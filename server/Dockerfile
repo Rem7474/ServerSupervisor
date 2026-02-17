@@ -10,7 +10,7 @@ RUN npm run build
 FROM golang:1.22-alpine AS server-builder
 RUN apk add --no-cache git
 WORKDIR /app
-COPY server/go.mod server/go.sum* ./
+COPY server/go.mod server/go.sum ./
 RUN go mod download
 COPY server/ .
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /serversupervisor ./cmd/server
