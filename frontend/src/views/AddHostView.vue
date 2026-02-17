@@ -44,7 +44,7 @@
 
         <div class="mt-4 bg-dark-900 rounded-lg p-4">
           <p class="text-sm text-gray-400 mb-2">Configuration agent :</p>
-          <pre class="text-xs text-gray-300">server_url: "http://{{ window.location.hostname }}:8080"
+          <pre class="text-xs text-gray-300">server_url: "http://{{ serverHostname }}:8080"
 api_key: "{{ result.api_key }}"
 report_interval: 30
 collect_docker: true
@@ -58,6 +58,11 @@ collect_apt: true</pre>
 <script setup>
 import { ref } from 'vue'
 import apiClient from '../api'
+
+const serverHostname =
+  typeof window !== 'undefined' && window.location?.hostname
+    ? window.location.hostname
+    : 'localhost'
 
 const form = ref({ hostname: '', ip_address: '', os: '' })
 const error = ref('')

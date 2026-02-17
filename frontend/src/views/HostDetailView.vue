@@ -54,11 +54,17 @@
             {{ h }}h
           </button>
         </div>
-        <Line v-if="cpuChartData" :data="cpuChartData" :options="chartOptions" class="h-48" />
+        <div class="h-48">
+          <Line v-if="cpuChartData" :data="cpuChartData" :options="chartOptions" class="h-full w-full" />
+          <div v-else class="h-full flex items-center justify-center text-sm text-gray-500">Aucune donnee</div>
+        </div>
       </div>
       <div class="card">
         <h3 class="text-lg font-semibold mb-4">Mémoire ({{ chartHours }}h)</h3>
-        <Line v-if="memChartData" :data="memChartData" :options="chartOptions" class="h-48" />
+        <div class="h-48">
+          <Line v-if="memChartData" :data="memChartData" :options="chartOptions" class="h-full w-full" />
+          <div v-else class="h-full flex items-center justify-center text-sm text-gray-500">Aucune donnee</div>
+        </div>
       </div>
     </div>
 
@@ -199,7 +205,13 @@ async function loadHistory(hours) {
   chartHours.value = hours
   try {
     const res = await apiClient.getMetricsHistory(hostId, hours)
-    metricsHistory.value = res.data
+    const history = Array.isArray(res.data) ? res.data : []
+    metricsHistory.value = history
+    if (!history.length) {
+      cpuChartData.value = null
+      memChartData.value = null
+      return
+    }
     buildCharts()
   } catch (e) {
     console.error('Failed to fetch metrics history:', e)
