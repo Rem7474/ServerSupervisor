@@ -1,0 +1,49 @@
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: supervisor
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-supervisor}
+      POSTGRES_DB: serversupervisor
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U supervisor"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ServerSupervisor Server (API + Frontend)
+  server:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${SERVER_PORT:-8080}:8080"
+    environment:
+      SERVER_PORT: "8080"
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: supervisor
+      DB_PASSWORD: ${DB_PASSWORD:-supervisor}
+      DB_NAME: serversupervisor
+      DB_SSLMODE: disable
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production-please}
+      ADMIN_USER: ${ADMIN_USER:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      GITHUB_POLL_INTERVAL: ${GITHUB_POLL_INTERVAL:-15m}
+      METRICS_RETENTION_DAYS: ${METRICS_RETENTION_DAYS:-30}
+      RATE_LIMIT_RPS: "100"
+      RATE_LIMIT_BURST: "200"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

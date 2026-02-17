@@ -1,0 +1,125 @@
+package sender
+
+import (
+	"bytes"
+	"crypto/tls"
+	"encoding/json"
+	"fmt"
+	"io"
+	"log"
+	"net/http"
+	"time"
+
+	"github.com/serversupervisor/agent/internal/config"
+)
+
+type Sender struct {
+	cfg    *config.Config
+	client *http.Client
+}
+
+type Report struct {
+	HostID    string      `json:"host_id"`
+	Metrics   interface{} `json:"metrics"`
+	Docker    interface{} `json:"docker"`
+	AptStatus interface{} `json:"apt_status"`
+	Timestamp time.Time   `json:"timestamp"`
+}
+
+type ReportResponse struct {
+	Status   string           `json:"status"`
+	Commands []PendingCommand `json:"commands"`
+}
+
+type PendingCommand struct {
+	ID      int64  `json:"id"`
+	Type    string `json:"type"`
+	Payload string `json:"payload"`
+}
+
+type CommandResult struct {
+	CommandID int64  `json:"command_id"`
+	Status    string `json:"status"`
+	Output    string `json:"output"`
+}
+
+func New(cfg *config.Config) *Sender {
+	transport := &http.Transport{
+		TLSClientConfig: &tls.Config{
+			InsecureSkipVerify: cfg.InsecureSkipVerify,
+		},
+	}
+
+	return &Sender{
+		cfg: cfg,
+		client: &http.Client{
+			Timeout:   30 * time.Second,
+			Transport: transport,
+		},
+	}
+}
+
+// SendReport sends a full report to the server and returns any pending commands
+func (s *Sender) SendReport(report *Report) (*ReportResponse, error) {
+	data, err := json.Marshal(report)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal report: %w", err)
+	}
+
+	req, err := http.NewRequest("POST", s.cfg.ServerURL+"/api/agent/report", bytes.NewReader(data))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-API-Key", s.cfg.APIKey)
+
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send report: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("server returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var response ReportResponse
+	if err := json.Unmarshal(body, &response); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	return &response, nil
+}
+
+// ReportCommandResult sends the result of a command execution back to the server
+func (s *Sender) ReportCommandResult(result *CommandResult) error {
+	data, err := json.Marshal(result)
+	if err != nil {
+		return fmt.Errorf("failed to marshal result: %w", err)
+	}
+
+	req, err := http.NewRequest("POST", s.cfg.ServerURL+"/api/agent/command/result", bytes.NewReader(data))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-API-Key", s.cfg.APIKey)
+
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to send command result: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("server returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	log.Printf("Command result for #%d reported successfully (status: %s)", result.CommandID, result.Status)
+	return nil
+}

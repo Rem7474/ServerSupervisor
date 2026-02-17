@@ -1,0 +1,15 @@
+# ServerSupervisor Agent Configuration
+server_url: "http://your-server:8080"
+api_key: "your-api-key-here"
+
+# Report interval in seconds
+report_interval: 30
+
+# Enable Docker container monitoring
+collect_docker: true
+
+# Enable APT update monitoring  
+collect_apt: true
+
+# Skip TLS verification (for self-signed certs)
+insecure_skip_verify: false
