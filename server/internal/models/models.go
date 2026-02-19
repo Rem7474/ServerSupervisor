@@ -8,9 +8,10 @@ import (
 
 type Host struct {
 	ID        string    `json:"id" db:"id"`
-	Hostname  string    `json:"hostname" db:"hostname"`
+	Name      string    `json:"name" db:"name"`           // User-defined name (e.g., "Prod Web Server")
+	Hostname  string    `json:"hostname" db:"hostname"`   // System hostname (auto-populated by agent)
 	IPAddress string    `json:"ip_address" db:"ip_address"`
-	OS        string    `json:"os" db:"os"`
+	OS        string    `json:"os" db:"os"`               // Auto-populated by agent
 	APIKey    string    `json:"-" db:"api_key"`
 	Status    string    `json:"status" db:"status"` // online, offline, warning
 	LastSeen  time.Time `json:"last_seen" db:"last_seen"`
@@ -19,9 +20,8 @@ type Host struct {
 }
 
 type HostRegistration struct {
-	Hostname  string `json:"hostname" binding:"required"`
+	Name      string `json:"name" binding:"required"`
 	IPAddress string `json:"ip_address" binding:"required"`
-	OS        string `json:"os" binding:"required"`
 }
 
 // ========== System Metrics ==========

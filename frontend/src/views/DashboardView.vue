@@ -38,7 +38,10 @@
       <router-link v-for="host in hosts" :key="host.id" :to="`/hosts/${host.id}`"
         class="card hover:border-primary-500/50 transition-colors cursor-pointer">
         <div class="flex items-center justify-between mb-4">
-          <h3 class="text-lg font-semibold">{{ host.hostname }}</h3>
+          <div>
+            <h3 class="text-lg font-semibold">{{ host.name }}</h3>
+            <p class="text-xs text-gray-500">{{ host.hostname || 'Non connecté' }}</p>
+          </div>
           <span :class="host.status === 'online' ? 'badge-online' : 'badge-offline'">
             {{ host.status === 'online' ? 'En ligne' : 'Hors ligne' }}
           </span>

@@ -52,7 +52,8 @@ func (db *DB) migrate() error {
 		)`,
 		`CREATE TABLE IF NOT EXISTS hosts (
 			id VARCHAR(64) PRIMARY KEY,
-			hostname VARCHAR(255) NOT NULL,
+			name VARCHAR(255) NOT NULL,
+			hostname VARCHAR(255) NOT NULL DEFAULT '',
 			ip_address VARCHAR(45) NOT NULL,
 			os VARCHAR(255) NOT NULL DEFAULT '',
 			api_key VARCHAR(255) NOT NULL,
@@ -144,6 +145,8 @@ func (db *DB) migrate() error {
 			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 			UNIQUE(owner, repo)
 		)`,
+		// Migration: Add name column to hosts if it doesn't exist
+		`ALTER TABLE IF EXISTS hosts ADD COLUMN IF NOT EXISTS name VARCHAR(255) NOT NULL DEFAULT ''`,
 	}
 
 	for _, m := range migrations {

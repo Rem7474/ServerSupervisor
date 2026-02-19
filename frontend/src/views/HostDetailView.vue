@@ -7,12 +7,21 @@
         </svg>
       </router-link>
       <div>
-        <h1 class="text-2xl font-bold">{{ host?.hostname || 'Chargement...' }}</h1>
-        <p class="text-gray-400 mt-1">{{ host?.ip_address }} &mdash; {{ host?.os }}</p>
+        <h1 class="text-2xl font-bold">{{ host?.name || 'Chargement...' }}</h1>
+        <p class="text-gray-400 mt-1">{{ host?.hostname }} &mdash; {{ host?.os }}</p>
+        <p class="text-gray-500 text-sm mt-1">{{ host?.ip_address }}</p>
       </div>
-      <span v-if="host" :class="host.status === 'online' ? 'badge-online' : 'badge-offline'" class="ml-auto">
-        {{ host.status === 'online' ? 'En ligne' : 'Hors ligne' }}
-      </span>
+      <div class="ml-auto flex items-center gap-3">
+        <button @click="deleteHost" class="btn-danger text-sm px-3 py-2">
+          <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+          </svg>
+          Supprimer
+        </button>
+        <span v-if="host" :class="host.status === 'online' ? 'badge-online' : 'badge-offline'">
+          {{ host.status === 'online' ? 'En ligne' : 'Hors ligne' }}
+        </span>
+      </div>
     </div>
 
     <!-- Metrics Cards -->
@@ -153,7 +162,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { Line } from 'vue-chartjs'
 import { Chart as ChartJS, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip } from 'chart.js'
 import apiClient from '../api'
@@ -166,6 +175,7 @@ dayjs.extend(relativeTime)
 dayjs.locale('fr')
 
 const route = useRoute()
+const router = useRouter()
 const hostId = route.params.id
 
 const host = ref(null)
@@ -284,6 +294,19 @@ function memColor(pct) {
   if (pct > 90) return 'text-red-400'
   if (pct > 75) return 'text-yellow-400'
   return 'text-emerald-400'
+}
+
+async function deleteHost() {
+  if (!confirm(`Êtes-vous sûr de vouloir supprimer ${host.value?.hostname} ? Cette action est irréversible.`)) {
+    return
+  }
+  try {
+    await apiClient.deleteHost(hostId)
+    alert(`Hôte ${host.value?.hostname} supprimé avec succès.`)
+    router.push('/')
+  } catch (e) {
+    alert('Erreur: ' + (e.response?.data?.error || e.message))
+  }
 }
 
 onMounted(() => {

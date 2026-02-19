@@ -12,21 +12,19 @@
     <div class="card max-w-lg">
       <form @submit.prevent="handleSubmit" class="space-y-6">
         <div>
-          <label class="block text-sm font-medium text-gray-300 mb-2">Hostname</label>
-          <input v-model="form.hostname" type="text" class="input-field" required placeholder="my-server-01" />
+          <label class="block text-sm font-medium text-gray-300 mb-2">Nom (alias personnel)</label>
+          <input v-model="form.name" type="text" class="input-field" required placeholder="Prod Web Server" />
         </div>
         <div>
           <label class="block text-sm font-medium text-gray-300 mb-2">Adresse IP</label>
           <input v-model="form.ip_address" type="text" class="input-field" required placeholder="192.168.1.100" />
         </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-300 mb-2">Système d'exploitation</label>
-          <input v-model="form.os" type="text" class="input-field" required placeholder="Ubuntu 22.04 LTS" />
-        </div>
 
         <div v-if="error" class="bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-red-400 text-sm">
           {{ error }}
         </div>
+
+        <p class="text-xs text-gray-400">OS et Hostname seront récupérés automatiquement lors de la première connexion de l'agent.</p>
 
         <button type="submit" class="btn-primary w-full" :disabled="loading">
           {{ loading ? 'Enregistrement...' : 'Enregistrer l\'hôte' }}
@@ -64,7 +62,7 @@ const serverHostname =
     ? window.location.hostname
     : 'localhost'
 
-const form = ref({ hostname: '', ip_address: '', os: '' })
+const form = ref({ name: '', ip_address: '' })
 const error = ref('')
 const loading = ref(false)
 const result = ref(null)
