@@ -2,9 +2,9 @@
   <div class="page">
     <!-- Sidebar + Main -->
     <div v-if="auth.isAuthenticated">
-      <aside class="navbar navbar-vertical navbar-expand-lg" data-bs-theme="dark">
-        <div class="container-fluid">
-          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#sidebar-menu">
+      <header class="navbar navbar-expand-md navbar-dark">
+        <div class="container-xl">
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar-menu">
             <span class="navbar-toggler-icon"></span>
           </button>
           <router-link to="/" class="navbar-brand navbar-brand-autodark">
@@ -14,8 +14,8 @@
             ServerSupervisor
           </router-link>
 
-          <div class="collapse navbar-collapse" id="sidebar-menu">
-            <ul class="navbar-nav pt-lg-3">
+          <div class="collapse navbar-collapse" id="navbar-menu">
+            <ul class="navbar-nav">
               <li class="nav-item">
                 <router-link to="/" class="nav-link" active-class="active">
                   <span class="nav-link-icon">
@@ -58,25 +58,27 @@
               </li>
             </ul>
 
-            <div class="mt-auto">
-              <div class="nav-item">
-                <div class="nav-link">
-                  <div class="d-flex align-items-center w-100">
-                    <span class="avatar avatar-sm bg-secondary-lt me-2">{{ auth.username?.slice(0, 2).toUpperCase() }}</span>
-                    <div class="flex-fill">
-                      <div class="fw-semibold">{{ auth.username }}</div>
-                      <div class="text-secondary small">Connecté</div>
-                    </div>
-                    <button @click="handleLogout" class="btn btn-outline-danger btn-sm ms-auto">
-                      Déconnexion
-                    </button>
-                  </div>
-                </div>
+            <div class="ms-auto d-flex align-items-center position-relative">
+              <button class="btn btn-outline-secondary d-flex align-items-center" @click="toggleUserMenu">
+                <span class="avatar avatar-sm bg-secondary-lt me-2">
+                  {{ auth.username?.slice(0, 2).toUpperCase() }}
+                </span>
+                <span class="me-2">{{ auth.username }}</span>
+                <span class="caret"></span>
+              </button>
+
+              <div v-if="userMenuOpen" class="dropdown-menu dropdown-menu-end show mt-2">
+                <div class="dropdown-header">Compte</div>
+                <button class="dropdown-item" @click="openChangePassword">
+                  Changer le mot de passe
+                </button>
+                <div class="dropdown-divider"></div>
+                <button class="dropdown-item text-danger" @click="handleLogout">Deconnexion</button>
               </div>
             </div>
           </div>
         </div>
-      </aside>
+      </header>
 
       <div class="page-wrapper">
         <div class="page-body">
@@ -85,6 +87,47 @@
           </div>
         </div>
       </div>
+
+      <div v-if="showPasswordModal" class="modal modal-blur fade show" tabindex="-1" role="dialog" aria-modal="true" style="display: block;">
+        <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
+          <div class="modal-content">
+            <form @submit.prevent="submitChangePassword">
+              <div class="modal-header">
+                <h3 class="modal-title">Changer le mot de passe</h3>
+                <button type="button" class="btn-close" @click="closeChangePassword" aria-label="Fermer"></button>
+              </div>
+              <div class="modal-body">
+                <div class="mb-3">
+                  <label class="form-label">Mot de passe actuel</label>
+                  <input v-model="passwordForm.current" type="password" class="form-control" required />
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">Nouveau mot de passe</label>
+                  <input v-model="passwordForm.next" type="password" class="form-control" required />
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">Confirmer le nouveau mot de passe</label>
+                  <input v-model="passwordForm.confirm" type="password" class="form-control" required />
+                </div>
+
+                <div v-if="passwordError" class="alert alert-danger" role="alert">
+                  {{ passwordError }}
+                </div>
+                <div v-if="passwordSuccess" class="alert alert-success" role="alert">
+                  {{ passwordSuccess }}
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" @click="closeChangePassword" :disabled="passwordLoading">Annuler</button>
+                <button type="submit" class="btn btn-primary" :disabled="passwordLoading">
+                  {{ passwordLoading ? 'Enregistrement...' : 'Mettre a jour' }}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+      <div v-if="showPasswordModal" class="modal-backdrop fade show" @click="closeChangePassword"></div>
     </div>
 
     <!-- Login page (no sidebar) -->
@@ -93,14 +136,64 @@
 </template>
 
 <script setup>
+import { ref } from 'vue'
 import { useAuthStore } from './stores/auth'
 import { useRouter } from 'vue-router'
+import apiClient from './api'
 
 const auth = useAuthStore()
 const router = useRouter()
+const userMenuOpen = ref(false)
+const showPasswordModal = ref(false)
+const passwordForm = ref({ current: '', next: '', confirm: '' })
+const passwordError = ref('')
+const passwordSuccess = ref('')
+const passwordLoading = ref(false)
 
 function handleLogout() {
+  userMenuOpen.value = false
   auth.logout()
   router.push('/login')
+}
+
+function toggleUserMenu() {
+  userMenuOpen.value = !userMenuOpen.value
+}
+
+function openChangePassword() {
+  passwordForm.value = { current: '', next: '', confirm: '' }
+  passwordError.value = ''
+  passwordSuccess.value = ''
+  showPasswordModal.value = true
+  userMenuOpen.value = false
+}
+
+function closeChangePassword() {
+  showPasswordModal.value = false
+}
+
+async function submitChangePassword() {
+  passwordError.value = ''
+  passwordSuccess.value = ''
+
+  if (passwordForm.value.next.length < 8) {
+    passwordError.value = 'Le mot de passe doit faire au moins 8 caracteres.'
+    return
+  }
+  if (passwordForm.value.next !== passwordForm.value.confirm) {
+    passwordError.value = 'La confirmation ne correspond pas.'
+    return
+  }
+
+  passwordLoading.value = true
+  try {
+    await apiClient.changePassword(passwordForm.value.current, passwordForm.value.next)
+    passwordSuccess.value = 'Mot de passe mis a jour.'
+    passwordForm.value = { current: '', next: '', confirm: '' }
+  } catch (e) {
+    passwordError.value = e.response?.data?.error || 'Erreur lors de la mise a jour.'
+  } finally {
+    passwordLoading.value = false
+  }
 }
 </script>

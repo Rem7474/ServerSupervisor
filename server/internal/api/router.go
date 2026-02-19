@@ -41,6 +41,9 @@ func SetupRouter(db *database.DB, cfg *config.Config) *gin.Engine {
 	api := r.Group("/api/v1")
 	api.Use(JWTMiddleware(cfg))
 	{
+		// Auth
+		api.POST("/auth/change-password", authH.ChangePassword)
+
 		// Hosts
 		api.GET("/hosts", hostH.ListHosts)
 		api.POST("/hosts", hostH.RegisterHost)

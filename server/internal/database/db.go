@@ -181,6 +181,14 @@ func (db *DB) GetUserByUsername(username string) (*models.User, error) {
 	return &u, nil
 }
 
+func (db *DB) UpdateUserPassword(username, passwordHash string) error {
+	_, err := db.conn.Exec(
+		`UPDATE users SET password_hash = $1 WHERE username = $2`,
+		passwordHash, username,
+	)
+	return err
+}
+
 // ========== Hosts ==========
 
 func (db *DB) RegisterHost(host *models.Host) error {

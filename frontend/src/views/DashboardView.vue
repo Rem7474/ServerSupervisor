@@ -99,7 +99,6 @@
               <th style="width: 1%"></th>
               <th>Nom</th>
               <th>Etat</th>
-              <th>Latence</th>
               <th>IP / OS</th>
               <th>CPU</th>
               <th>RAM</th>
@@ -126,11 +125,6 @@
               <td>
                 <span :class="host.status === 'online' ? 'badge bg-green-lt text-green' : host.status === 'warning' ? 'badge bg-yellow-lt text-yellow' : 'badge bg-red-lt text-red'">
                   {{ host.status === 'online' ? 'En ligne' : host.status === 'warning' ? 'Warning' : 'Hors ligne' }}
-                </span>
-              </td>
-              <td>
-                <span :class="latencyClass(host.last_seen)">
-                  {{ formatLatency(host.last_seen) }}
                 </span>
               </td>
               <td>
@@ -363,23 +357,6 @@ function memColor(pct) {
   return 'text-green'
 }
 
-function formatLatency(lastSeen) {
-  if (!lastSeen) return '-'
-  const seconds = dayjs().diff(dayjs(lastSeen), 'second')
-  if (seconds < 0) return '-'
-  if (seconds < 60) return `${seconds}s`
-  const minutes = Math.floor(seconds / 60)
-  return `${minutes}m`
-}
-
-function latencyClass(lastSeen) {
-  if (!lastSeen) return 'text-secondary'
-  const seconds = dayjs().diff(dayjs(lastSeen), 'second')
-  if (seconds < 0) return 'text-secondary'
-  if (seconds <= 60) return 'text-green'
-  if (seconds <= 180) return 'text-yellow'
-  return 'text-red'
-}
 
 onMounted(() => {
   fetchData()

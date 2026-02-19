@@ -31,6 +31,8 @@ api.interceptors.response.use(
 export default {
   // Auth
   login: (username, password) => api.post('/auth/login', { username, password }),
+  changePassword: (currentPassword, newPassword) =>
+    api.post('/v1/auth/change-password', { current_password: currentPassword, new_password: newPassword }),
 
   // Hosts
   getHosts: () => api.get('/v1/hosts'),
