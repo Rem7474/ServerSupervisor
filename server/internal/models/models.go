@@ -8,10 +8,10 @@ import (
 
 type Host struct {
 	ID        string    `json:"id" db:"id"`
-	Name      string    `json:"name" db:"name"`           // User-defined name (e.g., "Prod Web Server")
-	Hostname  string    `json:"hostname" db:"hostname"`   // System hostname (auto-populated by agent)
+	Name      string    `json:"name" db:"name"`         // User-defined name (e.g., "Prod Web Server")
+	Hostname  string    `json:"hostname" db:"hostname"` // System hostname (auto-populated by agent)
 	IPAddress string    `json:"ip_address" db:"ip_address"`
-	OS        string    `json:"os" db:"os"`               // Auto-populated by agent
+	OS        string    `json:"os" db:"os"` // Auto-populated by agent
 	APIKey    string    `json:"-" db:"api_key"`
 	Status    string    `json:"status" db:"status"` // online, offline, warning
 	LastSeen  time.Time `json:"last_seen" db:"last_seen"`

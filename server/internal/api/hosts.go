@@ -33,9 +33,9 @@ func (h *HostHandler) RegisterHost(c *gin.Context) {
 	host := &models.Host{
 		ID:        hostID,
 		Name:      req.Name,
-		Hostname:  "",           // Will be populated by agent
+		Hostname:  "", // Will be populated by agent
 		IPAddress: req.IPAddress,
-		OS:        "",           // Will be populated by agent
+		OS:        "", // Will be populated by agent
 		APIKey:    apiKey,
 		Status:    "offline",
 	}
