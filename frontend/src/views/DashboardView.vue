@@ -1,16 +1,28 @@
 <template>
   <div>
-    <div class="page-header d-flex align-items-center justify-content-between mb-4">
+    <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
       <div>
         <h2 class="page-title">Dashboard</h2>
         <div class="text-secondary">Vue d'ensemble de l'infrastructure</div>
       </div>
-      <router-link to="/hosts/new" class="btn btn-primary">
-        <svg class="icon me-2" width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
-        </svg>
-        Ajouter un hote
-      </router-link>
+      <div class="d-flex align-items-center gap-2">
+        <div class="btn-list">
+          <button class="btn btn-outline-secondary" @click="selectAllFiltered">Tout selectionner</button>
+          <button class="btn btn-outline-secondary" @click="clearSelection" :disabled="selectedCount === 0">Vider</button>
+          <button class="btn btn-outline-secondary" @click="sendBulkApt('update')" :disabled="selectedCount === 0">
+            apt update ({{ selectedCount }})
+          </button>
+          <button class="btn btn-primary" @click="sendBulkApt('upgrade')" :disabled="selectedCount === 0">
+            apt upgrade ({{ selectedCount }})
+          </button>
+        </div>
+        <router-link to="/hosts/new" class="btn btn-primary">
+          <svg class="icon me-2" width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+          </svg>
+          Ajouter un hote
+        </router-link>
+      </div>
     </div>
 
     <div class="row row-cards mb-4">
@@ -75,87 +87,81 @@
               {{ sortDir === 'asc' ? 'Asc' : 'Desc' }}
             </button>
           </div>
-          <div class="col-12">
-            <div class="d-flex flex-wrap gap-2">
-              <button class="btn btn-outline-secondary" @click="selectAllFiltered">Tout selectionner</button>
-              <button class="btn btn-outline-secondary" @click="clearSelection" :disabled="selectedCount === 0">Vider</button>
-              <button class="btn btn-outline-secondary" @click="sendBulkApt('update')" :disabled="selectedCount === 0">
-                apt update ({{ selectedCount }})
-              </button>
-              <button class="btn btn-primary" @click="sendBulkApt('upgrade')" :disabled="selectedCount === 0">
-                apt upgrade ({{ selectedCount }})
-              </button>
-            </div>
-          </div>
         </div>
       </div>
     </div>
 
-    <div class="row row-cards mb-4">
-      <div v-for="host in sortedHosts" :key="host.id" class="col-md-6 col-xl-4">
-        <router-link :to="`/hosts/${host.id}`" class="text-decoration-none text-reset">
-          <div class="card" :class="isSelected(host.id) ? 'border-primary' : ''">
-            <div class="card-body">
-              <div class="d-flex align-items-start justify-content-between mb-3">
-                <div class="d-flex align-items-start gap-3">
-                  <div class="form-check mt-1">
-                    <input
-                      class="form-check-input"
-                      type="checkbox"
-                      :checked="isSelected(host.id)"
-                      @click.stop.prevent="toggleHostSelection(host.id)"
-                    />
-                  </div>
-                  <div>
-                    <div class="fw-semibold">{{ host.name || host.hostname || 'Sans nom' }}</div>
-                    <div class="text-secondary small">{{ host.hostname || 'Non connecte' }}</div>
-                  </div>
-                </div>
+    <div class="card">
+      <div class="table-responsive">
+        <table class="table table-vcenter card-table">
+          <thead>
+            <tr>
+              <th style="width: 1%"></th>
+              <th>Nom</th>
+              <th>Etat</th>
+              <th>Latence</th>
+              <th>IP / OS</th>
+              <th>CPU</th>
+              <th>RAM</th>
+              <th>Uptime</th>
+              <th>Derniere activite</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="host in sortedHosts" :key="host.id">
+              <td>
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  :checked="isSelected(host.id)"
+                  @click.stop.prevent="toggleHostSelection(host.id)"
+                />
+              </td>
+              <td>
+                <router-link :to="`/hosts/${host.id}`" class="fw-semibold text-decoration-none">
+                  {{ host.name || host.hostname || 'Sans nom' }}
+                </router-link>
+                <div class="text-secondary small">{{ host.hostname || 'Non connecte' }}</div>
+              </td>
+              <td>
                 <span :class="host.status === 'online' ? 'badge bg-green-lt text-green' : host.status === 'warning' ? 'badge bg-yellow-lt text-yellow' : 'badge bg-red-lt text-red'">
                   {{ host.status === 'online' ? 'En ligne' : host.status === 'warning' ? 'Warning' : 'Hors ligne' }}
                 </span>
-              </div>
+              </td>
+              <td>
+                <span :class="latencyClass(host.last_seen)">
+                  {{ formatLatency(host.last_seen) }}
+                </span>
+              </td>
+              <td>
+                <div class="text-body">{{ host.ip_address }}</div>
+                <div class="text-secondary small">{{ host.os || 'N/A' }}</div>
+              </td>
+              <td>
+                <span :class="cpuColor(hostMetrics[host.id]?.cpu_usage_percent)">
+                  {{ hostMetrics[host.id]?.cpu_usage_percent?.toFixed(1) ?? '-' }}
+                </span>
+              </td>
+              <td>
+                <span :class="memColor(hostMetrics[host.id]?.memory_percent)">
+                  {{ hostMetrics[host.id]?.memory_percent?.toFixed(1) ?? '-' }}
+                </span>
+              </td>
+              <td>
+                {{ hostMetrics[host.id] ? formatUptime(hostMetrics[host.id].uptime) : '-' }}
+              </td>
+              <td>{{ formatDate(host.last_seen) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
 
-              <div class="d-flex justify-content-between small text-secondary mb-2">
-                <span>IP</span>
-                <span class="text-body">{{ host.ip_address }}</span>
-              </div>
-              <div class="d-flex justify-content-between small text-secondary mb-2">
-                <span>OS</span>
-                <span class="text-body">{{ host.os || 'N/A' }}</span>
-              </div>
-              <div class="d-flex justify-content-between small text-secondary">
-                <span>Derniere activite</span>
-                <span class="text-body">{{ formatDate(host.last_seen) }}</span>
-              </div>
-
-              <div v-if="hostMetrics[host.id]" class="mt-3 pt-3 border-top">
-                <div class="row text-center">
-                  <div class="col">
-                    <div class="fw-semibold" :class="cpuColor(hostMetrics[host.id].cpu_usage_percent)">
-                      {{ hostMetrics[host.id].cpu_usage_percent?.toFixed(1) }}%
-                    </div>
-                    <div class="text-secondary small">CPU</div>
-                  </div>
-                  <div class="col">
-                    <div class="fw-semibold" :class="memColor(hostMetrics[host.id].memory_percent)">
-                      {{ hostMetrics[host.id].memory_percent?.toFixed(1) }}%
-                    </div>
-                    <div class="text-secondary small">RAM</div>
-                  </div>
-                  <div class="col">
-                    <div class="fw-semibold text-body">{{ formatUptime(hostMetrics[host.id].uptime) }}</div>
-                    <div class="text-secondary small">Uptime</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </router-link>
+      <div v-if="loading" class="text-center py-4">
+        <div class="spinner-border" role="status"></div>
       </div>
     </div>
 
-    <div v-if="versionComparisons.length > 0" class="card">
+    <div v-if="versionComparisons.length > 0" class="card mt-4">
       <div class="card-header">
         <h3 class="card-title">Versions & Mises a jour</h3>
       </div>
@@ -189,10 +195,6 @@
           </tbody>
         </table>
       </div>
-    </div>
-
-    <div v-if="loading" class="text-center py-5">
-      <div class="spinner-border" role="status"></div>
     </div>
   </div>
 </template>
@@ -359,6 +361,24 @@ function memColor(pct) {
   if (pct > 90) return 'text-red'
   if (pct > 75) return 'text-yellow'
   return 'text-green'
+}
+
+function formatLatency(lastSeen) {
+  if (!lastSeen) return '-'
+  const seconds = dayjs().diff(dayjs(lastSeen), 'second')
+  if (seconds < 0) return '-'
+  if (seconds < 60) return `${seconds}s`
+  const minutes = Math.floor(seconds / 60)
+  return `${minutes}m`
+}
+
+function latencyClass(lastSeen) {
+  if (!lastSeen) return 'text-secondary'
+  const seconds = dayjs().diff(dayjs(lastSeen), 'second')
+  if (seconds < 0) return 'text-secondary'
+  if (seconds <= 60) return 'text-green'
+  if (seconds <= 180) return 'text-yellow'
+  return 'text-red'
 }
 
 onMounted(() => {
