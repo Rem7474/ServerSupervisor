@@ -76,6 +76,30 @@ func (h *HostHandler) GetHost(c *gin.Context) {
 	c.JSON(http.StatusOK, host)
 }
 
+// UpdateHost updates editable host fields
+func (h *HostHandler) UpdateHost(c *gin.Context) {
+	hostID := c.Param("id")
+	var req models.HostUpdate
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if req.Name == nil && req.Hostname == nil && req.IPAddress == nil && req.OS == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "no fields to update"})
+		return
+	}
+	if err := h.db.UpdateHost(hostID, &req); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update host"})
+		return
+	}
+	updated, err := h.db.GetHost(hostID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch updated host"})
+		return
+	}
+	c.JSON(http.StatusOK, updated)
+}
+
 // DeleteHost removes a host
 func (h *HostHandler) DeleteHost(c *gin.Context) {
 	hostID := c.Param("id")

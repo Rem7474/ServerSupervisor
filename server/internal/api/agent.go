@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -36,6 +37,15 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 
 	// Update host status
 	h.db.UpdateHostStatus(hostID, "online")
+
+	// Update host info from agent report
+	update := models.HostUpdate{
+		Hostname: stringPtrIfNotEmpty(report.Metrics.Hostname),
+		OS:       stringPtrIfNotEmpty(report.Metrics.OS),
+	}
+	if update.Hostname != nil || update.OS != nil {
+		_ = h.db.UpdateHost(hostID, &update)
+	}
 
 	// Store metrics
 	report.Metrics.HostID = hostID
@@ -108,4 +118,11 @@ func (h *AgentHandler) GetMetricsHistory(c *gin.Context) {
 		metrics = []models.SystemMetrics{}
 	}
 	c.JSON(http.StatusOK, metrics)
+}
+
+func stringPtrIfNotEmpty(value string) *string {
+	if strings.TrimSpace(value) == "" {
+		return nil
+	}
+	return &value
 }

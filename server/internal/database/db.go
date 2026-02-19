@@ -184,10 +184,14 @@ func (db *DB) GetUserByUsername(username string) (*models.User, error) {
 // ========== Hosts ==========
 
 func (db *DB) RegisterHost(host *models.Host) error {
+	lastSeen := host.LastSeen
+	if lastSeen.IsZero() {
+		lastSeen = time.Now()
+	}
 	_, err := db.conn.Exec(
-		`INSERT INTO hosts (id, hostname, ip_address, os, api_key, status, last_seen)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-		host.ID, host.Hostname, host.IPAddress, host.OS, host.APIKey, host.Status, host.LastSeen,
+		`INSERT INTO hosts (id, name, hostname, ip_address, os, api_key, status, last_seen)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+		host.ID, host.Name, host.Hostname, host.IPAddress, host.OS, host.APIKey, host.Status, lastSeen,
 	)
 	return err
 }
@@ -195,9 +199,9 @@ func (db *DB) RegisterHost(host *models.Host) error {
 func (db *DB) GetHost(id string) (*models.Host, error) {
 	var h models.Host
 	err := db.conn.QueryRow(
-		`SELECT id, hostname, ip_address, os, api_key, status, last_seen, created_at, updated_at
+		`SELECT id, name, hostname, ip_address, os, api_key, status, last_seen, created_at, updated_at
 		 FROM hosts WHERE id = $1`, id,
-	).Scan(&h.ID, &h.Hostname, &h.IPAddress, &h.OS, &h.APIKey, &h.Status, &h.LastSeen, &h.CreatedAt, &h.UpdatedAt)
+	).Scan(&h.ID, &h.Name, &h.Hostname, &h.IPAddress, &h.OS, &h.APIKey, &h.Status, &h.LastSeen, &h.CreatedAt, &h.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -207,9 +211,9 @@ func (db *DB) GetHost(id string) (*models.Host, error) {
 func (db *DB) GetHostByAPIKey(apiKey string) (*models.Host, error) {
 	var h models.Host
 	err := db.conn.QueryRow(
-		`SELECT id, hostname, ip_address, os, api_key, status, last_seen, created_at, updated_at
+		`SELECT id, name, hostname, ip_address, os, api_key, status, last_seen, created_at, updated_at
 		 FROM hosts WHERE api_key = $1`, apiKey,
-	).Scan(&h.ID, &h.Hostname, &h.IPAddress, &h.OS, &h.APIKey, &h.Status, &h.LastSeen, &h.CreatedAt, &h.UpdatedAt)
+	).Scan(&h.ID, &h.Name, &h.Hostname, &h.IPAddress, &h.OS, &h.APIKey, &h.Status, &h.LastSeen, &h.CreatedAt, &h.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -218,8 +222,8 @@ func (db *DB) GetHostByAPIKey(apiKey string) (*models.Host, error) {
 
 func (db *DB) GetAllHosts() ([]models.Host, error) {
 	rows, err := db.conn.Query(
-		`SELECT id, hostname, ip_address, os, status, last_seen, created_at, updated_at
-		 FROM hosts ORDER BY hostname`,
+		`SELECT id, name, hostname, ip_address, os, status, last_seen, created_at, updated_at
+		 FROM hosts ORDER BY name`,
 	)
 	if err != nil {
 		return nil, err
@@ -229,7 +233,7 @@ func (db *DB) GetAllHosts() ([]models.Host, error) {
 	var hosts []models.Host
 	for rows.Next() {
 		var h models.Host
-		if err := rows.Scan(&h.ID, &h.Hostname, &h.IPAddress, &h.OS, &h.Status, &h.LastSeen, &h.CreatedAt, &h.UpdatedAt); err != nil {
+		if err := rows.Scan(&h.ID, &h.Name, &h.Hostname, &h.IPAddress, &h.OS, &h.Status, &h.LastSeen, &h.CreatedAt, &h.UpdatedAt); err != nil {
 			return nil, err
 		}
 		hosts = append(hosts, h)
@@ -241,6 +245,20 @@ func (db *DB) UpdateHostStatus(id, status string) error {
 	_, err := db.conn.Exec(
 		`UPDATE hosts SET status = $1, last_seen = NOW(), updated_at = NOW() WHERE id = $2`,
 		status, id,
+	)
+	return err
+}
+
+func (db *DB) UpdateHost(id string, update *models.HostUpdate) error {
+	_, err := db.conn.Exec(
+		`UPDATE hosts SET
+			name = COALESCE($1, name),
+			hostname = COALESCE($2, hostname),
+			ip_address = COALESCE($3, ip_address),
+			os = COALESCE($4, os),
+			updated_at = NOW()
+		WHERE id = $5`,
+		update.Name, update.Hostname, update.IPAddress, update.OS, id,
 	)
 	return err
 }

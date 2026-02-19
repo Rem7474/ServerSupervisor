@@ -1,126 +1,189 @@
 <template>
   <div>
-    <div class="flex items-center justify-between mb-8">
+    <div class="page-header d-flex align-items-center justify-content-between mb-4">
       <div>
-        <h1 class="text-2xl font-bold">Dashboard</h1>
-        <p class="text-gray-400 mt-1">Vue d'ensemble de l'infrastructure</p>
+        <h2 class="page-title">Dashboard</h2>
+        <div class="text-secondary">Vue d'ensemble de l'infrastructure</div>
       </div>
-      <router-link to="/hosts/new" class="btn-primary flex items-center gap-2">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <router-link to="/hosts/new" class="btn btn-primary">
+        <svg class="icon me-2" width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
         </svg>
-        Ajouter un hôte
+        Ajouter un hote
       </router-link>
     </div>
 
-    <!-- Summary Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-      <div class="stat-card">
-        <div class="text-3xl font-bold text-primary-400">{{ hosts.length }}</div>
-        <div class="text-gray-400 mt-1">Hôtes</div>
+    <div class="row row-cards mb-4">
+      <div class="col-sm-6 col-lg-3">
+        <div class="card card-sm">
+          <div class="card-body">
+            <div class="subheader">Hotes</div>
+            <div class="h1 mb-0">{{ hosts.length }}</div>
+          </div>
+        </div>
       </div>
-      <div class="stat-card">
-        <div class="text-3xl font-bold text-emerald-400">{{ onlineCount }}</div>
-        <div class="text-gray-400 mt-1">En ligne</div>
+      <div class="col-sm-6 col-lg-3">
+        <div class="card card-sm">
+          <div class="card-body">
+            <div class="subheader">En ligne</div>
+            <div class="h1 mb-0 text-green">{{ onlineCount }}</div>
+          </div>
+        </div>
       </div>
-      <div class="stat-card">
-        <div class="text-3xl font-bold text-red-400">{{ offlineCount }}</div>
-        <div class="text-gray-400 mt-1">Hors ligne</div>
+      <div class="col-sm-6 col-lg-3">
+        <div class="card card-sm">
+          <div class="card-body">
+            <div class="subheader">Hors ligne</div>
+            <div class="h1 mb-0 text-red">{{ offlineCount }}</div>
+          </div>
+        </div>
       </div>
-      <div class="stat-card">
-        <div class="text-3xl font-bold text-yellow-400">{{ outdatedVersions }}</div>
-        <div class="text-gray-400 mt-1">Mises à jour dispo</div>
+      <div class="col-sm-6 col-lg-3">
+        <div class="card card-sm">
+          <div class="card-body">
+            <div class="subheader">Mises a jour dispo</div>
+            <div class="h1 mb-0 text-yellow">{{ outdatedVersions }}</div>
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- Hosts Grid -->
-    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 mb-8">
-      <router-link v-for="host in hosts" :key="host.id" :to="`/hosts/${host.id}`"
-        class="card hover:border-primary-500/50 transition-colors cursor-pointer">
-        <div class="flex items-center justify-between mb-4">
-          <div>
-            <h3 class="text-lg font-semibold">{{ host.name }}</h3>
-            <p class="text-xs text-gray-500">{{ host.hostname || 'Non connecté' }}</p>
+    <div class="card mb-4">
+      <div class="card-body">
+        <div class="row g-3 align-items-center">
+          <div class="col-12 col-lg">
+            <input v-model="searchQuery" type="text" class="form-control" placeholder="Rechercher un hote..." />
           </div>
-          <span :class="host.status === 'online' ? 'badge-online' : 'badge-offline'">
-            {{ host.status === 'online' ? 'En ligne' : 'Hors ligne' }}
-          </span>
-        </div>
-
-        <div class="space-y-3">
-          <div class="flex justify-between text-sm">
-            <span class="text-gray-400">IP</span>
-            <span>{{ host.ip_address }}</span>
+          <div class="col-12 col-md-4 col-lg-2">
+            <select v-model="statusFilter" class="form-select">
+              <option value="all">Tous</option>
+              <option value="online">En ligne</option>
+              <option value="offline">Hors ligne</option>
+              <option value="warning">Warning</option>
+            </select>
           </div>
-          <div class="flex justify-between text-sm">
-            <span class="text-gray-400">OS</span>
-            <span>{{ host.os || 'N/A' }}</span>
+          <div class="col-12 col-md-4 col-lg-3">
+            <select v-model="sortKey" class="form-select">
+              <option value="name">Trier par nom</option>
+              <option value="status">Trier par statut</option>
+              <option value="cpu">Trier par CPU</option>
+              <option value="last_seen">Trier par derniere activite</option>
+            </select>
           </div>
-          <div class="flex justify-between text-sm">
-            <span class="text-gray-400">Dernière activité</span>
-            <span>{{ formatDate(host.last_seen) }}</span>
+          <div class="col-12 col-md-4 col-lg-2">
+            <button class="btn btn-outline-secondary w-100" @click="sortDir = sortDir === 'asc' ? 'desc' : 'asc'">
+              {{ sortDir === 'asc' ? 'Asc' : 'Desc' }}
+            </button>
           </div>
-        </div>
-
-        <!-- Quick metrics if available -->
-        <div v-if="hostMetrics[host.id]" class="mt-4 pt-4 border-t border-dark-700">
-          <div class="grid grid-cols-3 gap-3">
-            <div class="text-center">
-              <div class="text-sm font-medium" :class="cpuColor(hostMetrics[host.id].cpu_usage_percent)">
-                {{ hostMetrics[host.id].cpu_usage_percent?.toFixed(1) }}%
-              </div>
-              <div class="text-xs text-gray-500">CPU</div>
-            </div>
-            <div class="text-center">
-              <div class="text-sm font-medium" :class="memColor(hostMetrics[host.id].memory_percent)">
-                {{ hostMetrics[host.id].memory_percent?.toFixed(1) }}%
-              </div>
-              <div class="text-xs text-gray-500">RAM</div>
-            </div>
-            <div class="text-center">
-              <div class="text-sm font-medium text-gray-300">
-                {{ formatUptime(hostMetrics[host.id].uptime) }}
-              </div>
-              <div class="text-xs text-gray-500">Uptime</div>
+          <div class="col-12">
+            <div class="d-flex flex-wrap gap-2">
+              <button class="btn btn-outline-secondary" @click="selectAllFiltered">Tout selectionner</button>
+              <button class="btn btn-outline-secondary" @click="clearSelection" :disabled="selectedCount === 0">Vider</button>
+              <button class="btn btn-outline-secondary" @click="sendBulkApt('update')" :disabled="selectedCount === 0">
+                apt update ({{ selectedCount }})
+              </button>
+              <button class="btn btn-primary" @click="sendBulkApt('upgrade')" :disabled="selectedCount === 0">
+                apt upgrade ({{ selectedCount }})
+              </button>
             </div>
           </div>
         </div>
-      </router-link>
+      </div>
     </div>
 
-    <!-- Last Updates Section -->
+    <div class="row row-cards mb-4">
+      <div v-for="host in sortedHosts" :key="host.id" class="col-md-6 col-xl-4">
+        <router-link :to="`/hosts/${host.id}`" class="text-decoration-none text-reset">
+          <div class="card" :class="isSelected(host.id) ? 'border-primary' : ''">
+            <div class="card-body">
+              <div class="d-flex align-items-start justify-content-between mb-3">
+                <div class="d-flex align-items-start gap-3">
+                  <div class="form-check mt-1">
+                    <input
+                      class="form-check-input"
+                      type="checkbox"
+                      :checked="isSelected(host.id)"
+                      @click.stop.prevent="toggleHostSelection(host.id)"
+                    />
+                  </div>
+                  <div>
+                    <div class="fw-semibold">{{ host.name || host.hostname || 'Sans nom' }}</div>
+                    <div class="text-secondary small">{{ host.hostname || 'Non connecte' }}</div>
+                  </div>
+                </div>
+                <span :class="host.status === 'online' ? 'badge bg-green-lt text-green' : host.status === 'warning' ? 'badge bg-yellow-lt text-yellow' : 'badge bg-red-lt text-red'">
+                  {{ host.status === 'online' ? 'En ligne' : host.status === 'warning' ? 'Warning' : 'Hors ligne' }}
+                </span>
+              </div>
+
+              <div class="d-flex justify-content-between small text-secondary mb-2">
+                <span>IP</span>
+                <span class="text-body">{{ host.ip_address }}</span>
+              </div>
+              <div class="d-flex justify-content-between small text-secondary mb-2">
+                <span>OS</span>
+                <span class="text-body">{{ host.os || 'N/A' }}</span>
+              </div>
+              <div class="d-flex justify-content-between small text-secondary">
+                <span>Derniere activite</span>
+                <span class="text-body">{{ formatDate(host.last_seen) }}</span>
+              </div>
+
+              <div v-if="hostMetrics[host.id]" class="mt-3 pt-3 border-top">
+                <div class="row text-center">
+                  <div class="col">
+                    <div class="fw-semibold" :class="cpuColor(hostMetrics[host.id].cpu_usage_percent)">
+                      {{ hostMetrics[host.id].cpu_usage_percent?.toFixed(1) }}%
+                    </div>
+                    <div class="text-secondary small">CPU</div>
+                  </div>
+                  <div class="col">
+                    <div class="fw-semibold" :class="memColor(hostMetrics[host.id].memory_percent)">
+                      {{ hostMetrics[host.id].memory_percent?.toFixed(1) }}%
+                    </div>
+                    <div class="text-secondary small">RAM</div>
+                  </div>
+                  <div class="col">
+                    <div class="fw-semibold text-body">{{ formatUptime(hostMetrics[host.id].uptime) }}</div>
+                    <div class="text-secondary small">Uptime</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </router-link>
+      </div>
+    </div>
+
     <div v-if="versionComparisons.length > 0" class="card">
-      <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">
-        <svg class="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
-        </svg>
-        Versions & Mises à jour
-      </h2>
-      <div class="overflow-x-auto">
-        <table class="w-full text-sm">
+      <div class="card-header">
+        <h3 class="card-title">Versions & Mises a jour</h3>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-vcenter card-table">
           <thead>
-            <tr class="text-gray-400 border-b border-dark-700">
-              <th class="text-left py-3 px-4">Image</th>
-              <th class="text-left py-3 px-4">Hôte</th>
-              <th class="text-left py-3 px-4">En cours</th>
-              <th class="text-left py-3 px-4">Dernière version</th>
-              <th class="text-left py-3 px-4">Statut</th>
+            <tr>
+              <th>Image</th>
+              <th>Hote</th>
+              <th>En cours</th>
+              <th>Derniere version</th>
+              <th>Statut</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="v in versionComparisons" :key="v.docker_image + v.host_id" class="border-b border-dark-700/50">
-              <td class="py-3 px-4 font-medium">{{ v.docker_image }}</td>
-              <td class="py-3 px-4 text-gray-400">{{ v.hostname }}</td>
-              <td class="py-3 px-4"><code class="text-xs bg-dark-700 px-2 py-1 rounded">{{ v.running_version }}</code></td>
-              <td class="py-3 px-4">
-                <a v-if="v.release_url" :href="v.release_url" target="_blank" class="text-primary-400 hover:underline">
+            <tr v-for="v in versionComparisons" :key="v.docker_image + v.host_id">
+              <td class="fw-semibold">{{ v.docker_image }}</td>
+              <td class="text-secondary">{{ v.hostname }}</td>
+              <td><code>{{ v.running_version }}</code></td>
+              <td>
+                <a v-if="v.release_url" :href="v.release_url" target="_blank" class="link-primary">
                   {{ v.latest_version }}
                 </a>
                 <span v-else>{{ v.latest_version }}</span>
               </td>
-              <td class="py-3 px-4">
-                <span v-if="v.is_up_to_date" class="badge-online">À jour</span>
-                <span v-else class="badge-warning">Mise à jour disponible</span>
+              <td>
+                <span v-if="v.is_up_to_date" class="badge bg-green-lt text-green">A jour</span>
+                <span v-else class="badge bg-yellow-lt text-yellow">Mise a jour disponible</span>
               </td>
             </tr>
           </tbody>
@@ -128,9 +191,8 @@
       </div>
     </div>
 
-    <!-- Loading -->
-    <div v-if="loading" class="flex justify-center py-12">
-      <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-primary-400"></div>
+    <div v-if="loading" class="text-center py-5">
+      <div class="spinner-border" role="status"></div>
     </div>
   </div>
 </template>
@@ -149,11 +211,70 @@ const hosts = ref([])
 const hostMetrics = ref({})
 const versionComparisons = ref([])
 const loading = ref(true)
+const searchQuery = ref('')
+const statusFilter = ref('all')
+const sortKey = ref('name')
+const sortDir = ref('asc')
+const selectedHostIds = ref([])
 let refreshInterval = null
 
 const onlineCount = computed(() => hosts.value.filter(h => h.status === 'online').length)
 const offlineCount = computed(() => hosts.value.filter(h => h.status !== 'online').length)
 const outdatedVersions = computed(() => versionComparisons.value.filter(v => !v.is_up_to_date).length)
+const selectedCount = computed(() => selectedHostIds.value.length)
+
+const filteredHosts = computed(() => {
+  const query = searchQuery.value.trim().toLowerCase()
+  return hosts.value.filter((host) => {
+    if (statusFilter.value !== 'all' && host.status !== statusFilter.value) {
+      return false
+    }
+    if (!query) return true
+    const haystack = [
+      host.name,
+      host.hostname,
+      host.ip_address,
+      host.os,
+    ].filter(Boolean).join(' ').toLowerCase()
+    return haystack.includes(query)
+  })
+})
+
+const sortedHosts = computed(() => {
+  const list = [...filteredHosts.value]
+  const direction = sortDir.value === 'asc' ? 1 : -1
+
+  const statusOrder = { online: 0, warning: 1, offline: 2 }
+  const getCpu = (host) => hostMetrics.value[host.id]?.cpu_usage_percent ?? -1
+
+  list.sort((a, b) => {
+    let aVal
+    let bVal
+    switch (sortKey.value) {
+      case 'status':
+        aVal = statusOrder[a.status] ?? 99
+        bVal = statusOrder[b.status] ?? 99
+        break
+      case 'cpu':
+        aVal = getCpu(a)
+        bVal = getCpu(b)
+        break
+      case 'last_seen':
+        aVal = a.last_seen ? new Date(a.last_seen).getTime() : 0
+        bVal = b.last_seen ? new Date(b.last_seen).getTime() : 0
+        break
+      case 'name':
+      default:
+        aVal = (a.name || a.hostname || '').toLowerCase()
+        bVal = (b.name || b.hostname || '').toLowerCase()
+        break
+    }
+    if (aVal < bVal) return -1 * direction
+    if (aVal > bVal) return 1 * direction
+    return 0
+  })
+  return list
+})
 
 async function fetchData() {
   try {
@@ -163,6 +284,7 @@ async function fetchData() {
     ])
     hosts.value = hostsRes.data
     versionComparisons.value = versionsRes.data || []
+    selectedHostIds.value = selectedHostIds.value.filter(id => hosts.value.some(h => h.id === id))
 
     // Fetch latest metrics for each online host
     for (const host of hosts.value.filter(h => h.status === 'online')) {
@@ -180,6 +302,38 @@ async function fetchData() {
   }
 }
 
+function isSelected(hostId) {
+  return selectedHostIds.value.includes(hostId)
+}
+
+function toggleHostSelection(hostId) {
+  if (isSelected(hostId)) {
+    selectedHostIds.value = selectedHostIds.value.filter(id => id !== hostId)
+  } else {
+    selectedHostIds.value = [...selectedHostIds.value, hostId]
+  }
+}
+
+function selectAllFiltered() {
+  const ids = sortedHosts.value.map(h => h.id)
+  selectedHostIds.value = Array.from(new Set([...selectedHostIds.value, ...ids]))
+}
+
+function clearSelection() {
+  selectedHostIds.value = []
+}
+
+async function sendBulkApt(command) {
+  if (!selectedHostIds.value.length) return
+  if (!confirm(`Exécuter 'apt ${command}' sur ${selectedHostIds.value.length} hote(s) ?`)) return
+  try {
+    await apiClient.sendAptCommand(selectedHostIds.value, command)
+    alert(`Commande 'apt ${command}' envoyee.`)
+  } catch (e) {
+    alert('Erreur: ' + (e.response?.data?.error || e.message))
+  }
+}
+
 function formatDate(date) {
   return dayjs(date).fromNow()
 }
@@ -194,17 +348,17 @@ function formatUptime(seconds) {
 }
 
 function cpuColor(pct) {
-  if (!pct) return 'text-gray-300'
-  if (pct > 90) return 'text-red-400'
-  if (pct > 70) return 'text-yellow-400'
-  return 'text-emerald-400'
+  if (!pct) return 'text-secondary'
+  if (pct > 90) return 'text-red'
+  if (pct > 70) return 'text-yellow'
+  return 'text-green'
 }
 
 function memColor(pct) {
-  if (!pct) return 'text-gray-300'
-  if (pct > 90) return 'text-red-400'
-  if (pct > 75) return 'text-yellow-400'
-  return 'text-emerald-400'
+  if (!pct) return 'text-secondary'
+  if (pct > 90) return 'text-red'
+  if (pct > 75) return 'text-yellow'
+  return 'text-green'
 }
 
 onMounted(() => {

@@ -27,6 +27,7 @@ type SystemMetrics struct {
 	NetworkRxBytes  uint64     `json:"network_rx_bytes"`
 	NetworkTxBytes  uint64     `json:"network_tx_bytes"`
 	Uptime          uint64     `json:"uptime"`
+	OS              string     `json:"os"`
 	Hostname        string     `json:"hostname"`
 }
 
@@ -47,6 +48,7 @@ func CollectSystem() (*SystemMetrics, error) {
 	}
 
 	m.Hostname, _ = os.Hostname()
+	m.OS = getOSName()
 	m.CPUModel = getCPUModel()
 	m.CPUUsagePercent = getCPUUsage()
 
@@ -92,6 +94,23 @@ func getCPUModel() string {
 		}
 	}
 	return "unknown"
+}
+
+func getOSName() string {
+	data, err := os.ReadFile("/etc/os-release")
+	if err != nil {
+		return runtime.GOOS
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		if strings.HasPrefix(line, "PRETTY_NAME=") {
+			value := strings.TrimPrefix(line, "PRETTY_NAME=")
+			value = strings.Trim(value, "\"")
+			if value != "" {
+				return value
+			}
+		}
+	}
+	return runtime.GOOS
 }
 
 func getCPUUsage() float64 {

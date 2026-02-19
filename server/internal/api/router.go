@@ -45,6 +45,7 @@ func SetupRouter(db *database.DB, cfg *config.Config) *gin.Engine {
 		api.GET("/hosts", hostH.ListHosts)
 		api.POST("/hosts", hostH.RegisterHost)
 		api.GET("/hosts/:id", hostH.GetHost)
+		api.PATCH("/hosts/:id", hostH.UpdateHost)
 		api.DELETE("/hosts/:id", hostH.DeleteHost)
 		api.GET("/hosts/:id/dashboard", hostH.GetHostDashboard)
 

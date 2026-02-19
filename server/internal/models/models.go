@@ -24,6 +24,13 @@ type HostRegistration struct {
 	IPAddress string `json:"ip_address" binding:"required"`
 }
 
+type HostUpdate struct {
+	Name      *string `json:"name"`
+	Hostname  *string `json:"hostname"`
+	IPAddress *string `json:"ip_address"`
+	OS        *string `json:"os"`
+}
+
 // ========== System Metrics ==========
 
 type SystemMetrics struct {
@@ -56,6 +63,7 @@ type SystemMetrics struct {
 
 	// System
 	Uptime   uint64 `json:"uptime" db:"uptime"`
+	OS       string `json:"os" db:"-"`
 	Hostname string `json:"hostname" db:"hostname"`
 }
 

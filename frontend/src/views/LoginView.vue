@@ -1,28 +1,33 @@
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-dark-950">
-    <div class="card w-full max-w-md">
-      <div class="text-center mb-8">
-        <h1 class="text-2xl font-bold text-primary-400">ServerSupervisor</h1>
-        <p class="text-gray-400 mt-2">Connexion au dashboard</p>
+  <div class="page page-center">
+    <div class="container container-tight py-4">
+      <div class="text-center mb-4">
+        <span class="h1">ServerSupervisor</span>
+        <div class="text-secondary">Connexion au dashboard</div>
       </div>
 
-      <form @submit.prevent="handleLogin" class="space-y-6">
-        <div>
-          <label class="block text-sm font-medium text-gray-300 mb-2">Utilisateur</label>
-          <input v-model="username" type="text" class="input-field" placeholder="admin" required />
-        </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-300 mb-2">Mot de passe</label>
-          <input v-model="password" type="password" class="input-field" placeholder="••••••••" required />
-        </div>
+      <form class="card card-md" @submit.prevent="handleLogin">
+        <div class="card-body">
+          <h2 class="card-title text-center mb-4">Se connecter</h2>
+          <div class="mb-3">
+            <label class="form-label">Utilisateur</label>
+            <input v-model="username" type="text" class="form-control" placeholder="admin" required />
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Mot de passe</label>
+            <input v-model="password" type="password" class="form-control" placeholder="••••••••" required />
+          </div>
 
-        <div v-if="error" class="bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-red-400 text-sm">
-          {{ error }}
-        </div>
+          <div v-if="error" class="alert alert-danger" role="alert">
+            {{ error }}
+          </div>
 
-        <button type="submit" class="btn-primary w-full" :disabled="loading">
-          {{ loading ? 'Connexion...' : 'Se connecter' }}
-        </button>
+          <div class="form-footer">
+            <button type="submit" class="btn btn-primary w-100" :disabled="loading">
+              {{ loading ? 'Connexion...' : 'Se connecter' }}
+            </button>
+          </div>
+        </div>
       </form>
     </div>
   </div>

@@ -1,159 +1,231 @@
 <template>
   <div>
-    <div class="flex items-center gap-4 mb-8">
-      <router-link to="/" class="text-gray-400 hover:text-gray-200">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <div class="page-header d-flex align-items-center gap-3 mb-4">
+      <router-link to="/" class="btn btn-outline-secondary btn-icon" aria-label="Retour">
+        <svg class="icon" width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
         </svg>
       </router-link>
       <div>
-        <h1 class="text-2xl font-bold">{{ host?.name || 'Chargement...' }}</h1>
-        <p class="text-gray-400 mt-1">{{ host?.hostname }} &mdash; {{ host?.os }}</p>
-        <p class="text-gray-500 text-sm mt-1">{{ host?.ip_address }}</p>
+        <h2 class="page-title">{{ host?.name || host?.hostname || 'Chargement...' }}</h2>
+        <div class="text-secondary">
+          {{ host?.hostname || 'Non connecte' }} — {{ host?.os || 'OS inconnu' }} • {{ host?.ip_address }}
+        </div>
       </div>
-      <div class="ml-auto flex items-center gap-3">
-        <button @click="deleteHost" class="btn-danger text-sm px-3 py-2">
-          <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-          </svg>
-          Supprimer
-        </button>
-        <span v-if="host" :class="host.status === 'online' ? 'badge-online' : 'badge-offline'">
+      <div class="ms-auto d-flex align-items-center gap-2">
+        <button @click="startEdit" class="btn btn-outline-secondary">Modifier</button>
+        <button @click="deleteHost" class="btn btn-outline-danger">Supprimer</button>
+        <span v-if="host" :class="host.status === 'online' ? 'badge bg-green-lt text-green' : 'badge bg-red-lt text-red'">
           {{ host.status === 'online' ? 'En ligne' : 'Hors ligne' }}
         </span>
       </div>
     </div>
 
-    <!-- Metrics Cards -->
-    <div v-if="metrics" class="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-      <div class="stat-card">
-        <div class="text-3xl font-bold" :class="cpuColor(metrics.cpu_usage_percent)">
-          {{ metrics.cpu_usage_percent?.toFixed(1) }}%
-        </div>
-        <div class="text-gray-400 mt-1">CPU ({{ metrics.cpu_cores }} cores)</div>
-        <div class="text-xs text-gray-500 mt-1">{{ metrics.cpu_model }}</div>
+    <div v-if="isEditing" class="card mb-4">
+      <div class="card-header">
+        <h3 class="card-title">Modifier l'hote</h3>
       </div>
-      <div class="stat-card">
-        <div class="text-3xl font-bold" :class="memColor(metrics.memory_percent)">
-          {{ metrics.memory_percent?.toFixed(1) }}%
-        </div>
-        <div class="text-gray-400 mt-1">RAM</div>
-        <div class="text-xs text-gray-500 mt-1">{{ formatBytes(metrics.memory_used) }} / {{ formatBytes(metrics.memory_total) }}</div>
-      </div>
-      <div class="stat-card">
-        <div class="text-3xl font-bold text-primary-400">{{ formatUptime(metrics.uptime) }}</div>
-        <div class="text-gray-400 mt-1">Uptime</div>
-      </div>
-      <div class="stat-card">
-        <div class="text-3xl font-bold text-gray-300">
-          {{ metrics.load_avg_1?.toFixed(2) }}
-        </div>
-        <div class="text-gray-400 mt-1">Load Avg</div>
-        <div class="text-xs text-gray-500 mt-1">{{ metrics.load_avg_5?.toFixed(2) }} / {{ metrics.load_avg_15?.toFixed(2) }}</div>
+      <div class="card-body">
+        <form @submit.prevent="saveEdit" class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label">Nom</label>
+            <input v-model="editForm.name" type="text" class="form-control" required />
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Hostname</label>
+            <input v-model="editForm.hostname" type="text" class="form-control" required />
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Adresse IP</label>
+            <input v-model="editForm.ip_address" type="text" class="form-control" required />
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">OS</label>
+            <input v-model="editForm.os" type="text" class="form-control" required />
+          </div>
+          <div class="col-12 d-flex justify-content-end gap-2">
+            <button type="button" @click="cancelEdit" class="btn btn-outline-secondary" :disabled="saving">Annuler</button>
+            <button type="submit" class="btn btn-primary" :disabled="saving">
+              {{ saving ? 'Enregistrement...' : 'Enregistrer' }}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
 
-    <!-- Charts -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-      <div class="card">
-        <h3 class="text-lg font-semibold mb-4">CPU ({{ chartHours }}h)</h3>
-        <div class="flex gap-2 mb-4">
-          <button v-for="h in [1, 6, 24, 72]" :key="h" @click="loadHistory(h)"
-            :class="chartHours === h ? 'btn-primary' : 'btn-secondary'" class="text-xs px-3 py-1">
-            {{ h }}h
-          </button>
-        </div>
-        <div class="h-48">
-          <Line v-if="cpuChartData" :data="cpuChartData" :options="chartOptions" class="h-full w-full" />
-          <div v-else class="h-full flex items-center justify-center text-sm text-gray-500">Aucune donnee</div>
+    <div v-if="metrics" class="row row-cards mb-4">
+      <div class="col-6 col-lg-3">
+        <div class="card card-sm">
+          <div class="card-body">
+            <div class="subheader">CPU ({{ metrics.cpu_cores }} cores)</div>
+            <div class="h2 mb-0" :class="cpuColor(metrics.cpu_usage_percent)">
+              {{ metrics.cpu_usage_percent?.toFixed(1) }}%
+            </div>
+            <div class="text-secondary small">{{ metrics.cpu_model }}</div>
+          </div>
         </div>
       </div>
-      <div class="card">
-        <h3 class="text-lg font-semibold mb-4">Mémoire ({{ chartHours }}h)</h3>
-        <div class="h-48">
-          <Line v-if="memChartData" :data="memChartData" :options="chartOptions" class="h-full w-full" />
-          <div v-else class="h-full flex items-center justify-center text-sm text-gray-500">Aucune donnee</div>
+      <div class="col-6 col-lg-3">
+        <div class="card card-sm">
+          <div class="card-body">
+            <div class="subheader">RAM</div>
+            <div class="h2 mb-0" :class="memColor(metrics.memory_percent)">
+              {{ metrics.memory_percent?.toFixed(1) }}%
+            </div>
+            <div class="text-secondary small">{{ formatBytes(metrics.memory_used) }} / {{ formatBytes(metrics.memory_total) }}</div>
+          </div>
         </div>
       </div>
-    </div>
-
-    <!-- Disks -->
-    <div v-if="metrics?.disks?.length" class="card mb-8">
-      <h3 class="text-lg font-semibold mb-4">Disques</h3>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div v-for="disk in metrics.disks" :key="disk.mount_point" class="bg-dark-900 rounded-lg p-4">
-          <div class="flex justify-between mb-2">
-            <span class="font-medium">{{ disk.mount_point }}</span>
-            <span class="text-gray-400 text-sm">{{ disk.device }} ({{ disk.fs_type }})</span>
+      <div class="col-6 col-lg-3">
+        <div class="card card-sm">
+          <div class="card-body">
+            <div class="subheader">Uptime</div>
+            <div class="h2 mb-0 text-primary">{{ formatUptime(metrics.uptime) }}</div>
           </div>
-          <div class="w-full bg-dark-700 rounded-full h-3 mb-2">
-            <div class="h-3 rounded-full transition-all duration-500"
-              :class="disk.used_percent > 90 ? 'bg-red-500' : disk.used_percent > 75 ? 'bg-yellow-500' : 'bg-primary-500'"
-              :style="{ width: disk.used_percent + '%' }"></div>
-          </div>
-          <div class="flex justify-between text-xs text-gray-400">
-            <span>{{ formatBytes(disk.used_bytes) }} utilisés</span>
-            <span>{{ disk.used_percent?.toFixed(1) }}%</span>
-            <span>{{ formatBytes(disk.total_bytes) }} total</span>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="card card-sm">
+          <div class="card-body">
+            <div class="subheader">Load Avg</div>
+            <div class="h2 mb-0">{{ metrics.load_avg_1?.toFixed(2) }}</div>
+            <div class="text-secondary small">{{ metrics.load_avg_5?.toFixed(2) }} / {{ metrics.load_avg_15?.toFixed(2) }}</div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Docker Containers -->
-    <div v-if="containers.length" class="card mb-8">
-      <h3 class="text-lg font-semibold mb-4">Conteneurs Docker ({{ containers.length }})</h3>
-      <div class="overflow-x-auto">
-        <table class="w-full text-sm">
+    <div class="row row-cards mb-4">
+      <div class="col-lg-6">
+        <div class="card">
+          <div class="card-header d-flex align-items-center justify-content-between">
+            <h3 class="card-title">CPU ({{ chartHours }}h)</h3>
+            <div class="btn-group btn-group-sm">
+              <button v-for="h in [1, 6, 24, 72]" :key="h" @click="loadHistory(h)"
+                :class="chartHours === h ? 'btn btn-primary' : 'btn btn-outline-secondary'">
+                {{ h }}h
+              </button>
+            </div>
+          </div>
+          <div class="card-body" style="height: 12rem;">
+            <Line v-if="cpuChartData" :data="cpuChartData" :options="chartOptions" class="h-100" />
+            <div v-else class="h-100 d-flex align-items-center justify-content-center text-secondary">Aucune donnee</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-lg-6">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Memoire ({{ chartHours }}h)</h3>
+          </div>
+          <div class="card-body" style="height: 12rem;">
+            <Line v-if="memChartData" :data="memChartData" :options="chartOptions" class="h-100" />
+            <div v-else class="h-100 d-flex align-items-center justify-content-center text-secondary">Aucune donnee</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="metrics?.disks?.length" class="card mb-4">
+      <div class="card-header">
+        <h3 class="card-title">Disques</h3>
+      </div>
+      <div class="card-body">
+        <div class="row row-cards">
+          <div v-for="disk in metrics.disks" :key="disk.mount_point" class="col-md-6">
+            <div class="border rounded p-3">
+              <div class="d-flex justify-content-between mb-2">
+                <div class="fw-semibold">{{ disk.mount_point }}</div>
+                <div class="text-secondary small">{{ disk.device }} ({{ disk.fs_type }})</div>
+              </div>
+              <div class="progress mb-2">
+                <div
+                  class="progress-bar"
+                  :class="disk.used_percent > 90 ? 'bg-red' : disk.used_percent > 75 ? 'bg-yellow' : 'bg-primary'"
+                  :style="{ width: disk.used_percent + '%' }"
+                ></div>
+              </div>
+              <div class="d-flex justify-content-between text-secondary small">
+                <span>{{ formatBytes(disk.used_bytes) }} utilises</span>
+                <span>{{ disk.used_percent?.toFixed(1) }}%</span>
+                <span>{{ formatBytes(disk.total_bytes) }} total</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="containers.length" class="card mb-4">
+      <div class="card-header">
+        <h3 class="card-title">Conteneurs Docker ({{ containers.length }})</h3>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-vcenter card-table">
           <thead>
-            <tr class="text-gray-400 border-b border-dark-700">
-              <th class="text-left py-3 px-4">Nom</th>
-              <th class="text-left py-3 px-4">Image</th>
-              <th class="text-left py-3 px-4">Tag</th>
-              <th class="text-left py-3 px-4">État</th>
-              <th class="text-left py-3 px-4">Status</th>
-              <th class="text-left py-3 px-4">Ports</th>
+            <tr>
+              <th>Nom</th>
+              <th>Image</th>
+              <th>Tag</th>
+              <th>Etat</th>
+              <th>Status</th>
+              <th>Ports</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="c in containers" :key="c.id" class="border-b border-dark-700/50">
-              <td class="py-3 px-4 font-medium">{{ c.name }}</td>
-              <td class="py-3 px-4 text-gray-400">{{ c.image }}</td>
-              <td class="py-3 px-4"><code class="text-xs bg-dark-700 px-2 py-1 rounded">{{ c.image_tag }}</code></td>
-              <td class="py-3 px-4">
-                <span :class="c.state === 'running' ? 'badge-running' : 'badge-stopped'">{{ c.state }}</span>
+            <tr v-for="c in containers" :key="c.id">
+              <td class="fw-semibold">{{ c.name }}</td>
+              <td class="text-secondary">{{ c.image }}</td>
+              <td><code>{{ c.image_tag }}</code></td>
+              <td>
+                <span :class="c.state === 'running' ? 'badge bg-green-lt text-green' : 'badge bg-secondary-lt text-secondary'">
+                  {{ c.state }}
+                </span>
               </td>
-              <td class="py-3 px-4 text-gray-400 text-xs">{{ c.status }}</td>
-              <td class="py-3 px-4 text-gray-400 text-xs font-mono">{{ c.ports || '-' }}</td>
+              <td class="text-secondary small">{{ c.status }}</td>
+              <td class="text-secondary small font-monospace">{{ c.ports || '-' }}</td>
             </tr>
           </tbody>
         </table>
       </div>
     </div>
 
-    <!-- APT Status -->
     <div v-if="aptStatus" class="card">
-      <div class="flex items-center justify-between mb-4">
-        <h3 class="text-lg font-semibold">APT - Mises à jour système</h3>
-        <div class="flex gap-2">
-          <button @click="sendAptCmd('update')" class="btn-secondary text-sm">apt update</button>
-          <button @click="sendAptCmd('upgrade')" class="btn-primary text-sm">apt upgrade</button>
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <h3 class="card-title">APT - Mises a jour systeme</h3>
+        <div class="btn-group btn-group-sm">
+          <button @click="sendAptCmd('update')" class="btn btn-outline-secondary">apt update</button>
+          <button @click="sendAptCmd('upgrade')" class="btn btn-primary">apt upgrade</button>
         </div>
       </div>
-      <div class="grid grid-cols-3 gap-4 mb-4">
-        <div class="bg-dark-900 rounded-lg p-4 text-center">
-          <div class="text-2xl font-bold" :class="aptStatus.pending_packages > 0 ? 'text-yellow-400' : 'text-emerald-400'">
-            {{ aptStatus.pending_packages }}
+      <div class="card-body">
+        <div class="row row-cards">
+          <div class="col-md-4">
+            <div class="card card-sm">
+              <div class="card-body text-center">
+                <div class="h2 mb-0" :class="aptStatus.pending_packages > 0 ? 'text-yellow' : 'text-green'">
+                  {{ aptStatus.pending_packages }}
+                </div>
+                <div class="text-secondary small">Paquets en attente</div>
+              </div>
+            </div>
           </div>
-          <div class="text-gray-400 text-sm">Paquets en attente</div>
-        </div>
-        <div class="bg-dark-900 rounded-lg p-4 text-center">
-          <div class="text-2xl font-bold text-red-400">{{ aptStatus.security_updates }}</div>
-          <div class="text-gray-400 text-sm">Mises à jour sécurité</div>
-        </div>
-        <div class="bg-dark-900 rounded-lg p-4 text-center">
-          <div class="text-sm font-medium text-gray-300">{{ formatDate(aptStatus.last_update) }}</div>
-          <div class="text-gray-400 text-sm">Dernier apt update</div>
+          <div class="col-md-4">
+            <div class="card card-sm">
+              <div class="card-body text-center">
+                <div class="h2 mb-0 text-red">{{ aptStatus.security_updates }}</div>
+                <div class="text-secondary small">Mises a jour securite</div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="card card-sm">
+              <div class="card-body text-center">
+                <div class="fw-semibold">{{ formatDate(aptStatus.last_update) }}</div>
+                <div class="text-secondary small">Dernier apt update</div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -186,6 +258,9 @@ const metricsHistory = ref([])
 const chartHours = ref(24)
 const cpuChartData = ref(null)
 const memChartData = ref(null)
+const isEditing = ref(false)
+const saving = ref(false)
+const editForm = ref({ name: '', hostname: '', ip_address: '', os: '' })
 let refreshInterval = null
 
 const chartOptions = {
@@ -250,6 +325,34 @@ function buildCharts() {
   }
 }
 
+function startEdit() {
+  if (!host.value) return
+  editForm.value = {
+    name: host.value.name || '',
+    hostname: host.value.hostname || '',
+    ip_address: host.value.ip_address || '',
+    os: host.value.os || '',
+  }
+  isEditing.value = true
+}
+
+function cancelEdit() {
+  isEditing.value = false
+}
+
+async function saveEdit() {
+  saving.value = true
+  try {
+    const res = await apiClient.updateHost(hostId, editForm.value)
+    host.value = res.data
+    isEditing.value = false
+  } catch (e) {
+    alert('Erreur: ' + (e.response?.data?.error || e.message))
+  } finally {
+    saving.value = false
+  }
+}
+
 async function sendAptCmd(command) {
   if (!confirm(`Exécuter 'apt ${command}' sur ${host.value?.hostname} ?`)) return
   try {
@@ -283,17 +386,17 @@ function formatDate(date) {
 }
 
 function cpuColor(pct) {
-  if (!pct) return 'text-gray-300'
-  if (pct > 90) return 'text-red-400'
-  if (pct > 70) return 'text-yellow-400'
-  return 'text-emerald-400'
+  if (!pct) return 'text-secondary'
+  if (pct > 90) return 'text-red'
+  if (pct > 70) return 'text-yellow'
+  return 'text-green'
 }
 
 function memColor(pct) {
-  if (!pct) return 'text-gray-300'
-  if (pct > 90) return 'text-red-400'
-  if (pct > 75) return 'text-yellow-400'
-  return 'text-emerald-400'
+  if (!pct) return 'text-secondary'
+  if (pct > 90) return 'text-red'
+  if (pct > 75) return 'text-yellow'
+  return 'text-green'
 }
 
 async function deleteHost() {
