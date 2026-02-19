@@ -84,6 +84,7 @@ type DiskInfo struct {
 type DockerContainer struct {
 	ID          string            `json:"id" db:"id"`
 	HostID      string            `json:"host_id" db:"host_id"`
+	Hostname    string            `json:"hostname" db:"hostname"` // Host's hostname for display
 	ContainerID string            `json:"container_id" db:"container_id"`
 	Name        string            `json:"name" db:"name"`
 	Image       string            `json:"image" db:"image"`

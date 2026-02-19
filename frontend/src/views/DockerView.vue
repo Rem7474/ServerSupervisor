@@ -40,7 +40,11 @@
           <tbody>
             <tr v-for="c in filteredContainers" :key="c.id">
               <td class="fw-semibold">{{ c.name }}</td>
-              <td class="text-secondary">{{ c.host_id?.substring(0, 8) }}</td>
+              <td>
+                <router-link :to="`/hosts/${c.host_id}`" class="text-decoration-none">
+                  {{ c.hostname }}
+                </router-link>
+              </td>
               <td>{{ c.image }}</td>
               <td><code>{{ c.image_tag }}</code></td>
               <td>

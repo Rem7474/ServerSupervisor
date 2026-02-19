@@ -426,7 +426,7 @@ func (db *DB) GetDockerContainers(hostID string) ([]models.DockerContainer, erro
 
 func (db *DB) GetAllDockerContainers() ([]models.DockerContainer, error) {
 	rows, err := db.conn.Query(
-		`SELECT dc.id, dc.host_id, dc.container_id, dc.name, dc.image, dc.image_tag, dc.image_id,
+		`SELECT dc.id, dc.host_id, h.hostname, dc.container_id, dc.name, dc.image, dc.image_tag, dc.image_id,
 		 dc.state, dc.status, dc.created, dc.ports, dc.labels, dc.updated_at
 		 FROM docker_containers dc
 		 JOIN hosts h ON dc.host_id = h.id
@@ -441,7 +441,7 @@ func (db *DB) GetAllDockerContainers() ([]models.DockerContainer, error) {
 	for rows.Next() {
 		var c models.DockerContainer
 		var labelsJSON string
-		if err := rows.Scan(&c.ID, &c.HostID, &c.ContainerID, &c.Name, &c.Image, &c.ImageTag, &c.ImageID,
+		if err := rows.Scan(&c.ID, &c.HostID, &c.Hostname, &c.ContainerID, &c.Name, &c.Image, &c.ImageTag, &c.ImageID,
 			&c.State, &c.Status, &c.Created, &c.Ports, &labelsJSON, &c.UpdatedAt); err != nil {
 			continue
 		}
