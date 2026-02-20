@@ -104,6 +104,13 @@ func (h *AgentHandler) ReportCommandResult(c *gin.Context) {
 		return
 	}
 
+	if result.Status == "completed" {
+		cmd, err := h.db.GetAptCommandByID(result.CommandID)
+		if err == nil {
+			_ = h.db.TouchAptLastAction(cmd.HostID, cmd.Command)
+		}
+	}
+
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
 
@@ -129,6 +136,32 @@ func (h *AgentHandler) GetMetricsHistory(c *gin.Context) {
 		metrics = []models.SystemMetrics{}
 	}
 	c.JSON(http.StatusOK, metrics)
+}
+
+// GetMetricsSummary returns global metrics summary for dashboard charts
+func (h *AgentHandler) GetMetricsSummary(c *gin.Context) {
+	hours, _ := strconv.Atoi(c.DefaultQuery("hours", "24"))
+	bucketMinutes, _ := strconv.Atoi(c.DefaultQuery("bucket_minutes", "5"))
+
+	if hours <= 0 {
+		hours = 24
+	}
+	if hours > 8760 {
+		hours = 8760
+	}
+	if bucketMinutes <= 0 {
+		bucketMinutes = 5
+	}
+
+	summary, err := h.db.GetMetricsSummary(hours, bucketMinutes)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch metrics summary"})
+		return
+	}
+	if summary == nil {
+		summary = []models.SystemMetricsSummary{}
+	}
+	c.JSON(http.StatusOK, summary)
 }
 
 func stringPtrIfNotEmpty(value string) *string {

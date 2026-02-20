@@ -94,6 +94,29 @@
       </div>
     </div>
 
+    <div class="card mb-4">
+      <div class="card-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+        <div>
+          <h3 class="card-title">Tendance globale CPU / RAM</h3>
+          <div class="text-secondary small">Moyenne sur tous les hotes</div>
+        </div>
+        <div class="btn-group btn-group-sm">
+          <button
+            v-for="h in [1, 6, 24, 168, 720]"
+            :key="h"
+            @click="changeSummaryRange(h)"
+            :class="summaryHours === h ? 'btn btn-primary' : 'btn btn-outline-secondary'"
+          >
+            {{ h >= 24 ? (h / 24) + 'j' : h + 'h' }}
+          </button>
+        </div>
+      </div>
+      <div class="card-body" style="height: 14rem;">
+        <Line v-if="summaryChartData" :data="summaryChartData" :options="summaryChartOptions" class="h-100" />
+        <div v-else class="h-100 d-flex align-items-center justify-content-center text-secondary">Aucune donnee</div>
+      </div>
+    </div>
+
     <div class="card">
       <div class="table-responsive">
         <table class="table table-vcenter card-table">
@@ -203,11 +226,14 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import apiClient from '../api'
 import { useAuthStore } from '../stores/auth'
+import { Line } from 'vue-chartjs'
+import { Chart as ChartJS, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip } from 'chart.js'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import utc from 'dayjs/plugin/utc'
 import 'dayjs/locale/fr'
 
+ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip)
 dayjs.extend(relativeTime)
 dayjs.extend(utc)
 dayjs.locale('fr')
@@ -221,8 +247,20 @@ const statusFilter = ref('all')
 const sortKey = ref('name')
 const sortDir = ref('asc')
 const selectedHostIds = ref([])
-let refreshInterval = null
+let ws = null
 const auth = useAuthStore()
+const summaryHours = ref(24)
+const summaryChartData = ref(null)
+const summaryChartOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: { legend: { display: false } },
+  scales: {
+    x: { display: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280', maxTicksLimit: 10 } },
+    y: { display: true, min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280' } },
+  },
+  elements: { point: { radius: 0 }, line: { tension: 0.3 } },
+}
 
 const onlineCount = computed(() => hosts.value.filter(h => h.status === 'online').length)
 const offlineCount = computed(() => hosts.value.filter(h => h.status !== 'online').length)
@@ -283,30 +321,75 @@ const sortedHosts = computed(() => {
   return list
 })
 
-async function fetchData() {
-  try {
-    const [hostsRes, versionsRes] = await Promise.all([
-      apiClient.getHosts(),
-      apiClient.getVersionComparisons().catch(() => ({ data: [] })),
-    ])
-    hosts.value = hostsRes.data
-    versionComparisons.value = versionsRes.data || []
-    selectedHostIds.value = selectedHostIds.value.filter(id => hosts.value.some(h => h.id === id))
+function connectWebSocket() {
+  if (!auth.token) return
+  const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
+  const wsUrl = `${protocol}://${window.location.host}/api/v1/ws/dashboard?token=${auth.token}`
+  ws = new WebSocket(wsUrl)
 
-    // Fetch latest metrics for each online host
-    for (const host of hosts.value.filter(h => h.status === 'online')) {
-      try {
-        const res = await apiClient.getHostDashboard(host.id)
-        if (res.data.metrics) {
-          hostMetrics.value[host.id] = res.data.metrics
-        }
-      } catch (e) { /* ignore */ }
+  ws.onmessage = (event) => {
+    try {
+      const payload = JSON.parse(event.data)
+      if (payload.type !== 'dashboard') return
+      hosts.value = payload.hosts || []
+      hostMetrics.value = payload.host_metrics || {}
+      versionComparisons.value = payload.version_comparisons || []
+      selectedHostIds.value = selectedHostIds.value.filter(id => hosts.value.some(h => h.id === id))
+      loading.value = false
+    } catch (e) {
+      // Ignore malformed payloads
+    }
+  }
+
+  ws.onclose = () => {
+    setTimeout(connectWebSocket, 2000)
+  }
+}
+
+function bucketMinutesFor(hours) {
+  if (hours <= 6) return 1
+  if (hours <= 24) return 5
+  if (hours <= 168) return 15
+  return 60
+}
+
+async function fetchSummary() {
+  try {
+    const bucketMinutes = bucketMinutesFor(summaryHours.value)
+    const res = await apiClient.getMetricsSummary(summaryHours.value, bucketMinutes)
+    const points = Array.isArray(res.data) ? res.data : []
+    if (!points.length) {
+      summaryChartData.value = null
+      return
+    }
+    const labels = points.map(p =>
+      summaryHours.value >= 24 ? dayjs(p.timestamp).format('DD/MM HH:mm') : dayjs(p.timestamp).format('HH:mm')
+    )
+    summaryChartData.value = {
+      labels,
+      datasets: [
+        {
+          data: points.map(p => p.cpu_avg),
+          borderColor: '#3b82f6',
+          backgroundColor: 'rgba(59, 130, 246, 0.1)',
+          fill: true,
+        },
+        {
+          data: points.map(p => p.memory_avg),
+          borderColor: '#10b981',
+          backgroundColor: 'rgba(16, 185, 129, 0.1)',
+          fill: true,
+        },
+      ],
     }
   } catch (e) {
-    console.error('Failed to fetch dashboard data:', e)
-  } finally {
-    loading.value = false
+    summaryChartData.value = null
   }
+}
+
+function changeSummaryRange(hours) {
+  summaryHours.value = hours
+  fetchSummary()
 }
 
 function selectAllFiltered() {
@@ -358,11 +441,12 @@ function memColor(pct) {
 
 
 onMounted(() => {
-  fetchData()
-  refreshInterval = setInterval(fetchData, 30000)
+  loading.value = true
+  connectWebSocket()
+  fetchSummary()
 })
 
 onUnmounted(() => {
-  if (refreshInterval) clearInterval(refreshInterval)
+  if (ws) ws.close()
 })
 </script>

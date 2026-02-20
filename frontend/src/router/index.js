@@ -55,6 +55,12 @@ const routes = [
     component: () => import('../views/SecurityView.vue'),
     meta: { requiresAuth: true },
   },
+  {
+    path: '/users',
+    name: 'Users',
+    component: () => import('../views/UsersView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true },
+  },
 ]
 
 const router = createRouter({

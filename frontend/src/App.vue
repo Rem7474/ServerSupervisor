@@ -66,6 +66,19 @@
                   <span class="nav-link-title">Audit</span>
                 </router-link>
               </li>
+              <li v-if="auth.isAdmin" class="nav-item">
+                <router-link to="/users" class="nav-link" active-class="active">
+                  <span class="nav-link-icon">
+                    <svg class="icon" width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-4-4h-1" />
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20H4v-2a4 4 0 014-4h1" />
+                      <circle cx="9" cy="7" r="4" />
+                      <circle cx="17" cy="9" r="3" />
+                    </svg>
+                  </span>
+                  <span class="nav-link-title">Utilisateurs</span>
+                </router-link>
+              </li>
             </ul>
 
             <div class="ms-auto d-flex align-items-center position-relative">

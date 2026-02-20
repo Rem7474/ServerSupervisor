@@ -139,14 +139,16 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import apiClient from '../api'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useAuthStore } from '../stores/auth'
 
 const containers = ref([])
 const search = ref('')
 const stateFilter = ref('')
 const composeFilter = ref('')
 const selectedContainer = ref(null)
+const auth = useAuthStore()
+let ws = null
 
 const getComposeInfo = (container) => {
   if (!container.labels) return {}
@@ -183,12 +185,32 @@ const filteredContainers = computed(() => {
   })
 })
 
-onMounted(async () => {
-  try {
-    const res = await apiClient.getAllContainers()
-    containers.value = res.data
-  } catch (e) {
-    console.error('Failed to fetch containers:', e)
+function connectWebSocket() {
+  if (!auth.token) return
+  const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
+  const wsUrl = `${protocol}://${window.location.host}/api/v1/ws/docker?token=${auth.token}`
+  ws = new WebSocket(wsUrl)
+
+  ws.onmessage = (event) => {
+    try {
+      const payload = JSON.parse(event.data)
+      if (payload.type !== 'docker') return
+      containers.value = payload.containers || []
+    } catch (e) {
+      // Ignore malformed payloads
+    }
   }
+
+  ws.onclose = () => {
+    setTimeout(connectWebSocket, 2000)
+  }
+}
+
+onMounted(() => {
+  connectWebSocket()
+})
+
+onUnmounted(() => {
+  if (ws) ws.close()
 })
 </script>

@@ -24,6 +24,8 @@ func SetupRouter(db *database.DB, cfg *config.Config) *gin.Engine {
 	aptH := NewAptHandler(db, cfg)
 	dockerH := NewDockerHandler(db, cfg)
 	auditH := NewAuditHandler(db, cfg)
+	wsH := NewWSHandler(db, cfg)
+	userH := NewUserHandler(db, cfg)
 
 	// ========== Public routes ==========
 	r.POST("/api/auth/login", authH.Login)
@@ -32,6 +34,12 @@ func SetupRouter(db *database.DB, cfg *config.Config) *gin.Engine {
 	r.GET("/api/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
+
+	// ========== WebSocket routes (token via query string) ==========
+	r.GET("/api/v1/ws/dashboard", wsH.Dashboard)
+	r.GET("/api/v1/ws/hosts/:id", wsH.HostDetail)
+	r.GET("/api/v1/ws/docker", wsH.Docker)
+	r.GET("/api/v1/ws/apt", wsH.Apt)
 
 	// ========== Agent routes (API Key auth) ==========
 	agent := r.Group("/api/agent")
@@ -62,6 +70,7 @@ func SetupRouter(db *database.DB, cfg *config.Config) *gin.Engine {
 
 		// Metrics
 		api.GET("/hosts/:id/metrics/history", agentH.GetMetricsHistory)
+		api.GET("/metrics/summary", agentH.GetMetricsSummary)
 
 		// Docker
 		api.GET("/hosts/:id/containers", dockerH.ListContainers)
@@ -82,6 +91,10 @@ func SetupRouter(db *database.DB, cfg *config.Config) *gin.Engine {
 		api.GET("/audit/logs", auditH.GetAuditLogs)
 		api.GET("/audit/logs/host/:host_id", auditH.GetAuditLogsByHost)
 		api.GET("/audit/logs/user/:username", auditH.GetAuditLogsByUser)
+
+		// Users
+		api.GET("/users", userH.ListUsers)
+		api.PATCH("/users/:id/role", userH.UpdateUserRole)
 	}
 
 	// Serve frontend static files

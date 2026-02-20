@@ -113,7 +113,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import apiClient from '../api'
 import { useAuthStore } from '../stores/auth'
 import dayjs from 'dayjs'
@@ -133,6 +133,7 @@ const aptHistories = ref({})
 const expandedHistories = ref({})
 const auth = useAuthStore()
 const canRunApt = computed(() => auth.role === 'admin' || auth.role === 'operator')
+let ws = null
 
 function toggleSelectAll() {
   if (selectAll.value) {
@@ -162,23 +163,34 @@ function formatDate(date) {
   return dayjs.utc(date).local().fromNow()
 }
 
-onMounted(async () => {
-  try {
-    const res = await apiClient.getHosts()
-    hosts.value = res.data
+function connectWebSocket() {
+  if (!auth.token) return
+  const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
+  const wsUrl = `${protocol}://${window.location.host}/api/v1/ws/apt?token=${auth.token}`
+  ws = new WebSocket(wsUrl)
 
-    for (const host of hosts.value) {
-      try {
-        const [aptRes, histRes] = await Promise.all([
-          apiClient.getAptStatus(host.id).catch(() => null),
-          apiClient.getAptHistory(host.id).catch(() => ({ data: [] })),
-        ])
-        if (aptRes?.data) aptStatuses.value[host.id] = aptRes.data
-        aptHistories.value[host.id] = histRes?.data || []
-      } catch (e) { /* ignore */ }
+  ws.onmessage = (event) => {
+    try {
+      const payload = JSON.parse(event.data)
+      if (payload.type !== 'apt') return
+      hosts.value = payload.hosts || []
+      aptStatuses.value = payload.apt_statuses || {}
+      aptHistories.value = payload.apt_histories || {}
+    } catch (e) {
+      // Ignore malformed payloads
     }
-  } catch (e) {
-    console.error('Failed to fetch data:', e)
   }
+
+  ws.onclose = () => {
+    setTimeout(connectWebSocket, 2000)
+  }
+}
+
+onMounted(() => {
+  connectWebSocket()
+})
+
+onUnmounted(() => {
+  if (ws) ws.close()
 })
 </script>

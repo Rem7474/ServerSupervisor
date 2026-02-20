@@ -263,6 +263,34 @@ func (db *DB) GetUserByUsername(username string) (*models.User, error) {
 	return &u, nil
 }
 
+func (db *DB) GetUsers() ([]models.User, error) {
+	rows, err := db.conn.Query(
+		`SELECT id, username, role, created_at FROM users ORDER BY username`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []models.User
+	for rows.Next() {
+		var u models.User
+		if err := rows.Scan(&u.ID, &u.Username, &u.Role, &u.CreatedAt); err != nil {
+			continue
+		}
+		users = append(users, u)
+	}
+	return users, nil
+}
+
+func (db *DB) UpdateUserRole(id int64, role string) error {
+	_, err := db.conn.Exec(
+		`UPDATE users SET role = $1 WHERE id = $2`,
+		role, id,
+	)
+	return err
+}
+
 func (db *DB) UpdateUserPassword(username, passwordHash string) error {
 	_, err := db.conn.Exec(
 		`UPDATE users SET password_hash = $1 WHERE username = $2`,
@@ -450,6 +478,38 @@ func (db *DB) GetMetricsHistory(hostID string, hours int) ([]models.SystemMetric
 	return metrics, nil
 }
 
+func (db *DB) GetMetricsSummary(hours int, bucketMinutes int) ([]models.SystemMetricsSummary, error) {
+	if bucketMinutes <= 0 {
+		bucketMinutes = 5
+	}
+	rows, err := db.conn.Query(
+		`SELECT
+			to_timestamp(floor(extract(epoch from timestamp) / ($2 * 60)) * ($2 * 60)) AS ts,
+			AVG(cpu_usage_percent) AS cpu_avg,
+			AVG(memory_percent) AS mem_avg,
+			COUNT(*) AS sample_count
+		 FROM system_metrics
+		 WHERE timestamp > NOW() - INTERVAL '1 hour' * $1
+		 GROUP BY ts
+		 ORDER BY ts ASC`,
+		hours, bucketMinutes,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var summary []models.SystemMetricsSummary
+	for rows.Next() {
+		var s models.SystemMetricsSummary
+		if err := rows.Scan(&s.Timestamp, &s.CPUAvg, &s.MemoryAvg, &s.SampleCount); err != nil {
+			continue
+		}
+		summary = append(summary, s)
+	}
+	return summary, nil
+}
+
 func (db *DB) CleanOldMetrics(retentionDays int) (int64, error) {
 	result, err := db.conn.Exec(
 		`DELETE FROM system_metrics WHERE timestamp < NOW() - INTERVAL '1 day' * $1`, retentionDays,
@@ -611,6 +671,41 @@ func (db *DB) UpdateCommandStatus(id int64, status, output string) error {
 		_, err := db.conn.Exec(query, status, output, id)
 		return err
 	}
+}
+
+func (db *DB) GetAptCommandByID(id int64) (*models.AptCommand, error) {
+	var c models.AptCommand
+	err := db.conn.QueryRow(
+		`SELECT id, host_id, command, status, output, triggered_by, created_at, started_at, ended_at
+		 FROM apt_commands WHERE id = $1`,
+		id,
+	).Scan(&c.ID, &c.HostID, &c.Command, &c.Status, &c.Output, &c.TriggeredBy, &c.CreatedAt, &c.StartedAt, &c.EndedAt)
+	if err != nil {
+		return nil, err
+	}
+	return &c, nil
+}
+
+func (db *DB) TouchAptLastAction(hostID, command string) error {
+	var lastUpdate time.Time
+	var lastUpgrade time.Time
+	if command == "update" {
+		lastUpdate = time.Now()
+	}
+	if command == "upgrade" || command == "dist-upgrade" {
+		lastUpgrade = time.Now()
+	}
+
+	_, err := db.conn.Exec(
+		`INSERT INTO apt_status (host_id, last_update, last_upgrade, pending_packages, package_list, security_updates, updated_at)
+		 VALUES ($1, $2, $3, 0, '[]', 0, NOW())
+		 ON CONFLICT (host_id) DO UPDATE SET
+			last_update = COALESCE(NULLIF($2::timestamp, '0001-01-01 00:00:00'), apt_status.last_update),
+			last_upgrade = COALESCE(NULLIF($3::timestamp, '0001-01-01 00:00:00'), apt_status.last_upgrade),
+			updated_at = NOW()`,
+		hostID, lastUpdate, lastUpgrade,
+	)
+	return err
 }
 
 func (db *DB) GetAptCommandHistory(hostID string, limit int) ([]models.AptCommand, error) {

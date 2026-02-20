@@ -235,6 +235,34 @@
       </div>
     </div>
 
+    <div v-if="aptHistory.length" class="card mt-4">
+      <div class="card-header">
+        <h3 class="card-title">Historique APT</h3>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-vcenter card-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Commande</th>
+              <th>Statut</th>
+              <th>Utilisateur</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="cmd in aptHistory" :key="cmd.id">
+              <td>{{ formatDate(cmd.created_at) }}</td>
+              <td><code>apt {{ cmd.command }}</code></td>
+              <td>
+                <span :class="statusClass(cmd.status)">{{ cmd.status }}</span>
+              </td>
+              <td>{{ cmd.triggered_by || '-' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
     <div v-if="auditLogs.length" class="card mt-4">
       <div class="card-header">
         <h3 class="card-title">Audit APT (hote)</h3>
@@ -290,6 +318,7 @@ const host = ref(null)
 const metrics = ref(null)
 const containers = ref([])
 const aptStatus = ref(null)
+const aptHistory = ref([])
 const auditLogs = ref([])
 const metricsHistory = ref([])
 const chartHours = ref(24)
@@ -298,7 +327,7 @@ const memChartData = ref(null)
 const isEditing = ref(false)
 const saving = ref(false)
 const editForm = ref({ name: '', hostname: '', ip_address: '', os: '' })
-let refreshInterval = null
+let ws = null
 const auth = useAuthStore()
 const canRunApt = computed(() => auth.role === 'admin' || auth.role === 'operator')
 
@@ -313,21 +342,29 @@ const chartOptions = {
   elements: { point: { radius: 0 }, line: { tension: 0.3 } },
 }
 
-async function fetchData() {
-  try {
-    const res = await apiClient.getHostDashboard(hostId)
-    host.value = res.data.host
-    metrics.value = res.data.metrics
-    containers.value = res.data.containers || []
-    aptStatus.value = res.data.apt_status
+function connectWebSocket() {
+  if (!auth.token) return
+  const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
+  const wsUrl = `${protocol}://${window.location.host}/api/v1/ws/hosts/${hostId}?token=${auth.token}`
+  ws = new WebSocket(wsUrl)
+
+  ws.onmessage = (event) => {
     try {
-      const auditRes = await apiClient.getAuditLogsByHost(hostId)
-      auditLogs.value = Array.isArray(auditRes.data) ? auditRes.data : []
+      const payload = JSON.parse(event.data)
+      if (payload.type !== 'host_detail') return
+      host.value = payload.host
+      metrics.value = payload.metrics
+      containers.value = payload.containers || []
+      aptStatus.value = payload.apt_status
+      aptHistory.value = payload.apt_history || []
+      auditLogs.value = payload.audit_logs || []
     } catch (e) {
-      auditLogs.value = []
+      // Ignore malformed payloads
     }
-  } catch (e) {
-    console.error('Failed to fetch host data:', e)
+  }
+
+  ws.onclose = () => {
+    setTimeout(connectWebSocket, 2000)
   }
 }
 
@@ -466,12 +503,11 @@ async function deleteHost() {
 }
 
 onMounted(() => {
-  fetchData()
+  connectWebSocket()
   loadHistory(24)
-  refreshInterval = setInterval(fetchData, 30000)
 })
 
 onUnmounted(() => {
-  if (refreshInterval) clearInterval(refreshInterval)
+  if (ws) ws.close()
 })
 </script>

@@ -50,6 +50,8 @@ export default {
 
   // Metrics
   getMetricsHistory: (hostId, hours = 24) => api.get(`/v1/hosts/${hostId}/metrics/history?hours=${hours}`),
+  getMetricsSummary: (hours = 24, bucketMinutes = 5) =>
+    api.get(`/v1/metrics/summary?hours=${hours}&bucket_minutes=${bucketMinutes}`),
 
   // Docker
   getContainers: (hostId) => api.get(`/v1/hosts/${hostId}/containers`),
@@ -70,4 +72,8 @@ export default {
   getAuditLogs: (page = 1, limit = 50) => api.get(`/v1/audit/logs?page=${page}&limit=${limit}`),
   getAuditLogsByHost: (hostId, limit = 100) => api.get(`/v1/audit/logs/host/${hostId}?limit=${limit}`),
   getAuditLogsByUser: (username, limit = 100) => api.get(`/v1/audit/logs/user/${username}?limit=${limit}`),
+
+  // Users
+  getUsers: () => api.get('/v1/users'),
+  updateUserRole: (id, role) => api.patch(`/v1/users/${id}/role`, { role }),
 }

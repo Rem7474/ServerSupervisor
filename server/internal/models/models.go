@@ -79,6 +79,14 @@ type DiskInfo struct {
 	UsedPercent float64 `json:"used_percent" db:"used_percent"`
 }
 
+// SystemMetricsSummary is a global aggregated view used for dashboard charts.
+type SystemMetricsSummary struct {
+	Timestamp   time.Time `json:"timestamp" db:"timestamp"`
+	CPUAvg      float64   `json:"cpu_avg" db:"cpu_avg"`
+	MemoryAvg   float64   `json:"memory_avg" db:"memory_avg"`
+	SampleCount int       `json:"sample_count" db:"sample_count"`
+}
+
 // ========== Docker Containers ==========
 
 type DockerContainer struct {
