@@ -11,8 +11,11 @@ func SetupRouter(db *database.DB, cfg *config.Config) *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Recovery())
 	r.Use(RequestLogger())
-	r.Use(CORSMiddleware())
-	r.Use(RateLimiter(cfg.RateLimitRPS, cfg.RateLimitBurst))
+	r.Use(CORSMiddleware("http://localhost:8080"))
+
+	// Per-IP rate limiter
+	ipRateLimiter := NewIPRateLimiter(cfg.RateLimitRPS, cfg.RateLimitBurst)
+	r.Use(RateLimiterMiddleware(ipRateLimiter))
 
 	// Handlers
 	authH := NewAuthHandler(db, cfg)

@@ -123,3 +123,39 @@ func (s *Sender) ReportCommandResult(result *CommandResult) error {
 	log.Printf("Command result for #%d reported successfully (status: %s)", result.CommandID, result.Status)
 	return nil
 }
+
+// ReportCommandStatus sends a status update for a running command
+func (s *Sender) ReportCommandStatus(commandID int64, status string) error {
+	result := &CommandResult{
+		CommandID: commandID,
+		Status:    status,
+		Output:    "",
+	}
+
+	data, err := json.Marshal(result)
+	if err != nil {
+		return fmt.Errorf("failed to marshal status: %w", err)
+	}
+
+	req, err := http.NewRequest("POST", s.cfg.ServerURL+"/api/agent/command/result", bytes.NewReader(data))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-API-Key", s.cfg.APIKey)
+
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to send command status: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("server returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	log.Printf("Command #%d marked as %s", commandID, status)
+	return nil
+}

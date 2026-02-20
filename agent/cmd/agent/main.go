@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -13,6 +14,9 @@ import (
 	"github.com/serversupervisor/agent/internal/config"
 	"github.com/serversupervisor/agent/internal/sender"
 )
+
+// commandMutex ensures only one APT command runs at a time
+var commandMutex sync.Mutex
 
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
@@ -129,6 +133,13 @@ func sendReport(cfg *config.Config, s *sender.Sender) {
 }
 
 func processCommands(s *sender.Sender, commands []sender.PendingCommand) {
+	// Try to acquire lock; if another command is running, skip this batch
+	if !commandMutex.TryLock() {
+		log.Println("A command is already running, skipping new commands")
+		return
+	}
+	defer commandMutex.Unlock()
+
 	for _, cmd := range commands {
 		log.Printf("Processing command #%d: %s", cmd.ID, cmd.Type)
 
@@ -150,6 +161,12 @@ func processCommands(s *sender.Sender, commands []sender.PendingCommand) {
 			continue
 		}
 
+		// Notify server that command is starting
+		if err := s.ReportCommandStatus(cmd.ID, "running"); err != nil {
+			log.Printf("Failed to report running status: %v", err)
+		}
+
+		// Execute the APT command
 		output, err := collector.ExecuteAptCommand(aptCmd)
 		status := "completed"
 		if err != nil {

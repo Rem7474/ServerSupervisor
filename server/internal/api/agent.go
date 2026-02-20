@@ -60,12 +60,18 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 		for i := range report.Docker.Containers {
 			report.Docker.Containers[i].HostID = hostID
 		}
-		h.db.UpsertDockerContainers(hostID, report.Docker.Containers)
+		if err := h.db.UpsertDockerContainers(hostID, report.Docker.Containers); err != nil {
+			// Log error but don't fail the entire request
+			c.Header("X-Docker-Error", err.Error())
+		}
 	}
 
 	// Store apt status
 	report.AptStatus.HostID = hostID
-	h.db.UpsertAptStatus(&report.AptStatus)
+	if err := h.db.UpsertAptStatus(&report.AptStatus); err != nil {
+		// Log error but don't fail the entire request
+		c.Header("X-APT-Error", err.Error())
+	}
 
 	// Return pending commands for this host
 	commands, _ := h.db.GetPendingCommands(hostID)
@@ -105,8 +111,13 @@ func (h *AgentHandler) ReportCommandResult(c *gin.Context) {
 func (h *AgentHandler) GetMetricsHistory(c *gin.Context) {
 	hostID := c.Param("id")
 	hours, _ := strconv.Atoi(c.DefaultQuery("hours", "24"))
-	if hours > 168 { // max 7 days
-		hours = 168
+
+	// Validate hours parameter
+	if hours <= 0 {
+		hours = 24
+	}
+	if hours > 8760 { // max 1 year
+		hours = 8760
 	}
 
 	metrics, err := h.db.GetMetricsHistory(hostID, hours)

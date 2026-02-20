@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 
 	"gopkg.in/yaml.v3"
 )
@@ -40,8 +41,30 @@ func Load(path string) (*Config, error) {
 		return nil, fmt.Errorf("failed to parse config file: %w", err)
 	}
 
+	// Environment variable overrides (for Docker/Kubernetes deployments)
+	if env := os.Getenv("SUPERVISOR_SERVER_URL"); env != "" {
+		cfg.ServerURL = env
+	}
+	if env := os.Getenv("SUPERVISOR_API_KEY"); env != "" {
+		cfg.APIKey = env
+	}
+	if env := os.Getenv("SUPERVISOR_REPORT_INTERVAL"); env != "" {
+		if interval, err := strconv.Atoi(env); err == nil {
+			cfg.ReportInterval = interval
+		}
+	}
+	if env := os.Getenv("SUPERVISOR_COLLECT_DOCKER"); env != "" {
+		cfg.CollectDocker = env == "true" || env == "1"
+	}
+	if env := os.Getenv("SUPERVISOR_COLLECT_APT"); env != "" {
+		cfg.CollectAPT = env == "true" || env == "1"
+	}
+	if env := os.Getenv("SUPERVISOR_INSECURE_SKIP_VERIFY"); env != "" {
+		cfg.InsecureSkipVerify = env == "true" || env == "1"
+	}
+
 	if cfg.APIKey == "" {
-		return nil, fmt.Errorf("api_key is required in config")
+		return nil, fmt.Errorf("api_key is required (set in config or SUPERVISOR_API_KEY env var)")
 	}
 
 	return cfg, nil

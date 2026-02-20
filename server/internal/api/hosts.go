@@ -1,6 +1,7 @@
 package api
 
 import (
+	"net"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -27,8 +28,15 @@ func (h *HostHandler) RegisterHost(c *gin.Context) {
 		return
 	}
 
+	// Validate IP address format
+	if net.ParseIP(req.IPAddress) == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid IP address format"})
+		return
+	}
+
 	hostID := uuid.New().String()
-	apiKey := uuid.New().String()
+	plainAPIKey := uuid.New().String()
+	hashedAPIKey := database.HashAPIKey(plainAPIKey)
 
 	host := &models.Host{
 		ID:        hostID,
@@ -36,7 +44,7 @@ func (h *HostHandler) RegisterHost(c *gin.Context) {
 		Hostname:  "", // Will be populated by agent
 		IPAddress: req.IPAddress,
 		OS:        "", // Will be populated by agent
-		APIKey:    apiKey,
+		APIKey:    hashedAPIKey,
 		Status:    "offline",
 	}
 
@@ -47,8 +55,8 @@ func (h *HostHandler) RegisterHost(c *gin.Context) {
 
 	c.JSON(http.StatusCreated, gin.H{
 		"id":      hostID,
-		"api_key": apiKey,
-		"message": "Host registered. Use this API key in the agent configuration.",
+		"api_key": plainAPIKey,
+		"message": "Host registered. Use this API key in the agent configuration. It will not be shown again.",
 	})
 }
 

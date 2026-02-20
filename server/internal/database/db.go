@@ -1,7 +1,9 @@
 package database
 
 import (
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -11,6 +13,12 @@ import (
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/models"
 )
+
+// HashAPIKey returns the SHA-256 hash of an API key
+func HashAPIKey(apiKey string) string {
+	hash := sha256.Sum256([]byte(apiKey))
+	return hex.EncodeToString(hash[:])
+}
 
 type DB struct {
 	conn *sql.DB
@@ -117,7 +125,7 @@ func (db *DB) migrate() error {
 			last_update TIMESTAMP WITH TIME ZONE,
 			last_upgrade TIMESTAMP WITH TIME ZONE,
 			pending_packages INTEGER DEFAULT 0,
-			package_list TEXT DEFAULT '[]',
+			package_list JSONB DEFAULT '[]',
 			security_updates INTEGER DEFAULT 0,
 			updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 		)`,
@@ -147,6 +155,8 @@ func (db *DB) migrate() error {
 		)`,
 		// Migration: Add name column to hosts if it doesn't exist
 		`ALTER TABLE IF EXISTS hosts ADD COLUMN IF NOT EXISTS name VARCHAR(255) NOT NULL DEFAULT ''`,
+		// Migration: Convert package_list from TEXT to JSONB for existing databases
+		`ALTER TABLE IF EXISTS apt_status ALTER COLUMN package_list TYPE JSONB USING COALESCE(package_list::jsonb, '[]'::jsonb)`,
 	}
 
 	for _, m := range migrations {
@@ -218,9 +228,10 @@ func (db *DB) GetHost(id string) (*models.Host, error) {
 
 func (db *DB) GetHostByAPIKey(apiKey string) (*models.Host, error) {
 	var h models.Host
+	apiKeyHash := HashAPIKey(apiKey)
 	err := db.conn.QueryRow(
 		`SELECT id, name, hostname, ip_address, os, api_key, status, last_seen, created_at, updated_at
-		 FROM hosts WHERE api_key = $1`, apiKey,
+		 FROM hosts WHERE api_key = $1`, apiKeyHash,
 	).Scan(&h.ID, &h.Name, &h.Hostname, &h.IPAddress, &h.OS, &h.APIKey, &h.Status, &h.LastSeen, &h.CreatedAt, &h.UpdatedAt)
 	if err != nil {
 		return nil, err

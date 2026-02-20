@@ -240,10 +240,12 @@ import { Chart as ChartJS, LineElement, PointElement, LinearScale, CategoryScale
 import apiClient from '../api'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
+import utc from 'dayjs/plugin/utc'
 import 'dayjs/locale/fr'
 
 ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip)
 dayjs.extend(relativeTime)
+dayjs.extend(utc)
 dayjs.locale('fr')
 
 const route = useRoute()
@@ -382,7 +384,7 @@ function formatUptime(seconds) {
 
 function formatDate(date) {
   if (!date || date === '0001-01-01T00:00:00Z') return 'Jamais'
-  return dayjs(date).fromNow()
+  return dayjs.utc(date).local().fromNow()
 }
 
 function cpuColor(pct) {

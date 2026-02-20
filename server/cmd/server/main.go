@@ -22,6 +22,14 @@ func main() {
 	// Load config
 	cfg := config.Load()
 
+	// ⚠️  Security warnings for default configuration
+	if cfg.JWTSecret == "change-me-in-production-please" {
+		log.Println("⚠️  WARNING: JWT_SECRET is using the default insecure value. Change it in production!")
+	}
+	if cfg.AdminPassword == "admin" {
+		log.Println("⚠️  WARNING: ADMIN_PASSWORD is 'admin'. Change it immediately!")
+	}
+
 	// Connect to database
 	db, err := database.New(cfg)
 	if err != nil {

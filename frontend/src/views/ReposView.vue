@@ -138,9 +138,11 @@ import { ref, onMounted } from 'vue'
 import apiClient from '../api'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
+import utc from 'dayjs/plugin/utc'
 import 'dayjs/locale/fr'
 
 dayjs.extend(relativeTime)
+dayjs.extend(utc)
 dayjs.locale('fr')
 
 const repos = ref([])
@@ -182,7 +184,7 @@ async function deleteRepo(id) {
 
 function formatDate(date) {
   if (!date || date === '0001-01-01T00:00:00Z') return ''
-  return dayjs(date).fromNow()
+  return dayjs.utc(date).local().fromNow()
 }
 
 onMounted(fetchData)

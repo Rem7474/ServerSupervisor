@@ -198,9 +198,11 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import apiClient from '../api'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
+import utc from 'dayjs/plugin/utc'
 import 'dayjs/locale/fr'
 
 dayjs.extend(relativeTime)
+dayjs.extend(utc)
 dayjs.locale('fr')
 
 const hosts = ref([])
@@ -331,7 +333,7 @@ async function sendBulkApt(command) {
 }
 
 function formatDate(date) {
-  return dayjs(date).fromNow()
+  return dayjs.utc(date).local().fromNow()
 }
 
 function formatUptime(seconds) {
