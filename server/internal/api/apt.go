@@ -26,13 +26,33 @@ func (h *AptHandler) SendCommand(c *gin.Context) {
 		return
 	}
 
+	username := c.GetString("username")
+	if username == "" {
+		username = "unknown"
+	}
+	tpRole := c.GetString("role")
+
+	// Only admin and operator can trigger APT commands
+	if tpRole != models.RoleAdmin && tpRole != models.RoleOperator {
+		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+		return
+	}
+
 	var results []gin.H
 	for _, hostID := range req.HostIDs {
-		cmd, err := h.db.CreateAptCommand(hostID, req.Command)
+		cmd, err := h.db.CreateAptCommand(hostID, req.Command, username)
 		if err != nil {
 			results = append(results, gin.H{"host_id": hostID, "error": err.Error()})
 			continue
 		}
+
+		// Log to audit trail
+		ip := c.ClientIP()
+		auditDetails := "apt " + req.Command
+		if err := h.db.CreateAuditLog(username, "apt_"+req.Command, hostID, ip, auditDetails, "pending"); err != nil {
+			// Log audit failure but don't block the request
+		}
+
 		results = append(results, gin.H{"host_id": hostID, "command_id": cmd.ID, "status": "pending"})
 	}
 

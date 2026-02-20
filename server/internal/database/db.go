@@ -157,6 +157,42 @@ func (db *DB) migrate() error {
 		`ALTER TABLE IF EXISTS hosts ADD COLUMN IF NOT EXISTS name VARCHAR(255) NOT NULL DEFAULT ''`,
 		// Migration: Convert package_list from TEXT to JSONB for existing databases
 		`ALTER TABLE IF EXISTS apt_status ALTER COLUMN package_list TYPE JSONB USING COALESCE(package_list::jsonb, '[]'::jsonb)`,
+		// Migration: Add TOTP & RBAC fields to users
+		`ALTER TABLE IF EXISTS users ADD COLUMN IF NOT EXISTS totp_secret TEXT DEFAULT ''`,
+		`ALTER TABLE IF EXISTS users ADD COLUMN IF NOT EXISTS backup_codes TEXT DEFAULT '[]'`,
+		`ALTER TABLE IF EXISTS users ADD COLUMN IF NOT EXISTS mfa_enabled BOOLEAN DEFAULT FALSE`,
+		// Migration: Add triggered_by to apt_commands (who launched it)
+		`ALTER TABLE IF EXISTS apt_commands ADD COLUMN IF NOT EXISTS triggered_by VARCHAR(255) DEFAULT 'system'`,
+		// Migration: Create audit_logs table for APT & admin action history
+		`CREATE TABLE IF NOT EXISTS audit_logs (
+			id BIGSERIAL PRIMARY KEY,
+			username VARCHAR(255) NOT NULL,
+			action VARCHAR(100) NOT NULL,
+			host_id VARCHAR(64),
+			ip_address VARCHAR(45),
+			details TEXT,
+			status VARCHAR(20) DEFAULT 'pending',
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_audit_logs_user_action ON audit_logs(username, action, created_at DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_audit_logs_host ON audit_logs(host_id, created_at DESC)`,
+		// Migration: Create metrics_aggregates table for downsampling (5min, hourly, daily)
+		`CREATE TABLE IF NOT EXISTS metrics_aggregates (
+			id BIGSERIAL PRIMARY KEY,
+			host_id VARCHAR(64) REFERENCES hosts(id) ON DELETE CASCADE,
+			aggregation_type VARCHAR(20) NOT NULL, -- '5min', 'hour', 'day'
+			timestamp TIMESTAMP WITH TIME ZONE NOT NULL, -- Start of the interval
+			cpu_usage_avg DOUBLE PRECISION,
+			cpu_usage_max DOUBLE PRECISION,
+			memory_usage_avg BIGINT,
+			memory_usage_max BIGINT,
+			disk_usage_avg DOUBLE PRECISION,
+			network_rx_bytes BIGINT,
+			network_tx_bytes BIGINT,
+			sample_count INTEGER DEFAULT 1,
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_metrics_aggregates_host_time ON metrics_aggregates(host_id, aggregation_type, timestamp DESC)`,
 	}
 
 	for _, m := range migrations {
@@ -492,12 +528,15 @@ func (db *DB) GetAptStatus(hostID string) (*models.AptStatus, error) {
 	return &s, nil
 }
 
-func (db *DB) CreateAptCommand(hostID, command string) (*models.AptCommand, error) {
+func (db *DB) CreateAptCommand(hostID, command, triggeredBy string) (*models.AptCommand, error) {
+	if triggeredBy == "" {
+		triggeredBy = "system"
+	}
 	var cmd models.AptCommand
 	err := db.conn.QueryRow(
-		`INSERT INTO apt_commands (host_id, command, status) VALUES ($1, $2, 'pending') RETURNING id, host_id, command, status, created_at`,
-		hostID, command,
-	).Scan(&cmd.ID, &cmd.HostID, &cmd.Command, &cmd.Status, &cmd.CreatedAt)
+		`INSERT INTO apt_commands (host_id, command, status, triggered_by) VALUES ($1, $2, 'pending', $3) RETURNING id, host_id, command, status, triggered_by, created_at`,
+		hostID, command, triggeredBy,
+	).Scan(&cmd.ID, &cmd.HostID, &cmd.Command, &cmd.Status, &cmd.TriggeredBy, &cmd.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -540,7 +579,7 @@ func (db *DB) UpdateCommandStatus(id int64, status, output string) error {
 
 func (db *DB) GetAptCommandHistory(hostID string, limit int) ([]models.AptCommand, error) {
 	rows, err := db.conn.Query(
-		`SELECT id, host_id, command, status, output, created_at, started_at, ended_at
+		`SELECT id, host_id, command, status, output, triggered_by, created_at, started_at, ended_at
 		 FROM apt_commands WHERE host_id = $1 ORDER BY created_at DESC LIMIT $2`, hostID, limit,
 	)
 	if err != nil {
@@ -551,7 +590,7 @@ func (db *DB) GetAptCommandHistory(hostID string, limit int) ([]models.AptComman
 	var cmds []models.AptCommand
 	for rows.Next() {
 		var c models.AptCommand
-		if err := rows.Scan(&c.ID, &c.HostID, &c.Command, &c.Status, &c.Output, &c.CreatedAt, &c.StartedAt, &c.EndedAt); err != nil {
+		if err := rows.Scan(&c.ID, &c.HostID, &c.Command, &c.Status, &c.Output, &c.TriggeredBy, &c.CreatedAt, &c.StartedAt, &c.EndedAt); err != nil {
 			continue
 		}
 		cmds = append(cmds, c)
@@ -567,6 +606,186 @@ func (db *DB) CreateTrackedRepo(repo *models.TrackedRepo) error {
 		 VALUES ($1,$2,$3,$4) RETURNING id, created_at`,
 		repo.Owner, repo.Repo, repo.DisplayName, repo.DockerImage,
 	).Scan(&repo.ID, &repo.CreatedAt)
+}
+
+// ========== Audit Logs ==========
+
+func (db *DB) CreateAuditLog(username, action, hostID, ipAddress, details, status string) error {
+	_, err := db.conn.Exec(
+		`INSERT INTO audit_logs (username, action, host_id, ip_address, details, status)
+		 VALUES ($1, $2, $3, $4, $5, $6)`,
+		username, action, hostID, ipAddress, details, status,
+	)
+	return err
+}
+
+func (db *DB) GetAuditLogs(limit, offset int) ([]models.AuditLog, error) {
+	rows, err := db.conn.Query(
+		`SELECT id, username, action, host_id, ip_address, details, status, created_at
+		 FROM audit_logs ORDER BY created_at DESC LIMIT $1 OFFSET $2`,
+		limit, offset,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var logs []models.AuditLog
+	for rows.Next() {
+		var log models.AuditLog
+		if err := rows.Scan(&log.ID, &log.Username, &log.Action, &log.HostID, &log.IPAddress,
+			&log.Details, &log.Status, &log.CreatedAt); err != nil {
+			continue
+		}
+		logs = append(logs, log)
+	}
+	return logs, nil
+}
+
+func (db *DB) GetAuditLogsByHost(hostID string, limit int) ([]models.AuditLog, error) {
+	rows, err := db.conn.Query(
+		`SELECT id, username, action, host_id, ip_address, details, status, created_at
+		 FROM audit_logs WHERE host_id = $1 ORDER BY created_at DESC LIMIT $2`,
+		hostID, limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var logs []models.AuditLog
+	for rows.Next() {
+		var log models.AuditLog
+		if err := rows.Scan(&log.ID, &log.Username, &log.Action, &log.HostID, &log.IPAddress,
+			&log.Details, &log.Status, &log.CreatedAt); err != nil {
+			continue
+		}
+		logs = append(logs, log)
+	}
+	return logs, nil
+}
+
+func (db *DB) UpdateAuditLogStatus(id int64, status, details string) error {
+	_, err := db.conn.Exec(
+		`UPDATE audit_logs SET status = $1, details = $2 WHERE id = $3`,
+		status, details, id,
+	)
+	return err
+}
+
+// ========== User TOTP ==========
+
+func (db *DB) SetUserTOTPSecret(userID int64, secret, backupCodes string, enabled bool) error {
+	_, err := db.conn.Exec(
+		`UPDATE users SET totp_secret = $1, backup_codes = $2, mfa_enabled = $3 WHERE id = $4`,
+		secret, backupCodes, enabled, userID,
+	)
+	return err
+}
+
+func (db *DB) GetUserTOTPSecret(username string) (string, error) {
+	var secret string
+	err := db.conn.QueryRow(
+		`SELECT COALESCE(totp_secret, '') FROM users WHERE username = $1`,
+		username,
+	).Scan(&secret)
+	return secret, err
+}
+
+func (db *DB) GetUserMFAStatus(username string) (bool, error) {
+	var enabled bool
+	err := db.conn.QueryRow(
+		`SELECT mfa_enabled FROM users WHERE username = $1`,
+		username,
+	).Scan(&enabled)
+	return enabled, err
+}
+
+func (db *DB) DisableUserMFA(username string) error {
+	_, err := db.conn.Exec(
+		`UPDATE users SET mfa_enabled = FALSE, totp_secret = '', backup_codes = '[]' WHERE username = $1`,
+		username,
+	)
+	return err
+}
+
+func (db *DB) ConsumeMFABackupCode(username, codeHash string) error {
+	// This would require fetching backup codes, removing the used one, and updating
+	// For simplicity, we'll implement this as a basic function
+	// In production, consider using a separate backup_codes table
+	_, err := db.conn.Exec(
+		`UPDATE users SET backup_codes = jsonb_remove_element(backup_codes, $1) WHERE username = $2`,
+		codeHash, username,
+	)
+	return err
+}
+
+// ========== Metrics Aggregates (Downsampling) ==========
+
+func (db *DB) InsertMetricsAggregate(agg *models.MetricsAggregate) error {
+	return db.conn.QueryRow(
+		`INSERT INTO metrics_aggregates (host_id, aggregation_type, timestamp, cpu_usage_avg, cpu_usage_max,
+		 memory_usage_avg, memory_usage_max, disk_usage_avg, network_rx_bytes, network_tx_bytes, sample_count)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+		 RETURNING id`,
+		agg.HostID, agg.AggregationType, agg.Timestamp, agg.CPUUsageAvg, agg.CPUUsageMax,
+		agg.MemoryUsageAvg, agg.MemoryUsageMax, agg.DiskUsageAvg, agg.NetworkRxBytes, agg.NetworkTxBytes, agg.SampleCount,
+	).Scan(&agg.ID)
+}
+
+func (db *DB) GetMetricsAggregates(hostID string, aggregationType string, limit int) ([]models.MetricsAggregate, error) {
+	rows, err := db.conn.Query(
+		`SELECT id, host_id, aggregation_type, timestamp, cpu_usage_avg, cpu_usage_max,
+		 memory_usage_avg, memory_usage_max, disk_usage_avg, network_rx_bytes, network_tx_bytes, sample_count, created_at
+		 FROM metrics_aggregates WHERE host_id = $1 AND aggregation_type = $2
+		 ORDER BY timestamp DESC LIMIT $3`,
+		hostID, aggregationType, limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var aggs []models.MetricsAggregate
+	for rows.Next() {
+		var agg models.MetricsAggregate
+		if err := rows.Scan(&agg.ID, &agg.HostID, &agg.AggregationType, &agg.Timestamp, &agg.CPUUsageAvg, &agg.CPUUsageMax,
+			&agg.MemoryUsageAvg, &agg.MemoryUsageMax, &agg.DiskUsageAvg, &agg.NetworkRxBytes, &agg.NetworkTxBytes, &agg.SampleCount, &agg.CreatedAt); err != nil {
+			continue
+		}
+		aggs = append(aggs, agg)
+	}
+	return aggs, nil
+}
+
+// DeleteOldMetrics deletes raw metrics older than retentionDays and based on downsampling policy
+func (db *DB) DeleteOldMetrics(hostID string, retentionDays int) error {
+	// Keep raw metrics for only retentionDays
+	cutoffTime := time.Now().AddDate(0, 0, -retentionDays)
+	_, err := db.conn.Exec(
+		`DELETE FROM system_metrics WHERE host_id = $1 AND timestamp < $2`,
+		hostID, cutoffTime,
+	)
+	return err
+}
+
+// UpdateHostStatusBasedOnLastSeen updates host status to 'offline' if not seen for too long
+func (db *DB) UpdateHostStatusBasedOnLastSeen(maxOfflineMinutes int) error {
+	cutoffTime := time.Now().Add(time.Duration(-maxOfflineMinutes) * time.Minute)
+	_, err := db.conn.Exec(
+		`UPDATE hosts SET status = 'offline' WHERE status != 'offline' AND last_seen < $1`,
+		cutoffTime,
+	)
+	return err
+}
+
+// GetHostHealthStatus returns health check info for a host
+func (db *DB) GetHostHealthStatus(hostID string) (status string, lastSeen time.Time, err error) {
+	err = db.conn.QueryRow(
+		`SELECT status, last_seen FROM hosts WHERE id = $1`,
+		hostID,
+	).Scan(&status, &lastSeen)
+	return
 }
 
 func (db *DB) GetTrackedRepos() ([]models.TrackedRepo, error) {

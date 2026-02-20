@@ -23,6 +23,7 @@ func SetupRouter(db *database.DB, cfg *config.Config) *gin.Engine {
 	agentH := NewAgentHandler(db, cfg)
 	aptH := NewAptHandler(db, cfg)
 	dockerH := NewDockerHandler(db, cfg)
+	auditH := NewAuditHandler(db, cfg)
 
 	// ========== Public routes ==========
 	r.POST("/api/auth/login", authH.Login)
@@ -46,6 +47,10 @@ func SetupRouter(db *database.DB, cfg *config.Config) *gin.Engine {
 	{
 		// Auth
 		api.POST("/auth/change-password", authH.ChangePassword)
+		api.GET("/auth/mfa/status", authH.GetMFAStatus)
+		api.POST("/auth/mfa/setup", authH.SetupMFA)
+		api.POST("/auth/mfa/verify", authH.VerifyMFA)
+		api.POST("/auth/mfa/disable", authH.DisableMFA)
 
 		// Hosts
 		api.GET("/hosts", hostH.ListHosts)
@@ -72,6 +77,11 @@ func SetupRouter(db *database.DB, cfg *config.Config) *gin.Engine {
 		api.GET("/hosts/:id/apt", aptH.GetAptStatus)
 		api.GET("/hosts/:id/apt/history", aptH.GetCommandHistory)
 		api.POST("/apt/command", aptH.SendCommand)
+
+		// Audit logs
+		api.GET("/audit/logs", auditH.GetAuditLogs)
+		api.GET("/audit/logs/host/:host_id", auditH.GetAuditLogsByHost)
+		api.GET("/audit/logs/user/:username", auditH.GetAuditLogsByUser)
 	}
 
 	// Serve frontend static files

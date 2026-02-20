@@ -118,14 +118,15 @@ type AptStatus struct {
 }
 
 type AptCommand struct {
-	ID        int64      `json:"id" db:"id"`
-	HostID    string     `json:"host_id" db:"host_id"`
-	Command   string     `json:"command" db:"command"` // update, upgrade, dist-upgrade
-	Status    string     `json:"status" db:"status"`   // pending, running, completed, failed
-	Output    string     `json:"output" db:"output"`
-	CreatedAt time.Time  `json:"created_at" db:"created_at"`
-	StartedAt *time.Time `json:"started_at" db:"started_at"`
-	EndedAt   *time.Time `json:"ended_at" db:"ended_at"`
+	ID          int64      `json:"id" db:"id"`
+	HostID      string     `json:"host_id" db:"host_id"`
+	Command     string     `json:"command" db:"command"` // update, upgrade, dist-upgrade
+	Status      string     `json:"status" db:"status"`   // pending, running, completed, failed
+	Output      string     `json:"output" db:"output"`
+	TriggeredBy string     `json:"triggered_by" db:"triggered_by"` // Username who triggered this
+	CreatedAt   time.Time  `json:"created_at" db:"created_at"`
+	StartedAt   *time.Time `json:"started_at" db:"started_at"`
+	EndedAt     *time.Time `json:"ended_at" db:"ended_at"`
 }
 
 type AptCommandRequest struct {
@@ -207,17 +208,72 @@ type CommandResult struct {
 type LoginRequest struct {
 	Username string `json:"username" binding:"required"`
 	Password string `json:"password" binding:"required"`
+	TOTPCode string `json:"totp_code"` // Optional: TOTP code if user has MFA enabled
 }
 
 type LoginResponse struct {
-	Token     string    `json:"token"`
-	ExpiresAt time.Time `json:"expires_at"`
+	Token      string    `json:"token"`
+	ExpiresAt  time.Time `json:"expires_at"`
+	Role       string    `json:"role"`
+	RequireMFA bool      `json:"require_mfa"` // True if needs TOTP step
+}
+
+type TOTPSecretResponse struct {
+	Secret      string   `json:"secret"`       // Base32 encoded secret
+	QRCode      string   `json:"qr_code"`      // Data URL for QR code
+	BackupCodes []string `json:"backup_codes"` // 10 single-use backup codes
 }
 
 type User struct {
 	ID           int64     `json:"id" db:"id"`
 	Username     string    `json:"username" db:"username"`
 	PasswordHash string    `json:"-" db:"password_hash"`
-	Role         string    `json:"role" db:"role"` // admin, viewer
+	Role         string    `json:"role" db:"role"`      // admin, operator, viewer
+	TOTPSecret   string    `json:"-" db:"totp_secret"`  // Encrypted TOTP secret (empty if MFA disabled)
+	BackupCodes  string    `json:"-" db:"backup_codes"` // JSON array of backup codes (hashed)
+	MFAEnabled   bool      `json:"mfa_enabled" db:"mfa_enabled"`
 	CreatedAt    time.Time `json:"created_at" db:"created_at"`
+}
+
+// ========== RBAC & Permissions ==========
+
+const (
+	RoleAdmin    = "admin"    // Full access
+	RoleOperator = "operator" // Can launch APT commands + read all
+	RoleViewer   = "viewer"   // Read-only
+)
+
+// ========== Audit Log (APT & Admin Actions) ==========
+
+type AuditLog struct {
+	ID        int64     `json:"id" db:"id"`
+	Username  string    `json:"username" db:"username"`     // Who
+	Action    string    `json:"action" db:"action"`         // What (apt_update, apt_upgrade, user_created, etc.)
+	HostID    string    `json:"host_id" db:"host_id"`       // On which host (nullable)
+	IPAddress string    `json:"ip_address" db:"ip_address"` // Client IP
+	Details   string    `json:"details" db:"details"`       // JSON payload (command output, new privileges, etc.)
+	Status    string    `json:"status" db:"status"`         // pending, completed, failed
+	CreatedAt time.Time `json:"created_at" db:"created_at"`
+}
+
+// ========== Metrics Aggregation (for downsampling) ==========
+
+// MetricsAggregate stores downsampled metrics (5-min, hourly, daily)
+type MetricsAggregate struct {
+	ID              int64     `json:"id" db:"id"`
+	HostID          string    `json:"host_id" db:"host_id"`
+	AggregationType string    `json:"aggregation_type" db:"aggregation_type"` // 5min, hour, day
+	Timestamp       time.Time `json:"timestamp" db:"timestamp"`               // Start of the interval
+
+	// Metrics (averages for the period)
+	CPUUsageAvg    float64 `json:"cpu_usage_avg" db:"cpu_usage_avg"`
+	CPUUsageMax    float64 `json:"cpu_usage_max" db:"cpu_usage_max"`
+	MemoryUsageAvg uint64  `json:"memory_usage_avg" db:"memory_usage_avg"`
+	MemoryUsageMax uint64  `json:"memory_usage_max" db:"memory_usage_max"`
+	DiskUsageAvg   float64 `json:"disk_usage_avg" db:"disk_usage_avg"`
+	NetworkRxBytes uint64  `json:"network_rx_bytes" db:"network_rx_bytes"`
+	NetworkTxBytes uint64  `json:"network_tx_bytes" db:"network_tx_bytes"`
+
+	SampleCount int       `json:"sample_count" db:"sample_count"` // How many raw samples in period
+	CreatedAt   time.Time `json:"created_at" db:"created_at"`
 }

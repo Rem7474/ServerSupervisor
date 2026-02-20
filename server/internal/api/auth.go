@@ -7,8 +7,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/serversupervisor/server/internal/auth"
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/database"
+	"github.com/serversupervisor/server/internal/models"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -25,6 +27,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	var req struct {
 		Username string `json:"username" binding:"required"`
 		Password string `json:"password" binding:"required"`
+		TOTPCode string `json:"totp_code"` // Optional: if MFA is enabled
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
@@ -40,6 +43,27 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
 		return
+	}
+
+	// Check if user has MFA enabled
+	if user.MFAEnabled {
+		if req.TOTPCode == "" {
+			// MFA required but not provided - return flag to prompt user
+			c.JSON(http.StatusOK, gin.H{
+				"require_mfa": true,
+				"message":     "MFA code required",
+			})
+			return
+		}
+
+		// Verify TOTP code
+		if !auth.VerifyTOTPCode(user.TOTPSecret, req.TOTPCode) {
+			// Try backup codes
+			if !auth.VerifyBackupCode(user.BackupCodes, req.TOTPCode) {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid TOTP code"})
+				return
+			}
+		}
 	}
 
 	expiresAt := time.Now().Add(h.cfg.JWTExpiration)
@@ -177,4 +201,129 @@ func APIKeyMiddleware(db *database.DB, cfg *config.Config) gin.HandlerFunc {
 func HashPassword(password string) (string, error) {
 	bytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	return string(bytes), err
+}
+
+// ========== MFA Endpoints ==========
+
+// SetupMFA initiates TOTP setup for the current user
+func (h *AuthHandler) SetupMFA(c *gin.Context) {
+	username := c.GetString("username")
+	if username == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	secret, qrCodeURL, backupCodes, err := auth.GenerateTOTPSecret(username)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate MFA secret"})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.TOTPSecretResponse{
+		Secret:      secret,
+		QRCode:      qrCodeURL,
+		BackupCodes: backupCodes,
+	})
+}
+
+// VerifyMFA verifies and enables TOTP for the current user
+func (h *AuthHandler) VerifyMFA(c *gin.Context) {
+	username := c.GetString("username")
+	if username == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	var req struct {
+		Secret      string   `json:"secret" binding:"required"`
+		TOTPCode    string   `json:"totp_code" binding:"required"`
+		BackupCodes []string `json:"backup_codes" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		return
+	}
+
+	// Verify TOTP code with the secret
+	if !auth.VerifyTOTPCode(req.Secret, req.TOTPCode) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid TOTP code"})
+		return
+	}
+
+	// Hash backup codes
+	hashedCodes, err := auth.HashBackupCodes(req.BackupCodes)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to hash backup codes"})
+		return
+	}
+
+	// Get user and update MFA
+	user, err := h.db.GetUserByUsername(username)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	if err := h.db.SetUserTOTPSecret(user.ID, req.Secret, hashedCodes, true); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to enable MFA"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "MFA enabled successfully"})
+}
+
+// DisableMFA disables TOTP for the current user
+func (h *AuthHandler) DisableMFA(c *gin.Context) {
+	username := c.GetString("username")
+	if username == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	var req struct {
+		Password string `json:"password" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		return
+	}
+
+	// Verify password
+	user, err := h.db.GetUserByUsername(username)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid password"})
+		return
+	}
+
+	if err := h.db.DisableUserMFA(username); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to disable MFA"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "MFA disabled successfully"})
+}
+
+// GetMFAStatus returns MFA status for the current user
+func (h *AuthHandler) GetMFAStatus(c *gin.Context) {
+	username := c.GetString("username")
+	if username == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	user, err := h.db.GetUserByUsername(username)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"username":    user.Username,
+		"mfa_enabled": user.MFAEnabled,
+	})
 }

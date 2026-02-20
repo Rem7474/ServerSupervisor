@@ -70,15 +70,29 @@ func main() {
 		ticker := time.NewTicker(30 * time.Second)
 		defer ticker.Stop()
 		for range ticker.C {
+			// Update all hosts that haven't been seen in 2+ minutes
+			if err := db.UpdateHostStatusBasedOnLastSeen(2); err != nil {
+				log.Printf("Failed to update host status: %v", err)
+			}
+		}
+	}()
+
+	// Start periodic metrics downsampling (aggregate raw metrics)
+	go func() {
+		ticker := time.NewTicker(5 * time.Minute)
+		defer ticker.Stop()
+		for range ticker.C {
+			// Get all hosts and downsample their metrics
 			hosts, err := db.GetAllHosts()
 			if err != nil {
+				log.Printf("Failed to get hosts for downsampling: %v", err)
 				continue
 			}
 			for _, h := range hosts {
-				if h.Status == "online" && time.Since(h.LastSeen) > 2*time.Minute {
-					db.UpdateHostStatus(h.ID, "offline")
-					log.Printf("Host %s (%s) marked as offline", h.Hostname, h.ID)
-				}
+				_ = h // TODO: Implement metrics downsampling for each host
+				// Downsample 5-minute aggregates (keep for 30 days)
+				// Downsampling logic would go here
+				// For now, this is a placeholder for future enhancement
 			}
 		}
 	}()
