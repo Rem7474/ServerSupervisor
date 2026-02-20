@@ -20,51 +20,52 @@
         <div class="card">
           <div class="card-body">
             <form v-if="!result" @submit.prevent="handleSubmit">
-          <div class="mb-3">
-            <label class="form-label">Nom (alias personnel)</label>
-            <input v-model="form.name" type="text" class="form-control" required placeholder="Prod Web Server" />
-          </div>
-          <div class="mb-3">
-            <label class="form-label">Adresse IP</label>
-            <input v-model="form.ip_address" type="text" class="form-control" required placeholder="192.168.1.100" />
-          </div>
-
-          <div v-if="error" class="alert alert-danger" role="alert">
-            {{ error }}
-          </div>
-
-          <div class="text-secondary small mb-3">
-            OS et Hostname seront recuperes automatiquement lors de la premiere connexion de l'agent.
-          </div>
-
-            <button type="submit" class="btn btn-primary w-100" :disabled="loading">
-              {{ loading ? 'Enregistrement...' : 'Enregistrer l\'hote' }}
-            </button>
-          </form>
-
-          <div v-else class="alert alert-success" role="alert">
-            <div class="fw-semibold mb-2">Hote enregistre avec succes</div>
-            <div class="text-secondary mb-2">Utilisez cette cle API dans la configuration de l'agent :</div>
-            <div class="d-flex align-items-center gap-2 mb-2">
-              <div class="bg-dark rounded p-2 flex-fill">
-                <code class="text-light">{{ result.api_key }}</code>
+              <div class="mb-3">
+                <label class="form-label">Nom (alias personnel)</label>
+                <input v-model="form.name" type="text" class="form-control" required placeholder="Prod Web Server" />
               </div>
-              <button type="button" class="btn btn-outline-light" @click="copyApiKey">
-                {{ copiedApiKey ? 'Copie' : 'Copier' }}
+              <div class="mb-3">
+                <label class="form-label">Adresse IP</label>
+                <input v-model="form.ip_address" type="text" class="form-control" required placeholder="192.168.1.100" />
+              </div>
+
+              <div v-if="error" class="alert alert-danger" role="alert">
+                {{ error }}
+              </div>
+
+              <div class="text-secondary small mb-3">
+                OS et Hostname seront recuperes automatiquement lors de la premiere connexion de l'agent.
+              </div>
+
+              <button type="submit" class="btn btn-primary w-100" :disabled="loading">
+                {{ loading ? 'Enregistrement...' : 'Enregistrer l\'hote' }}
               </button>
-            </div>
-            <div class="text-secondary small">Cette cle ne sera plus affichee. Copiez-la maintenant.</div>
-            <div class="mt-3">
-              <div class="d-flex align-items-center justify-content-between mb-1">
-                <div class="text-secondary small">Configuration agent :</div>
-                <button type="button" class="btn btn-outline-light btn-sm" @click="copyAgentConfig">
-                  {{ copiedConfig ? 'Copie' : 'Copier la config' }}
+            </form>
+
+            <div v-else class="alert alert-success" role="alert">
+              <div class="fw-semibold mb-2">Hote enregistre avec succes</div>
+              <div class="text-secondary mb-2">Utilisez cette cle API dans la configuration de l'agent :</div>
+              <div class="d-flex align-items-center gap-2 mb-2">
+                <div class="bg-dark rounded p-2 flex-fill">
+                  <code class="text-light">{{ result.api_key }}</code>
+                </div>
+                <button type="button" class="btn btn-outline-light" @click="copyApiKey">
+                  {{ copiedApiKey ? 'Copie' : 'Copier' }}
                 </button>
               </div>
-              <pre class="bg-dark text-light p-2 rounded small">{{ agentConfig }}</pre>
-            </div>
-            <div class="mt-3 d-flex justify-content-end">
-              <button type="button" class="btn btn-success" @click="finishAdd">Termine</button>
+              <div class="text-secondary small">Cette cle ne sera plus affichee. Copiez-la maintenant.</div>
+              <div class="mt-3">
+                <div class="d-flex align-items-center justify-content-between mb-1">
+                  <div class="text-secondary small">Configuration agent :</div>
+                  <button type="button" class="btn btn-outline-light btn-sm" @click="copyAgentConfig">
+                    {{ copiedConfig ? 'Copie' : 'Copier la config' }}
+                  </button>
+                </div>
+                <pre class="bg-dark text-light p-2 rounded small">{{ agentConfig }}</pre>
+              </div>
+              <div class="mt-3 d-flex justify-content-end">
+                <button type="button" class="btn btn-success" @click="finishAdd">Termine</button>
+              </div>
             </div>
           </div>
         </div>
