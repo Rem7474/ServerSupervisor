@@ -13,15 +13,18 @@
             <span class="form-check-label">Selectionner tous les hotes</span>
           </label>
           <div class="ms-auto d-flex flex-wrap gap-2">
-            <button @click="bulkAptCmd('update')" class="btn btn-outline-secondary" :disabled="selectedHosts.length === 0">
-              apt update ({{ selectedHosts.length }})
-            </button>
-            <button @click="bulkAptCmd('upgrade')" class="btn btn-primary" :disabled="selectedHosts.length === 0">
-              apt upgrade ({{ selectedHosts.length }})
-            </button>
-            <button @click="bulkAptCmd('dist-upgrade')" class="btn btn-outline-danger" :disabled="selectedHosts.length === 0">
-              apt dist-upgrade ({{ selectedHosts.length }})
-            </button>
+            <template v-if="canRunApt">
+              <button @click="bulkAptCmd('update')" class="btn btn-outline-secondary" :disabled="selectedHosts.length === 0">
+                apt update ({{ selectedHosts.length }})
+              </button>
+              <button @click="bulkAptCmd('upgrade')" class="btn btn-primary" :disabled="selectedHosts.length === 0">
+                apt upgrade ({{ selectedHosts.length }})
+              </button>
+              <button @click="bulkAptCmd('dist-upgrade')" class="btn btn-outline-danger" :disabled="selectedHosts.length === 0">
+                apt dist-upgrade ({{ selectedHosts.length }})
+              </button>
+            </template>
+            <div v-else class="text-secondary small">Mode lecture seule</div>
           </div>
         </div>
       </div>
@@ -32,7 +35,10 @@
         <div class="card">
           <div class="card-body">
             <div class="d-flex align-items-center gap-3 mb-3">
-              <input type="checkbox" class="form-check-input" :value="host.id" v-model="selectedHosts" />
+              <label class="form-check">
+                <input type="checkbox" class="form-check-input" :value="host.id" v-model="selectedHosts" />
+                <span class="form-check-label"></span>
+              </label>
               <div class="flex-fill">
                 <div class="fw-semibold">{{ host.hostname || host.name }}</div>
                 <div class="text-secondary small">{{ host.ip_address }}</div>
@@ -91,7 +97,10 @@
                       {{ cmd.status }}
                     </span>
                   </div>
-                  <div class="text-secondary small mt-1">{{ formatDate(cmd.created_at) }}</div>
+                  <div class="text-secondary small mt-1">
+                    {{ formatDate(cmd.created_at) }}
+                    <span v-if="cmd.triggered_by">• par {{ cmd.triggered_by }}</span>
+                  </div>
                   <pre v-if="cmd.output" class="bg-dark text-light p-2 rounded mt-2" style="max-height: 8rem; overflow-y: auto;">{{ cmd.output }}</pre>
                 </div>
               </div>
@@ -104,8 +113,9 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import apiClient from '../api'
+import { useAuthStore } from '../stores/auth'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import utc from 'dayjs/plugin/utc'
@@ -121,6 +131,8 @@ const selectAll = ref(false)
 const aptStatuses = ref({})
 const aptHistories = ref({})
 const expandedHistories = ref({})
+const auth = useAuthStore()
+const canRunApt = computed(() => auth.role === 'admin' || auth.role === 'operator')
 
 function toggleSelectAll() {
   if (selectAll.value) {

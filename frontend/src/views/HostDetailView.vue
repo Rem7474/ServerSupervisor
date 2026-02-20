@@ -1,23 +1,27 @@
 <template>
   <div>
-    <div class="page-header d-flex align-items-center gap-3 mb-4">
-      <router-link to="/" class="btn btn-outline-secondary btn-icon" aria-label="Retour">
-        <svg class="icon" width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
-        </svg>
-      </router-link>
-      <div>
-        <h2 class="page-title">{{ host?.name || host?.hostname || 'Chargement...' }}</h2>
-        <div class="text-secondary">
-          {{ host?.hostname || 'Non connecte' }} — {{ host?.os || 'OS inconnu' }} • {{ host?.ip_address }}
+    <div class="page-header mb-4">
+      <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3">
+        <div>
+          <div class="text-secondary small">
+            <router-link to="/" class="text-decoration-none">Dashboard</router-link>
+            <span class="mx-1">/</span>
+            <span>Hote</span>
+          </div>
+          <h2 class="page-title">{{ host?.name || host?.hostname || 'Chargement...' }}</h2>
+          <div class="text-secondary">
+            {{ host?.hostname || 'Non connecte' }} — {{ host?.os || 'OS inconnu' }} • {{ host?.ip_address }}
+            <span v-if="host?.last_seen">• Derniere activite: {{ formatDate(host.last_seen) }}</span>
+          </div>
         </div>
-      </div>
-      <div class="ms-auto d-flex align-items-center gap-2">
+        <div class="d-flex align-items-center gap-2">
+          <router-link to="/" class="btn btn-outline-secondary">Retour au dashboard</router-link>
         <button @click="startEdit" class="btn btn-outline-secondary">Modifier</button>
         <button @click="deleteHost" class="btn btn-outline-danger">Supprimer</button>
         <span v-if="host" :class="host.status === 'online' ? 'badge bg-green-lt text-green' : 'badge bg-red-lt text-red'">
           {{ host.status === 'online' ? 'En ligne' : 'Hors ligne' }}
         </span>
+        </div>
       </div>
     </div>
 
@@ -101,9 +105,9 @@
           <div class="card-header d-flex align-items-center justify-content-between">
             <h3 class="card-title">CPU ({{ chartHours }}h)</h3>
             <div class="btn-group btn-group-sm">
-              <button v-for="h in [1, 6, 24, 72]" :key="h" @click="loadHistory(h)"
+              <button v-for="h in [1, 6, 24, 168, 720, 8760]" :key="h" @click="loadHistory(h)"
                 :class="chartHours === h ? 'btn btn-primary' : 'btn btn-outline-secondary'">
-                {{ h }}h
+                {{ h >= 24 ? (h / 24) + 'j' : h + 'h' }}
               </button>
             </div>
           </div>
@@ -193,10 +197,11 @@
     <div v-if="aptStatus" class="card">
       <div class="card-header d-flex align-items-center justify-content-between">
         <h3 class="card-title">APT - Mises a jour systeme</h3>
-        <div class="btn-group btn-group-sm">
+        <div class="btn-group btn-group-sm" v-if="canRunApt">
           <button @click="sendAptCmd('update')" class="btn btn-outline-secondary">apt update</button>
           <button @click="sendAptCmd('upgrade')" class="btn btn-primary">apt upgrade</button>
         </div>
+        <span v-else class="text-secondary small">Mode lecture seule</span>
       </div>
       <div class="card-body">
         <div class="row row-cards">
@@ -229,15 +234,44 @@
         </div>
       </div>
     </div>
+
+    <div v-if="auditLogs.length" class="card mt-4">
+      <div class="card-header">
+        <h3 class="card-title">Audit APT (hote)</h3>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-vcenter card-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Utilisateur</th>
+              <th>Action</th>
+              <th>Statut</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="log in auditLogs" :key="log.id">
+              <td>{{ formatDate(log.created_at) }}</td>
+              <td class="fw-semibold">{{ log.username }}</td>
+              <td><code>{{ log.action }}</code></td>
+              <td>
+                <span :class="statusClass(log.status)">{{ log.status }}</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Line } from 'vue-chartjs'
 import { Chart as ChartJS, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip } from 'chart.js'
 import apiClient from '../api'
+import { useAuthStore } from '../stores/auth'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import utc from 'dayjs/plugin/utc'
@@ -256,6 +290,7 @@ const host = ref(null)
 const metrics = ref(null)
 const containers = ref([])
 const aptStatus = ref(null)
+const auditLogs = ref([])
 const metricsHistory = ref([])
 const chartHours = ref(24)
 const cpuChartData = ref(null)
@@ -264,6 +299,8 @@ const isEditing = ref(false)
 const saving = ref(false)
 const editForm = ref({ name: '', hostname: '', ip_address: '', os: '' })
 let refreshInterval = null
+const auth = useAuthStore()
+const canRunApt = computed(() => auth.role === 'admin' || auth.role === 'operator')
 
 const chartOptions = {
   responsive: true,
@@ -283,6 +320,12 @@ async function fetchData() {
     metrics.value = res.data.metrics
     containers.value = res.data.containers || []
     aptStatus.value = res.data.apt_status
+    try {
+      const auditRes = await apiClient.getAuditLogsByHost(hostId)
+      auditLogs.value = Array.isArray(auditRes.data) ? auditRes.data : []
+    } catch (e) {
+      auditLogs.value = []
+    }
   } catch (e) {
     console.error('Failed to fetch host data:', e)
   }
@@ -306,7 +349,9 @@ async function loadHistory(hours) {
 }
 
 function buildCharts() {
-  const labels = metricsHistory.value.map(m => dayjs(m.timestamp).format('HH:mm'))
+  const labels = metricsHistory.value.map(m =>
+    chartHours.value >= 24 ? dayjs(m.timestamp).format('DD/MM HH:mm') : dayjs(m.timestamp).format('HH:mm')
+  )
   cpuChartData.value = {
     labels,
     datasets: [{
@@ -399,6 +444,12 @@ function memColor(pct) {
   if (pct > 90) return 'text-red'
   if (pct > 75) return 'text-yellow'
   return 'text-green'
+}
+
+function statusClass(status) {
+  if (status === 'completed') return 'badge bg-green-lt text-green'
+  if (status === 'failed') return 'badge bg-red-lt text-red'
+  return 'badge bg-yellow-lt text-yellow'
 }
 
 async function deleteHost() {

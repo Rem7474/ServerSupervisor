@@ -43,6 +43,18 @@ const routes = [
     component: () => import('../views/AddHostView.vue'),
     meta: { requiresAuth: true },
   },
+  {
+    path: '/audit',
+    name: 'AuditLogs',
+    component: () => import('../views/AuditLogsView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true },
+  },
+  {
+    path: '/security',
+    name: 'Security',
+    component: () => import('../views/SecurityView.vue'),
+    meta: { requiresAuth: true },
+  },
 ]
 
 const router = createRouter({
@@ -54,6 +66,8 @@ router.beforeEach((to, from, next) => {
   const auth = useAuthStore()
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
     next('/login')
+  } else if (to.meta.requiresAdmin && !auth.isAdmin) {
+    next('/')
   } else if (to.path === '/login' && auth.isAuthenticated) {
     next('/')
   } else {

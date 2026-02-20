@@ -56,6 +56,16 @@
                   <span class="nav-link-title">Versions & Repos</span>
                 </router-link>
               </li>
+              <li v-if="auth.isAdmin" class="nav-item">
+                <router-link to="/audit" class="nav-link" active-class="active">
+                  <span class="nav-link-icon">
+                    <svg class="icon" width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6M5 7h14a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V9a2 2 0 012-2z"/>
+                    </svg>
+                  </span>
+                  <span class="nav-link-title">Audit</span>
+                </router-link>
+              </li>
             </ul>
 
             <div class="ms-auto d-flex align-items-center position-relative">
@@ -69,9 +79,13 @@
 
               <div v-if="userMenuOpen" class="dropdown-menu dropdown-menu-end show mt-2">
                 <div class="dropdown-header">Compte</div>
+                <div class="dropdown-item text-secondary small">Role: {{ auth.role || 'inconnu' }}</div>
                 <button class="dropdown-item" @click="openChangePassword">
                   Changer le mot de passe
                 </button>
+                <router-link to="/security" class="dropdown-item" @click="userMenuOpen = false">
+                  Securite (MFA)
+                </router-link>
                 <div class="dropdown-divider"></div>
                 <button class="dropdown-item text-danger" @click="handleLogout">Deconnexion</button>
               </div>

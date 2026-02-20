@@ -9,13 +9,16 @@
         <div class="btn-list">
           <button class="btn btn-outline-secondary" @click="selectAllFiltered">Tout selectionner</button>
           <button class="btn btn-outline-secondary" @click="clearSelection" :disabled="selectedCount === 0">Vider</button>
-          <button class="btn btn-outline-secondary" @click="sendBulkApt('update')" :disabled="selectedCount === 0">
-            apt update ({{ selectedCount }})
-          </button>
-          <button class="btn btn-primary" @click="sendBulkApt('upgrade')" :disabled="selectedCount === 0">
-            apt upgrade ({{ selectedCount }})
-          </button>
+          <template v-if="canRunApt">
+            <button class="btn btn-outline-secondary" @click="sendBulkApt('update')" :disabled="selectedCount === 0">
+              apt update ({{ selectedCount }})
+            </button>
+            <button class="btn btn-primary" @click="sendBulkApt('upgrade')" :disabled="selectedCount === 0">
+              apt upgrade ({{ selectedCount }})
+            </button>
+          </template>
         </div>
+        <div v-if="!canRunApt" class="text-secondary small">Mode lecture seule</div>
         <router-link to="/hosts/new" class="btn btn-primary">
           <svg class="icon me-2" width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
@@ -109,12 +112,15 @@
           <tbody>
             <tr v-for="host in sortedHosts" :key="host.id">
               <td>
-                <input
-                  class="form-check-input"
-                  type="checkbox"
-                  :checked="isSelected(host.id)"
-                  @click.stop.prevent="toggleHostSelection(host.id)"
-                />
+                <label class="form-check">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    :value="host.id"
+                    v-model="selectedHostIds"
+                  />
+                  <span class="form-check-label"></span>
+                </label>
               </td>
               <td>
                 <router-link :to="`/hosts/${host.id}`" class="fw-semibold text-decoration-none">
@@ -196,6 +202,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import apiClient from '../api'
+import { useAuthStore } from '../stores/auth'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import utc from 'dayjs/plugin/utc'
@@ -215,11 +222,13 @@ const sortKey = ref('name')
 const sortDir = ref('asc')
 const selectedHostIds = ref([])
 let refreshInterval = null
+const auth = useAuthStore()
 
 const onlineCount = computed(() => hosts.value.filter(h => h.status === 'online').length)
 const offlineCount = computed(() => hosts.value.filter(h => h.status !== 'online').length)
 const outdatedVersions = computed(() => versionComparisons.value.filter(v => !v.is_up_to_date).length)
 const selectedCount = computed(() => selectedHostIds.value.length)
+const canRunApt = computed(() => auth.role === 'admin' || auth.role === 'operator')
 
 const filteredHosts = computed(() => {
   const query = searchQuery.value.trim().toLowerCase()
@@ -297,18 +306,6 @@ async function fetchData() {
     console.error('Failed to fetch dashboard data:', e)
   } finally {
     loading.value = false
-  }
-}
-
-function isSelected(hostId) {
-  return selectedHostIds.value.includes(hostId)
-}
-
-function toggleHostSelection(hostId) {
-  if (isSelected(hostId)) {
-    selectedHostIds.value = selectedHostIds.value.filter(id => id !== hostId)
-  } else {
-    selectedHostIds.value = [...selectedHostIds.value, hostId]
   }
 }
 

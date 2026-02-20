@@ -30,9 +30,15 @@ api.interceptors.response.use(
 
 export default {
   // Auth
-  login: (username, password) => api.post('/auth/login', { username, password }),
+  login: (username, password, totpCode = '') =>
+    api.post('/auth/login', { username, password, ...(totpCode ? { totp_code: totpCode } : {}) }),
   changePassword: (currentPassword, newPassword) =>
     api.post('/v1/auth/change-password', { current_password: currentPassword, new_password: newPassword }),
+  getMFAStatus: () => api.get('/v1/auth/mfa/status'),
+  setupMFA: () => api.post('/v1/auth/mfa/setup'),
+  verifyMFA: (secret, totpCode, backupCodes) =>
+    api.post('/v1/auth/mfa/verify', { secret, totp_code: totpCode, backup_codes: backupCodes }),
+  disableMFA: (password) => api.post('/v1/auth/mfa/disable', { password }),
 
   // Hosts
   getHosts: () => api.get('/v1/hosts'),
@@ -59,4 +65,9 @@ export default {
   getAptStatus: (hostId) => api.get(`/v1/hosts/${hostId}/apt`),
   getAptHistory: (hostId) => api.get(`/v1/hosts/${hostId}/apt/history`),
   sendAptCommand: (hostIds, command) => api.post('/v1/apt/command', { host_ids: hostIds, command }),
+
+  // Audit
+  getAuditLogs: (page = 1, limit = 50) => api.get(`/v1/audit/logs?page=${page}&limit=${limit}`),
+  getAuditLogsByHost: (hostId, limit = 100) => api.get(`/v1/audit/logs/host/${hostId}?limit=${limit}`),
+  getAuditLogsByUser: (username, limit = 100) => api.get(`/v1/audit/logs/user/${username}?limit=${limit}`),
 }
