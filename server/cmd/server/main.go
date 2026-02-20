@@ -21,6 +21,7 @@ func main() {
 
 	// Load config
 	cfg := config.Load()
+	log.Printf("Database Config: host=%s port=%s user=%s dbname=%s", cfg.DBHost, cfg.DBPort, cfg.DBUser, cfg.DBName)
 
 	// ⚠️  Security warnings for default configuration
 	if cfg.JWTSecret == "change-me-in-production-please" {
@@ -28,6 +29,11 @@ func main() {
 	}
 	if cfg.AdminPassword == "admin" {
 		log.Println("⚠️  WARNING: ADMIN_PASSWORD is 'admin'. Change it immediately!")
+	}
+
+	// Ensure database exists
+	if err := database.EnsureDatabaseExists(cfg); err != nil {
+		log.Printf("Warning: could not ensure database exists: %v (will retry on connection)", err)
 	}
 
 	// Connect to database

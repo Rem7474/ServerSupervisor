@@ -9,7 +9,7 @@ import (
 	"log"
 	"time"
 
-	_ "github.com/lib/pq"
+	"github.com/lib/pq"
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/models"
 )
@@ -18,6 +18,40 @@ import (
 func HashAPIKey(apiKey string) string {
 	hash := sha256.Sum256([]byte(apiKey))
 	return hex.EncodeToString(hash[:])
+}
+
+// EnsureDatabaseExists creates the database if it doesn't exist
+func EnsureDatabaseExists(cfg *config.Config) error {
+	// Connect to the default "postgres" database to create our database
+	tempDSN := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=postgres sslmode=%s",
+		cfg.DBHost, cfg.DBPort, cfg.DBUser, cfg.DBPassword, cfg.DBSSLMode)
+
+	tempConn, err := sql.Open("postgres", tempDSN)
+	if err != nil {
+		return fmt.Errorf("failed to connect to postgres database: %w", err)
+	}
+	defer tempConn.Close()
+
+	if err := tempConn.Ping(); err != nil {
+		return fmt.Errorf("failed to ping postgres database: %w", err)
+	}
+
+	// Create database if it doesn't exist
+	var exists int
+	row := tempConn.QueryRow("SELECT 1 FROM pg_database WHERE datname = $1", cfg.DBName)
+	if err := row.Scan(&exists); err != nil {
+		if err != sql.ErrNoRows {
+			return fmt.Errorf("failed to check database existence: %w", err)
+		}
+
+		createDBSQL := fmt.Sprintf("CREATE DATABASE %s", pq.QuoteIdentifier(cfg.DBName))
+		if _, err := tempConn.Exec(createDBSQL); err != nil {
+			return fmt.Errorf("failed to create database: %w", err)
+		}
+	}
+
+	log.Printf("Database %s is ready", cfg.DBName)
+	return nil
 }
 
 type DB struct {
@@ -156,7 +190,9 @@ func (db *DB) migrate() error {
 		// Migration: Add name column to hosts if it doesn't exist
 		`ALTER TABLE IF EXISTS hosts ADD COLUMN IF NOT EXISTS name VARCHAR(255) NOT NULL DEFAULT ''`,
 		// Migration: Convert package_list from TEXT to JSONB for existing databases
+		`ALTER TABLE IF EXISTS apt_status ALTER COLUMN package_list DROP DEFAULT`,
 		`ALTER TABLE IF EXISTS apt_status ALTER COLUMN package_list TYPE JSONB USING COALESCE(package_list::jsonb, '[]'::jsonb)`,
+		`ALTER TABLE IF EXISTS apt_status ALTER COLUMN package_list SET DEFAULT '[]'::jsonb`,
 		// Migration: Add TOTP & RBAC fields to users
 		`ALTER TABLE IF EXISTS users ADD COLUMN IF NOT EXISTS totp_secret TEXT DEFAULT ''`,
 		`ALTER TABLE IF EXISTS users ADD COLUMN IF NOT EXISTS backup_codes TEXT DEFAULT '[]'`,

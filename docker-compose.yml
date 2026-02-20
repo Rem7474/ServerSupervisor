@@ -9,8 +9,9 @@ services:
       POSTGRES_DB: serversupervisor
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./docker-init.sh:/docker-entrypoint-initdb.d/init.sh
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U supervisor"]
+      test: ["CMD-SHELL", "pg_isready -U supervisor -d serversupervisor"]
       interval: 10s
       timeout: 5s
       retries: 5
