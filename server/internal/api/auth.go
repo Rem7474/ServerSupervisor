@@ -108,11 +108,11 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"token":               tokenString,
-		"expires_at":          expiresAt,
-		"role":                user.Role,
-		"refresh_token":       refreshToken,
-		"refresh_expires_at":  refreshExpiresAt,
+		"token":              tokenString,
+		"expires_at":         expiresAt,
+		"role":               user.Role,
+		"refresh_token":      refreshToken,
+		"refresh_expires_at": refreshExpiresAt,
 	})
 }
 

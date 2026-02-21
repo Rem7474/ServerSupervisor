@@ -144,15 +144,15 @@ func matchRule(rule models.AlertRule, host models.Host, value float64) bool {
 func (n *notifier) notify(cfg *config.Config, rule models.AlertRule, host models.Host, value float64) {
 	msg := fmt.Sprintf("Alert %s %s %.2f on host %s (%s)", rule.Metric, rule.Operator, value, host.Name, host.ID)
 	payload := map[string]interface{}{
-		"title":       "ServerSupervisor Alert",
-		"message":     msg,
-		"rule_id":     rule.ID,
-		"host_id":     host.ID,
-		"host_name":   host.Name,
-		"metric":      rule.Metric,
-		"operator":    rule.Operator,
-		"threshold":   rule.Threshold,
-		"value":       value,
+		"title":        "ServerSupervisor Alert",
+		"message":      msg,
+		"rule_id":      rule.ID,
+		"host_id":      host.ID,
+		"host_name":    host.Name,
+		"metric":       rule.Metric,
+		"operator":     rule.Operator,
+		"threshold":    rule.Threshold,
+		"value":        value,
 		"triggered_at": time.Now().UTC(),
 	}
 

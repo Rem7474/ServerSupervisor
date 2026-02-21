@@ -283,7 +283,6 @@ func (h *WSHandler) readLoop(conn *websocket.Conn, done chan struct{}) {
 	}
 }
 
-
 func (h *WSHandler) validateToken(tokenString string) bool {
 	if tokenString == "" {
 		return false

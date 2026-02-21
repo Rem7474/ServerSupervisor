@@ -26,12 +26,12 @@ type Config struct {
 	DBSSLMode  string
 
 	// Auth
-	JWTSecret     string
-	JWTExpiration time.Duration
+	JWTSecret              string
+	JWTExpiration          time.Duration
 	RefreshTokenExpiration time.Duration
-	APIKeyHeader  string
-	AdminUser     string
-	AdminPassword string
+	APIKeyHeader           string
+	AdminUser              string
+	AdminPassword          string
 
 	// Rate limiting
 	RateLimitRPS   int
@@ -69,12 +69,12 @@ func Load() *Config {
 		DBName:     getEnv("DB_NAME", "serversupervisor"),
 		DBSSLMode:  getEnv("DB_SSLMODE", "disable"),
 
-		JWTSecret:     getEnv("JWT_SECRET", DefaultJWTSecret),
-		JWTExpiration: getDurationEnv("JWT_EXPIRATION", 24*time.Hour),
+		JWTSecret:              getEnv("JWT_SECRET", DefaultJWTSecret),
+		JWTExpiration:          getDurationEnv("JWT_EXPIRATION", 24*time.Hour),
 		RefreshTokenExpiration: getDurationEnv("REFRESH_TOKEN_EXPIRATION", 7*24*time.Hour),
-		APIKeyHeader:  "X-API-Key",
-		AdminUser:     getEnv("ADMIN_USER", "admin"),
-		AdminPassword: getEnv("ADMIN_PASSWORD", "admin"),
+		APIKeyHeader:           "X-API-Key",
+		AdminUser:              getEnv("ADMIN_USER", "admin"),
+		AdminPassword:          getEnv("ADMIN_PASSWORD", "admin"),
 
 		RateLimitRPS:   getIntEnv("RATE_LIMIT_RPS", 100),
 		RateLimitBurst: getIntEnv("RATE_LIMIT_BURST", 200),

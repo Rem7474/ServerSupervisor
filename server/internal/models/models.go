@@ -28,11 +28,11 @@ type HostRegistration struct {
 }
 
 type HostUpdate struct {
-	Name         *string `json:"name"`
-	Hostname     *string `json:"hostname"`
-	IPAddress    *string `json:"ip_address"`
-	OS           *string `json:"os"`
-	AgentVersion *string `json:"agent_version"`
+	Name         *string   `json:"name"`
+	Hostname     *string   `json:"hostname"`
+	IPAddress    *string   `json:"ip_address"`
+	OS           *string   `json:"os"`
+	AgentVersion *string   `json:"agent_version"`
 	Tags         *[]string `json:"tags"`
 }
 
@@ -283,15 +283,15 @@ type AuditLog struct {
 // ========== Alerts ==========
 
 type AlertRule struct {
-	ID              int64    `json:"id" db:"id"`
-	HostID          *string  `json:"host_id" db:"host_id"`
-	Metric          string   `json:"metric" db:"metric"`
-	Operator        string   `json:"operator" db:"operator"`
-	Threshold       *float64 `json:"threshold" db:"threshold"`
-	DurationSeconds int      `json:"duration_seconds" db:"duration_seconds"`
-	Channel         string   `json:"channel" db:"channel"`
-	ChannelConfig   string   `json:"channel_config" db:"channel_config"`
-	Enabled         bool     `json:"enabled" db:"enabled"`
+	ID              int64     `json:"id" db:"id"`
+	HostID          *string   `json:"host_id" db:"host_id"`
+	Metric          string    `json:"metric" db:"metric"`
+	Operator        string    `json:"operator" db:"operator"`
+	Threshold       *float64  `json:"threshold" db:"threshold"`
+	DurationSeconds int       `json:"duration_seconds" db:"duration_seconds"`
+	Channel         string    `json:"channel" db:"channel"`
+	ChannelConfig   string    `json:"channel_config" db:"channel_config"`
+	Enabled         bool      `json:"enabled" db:"enabled"`
 	CreatedAt       time.Time `json:"created_at" db:"created_at"`
 }
 

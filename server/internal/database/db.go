@@ -101,7 +101,7 @@ func (db *DB) migrate() error {
 			revoked_at TIMESTAMP WITH TIME ZONE,
 			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 		)`,
-		`CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens(user_id)` ,
+		`CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens(user_id)`,
 		`CREATE TABLE IF NOT EXISTS hosts (
 			id VARCHAR(64) PRIMARY KEY,
 			name VARCHAR(255) NOT NULL,

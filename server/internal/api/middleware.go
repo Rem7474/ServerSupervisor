@@ -39,7 +39,6 @@ func NewIPRateLimiter(rps int, burst int, trustedProxyCIDRs []string) *IPRateLim
 	return rl
 }
 
-
 func (rl *IPRateLimiter) getClientIP(c *gin.Context) string {
 	remoteIP := rl.remoteAddrIP(c)
 	if remoteIP == "" {
