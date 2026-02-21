@@ -12,12 +12,16 @@
           <div class="text-secondary">
             {{ host?.hostname || 'Non connecte' }} — {{ host?.os || 'OS inconnu' }} • {{ host?.ip_address }}
             <span v-if="host?.last_seen">• Derniere activite: {{ formatDate(host.last_seen) }}</span>
+            <span v-if="host?.agent_version">• Agent v{{ host.agent_version }}</span>
           </div>
         </div>
         <div class="d-flex align-items-center gap-2">
           <router-link to="/" class="btn btn-outline-secondary">Retour au dashboard</router-link>
         <button @click="startEdit" class="btn btn-outline-secondary">Modifier</button>
         <button @click="deleteHost" class="btn btn-outline-danger">Supprimer</button>
+        <span v-if="host?.agent_version" :class="isAgentUpToDate(host.agent_version) ? 'badge bg-green-lt text-green' : 'badge bg-yellow-lt text-yellow'">
+          Agent v{{ host.agent_version }}
+        </span>
         <span v-if="host" :class="host.status === 'online' ? 'badge bg-green-lt text-green' : 'badge bg-red-lt text-red'">
           {{ host.status === 'online' ? 'En ligne' : 'Hors ligne' }}
         </span>
@@ -310,6 +314,8 @@ dayjs.extend(relativeTime)
 dayjs.extend(utc)
 dayjs.locale('fr')
 
+const LATEST_AGENT_VERSION = '1.2.0'
+
 const route = useRoute()
 const router = useRouter()
 const hostId = route.params.id
@@ -334,12 +340,36 @@ const canRunApt = computed(() => auth.role === 'admin' || auth.role === 'operato
 const chartOptions = {
   responsive: true,
   maintainAspectRatio: false,
-  plugins: { legend: { display: false } },
+  plugins: {
+    legend: { display: false },
+    tooltip: {
+      enabled: true,
+      mode: 'index',
+      intersect: false,
+      backgroundColor: 'rgba(0, 0, 0, 0.8)',
+      titleColor: '#fff',
+      bodyColor: '#fff',
+      borderColor: '#555',
+      borderWidth: 1,
+      padding: 10,
+      displayColors: false,
+      callbacks: {
+        title: (items) => {
+          return items[0]?.label || ''
+        },
+        label: (context) => {
+          const value = context.parsed.y.toFixed(1)
+          return `${value}%`
+        },
+      },
+    },
+  },
   scales: {
     x: { display: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280', maxTicksLimit: 10 } },
     y: { display: true, min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280' } },
   },
-  elements: { point: { radius: 0 }, line: { tension: 0.3 } },
+  elements: { point: { radius: 0, hitRadius: 10, hoverRadius: 5 }, line: { tension: 0.3 } },
+  interaction: { mode: 'nearest', axis: 'x', intersect: false },
 }
 
 function connectWebSocket() {
@@ -487,6 +517,11 @@ function statusClass(status) {
   if (status === 'completed') return 'badge bg-green-lt text-green'
   if (status === 'failed') return 'badge bg-red-lt text-red'
   return 'badge bg-yellow-lt text-yellow'
+}
+
+function isAgentUpToDate(version) {
+  if (!version) return false
+  return version === LATEST_AGENT_VERSION
 }
 
 async function deleteHost() {

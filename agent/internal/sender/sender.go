@@ -19,11 +19,12 @@ type Sender struct {
 }
 
 type Report struct {
-	HostID    string      `json:"host_id"`
-	Metrics   interface{} `json:"metrics"`
-	Docker    interface{} `json:"docker"`
-	AptStatus interface{} `json:"apt_status"`
-	Timestamp time.Time   `json:"timestamp"`
+	HostID       string      `json:"host_id"`
+	AgentVersion string      `json:"agent_version"`
+	Metrics      interface{} `json:"metrics"`
+	Docker       interface{} `json:"docker"`
+	AptStatus    interface{} `json:"apt_status"`
+	Timestamp    time.Time   `json:"timestamp"`
 }
 
 type ReportResponse struct {
@@ -157,5 +158,43 @@ func (s *Sender) ReportCommandStatus(commandID int64, status string) error {
 	}
 
 	log.Printf("Command #%d marked as %s", commandID, status)
+	return nil
+}
+
+// StreamCommandChunk sends a chunk of command output to the server for real-time streaming
+func (s *Sender) StreamCommandChunk(commandID int64, chunk string) error {
+	payload := struct {
+		CommandID string `json:"command_id"`
+		Chunk     string `json:"chunk"`
+	}{
+		CommandID: fmt.Sprintf("%d", commandID),
+		Chunk:     chunk,
+	}
+
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("failed to marshal chunk: %w", err)
+	}
+
+	req, err := http.NewRequest("POST", s.cfg.ServerURL+"/api/agent/command/stream", bytes.NewReader(data))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-API-Key", s.cfg.APIKey)
+
+	resp, err := s.client.Do(req)
+	if err != nil {
+		// Don't fail the command if streaming fails, just log it
+		log.Printf("Failed to stream chunk for command #%d: %v", commandID, err)
+		return nil
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("Server returned status %d when streaming chunk", resp.StatusCode)
+	}
+
 	return nil
 }

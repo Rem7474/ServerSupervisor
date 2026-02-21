@@ -7,16 +7,17 @@ import (
 // ========== Host (VM) ==========
 
 type Host struct {
-	ID        string    `json:"id" db:"id"`
-	Name      string    `json:"name" db:"name"`         // User-defined name (e.g., "Prod Web Server")
-	Hostname  string    `json:"hostname" db:"hostname"` // System hostname (auto-populated by agent)
-	IPAddress string    `json:"ip_address" db:"ip_address"`
-	OS        string    `json:"os" db:"os"` // Auto-populated by agent
-	APIKey    string    `json:"-" db:"api_key"`
-	Status    string    `json:"status" db:"status"` // online, offline, warning
-	LastSeen  time.Time `json:"last_seen" db:"last_seen"`
-	CreatedAt time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
+	ID           string    `json:"id" db:"id"`
+	Name         string    `json:"name" db:"name"`         // User-defined name (e.g., "Prod Web Server")
+	Hostname     string    `json:"hostname" db:"hostname"` // System hostname (auto-populated by agent)
+	IPAddress    string    `json:"ip_address" db:"ip_address"`
+	OS           string    `json:"os" db:"os"`                       // Auto-populated by agent
+	AgentVersion string    `json:"agent_version" db:"agent_version"` // Agent version
+	APIKey       string    `json:"-" db:"api_key"`
+	Status       string    `json:"status" db:"status"` // online, offline, warning
+	LastSeen     time.Time `json:"last_seen" db:"last_seen"`
+	CreatedAt    time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at" db:"updated_at"`
 }
 
 type HostRegistration struct {
@@ -25,10 +26,11 @@ type HostRegistration struct {
 }
 
 type HostUpdate struct {
-	Name      *string `json:"name"`
-	Hostname  *string `json:"hostname"`
-	IPAddress *string `json:"ip_address"`
-	OS        *string `json:"os"`
+	Name         *string `json:"name"`
+	Hostname     *string `json:"hostname"`
+	IPAddress    *string `json:"ip_address"`
+	OS           *string `json:"os"`
+	AgentVersion *string `json:"agent_version"`
 }
 
 // ========== System Metrics ==========
@@ -190,11 +192,12 @@ type VersionComparison struct {
 // ========== Agent Heartbeat / Full Report ==========
 
 type AgentReport struct {
-	HostID    string        `json:"host_id"`
-	Metrics   SystemMetrics `json:"metrics"`
-	Docker    DockerReport  `json:"docker"`
-	AptStatus AptStatus     `json:"apt_status"`
-	Timestamp time.Time     `json:"timestamp"`
+	HostID       string        `json:"host_id"`
+	AgentVersion string        `json:"agent_version"`
+	Metrics      SystemMetrics `json:"metrics"`
+	Docker       DockerReport  `json:"docker"`
+	AptStatus    AptStatus     `json:"apt_status"`
+	Timestamp    time.Time     `json:"timestamp"`
 }
 
 // ========== Commands (server → agent) ==========

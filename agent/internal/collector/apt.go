@@ -79,6 +79,12 @@ func CollectAPT() (*AptStatus, error) {
 
 // ExecuteAptCommand runs an apt command (update, upgrade, dist-upgrade)
 func ExecuteAptCommand(command string) (string, error) {
+	return ExecuteAptCommandWithStreaming(command, nil)
+}
+
+// ExecuteAptCommandWithStreaming runs an apt command with real-time output streaming
+// streamCallback is called for each chunk of output (can be nil)
+func ExecuteAptCommandWithStreaming(command string, streamCallback func(chunk string)) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
@@ -95,6 +101,18 @@ func ExecuteAptCommand(command string) (string, error) {
 	}
 
 	log.Printf("Executing: sudo apt %s -y", command)
+
+	// If streaming callback provided, capture output in real-time
+	if streamCallback != nil {
+		output, err := runCommandWithStreaming(cmd, streamCallback)
+		if err != nil {
+			return output, fmt.Errorf("apt %s failed: %w\nOutput: %s", command, err, output)
+		}
+		log.Printf("apt %s completed successfully", command)
+		return output, nil
+	}
+
+	// Fallback to simple execution
 	out, err := cmd.CombinedOutput()
 	output := string(out)
 
@@ -104,6 +122,64 @@ func ExecuteAptCommand(command string) (string, error) {
 
 	log.Printf("apt %s completed successfully", command)
 	return output, nil
+}
+
+// runCommandWithStreaming executes a command and streams output via callback
+func runCommandWithStreaming(cmd *exec.Cmd, streamCallback func(chunk string)) (string, error) {
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return "", err
+	}
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return "", err
+	}
+
+	if err := cmd.Start(); err != nil {
+		return "", err
+	}
+
+	var fullOutput strings.Builder
+	buf := make([]byte, 1024)
+
+	// Read stdout and stderr concurrently
+	done := make(chan bool)
+	go func() {
+		for {
+			n, err := stdout.Read(buf)
+			if n > 0 {
+				chunk := string(buf[:n])
+				fullOutput.WriteString(chunk)
+				streamCallback(chunk)
+			}
+			if err != nil {
+				break
+			}
+		}
+		done <- true
+	}()
+
+	go func() {
+		for {
+			n, err := stderr.Read(buf)
+			if n > 0 {
+				chunk := string(buf[:n])
+				fullOutput.WriteString(chunk)
+				streamCallback(chunk)
+			}
+			if err != nil {
+				break
+			}
+		}
+		done <- true
+	}()
+
+	// Wait for both streams to finish
+	<-done
+	<-done
+
+	err = cmd.Wait()
+	return fullOutput.String(), err
 }
 
 func getLastAptAction(prefix, logFile string) time.Time {

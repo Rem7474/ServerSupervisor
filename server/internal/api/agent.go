@@ -13,12 +13,17 @@ import (
 )
 
 type AgentHandler struct {
-	db  *database.DB
-	cfg *config.Config
+	db        *database.DB
+	cfg       *config.Config
+	streamHub *AptStreamHub
 }
 
-func NewAgentHandler(db *database.DB, cfg *config.Config) *AgentHandler {
-	return &AgentHandler{db: db, cfg: cfg}
+func NewAgentHandler(db *database.DB, cfg *config.Config, streamHub *AptStreamHub) *AgentHandler {
+	return &AgentHandler{
+		db:        db,
+		cfg:       cfg,
+		streamHub: streamHub,
+	}
 }
 
 // ReceiveReport processes a full agent report (metrics + docker + apt)
@@ -40,8 +45,9 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 
 	// Update host info from agent report
 	update := models.HostUpdate{
-		Hostname: stringPtrIfNotEmpty(report.Metrics.Hostname),
-		OS:       stringPtrIfNotEmpty(report.Metrics.OS),
+		Hostname:     stringPtrIfNotEmpty(report.Metrics.Hostname),
+		OS:           stringPtrIfNotEmpty(report.Metrics.OS),
+		AgentVersion: stringPtrIfNotEmpty(report.AgentVersion),
 	}
 	if update.Hostname != nil || update.OS != nil {
 		_ = h.db.UpdateHost(hostID, &update)
@@ -110,6 +116,29 @@ func (h *AgentHandler) ReportCommandResult(c *gin.Context) {
 			_ = h.db.TouchAptLastAction(cmd.HostID, cmd.Command)
 		}
 	}
+
+	c.JSON(http.StatusOK, gin.H{"status": "ok"})
+}
+
+// StreamCommandOutput receives streaming output chunks from agents
+func (h *AgentHandler) StreamCommandOutput(c *gin.Context) {
+	hostID := c.GetString("host_id")
+	if hostID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "host not identified"})
+		return
+	}
+
+	var chunk struct {
+		CommandID string `json:"command_id" binding:"required"`
+		Chunk     string `json:"chunk" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&chunk); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Broadcast chunk to all connected WebSocket clients
+	h.streamHub.Broadcast(chunk.CommandID, chunk.Chunk)
 
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }

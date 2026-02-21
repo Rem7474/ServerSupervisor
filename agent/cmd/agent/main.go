@@ -15,6 +15,8 @@ import (
 	"github.com/serversupervisor/agent/internal/sender"
 )
 
+const AgentVersion = "1.2.0"
+
 // commandMutex ensures only one APT command runs at a time
 var commandMutex sync.Mutex
 
@@ -111,10 +113,11 @@ func sendReport(cfg *config.Config, s *sender.Sender) {
 
 	// Send report
 	report := &sender.Report{
-		Metrics:   metrics,
-		Docker:    dockerData,
-		AptStatus: aptData,
-		Timestamp: time.Now(),
+		AgentVersion: AgentVersion,
+		Metrics:      metrics,
+		Docker:       dockerData,
+		AptStatus:    aptData,
+		Timestamp:    time.Now(),
 	}
 
 	response, err := s.SendReport(report)
@@ -166,8 +169,13 @@ func processCommands(s *sender.Sender, commands []sender.PendingCommand) {
 			log.Printf("Failed to report running status: %v", err)
 		}
 
-		// Execute the APT command
-		output, err := collector.ExecuteAptCommand(aptCmd)
+		// Execute the APT command with streaming
+		output, err := collector.ExecuteAptCommandWithStreaming(aptCmd, func(chunk string) {
+			// Stream each chunk to the server
+			if err := s.StreamCommandChunk(cmd.ID, chunk); err != nil {
+				log.Printf("Failed to stream chunk: %v", err)
+			}
+		})
 		status := "completed"
 		if err != nil {
 			status = "failed"

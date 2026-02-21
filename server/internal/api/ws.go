@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -13,12 +14,22 @@ import (
 )
 
 type WSHandler struct {
-	db  *database.DB
-	cfg *config.Config
+	db        *database.DB
+	cfg       *config.Config
+	streamHub *AptStreamHub
 }
 
 func NewWSHandler(db *database.DB, cfg *config.Config) *WSHandler {
-	return &WSHandler{db: db, cfg: cfg}
+	return &WSHandler{
+		db:        db,
+		cfg:       cfg,
+		streamHub: NewAptStreamHub(),
+	}
+}
+
+// GetStreamHub returns the APT stream hub for use by other handlers
+func (h *WSHandler) GetStreamHub() *AptStreamHub {
+	return h.streamHub
 }
 
 var wsUpgrader = websocket.Upgrader{
@@ -159,6 +170,50 @@ func (h *WSHandler) Apt(c *gin.Context) {
 			}
 		}
 	}
+}
+
+// AptStream allows clients to subscribe to real-time APT command output
+func (h *WSHandler) AptStream(c *gin.Context) {
+	if !h.validateWSToken(c) {
+		return
+	}
+	commandID := c.Param("command_id")
+	if commandID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "command_id required"})
+		return
+	}
+
+	conn, err := wsUpgrader.Upgrade(c.Writer, c.Request, nil)
+	if err != nil {
+		return
+	}
+	defer func() {
+		h.streamHub.Unregister(commandID, conn)
+		conn.Close()
+	}()
+
+	// Register this connection to receive streaming logs
+	h.streamHub.Register(commandID, conn)
+
+	// Send initial status (parse commandID as int64 for DB query)
+	cmdID, parseErr := strconv.ParseInt(commandID, 10, 64)
+	if parseErr == nil {
+		cmd, dbErr := h.db.GetAptCommandByID(cmdID)
+		if dbErr == nil {
+			conn.WriteJSON(gin.H{
+				"type":       "apt_stream_init",
+				"command_id": commandID,
+				"status":     cmd.Status,
+				"command":    cmd.Command,
+				"output":     cmd.Output, // Send existing output if any
+			})
+		}
+	}
+
+	// Keep connection alive until client disconnects
+	done := make(chan struct{})
+	go h.readLoop(conn, done)
+	<-done
 }
 
 func (h *WSHandler) readLoop(conn *websocket.Conn, done chan struct{}) {

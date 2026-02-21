@@ -5,6 +5,25 @@
       <div class="text-secondary">Gerer les mises a jour APT sur tous les hotes</div>
     </div>
 
+    <div v-if="liveCommand" class="card mb-4">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <h3 class="card-title">Console Live - {{ liveCommand.hostname }}</h3>
+        <button @click="closeLiveConsole" class="btn btn-sm btn-outline-secondary">Fermer</button>
+      </div>
+      <div class="card-body">
+        <div class="text-secondary small mb-2">
+          Commande: <code>apt {{ liveCommand.command }}</code>
+          <span class="mx-2">•</span>
+          Statut: <span :class="statusClass(liveCommand.status)">{{ liveCommand.status }}</span>
+        </div>
+        <pre
+          ref="consoleOutput"
+          class="bg-dark text-light p-3 rounded mb-0"
+          style="max-height: 20rem; overflow-y: auto; font-size: 0.85rem; line-height: 1.5;"
+        >{{ liveCommand.output }}</pre>
+      </div>
+    </div>
+
     <div class="card mb-4">
       <div class="card-body">
         <div class="d-flex flex-wrap align-items-center gap-3">
@@ -93,9 +112,18 @@
                 <div v-for="cmd in aptHistories[host.id]" :key="cmd.id" class="border rounded p-3 mb-2">
                   <div class="d-flex align-items-center justify-content-between">
                     <div class="fw-semibold">apt {{ cmd.command }}</div>
-                    <span :class="cmd.status === 'completed' ? 'badge bg-green-lt text-green' : cmd.status === 'failed' ? 'badge bg-red-lt text-red' : 'badge bg-yellow-lt text-yellow'">
-                      {{ cmd.status }}
-                    </span>
+                    <div class="d-flex align-items-center gap-2">
+                      <span :class="cmd.status === 'completed' ? 'badge bg-green-lt text-green' : cmd.status === 'failed' ? 'badge bg-red-lt text-red' : 'badge bg-yellow-lt text-yellow'">
+                        {{ cmd.status }}
+                      </span>
+                      <button
+                        v-if="cmd.status === 'running' || cmd.status === 'pending'"
+                        @click="watchCommand(cmd, host)"
+                        class="btn btn-sm btn-outline-primary"
+                      >
+                        Voir les logs
+                      </button>
+                    </div>
                   </div>
                   <div class="text-secondary small mt-1">
                     {{ formatDate(cmd.created_at) }}
@@ -113,7 +141,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue'
 import apiClient from '../api'
 import { useAuthStore } from '../stores/auth'
 import dayjs from 'dayjs'
@@ -133,7 +161,10 @@ const aptHistories = ref({})
 const expandedHistories = ref({})
 const auth = useAuthStore()
 const canRunApt = computed(() => auth.role === 'admin' || auth.role === 'operator')
+const liveCommand = ref(null)
+const consoleOutput = ref(null)
 let ws = null
+let streamWs = null
 
 function toggleSelectAll() {
   if (selectAll.value) {
@@ -145,6 +176,61 @@ function toggleSelectAll() {
 
 function toggleHistory(hostId) {
   expandedHistories.value[hostId] = !expandedHistories.value[hostId]
+}
+
+function watchCommand(cmd, host) {
+  liveCommand.value = {
+    id: cmd.id,
+    command: cmd.command,
+    status: cmd.status,
+    hostname: host.hostname || host.name,
+    output: cmd.output || '',
+  }
+  connectStreamWebSocket(cmd.id)
+  nextTick(() => scrollToBottom())
+}
+
+function closeLiveConsole() {
+  if (streamWs) {
+    streamWs.close()
+    streamWs = null
+  }
+  liveCommand.value = null
+}
+
+function scrollToBottom() {
+  if (consoleOutput.value) {
+    consoleOutput.value.scrollTop = consoleOutput.value.scrollHeight
+  }
+}
+
+function connectStreamWebSocket(commandId) {
+  if (streamWs) {
+    streamWs.close()
+  }
+  const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
+  const wsUrl = `${protocol}://${window.location.host}/api/v1/ws/apt/stream/${commandId}?token=${auth.token}`
+  streamWs = new WebSocket(wsUrl)
+
+  streamWs.onmessage = (event) => {
+    try {
+      const payload = JSON.parse(event.data)
+      if (payload.type === 'apt_stream_init') {
+        liveCommand.value.status = payload.status
+        liveCommand.value.output = payload.output || ''
+        nextTick(() => scrollToBottom())
+      } else if (payload.type === 'apt_stream') {
+        liveCommand.value.output += payload.chunk
+        nextTick(() => scrollToBottom())
+      }
+    } catch (e) {
+      // Ignore malformed payloads
+    }
+  }
+
+  streamWs.onclose = () => {
+    // Connection closed, don't reconnect automatically
+  }
 }
 
 async function bulkAptCmd(command) {
@@ -161,6 +247,12 @@ async function bulkAptCmd(command) {
 function formatDate(date) {
   if (!date || date === '0001-01-01T00:00:00Z') return 'Jamais'
   return dayjs.utc(date).local().fromNow()
+}
+
+function statusClass(status) {
+  if (status === 'completed') return 'badge bg-green-lt text-green'
+  if (status === 'failed') return 'badge bg-red-lt text-red'
+  return 'badge bg-yellow-lt text-yellow'
 }
 
 function connectWebSocket() {
@@ -192,5 +284,6 @@ onMounted(() => {
 
 onUnmounted(() => {
   if (ws) ws.close()
+  if (streamWs) streamWs.close()
 })
 </script>

@@ -20,11 +20,11 @@ func SetupRouter(db *database.DB, cfg *config.Config) *gin.Engine {
 	// Handlers
 	authH := NewAuthHandler(db, cfg)
 	hostH := NewHostHandler(db, cfg)
-	agentH := NewAgentHandler(db, cfg)
+	wsH := NewWSHandler(db, cfg)
+	agentH := NewAgentHandler(db, cfg, wsH.GetStreamHub())
 	aptH := NewAptHandler(db, cfg)
 	dockerH := NewDockerHandler(db, cfg)
 	auditH := NewAuditHandler(db, cfg)
-	wsH := NewWSHandler(db, cfg)
 	userH := NewUserHandler(db, cfg)
 
 	// ========== Public routes ==========
@@ -40,6 +40,7 @@ func SetupRouter(db *database.DB, cfg *config.Config) *gin.Engine {
 	r.GET("/api/v1/ws/hosts/:id", wsH.HostDetail)
 	r.GET("/api/v1/ws/docker", wsH.Docker)
 	r.GET("/api/v1/ws/apt", wsH.Apt)
+	r.GET("/api/v1/ws/apt/stream/:command_id", wsH.AptStream)
 
 	// ========== Agent routes (API Key auth) ==========
 	agent := r.Group("/api/agent")
@@ -47,6 +48,7 @@ func SetupRouter(db *database.DB, cfg *config.Config) *gin.Engine {
 	{
 		agent.POST("/report", agentH.ReceiveReport)
 		agent.POST("/command/result", agentH.ReportCommandResult)
+		agent.POST("/command/stream", agentH.StreamCommandOutput)
 	}
 
 	// ========== Dashboard routes (JWT auth) ==========

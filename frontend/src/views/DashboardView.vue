@@ -126,6 +126,7 @@
               <th>Nom</th>
               <th>Etat</th>
               <th>IP / OS</th>
+              <th>Agent</th>
               <th>CPU</th>
               <th>RAM</th>
               <th>Uptime</th>
@@ -159,6 +160,12 @@
               <td>
                 <div class="text-body">{{ host.ip_address }}</div>
                 <div class="text-secondary small">{{ host.os || 'N/A' }}</div>
+              </td>
+              <td>
+                <span v-if="host.agent_version" :class="isAgentUpToDate(host.agent_version) ? 'badge bg-green-lt text-green' : 'badge bg-yellow-lt text-yellow'">
+                  v{{ host.agent_version }}
+                </span>
+                <span v-else class="text-secondary small">-</span>
               </td>
               <td>
                 <span :class="cpuColor(hostMetrics[host.id]?.cpu_usage_percent)">
@@ -238,6 +245,8 @@ dayjs.extend(relativeTime)
 dayjs.extend(utc)
 dayjs.locale('fr')
 
+const LATEST_AGENT_VERSION = '1.2.0'
+
 const hosts = ref([])
 const hostMetrics = ref({})
 const versionComparisons = ref([])
@@ -254,12 +263,37 @@ const summaryChartData = ref(null)
 const summaryChartOptions = {
   responsive: true,
   maintainAspectRatio: false,
-  plugins: { legend: { display: false } },
+  plugins: {
+    legend: { display: false },
+    tooltip: {
+      enabled: true,
+      mode: 'index',
+      intersect: false,
+      backgroundColor: 'rgba(0, 0, 0, 0.8)',
+      titleColor: '#fff',
+      bodyColor: '#fff',
+      borderColor: '#555',
+      borderWidth: 1,
+      padding: 10,
+      displayColors: true,
+      callbacks: {
+        title: (items) => {
+          return items[0]?.label || ''
+        },
+        label: (context) => {
+          const label = context.datasetIndex === 0 ? 'CPU' : 'RAM'
+          const value = context.parsed.y.toFixed(1)
+          return `${label}: ${value}%`
+        },
+      },
+    },
+  },
   scales: {
     x: { display: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280', maxTicksLimit: 10 } },
     y: { display: true, min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280' } },
   },
-  elements: { point: { radius: 0 }, line: { tension: 0.3 } },
+  elements: { point: { radius: 0, hitRadius: 10, hoverRadius: 5 }, line: { tension: 0.3 } },
+  interaction: { mode: 'nearest', axis: 'x', intersect: false },
 }
 
 const onlineCount = computed(() => hosts.value.filter(h => h.status === 'online').length)
@@ -437,6 +471,12 @@ function memColor(pct) {
   if (pct > 90) return 'text-red'
   if (pct > 75) return 'text-yellow'
   return 'text-green'
+}
+
+function isAgentUpToDate(version) {
+  if (!version) return false
+  // Simple version comparison (assumes semantic versioning)
+  return version === LATEST_AGENT_VERSION
 }
 
 

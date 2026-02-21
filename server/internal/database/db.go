@@ -375,9 +375,10 @@ func (db *DB) UpdateHost(id string, update *models.HostUpdate) error {
 			hostname = COALESCE($2, hostname),
 			ip_address = COALESCE($3, ip_address),
 			os = COALESCE($4, os),
+			agent_version = COALESCE($5, agent_version),
 			updated_at = NOW()
-		WHERE id = $5`,
-		update.Name, update.Hostname, update.IPAddress, update.OS, id,
+		WHERE id = $6`,
+		update.Name, update.Hostname, update.IPAddress, update.OS, update.AgentVersion, id,
 	)
 	return err
 }
