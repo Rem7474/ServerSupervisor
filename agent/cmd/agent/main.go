@@ -185,7 +185,7 @@ func processCommands(s *sender.Sender, commands []sender.PendingCommand) {
 				aptStatus = nil
 			} else {
 				aptStatus = apt
-				log.Printf("APT status collected: %d packages, %d security, CVE count: %d", 
+				log.Printf("APT status collected: %d packages, %d security, CVE count: %d",
 					apt.PendingPackages, apt.SecurityUpdates, len(apt.CVEList))
 			}
 		}

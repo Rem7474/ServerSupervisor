@@ -115,7 +115,7 @@ func (h *AgentHandler) ReportCommandResult(c *gin.Context) {
 		cmd, err := h.db.GetAptCommandByID(result.CommandID)
 		if err == nil {
 			_ = h.db.TouchAptLastAction(cmd.HostID, cmd.Command)
-			
+
 			// Update full APT status if provided with command result
 			if result.AptStatus != nil {
 				result.AptStatus.HostID = cmd.HostID
