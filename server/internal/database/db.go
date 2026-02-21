@@ -599,16 +599,17 @@ func (db *DB) GetAllDockerContainers() ([]models.DockerContainer, error) {
 
 func (db *DB) UpsertAptStatus(status *models.AptStatus) error {
 	_, err := db.conn.Exec(
-		`INSERT INTO apt_status (host_id, last_update, last_upgrade, pending_packages, package_list, security_updates, updated_at)
-		 VALUES ($1,$2,$3,$4,$5,$6,NOW())
+		`INSERT INTO apt_status (host_id, last_update, last_upgrade, pending_packages, package_list, security_updates, cve_list, updated_at)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())
 		 ON CONFLICT (host_id) DO UPDATE SET
 			last_update = EXCLUDED.last_update,
 			last_upgrade = EXCLUDED.last_upgrade,
 			pending_packages = EXCLUDED.pending_packages,
 			package_list = EXCLUDED.package_list,
 			security_updates = EXCLUDED.security_updates,
+			cve_list = EXCLUDED.cve_list,
 			updated_at = NOW()`,
-		status.HostID, status.LastUpdate, status.LastUpgrade, status.PendingPackages, status.PackageList, status.SecurityUpdates,
+		status.HostID, status.LastUpdate, status.LastUpgrade, status.PendingPackages, status.PackageList, status.SecurityUpdates, status.CVEList,
 	)
 	return err
 }
@@ -616,9 +617,9 @@ func (db *DB) UpsertAptStatus(status *models.AptStatus) error {
 func (db *DB) GetAptStatus(hostID string) (*models.AptStatus, error) {
 	var s models.AptStatus
 	err := db.conn.QueryRow(
-		`SELECT id, host_id, last_update, last_upgrade, pending_packages, package_list, security_updates, updated_at
+		`SELECT id, host_id, last_update, last_upgrade, pending_packages, package_list, security_updates, cve_list, updated_at
 		 FROM apt_status WHERE host_id = $1`, hostID,
-	).Scan(&s.ID, &s.HostID, &s.LastUpdate, &s.LastUpgrade, &s.PendingPackages, &s.PackageList, &s.SecurityUpdates, &s.UpdatedAt)
+	).Scan(&s.ID, &s.HostID, &s.LastUpdate, &s.LastUpgrade, &s.PendingPackages, &s.PackageList, &s.SecurityUpdates, &s.CVEList, &s.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -688,25 +689,33 @@ func (db *DB) GetAptCommandByID(id int64) (*models.AptCommand, error) {
 }
 
 func (db *DB) TouchAptLastAction(hostID, command string) error {
-	var lastUpdate time.Time
-	var lastUpgrade time.Time
+	now := time.Now()
+
 	if command == "update" {
-		lastUpdate = time.Now()
-	}
-	if command == "upgrade" || command == "dist-upgrade" {
-		lastUpgrade = time.Now()
+		_, err := db.conn.Exec(
+			`INSERT INTO apt_status (host_id, last_update, pending_packages, package_list, security_updates, updated_at)
+			 VALUES ($1, $2, 0, '[]', 0, NOW())
+			 ON CONFLICT (host_id) DO UPDATE SET
+				last_update = $2,
+				updated_at = NOW()`,
+			hostID, now,
+		)
+		return err
 	}
 
-	_, err := db.conn.Exec(
-		`INSERT INTO apt_status (host_id, last_update, last_upgrade, pending_packages, package_list, security_updates, updated_at)
-		 VALUES ($1, $2, $3, 0, '[]', 0, NOW())
-		 ON CONFLICT (host_id) DO UPDATE SET
-			last_update = COALESCE(NULLIF($2::timestamp, '0001-01-01 00:00:00'), apt_status.last_update),
-			last_upgrade = COALESCE(NULLIF($3::timestamp, '0001-01-01 00:00:00'), apt_status.last_upgrade),
-			updated_at = NOW()`,
-		hostID, lastUpdate, lastUpgrade,
-	)
-	return err
+	if command == "upgrade" || command == "dist-upgrade" {
+		_, err := db.conn.Exec(
+			`INSERT INTO apt_status (host_id, last_upgrade, pending_packages, package_list, security_updates, updated_at)
+			 VALUES ($1, $2, 0, '[]', 0, NOW())
+			 ON CONFLICT (host_id) DO UPDATE SET
+				last_upgrade = $2,
+				updated_at = NOW()`,
+			hostID, now,
+		)
+		return err
+	}
+
+	return nil
 }
 
 func (db *DB) GetAptCommandHistory(hostID string, limit int) ([]models.AptCommand, error) {

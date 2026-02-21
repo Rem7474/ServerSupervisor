@@ -180,7 +180,7 @@
               <td>
                 {{ hostMetrics[host.id] ? formatUptime(hostMetrics[host.id].uptime) : '-' }}
               </td>
-              <td>{{ formatDate(host.last_seen) }}</td>
+              <td><RelativeTime :date="host.last_seen" /></td>
             </tr>
           </tbody>
         </table>
@@ -231,6 +231,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import RelativeTime from '../components/RelativeTime.vue'
 import apiClient from '../api'
 import { useAuthStore } from '../stores/auth'
 import { Line } from 'vue-chartjs'

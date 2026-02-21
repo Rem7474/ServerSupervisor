@@ -1,6 +1,6 @@
 <template>
-  <div>
-    <div class="page-header mb-4">
+  <div class="d-flex flex-column" style="height: calc(100vh - 100px);">
+    <div class="page-header mb-3">
       <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3">
         <div>
           <div class="text-secondary small">
@@ -11,7 +11,7 @@
           <h2 class="page-title">{{ host?.name || host?.hostname || 'Chargement...' }}</h2>
           <div class="text-secondary">
             {{ host?.hostname || 'Non connecte' }} — {{ host?.os || 'OS inconnu' }} • {{ host?.ip_address }}
-            <span v-if="host?.last_seen">• Derniere activite: {{ formatDate(host.last_seen) }}</span>
+            <span v-if="host?.last_seen">• Derniere activite: <RelativeTime :date="host.last_seen" /></span>
             <span v-if="host?.agent_version">• Agent v{{ host.agent_version }}</span>
           </div>
         </div>
@@ -28,6 +28,10 @@
         </div>
       </div>
     </div>
+
+    <div class="d-flex flex-fill" style="gap: 1rem; overflow: hidden; min-height: 0;">
+      <!-- Colonne gauche: Informations hôte -->
+      <div style="flex: 1; overflow-y: auto; min-width: 0;">
 
     <div v-if="isEditing" class="card mb-4">
       <div class="card-header">
@@ -260,7 +264,17 @@
               <td>
                 <span :class="statusClass(cmd.status)">{{ cmd.status }}</span>
               </td>
-              <td>{{ cmd.triggered_by || '-' }}</td>
+              <td>
+                <div class="d-flex align-items-center justify-content-between">
+                  <span>{{ cmd.triggered_by || '-' }}</span>
+                  <button
+                    @click="watchCommand(cmd)"
+                    class="btn btn-sm btn-outline-primary ms-2"
+                  >
+                    Voir les logs
+                  </button>
+                </div>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -276,32 +290,109 @@
           <thead>
             <tr>
               <th>Date</th>
-              <th>Utilisateur</th>
-              <th>Action</th>
+              <th>Commande</th>
               <th>Statut</th>
+              <th>Utilisateur</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="log in auditLogs" :key="log.id">
               <td>{{ formatDate(log.created_at) }}</td>
-              <td class="fw-semibold">{{ log.username }}</td>
               <td><code>{{ log.action }}</code></td>
               <td>
                 <span :class="statusClass(log.status)">{{ log.status }}</span>
               </td>
+              <td>{{ log.username }}</td>
             </tr>
           </tbody>
         </table>
+      </div>
+    </div>
+      </div>
+
+      <!-- Colonne droite: Console Live -->
+      <div style="width: 38%; min-width: 450px; display: flex; flex-direction: column;">
+        <div class="card" style="display: flex; flex-direction: column; height: 100%;">
+          <div class="card-header d-flex align-items-center justify-content-between">
+            <h3 class="card-title">
+              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                <path d="M8 9l3 3l-3 3" />
+                <path d="M13 15l3 0" />
+                <path d="M3 4m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z" />
+              </svg>
+              Console Live
+            </h3>
+            <button 
+              v-if="liveCommand" 
+              @click="closeLiveConsole" 
+              class="btn btn-sm btn-ghost-secondary"
+              title="Fermer la console"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                <path d="M18 6l-12 12" />
+                <path d="M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <div class="card-body d-flex flex-column" style="flex: 1; min-height: 0; padding: 0;">
+            <!-- État vide -->
+            <div v-if="!liveCommand" class="d-flex align-items-center justify-content-center flex-fill text-secondary" style="background: #1e293b; border-radius: 0 0 0.5rem 0.5rem;">
+              <div class="text-center p-4">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler mb-2" width="48" height="48" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.5;">
+                  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                  <path d="M8 9l3 3l-3 3" />
+                  <path d="M13 15l3 0" />
+                  <path d="M3 4m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z" />
+                </svg>
+                <div style="opacity: 0.7;">Aucune console active</div>
+                <div class="small mt-1" style="opacity: 0.5;">Cliquez sur "Voir les logs" pour afficher la sortie d'une commande</div>
+              </div>
+            </div>
+
+            <!-- Console active -->
+            <div v-else style="display: flex; flex-direction: column; height: 100%;">
+              <div class="px-3 pt-3 pb-2" style="background: #1e293b; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                <div class="d-flex align-items-start justify-content-between mb-2">
+                  <div class="flex-fill" style="min-width: 0;">
+                    <div class="fw-semibold text-light" style="font-size: 0.95rem;">{{ host?.hostname || 'Hôte' }}</div>
+                    <div class="text-secondary small mt-1">
+                      <code style="background: rgba(0,0,0,0.3); padding: 0.15rem 0.4rem; border-radius: 0.25rem; color: #94a3b8;">apt {{ liveCommand.command }}</code>
+                    </div>
+                  </div>
+                  <span :class="statusClass(liveCommand.status)" style="margin-left: 0.5rem;">{{ liveCommand.status }}</span>
+                </div>
+              </div>
+              <pre
+                ref="consoleOutput"
+                class="mb-0 flex-fill"
+                style="
+                  background: #0f172a;
+                  color: #e2e8f0;
+                  padding: 1rem;
+                  margin: 0;
+                  overflow-y: auto;
+                  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+                  font-size: 0.813rem;
+                  line-height: 1.5;
+                  border-radius: 0 0 0.5rem 0.5rem;
+                "
+              >{{ liveCommand.output || 'En attente de sortie...' }}</pre>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Line } from 'vue-chartjs'
 import { Chart as ChartJS, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip } from 'chart.js'
+import RelativeTime from '../components/RelativeTime.vue'
 import apiClient from '../api'
 import { useAuthStore } from '../stores/auth'
 import dayjs from 'dayjs'
@@ -333,7 +424,10 @@ const memChartData = ref(null)
 const isEditing = ref(false)
 const saving = ref(false)
 const editForm = ref({ name: '', hostname: '', ip_address: '', os: '' })
+const liveCommand = ref(null)
+const consoleOutput = ref(null)
 let ws = null
+let streamWs = null
 const auth = useAuthStore()
 const canRunApt = computed(() => auth.role === 'admin' || auth.role === 'operator')
 
@@ -524,6 +618,60 @@ function isAgentUpToDate(version) {
   return version === LATEST_AGENT_VERSION
 }
 
+function watchCommand(cmd) {
+  liveCommand.value = {
+    id: cmd.id,
+    command: cmd.command,
+    status: cmd.status,
+    output: cmd.output || '',
+  }
+  connectStreamWebSocket(cmd.id)
+  nextTick(() => scrollToBottom())
+}
+
+function closeLiveConsole() {
+  if (streamWs) {
+    streamWs.close()
+    streamWs = null
+  }
+  liveCommand.value = null
+}
+
+function scrollToBottom() {
+  if (consoleOutput.value) {
+    consoleOutput.value.scrollTop = consoleOutput.value.scrollHeight
+  }
+}
+
+function connectStreamWebSocket(commandId) {
+  if (streamWs) {
+    streamWs.close()
+  }
+  const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
+  const wsUrl = `${protocol}://${window.location.host}/api/v1/ws/apt/stream/${commandId}?token=${auth.token}`
+  streamWs = new WebSocket(wsUrl)
+
+  streamWs.onmessage = (event) => {
+    try {
+      const payload = JSON.parse(event.data)
+      if (payload.type === 'apt_stream_init') {
+        liveCommand.value.status = payload.status
+        liveCommand.value.output = payload.output || ''
+        nextTick(() => scrollToBottom())
+      } else if (payload.type === 'apt_stream') {
+        liveCommand.value.output += payload.chunk
+        nextTick(() => scrollToBottom())
+      }
+    } catch (e) {
+      // Ignore malformed payloads
+    }
+  }
+
+  streamWs.onclose = () => {
+    // Connection closed, don't reconnect automatically
+  }
+}
+
 async function deleteHost() {
   if (!confirm(`Êtes-vous sûr de vouloir supprimer ${host.value?.hostname} ? Cette action est irréversible.`)) {
     return
@@ -544,5 +692,6 @@ onMounted(() => {
 
 onUnmounted(() => {
   if (ws) ws.close()
+  if (streamWs) streamWs.close()
 })
 </script>

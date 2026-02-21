@@ -116,6 +116,12 @@ type DockerReport struct {
 
 // ========== APT Updates ==========
 
+type CVEInfo struct {
+	ID       string `json:"id"`
+	Severity string `json:"severity"`
+	Package  string `json:"package"`
+}
+
 type AptStatus struct {
 	ID              int64     `json:"id" db:"id"`
 	HostID          string    `json:"host_id" db:"host_id"`
@@ -124,6 +130,7 @@ type AptStatus struct {
 	PendingPackages int       `json:"pending_packages" db:"pending_packages"`
 	PackageList     string    `json:"package_list" db:"package_list"` // JSON array of package names
 	SecurityUpdates int       `json:"security_updates" db:"security_updates"`
+	CVEList         string    `json:"cve_list" db:"cve_list"` // JSON array of CVEInfo
 	UpdatedAt       time.Time `json:"updated_at" db:"updated_at"`
 }
 

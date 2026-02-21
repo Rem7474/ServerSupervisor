@@ -1,56 +1,40 @@
 <template>
-  <div>
-    <div class="page-header mb-4">
+  <div class="d-flex flex-column" style="height: calc(100vh - 120px);">
+    <div class="page-header mb-3">
       <h2 class="page-title">APT - Mises a jour systeme</h2>
       <div class="text-secondary">Gerer les mises a jour APT sur tous les hotes</div>
     </div>
 
-    <div v-if="liveCommand" class="card mb-4">
-      <div class="card-header d-flex align-items-center justify-content-between">
-        <h3 class="card-title">Console Live - {{ liveCommand.hostname }}</h3>
-        <button @click="closeLiveConsole" class="btn btn-sm btn-outline-secondary">Fermer</button>
-      </div>
-      <div class="card-body">
-        <div class="text-secondary small mb-2">
-          Commande: <code>apt {{ liveCommand.command }}</code>
-          <span class="mx-2">•</span>
-          Statut: <span :class="statusClass(liveCommand.status)">{{ liveCommand.status }}</span>
-        </div>
-        <pre
-          ref="consoleOutput"
-          class="bg-dark text-light p-3 rounded mb-0"
-          style="max-height: 20rem; overflow-y: auto; font-size: 0.85rem; line-height: 1.5;"
-        >{{ liveCommand.output }}</pre>
-      </div>
-    </div>
-
-    <div class="card mb-4">
-      <div class="card-body">
-        <div class="d-flex flex-wrap align-items-center gap-3">
-          <label class="form-check">
-            <input type="checkbox" class="form-check-input" v-model="selectAll" @change="toggleSelectAll" />
-            <span class="form-check-label">Selectionner tous les hotes</span>
-          </label>
-          <div class="ms-auto d-flex flex-wrap gap-2">
-            <template v-if="canRunApt">
-              <button @click="bulkAptCmd('update')" class="btn btn-outline-secondary" :disabled="selectedHosts.length === 0">
-                apt update ({{ selectedHosts.length }})
-              </button>
-              <button @click="bulkAptCmd('upgrade')" class="btn btn-primary" :disabled="selectedHosts.length === 0">
-                apt upgrade ({{ selectedHosts.length }})
-              </button>
-              <button @click="bulkAptCmd('dist-upgrade')" class="btn btn-outline-danger" :disabled="selectedHosts.length === 0">
-                apt dist-upgrade ({{ selectedHosts.length }})
-              </button>
-            </template>
-            <div v-else class="text-secondary small">Mode lecture seule</div>
+    <div class="d-flex flex-fill" style="gap: 1rem; overflow: hidden; min-height: 0;">
+      <!-- Colonne gauche: Liste des hôtes -->
+      <div style="flex: 1; overflow-y: auto; min-width: 0;">
+        <div class="card mb-3">
+          <div class="card-body">
+            <div class="d-flex flex-wrap align-items-center gap-3">
+              <label class="form-check">
+                <input type="checkbox" class="form-check-input" v-model="selectAll" @change="toggleSelectAll" />
+                <span class="form-check-label">Selectionner tous les hotes</span>
+              </label>
+              <div class="ms-auto d-flex flex-wrap gap-2">
+                <template v-if="canRunApt">
+                  <button @click="bulkAptCmd('update')" class="btn btn-outline-secondary" :disabled="selectedHosts.length === 0">
+                    apt update ({{ selectedHosts.length }})
+                  </button>
+                  <button @click="bulkAptCmd('upgrade')" class="btn btn-primary" :disabled="selectedHosts.length === 0">
+                    apt upgrade ({{ selectedHosts.length }})
+                  </button>
+                  <button @click="bulkAptCmd('dist-upgrade')" class="btn btn-outline-danger" :disabled="selectedHosts.length === 0">
+                    apt dist-upgrade ({{ selectedHosts.length }})
+                  </button>
+                </template>
+                <div v-else class="text-secondary small">Mode lecture seule</div>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
-    </div>
 
-    <div class="row row-cards">
-      <div v-for="host in hosts" :key="host.id" class="col-12">
+        <div class="row row-cards">
+          <div v-for="host in hosts" :key="host.id" class="col-12">
         <div class="card">
           <div class="card-body">
             <div class="d-flex align-items-center gap-3 mb-3">
@@ -104,6 +88,16 @@
               </div>
             </div>
 
+            <!-- CVE Information -->
+            <div v-if="aptStatuses[host.id]?.cve_list" class="mb-3">
+              <CVEList 
+                :cveList="aptStatuses[host.id].cve_list" 
+                :showMaxSeverity="true"
+                :alwaysExpanded="false"
+                :limit="5"
+              />
+            </div>
+
             <div v-if="aptHistories[host.id]?.length">
               <button @click="toggleHistory(host.id)" class="btn btn-link p-0">
                 {{ expandedHistories[host.id] ? 'Masquer' : 'Voir' }} l'historique ({{ aptHistories[host.id].length }})
@@ -113,11 +107,10 @@
                   <div class="d-flex align-items-center justify-content-between">
                     <div class="fw-semibold">apt {{ cmd.command }}</div>
                     <div class="d-flex align-items-center gap-2">
-                      <span :class="cmd.status === 'completed' ? 'badge bg-green-lt text-green' : cmd.status === 'failed' ? 'badge bg-red-lt text-red' : 'badge bg-yellow-lt text-yellow'">
+                      <span :class="statusClass(cmd.status)">
                         {{ cmd.status }}
                       </span>
                       <button
-                        v-if="cmd.status === 'running' || cmd.status === 'pending'"
                         @click="watchCommand(cmd, host)"
                         class="btn btn-sm btn-outline-primary"
                       >
@@ -129,9 +122,84 @@
                     {{ formatDate(cmd.created_at) }}
                     <span v-if="cmd.triggered_by">• par {{ cmd.triggered_by }}</span>
                   </div>
-                  <pre v-if="cmd.output" class="bg-dark text-light p-2 rounded mt-2" style="max-height: 8rem; overflow-y: auto;">{{ cmd.output }}</pre>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+      </div>
+
+      <!-- Colonne droite: Console Live -->
+      <div style="width: 38%; min-width: 450px; display: flex; flex-direction: column;">
+        <div class="card" style="display: flex; flex-direction: column; height: 100%;">
+          <div class="card-header d-flex align-items-center justify-content-between">
+            <h3 class="card-title">
+              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                <path d="M8 9l3 3l-3 3" />
+                <path d="M13 15l3 0" />
+                <path d="M3 4m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z" />
+              </svg>
+              Console Live
+            </h3>
+            <button 
+              v-if="liveCommand" 
+              @click="closeLiveConsole" 
+              class="btn btn-sm btn-ghost-secondary"
+              title="Fermer la console"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                <path d="M18 6l-12 12" />
+                <path d="M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <div class="card-body d-flex flex-column" style="flex: 1; min-height: 0; padding: 0;">
+            <!-- État vide -->
+            <div v-if="!liveCommand" class="d-flex align-items-center justify-content-center flex-fill text-secondary" style="background: #1e293b; border-radius: 0 0 0.5rem 0.5rem;">
+              <div class="text-center p-4">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler mb-2" width="48" height="48" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.5;">
+                  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                  <path d="M8 9l3 3l-3 3" />
+                  <path d="M13 15l3 0" />
+                  <path d="M3 4m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z" />
+                </svg>
+                <div style="opacity: 0.7;">Aucune console active</div>
+                <div class="small mt-1" style="opacity: 0.5;">Cliquez sur "Voir les logs" pour afficher la sortie d'une commande</div>
+              </div>
+            </div>
+
+            <!-- Console active -->
+            <div v-else style="display: flex; flex-direction: column; height: 100%;">
+              <div class="px-3 pt-3 pb-2" style="background: #1e293b; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                <div class="d-flex align-items-start justify-content-between mb-2">
+                  <div class="flex-fill" style="min-width: 0;">
+                    <div class="fw-semibold text-light" style="font-size: 0.95rem;">{{ liveCommand.hostname }}</div>
+                    <div class="text-secondary small mt-1">
+                      <code style="background: rgba(0,0,0,0.3); padding: 0.15rem 0.4rem; border-radius: 0.25rem; color: #94a3b8;">apt {{ liveCommand.command }}</code>
+                    </div>
+                  </div>
+                  <span :class="statusClass(liveCommand.status)" style="margin-left: 0.5rem;">{{ liveCommand.status }}</span>
+                </div>
+              </div>
+              <pre
+                ref="consoleOutput"
+                class="mb-0 flex-fill"
+                style="
+                  background: #0f172a;
+                  color: #e2e8f0;
+                  padding: 1rem;
+                  margin: 0;
+                  overflow-y: auto;
+                  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+                  font-size: 0.813rem;
+                  line-height: 1.5;
+                  border-radius: 0 0 0.5rem 0.5rem;
+                "
+              >{{ liveCommand.output || 'En attente de sortie...' }}</pre>
             </div>
           </div>
         </div>
@@ -142,6 +210,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue'
+import CVEList from '../components/CVEList.vue'
 import apiClient from '../api'
 import { useAuthStore } from '../stores/auth'
 import dayjs from 'dayjs'
