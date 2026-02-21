@@ -126,16 +126,16 @@ func ExecuteAptCommandWithStreaming(command string, streamCallback func(chunk st
 	var cmd *exec.Cmd
 	switch command {
 	case "update":
-		cmd = exec.CommandContext(ctx, "sudo", "apt", "update", "-y", "-qq")
+		cmd = exec.CommandContext(ctx, "apt", "update", "-y", "-qq")
 	case "upgrade":
-		cmd = exec.CommandContext(ctx, "sudo", "apt", "upgrade", "-y", "-qq", "--allow-unauthenticated")
+		cmd = exec.CommandContext(ctx, "apt", "upgrade", "-y", "-qq", "--allow-unauthenticated")
 	case "dist-upgrade":
-		cmd = exec.CommandContext(ctx, "sudo", "apt", "dist-upgrade", "-y", "-qq", "--allow-unauthenticated")
+		cmd = exec.CommandContext(ctx, "apt", "dist-upgrade", "-y", "-qq", "--allow-unauthenticated")
 	default:
 		return "", fmt.Errorf("unknown apt command: %s", command)
 	}
 
-	log.Printf("Executing: sudo apt %s -y", command)
+	log.Printf("Executing: apt %s -y", command)
 
 	// If streaming callback provided, capture output in real-time
 	if streamCallback != nil {
