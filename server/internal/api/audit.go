@@ -103,10 +103,21 @@ func (h *AuditHandler) GetAuditLogsByUser(c *gin.Context) {
 		return
 	}
 
-	// Get logs for user (we need to add this function to DB)
-	// For now, we'll return empty and note that it should be implemented
+	limit := 100
+	if l := c.Query("limit"); l != "" {
+		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 && parsed <= 500 {
+			limit = parsed
+		}
+	}
+
+	logs, err := h.db.GetAuditLogsByUser(username, limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch logs"})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"user": username,
-		"logs": []models.AuditLog{},
+		"logs": logs,
 	})
 }

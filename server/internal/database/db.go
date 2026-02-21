@@ -234,6 +234,10 @@ func (db *DB) migrate() error {
 		`ALTER TABLE IF EXISTS hosts ADD COLUMN IF NOT EXISTS agent_version VARCHAR(20) DEFAULT ''`,
 		// Migration: Add cve_list to apt_status for CVE tracking
 		`ALTER TABLE IF EXISTS apt_status ADD COLUMN IF NOT EXISTS cve_list TEXT DEFAULT '[]'`,
+		// Migration: Convert backup_codes from TEXT to JSONB for better validation
+		`ALTER TABLE IF EXISTS users ALTER COLUMN backup_codes DROP DEFAULT`,
+		`ALTER TABLE IF EXISTS users ALTER COLUMN backup_codes TYPE JSONB USING COALESCE(backup_codes::jsonb, '[]'::jsonb)`,
+		`ALTER TABLE IF EXISTS users ALTER COLUMN backup_codes SET DEFAULT '[]'::jsonb`,
 	}
 
 	for _, m := range migrations {
@@ -853,6 +857,41 @@ func (db *DB) GetAuditLogsByHost(hostID string, limit int) ([]models.AuditLog, e
 		logs = append(logs, log)
 	}
 	return logs, nil
+}
+
+func (db *DB) GetAuditLogsByUser(username string, limit int) ([]models.AuditLog, error) {
+	rows, err := db.conn.Query(
+		`SELECT id, username, action, host_id, ip_address, details, status, created_at
+		 FROM audit_logs WHERE username = $1 ORDER BY created_at DESC LIMIT $2`,
+		username, limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var logs []models.AuditLog
+	for rows.Next() {
+		var log models.AuditLog
+		if err := rows.Scan(&log.ID, &log.Username, &log.Action, &log.HostID, &log.IPAddress,
+			&log.Details, &log.Status, &log.CreatedAt); err != nil {
+			continue
+		}
+		logs = append(logs, log)
+	}
+	return logs, nil
+}
+
+// CleanOldAuditLogs removes audit logs older than retentionDays (for compliance/storage reduction)
+func (db *DB) CleanOldAuditLogs(retentionDays int) (int64, error) {
+	result, err := db.conn.Exec(
+		`DELETE FROM audit_logs WHERE created_at < NOW() - INTERVAL '1 day' * $1`,
+		retentionDays,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 func (db *DB) UpdateAuditLogStatus(id int64, status, details string) error {

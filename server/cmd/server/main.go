@@ -62,16 +62,22 @@ func main() {
 	tracker.Start()
 	defer tracker.Stop()
 
-	// Start periodic cleanup of old metrics
+	// Start periodic cleanup of old metrics (7+ days)
 	go func() {
 		ticker := time.NewTicker(1 * time.Hour)
 		defer ticker.Stop()
 		for range ticker.C {
-			deleted, err := db.CleanOldMetrics(cfg.MetricsRetentionDays)
-			if err != nil {
+			if deleted, err := db.CleanOldMetrics(7); err != nil {
 				log.Printf("Metrics cleanup error: %v", err)
 			} else if deleted > 0 {
 				log.Printf("Cleaned up %d old metrics records", deleted)
+			}
+
+			// Also cleanup old audit logs (90+ days retention for compliance)
+			if deleted, err := db.CleanOldAuditLogs(90); err != nil {
+				log.Printf("Audit cleanup error: %v", err)
+			} else if deleted > 0 {
+				log.Printf("Cleaned up %d old audit log records", deleted)
 			}
 		}
 	}()
@@ -104,6 +110,14 @@ func main() {
 				// Downsample 5-minute aggregates (keep for 30 days)
 				// Downsampling logic would go here
 				// For now, this is a placeholder for future enhancement
+			}
+
+			// Clean up old raw metrics (older than 7 days) to prevent unbounded growth
+			// Aggregates are retained longer for historical trend analysis
+			if deletedCount, err := db.CleanOldMetrics(7); err != nil {
+				log.Printf("Metrics cleanup error: %v", err)
+			} else if deletedCount > 0 {
+				log.Printf("Cleaned up %d old metric records", deletedCount)
 			}
 		}
 	}()

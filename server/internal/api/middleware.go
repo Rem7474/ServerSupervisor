@@ -76,14 +76,15 @@ func (rl *IPRateLimiter) cleanup() {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
 
-	// Remove limiters that haven't been used
+	// Remove limiters that are not being actively used (still have tokens available)
+	// We check the available tokens without consuming them
 	for ip, limiter := range rl.limiters {
-		if !limiter.Allow() {
-			// If Allow returns false, the limiter is still actively limiting
-			continue
+		// Check if the limiter has fully recovered (enough tokens for a new burst)
+		// This doesn't consume tokens - it just checks the state
+		if limiter.Tokens() >= float64(rl.burst) {
+			// Limiter is not being used recently - safe to remove
+			delete(rl.limiters, ip)
 		}
-		// Remove old entries periodically when they're not being hit
-		delete(rl.limiters, ip)
 	}
 }
 
@@ -101,11 +102,18 @@ func RateLimiterMiddleware(rl *IPRateLimiter) gin.HandlerFunc {
 	}
 }
 
-// RequestLogger logs all requests
+// RequestLogger logs all requests (with sensitive info masked)
 func RequestLogger() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
 		path := c.Request.URL.Path
+		query := c.Request.URL.RawQuery
+
+		// Mask sensitive query parameters in logs
+		if query != "" {
+			query = maskSensitiveParams(query)
+			path = path + "?" + query
+		}
 
 		c.Next()
 
@@ -114,6 +122,28 @@ func RequestLogger() gin.HandlerFunc {
 
 		log.Printf("[%d] %s %s (%v)", status, c.Request.Method, path, latency)
 	}
+}
+
+// maskSensitiveParams removes or masks sensitive query parameters like tokens, passwords, keys
+func maskSensitiveParams(query string) string {
+	sensitiveKeys := map[string]bool{
+		"token":    true,
+		"api_key":  true,
+		"key":      true,
+		"password": true,
+		"secret":   true,
+	}
+
+	parts := strings.Split(query, "&")
+	for i, part := range parts {
+		if idx := strings.Index(part, "="); idx > 0 {
+			key := part[:idx]
+			if sensitiveKeys[strings.ToLower(key)] {
+				parts[i] = key + "=***MASKED***"
+			}
+		}
+	}
+	return strings.Join(parts, "&")
 }
 
 // CORSMiddleware handles CORS with proper origin
