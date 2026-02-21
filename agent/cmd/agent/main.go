@@ -209,7 +209,7 @@ func initialAptCollection(cfg *config.Config, s *sender.Sender) {
 	// Wait a bit to avoid overwhelming the system at startup
 	time.Sleep(5 * time.Second)
 
-	log.Println("🔍 Performing initial APT status collection with CVE extraction...")
+	log.Println("Performing initial APT status collection with CVE extraction...")
 	apt, err := collector.CollectAPT(true) // true = extract CVE
 	if err != nil {
 		log.Printf("Initial APT collection failed: %v", err)

@@ -88,9 +88,15 @@ func (rl *IPRateLimiter) cleanup() {
 	}
 }
 
-// RateLimiterMiddleware applies per-IP rate limiting
+// RateLimiterMiddleware applies per-IP rate limiting (but NOT for WebSocket upgrades)
 func RateLimiterMiddleware(rl *IPRateLimiter) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Skip rate limiting for WebSocket upgrades - they handle their own protocol
+		if c.Request.Header.Get("Upgrade") == "websocket" {
+			c.Next()
+			return
+		}
+
 		clientIP := rl.getClientIP(c)
 
 		if !rl.Allow(clientIP) {

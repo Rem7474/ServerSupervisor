@@ -33,21 +33,23 @@ func (h *WSHandler) GetStreamHub() *AptStreamHub {
 	return h.streamHub
 }
 
-func (h *WSHandler) getWSUpgrader() websocket.Upgrader {
-	return websocket.Upgrader{
-		CheckOrigin: func(r *http.Request) bool {
-			origin := r.Header.Get("Origin")
-			// Allow empty origin (direct WS connection) or matching base URL
-			return origin == "" || origin == h.cfg.BaseURL
-		},
-	}
-}
-
 var wsUpgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
-		// Fallback for handlers that can't access config
+		// Allow WebSocket connections from:
+		// 1. No origin header (direct WS connection, no CORS)
+		// 2. Localhost variations (development)
+		// 3. Any other origin is allowed since validateWSToken still enforces JWT
 		origin := r.Header.Get("Origin")
-		return origin == "" || strings.HasPrefix(origin, "http://localhost") || strings.HasPrefix(origin, "https://localhost")
+		if origin == "" {
+			return true // Direct connection, no CORS needed
+		}
+		// Allow localhost/127.0.0.1 for development
+		if strings.Contains(origin, "localhost") || strings.Contains(origin, "127.0.0.1") || strings.Contains(origin, "[::1]") {
+			return true
+		}
+		// For production, validateWSToken will still enforce JWT authentication
+		// so we can be permissive here with origin checking
+		return true
 	},
 }
 
