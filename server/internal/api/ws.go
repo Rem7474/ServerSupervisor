@@ -196,6 +196,39 @@ func (h *WSHandler) Docker(c *gin.Context) {
 	}
 }
 
+func (h *WSHandler) Network(c *gin.Context) {
+	conn, err := h.upgrader().Upgrade(c.Writer, c.Request, nil)
+	if err != nil {
+		return
+	}
+	defer conn.Close()
+
+	if !h.authenticateWS(conn) {
+		return
+	}
+
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
+
+	if err := h.sendNetworkSnapshot(conn); err != nil {
+		return
+	}
+
+	done := make(chan struct{})
+	go h.readLoop(conn, done)
+
+	for {
+		select {
+		case <-done:
+			return
+		case <-ticker.C:
+			if err := h.sendNetworkSnapshot(conn); err != nil {
+				return
+			}
+		}
+	}
+}
+
 func (h *WSHandler) Apt(c *gin.Context) {
 	conn, err := h.upgrader().Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
@@ -356,6 +389,20 @@ func (h *WSHandler) sendDockerSnapshot(conn *websocket.Conn) error {
 	payload := gin.H{
 		"type":       "docker",
 		"containers": containers,
+	}
+	return conn.WriteJSON(payload)
+}
+
+func (h *WSHandler) sendNetworkSnapshot(conn *websocket.Conn) error {
+	snapshot, err := buildNetworkSnapshot(h.db)
+	if err != nil {
+		return err
+	}
+	payload := gin.H{
+		"type":       "network",
+		"hosts":      snapshot.Hosts,
+		"containers": snapshot.Containers,
+		"updated_at": snapshot.UpdatedAt,
 	}
 	return conn.WriteJSON(payload)
 }

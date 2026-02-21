@@ -117,6 +117,46 @@ type DockerReport struct {
 	Timestamp  time.Time         `json:"timestamp"`
 }
 
+// ========== Network Snapshot ==========
+
+type PortMapping struct {
+	HostIP        string `json:"host_ip"`
+	HostPort      int    `json:"host_port"`
+	ContainerPort int    `json:"container_port"`
+	Protocol      string `json:"protocol"`
+	Raw           string `json:"raw"`
+}
+
+type NetworkContainer struct {
+	ID           string        `json:"id"`
+	HostID       string        `json:"host_id"`
+	Hostname     string        `json:"hostname"`
+	Name         string        `json:"name"`
+	Image        string        `json:"image"`
+	ImageTag     string        `json:"image_tag"`
+	State        string        `json:"state"`
+	Status       string        `json:"status"`
+	Ports        string        `json:"ports"`
+	PortMappings []PortMapping `json:"port_mappings"`
+}
+
+type NetworkHost struct {
+	ID             string    `json:"id"`
+	Name           string    `json:"name"`
+	Hostname       string    `json:"hostname"`
+	IPAddress      string    `json:"ip_address"`
+	Status         string    `json:"status"`
+	NetworkRxBytes uint64    `json:"network_rx_bytes"`
+	NetworkTxBytes uint64    `json:"network_tx_bytes"`
+	LastSeen       time.Time `json:"last_seen"`
+}
+
+type NetworkSnapshot struct {
+	Hosts      []NetworkHost      `json:"hosts"`
+	Containers []NetworkContainer `json:"containers"`
+	UpdatedAt  time.Time          `json:"updated_at"`
+}
+
 // ========== APT Updates ==========
 
 type CVEInfo struct {

@@ -1,0 +1,281 @@
+<template>
+  <div>
+    <div class="page-header mb-4">
+      <h2 class="page-title">Network</h2>
+      <div class="text-secondary">Ports exposes et trafic par hote</div>
+    </div>
+
+    <div class="row row-cards mb-4">
+      <div class="col-sm-6 col-lg-3">
+        <div class="card card-sm">
+          <div class="card-body">
+            <div class="subheader">Hotes</div>
+            <div class="h1 mb-0">{{ hosts.length }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-sm-6 col-lg-3">
+        <div class="card card-sm">
+          <div class="card-body">
+            <div class="subheader">Conteneurs</div>
+            <div class="h1 mb-0">{{ containers.length }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-sm-6 col-lg-3">
+        <div class="card card-sm">
+          <div class="card-body">
+            <div class="subheader">Ports visibles</div>
+            <div class="h1 mb-0">{{ totalPorts }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-sm-6 col-lg-3">
+        <div class="card card-sm">
+          <div class="card-body">
+            <div class="subheader">Trafic total</div>
+            <div class="h1 mb-0">{{ formatBytes(totalRx + totalTx) }}</div>
+            <div class="text-secondary small">Rx {{ formatBytes(totalRx) }} / Tx {{ formatBytes(totalTx) }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card mb-4">
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-6 col-lg-3">
+            <input v-model="search" type="text" class="form-control" placeholder="Rechercher un port, conteneur, image..." />
+          </div>
+          <div class="col-md-6 col-lg-3">
+            <select v-model="protocolFilter" class="form-select">
+              <option value="">Tous les protocoles</option>
+              <option value="tcp">TCP</option>
+              <option value="udp">UDP</option>
+            </select>
+          </div>
+          <div class="col-md-6 col-lg-3">
+            <select v-model="hostFilter" class="form-select">
+              <option value="">Tous les hotes</option>
+              <option v-for="h in hosts" :key="h.id" :value="h.id">
+                {{ h.name || h.hostname || h.id }}
+              </option>
+            </select>
+          </div>
+          <div class="col-md-6 col-lg-3">
+            <label class="form-check form-switch">
+              <input v-model="onlyPublished" class="form-check-input" type="checkbox" />
+              <span class="form-check-label">Ports publies seulement</span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card mb-4">
+      <div class="table-responsive">
+        <table class="table table-vcenter card-table">
+          <thead>
+            <tr>
+              <th>Hote</th>
+              <th>Conteneur</th>
+              <th>Image</th>
+              <th>Port hote</th>
+              <th>Port conteneur</th>
+              <th>Proto</th>
+              <th>Bind</th>
+              <th>Etat</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="row in portRows" :key="row.key">
+              <td>
+                <router-link :to="`/hosts/${row.host_id}`" class="text-decoration-none">
+                  {{ row.host_name || row.host_id }}
+                </router-link>
+              </td>
+              <td class="fw-semibold">{{ row.container_name }}</td>
+              <td>
+                <div>{{ row.image }}</div>
+                <div class="text-secondary small"><code>{{ row.image_tag || '-' }}</code></div>
+              </td>
+              <td class="fw-semibold">{{ row.host_port || '-' }}</td>
+              <td class="text-secondary">{{ row.container_port || '-' }}</td>
+              <td class="text-secondary text-uppercase">{{ row.protocol || '-' }}</td>
+              <td class="text-secondary small font-monospace">{{ row.host_ip || '-' }}</td>
+              <td>
+                <span :class="row.state === 'running' ? 'badge bg-green-lt text-green' : 'badge bg-secondary-lt text-secondary'">
+                  {{ row.state || 'unknown' }}
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div v-if="portRows.length === 0" class="text-center text-secondary py-4">
+        Aucun port visible
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">Trafic par hote</h3>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-vcenter card-table">
+          <thead>
+            <tr>
+              <th>Hote</th>
+              <th>IP</th>
+              <th>Rx</th>
+              <th>Tx</th>
+              <th>Statut</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="h in hosts" :key="h.id">
+              <td>
+                <router-link :to="`/hosts/${h.id}`" class="fw-semibold text-decoration-none">
+                  {{ h.name || h.hostname || h.id }}
+                </router-link>
+              </td>
+              <td class="text-secondary">{{ h.ip_address }}</td>
+              <td>{{ formatBytes(h.network_rx_bytes || 0) }}</td>
+              <td>{{ formatBytes(h.network_tx_bytes || 0) }}</td>
+              <td>
+                <span :class="h.status === 'online' ? 'badge bg-green-lt text-green' : h.status === 'warning' ? 'badge bg-yellow-lt text-yellow' : 'badge bg-red-lt text-red'">
+                  {{ h.status || 'unknown' }}
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div v-if="hosts.length === 0" class="text-center text-secondary py-4">
+        Aucun hote trouve
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useAuthStore } from '../stores/auth'
+import apiClient from '../api'
+
+const hosts = ref([])
+const containers = ref([])
+const search = ref('')
+const protocolFilter = ref('')
+const hostFilter = ref('')
+const onlyPublished = ref(true)
+const auth = useAuthStore()
+let ws = null
+
+const portRows = computed(() => {
+  const rows = []
+  for (const container of containers.value) {
+    const mappings = container.port_mappings || []
+    for (const mapping of mappings) {
+      const hostPort = Number(mapping.host_port || 0)
+      const isPublished = hostPort > 0
+      if (onlyPublished.value && !isPublished) continue
+
+      rows.push({
+        key: `${container.id}-${mapping.raw}`,
+        host_id: container.host_id,
+        host_name: container.hostname,
+        container_name: container.name,
+        image: container.image,
+        image_tag: container.image_tag,
+        state: container.state,
+        host_port: hostPort,
+        container_port: mapping.container_port,
+        protocol: mapping.protocol,
+        host_ip: mapping.host_ip,
+        raw: mapping.raw,
+      })
+    }
+  }
+
+  const query = search.value.trim().toLowerCase()
+  return rows.filter((row) => {
+    const matchHost = !hostFilter.value || row.host_id === hostFilter.value
+    const matchProto = !protocolFilter.value || row.protocol === protocolFilter.value
+    const matchSearch =
+      !query ||
+      row.container_name?.toLowerCase().includes(query) ||
+      row.image?.toLowerCase().includes(query) ||
+      row.image_tag?.toLowerCase().includes(query) ||
+      row.host_name?.toLowerCase().includes(query) ||
+      String(row.host_port || '').includes(query) ||
+      String(row.container_port || '').includes(query) ||
+      row.protocol?.toLowerCase().includes(query) ||
+      row.host_ip?.toLowerCase().includes(query)
+
+    return matchHost && matchProto && matchSearch
+  })
+})
+
+const totalPorts = computed(() => portRows.value.length)
+const totalRx = computed(() => hosts.value.reduce((sum, h) => sum + (h.network_rx_bytes || 0), 0))
+const totalTx = computed(() => hosts.value.reduce((sum, h) => sum + (h.network_tx_bytes || 0), 0))
+
+function formatBytes(bytes) {
+  if (!bytes && bytes !== 0) return '-'
+  if (bytes < 1024) return `${bytes} B`
+  const units = ['KB', 'MB', 'GB', 'TB']
+  let value = bytes / 1024
+  let idx = 0
+  while (value >= 1024 && idx < units.length - 1) {
+    value /= 1024
+    idx += 1
+  }
+  return `${value.toFixed(1)} ${units[idx]}`
+}
+
+async function fetchSnapshot() {
+  try {
+    const res = await apiClient.getNetworkSnapshot()
+    hosts.value = res.data?.hosts || []
+    containers.value = res.data?.containers || []
+  } catch (e) {
+    // ignore
+  }
+}
+
+function connectWebSocket() {
+  if (!auth.token) return
+  const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
+  const wsUrl = `${protocol}://${window.location.host}/api/v1/ws/network`
+  ws = new WebSocket(wsUrl)
+
+  ws.onopen = () => {
+    ws.send(JSON.stringify({ type: 'auth', token: auth.token }))
+  }
+
+  ws.onmessage = (event) => {
+    try {
+      const payload = JSON.parse(event.data)
+      if (payload.type !== 'network') return
+      hosts.value = payload.hosts || []
+      containers.value = payload.containers || []
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  ws.onclose = () => {
+    setTimeout(connectWebSocket, 2000)
+  }
+}
+
+onMounted(() => {
+  fetchSnapshot()
+  connectWebSocket()
+})
+
+onUnmounted(() => {
+  if (ws) ws.close()
+})
+</script>

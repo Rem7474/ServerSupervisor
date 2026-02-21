@@ -26,6 +26,12 @@ const routes = [
     meta: { requiresAuth: true },
   },
   {
+    path: '/network',
+    name: 'Network',
+    component: () => import('../views/NetworkView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
     path: '/apt',
     name: 'APT',
     component: () => import('../views/AptView.vue'),

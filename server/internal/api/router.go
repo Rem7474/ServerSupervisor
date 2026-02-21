@@ -24,6 +24,7 @@ func SetupRouter(db *database.DB, cfg *config.Config) *gin.Engine {
 	agentH := NewAgentHandler(db, cfg, wsH.GetStreamHub())
 	aptH := NewAptHandler(db, cfg)
 	dockerH := NewDockerHandler(db, cfg)
+	networkH := NewNetworkHandler(db)
 	auditH := NewAuditHandler(db, cfg)
 	userH := NewUserHandler(db, cfg)
 	alertH := NewAlertHandler(db, cfg)
@@ -42,6 +43,7 @@ func SetupRouter(db *database.DB, cfg *config.Config) *gin.Engine {
 	r.GET("/api/v1/ws/dashboard", wsH.Dashboard)
 	r.GET("/api/v1/ws/hosts/:id", wsH.HostDetail)
 	r.GET("/api/v1/ws/docker", wsH.Docker)
+	r.GET("/api/v1/ws/network", wsH.Network)
 	r.GET("/api/v1/ws/apt", wsH.Apt)
 	r.GET("/api/v1/ws/apt/stream/:command_id", wsH.AptStream)
 
@@ -82,6 +84,7 @@ func SetupRouter(db *database.DB, cfg *config.Config) *gin.Engine {
 		api.GET("/hosts/:id/containers", dockerH.ListContainers)
 		api.GET("/docker/containers", dockerH.ListAllContainers)
 		api.GET("/docker/versions", dockerH.CompareVersions)
+		api.GET("/network", networkH.GetNetworkSnapshot)
 
 		// Tracked GitHub repos
 		api.GET("/repos", dockerH.ListTrackedRepos)

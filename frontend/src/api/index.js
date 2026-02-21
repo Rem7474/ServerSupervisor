@@ -58,6 +58,9 @@ export default {
   getAllContainers: () => api.get('/v1/docker/containers'),
   getVersionComparisons: () => api.get('/v1/docker/versions'),
 
+  // Network
+  getNetworkSnapshot: () => api.get('/v1/network'),
+
   // Tracked Repos
   getTrackedRepos: () => api.get('/v1/repos'),
   addTrackedRepo: (data) => api.post('/v1/repos', data),

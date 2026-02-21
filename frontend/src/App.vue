@@ -37,6 +37,16 @@
                 </router-link>
               </li>
               <li class="nav-item">
+                <router-link to="/network" class="nav-link" active-class="active">
+                  <span class="nav-link-icon">
+                    <svg class="icon" width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3a9 9 0 100 18 9 9 0 000-18zm0 0v18m-7.5-9h15"/>
+                    </svg>
+                  </span>
+                  <span class="nav-link-title">Network</span>
+                </router-link>
+              </li>
+              <li class="nav-item">
                 <router-link to="/apt" class="nav-link" active-class="active">
                   <span class="nav-link-icon">
                     <svg class="icon" width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -273,7 +273,9 @@ func (db *DB) migrate() error {
 		`ALTER TABLE IF EXISTS hosts ADD COLUMN IF NOT EXISTS agent_version VARCHAR(20) DEFAULT ''`,
 		// Migration: Add cve_list to apt_status for CVE tracking
 		`ALTER TABLE IF EXISTS apt_status ADD COLUMN IF NOT EXISTS cve_list JSONB DEFAULT '[]'::jsonb`,
+		`ALTER TABLE IF EXISTS apt_status ALTER COLUMN cve_list DROP DEFAULT`,
 		`ALTER TABLE IF EXISTS apt_status ALTER COLUMN cve_list TYPE JSONB USING COALESCE(cve_list::jsonb, '[]'::jsonb)`,
+		`ALTER TABLE IF EXISTS apt_status ALTER COLUMN cve_list SET DEFAULT '[]'::jsonb`,
 		// Migration: Convert backup_codes from TEXT to JSONB for better validation
 		`ALTER TABLE IF EXISTS users ALTER COLUMN backup_codes DROP DEFAULT`,
 		`ALTER TABLE IF EXISTS users ALTER COLUMN backup_codes TYPE JSONB USING COALESCE(backup_codes::jsonb, '[]'::jsonb)`,
