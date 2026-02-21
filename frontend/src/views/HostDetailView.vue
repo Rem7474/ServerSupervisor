@@ -292,33 +292,7 @@
       </div>
     </div>
 
-    <div v-if="auditLogs.length" class="card mt-4">
-      <div class="card-header">
-        <h3 class="card-title">Audit APT (hote)</h3>
-      </div>
-      <div class="table-responsive">
-        <table class="table table-vcenter card-table">
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Commande</th>
-              <th>Statut</th>
-              <th>Utilisateur</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="log in auditLogs" :key="log.id">
-              <td>{{ formatDate(log.created_at) }}</td>
-              <td><code>{{ log.action }}</code></td>
-              <td>
-                <span :class="statusClass(log.status)">{{ log.status }}</span>
-              </td>
-              <td>{{ log.username }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
+    
       </div>
 
       <!-- Colonne droite: Console Live -->
@@ -389,7 +363,7 @@
                   line-height: 1.5;
                   border-radius: 0 0 0.5rem 0.5rem;
                 "
-              >{{ liveCommand.output || 'En attente de sortie...' }}</pre>
+              >{{ renderedConsoleOutput || 'En attente de sortie...' }}</pre>
             </div>
           </div>
         </div>
@@ -442,6 +416,12 @@ let ws = null
 let streamWs = null
 const auth = useAuthStore()
 const canRunApt = computed(() => auth.role === 'admin' || auth.role === 'operator')
+
+const renderedConsoleOutput = computed(() => {
+  if (!liveCommand.value) return ''
+  const raw = liveCommand.value.output || ''
+  return renderConsoleOutput(raw)
+})
 
 const chartOptions = {
   responsive: true,
@@ -636,6 +616,30 @@ function statusClass(status) {
   if (status === 'completed') return 'badge bg-green-lt text-green'
   if (status === 'failed') return 'badge bg-red-lt text-red'
   return 'badge bg-yellow-lt text-yellow'
+}
+
+function renderConsoleOutput(raw) {
+  if (!raw) return ''
+  const lines = ['']
+  let currentLine = ''
+
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw[i]
+    if (ch === '\r') {
+      currentLine = ''
+      lines[lines.length - 1] = ''
+      continue
+    }
+    if (ch === '\n') {
+      currentLine = ''
+      lines.push('')
+      continue
+    }
+    currentLine += ch
+    lines[lines.length - 1] = currentLine
+  }
+
+  return lines.join('\n')
 }
 
 function isAgentUpToDate(version) {

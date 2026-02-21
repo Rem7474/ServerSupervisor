@@ -199,7 +199,7 @@
                   line-height: 1.5;
                   border-radius: 0 0 0.5rem 0.5rem;
                 "
-              >{{ liveCommand.output || 'En attente de sortie...' }}</pre>
+              >{{ renderedConsoleOutput || 'En attente de sortie...' }}</pre>
             </div>
           </div>
         </div>
@@ -230,6 +230,12 @@ const aptHistories = ref({})
 const expandedHistories = ref({})
 const auth = useAuthStore()
 const canRunApt = computed(() => auth.role === 'admin' || auth.role === 'operator')
+
+const renderedConsoleOutput = computed(() => {
+  if (!liveCommand.value) return ''
+  const raw = liveCommand.value.output || ''
+  return renderConsoleOutput(raw)
+})
 const liveCommand = ref(null)
 const consoleOutput = ref(null)
 let ws = null
@@ -338,6 +344,30 @@ function statusClass(status) {
   if (status === 'completed') return 'badge bg-green-lt text-green'
   if (status === 'failed') return 'badge bg-red-lt text-red'
   return 'badge bg-yellow-lt text-yellow'
+}
+
+function renderConsoleOutput(raw) {
+  if (!raw) return ''
+  const lines = ['']
+  let currentLine = ''
+
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw[i]
+    if (ch === '\r') {
+      currentLine = ''
+      lines[lines.length - 1] = ''
+      continue
+    }
+    if (ch === '\n') {
+      currentLine = ''
+      lines.push('')
+      continue
+    }
+    currentLine += ch
+    lines[lines.length - 1] = currentLine
+  }
+
+  return lines.join('\n')
 }
 
 function connectWebSocket() {

@@ -40,17 +40,27 @@ func (h *AptHandler) SendCommand(c *gin.Context) {
 
 	var results []gin.H
 	for _, hostID := range req.HostIDs {
-		cmd, err := h.db.CreateAptCommand(hostID, req.Command, username)
-		if err != nil {
-			results = append(results, gin.H{"host_id": hostID, "error": err.Error()})
-			continue
-		}
-
 		// Log to audit trail
 		ip := c.ClientIP()
 		auditDetails := "apt " + req.Command
-		if err := h.db.CreateAuditLog(username, "apt_"+req.Command, hostID, ip, auditDetails, "pending"); err != nil {
+		auditLogID, err := h.db.CreateAuditLog(username, "apt_"+req.Command, hostID, ip, auditDetails, "pending")
+		if err != nil {
 			// Log audit failure but don't block the request
+			auditLogID = 0
+		}
+
+		var auditLogIDPtr *int64
+		if auditLogID != 0 {
+			auditLogIDPtr = &auditLogID
+		}
+
+		cmd, err := h.db.CreateAptCommand(hostID, req.Command, username, auditLogIDPtr)
+		if err != nil {
+			if auditLogIDPtr != nil {
+				_ = h.db.UpdateAuditLogStatus(*auditLogIDPtr, "failed", err.Error())
+			}
+			results = append(results, gin.H{"host_id": hostID, "error": err.Error()})
+			continue
 		}
 
 		results = append(results, gin.H{"host_id": hostID, "command_id": cmd.ID, "status": "pending"})

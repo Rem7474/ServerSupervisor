@@ -128,22 +128,29 @@ func (h *AgentHandler) ReportCommandResult(c *gin.Context) {
 		return
 	}
 
+	// Update related audit log status (if linked)
+	cmd, _ := h.db.GetAptCommandByID(result.CommandID)
+	if cmd != nil && cmd.AuditLogID != nil {
+		details := ""
+		if result.Status == "failed" {
+			details = truncateOutput(result.Output, 2000)
+		}
+		_ = h.db.UpdateAuditLogStatus(*cmd.AuditLogID, result.Status, details)
+	}
+
 	// Broadcast status update to WebSocket clients
 	commandIDStr := strconv.FormatInt(result.CommandID, 10)
 	h.streamHub.BroadcastStatus(commandIDStr, result.Status)
 
-	if result.Status == "completed" {
-		cmd, err := h.db.GetAptCommandByID(result.CommandID)
-		if err == nil {
-			_ = h.db.TouchAptLastAction(cmd.HostID, cmd.Command)
+	if result.Status == "completed" && cmd != nil {
+		_ = h.db.TouchAptLastAction(cmd.HostID, cmd.Command)
 
-			// Update full APT status if provided with command result
-			if result.AptStatus != nil {
-				result.AptStatus.HostID = cmd.HostID
-				err := h.db.UpsertAptStatus(result.AptStatus)
-				if err != nil {
-					log.Printf("Failed to update APT status: %v", err)
-				}
+		// Update full APT status if provided with command result
+		if result.AptStatus != nil {
+			result.AptStatus.HostID = cmd.HostID
+			err := h.db.UpsertAptStatus(result.AptStatus)
+			if err != nil {
+				log.Printf("Failed to update APT status: %v", err)
 			}
 		}
 	}
@@ -172,6 +179,13 @@ func (h *AgentHandler) StreamCommandOutput(c *gin.Context) {
 	h.streamHub.Broadcast(chunk.CommandID, chunk.Chunk)
 
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
+}
+
+func truncateOutput(s string, max int) string {
+	if max <= 0 || len(s) <= max {
+		return s
+	}
+	return s[:max] + "..."
 }
 
 // GetMetricsHistory returns historical metrics for charts

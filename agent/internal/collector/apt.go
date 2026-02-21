@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -175,6 +176,16 @@ func runCommandWithStreaming(cmd *exec.Cmd, streamCallback func(chunk string)) (
 	}
 
 	var fullOutput strings.Builder
+	var mu sync.Mutex
+
+	handleChunk := func(chunk string) {
+		mu.Lock()
+		fullOutput.WriteString(chunk)
+		mu.Unlock()
+		if streamCallback != nil {
+			streamCallback(chunk)
+		}
+	}
 
 	// Read stdout and stderr concurrently - each goroutine has its own buffer
 	done := make(chan error, 2)
@@ -184,11 +195,7 @@ func runCommandWithStreaming(cmd *exec.Cmd, streamCallback func(chunk string)) (
 		for {
 			n, err := stdout.Read(buf)
 			if n > 0 {
-				chunk := string(buf[:n])
-				fullOutput.WriteString(chunk)
-				if streamCallback != nil {
-					streamCallback(chunk)
-				}
+				handleChunk(string(buf[:n]))
 			}
 			if err != nil {
 				done <- nil
@@ -202,11 +209,7 @@ func runCommandWithStreaming(cmd *exec.Cmd, streamCallback func(chunk string)) (
 		for {
 			n, err := stderr.Read(buf)
 			if n > 0 {
-				chunk := string(buf[:n])
-				fullOutput.WriteString(chunk)
-				if streamCallback != nil {
-					streamCallback(chunk)
-				}
+				handleChunk(string(buf[:n]))
 			}
 			if err != nil {
 				done <- nil
@@ -239,7 +242,8 @@ func getLastAptAction(prefix, logFile string) time.Time {
 		return time.Time{}
 	}
 	ts := strings.TrimSpace(parts[1])
-	t, _ := time.Parse("2006-01-02  15:04:05", ts)
+	// APT history timestamps are in local time; preserve local timezone
+	t, _ := time.ParseInLocation("2006-01-02  15:04:05", ts, time.Local)
 	return t
 }
 
@@ -253,7 +257,8 @@ func getLastAptUpgrade() time.Time {
 	if err != nil {
 		return time.Time{}
 	}
-	return time.Unix(epoch, 0)
+	// Preserve local timezone for UI relative time display
+	return time.Unix(epoch, 0).In(time.Local)
 }
 
 // extractCVEsForPackage extracts CVE information from package changelog and USN

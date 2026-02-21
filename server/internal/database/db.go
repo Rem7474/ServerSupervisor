@@ -170,6 +170,7 @@ func (db *DB) migrate() error {
 			command VARCHAR(50) NOT NULL,
 			status VARCHAR(20) NOT NULL DEFAULT 'pending',
 			output TEXT DEFAULT '',
+			audit_log_id BIGINT,
 			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 			started_at TIMESTAMP WITH TIME ZONE,
 			ended_at TIMESTAMP WITH TIME ZONE
@@ -200,6 +201,8 @@ func (db *DB) migrate() error {
 		`ALTER TABLE IF EXISTS users ADD COLUMN IF NOT EXISTS mfa_enabled BOOLEAN DEFAULT FALSE`,
 		// Migration: Add triggered_by to apt_commands (who launched it)
 		`ALTER TABLE IF EXISTS apt_commands ADD COLUMN IF NOT EXISTS triggered_by VARCHAR(255) DEFAULT 'system'`,
+		// Migration: Link apt_commands to audit_logs
+		`ALTER TABLE IF EXISTS apt_commands ADD COLUMN IF NOT EXISTS audit_log_id BIGINT`,
 		// Migration: Create audit_logs table for APT & admin action history
 		`CREATE TABLE IF NOT EXISTS audit_logs (
 			id BIGSERIAL PRIMARY KEY,
@@ -635,15 +638,17 @@ func (db *DB) GetAptStatus(hostID string) (*models.AptStatus, error) {
 	return &s, nil
 }
 
-func (db *DB) CreateAptCommand(hostID, command, triggeredBy string) (*models.AptCommand, error) {
+func (db *DB) CreateAptCommand(hostID, command, triggeredBy string, auditLogID *int64) (*models.AptCommand, error) {
 	if triggeredBy == "" {
 		triggeredBy = "system"
 	}
 	var cmd models.AptCommand
 	err := db.conn.QueryRow(
-		`INSERT INTO apt_commands (host_id, command, status, triggered_by) VALUES ($1, $2, 'pending', $3) RETURNING id, host_id, command, status, triggered_by, created_at`,
-		hostID, command, triggeredBy,
-	).Scan(&cmd.ID, &cmd.HostID, &cmd.Command, &cmd.Status, &cmd.TriggeredBy, &cmd.CreatedAt)
+		`INSERT INTO apt_commands (host_id, command, status, triggered_by, audit_log_id)
+		 VALUES ($1, $2, 'pending', $3, $4)
+		 RETURNING id, host_id, command, status, triggered_by, audit_log_id, created_at`,
+		hostID, command, triggeredBy, auditLogID,
+	).Scan(&cmd.ID, &cmd.HostID, &cmd.Command, &cmd.Status, &cmd.TriggeredBy, &cmd.AuditLogID, &cmd.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -732,10 +737,10 @@ func (db *DB) CleanupHostStalledCommands(hostID string, timeoutMinutes int) erro
 func (db *DB) GetAptCommandByID(id int64) (*models.AptCommand, error) {
 	var c models.AptCommand
 	err := db.conn.QueryRow(
-		`SELECT id, host_id, command, status, output, triggered_by, created_at, started_at, ended_at
+		`SELECT id, host_id, command, status, output, triggered_by, audit_log_id, created_at, started_at, ended_at
 		 FROM apt_commands WHERE id = $1`,
 		id,
-	).Scan(&c.ID, &c.HostID, &c.Command, &c.Status, &c.Output, &c.TriggeredBy, &c.CreatedAt, &c.StartedAt, &c.EndedAt)
+	).Scan(&c.ID, &c.HostID, &c.Command, &c.Status, &c.Output, &c.TriggeredBy, &c.AuditLogID, &c.CreatedAt, &c.StartedAt, &c.EndedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -805,13 +810,18 @@ func (db *DB) CreateTrackedRepo(repo *models.TrackedRepo) error {
 
 // ========== Audit Logs ==========
 
-func (db *DB) CreateAuditLog(username, action, hostID, ipAddress, details, status string) error {
-	_, err := db.conn.Exec(
+func (db *DB) CreateAuditLog(username, action, hostID, ipAddress, details, status string) (int64, error) {
+	var id int64
+	err := db.conn.QueryRow(
 		`INSERT INTO audit_logs (username, action, host_id, ip_address, details, status)
-		 VALUES ($1, $2, $3, $4, $5, $6)`,
+		 VALUES ($1, $2, $3, $4, $5, $6)
+		 RETURNING id`,
 		username, action, hostID, ipAddress, details, status,
-	)
-	return err
+	).Scan(&id)
+	if err != nil {
+		return 0, err
+	}
+	return id, nil
 }
 
 func (db *DB) GetAuditLogs(limit, offset int) ([]models.AuditLog, error) {
@@ -897,7 +907,10 @@ func (db *DB) CleanOldAuditLogs(retentionDays int) (int64, error) {
 
 func (db *DB) UpdateAuditLogStatus(id int64, status, details string) error {
 	_, err := db.conn.Exec(
-		`UPDATE audit_logs SET status = $1, details = $2 WHERE id = $3`,
+		`UPDATE audit_logs
+		 SET status = $1,
+		     details = COALESCE(NULLIF($2, ''), details)
+		 WHERE id = $3`,
 		status, details, id,
 	)
 	return err

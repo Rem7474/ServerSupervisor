@@ -141,6 +141,7 @@ type AptCommand struct {
 	Status      string     `json:"status" db:"status"`   // pending, running, completed, failed
 	Output      string     `json:"output" db:"output"`
 	TriggeredBy string     `json:"triggered_by" db:"triggered_by"` // Username who triggered this
+	AuditLogID  *int64     `json:"audit_log_id,omitempty" db:"audit_log_id"`
 	CreatedAt   time.Time  `json:"created_at" db:"created_at"`
 	StartedAt   *time.Time `json:"started_at" db:"started_at"`
 	EndedAt     *time.Time `json:"ended_at" db:"ended_at"`
