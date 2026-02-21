@@ -706,17 +706,18 @@ func (db *DB) CleanupStalledCommands(timeoutMinutes int) error {
 	return nil
 }
 
-// CleanupHostStalledCommands marks pending/running commands for a specific host as failed
-func (db *DB) CleanupHostStalledCommands(hostID string) error {
+// CleanupHostStalledCommands marks old pending/running commands for a specific host as failed
+func (db *DB) CleanupHostStalledCommands(hostID string, timeoutMinutes int) error {
 	query := `
 		UPDATE apt_commands 
 		SET status = 'failed', 
-		    output = 'Agent restarted - command cancelled', 
-		    ended_at = NOW()
+			output = 'Command timed out - agent may have crashed or restarted', 
+			ended_at = NOW()
 		WHERE host_id = $1 
 		  AND status IN ('pending', 'running')
+		  AND created_at < NOW() - INTERVAL '1 minute' * $2
 	`
-	result, err := db.conn.Exec(query, hostID)
+	result, err := db.conn.Exec(query, hostID, timeoutMinutes)
 	if err != nil {
 		return fmt.Errorf("failed to cleanup host stalled commands: %w", err)
 	}

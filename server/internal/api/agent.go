@@ -45,7 +45,7 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 	h.db.UpdateHostStatus(hostID, "online")
 
 	// Cleanup any stalled commands for this host (in case agent restarted)
-	if err := h.db.CleanupHostStalledCommands(hostID); err != nil {
+	if err := h.db.CleanupHostStalledCommands(hostID, 60); err != nil {
 		log.Printf("Warning: failed to cleanup stalled commands for host %s: %v", hostID, err)
 	}
 
