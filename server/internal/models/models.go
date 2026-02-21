@@ -13,6 +13,7 @@ type Host struct {
 	IPAddress    string    `json:"ip_address" db:"ip_address"`
 	OS           string    `json:"os" db:"os"`                       // Auto-populated by agent
 	AgentVersion string    `json:"agent_version" db:"agent_version"` // Agent version
+	Tags         []string  `json:"tags" db:"tags"`
 	APIKey       string    `json:"-" db:"api_key"`
 	Status       string    `json:"status" db:"status"` // online, offline, warning
 	LastSeen     time.Time `json:"last_seen" db:"last_seen"`
@@ -21,8 +22,9 @@ type Host struct {
 }
 
 type HostRegistration struct {
-	Name      string `json:"name" binding:"required"`
-	IPAddress string `json:"ip_address" binding:"required"`
+	Name      string   `json:"name" binding:"required"`
+	IPAddress string   `json:"ip_address" binding:"required"`
+	Tags      []string `json:"tags"`
 }
 
 type HostUpdate struct {
@@ -31,6 +33,7 @@ type HostUpdate struct {
 	IPAddress    *string `json:"ip_address"`
 	OS           *string `json:"os"`
 	AgentVersion *string `json:"agent_version"`
+	Tags         *[]string `json:"tags"`
 }
 
 // ========== System Metrics ==========
@@ -270,10 +273,35 @@ type AuditLog struct {
 	Username  string    `json:"username" db:"username"`     // Who
 	Action    string    `json:"action" db:"action"`         // What (apt_update, apt_upgrade, user_created, etc.)
 	HostID    string    `json:"host_id" db:"host_id"`       // On which host (nullable)
+	HostName  string    `json:"host_name" db:"host_name"`   // Display name (if available)
 	IPAddress string    `json:"ip_address" db:"ip_address"` // Client IP
 	Details   string    `json:"details" db:"details"`       // JSON payload (command output, new privileges, etc.)
 	Status    string    `json:"status" db:"status"`         // pending, completed, failed
 	CreatedAt time.Time `json:"created_at" db:"created_at"`
+}
+
+// ========== Alerts ==========
+
+type AlertRule struct {
+	ID              int64    `json:"id" db:"id"`
+	HostID          *string  `json:"host_id" db:"host_id"`
+	Metric          string   `json:"metric" db:"metric"`
+	Operator        string   `json:"operator" db:"operator"`
+	Threshold       *float64 `json:"threshold" db:"threshold"`
+	DurationSeconds int      `json:"duration_seconds" db:"duration_seconds"`
+	Channel         string   `json:"channel" db:"channel"`
+	ChannelConfig   string   `json:"channel_config" db:"channel_config"`
+	Enabled         bool     `json:"enabled" db:"enabled"`
+	CreatedAt       time.Time `json:"created_at" db:"created_at"`
+}
+
+type AlertIncident struct {
+	ID          int64      `json:"id" db:"id"`
+	RuleID      int64      `json:"rule_id" db:"rule_id"`
+	HostID      string     `json:"host_id" db:"host_id"`
+	TriggeredAt time.Time  `json:"triggered_at" db:"triggered_at"`
+	ResolvedAt  *time.Time `json:"resolved_at" db:"resolved_at"`
+	Value       float64    `json:"value" db:"value"`
 }
 
 // ========== Metrics Aggregation (for downsampling) ==========

@@ -28,7 +28,16 @@
               <td>{{ formatDate(log.created_at) }}</td>
               <td class="fw-semibold">{{ log.username }}</td>
               <td><code>{{ log.action }}</code></td>
-              <td class="text-secondary small">{{ log.host_id || '-' }}</td>
+              <td>
+                <router-link
+                  v-if="log.host_id"
+                  :to="`/hosts/${log.host_id}`"
+                  class="text-decoration-none fw-semibold"
+                >
+                  {{ log.host_name || log.host_id }}
+                </router-link>
+                <span v-else class="text-secondary">-</span>
+              </td>
               <td class="text-secondary small">{{ log.ip_address || '-' }}</td>
               <td>
                 <span :class="statusClass(log.status)">{{ log.status }}</span>

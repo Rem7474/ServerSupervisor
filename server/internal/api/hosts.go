@@ -22,6 +22,11 @@ func NewHostHandler(db *database.DB, cfg *config.Config) *HostHandler {
 
 // RegisterHost creates a new host and returns its API key (admin only)
 func (h *HostHandler) RegisterHost(c *gin.Context) {
+	if c.GetString("role") != models.RoleAdmin {
+		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+		return
+	}
+
 	var req models.HostRegistration
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -45,6 +50,7 @@ func (h *HostHandler) RegisterHost(c *gin.Context) {
 		IPAddress: req.IPAddress,
 		OS:        "", // Will be populated by agent
 		APIKey:    hashedAPIKey,
+		Tags:      req.Tags,
 		Status:    "offline",
 	}
 
@@ -86,13 +92,18 @@ func (h *HostHandler) GetHost(c *gin.Context) {
 
 // UpdateHost updates editable host fields
 func (h *HostHandler) UpdateHost(c *gin.Context) {
+	if c.GetString("role") != models.RoleAdmin {
+		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+		return
+	}
+
 	hostID := c.Param("id")
 	var req models.HostUpdate
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if req.Name == nil && req.Hostname == nil && req.IPAddress == nil && req.OS == nil {
+	if req.Name == nil && req.Hostname == nil && req.IPAddress == nil && req.OS == nil && req.Tags == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "no fields to update"})
 		return
 	}
@@ -110,12 +121,39 @@ func (h *HostHandler) UpdateHost(c *gin.Context) {
 
 // DeleteHost removes a host
 func (h *HostHandler) DeleteHost(c *gin.Context) {
+	if c.GetString("role") != models.RoleAdmin {
+		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+		return
+	}
+
 	hostID := c.Param("id")
 	if err := h.db.DeleteHost(hostID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete host"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "host deleted"})
+}
+
+// RotateAPIKey regenerates an API key for a host (admin only)
+func (h *HostHandler) RotateAPIKey(c *gin.Context) {
+	if c.GetString("role") != models.RoleAdmin {
+		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+		return
+	}
+
+	hostID := c.Param("id")
+	plainAPIKey := uuid.New().String()
+	hashedAPIKey := database.HashAPIKey(plainAPIKey)
+
+	if err := h.db.UpdateHostAPIKey(hostID, hashedAPIKey); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to rotate API key"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"api_key": plainAPIKey,
+		"message": "API key rotated. Update the agent configuration immediately; it will not be shown again.",
+	})
 }
 
 // GetHostDashboard returns complete host info (metrics + docker + apt)

@@ -188,8 +188,12 @@ const filteredContainers = computed(() => {
 function connectWebSocket() {
   if (!auth.token) return
   const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
-  const wsUrl = `${protocol}://${window.location.host}/api/v1/ws/docker?token=${auth.token}`
+  const wsUrl = `${protocol}://${window.location.host}/api/v1/ws/docker`
   ws = new WebSocket(wsUrl)
+
+  ws.onopen = () => {
+    ws.send(JSON.stringify({ type: 'auth', token: auth.token }))
+  }
 
   ws.onmessage = (event) => {
     try {

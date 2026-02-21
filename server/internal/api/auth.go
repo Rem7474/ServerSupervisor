@@ -1,6 +1,10 @@
 package api
 
 import (
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
+	"encoding/hex"
 	"log"
 	"net/http"
 	"strings"
@@ -92,11 +96,99 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
+	refreshToken, err := generateRefreshToken()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate refresh token"})
+		return
+	}
+	refreshExpiresAt := time.Now().Add(h.cfg.RefreshTokenExpiration)
+	if err := h.db.CreateRefreshToken(user.ID, hashToken(refreshToken), refreshExpiresAt); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store refresh token"})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"token":      tokenString,
-		"expires_at": expiresAt,
-		"role":       user.Role,
+		"token":               tokenString,
+		"expires_at":          expiresAt,
+		"role":                user.Role,
+		"refresh_token":       refreshToken,
+		"refresh_expires_at":  refreshExpiresAt,
 	})
+}
+
+// RefreshToken exchanges a refresh token for a new JWT + refresh token
+func (h *AuthHandler) RefreshToken(c *gin.Context) {
+	var req struct {
+		RefreshToken string `json:"refresh_token" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		return
+	}
+
+	rec, err := h.db.GetRefreshToken(hashToken(req.RefreshToken))
+	if err != nil || rec == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid refresh token"})
+		return
+	}
+	if rec.RevokedAt != nil || time.Now().After(rec.ExpiresAt) {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "refresh token expired"})
+		return
+	}
+
+	user, err := h.db.GetUserByID(rec.UserID)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid refresh token"})
+		return
+	}
+
+	// Rotate refresh token
+	_ = h.db.RevokeRefreshToken(hashToken(req.RefreshToken))
+	newRefreshToken, err := generateRefreshToken()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate refresh token"})
+		return
+	}
+	refreshExpiresAt := time.Now().Add(h.cfg.RefreshTokenExpiration)
+	if err := h.db.CreateRefreshToken(user.ID, hashToken(newRefreshToken), refreshExpiresAt); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store refresh token"})
+		return
+	}
+
+	// Issue new JWT
+	expiresAt := time.Now().Add(h.cfg.JWTExpiration)
+	newToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"sub":  user.Username,
+		"role": user.Role,
+		"exp":  expiresAt.Unix(),
+		"iat":  time.Now().Unix(),
+	})
+	newTokenString, err := newToken.SignedString([]byte(h.cfg.JWTSecret))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate token"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"token":              newTokenString,
+		"expires_at":         expiresAt,
+		"refresh_token":      newRefreshToken,
+		"refresh_expires_at": refreshExpiresAt,
+	})
+}
+
+// Logout revokes a refresh token
+func (h *AuthHandler) Logout(c *gin.Context) {
+	var req struct {
+		RefreshToken string `json:"refresh_token" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		return
+	}
+
+	_ = h.db.RevokeRefreshToken(hashToken(req.RefreshToken))
+	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
 
 func (h *AuthHandler) ChangePassword(c *gin.Context) {
@@ -213,6 +305,19 @@ func APIKeyMiddleware(db *database.DB, cfg *config.Config) gin.HandlerFunc {
 func HashPassword(password string) (string, error) {
 	bytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	return string(bytes), err
+}
+
+func generateRefreshToken() (string, error) {
+	buf := make([]byte, 32)
+	if _, err := rand.Read(buf); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(buf), nil
+}
+
+func hashToken(token string) string {
+	hash := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(hash[:])
 }
 
 // ========== MFA Endpoints ==========

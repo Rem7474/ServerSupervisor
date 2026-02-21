@@ -8,3 +8,6 @@ agent/build/
 postgres_data/
 .DS_Store
 Thumbs.db
+agent/agent
+agent/agent.exe
+server/server

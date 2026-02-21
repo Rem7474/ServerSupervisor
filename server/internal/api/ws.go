@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -33,35 +34,73 @@ func (h *WSHandler) GetStreamHub() *AptStreamHub {
 	return h.streamHub
 }
 
-var wsUpgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool {
-		// Allow WebSocket connections from:
-		// 1. No origin header (direct WS connection, no CORS)
-		// 2. Localhost variations (development)
-		// 3. Any other origin is allowed since validateWSToken still enforces JWT
-		origin := r.Header.Get("Origin")
-		if origin == "" {
-			return true // Direct connection, no CORS needed
-		}
-		// Allow localhost/127.0.0.1 for development
-		if strings.Contains(origin, "localhost") || strings.Contains(origin, "127.0.0.1") || strings.Contains(origin, "[::1]") {
-			return true
-		}
-		// For production, validateWSToken will still enforce JWT authentication
-		// so we can be permissive here with origin checking
+type wsAuthMessage struct {
+	Type  string `json:"type"`
+	Token string `json:"token"`
+}
+
+func (h *WSHandler) upgrader() *websocket.Upgrader {
+	return &websocket.Upgrader{
+		CheckOrigin: func(r *http.Request) bool {
+			return isAllowedOrigin(r.Header.Get("Origin"), h.cfg.BaseURL)
+		},
+	}
+}
+
+func isAllowedOrigin(origin string, baseURL string) bool {
+	if origin == "" {
 		return true
-	},
+	}
+
+	parsedOrigin, err := url.Parse(origin)
+	if err != nil {
+		return false
+	}
+	parsedBase, err := url.Parse(baseURL)
+	if err != nil {
+		return false
+	}
+
+	if parsedOrigin.Host == parsedBase.Host && parsedOrigin.Scheme == parsedBase.Scheme {
+		return true
+	}
+
+	if strings.Contains(parsedOrigin.Host, "localhost") || strings.Contains(parsedOrigin.Host, "127.0.0.1") || strings.Contains(parsedOrigin.Host, "[::1]") {
+		return true
+	}
+
+	return false
+}
+
+func (h *WSHandler) authenticateWS(conn *websocket.Conn) bool {
+	_ = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+	var msg wsAuthMessage
+	if err := conn.ReadJSON(&msg); err != nil {
+		_ = conn.WriteJSON(gin.H{"type": "auth_error", "error": "missing auth"})
+		return false
+	}
+	if msg.Type != "auth" || msg.Token == "" {
+		_ = conn.WriteJSON(gin.H{"type": "auth_error", "error": "invalid auth"})
+		return false
+	}
+	if !h.validateToken(msg.Token) {
+		_ = conn.WriteJSON(gin.H{"type": "auth_error", "error": "unauthorized"})
+		return false
+	}
+	_ = conn.SetReadDeadline(time.Time{})
+	return true
 }
 
 func (h *WSHandler) Dashboard(c *gin.Context) {
-	if !h.validateWSToken(c) {
-		return
-	}
-	conn, err := wsUpgrader.Upgrade(c.Writer, c.Request, nil)
+	conn, err := h.upgrader().Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		return
 	}
 	defer conn.Close()
+
+	if !h.authenticateWS(conn) {
+		return
+	}
 
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
@@ -86,20 +125,21 @@ func (h *WSHandler) Dashboard(c *gin.Context) {
 }
 
 func (h *WSHandler) HostDetail(c *gin.Context) {
-	if !h.validateWSToken(c) {
-		return
-	}
 	hostID := c.Param("id")
 	if hostID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "host id required"})
 		return
 	}
 
-	conn, err := wsUpgrader.Upgrade(c.Writer, c.Request, nil)
+	conn, err := h.upgrader().Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		return
 	}
 	defer conn.Close()
+
+	if !h.authenticateWS(conn) {
+		return
+	}
 
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
@@ -124,14 +164,15 @@ func (h *WSHandler) HostDetail(c *gin.Context) {
 }
 
 func (h *WSHandler) Docker(c *gin.Context) {
-	if !h.validateWSToken(c) {
-		return
-	}
-	conn, err := wsUpgrader.Upgrade(c.Writer, c.Request, nil)
+	conn, err := h.upgrader().Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		return
 	}
 	defer conn.Close()
+
+	if !h.authenticateWS(conn) {
+		return
+	}
 
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
@@ -156,14 +197,15 @@ func (h *WSHandler) Docker(c *gin.Context) {
 }
 
 func (h *WSHandler) Apt(c *gin.Context) {
-	if !h.validateWSToken(c) {
-		return
-	}
-	conn, err := wsUpgrader.Upgrade(c.Writer, c.Request, nil)
+	conn, err := h.upgrader().Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		return
 	}
 	defer conn.Close()
+
+	if !h.authenticateWS(conn) {
+		return
+	}
 
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
@@ -189,16 +231,13 @@ func (h *WSHandler) Apt(c *gin.Context) {
 
 // AptStream allows clients to subscribe to real-time APT command output
 func (h *WSHandler) AptStream(c *gin.Context) {
-	if !h.validateWSToken(c) {
-		return
-	}
 	commandID := c.Param("command_id")
 	if commandID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "command_id required"})
 		return
 	}
 
-	conn, err := wsUpgrader.Upgrade(c.Writer, c.Request, nil)
+	conn, err := h.upgrader().Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		return
 	}
@@ -206,6 +245,10 @@ func (h *WSHandler) AptStream(c *gin.Context) {
 		h.streamHub.Unregister(commandID, conn)
 		conn.Close()
 	}()
+
+	if !h.authenticateWS(conn) {
+		return
+	}
 
 	// Register this connection to receive streaming logs
 	h.streamHub.Register(commandID, conn)
@@ -240,10 +283,9 @@ func (h *WSHandler) readLoop(conn *websocket.Conn, done chan struct{}) {
 	}
 }
 
-func (h *WSHandler) validateWSToken(c *gin.Context) bool {
-	tokenString := c.Query("token")
+
+func (h *WSHandler) validateToken(tokenString string) bool {
 	if tokenString == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing token"})
 		return false
 	}
 
@@ -253,11 +295,7 @@ func (h *WSHandler) validateWSToken(c *gin.Context) bool {
 		}
 		return []byte(h.cfg.JWTSecret), nil
 	})
-	if err != nil || !token.Valid {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
-		return false
-	}
-	return true
+	return err == nil && token.Valid
 }
 
 func (h *WSHandler) sendDashboardSnapshot(conn *websocket.Conn) error {

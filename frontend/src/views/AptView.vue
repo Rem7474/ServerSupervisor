@@ -284,8 +284,12 @@ function connectStreamWebSocket(commandId) {
     streamWs.close()
   }
   const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
-  const wsUrl = `${protocol}://${window.location.host}/api/v1/ws/apt/stream/${commandId}?token=${auth.token}`
+  const wsUrl = `${protocol}://${window.location.host}/api/v1/ws/apt/stream/${commandId}`
   streamWs = new WebSocket(wsUrl)
+
+  streamWs.onopen = () => {
+    streamWs.send(JSON.stringify({ type: 'auth', token: auth.token }))
+  }
 
   streamWs.onmessage = (event) => {
     try {
@@ -373,8 +377,12 @@ function renderConsoleOutput(raw) {
 function connectWebSocket() {
   if (!auth.token) return
   const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
-  const wsUrl = `${protocol}://${window.location.host}/api/v1/ws/apt?token=${auth.token}`
+  const wsUrl = `${protocol}://${window.location.host}/api/v1/ws/apt`
   ws = new WebSocket(wsUrl)
+
+  ws.onopen = () => {
+    ws.send(JSON.stringify({ type: 'auth', token: auth.token }))
+  }
 
   ws.onmessage = (event) => {
     try {

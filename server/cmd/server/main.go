@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/serversupervisor/server/internal/alerts"
 	"github.com/serversupervisor/server/internal/api"
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/database"
@@ -24,7 +25,7 @@ func main() {
 	log.Printf("Database Config: host=%s port=%s user=%s dbname=%s", cfg.DBHost, cfg.DBPort, cfg.DBUser, cfg.DBName)
 
 	// ⚠️  Security warnings for default configuration
-	if cfg.JWTSecret == "change-me-in-production-please" {
+	if cfg.JWTSecret == config.DefaultJWTSecret {
 		log.Println("⚠️  WARNING: JWT_SECRET is using the default insecure value. Change it in production!")
 	}
 	if cfg.AdminPassword == "admin" {
@@ -62,12 +63,12 @@ func main() {
 	tracker.Start()
 	defer tracker.Stop()
 
-	// Start periodic cleanup of old metrics (7+ days)
+	// Start periodic cleanup of old metrics
 	go func() {
 		ticker := time.NewTicker(1 * time.Hour)
 		defer ticker.Stop()
 		for range ticker.C {
-			if deleted, err := db.CleanOldMetrics(7); err != nil {
+			if deleted, err := db.CleanOldMetrics(cfg.MetricsRetentionDays); err != nil {
 				log.Printf("Metrics cleanup error: %v", err)
 			} else if deleted > 0 {
 				log.Printf("Cleaned up %d old metrics records", deleted)
@@ -94,11 +95,24 @@ func main() {
 		}
 	}()
 
+	// Start periodic alert evaluation
+	go func() {
+		ticker := time.NewTicker(60 * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			alerts.EvaluateAlerts(db, cfg)
+		}
+	}()
+
 	// Start periodic metrics downsampling (aggregate raw metrics)
 	go func() {
 		ticker := time.NewTicker(5 * time.Minute)
 		defer ticker.Stop()
 		for range ticker.C {
+			now := time.Now().UTC()
+			windowEnd := now.Truncate(5 * time.Minute)
+			windowStart := windowEnd.Add(-5 * time.Minute)
+
 			// Get all hosts and downsample their metrics
 			hosts, err := db.GetAllHosts()
 			if err != nil {
@@ -106,18 +120,57 @@ func main() {
 				continue
 			}
 			for _, h := range hosts {
-				_ = h // TODO: Implement metrics downsampling for each host
-				// Downsample 5-minute aggregates (keep for 30 days)
-				// Downsampling logic would go here
-				// For now, this is a placeholder for future enhancement
+				agg, err := db.BuildMetricsAggregate(h.ID, windowStart, windowEnd)
+				if err != nil {
+					log.Printf("Downsampling error for host %s: %v", h.ID, err)
+					continue
+				}
+				if agg == nil {
+					continue
+				}
+				agg.AggregationType = "5min"
+				agg.Timestamp = windowStart
+				if err := db.InsertMetricsAggregate(agg); err != nil {
+					log.Printf("Failed to insert 5min aggregate for host %s: %v", h.ID, err)
+				}
 			}
 
-			// Clean up old raw metrics (older than 7 days) to prevent unbounded growth
-			// Aggregates are retained longer for historical trend analysis
-			if deletedCount, err := db.CleanOldMetrics(7); err != nil {
-				log.Printf("Metrics cleanup error: %v", err)
-			} else if deletedCount > 0 {
-				log.Printf("Cleaned up %d old metric records", deletedCount)
+			if windowEnd.Minute() == 0 {
+				hourStart := windowEnd.Add(-1 * time.Hour)
+				for _, h := range hosts {
+					agg, err := db.BuildMetricsAggregate(h.ID, hourStart, windowEnd)
+					if err != nil {
+						log.Printf("Hourly downsampling error for host %s: %v", h.ID, err)
+						continue
+					}
+					if agg == nil {
+						continue
+					}
+					agg.AggregationType = "hour"
+					agg.Timestamp = hourStart
+					if err := db.InsertMetricsAggregate(agg); err != nil {
+						log.Printf("Failed to insert hourly aggregate for host %s: %v", h.ID, err)
+					}
+				}
+			}
+
+			if windowEnd.Hour() == 0 && windowEnd.Minute() == 0 {
+				dayStart := windowEnd.Add(-24 * time.Hour)
+				for _, h := range hosts {
+					agg, err := db.BuildMetricsAggregate(h.ID, dayStart, windowEnd)
+					if err != nil {
+						log.Printf("Daily downsampling error for host %s: %v", h.ID, err)
+						continue
+					}
+					if agg == nil {
+						continue
+					}
+					agg.AggregationType = "day"
+					agg.Timestamp = dayStart
+					if err := db.InsertMetricsAggregate(agg); err != nil {
+						log.Printf("Failed to insert daily aggregate for host %s: %v", h.ID, err)
+					}
+				}
 			}
 		}
 	}()

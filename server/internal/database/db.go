@@ -93,6 +93,15 @@ func (db *DB) migrate() error {
 			role VARCHAR(50) NOT NULL DEFAULT 'viewer',
 			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 		)`,
+		`CREATE TABLE IF NOT EXISTS refresh_tokens (
+			id BIGSERIAL PRIMARY KEY,
+			user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+			token_hash VARCHAR(64) UNIQUE NOT NULL,
+			expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+			revoked_at TIMESTAMP WITH TIME ZONE,
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens(user_id)` ,
 		`CREATE TABLE IF NOT EXISTS hosts (
 			id VARCHAR(64) PRIMARY KEY,
 			name VARCHAR(255) NOT NULL,
@@ -100,6 +109,7 @@ func (db *DB) migrate() error {
 			ip_address VARCHAR(45) NOT NULL,
 			os VARCHAR(255) NOT NULL DEFAULT '',
 			api_key VARCHAR(255) NOT NULL,
+			tags JSONB DEFAULT '[]',
 			status VARCHAR(20) NOT NULL DEFAULT 'offline',
 			last_seen TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
 			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -162,6 +172,7 @@ func (db *DB) migrate() error {
 			pending_packages INTEGER DEFAULT 0,
 			package_list JSONB DEFAULT '[]',
 			security_updates INTEGER DEFAULT 0,
+			cve_list JSONB DEFAULT '[]',
 			updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 		)`,
 		`CREATE TABLE IF NOT EXISTS apt_commands (
@@ -191,6 +202,8 @@ func (db *DB) migrate() error {
 		)`,
 		// Migration: Add name column to hosts if it doesn't exist
 		`ALTER TABLE IF EXISTS hosts ADD COLUMN IF NOT EXISTS name VARCHAR(255) NOT NULL DEFAULT ''`,
+		// Migration: Add tags column to hosts
+		`ALTER TABLE IF EXISTS hosts ADD COLUMN IF NOT EXISTS tags JSONB DEFAULT '[]'::jsonb`,
 		// Migration: Convert package_list from TEXT to JSONB for existing databases
 		`ALTER TABLE IF EXISTS apt_status ALTER COLUMN package_list DROP DEFAULT`,
 		`ALTER TABLE IF EXISTS apt_status ALTER COLUMN package_list TYPE JSONB USING COALESCE(package_list::jsonb, '[]'::jsonb)`,
@@ -216,6 +229,28 @@ func (db *DB) migrate() error {
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_audit_logs_user_action ON audit_logs(username, action, created_at DESC)`,
 		`CREATE INDEX IF NOT EXISTS idx_audit_logs_host ON audit_logs(host_id, created_at DESC)`,
+		// Migration: Create alert rules and incidents
+		`CREATE TABLE IF NOT EXISTS alert_rules (
+			id SERIAL PRIMARY KEY,
+			host_id VARCHAR(64),
+			metric VARCHAR(50) NOT NULL,
+			operator VARCHAR(5) NOT NULL,
+			threshold DOUBLE PRECISION,
+			duration_seconds INTEGER DEFAULT 60,
+			channel VARCHAR(50) NOT NULL,
+			channel_config JSONB NOT NULL DEFAULT '{}'::jsonb,
+			enabled BOOLEAN DEFAULT TRUE,
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)`,
+		`CREATE TABLE IF NOT EXISTS alert_incidents (
+			id BIGSERIAL PRIMARY KEY,
+			rule_id INTEGER REFERENCES alert_rules(id) ON DELETE CASCADE,
+			host_id VARCHAR(64),
+			triggered_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+			resolved_at TIMESTAMP WITH TIME ZONE,
+			value DOUBLE PRECISION
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_alert_incidents_rule ON alert_incidents(rule_id, triggered_at DESC)`,
 		// Migration: Create metrics_aggregates table for downsampling (5min, hourly, daily)
 		`CREATE TABLE IF NOT EXISTS metrics_aggregates (
 			id BIGSERIAL PRIMARY KEY,
@@ -233,10 +268,12 @@ func (db *DB) migrate() error {
 			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_metrics_aggregates_host_time ON metrics_aggregates(host_id, aggregation_type, timestamp DESC)`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_metrics_aggregates_unique ON metrics_aggregates(host_id, aggregation_type, timestamp)`,
 		// Migration: Add agent_version to hosts
 		`ALTER TABLE IF EXISTS hosts ADD COLUMN IF NOT EXISTS agent_version VARCHAR(20) DEFAULT ''`,
 		// Migration: Add cve_list to apt_status for CVE tracking
-		`ALTER TABLE IF EXISTS apt_status ADD COLUMN IF NOT EXISTS cve_list TEXT DEFAULT '[]'`,
+		`ALTER TABLE IF EXISTS apt_status ADD COLUMN IF NOT EXISTS cve_list JSONB DEFAULT '[]'::jsonb`,
+		`ALTER TABLE IF EXISTS apt_status ALTER COLUMN cve_list TYPE JSONB USING COALESCE(cve_list::jsonb, '[]'::jsonb)`,
 		// Migration: Convert backup_codes from TEXT to JSONB for better validation
 		`ALTER TABLE IF EXISTS users ALTER COLUMN backup_codes DROP DEFAULT`,
 		`ALTER TABLE IF EXISTS users ALTER COLUMN backup_codes TYPE JSONB USING COALESCE(backup_codes::jsonb, '[]'::jsonb)`,
@@ -268,6 +305,18 @@ func (db *DB) GetUserByUsername(username string) (*models.User, error) {
 	err := db.conn.QueryRow(
 		`SELECT id, username, password_hash, role, totp_secret, backup_codes, mfa_enabled, created_at FROM users WHERE username = $1`,
 		username,
+	).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Role, &u.TOTPSecret, &u.BackupCodes, &u.MFAEnabled, &u.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return &u, nil
+}
+
+func (db *DB) GetUserByID(id int64) (*models.User, error) {
+	var u models.User
+	err := db.conn.QueryRow(
+		`SELECT id, username, password_hash, role, totp_secret, backup_codes, mfa_enabled, created_at FROM users WHERE id = $1`,
+		id,
 	).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Role, &u.TOTPSecret, &u.BackupCodes, &u.MFAEnabled, &u.CreatedAt)
 	if err != nil {
 		return nil, err
@@ -311,49 +360,119 @@ func (db *DB) UpdateUserPassword(username, passwordHash string) error {
 	return err
 }
 
+type RefreshTokenRecord struct {
+	UserID    int64
+	ExpiresAt time.Time
+	RevokedAt *time.Time
+}
+
+func (db *DB) CreateRefreshToken(userID int64, tokenHash string, expiresAt time.Time) error {
+	_, err := db.conn.Exec(
+		`INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)`,
+		userID, tokenHash, expiresAt,
+	)
+	return err
+}
+
+func (db *DB) GetRefreshToken(tokenHash string) (*RefreshTokenRecord, error) {
+	var rec RefreshTokenRecord
+	var revoked sql.NullTime
+	err := db.conn.QueryRow(
+		`SELECT user_id, expires_at, revoked_at FROM refresh_tokens WHERE token_hash = $1`,
+		tokenHash,
+	).Scan(&rec.UserID, &rec.ExpiresAt, &revoked)
+	if err != nil {
+		return nil, err
+	}
+	if revoked.Valid {
+		rec.RevokedAt = &revoked.Time
+	}
+	return &rec, nil
+}
+
+func (db *DB) RevokeRefreshToken(tokenHash string) error {
+	_, err := db.conn.Exec(
+		`UPDATE refresh_tokens SET revoked_at = NOW() WHERE token_hash = $1 AND revoked_at IS NULL`,
+		tokenHash,
+	)
+	return err
+}
+
+func (db *DB) DeleteUser(id int64) error {
+	_, err := db.conn.Exec(`DELETE FROM users WHERE id = $1`, id)
+	return err
+}
+
 // ========== Hosts ==========
+
+func marshalTags(tags []string) string {
+	if tags == nil {
+		return "[]"
+	}
+	data, err := json.Marshal(tags)
+	if err != nil {
+		return "[]"
+	}
+	return string(data)
+}
+
+func parseTags(raw string) []string {
+	if raw == "" {
+		return []string{}
+	}
+	var tags []string
+	if err := json.Unmarshal([]byte(raw), &tags); err != nil {
+		return []string{}
+	}
+	return tags
+}
 
 func (db *DB) RegisterHost(host *models.Host) error {
 	lastSeen := host.LastSeen
 	if lastSeen.IsZero() {
 		lastSeen = time.Now()
 	}
+	tagsJSON := marshalTags(host.Tags)
 	_, err := db.conn.Exec(
-		`INSERT INTO hosts (id, name, hostname, ip_address, os, api_key, status, last_seen)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-		host.ID, host.Name, host.Hostname, host.IPAddress, host.OS, host.APIKey, host.Status, lastSeen,
+		`INSERT INTO hosts (id, name, hostname, ip_address, os, api_key, tags, status, last_seen)
+		 VALUES ($1, $2, $3, $4, $5, $6, CAST($7 AS JSONB), $8, $9)`,
+		host.ID, host.Name, host.Hostname, host.IPAddress, host.OS, host.APIKey, tagsJSON, host.Status, lastSeen,
 	)
 	return err
 }
 
 func (db *DB) GetHost(id string) (*models.Host, error) {
 	var h models.Host
+	var tagsJSON string
 	err := db.conn.QueryRow(
-		`SELECT id, name, hostname, ip_address, os, api_key, status, last_seen, created_at, updated_at
+		`SELECT id, name, hostname, ip_address, os, agent_version, api_key, tags, status, last_seen, created_at, updated_at
 		 FROM hosts WHERE id = $1`, id,
-	).Scan(&h.ID, &h.Name, &h.Hostname, &h.IPAddress, &h.OS, &h.APIKey, &h.Status, &h.LastSeen, &h.CreatedAt, &h.UpdatedAt)
+	).Scan(&h.ID, &h.Name, &h.Hostname, &h.IPAddress, &h.OS, &h.AgentVersion, &h.APIKey, &tagsJSON, &h.Status, &h.LastSeen, &h.CreatedAt, &h.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
+	h.Tags = parseTags(tagsJSON)
 	return &h, nil
 }
 
 func (db *DB) GetHostByAPIKey(apiKey string) (*models.Host, error) {
 	var h models.Host
+	var tagsJSON string
 	apiKeyHash := HashAPIKey(apiKey)
 	err := db.conn.QueryRow(
-		`SELECT id, name, hostname, ip_address, os, api_key, status, last_seen, created_at, updated_at
+		`SELECT id, name, hostname, ip_address, os, agent_version, api_key, tags, status, last_seen, created_at, updated_at
 		 FROM hosts WHERE api_key = $1`, apiKeyHash,
-	).Scan(&h.ID, &h.Name, &h.Hostname, &h.IPAddress, &h.OS, &h.APIKey, &h.Status, &h.LastSeen, &h.CreatedAt, &h.UpdatedAt)
+	).Scan(&h.ID, &h.Name, &h.Hostname, &h.IPAddress, &h.OS, &h.AgentVersion, &h.APIKey, &tagsJSON, &h.Status, &h.LastSeen, &h.CreatedAt, &h.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
+	h.Tags = parseTags(tagsJSON)
 	return &h, nil
 }
 
 func (db *DB) GetAllHosts() ([]models.Host, error) {
 	rows, err := db.conn.Query(
-		`SELECT id, name, hostname, ip_address, os, status, last_seen, created_at, updated_at
+		`SELECT id, name, hostname, ip_address, os, agent_version, tags, status, last_seen, created_at, updated_at
 		 FROM hosts ORDER BY name`,
 	)
 	if err != nil {
@@ -364,9 +483,11 @@ func (db *DB) GetAllHosts() ([]models.Host, error) {
 	var hosts []models.Host
 	for rows.Next() {
 		var h models.Host
-		if err := rows.Scan(&h.ID, &h.Name, &h.Hostname, &h.IPAddress, &h.OS, &h.Status, &h.LastSeen, &h.CreatedAt, &h.UpdatedAt); err != nil {
+		var tagsJSON string
+		if err := rows.Scan(&h.ID, &h.Name, &h.Hostname, &h.IPAddress, &h.OS, &h.AgentVersion, &tagsJSON, &h.Status, &h.LastSeen, &h.CreatedAt, &h.UpdatedAt); err != nil {
 			return nil, err
 		}
+		h.Tags = parseTags(tagsJSON)
 		hosts = append(hosts, h)
 	}
 	return hosts, nil
@@ -381,6 +502,11 @@ func (db *DB) UpdateHostStatus(id, status string) error {
 }
 
 func (db *DB) UpdateHost(id string, update *models.HostUpdate) error {
+	var tagsJSON *string
+	if update.Tags != nil {
+		value := marshalTags(*update.Tags)
+		tagsJSON = &value
+	}
 	_, err := db.conn.Exec(
 		`UPDATE hosts SET
 			name = COALESCE($1, name),
@@ -388,15 +514,24 @@ func (db *DB) UpdateHost(id string, update *models.HostUpdate) error {
 			ip_address = COALESCE($3, ip_address),
 			os = COALESCE($4, os),
 			agent_version = COALESCE($5, agent_version),
+			tags = COALESCE($6::jsonb, tags),
 			updated_at = NOW()
-		WHERE id = $6`,
-		update.Name, update.Hostname, update.IPAddress, update.OS, update.AgentVersion, id,
+		WHERE id = $7`,
+		update.Name, update.Hostname, update.IPAddress, update.OS, update.AgentVersion, tagsJSON, id,
 	)
 	return err
 }
 
 func (db *DB) DeleteHost(id string) error {
 	_, err := db.conn.Exec(`DELETE FROM hosts WHERE id = $1`, id)
+	return err
+}
+
+func (db *DB) UpdateHostAPIKey(id string, apiKeyHash string) error {
+	_, err := db.conn.Exec(
+		`UPDATE hosts SET api_key = $1, updated_at = NOW() WHERE id = $2`,
+		apiKeyHash, id,
+	)
 	return err
 }
 
@@ -612,7 +747,7 @@ func (db *DB) GetAllDockerContainers() ([]models.DockerContainer, error) {
 func (db *DB) UpsertAptStatus(status *models.AptStatus) error {
 	_, err := db.conn.Exec(
 		`INSERT INTO apt_status (host_id, last_update, last_upgrade, pending_packages, package_list, security_updates, cve_list, updated_at)
-		 VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())
+		 VALUES ($1,$2,$3,$4,$5,$6,CAST($7 AS JSONB),NOW())
 		 ON CONFLICT (host_id) DO UPDATE SET
 			last_update = EXCLUDED.last_update,
 			last_upgrade = EXCLUDED.last_upgrade,
@@ -826,8 +961,12 @@ func (db *DB) CreateAuditLog(username, action, hostID, ipAddress, details, statu
 
 func (db *DB) GetAuditLogs(limit, offset int) ([]models.AuditLog, error) {
 	rows, err := db.conn.Query(
-		`SELECT id, username, action, host_id, ip_address, details, status, created_at
-		 FROM audit_logs ORDER BY created_at DESC LIMIT $1 OFFSET $2`,
+		`SELECT al.id, al.username, al.action, al.host_id,
+			COALESCE(h.name, '') AS host_name,
+			al.ip_address, al.details, al.status, al.created_at
+		 FROM audit_logs al
+		 LEFT JOIN hosts h ON al.host_id = h.id
+		 ORDER BY al.created_at DESC LIMIT $1 OFFSET $2`,
 		limit, offset,
 	)
 	if err != nil {
@@ -838,7 +977,7 @@ func (db *DB) GetAuditLogs(limit, offset int) ([]models.AuditLog, error) {
 	var logs []models.AuditLog
 	for rows.Next() {
 		var log models.AuditLog
-		if err := rows.Scan(&log.ID, &log.Username, &log.Action, &log.HostID, &log.IPAddress,
+		if err := rows.Scan(&log.ID, &log.Username, &log.Action, &log.HostID, &log.HostName, &log.IPAddress,
 			&log.Details, &log.Status, &log.CreatedAt); err != nil {
 			continue
 		}
@@ -849,8 +988,13 @@ func (db *DB) GetAuditLogs(limit, offset int) ([]models.AuditLog, error) {
 
 func (db *DB) GetAuditLogsByHost(hostID string, limit int) ([]models.AuditLog, error) {
 	rows, err := db.conn.Query(
-		`SELECT id, username, action, host_id, ip_address, details, status, created_at
-		 FROM audit_logs WHERE host_id = $1 ORDER BY created_at DESC LIMIT $2`,
+		`SELECT al.id, al.username, al.action, al.host_id,
+			COALESCE(h.name, '') AS host_name,
+			al.ip_address, al.details, al.status, al.created_at
+		 FROM audit_logs al
+		 LEFT JOIN hosts h ON al.host_id = h.id
+		 WHERE al.host_id = $1
+		 ORDER BY al.created_at DESC LIMIT $2`,
 		hostID, limit,
 	)
 	if err != nil {
@@ -861,7 +1005,7 @@ func (db *DB) GetAuditLogsByHost(hostID string, limit int) ([]models.AuditLog, e
 	var logs []models.AuditLog
 	for rows.Next() {
 		var log models.AuditLog
-		if err := rows.Scan(&log.ID, &log.Username, &log.Action, &log.HostID, &log.IPAddress,
+		if err := rows.Scan(&log.ID, &log.Username, &log.Action, &log.HostID, &log.HostName, &log.IPAddress,
 			&log.Details, &log.Status, &log.CreatedAt); err != nil {
 			continue
 		}
@@ -872,8 +1016,13 @@ func (db *DB) GetAuditLogsByHost(hostID string, limit int) ([]models.AuditLog, e
 
 func (db *DB) GetAuditLogsByUser(username string, limit int) ([]models.AuditLog, error) {
 	rows, err := db.conn.Query(
-		`SELECT id, username, action, host_id, ip_address, details, status, created_at
-		 FROM audit_logs WHERE username = $1 ORDER BY created_at DESC LIMIT $2`,
+		`SELECT al.id, al.username, al.action, al.host_id,
+			COALESCE(h.name, '') AS host_name,
+			al.ip_address, al.details, al.status, al.created_at
+		 FROM audit_logs al
+		 LEFT JOIN hosts h ON al.host_id = h.id
+		 WHERE al.username = $1
+		 ORDER BY al.created_at DESC LIMIT $2`,
 		username, limit,
 	)
 	if err != nil {
@@ -884,7 +1033,7 @@ func (db *DB) GetAuditLogsByUser(username string, limit int) ([]models.AuditLog,
 	var logs []models.AuditLog
 	for rows.Next() {
 		var log models.AuditLog
-		if err := rows.Scan(&log.ID, &log.Username, &log.Action, &log.HostID, &log.IPAddress,
+		if err := rows.Scan(&log.ID, &log.Username, &log.Action, &log.HostID, &log.HostName, &log.IPAddress,
 			&log.Details, &log.Status, &log.CreatedAt); err != nil {
 			continue
 		}
@@ -914,6 +1063,119 @@ func (db *DB) UpdateAuditLogStatus(id int64, status, details string) error {
 		status, details, id,
 	)
 	return err
+}
+
+// ========== Alerts ==========
+
+func (db *DB) CreateAlertRule(rule *models.AlertRule) error {
+	return db.conn.QueryRow(
+		`INSERT INTO alert_rules (host_id, metric, operator, threshold, duration_seconds, channel, channel_config, enabled)
+		 VALUES ($1,$2,$3,$4,$5,$6,CAST($7 AS JSONB),$8)
+		 RETURNING id`,
+		rule.HostID, rule.Metric, rule.Operator, rule.Threshold, rule.DurationSeconds, rule.Channel, rule.ChannelConfig, rule.Enabled,
+	).Scan(&rule.ID)
+}
+
+func (db *DB) UpdateAlertRule(rule *models.AlertRule) error {
+	_, err := db.conn.Exec(
+		`UPDATE alert_rules SET
+			host_id = $1,
+			metric = $2,
+			operator = $3,
+			threshold = $4,
+			duration_seconds = $5,
+			channel = $6,
+			channel_config = CAST($7 AS JSONB),
+			enabled = $8
+		 WHERE id = $9`,
+		rule.HostID, rule.Metric, rule.Operator, rule.Threshold, rule.DurationSeconds, rule.Channel, rule.ChannelConfig, rule.Enabled, rule.ID,
+	)
+	return err
+}
+
+func (db *DB) DeleteAlertRule(id int64) error {
+	_, err := db.conn.Exec(`DELETE FROM alert_rules WHERE id = $1`, id)
+	return err
+}
+
+func (db *DB) GetAlertRules() ([]models.AlertRule, error) {
+	rows, err := db.conn.Query(
+		`SELECT id, host_id, metric, operator, threshold, duration_seconds, channel, channel_config, enabled, created_at
+		 FROM alert_rules ORDER BY created_at DESC`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var rules []models.AlertRule
+	for rows.Next() {
+		var r models.AlertRule
+		var hostID sql.NullString
+		var channelConfig string
+		if err := rows.Scan(&r.ID, &hostID, &r.Metric, &r.Operator, &r.Threshold, &r.DurationSeconds, &r.Channel, &channelConfig, &r.Enabled, &r.CreatedAt); err != nil {
+			continue
+		}
+		if hostID.Valid {
+			r.HostID = &hostID.String
+		}
+		r.ChannelConfig = channelConfig
+		rules = append(rules, r)
+	}
+	return rules, nil
+}
+
+func (db *DB) GetOpenAlertIncident(ruleID int64, hostID string) (*models.AlertIncident, error) {
+	var inc models.AlertIncident
+	err := db.conn.QueryRow(
+		`SELECT id, rule_id, host_id, triggered_at, resolved_at, value
+		 FROM alert_incidents
+		 WHERE rule_id = $1 AND host_id = $2 AND resolved_at IS NULL
+		 ORDER BY triggered_at DESC LIMIT 1`,
+		ruleID, hostID,
+	).Scan(&inc.ID, &inc.RuleID, &inc.HostID, &inc.TriggeredAt, &inc.ResolvedAt, &inc.Value)
+	if err != nil {
+		return nil, err
+	}
+	return &inc, nil
+}
+
+func (db *DB) CreateAlertIncident(ruleID int64, hostID string, value float64) error {
+	_, err := db.conn.Exec(
+		`INSERT INTO alert_incidents (rule_id, host_id, value) VALUES ($1, $2, $3)`,
+		ruleID, hostID, value,
+	)
+	return err
+}
+
+func (db *DB) ResolveAlertIncident(id int64) error {
+	_, err := db.conn.Exec(
+		`UPDATE alert_incidents SET resolved_at = NOW() WHERE id = $1 AND resolved_at IS NULL`,
+		id,
+	)
+	return err
+}
+
+func (db *DB) GetAlertIncidents(limit, offset int) ([]models.AlertIncident, error) {
+	rows, err := db.conn.Query(
+		`SELECT id, rule_id, host_id, triggered_at, resolved_at, value
+		 FROM alert_incidents ORDER BY triggered_at DESC LIMIT $1 OFFSET $2`,
+		limit, offset,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var incidents []models.AlertIncident
+	for rows.Next() {
+		var inc models.AlertIncident
+		if err := rows.Scan(&inc.ID, &inc.RuleID, &inc.HostID, &inc.TriggeredAt, &inc.ResolvedAt, &inc.Value); err != nil {
+			continue
+		}
+		incidents = append(incidents, inc)
+	}
+	return incidents, nil
 }
 
 // ========== User TOTP ==========
@@ -992,14 +1254,84 @@ func (db *DB) ConsumeMFABackupCode(username, usedCode string) error {
 // ========== Metrics Aggregates (Downsampling) ==========
 
 func (db *DB) InsertMetricsAggregate(agg *models.MetricsAggregate) error {
-	return db.conn.QueryRow(
+	_, err := db.conn.Exec(
 		`INSERT INTO metrics_aggregates (host_id, aggregation_type, timestamp, cpu_usage_avg, cpu_usage_max,
 		 memory_usage_avg, memory_usage_max, disk_usage_avg, network_rx_bytes, network_tx_bytes, sample_count)
 		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
-		 RETURNING id`,
+		 ON CONFLICT (host_id, aggregation_type, timestamp) DO NOTHING`,
 		agg.HostID, agg.AggregationType, agg.Timestamp, agg.CPUUsageAvg, agg.CPUUsageMax,
 		agg.MemoryUsageAvg, agg.MemoryUsageMax, agg.DiskUsageAvg, agg.NetworkRxBytes, agg.NetworkTxBytes, agg.SampleCount,
-	).Scan(&agg.ID)
+	)
+	return err
+}
+
+func (db *DB) BuildMetricsAggregate(hostID string, start, end time.Time) (*models.MetricsAggregate, error) {
+	var agg models.MetricsAggregate
+	var sampleCount int
+	var diskAvg sql.NullFloat64
+	var rxDelta sql.NullInt64
+	var txDelta sql.NullInt64
+	var cpuAvg sql.NullFloat64
+	var cpuMax sql.NullFloat64
+	var memAvg sql.NullFloat64
+	var memMax sql.NullFloat64
+
+	err := db.conn.QueryRow(
+		`SELECT
+			AVG(cpu_usage_percent) AS cpu_avg,
+			MAX(cpu_usage_percent) AS cpu_max,
+			AVG(memory_used) AS mem_avg,
+			MAX(memory_used) AS mem_max,
+			COUNT(*) AS sample_count,
+			MAX(network_rx_bytes) - MIN(network_rx_bytes) AS rx_delta,
+			MAX(network_tx_bytes) - MIN(network_tx_bytes) AS tx_delta
+		 FROM system_metrics
+		 WHERE host_id = $1 AND timestamp >= $2 AND timestamp < $3`,
+		hostID, start, end,
+	).Scan(&cpuAvg, &cpuMax, &memAvg, &memMax, &sampleCount, &rxDelta, &txDelta)
+	if err != nil {
+		return nil, err
+	}
+	if sampleCount == 0 {
+		return nil, nil
+	}
+
+	err = db.conn.QueryRow(
+		`SELECT AVG(di.used_percent)
+		 FROM system_metrics sm
+		 JOIN disk_info di ON di.metrics_id = sm.id
+		 WHERE sm.host_id = $1 AND sm.timestamp >= $2 AND sm.timestamp < $3`,
+		hostID, start, end,
+	).Scan(&diskAvg)
+	if err != nil && err != sql.ErrNoRows {
+		return nil, err
+	}
+
+	if diskAvg.Valid {
+		agg.DiskUsageAvg = diskAvg.Float64
+	}
+	if cpuAvg.Valid {
+		agg.CPUUsageAvg = cpuAvg.Float64
+	}
+	if cpuMax.Valid {
+		agg.CPUUsageMax = cpuMax.Float64
+	}
+	if memAvg.Valid {
+		agg.MemoryUsageAvg = uint64(memAvg.Float64)
+	}
+	if memMax.Valid {
+		agg.MemoryUsageMax = uint64(memMax.Float64)
+	}
+	if rxDelta.Valid {
+		agg.NetworkRxBytes = uint64(rxDelta.Int64)
+	}
+	if txDelta.Valid {
+		agg.NetworkTxBytes = uint64(txDelta.Int64)
+	}
+
+	agg.HostID = hostID
+	agg.SampleCount = sampleCount
+	return &agg, nil
 }
 
 func (db *DB) GetMetricsAggregates(hostID string, aggregationType string, limit int) ([]models.MetricsAggregate, error) {

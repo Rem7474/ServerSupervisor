@@ -16,13 +16,15 @@ type IPRateLimiter struct {
 	limiters map[string]*rate.Limiter
 	rps      rate.Limit
 	burst    int
+	trusted  []*net.IPNet
 }
 
-func NewIPRateLimiter(rps int, burst int) *IPRateLimiter {
+func NewIPRateLimiter(rps int, burst int, trustedProxyCIDRs []string) *IPRateLimiter {
 	rl := &IPRateLimiter{
 		limiters: make(map[string]*rate.Limiter),
 		rps:      rate.Limit(rps),
 		burst:    burst,
+		trusted:  parseTrustedProxies(trustedProxyCIDRs),
 	}
 
 	// Cleanup goroutine: remove unused limiters every 10 minutes
@@ -37,26 +39,29 @@ func NewIPRateLimiter(rps int, burst int) *IPRateLimiter {
 	return rl
 }
 
+
 func (rl *IPRateLimiter) getClientIP(c *gin.Context) string {
-	// Check X-Forwarded-For header first (for proxies)
-	if forwarded := c.Request.Header.Get("X-Forwarded-For"); forwarded != "" {
-		// Take the first IP if multiple are present
-		if idx := strings.Index(forwarded, ","); idx > 0 {
-			return strings.TrimSpace(forwarded[:idx])
+	remoteIP := rl.remoteAddrIP(c)
+	if remoteIP == "" {
+		return c.Request.RemoteAddr
+	}
+
+	if rl.isTrustedProxy(remoteIP) {
+		// Check X-Forwarded-For header first (trusted proxy only)
+		if forwarded := c.Request.Header.Get("X-Forwarded-For"); forwarded != "" {
+			if idx := strings.Index(forwarded, ","); idx > 0 {
+				return strings.TrimSpace(forwarded[:idx])
+			}
+			return strings.TrimSpace(forwarded)
 		}
-		return strings.TrimSpace(forwarded)
+
+		// Check X-Real-IP header
+		if realIP := c.Request.Header.Get("X-Real-IP"); realIP != "" {
+			return realIP
+		}
 	}
 
-	// Check X-Real-IP header
-	if realIP := c.Request.Header.Get("X-Real-IP"); realIP != "" {
-		return realIP
-	}
-
-	// Fall back to RemoteAddr (strip port if present)
-	if host, _, err := net.SplitHostPort(c.Request.RemoteAddr); err == nil {
-		return host
-	}
-	return c.Request.RemoteAddr
+	return remoteIP
 }
 
 func (rl *IPRateLimiter) Allow(ip string) bool {
@@ -88,15 +93,57 @@ func (rl *IPRateLimiter) cleanup() {
 	}
 }
 
-// RateLimiterMiddleware applies per-IP rate limiting (but NOT for WebSocket upgrades)
+func (rl *IPRateLimiter) remoteAddrIP(c *gin.Context) string {
+	if host, _, err := net.SplitHostPort(c.Request.RemoteAddr); err == nil {
+		return host
+	}
+	return c.Request.RemoteAddr
+}
+
+func (rl *IPRateLimiter) isTrustedProxy(ip string) bool {
+	parsed := net.ParseIP(ip)
+	if parsed == nil {
+		return false
+	}
+	for _, cidr := range rl.trusted {
+		if cidr.Contains(parsed) {
+			return true
+		}
+	}
+	return false
+}
+
+func parseTrustedProxies(values []string) []*net.IPNet {
+	var nets []*net.IPNet
+	for _, entry := range values {
+		entry = strings.TrimSpace(entry)
+		if entry == "" {
+			continue
+		}
+		if strings.Contains(entry, "/") {
+			_, ipnet, err := net.ParseCIDR(entry)
+			if err != nil {
+				continue
+			}
+			nets = append(nets, ipnet)
+			continue
+		}
+		ip := net.ParseIP(entry)
+		if ip == nil {
+			continue
+		}
+		bits := 32
+		if ip.To4() == nil {
+			bits = 128
+		}
+		nets = append(nets, &net.IPNet{IP: ip, Mask: net.CIDRMask(bits, bits)})
+	}
+	return nets
+}
+
+// RateLimiterMiddleware applies per-IP rate limiting
 func RateLimiterMiddleware(rl *IPRateLimiter) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Skip rate limiting for WebSocket upgrades - they handle their own protocol
-		if c.Request.Header.Get("Upgrade") == "websocket" {
-			c.Next()
-			return
-		}
-
 		clientIP := rl.getClientIP(c)
 
 		if !rl.Allow(clientIP) {

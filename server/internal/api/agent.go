@@ -57,7 +57,9 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 			AgentVersion: stringPtrIfNotEmpty(report.AgentVersion),
 		}
 		if update.Hostname != nil || update.OS != nil || update.AgentVersion != nil {
-			_ = h.db.UpdateHost(hostID, &update)
+			if err := h.db.UpdateHost(hostID, &update); err != nil {
+				log.Printf("Warning: failed to update host %s: %v", hostID, err)
+			}
 		}
 
 		// Store metrics
@@ -73,7 +75,9 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 			update := models.HostUpdate{
 				AgentVersion: stringPtrIfNotEmpty(report.AgentVersion),
 			}
-			_ = h.db.UpdateHost(hostID, &update)
+			if err := h.db.UpdateHost(hostID, &update); err != nil {
+				log.Printf("Warning: failed to update host %s: %v", hostID, err)
+			}
 		}
 	}
 
@@ -123,13 +127,18 @@ func (h *AgentHandler) ReportCommandResult(c *gin.Context) {
 		return
 	}
 
+	cmd, cmdErr := h.db.GetAptCommandByID(result.CommandID)
+	if cmdErr != nil || cmd.HostID != hostID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "command does not belong to host"})
+		return
+	}
+
 	if err := h.db.UpdateCommandStatus(result.CommandID, result.Status, result.Output); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update command"})
 		return
 	}
 
 	// Update related audit log status (if linked)
-	cmd, _ := h.db.GetAptCommandByID(result.CommandID)
 	if cmd != nil && cmd.AuditLogID != nil {
 		details := ""
 		if result.Status == "failed" {
@@ -172,6 +181,18 @@ func (h *AgentHandler) StreamCommandOutput(c *gin.Context) {
 	}
 	if err := c.ShouldBindJSON(&chunk); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	cmdID, err := strconv.ParseInt(chunk.CommandID, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid command_id"})
+		return
+	}
+
+	cmd, cmdErr := h.db.GetAptCommandByID(cmdID)
+	if cmdErr != nil || cmd.HostID != hostID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "command does not belong to host"})
 		return
 	}
 

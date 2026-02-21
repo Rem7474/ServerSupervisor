@@ -14,7 +14,7 @@ func SetupRouter(db *database.DB, cfg *config.Config) *gin.Engine {
 	r.Use(CORSMiddleware(cfg.BaseURL))
 
 	// Per-IP rate limiter
-	ipRateLimiter := NewIPRateLimiter(cfg.RateLimitRPS, cfg.RateLimitBurst)
+	ipRateLimiter := NewIPRateLimiter(cfg.RateLimitRPS, cfg.RateLimitBurst, cfg.TrustedProxyCIDRs)
 	r.Use(RateLimiterMiddleware(ipRateLimiter))
 
 	// Handlers
@@ -26,9 +26,12 @@ func SetupRouter(db *database.DB, cfg *config.Config) *gin.Engine {
 	dockerH := NewDockerHandler(db, cfg)
 	auditH := NewAuditHandler(db, cfg)
 	userH := NewUserHandler(db, cfg)
+	alertH := NewAlertHandler(db, cfg)
 
 	// ========== Public routes ==========
 	r.POST("/api/auth/login", authH.Login)
+	r.POST("/api/auth/refresh", authH.RefreshToken)
+	r.POST("/api/auth/logout", authH.Logout)
 
 	// Health check
 	r.GET("/api/health", func(c *gin.Context) {
@@ -68,6 +71,7 @@ func SetupRouter(db *database.DB, cfg *config.Config) *gin.Engine {
 		api.GET("/hosts/:id", hostH.GetHost)
 		api.PATCH("/hosts/:id", hostH.UpdateHost)
 		api.DELETE("/hosts/:id", hostH.DeleteHost)
+		api.POST("/hosts/:id/rotate-key", hostH.RotateAPIKey)
 		api.GET("/hosts/:id/dashboard", hostH.GetHostDashboard)
 
 		// Metrics
@@ -94,9 +98,18 @@ func SetupRouter(db *database.DB, cfg *config.Config) *gin.Engine {
 		api.GET("/audit/logs/host/:host_id", auditH.GetAuditLogsByHost)
 		api.GET("/audit/logs/user/:username", auditH.GetAuditLogsByUser)
 
+		// Alerts
+		api.GET("/alerts/rules", alertH.ListRules)
+		api.POST("/alerts/rules", alertH.CreateRule)
+		api.PATCH("/alerts/rules/:id", alertH.UpdateRule)
+		api.DELETE("/alerts/rules/:id", alertH.DeleteRule)
+		api.GET("/alerts/incidents", alertH.ListIncidents)
+
 		// Users
 		api.GET("/users", userH.ListUsers)
+		api.POST("/users", userH.CreateUser)
 		api.PATCH("/users/:id/role", userH.UpdateUserRole)
+		api.DELETE("/users/:id", userH.DeleteUser)
 	}
 
 	// Serve frontend static files

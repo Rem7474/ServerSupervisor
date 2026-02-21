@@ -359,8 +359,12 @@ const sortedHosts = computed(() => {
 function connectWebSocket() {
   if (!auth.token) return
   const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
-  const wsUrl = `${protocol}://${window.location.host}/api/v1/ws/dashboard?token=${auth.token}`
+  const wsUrl = `${protocol}://${window.location.host}/api/v1/ws/dashboard`
   ws = new WebSocket(wsUrl)
+
+  ws.onopen = () => {
+    ws.send(JSON.stringify({ type: 'auth', token: auth.token }))
+  }
 
   ws.onmessage = (event) => {
     try {
