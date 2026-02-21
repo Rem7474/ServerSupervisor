@@ -44,6 +44,11 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 	// Update host status
 	h.db.UpdateHostStatus(hostID, "online")
 
+	// Cleanup any stalled commands for this host (in case agent restarted)
+	if err := h.db.CleanupHostStalledCommands(hostID); err != nil {
+		log.Printf("Warning: failed to cleanup stalled commands for host %s: %v", hostID, err)
+	}
+
 	// Update host info from agent report (only if metrics are provided)
 	if report.Metrics != nil {
 		update := models.HostUpdate{

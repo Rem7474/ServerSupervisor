@@ -679,6 +679,50 @@ func (db *DB) UpdateCommandStatus(id int64, status, output string) error {
 	}
 }
 
+// CleanupStalledCommands marks pending/running commands as failed if they're older than the timeout
+func (db *DB) CleanupStalledCommands(timeoutMinutes int) error {
+	query := `
+		UPDATE apt_commands 
+		SET status = 'failed', 
+		    output = 'Command timed out - agent may have crashed or restarted', 
+		    ended_at = NOW()
+		WHERE status IN ('pending', 'running') 
+		  AND created_at < NOW() - INTERVAL '1 minute' * $1
+	`
+	result, err := db.conn.Exec(query, timeoutMinutes)
+	if err != nil {
+		return fmt.Errorf("failed to cleanup stalled commands: %w", err)
+	}
+
+	affected, _ := result.RowsAffected()
+	if affected > 0 {
+		log.Printf("Cleaned up %d stalled APT commands", affected)
+	}
+	return nil
+}
+
+// CleanupHostStalledCommands marks pending/running commands for a specific host as failed
+func (db *DB) CleanupHostStalledCommands(hostID string) error {
+	query := `
+		UPDATE apt_commands 
+		SET status = 'failed', 
+		    output = 'Agent restarted - command cancelled', 
+		    ended_at = NOW()
+		WHERE host_id = $1 
+		  AND status IN ('pending', 'running')
+	`
+	result, err := db.conn.Exec(query, hostID)
+	if err != nil {
+		return fmt.Errorf("failed to cleanup host stalled commands: %w", err)
+	}
+
+	affected, _ := result.RowsAffected()
+	if affected > 0 {
+		log.Printf("Cleaned up %d stalled commands for host %s", affected, hostID)
+	}
+	return nil
+}
+
 func (db *DB) GetAptCommandByID(id int64) (*models.AptCommand, error) {
 	var c models.AptCommand
 	err := db.conn.QueryRow(

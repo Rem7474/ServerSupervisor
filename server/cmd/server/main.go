@@ -43,6 +43,11 @@ func main() {
 	}
 	defer db.Close()
 
+	// Cleanup stalled commands at startup (commands older than 10 minutes)
+	if err := db.CleanupStalledCommands(10); err != nil {
+		log.Printf("Warning: failed to cleanup stalled commands: %v", err)
+	}
+
 	// Create default admin user
 	hash, err := api.HashPassword(cfg.AdminPassword)
 	if err != nil {

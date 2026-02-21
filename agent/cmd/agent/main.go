@@ -102,19 +102,11 @@ func sendReport(cfg *config.Config, s *sender.Sender) {
 		}{Containers: []interface{}{}}
 	}
 
-	// Collect APT status (without CVE extraction for performance)
-	var aptData interface{}
-	if cfg.CollectAPT {
-		aptStatus, err := collector.CollectAPT(false) // false = don't extract CVE
-		if err != nil {
-			log.Printf("APT collection skipped: %v", err)
-			aptData = &collector.AptStatus{PackageList: "[]", CVEList: "[]"}
-		} else {
-			aptData = aptStatus
-		}
-	} else {
-		aptData = &collector.AptStatus{PackageList: "[]", CVEList: "[]"}
-	}
+	// Don't collect APT in periodic reports to avoid overwriting CVE history
+	// APT status is only collected:
+	// 1. At agent startup (with CVE)
+	// 2. After manual apt update/upgrade commands (with CVE)
+	var aptData interface{} = nil
 
 	// Send report
 	report := &sender.Report{
