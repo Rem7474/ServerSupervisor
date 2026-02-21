@@ -51,6 +51,11 @@ func main() {
 	// Run first report immediately
 	sendReport(cfg, s)
 
+	// Perform initial APT status collection with CVE extraction (only once at startup)
+	if cfg.CollectAPT {
+		go initialAptCollection(cfg, s)
+	}
+
 	// Start periodic reporting
 	ticker := time.NewTicker(time.Duration(cfg.ReportInterval) * time.Second)
 	defer ticker.Stop()
@@ -97,11 +102,18 @@ func sendReport(cfg *config.Config, s *sender.Sender) {
 		}{Containers: []interface{}{}}
 	}
 
-	// APT status is no longer sent in periodic reports (only after manual updates)
-	// Send empty APT data to maintain API compatibility
-	aptData := &collector.AptStatus{
-		PackageList: "[]",
-		CVEList:     "[]",
+	// Collect APT status (without CVE extraction for performance)
+	var aptData interface{}
+	if cfg.CollectAPT {
+		aptStatus, err := collector.CollectAPT(false) // false = don't extract CVE
+		if err != nil {
+			log.Printf("APT collection skipped: %v", err)
+			aptData = &collector.AptStatus{PackageList: "[]", CVEList: "[]"}
+		} else {
+			aptData = aptStatus
+		}
+	} else {
+		aptData = &collector.AptStatus{PackageList: "[]", CVEList: "[]"}
 	}
 
 	// Send report
@@ -175,18 +187,18 @@ func processCommands(s *sender.Sender, commands []sender.PendingCommand) {
 			output = err.Error() + "\n" + output
 		}
 
-		// Collect APT status after successful update/upgrade
+		// Collect APT status after successful update/upgrade (with CVE extraction)
 		var aptStatus interface{}
 		if status == "completed" {
-			log.Printf("Collecting APT status after %s...", aptCmd)
-			apt, aptErr := collector.CollectAPT()
+			log.Printf("Collecting APT status with CVE extraction after %s...", aptCmd)
+			apt, aptErr := collector.CollectAPT(true) // true = extract CVE
 			if aptErr != nil {
 				log.Printf("Failed to collect APT status: %v", aptErr)
 				aptStatus = nil
 			} else {
 				aptStatus = apt
-				log.Printf("APT status collected: %d packages, %d security, CVE count: %d",
-					apt.PendingPackages, apt.SecurityUpdates, len(apt.CVEList))
+				log.Printf("APT status collected: %d packages, %d security",
+					apt.PendingPackages, apt.SecurityUpdates)
 			}
 		}
 
@@ -197,5 +209,36 @@ func processCommands(s *sender.Sender, commands []sender.PendingCommand) {
 			Output:    output,
 			AptStatus: aptStatus,
 		})
+	}
+}
+
+// initialAptCollection performs a full APT status check with CVE extraction at startup
+func initialAptCollection(cfg *config.Config, s *sender.Sender) {
+	// Wait a bit to avoid overwhelming the system at startup
+	time.Sleep(5 * time.Second)
+
+	log.Println("🔍 Performing initial APT status collection with CVE extraction...")
+	apt, err := collector.CollectAPT(true) // true = extract CVE
+	if err != nil {
+		log.Printf("❌ Initial APT collection failed: %v", err)
+		return
+	}
+
+	log.Printf("✅ Initial APT status: %d packages, %d security updates",
+		apt.PendingPackages, apt.SecurityUpdates)
+
+	// Send updated APT status to server
+	report := &sender.Report{
+		AgentVersion: AgentVersion,
+		Metrics:      nil, // Skip metrics in this report
+		Docker:       nil, // Skip docker in this report
+		AptStatus:    apt,
+		Timestamp:    time.Now(),
+	}
+
+	if _, err := s.SendReport(report); err != nil {
+		log.Printf("❌ Failed to send initial APT status: %v", err)
+	} else {
+		log.Println("✅ Initial APT status with CVE sent successfully")
 	}
 }

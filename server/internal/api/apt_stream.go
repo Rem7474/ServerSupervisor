@@ -63,6 +63,25 @@ func (h *AptStreamHub) Broadcast(commandID string, logChunk string) {
 	}
 }
 
+// BroadcastStatus sends a status update to all connected clients for a given command
+func (h *AptStreamHub) BroadcastStatus(commandID string, status string) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	clients := h.clients[commandID]
+	for conn := range clients {
+		payload := map[string]interface{}{
+			"type":       "apt_status_update",
+			"command_id": commandID,
+			"status":     status,
+		}
+		if err := conn.WriteJSON(payload); err != nil {
+			conn.Close()
+			go h.Unregister(commandID, conn)
+		}
+	}
+}
+
 // runBroadcast runs the broadcast loop for a specific command
 func (h *AptStreamHub) runBroadcast(commandID string) {
 	h.mu.RLock()

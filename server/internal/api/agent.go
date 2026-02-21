@@ -44,26 +44,36 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 	// Update host status
 	h.db.UpdateHostStatus(hostID, "online")
 
-	// Update host info from agent report
-	update := models.HostUpdate{
-		Hostname:     stringPtrIfNotEmpty(report.Metrics.Hostname),
-		OS:           stringPtrIfNotEmpty(report.Metrics.OS),
-		AgentVersion: stringPtrIfNotEmpty(report.AgentVersion),
-	}
-	if update.Hostname != nil || update.OS != nil {
-		_ = h.db.UpdateHost(hostID, &update)
-	}
+	// Update host info from agent report (only if metrics are provided)
+	if report.Metrics != nil {
+		update := models.HostUpdate{
+			Hostname:     stringPtrIfNotEmpty(report.Metrics.Hostname),
+			OS:           stringPtrIfNotEmpty(report.Metrics.OS),
+			AgentVersion: stringPtrIfNotEmpty(report.AgentVersion),
+		}
+		if update.Hostname != nil || update.OS != nil || update.AgentVersion != nil {
+			_ = h.db.UpdateHost(hostID, &update)
+		}
 
-	// Store metrics
-	report.Metrics.HostID = hostID
-	report.Metrics.Timestamp = time.Now()
-	if _, err := h.db.InsertMetrics(&report.Metrics); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store metrics"})
-		return
+		// Store metrics
+		report.Metrics.HostID = hostID
+		report.Metrics.Timestamp = time.Now()
+		if _, err := h.db.InsertMetrics(report.Metrics); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store metrics"})
+			return
+		}
+	} else {
+		// If no metrics, still update agent version
+		if report.AgentVersion != "" {
+			update := models.HostUpdate{
+				AgentVersion: stringPtrIfNotEmpty(report.AgentVersion),
+			}
+			_ = h.db.UpdateHost(hostID, &update)
+		}
 	}
 
 	// Store docker containers
-	if len(report.Docker.Containers) > 0 {
+	if report.Docker != nil && len(report.Docker.Containers) > 0 {
 		for i := range report.Docker.Containers {
 			report.Docker.Containers[i].HostID = hostID
 		}
@@ -74,10 +84,12 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 	}
 
 	// Store apt status
-	report.AptStatus.HostID = hostID
-	if err := h.db.UpsertAptStatus(&report.AptStatus); err != nil {
-		// Log error but don't fail the entire request
-		c.Header("X-APT-Error", err.Error())
+	if report.AptStatus != nil {
+		report.AptStatus.HostID = hostID
+		if err := h.db.UpsertAptStatus(report.AptStatus); err != nil {
+			// Log error but don't fail the entire request
+			c.Header("X-APT-Error", err.Error())
+		}
 	}
 
 	// Return pending commands for this host
@@ -110,6 +122,10 @@ func (h *AgentHandler) ReportCommandResult(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update command"})
 		return
 	}
+
+	// Broadcast status update to WebSocket clients
+	commandIDStr := strconv.FormatInt(result.CommandID, 10)
+	h.streamHub.BroadcastStatus(commandIDStr, result.Status)
 
 	if result.Status == "completed" {
 		cmd, err := h.db.GetAptCommandByID(result.CommandID)

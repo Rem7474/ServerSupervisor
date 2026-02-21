@@ -241,6 +241,16 @@
             </div>
           </div>
         </div>
+        
+        <!-- CVE Information -->
+        <div v-if="aptStatus.cve_list" class="mt-3">
+          <CVEList 
+            :cveList="aptStatus.cve_list" 
+            :showMaxSeverity="true"
+            :alwaysExpanded="false"
+            :limit="5"
+          />
+        </div>
       </div>
     </div>
 
@@ -394,6 +404,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { Line } from 'vue-chartjs'
 import { Chart as ChartJS, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip } from 'chart.js'
 import RelativeTime from '../components/RelativeTime.vue'
+import CVEList from '../components/CVEList.vue'
 import apiClient from '../api'
 import { useAuthStore } from '../stores/auth'
 import dayjs from 'dayjs'
@@ -675,6 +686,8 @@ function connectStreamWebSocket(commandId) {
       } else if (payload.type === 'apt_stream') {
         liveCommand.value.output += payload.chunk
         nextTick(() => scrollToBottom())
+      } else if (payload.type === 'apt_status_update') {
+        liveCommand.value.status = payload.status
       }
     } catch (e) {
       // Ignore malformed payloads

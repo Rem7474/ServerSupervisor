@@ -291,6 +291,8 @@ function connectStreamWebSocket(commandId) {
       } else if (payload.type === 'apt_stream') {
         liveCommand.value.output += payload.chunk
         nextTick(() => scrollToBottom())
+      } else if (payload.type === 'apt_status_update') {
+        liveCommand.value.status = payload.status
       }
     } catch (e) {
       // Ignore malformed payloads

@@ -28,7 +28,8 @@ type AptStatus struct {
 }
 
 // CollectAPT checks for available APT updates
-func CollectAPT() (*AptStatus, error) {
+// If extractCVE is true, extracts CVE information (resource intensive)
+func CollectAPT(extractCVE bool) (*AptStatus, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -68,9 +69,11 @@ func CollectAPT() (*AptStatus, error) {
 			// Check if it's a security update
 			if strings.Contains(line, "-security") {
 				secCount++
-				// Extract CVEs for security packages
-				cves := extractCVEsForPackage(packageName)
-				cveInfos = append(cveInfos, cves...)
+				// Extract CVEs for security packages only if requested
+				if extractCVE {
+					cves := extractCVEsForPackage(packageName)
+					cveInfos = append(cveInfos, cves...)
+				}
 			}
 		}
 	}
@@ -101,7 +104,11 @@ func CollectAPT() (*AptStatus, error) {
 		status.CVEList = "[]"
 	}
 
-	log.Printf("APT: %d upgradable packages (%d security, %d CVEs)", status.PendingPackages, status.SecurityUpdates, len(cveInfos))
+	if extractCVE {
+		log.Printf("APT: %d upgradable packages (%d security, %d CVEs)", status.PendingPackages, status.SecurityUpdates, len(cveInfos))
+	} else {
+		log.Printf("APT: %d upgradable packages (%d security)", status.PendingPackages, status.SecurityUpdates)
+	}
 	return status, nil
 }
 

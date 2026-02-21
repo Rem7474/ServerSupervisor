@@ -199,12 +199,12 @@ type VersionComparison struct {
 // ========== Agent Heartbeat / Full Report ==========
 
 type AgentReport struct {
-	HostID       string        `json:"host_id"`
-	AgentVersion string        `json:"agent_version"`
-	Metrics      SystemMetrics `json:"metrics"`
-	Docker       DockerReport  `json:"docker"`
-	AptStatus    AptStatus     `json:"apt_status"`
-	Timestamp    time.Time     `json:"timestamp"`
+	HostID       string         `json:"host_id"`
+	AgentVersion string         `json:"agent_version"`
+	Metrics      *SystemMetrics `json:"metrics,omitempty"`
+	Docker       *DockerReport  `json:"docker,omitempty"`
+	AptStatus    *AptStatus     `json:"apt_status,omitempty"`
+	Timestamp    time.Time      `json:"timestamp"`
 }
 
 // ========== Commands (server → agent) ==========
