@@ -176,22 +176,22 @@ func processCommands(s *sender.Sender, commands []sender.PendingCommand) {
 		status := "completed"
 		if err != nil {
 			status = "failed"
-			output = err.Error() + "\n" + output
+			output = fmt.Sprintf("ERROR: %v\n%s", err, output)
+			log.Printf("APT %s failed: %v", aptCmd, err)
+		} else {
+			log.Printf("APT %s completed successfully", aptCmd)
 		}
 
-		// Collect APT status after successful update/upgrade (with CVE extraction)
+		// Collect APT status after command (with CVE extraction) - always collect on completion OR failure
 		var aptStatus interface{}
-		if status == "completed" {
-			log.Printf("Collecting APT status with CVE extraction after %s...", aptCmd)
-			apt, aptErr := collector.CollectAPT(true) // true = extract CVE
-			if aptErr != nil {
-				log.Printf("Failed to collect APT status: %v", aptErr)
-				aptStatus = nil
-			} else {
-				aptStatus = apt
-				log.Printf("APT status collected: %d packages, %d security",
-					apt.PendingPackages, apt.SecurityUpdates)
-			}
+		log.Printf("Collecting APT status with CVE extraction after %s...", aptCmd)
+		apt, aptErr := collector.CollectAPT(true) // true = extract CVE
+		if aptErr != nil {
+			log.Printf("Failed to collect APT status after %s: %v", aptCmd, aptErr)
+			aptStatus = nil
+		} else {
+			aptStatus = apt
+			log.Printf("APT status collected: %d packages, %d security", apt.PendingPackages, apt.SecurityUpdates)
 		}
 
 		// Report command result with APT status
@@ -212,11 +212,11 @@ func initialAptCollection(cfg *config.Config, s *sender.Sender) {
 	log.Println("🔍 Performing initial APT status collection with CVE extraction...")
 	apt, err := collector.CollectAPT(true) // true = extract CVE
 	if err != nil {
-		log.Printf("❌ Initial APT collection failed: %v", err)
+		log.Printf("Initial APT collection failed: %v", err)
 		return
 	}
 
-	log.Printf("✅ Initial APT status: %d packages, %d security updates",
+	log.Printf("Initial APT status: %d packages, %d security updates",
 		apt.PendingPackages, apt.SecurityUpdates)
 
 	// Send updated APT status to server
@@ -229,8 +229,8 @@ func initialAptCollection(cfg *config.Config, s *sender.Sender) {
 	}
 
 	if _, err := s.SendReport(report); err != nil {
-		log.Printf("❌ Failed to send initial APT status: %v", err)
+		log.Printf("Failed to send initial APT status: %v", err)
 	} else {
-		log.Println("✅ Initial APT status with CVE sent successfully")
+		log.Println("Initial APT status with CVE sent successfully")
 	}
 }

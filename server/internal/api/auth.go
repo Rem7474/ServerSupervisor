@@ -1,6 +1,7 @@
 package api
 
 import (
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -47,6 +48,12 @@ func (h *AuthHandler) Login(c *gin.Context) {
 
 	// Check if user has MFA enabled
 	if user.MFAEnabled {
+		if user.TOTPSecret == "" {
+			// MFA flag is set but no secret configured - shouldn't happen
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "MFA configuration error"})
+			return
+		}
+
 		if req.TOTPCode == "" {
 			// MFA required but not provided - return flag to prompt user
 			c.JSON(http.StatusOK, gin.H{
@@ -62,6 +69,11 @@ func (h *AuthHandler) Login(c *gin.Context) {
 			if !auth.VerifyBackupCode(user.BackupCodes, req.TOTPCode) {
 				c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid TOTP code"})
 				return
+			}
+			// Consume the backup code to prevent reuse
+			if err := h.db.ConsumeMFABackupCode(user.Username, req.TOTPCode); err != nil {
+				log.Printf("Warning: failed to consume backup code for %s: %v", user.Username, err)
+				// Don't fail login, just log the error
 			}
 		}
 	}

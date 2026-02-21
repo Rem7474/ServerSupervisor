@@ -126,11 +126,11 @@ func ExecuteAptCommandWithStreaming(command string, streamCallback func(chunk st
 	var cmd *exec.Cmd
 	switch command {
 	case "update":
-		cmd = exec.CommandContext(ctx, "sudo", "apt", "update", "-y")
+		cmd = exec.CommandContext(ctx, "sudo", "apt", "update", "-y", "-qq")
 	case "upgrade":
-		cmd = exec.CommandContext(ctx, "sudo", "apt", "upgrade", "-y")
+		cmd = exec.CommandContext(ctx, "sudo", "apt", "upgrade", "-y", "-qq", "--allow-unauthenticated")
 	case "dist-upgrade":
-		cmd = exec.CommandContext(ctx, "sudo", "apt", "dist-upgrade", "-y")
+		cmd = exec.CommandContext(ctx, "sudo", "apt", "dist-upgrade", "-y", "-qq", "--allow-unauthenticated")
 	default:
 		return "", fmt.Errorf("unknown apt command: %s", command)
 	}
@@ -175,38 +175,44 @@ func runCommandWithStreaming(cmd *exec.Cmd, streamCallback func(chunk string)) (
 	}
 
 	var fullOutput strings.Builder
-	buf := make([]byte, 1024)
 
-	// Read stdout and stderr concurrently
-	done := make(chan bool)
+	// Read stdout and stderr concurrently - each goroutine has its own buffer
+	done := make(chan error, 2)
+
 	go func() {
+		buf := make([]byte, 4096) // Local buffer for this goroutine
 		for {
 			n, err := stdout.Read(buf)
 			if n > 0 {
 				chunk := string(buf[:n])
 				fullOutput.WriteString(chunk)
-				streamCallback(chunk)
+				if streamCallback != nil {
+					streamCallback(chunk)
+				}
 			}
 			if err != nil {
-				break
+				done <- nil
+				return
 			}
 		}
-		done <- true
 	}()
 
 	go func() {
+		buf := make([]byte, 4096) // Local buffer for this goroutine
 		for {
 			n, err := stderr.Read(buf)
 			if n > 0 {
 				chunk := string(buf[:n])
 				fullOutput.WriteString(chunk)
-				streamCallback(chunk)
+				if streamCallback != nil {
+					streamCallback(chunk)
+				}
 			}
 			if err != nil {
-				break
+				done <- nil
+				return
 			}
 		}
-		done <- true
 	}()
 
 	// Wait for both streams to finish

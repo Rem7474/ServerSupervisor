@@ -12,6 +12,7 @@ import (
 	"github.com/lib/pq"
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/models"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // HashAPIKey returns the SHA-256 hash of an API key
@@ -258,9 +259,9 @@ func (db *DB) CreateUser(username, passwordHash, role string) error {
 func (db *DB) GetUserByUsername(username string) (*models.User, error) {
 	var u models.User
 	err := db.conn.QueryRow(
-		`SELECT id, username, password_hash, role, created_at FROM users WHERE username = $1`,
+		`SELECT id, username, password_hash, role, totp_secret, backup_codes, mfa_enabled, created_at FROM users WHERE username = $1`,
 		username,
-	).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Role, &u.CreatedAt)
+	).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Role, &u.TOTPSecret, &u.BackupCodes, &u.MFAEnabled, &u.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -898,13 +899,39 @@ func (db *DB) DisableUserMFA(username string) error {
 	return err
 }
 
-func (db *DB) ConsumeMFABackupCode(username, codeHash string) error {
-	// This would require fetching backup codes, removing the used one, and updating
-	// For simplicity, we'll implement this as a basic function
-	// In production, consider using a separate backup_codes table
-	_, err := db.conn.Exec(
-		`UPDATE users SET backup_codes = jsonb_remove_element(backup_codes, $1) WHERE username = $2`,
-		codeHash, username,
+func (db *DB) ConsumeMFABackupCode(username, usedCode string) error {
+	var rawJSON string
+	err := db.conn.QueryRow(
+		`SELECT backup_codes FROM users WHERE username = $1`, username,
+	).Scan(&rawJSON)
+	if err != nil {
+		return fmt.Errorf("user not found: %w", err)
+	}
+
+	var codes []string
+	if err := json.Unmarshal([]byte(rawJSON), &codes); err != nil {
+		return fmt.Errorf("invalid backup codes format: %w", err)
+	}
+
+	// Find and remove the used code (compare both plain and hashed versions)
+	var remaining []string
+	var found bool
+	for _, hashed := range codes {
+		// Try bcrypt comparison (codes are hashed)
+		if bcrypt.CompareHashAndPassword([]byte(hashed), []byte(usedCode)) == nil {
+			found = true
+			continue // Skip this code (consumed)
+		}
+		remaining = append(remaining, hashed)
+	}
+
+	if !found {
+		return fmt.Errorf("backup code not found or invalid")
+	}
+
+	newJSON, _ := json.Marshal(remaining)
+	_, err = db.conn.Exec(
+		`UPDATE users SET backup_codes = $1 WHERE username = $2`, string(newJSON), username,
 	)
 	return err
 }

@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -32,9 +33,21 @@ func (h *WSHandler) GetStreamHub() *AptStreamHub {
 	return h.streamHub
 }
 
+func (h *WSHandler) getWSUpgrader() websocket.Upgrader {
+	return websocket.Upgrader{
+		CheckOrigin: func(r *http.Request) bool {
+			origin := r.Header.Get("Origin")
+			// Allow empty origin (direct WS connection) or matching base URL
+			return origin == "" || origin == h.cfg.BaseURL
+		},
+	}
+}
+
 var wsUpgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
-		return true
+		// Fallback for handlers that can't access config
+		origin := r.Header.Get("Origin")
+		return origin == "" || strings.HasPrefix(origin, "http://localhost") || strings.HasPrefix(origin, "https://localhost")
 	},
 }
 
