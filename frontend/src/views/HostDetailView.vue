@@ -208,6 +208,7 @@
         <div class="btn-group btn-group-sm" v-if="canRunApt">
           <button @click="sendAptCmd('update')" class="btn btn-outline-secondary">apt update</button>
           <button @click="sendAptCmd('upgrade')" class="btn btn-primary">apt upgrade</button>
+          <button @click="sendAptCmd('dist-upgrade')" class="btn btn-outline-danger">apt dist-upgrade</button>
         </div>
         <span v-else class="text-secondary small">Mode lecture seule</span>
       </div>
@@ -564,8 +565,21 @@ async function saveEdit() {
 async function sendAptCmd(command) {
   if (!confirm(`Exécuter 'apt ${command}' sur ${host.value?.hostname} ?`)) return
   try {
-    await apiClient.sendAptCommand([hostId], command)
+    const response = await apiClient.sendAptCommand([hostId], command)
     alert(`Commande 'apt ${command}' envoyée. L'agent l'exécutera au prochain rapport.`)
+    
+    // Auto-open console with command
+    if (response.data?.commands?.length > 0) {
+      const cmd = response.data.commands[0]
+      if (cmd.command_id) {
+        watchCommand({
+          id: cmd.command_id,
+          command: command,
+          status: 'pending',
+          output: ''
+        })
+      }
+    }
   } catch (e) {
     alert('Erreur: ' + (e.response?.data?.error || e.message))
   }

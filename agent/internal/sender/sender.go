@@ -39,9 +39,10 @@ type PendingCommand struct {
 }
 
 type CommandResult struct {
-	CommandID int64  `json:"command_id"`
-	Status    string `json:"status"`
-	Output    string `json:"output"`
+	CommandID int64       `json:"command_id"`
+	Status    string      `json:"status"`
+	Output    string      `json:"output"`
+	AptStatus interface{} `json:"apt_status,omitempty"` // Full APT status after update/upgrade
 }
 
 func New(cfg *config.Config) *Sender {

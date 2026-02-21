@@ -97,18 +97,11 @@ func sendReport(cfg *config.Config, s *sender.Sender) {
 		}{Containers: []interface{}{}}
 	}
 
-	// Collect APT status
-	var aptData interface{}
-	if cfg.CollectAPT {
-		aptStatus, err := collector.CollectAPT()
-		if err != nil {
-			log.Printf("APT collection skipped: %v", err)
-			aptData = &collector.AptStatus{PackageList: "[]"}
-		} else {
-			aptData = aptStatus
-		}
-	} else {
-		aptData = &collector.AptStatus{PackageList: "[]"}
+	// APT status is no longer sent in periodic reports (only after manual updates)
+	// Send empty APT data to maintain API compatibility
+	aptData := &collector.AptStatus{
+		PackageList: "[]",
+		CVEList:     "[]",
 	}
 
 	// Send report
@@ -182,10 +175,27 @@ func processCommands(s *sender.Sender, commands []sender.PendingCommand) {
 			output = err.Error() + "\n" + output
 		}
 
+		// Collect APT status after successful update/upgrade
+		var aptStatus interface{}
+		if status == "completed" {
+			log.Printf("Collecting APT status after %s...", aptCmd)
+			apt, aptErr := collector.CollectAPT()
+			if aptErr != nil {
+				log.Printf("Failed to collect APT status: %v", aptErr)
+				aptStatus = nil
+			} else {
+				aptStatus = apt
+				log.Printf("APT status collected: %d packages, %d security, CVE count: %d", 
+					apt.PendingPackages, apt.SecurityUpdates, len(apt.CVEList))
+			}
+		}
+
+		// Report command result with APT status
 		s.ReportCommandResult(&sender.CommandResult{
 			CommandID: cmd.ID,
 			Status:    status,
 			Output:    output,
+			AptStatus: aptStatus,
 		})
 	}
 }

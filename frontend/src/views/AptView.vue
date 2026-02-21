@@ -306,8 +306,22 @@ async function bulkAptCmd(command) {
   const hostnames = hosts.value.filter(h => selectedHosts.value.includes(h.id)).map(h => h.hostname).join(', ')
   if (!confirm(`Exécuter 'apt ${command}' sur: ${hostnames} ?`)) return
   try {
-    await apiClient.sendAptCommand(selectedHosts.value, command)
+    const response = await apiClient.sendAptCommand(selectedHosts.value, command)
     alert(`Commande envoyée à ${selectedHosts.value.length} hôte(s)`)
+    
+    // Auto-open console if only 1 host selected
+    if (selectedHosts.value.length === 1 && response.data?.commands?.length > 0) {
+      const cmd = response.data.commands[0]
+      const host = hosts.value.find(h => h.id === selectedHosts.value[0])
+      if (cmd.command_id && host) {
+        watchCommand({
+          id: cmd.command_id,
+          command: command,
+          status: 'pending',
+          output: ''
+        }, host)
+      }
+    }
   } catch (e) {
     alert('Erreur: ' + (e.response?.data?.error || e.message))
   }

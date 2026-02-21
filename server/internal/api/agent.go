@@ -1,6 +1,7 @@
 package api
 
 import (
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -114,6 +115,15 @@ func (h *AgentHandler) ReportCommandResult(c *gin.Context) {
 		cmd, err := h.db.GetAptCommandByID(result.CommandID)
 		if err == nil {
 			_ = h.db.TouchAptLastAction(cmd.HostID, cmd.Command)
+			
+			// Update full APT status if provided with command result
+			if result.AptStatus != nil {
+				result.AptStatus.HostID = cmd.HostID
+				err := h.db.UpsertAptStatus(result.AptStatus)
+				if err != nil {
+					log.Printf("Failed to update APT status: %v", err)
+				}
+			}
 		}
 	}
 
