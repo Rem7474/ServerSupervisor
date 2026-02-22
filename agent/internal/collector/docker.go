@@ -2,6 +2,7 @@ package collector
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"os/exec"
@@ -34,68 +35,140 @@ func CollectDocker() ([]DockerContainer, error) {
 		return nil, fmt.Errorf("docker not found in PATH")
 	}
 
-	// List all containers (running and stopped)
-	// Format: ID|Name|Image|State|Status|Ports|CreatedAt|ImageID|Labels
-	format := "{{.ID}}|{{.Names}}|{{.Image}}|{{.State}}|{{.Status}}|{{.Ports}}|{{.CreatedAt}}|{{.ID}}|{{.Labels}}"
-	out, err := exec.CommandContext(ctx, "docker", "ps", "-a", "--no-trunc", "--format", format).Output()
+	// Get all container IDs
+	out, err := exec.CommandContext(ctx, "docker", "ps", "-a", "-q").Output()
 	if err != nil {
 		return nil, fmt.Errorf("docker ps failed: %w", err)
 	}
 
+	containerIDs := strings.Fields(strings.TrimSpace(string(out)))
+	if len(containerIDs) == 0 {
+		log.Printf("No Docker containers found")
+		return []DockerContainer{}, nil
+	}
+
+	// Inspect all containers at once to get JSON data
+	args := append([]string{"inspect"}, containerIDs...)
+	inspectOut, err := exec.CommandContext(ctx, "docker", args...).Output()
+	if err != nil {
+		return nil, fmt.Errorf("docker inspect failed: %w", err)
+	}
+
+	// Parse JSON output
+	var inspectData []struct {
+		Id      string `json:"Id"`
+		Name    string `json:"Name"`
+		Config  struct {
+			Image  string            `json:"Image"`
+			Labels map[string]string `json:"Labels"`
+		} `json:"Config"`
+		State struct {
+			Status     string    `json:"Status"`
+			Running    bool      `json:"Running"`
+			Paused     bool      `json:"Paused"`
+			StartedAt  time.Time `json:"StartedAt"`
+			FinishedAt time.Time `json:"FinishedAt"`
+		} `json:"State"`
+		Created      time.Time `json:"Created"`
+		Image        string    `json:"Image"`
+		NetworkSettings struct {
+			Ports map[string][]struct {
+				HostIp   string `json:"HostIp"`
+				HostPort string `json:"HostPort"`
+			} `json:"Ports"`
+		} `json:"NetworkSettings"`
+	}
+
+	if err := json.Unmarshal(inspectOut, &inspectData); err != nil {
+		return nil, fmt.Errorf("failed to parse docker inspect output: %w", err)
+	}
+
 	var containers []DockerContainer
-	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
-
-	for _, line := range lines {
-		if line == "" {
-			continue
-		}
-
-		parts := strings.SplitN(line, "|", 9)
-		if len(parts) < 8 {
-			continue
-		}
-
-		containerID := parts[0]
-		name := strings.TrimPrefix(parts[1], "/")
-		fullImage := parts[2]
-		state := parts[3]
-		status := parts[4]
-		ports := parts[5]
-
-		// Parse image name and tag
+	for _, data := range inspectData {
+		name := strings.TrimPrefix(data.Name, "/")
+		fullImage := data.Config.Image
 		image, tag := parseImageTag(fullImage)
-
-		// Get the actual image ID
-		imageID := getImageID(ctx, containerID)
-
-		// Parse labels
-		labels := make(map[string]string)
-		if len(parts) > 8 && parts[8] != "" {
-			labelStr := strings.Trim(parts[8], "map[]")
-			for _, pair := range strings.Split(labelStr, " ") {
-				kv := strings.SplitN(pair, ":", 2)
-				if len(kv) == 2 {
-					labels[kv[0]] = kv[1]
-				}
-			}
+		
+		// Build state string
+		state := "unknown"
+		if data.State.Running {
+			state = "running"
+		} else if data.State.Paused {
+			state = "paused"
+		} else {
+			state = "exited"
 		}
+
+		// Build status string (similar to docker ps output)
+		status := data.State.Status
+		if data.State.Running {
+			uptime := time.Since(data.State.StartedAt)
+			status = fmt.Sprintf("Up %s", formatDuration(uptime))
+		} else if !data.State.FinishedAt.IsZero() {
+			downtime := time.Since(data.State.FinishedAt)
+			status = fmt.Sprintf("Exited %s ago", formatDuration(downtime))
+		}
+
+		// Format ports
+		ports := formatPorts(data.NetworkSettings.Ports)
 
 		containers = append(containers, DockerContainer{
-			ID:          fmt.Sprintf("%s-%s", containerID[:12], name),
-			ContainerID: containerID[:12],
+			ID:          fmt.Sprintf("%s-%s", data.Id[:12], name),
+			ContainerID: data.Id[:12],
 			Name:        name,
 			Image:       image,
 			ImageTag:    tag,
-			ImageID:     imageID,
+			ImageID:     data.Image[:12],
 			State:       state,
 			Status:      status,
+			Created:     data.Created,
 			Ports:       ports,
-			Labels:      labels,
+			Labels:      data.Config.Labels, // Labels are now properly parsed from JSON
 		})
 	}
 
 	log.Printf("Collected %d Docker containers", len(containers))
 	return containers, nil
+}
+
+func formatDuration(d time.Duration) string {
+	if d < time.Minute {
+		return fmt.Sprintf("%d seconds", int(d.Seconds()))
+	} else if d < time.Hour {
+		return fmt.Sprintf("%d minutes", int(d.Minutes()))
+	} else if d < 24*time.Hour {
+		return fmt.Sprintf("%d hours", int(d.Hours()))
+	}
+	return fmt.Sprintf("%d days", int(d.Hours()/24))
+}
+
+func formatPorts(portsMap map[string][]struct {
+	HostIp   string `json:"HostIp"`
+	HostPort string `json:"HostPort"`
+}) string {
+	if len(portsMap) == 0 {
+		return ""
+	}
+	
+	var parts []string
+	for containerPort, bindings := range portsMap {
+		if len(bindings) == 0 {
+			// No host binding, just exposed
+			parts = append(parts, containerPort)
+		} else {
+			for _, binding := range bindings {
+				if binding.HostPort != "" {
+					hostIp := binding.HostIp
+					if hostIp == "" || hostIp == "0.0.0.0" {
+						hostIp = "0.0.0.0"
+					}
+					parts = append(parts, fmt.Sprintf("%s:%s->%s", hostIp, binding.HostPort, containerPort))
+				}
+			}
+		}
+	}
+	
+	return strings.Join(parts, ", ")
 }
 
 func parseImageTag(fullImage string) (image, tag string) {
@@ -105,22 +178,6 @@ func parseImageTag(fullImage string) (image, tag string) {
 		return fullImage, "latest"
 	}
 	return fullImage[:lastColon], fullImage[lastColon+1:]
-}
-
-func getImageID(ctx context.Context, containerID string) string {
-	out, err := exec.CommandContext(ctx, "docker", "inspect", "--format", "{{.Image}}", containerID).Output()
-	if err != nil {
-		return ""
-	}
-	id := strings.TrimSpace(string(out))
-	// Shorten sha256:xxx to first 12 chars
-	if strings.HasPrefix(id, "sha256:") {
-		id = id[7:]
-		if len(id) > 12 {
-			id = id[:12]
-		}
-	}
-	return id
 }
 
 // DockerNetwork represents a Docker network and connected containers

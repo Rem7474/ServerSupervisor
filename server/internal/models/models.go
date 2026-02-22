@@ -142,16 +142,17 @@ type PortMapping struct {
 }
 
 type NetworkContainer struct {
-	ID           string        `json:"id"`
-	HostID       string        `json:"host_id"`
-	Hostname     string        `json:"hostname"`
-	Name         string        `json:"name"`
-	Image        string        `json:"image"`
-	ImageTag     string        `json:"image_tag"`
-	State        string        `json:"state"`
-	Status       string        `json:"status"`
-	Ports        string        `json:"ports"`
-	PortMappings []PortMapping `json:"port_mappings"`
+	ID           string            `json:"id"`
+	HostID       string            `json:"host_id"`
+	Hostname     string            `json:"hostname"`
+	Name         string            `json:"name"`
+	Image        string            `json:"image"`
+	ImageTag     string            `json:"image_tag"`
+	State        string            `json:"state"`
+	Status       string            `json:"status"`
+	Ports        string            `json:"ports"`
+	PortMappings []PortMapping     `json:"port_mappings"`
+	Labels       map[string]string `json:"labels,omitempty" db:"-"`
 }
 
 type NetworkHost struct {

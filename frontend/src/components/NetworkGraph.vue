@@ -144,7 +144,8 @@ const buildHierarchy = () => {
               protocol: 'tcp',
               port: internalPort,
               hostId: host.id,
-              tags: service.tags || ''
+              tags: service.tags || '',
+              isProxyLinked: true
             }
           })
           : filteredPorts.map((port) => {
@@ -159,7 +160,8 @@ const buildHierarchy = () => {
               protocol,
               port: portNumber,
               hostId: host.id,
-              containers: port.containers || []
+              containers: port.containers || [],
+              isProxyLinked: !!(hostPortMap?.[portNumber])
             }
           })
       }
@@ -222,10 +224,10 @@ const render = () => {
   const clusterPadding = { x: 80, y: 36 }
   const clusters = d3.group(serviceNodesData, (d) => d.data.hostId)
 
-  // Only render clusters when not in proxy-only mode (clusters require host nodes)
-  if (!props.showProxyLinks) {
-    for (const [hostId, nodes] of clusters.entries()) {
-      const hostNode = hostById.get(hostId)
+  // Render service clusters
+  for (const [hostId, nodes] of clusters.entries()) {
+    if (nodes.length === 0) continue
+    const hostNode = hostById.get(hostId)
     const positions = nodes.map((node) => ({
       x: node.y + 100,
       y: node.x + 40
@@ -257,7 +259,6 @@ const render = () => {
       .attr('y', rectY + 26)
       .attr('class', 'cluster-label')
       .text(`${label}${ip}`)
-    }
   }
 
   linkGroup

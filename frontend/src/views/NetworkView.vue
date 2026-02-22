@@ -449,7 +449,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, watchEffect } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useWebSocket } from '../composables/useWebSocket'
@@ -475,7 +475,6 @@ const excludedPortsText = ref('')
 const networkServices = ref([])
 const hostPortConfig = ref([])
 const topologyConfigLoaded = ref(false)
-const configAppliedFromWS = ref(false)
 const inferredLinks = ref([])
 const saveStatus = ref('idle') // 'idle' | 'saving' | 'saved' | 'error'
 const graphSurfaceRef = ref(null)
@@ -832,33 +831,15 @@ async function fetchSnapshot() {
   }
 }
 
-const { wsStatus, wsError, retryCount, reconnect } = useWebSocket('/api/v1/ws/network', (payload) => {
-  if (payload.type !== 'network') return
-  hosts.value = payload.hosts || []
-  containers.value = payload.containers || []
-  networks.value = payload.networks || []
-  inferredLinks.value = payload.links || []
-  
-  // Apply config from WebSocket only once, on initial connection, and only if not already loaded from REST
-  if (payload.config && !configAppliedFromWS.value && !topologyConfigLoaded.value) {
-    rootNodeName.value = payload.config.root_label || rootNodeName.value
-    rootNodeIp.value = payload.config.root_ip || rootNodeIp.value
-    showProxyLinks.value = payload.config.show_proxy_links !== false
-    configAppliedFromWS.value = true
+// Setup ResizeObserver with watchEffect to handle dynamic mounting/unmounting
+let resizeObserver = null
+watchEffect(() => {
+  if (resizeObserver) {
+    resizeObserver.disconnect()
+    resizeObserver = null
   }
-  
-  ensureHostPortConfig()
-})
-
-onMounted(async () => {
-  // Load topology config from server first
-  await loadTopologyConfig()
-  // Then fetch snapshot to populate real hosts/containers
-  await fetchSnapshot()
-  
-  // Setup ResizeObserver for dynamic graph height
   if (graphSurfaceRef.value) {
-    const resizeObserver = new ResizeObserver(() => {
+    resizeObserver = new ResizeObserver(() => {
       const rect = graphSurfaceRef.value?.getBoundingClientRect()
       if (rect) {
         const availableHeight = window.innerHeight - rect.top - 20
@@ -869,7 +850,29 @@ onMounted(async () => {
   }
 })
 
+const { wsStatus, wsError, retryCount, reconnect } = useWebSocket('/api/v1/ws/network', (payload) => {
+  if (payload.type !== 'network') return
+  hosts.value = payload.hosts || []
+  containers.value = payload.containers || []
+  networks.value = payload.networks || []
+  inferredLinks.value = payload.links || []
+  
+  // Config is loaded only via REST API (loadTopologyConfig), not from WebSocket
+  
+  ensureHostPortConfig()
+})
+
+onMounted(async () => {
+  // Load topology config from server first
+  await loadTopologyConfig()
+  // Then fetch snapshot to populate real hosts/containers
+  await fetchSnapshot()
+})
+
 onUnmounted(() => {
+  if (resizeObserver) {
+    resizeObserver.disconnect()
+  }
 })
 </script>
 

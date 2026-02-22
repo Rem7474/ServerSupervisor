@@ -80,6 +80,7 @@ func buildNetworkSnapshot(db *database.DB) (*models.NetworkSnapshot, error) {
 			Status:       container.Status,
 			Ports:        container.Ports,
 			PortMappings: mappings,
+			Labels:       container.Labels,
 		})
 	}
 
@@ -211,18 +212,18 @@ func (h *NetworkHandler) GetTopologySnapshot(c *gin.Context) {
 	// Get persisted config
 	config, _ := h.db.GetNetworkTopologyConfig()
 
-	// Convert to new structure
+	// Infer topology links
+	links := inferTopologyLinks(h.db, baseSnapshot.Containers, networks)
+
+	// Build topology snapshot
 	snapshot := &models.TopologySnapshot{
 		Hosts:      baseSnapshot.Hosts,
 		Containers: baseSnapshot.Containers,
 		Networks:   networks,
-		Links:      []models.TopologyLink{}, // TODO: Infer links
+		Links:      links,
 		Config:     config,
 		UpdatedAt:  time.Now(),
 	}
-
-	// Infer topology links
-	snapshot.Links = inferTopologyLinks(h.db, baseSnapshot.Containers, networks)
 
 	c.JSON(http.StatusOK, snapshot)
 }
@@ -242,29 +243,43 @@ func inferTopologyLinks(db *database.DB, containers []models.NetworkContainer, n
 		containerByID[c.ID] = c
 	}
 
-	// Rule 1: Docker networks - containers on same network are connected
+	// Rule 1: Docker networks - star topology to avoid O(n²) explosion
+	// Only create links for custom networks (skip bridge/host/none)
+	// Link first container (anchor) to others, max 8 links per network
 	for _, network := range networks {
 		if len(network.ContainerIDs) < 2 {
 			continue
 		}
-		// Create links between all pairs of containers on this network
-		for i := 0; i < len(network.ContainerIDs)-1; i++ {
-			for j := i + 1; j < len(network.ContainerIDs); j++ {
-				cA, okA := containerByID[network.ContainerIDs[i]]
-				cB, okB := containerByID[network.ContainerIDs[j]]
-				if !okA || !okB || cA.Name == "" || cB.Name == "" {
-					continue
-				}
-				links = append(links, models.TopologyLink{
-					SourceContainerName: cA.Name,
-					SourceHostID:        cA.HostID,
-					TargetContainerName: cB.Name,
-					TargetHostID:        cB.HostID,
-					LinkType:            "network",
-					NetworkName:         network.Name,
-					Confidence:          70,
-				})
+		// Ignore generic system networks
+		if network.Name == "bridge" || network.Name == "host" || network.Name == "none" {
+			continue
+		}
+		// Star topology: link anchor (first container) to others
+		maxLinks := 8
+		linkCount := 0
+		anchorID := network.ContainerIDs[0]
+		anchor, okAnchor := containerByID[anchorID]
+		if !okAnchor || anchor.Name == "" {
+			continue
+		}
+		for _, targetID := range network.ContainerIDs[1:] {
+			if linkCount >= maxLinks {
+				break
 			}
+			target, okTarget := containerByID[targetID]
+			if !okTarget || target.Name == "" {
+				continue
+			}
+			links = append(links, models.TopologyLink{
+				SourceContainerName: anchor.Name,
+				SourceHostID:        anchor.HostID,
+				TargetContainerName: target.Name,
+				TargetHostID:        target.HostID,
+				LinkType:            "network",
+				NetworkName:         network.Name,
+				Confidence:          70,
+			})
+			linkCount++
 		}
 	}
 
@@ -303,8 +318,20 @@ func inferTopologyLinks(db *database.DB, containers []models.NetworkContainer, n
 		}
 	}
 
-	// Rule 3: Traefik/Proxy labels - proxy to services
+	// Rule 3: Proxy detection - only link proxy to containers on the same Docker network
 	proxyImages := []string{"nginx", "traefik", "caddy", "haproxy", "proxy"}
+
+	// Build a set of networks per container for fast lookup
+	containerNetworks := make(map[string]map[string]bool) // containerID -> set of networkIDs
+	for _, network := range networks {
+		for _, cID := range network.ContainerIDs {
+			if containerNetworks[cID] == nil {
+				containerNetworks[cID] = make(map[string]bool)
+			}
+			containerNetworks[cID][network.ID] = true
+		}
+	}
+
 	for _, c := range containers {
 		isProxy := false
 		for _, proxyImg := range proxyImages {
@@ -316,23 +343,38 @@ func inferTopologyLinks(db *database.DB, containers []models.NetworkContainer, n
 		if !isProxy {
 			continue
 		}
-		// This is a proxy, find services it might serve
-		// Look for other containers with common frameworks
+		proxyNetworks := containerNetworks[c.ID]
+		if len(proxyNetworks) == 0 {
+			continue // proxy not on any known network, skip
+		}
 		for _, target := range containers {
 			if target.ID == c.ID {
 				continue
 			}
-			// Simple heuristic: if target has known service ports or labels
-			if hasServiceIndicators(target) {
-				links = append(links, models.TopologyLink{
-					SourceContainerName: c.Name,
-					SourceHostID:        c.HostID,
-					TargetContainerName: target.Name,
-					TargetHostID:        target.HostID,
-					LinkType:            "proxy",
-					Confidence:          60,
-				})
+			// Only link if they share at least one Docker network
+			targetNetworks := containerNetworks[target.ID]
+			sharedNetwork := false
+			for netID := range proxyNetworks {
+				if targetNetworks[netID] {
+					sharedNetwork = true
+					break
+				}
 			}
+			if !sharedNetwork {
+				continue
+			}
+			// Only link if target has published ports (likely serves traffic)
+			if len(target.PortMappings) == 0 {
+				continue
+			}
+			links = append(links, models.TopologyLink{
+				SourceContainerName: c.Name,
+				SourceHostID:        c.HostID,
+				TargetContainerName: target.Name,
+				TargetHostID:        target.HostID,
+				LinkType:            "proxy",
+				Confidence:          75,
+			})
 		}
 	}
 
