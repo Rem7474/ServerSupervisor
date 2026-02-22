@@ -19,12 +19,14 @@ type Sender struct {
 }
 
 type Report struct {
-	HostID       string      `json:"host_id"`
-	AgentVersion string      `json:"agent_version"`
-	Metrics      interface{} `json:"metrics"`
-	Docker       interface{} `json:"docker"`
-	AptStatus    interface{} `json:"apt_status"`
-	Timestamp    time.Time   `json:"timestamp"`
+	HostID         string      `json:"host_id"`
+	AgentVersion   string      `json:"agent_version"`
+	Metrics        interface{} `json:"metrics"`
+	Docker         interface{} `json:"docker"`
+	AptStatus      interface{} `json:"apt_status"`
+	DockerNetworks interface{} `json:"docker_networks,omitempty"` // Network topology data
+	ContainerEnvs  interface{} `json:"container_envs,omitempty"`  // Container environment variables
+	Timestamp      time.Time   `json:"timestamp"`
 }
 
 type ReportResponse struct {

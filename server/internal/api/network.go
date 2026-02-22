@@ -169,3 +169,57 @@ func parsePortNumber(raw string) int {
 	}
 	return value
 }
+
+// GetTopologyConfig returns persisted network configuration
+func (h *NetworkHandler) GetTopologyConfig(c *gin.Context) {
+	cfg, err := h.db.GetNetworkTopologyConfig()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, cfg)
+}
+
+// SaveTopologyConfig persists network configuration
+func (h *NetworkHandler) SaveTopologyConfig(c *gin.Context) {
+	var cfg models.NetworkTopologyConfig
+	if err := c.ShouldBindJSON(&cfg); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := h.db.SaveNetworkTopologyConfig(&cfg); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+// GetTopologySnapshot returns enhanced topology with inferred links
+func (h *NetworkHandler) GetTopologySnapshot(c *gin.Context) {
+	// Get base network snapshot
+	baseSnapshot, err := buildNetworkSnapshot(h.db)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch network snapshot"})
+		return
+	}
+
+	// Get Docker networks
+	networks, _ := h.db.GetAllDockerNetworks()
+
+	// Get persisted config
+	config, _ := h.db.GetNetworkTopologyConfig()
+
+	// Convert to new structure
+	snapshot := &models.TopologySnapshot{
+		Hosts:      baseSnapshot.Hosts,
+		Containers: baseSnapshot.Containers,
+		Networks:   networks,
+		Links:      []models.TopologyLink{}, // TODO: Infer links
+		Config:     config,
+		UpdatedAt:  time.Now(),
+	}
+
+	c.JSON(http.StatusOK, snapshot)
+}

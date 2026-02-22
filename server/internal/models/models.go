@@ -365,3 +365,52 @@ type MetricsAggregate struct {
 	SampleCount int       `json:"sample_count" db:"sample_count"` // How many raw samples in period
 	CreatedAt   time.Time `json:"created_at" db:"created_at"`
 }
+
+// ========== Network Topology (Automatic Detection) ==========
+
+// DockerNetwork represents a Docker network and its connected containers
+type DockerNetwork struct {
+	ID           string    `json:"id" db:"id"`
+	HostID       string    `json:"host_id" db:"host_id"`
+	NetworkID    string    `json:"network_id" db:"network_id"`
+	Name         string    `json:"name" db:"name"`
+	Driver       string    `json:"driver" db:"driver"`   // bridge, overlay, host, none
+	Scope        string    `json:"scope" db:"scope"`     // local, swarm
+	ContainerIDs []string  `json:"container_ids" db:"-"` // Stored as JSONB, not queried directly
+	UpdatedAt    time.Time `json:"updated_at" db:"updated_at"`
+}
+
+// TopologyLink represents an inferred logical link between two services
+type TopologyLink struct {
+	SourceContainerName string `json:"source_container_name"`
+	SourceHostID        string `json:"source_host_id"`
+	TargetContainerName string `json:"target_container_name"`
+	TargetHostID        string `json:"target_host_id"`
+	LinkType            string `json:"link_type"` // "network", "env_ref", "port_forward", "proxy"
+	NetworkName         string `json:"network_name,omitempty"`
+	EnvKey              string `json:"env_key,omitempty"` // Stores env var key or domain for inference
+	Confidence          int    `json:"confidence"`        // 0-100
+}
+
+// NetworkTopologyConfig stores persisted configuration (replaces localStorage)
+type NetworkTopologyConfig struct {
+	ID             int64     `json:"id" db:"id"`
+	RootLabel      string    `json:"root_label" db:"root_label"`
+	RootIP         string    `json:"root_ip" db:"root_ip"`
+	ExcludedPorts  []int     `json:"excluded_ports" db:"-"`        // Stored as JSONB
+	ServiceMap     string    `json:"service_map" db:"service_map"` // JSON {port: name}
+	ShowProxyLinks bool      `json:"show_proxy_links" db:"show_proxy_links"`
+	HostOverrides  string    `json:"host_overrides" db:"host_overrides"`   // JSON
+	ManualServices string    `json:"manual_services" db:"manual_services"` // JSON
+	UpdatedAt      time.Time `json:"updated_at" db:"updated_at"`
+}
+
+// TopologySnapshot is the complete network state sent via WebSocket
+type TopologySnapshot struct {
+	Hosts      []NetworkHost          `json:"hosts"`
+	Containers []NetworkContainer     `json:"containers"`
+	Networks   []DockerNetwork        `json:"networks"`
+	Links      []TopologyLink         `json:"links"`
+	Config     *NetworkTopologyConfig `json:"config,omitempty"`
+	UpdatedAt  time.Time              `json:"updated_at"`
+}

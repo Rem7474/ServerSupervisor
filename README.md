@@ -41,12 +41,17 @@ Système de supervision d'infrastructure : monitoring de VMs, conteneurs Docker,
 
 ### Dashboard
 - **Vue d'ensemble** : tous les hôtes avec statut temps réel (CPU, RAM, uptime)
+![Dashboard](./screenshot/Dashboard.png)
 - **Détail par hôte** : graphiques CPU/RAM historiques, disques, conteneurs, APT
+![Host Detail](./screenshot/HostDetail.png)
 - **Docker** : vue globale de tous les conteneurs sur toute l'infrastructure
-- **Network** : ports exposés et trafic réseau par hôte
+![Docker](./screenshot/Docker.png)
+- **Network** : ports exposés et trafic réseau par hôte et topologie réseau
 - **APT** : gestion centralisée des mises à jour avec actions groupées et console live
+![APT](./screenshot/APT.png)
 - **Versions** : suivi des releases GitHub et comparaison avec les images Docker en cours
 - **Audit** : logs d'actions utilisateurs et commandes système
+![Audit](./screenshot/Audit.png)
 - **Alertes** : règles d'alertes configurables avec notifications webhook/email
 
 ### Agent

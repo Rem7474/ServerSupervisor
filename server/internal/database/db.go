@@ -280,6 +280,33 @@ func (db *DB) migrate() error {
 		`ALTER TABLE IF EXISTS users ALTER COLUMN backup_codes DROP DEFAULT`,
 		`ALTER TABLE IF EXISTS users ALTER COLUMN backup_codes TYPE JSONB USING COALESCE(backup_codes::jsonb, '[]'::jsonb)`,
 		`ALTER TABLE IF EXISTS users ALTER COLUMN backup_codes SET DEFAULT '[]'::jsonb`,
+		// Migration: Docker networks and automatic topology detection
+		`CREATE TABLE IF NOT EXISTS docker_networks (
+			id VARCHAR(64) PRIMARY KEY,
+			host_id VARCHAR(64) REFERENCES hosts(id) ON DELETE CASCADE,
+			network_id VARCHAR(64) NOT NULL,
+			name VARCHAR(255) NOT NULL,
+			driver VARCHAR(50) DEFAULT 'bridge',
+			scope VARCHAR(20) DEFAULT 'local',
+			container_ids JSONB DEFAULT '[]'::jsonb,
+			updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_docker_networks_host ON docker_networks(host_id)`,
+		// Migration: Network topology configuration (persistent)
+		`CREATE TABLE IF NOT EXISTS network_topology_config (
+			id SERIAL PRIMARY KEY,
+			root_label VARCHAR(255) DEFAULT 'Infrastructure',
+			root_ip VARCHAR(45) DEFAULT '',
+			excluded_ports JSONB DEFAULT '[]'::jsonb,
+			service_map TEXT DEFAULT '{}',
+			show_proxy_links BOOLEAN DEFAULT TRUE,
+			host_overrides TEXT DEFAULT '{}',
+			manual_services TEXT DEFAULT '[]',
+			updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)`,
+		// Insert default config if not exists
+		`INSERT INTO network_topology_config (root_label) 
+		 SELECT 'Infrastructure' WHERE NOT EXISTS (SELECT 1 FROM network_topology_config)`,
 	}
 
 	for _, m := range migrations {
@@ -1172,17 +1199,6 @@ func (db *DB) GetOpenAlertIncident(ruleID int64, hostID string) (*models.AlertIn
 	return &inc, nil
 }
 
-// HasOpenIncident checks if there's an unresolved incident for a rule+host combination
-func (db *DB) HasOpenIncident(ruleID int64, hostID string) bool {
-	var id int64
-	err := db.conn.QueryRow(
-		`SELECT id FROM alert_incidents
-		 WHERE rule_id = $1 AND host_id = $2 AND resolved_at IS NULL LIMIT 1`,
-		ruleID, hostID,
-	).Scan(&id)
-	return err == nil
-}
-
 func (db *DB) CreateAlertIncident(ruleID int64, hostID string, value float64) error {
 	_, err := db.conn.Exec(
 		`INSERT INTO alert_incidents (rule_id, host_id, value) VALUES ($1, $2, $3)`,
@@ -1527,4 +1543,110 @@ func (db *DB) GetAptHistoryWithAgentUpdates(hostID string, limit int) ([]models.
 		cmds = append(cmds, c)
 	}
 	return cmds, nil
+}
+
+// ========== Network Topology ==========
+
+func (db *DB) UpsertDockerNetworks(hostID string, networks []models.DockerNetwork) error {
+	if len(networks) == 0 {
+		return nil
+	}
+	for _, n := range networks {
+		containerIDsJSON, _ := json.Marshal(n.ContainerIDs)
+		_, err := db.conn.Exec(
+			`INSERT INTO docker_networks (id, host_id, network_id, name, driver, scope, container_ids, updated_at)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+			 ON CONFLICT(id) DO UPDATE SET
+			 container_ids = $7, updated_at = NOW()`,
+			n.ID, hostID, n.NetworkID, n.Name, n.Driver, n.Scope, containerIDsJSON,
+		)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (db *DB) GetDockerNetworksByHost(hostID string) ([]models.DockerNetwork, error) {
+	rows, err := db.conn.Query(
+		`SELECT id, host_id, network_id, name, driver, scope, container_ids, updated_at
+		 FROM docker_networks WHERE host_id = $1`,
+		hostID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var networks []models.DockerNetwork
+	for rows.Next() {
+		var n models.DockerNetwork
+		var containerIDsJSON []byte
+		if err := rows.Scan(&n.ID, &n.HostID, &n.NetworkID, &n.Name, &n.Driver, &n.Scope, &containerIDsJSON, &n.UpdatedAt); err != nil {
+			continue
+		}
+		json.Unmarshal(containerIDsJSON, &n.ContainerIDs)
+		networks = append(networks, n)
+	}
+	return networks, nil
+}
+
+func (db *DB) GetAllDockerNetworks() ([]models.DockerNetwork, error) {
+	rows, err := db.conn.Query(
+		`SELECT id, host_id, network_id, name, driver, scope, container_ids, updated_at
+		 FROM docker_networks ORDER BY host_id, name`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var networks []models.DockerNetwork
+	for rows.Next() {
+		var n models.DockerNetwork
+		var containerIDsJSON []byte
+		if err := rows.Scan(&n.ID, &n.HostID, &n.NetworkID, &n.Name, &n.Driver, &n.Scope, &containerIDsJSON, &n.UpdatedAt); err != nil {
+			continue
+		}
+		json.Unmarshal(containerIDsJSON, &n.ContainerIDs)
+		networks = append(networks, n)
+	}
+	return networks, nil
+}
+
+func (db *DB) GetNetworkTopologyConfig() (*models.NetworkTopologyConfig, error) {
+	var cfg models.NetworkTopologyConfig
+	err := db.conn.QueryRow(
+		`SELECT id, root_label, root_ip, excluded_ports, service_map, show_proxy_links, host_overrides, manual_services, updated_at
+		 FROM network_topology_config LIMIT 1`,
+	).Scan(&cfg.ID, &cfg.RootLabel, &cfg.RootIP, pq.Array(&cfg.ExcludedPorts), &cfg.ServiceMap, &cfg.ShowProxyLinks, &cfg.HostOverrides, &cfg.ManualServices, &cfg.UpdatedAt)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			// Return default config if none exists
+			return &models.NetworkTopologyConfig{
+				RootLabel:      "Infrastructure",
+				ShowProxyLinks: true,
+				ExcludedPorts:  []int{},
+				ServiceMap:     "{}",
+				HostOverrides:  "{}",
+				ManualServices: "[]",
+			}, nil
+		}
+		return nil, err
+	}
+	return &cfg, nil
+}
+
+func (db *DB) SaveNetworkTopologyConfig(cfg *models.NetworkTopologyConfig) error {
+	excludedPortsJSON, _ := json.Marshal(cfg.ExcludedPorts)
+	_, err := db.conn.Exec(
+		`UPDATE network_topology_config SET
+		 root_label = $1, root_ip = $2, excluded_ports = $3,
+		 service_map = $4, show_proxy_links = $5, host_overrides = $6,
+		 manual_services = $7, updated_at = NOW()`,
+		cfg.RootLabel, cfg.RootIP, excludedPortsJSON,
+		cfg.ServiceMap, cfg.ShowProxyLinks, cfg.HostOverrides,
+		cfg.ManualServices,
+	)
+	return err
 }

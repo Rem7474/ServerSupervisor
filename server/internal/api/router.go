@@ -88,6 +88,9 @@ func SetupRouter(db *database.DB, cfg *config.Config) *gin.Engine {
 		api.GET("/docker/containers", dockerH.ListAllContainers)
 		api.GET("/docker/versions", dockerH.CompareVersions)
 		api.GET("/network", networkH.GetNetworkSnapshot)
+		api.GET("/network/topology", networkH.GetTopologySnapshot)
+		api.GET("/network/config", networkH.GetTopologyConfig)
+		api.PUT("/network/config", networkH.SaveTopologyConfig)
 
 		// Tracked GitHub repos
 		api.GET("/repos", dockerH.ListTrackedRepos)

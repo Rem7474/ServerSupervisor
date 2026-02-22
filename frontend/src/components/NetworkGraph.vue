@@ -170,6 +170,53 @@ const buildHierarchy = () => {
   return d3.hierarchy(root)
 }
 
+const buildProxyOnlyHierarchy = () => {
+  const servicesByHost = new Map()
+  for (const service of props.services || []) {
+    if (!service?.hostId) continue
+    if (!servicesByHost.has(service.hostId)) {
+      servicesByHost.set(service.hostId, [])
+    }
+    servicesByHost.get(service.hostId).push(service)
+  }
+
+  // Flatten all services directly under root
+  const allServices = []
+  for (const host of props.data) {
+    const hostServices = servicesByHost.get(host.id) || []
+    for (const service of hostServices) {
+      const internalPort = Number(service.internalPort || 0)
+      const externalPort = Number(service.externalPort || 0)
+      const path = service.path || '/'
+      const domain = service.domain || ''
+      const name = service.name || 'Service'
+      const label = domain ? `${domain}${path}` : path
+      allServices.push({
+        id: `service-${host.id}-${service.id}`,
+        name,
+        subtitle: label,
+        internalPort,
+        externalPort,
+        type: 'service',
+        protocol: 'tcp',
+        port: internalPort,
+        hostId: host.id,
+        tags: service.tags || ''
+      })
+    }
+  }
+
+  const root = {
+    id: 'root',
+    name: props.rootLabel || 'root',
+    type: 'root',
+    children: allServices
+  }
+
+  return d3.hierarchy(root)
+}
+
+
 const render = () => {
   if (!svgRef.value) return
 
@@ -184,7 +231,7 @@ const render = () => {
     simulation = null
   }
 
-  const root = buildHierarchy()
+  const root = props.showProxyLinks ? buildProxyOnlyHierarchy() : buildHierarchy()
   if (!root.children || root.children.length === 0) return
 
   const svg = d3.select(svgRef.value)
@@ -228,8 +275,10 @@ const render = () => {
   const clusterPadding = { x: 80, y: 36 }
   const clusters = d3.group(serviceNodesData, (d) => d.data.hostId)
 
-  for (const [hostId, nodes] of clusters.entries()) {
-    const hostNode = hostById.get(hostId)
+  // Only render clusters when not in proxy-only mode (clusters require host nodes)
+  if (!props.showProxyLinks) {
+    for (const [hostId, nodes] of clusters.entries()) {
+      const hostNode = hostById.get(hostId)
     const positions = nodes.map((node) => ({
       x: node.y + 100,
       y: node.x + 40
@@ -261,23 +310,7 @@ const render = () => {
       .attr('y', rectY + 26)
       .attr('class', 'cluster-label')
       .text(`${label}${ip}`)
-  }
-
-  if (props.showProxyLinks && rootNodeData) {
-    const rootX = rootNodeData.y + 100
-    const rootY = rootNodeData.x + 40
-    proxyLinkGroup
-      .selectAll('path')
-      .data(serviceNodesData)
-      .enter()
-      .append('path')
-      .attr('class', 'proxy-link')
-      .attr('d', (d) => {
-        const endX = d.y + 100
-        const endY = d.x + 40
-        const midX = (rootX + endX) / 2
-        return `M${rootX},${rootY} C${midX},${rootY} ${midX},${endY} ${endX},${endY}`
-      })
+    }
   }
 
   linkGroup

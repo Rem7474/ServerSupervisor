@@ -425,10 +425,19 @@ func (h *WSHandler) sendNetworkSnapshot(conn *websocket.Conn) error {
 	if err != nil {
 		return err
 	}
+
+	// Get Docker networks
+	networks, _ := h.db.GetAllDockerNetworks()
+
+	// Get network topology config
+	config, _ := h.db.GetNetworkTopologyConfig()
+
 	payload := gin.H{
 		"type":       "network",
 		"hosts":      snapshot.Hosts,
 		"containers": snapshot.Containers,
+		"networks":   networks,
+		"config":     config,
 		"updated_at": snapshot.UpdatedAt,
 	}
 	return conn.WriteJSON(payload)

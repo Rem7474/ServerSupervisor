@@ -85,6 +85,8 @@ func sendReport(cfg *config.Config, s *sender.Sender) {
 
 	// Collect Docker containers
 	var dockerData interface{}
+	var dockerNetworks interface{}
+	var containerEnvs interface{}
 	if cfg.CollectDocker {
 		containers, err := collector.CollectDocker()
 		if err != nil {
@@ -96,6 +98,20 @@ func sendReport(cfg *config.Config, s *sender.Sender) {
 			dockerData = struct {
 				Containers []collector.DockerContainer `json:"containers"`
 			}{Containers: containers}
+
+			// Collect Docker networks
+			if networks, err := collector.CollectDockerNetworks(); err == nil {
+				dockerNetworks = networks
+			}
+
+			// Collect container environment variables
+			containerNames := make([]string, len(containers))
+			for i, c := range containers {
+				containerNames[i] = c.Name
+			}
+			if envs, err := collector.CollectContainerEnvVars(containerNames); err == nil {
+				containerEnvs = envs
+			}
 		}
 	} else {
 		dockerData = struct {
@@ -111,11 +127,13 @@ func sendReport(cfg *config.Config, s *sender.Sender) {
 
 	// Send report
 	report := &sender.Report{
-		AgentVersion: AgentVersion,
-		Metrics:      metrics,
-		Docker:       dockerData,
-		AptStatus:    aptData,
-		Timestamp:    time.Now(),
+		AgentVersion:   AgentVersion,
+		Metrics:        metrics,
+		Docker:         dockerData,
+		AptStatus:      aptData,
+		DockerNetworks: dockerNetworks,
+		ContainerEnvs:  containerEnvs,
+		Timestamp:      time.Now(),
 	}
 
 	response, err := s.SendReport(report)
@@ -211,7 +229,7 @@ func initialAptCollection(cfg *config.Config, s *sender.Sender) {
 	time.Sleep(5 * time.Second)
 
 	log.Println("Performing initial APT update...")
-	
+
 	// Execute apt update at startup to ensure latest package list
 	if err := executeAptUpdate(); err != nil {
 		log.Printf("Warning: Initial apt update failed: %v", err)
@@ -260,7 +278,7 @@ func executeAptUpdate() error {
 func logAptAction(cfg *config.Config, s *sender.Sender, action, status, message string) {
 	// Create a simple audit log entry (we'll send it in the next report or via API)
 	log.Printf("APT Action: %s [%s] - %s", action, status, message)
-	
+
 	// Send it to the server via the audit endpoint if available
 	// This ensures the action is logged in the dashboard
 	if err := s.SendAuditLog(action, status, message); err != nil {

@@ -73,6 +73,12 @@ export default {
   getAptHistory: (hostId) => api.get(`/v1/hosts/${hostId}/apt/history`),
   sendAptCommand: (hostIds, command) => api.post('/v1/apt/command', { host_ids: hostIds, command }),
 
+  // Network Topology
+  getNetworkSnapshot: () => api.get('/v1/network'),
+  getTopologySnapshot: () => api.get('/v1/network/topology'),
+  getTopologyConfig: () => api.get('/v1/network/config'),
+  saveTopologyConfig: (config) => api.put('/v1/network/config', config),
+
   // Audit
   getAuditLogs: (page = 1, limit = 50) => api.get(`/v1/audit/logs?page=${page}&limit=${limit}`),
   getAuditLogsByHost: (hostId, limit = 100) => api.get(`/v1/audit/logs/host/${hostId}?limit=${limit}`),

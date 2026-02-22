@@ -380,55 +380,91 @@ import apiClient from '../api'
 const router = useRouter()
 const hosts = ref([])
 const containers = ref([])
+const networks = ref([])
 const search = ref('')
 const protocolFilter = ref('')
 const hostFilter = ref('')
 const onlyPublished = ref(true)
 const viewMode = ref(localStorage.getItem('networkViewMode') || 'cards')
 const networkTab = ref('topology')
-const rootNodeName = ref(localStorage.getItem('networkRootName') || 'pve')
-const rootNodeIp = ref(localStorage.getItem('networkRootIp') || '')
-const showProxyLinks = ref(localStorage.getItem('networkShowProxyLinks') !== 'false')
-const servicePortMapText = ref(localStorage.getItem('networkServiceMap') || '')
-const excludedPortsText = ref(localStorage.getItem('networkExcludedPorts') || '')
-const storedServices = localStorage.getItem('networkServices')
-const networkServices = ref(parseStoredServices(storedServices))
-const storedHostPorts = localStorage.getItem('networkHostPorts')
-const hostPortConfig = ref(parseStoredHostPorts(storedHostPorts))
+const rootNodeName = ref('Infrastructure')
+const rootNodeIp = ref('')
+const showProxyLinks = ref(true)
+const servicePortMapText = ref('')
+const excludedPortsText = ref('')
+const networkServices = ref([])
+const hostPortConfig = ref([])
+const topologyConfigLoaded = ref(false)
 const auth = useAuthStore()
 
-// Save view mode to localStorage when it changes
+// Save view mode to localStorage only (local UI preference)
 watch(viewMode, (newMode) => {
   localStorage.setItem('networkViewMode', newMode)
 })
 
-watch(rootNodeName, (value) => {
-  localStorage.setItem('networkRootName', value)
-})
+// Debounced save function (500ms debounce)
+let saveTimeout = null
+const debouncedSave = () => {
+  if (saveTimeout) clearTimeout(saveTimeout)
+  saveTimeout = setTimeout(async () => {
+    await saveTopologyConfig()
+  }, 500)
+}
 
-watch(rootNodeIp, (value) => {
-  localStorage.setItem('networkRootIp', value)
-})
+// Watch for changes and trigger save
+watch(rootNodeName, () => debouncedSave())
+watch(rootNodeIp, () => debouncedSave())
+watch(showProxyLinks, () => debouncedSave())
+watch(servicePortMapText, () => debouncedSave())
+watch(excludedPortsText, () => debouncedSave())
+watch(networkServices, () => debouncedSave(), { deep: true })
+watch(hostPortConfig, () => debouncedSave(), { deep: true })
 
-watch(showProxyLinks, (value) => {
-  localStorage.setItem('networkShowProxyLinks', value ? 'true' : 'false')
-})
+// Load topology configuration from database
+async function loadTopologyConfig() {
+  try {
+    const res = await apiClient.getTopologyConfig()
+    if (res.data) {
+      const cfg = res.data
+      rootNodeName.value = cfg.root_label || 'Infrastructure'
+      rootNodeIp.value = cfg.root_ip || ''
+      showProxyLinks.value = cfg.show_proxy_links !== false
+      networkServices.value = cfg.manual_services ? JSON.parse(cfg.manual_services) : []
+      servicePortMapText.value = cfg.service_map && cfg.service_map !== '{}' ? cfg.service_map : ''
+      excludedPortsText.value = (cfg.excluded_ports || []).join(', ')
+      if (cfg.host_overrides) {
+        try {
+          hostPortConfig.value = JSON.parse(cfg.host_overrides)
+        } catch {
+          hostPortConfig.value = []
+        }
+      }
+      topologyConfigLoaded.value = true
+    }
+  } catch (e) {
+    console.warn('Failed to load topology config from server:', e)
+    topologyConfigLoaded.value = true
+  }
+}
 
-watch(servicePortMapText, (value) => {
-  localStorage.setItem('networkServiceMap', value)
-})
-
-watch(excludedPortsText, (value) => {
-  localStorage.setItem('networkExcludedPorts', value)
-})
-
-watch(networkServices, (value) => {
-  localStorage.setItem('networkServices', JSON.stringify(value))
-}, { deep: true })
-
-watch(hostPortConfig, (value) => {
-  localStorage.setItem('networkHostPorts', JSON.stringify(value))
-}, { deep: true })
+// Save topology configuration to database
+async function saveTopologyConfig() {
+  if (!topologyConfigLoaded.value) return // Don't save until fully loaded
+  try {
+    const config = {
+      root_label: rootNodeName.value,
+      root_ip: rootNodeIp.value,
+      excluded_ports: excludedPorts.value,
+      service_map: servicePortMapText.value || '{}',
+      show_proxy_links: showProxyLinks.value,
+      host_overrides: JSON.stringify(hostPortConfig.value),
+      manual_services: JSON.stringify(networkServices.value)
+    }
+    await apiClient.saveTopologyConfig(config)
+  } catch (e) {
+    console.warn('Failed to save topology config:', e)
+  }
+}
 
 const servicePortMap = computed(() => {
   const map = {}
@@ -682,8 +718,27 @@ function getPortSetting(hostId, portNumber) {
 }
 
 function updatePortSetting(hostId, portNumber, property, value) {
-  const setting = getPortSetting(hostId, portNumber)
-  setting[property] = value
+  const hostIndex = hostPortConfig.value.findIndex((item) => item.hostId === hostId)
+  if (hostIndex === -1) return
+
+  const portKey = String(portNumber)
+  const entry = hostPortConfig.value[hostIndex]
+  const currentSetting = entry.ports[portKey] || {
+    name: '',
+    domain: '',
+    path: '/',
+    enabled: true,
+    linkToProxy: false
+  }
+
+  // Explicitly replace the ports object to trigger Vue reactivity
+  entry.ports = {
+    ...entry.ports,
+    [portKey]: {
+      ...currentSetting,
+      [property]: value
+    }
+  }
 }
 
 function ensureHostPortConfig() {
@@ -756,11 +811,23 @@ const { wsStatus, wsError, retryCount, reconnect } = useWebSocket('/api/v1/ws/ne
   if (payload.type !== 'network') return
   hosts.value = payload.hosts || []
   containers.value = payload.containers || []
+  networks.value = payload.networks || []
+  
+  // Update config from WebSocket if provided (for auto-sync across clients)
+  if (payload.config) {
+    rootNodeName.value = payload.config.root_label || rootNodeName.value
+    rootNodeIp.value = payload.config.root_ip || rootNodeIp.value
+    showProxyLinks.value = payload.config.show_proxy_links !== false
+  }
+  
   ensureHostPortConfig()
 })
 
-onMounted(() => {
-  fetchSnapshot()
+onMounted(async () => {
+  // Load topology config from server first
+  await loadTopologyConfig()
+  // Then fetch snapshot to populate real hosts/containers
+  await fetchSnapshot()
 })
 
 onUnmounted(() => {
@@ -791,6 +858,8 @@ onUnmounted(() => {
   padding: 16px 18px 24px;
   border-bottom: 1px solid rgba(148, 163, 184, 0.2);
   background: rgba(15, 23, 42, 0.45);
+  overflow-y: auto;
+  max-height: calc(60vh - 120px);
 }
 
 .network-config-row {

@@ -119,6 +119,10 @@ func (h *SettingsHandler) TestNtfy(c *gin.Context) {
 
 // CleanupMetrics triggers manual cleanup of old metrics
 func (h *SettingsHandler) CleanupMetrics(c *gin.Context) {
+	if c.GetString("role") != "admin" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+		return
+	}
 	user := c.GetString("username")
 	log.Printf("User %s triggered manual metrics cleanup", user)
 
@@ -137,6 +141,10 @@ func (h *SettingsHandler) CleanupMetrics(c *gin.Context) {
 
 // CleanupAuditLogs triggers manual cleanup of old audit logs
 func (h *SettingsHandler) CleanupAuditLogs(c *gin.Context) {
+	if c.GetString("role") != "admin" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+		return
+	}
 	user := c.GetString("username")
 	log.Printf("User %s triggered manual audit logs cleanup", user)
 
