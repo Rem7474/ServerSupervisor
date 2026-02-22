@@ -160,9 +160,9 @@ func (h *SettingsHandler) getDatabaseStatus() gin.H {
 	hostsCount, _ := h.db.CountHosts()
 
 	return gin.H{
-		"connected":      true,
-		"auditLogCount":  auditLogCount,
-		"metricsCount":   metricsCount,
-		"hostsCount":     hostsCount,
+		"connected":     true,
+		"auditLogCount": auditLogCount,
+		"metricsCount":  metricsCount,
+		"hostsCount":    hostsCount,
 	}
 }

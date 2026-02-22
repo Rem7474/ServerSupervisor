@@ -1437,6 +1437,7 @@ func (db *DB) DeleteTrackedRepo(id int64) error {
 	_, err := db.conn.Exec(`DELETE FROM tracked_repos WHERE id = $1`, id)
 	return err
 }
+
 // CountAuditLogs returns the total number of audit log entries
 func (db *DB) CountAuditLogs() (int64, error) {
 	var count int64
