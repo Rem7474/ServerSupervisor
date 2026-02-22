@@ -195,23 +195,25 @@
                         <td>
                           <label class="form-check">
                             <input
+                              :id="`port-enabled-${host.id}-${port.port}`"
                               :checked="getPortSetting(host.id, port.port).enabled"
                               class="form-check-input"
                               type="checkbox"
-                              @input="updatePortSetting(host.id, port.port, 'enabled', $event.target.checked)"
+                              @change="(e) => { updatePortSetting(host.id, port.port, 'enabled', e.target.checked); }"
                             />
-                            <span class="form-check-label">Afficher</span>
+                            <span class="form-check-label" :for="`port-enabled-${host.id}-${port.port}`">Afficher</span>
                           </label>
                         </td>
                         <td>
                           <label class="form-check form-switch">
                             <input
+                              :id="`port-proxy-${host.id}-${port.port}`"
                               :checked="getPortSetting(host.id, port.port).linkToProxy"
                               class="form-check-input"
                               type="checkbox"
-                              @input="updatePortSetting(host.id, port.port, 'linkToProxy', $event.target.checked)"
+                              @change="(e) => { updatePortSetting(host.id, port.port, 'linkToProxy', e.target.checked); }"
                             />
-                            <span class="form-check-label">Proxy</span>
+                            <span class="form-check-label" :for="`port-proxy-${host.id}-${port.port}`">Proxy</span>
                           </label>
                         </td>
                       </tr>
@@ -731,14 +733,19 @@ function updatePortSetting(hostId, portNumber, property, value) {
     linkToProxy: false
   }
 
-  // Explicitly replace the ports object to trigger Vue reactivity
-  entry.ports = {
-    ...entry.ports,
-    [portKey]: {
-      ...currentSetting,
-      [property]: value
+  // Create new object structure and force array reassign to trigger Vue reactivity
+  const newConfig = [...hostPortConfig.value]
+  newConfig[hostIndex] = {
+    ...entry,
+    ports: {
+      ...entry.ports,
+      [portKey]: {
+        ...currentSetting,
+        [property]: value
+      }
     }
   }
+  hostPortConfig.value = newConfig
 }
 
 function ensureHostPortConfig() {
