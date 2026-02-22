@@ -149,3 +149,73 @@ Si les problèmes persistent :
 1. Exécutez `.\diagnostic.ps1` et sauvegardez le résultat
 2. Vérifiez les logs : `docker logs serversupervisor-server-1 > server-logs.txt`
 3. Vérifiez la console navigateur (F12) et sauvegardez les erreurs
+
+---
+
+## Migrations de base de données non appliquées
+
+### Diagnostic du problème
+
+Le script `docker-init.sh` est monté dans `/docker-entrypoint-initdb.d/`, mais PostgreSQL **n'exécute ces scripts que lors de la première initialisation**.
+
+Si vous aviez déjà créé les containers avant d'ajouter les migrations, les scripts d'init n'ont jamais été exécutés.
+
+### Solutions
+
+#### Option 1 : Appliquer les migrations manuellement (recommandé)
+
+Sur Linux :
+```bash
+# 1. Rendre le script exécutable
+chmod +x apply-migrations.sh
+
+# 2. Appliquer les migrations
+./apply-migrations.sh
+
+# 3. Vérifier
+chmod +x check-db.sh
+./check-db.sh
+```
+
+Sur Windows (PowerShell) :
+```powershell
+# Vérifier l'état actuel
+.\check-db.ps1
+
+# Trouver le nom du container PostgreSQL
+docker ps | Select-String postgres
+
+# Appliquer les migrations (remplacer <container_name>)
+docker exec -it <container_name> psql -U supervisor -d serversupervisor -c "ALTER TABLE hosts ADD COLUMN IF NOT EXISTS agent_version VARCHAR(20);"
+docker exec -it <container_name> psql -U supervisor -d serversupervisor -c "ALTER TABLE apt_status ADD COLUMN IF NOT EXISTS cve_list JSONB DEFAULT '[]'::jsonb;"
+```
+
+#### Option 2 : Recréer complètement (⚠️ perte de données)
+
+```bash
+# ATTENTION: supprime TOUTES les données
+docker-compose down -v
+docker-compose up -d
+```
+
+### Vérification post-migration
+
+1. **Redémarrer les agents** sur tous les serveurs surveillés :
+   ```bash
+   sudo systemctl restart serversupervisor-agent
+   ```
+
+2. **Vérifier les logs agents** :
+   ```bash
+   journalctl -u serversupervisor-agent -f | grep "Report sent"
+   ```
+
+3. **Attendre 30-60s** pour que les agents envoient un rapport, puis rafraîchir le dashboard
+
+### Pour éviter ce problème à l'avenir
+
+Quand vous modifiez `docker-init.sh`, vous devez soit :
+- **Recréer le volume** : `docker-compose down -v && docker-compose up -d`
+- **Ou appliquer manuellement** avec `apply-migrations.sh`
+
+Le script d'init ne s'exécute que si le répertoire de données PostgreSQL est vide.
