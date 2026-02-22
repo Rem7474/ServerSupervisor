@@ -28,7 +28,6 @@
       </div>
     </div>
 
-    <div class="row row-cards mb-4">
     <WsStatusBar :status="wsStatus" :error="wsError" :retry-count="retryCount" @reconnect="reconnect" />
 
     <div class="row row-cards mb-4">
