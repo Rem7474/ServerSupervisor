@@ -1437,3 +1437,23 @@ func (db *DB) DeleteTrackedRepo(id int64) error {
 	_, err := db.conn.Exec(`DELETE FROM tracked_repos WHERE id = $1`, id)
 	return err
 }
+// CountAuditLogs returns the total number of audit log entries
+func (db *DB) CountAuditLogs() (int64, error) {
+	var count int64
+	err := db.conn.QueryRow(`SELECT COUNT(*) FROM audit_logs`).Scan(&count)
+	return count, err
+}
+
+// CountMetrics returns the total number of metrics records
+func (db *DB) CountMetrics() (int64, error) {
+	var count int64
+	err := db.conn.QueryRow(`SELECT COUNT(*) FROM metrics`).Scan(&count)
+	return count, err
+}
+
+// CountHosts returns the total number of registered hosts
+func (db *DB) CountHosts() (int64, error) {
+	var count int64
+	err := db.conn.QueryRow(`SELECT COUNT(*) FROM hosts`).Scan(&count)
+	return count, err
+}

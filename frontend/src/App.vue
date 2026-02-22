@@ -110,6 +110,10 @@
                   Securite (MFA)
                 </router-link>
                 <div class="dropdown-divider"></div>
+                <router-link to="/settings" class="dropdown-item" @click="userMenuOpen = false">
+                  Paramètres
+                </router-link>
+                <div class="dropdown-divider"></div>
                 <button class="dropdown-item text-danger" @click="handleLogout">Deconnexion</button>
               </div>
             </div>

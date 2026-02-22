@@ -28,6 +28,7 @@ func SetupRouter(db *database.DB, cfg *config.Config) *gin.Engine {
 	auditH := NewAuditHandler(db, cfg)
 	userH := NewUserHandler(db, cfg)
 	alertH := NewAlertHandler(db, cfg)
+	settingsH := NewSettingsHandler(db, cfg)
 
 	// ========== Public routes ==========
 	r.POST("/api/auth/login", authH.Login)
@@ -107,6 +108,13 @@ func SetupRouter(db *database.DB, cfg *config.Config) *gin.Engine {
 		api.PATCH("/alerts/rules/:id", alertH.UpdateRule)
 		api.DELETE("/alerts/rules/:id", alertH.DeleteRule)
 		api.GET("/alerts/incidents", alertH.ListIncidents)
+
+		// Settings
+		api.GET("/settings", settingsH.GetSettings)
+		api.POST("/settings/test-smtp", settingsH.TestSmtp)
+		api.POST("/settings/test-ntfy", settingsH.TestNtfy)
+		api.POST("/settings/cleanup-metrics", settingsH.CleanupMetrics)
+		api.POST("/settings/cleanup-audit", settingsH.CleanupAuditLogs)
 
 		// Users
 		api.GET("/users", userH.ListUsers)

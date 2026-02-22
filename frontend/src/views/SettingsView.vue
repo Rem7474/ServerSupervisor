@@ -1,0 +1,304 @@
+<template>
+  <div>
+    <div class="page-header mb-4">
+      <h2 class="page-title">Paramètres</h2>
+      <div class="text-secondary">Configuration et diagnostics du système</div>
+    </div>
+
+    <!-- Configuration Actuelle -->
+    <div class="row row-cards mb-4">
+      <div class="col-lg-6">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Configuration</h3>
+          </div>
+          <div class="card-body">
+            <div class="mb-3 pb-3 border-bottom">
+              <div class="text-secondary small">URL de base (Frontend)</div>
+              <div class="font-monospace">{{ settings.baseUrl || 'Non configuré' }}</div>
+            </div>
+            <div class="mb-3 pb-3 border-bottom">
+              <div class="text-secondary small">Base de données</div>
+              <div class="font-monospace">{{ settings.dbHost }}:{{ settings.dbPort }}</div>
+            </div>
+            <div class="mb-3 pb-3 border-bottom">
+              <div class="text-secondary small">Mode HTTPS/SSL</div>
+              <span :class="settings.tlsEnabled ? 'badge bg-green-lt text-green' : 'badge bg-yellow-lt text-yellow'">
+                {{ settings.tlsEnabled ? 'Activé' : 'Désactivé' }}
+              </span>
+            </div>
+            <div class="mb-3">
+              <div class="text-secondary small">Rétention des métriques</div>
+              <div>{{ settings.metricsRetentionDays }} jours</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-6">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">État de la base de données</h3>
+          </div>
+          <div class="card-body">
+            <div class="mb-3 pb-3 border-bottom">
+              <div class="text-secondary small">Statut de la connexion</div>
+              <span :class="dbStatus.connected ? 'badge bg-green-lt text-green' : 'badge bg-red-lt text-red'">
+                {{ dbStatus.connected ? 'Connecté' : 'Déconnecté' }}
+              </span>
+            </div>
+            <div class="mb-3 pb-3 border-bottom">
+              <div class="text-secondary small">Enregistrements audit</div>
+              <div>{{ formatNumber(dbStatus.auditLogCount) }} entrées</div>
+            </div>
+            <div class="mb-3 pb-3 border-bottom">
+              <div class="text-secondary small">Métriques stockées</div>
+              <div>{{ formatNumber(dbStatus.metricsCount) }} points</div>
+            </div>
+            <div class="mb-3">
+              <div class="text-secondary small">Hôtes enregistrés</div>
+              <div>{{ dbStatus.hostsCount }} hôtes</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notifications & SMTP -->
+    <div class="row row-cards mb-4">
+      <div class="col-lg-6">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Email (SMTP)</h3>
+          </div>
+          <div class="card-body">
+            <div class="mb-3 pb-3 border-bottom">
+              <div class="text-secondary small">SMTP Configuré</div>
+              <span :class="settings.smtpConfigured ? 'badge bg-green-lt text-green' : 'badge bg-yellow-lt text-yellow'">
+                {{ settings.smtpConfigured ? 'Activé' : 'Non configuré' }}
+              </span>
+            </div>
+            <div v-if="settings.smtpConfigured" class="mb-3">
+              <div class="text-secondary small">Serveur SMTP</div>
+              <div class="font-monospace small">{{ settings.smtpHost }}:{{ settings.smtpPort }}</div>
+            </div>
+            <button 
+              v-if="settings.smtpConfigured"
+              class="btn btn-primary btn-sm mt-2"
+              @click="testSmtp"
+              :disabled="testingSmtp"
+            >
+              {{ testingSmtp ? 'Test en cours...' : 'Tester la connexion' }}
+            </button>
+            <div v-if="smtpTestMessage" :class="['alert mt-2', smtpTestSuccess ? 'alert-success' : 'alert-danger']">
+              {{ smtpTestMessage }}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-6">
+        <div class="card">
+          <div class="card-header">
+            <h3 class="card-title">Webhooks</h3>
+          </div>
+          <div class="card-body">
+            <div class="mb-3 pb-3 border-bottom">
+              <div class="text-secondary small">ntfy.sh Webhook</div>
+              <span :class="settings.ntfyUrl ? 'badge bg-green-lt text-green' : 'badge bg-secondary-lt text-secondary'">
+                {{ settings.ntfyUrl ? 'Configuré' : 'Non configuré' }}
+              </span>
+            </div>
+            <div v-if="settings.ntfyUrl" class="mb-3">
+              <div class="text-secondary small">URL</div>
+              <div class="font-monospace small text-truncate">{{ settings.ntfyUrl }}</div>
+            </div>
+            <button 
+              v-if="settings.ntfyUrl"
+              class="btn btn-primary btn-sm mt-2"
+              @click="testNtfy"
+              :disabled="testingNtfy"
+            >
+              {{ testingNtfy ? 'Test en cours...' : 'Envoyer test' }}
+            </button>
+            <div v-if="ntfyTestMessage" :class="['alert mt-2', ntfyTestSuccess ? 'alert-success' : 'alert-danger']">
+              {{ ntfyTestMessage }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Maintenance -->
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">Maintenance</h3>
+      </div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <h4 class="text-sm mb-2">Nettoyage des métriques</h4>
+            <p class="text-secondary small mb-3">
+              Supprime les métriques brutes + agrégats plus anciens que {{ settings.metricsRetentionDays }} jours
+            </p>
+            <button 
+              class="btn btn-warning btn-sm"
+              @click="cleanMetrics"
+              :disabled="cleaningMetrics"
+            >
+              {{ cleaningMetrics ? 'Nettoyage en cours...' : 'Lancer le nettoyage' }}
+            </button>
+            <div v-if="cleanMessage" :class="['alert alert-sm mt-2', cleanSuccess ? 'alert-success' : 'alert-danger']">
+              {{ cleanMessage }}
+            </div>
+          </div>
+
+          <div class="col-md-6">
+            <h4 class="text-sm mb-2">Nettoyage des logs audit</h4>
+            <p class="text-secondary small mb-3">
+              Supprime les entrées audit plus anciennes que 90 jours (conformité)
+            </p>
+            <button 
+              class="btn btn-warning btn-sm"
+              @click="cleanAuditLogs"
+              :disabled="cleaningAuditLogs"
+            >
+              {{ cleaningAuditLogs ? 'Nettoyage en cours...' : 'Lancer le nettoyage' }}
+            </button>
+            <div v-if="auditCleanMessage" :class="['alert alert-sm mt-2', auditCleanSuccess ? 'alert-success' : 'alert-danger']">
+              {{ auditCleanMessage }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted } from 'vue'
+import { useAuthStore } from '../stores/auth'
+import apiClient from '../api'
+
+const auth = useAuthStore()
+
+const settings = ref({
+  baseUrl: '',
+  dbHost: '',
+  dbPort: '',
+  tlsEnabled: false,
+  metricsRetentionDays: 7,
+  smtpConfigured: false,
+  smtpHost: '',
+  smtpPort: '',
+  ntfyUrl: '',
+})
+
+const dbStatus = ref({
+  connected: false,
+  auditLogCount: 0,
+  metricsCount: 0,
+  hostsCount: 0,
+})
+
+const testingSmtp = ref(false)
+const smtpTestMessage = ref('')
+const smtpTestSuccess = ref(false)
+
+const testingNtfy = ref(false)
+const ntfyTestMessage = ref('')
+const ntfyTestSuccess = ref(false)
+
+const cleaningMetrics = ref(false)
+const cleanMessage = ref('')
+const cleanSuccess = ref(false)
+
+const cleaningAuditLogs = ref(false)
+const auditCleanMessage = ref('')
+const auditCleanSuccess = ref(false)
+
+function formatNumber(n) {
+  if (!n) return '0'
+  return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
+}
+
+async function fetchSettings() {
+  try {
+    const res = await apiClient.get('/api/v1/settings')
+    if (res.data) {
+      settings.value = res.data.settings || {}
+      dbStatus.value = res.data.dbStatus || {}
+    }
+  } catch (e) {
+    console.error('Erreur lors du chargement des paramètres:', e)
+  }
+}
+
+async function testSmtp() {
+  testingSmtp.value = true
+  smtpTestMessage.value = ''
+  try {
+    const res = await apiClient.post('/api/v1/settings/test-smtp')
+    smtpTestSuccess.value = true
+    smtpTestMessage.value = 'Connexion SMTP réussie!'
+  } catch (e) {
+    smtpTestSuccess.value = false
+    smtpTestMessage.value = `Erreur: ${e.response?.data?.error || e.message}`
+  } finally {
+    testingSmtp.value = false
+  }
+}
+
+async function testNtfy() {
+  testingNtfy.value = true
+  ntfyTestMessage.value = ''
+  try {
+    const res = await apiClient.post('/api/v1/settings/test-ntfy')
+    ntfyTestSuccess.value = true
+    ntfyTestMessage.value = 'Message test envoyé à ntfy.sh!'
+  } catch (e) {
+    ntfyTestSuccess.value = false
+    ntfyTestMessage.value = `Erreur: ${e.response?.data?.error || e.message}`
+  } finally {
+    testingNtfy.value = false
+  }
+}
+
+async function cleanMetrics() {
+  cleaningMetrics.value = true
+  cleanMessage.value = ''
+  try {
+    const res = await apiClient.post('/api/v1/settings/cleanup-metrics')
+    cleanSuccess.value = true
+    cleanMessage.value = res.data?.message || 'Nettoyage des métriques réussi'
+    // Refresh DB status
+    await fetchSettings()
+  } catch (e) {
+    cleanSuccess.value = false
+    cleanMessage.value = `Erreur: ${e.response?.data?.error || e.message}`
+  } finally {
+    cleaningMetrics.value = false
+  }
+}
+
+async function cleanAuditLogs() {
+  cleaningAuditLogs.value = true
+  auditCleanMessage.value = ''
+  try {
+    const res = await apiClient.post('/api/v1/settings/cleanup-audit')
+    auditCleanSuccess.value = true
+    auditCleanMessage.value = res.data?.message || 'Nettoyage des logs audit réussi'
+    // Refresh DB status
+    await fetchSettings()
+  } catch (e) {
+    auditCleanSuccess.value = false
+    auditCleanMessage.value = `Erreur: ${e.response?.data?.error || e.message}`
+  } finally {
+    cleaningAuditLogs.value = false
+  }
+}
+
+onMounted(() => {
+  fetchSettings()
+})
+</script>

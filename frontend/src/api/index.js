@@ -78,5 +78,7 @@ export default {
 
   // Users
   getUsers: () => api.get('/v1/users'),
+  createUser: (username, password, role) => api.post('/v1/users', { username, password, role }),
   updateUserRole: (id, role) => api.patch(`/v1/users/${id}/role`, { role }),
+  deleteUser: (id) => api.delete(`/v1/users/${id}`),
 }
