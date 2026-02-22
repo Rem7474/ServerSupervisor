@@ -67,11 +67,11 @@
       </div>
     </div>
 
-    <div v-if="metrics" class="row row-cards mb-4">
+    <div v-if="metrics" class="row row-cards mb-4 g-3">
       <div class="col-6 col-lg-3">
-        <div class="card card-sm">
+        <div class="card card-sm h-100">
           <div class="card-body">
-            <div class="subheader">CPU ({{ metrics.cpu_cores }} cores)</div>
+            <div class="subheader">CPU ({{ metrics.cpu_cores }} CORES)</div>
             <div class="h2 mb-0" :class="cpuColor(metrics.cpu_usage_percent)">
               {{ metrics.cpu_usage_percent?.toFixed(1) }}%
             </div>
@@ -80,7 +80,7 @@
         </div>
       </div>
       <div class="col-6 col-lg-3">
-        <div class="card card-sm">
+        <div class="card card-sm h-100">
           <div class="card-body">
             <div class="subheader">RAM</div>
             <div class="h2 mb-0" :class="memColor(metrics.memory_percent)">
@@ -91,17 +91,17 @@
         </div>
       </div>
       <div class="col-6 col-lg-3">
-        <div class="card card-sm">
+        <div class="card card-sm h-100">
           <div class="card-body">
-            <div class="subheader">Uptime</div>
+            <div class="subheader">UPTIME</div>
             <div class="h2 mb-0 text-primary">{{ formatUptime(metrics.uptime) }}</div>
           </div>
         </div>
       </div>
       <div class="col-6 col-lg-3">
-        <div class="card card-sm">
+        <div class="card card-sm h-100">
           <div class="card-body">
-            <div class="subheader">Load Avg</div>
+            <div class="subheader">LOAD AVG</div>
             <div class="h2 mb-0">{{ metrics.load_avg_1?.toFixed(2) }}</div>
             <div class="text-secondary small">{{ metrics.load_avg_5?.toFixed(2) }} / {{ metrics.load_avg_15?.toFixed(2) }}</div>
           </div>
@@ -113,11 +113,11 @@
       <div class="col-lg-6">
         <div class="card">
           <div class="card-header d-flex align-items-center justify-content-between">
-            <h3 class="card-title">CPU ({{ chartHours }}h)</h3>
+            <h3 class="card-title">CPU</h3>
             <div class="btn-group btn-group-sm">
-              <button v-for="h in [1, 6, 24, 168, 720, 8760]" :key="h" @click="loadHistory(h)"
-                :class="chartHours === h ? 'btn btn-primary' : 'btn btn-outline-secondary'">
-                {{ h >= 24 ? (h / 24) + 'j' : h + 'h' }}
+              <button v-for="opt in timeRangeOptions" :key="opt.hours" @click="loadHistory(opt.hours)"
+                :class="chartHours === opt.hours ? 'btn btn-primary' : 'btn btn-outline-secondary'">
+                {{ opt.label }}
               </button>
             </div>
           </div>
@@ -130,7 +130,7 @@
       <div class="col-lg-6">
         <div class="card">
           <div class="card-header">
-            <h3 class="card-title">Memoire ({{ chartHours }}h)</h3>
+            <h3 class="card-title">Memoire</h3>
           </div>
           <div class="card-body" style="height: 12rem;">
             <Line v-if="memChartData" :data="memChartData" :options="chartOptions" class="h-100" />
@@ -271,7 +271,7 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="cmd in aptHistory" :key="cmd.id">
+            <tr v-for="cmd in displayedAptHistory" :key="cmd.id">
               <td>{{ formatDate(cmd.created_at) }}</td>
               <td><code>apt {{ cmd.command }}</code></td>
               <td>
@@ -292,13 +292,29 @@
           </tbody>
         </table>
       </div>
+      <div v-if="aptHistory.length > 3 && !showFullAptHistory" class="card-footer text-center">
+        <button @click="showFullAptHistory = true" class="btn btn-outline-primary btn-sm">
+          Afficher plus ({{ aptHistory.length - 3 }} autres)
+        </button>
+      </div>
     </div>
 
     
       </div>
 
       <!-- Colonne droite: Console Live -->
-      <div style="width: 38%; min-width: 450px; display: flex; flex-direction: column;">
+      <div 
+        v-show="showConsole"
+        class="console-panel"
+        style="
+          width: 38%; 
+          min-width: 450px; 
+          display: flex; 
+          flex-direction: column;
+          transition: all 0.3s ease-in-out;
+          overflow: hidden;
+        "
+      >
         <div class="card" style="display: flex; flex-direction: column; height: 100%;">
           <div class="card-header d-flex align-items-center justify-content-between">
             <h3 class="card-title">
@@ -310,18 +326,31 @@
               </svg>
               Console Live
             </h3>
-            <button 
-              v-if="liveCommand" 
-              @click="closeLiveConsole" 
-              class="btn btn-sm btn-ghost-secondary"
-              title="Fermer la console"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                <path d="M18 6l-12 12" />
-                <path d="M6 6l12 12" />
-              </svg>
-            </button>
+            <div class="d-flex gap-2">
+              <button 
+                @click="showConsole = false" 
+                class="btn btn-sm btn-ghost-secondary"
+                title="Masquer la console"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                  <path d="M17 6l-10 10" />
+                  <path d="M7 6l10 10" />
+                </svg>
+              </button>
+              <button 
+                v-if="liveCommand" 
+                @click="closeLiveConsole" 
+                class="btn btn-sm btn-ghost-secondary"
+                title="Fermer la console"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                  <path d="M18 6l-12 12" />
+                  <path d="M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
           </div>
           <div class="card-body d-flex flex-column" style="flex: 1; min-height: 0; padding: 0;">
             <!-- État vide -->
@@ -370,6 +399,23 @@
           </div>
         </div>
       </div>
+
+      <!-- Bouton pour afficher la console quand cachée -->
+      <button 
+        v-show="!showConsole"
+        @click="showConsole = true" 
+        class="btn btn-sm btn-outline-secondary ms-auto"
+        style="position: absolute; bottom: 1rem; right: 1rem; z-index: 10;"
+        title="Afficher la console"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+          <path d="M8 9l3 3l-3 3" />
+          <path d="M13 15l3 0" />
+          <path d="M3 4m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z" />
+        </svg>
+        Console
+      </button>
     </div>
   </div>
 </template>
@@ -406,6 +452,7 @@ const metrics = ref(null)
 const containers = ref([])
 const aptStatus = ref(null)
 const aptHistory = ref([])
+const showFullAptHistory = ref(false)
 const auditLogs = ref([])
 const metricsHistory = ref([])
 const chartHours = ref(24)
@@ -416,9 +463,21 @@ const saving = ref(false)
 const editForm = ref({ name: '', hostname: '', ip_address: '', os: '' })
 const liveCommand = ref(null)
 const consoleOutput = ref(null)
+const showConsole = ref(true)
 let streamWs = null
 const auth = useAuthStore()
 const canRunApt = computed(() => auth.role === 'admin' || auth.role === 'operator')
+
+// Time range options for metrics
+const timeRangeOptions = [
+  { hours: 1, label: '1h' },
+  { hours: 6, label: '6h' },
+  { hours: 24, label: '24h' },
+  { hours: 168, label: '7d' },
+  { hours: 720, label: '30d' },
+  { hours: 2160, label: '90d' },
+  { hours: 8760, label: '1y' },
+]
 
 const renderedConsoleOutput = computed(() => {
   if (!liveCommand.value) return ''
@@ -474,8 +533,17 @@ const { wsStatus, wsError, retryCount, reconnect } = useWebSocket(`/api/v1/ws/ho
 async function loadHistory(hours) {
   chartHours.value = hours
   try {
-    const res = await apiClient.getMetricsHistory(hostId, hours)
-    const history = Array.isArray(res.data) ? res.data : []
+    let history
+    
+    // Use aggregated metrics for periods > 24 hours
+    if (hours > 24) {
+      const res = await apiClient.getMetricsAggregated(hostId, hours)
+      history = Array.isArray(res.data?.metrics) ? res.data.metrics : []
+    } else {
+      const res = await apiClient.getMetricsHistory(hostId, hours)
+      history = Array.isArray(res.data) ? res.data : []
+    }
+    
     metricsHistory.value = history
     if (!history.length) {
       cpuChartData.value = null
@@ -489,9 +557,18 @@ async function loadHistory(hours) {
 }
 
 function buildCharts() {
-  const labels = metricsHistory.value.map(m =>
-    chartHours.value >= 24 ? dayjs(m.timestamp).format('DD/MM HH:mm') : dayjs(m.timestamp).format('HH:mm')
-  )
+  const labels = metricsHistory.value.map(m => {
+    const date = dayjs(m.timestamp)
+    // Format labels based on time range
+    if (chartHours.value <= 24) {
+      return date.format('HH:mm')
+    } else if (chartHours.value <= 720) { // 30 days
+      return date.format('DD/MM HH:mm')
+    } else {
+      return date.format('DD/MM')
+    }
+  })
+  
   cpuChartData.value = {
     labels,
     datasets: [{
@@ -499,6 +576,7 @@ function buildCharts() {
       borderColor: '#3b82f6',
       backgroundColor: 'rgba(59, 130, 246, 0.1)',
       fill: true,
+      tension: 0.3,
     }],
   }
   memChartData.value = {
@@ -508,6 +586,7 @@ function buildCharts() {
       borderColor: '#10b981',
       backgroundColor: 'rgba(16, 185, 129, 0.1)',
       fill: true,
+      tension: 0.3,
     }],
   }
 }
@@ -591,6 +670,13 @@ function cpuColor(pct) {
   if (pct > 70) return 'text-yellow'
   return 'text-green'
 }
+
+const displayedAptHistory = computed(() => {
+  if (showFullAptHistory.value) {
+    return aptHistory.value
+  }
+  return aptHistory.value.slice(0, 3)
+})
 
 function memColor(pct) {
   if (!pct) return 'text-secondary'

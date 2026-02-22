@@ -143,7 +143,7 @@
             </p>
             <button 
               class="btn btn-warning btn-sm"
-              @click="cleanMetrics"
+              @click="requestCleanMetrics"
               :disabled="cleaningMetrics"
             >
               {{ cleaningMetrics ? 'Nettoyage en cours...' : 'Lancer le nettoyage' }}
@@ -160,13 +160,55 @@
             </p>
             <button 
               class="btn btn-warning btn-sm"
-              @click="cleanAuditLogs"
+              @click="requestCleanAuditLogs"
               :disabled="cleaningAuditLogs"
             >
               {{ cleaningAuditLogs ? 'Nettoyage en cours...' : 'Lancer le nettoyage' }}
             </button>
             <div v-if="auditCleanMessage" :class="['alert alert-sm mt-2', auditCleanSuccess ? 'alert-success' : 'alert-danger']">
               {{ auditCleanMessage }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Confirmation Modale Cleanup Metrics -->
+    <div v-if="showCleanMetricsModal" class="modal modal-blur fade show" style="display: block; background: rgba(0,0,0,0.5);">
+      <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content">
+          <button @click="showCleanMetricsModal = false" type="button" class="btn-close" aria-label="Close"></button>
+          <div class="modal-status bg-warning"></div>
+          <div class="modal-body text-center py-4">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon mb-2 text-warning icon-lg" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 9m-6 0a6 6 0 1 0 12 0a6 6 0 1 0 -12 0" /><path d="M12 7v5" /><path d="M12 13v.01" /></svg>
+            <h3>Confirmer le nettoyage des métriques</h3>
+            <div class="text-secondary mb-3">Les métriques plus anciennes que {{ settings.metricsRetentionDays }} jours seront supprimées définitivement.</div>
+          </div>
+          <div class="modal-footer">
+            <div class="w-100 d-flex gap-2">
+              <button @click="showCleanMetricsModal = false" type="button" class="btn btn-link link-secondary w-100">Annuler</button>
+              <button @click="cleanMetrics(); showCleanMetricsModal = false;" type="button" class="btn btn-warning w-100">Continuer</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Confirmation Modale Cleanup Audit Logs -->
+    <div v-if="showCleanAuditModal" class="modal modal-blur fade show" style="display: block; background: rgba(0,0,0,0.5);">
+      <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content">
+          <button @click="showCleanAuditModal = false" type="button" class="btn-close" aria-label="Close"></button>
+          <div class="modal-status bg-warning"></div>
+          <div class="modal-body text-center py-4">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon mb-2 text-warning icon-lg" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 9m-6 0a6 6 0 1 0 12 0a6 6 0 1 0 -12 0" /><path d="M12 7v5" /><path d="M12 13v.01" /></svg>
+            <h3>Confirmer le nettoyage des logs audit</h3>
+            <div class="text-secondary mb-3">Les entrées audit plus anciennes que 90 jours seront supprimées. Cette action est irréversible.</div>
+          </div>
+          <div class="modal-footer">
+            <div class="w-100 d-flex gap-2">
+              <button @click="showCleanAuditModal = false" type="button" class="btn btn-link link-secondary w-100">Annuler</button>
+              <button @click="cleanAuditLogs(); showCleanAuditModal = false;" type="button" class="btn btn-warning w-100">Continuer</button>
             </div>
           </div>
         </div>
@@ -216,6 +258,17 @@ const cleanSuccess = ref(false)
 const cleaningAuditLogs = ref(false)
 const auditCleanMessage = ref('')
 const auditCleanSuccess = ref(false)
+
+const showCleanMetricsModal = ref(false)
+const showCleanAuditModal = ref(false)
+
+function requestCleanMetrics() {
+  showCleanMetricsModal.value = true
+}
+
+function requestCleanAuditLogs() {
+  showCleanAuditModal.value = true
+}
 
 function formatNumber(n) {
   if (!n) return '0'

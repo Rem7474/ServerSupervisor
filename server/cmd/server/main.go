@@ -44,6 +44,11 @@ func main() {
 	}
 	defer db.Close()
 
+	// Create performance indices
+	if err := db.CreateIndices(); err != nil {
+		log.Printf("Warning: failed to create database indices: %v", err)
+	}
+
 	// Cleanup stalled commands at startup (commands older than 10 minutes)
 	if err := db.CleanupStalledCommands(10); err != nil {
 		log.Printf("Warning: failed to cleanup stalled commands: %v", err)

@@ -628,6 +628,34 @@ func (db *DB) GetMetricsHistory(hostID string, hours int) ([]models.SystemMetric
 	return metrics, nil
 }
 
+// GetMetricsAggregatesByType returns aggregated metrics (hourly or daily) to reduce data points
+func (db *DB) GetMetricsAggregatesByType(hostID string, hours int, aggregationType string) ([]models.SystemMetrics, error) {
+	rows, err := db.conn.Query(
+		`SELECT id, host_id, timestamp, cpu_usage_percent, cpu_cores, load_avg_1, load_avg_5, load_avg_15,
+		 memory_total, memory_used, memory_free, memory_percent, swap_total, swap_used,
+		 network_rx_bytes, network_tx_bytes, uptime
+		 FROM metrics_aggregates
+		 WHERE host_id = $1 AND aggregation_type = $2 AND timestamp > NOW() - INTERVAL '1 hour' * $3
+		 ORDER BY timestamp ASC`, hostID, aggregationType, hours,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var metrics []models.SystemMetrics
+	for rows.Next() {
+		var m models.SystemMetrics
+		if err := rows.Scan(&m.ID, &m.HostID, &m.Timestamp, &m.CPUUsagePercent, &m.CPUCores,
+			&m.LoadAvg1, &m.LoadAvg5, &m.LoadAvg15, &m.MemoryTotal, &m.MemoryUsed, &m.MemoryFree, &m.MemoryPercent,
+			&m.SwapTotal, &m.SwapUsed, &m.NetworkRxBytes, &m.NetworkTxBytes, &m.Uptime); err != nil {
+			continue
+		}
+		metrics = append(metrics, m)
+	}
+	return metrics, nil
+}
+
 func (db *DB) GetMetricsSummary(hours int, bucketMinutes int) ([]models.SystemMetricsSummary, error) {
 	if bucketMinutes <= 0 {
 		bucketMinutes = 5

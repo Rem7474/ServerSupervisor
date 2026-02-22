@@ -50,6 +50,7 @@ export default {
 
   // Metrics
   getMetricsHistory: (hostId, hours = 24) => api.get(`/v1/hosts/${hostId}/metrics/history?hours=${hours}`),
+  getMetricsAggregated: (hostId, hours = 24) => api.get(`/v1/hosts/${hostId}/metrics/aggregated?hours=${hours}`),
   getMetricsSummary: (hours = 24, bucketMinutes = 5) =>
     api.get(`/v1/metrics/summary?hours=${hours}&bucket_minutes=${bucketMinutes}`),
 

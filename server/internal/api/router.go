@@ -79,6 +79,7 @@ func SetupRouter(db *database.DB, cfg *config.Config) *gin.Engine {
 
 		// Metrics
 		api.GET("/hosts/:id/metrics/history", agentH.GetMetricsHistory)
+		api.GET("/hosts/:id/metrics/aggregated", agentH.GetMetricsAggregated)
 		api.GET("/metrics/summary", agentH.GetMetricsSummary)
 
 		// Docker

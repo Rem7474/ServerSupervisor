@@ -233,6 +233,56 @@ func (h *AgentHandler) GetMetricsHistory(c *gin.Context) {
 	c.JSON(http.StatusOK, metrics)
 }
 
+// GetMetricsAggregated returns metrics with intelligent aggregation based on time range
+// - 0-24h: raw 5min metrics
+// - 24-720h (30d): hourly aggregates
+// - 720h+ (>30d): daily aggregates
+func (h *AgentHandler) GetMetricsAggregated(c *gin.Context) {
+	hostID := c.Param("id")
+	hours, _ := strconv.Atoi(c.DefaultQuery("hours", "24"))
+
+	// Validate hours parameter
+	if hours <= 0 {
+		hours = 24
+	}
+	if hours > 8760 { // max 1 year
+		hours = 8760
+	}
+
+	var metrics interface{}
+	var err error
+	var aggregationType string
+
+	// Determine which aggregation to use based on time range
+	if hours <= 24 {
+		// Raw metrics (5-minute intervals)
+		metrics, err = h.db.GetMetricsHistory(hostID, hours)
+		aggregationType = "raw"
+	} else if hours <= 720 { // 30 days
+		// Hourly aggregates
+		metrics, err = h.db.GetMetricsAggregatesByType(hostID, hours, "hour")
+		aggregationType = "hour"
+	} else {
+		// Daily aggregates
+		metrics, err = h.db.GetMetricsAggregatesByType(hostID, hours, "day")
+		aggregationType = "day"
+	}
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch aggregated metrics"})
+		return
+	}
+	if metrics == nil {
+		metrics = []interface{}{}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"aggregation_type": aggregationType,
+		"hours":            hours,
+		"metrics":          metrics,
+	})
+}
+
 // GetMetricsSummary returns global metrics summary for dashboard charts
 func (h *AgentHandler) GetMetricsSummary(c *gin.Context) {
 	hours, _ := strconv.Atoi(c.DefaultQuery("hours", "24"))
