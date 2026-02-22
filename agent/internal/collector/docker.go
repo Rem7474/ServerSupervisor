@@ -308,35 +308,55 @@ func CollectComposeProjects() ([]ComposeProject, error) {
 		return nil, fmt.Errorf("docker not found in PATH")
 	}
 
-	out, err := exec.CommandContext(ctx, "docker", "ps", "-a",
-		"--filter", "label=com.docker.compose.project",
-		"--format", `{{index .Labels "com.docker.compose.project"}}|{{index .Labels "com.docker.compose.project.working_dir"}}|{{index .Labels "com.docker.compose.project.config_files"}}|{{index .Labels "com.docker.compose.service"}}`,
-	).Output()
+	// Get all container IDs with compose labels
+	out, err := exec.CommandContext(ctx, "docker", "ps", "-a", "-q",
+		"--filter", "label=com.docker.compose.project").Output()
 	if err != nil {
 		return nil, fmt.Errorf("docker ps compose failed: %w", err)
 	}
 
+	containerIDs := strings.Fields(strings.TrimSpace(string(out)))
+	if len(containerIDs) == 0 {
+		log.Printf("No Docker Compose containers found")
+		return []ComposeProject{}, nil
+	}
+
+	// Inspect all containers to get labels
+	args := append([]string{"inspect"}, containerIDs...)
+	inspectOut, err := exec.CommandContext(ctx, "docker", args...).Output()
+	if err != nil {
+		return nil, fmt.Errorf("docker inspect failed: %w", err)
+	}
+
+	// Parse JSON output
+	var inspectData []struct {
+		Config struct {
+			Labels map[string]string `json:"Labels"`
+		} `json:"Config"`
+	}
+	if err := json.Unmarshal(inspectOut, &inspectData); err != nil {
+		return nil, fmt.Errorf("failed to parse inspect output: %w", err)
+	}
+
+	// Build projects map from labels
 	projects := make(map[string]*ComposeProject)
-	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
-		if line == "" {
-			continue
-		}
-		parts := strings.SplitN(line, "|", 4)
-		if len(parts) < 4 {
-			continue
-		}
-		name, workDir, configFile, service := parts[0], parts[1], parts[2], parts[3]
+	for _, data := range inspectData {
+		labels := data.Config.Labels
+		name := labels["com.docker.compose.project"]
 		if name == "" {
 			continue
 		}
+
 		if _, exists := projects[name]; !exists {
 			projects[name] = &ComposeProject{
 				Name:       name,
-				WorkingDir: workDir,
-				ConfigFile: configFile,
+				WorkingDir: labels["com.docker.compose.project.working_dir"],
+				ConfigFile: labels["com.docker.compose.project.config_files"],
 				Services:   []string{},
 			}
 		}
+
+		service := labels["com.docker.compose.service"]
 		if service != "" {
 			// avoid duplicates
 			found := false
@@ -352,6 +372,7 @@ func CollectComposeProjects() ([]ComposeProject, error) {
 		}
 	}
 
+	// Get raw config for each project
 	var result []ComposeProject
 	for _, p := range projects {
 		if p.WorkingDir != "" {
