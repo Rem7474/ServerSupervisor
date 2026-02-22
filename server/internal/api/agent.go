@@ -336,6 +336,11 @@ func (h *AgentHandler) LogAuditAction(c *gin.Context) {
 		return
 	}
 
+	// If this is an apt update action, also update the last_update timestamp
+	if audit.Action == "update" && audit.Status == "completed" {
+		_ = h.db.TouchAptLastAction(hostID, "update")
+	}
+
 	c.JSON(http.StatusOK, gin.H{"success": true, "message": "Audit log recorded"})
 }
 

@@ -451,7 +451,7 @@ const saving = ref(false)
 const editForm = ref({ name: '', hostname: '', ip_address: '', os: '' })
 const liveCommand = ref(null)
 const consoleOutput = ref(null)
-const showConsole = ref(true)
+const showConsole = ref(false)
 let streamWs = null
 const auth = useAuthStore()
 const canRunApt = computed(() => auth.role === 'admin' || auth.role === 'operator')

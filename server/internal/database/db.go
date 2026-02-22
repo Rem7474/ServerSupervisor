@@ -1486,3 +1486,43 @@ func (db *DB) CountHosts() (int64, error) {
 	err := db.conn.QueryRow(`SELECT COUNT(*) FROM hosts`).Scan(&count)
 	return count, err
 }
+
+// GetAptHistoryWithAgentUpdates returns combined APT command history and agent-initiated updates from audit logs
+func (db *DB) GetAptHistoryWithAgentUpdates(hostID string, limit int) ([]models.AptCommand, error) {
+	rows, err := db.conn.Query(`
+		SELECT id, host_id, command, status, output, triggered_by, created_at, started_at, ended_at, audit_log_id FROM (
+			-- APT commands from apt_commands table
+			SELECT 
+				id, host_id, command, status, output, triggered_by, 
+				created_at, started_at, ended_at, NULL::BIGINT as audit_log_id
+			FROM apt_commands 
+			WHERE host_id = $1
+			
+			UNION ALL
+			
+			-- Agent-initiated updates from audit_logs table (only "update" actions by agent)
+			SELECT 
+				id, host_id, action as command, status, details as output, username as triggered_by,
+				created_at, NULL::TIMESTAMP, NULL::TIMESTAMP, id as audit_log_id
+			FROM audit_logs
+			WHERE host_id = $1 AND action = 'update' AND username = 'agent'
+		) combined
+		ORDER BY created_at DESC
+		LIMIT $2
+	`, hostID, limit)
+
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var cmds []models.AptCommand
+	for rows.Next() {
+		var c models.AptCommand
+		if err := rows.Scan(&c.ID, &c.HostID, &c.Command, &c.Status, &c.Output, &c.TriggeredBy, &c.CreatedAt, &c.StartedAt, &c.EndedAt, &c.AuditLogID); err != nil {
+			continue
+		}
+		cmds = append(cmds, c)
+	}
+	return cmds, nil
+}

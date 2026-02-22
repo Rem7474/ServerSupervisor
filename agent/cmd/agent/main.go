@@ -16,7 +16,7 @@ import (
 	"github.com/serversupervisor/agent/internal/sender"
 )
 
-const AgentVersion = "1.2.0"
+const AgentVersion = "1.3.0"
 
 // commandMutex ensures only one APT command runs at a time
 var commandMutex sync.Mutex

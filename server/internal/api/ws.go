@@ -393,7 +393,7 @@ func (h *WSHandler) sendHostSnapshot(conn *websocket.Conn, hostID string) error 
 	metrics, _ := h.db.GetLatestMetrics(hostID)
 	containers, _ := h.db.GetDockerContainers(hostID)
 	aptStatus, _ := h.db.GetAptStatus(hostID)
-	aptHistory, _ := h.db.GetAptCommandHistory(hostID, 50)
+	aptHistory, _ := h.db.GetAptHistoryWithAgentUpdates(hostID, 50)
 	auditLogs, _ := h.db.GetAuditLogsByHost(hostID, 50)
 
 	payload := gin.H{
