@@ -292,6 +292,16 @@ func (db *DB) migrate() error {
 			updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_docker_networks_host ON docker_networks(host_id)`,
+		// Migration: Container environment variables (for topology inference)
+		`CREATE TABLE IF NOT EXISTS container_envs (
+			id BIGSERIAL PRIMARY KEY,
+			host_id VARCHAR(64) REFERENCES hosts(id) ON DELETE CASCADE,
+			container_name VARCHAR(255) NOT NULL,
+			env_vars JSONB DEFAULT '{}'::jsonb,
+			updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_container_envs_host ON container_envs(host_id)`,
+		`CREATE UNIQUE INDEX IF NOT EXISTS idx_container_envs_host_name ON container_envs(host_id, container_name)`,
 		// Migration: Network topology configuration (persistent)
 		`CREATE TABLE IF NOT EXISTS network_topology_config (
 			id SERIAL PRIMARY KEY,
@@ -305,8 +315,10 @@ func (db *DB) migrate() error {
 			updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 		)`,
 		// Insert default config if not exists
-		`INSERT INTO network_topology_config (root_label) 
-		 SELECT 'Infrastructure' WHERE NOT EXISTS (SELECT 1 FROM network_topology_config)`,
+		`INSERT INTO network_topology_config (id, root_label) 
+		 SELECT 1, 'Infrastructure' WHERE NOT EXISTS (SELECT 1 FROM network_topology_config)`,
+		// Add unique constraint for singleton pattern
+		`ALTER TABLE IF EXISTS network_topology_config ADD CONSTRAINT network_topology_config_singleton UNIQUE (id) WHERE id = 1`,
 	}
 
 	for _, m := range migrations {
@@ -1614,6 +1626,71 @@ func (db *DB) GetAllDockerNetworks() ([]models.DockerNetwork, error) {
 	return networks, nil
 }
 
+func (db *DB) UpsertContainerEnvs(hostID string, envs []models.ContainerEnv) error {
+	if len(envs) == 0 {
+		return nil
+	}
+	for _, env := range envs {
+		envVarsJSON, _ := json.Marshal(env.EnvVars)
+		_, err := db.conn.Exec(
+			`INSERT INTO container_envs (host_id, container_name, env_vars, updated_at)
+			 VALUES ($1, $2, $3, NOW())
+			 ON CONFLICT(host_id, container_name) DO UPDATE SET
+			 env_vars = $3, updated_at = NOW()`,
+			hostID, env.ContainerName, envVarsJSON,
+		)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (db *DB) GetContainerEnvsByHost(hostID string) ([]models.ContainerEnv, error) {
+	rows, err := db.conn.Query(
+		`SELECT container_name, env_vars FROM container_envs WHERE host_id = $1`,
+		hostID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var envs []models.ContainerEnv
+	for rows.Next() {
+		var env models.ContainerEnv
+		var envVarsJSON []byte
+		if err := rows.Scan(&env.ContainerName, &envVarsJSON); err != nil {
+			continue
+		}
+		json.Unmarshal(envVarsJSON, &env.EnvVars)
+		envs = append(envs, env)
+	}
+	return envs, nil
+}
+
+func (db *DB) GetAllContainerEnvs() ([]models.ContainerEnv, error) {
+	rows, err := db.conn.Query(
+		`SELECT container_name, env_vars FROM container_envs ORDER BY host_id, container_name`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var envs []models.ContainerEnv
+	for rows.Next() {
+		var env models.ContainerEnv
+		var envVarsJSON []byte
+		if err := rows.Scan(&env.ContainerName, &envVarsJSON); err != nil {
+			continue
+		}
+		json.Unmarshal(envVarsJSON, &env.EnvVars)
+		envs = append(envs, env)
+	}
+	return envs, nil
+}
+
 func (db *DB) GetNetworkTopologyConfig() (*models.NetworkTopologyConfig, error) {
 	var cfg models.NetworkTopologyConfig
 	var excludedPortsJSON []byte
@@ -1645,10 +1722,17 @@ func (db *DB) GetNetworkTopologyConfig() (*models.NetworkTopologyConfig, error) 
 func (db *DB) SaveNetworkTopologyConfig(cfg *models.NetworkTopologyConfig) error {
 	excludedPortsJSON, _ := json.Marshal(cfg.ExcludedPorts)
 	_, err := db.conn.Exec(
-		`UPDATE network_topology_config SET
-		 root_label = $1, root_ip = $2, excluded_ports = $3::jsonb,
-		 service_map = $4, show_proxy_links = $5, host_overrides = $6,
-		 manual_services = $7, updated_at = NOW()`,
+		`INSERT INTO network_topology_config (id, root_label, root_ip, excluded_ports, service_map, show_proxy_links, host_overrides, manual_services, updated_at)
+		 VALUES (1, $1, $2, $3::jsonb, $4, $5, $6, $7, NOW())
+		 ON CONFLICT(id) DO UPDATE SET
+		   root_label = EXCLUDED.root_label,
+		   root_ip = EXCLUDED.root_ip,
+		   excluded_ports = EXCLUDED.excluded_ports,
+		   service_map = EXCLUDED.service_map,
+		   show_proxy_links = EXCLUDED.show_proxy_links,
+		   host_overrides = EXCLUDED.host_overrides,
+		   manual_services = EXCLUDED.manual_services,
+		   updated_at = NOW()`,
 		cfg.RootLabel, cfg.RootIP, excludedPortsJSON,
 		cfg.ServiceMap, cfg.ShowProxyLinks, cfg.HostOverrides,
 		cfg.ManualServices,

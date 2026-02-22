@@ -170,53 +170,6 @@ const buildHierarchy = () => {
   return d3.hierarchy(root)
 }
 
-const buildProxyOnlyHierarchy = () => {
-  const servicesByHost = new Map()
-  for (const service of props.services || []) {
-    if (!service?.hostId) continue
-    if (!servicesByHost.has(service.hostId)) {
-      servicesByHost.set(service.hostId, [])
-    }
-    servicesByHost.get(service.hostId).push(service)
-  }
-
-  // Flatten all services directly under root
-  const allServices = []
-  for (const host of props.data) {
-    const hostServices = servicesByHost.get(host.id) || []
-    for (const service of hostServices) {
-      const internalPort = Number(service.internalPort || 0)
-      const externalPort = Number(service.externalPort || 0)
-      const path = service.path || '/'
-      const domain = service.domain || ''
-      const name = service.name || 'Service'
-      const label = domain ? `${domain}${path}` : path
-      allServices.push({
-        id: `service-${host.id}-${service.id}`,
-        name,
-        subtitle: label,
-        internalPort,
-        externalPort,
-        type: 'service',
-        protocol: 'tcp',
-        port: internalPort,
-        hostId: host.id,
-        tags: service.tags || ''
-      })
-    }
-  }
-
-  const root = {
-    id: 'root',
-    name: props.rootLabel || 'root',
-    type: 'root',
-    children: allServices
-  }
-
-  return d3.hierarchy(root)
-}
-
-
 const render = () => {
   if (!svgRef.value) return
 
@@ -231,7 +184,7 @@ const render = () => {
     simulation = null
   }
 
-  const root = props.showProxyLinks ? buildProxyOnlyHierarchy() : buildHierarchy()
+  const root = buildHierarchy()
   if (!root.children || root.children.length === 0) return
 
   const svg = d3.select(svgRef.value)
@@ -536,6 +489,31 @@ const render = () => {
     .style('font-size', '11px')
     .style('fill', '#e2e8f0')
     .text(d => d.data.name)
+
+  // Draw proxy links if enabled
+  if (props.showProxyLinks) {
+    const rootNode = treeData.descendants().find(d => d.data.type === 'root')
+    const proxyTargets = treeData.descendants().filter(
+      d => (d.data.type === 'service' || d.data.type === 'port') && d.data.isProxyLinked
+    )
+
+    if (rootNode && proxyTargets.length > 0) {
+      proxyLinkGroup
+        .selectAll('.proxy-link')
+        .data(proxyTargets)
+        .enter()
+        .append('path')
+        .attr('class', 'proxy-link')
+        .attr('d', (d) => {
+          const sx = rootNode.y + 100
+          const sy = rootNode.x + 40
+          const ex = d.y + 100
+          const ey = d.x + 40
+          const mx = (sx + ex) / 2
+          return `M${sx},${sy} C${mx},${sy} ${mx},${ey} ${ex},${ey}`
+        })
+    }
+  }
 }
 
 onMounted(() => {
@@ -554,9 +532,11 @@ onMounted(() => {
 })
 
 // Watch for data changes
-watch(() => props.data, () => {
-  render()
-}, { deep: true })
+watch(
+  () => [props.data, props.services, props.excludedPorts, props.hostPortOverrides, props.showProxyLinks, props.serviceMap, props.rootLabel, props.rootIp],
+  () => { render() },
+  { deep: true }
+)
 </script>
 
 <style scoped>

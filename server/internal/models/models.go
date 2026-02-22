@@ -243,12 +243,14 @@ type VersionComparison struct {
 // ========== Agent Heartbeat / Full Report ==========
 
 type AgentReport struct {
-	HostID       string         `json:"host_id"`
-	AgentVersion string         `json:"agent_version"`
-	Metrics      *SystemMetrics `json:"metrics,omitempty"`
-	Docker       *DockerReport  `json:"docker,omitempty"`
-	AptStatus    *AptStatus     `json:"apt_status,omitempty"`
-	Timestamp    time.Time      `json:"timestamp"`
+	HostID         string         `json:"host_id"`
+	AgentVersion   string         `json:"agent_version"`
+	Metrics        *SystemMetrics `json:"metrics,omitempty"`
+	Docker         *DockerReport  `json:"docker,omitempty"`
+	AptStatus      *AptStatus     `json:"apt_status,omitempty"`
+	DockerNetworks []DockerNetwork `json:"docker_networks,omitempty"`
+	ContainerEnvs  []ContainerEnv  `json:"container_envs,omitempty"`
+	Timestamp      time.Time      `json:"timestamp"`
 }
 
 // ========== Commands (server → agent) ==========
@@ -378,6 +380,12 @@ type DockerNetwork struct {
 	Scope        string    `json:"scope" db:"scope"`     // local, swarm
 	ContainerIDs []string  `json:"container_ids" db:"-"` // Stored as JSONB, not queried directly
 	UpdatedAt    time.Time `json:"updated_at" db:"updated_at"`
+}
+
+// ContainerEnv represents container environment variables for topology inference
+type ContainerEnv struct {
+	ContainerName string            `json:"container_name"`
+	EnvVars       map[string]string `json:"env_vars"`
 }
 
 // TopologyLink represents an inferred logical link between two services

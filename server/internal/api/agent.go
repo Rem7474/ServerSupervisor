@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
@@ -98,6 +99,33 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 		if err := h.db.UpsertAptStatus(report.AptStatus); err != nil {
 			// Log error but don't fail the entire request
 			c.Header("X-APT-Error", err.Error())
+		}
+	}
+
+	// Store Docker networks
+	if len(report.DockerNetworks) > 0 {
+		dbNetworks := make([]models.DockerNetwork, 0, len(report.DockerNetworks))
+		for _, n := range report.DockerNetworks {
+			dbNetworks = append(dbNetworks, models.DockerNetwork{
+				ID:           fmt.Sprintf("%s-%s", hostID, n.NetworkID),
+				HostID:       hostID,
+				NetworkID:    n.NetworkID,
+				Name:         n.Name,
+				Driver:       n.Driver,
+				Scope:        n.Scope,
+				ContainerIDs: n.ContainerIDs,
+				UpdatedAt:    time.Now(),
+			})
+		}
+		if err := h.db.UpsertDockerNetworks(hostID, dbNetworks); err != nil {
+			log.Printf("Warning: failed to store docker networks for host %s: %v", hostID, err)
+		}
+	}
+
+	// Store container env vars (for topology inference)
+	if len(report.ContainerEnvs) > 0 {
+		if err := h.db.UpsertContainerEnvs(hostID, report.ContainerEnvs); err != nil {
+			log.Printf("Warning: failed to store container envs for host %s: %v", hostID, err)
 		}
 	}
 

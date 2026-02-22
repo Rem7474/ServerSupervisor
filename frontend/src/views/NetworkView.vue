@@ -397,6 +397,7 @@ const excludedPortsText = ref('')
 const networkServices = ref([])
 const hostPortConfig = ref([])
 const topologyConfigLoaded = ref(false)
+const configAppliedFromWS = ref(false)
 const auth = useAuthStore()
 
 // Save view mode to localStorage only (local UI preference)
@@ -820,11 +821,12 @@ const { wsStatus, wsError, retryCount, reconnect } = useWebSocket('/api/v1/ws/ne
   containers.value = payload.containers || []
   networks.value = payload.networks || []
   
-  // Update config from WebSocket if provided (for auto-sync across clients)
-  if (payload.config) {
+  // Apply config from WebSocket only once, on initial connection, and only if not already loaded from REST
+  if (payload.config && !configAppliedFromWS.value && !topologyConfigLoaded.value) {
     rootNodeName.value = payload.config.root_label || rootNodeName.value
     rootNodeIp.value = payload.config.root_ip || rootNodeIp.value
     showProxyLinks.value = payload.config.show_proxy_links !== false
+    configAppliedFromWS.value = true
   }
   
   ensureHostPortConfig()
