@@ -108,13 +108,6 @@
             <textarea v-model="servicePortMapText" rows="2" class="form-control form-control-sm" placeholder="80=Nginx Proxy Manager&#10;3000=Vaultwarden"></textarea>
           </div>
           <div class="network-config-item mt-3">
-            <label class="form-label">Liens proxy</label>
-            <label class="form-check form-switch">
-              <input v-model="showProxyLinks" class="form-check-input" type="checkbox" />
-              <span class="form-check-label">Afficher les liens explicites Proxy → Service</span>
-            </label>
-          </div>
-          <div class="network-config-item mt-3">
             <div class="d-flex align-items-center justify-content-between mb-2">
               <label class="form-label mb-0">Services exposes via proxy</label>
               <button class="btn btn-outline-light btn-sm" @click="addServiceRow">
@@ -223,6 +216,13 @@
           </div>
         </div>
         <div v-else class="network-graph-surface">
+          <div class="network-topology-toolbar">
+            <div class="text-secondary small">Liens proxy</div>
+            <label class="form-check form-switch m-0">
+              <input v-model="showProxyLinks" class="form-check-input" type="checkbox" />
+              <span class="form-check-label">Afficher Proxy → Service</span>
+            </label>
+          </div>
           <NetworkGraph
             :data="graphHosts"
             :root-label="rootNodeName"
@@ -765,7 +765,7 @@ onUnmounted(() => {
 }
 
 .network-topology-body {
-  height: 68vh;
+  height: auto;
   min-height: 520px;
   padding: 0;
   display: flex;
@@ -773,7 +773,7 @@ onUnmounted(() => {
 }
 
 .network-config {
-  padding: 16px 18px 12px;
+  padding: 16px 18px 24px;
   border-bottom: 1px solid rgba(148, 163, 184, 0.2);
   background: rgba(15, 23, 42, 0.45);
 }
@@ -836,14 +836,29 @@ onUnmounted(() => {
 
 .network-graph-surface {
   flex: 1;
-  min-height: 0;
+  min-height: 520px;
+  height: 60vh;
   padding: 16px 18px 18px;
+  display: flex;
+  flex-direction: column;
+}
+
+.network-topology-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 0 4px 12px;
+  color: #cbd5f5;
 }
 
 @media (max-width: 991px) {
   .network-topology-body {
-    height: 60vh;
     min-height: 420px;
+  }
+
+  .network-graph-surface {
+    height: 52vh;
   }
 
   .network-config-row {
