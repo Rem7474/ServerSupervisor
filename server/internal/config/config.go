@@ -11,8 +11,9 @@ const DefaultJWTSecret = "change-me-in-production-please"
 
 type Config struct {
 	// Server
-	Port    string
-	BaseURL string
+	Port       string
+	BaseURL    string
+	TLSEnabled bool // Whether HTTPS is enabled
 
 	// Proxies
 	TrustedProxyCIDRs []string
@@ -58,8 +59,9 @@ type Config struct {
 
 func Load() *Config {
 	return &Config{
-		Port:    getEnv("SERVER_PORT", "8080"),
-		BaseURL: getEnv("BASE_URL", "http://localhost:8080"),
+		Port:       getEnv("SERVER_PORT", "8080"),
+		BaseURL:    getEnv("BASE_URL", "http://localhost:8080"),
+		TLSEnabled: getBoolEnv("TLS_ENABLED", false),
 
 		TrustedProxyCIDRs: getCSVEnv("TRUSTED_PROXIES"),
 		AllowedOrigins:    getCSVEnv("ALLOWED_ORIGINS"),

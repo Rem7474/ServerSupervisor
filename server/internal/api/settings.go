@@ -37,7 +37,7 @@ func (h *SettingsHandler) GetSettings(c *gin.Context) {
 			"smtpConfigured":       h.cfg.SMTPHost != "",
 			"smtpHost":             h.cfg.SMTPHost,
 			"smtpPort":             h.cfg.SMTPPort,
-			"ntfyUrl":              h.cfg.NtfyURL,
+			"ntfyUrl":              h.cfg.NotifyURL,
 		},
 		"dbStatus": dbStatus,
 	}
@@ -62,8 +62,8 @@ func (h *SettingsHandler) TestSmtp(c *gin.Context) {
 	defer client.Close()
 
 	// If auth is required
-	if h.cfg.SMTPUser != "" && h.cfg.SMTPPassword != "" {
-		auth := smtp.PlainAuth("", h.cfg.SMTPUser, h.cfg.SMTPPassword, h.cfg.SMTPHost)
+	if h.cfg.SMTPUser != "" && h.cfg.SMTPPass != "" {
+		auth := smtp.PlainAuth("", h.cfg.SMTPUser, h.cfg.SMTPPass, h.cfg.SMTPHost)
 		if err := client.Auth(auth); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("SMTP auth failed: %v", err)})
 			return
@@ -81,13 +81,13 @@ func (h *SettingsHandler) TestSmtp(c *gin.Context) {
 
 // TestNtfy sends a test notification to ntfy.sh
 func (h *SettingsHandler) TestNtfy(c *gin.Context) {
-	if h.cfg.NtfyURL == "" {
+	if h.cfg.NotifyURL == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "ntfy.sh URL not configured"})
 		return
 	}
 
 	// Parse URL to get base path
-	u, err := url.Parse(h.cfg.NtfyURL)
+	u, err := url.Parse(h.cfg.NotifyURL)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ntfy.sh URL"})
 		return
@@ -132,7 +132,7 @@ func (h *SettingsHandler) CleanupMetrics(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true, "message": message, "deleted": deleted})
 
 	// Log the action
-	_ = h.db.CreateAuditLog(user, "cleanup_metrics", "", "success", gin.H{"deleted": deleted}, c.ClientIP())
+	_, _ = h.db.CreateAuditLog(user, "cleanup_metrics", "", c.ClientIP(), message, "success")
 }
 
 // CleanupAuditLogs triggers manual cleanup of old audit logs
@@ -150,7 +150,7 @@ func (h *SettingsHandler) CleanupAuditLogs(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true, "message": message, "deleted": deleted})
 
 	// Log the action
-	_ = h.db.CreateAuditLog(user, "cleanup_audit_logs", "", "success", gin.H{"deleted": deleted}, c.ClientIP())
+	_, _ = h.db.CreateAuditLog(user, "cleanup_audit_logs", "", c.ClientIP(), message, "success")
 }
 
 // getDatabaseStatus returns current database statistics
