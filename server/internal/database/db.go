@@ -1142,6 +1142,17 @@ func (db *DB) GetOpenAlertIncident(ruleID int64, hostID string) (*models.AlertIn
 	return &inc, nil
 }
 
+// HasOpenIncident checks if there's an unresolved incident for a rule+host combination
+func (db *DB) HasOpenIncident(ruleID int64, hostID string) bool {
+	var id int64
+	err := db.conn.QueryRow(
+		`SELECT id FROM alert_incidents
+		 WHERE rule_id = $1 AND host_id = $2 AND resolved_at IS NULL LIMIT 1`,
+		ruleID, hostID,
+	).Scan(&id)
+	return err == nil
+}
+
 func (db *DB) CreateAlertIncident(ruleID int64, hostID string, value float64) error {
 	_, err := db.conn.Exec(
 		`INSERT INTO alert_incidents (rule_id, host_id, value) VALUES ($1, $2, $3)`,

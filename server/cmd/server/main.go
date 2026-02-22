@@ -183,7 +183,7 @@ func main() {
 		Addr:         ":" + cfg.Port,
 		Handler:      router,
 		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
+		WriteTimeout: 0, // Disabled for WebSocket streaming
 		IdleTimeout:  60 * time.Second,
 	}
 
