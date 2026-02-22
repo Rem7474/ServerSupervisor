@@ -213,7 +213,7 @@
                               class="form-check-input"
                               type="checkbox"
                             />
-                            <span class="form-check-label" :for="`port-enabled-${host.id}-${port.port}`">Afficher</span>
+                            <span class="form-check-label">Afficher</span>
                           </label>
                         </td>
                         <td>
@@ -224,7 +224,7 @@
                               class="form-check-input"
                               type="checkbox"
                             />
-                            <span class="form-check-label" :for="`port-proxy-${host.id}-${port.port}`">Proxy</span>
+                            <span class="form-check-label">Proxy</span>
                           </label>
                         </td>
                       </tr>
@@ -754,11 +754,8 @@ function formatBytes(bytes) {
 function getPortSetting(hostId, portNumber) {
   const entry = getHostPortEntry(hostId)
   const key = String(portNumber)
-  // Ensure the port setting exists in the reactive object
-  if (!entry.ports[key]) {
-    entry.ports[key] = { name: '', domain: '', path: '/', enabled: true, linkToProxy: false }
-  }
-  return entry.ports[key]
+  // Return a safe fallback if not yet initialized (ensureHostPortConfig handles init)
+  return entry.ports[key] ?? { name: '', domain: '', path: '/', enabled: true, linkToProxy: false }
 }
 
 function ensureHostPortConfig() {
@@ -930,7 +927,7 @@ onUnmounted(() => {
 }
 
 .network-config-item textarea,
-.network-config-item input {
+.network-config-item input:not([type="checkbox"]):not([type="radio"]) {
   background: rgba(15, 23, 42, 0.7);
   border: 1px solid rgba(148, 163, 184, 0.4);
   color: #e2e8f0;

@@ -12,13 +12,13 @@
       <li class="nav-item">
         <a class="nav-link" :class="{ active: activeTab === 'containers' }" href="#" @click.prevent="activeTab = 'containers'">
           Conteneurs
-          <span class="badge bg-secondary ms-1">{{ containers.length }}</span>
+          <span class="badge bg-secondary ms-1">{{ containers?.length || 0 }}</span>
         </a>
       </li>
       <li class="nav-item">
         <a class="nav-link" :class="{ active: activeTab === 'compose' }" href="#" @click.prevent="activeTab = 'compose'">
           Projets Compose
-          <span class="badge bg-secondary ms-1">{{ composeProjects.length }}</span>
+          <span class="badge bg-secondary ms-1">{{ composeProjects?.length || 0 }}</span>
         </a>
       </li>
     </ul>
@@ -205,9 +205,9 @@
             </div>
             <div v-if="Object.keys(selectedContainer.labels || {}).length > 0" class="mb-3">
               <label class="form-label fw-semibold">Labels</label>
-              <div class="border rounded p-2 bg-light small font-monospace" style="max-height: 200px; overflow-y: auto;">
+              <div class="border rounded p-2 bg-dark small font-monospace" style="max-height: 200px; overflow-y: auto;">
                 <div v-for="(value, key) in selectedContainer.labels" :key="key" class="mb-1">
-                  <span class="text-secondary">{{ key }}:</span> {{ value }}
+                  <span class="text-muted">{{ key }}:</span> <span class="text-light">{{ value }}</span>
                 </div>
               </div>
             </div>
@@ -354,6 +354,10 @@ const { wsStatus, wsError, retryCount, reconnect } = useWebSocket('/api/v1/ws/do
   if (payload.type !== 'docker') return
   containers.value = payload.containers || []
   composeProjects.value = payload.compose_projects || []
+  console.log('[Docker] Updated:', {
+    containers: containers.value.length,
+    projects: composeProjects.value.length
+  })
 })
 
 onMounted(() => {})
