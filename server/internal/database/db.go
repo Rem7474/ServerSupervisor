@@ -317,8 +317,8 @@ func (db *DB) migrate() error {
 		// Insert default config if not exists
 		`INSERT INTO network_topology_config (id, root_label) 
 		 SELECT 1, 'Infrastructure' WHERE NOT EXISTS (SELECT 1 FROM network_topology_config)`,
-		// Add unique constraint for singleton pattern
-		`ALTER TABLE IF EXISTS network_topology_config ADD CONSTRAINT network_topology_config_singleton UNIQUE (id) WHERE id = 1`,
+		// Create partial unique index for singleton pattern (PostgreSQL doesn't support WHERE in UNIQUE constraints)
+		`CREATE UNIQUE INDEX IF NOT EXISTS network_topology_config_singleton ON network_topology_config (id) WHERE id = 1`,
 	}
 
 	for _, m := range migrations {
