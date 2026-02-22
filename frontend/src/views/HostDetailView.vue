@@ -338,18 +338,6 @@
                   <path d="M7 6l10 10" />
                 </svg>
               </button>
-              <button 
-                v-if="liveCommand" 
-                @click="closeLiveConsole" 
-                class="btn btn-sm btn-ghost-secondary"
-                title="Fermer la console"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                  <path d="M18 6l-12 12" />
-                  <path d="M6 6l12 12" />
-                </svg>
-              </button>
             </div>
           </div>
           <div class="card-body d-flex flex-column" style="flex: 1; min-height: 0; padding: 0;">
@@ -552,7 +540,7 @@ async function loadHistory(hours) {
     }
     buildCharts()
   } catch (e) {
-    console.error('Failed to fetch metrics history:', e)
+    console.error(`Failed to fetch metrics history (${hours}h):`, e.response?.data || e.message)
   }
 }
 
@@ -727,6 +715,7 @@ function watchCommand(cmd) {
     status: cmd.status,
     output: cmd.output || '',
   }
+  showConsole.value = true // Auto-show console si masquée
   connectStreamWebSocket(cmd.id)
   nextTick(() => scrollToBottom())
 }
@@ -794,7 +783,16 @@ async function deleteHost() {
 }
 
 onMounted(() => {
-  loadHistory(24)
+  // Wait for auth to be properly initialized before loading data
+  if (auth.token) {
+    loadHistory(24)
+  } else {
+    // Retry after a short delay if token not yet loaded
+    const timer = setTimeout(() => {
+      if (auth.token) loadHistory(24)
+    }, 100)
+    onUnmounted(() => clearTimeout(timer))
+  }
 })
 
 onUnmounted(() => {

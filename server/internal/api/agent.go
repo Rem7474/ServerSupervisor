@@ -309,6 +309,36 @@ func (h *AgentHandler) GetMetricsSummary(c *gin.Context) {
 	c.JSON(http.StatusOK, summary)
 }
 
+// LogAuditAction records an audit log entry from the agent (e.g., startup apt update)
+func (h *AgentHandler) LogAuditAction(c *gin.Context) {
+	hostID := c.GetString("host_id")
+	if hostID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "host not identified"})
+		return
+	}
+
+	var audit struct {
+		Action  string `json:"action" binding:"required"`
+		Status  string `json:"status" binding:"required"`
+		Details string `json:"details"`
+	}
+
+	if err := c.ShouldBindJSON(&audit); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Create audit log entry with "agent" as the username
+	_, err := h.db.CreateAuditLog("agent", audit.Action, hostID, c.ClientIP(), audit.Details, audit.Status)
+	if err != nil {
+		log.Printf("Failed to log audit action: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to record audit log"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "message": "Audit log recorded"})
+}
+
 func stringPtrIfNotEmpty(value string) *string {
 	if strings.TrimSpace(value) == "" {
 		return nil

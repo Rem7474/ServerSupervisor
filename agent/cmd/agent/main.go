@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"os/signal"
 	"sync"
 	"syscall"
@@ -209,7 +210,16 @@ func initialAptCollection(cfg *config.Config, s *sender.Sender) {
 	// Wait a bit to avoid overwhelming the system at startup
 	time.Sleep(5 * time.Second)
 
-	log.Println("Performing initial APT status collection with CVE extraction...")
+	log.Println("Performing initial APT update...")
+	
+	// Execute apt update at startup to ensure latest package list
+	if err := executeAptUpdate(); err != nil {
+		log.Printf("Warning: Initial apt update failed: %v", err)
+	} else {
+		log.Println("Initial apt update completed successfully")
+	}
+
+	log.Println("Performing APT status collection with CVE extraction...")
 	apt, err := collector.CollectAPT(true) // true = extract CVE
 	if err != nil {
 		log.Printf("Initial APT collection failed: %v", err)
@@ -232,5 +242,28 @@ func initialAptCollection(cfg *config.Config, s *sender.Sender) {
 		log.Printf("Failed to send initial APT status: %v", err)
 	} else {
 		log.Println("Initial APT status with CVE sent successfully")
+		// Log the apt update action
+		logAptAction(cfg, s, "update", "completed", "Initial startup update")
+	}
+}
+
+// executeAptUpdate runs apt update command
+func executeAptUpdate() error {
+	cmd := exec.Command("apt", "update")
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("apt update failed: %w", err)
+	}
+	return nil
+}
+
+// logAptAction sends an audit log entry for APT actions to the server
+func logAptAction(cfg *config.Config, s *sender.Sender, action, status, message string) {
+	// Create a simple audit log entry (we'll send it in the next report or via API)
+	log.Printf("APT Action: %s [%s] - %s", action, status, message)
+	
+	// Send it to the server via the audit endpoint if available
+	// This ensures the action is logged in the dashboard
+	if err := s.SendAuditLog(action, status, message); err != nil {
+		log.Printf("Warning: Failed to send audit log: %v", err)
 	}
 }

@@ -199,3 +199,38 @@ func (s *Sender) StreamCommandChunk(commandID int64, chunk string) error {
 
 	return nil
 }
+
+// SendAuditLog sends an audit log entry for agent actions
+func (s *Sender) SendAuditLog(action, status, details string) error {
+	auditLog := map[string]string{
+		"action":  action,
+		"status":  status,
+		"details": details,
+	}
+
+	data, err := json.Marshal(auditLog)
+	if err != nil {
+		return fmt.Errorf("failed to marshal audit log: %w", err)
+	}
+
+	req, err := http.NewRequest("POST", s.cfg.ServerURL+"/api/agent/audit", bytes.NewReader(data))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-API-Key", s.cfg.APIKey)
+
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to send audit log: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		// Log but don't fail - audit logging is best-effort
+		log.Printf("Warning: Server returned status %d when recording audit log", resp.StatusCode)
+	}
+
+	return nil
+}

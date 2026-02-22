@@ -55,6 +55,7 @@ func SetupRouter(db *database.DB, cfg *config.Config) *gin.Engine {
 		agent.POST("/report", agentH.ReceiveReport)
 		agent.POST("/command/result", agentH.ReportCommandResult)
 		agent.POST("/command/stream", agentH.StreamCommandOutput)
+		agent.POST("/audit", agentH.LogAuditAction)
 	}
 
 	// ========== Dashboard routes (JWT auth) ==========
