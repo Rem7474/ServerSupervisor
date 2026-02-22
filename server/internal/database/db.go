@@ -1616,10 +1616,11 @@ func (db *DB) GetAllDockerNetworks() ([]models.DockerNetwork, error) {
 
 func (db *DB) GetNetworkTopologyConfig() (*models.NetworkTopologyConfig, error) {
 	var cfg models.NetworkTopologyConfig
+	var excludedPortsJSON []byte
 	err := db.conn.QueryRow(
 		`SELECT id, root_label, root_ip, excluded_ports, service_map, show_proxy_links, host_overrides, manual_services, updated_at
 		 FROM network_topology_config LIMIT 1`,
-	).Scan(&cfg.ID, &cfg.RootLabel, &cfg.RootIP, pq.Array(&cfg.ExcludedPorts), &cfg.ServiceMap, &cfg.ShowProxyLinks, &cfg.HostOverrides, &cfg.ManualServices, &cfg.UpdatedAt)
+	).Scan(&cfg.ID, &cfg.RootLabel, &cfg.RootIP, &excludedPortsJSON, &cfg.ServiceMap, &cfg.ShowProxyLinks, &cfg.HostOverrides, &cfg.ManualServices, &cfg.UpdatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			// Return default config if none exists
@@ -1634,6 +1635,10 @@ func (db *DB) GetNetworkTopologyConfig() (*models.NetworkTopologyConfig, error) 
 		}
 		return nil, err
 	}
+	// Unmarshal JSONB excluded_ports
+	if len(excludedPortsJSON) > 0 {
+		json.Unmarshal(excludedPortsJSON, &cfg.ExcludedPorts)
+	}
 	return &cfg, nil
 }
 
@@ -1641,7 +1646,7 @@ func (db *DB) SaveNetworkTopologyConfig(cfg *models.NetworkTopologyConfig) error
 	excludedPortsJSON, _ := json.Marshal(cfg.ExcludedPorts)
 	_, err := db.conn.Exec(
 		`UPDATE network_topology_config SET
-		 root_label = $1, root_ip = $2, excluded_ports = $3,
+		 root_label = $1, root_ip = $2, excluded_ports = $3::jsonb,
 		 service_map = $4, show_proxy_links = $5, host_overrides = $6,
 		 manual_services = $7, updated_at = NOW()`,
 		cfg.RootLabel, cfg.RootIP, excludedPortsJSON,
