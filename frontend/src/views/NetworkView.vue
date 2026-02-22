@@ -5,6 +5,8 @@
       <div class="text-secondary">Ports exposes et trafic par hote</div>
     </div>
 
+    <WsStatusBar :status="wsStatus" :error="wsError" :retry-count="retryCount" @reconnect="reconnect" />
+
     <div class="row row-cards mb-4">
       <div class="col-sm-6 col-lg-3">
         <div class="card card-sm">
@@ -161,6 +163,8 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
+import { useWebSocket } from '../composables/useWebSocket'
+import WsStatusBar from '../components/WsStatusBar.vue'
 import apiClient from '../api'
 
 const hosts = ref([])
@@ -170,7 +174,6 @@ const protocolFilter = ref('')
 const hostFilter = ref('')
 const onlyPublished = ref(true)
 const auth = useAuthStore()
-let ws = null
 
 const portRows = computed(() => {
   const rows = []
@@ -244,38 +247,16 @@ async function fetchSnapshot() {
   }
 }
 
-function connectWebSocket() {
-  if (!auth.token) return
-  const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
-  const wsUrl = `${protocol}://${window.location.host}/api/v1/ws/network`
-  ws = new WebSocket(wsUrl)
-
-  ws.onopen = () => {
-    ws.send(JSON.stringify({ type: 'auth', token: auth.token }))
-  }
-
-  ws.onmessage = (event) => {
-    try {
-      const payload = JSON.parse(event.data)
-      if (payload.type !== 'network') return
-      hosts.value = payload.hosts || []
-      containers.value = payload.containers || []
-    } catch (e) {
-      // ignore
-    }
-  }
-
-  ws.onclose = () => {
-    setTimeout(connectWebSocket, 2000)
-  }
-}
+const { wsStatus, wsError, retryCount, reconnect } = useWebSocket('/api/v1/ws/network', (payload) => {
+  if (payload.type !== 'network') return
+  hosts.value = payload.hosts || []
+  containers.value = payload.containers || []
+})
 
 onMounted(() => {
   fetchSnapshot()
-  connectWebSocket()
 })
 
 onUnmounted(() => {
-  if (ws) ws.close()
 })
 </script>

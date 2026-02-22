@@ -29,6 +29,8 @@
       </div>
     </div>
 
+    <WsStatusBar :status="wsStatus" :error="wsError" :retry-count="retryCount" @reconnect="reconnect" />
+
     <div class="d-flex flex-fill" style="gap: 1rem; overflow: hidden; min-height: 0;">
       <!-- Colonne gauche: Informations hôte -->
       <div style="flex: 1; overflow-y: auto; min-width: 0;">
@@ -381,6 +383,8 @@ import RelativeTime from '../components/RelativeTime.vue'
 import CVEList from '../components/CVEList.vue'
 import apiClient from '../api'
 import { useAuthStore } from '../stores/auth'
+import { useWebSocket } from '../composables/useWebSocket'
+import WsStatusBar from '../components/WsStatusBar.vue'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import utc from 'dayjs/plugin/utc'
@@ -412,7 +416,6 @@ const saving = ref(false)
 const editForm = ref({ name: '', hostname: '', ip_address: '', os: '' })
 const liveCommand = ref(null)
 const consoleOutput = ref(null)
-let ws = null
 let streamWs = null
 const auth = useAuthStore()
 const canRunApt = computed(() => auth.role === 'admin' || auth.role === 'operator')
@@ -458,35 +461,15 @@ const chartOptions = {
   interaction: { mode: 'nearest', axis: 'x', intersect: false },
 }
 
-function connectWebSocket() {
-  if (!auth.token) return
-  const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
-  const wsUrl = `${protocol}://${window.location.host}/api/v1/ws/hosts/${hostId}`
-  ws = new WebSocket(wsUrl)
-
-  ws.onopen = () => {
-    ws.send(JSON.stringify({ type: 'auth', token: auth.token }))
-  }
-
-  ws.onmessage = (event) => {
-    try {
-      const payload = JSON.parse(event.data)
-      if (payload.type !== 'host_detail') return
-      host.value = payload.host
-      metrics.value = payload.metrics
-      containers.value = payload.containers || []
-      aptStatus.value = payload.apt_status
-      aptHistory.value = payload.apt_history || []
-      auditLogs.value = payload.audit_logs || []
-    } catch (e) {
-      // Ignore malformed payloads
-    }
-  }
-
-  ws.onclose = () => {
-    setTimeout(connectWebSocket, 2000)
-  }
-}
+const { wsStatus, wsError, retryCount, reconnect } = useWebSocket(`/api/v1/ws/hosts/${hostId}`, (payload) => {
+  if (payload.type !== 'host_detail') return
+  host.value = payload.host
+  metrics.value = payload.metrics
+  containers.value = payload.containers || []
+  aptStatus.value = payload.apt_status
+  aptHistory.value = payload.apt_history || []
+  auditLogs.value = payload.audit_logs || []
+})
 
 async function loadHistory(hours) {
   chartHours.value = hours
@@ -725,12 +708,10 @@ async function deleteHost() {
 }
 
 onMounted(() => {
-  connectWebSocket()
   loadHistory(24)
 })
 
 onUnmounted(() => {
-  if (ws) ws.close()
   if (streamWs) streamWs.close()
 })
 </script>

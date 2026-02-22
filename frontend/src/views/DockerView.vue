@@ -5,6 +5,8 @@
       <div class="text-secondary">Vue globale de tous les conteneurs sur l'infrastructure</div>
     </div>
 
+    <WsStatusBar :status="wsStatus" :error="wsError" :retry-count="retryCount" @reconnect="reconnect" />
+
     <div class="card mb-4">
       <div class="card-body">
         <div class="row g-3">
@@ -141,6 +143,8 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
+import { useWebSocket } from '../composables/useWebSocket'
+import WsStatusBar from '../components/WsStatusBar.vue'
 
 const containers = ref([])
 const search = ref('')
@@ -148,7 +152,6 @@ const stateFilter = ref('')
 const composeFilter = ref('')
 const selectedContainer = ref(null)
 const auth = useAuthStore()
-let ws = null
 
 const getComposeInfo = (container) => {
   if (!container.labels) return {}
@@ -185,36 +188,14 @@ const filteredContainers = computed(() => {
   })
 })
 
-function connectWebSocket() {
-  if (!auth.token) return
-  const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
-  const wsUrl = `${protocol}://${window.location.host}/api/v1/ws/docker`
-  ws = new WebSocket(wsUrl)
-
-  ws.onopen = () => {
-    ws.send(JSON.stringify({ type: 'auth', token: auth.token }))
-  }
-
-  ws.onmessage = (event) => {
-    try {
-      const payload = JSON.parse(event.data)
-      if (payload.type !== 'docker') return
-      containers.value = payload.containers || []
-    } catch (e) {
-      // Ignore malformed payloads
-    }
-  }
-
-  ws.onclose = () => {
-    setTimeout(connectWebSocket, 2000)
-  }
-}
+const { wsStatus, wsError, retryCount, reconnect } = useWebSocket('/api/v1/ws/docker', (payload) => {
+  if (payload.type !== 'docker') return
+  containers.value = payload.containers || []
+})
 
 onMounted(() => {
-  connectWebSocket()
 })
 
 onUnmounted(() => {
-  if (ws) ws.close()
 })
 </script>

@@ -5,6 +5,8 @@
       <div class="text-secondary">Gerer les mises a jour APT sur tous les hotes</div>
     </div>
 
+    <WsStatusBar :status="wsStatus" :error="wsError" :retry-count="retryCount" @reconnect="reconnect" />
+
     <div class="d-flex flex-fill" style="gap: 1rem; overflow: hidden; min-height: 0;">
       <!-- Colonne gauche: Liste des hôtes -->
       <div style="flex: 1; overflow-y: auto; min-width: 0;">
@@ -213,6 +215,8 @@ import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue'
 import CVEList from '../components/CVEList.vue'
 import apiClient from '../api'
 import { useAuthStore } from '../stores/auth'
+import { useWebSocket } from '../composables/useWebSocket'
+import WsStatusBar from '../components/WsStatusBar.vue'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import utc from 'dayjs/plugin/utc'
@@ -238,7 +242,6 @@ const renderedConsoleOutput = computed(() => {
 })
 const liveCommand = ref(null)
 const consoleOutput = ref(null)
-let ws = null
 let streamWs = null
 
 function toggleSelectAll() {
@@ -374,39 +377,17 @@ function renderConsoleOutput(raw) {
   return lines.join('\n')
 }
 
-function connectWebSocket() {
-  if (!auth.token) return
-  const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
-  const wsUrl = `${protocol}://${window.location.host}/api/v1/ws/apt`
-  ws = new WebSocket(wsUrl)
-
-  ws.onopen = () => {
-    ws.send(JSON.stringify({ type: 'auth', token: auth.token }))
-  }
-
-  ws.onmessage = (event) => {
-    try {
-      const payload = JSON.parse(event.data)
-      if (payload.type !== 'apt') return
-      hosts.value = payload.hosts || []
-      aptStatuses.value = payload.apt_statuses || {}
-      aptHistories.value = payload.apt_histories || {}
-    } catch (e) {
-      // Ignore malformed payloads
-    }
-  }
-
-  ws.onclose = () => {
-    setTimeout(connectWebSocket, 2000)
-  }
-}
+const { wsStatus, wsError, retryCount, reconnect } = useWebSocket('/api/v1/ws/apt', (payload) => {
+  if (payload.type !== 'apt') return
+  hosts.value = payload.hosts || []
+  aptStatuses.value = payload.apt_statuses || {}
+  aptHistories.value = payload.apt_histories || {}
+})
 
 onMounted(() => {
-  connectWebSocket()
 })
 
 onUnmounted(() => {
-  if (ws) ws.close()
   if (streamWs) streamWs.close()
 })
 </script>

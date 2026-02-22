@@ -29,6 +29,9 @@
     </div>
 
     <div class="row row-cards mb-4">
+    <WsStatusBar :status="wsStatus" :error="wsError" :retry-count="retryCount" @reconnect="reconnect" />
+
+    <div class="row row-cards mb-4">
       <div class="col-sm-6 col-lg-3">
         <div class="card card-sm">
           <div class="card-body">
@@ -232,8 +235,10 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import RelativeTime from '../components/RelativeTime.vue'
+import WsStatusBar from '../components/WsStatusBar.vue'
 import apiClient from '../api'
 import { useAuthStore } from '../stores/auth'
+import { useWebSocket } from '../composables/useWebSocket'
 import { Line } from 'vue-chartjs'
 import { Chart as ChartJS, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip } from 'chart.js'
 import dayjs from 'dayjs'
@@ -257,7 +262,6 @@ const statusFilter = ref('all')
 const sortKey = ref('name')
 const sortDir = ref('asc')
 const selectedHostIds = ref([])
-let ws = null
 const auth = useAuthStore()
 const summaryHours = ref(24)
 const summaryChartData = ref(null)
@@ -356,34 +360,14 @@ const sortedHosts = computed(() => {
   return list
 })
 
-function connectWebSocket() {
-  if (!auth.token) return
-  const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
-  const wsUrl = `${protocol}://${window.location.host}/api/v1/ws/dashboard`
-  ws = new WebSocket(wsUrl)
-
-  ws.onopen = () => {
-    ws.send(JSON.stringify({ type: 'auth', token: auth.token }))
-  }
-
-  ws.onmessage = (event) => {
-    try {
-      const payload = JSON.parse(event.data)
-      if (payload.type !== 'dashboard') return
-      hosts.value = payload.hosts || []
-      hostMetrics.value = payload.host_metrics || {}
-      versionComparisons.value = payload.version_comparisons || []
-      selectedHostIds.value = selectedHostIds.value.filter(id => hosts.value.some(h => h.id === id))
-      loading.value = false
-    } catch (e) {
-      // Ignore malformed payloads
-    }
-  }
-
-  ws.onclose = () => {
-    setTimeout(connectWebSocket, 2000)
-  }
-}
+const { wsStatus, wsError, retryCount, reconnect } = useWebSocket('/api/v1/ws/dashboard', (payload) => {
+  if (payload.type !== 'dashboard') return
+  hosts.value = payload.hosts || []
+  hostMetrics.value = payload.host_metrics || {}
+  versionComparisons.value = payload.version_comparisons || []
+  selectedHostIds.value = selectedHostIds.value.filter(id => hosts.value.some(h => h.id === id))
+  loading.value = false
+})
 
 function bucketMinutesFor(hours) {
   if (hours <= 6) return 1
@@ -487,11 +471,9 @@ function isAgentUpToDate(version) {
 
 onMounted(() => {
   loading.value = true
-  connectWebSocket()
   fetchSummary()
 })
 
 onUnmounted(() => {
-  if (ws) ws.close()
 })
 </script>
