@@ -194,13 +194,23 @@
                         </td>
                         <td>
                           <label class="form-check">
-                            <input v-model="getPortSetting(host.id, port.port).enabled" class="form-check-input" type="checkbox" />
+                            <input
+                              :checked="getPortSetting(host.id, port.port).enabled"
+                              class="form-check-input"
+                              type="checkbox"
+                              @change="updatePortSetting(host.id, port.port, 'enabled', $event.target.checked)"
+                            />
                             <span class="form-check-label">Afficher</span>
                           </label>
                         </td>
                         <td>
                           <label class="form-check form-switch">
-                            <input v-model="getPortSetting(host.id, port.port).linkToProxy" class="form-check-input" type="checkbox" />
+                            <input
+                              :checked="getPortSetting(host.id, port.port).linkToProxy"
+                              class="form-check-input"
+                              type="checkbox"
+                              @change="updatePortSetting(host.id, port.port, 'linkToProxy', $event.target.checked)"
+                            />
                             <span class="form-check-label">Proxy</span>
                           </label>
                         </td>
@@ -669,6 +679,11 @@ function getPortSetting(hostId, portNumber) {
     entry.ports[key] = { name: '', domain: '', path: '/', enabled: true, linkToProxy: false }
   }
   return entry.ports[key]
+}
+
+function updatePortSetting(hostId, portNumber, property, value) {
+  const setting = getPortSetting(hostId, portNumber)
+  setting[property] = value
 }
 
 function ensureHostPortConfig() {
