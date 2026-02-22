@@ -209,10 +209,9 @@
                           <label class="form-check">
                             <input
                               :id="`port-enabled-${host.id}-${port.port}`"
-                              :checked="getPortSetting(host.id, port.port).enabled"
+                              v-model="getPortSetting(host.id, port.port).enabled"
                               class="form-check-input"
                               type="checkbox"
-                              @change="(e) => { updatePortSetting(host.id, port.port, 'enabled', e.target.checked); }"
                             />
                             <span class="form-check-label" :for="`port-enabled-${host.id}-${port.port}`">Afficher</span>
                           </label>
@@ -221,10 +220,9 @@
                           <label class="form-check form-switch">
                             <input
                               :id="`port-proxy-${host.id}-${port.port}`"
-                              :checked="getPortSetting(host.id, port.port).linkToProxy"
+                              v-model="getPortSetting(host.id, port.port).linkToProxy"
                               class="form-check-input"
                               type="checkbox"
-                              @change="(e) => { updatePortSetting(host.id, port.port, 'linkToProxy', e.target.checked); }"
                             />
                             <span class="form-check-label" :for="`port-proxy-${host.id}-${port.port}`">Proxy</span>
                           </label>
@@ -755,41 +753,13 @@ function formatBytes(bytes) {
 }
 
 function getPortSetting(hostId, portNumber) {
-  const entry = hostPortConfig.value.find((item) => item.hostId === hostId)
-  if (!entry) {
-    return { name: '', domain: '', path: '/', enabled: true, linkToProxy: false }
-  }
+  const entry = getHostPortEntry(hostId)
   const key = String(portNumber)
-  return entry.ports[key] || { name: '', domain: '', path: '/', enabled: true, linkToProxy: false }
-}
-
-function updatePortSetting(hostId, portNumber, property, value) {
-  const hostIndex = hostPortConfig.value.findIndex((item) => item.hostId === hostId)
-  if (hostIndex === -1) return
-
-  const portKey = String(portNumber)
-  const entry = hostPortConfig.value[hostIndex]
-  const currentSetting = entry.ports[portKey] || {
-    name: '',
-    domain: '',
-    path: '/',
-    enabled: true,
-    linkToProxy: false
+  // Ensure the port setting exists in the reactive object
+  if (!entry.ports[key]) {
+    entry.ports[key] = { name: '', domain: '', path: '/', enabled: true, linkToProxy: false }
   }
-
-  // Create new object structure and force array reassign to trigger Vue reactivity
-  const newConfig = [...hostPortConfig.value]
-  newConfig[hostIndex] = {
-    ...entry,
-    ports: {
-      ...entry.ports,
-      [portKey]: {
-        ...currentSetting,
-        [property]: value
-      }
-    }
-  }
-  hostPortConfig.value = newConfig
+  return entry.ports[key]
 }
 
 function ensureHostPortConfig() {
