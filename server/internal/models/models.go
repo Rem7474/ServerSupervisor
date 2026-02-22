@@ -117,6 +117,20 @@ type DockerReport struct {
 	Timestamp  time.Time         `json:"timestamp"`
 }
 
+// ========== Docker Compose Projects ==========
+
+type ComposeProject struct {
+	ID         string    `json:"id" db:"id"`
+	HostID     string    `json:"host_id" db:"host_id"`
+	Hostname   string    `json:"hostname" db:"hostname"`
+	Name       string    `json:"name" db:"name"`
+	WorkingDir string    `json:"working_dir" db:"working_dir"`
+	ConfigFile string    `json:"config_file" db:"config_file"`
+	Services   []string  `json:"services" db:"-"`
+	RawConfig  string    `json:"raw_config" db:"raw_config"`
+	UpdatedAt  time.Time `json:"updated_at" db:"updated_at"`
+}
+
 // ========== Network Snapshot ==========
 
 type PortMapping struct {
@@ -243,14 +257,15 @@ type VersionComparison struct {
 // ========== Agent Heartbeat / Full Report ==========
 
 type AgentReport struct {
-	HostID         string          `json:"host_id"`
-	AgentVersion   string          `json:"agent_version"`
-	Metrics        *SystemMetrics  `json:"metrics,omitempty"`
-	Docker         *DockerReport   `json:"docker,omitempty"`
-	AptStatus      *AptStatus      `json:"apt_status,omitempty"`
-	DockerNetworks []DockerNetwork `json:"docker_networks,omitempty"`
-	ContainerEnvs  []ContainerEnv  `json:"container_envs,omitempty"`
-	Timestamp      time.Time       `json:"timestamp"`
+	HostID          string           `json:"host_id"`
+	AgentVersion    string           `json:"agent_version"`
+	Metrics         *SystemMetrics   `json:"metrics,omitempty"`
+	Docker          *DockerReport    `json:"docker,omitempty"`
+	AptStatus       *AptStatus       `json:"apt_status,omitempty"`
+	DockerNetworks  []DockerNetwork  `json:"docker_networks,omitempty"`
+	ContainerEnvs   []ContainerEnv   `json:"container_envs,omitempty"`
+	ComposeProjects []ComposeProject `json:"compose_projects,omitempty"`
+	Timestamp       time.Time        `json:"timestamp"`
 }
 
 // ========== Commands (server → agent) ==========

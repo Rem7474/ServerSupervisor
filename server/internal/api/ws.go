@@ -413,9 +413,16 @@ func (h *WSHandler) sendDockerSnapshot(conn *websocket.Conn) error {
 	if err != nil {
 		return err
 	}
+
+	composeProjects, _ := h.db.GetAllComposeProjects()
+	if composeProjects == nil {
+		composeProjects = []models.ComposeProject{}
+	}
+
 	payload := gin.H{
-		"type":       "docker",
-		"containers": containers,
+		"type":             "docker",
+		"containers":       containers,
+		"compose_projects": composeProjects,
 	}
 	return conn.WriteJSON(payload)
 }

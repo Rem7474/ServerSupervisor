@@ -87,6 +87,7 @@ func sendReport(cfg *config.Config, s *sender.Sender) {
 	var dockerData interface{}
 	var dockerNetworks interface{}
 	var containerEnvs interface{}
+	var composeProjects interface{}
 	if cfg.CollectDocker {
 		containers, err := collector.CollectDocker()
 		if err != nil {
@@ -112,6 +113,13 @@ func sendReport(cfg *config.Config, s *sender.Sender) {
 			if envs, err := collector.CollectContainerEnvVars(containerNames); err == nil {
 				containerEnvs = envs
 			}
+
+			// Collect docker-compose projects
+			if projects, err := collector.CollectComposeProjects(); err == nil {
+				composeProjects = projects
+			} else {
+				log.Printf("Compose projects collection skipped: %v", err)
+			}
 		}
 	} else {
 		dockerData = struct {
@@ -127,13 +135,14 @@ func sendReport(cfg *config.Config, s *sender.Sender) {
 
 	// Send report
 	report := &sender.Report{
-		AgentVersion:   AgentVersion,
-		Metrics:        metrics,
-		Docker:         dockerData,
-		AptStatus:      aptData,
-		DockerNetworks: dockerNetworks,
-		ContainerEnvs:  containerEnvs,
-		Timestamp:      time.Now(),
+		AgentVersion:    AgentVersion,
+		Metrics:         metrics,
+		Docker:          dockerData,
+		AptStatus:       aptData,
+		DockerNetworks:  dockerNetworks,
+		ContainerEnvs:   containerEnvs,
+		ComposeProjects: composeProjects,
+		Timestamp:       time.Now(),
 	}
 
 	response, err := s.SendReport(report)

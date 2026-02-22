@@ -319,6 +319,18 @@ func (db *DB) migrate() error {
 		 SELECT 1, 'Infrastructure' WHERE NOT EXISTS (SELECT 1 FROM network_topology_config)`,
 		// Create partial unique index for singleton pattern (PostgreSQL doesn't support WHERE in UNIQUE constraints)
 		`CREATE UNIQUE INDEX IF NOT EXISTS network_topology_config_singleton ON network_topology_config (id) WHERE id = 1`,
+		// Migration: Docker Compose projects
+		`CREATE TABLE IF NOT EXISTS compose_projects (
+			id VARCHAR(255) PRIMARY KEY,
+			host_id VARCHAR(64) NOT NULL REFERENCES hosts(id) ON DELETE CASCADE,
+			name VARCHAR(255) NOT NULL,
+			working_dir TEXT NOT NULL DEFAULT '',
+			config_file TEXT NOT NULL DEFAULT '',
+			services TEXT NOT NULL DEFAULT '[]',
+			raw_config TEXT NOT NULL DEFAULT '',
+			updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_compose_projects_host_id ON compose_projects(host_id)`,
 	}
 
 	for _, m := range migrations {

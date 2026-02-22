@@ -231,3 +231,114 @@ func isSensitiveEnvKey(key string) bool {
 	}
 	return false
 }
+
+// ComposeProject represents a docker-compose project and its resolved config
+type ComposeProject struct {
+	Name       string   `json:"name"`
+	WorkingDir string   `json:"working_dir"`
+	ConfigFile string   `json:"config_file"`
+	Services   []string `json:"services"`
+	RawConfig  string   `json:"raw_config"`
+}
+
+// CollectComposeProjects discovers docker-compose projects via container labels
+// and retrieves their resolved configuration via `docker compose config`
+func CollectComposeProjects() ([]ComposeProject, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	if _, err := exec.LookPath("docker"); err != nil {
+		return nil, fmt.Errorf("docker not found in PATH")
+	}
+
+	out, err := exec.CommandContext(ctx, "docker", "ps", "-a",
+		"--filter", "label=com.docker.compose.project",
+		"--format", `{{index .Labels "com.docker.compose.project"}}|{{index .Labels "com.docker.compose.project.working_dir"}}|{{index .Labels "com.docker.compose.project.config_files"}}|{{index .Labels "com.docker.compose.service"}}`,
+	).Output()
+	if err != nil {
+		return nil, fmt.Errorf("docker ps compose failed: %w", err)
+	}
+
+	projects := make(map[string]*ComposeProject)
+	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+		if line == "" {
+			continue
+		}
+		parts := strings.SplitN(line, "|", 4)
+		if len(parts) < 4 {
+			continue
+		}
+		name, workDir, configFile, service := parts[0], parts[1], parts[2], parts[3]
+		if name == "" {
+			continue
+		}
+		if _, exists := projects[name]; !exists {
+			projects[name] = &ComposeProject{
+				Name:       name,
+				WorkingDir: workDir,
+				ConfigFile: configFile,
+				Services:   []string{},
+			}
+		}
+		if service != "" {
+			// avoid duplicates
+			found := false
+			for _, s := range projects[name].Services {
+				if s == service {
+					found = true
+					break
+				}
+			}
+			if !found {
+				projects[name].Services = append(projects[name].Services, service)
+			}
+		}
+	}
+
+	var result []ComposeProject
+	for _, p := range projects {
+		if p.WorkingDir != "" {
+			cfgCtx, cfgCancel := context.WithTimeout(context.Background(), 10*time.Second)
+			cfgOut, err := exec.CommandContext(cfgCtx, "docker", "compose",
+				"--project-directory", p.WorkingDir, "config").Output()
+			cfgCancel()
+			if err == nil {
+				p.RawConfig = filterSensitiveYAML(string(cfgOut))
+			}
+		}
+		result = append(result, *p)
+	}
+
+	log.Printf("Collected %d Docker Compose projects", len(result))
+	return result, nil
+}
+
+// filterSensitiveYAML redacts lines containing sensitive keys in YAML output
+func filterSensitiveYAML(yaml string) string {
+	sensitiveKeys := []string{
+		"password", "secret", "token", "key", "pass",
+		"pwd", "credential", "auth", "private", "salt",
+		"apikey", "bearer", "jwt",
+	}
+	var filtered []string
+	for _, line := range strings.Split(yaml, "\n") {
+		lineLower := strings.ToLower(line)
+		sensitive := false
+		for _, k := range sensitiveKeys {
+			if strings.Contains(lineLower, k+"=") || strings.Contains(lineLower, k+":") {
+				sensitive = true
+				break
+			}
+		}
+		if sensitive {
+			if idx := strings.Index(line, ":"); idx >= 0 {
+				filtered = append(filtered, line[:idx+1]+" [REDACTED]")
+			} else {
+				filtered = append(filtered, line)
+			}
+		} else {
+			filtered = append(filtered, line)
+		}
+	}
+	return strings.Join(filtered, "\n")
+}

@@ -129,6 +129,13 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 		}
 	}
 
+	// Store docker-compose projects
+	if len(report.ComposeProjects) > 0 {
+		if err := h.db.UpsertComposeProjects(hostID, report.ComposeProjects); err != nil {
+			log.Printf("Warning: failed to store compose projects for host %s: %v", hostID, err)
+		}
+	}
+
 	// Return pending commands for this host
 	commands, _ := h.db.GetPendingCommands(hostID)
 	if commands == nil {
