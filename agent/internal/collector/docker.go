@@ -56,9 +56,9 @@ func CollectDocker() ([]DockerContainer, error) {
 
 	// Parse JSON output
 	var inspectData []struct {
-		Id      string `json:"Id"`
-		Name    string `json:"Name"`
-		Config  struct {
+		Id     string `json:"Id"`
+		Name   string `json:"Name"`
+		Config struct {
 			Image  string            `json:"Image"`
 			Labels map[string]string `json:"Labels"`
 		} `json:"Config"`
@@ -69,8 +69,8 @@ func CollectDocker() ([]DockerContainer, error) {
 			StartedAt  time.Time `json:"StartedAt"`
 			FinishedAt time.Time `json:"FinishedAt"`
 		} `json:"State"`
-		Created      time.Time `json:"Created"`
-		Image        string    `json:"Image"`
+		Created         time.Time `json:"Created"`
+		Image           string    `json:"Image"`
 		NetworkSettings struct {
 			Ports map[string][]struct {
 				HostIp   string `json:"HostIp"`
@@ -88,7 +88,7 @@ func CollectDocker() ([]DockerContainer, error) {
 		name := strings.TrimPrefix(data.Name, "/")
 		fullImage := data.Config.Image
 		image, tag := parseImageTag(fullImage)
-		
+
 		// Build state string
 		state := "unknown"
 		if data.State.Running {
@@ -149,7 +149,7 @@ func formatPorts(portsMap map[string][]struct {
 	if len(portsMap) == 0 {
 		return ""
 	}
-	
+
 	var parts []string
 	for containerPort, bindings := range portsMap {
 		if len(bindings) == 0 {
@@ -167,7 +167,7 @@ func formatPorts(portsMap map[string][]struct {
 			}
 		}
 	}
-	
+
 	return strings.Join(parts, ", ")
 }
 
