@@ -221,5 +221,197 @@ func (h *NetworkHandler) GetTopologySnapshot(c *gin.Context) {
 		UpdatedAt:  time.Now(),
 	}
 
+	// Infer topology links
+	snapshot.Links = inferTopologyLinks(h.db, baseSnapshot.Containers, networks)
+
 	c.JSON(http.StatusOK, snapshot)
+}
+
+// inferTopologyLinks infers logical links between containers based on 3 rules:
+// 1. Docker networks (shared network = connection)
+// 2. Environment variables (*_HOST, *_URL, *_ADDR patterns)
+// 3. Labels Traefik (proxy detection)
+func inferTopologyLinks(db *database.DB, containers []models.NetworkContainer, networks []models.DockerNetwork) []models.TopologyLink {
+	var links []models.TopologyLink
+
+	// Build container lookup map
+	containerByName := make(map[string]models.NetworkContainer)
+	containerByID := make(map[string]models.NetworkContainer)
+	for _, c := range containers {
+		containerByName[c.Name] = c
+		containerByID[c.ID] = c
+	}
+
+	// Rule 1: Docker networks - containers on same network are connected
+	for _, network := range networks {
+		if len(network.ContainerIDs) < 2 {
+			continue
+		}
+		// Create links between all pairs of containers on this network
+		for i := 0; i < len(network.ContainerIDs)-1; i++ {
+			for j := i + 1; j < len(network.ContainerIDs); j++ {
+				cA, okA := containerByID[network.ContainerIDs[i]]
+				cB, okB := containerByID[network.ContainerIDs[j]]
+				if !okA || !okB || cA.Name == "" || cB.Name == "" {
+					continue
+				}
+				links = append(links, models.TopologyLink{
+					SourceContainerName: cA.Name,
+					SourceHostID:        cA.HostID,
+					TargetContainerName: cB.Name,
+					TargetHostID:        cB.HostID,
+					LinkType:            "network",
+					NetworkName:         network.Name,
+					Confidence:          70,
+				})
+			}
+		}
+	}
+
+	// Rule 2: Environment variables referencing other containers
+	envs, errEnvs := db.GetAllContainerEnvs()
+	if errEnvs == nil && len(envs) > 0 {
+		for _, env := range envs {
+			source, okSource := containerByName[env.ContainerName]
+			if !okSource || source.Name == "" {
+				continue
+			}
+			// Check each env var for patterns like DB_HOST, REDIS_URL, etc.
+			for key, value := range env.EnvVars {
+				if !isHostLikeVar(key) {
+					continue
+				}
+				// Extract hostname/container name from value
+				targetName := extractContainerNameFromEnv(value)
+				if targetName == "" {
+					continue
+				}
+				target, okTarget := containerByName[targetName]
+				if !okTarget || target.Name == "" {
+					continue
+				}
+				links = append(links, models.TopologyLink{
+					SourceContainerName: source.Name,
+					SourceHostID:        source.HostID,
+					TargetContainerName: target.Name,
+					TargetHostID:        target.HostID,
+					LinkType:            "env_ref",
+					EnvKey:              key,
+					Confidence:          90,
+				})
+			}
+		}
+	}
+
+	// Rule 3: Traefik/Proxy labels - proxy to services
+	proxyImages := []string{"nginx", "traefik", "caddy", "haproxy", "proxy"}
+	for _, c := range containers {
+		isProxy := false
+		for _, proxyImg := range proxyImages {
+			if strings.Contains(strings.ToLower(c.Image), proxyImg) {
+				isProxy = true
+				break
+			}
+		}
+		if !isProxy {
+			continue
+		}
+		// This is a proxy, find services it might serve
+		// Look for other containers with common frameworks
+		for _, target := range containers {
+			if target.ID == c.ID {
+				continue
+			}
+			// Simple heuristic: if target has known service ports or labels
+			if hasServiceIndicators(target) {
+				links = append(links, models.TopologyLink{
+					SourceContainerName: c.Name,
+					SourceHostID:        c.HostID,
+					TargetContainerName: target.Name,
+					TargetHostID:        target.HostID,
+					LinkType:            "proxy",
+					Confidence:          60,
+				})
+			}
+		}
+	}
+
+	// Deduplicate links
+	return deduplicateLinks(links)
+}
+
+// isHostLikeVar checks if an env var name suggests a hostname/connection
+func isHostLikeVar(key string) bool {
+	upperKey := strings.ToUpper(key)
+	patterns := []string{"_HOST", "_URL", "_ADDR", "_ENDPOINT", "_SERVICE", "_DATABASE_URL", "_CONNECTION", "_SERVER"}
+	for _, pattern := range patterns {
+		if strings.Contains(upperKey, pattern) {
+			return true
+		}
+	}
+	return false
+}
+
+// extractContainerNameFromEnv extracts a container name from an env var value
+func extractContainerNameFromEnv(value string) string {
+	// Remove common protocols
+	value = strings.TrimPrefix(value, "http://")
+	value = strings.TrimPrefix(value, "https://")
+	value = strings.TrimPrefix(value, "postgres://")
+	value = strings.TrimPrefix(value, "mysql://")
+	value = strings.TrimPrefix(value, "redis://")
+
+	// Remove port number (everything after :)
+	if idx := strings.Index(value, ":"); idx > 0 {
+		value = value[:idx]
+	}
+
+	// Remove path (everything after /)
+	if idx := strings.Index(value, "/"); idx > 0 {
+		value = value[:idx]
+	}
+
+	// Remove query string
+	if idx := strings.Index(value, "?"); idx > 0 {
+		value = value[:idx]
+	}
+
+	value = strings.TrimSpace(value)
+	if len(value) > 2 {
+		return value
+	}
+	return ""
+}
+
+// hasServiceIndicators checks if a container looks like a service
+func hasServiceIndicators(c models.NetworkContainer) bool {
+	// Check if image contains known service keywords
+	imageWords := strings.ToLower(c.Image)
+	serviceKeywords := []string{
+		"postgres", "mysql", "redis", "mongodb", "elasticsearch",
+		"app", "api", "service", "backend", "frontend", "web",
+		"node", "python", "java", "go", "rust",
+		"nginx", "apache", "gunicorn", "uwsgi",
+	}
+	for _, keyword := range serviceKeywords {
+		if strings.Contains(imageWords, keyword) {
+			return true
+		}
+	}
+	return false
+}
+
+// deduplicateLinks removes duplicate links
+func deduplicateLinks(links []models.TopologyLink) []models.TopologyLink {
+	seen := make(map[string]bool)
+	var result []models.TopologyLink
+	for _, link := range links {
+		// Create a key based on source, target, and type
+		key := link.SourceContainerName + "|" + link.TargetContainerName + "|" + link.LinkType
+		if !seen[key] {
+			seen[key] = true
+			result = append(result, link)
+		}
+	}
+	return result
 }

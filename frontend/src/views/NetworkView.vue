@@ -49,19 +49,18 @@
         <div class="btn-group" role="group">
           <input type="radio" class="btn-check" id="viewCards" value="cards" v-model="viewMode" />
           <label class="btn btn-outline-primary" for="viewCards">
-            <svg width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+            <svg width="18" height="18" fill="currentColor" viewBox="0 0 16 16" style="margin-right: 0.25rem;">
               <path d="M1 1a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V1zm10 0a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1V1zM1 11a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1v-4zm10 0a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-4z"/>
             </svg>
-            Cards
+            <span class="d-none d-sm-inline">Cards</span>
           </label>
           
           <input type="radio" class="btn-check" id="viewGraph" value="graph" v-model="viewMode" />
           <label class="btn btn-outline-primary" for="viewGraph">
-            <svg width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
-              <path d="M12 1a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1h8zM4 0a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V2a2 2 0 0 0-2-2H4z"/>
-              <path d="M5 6a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm3 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0zM5 9a1 1 0 1 1-2 0 1 1 0 0 1 2 0zm3 0a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/>
+            <svg width="18" height="18" fill="currentColor" viewBox="0 0 16 16" style="margin-right: 0.25rem;">
+              <path d="M0 2a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V2zm2.5 7a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-1zm2-4a.5.5 0 0 0-.5.5v5a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-5a.5.5 0 0 0-.5-.5h-1zm2-2a.5.5 0 0 0-.5.5v8a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5V3.5a.5.5 0 0 0-.5-.5h-1zm2-1a.5.5 0 0 0-.5.5v9a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5V2.5a.5.5 0 0 0-.5-.5h-1z"/>
             </svg>
-            Graph
+            <span class="d-none d-sm-inline">Graph</span>
           </label>
         </div>
       </div>
@@ -74,16 +73,30 @@
           <h3 class="card-title mb-1">Network Topology</h3>
           <div class="text-secondary small">Glisser pour reordonner, scroll pour zoomer</div>
         </div>
-        <div class="text-secondary small">
-          {{ hosts.length }} hotes • {{ totalPorts }} ports publies
+        <div class="d-flex align-items-center gap-3">
+          <div v-if="saveStatus !== 'idle'" class="d-flex align-items-center gap-2">
+            <span v-if="saveStatus === 'saving'" class="spinner-border spinner-border-sm"></span>
+            <span v-else-if="saveStatus === 'saved'" class="text-success small">✓ Enregistré</span>
+            <span v-else-if="saveStatus === 'error'" class="text-danger small">✗ Erreur</span>
+          </div>
+          <div class="text-secondary small">
+            {{ hosts.length }} hotes • {{ totalPorts }} ports publies
+          </div>
         </div>
       </div>
-      <div class="network-subnav">
+      <div class="network-subnav" style="gap: 0.5rem;">
         <button class="btn" :class="networkTab === 'topology' ? 'btn-primary' : 'btn-outline-primary'" @click="networkTab = 'topology'">
+          <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16" style="margin-right: 0.25rem; display: inline;"><path d="M2 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v13.5a.5.5 0 0 1-.777.416L8 13.71l-5.223 2.206A.5.5 0 0 1 2 15.5V2zm2-1a1 1 0 0 0-1 1v12.566l4.723-2.482a.5.5 0 0 1 .554 0L13 14.566V2a1 1 0 0 0-1-1H4z"/></svg>
           Topology
         </button>
         <button class="btn" :class="networkTab === 'config' ? 'btn-primary' : 'btn-outline-primary'" @click="networkTab = 'config'">
+          <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16" style="margin-right: 0.25rem; display: inline;"><path d="M9.405 1.05c-.413-1.4-2.397-1.4-2.81 0l-.1.34a1.464 1.464 0 0 1-2.105.872l-.31-.17c-1.283-.698-2.686.264-2.17 1.655l.119.355a1.464 1.464 0 0 1-1.738 1.738l-.355-.119c-1.39-.516-2.353 1.102-1.656 2.17l.17.31a1.464 1.464 0 0 1-.872 2.105l-.34.1c-1.4.413-1.4 2.397 0 2.81l.34.1a1.464 1.464 0 0 1 .872 2.105l-.17.31c-.697 1.283.264 2.686 1.655 2.17l.355-.119a1.464 1.464 0 0 1 1.738 1.738l-.119.355c-.516 1.39 1.102 2.353 2.17 1.656l.31-.17a1.464 1.464 0 0 1 2.105.872l.1.34c.413 1.4 2.397 1.4 2.81 0l.1-.34a1.464 1.464 0 0 1 2.105-.872l.31.17c1.283.697 2.686-.264 2.17-1.655l-.119-.355a1.464 1.464 0 0 1 1.738-1.738l.355.119c1.39.516 2.353-1.102 1.656-2.17l-.17-.31a1.464 1.464 0 0 1 .872-2.105l.34-.1c1.4-.413 1.4-2.397 0-2.81l-.34-.1a1.464 1.464 0 0 1-.872-2.105l.17-.31c.697-1.283-.264-2.686-1.655-2.17l-.355.119a1.464 1.464 0 0 1-1.738-1.738l.119-.355c.516-1.39-1.102-2.353-2.17-1.656l-.31.17a1.464 1.464 0 0 1-2.105-.872l-.1-.34zM8 10.93a2.929 2.929 0 1 1 0-5.86 2.929 2.929 0 0 1 0 5.858z"/></svg>
           Configuration
+        </button>
+        <button class="btn" :class="networkTab === 'auto' ? 'btn-primary' : 'btn-outline-primary'" @click="networkTab = 'auto'">
+          <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16" style="margin-right: 0.25rem; display: inline;"><path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492zM5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0z"/><path d="M9.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 0 1-1.255.52l-.292-.16c-1.64-.892-3.433.902-2.54 2.541l.159.292a.873.873 0 0 1-.52 1.255l-.319.094c-1.79.527-1.79 3.065 0 3.592l.319.094a.873.873 0 0 1 .52 1.255l-.16.292c-.892 1.64.901 3.434 2.541 2.54l.292-.159a.873.873 0 0 1 1.255.52l.094.319c.527 1.79 3.065 1.79 3.592 0l.094-.319a.873.873 0 0 1 1.255-.52l.292.16c1.64.893 3.434-.902 2.54-2.541l-.159-.292a.873.873 0 0 1 .52-1.255l.319-.094c1.79-.527 1.79-3.065 0-3.592l-.319-.094a.873.873 0 0 1-.52-1.255l.16-.292c.893-1.64-.902-3.433-2.541-2.54l-.292.159a.873.873 0 0 1-1.255-.52l-.094-.319zm-2.633.283c.246-.835 1.428-.835 1.674 0l.094.319a1.873 1.873 0 0 0 2.693 1.115l.291-.16c.764-.415 1.6.42 1.184 1.185l-.159.292a1.873 1.873 0 0 0 1.116 2.692l.318.094c.835.246.835 1.428 0 1.674l-.319.094a1.873 1.873 0 0 0-1.115 2.693l.16.291c.415.764-.42 1.6-1.185 1.184l-.291-.159a1.873 1.873 0 0 0-2.693 1.116l-.094.318c-.246.835-1.428.835-1.674 0l-.094-.319a1.873 1.873 0 0 0-2.692-1.115l-.292.16c-.764.415-1.6-.42-1.184-1.185l.159-.291A1.873 1.873 0 0 0 1.945 8.93l-.319-.094c-.835-.246-.835-1.428 0-1.674l.319-.094A1.873 1.873 0 0 0 3.06 4.377l-.16-.292c-.415-.764.42-1.6 1.185-1.184l.292.159a1.873 1.873 0 0 0 2.692-1.115l.094-.319z"/></svg>
+          Auto
+          <span v-if="inferredLinks.length > 0" class="badge bg-blue-lt ms-1">{{ inferredLinks.length }}</span>
         </button>
       </div>
       <div class="card-body network-topology-body">
@@ -227,13 +240,80 @@
             </div>
           </div>
         </div>
-        <div v-else class="network-graph-surface">
+        <div v-else-if="networkTab === 'auto'" class="network-config">
+          <div class="network-config-item">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+              <label class="form-label mb-0">Liens decouverts automatiquement</label>
+              <span v-if="inferredLinks.length === 0" class="text-secondary small">Aucun lien detecte</span>
+              <span v-else class="text-secondary small">{{ inferredLinks.length }} lien(s)</span>
+            </div>
+            <div v-if="inferredLinks.length === 0" class="text-secondary text-center py-4">
+              Les connexions entre conteneurs seront deduites des reseaux Docker, variables d'environnement et configs Traefik.
+            </div>
+            <div v-else class="table-responsive network-config-table">
+              <table class="table table-sm table-vcenter">
+                <thead>
+                  <tr>
+                    <th>Conteneur source</th>
+                    <th></th>
+                    <th>Conteneur cible</th>
+                    <th>Type</th>
+                    <th>Confiance</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="link in inferredLinks" :key="`${link.source}|${link.target}|${link.type}`">
+                    <td class="fw-semibold text-truncate">{{ link.source }}</td>
+                    <td class="text-center text-secondary">→</td>
+                    <td class="fw-semibold text-truncate">{{ link.target }}</td>
+                    <td>
+                      <span v-if="link.type === 'network'" class="badge bg-blue">Network</span>
+                      <span v-else-if="link.type === 'env_ref'" class="badge bg-orange">Env Ref</span>
+                      <span v-else-if="link.type === 'proxy'" class="badge bg-cyan">Proxy</span>
+                      <span v-else class="badge bg-gray">{{ link.type }}</span>
+                    </td>
+                    <td>
+                      <div class="d-flex align-items-center gap-1">
+                        <div class="progress flex-grow-1" style="height: 4px;">
+                          <div class="progress-bar" :style="{ width: (link.confidence || 0) + '%' }"></div>
+                        </div>
+                        <span class="text-secondary small" style="min-width: 30px;">{{ link.confidence || 0 }}%</span>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div v-else ref="graphSurfaceRef" class="network-graph-surface" :style="{ height: graphHeight }">
           <div class="network-topology-toolbar">
-            <div class="text-secondary small">Liens proxy</div>
-            <label class="form-check form-switch m-0">
-              <input v-model="showProxyLinks" class="form-check-input" type="checkbox" />
-              <span class="form-check-label">Afficher Proxy → Service</span>
-            </label>
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+              <div>
+                <div class="text-secondary small mb-1" style="font-weight: 600;">Légende</div>
+                <div class="d-flex gap-2 flex-wrap" style="font-size: 0.85rem;">
+                  <div class="d-flex align-items-center gap-1">
+                    <div style="width: 3px; height: 20px; background: #4f46e5; border-radius: 2px;"></div>
+                    <span class="text-secondary">Conteneur</span>
+                  </div>
+                  <div class="d-flex align-items-center gap-1">
+                    <div style="width: 3px; height: 20px; background: #8b5cf6; border-radius: 2px;"></div>
+                    <span class="text-secondary">Service</span>
+                  </div>
+                  <div class="d-flex align-items-center gap-1">
+                    <div style="width: 3px; height: 20px; background: #06b6d4; border-radius: 2px;"></div>
+                    <span class="text-secondary" v-if="showProxyLinks">Proxy</span>
+                    <span class="text-secondary" v-else>Port interne</span>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <label class="form-check form-switch m-0">
+                  <input v-model="showProxyLinks" class="form-check-input" type="checkbox" />
+                  <span class="form-check-label">{{ showProxyLinks ? 'Masquer' : 'Afficher' }} Proxy → Service</span>
+                </label>
+              </div>
+            </div>
           </div>
           <NetworkGraph
             :data="graphHosts"
@@ -398,6 +478,10 @@ const networkServices = ref([])
 const hostPortConfig = ref([])
 const topologyConfigLoaded = ref(false)
 const configAppliedFromWS = ref(false)
+const inferredLinks = ref([])
+const saveStatus = ref('idle') // 'idle' | 'saving' | 'saved' | 'error'
+const graphSurfaceRef = ref(null)
+const graphHeight = ref('auto')
 const auth = useAuthStore()
 
 // Save view mode to localStorage only (local UI preference)
@@ -454,6 +538,7 @@ async function loadTopologyConfig() {
 async function saveTopologyConfig() {
   if (!topologyConfigLoaded.value) return // Don't save until fully loaded
   try {
+    saveStatus.value = 'saving'
     const config = {
       root_label: rootNodeName.value,
       root_ip: rootNodeIp.value,
@@ -464,8 +549,17 @@ async function saveTopologyConfig() {
       manual_services: JSON.stringify(networkServices.value)
     }
     await apiClient.saveTopologyConfig(config)
+    saveStatus.value = 'saved'
+    // Auto-reset to idle after 3 seconds
+    setTimeout(() => {
+      if (saveStatus.value === 'saved') saveStatus.value = 'idle'
+    }, 3000)
   } catch (e) {
     console.warn('Failed to save topology config:', e)
+    saveStatus.value = 'error'
+    setTimeout(() => {
+      if (saveStatus.value === 'error') saveStatus.value = 'idle'
+    }, 3000)
   }
 }
 
@@ -660,64 +754,13 @@ function formatBytes(bytes) {
   return `${value.toFixed(1)} ${units[idx]}`
 }
 
-function hostLabel(hostId) {
-  const host = hosts.value.find((item) => item.id === hostId)
-  return host?.name || host?.hostname || host?.ip_address || hostId
-}
-
-function parseStoredHostPorts(raw) {
-  if (!raw) return []
-  try {
-    const parsed = JSON.parse(raw)
-    if (!Array.isArray(parsed)) return []
-    return parsed.map((entry) => {
-      if (entry?.ports) return entry
-      const ports = {}
-      const excluded = parsePortList(entry?.excludedPortsText || '')
-      const map = parsePortMap(entry?.portMapText || '')
-      for (const port of Object.keys(map)) {
-        const portNumber = Number(port)
-        ports[portNumber] = {
-          name: map[portNumber],
-          domain: '',
-          path: '/',
-          enabled: !excluded.includes(portNumber),
-          linkToProxy: false
-        }
-      }
-      return { hostId: entry?.hostId, ports }
-    })
-  } catch (err) {
-    return []
-  }
-}
-
-function parsePortList(text) {
-  if (!text) return []
-  return Array.from(new Set(text.split(/\s*,\s*/).map(entry => Number(entry.trim())).filter(Boolean)))
-}
-
-function parsePortMap(text) {
-  const map = {}
-  if (!text) return map
-  const lines = text.split(/\r?\n|,/).map(line => line.trim()).filter(Boolean)
-  for (const line of lines) {
-    const [portRaw, ...nameParts] = line.split(/[=:]/)
-    const port = Number(portRaw?.trim())
-    const name = nameParts.join(':').trim()
-    if (!port || !name) continue
-    map[port] = name
-  }
-  return map
-}
-
 function getPortSetting(hostId, portNumber) {
-  const entry = getHostPortEntry(hostId)
-  const key = String(portNumber)
-  if (!entry.ports[key]) {
-    entry.ports[key] = { name: '', domain: '', path: '/', enabled: true, linkToProxy: false }
+  const entry = hostPortConfig.value.find((item) => item.hostId === hostId)
+  if (!entry) {
+    return { name: '', domain: '', path: '/', enabled: true, linkToProxy: false }
   }
-  return entry.ports[key]
+  const key = String(portNumber)
+  return entry.ports[key] || { name: '', domain: '', path: '/', enabled: true, linkToProxy: false }
 }
 
 function updatePortSetting(hostId, portNumber, property, value) {
@@ -755,10 +798,14 @@ function ensureHostPortConfig() {
     if (known.has(host.id)) continue
     hostPortConfig.value.push({ hostId: host.id, ports: {} })
   }
+  // Pre-initialize all discovered ports
   for (const [hostId, ports] of Object.entries(discoveredPortsByHost.value)) {
     const entry = getHostPortEntry(hostId)
     for (const port of ports) {
-      getPortSetting(hostId, port.port)
+      const portKey = String(port.port)
+      if (!entry.ports[portKey]) {
+        entry.ports[portKey] = { name: '', domain: '', path: '/', enabled: true, linkToProxy: false }
+      }
     }
   }
 }
@@ -820,6 +867,7 @@ const { wsStatus, wsError, retryCount, reconnect } = useWebSocket('/api/v1/ws/ne
   hosts.value = payload.hosts || []
   containers.value = payload.containers || []
   networks.value = payload.networks || []
+  inferredLinks.value = payload.links || []
   
   // Apply config from WebSocket only once, on initial connection, and only if not already loaded from REST
   if (payload.config && !configAppliedFromWS.value && !topologyConfigLoaded.value) {
@@ -837,6 +885,18 @@ onMounted(async () => {
   await loadTopologyConfig()
   // Then fetch snapshot to populate real hosts/containers
   await fetchSnapshot()
+  
+  // Setup ResizeObserver for dynamic graph height
+  if (graphSurfaceRef.value) {
+    const resizeObserver = new ResizeObserver(() => {
+      const rect = graphSurfaceRef.value?.getBoundingClientRect()
+      if (rect) {
+        const availableHeight = window.innerHeight - rect.top - 20
+        graphHeight.value = Math.max(400, availableHeight) + 'px'
+      }
+    })
+    resizeObserver.observe(graphSurfaceRef.value)
+  }
 })
 
 onUnmounted(() => {
@@ -868,14 +928,27 @@ onUnmounted(() => {
   border-bottom: 1px solid rgba(148, 163, 184, 0.2);
   background: rgba(15, 23, 42, 0.45);
   overflow-y: auto;
-  max-height: calc(60vh - 120px);
+  max-height: calc(100vh - 260px);
 }
 
 .network-config-row {
   display: grid;
-  grid-template-columns: minmax(180px, 260px) minmax(220px, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 16px;
   margin-bottom: 12px;
+  align-items: start;
+}
+
+@media (max-width: 1400px) {
+  .network-config-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .network-config-row {
+    grid-template-columns: 1fr;
+  }
 }
 
 .network-config-item .form-label {
@@ -929,8 +1002,7 @@ onUnmounted(() => {
 
 .network-graph-surface {
   flex: 1;
-  min-height: 600px;
-  height: calc(100vh - 300px);
+  min-height: 400px;
   padding: 16px 18px 18px;
   display: flex;
   flex-direction: column;

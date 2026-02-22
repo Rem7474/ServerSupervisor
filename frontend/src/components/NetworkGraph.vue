@@ -76,7 +76,6 @@ const emit = defineEmits(['host-click'])
 const svgRef = ref(null)
 const tooltipRef = ref(null)
 const hasData = computed(() => Array.isArray(props.data) && props.data.length > 0)
-let simulation = null
 
 const statusColors = {
   online: '#22c55e',
@@ -178,11 +177,6 @@ const render = () => {
 
   d3.select(svgRef.value).selectAll('*').remove()
   if (!hasData.value) return
-
-  if (simulation) {
-    simulation.stop()
-    simulation = null
-  }
 
   const root = buildHierarchy()
   if (!root.children || root.children.length === 0) return
@@ -340,9 +334,9 @@ const render = () => {
     .attr('rx', 10)
     .attr('ry', 10)
     .attr('x', -110)
-    .attr('y', -18)
+    .attr('y', -21)
     .attr('width', 220)
-    .attr('height', 36)
+    .attr('height', 42)
     .attr('fill', d => statusColors[d.data.status] ? 'rgba(30, 41, 59, 0.85)' : 'rgba(30, 41, 59, 0.85)')
     .attr('stroke', d => statusColors[d.data.status] || statusColors.unknown)
     .attr('stroke-width', 1.6)
@@ -370,7 +364,7 @@ const render = () => {
   hostNodes
     .append('text')
     .attr('text-anchor', 'middle')
-    .attr('dy', '-0.1em')
+    .attr('dy', '-0.5em')
     .style('font-size', '12px')
     .style('font-weight', '600')
     .style('fill', '#f8fafc')
@@ -399,9 +393,9 @@ const render = () => {
     .attr('rx', 10)
     .attr('ry', 10)
     .attr('x', -130)
-    .attr('y', -22)
+    .attr('y', -30)
     .attr('width', 260)
-    .attr('height', 44)
+    .attr('height', 60)
     .attr('fill', 'rgba(15, 23, 42, 0.86)')
     .attr('stroke', '#38bdf8')
     .attr('stroke-width', 1.3)
@@ -427,7 +421,7 @@ const render = () => {
   serviceNodes
     .append('text')
     .attr('text-anchor', 'middle')
-    .attr('dy', '-0.2em')
+    .attr('dy', '-0.7em')
     .style('font-size', '11px')
     .style('font-weight', '600')
     .style('fill', '#e2e8f0')
@@ -457,9 +451,9 @@ const render = () => {
     .attr('rx', 8)
     .attr('ry', 8)
     .attr('x', -90)
-    .attr('y', -14)
+    .attr('y', -16)
     .attr('width', 180)
-    .attr('height', 28)
+    .attr('height', 32)
     .attr('fill', 'rgba(15, 23, 42, 0.82)')
     .attr('stroke', d => protocolColors[d.data.protocol] || protocolColors.other)
     .attr('stroke-width', 1.2)
@@ -527,7 +521,6 @@ onMounted(() => {
 
   onUnmounted(() => {
     window.removeEventListener('resize', handleResize)
-    if (simulation) simulation.stop()
   })
 })
 
