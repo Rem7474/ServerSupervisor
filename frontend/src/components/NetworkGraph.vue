@@ -18,6 +18,10 @@
         <span class="legend-dot port-udp"></span>
         Port UDP
       </div>
+      <div class="legend-item">
+        <span class="legend-dot service-node"></span>
+        Service expose
+      </div>
     </div>
     <div v-if="!hasData" class="graph-empty">
       <div class="empty-title">Aucune topologie disponible</div>
@@ -36,6 +40,22 @@ const props = defineProps({
   data: {
     type: Array, // Array of host objects with containers
     required: true
+  },
+  rootLabel: {
+    type: String,
+    default: 'root'
+  },
+  serviceMap: {
+    type: Object,
+    default: () => ({})
+  },
+  excludedPorts: {
+    type: Array,
+    default: () => []
+  },
+  services: {
+    type: Array,
+    default: () => []
   }
 })
 
@@ -47,52 +67,89 @@ const hasData = computed(() => Array.isArray(props.data) && props.data.length > 
 let simulation = null
 
 const statusColors = {
-  online: '#10b981',
+  online: '#22c55e',
   warning: '#f59e0b',
   offline: '#ef4444',
   unknown: '#94a3b8'
 }
 
 const protocolColors = {
-  tcp: '#2563eb',
-  udp: '#f97316',
-  other: '#14b8a6'
+  tcp: '#60a5fa',
+  udp: '#fb923c',
+  other: '#34d399'
 }
 
-const buildGraphData = () => {
-  const nodes = []
-  const links = []
-
-  for (const host of props.data) {
-    const hostNode = {
-      id: `host-${host.id}`,
-      type: 'host',
-      name: host.name || host.hostname || host.id,
-      status: host.status || 'unknown',
-      hostId: host.id,
-      portCount: (host.ports || []).length,
-      containerCount: (host.containers || []).length
+const buildHierarchy = () => {
+  const excluded = new Set((props.excludedPorts || []).map(value => Number(value)).filter(Boolean))
+  const servicesByHost = new Map()
+  for (const service of props.services || []) {
+    if (!service?.hostId) continue
+    if (!servicesByHost.has(service.hostId)) {
+      servicesByHost.set(service.hostId, [])
     }
-    nodes.push(hostNode)
+    servicesByHost.get(service.hostId).push(service)
+  }
+  const root = {
+    id: 'root',
+    name: props.rootLabel || 'root',
+    type: 'root',
+    children: props.data.map((host) => {
+      const rawPorts = host.ports || []
+      const filteredPorts = rawPorts.filter((port) => {
+        const portNumber = Number(port.port || 0)
+        return portNumber && !excluded.has(portNumber)
+      })
+      const hostServices = servicesByHost.get(host.id) || []
 
-    const ports = host.ports || []
-    for (const port of ports) {
-      const protocol = (port.protocol || 'tcp').toLowerCase()
-      const portNode = {
-        id: `port-${host.id}-${port.port}-${protocol}`,
-        type: 'port',
-        name: `${port.port}/${protocol.toUpperCase()}`,
-        protocol,
-        port: port.port,
+      return {
+        id: `host-${host.id}`,
+        name: host.name || host.hostname || host.id,
+        type: 'host',
         hostId: host.id,
-        containers: port.containers || []
+        status: host.status || 'unknown',
+        portCount: hostServices.length ? hostServices.length : filteredPorts.length,
+        ipAddress: host.ip_address,
+        children: hostServices.length
+          ? hostServices.map((service) => {
+            const internalPort = Number(service.internalPort || 0)
+            const externalPort = Number(service.externalPort || 0)
+            const path = service.path || '/'
+            const domain = service.domain || ''
+            const name = service.name || 'Service'
+            const label = domain ? `${domain}${path}` : path
+            return {
+              id: `service-${host.id}-${service.id}`,
+              name,
+              subtitle: label,
+              internalPort,
+              externalPort,
+              type: 'service',
+              protocol: 'tcp',
+              port: internalPort,
+              hostId: host.id,
+              tags: service.tags || ''
+            }
+          })
+          : filteredPorts.map((port) => {
+            const portNumber = Number(port.port || 0)
+            const protocol = (port.protocol || 'tcp').toLowerCase()
+            const serviceName = props.serviceMap?.[portNumber]
+            const label = serviceName ? `${serviceName} (${portNumber}/${protocol.toUpperCase()})` : `${portNumber}/${protocol.toUpperCase()}`
+            return {
+              id: `port-${host.id}-${port.port}-${protocol}`,
+              name: label,
+              type: 'port',
+              protocol,
+              port: portNumber,
+              hostId: host.id,
+              containers: port.containers || []
+            }
+          })
       }
-      nodes.push(portNode)
-      links.push({ source: hostNode.id, target: portNode.id, protocol })
-    }
+    })
   }
 
-  return { nodes, links }
+  return d3.hierarchy(root)
 }
 
 const render = () => {
@@ -109,8 +166,8 @@ const render = () => {
     simulation = null
   }
 
-  const { nodes, links } = buildGraphData()
-  if (!nodes.length) return
+  const root = buildHierarchy()
+  if (!root.children || root.children.length === 0) return
 
   const svg = d3.select(svgRef.value)
     .attr('width', width)
@@ -121,88 +178,104 @@ const render = () => {
     .attr('id', 'node-shadow')
     .append('feDropShadow')
     .attr('dx', 0)
-    .attr('dy', 6)
-    .attr('stdDeviation', 6)
-    .attr('flood-opacity', 0.25)
+    .attr('dy', 10)
+    .attr('stdDeviation', 8)
+    .attr('flood-opacity', 0.45)
 
   const g = svg.append('g').attr('class', 'graph-root')
 
   const zoom = d3.zoom()
-    .scaleExtent([0.4, 2.6])
+    .scaleExtent([0.6, 2.2])
     .on('zoom', (event) => {
       g.attr('transform', event.transform)
     })
 
   svg.call(zoom)
 
+  const treeLayout = d3.tree().size([height - 100, width - 260])
+  treeLayout.separation((a, b) => (a.parent === b.parent ? 1.2 : 2))
+
+  const treeData = treeLayout(root)
+
   const linkGroup = g.append('g').attr('class', 'links')
   const nodeGroup = g.append('g').attr('class', 'nodes')
 
-  const link = linkGroup
-    .selectAll('line')
-    .data(links)
+  linkGroup
+    .selectAll('path')
+    .data(treeData.links())
     .enter()
-    .append('line')
+    .append('path')
     .attr('class', 'link')
-    .attr('stroke', d => protocolColors[d.protocol] || protocolColors.other)
-    .attr('stroke-width', 1.8)
-    .attr('opacity', 0.55)
-
-  const drag = d3.drag()
-    .on('start', (event, d) => {
-      if (!event.active) simulation.alphaTarget(0.3).restart()
-      d.fx = d.x
-      d.fy = d.y
-    })
-    .on('drag', (event, d) => {
-      d.fx = event.x
-      d.fy = event.y
-    })
-    .on('end', (event, d) => {
-      if (!event.active) simulation.alphaTarget(0)
-      d.fx = null
-      d.fy = null
-    })
-
-  const node = nodeGroup
-    .selectAll('g')
-    .data(nodes)
-    .enter()
-    .append('g')
-    .attr('class', d => `node ${d.type}`)
-    .style('cursor', d => d.type === 'host' ? 'pointer' : 'default')
-    .call(drag)
-
-  node.append('circle')
-    .attr('r', d => d.type === 'host' ? 18 : 8)
-    .attr('fill', d => {
-      if (d.type === 'host') return statusColors[d.status] || statusColors.unknown
-      return protocolColors[d.protocol] || protocolColors.other
+    .attr('d', (d) => {
+      const startX = d.source.y
+      const startY = d.source.x
+      const endX = d.target.y
+      const endY = d.target.x
+      const midX = (startX + endX) / 2
+      return `M${startX},${startY} C${midX},${startY} ${midX},${endY} ${endX},${endY}`
     })
     .attr('stroke', d => {
-      if (d.type === 'host') return '#0f172a'
-      return '#1f2937'
+      if (d.target.data.type === 'host') return 'rgba(148, 163, 184, 0.7)'
+      const protocol = d.target.data.protocol
+      return protocolColors[protocol] || protocolColors.other
     })
-    .attr('stroke-width', d => d.type === 'host' ? 2 : 1)
-    .attr('filter', d => d.type === 'host' ? 'url(#node-shadow)' : null)
+    .attr('stroke-width', d => (d.target.data.type === 'host' ? 2.4 : 1.4))
+    .attr('opacity', 0.7)
+
+  const nodes = nodeGroup
+    .selectAll('g')
+    .data(treeData.descendants())
+    .enter()
+    .append('g')
+    .attr('class', d => `node ${d.data.type}`)
+    .attr('transform', d => `translate(${d.y + 100},${d.x + 40})`)
+    .style('cursor', d => d.data.type === 'host' ? 'pointer' : 'default')
+
+  const rootNodes = nodes.filter(d => d.data.type === 'root')
+  const hostNodes = nodes.filter(d => d.data.type === 'host')
+  const serviceNodes = nodes.filter(d => d.data.type === 'service')
+  const portNodes = nodes.filter(d => d.data.type === 'port')
+
+  rootNodes
+    .append('rect')
+    .attr('rx', 12)
+    .attr('ry', 12)
+    .attr('x', -120)
+    .attr('y', -22)
+    .attr('width', 240)
+    .attr('height', 44)
+    .attr('fill', 'rgba(15, 23, 42, 0.9)')
+    .attr('stroke', '#94a3b8')
+    .attr('stroke-width', 1.4)
+    .attr('filter', 'url(#node-shadow)')
+
+  rootNodes
+    .append('text')
+    .attr('text-anchor', 'middle')
+    .attr('dy', '0.35em')
+    .style('font-size', '13px')
+    .style('font-weight', '700')
+    .style('fill', '#e2e8f0')
+    .text(d => d.data.name)
+
+  hostNodes
+    .append('rect')
+    .attr('rx', 10)
+    .attr('ry', 10)
+    .attr('x', -110)
+    .attr('y', -18)
+    .attr('width', 220)
+    .attr('height', 36)
+    .attr('fill', d => statusColors[d.data.status] ? 'rgba(30, 41, 59, 0.85)' : 'rgba(30, 41, 59, 0.85)')
+    .attr('stroke', d => statusColors[d.data.status] || statusColors.unknown)
+    .attr('stroke-width', 1.6)
+    .attr('filter', 'url(#node-shadow)')
     .on('click', (event, d) => {
-      if (d.type === 'host') {
-        emit('host-click', d.hostId)
-      }
+      emit('host-click', d.data.hostId)
     })
     .on('mouseover', (event, d) => {
       if (!tooltipRef.value) return
-      const lines = []
-      if (d.type === 'host') {
-        lines.push(d.name)
-        lines.push(`Statut: ${d.status}`)
-        lines.push(`Ports: ${d.portCount}`)
-        if (d.containerCount) lines.push(`Conteneurs: ${d.containerCount}`)
-      } else {
-        lines.push(`Port ${d.port}/${(d.protocol || 'tcp').toUpperCase()}`)
-        if (d.containers?.length) lines.push(`Conteneurs: ${d.containers.length}`)
-      }
-
+      const lines = [d.data.name, `Statut: ${d.data.status}`, `Ports: ${d.data.portCount}`]
       tooltipRef.value.innerHTML = lines.map(line => `<div>${line}</div>`).join('')
       tooltipRef.value.style.display = 'block'
       tooltipRef.value.style.left = `${event.pageX + 12}px`
@@ -214,49 +287,123 @@ const render = () => {
       tooltipRef.value.style.top = `${event.pageY + 12}px`
     })
     .on('mouseout', () => {
-      if (tooltipRef.value) {
-        tooltipRef.value.style.display = 'none'
+      if (tooltipRef.value) tooltipRef.value.style.display = 'none'
+    })
+
+  hostNodes
+    .append('text')
+    .attr('text-anchor', 'middle')
+    .attr('dy', '-0.1em')
+    .style('font-size', '12px')
+    .style('font-weight', '600')
+    .style('fill', '#f8fafc')
+    .each(function (d) {
+      const text = d3.select(this)
+      text.append('tspan').text(d.data.name)
+      if (d.data.ipAddress) {
+        text.append('tspan')
+          .attr('x', 0)
+          .attr('dy', '1.3em')
+          .style('font-size', '10px')
+          .style('fill', '#cbd5f5')
+          .text(d.data.ipAddress)
       }
     })
 
-  node
-    .filter(d => d.type === 'host')
-    .append('text')
-    .attr('x', 26)
-    .attr('dy', '0.31em')
-    .style('font-size', '12px')
-    .style('font-weight', '600')
-    .style('fill', '#0f172a')
-    .text(d => d.name)
+  hostNodes
+    .append('circle')
+    .attr('r', 5)
+    .attr('cx', -118)
+    .attr('cy', 0)
+    .attr('fill', d => statusColors[d.data.status] || statusColors.unknown)
 
-  const showPortLabels = nodes.filter(n => n.type === 'port').length <= 24
-  if (showPortLabels) {
-    node
-      .filter(d => d.type === 'port')
-      .append('text')
-      .attr('x', 14)
-      .attr('dy', '0.35em')
-      .style('font-size', '10px')
-      .style('fill', '#1f2937')
-      .text(d => d.name)
-  }
-
-  simulation = d3.forceSimulation(nodes)
-    .force('link', d3.forceLink(links).id(d => d.id).distance(d => d.protocol ? 70 : 120))
-    .force('charge', d3.forceManyBody().strength(d => d.type === 'host' ? -420 : -90))
-    .force('collision', d3.forceCollide().radius(d => d.type === 'host' ? 34 : 16))
-    .force('center', d3.forceCenter(width / 2, height / 2))
-    .force('x', d3.forceX(width / 2).strength(0.05))
-    .force('y', d3.forceY(height / 2).strength(0.05))
-    .on('tick', () => {
-      link
-        .attr('x1', d => d.source.x)
-        .attr('y1', d => d.source.y)
-        .attr('x2', d => d.target.x)
-        .attr('y2', d => d.target.y)
-
-      node.attr('transform', d => `translate(${d.x},${d.y})`)
+  serviceNodes
+    .append('rect')
+    .attr('rx', 10)
+    .attr('ry', 10)
+    .attr('x', -130)
+    .attr('y', -22)
+    .attr('width', 260)
+    .attr('height', 44)
+    .attr('fill', 'rgba(15, 23, 42, 0.86)')
+    .attr('stroke', '#38bdf8')
+    .attr('stroke-width', 1.3)
+    .attr('filter', 'url(#node-shadow)')
+    .on('mouseover', (event, d) => {
+      if (!tooltipRef.value) return
+      const lines = [d.data.name, d.data.subtitle, `Interne: ${d.data.internalPort || '-'} / Externe: ${d.data.externalPort || '-'}`]
+      if (d.data.tags) lines.push(`Tags: ${d.data.tags}`)
+      tooltipRef.value.innerHTML = lines.map(line => `<div>${line}</div>`).join('')
+      tooltipRef.value.style.display = 'block'
+      tooltipRef.value.style.left = `${event.pageX + 12}px`
+      tooltipRef.value.style.top = `${event.pageY + 12}px`
     })
+    .on('mousemove', (event) => {
+      if (!tooltipRef.value || tooltipRef.value.style.display !== 'block') return
+      tooltipRef.value.style.left = `${event.pageX + 12}px`
+      tooltipRef.value.style.top = `${event.pageY + 12}px`
+    })
+    .on('mouseout', () => {
+      if (tooltipRef.value) tooltipRef.value.style.display = 'none'
+    })
+
+  serviceNodes
+    .append('text')
+    .attr('text-anchor', 'middle')
+    .attr('dy', '-0.2em')
+    .style('font-size', '11px')
+    .style('font-weight', '600')
+    .style('fill', '#e2e8f0')
+    .each(function (d) {
+      const text = d3.select(this)
+      text.append('tspan').text(d.data.name)
+      if (d.data.subtitle) {
+        text.append('tspan')
+          .attr('x', 0)
+          .attr('dy', '1.3em')
+          .style('font-size', '10px')
+          .style('fill', '#93c5fd')
+          .text(d.data.subtitle)
+      }
+    })
+
+  portNodes
+    .append('rect')
+    .attr('rx', 8)
+    .attr('ry', 8)
+    .attr('x', -90)
+    .attr('y', -14)
+    .attr('width', 180)
+    .attr('height', 28)
+    .attr('fill', 'rgba(15, 23, 42, 0.82)')
+    .attr('stroke', d => protocolColors[d.data.protocol] || protocolColors.other)
+    .attr('stroke-width', 1.2)
+    .attr('filter', 'url(#node-shadow)')
+    .on('mouseover', (event, d) => {
+      if (!tooltipRef.value) return
+      const lines = [`Port ${d.data.name}`]
+      if (d.data.containers?.length) lines.push(`Conteneurs: ${d.data.containers.length}`)
+      tooltipRef.value.innerHTML = lines.map(line => `<div>${line}</div>`).join('')
+      tooltipRef.value.style.display = 'block'
+      tooltipRef.value.style.left = `${event.pageX + 12}px`
+      tooltipRef.value.style.top = `${event.pageY + 12}px`
+    })
+    .on('mousemove', (event) => {
+      if (!tooltipRef.value || tooltipRef.value.style.display !== 'block') return
+      tooltipRef.value.style.left = `${event.pageX + 12}px`
+      tooltipRef.value.style.top = `${event.pageY + 12}px`
+    })
+    .on('mouseout', () => {
+      if (tooltipRef.value) tooltipRef.value.style.display = 'none'
+    })
+
+  portNodes
+    .append('text')
+    .attr('text-anchor', 'middle')
+    .attr('dy', '0.35em')
+    .style('font-size', '11px')
+    .style('fill', '#e2e8f0')
+    .text(d => d.data.name)
 }
 
 onMounted(() => {
@@ -287,10 +434,11 @@ watch(() => props.data, () => {
   height: 100%;
   min-height: 520px;
   position: relative;
-  background: radial-gradient(circle at 20% 20%, rgba(59, 130, 246, 0.08), transparent 45%),
-    radial-gradient(circle at 80% 0%, rgba(16, 185, 129, 0.08), transparent 40%),
-    linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
-  border: 1px solid #e2e8f0;
+  background: radial-gradient(circle at 15% 20%, rgba(96, 165, 250, 0.18), transparent 42%),
+    radial-gradient(circle at 70% 0%, rgba(16, 185, 129, 0.12), transparent 40%),
+    radial-gradient(circle at 20% 80%, rgba(244, 63, 94, 0.1), transparent 45%),
+    #0b0f1a;
+  border: 1px solid rgba(148, 163, 184, 0.25);
   border-radius: 16px;
   overflow: hidden;
 }
@@ -299,9 +447,8 @@ watch(() => props.data, () => {
   content: '';
   position: absolute;
   inset: 0;
-  background-image: linear-gradient(rgba(148, 163, 184, 0.2) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(148, 163, 184, 0.2) 1px, transparent 1px);
-  background-size: 40px 40px;
+  background-image: radial-gradient(circle, rgba(148, 163, 184, 0.22) 1px, transparent 1px);
+  background-size: 48px 48px;
   opacity: 0.35;
   pointer-events: none;
 }
@@ -316,7 +463,7 @@ watch(() => props.data, () => {
 .d3-tooltip {
   position: fixed;
   padding: 10px 12px;
-  background-color: rgba(15, 23, 42, 0.92);
+  background-color: rgba(15, 23, 42, 0.94);
   color: #e2e8f0;
   border-radius: 8px;
   font-size: 12px;
@@ -333,13 +480,13 @@ watch(() => props.data, () => {
   top: 16px;
   left: 16px;
   padding: 12px 14px;
-  background: rgba(255, 255, 255, 0.85);
-  border: 1px solid rgba(148, 163, 184, 0.4);
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(148, 163, 184, 0.3);
   border-radius: 12px;
   backdrop-filter: blur(10px);
   z-index: 2;
   font-size: 12px;
-  color: #1f2937;
+  color: #e2e8f0;
   min-width: 160px;
 }
 
@@ -349,7 +496,7 @@ watch(() => props.data, () => {
   letter-spacing: 0.4px;
   text-transform: uppercase;
   font-size: 11px;
-  color: #64748b;
+  color: #94a3b8;
 }
 
 .legend-item {
@@ -382,6 +529,10 @@ watch(() => props.data, () => {
   background: #f97316;
 }
 
+.legend-dot.service-node {
+  background: #38bdf8;
+}
+
 .graph-empty {
   position: absolute;
   inset: 0;
@@ -391,14 +542,14 @@ watch(() => props.data, () => {
   justify-content: center;
   z-index: 1;
   text-align: center;
-  color: #64748b;
+  color: #94a3b8;
   padding: 24px;
 }
 
 .empty-title {
   font-size: 18px;
   font-weight: 600;
-  color: #0f172a;
+  color: #f8fafc;
 }
 
 .empty-subtitle {

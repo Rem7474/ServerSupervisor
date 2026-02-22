@@ -79,7 +79,81 @@
         </div>
       </div>
       <div class="card-body network-topology-body">
-        <NetworkGraph :data="hosts" @host-click="handleHostClick" />
+        <div class="network-config">
+          <div class="network-config-row">
+            <div class="network-config-item">
+              <label class="form-label">Reverse proxy</label>
+              <input v-model="rootNodeName" type="text" class="form-control form-control-sm" placeholder="Ex: Nginx Proxy Manager" />
+            </div>
+            <div class="network-config-item">
+              <label class="form-label">Exclure ports</label>
+              <input v-model="excludedPortsText" type="text" class="form-control form-control-sm" placeholder="Ex: 22, 2375, 9000" />
+              <div class="text-secondary small">Liste separee par virgules</div>
+            </div>
+          </div>
+          <div class="network-config-item">
+            <label class="form-label">Nom des services (port=nom)</label>
+            <textarea v-model="servicePortMapText" rows="2" class="form-control form-control-sm" placeholder="80=Nginx Proxy Manager&#10;3000=Vaultwarden"></textarea>
+          </div>
+          <div class="network-config-item mt-3">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+              <label class="form-label mb-0">Services exposes via proxy</label>
+              <button class="btn btn-outline-light btn-sm" @click="addServiceRow">
+                Ajouter un service
+              </button>
+            </div>
+            <div class="table-responsive network-config-table">
+              <table class="table table-sm table-vcenter">
+                <thead>
+                  <tr>
+                    <th>Nom</th>
+                    <th>Domaine</th>
+                    <th>Chemin</th>
+                    <th>Port interne</th>
+                    <th>Port externe</th>
+                    <th>Host</th>
+                    <th>Tags</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="service in networkServices" :key="service.id">
+                    <td><input v-model="service.name" class="form-control form-control-sm" placeholder="Ex: Vaultwarden" /></td>
+                    <td><input v-model="service.domain" class="form-control form-control-sm" placeholder="vault.example.com" /></td>
+                    <td><input v-model="service.path" class="form-control form-control-sm" placeholder="/" /></td>
+                    <td><input v-model.number="service.internalPort" type="number" class="form-control form-control-sm" placeholder="3000" /></td>
+                    <td><input v-model.number="service.externalPort" type="number" class="form-control form-control-sm" placeholder="443" /></td>
+                    <td>
+                      <select v-model="service.hostId" class="form-select form-select-sm">
+                        <option value="">Choisir...</option>
+                        <option v-for="h in hosts" :key="h.id" :value="h.id">
+                          {{ h.name || h.hostname || h.ip_address || h.id }}
+                        </option>
+                      </select>
+                    </td>
+                    <td><input v-model="service.tags" class="form-control form-control-sm" placeholder="auth, admin" /></td>
+                    <td class="text-end">
+                      <button class="btn btn-sm btn-outline-danger" @click="removeServiceRow(service.id)">Supprimer</button>
+                    </td>
+                  </tr>
+                  <tr v-if="networkServices.length === 0">
+                    <td colspan="8" class="text-secondary text-center py-3">Aucun service configure</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+        <div class="network-graph-surface">
+          <NetworkGraph
+            :data="graphHosts"
+            :root-label="rootNodeName"
+            :service-map="servicePortMap"
+            :excluded-ports="excludedPorts"
+            :services="networkServices"
+            @host-click="handleHostClick"
+          />
+        </div>
       </div>
     </div>
 
@@ -220,11 +294,50 @@ const protocolFilter = ref('')
 const hostFilter = ref('')
 const onlyPublished = ref(true)
 const viewMode = ref(localStorage.getItem('networkViewMode') || 'cards')
+const rootNodeName = ref(localStorage.getItem('networkRootName') || 'pve')
+const servicePortMapText = ref(localStorage.getItem('networkServiceMap') || '')
+const excludedPortsText = ref(localStorage.getItem('networkExcludedPorts') || '')
+const storedServices = localStorage.getItem('networkServices')
+const networkServices = ref(parseStoredServices(storedServices))
 const auth = useAuthStore()
 
 // Save view mode to localStorage when it changes
 watch(viewMode, (newMode) => {
   localStorage.setItem('networkViewMode', newMode)
+})
+
+watch(rootNodeName, (value) => {
+  localStorage.setItem('networkRootName', value)
+})
+
+watch(servicePortMapText, (value) => {
+  localStorage.setItem('networkServiceMap', value)
+})
+
+watch(excludedPortsText, (value) => {
+  localStorage.setItem('networkExcludedPorts', value)
+})
+
+watch(networkServices, (value) => {
+  localStorage.setItem('networkServices', JSON.stringify(value))
+}, { deep: true })
+
+const servicePortMap = computed(() => {
+  const map = {}
+  const lines = servicePortMapText.value.split(/\r?\n|,/).map(line => line.trim()).filter(Boolean)
+  for (const line of lines) {
+    const [portRaw, ...nameParts] = line.split(/[=:]/)
+    const port = Number(portRaw?.trim())
+    const name = nameParts.join(':').trim()
+    if (!port || !name) continue
+    map[port] = name
+  }
+  return map
+})
+
+const excludedPorts = computed(() => {
+  const values = excludedPortsText.value.split(/\s*,\s*/).map(entry => Number(entry.trim())).filter(Boolean)
+  return Array.from(new Set(values))
 })
 
 const portRows = computed(() => {
@@ -276,6 +389,47 @@ const totalPorts = computed(() => portRows.value.length)
 const totalRx = computed(() => hosts.value.reduce((sum, h) => sum + (h.network_rx_bytes || 0), 0))
 const totalTx = computed(() => hosts.value.reduce((sum, h) => sum + (h.network_tx_bytes || 0), 0))
 
+const graphHosts = computed(() => {
+  const portsByHost = new Map()
+  for (const container of containers.value) {
+    const mappings = container.port_mappings || []
+    for (const mapping of mappings) {
+      const hostId = container.host_id
+      if (!hostId) continue
+
+      const portNumber = mapping.host_port || mapping.container_port || 0
+      if (!portNumber) continue
+
+      const protocol = (mapping.protocol || 'tcp').toLowerCase()
+      const key = `${portNumber}-${protocol}`
+
+      if (!portsByHost.has(hostId)) {
+        portsByHost.set(hostId, new Map())
+      }
+
+      const hostPorts = portsByHost.get(hostId)
+      if (!hostPorts.has(key)) {
+        hostPorts.set(key, {
+          port: portNumber,
+          protocol,
+          containers: []
+        })
+      }
+
+      const entry = hostPorts.get(key)
+      entry.containers.push(container.name)
+    }
+  }
+
+  return hosts.value.map((host) => {
+    const hostPorts = portsByHost.get(host.id)
+    return {
+      ...host,
+      ports: hostPorts ? Array.from(hostPorts.values()) : []
+    }
+  })
+})
+
 function formatBytes(bytes) {
   if (!bytes && bytes !== 0) return '-'
   if (bytes < 1024) return `${bytes} B`
@@ -287,6 +441,33 @@ function formatBytes(bytes) {
     idx += 1
   }
   return `${value.toFixed(1)} ${units[idx]}`
+}
+
+function parseStoredServices(raw) {
+  if (!raw) return []
+  try {
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed : []
+  } catch (err) {
+    return []
+  }
+}
+
+function addServiceRow() {
+  networkServices.value.push({
+    id: `svc-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    name: '',
+    domain: '',
+    path: '/',
+    internalPort: null,
+    externalPort: null,
+    hostId: '',
+    tags: ''
+  })
+}
+
+function removeServiceRow(serviceId) {
+  networkServices.value = networkServices.value.filter((service) => service.id !== serviceId)
 }
 
 function handleHostClick(hostId) {
@@ -326,12 +507,86 @@ onUnmounted(() => {
   height: 68vh;
   min-height: 520px;
   padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.network-config {
+  padding: 16px 18px 12px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.network-config-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 260px) minmax(220px, 1fr);
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.network-config-item .form-label {
+  font-size: 12px;
+  color: #cbd5f5;
+}
+
+.network-config-item textarea,
+.network-config-item input {
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  color: #e2e8f0;
+}
+
+.network-config-table {
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.network-config-table table {
+  margin: 0;
+}
+
+.network-config-table thead th {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: #94a3b8;
+  background: rgba(15, 23, 42, 0.7);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.network-config-table tbody td {
+  border-top: 1px solid rgba(148, 163, 184, 0.1);
+  vertical-align: middle;
+}
+
+.network-config-table .form-control,
+.network-config-table .form-select {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  color: #e2e8f0;
+}
+
+.network-config-item textarea::placeholder,
+.network-config-item input::placeholder {
+  color: rgba(226, 232, 240, 0.55);
+}
+
+.network-graph-surface {
+  flex: 1;
+  min-height: 0;
+  padding: 16px 18px 18px;
 }
 
 @media (max-width: 991px) {
   .network-topology-body {
     height: 60vh;
     min-height: 420px;
+  }
+
+  .network-config-row {
+    grid-template-columns: 1fr;
   }
 }
 </style>

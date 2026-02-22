@@ -116,7 +116,6 @@
                 <div class="dropdown-divider"></div>
                 <button class="dropdown-item text-danger" @click="handleLogout">Deconnexion</button>
               </div>
-              <div v-if="userMenuOpen" class="user-menu-backdrop" @click="userMenuOpen = false"></div>
             </div>
           </div>
         </div>
@@ -286,10 +285,4 @@ onUnmounted(() => {
   transform: rotate(45deg);
 }
 
-.user-menu-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 1900;
-  background: transparent;
-}
 </style>
