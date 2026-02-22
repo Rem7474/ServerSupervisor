@@ -56,6 +56,10 @@ const props = defineProps({
   services: {
     type: Array,
     default: () => []
+  },
+  hostPortOverrides: {
+    type: Object,
+    default: () => ({})
   }
 })
 
@@ -80,7 +84,7 @@ const protocolColors = {
 }
 
 const buildHierarchy = () => {
-  const excluded = new Set((props.excludedPorts || []).map(value => Number(value)).filter(Boolean))
+  const globalExcluded = (props.excludedPorts || []).map(value => Number(value)).filter(Boolean)
   const servicesByHost = new Map()
   for (const service of props.services || []) {
     if (!service?.hostId) continue
@@ -94,10 +98,16 @@ const buildHierarchy = () => {
     name: props.rootLabel || 'root',
     type: 'root',
     children: props.data.map((host) => {
+      const hostOverride = props.hostPortOverrides?.[host.id]
+      const hostExcluded = new Set([
+        ...globalExcluded,
+        ...(hostOverride?.excludedPorts || [])
+      ].map(value => Number(value)).filter(Boolean))
+      const hostPortMap = hostOverride?.portMap || {}
       const rawPorts = host.ports || []
       const filteredPorts = rawPorts.filter((port) => {
         const portNumber = Number(port.port || 0)
-        return portNumber && !excluded.has(portNumber)
+        return portNumber && !hostExcluded.has(portNumber)
       })
       const hostServices = servicesByHost.get(host.id) || []
 
@@ -133,7 +143,7 @@ const buildHierarchy = () => {
           : filteredPorts.map((port) => {
             const portNumber = Number(port.port || 0)
             const protocol = (port.protocol || 'tcp').toLowerCase()
-            const serviceName = props.serviceMap?.[portNumber]
+            const serviceName = hostPortMap?.[portNumber] || props.serviceMap?.[portNumber]
             const label = serviceName ? `${serviceName} (${portNumber}/${protocol.toUpperCase()})` : `${portNumber}/${protocol.toUpperCase()}`
             return {
               id: `port-${host.id}-${port.port}-${protocol}`,
@@ -197,8 +207,51 @@ const render = () => {
 
   const treeData = treeLayout(root)
 
+  const clusterGroup = g.append('g').attr('class', 'service-clusters')
   const linkGroup = g.append('g').attr('class', 'links')
   const nodeGroup = g.append('g').attr('class', 'nodes')
+
+  const serviceNodesData = treeData.descendants().filter((d) => d.data.type === 'service')
+  const hostNodesData = treeData.descendants().filter((d) => d.data.type === 'host')
+  const hostById = new Map(hostNodesData.map((node) => [node.data.hostId, node]))
+
+  const clusterPadding = { x: 80, y: 36 }
+  const clusters = d3.group(serviceNodesData, (d) => d.data.hostId)
+
+  for (const [hostId, nodes] of clusters.entries()) {
+    const hostNode = hostById.get(hostId)
+    const positions = nodes.map((node) => ({
+      x: node.y + 100,
+      y: node.x + 40
+    }))
+    const minX = d3.min(positions, (pos) => pos.x) ?? 0
+    const maxX = d3.max(positions, (pos) => pos.x) ?? 0
+    const minY = d3.min(positions, (pos) => pos.y) ?? 0
+    const maxY = d3.max(positions, (pos) => pos.y) ?? 0
+
+    const rectX = minX - 130 - clusterPadding.x
+    const rectY = minY - 22 - clusterPadding.y
+    const rectW = (maxX - minX) + 260 + clusterPadding.x * 2
+    const rectH = (maxY - minY) + 44 + clusterPadding.y * 2
+
+    const label = hostNode?.data?.name || 'Host'
+    const ip = hostNode?.data?.ipAddress ? ` • ${hostNode.data.ipAddress}` : ''
+
+    const cluster = clusterGroup.append('g').attr('class', 'service-cluster')
+    cluster.append('rect')
+      .attr('x', rectX)
+      .attr('y', rectY)
+      .attr('width', rectW)
+      .attr('height', rectH)
+      .attr('rx', 16)
+      .attr('ry', 16)
+
+    cluster.append('text')
+      .attr('x', rectX + 20)
+      .attr('y', rectY + 26)
+      .attr('class', 'cluster-label')
+      .text(`${label}${ip}`)
+  }
 
   linkGroup
     .selectAll('path')
@@ -559,6 +612,18 @@ watch(() => props.data, () => {
 
 .link {
   fill: none;
+}
+
+.service-cluster rect {
+  fill: rgba(15, 23, 42, 0.45);
+  stroke: rgba(56, 189, 248, 0.4);
+  stroke-width: 1.2;
+}
+
+.cluster-label {
+  font-size: 12px;
+  font-weight: 600;
+  fill: #cbd5f5;
 }
 
 .node {

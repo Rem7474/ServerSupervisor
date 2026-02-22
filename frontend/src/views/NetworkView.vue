@@ -78,15 +78,23 @@
           {{ hosts.length }} hotes • {{ totalPorts }} ports publies
         </div>
       </div>
+      <div class="network-subnav">
+        <button class="btn" :class="networkTab === 'topology' ? 'btn-primary' : 'btn-outline-primary'" @click="networkTab = 'topology'">
+          Topology
+        </button>
+        <button class="btn" :class="networkTab === 'config' ? 'btn-primary' : 'btn-outline-primary'" @click="networkTab = 'config'">
+          Configuration
+        </button>
+      </div>
       <div class="card-body network-topology-body">
-        <div class="network-config">
+        <div v-if="networkTab === 'config'" class="network-config">
           <div class="network-config-row">
             <div class="network-config-item">
               <label class="form-label">Reverse proxy</label>
               <input v-model="rootNodeName" type="text" class="form-control form-control-sm" placeholder="Ex: Nginx Proxy Manager" />
             </div>
             <div class="network-config-item">
-              <label class="form-label">Exclure ports</label>
+              <label class="form-label">Exclure ports (global)</label>
               <input v-model="excludedPortsText" type="text" class="form-control form-control-sm" placeholder="Ex: 22, 2375, 9000" />
               <div class="text-secondary small">Liste separee par virgules</div>
             </div>
@@ -143,14 +151,46 @@
               </table>
             </div>
           </div>
+          <div class="network-config-item mt-4">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+              <label class="form-label mb-0">Ports par host</label>
+              <div class="text-secondary small">Exclusions et noms locaux</div>
+            </div>
+            <div class="table-responsive network-config-table">
+              <table class="table table-sm table-vcenter">
+                <thead>
+                  <tr>
+                    <th>Host</th>
+                    <th>Exclure ports</th>
+                    <th>Noms des ports (port=nom)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="row in hostPortConfig" :key="row.hostId">
+                    <td class="fw-semibold">{{ hostLabel(row.hostId) }}</td>
+                    <td>
+                      <input v-model="row.excludedPortsText" class="form-control form-control-sm" placeholder="22, 2375" />
+                    </td>
+                    <td>
+                      <textarea v-model="row.portMapText" rows="2" class="form-control form-control-sm" placeholder="80=Admin UI"></textarea>
+                    </td>
+                  </tr>
+                  <tr v-if="hostPortConfig.length === 0">
+                    <td colspan="3" class="text-secondary text-center py-3">Aucun host disponible</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
-        <div class="network-graph-surface">
+        <div v-else class="network-graph-surface">
           <NetworkGraph
             :data="graphHosts"
             :root-label="rootNodeName"
             :service-map="servicePortMap"
             :excluded-ports="excludedPorts"
             :services="networkServices"
+            :host-port-overrides="hostPortOverrides"
             @host-click="handleHostClick"
           />
         </div>
@@ -294,11 +334,14 @@ const protocolFilter = ref('')
 const hostFilter = ref('')
 const onlyPublished = ref(true)
 const viewMode = ref(localStorage.getItem('networkViewMode') || 'cards')
+const networkTab = ref('topology')
 const rootNodeName = ref(localStorage.getItem('networkRootName') || 'pve')
 const servicePortMapText = ref(localStorage.getItem('networkServiceMap') || '')
 const excludedPortsText = ref(localStorage.getItem('networkExcludedPorts') || '')
 const storedServices = localStorage.getItem('networkServices')
 const networkServices = ref(parseStoredServices(storedServices))
+const storedHostPorts = localStorage.getItem('networkHostPorts')
+const hostPortConfig = ref(parseStoredHostPorts(storedHostPorts))
 const auth = useAuthStore()
 
 // Save view mode to localStorage when it changes
@@ -322,6 +365,10 @@ watch(networkServices, (value) => {
   localStorage.setItem('networkServices', JSON.stringify(value))
 }, { deep: true })
 
+watch(hostPortConfig, (value) => {
+  localStorage.setItem('networkHostPorts', JSON.stringify(value))
+}, { deep: true })
+
 const servicePortMap = computed(() => {
   const map = {}
   const lines = servicePortMapText.value.split(/\r?\n|,/).map(line => line.trim()).filter(Boolean)
@@ -338,6 +385,18 @@ const servicePortMap = computed(() => {
 const excludedPorts = computed(() => {
   const values = excludedPortsText.value.split(/\s*,\s*/).map(entry => Number(entry.trim())).filter(Boolean)
   return Array.from(new Set(values))
+})
+
+const hostPortOverrides = computed(() => {
+  const overrides = {}
+  for (const entry of hostPortConfig.value) {
+    if (!entry.hostId) continue
+    overrides[entry.hostId] = {
+      excludedPorts: parsePortList(entry.excludedPortsText),
+      portMap: parsePortMap(entry.portMapText)
+    }
+  }
+  return overrides
 })
 
 const portRows = computed(() => {
@@ -388,6 +447,7 @@ const portRows = computed(() => {
 const totalPorts = computed(() => portRows.value.length)
 const totalRx = computed(() => hosts.value.reduce((sum, h) => sum + (h.network_rx_bytes || 0), 0))
 const totalTx = computed(() => hosts.value.reduce((sum, h) => sum + (h.network_tx_bytes || 0), 0))
+
 
 const graphHosts = computed(() => {
   const portsByHost = new Map()
@@ -443,6 +503,52 @@ function formatBytes(bytes) {
   return `${value.toFixed(1)} ${units[idx]}`
 }
 
+function hostLabel(hostId) {
+  const host = hosts.value.find((item) => item.id === hostId)
+  return host?.name || host?.hostname || host?.ip_address || hostId
+}
+
+function parseStoredHostPorts(raw) {
+  if (!raw) return []
+  try {
+    const parsed = JSON.parse(raw)
+    return Array.isArray(parsed) ? parsed : []
+  } catch (err) {
+    return []
+  }
+}
+
+function parsePortList(text) {
+  if (!text) return []
+  return Array.from(new Set(text.split(/\s*,\s*/).map(entry => Number(entry.trim())).filter(Boolean)))
+}
+
+function parsePortMap(text) {
+  const map = {}
+  if (!text) return map
+  const lines = text.split(/\r?\n|,/).map(line => line.trim()).filter(Boolean)
+  for (const line of lines) {
+    const [portRaw, ...nameParts] = line.split(/[=:]/)
+    const port = Number(portRaw?.trim())
+    const name = nameParts.join(':').trim()
+    if (!port || !name) continue
+    map[port] = name
+  }
+  return map
+}
+
+function ensureHostPortConfig() {
+  const known = new Set(hostPortConfig.value.map((item) => item.hostId))
+  for (const host of hosts.value) {
+    if (known.has(host.id)) continue
+    hostPortConfig.value.push({
+      hostId: host.id,
+      excludedPortsText: '',
+      portMapText: ''
+    })
+  }
+}
+
 function parseStoredServices(raw) {
   if (!raw) return []
   try {
@@ -479,6 +585,7 @@ async function fetchSnapshot() {
     const res = await apiClient.getNetworkSnapshot()
     hosts.value = res.data?.hosts || []
     containers.value = res.data?.containers || []
+    ensureHostPortConfig()
   } catch (e) {
     // ignore
   }
@@ -488,6 +595,7 @@ const { wsStatus, wsError, retryCount, reconnect } = useWebSocket('/api/v1/ws/ne
   if (payload.type !== 'network') return
   hosts.value = payload.hosts || []
   containers.value = payload.containers || []
+  ensureHostPortConfig()
 })
 
 onMounted(() => {
@@ -501,6 +609,13 @@ onUnmounted(() => {
 <style scoped>
 .network-topology-card {
   overflow: hidden;
+}
+
+.network-subnav {
+  display: flex;
+  gap: 8px;
+  padding: 14px 18px 0;
+  background: rgba(15, 23, 42, 0.45);
 }
 
 .network-topology-body {
