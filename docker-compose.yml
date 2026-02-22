@@ -25,21 +25,49 @@ services:
     ports:
       - "${SERVER_PORT:-8080}:8080"
     environment:
+      # Server
       SERVER_PORT: "8080"
+      BASE_URL: ${BASE_URL:-http://localhost:8080}
+      
+      # Proxies
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
+      
+      # Database
       DB_HOST: postgres
       DB_PORT: "5432"
       DB_USER: supervisor
       DB_PASSWORD: ${DB_PASSWORD:-supervisor}
       DB_NAME: serversupervisor
       DB_SSLMODE: disable
+      
+      # Authentication
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production-please}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-24h}
+      REFRESH_TOKEN_EXPIRATION: ${REFRESH_TOKEN_EXPIRATION:-168h}
       ADMIN_USER: ${ADMIN_USER:-admin}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}
+      
+      # Rate Limiting
+      RATE_LIMIT_RPS: ${RATE_LIMIT_RPS:-100}
+      RATE_LIMIT_BURST: ${RATE_LIMIT_BURST:-200}
+      
+      # GitHub
       GITHUB_TOKEN: ${GITHUB_TOKEN:-}
       GITHUB_POLL_INTERVAL: ${GITHUB_POLL_INTERVAL:-15m}
+      
+      # Alerts
+      NOTIFY_URL: ${NOTIFY_URL:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      SMTP_TO: ${SMTP_TO:-}
+      SMTP_TLS: ${SMTP_TLS:-true}
+      
+      # Metrics
       METRICS_RETENTION_DAYS: ${METRICS_RETENTION_DAYS:-30}
-      RATE_LIMIT_RPS: "100"
-      RATE_LIMIT_BURST: "200"
     depends_on:
       postgres:
         condition: service_healthy
