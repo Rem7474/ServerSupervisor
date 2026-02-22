@@ -1,6 +1,7 @@
 package api
 
 import (
+	"log"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -42,33 +43,59 @@ type wsAuthMessage struct {
 func (h *WSHandler) upgrader() *websocket.Upgrader {
 	return &websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {
-			return isAllowedOrigin(r.Header.Get("Origin"), h.cfg.BaseURL)
+			return isAllowedOrigin(r.Header.Get("Origin"), h.cfg.BaseURL, h.cfg.AllowedOrigins)
 		},
 	}
 }
 
-func isAllowedOrigin(origin string, baseURL string) bool {
+func isAllowedOrigin(origin string, baseURL string, extraOrigins []string) bool {
 	if origin == "" {
 		return true
 	}
 
 	parsedOrigin, err := url.Parse(origin)
 	if err != nil {
+		log.Printf("[WS] rejected origin (parse error): %q", origin)
 		return false
 	}
+
+	// Always allow localhost for development
+	if strings.Contains(parsedOrigin.Host, "localhost") ||
+		strings.Contains(parsedOrigin.Host, "127.0.0.1") ||
+		strings.Contains(parsedOrigin.Host, "[::1]") {
+		return true
+	}
+
+	// Check against BASE_URL
 	parsedBase, err := url.Parse(baseURL)
-	if err != nil {
-		return false
+	if err == nil {
+		// Exact match (scheme + host)
+		if parsedOrigin.Host == parsedBase.Host && parsedOrigin.Scheme == parsedBase.Scheme {
+			return true
+		}
+		// Allow host-only match — handles http/https mismatch during NPM setup
+		if parsedOrigin.Host == parsedBase.Host {
+			log.Printf("[WS] allowed origin with scheme mismatch: origin=%q base=%q (update BASE_URL scheme if needed)", origin, baseURL)
+			return true
+		}
 	}
 
-	if parsedOrigin.Host == parsedBase.Host && parsedOrigin.Scheme == parsedBase.Scheme {
-		return true
+	// Check against ALLOWED_ORIGINS list (extra origins from config)
+	for _, allowed := range extraOrigins {
+		allowed = strings.TrimSpace(allowed)
+		if allowed == "" {
+			continue
+		}
+		parsedAllowed, err := url.Parse(allowed)
+		if err != nil {
+			continue
+		}
+		if parsedOrigin.Host == parsedAllowed.Host && parsedOrigin.Scheme == parsedAllowed.Scheme {
+			return true
+		}
 	}
 
-	if strings.Contains(parsedOrigin.Host, "localhost") || strings.Contains(parsedOrigin.Host, "127.0.0.1") || strings.Contains(parsedOrigin.Host, "[::1]") {
-		return true
-	}
-
+	log.Printf("[WS] rejected origin: %q (BASE_URL=%q) — set BASE_URL or ALLOWED_ORIGINS correctly", origin, baseURL)
 	return false
 }
 
