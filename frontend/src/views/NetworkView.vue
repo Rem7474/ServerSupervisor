@@ -68,11 +68,17 @@
     </div>
 
     <!-- Graph View -->
-    <div v-if="viewMode === 'graph'" class="card mb-4">
-      <div class="card-header">
-        <h3 class="card-title">Network Topology</h3>
+    <div v-if="viewMode === 'graph'" class="card mb-4 network-topology-card">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <div>
+          <h3 class="card-title mb-1">Network Topology</h3>
+          <div class="text-secondary small">Glisser pour reordonner, scroll pour zoomer</div>
+        </div>
+        <div class="text-secondary small">
+          {{ hosts.length }} hotes • {{ totalPorts }} ports publies
+        </div>
       </div>
-      <div class="card-body" style="height: 600px; padding: 0;">
+      <div class="card-body network-topology-body">
         <NetworkGraph :data="hosts" @host-click="handleHostClick" />
       </div>
     </div>
@@ -310,3 +316,22 @@ onMounted(() => {
 onUnmounted(() => {
 })
 </script>
+
+<style scoped>
+.network-topology-card {
+  overflow: hidden;
+}
+
+.network-topology-body {
+  height: 68vh;
+  min-height: 520px;
+  padding: 0;
+}
+
+@media (max-width: 991px) {
+  .network-topology-body {
+    height: 60vh;
+    min-height: 420px;
+  }
+}
+</style>

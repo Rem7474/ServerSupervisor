@@ -91,7 +91,7 @@
               </li>
             </ul>
 
-            <div class="ms-auto d-flex align-items-center position-relative">
+            <div class="ms-auto d-flex align-items-center position-relative user-menu" ref="userMenuRef">
               <button class="btn btn-outline-secondary d-flex align-items-center" @click="toggleUserMenu">
                 <span class="avatar avatar-sm bg-secondary-lt me-2">
                   {{ auth.username?.slice(0, 2).toUpperCase() }}
@@ -100,7 +100,7 @@
                 <span class="caret"></span>
               </button>
 
-              <div v-if="userMenuOpen" class="dropdown-menu dropdown-menu-end show mt-2">
+              <div v-if="userMenuOpen" class="dropdown-menu dropdown-menu-end show user-dropdown">
                 <div class="dropdown-header">Compte</div>
                 <div class="dropdown-item text-secondary small">Role: {{ auth.role || 'inconnu' }}</div>
                 <button class="dropdown-item" @click="openChangePassword">
@@ -116,6 +116,7 @@
                 <div class="dropdown-divider"></div>
                 <button class="dropdown-item text-danger" @click="handleLogout">Deconnexion</button>
               </div>
+              <div v-if="userMenuOpen" class="user-menu-backdrop" @click="userMenuOpen = false"></div>
             </div>
           </div>
         </div>
@@ -177,7 +178,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useAuthStore } from './stores/auth'
 import { useRouter } from 'vue-router'
 import apiClient from './api'
@@ -185,6 +186,7 @@ import apiClient from './api'
 const auth = useAuthStore()
 const router = useRouter()
 const userMenuOpen = ref(false)
+const userMenuRef = ref(null)
 const showPasswordModal = ref(false)
 const passwordForm = ref({ current: '', next: '', confirm: '' })
 const passwordError = ref('')
@@ -199,6 +201,13 @@ function handleLogout() {
 
 function toggleUserMenu() {
   userMenuOpen.value = !userMenuOpen.value
+}
+
+function handleOutsideClick(event) {
+  if (!userMenuOpen.value) return
+  const el = userMenuRef.value
+  if (el && el.contains(event.target)) return
+  userMenuOpen.value = false
 }
 
 function openChangePassword() {
@@ -237,4 +246,50 @@ async function submitChangePassword() {
     passwordLoading.value = false
   }
 }
+
+onMounted(() => {
+  document.addEventListener('click', handleOutsideClick, true)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleOutsideClick, true)
+})
 </script>
+
+<style scoped>
+.user-menu {
+  z-index: 2000;
+}
+
+.user-dropdown {
+  min-width: 240px;
+  padding: 8px 0;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.25);
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  margin: 0;
+}
+
+.user-dropdown::before {
+  content: '';
+  position: absolute;
+  top: -6px;
+  right: 14px;
+  width: 12px;
+  height: 12px;
+  background: inherit;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  transform: rotate(45deg);
+}
+
+.user-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1900;
+  background: transparent;
+}
+</style>
