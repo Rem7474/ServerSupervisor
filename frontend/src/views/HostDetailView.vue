@@ -63,6 +63,38 @@
               {{ saving ? 'Enregistrement...' : 'Enregistrer' }}
             </button>
           </div>
+          <div class="col-12">
+            <div class="border-top pt-3 mt-2">
+              <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-2">
+                <div>
+                  <div class="fw-semibold">API Key agent</div>
+                  <div class="text-secondary small">Regenerer la cle pour un hote existant.</div>
+                </div>
+                <button type="button" class="btn btn-outline-warning" :disabled="rotateKeyLoading" @click="rotateHostKey">
+                  {{ rotateKeyLoading ? 'Rotation...' : 'Regenerer la cle' }}
+                </button>
+              </div>
+              <div v-if="rotateKeyResult" class="alert alert-info mt-3 mb-0" role="alert">
+                <div class="fw-semibold mb-2">Nouvelle cle generee</div>
+                <div class="text-secondary small mb-2">Copiez-la maintenant, elle ne sera plus affichee.</div>
+                <div class="d-flex align-items-center gap-2 mb-2">
+                  <div class="bg-dark rounded p-2 flex-fill">
+                    <code class="text-light">{{ rotateKeyResult.api_key }}</code>
+                  </div>
+                  <button type="button" class="btn btn-outline-light" @click="copyRotatedKey">
+                    {{ rotateCopiedKey ? 'Copie' : 'Copier' }}
+                  </button>
+                </div>
+                <div class="d-flex align-items-center justify-content-between mb-1">
+                  <div class="text-secondary small">Configuration agent :</div>
+                  <button type="button" class="btn btn-outline-light btn-sm" @click="copyRotatedConfig">
+                    {{ rotateCopiedConfig ? 'Copie' : 'Copier la config' }}
+                  </button>
+                </div>
+                <pre class="bg-dark text-light p-2 rounded small mb-0">{{ rotatedAgentConfig }}</pre>
+              </div>
+            </div>
+          </div>
         </form>
       </div>
     </div>
@@ -429,7 +461,7 @@ dayjs.extend(relativeTime)
 dayjs.extend(utc)
 dayjs.locale('fr')
 
-const LATEST_AGENT_VERSION = '1.2.0'
+const LATEST_AGENT_VERSION = '1.3.0'
 
 const route = useRoute()
 const router = useRouter()
@@ -449,12 +481,26 @@ const memChartData = ref(null)
 const isEditing = ref(false)
 const saving = ref(false)
 const editForm = ref({ name: '', hostname: '', ip_address: '', os: '' })
+const rotateKeyLoading = ref(false)
+const rotateKeyResult = ref(null)
+const rotateCopiedKey = ref(false)
+const rotateCopiedConfig = ref(false)
 const liveCommand = ref(null)
 const consoleOutput = ref(null)
 const showConsole = ref(false)
 let streamWs = null
 const auth = useAuthStore()
 const canRunApt = computed(() => auth.role === 'admin' || auth.role === 'operator')
+
+const serverHostname =
+  typeof window !== 'undefined' && window.location?.hostname
+    ? window.location.hostname
+    : 'localhost'
+
+const rotatedAgentConfig = computed(() => {
+  if (!rotateKeyResult.value) return ''
+  return `server_url: "http://${serverHostname}:8080"\napi_key: "${rotateKeyResult.value.api_key}"\nreport_interval: 30\ncollect_docker: true\ncollect_apt: true`
+})
 
 // Time range options for metrics
 const timeRangeOptions = [
@@ -587,11 +633,44 @@ function startEdit() {
     ip_address: host.value.ip_address || '',
     os: host.value.os || '',
   }
+  rotateKeyResult.value = null
   isEditing.value = true
 }
 
 function cancelEdit() {
   isEditing.value = false
+  rotateKeyResult.value = null
+}
+
+async function rotateHostKey() {
+  rotateKeyLoading.value = true
+  rotateKeyResult.value = null
+  try {
+    const res = await apiClient.rotateHostKey(hostId)
+    rotateKeyResult.value = res.data
+  } catch (e) {
+    console.error('Failed to rotate API key:', e.response?.data || e.message)
+  } finally {
+    rotateKeyLoading.value = false
+  }
+}
+
+async function copyRotatedKey() {
+  if (!rotateKeyResult.value?.api_key) return
+  await navigator.clipboard.writeText(rotateKeyResult.value.api_key)
+  rotateCopiedKey.value = true
+  setTimeout(() => {
+    rotateCopiedKey.value = false
+  }, 1500)
+}
+
+async function copyRotatedConfig() {
+  if (!rotatedAgentConfig.value) return
+  await navigator.clipboard.writeText(rotatedAgentConfig.value)
+  rotateCopiedConfig.value = true
+  setTimeout(() => {
+    rotateCopiedConfig.value = false
+  }, 1500)
 }
 
 async function saveEdit() {

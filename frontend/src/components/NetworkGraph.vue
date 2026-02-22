@@ -45,6 +45,10 @@ const props = defineProps({
     type: String,
     default: 'root'
   },
+  rootIp: {
+    type: String,
+    default: ''
+  },
   serviceMap: {
     type: Object,
     default: () => ({})
@@ -60,6 +64,10 @@ const props = defineProps({
   hostPortOverrides: {
     type: Object,
     default: () => ({})
+  },
+  showProxyLinks: {
+    type: Boolean,
+    default: true
   }
 })
 
@@ -208,11 +216,13 @@ const render = () => {
   const treeData = treeLayout(root)
 
   const clusterGroup = g.append('g').attr('class', 'service-clusters')
+  const proxyLinkGroup = g.append('g').attr('class', 'proxy-links')
   const linkGroup = g.append('g').attr('class', 'links')
   const nodeGroup = g.append('g').attr('class', 'nodes')
 
   const serviceNodesData = treeData.descendants().filter((d) => d.data.type === 'service')
   const hostNodesData = treeData.descendants().filter((d) => d.data.type === 'host')
+  const rootNodeData = treeData.descendants().find((d) => d.data.type === 'root')
   const hostById = new Map(hostNodesData.map((node) => [node.data.hostId, node]))
 
   const clusterPadding = { x: 80, y: 36 }
@@ -251,6 +261,23 @@ const render = () => {
       .attr('y', rectY + 26)
       .attr('class', 'cluster-label')
       .text(`${label}${ip}`)
+  }
+
+  if (props.showProxyLinks && rootNodeData) {
+    const rootX = rootNodeData.y + 100
+    const rootY = rootNodeData.x + 40
+    proxyLinkGroup
+      .selectAll('path')
+      .data(serviceNodesData)
+      .enter()
+      .append('path')
+      .attr('class', 'proxy-link')
+      .attr('d', (d) => {
+        const endX = d.y + 100
+        const endY = d.x + 40
+        const midX = (rootX + endX) / 2
+        return `M${rootX},${rootY} C${midX},${rootY} ${midX},${endY} ${endX},${endY}`
+      })
   }
 
   linkGroup
@@ -305,11 +332,22 @@ const render = () => {
   rootNodes
     .append('text')
     .attr('text-anchor', 'middle')
-    .attr('dy', '0.35em')
+    .attr('dy', '-0.1em')
     .style('font-size', '13px')
     .style('font-weight', '700')
     .style('fill', '#e2e8f0')
-    .text(d => d.data.name)
+    .each(function (d) {
+      const text = d3.select(this)
+      text.append('tspan').text(d.data.name)
+      if (props.rootIp) {
+        text.append('tspan')
+          .attr('x', 0)
+          .attr('dy', '1.2em')
+          .style('font-size', '10px')
+          .style('fill', '#94a3b8')
+          .text(props.rootIp)
+      }
+    })
 
   hostNodes
     .append('rect')
@@ -417,6 +455,14 @@ const render = () => {
           .style('font-size', '10px')
           .style('fill', '#93c5fd')
           .text(d.data.subtitle)
+      }
+      if (d.data.internalPort) {
+        text.append('tspan')
+          .attr('x', 0)
+          .attr('dy', '1.2em')
+          .style('font-size', '10px')
+          .style('fill', '#cbd5f5')
+          .text(`Port interne ${d.data.internalPort}`)
       }
     })
 
@@ -612,6 +658,13 @@ watch(() => props.data, () => {
 
 .link {
   fill: none;
+}
+
+.proxy-link {
+  fill: none;
+  stroke: rgba(56, 189, 248, 0.65);
+  stroke-width: 1.6;
+  stroke-dasharray: 6 6;
 }
 
 .service-cluster rect {

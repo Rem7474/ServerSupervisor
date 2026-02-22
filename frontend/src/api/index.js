@@ -47,6 +47,7 @@ export default {
   registerHost: (data) => api.post('/v1/hosts', data),
   updateHost: (id, data) => api.patch(`/v1/hosts/${id}`, data),
   deleteHost: (id) => api.delete(`/v1/hosts/${id}`),
+  rotateHostKey: (id) => api.post(`/v1/hosts/${id}/rotate-key`),
 
   // Metrics
   getMetricsHistory: (hostId, hours = 24) => api.get(`/v1/hosts/${hostId}/metrics/history?hours=${hours}`),

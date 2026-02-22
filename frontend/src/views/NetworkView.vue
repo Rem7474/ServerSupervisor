@@ -94,6 +94,10 @@
               <input v-model="rootNodeName" type="text" class="form-control form-control-sm" placeholder="Ex: Nginx Proxy Manager" />
             </div>
             <div class="network-config-item">
+              <label class="form-label">IP du proxy</label>
+              <input v-model="rootNodeIp" type="text" class="form-control form-control-sm" placeholder="Ex: 192.168.1.10" />
+            </div>
+            <div class="network-config-item">
               <label class="form-label">Exclure ports (global)</label>
               <input v-model="excludedPortsText" type="text" class="form-control form-control-sm" placeholder="Ex: 22, 2375, 9000" />
               <div class="text-secondary small">Liste separee par virgules</div>
@@ -102,6 +106,13 @@
           <div class="network-config-item">
             <label class="form-label">Nom des services (port=nom)</label>
             <textarea v-model="servicePortMapText" rows="2" class="form-control form-control-sm" placeholder="80=Nginx Proxy Manager&#10;3000=Vaultwarden"></textarea>
+          </div>
+          <div class="network-config-item mt-3">
+            <label class="form-label">Liens proxy</label>
+            <label class="form-check form-switch">
+              <input v-model="showProxyLinks" class="form-check-input" type="checkbox" />
+              <span class="form-check-label">Afficher les liens explicites Proxy → Service</span>
+            </label>
           </div>
           <div class="network-config-item mt-3">
             <div class="d-flex align-items-center justify-content-between mb-2">
@@ -153,33 +164,61 @@
           </div>
           <div class="network-config-item mt-4">
             <div class="d-flex align-items-center justify-content-between mb-2">
-              <label class="form-label mb-0">Ports par host</label>
-              <div class="text-secondary small">Exclusions et noms locaux</div>
+              <label class="form-label mb-0">Ports decouverts par host</label>
+              <div class="text-secondary small">Nommer, masquer, lier au proxy</div>
             </div>
-            <div class="table-responsive network-config-table">
-              <table class="table table-sm table-vcenter">
-                <thead>
-                  <tr>
-                    <th>Host</th>
-                    <th>Exclure ports</th>
-                    <th>Noms des ports (port=nom)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="row in hostPortConfig" :key="row.hostId">
-                    <td class="fw-semibold">{{ hostLabel(row.hostId) }}</td>
-                    <td>
-                      <input v-model="row.excludedPortsText" class="form-control form-control-sm" placeholder="22, 2375" />
-                    </td>
-                    <td>
-                      <textarea v-model="row.portMapText" rows="2" class="form-control form-control-sm" placeholder="80=Admin UI"></textarea>
-                    </td>
-                  </tr>
-                  <tr v-if="hostPortConfig.length === 0">
-                    <td colspan="3" class="text-secondary text-center py-3">Aucun host disponible</td>
-                  </tr>
-                </tbody>
-              </table>
+            <div class="network-discovered">
+              <div v-for="host in hosts" :key="host.id" class="network-host-block">
+                <div class="network-host-header">
+                  <div class="fw-semibold">{{ host.name || host.hostname || host.ip_address || host.id }}</div>
+                  <div class="text-secondary small">{{ host.ip_address || 'IP inconnue' }}</div>
+                </div>
+                <div class="table-responsive network-config-table">
+                  <table class="table table-sm table-vcenter">
+                    <thead>
+                      <tr>
+                        <th>Port interne</th>
+                        <th>Proto</th>
+                        <th>Nom</th>
+                        <th>Domaine</th>
+                        <th>Chemin</th>
+                        <th>Afficher</th>
+                        <th>Lier proxy</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="port in discoveredPortsByHost[host.id] || []" :key="port.key">
+                        <td class="fw-semibold">{{ port.port }}</td>
+                        <td class="text-secondary text-uppercase">{{ port.protocol }}</td>
+                        <td>
+                          <input v-model="getPortSetting(host.id, port.port).name" class="form-control form-control-sm" placeholder="Ex: Vaultwarden" />
+                        </td>
+                        <td>
+                          <input v-model="getPortSetting(host.id, port.port).domain" class="form-control form-control-sm" placeholder="vault.example.com" />
+                        </td>
+                        <td>
+                          <input v-model="getPortSetting(host.id, port.port).path" class="form-control form-control-sm" placeholder="/" />
+                        </td>
+                        <td>
+                          <label class="form-check">
+                            <input v-model="getPortSetting(host.id, port.port).enabled" class="form-check-input" type="checkbox" />
+                            <span class="form-check-label">Afficher</span>
+                          </label>
+                        </td>
+                        <td>
+                          <label class="form-check form-switch">
+                            <input v-model="getPortSetting(host.id, port.port).linkToProxy" class="form-check-input" type="checkbox" />
+                            <span class="form-check-label">Proxy</span>
+                          </label>
+                        </td>
+                      </tr>
+                      <tr v-if="(discoveredPortsByHost[host.id] || []).length === 0">
+                        <td colspan="7" class="text-secondary text-center py-3">Aucun port detecte</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -187,10 +226,12 @@
           <NetworkGraph
             :data="graphHosts"
             :root-label="rootNodeName"
+            :root-ip="rootNodeIp"
             :service-map="servicePortMap"
             :excluded-ports="excludedPorts"
-            :services="networkServices"
+            :services="combinedServices"
             :host-port-overrides="hostPortOverrides"
+            :show-proxy-links="showProxyLinks"
             @host-click="handleHostClick"
           />
         </div>
@@ -336,6 +377,8 @@ const onlyPublished = ref(true)
 const viewMode = ref(localStorage.getItem('networkViewMode') || 'cards')
 const networkTab = ref('topology')
 const rootNodeName = ref(localStorage.getItem('networkRootName') || 'pve')
+const rootNodeIp = ref(localStorage.getItem('networkRootIp') || '')
+const showProxyLinks = ref(localStorage.getItem('networkShowProxyLinks') !== 'false')
 const servicePortMapText = ref(localStorage.getItem('networkServiceMap') || '')
 const excludedPortsText = ref(localStorage.getItem('networkExcludedPorts') || '')
 const storedServices = localStorage.getItem('networkServices')
@@ -351,6 +394,14 @@ watch(viewMode, (newMode) => {
 
 watch(rootNodeName, (value) => {
   localStorage.setItem('networkRootName', value)
+})
+
+watch(rootNodeIp, (value) => {
+  localStorage.setItem('networkRootIp', value)
+})
+
+watch(showProxyLinks, (value) => {
+  localStorage.setItem('networkShowProxyLinks', value ? 'true' : 'false')
 })
 
 watch(servicePortMapText, (value) => {
@@ -387,14 +438,45 @@ const excludedPorts = computed(() => {
   return Array.from(new Set(values))
 })
 
+const discoveredPortsByHost = computed(() => {
+  const map = {}
+  for (const container of containers.value) {
+    const mappings = container.port_mappings || []
+    for (const mapping of mappings) {
+      const hostId = container.host_id
+      if (!hostId) continue
+
+      const portNumber = mapping.container_port || mapping.host_port || 0
+      if (!portNumber) continue
+
+      const protocol = (mapping.protocol || 'tcp').toLowerCase()
+      if (!map[hostId]) map[hostId] = []
+      const key = `${portNumber}-${protocol}`
+      if (map[hostId].some(entry => entry.key === key)) continue
+
+      map[hostId].push({ key, port: portNumber, protocol })
+    }
+  }
+
+  for (const host of hosts.value) {
+    if (!map[host.id]) map[host.id] = []
+  }
+
+  return map
+})
+
 const hostPortOverrides = computed(() => {
   const overrides = {}
   for (const entry of hostPortConfig.value) {
     if (!entry.hostId) continue
-    overrides[entry.hostId] = {
-      excludedPorts: parsePortList(entry.excludedPortsText),
-      portMap: parsePortMap(entry.portMapText)
+    const excludedPortsList = []
+    const portMap = {}
+    for (const [port, settings] of Object.entries(entry.ports || {})) {
+      const portNumber = Number(port)
+      if (!settings?.enabled) excludedPortsList.push(portNumber)
+      if (settings?.name) portMap[portNumber] = settings.name
     }
+    overrides[entry.hostId] = { excludedPorts: excludedPortsList, portMap }
   }
   return overrides
 })
@@ -447,6 +529,32 @@ const portRows = computed(() => {
 const totalPorts = computed(() => portRows.value.length)
 const totalRx = computed(() => hosts.value.reduce((sum, h) => sum + (h.network_rx_bytes || 0), 0))
 const totalTx = computed(() => hosts.value.reduce((sum, h) => sum + (h.network_tx_bytes || 0), 0))
+
+const combinedServices = computed(() => {
+  const linkedServices = []
+  for (const entry of hostPortConfig.value) {
+    if (!entry.hostId) continue
+    for (const [port, settings] of Object.entries(entry.ports || {})) {
+      if (!settings?.linkToProxy) continue
+      const portNumber = Number(port)
+      if (!portNumber) continue
+      const name = settings.name || `Port ${portNumber}`
+      const domain = settings.domain || ''
+      const path = settings.path || '/'
+      linkedServices.push({
+        id: `linked-${entry.hostId}-${portNumber}`,
+        name,
+        domain,
+        path,
+        internalPort: portNumber,
+        externalPort: null,
+        hostId: entry.hostId,
+        tags: 'proxy'
+      })
+    }
+  }
+  return [...networkServices.value, ...linkedServices]
+})
 
 
 const graphHosts = computed(() => {
@@ -512,7 +620,24 @@ function parseStoredHostPorts(raw) {
   if (!raw) return []
   try {
     const parsed = JSON.parse(raw)
-    return Array.isArray(parsed) ? parsed : []
+    if (!Array.isArray(parsed)) return []
+    return parsed.map((entry) => {
+      if (entry?.ports) return entry
+      const ports = {}
+      const excluded = parsePortList(entry?.excludedPortsText || '')
+      const map = parsePortMap(entry?.portMapText || '')
+      for (const port of Object.keys(map)) {
+        const portNumber = Number(port)
+        ports[portNumber] = {
+          name: map[portNumber],
+          domain: '',
+          path: '/',
+          enabled: !excluded.includes(portNumber),
+          linkToProxy: false
+        }
+      }
+      return { hostId: entry?.hostId, ports }
+    })
   } catch (err) {
     return []
   }
@@ -537,16 +662,37 @@ function parsePortMap(text) {
   return map
 }
 
+function getPortSetting(hostId, portNumber) {
+  const entry = getHostPortEntry(hostId)
+  const key = String(portNumber)
+  if (!entry.ports[key]) {
+    entry.ports[key] = { name: '', domain: '', path: '/', enabled: true, linkToProxy: false }
+  }
+  return entry.ports[key]
+}
+
 function ensureHostPortConfig() {
   const known = new Set(hostPortConfig.value.map((item) => item.hostId))
   for (const host of hosts.value) {
     if (known.has(host.id)) continue
-    hostPortConfig.value.push({
-      hostId: host.id,
-      excludedPortsText: '',
-      portMapText: ''
-    })
+    hostPortConfig.value.push({ hostId: host.id, ports: {} })
   }
+  for (const [hostId, ports] of Object.entries(discoveredPortsByHost.value)) {
+    const entry = getHostPortEntry(hostId)
+    for (const port of ports) {
+      getPortSetting(hostId, port.port)
+    }
+  }
+}
+
+function getHostPortEntry(hostId) {
+  let entry = hostPortConfig.value.find((item) => item.hostId === hostId)
+  if (!entry) {
+    entry = { hostId, ports: {} }
+    hostPortConfig.value.push(entry)
+  }
+  if (!entry.ports) entry.ports = {}
+  return entry
 }
 
 function parseStoredServices(raw) {
