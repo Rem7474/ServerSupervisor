@@ -631,9 +631,11 @@ func (db *DB) GetMetricsHistory(hostID string, hours int) ([]models.SystemMetric
 // GetMetricsAggregatesByType returns aggregated metrics (hourly or daily) to reduce data points
 func (db *DB) GetMetricsAggregatesByType(hostID string, hours int, aggregationType string) ([]models.SystemMetrics, error) {
 	rows, err := db.conn.Query(
-		`SELECT id, host_id, timestamp, cpu_usage_percent, cpu_cores, load_avg_1, load_avg_5, load_avg_15,
-		 memory_total, memory_used, memory_free, memory_percent, swap_total, swap_used,
-		 network_rx_bytes, network_tx_bytes, uptime
+		`SELECT id, host_id, timestamp, cpu_usage_avg as cpu_usage_percent, 0 as cpu_cores, 
+		 0 as load_avg_1, 0 as load_avg_5, 0 as load_avg_15,
+		 0 as memory_total, memory_usage_avg as memory_used, 0 as memory_free, 0 as memory_percent, 
+		 0 as swap_total, 0 as swap_used,
+		 network_rx_bytes, network_tx_bytes, 0 as uptime
 		 FROM metrics_aggregates
 		 WHERE host_id = $1 AND aggregation_type = $2 AND timestamp > NOW() - INTERVAL '1 hour' * $3
 		 ORDER BY timestamp ASC`, hostID, aggregationType, hours,
