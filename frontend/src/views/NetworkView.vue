@@ -198,7 +198,7 @@
                               :checked="getPortSetting(host.id, port.port).enabled"
                               class="form-check-input"
                               type="checkbox"
-                              @change="updatePortSetting(host.id, port.port, 'enabled', $event.target.checked)"
+                              @input="updatePortSetting(host.id, port.port, 'enabled', $event.target.checked)"
                             />
                             <span class="form-check-label">Afficher</span>
                           </label>
@@ -209,7 +209,7 @@
                               :checked="getPortSetting(host.id, port.port).linkToProxy"
                               class="form-check-input"
                               type="checkbox"
-                              @change="updatePortSetting(host.id, port.port, 'linkToProxy', $event.target.checked)"
+                              @input="updatePortSetting(host.id, port.port, 'linkToProxy', $event.target.checked)"
                             />
                             <span class="form-check-label">Proxy</span>
                           </label>
@@ -848,7 +848,7 @@ onUnmounted(() => {
 
 .network-topology-body {
   height: auto;
-  min-height: 520px;
+  min-height: 600px;
   padding: 0;
   display: flex;
   flex-direction: column;
@@ -920,11 +920,13 @@ onUnmounted(() => {
 
 .network-graph-surface {
   flex: 1;
-  min-height: 520px;
-  height: 60vh;
+  min-height: 600px;
+  height: calc(100vh - 300px);
   padding: 16px 18px 18px;
   display: flex;
   flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .network-topology-toolbar {
