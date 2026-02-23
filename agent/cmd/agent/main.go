@@ -133,6 +133,17 @@ func sendReport(cfg *config.Config, s *sender.Sender) {
 	// 2. After manual apt update/upgrade commands (with CVE)
 	var aptData interface{} = nil
 
+	// Collect disk metrics and health
+	diskMetrics, err := collector.CollectDiskMetrics()
+	if err != nil {
+		log.Printf("Failed to collect disk metrics: %v", err)
+	}
+
+	diskHealth, err := collector.CollectDiskHealth()
+	if err != nil {
+		log.Printf("Failed to collect disk health (smartctl may not be installed): %v", err)
+	}
+
 	// Send report
 	report := &sender.Report{
 		AgentVersion:    AgentVersion,
@@ -142,6 +153,8 @@ func sendReport(cfg *config.Config, s *sender.Sender) {
 		DockerNetworks:  dockerNetworks,
 		ContainerEnvs:   containerEnvs,
 		ComposeProjects: composeProjects,
+		DiskMetrics:     diskMetrics,
+		DiskHealth:      diskHealth,
 		Timestamp:       time.Now(),
 	}
 

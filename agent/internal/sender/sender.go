@@ -27,6 +27,8 @@ type Report struct {
 	DockerNetworks  interface{} `json:"docker_networks,omitempty"`  // Network topology data
 	ContainerEnvs   interface{} `json:"container_envs,omitempty"`   // Container environment variables
 	ComposeProjects interface{} `json:"compose_projects,omitempty"` // Docker Compose projects
+	DiskMetrics     interface{} `json:"disk_metrics,omitempty"`     // Detailed disk usage with inodes
+	DiskHealth      interface{} `json:"disk_health,omitempty"`      // SMART disk health data
 	Timestamp       time.Time   `json:"timestamp"`
 }
 

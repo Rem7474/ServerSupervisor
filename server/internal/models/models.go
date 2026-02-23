@@ -266,6 +266,8 @@ type AgentReport struct {
 	DockerNetworks  []DockerNetwork  `json:"docker_networks,omitempty"`
 	ContainerEnvs   []ContainerEnv   `json:"container_envs,omitempty"`
 	ComposeProjects []ComposeProject `json:"compose_projects,omitempty"`
+	DiskMetrics     []DiskMetrics    `json:"disk_metrics,omitempty"`
+	DiskHealth      []DiskHealth     `json:"disk_health,omitempty"`
 	Timestamp       time.Time        `json:"timestamp"`
 }
 
@@ -498,7 +500,7 @@ type DiskMetrics struct {
 type DiskHealth struct {
 	ID             int64     `json:"id" db:"id"`
 	HostID         string    `json:"host_id" db:"host_id"`
-	Timestamp      time.Time `json:"timestamp" db:"timestamp"`
+	CollectedAt    time.Time `json:"collected_at" db:"timestamp"`
 	Device         string    `json:"device" db:"device"` // /dev/sda, /dev/nvme0n1
 	Model          string    `json:"model" db:"model"`
 	SerialNumber   string    `json:"serial_number" db:"serial_number"`

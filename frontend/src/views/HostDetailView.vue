@@ -202,6 +202,12 @@
       </div>
     </div>
 
+    <!-- Disk Metrics Card - Filesystem Usage -->
+    <DiskMetricsCard :hostId="hostId" class="mb-4" />
+
+    <!-- Disk Health Card - SMART Data -->
+    <DiskHealthCard :hostId="hostId" class="mb-4" />
+
     <div v-if="containers.length" class="card mb-4">
       <div class="card-header">
         <h3 class="card-title">Conteneurs Docker ({{ containers.length }})</h3>
@@ -439,6 +445,8 @@ import { Line } from 'vue-chartjs'
 import { Chart as ChartJS, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip } from 'chart.js'
 import RelativeTime from '../components/RelativeTime.vue'
 import CVEList from '../components/CVEList.vue'
+import DiskMetricsCard from '../components/DiskMetricsCard.vue'
+import DiskHealthCard from '../components/DiskHealthCard.vue'
 import apiClient from '../api'
 import { useAuthStore } from '../stores/auth'
 import { useConfirmDialog } from '../composables/useConfirmDialog'

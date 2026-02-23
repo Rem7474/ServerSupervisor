@@ -136,6 +136,28 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 		}
 	}
 
+	// Store disk metrics
+	if len(report.DiskMetrics) > 0 {
+		for i := range report.DiskMetrics {
+			report.DiskMetrics[i].HostID = hostID
+			report.DiskMetrics[i].Timestamp = time.Now()
+		}
+		if err := h.db.InsertDiskMetrics(report.DiskMetrics); err != nil {
+			log.Printf("Warning: failed to store disk metrics for host %s: %v", hostID, err)
+		}
+	}
+
+	// Store disk health
+	if len(report.DiskHealth) > 0 {
+		for i := range report.DiskHealth {
+			report.DiskHealth[i].HostID = hostID
+			report.DiskHealth[i].CollectedAt = time.Now()
+		}
+		if err := h.db.InsertDiskHealth(report.DiskHealth); err != nil {
+			log.Printf("Warning: failed to store disk health for host %s: %v", hostID, err)
+		}
+	}
+
 	// Return pending commands for this host
 	commands, _ := h.db.GetPendingCommands(hostID)
 	if commands == nil {
