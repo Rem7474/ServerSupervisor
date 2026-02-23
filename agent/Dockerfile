@@ -10,7 +10,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /agent ./cmd/agent
 # This Dockerfile is for building the agent binary only.
 # The agent should run as a native binary on the host (not in Docker).
 
-FROM alpine:3.19
+FROM alpine:3.23
 WORKDIR /app
 COPY --from=builder /agent .
 ENTRYPOINT ["./agent"]
