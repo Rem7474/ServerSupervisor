@@ -255,9 +255,7 @@
                         <td>
                           <label
                             class="form-check form-switch"
-                            :title="!getPortSetting(host.id, port.port).enabled
-                              ? \"Activez d'abord l'affichage du port\"
-                              : ''"
+                            :title="getPortProxyTooltip(host.id, port.port)"
                           >
                             <input
                               :id="`port-proxy-${host.id}-${port.port}`"
@@ -872,6 +870,11 @@ function onEnabledChange(hostId, portNumber, event) {
   if (!event.target.checked) {
     setting.linkToProxy = false
   }
+}
+
+function getPortProxyTooltip(hostId, portNumber) {
+  const setting = getPortSetting(hostId, portNumber)
+  return !setting.enabled ? "Activez d'abord l'affichage du port" : ''
 }
 
 function countEnabled(hostId) {
