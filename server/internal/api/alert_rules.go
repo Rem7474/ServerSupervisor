@@ -33,7 +33,7 @@ func (h *AlertRulesHandler) ListAlertRules(c *gin.Context) {
 		FROM alert_rules
 		ORDER BY created_at DESC
 	`
-	
+
 	rows, err := h.db.Query(query)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -210,7 +210,7 @@ func (h *AlertRulesHandler) CreateAlertRule(c *gin.Context) {
 	rule.Threshold = &threshold
 	rule.DurationSeconds = req.Duration
 	rule.Channels = req.Channels
-	
+
 	if req.SMTPTo != "" {
 		rule.SMTPTo = &req.SMTPTo
 	}
@@ -365,8 +365,8 @@ func (h *AlertRulesHandler) TestAlertRule(c *gin.Context) {
 	// Simulate evaluation logic
 	// In real implementation, this would check current metrics against the rule
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Test alert would fire if conditions are met",
-		"rule": req,
+		"message":   "Test alert would fire if conditions are met",
+		"rule":      req,
 		"timestamp": time.Now(),
 	})
 }

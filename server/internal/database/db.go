@@ -1243,15 +1243,15 @@ func (db *DB) GetAlertRules() ([]models.AlertRule, error) {
 		var cooldown sql.NullInt32
 		var lastFired, updatedAt sql.NullTime
 		var channelConfig string
-		
+
 		if err := rows.Scan(
-			&r.ID, &name, &hostID, &r.Metric, &r.Operator, &threshold, &r.DurationSeconds, 
-			&r.Channel, &channelConfig, &channelsJSON, &smtpTo, &ntfyTopic, &cooldown, 
+			&r.ID, &name, &hostID, &r.Metric, &r.Operator, &threshold, &r.DurationSeconds,
+			&r.Channel, &channelConfig, &channelsJSON, &smtpTo, &ntfyTopic, &cooldown,
 			&lastFired, &r.Enabled, &r.CreatedAt, &updatedAt,
 		); err != nil {
 			continue
 		}
-		
+
 		if name.Valid {
 			r.Name = &name.String
 		}
@@ -1277,14 +1277,14 @@ func (db *DB) GetAlertRules() ([]models.AlertRule, error) {
 		if updatedAt.Valid {
 			r.UpdatedAt = &updatedAt.Time
 		}
-		
+
 		r.ChannelConfig = channelConfig
 		if len(channelsJSON) > 0 {
 			json.Unmarshal(channelsJSON, &r.Channels)
 		} else {
 			r.Channels = []string{}
 		}
-		
+
 		rules = append(rules, r)
 	}
 	return rules, nil
