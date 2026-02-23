@@ -1,0 +1,65 @@
+# .github/labeler.yml
+# Utilisé par actions/labeler dans pr-checks.yml
+
+server:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'server/**'
+
+agent:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'agent/**'
+
+frontend:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'frontend/**'
+
+docker:
+  - changed-files:
+    - any-glob-to-any-file:
+      - '**/Dockerfile'
+      - 'docker-compose.yml'
+      - 'docker-compose*.yml'
+
+ci:
+  - changed-files:
+    - any-glob-to-any-file:
+      - '.github/**'
+
+documentation:
+  - changed-files:
+    - any-glob-to-any-file:
+      - '*.md'
+      - 'docs/**'
+
+database:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'server/internal/database/**'
+      - 'server/migrations/**'
+
+security:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'server/internal/auth/**'
+      - 'server/internal/api/middleware.go'
+      - 'server/internal/api/auth.go'
+
+network-topology:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'server/internal/api/network.go'
+      - 'frontend/src/views/NetworkView.vue'
+      - 'frontend/src/components/NetworkGraph.vue'
+
+dependencies:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'server/go.mod'
+      - 'server/go.sum'
+      - 'agent/go.mod'
+      - 'agent/go.sum'
+      - 'frontend/package.json'
+      - 'frontend/package-lock.json'

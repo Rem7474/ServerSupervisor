@@ -28,22 +28,31 @@
       <div class="card mb-4">
         <div class="card-body">
           <div class="row g-3">
-            <div class="col-md-6 col-lg-3">
-              <input v-model="search" type="text" class="form-control" placeholder="Rechercher un conteneur..." />
+            <div class="col-md-6 col-lg-2">
+              <input v-model="search" type="text" class="form-control" placeholder="Rechercher..." />
             </div>
-            <div class="col-md-6 col-lg-3">
-              <select v-model="stateFilter" class="form-select">
-                <option value="">Tous les etats</option>
-                <option value="running">Running</option>
-                <option value="exited">Exited</option>
-                <option value="paused">Paused</option>
+            <div class="col-md-6 col-lg-2">
+              <select v-model="hostFilter" class="form-select">
+                <option value="">Tous les hôtes</option>
+                <option v-for="h in uniqueHosts" :key="h" :value="h">{{ h }}</option>
               </select>
             </div>
-            <div class="col-md-6 col-lg-3">
+            <div class="col-md-6 col-lg-2">
+              <select v-model="stateFilter" class="form-select">
+                <option value="">Tous les états</option>
+                <option value="running">Running</option>
+                <option value="restarting">Restarting</option>
+                <option value="paused">Paused</option>
+                <option value="created">Created</option>
+                <option value="exited">Exited</option>
+                <option value="dead">Dead</option>
+              </select>
+            </div>
+            <div class="col-md-6 col-lg-2">
               <select v-model="composeFilter" class="form-select">
                 <option value="">Tous les conteneurs</option>
-                <option value="compose">Docker Compose uniquement</option>
-                <option value="standalone">Standalone uniquement</option>
+                <option value="compose">Docker Compose</option>
+                <option value="standalone">Standalone</option>
               </select>
             </div>
           </div>
@@ -56,12 +65,10 @@
             <thead>
               <tr>
                 <th>Nom</th>
-                <th>Hote</th>
+                <th>Hôte</th>
                 <th>Compose</th>
                 <th>Image</th>
-                <th>Tag</th>
-                <th>Etat</th>
-                <th>Status</th>
+                <th>État</th>
                 <th>Ports</th>
                 <th></th>
               </tr>
@@ -81,23 +88,24 @@
                   </div>
                   <span v-else class="text-secondary">-</span>
                 </td>
-                <td>{{ c.image }}</td>
-                <td><code>{{ c.image_tag }}</code></td>
+                <td class="small">{{ c.image }}</td>
                 <td>
-                  <span :class="c.state === 'running' ? 'badge bg-green-lt text-green' : 'badge bg-secondary-lt text-secondary'">
-                    {{ c.state }}
-                  </span>
+                  <span :class="stateClass(c.state)">{{ c.state }}</span>
                 </td>
-                <td class="text-secondary small">{{ c.status }}</td>
-                <td class="text-secondary small font-monospace">{{ c.ports || '-' }}</td>
+                <td class="text-secondary small font-monospace">{{ formatContainerPorts(c.ports) }}</td>
                 <td class="text-end">
-                  <button v-if="getComposeInfo(c).project" @click="showComposeDetails(c)" class="btn btn-sm btn-ghost-secondary">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                      <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                      <path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" />
-                      <path d="M12 10m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" />
-                      <path d="M12 10l0 5" />
-                    </svg>
+                  <button v-if="getComposeInfo(c).project" @click="showComposeDetails(c)" class="btn btn-sm btn-ghost-secondary me-1">
+                    Compose
+                  </button>
+                  <button v-if="Object.keys(c.labels || {}).length > 0" @click="selectedContainer = c; showLabelsModal = true" class="btn btn-sm btn-ghost-secondary">
+                    Labels
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
                   </button>
                 </td>
               </tr>
@@ -283,7 +291,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useWebSocket } from '../composables/useWebSocket'
 import WsStatusBar from '../components/WsStatusBar.vue'
 
@@ -291,12 +299,18 @@ const containers = ref([])
 const composeProjects = ref([])
 const search = ref('')
 const stateFilter = ref('')
+const hostFilter = ref('')
 const composeFilter = ref('')
 const composeSearch = ref('')
 const selectedContainer = ref(null)
 const selectedProject = ref(null)
-const activeTab = ref('containers')
+const activeTab = ref(localStorage.getItem('dockerActiveTab') || 'containers')
 const copied = ref(false)
+
+// Persist active tab to localStorage
+watch(activeTab, (newTab) => {
+  localStorage.setItem('dockerActiveTab', newTab)
+})
 
 const getComposeInfo = (container) => {
   if (!container.labels) return {}
@@ -333,8 +347,17 @@ const filteredContainers = computed(() => {
     const matchCompose = !composeFilter.value ||
       (composeFilter.value === 'compose' && isComposeContainer(c)) ||
       (composeFilter.value === 'standalone' && !isComposeContainer(c))
-    return matchSearch && matchState && matchCompose
+    const matchHost = !hostFilter.value || c.hostname === hostFilter.value
+    return matchSearch && matchState && matchCompose && matchHost
   })
+})
+
+const uniqueHosts = computed(() => {
+  const seen = new Set()
+  return containers.value
+    .filter(c => { if (seen.has(c.hostname)) return false; seen.add(c.hostname); return true })
+    .map(c => c.hostname)
+    .sort()
 })
 
 const filteredComposeProjects = computed(() => {

@@ -84,6 +84,10 @@ func (db *DB) Close() error {
 	return db.conn.Close()
 }
 
+func (db *DB) Ping() error {
+	return db.conn.Ping()
+}
+
 func (db *DB) migrate() error {
 	migrations := []string{
 		`CREATE TABLE IF NOT EXISTS users (
@@ -742,13 +746,35 @@ func (db *DB) GetMetricsSummary(hours int, bucketMinutes int) ([]models.SystemMe
 }
 
 func (db *DB) CleanOldMetrics(retentionDays int) (int64, error) {
-	result, err := db.conn.Exec(
-		`DELETE FROM system_metrics WHERE timestamp < NOW() - INTERVAL '1 day' * $1`, retentionDays,
+	tx, err := db.conn.Begin()
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+
+	// Delete raw metrics
+	rawResult, err := tx.Exec(
+		`DELETE FROM system_metrics WHERE timestamp < NOW() - INTERVAL '1 day' * $1`,
+		retentionDays,
 	)
 	if err != nil {
 		return 0, err
 	}
-	return result.RowsAffected()
+	rawDeleted, _ := rawResult.RowsAffected()
+
+	// Delete aggregates of the same period
+	_, err = tx.Exec(
+		`DELETE FROM metrics_aggregates WHERE timestamp < NOW() - INTERVAL '1 day' * $1`,
+		retentionDays,
+	)
+	if err != nil {
+		return rawDeleted, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
+	return rawDeleted, nil
 }
 
 // ========== Docker ==========
@@ -1518,7 +1544,7 @@ func (db *DB) CountAuditLogs() (int64, error) {
 // CountMetrics returns the total number of metrics records
 func (db *DB) CountMetrics() (int64, error) {
 	var count int64
-	err := db.conn.QueryRow(`SELECT COUNT(*) FROM metrics`).Scan(&count)
+	err := db.conn.QueryRow(`SELECT COUNT(*) FROM system_metrics`).Scan(&count)
 	return count, err
 }
 

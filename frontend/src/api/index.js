@@ -58,6 +58,7 @@ export default {
   // Docker
   getContainers: (hostId) => api.get(`/v1/hosts/${hostId}/containers`),
   getAllContainers: () => api.get('/v1/docker/containers'),
+  getComposeProjects: () => api.get('/v1/docker/compose'),
   getVersionComparisons: () => api.get('/v1/docker/versions'),
 
   // Tracked Repos
@@ -86,4 +87,11 @@ export default {
   createUser: (username, password, role) => api.post('/v1/users', { username, password, role }),
   updateUserRole: (id, role) => api.patch(`/v1/users/${id}/role`, { role }),
   deleteUser: (id) => api.delete(`/v1/users/${id}`),
+
+  // Settings
+  getSettings: () => api.get('/v1/settings'),
+  testSmtp: () => api.post('/v1/settings/test-smtp'),
+  testNtfy: () => api.post('/v1/settings/test-ntfy'),
+  cleanupMetrics: () => api.post('/v1/settings/cleanup-metrics'),
+  cleanupAudit: () => api.post('/v1/settings/cleanup-audit'),
 }

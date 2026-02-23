@@ -53,8 +53,9 @@ type Config struct {
 	SMTPTo    string
 	SMTPTLS   bool
 
-	// Metrics retention
+	// Metrics and Audit retention
 	MetricsRetentionDays int
+	AuditRetentionDays   int
 }
 
 func Load() *Config {
@@ -96,6 +97,7 @@ func Load() *Config {
 		SMTPTLS:   getBoolEnv("SMTP_TLS", true),
 
 		MetricsRetentionDays: getIntEnv("METRICS_RETENTION_DAYS", 30),
+		AuditRetentionDays:   getIntEnv("AUDIT_RETENTION_DAYS", 90),
 	}
 }
 

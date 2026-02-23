@@ -1,0 +1,74 @@
+name: PR checks
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  # ─────────────────────────────────────────
+  # Titre de PR au format Conventional Commits
+  # ─────────────────────────────────────────
+  conventional-title:
+    name: Validate PR title
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check PR title format
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          # Format attendu : <type>(<scope>): <description>
+          # Types valides (conventionalcommits.org)
+          PATTERN='^(feat|fix|docs|style|refactor|perf|test|chore|ci|revert|build)(\([a-z0-9\-\/]+\))?: .{3,}'
+          if ! echo "$PR_TITLE" | grep -qE "$PATTERN"; then
+            echo "::error::Titre de PR invalide : '$PR_TITLE'"
+            echo ""
+            echo "Format attendu : <type>(<scope>): <description>"
+            echo "Exemples valides :"
+            echo "  feat(docker): add host filter to container list"
+            echo "  fix(network): rule 1 inference uses container names not IDs"
+            echo "  chore(deps): update gin to v1.10.0"
+            echo ""
+            echo "Types valides : feat, fix, docs, style, refactor, perf, test, chore, ci, revert, build"
+            exit 1
+          fi
+          echo "✓ Titre valide : $PR_TITLE"
+
+  # ─────────────────────────────────────────
+  # Auto-labeling selon les fichiers modifiés
+  # ─────────────────────────────────────────
+  auto-label:
+    name: Auto-label PR
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/labeler@v5
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+          configuration-path: .github/labeler.yml
+          sync-labels: true
+
+  # ─────────────────────────────────────────
+  # Taille de PR (warning si trop grande)
+  # ─────────────────────────────────────────
+  pr-size:
+    name: Check PR size
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check number of changed lines
+        env:
+          ADDITIONS: ${{ github.event.pull_request.additions }}
+          DELETIONS: ${{ github.event.pull_request.deletions }}
+        run: |
+          TOTAL=$((ADDITIONS + DELETIONS))
+          echo "PR size: +${ADDITIONS} -${DELETIONS} = ${TOTAL} lines"
+          if [ "$TOTAL" -gt 1000 ]; then
+            echo "::warning::Cette PR modifie ${TOTAL} lignes. Envisagez de la découper en PRs plus petites pour faciliter la review."
+          else
+            echo "✓ Taille acceptable (${TOTAL} lignes)"
+          fi

@@ -1,0 +1,129 @@
+version: 2
+
+updates:
+  # ── Actions GitHub ────────────────────────────────────────────────────────
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:00"
+      timezone: Europe/Paris
+    commit-message:
+      prefix: "ci"
+    labels:
+      - dependencies
+      - github-actions
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+
+  # ── Go - Serveur ──────────────────────────────────────────────────────────
+  - package-ecosystem: gomod
+    directory: /server
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:30"
+      timezone: Europe/Paris
+    commit-message:
+      prefix: "chore(server)"
+    labels:
+      - dependencies
+      - go
+      - server
+    # Grouper les mises à jour mineures/patch ensemble
+    groups:
+      server-minor-patch:
+        update-types:
+          - minor
+          - patch
+    # Ouvrir des PRs séparées pour les majeurs
+    open-pull-requests-limit: 10
+
+  # ── Go - Agent ────────────────────────────────────────────────────────────
+  - package-ecosystem: gomod
+    directory: /agent
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:45"
+      timezone: Europe/Paris
+    commit-message:
+      prefix: "chore(agent)"
+    labels:
+      - dependencies
+      - go
+      - agent
+    groups:
+      agent-minor-patch:
+        update-types:
+          - minor
+          - patch
+    open-pull-requests-limit: 10
+
+  # ── npm - Frontend ────────────────────────────────────────────────────────
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+      day: tuesday    # décalé pour éviter trop de PRs le même jour
+      time: "08:00"
+      timezone: Europe/Paris
+    commit-message:
+      prefix: "chore(frontend)"
+    labels:
+      - dependencies
+      - javascript
+      - frontend
+    # Grouper toutes les devDependencies ensemble
+    groups:
+      frontend-dev:
+        dependency-type: development
+        update-types:
+          - minor
+          - patch
+      # Vue + écosystème ensemble
+      vue-ecosystem:
+        patterns:
+          - "vue"
+          - "vue-*"
+          - "@vitejs/*"
+          - "vite"
+        update-types:
+          - minor
+          - patch
+      # Garder les prod deps séparées pour review
+      frontend-prod-patch:
+        dependency-type: production
+        update-types:
+          - patch
+    open-pull-requests-limit: 10
+
+  # ── Docker - images de base ───────────────────────────────────────────────
+  - package-ecosystem: docker
+    directory: /server
+    schedule:
+      interval: weekly
+      day: wednesday
+      time: "08:00"
+      timezone: Europe/Paris
+    commit-message:
+      prefix: "chore(docker)"
+    labels:
+      - dependencies
+      - docker
+
+  - package-ecosystem: docker
+    directory: /agent
+    schedule:
+      interval: weekly
+      day: wednesday
+      time: "08:15"
+      timezone: Europe/Paris
+    commit-message:
+      prefix: "chore(docker)"
+    labels:
+      - dependencies
+      - docker

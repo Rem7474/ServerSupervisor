@@ -1,0 +1,45 @@
+name: Stale issues & PRs
+
+on:
+  schedule:
+    - cron: '0 8 * * 3'   # chaque mercredi à 8h UTC
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/stale@v9
+        with:
+          # ── Issues ──────────────────────────────────────────────────────
+          stale-issue-label: stale
+          stale-issue-message: >
+            Cette issue est inactive depuis 60 jours. Elle sera fermée dans 14 jours
+            si aucune activité n'est détectée. Commentez pour la maintenir ouverte,
+            ou ajoutez le label `pinned` pour l'exclure de ce processus.
+          close-issue-message: >
+            Fermée faute d'activité. Réouvrez si le problème est toujours d'actualité.
+          days-before-issue-stale: 60
+          days-before-issue-close: 14
+
+          # ── Pull Requests ────────────────────────────────────────────────
+          stale-pr-label: stale
+          stale-pr-message: >
+            Cette PR est inactive depuis 30 jours. Elle sera fermée dans 14 jours
+            si aucune activité n'est détectée. Rebasez ou commentez pour la réactiver.
+          close-pr-message: >
+            Fermée faute d'activité. Réouvrez si les changements sont toujours pertinents.
+          days-before-pr-stale: 30
+          days-before-pr-close: 14
+
+          # ── Exclusions ───────────────────────────────────────────────────
+          exempt-issue-labels: pinned,security,bug,in-progress
+          exempt-pr-labels: pinned,security,in-progress,do-not-merge
+
+          # Ne pas traiter plus de 100 items par run pour rester dans les quotas
+          operations-per-run: 100

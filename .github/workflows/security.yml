@@ -1,0 +1,210 @@
+name: Security
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'    # chaque lundi à 6h UTC
+  push:
+    branches: [main]
+    paths:
+      - 'server/go.mod'
+      - 'server/go.sum'
+      - 'agent/go.mod'
+      - 'agent/go.sum'
+      - 'frontend/package.json'
+      - 'frontend/package-lock.json'
+      - '**/Dockerfile'
+  workflow_dispatch:        # déclenchable manuellement depuis l'UI GitHub
+
+permissions:
+  contents: read
+  security-events: write    # upload SARIF vers GitHub Security tab
+
+jobs:
+  # ─────────────────────────────────────────
+  # Vulnérabilités Go - govulncheck (officiel Google)
+  # ─────────────────────────────────────────
+  govulncheck-server:
+    name: govulncheck (server)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+
+      - name: Run govulncheck
+        working-directory: server
+        run: govulncheck ./...
+
+  govulncheck-agent:
+    name: govulncheck (agent)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: agent/go.mod
+          cache-dependency-path: agent/go.sum
+
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+
+      - name: Run govulncheck
+        working-directory: agent
+        run: govulncheck ./...
+
+  # ─────────────────────────────────────────
+  # Audit npm
+  # ─────────────────────────────────────────
+  npm-audit:
+    name: npm audit (frontend)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run npm audit
+        working-directory: frontend
+        # --audit-level=high : échouer seulement sur high/critical
+        run: npm audit --audit-level=high --omit=dev
+
+  # ─────────────────────────────────────────
+  # Scan Trivy - image Docker serveur
+  # ─────────────────────────────────────────
+  trivy-server:
+    name: Trivy scan (server image)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build server image locally
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: server/Dockerfile
+          push: false
+          load: true
+          tags: serversupervisor-server:scan
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: serversupervisor-server:scan
+          format: sarif
+          output: trivy-server.sarif
+          severity: CRITICAL,HIGH
+          exit-code: '0'    # ne pas faire échouer le build, juste reporter
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-server.sarif
+          category: trivy-server
+
+  # ─────────────────────────────────────────
+  # Scan Trivy - image Docker agent
+  # ─────────────────────────────────────────
+  trivy-agent:
+    name: Trivy scan (agent image)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build agent image locally
+        uses: docker/build-push-action@v5
+        with:
+          context: agent
+          file: agent/Dockerfile
+          push: false
+          load: true
+          tags: serversupervisor-agent:scan
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: serversupervisor-agent:scan
+          format: sarif
+          output: trivy-agent.sarif
+          severity: CRITICAL,HIGH
+          exit-code: '0'
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-agent.sarif
+          category: trivy-agent
+
+  # ─────────────────────────────────────────
+  # Scan du code source (CodeQL)
+  # ─────────────────────────────────────────
+  codeql:
+    name: CodeQL analysis
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [go, javascript]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          # Règles supplémentaires pour la sécurité web
+          queries: security-extended
+
+      - name: Setup Go (pour analyse Go)
+        if: matrix.language == 'go'
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: server/go.mod
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: codeql-${{ matrix.language }}

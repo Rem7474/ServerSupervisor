@@ -277,7 +277,7 @@ function formatNumber(n) {
 
 async function fetchSettings() {
   try {
-    const res = await apiClient.get('/api/v1/settings')
+    const res = await apiClient.getSettings()
     if (res.data) {
       settings.value = res.data.settings || {}
       dbStatus.value = res.data.dbStatus || {}
@@ -291,12 +291,14 @@ async function testSmtp() {
   testingSmtp.value = true
   smtpTestMessage.value = ''
   try {
-    const res = await apiClient.post('/api/v1/settings/test-smtp')
+    const res = await apiClient.testSmtp()
     smtpTestSuccess.value = true
     smtpTestMessage.value = 'Connexion SMTP réussie!'
+    setTimeout(() => { smtpTestMessage.value = '' }, 5000)
   } catch (e) {
     smtpTestSuccess.value = false
     smtpTestMessage.value = `Erreur: ${e.response?.data?.error || e.message}`
+    setTimeout(() => { smtpTestMessage.value = '' }, 5000)
   } finally {
     testingSmtp.value = false
   }
@@ -306,12 +308,14 @@ async function testNtfy() {
   testingNtfy.value = true
   ntfyTestMessage.value = ''
   try {
-    const res = await apiClient.post('/api/v1/settings/test-ntfy')
+    const res = await apiClient.testNtfy()
     ntfyTestSuccess.value = true
     ntfyTestMessage.value = 'Message test envoyé à ntfy.sh!'
+    setTimeout(() => { ntfyTestMessage.value = '' }, 5000)
   } catch (e) {
     ntfyTestSuccess.value = false
     ntfyTestMessage.value = `Erreur: ${e.response?.data?.error || e.message}`
+    setTimeout(() => { ntfyTestMessage.value = '' }, 5000)
   } finally {
     testingNtfy.value = false
   }
@@ -321,14 +325,16 @@ async function cleanMetrics() {
   cleaningMetrics.value = true
   cleanMessage.value = ''
   try {
-    const res = await apiClient.post('/api/v1/settings/cleanup-metrics')
+    const res = await apiClient.cleanupMetrics()
     cleanSuccess.value = true
     cleanMessage.value = res.data?.message || 'Nettoyage des métriques réussi'
+    setTimeout(() => { cleanMessage.value = '' }, 5000)
     // Refresh DB status
     await fetchSettings()
   } catch (e) {
     cleanSuccess.value = false
     cleanMessage.value = `Erreur: ${e.response?.data?.error || e.message}`
+    setTimeout(() => { cleanMessage.value = '' }, 5000)
   } finally {
     cleaningMetrics.value = false
   }
@@ -338,14 +344,16 @@ async function cleanAuditLogs() {
   cleaningAuditLogs.value = true
   auditCleanMessage.value = ''
   try {
-    const res = await apiClient.post('/api/v1/settings/cleanup-audit')
+    const res = await apiClient.cleanupAudit()
     auditCleanSuccess.value = true
     auditCleanMessage.value = res.data?.message || 'Nettoyage des logs audit réussi'
+    setTimeout(() => { auditCleanMessage.value = '' }, 5000)
     // Refresh DB status
     await fetchSettings()
   } catch (e) {
     auditCleanSuccess.value = false
     auditCleanMessage.value = `Erreur: ${e.response?.data?.error || e.message}`
+    setTimeout(() => { auditCleanMessage.value = '' }, 5000)
   } finally {
     cleaningAuditLogs.value = false
   }
