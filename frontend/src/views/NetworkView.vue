@@ -256,7 +256,7 @@
                           <label
                             class="form-check form-switch"
                             :title="!getPortSetting(host.id, port.port).enabled
-                              ? 'Activez d\\'abord l\\'affichage du port'
+                              ? \"Activez d'abord l'affichage du port\"
                               : ''"
                           >
                             <input
