@@ -1,14 +1,14 @@
 <template>
   <div class="d3-graph-container">
     <div class="graph-legend">
-      <div class="legend-title">Topology</div>
+      <div class="legend-title">Légende</div>
       <div class="legend-item">
         <span class="legend-dot host-online"></span>
-        Hote en ligne
+        Hôte en ligne
       </div>
       <div class="legend-item">
         <span class="legend-dot host-offline"></span>
-        Hote hors ligne
+        Hôte hors ligne
       </div>
       <div class="legend-item">
         <span class="legend-dot port-tcp"></span>
@@ -18,9 +18,13 @@
         <span class="legend-dot port-udp"></span>
         Port UDP
       </div>
-      <div class="legend-item">
+      <div v-if="hasServices" class="legend-item">
         <span class="legend-dot service-node"></span>
-        Service expose
+        Service proxy
+      </div>
+      <div v-if="showProxyLinks && hasProxyLinks" class="legend-item">
+        <span class="legend-line proxy-line"></span>
+        Lien proxy
       </div>
     </div>
     <div v-if="!hasData" class="graph-empty">
@@ -76,6 +80,15 @@ const emit = defineEmits(['host-click'])
 const svgRef = ref(null)
 const tooltipRef = ref(null)
 const hasData = computed(() => Array.isArray(props.data) && props.data.length > 0)
+const hasServices = computed(() =>
+  props.services && props.services.length > 0
+)
+const hasProxyLinks = computed(() => {
+  // Check if there are any proxy-linked ports or manual services
+  const hasManualServices = props.services && props.services.length > 0
+  const hasLinkedPorts = Object.values(props.hostPortOverrides || {}).some(o => o.proxyPorts?.size > 0)
+  return hasManualServices || hasLinkedPorts
+})
 
 const statusColors = {
   online: '#22c55e',
@@ -111,6 +124,7 @@ const buildHierarchy = () => {
         ...(hostOverride?.excludedPorts || [])
       ].map(value => Number(value)).filter(Boolean))
       const hostPortMap = hostOverride?.portMap || {}
+      const proxyPorts = hostOverride?.proxyPorts || new Set()
       const rawPorts = host.ports || []
       const filteredPorts = rawPorts.filter((port) => {
         const portNumber = Number(port.port || 0)
@@ -118,37 +132,38 @@ const buildHierarchy = () => {
       })
       const hostServices = servicesByHost.get(host.id) || []
 
-      return {
-        id: `host-${host.id}`,
-        name: host.name || host.hostname || host.id,
-        type: 'host',
-        hostId: host.id,
-        status: host.status || 'unknown',
-        portCount: hostServices.length ? hostServices.length : filteredPorts.length,
-        ipAddress: host.ip_address,
-        children: hostServices.length
-          ? hostServices.map((service) => {
-            const internalPort = Number(service.internalPort || 0)
-            const externalPort = Number(service.externalPort || 0)
-            const path = service.path || '/'
-            const domain = service.domain || ''
-            const name = service.name || 'Service'
-            const label = domain ? `${domain}${path}` : path
-            return {
-              id: `service-${host.id}-${service.id}`,
-              name,
-              subtitle: label,
-              internalPort,
-              externalPort,
-              type: 'service',
-              protocol: 'tcp',
-              port: internalPort,
-              hostId: host.id,
-              tags: service.tags || '',
-              isProxyLinked: true
-            }
+      // Afficher à la fois services ET ports (logique inclusive)
+      const children = [
+        // Services liés au proxy
+        ...hostServices.map((service) => {
+          const internalPort = Number(service.internalPort || 0)
+          const externalPort = Number(service.externalPort || 0)
+          const path = service.path || '/'
+          const domain = service.domain || ''
+          const name = service.name || 'Service'
+          const label = domain ? `${domain}${path}` : path
+          return {
+            id: `service-${host.id}-${service.id}`,
+            name,
+            subtitle: label,
+            internalPort,
+            externalPort,
+            type: 'service',
+            protocol: 'tcp',
+            port: internalPort,
+            hostId: host.id,
+            tags: service.tags || '',
+            isProxyLinked: true
+          }
+        }),
+        // Ports non liés au proxy (exclure ceux déjà représentés comme service)
+        ...filteredPorts
+          .filter(port => {
+            const portNumber = Number(port.port || 0)
+            // Ne pas afficher en tant que port si déjà rendu comme service
+            return !hostServices.some(s => Number(s.internalPort) === portNumber)
           })
-          : filteredPorts.map((port) => {
+          .map((port) => {
             const portNumber = Number(port.port || 0)
             const protocol = (port.protocol || 'tcp').toLowerCase()
             const serviceName = hostPortMap?.[portNumber] || props.serviceMap?.[portNumber]
@@ -161,9 +176,20 @@ const buildHierarchy = () => {
               port: portNumber,
               hostId: host.id,
               containers: port.containers || [],
-              isProxyLinked: !!(hostPortMap?.[portNumber])
+              isProxyLinked: proxyPorts.has(portNumber)
             }
           })
+      ]
+
+      return {
+        id: `host-${host.id}`,
+        name: host.name || host.hostname || host.id,
+        type: 'host',
+        hostId: host.id,
+        status: host.status || 'unknown',
+        portCount: children.length,
+        ipAddress: host.ip_address,
+        children
       }
     })
   }
@@ -617,6 +643,14 @@ watch(
   height: 10px;
   border-radius: 50%;
   display: inline-block;
+  flex-shrink: 0;
+}
+
+.legend-line {
+  display: inline-block;
+  width: 24px;
+  height: 2px;
+  border-top: 2px dashed rgba(56, 189, 248, 0.8);
   flex-shrink: 0;
 }
 

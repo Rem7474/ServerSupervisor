@@ -122,9 +122,16 @@
           </div>
           <div class="network-config-item mt-3">
             <div class="d-flex align-items-center justify-content-between mb-2">
-              <label class="form-label mb-0">Services exposes via proxy</label>
-              <button class="btn btn-outline-light btn-sm" @click="addServiceRow">
-                Ajouter un service
+              <div>
+                <label class="form-label mb-0">Services manuels via proxy</label>
+                <div class="text-secondary small mt-1">
+                  Services définis manuellement, non détectés automatiquement.
+                  Pour les ports découverts, utilisez la section "Ports découverts" ci-dessous
+                  et cochez "Proxy".
+                </div>
+              </div>
+              <button class="btn btn-outline-light btn-sm ms-2" @click="addServiceRow">
+                + Ajouter
               </button>
             </div>
             <div class="table-responsive network-config-table">
@@ -135,9 +142,7 @@
                     <th>Domaine</th>
                     <th>Chemin</th>
                     <th>Port interne</th>
-                    <th>Port externe</th>
                     <th>Host</th>
-                    <th>Tags</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -147,7 +152,6 @@
                     <td><input v-model="service.domain" class="form-control form-control-sm" placeholder="vault.example.com" /></td>
                     <td><input v-model="service.path" class="form-control form-control-sm" placeholder="/" /></td>
                     <td><input v-model.number="service.internalPort" type="number" class="form-control form-control-sm" placeholder="3000" /></td>
-                    <td><input v-model.number="service.externalPort" type="number" class="form-control form-control-sm" placeholder="443" /></td>
                     <td>
                       <select v-model="service.hostId" class="form-select form-select-sm">
                         <option value="">Choisir...</option>
@@ -156,7 +160,6 @@
                         </option>
                       </select>
                     </td>
-                    <td><input v-model="service.tags" class="form-control form-control-sm" placeholder="auth, admin" /></td>
                     <td class="text-end">
                       <button class="btn btn-sm btn-outline-danger" @click="removeServiceRow(service.id)">Supprimer</button>
                     </td>
@@ -168,6 +171,22 @@
               </table>
             </div>
           </div>
+          <!-- Options du graphe (toggle showProxyLinks) -->
+          <div class="network-config-item mt-3">
+            <label class="form-label">Options du graphe</label>
+            <div class="d-flex flex-column gap-2">
+              <label class="form-check">
+                <input v-model="showProxyLinks" class="form-check-input" type="checkbox" />
+                <span class="form-check-label">
+                  Afficher les connexions proxy (arcs pointillés)
+                </span>
+                <div class="text-secondary small mt-1">
+                  Dessine un arc du nœud racine vers chaque service lié au proxy.
+                </div>
+              </label>
+            </div>
+          </div>
+
           <div class="network-config-item mt-4">
             <div class="d-flex align-items-center justify-content-between mb-2">
               <label class="form-label mb-0">Ports decouverts par host</label>
@@ -178,6 +197,14 @@
                 <div class="network-host-header">
                   <div class="fw-semibold">{{ host.name || host.hostname || host.ip_address || host.id }}</div>
                   <div class="text-secondary small">{{ host.ip_address || 'IP inconnue' }}</div>
+                  <div class="d-flex gap-2 mt-1">
+                    <span class="badge bg-blue-lt text-blue text-xs">
+                      {{ countEnabled(host.id) }} / {{ (discoveredPortsByHost[host.id] || []).length }} ports affichés
+                    </span>
+                    <span v-if="countProxyLinked(host.id) > 0" class="badge bg-cyan-lt text-cyan text-xs">
+                      {{ countProxyLinked(host.id) }} liés au proxy
+                    </span>
+                  </div>
                 </div>
                 <div class="table-responsive network-config-table">
                   <table class="table table-sm table-vcenter">
@@ -190,10 +217,18 @@
                         <th>Chemin</th>
                         <th>Afficher</th>
                         <th>Lier proxy</th>
+                        <th></th>
                       </tr>
                     </thead>
                     <tbody>
-                      <tr v-for="port in discoveredPortsByHost[host.id] || []" :key="port.key">
+                      <tr
+                        v-for="port in discoveredPortsByHost[host.id] || []"
+                        :key="port.key"
+                        :class="{
+                          'opacity-50': !getPortSetting(host.id, port.port).enabled,
+                          'table-info': getPortSetting(host.id, port.port).linkToProxy
+                        }"
+                      >
                         <td class="fw-semibold">{{ port.port }}</td>
                         <td class="text-secondary text-uppercase">{{ port.protocol }}</td>
                         <td>
@@ -212,20 +247,47 @@
                               v-model="getPortSetting(host.id, port.port).enabled"
                               class="form-check-input"
                               type="checkbox"
+                              @change="onEnabledChange(host.id, port.port, $event)"
                             />
                             <span class="form-check-label">Afficher</span>
                           </label>
                         </td>
                         <td>
-                          <label class="form-check form-switch">
+                          <label
+                            class="form-check form-switch"
+                            :title="!getPortSetting(host.id, port.port).enabled
+                              ? 'Activez d\\'abord l\\'affichage du port'
+                              : ''"
+                          >
                             <input
                               :id="`port-proxy-${host.id}-${port.port}`"
                               v-model="getPortSetting(host.id, port.port).linkToProxy"
                               class="form-check-input"
                               type="checkbox"
+                              :disabled="!getPortSetting(host.id, port.port).enabled"
                             />
-                            <span class="form-check-label">Proxy</span>
+                            <span
+                              class="form-check-label"
+                              :class="{ 'text-secondary': !getPortSetting(host.id, port.port).enabled }"
+                            >
+                              Proxy
+                            </span>
                           </label>
+                        </td>
+                        <td class="text-end">
+                          <button
+                            v-if="isPortModified(host.id, port.port)"
+                            class="btn btn-sm btn-ghost-secondary"
+                            title="Réinitialiser ce port"
+                            @click="resetPortSetting(host.id, port.port)"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16"
+                                 viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none">
+                              <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                              <path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4"/>
+                              <path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4"/>
+                            </svg>
+                          </button>
                         </td>
                       </tr>
                       <tr v-if="(discoveredPortsByHost[host.id] || []).length === 0">
@@ -240,42 +302,93 @@
         </div>
         <div v-else-if="networkTab === 'auto'" class="network-config">
           <div class="network-config-item">
-            <div class="d-flex align-items-center justify-content-between mb-2">
-              <label class="form-label mb-0">Liens decouverts automatiquement</label>
-              <span v-if="inferredLinks.length === 0" class="text-secondary small">Aucun lien detecte</span>
-              <span v-else class="text-secondary small">{{ inferredLinks.length }} lien(s)</span>
+            <div class="d-flex align-items-center justify-content-between mb-3">
+              <div>
+                <label class="form-label mb-0">Liens découverts automatiquement</label>
+                <div class="text-secondary small mt-1">
+                  Déduits des réseaux Docker partagés, variables d'environnement et images proxy.
+                </div>
+              </div>
+              <div class="d-flex gap-2 align-items-center">
+                <!-- Filtre par type -->
+                <select v-model="autoLinkFilter" class="form-select form-select-sm" style="width: auto;">
+                  <option value="">Tous les types</option>
+                  <option value="network">Docker Network</option>
+                  <option value="env_ref">Var. d'env.</option>
+                  <option value="proxy">Proxy</option>
+                </select>
+                <span class="text-secondary small">
+                  {{ filteredAutoLinks.length }} / {{ inferredLinks.length }} lien(s)
+                </span>
+              </div>
             </div>
-            <div v-if="inferredLinks.length === 0" class="text-secondary text-center py-4">
-              Les connexions entre conteneurs seront deduites des reseaux Docker, variables d'environnement et configs Traefik.
+
+            <div v-if="filteredAutoLinks.length === 0" class="text-secondary text-center py-4">
+              Aucun lien détecté. Les connexions sont déduites des réseaux Docker partagés,
+              variables d'environnement (*_HOST, *_URL) et labels Traefik.
             </div>
+
             <div v-else class="table-responsive network-config-table">
               <table class="table table-sm table-vcenter">
                 <thead>
                   <tr>
-                    <th>Conteneur source</th>
+                    <th>Source</th>
+                    <th>Hôte source</th>
                     <th></th>
-                    <th>Conteneur cible</th>
+                    <th>Cible</th>
+                    <th>Hôte cible</th>
                     <th>Type</th>
                     <th>Confiance</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="link in inferredLinks" :key="`${link.source_container_name}|${link.target_container_name}|${link.link_type}`">
-                    <td class="fw-semibold text-truncate" :title="link.source_container_name">{{ link.source_container_name }}</td>
+                  <tr
+                    v-for="link in filteredAutoLinks"
+                    :key="`${link.source_container_name}|${link.target_container_name}|${link.link_type}`"
+                    :class="{ 'opacity-50': ignoredLinks.has(linkKey(link)) }"
+                  >
+                    <td class="fw-semibold text-truncate" style="max-width: 160px;"
+                        :title="link.source_container_name">
+                      {{ link.source_container_name }}
+                    </td>
+                    <td class="text-secondary small">
+                      {{ hostNameById(link.source_host_id) }}
+                    </td>
                     <td class="text-center text-secondary">→</td>
-                    <td class="fw-semibold text-truncate" :title="link.target_container_name">{{ link.target_container_name }}</td>
-                    <td>
-                      <span v-if="link.link_type === 'network'" class="badge bg-blue-lt text-blue">Network</span>
-                      <span v-else-if="link.link_type === 'env_ref'" class="badge bg-orange-lt text-orange">Env Ref</span>
-                      <span v-else-if="link.link_type === 'proxy'" class="badge bg-cyan-lt text-cyan">Proxy</span>
-                      <span v-else class="badge bg-secondary-lt text-secondary">{{ link.link_type }}</span>
+                    <td class="fw-semibold text-truncate" style="max-width: 160px;"
+                        :title="link.target_container_name">
+                      {{ link.target_container_name }}
+                    </td>
+                    <td class="text-secondary small">
+                      {{ hostNameById(link.target_host_id) }}
                     </td>
                     <td>
-                      <div class="d-flex align-items-center gap-1">
-                        <div class="progress flex-grow-1" style="height: 4px;">
-                          <div class="progress-bar" :style="{ width: (link.confidence || 0) + '%', backgroundColor: link.confidence >= 80 ? '#10b981' : link.confidence >= 60 ? '#f59e0b' : '#ef4444' }"></div>
+                      <span v-if="link.link_type === 'network'" class="badge bg-blue-lt text-blue">
+                        Docker Network
+                      </span>
+                      <span v-else-if="link.link_type === 'env_ref'" class="badge bg-orange-lt text-orange"
+                            :title="link.env_key ? `Variable : ${link.env_key}` : ''">
+                        Env Ref{{ link.env_key ? ` (${link.env_key})` : '' }}
+                      </span>
+                      <span v-else-if="link.link_type === 'proxy'" class="badge bg-cyan-lt text-cyan">
+                        Proxy
+                      </span>
+                      <span v-else class="badge bg-secondary-lt text-secondary">
+                        {{ link.link_type }}
+                      </span>
+                    </td>
+                    <td>
+                      <div class="d-flex align-items-center gap-2">
+                        <div class="progress flex-grow-1" style="height: 4px; min-width: 60px;">
+                          <div class="progress-bar" :style="{
+                            width: (link.confidence || 0) + '%',
+                            backgroundColor: link.confidence >= 80 ? '#10b981'
+                                           : link.confidence >= 60 ? '#f59e0b' : '#ef4444'
+                          }"></div>
                         </div>
-                        <span class="text-secondary small" style="min-width: 30px;">{{ link.confidence || 0 }}%</span>
+                        <span class="text-secondary small" style="min-width: 30px;">
+                          {{ link.confidence || 0 }}%
+                        </span>
                       </div>
                     </td>
                   </tr>
@@ -300,16 +413,9 @@
                   </div>
                   <div class="d-flex align-items-center gap-1">
                     <div style="width: 3px; height: 20px; background: #06b6d4; border-radius: 2px;"></div>
-                    <span class="text-secondary" v-if="showProxyLinks">Proxy</span>
-                    <span class="text-secondary" v-else>Port interne</span>
+                    <span class="text-secondary">Port interne</span>
                   </div>
                 </div>
-              </div>
-              <div>
-                <label class="form-check form-switch m-0">
-                  <input v-model="showProxyLinks" class="form-check-input" type="checkbox" />
-                  <span class="form-check-label">{{ showProxyLinks ? 'Masquer' : 'Afficher' }} Proxy → Service</span>
-                </label>
               </div>
             </div>
           </div>
@@ -475,6 +581,8 @@ const networkServices = ref([])
 const hostPortConfig = ref([])
 const topologyConfigLoaded = ref(false)
 const inferredLinks = ref([])
+const autoLinkFilter = ref('')
+const ignoredLinks = ref(new Set())
 const saveStatus = ref('idle') // 'idle' | 'saving' | 'saved' | 'error'
 const graphSurfaceRef = ref(null)
 const graphHeight = ref('auto')
@@ -609,12 +717,14 @@ const hostPortOverrides = computed(() => {
     if (!entry.hostId) continue
     const excludedPortsList = []
     const portMap = {}
+    const proxyPorts = new Set()
     for (const [port, settings] of Object.entries(entry.ports || {})) {
       const portNumber = Number(port)
       if (!settings?.enabled) excludedPortsList.push(portNumber)
       if (settings?.name) portMap[portNumber] = settings.name
+      if (settings?.linkToProxy && settings?.enabled) proxyPorts.add(portNumber)
     }
-    overrides[entry.hostId] = { excludedPorts: excludedPortsList, portMap }
+    overrides[entry.hostId] = { excludedPorts: excludedPortsList, portMap, proxyPorts }
   }
   return overrides
 })
@@ -694,6 +804,13 @@ const combinedServices = computed(() => {
   return [...networkServices.value, ...linkedServices]
 })
 
+const filteredAutoLinks = computed(() => {
+  return inferredLinks.value.filter(link => {
+    if (autoLinkFilter.value && link.link_type !== autoLinkFilter.value) return false
+    return true
+  })
+})
+
 
 const graphHosts = computed(() => {
   const portsByHost = new Map()
@@ -747,6 +864,49 @@ function formatBytes(bytes) {
     idx += 1
   }
   return `${value.toFixed(1)} ${units[idx]}`
+}
+
+function onEnabledChange(hostId, portNumber, event) {
+  const setting = getPortSetting(hostId, portNumber)
+  // Si le port est masqué, forcer linkToProxy à false
+  if (!event.target.checked) {
+    setting.linkToProxy = false
+  }
+}
+
+function countEnabled(hostId) {
+  const entry = hostPortConfig.value.find(e => e.hostId === hostId)
+  if (!entry) return (discoveredPortsByHost.value[hostId] || []).length
+  const ports = discoveredPortsByHost.value[hostId] || []
+  return ports.filter(p => {
+    const s = entry.ports?.[String(p.port)]
+    return s === undefined || s.enabled !== false
+  }).length
+}
+
+function countProxyLinked(hostId) {
+  const entry = hostPortConfig.value.find(e => e.hostId === hostId)
+  if (!entry) return 0
+  return Object.values(entry.ports || {}).filter(s => s?.linkToProxy && s?.enabled).length
+}
+
+function isPortModified(hostId, portNumber) {
+  const s = getPortSetting(hostId, portNumber)
+  return s.name !== '' || !s.enabled || s.linkToProxy || s.domain !== '' || (s.path !== '/' && s.path !== '')
+}
+
+function resetPortSetting(hostId, portNumber) {
+  const entry = getHostPortEntry(hostId)
+  entry.ports[String(portNumber)] = { name: '', domain: '', path: '/', enabled: true, linkToProxy: false }
+}
+
+function linkKey(link) {
+  return `${link.source_container_name}|${link.target_container_name}|${link.link_type}`
+}
+
+function hostNameById(hostId) {
+  const h = hosts.value.find(h => h.id === hostId)
+  return h ? (h.name || h.hostname || h.ip_address || hostId) : hostId
 }
 
 function getPortSetting(hostId, portNumber) {
