@@ -2,7 +2,7 @@
   <div>
     <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
       <div>
-        <h2 class="page-title">Securite</h2>
+        <h2 class="page-title">Sécurité</h2>
         <div class="text-secondary">Gestion du MFA (TOTP)</div>
       </div>
     </div>
@@ -12,20 +12,20 @@
         <div class="d-flex align-items-center justify-content-between mb-3">
           <div class="fw-semibold">Authentification multi-facteur</div>
           <span :class="mfaEnabled ? 'badge bg-green-lt text-green' : 'badge bg-secondary-lt text-secondary'">
-            {{ mfaEnabled ? 'Active' : 'Desactivee' }}
+            {{ mfaEnabled ? 'Activé' : 'Désactivée' }}
           </span>
         </div>
 
         <div v-if="!mfaEnabled">
-          <p class="text-secondary">Activez le MFA pour renforcer la securite du compte.</p>
+          <p class="text-secondary">Activez le MFA pour renforcer la sécurité du compte.</p>
           <button class="btn btn-primary" @click="startSetup" :disabled="loading">
             {{ loading ? 'Chargement...' : 'Activer MFA' }}
           </button>
         </div>
 
         <div v-else>
-          <p class="text-secondary">Le MFA est actif. Vous pouvez le desactiver si besoin.</p>
-          <button class="btn btn-outline-danger" @click="showDisable = true">Desactiver MFA</button>
+          <p class="text-secondary">Le MFA est actif. Vous pouvez le désactiver si besoin.</p>
+          <button class="btn btn-outline-danger" @click="showDisable = true">Désactiver le MFA</button>
         </div>
 
         <div v-if="setupVisible" class="mt-4">
@@ -42,7 +42,7 @@
                   <input v-model="verifyCode" type="text" class="form-control" placeholder="123456" inputmode="numeric" maxlength="6" />
                 </div>
                 <button class="btn btn-success" @click="verifySetup" :disabled="loading || !verifyCode">
-                  {{ loading ? 'Verification...' : 'Verifier et activer' }}
+                  {{ loading ? 'Vérification...' : 'Vérifier et activer' }}
                 </button>
               </div>
             </div>
@@ -59,13 +59,13 @@
 
         <div v-if="showDisable" class="mt-4">
           <div class="border rounded p-3">
-            <div class="fw-semibold mb-2">Desactiver le MFA</div>
+            <div class="fw-semibold mb-2">Désactiver le MFA</div>
             <div class="mb-3">
               <label class="form-label">Mot de passe</label>
               <input v-model="disablePassword" type="password" class="form-control" placeholder="••••••••" />
             </div>
             <button class="btn btn-danger" @click="disableMFA" :disabled="loading || !disablePassword">
-              {{ loading ? 'Desactivation...' : 'Confirmer la desactivation' }}
+              {{ loading ? 'Désactivation...' : 'Confirmer la désactivation' }}
             </button>
             <button class="btn btn-outline-secondary ms-2" @click="showDisable = false" :disabled="loading">Annuler</button>
           </div>
@@ -127,7 +127,7 @@ async function verifySetup() {
   success.value = ''
   try {
     await apiClient.verifyMFA(setup.value.secret, verifyCode.value, setup.value.backup_codes)
-    success.value = 'MFA active avec succes.'
+    success.value = 'MFA activé avec succès.'
     setupVisible.value = false
     verifyCode.value = ''
     await loadStatus()
@@ -144,12 +144,12 @@ async function disableMFA() {
   success.value = ''
   try {
     await apiClient.disableMFA(disablePassword.value)
-    success.value = 'MFA desactive.'
+    success.value = 'MFA désactivé.'
     showDisable.value = false
     disablePassword.value = ''
     await loadStatus()
   } catch (e) {
-    error.value = e.response?.data?.error || 'Erreur lors de la desactivation'
+    error.value = e.response?.data?.error || 'Erreur lors de la désactivation'
   } finally {
     loading.value = false
   }

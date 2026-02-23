@@ -22,8 +22,8 @@
         <span v-if="host?.agent_version" :class="isAgentUpToDate(host.agent_version) ? 'badge bg-green-lt text-green' : 'badge bg-yellow-lt text-yellow'">
           Agent v{{ host.agent_version }}
         </span>
-        <span v-if="host" :class="host.status === 'online' ? 'badge bg-green-lt text-green' : 'badge bg-red-lt text-red'">
-          {{ host.status === 'online' ? 'En ligne' : 'Hors ligne' }}
+        <span v-if="host" :class="hostStatusClass(host.status)">
+          {{ formatHostStatus(host.status) }}
         </span>
         </div>
       </div>
@@ -439,7 +439,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue'
+import { ref, shallowRef, onMounted, onUnmounted, computed, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Line } from 'vue-chartjs'
 import { Chart as ChartJS, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip } from 'chart.js'
@@ -452,6 +452,7 @@ import { useAuthStore } from '../stores/auth'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
 import { useWebSocket } from '../composables/useWebSocket'
 import WsStatusBar from '../components/WsStatusBar.vue'
+import { formatHostStatus, hostStatusClass } from '../utils/formatHostStatus'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import utc from 'dayjs/plugin/utc'
@@ -477,8 +478,8 @@ const showFullAptHistory = ref(false)
 const auditLogs = ref([])
 const metricsHistory = ref([])
 const chartHours = ref(24)
-const cpuChartData = ref(null)
-const memChartData = ref(null)
+const cpuChartData = shallowRef(null)
+const memChartData = shallowRef(null)
 const isEditing = ref(false)
 const saving = ref(false)
 const editForm = ref({ name: '', hostname: '', ip_address: '', os: '' })
@@ -564,7 +565,7 @@ const { wsStatus, wsError, retryCount, reconnect } = useWebSocket(`/api/v1/ws/ho
   aptStatus.value = payload.apt_status
   aptHistory.value = payload.apt_history || []
   auditLogs.value = payload.audit_logs || []
-})
+}, { debounceMs: 200 })
 
 async function loadHistory(hours) {
   chartHours.value = hours

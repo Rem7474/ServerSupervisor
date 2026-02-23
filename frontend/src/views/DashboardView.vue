@@ -17,10 +17,12 @@
             <button class="btn btn-outline-secondary btn-sm" @click="clearSelection" :disabled="selectedCount === 0">
               Vider
             </button>
-            <button class="btn btn-outline-secondary btn-sm" @click="sendBulkApt('update')" :disabled="selectedCount === 0">
+            <button class="btn btn-outline-secondary btn-sm" @click="sendBulkApt('update')" :disabled="selectedCount === 0 || aptLoading !== ''">
+              <span v-if="aptLoading === 'update'" class="spinner-border spinner-border-sm me-1" role="status"></span>
               apt update ({{ selectedCount }})
             </button>
-            <button class="btn btn-primary btn-sm" @click="sendBulkApt('upgrade')" :disabled="selectedCount === 0">
+            <button class="btn btn-primary btn-sm" @click="sendBulkApt('upgrade')" :disabled="selectedCount === 0 || aptLoading !== ''">
+              <span v-if="aptLoading === 'upgrade'" class="spinner-border spinner-border-sm me-1" role="status"></span>
               apt upgrade ({{ selectedCount }})
             </button>
           </div>
@@ -78,7 +80,7 @@
       <div class="card-body">
         <div class="row g-3 align-items-center">
           <div class="col-12 col-lg">
-            <input v-model="searchQuery" type="text" class="form-control" placeholder="Rechercher un hote..." />
+            <input v-model="searchQuery" type="text" class="form-control" placeholder="Rechercher un hôte..." />
           </div>
           <div class="col-12 col-md-4 col-lg-2">
             <select v-model="statusFilter" class="form-select">
@@ -109,7 +111,7 @@
       <div class="card-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
         <div>
           <h3 class="card-title">Tendance globale CPU / RAM</h3>
-          <div class="text-secondary small">Moyenne sur tous les hotes</div>
+          <div class="text-secondary small">Moyenne sur tous les hôtes</div>
         </div>
         <div class="btn-group btn-group-sm">
           <button
@@ -123,8 +125,11 @@
         </div>
       </div>
       <div class="card-body" style="height: 14rem;">
-        <Line v-if="summaryChartData" :data="summaryChartData" :options="summaryChartOptions" class="h-100" />
-        <div v-else class="h-100 d-flex align-items-center justify-content-center text-secondary">Aucune donnee</div>
+        <div v-if="summaryLoading" class="h-100 d-flex align-items-center justify-content-center">
+          <div class="spinner-border text-secondary" role="status"></div>
+        </div>
+        <Line v-else-if="summaryChartData" :data="summaryChartData" :options="summaryChartOptions" class="h-100" />
+        <div v-else class="h-100 d-flex align-items-center justify-content-center text-secondary">Aucune donnée</div>
       </div>
     </div>
 
@@ -164,8 +169,8 @@
                 <div class="text-secondary small">{{ host.hostname || 'Non connecte' }}</div>
               </td>
               <td>
-                <span :class="host.status === 'online' ? 'badge bg-green-lt text-green' : host.status === 'warning' ? 'badge bg-yellow-lt text-yellow' : 'badge bg-red-lt text-red'">
-                  {{ host.status === 'online' ? 'En ligne' : host.status === 'warning' ? 'Warning' : 'Hors ligne' }}
+                <span :class="hostStatusClass(host.status)">
+                  {{ formatHostStatus(host.status) }}
                 </span>
               </td>
               <td>
@@ -211,7 +216,7 @@
           <thead>
             <tr>
               <th>Image</th>
-              <th>Hote</th>
+              <th>Hôte</th>
               <th>En cours</th>
               <th>Derniere version</th>
               <th>Statut</th>
@@ -248,6 +253,8 @@ import apiClient from '../api'
 import { useAuthStore } from '../stores/auth'
 import { useWebSocket } from '../composables/useWebSocket'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
+import { formatHostStatus, hostStatusClass } from '../utils/formatHostStatus'
+import { translateError } from '../utils/translateError'
 import { Line } from 'vue-chartjs'
 import { Chart as ChartJS, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip } from 'chart.js'
 import dayjs from 'dayjs'
@@ -271,10 +278,12 @@ const statusFilter = ref('all')
 const sortKey = ref('name')
 const sortDir = ref('asc')
 const selectedHostIds = ref([])
+const aptLoading = ref('')   // '' | 'update' | 'upgrade'
 const auth = useAuthStore()
 const dialog = useConfirmDialog()
 const summaryHours = ref(24)
 const summaryChartData = ref(null)
+const summaryLoading = ref(false)
 const summaryChartOptions = {
   responsive: true,
   maintainAspectRatio: false,
@@ -377,7 +386,7 @@ const { wsStatus, wsError, retryCount, reconnect } = useWebSocket('/api/v1/ws/da
   versionComparisons.value = payload.version_comparisons || []
   selectedHostIds.value = selectedHostIds.value.filter(id => hosts.value.some(h => h.id === id))
   loading.value = false
-})
+}, { debounceMs: 200 })
 
 function bucketMinutesFor(hours) {
   if (hours <= 6) return 1
@@ -387,6 +396,7 @@ function bucketMinutesFor(hours) {
 }
 
 async function fetchSummary() {
+  summaryLoading.value = true
   try {
     const bucketMinutes = bucketMinutesFor(summaryHours.value)
     const res = await apiClient.getMetricsSummary(summaryHours.value, bucketMinutes)
@@ -417,6 +427,8 @@ async function fetchSummary() {
     }
   } catch (e) {
     summaryChartData.value = null
+  } finally {
+    summaryLoading.value = false
   }
 }
 
@@ -435,29 +447,32 @@ function clearSelection() {
 }
 
 async function sendBulkApt(command) {
-  if (!selectedHostIds.value.length) return
-  
+  if (!selectedHostIds.value.length || aptLoading.value) return
+
   const hostnames = hosts.value
     .filter(h => selectedHostIds.value.includes(h.id))
     .map(h => h.hostname || h.name)
     .join(', ')
-  
+
   const confirmed = await dialog.confirm({
     title: `apt ${command}`,
     message: `Exécuter sur ${selectedHostIds.value.length} hôte(s) :\n${hostnames}`,
     variant: 'warning'
   })
-  
+
   if (!confirmed) return
-  
+
+  aptLoading.value = command
   try {
     await apiClient.sendAptCommand(selectedHostIds.value, command)
   } catch (e) {
     await dialog.confirm({
       title: 'Erreur',
-      message: e.response?.data?.error || e.message,
+      message: translateError(e),
       variant: 'danger'
     })
+  } finally {
+    aptLoading.value = ''
   }
 }
 

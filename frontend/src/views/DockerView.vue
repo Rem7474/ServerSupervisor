@@ -12,13 +12,17 @@
       <li class="nav-item">
         <a class="nav-link" :class="{ active: activeTab === 'containers' }" href="#" @click.prevent="activeTab = 'containers'">
           Conteneurs
-          <span class="badge bg-secondary ms-1">{{ containers?.length || 0 }}</span>
+          <span class="badge bg-secondary text-white ms-1">
+            {{ filteredContainers.length }}<template v-if="filteredContainers.length !== containers.length"> / {{ containers.length }}</template>
+          </span>
         </a>
       </li>
       <li class="nav-item">
         <a class="nav-link" :class="{ active: activeTab === 'compose' }" href="#" @click.prevent="activeTab = 'compose'">
           Projets Compose
-          <span class="badge bg-secondary ms-1">{{ composeProjects?.length || 0 }}</span>
+          <span class="badge bg-secondary text-white ms-1">
+            {{ filteredComposeProjects.length }}<template v-if="filteredComposeProjects.length !== composeProjects.length"> / {{ composeProjects.length }}</template>
+          </span>
         </a>
       </li>
     </ul>
@@ -309,7 +313,6 @@ const composeSearch = ref('')
 const selectedContainer = ref(null)
 const selectedProject = ref(null)
 const activeTab = ref(localStorage.getItem('dockerActiveTab') || 'containers')
-const showLabelsModal = ref(false)
 const copied = ref(false)
 
 // Persist active tab to localStorage

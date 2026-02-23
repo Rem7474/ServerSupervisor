@@ -10,7 +10,7 @@ import { useAuthStore } from '../stores/auth'
  *   'disconnected' — manually closed
  */
 
-export function useWebSocket(path, onMessage) {
+export function useWebSocket(path, onMessage, { debounceMs = 0 } = {}) {
   const auth = useAuthStore()
 
   const wsStatus = ref('connecting')
@@ -19,6 +19,7 @@ export function useWebSocket(path, onMessage) {
 
   let ws = null
   let retryTimer = null
+  let debounceTimer = null
   let manualClose = false
 
   // Exponential backoff: 2s, 4s, 8s, capped at 30s
@@ -58,7 +59,12 @@ export function useWebSocket(path, onMessage) {
           retryCount.value = 0
         }
 
-        onMessage(payload)
+        if (debounceMs > 0) {
+          clearTimeout(debounceTimer)
+          debounceTimer = setTimeout(() => onMessage(payload), debounceMs)
+        } else {
+          onMessage(payload)
+        }
       } catch {
         // Ignore malformed payloads
       }
@@ -109,6 +115,7 @@ export function useWebSocket(path, onMessage) {
   function disconnect() {
     manualClose = true
     clearTimeout(retryTimer)
+    clearTimeout(debounceTimer)
     if (ws) {
       ws.close()
       ws = null
