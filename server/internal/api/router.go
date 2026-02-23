@@ -28,6 +28,7 @@ func SetupRouter(db *database.DB, cfg *config.Config) *gin.Engine {
 	auditH := NewAuditHandler(db, cfg)
 	userH := NewUserHandler(db, cfg)
 	alertH := NewAlertHandler(db, cfg)
+	alertRulesH := NewAlertRulesHandler(db, cfg)
 	settingsH := NewSettingsHandler(db, cfg)
 
 	// ========== Public routes ==========
@@ -113,6 +114,14 @@ func SetupRouter(db *database.DB, cfg *config.Config) *gin.Engine {
 		api.PATCH("/alerts/rules/:id", alertH.UpdateRule)
 		api.DELETE("/alerts/rules/:id", alertH.DeleteRule)
 		api.GET("/alerts/incidents", alertH.ListIncidents)
+
+		// Configurable Alert Rules (new system)
+		api.GET("/alert-rules", alertRulesH.ListAlertRules)
+		api.GET("/alert-rules/:id", alertRulesH.GetAlertRule)
+		api.POST("/alert-rules", alertRulesH.CreateAlertRule)
+		api.PATCH("/alert-rules/:id", alertRulesH.UpdateAlertRule)
+		api.DELETE("/alert-rules/:id", alertRulesH.DeleteAlertRule)
+		api.POST("/alert-rules/test", alertRulesH.TestAlertRule)
 
 		// Settings
 		api.GET("/settings", settingsH.GetSettings)

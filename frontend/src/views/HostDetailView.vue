@@ -1,17 +1,17 @@
 <template>
-  <div class="d-flex flex-column" style="height: calc(100vh - 100px);">
+  <div class="host-detail-page">
     <div class="page-header mb-3">
       <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3">
         <div>
           <div class="text-secondary small">
             <router-link to="/" class="text-decoration-none">Dashboard</router-link>
             <span class="mx-1">/</span>
-            <span>Hote</span>
+            <span>Hôte</span>
           </div>
           <h2 class="page-title">{{ host?.name || host?.hostname || 'Chargement...' }}</h2>
           <div class="text-secondary">
-            {{ host?.hostname || 'Non connecte' }} — {{ host?.os || 'OS inconnu' }} • {{ host?.ip_address }}
-            <span v-if="host?.last_seen">• Derniere activite: <RelativeTime :date="host.last_seen" /></span>
+            {{ host?.hostname || 'Non connecté' }} — {{ host?.os || 'OS inconnu' }} • {{ host?.ip_address }}
+            <span v-if="host?.last_seen">• Dernière activité: <RelativeTime :date="host.last_seen" /></span>
             <span v-if="host?.agent_version">• Agent v{{ host.agent_version }}</span>
           </div>
         </div>
@@ -31,13 +31,13 @@
 
     <WsStatusBar :status="wsStatus" :error="wsError" :retry-count="retryCount" @reconnect="reconnect" />
 
-    <div class="d-flex flex-fill" style="gap: 1rem; overflow: hidden; min-height: 0;">
+    <div class="host-layout">
       <!-- Colonne gauche: Informations hôte -->
-      <div style="flex: 1; overflow-y: auto; min-width: 0;">
+      <div class="host-panel-main">
 
     <div v-if="isEditing" class="card mb-4">
       <div class="card-header">
-        <h3 class="card-title">Modifier l'hote</h3>
+        <h3 class="card-title">Modifier l'hôte</h3>
       </div>
       <div class="card-body">
         <form @submit.prevent="saveEdit" class="row g-3">
@@ -337,15 +337,7 @@
       <!-- Colonne droite: Console Live -->
       <div 
         v-show="showConsole"
-        class="console-panel"
-        style="
-          width: 38%; 
-          min-width: 450px; 
-          display: flex; 
-          flex-direction: column;
-          transition: all 0.3s ease-in-out;
-          overflow: hidden;
-        "
+        class="host-panel-right"
       >
         <div class="card" style="display: flex; flex-direction: column; height: 100%;">
           <div class="card-header d-flex align-items-center justify-content-between">
@@ -449,6 +441,7 @@ import RelativeTime from '../components/RelativeTime.vue'
 import CVEList from '../components/CVEList.vue'
 import apiClient from '../api'
 import { useAuthStore } from '../stores/auth'
+import { useConfirmDialog } from '../composables/useConfirmDialog'
 import { useWebSocket } from '../composables/useWebSocket'
 import WsStatusBar from '../components/WsStatusBar.vue'
 import dayjs from 'dayjs'
@@ -490,6 +483,7 @@ const consoleOutput = ref(null)
 const showConsole = ref(false)
 let streamWs = null
 const auth = useAuthStore()
+const dialog = useConfirmDialog()
 const canRunApt = computed(() => auth.role === 'admin' || auth.role === 'operator')
 
 const serverHostname =
@@ -687,10 +681,16 @@ async function saveEdit() {
 }
 
 async function sendAptCmd(command) {
-  if (!confirm(`Exécuter 'apt ${command}' sur ${host.value?.hostname} ?`)) return
+  const confirmed = await dialog.confirm({
+    title: `apt ${command}`,
+    message: `Exécuter sur : ${host.value?.hostname}`,
+    variant: command === 'dist-upgrade' ? 'danger' : 'warning'
+  })
+  
+  if (!confirmed) return
+  
   try {
     const response = await apiClient.sendAptCommand([hostId], command)
-    alert(`Commande 'apt ${command}' envoyée. L'agent l'exécutera au prochain rapport.`)
     
     // Auto-open console with command
     if (response.data?.commands?.length > 0) {
@@ -705,7 +705,11 @@ async function sendAptCmd(command) {
       }
     }
   } catch (e) {
-    alert('Erreur: ' + (e.response?.data?.error || e.message))
+    await dialog.confirm({
+      title: 'Erreur',
+      message: e.response?.data?.error || e.message,
+      variant: 'danger'
+    })
   }
 }
 
@@ -849,15 +853,23 @@ function connectStreamWebSocket(commandId) {
 }
 
 async function deleteHost() {
-  if (!confirm(`Êtes-vous sûr de vouloir supprimer ${host.value?.hostname} ? Cette action est irréversible.`)) {
-    return
-  }
+  const confirmed = await dialog.confirm({
+    title: 'Supprimer l\'hôte',
+    message: `Êtes-vous sûr de vouloir supprimer ${host.value?.hostname} ?\nCette action est irréversible.`,
+    variant: 'danger'
+  })
+  
+  if (!confirmed) return
+  
   try {
     await apiClient.deleteHost(hostId)
-    alert(`Hôte ${host.value?.hostname} supprimé avec succès.`)
     router.push('/')
   } catch (e) {
-    alert('Erreur: ' + (e.response?.data?.error || e.message))
+    await dialog.confirm({
+      title: 'Erreur',
+      message: e.response?.data?.error || e.message,
+      variant: 'danger'
+    })
   }
 }
 
@@ -878,3 +890,56 @@ onUnmounted(() => {
   if (streamWs) streamWs.close()
 })
 </script>
+
+<style scoped>
+.host-detail-page {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 100px);
+}
+
+.host-layout {
+  display: flex;
+  flex: 1;
+  gap: 1rem;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.host-panel-main {
+  flex: 1;
+  overflow-y: auto;
+  min-width: 0;
+}
+
+.host-panel-right {
+  width: 38%;
+  min-width: 380px;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.3s ease-in-out;
+  overflow: hidden;
+}
+
+@media (max-width: 991px) {
+  .host-detail-page {
+    height: auto;
+  }
+
+  .host-layout {
+    flex-direction: column;
+    overflow: visible;
+    height: auto;
+  }
+
+  .host-panel-main {
+    overflow-y: visible;
+  }
+
+  .host-panel-right {
+    width: 100%;
+    min-width: 0;
+    max-height: 50vh;
+  }
+}
+</style>

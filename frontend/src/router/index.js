@@ -38,6 +38,12 @@ const routes = [
     meta: { requiresAuth: true },
   },
   {
+    path: '/alerts',
+    name: 'Alerts',
+    component: () => import('../views/AlertsView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
     path: '/repos',
     name: 'Repos',
     component: () => import('../views/ReposView.vue'),

@@ -341,16 +341,23 @@ type AuditLog struct {
 // ========== Alerts ==========
 
 type AlertRule struct {
-	ID              int64     `json:"id" db:"id"`
-	HostID          *string   `json:"host_id" db:"host_id"`
-	Metric          string    `json:"metric" db:"metric"`
-	Operator        string    `json:"operator" db:"operator"`
-	Threshold       *float64  `json:"threshold" db:"threshold"`
-	DurationSeconds int       `json:"duration_seconds" db:"duration_seconds"`
-	Channel         string    `json:"channel" db:"channel"`
-	ChannelConfig   string    `json:"channel_config" db:"channel_config"`
-	Enabled         bool      `json:"enabled" db:"enabled"`
-	CreatedAt       time.Time `json:"created_at" db:"created_at"`
+	ID              int64      `json:"id" db:"id"`
+	Name            *string    `json:"name,omitempty" db:"name"` // New: Human-readable name
+	HostID          *string    `json:"host_id" db:"host_id"`
+	Metric          string     `json:"metric" db:"metric"`
+	Operator        string     `json:"operator" db:"operator"`
+	Threshold       *float64   `json:"threshold" db:"threshold"`
+	DurationSeconds int        `json:"duration_seconds" db:"duration_seconds"`
+	Channel         string     `json:"channel" db:"channel"`           // Legacy channel (smtp, ntfy)
+	ChannelConfig   string     `json:"channel_config" db:"channel_config"` // Legacy JSONB config
+	Channels        []string   `json:"channels,omitempty" db:"-"`      // New: Array of channels (from JSONB)
+	SMTPTo          *string    `json:"smtp_to,omitempty" db:"smtp_to"` // New: Email recipients
+	NtfyTopic       *string    `json:"ntfy_topic,omitempty" db:"ntfy_topic"` // New: ntfy topic
+	Cooldown        *int       `json:"cooldown,omitempty" db:"cooldown"` // New: Cooldown period in seconds
+	LastFired       *time.Time `json:"last_fired,omitempty" db:"last_fired"` // New: Last trigger timestamp
+	Enabled         bool       `json:"enabled" db:"enabled"`
+	CreatedAt       time.Time  `json:"created_at" db:"created_at"`
+	UpdatedAt       *time.Time `json:"updated_at,omitempty" db:"updated_at"` // New: Update timestamp
 }
 
 type AlertIncident struct {
@@ -437,4 +444,68 @@ type TopologySnapshot struct {
 	Links      []TopologyLink         `json:"links"`
 	Config     *NetworkTopologyConfig `json:"config,omitempty"`
 	UpdatedAt  time.Time              `json:"updated_at"`
+}
+
+// ========== Alert Rules - Create/Update Helpers ==========
+
+type AlertRuleCreate struct {
+	Name      string   `json:"name" binding:"required"`
+	Enabled   bool     `json:"enabled"`
+	HostID    *string  `json:"host_id"`
+	Metric    string   `json:"metric" binding:"required"`
+	Operator  string   `json:"operator" binding:"required"`
+	Threshold float64  `json:"threshold" binding:"required"`
+	Duration  int      `json:"duration"`
+	Channels  []string `json:"channels"`
+	SMTPTo    string   `json:"smtp_to"`
+	NtfyTopic string   `json:"ntfy_topic"`
+	Cooldown  int      `json:"cooldown"`
+}
+
+type AlertRuleUpdate struct {
+	Name      *string   `json:"name"`
+	Enabled   *bool     `json:"enabled"`
+	HostID    *string   `json:"host_id"`
+	Metric    *string   `json:"metric"`
+	Operator  *string   `json:"operator"`
+	Threshold *float64  `json:"threshold"`
+	Duration  *int      `json:"duration"`
+	Channels  *[]string `json:"channels"`
+	SMTPTo    *string   `json:"smtp_to"`
+	NtfyTopic *string   `json:"ntfy_topic"`
+	Cooldown  *int      `json:"cooldown"`
+}
+
+// ========== Disk Metrics ==========
+
+type DiskMetrics struct {
+	ID           int64     `json:"id" db:"id"`
+	HostID       string    `json:"host_id" db:"host_id"`
+	Timestamp    time.Time `json:"timestamp" db:"timestamp"`
+	MountPoint   string    `json:"mount_point" db:"mount_point"`
+	Filesystem   string    `json:"filesystem" db:"filesystem"`
+	SizeGB       float64   `json:"size_gb" db:"size_gb"`
+	UsedGB       float64   `json:"used_gb" db:"used_gb"`
+	AvailGB      float64   `json:"avail_gb" db:"avail_gb"`
+	UsedPercent  float64   `json:"used_percent" db:"used_percent"`
+	InodesTotal  int64     `json:"inodes_total" db:"inodes_total"`
+	InodesUsed   int64     `json:"inodes_used" db:"inodes_used"`
+	InodesFree   int64     `json:"inodes_free" db:"inodes_free"`
+	InodesPercent float64  `json:"inodes_percent" db:"inodes_percent"`
+}
+
+// DiskHealth for SMART monitoring (optional, collected if smartctl available)
+type DiskHealth struct {
+	ID            int64     `json:"id" db:"id"`
+	HostID        string    `json:"host_id" db:"host_id"`
+	Timestamp     time.Time `json:"timestamp" db:"timestamp"`
+	Device        string    `json:"device" db:"device"` // /dev/sda, /dev/nvme0n1
+	Model         string    `json:"model" db:"model"`
+	SerialNumber  string    `json:"serial_number" db:"serial_number"`
+	SmartStatus   string    `json:"smart_status" db:"smart_status"` // PASSED, FAILED, UNKNOWN
+	Temperature   int       `json:"temperature" db:"temperature"` // Celsius
+	PowerOnHours  int64     `json:"power_on_hours" db:"power_on_hours"`
+	PowerCycles   int64     `json:"power_cycles" db:"power_cycles"`
+	ReallocSectors int      `json:"realloc_sectors" db:"realloc_sectors"`
+	PendingSectors int      `json:"pending_sectors" db:"pending_sectors"`
 }

@@ -57,6 +57,16 @@
                 </router-link>
               </li>
               <li class="nav-item">
+                <router-link to="/alerts" class="nav-link" active-class="active">
+                  <span class="nav-link-icon">
+                    <svg class="icon" width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+                    </svg>
+                  </span>
+                  <span class="nav-link-title">Alertes</span>
+                </router-link>
+              </li>
+              <li class="nav-item">
                 <router-link to="/repos" class="nav-link" active-class="active">
                   <span class="nav-link-icon">
                     <svg class="icon" width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -107,14 +117,14 @@
                   Changer le mot de passe
                 </button>
                 <router-link to="/security" class="dropdown-item" @click="userMenuOpen = false">
-                  Securite (MFA)
+                  Sécurité (MFA)
                 </router-link>
                 <div class="dropdown-divider"></div>
                 <router-link to="/settings" class="dropdown-item" @click="userMenuOpen = false">
                   Paramètres
                 </router-link>
                 <div class="dropdown-divider"></div>
-                <button class="dropdown-item text-danger" @click="handleLogout">Deconnexion</button>
+                <button class="dropdown-item text-danger" @click="handleLogout">Déconnexion</button>
               </div>
             </div>
           </div>
@@ -128,6 +138,9 @@
           </div>
         </div>
       </div>
+
+      <!-- Global Confirm Dialog -->
+      <ConfirmDialog />
 
       <div v-if="showPasswordModal" class="modal modal-blur fade show" tabindex="-1" role="dialog" aria-modal="true" style="display: block;">
         <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
@@ -181,6 +194,7 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { useAuthStore } from './stores/auth'
 import { useRouter } from 'vue-router'
 import apiClient from './api'
+import ConfirmDialog from './components/ConfirmDialog.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -226,7 +240,7 @@ async function submitChangePassword() {
   passwordSuccess.value = ''
 
   if (passwordForm.value.next.length < 8) {
-    passwordError.value = 'Le mot de passe doit faire au moins 8 caracteres.'
+    passwordError.value = 'Le mot de passe doit faire au moins 8 caractères.'
     return
   }
   if (passwordForm.value.next !== passwordForm.value.confirm) {

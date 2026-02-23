@@ -88,6 +88,21 @@ func (db *DB) Ping() error {
 	return db.conn.Ping()
 }
 
+// Query executes a query that returns rows
+func (db *DB) Query(query string, args ...interface{}) (*sql.Rows, error) {
+	return db.conn.Query(query, args...)
+}
+
+// QueryRow executes a query that is expected to return at most one row
+func (db *DB) QueryRow(query string, args ...interface{}) *sql.Row {
+	return db.conn.QueryRow(query, args...)
+}
+
+// Exec executes a query without returning any rows
+func (db *DB) Exec(query string, args ...interface{}) (sql.Result, error) {
+	return db.conn.Exec(query, args...)
+}
+
 func (db *DB) migrate() error {
 	migrations := []string{
 		`CREATE TABLE IF NOT EXISTS users (
@@ -1209,7 +1224,8 @@ func (db *DB) DeleteAlertRule(id int64) error {
 
 func (db *DB) GetAlertRules() ([]models.AlertRule, error) {
 	rows, err := db.conn.Query(
-		`SELECT id, host_id, metric, operator, threshold, duration_seconds, channel, channel_config, enabled, created_at
+		`SELECT id, name, host_id, metric, operator, threshold, duration_seconds, channel, channel_config, 
+		        channels, smtp_to, ntfy_topic, cooldown, last_fired, enabled, created_at, updated_at
 		 FROM alert_rules ORDER BY created_at DESC`,
 	)
 	if err != nil {
@@ -1220,15 +1236,55 @@ func (db *DB) GetAlertRules() ([]models.AlertRule, error) {
 	var rules []models.AlertRule
 	for rows.Next() {
 		var r models.AlertRule
+		var name, smtpTo, ntfyTopic sql.NullString
 		var hostID sql.NullString
+		var threshold sql.NullFloat64
+		var channelsJSON []byte
+		var cooldown sql.NullInt32
+		var lastFired, updatedAt sql.NullTime
 		var channelConfig string
-		if err := rows.Scan(&r.ID, &hostID, &r.Metric, &r.Operator, &r.Threshold, &r.DurationSeconds, &r.Channel, &channelConfig, &r.Enabled, &r.CreatedAt); err != nil {
+		
+		if err := rows.Scan(
+			&r.ID, &name, &hostID, &r.Metric, &r.Operator, &threshold, &r.DurationSeconds, 
+			&r.Channel, &channelConfig, &channelsJSON, &smtpTo, &ntfyTopic, &cooldown, 
+			&lastFired, &r.Enabled, &r.CreatedAt, &updatedAt,
+		); err != nil {
 			continue
+		}
+		
+		if name.Valid {
+			r.Name = &name.String
 		}
 		if hostID.Valid {
 			r.HostID = &hostID.String
 		}
+		if threshold.Valid {
+			r.Threshold = &threshold.Float64
+		}
+		if smtpTo.Valid {
+			r.SMTPTo = &smtpTo.String
+		}
+		if ntfyTopic.Valid {
+			r.NtfyTopic = &ntfyTopic.String
+		}
+		if cooldown.Valid {
+			cooldownInt := int(cooldown.Int32)
+			r.Cooldown = &cooldownInt
+		}
+		if lastFired.Valid {
+			r.LastFired = &lastFired.Time
+		}
+		if updatedAt.Valid {
+			r.UpdatedAt = &updatedAt.Time
+		}
+		
 		r.ChannelConfig = channelConfig
+		if len(channelsJSON) > 0 {
+			json.Unmarshal(channelsJSON, &r.Channels)
+		} else {
+			r.Channels = []string{}
+		}
+		
 		rules = append(rules, r)
 	}
 	return rules, nil

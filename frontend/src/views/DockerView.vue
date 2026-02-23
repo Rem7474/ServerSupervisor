@@ -92,13 +92,22 @@
                 <td>
                   <span :class="stateClass(c.state)">{{ c.state }}</span>
                 </td>
-                <td class="text-secondary small font-monospace">{{ formatContainerPorts(c.ports) }}</td>
+                <td class="d-none d-sm-table-cell text-secondary small font-monospace">{{ formatContainerPorts(c.ports) }}</td>
                 <td class="text-end">
-                  <button v-if="getComposeInfo(c).project" @click="showComposeDetails(c)" class="btn btn-sm btn-ghost-secondary me-1">
-                    Compose
-                  </button>
-                  <button v-if="Object.keys(c.labels || {}).length > 0" @click="selectedContainer = c; showLabelsModal = true" class="btn btn-sm btn-ghost-secondary">
-                    Labels
+                  <button
+                    v-if="getComposeInfo(c).project || Object.keys(c.labels || {}).length > 0"
+                    @click="selectedContainer = c"
+                    class="btn btn-sm btn-ghost-secondary"
+                    :title="getComposeInfo(c).project ? 'Infos Compose + Labels' : 'Labels'"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm me-1" width="16" height="16"
+                         viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none">
+                      <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                      <path d="M9 5H7a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2V7a2 2 0 0 0 -2 -2h-2"/>
+                      <path d="M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2 -2a2 2 0 0 0 -2 -2h-2a2 2 0 0 0 -2 2z"/>
+                      <path d="M9 12l.01 0"/><path d="M13 12l2 0"/><path d="M9 16l.01 0"/><path d="M13 16l2 0"/>
+                    </svg>
+                    Détails
                   </button>
                 </td>
               </tr>
@@ -107,7 +116,7 @@
         </div>
       </div>
       <div v-if="filteredContainers.length === 0" class="text-center text-secondary py-4">
-        Aucun conteneur trouve
+        Aucun conteneur trouvé
       </div>
     </div>
 
@@ -239,11 +248,11 @@
               <!-- Infos projet -->
               <div class="col-md-3 border-end p-3">
                 <div class="mb-3">
-                  <div class="text-secondary small fw-semibold text-uppercase mb-1">Hote</div>
+                  <div class="text-secondary small fw-semibold text-uppercase mb-1">Hôte</div>
                   <div>{{ selectedProject.hostname }}</div>
                 </div>
                 <div class="mb-3">
-                  <div class="text-secondary small fw-semibold text-uppercase mb-1">Repertoire</div>
+                  <div class="text-secondary small fw-semibold text-uppercase mb-1">Répertoire</div>
                   <div class="font-monospace small text-break">{{ selectedProject.working_dir || '-' }}</div>
                 </div>
                 <div class="mb-3">
@@ -262,7 +271,9 @@
               <div class="col-md-9">
                 <div class="d-flex align-items-center justify-content-between px-3 pt-3 pb-2 border-bottom">
                   <span class="text-secondary small fw-semibold">docker compose config (résolu)</span>
-                  <button class="btn btn-sm btn-ghost-secondary" @click="copyConfig(selectedProject.raw_config)">
+                  <button 
+                    :class="['btn', 'btn-sm', copied ? 'btn-success' : 'btn-ghost-secondary']"
+                    @click="copyConfig(selectedProject.raw_config)">
                     {{ copied ? '✓ Copié' : 'Copier' }}
                   </button>
                 </div>

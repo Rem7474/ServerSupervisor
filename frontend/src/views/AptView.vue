@@ -1,21 +1,21 @@
 <template>
-  <div class="d-flex flex-column" style="height: calc(100vh - 120px);">
+  <div class="apt-page">
     <div class="page-header mb-3">
-      <h2 class="page-title">APT - Mises a jour systeme</h2>
-      <div class="text-secondary">Gerer les mises a jour APT sur tous les hotes</div>
+      <h2 class="page-title">APT — Mises à jour système</h2>
+      <div class="text-secondary">Gérer les mises à jour APT sur tous les hôtes</div>
     </div>
 
     <WsStatusBar :status="wsStatus" :error="wsError" :retry-count="retryCount" @reconnect="reconnect" />
 
-    <div class="d-flex flex-fill" style="gap: 1rem; overflow: hidden; min-height: 0;">
+    <div class="apt-layout">
       <!-- Colonne gauche: Liste des hôtes -->
-      <div style="flex: 1; overflow-y: auto; min-width: 0;">
+      <div class="apt-hosts">
         <div class="card mb-3">
           <div class="card-body">
             <div class="d-flex flex-wrap align-items-center gap-3">
               <label class="form-check">
                 <input type="checkbox" class="form-check-input" v-model="selectAll" @change="toggleSelectAll" />
-                <span class="form-check-label">Selectionner tous les hotes</span>
+                <span class="form-check-label">Sélectionner tous les hôtes</span>
               </label>
               <div class="ms-auto d-flex flex-wrap gap-2">
                 <template v-if="canRunApt">
@@ -84,7 +84,7 @@
                 <div class="card card-sm">
                   <div class="card-body text-center">
                     <div class="fw-semibold">{{ formatDate(aptStatuses[host.id].last_upgrade) }}</div>
-                    <div class="text-secondary small">Dernier upgrade</div>
+                    <div class="text-secondary small">Dernière mise à jour</div>
                   </div>
                 </div>
               </div>
@@ -118,6 +118,11 @@
                       >
                         Voir les logs
                       </button>
+                      <div class="d-block d-lg-none mt-2" v-if="liveCommand?.id === cmd.id">
+                        <a href="#apt-console-mobile" class="btn btn-sm btn-outline-primary w-100">
+                          ↓ Voir la console ci-dessous
+                        </a>
+                      </div>
                     </div>
                   </div>
                   <div class="text-secondary small mt-1">
@@ -134,7 +139,7 @@
       </div>
 
       <!-- Colonne droite: Console Live -->
-      <div style="width: 38%; min-width: 450px; display: flex; flex-direction: column;">
+      <div class="apt-console" :class="{ 'apt-console--active': liveCommand }" id="apt-console-mobile">
         <div class="card" style="display: flex; flex-direction: column; height: 100%;">
           <div class="card-header d-flex align-items-center justify-content-between">
             <h3 class="card-title">
@@ -216,6 +221,7 @@ import CVEList from '../components/CVEList.vue'
 import apiClient from '../api'
 import { useAuthStore } from '../stores/auth'
 import { useWebSocket } from '../composables/useWebSocket'
+import { useConfirmDialog } from '../composables/useConfirmDialog'
 import WsStatusBar from '../components/WsStatusBar.vue'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
@@ -233,6 +239,7 @@ const aptStatuses = ref({})
 const aptHistories = ref({})
 const expandedHistories = ref({})
 const auth = useAuthStore()
+const dialog = useConfirmDialog()
 const canRunApt = computed(() => auth.role === 'admin' || auth.role === 'operator')
 
 const renderedConsoleOutput = computed(() => {
@@ -319,11 +326,20 @@ function connectStreamWebSocket(commandId) {
 
 async function bulkAptCmd(command) {
   const hostnames = hosts.value.filter(h => selectedHosts.value.includes(h.id)).map(h => h.hostname).join(', ')
-  if (!confirm(`Exécuter 'apt ${command}' sur: ${hostnames} ?`)) return
+  
+  const isDangerous = command === 'dist-upgrade'
+  const confirmed = await dialog.confirm({
+    title: `apt ${command}`,
+    message: isDangerous
+      ? `⚠️ apt dist-upgrade peut supprimer des paquets existants.\nExécuter sur : ${hostnames} ?`
+      : `Exécuter sur : ${hostnames} ?`,
+    variant: isDangerous ? 'danger' : 'warning'
+  })
+  
+  if (!confirmed) return
+  
   try {
     const response = await apiClient.sendAptCommand(selectedHosts.value, command)
-    alert(`Commande envoyée à ${selectedHosts.value.length} hôte(s)`)
-    
     // Auto-open console if only 1 host selected
     if (selectedHosts.value.length === 1 && response.data?.commands?.length > 0) {
       const cmd = response.data.commands[0]
@@ -338,7 +354,11 @@ async function bulkAptCmd(command) {
       }
     }
   } catch (e) {
-    alert('Erreur: ' + (e.response?.data?.error || e.message))
+    await dialog.confirm({
+      title: 'Erreur',
+      message: e.response?.data?.error || e.message,
+      variant: 'danger'
+    })
   }
 }
 
@@ -391,3 +411,59 @@ onUnmounted(() => {
   if (streamWs) streamWs.close()
 })
 </script>
+
+<style scoped>
+.apt-page {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 120px);
+}
+
+.apt-layout {
+  display: flex;
+  flex: 1;
+  gap: 1rem;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.apt-hosts {
+  flex: 1;
+  overflow-y: auto;
+  min-width: 0;
+}
+
+.apt-console {
+  width: 38%;
+  min-width: 380px;
+  display: flex;
+  flex-direction: column;
+}
+
+@media (max-width: 991px) {
+  .apt-page {
+    height: auto;
+  }
+
+  .apt-layout {
+    flex-direction: column;
+    overflow: visible;
+    height: auto;
+  }
+
+  .apt-hosts {
+    overflow-y: visible;
+  }
+
+  .apt-console {
+    width: 100%;
+    min-width: 0;
+    max-height: 60vh;
+    display: none;
+  }
+
+  .apt-console--active {
+    display: flex;
+  }
+}
+</style>

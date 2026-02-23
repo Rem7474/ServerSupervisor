@@ -1,29 +1,38 @@
 <template>
   <div>
-    <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
+    <div class="page-header d-flex flex-column flex-md-row align-items-md-center
+                justify-content-between gap-3 mb-4">
       <div>
         <h2 class="page-title">Dashboard</h2>
         <div class="text-secondary">Vue d'ensemble de l'infrastructure</div>
       </div>
-      <div class="d-flex align-items-center gap-2">
-        <div class="btn-list">
-          <button class="btn btn-outline-secondary" @click="selectAllFiltered">Tout selectionner</button>
-          <button class="btn btn-outline-secondary" @click="clearSelection" :disabled="selectedCount === 0">Vider</button>
-          <template v-if="canRunApt">
-            <button class="btn btn-outline-secondary" @click="sendBulkApt('update')" :disabled="selectedCount === 0">
+
+      <div class="d-flex flex-wrap align-items-center gap-2">
+        <!-- Sélection + APT : groupés, wrappables -->
+        <template v-if="canRunApt">
+          <div class="d-flex flex-wrap gap-2">
+            <button class="btn btn-outline-secondary btn-sm" @click="selectAllFiltered">
+              Tout sélectionner
+            </button>
+            <button class="btn btn-outline-secondary btn-sm" @click="clearSelection" :disabled="selectedCount === 0">
+              Vider
+            </button>
+            <button class="btn btn-outline-secondary btn-sm" @click="sendBulkApt('update')" :disabled="selectedCount === 0">
               apt update ({{ selectedCount }})
             </button>
-            <button class="btn btn-primary" @click="sendBulkApt('upgrade')" :disabled="selectedCount === 0">
+            <button class="btn btn-primary btn-sm" @click="sendBulkApt('upgrade')" :disabled="selectedCount === 0">
               apt upgrade ({{ selectedCount }})
             </button>
-          </template>
-        </div>
-        <div v-if="!canRunApt" class="text-secondary small">Mode lecture seule</div>
+          </div>
+        </template>
+        <div v-else class="text-secondary small">Mode lecture seule</div>
+
+        <!-- Bouton Ajouter : icône seule sur xs, texte complet sur sm+ -->
         <router-link to="/hosts/new" class="btn btn-primary">
-          <svg class="icon me-2" width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg class="icon" width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
           </svg>
-          Ajouter un hote
+          <span class="d-none d-sm-inline ms-1">Ajouter un hôte</span>
         </router-link>
       </div>
     </div>
@@ -34,7 +43,7 @@
       <div class="col-sm-6 col-lg-3">
         <div class="card card-sm">
           <div class="card-body">
-            <div class="subheader">Hotes</div>
+            <div class="subheader">Hôtes</div>
             <div class="h1 mb-0">{{ hosts.length }}</div>
           </div>
         </div>
@@ -58,7 +67,7 @@
       <div class="col-sm-6 col-lg-3">
         <div class="card card-sm">
           <div class="card-body">
-            <div class="subheader">Mises a jour dispo</div>
+            <div class="subheader">Mises à jour disponibles</div>
             <div class="h1 mb-0 text-yellow">{{ outdatedVersions }}</div>
           </div>
         </div>
@@ -238,6 +247,7 @@ import WsStatusBar from '../components/WsStatusBar.vue'
 import apiClient from '../api'
 import { useAuthStore } from '../stores/auth'
 import { useWebSocket } from '../composables/useWebSocket'
+import { useConfirmDialog } from '../composables/useConfirmDialog'
 import { Line } from 'vue-chartjs'
 import { Chart as ChartJS, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip } from 'chart.js'
 import dayjs from 'dayjs'
@@ -262,6 +272,7 @@ const sortKey = ref('name')
 const sortDir = ref('asc')
 const selectedHostIds = ref([])
 const auth = useAuthStore()
+const dialog = useConfirmDialog()
 const summaryHours = ref(24)
 const summaryChartData = ref(null)
 const summaryChartOptions = {
@@ -425,12 +436,28 @@ function clearSelection() {
 
 async function sendBulkApt(command) {
   if (!selectedHostIds.value.length) return
-  if (!confirm(`Exécuter 'apt ${command}' sur ${selectedHostIds.value.length} hote(s) ?`)) return
+  
+  const hostnames = hosts.value
+    .filter(h => selectedHostIds.value.includes(h.id))
+    .map(h => h.hostname || h.name)
+    .join(', ')
+  
+  const confirmed = await dialog.confirm({
+    title: `apt ${command}`,
+    message: `Exécuter sur ${selectedHostIds.value.length} hôte(s) :\n${hostnames}`,
+    variant: 'warning'
+  })
+  
+  if (!confirmed) return
+  
   try {
     await apiClient.sendAptCommand(selectedHostIds.value, command)
-    alert(`Commande 'apt ${command}' envoyee.`)
   } catch (e) {
-    alert('Erreur: ' + (e.response?.data?.error || e.message))
+    await dialog.confirm({
+      title: 'Erreur',
+      message: e.response?.data?.error || e.message,
+      variant: 'danger'
+    })
   }
 }
 

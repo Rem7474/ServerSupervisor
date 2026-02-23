@@ -6,10 +6,10 @@
           <div class="text-secondary small">
             <router-link to="/" class="text-decoration-none">Dashboard</router-link>
             <span class="mx-1">/</span>
-            <span>Ajouter un hote</span>
+            <span>Ajouter un hôte</span>
           </div>
-          <h2 class="page-title">Ajouter un hote</h2>
-          <div class="text-secondary">Enregistrer un nouvel hote</div>
+          <h2 class="page-title">Ajouter un hôte</h2>
+          <div class="text-secondary">Enregistrer un nouvel hôte</div>
         </div>
         <router-link to="/" class="btn btn-outline-secondary">Retour au dashboard</router-link>
       </div>
@@ -38,14 +38,14 @@
               </div>
 
               <button type="submit" class="btn btn-primary w-100" :disabled="loading">
-                {{ loading ? 'Enregistrement...' : 'Enregistrer l\'hote' }}
+                {{ loading ? 'Enregistrement...' : 'Enregistrer l\'hôte' }}
               </button>
             </form>
 
             <div v-else class="host-success" role="alert">
               <div class="host-success-header">
                 <div>
-                  <div class="fw-semibold">Hote enregistre avec succes</div>
+                  <div class="fw-semibold">Hôte enregistré avec succès</div>
                   <div class="text-secondary small">La cle ne sera plus affichee. Copiez-la maintenant.</div>
                 </div>
                 <button type="button" class="btn btn-success" @click="finishAdd">Termine</button>
