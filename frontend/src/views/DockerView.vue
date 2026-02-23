@@ -298,6 +298,7 @@ const composeSearch = ref('')
 const selectedContainer = ref(null)
 const selectedProject = ref(null)
 const activeTab = ref(localStorage.getItem('dockerActiveTab') || 'containers')
+const showLabelsModal = ref(false)
 const copied = ref(false)
 
 // Persist active tab to localStorage
@@ -317,6 +318,27 @@ const getComposeInfo = (container) => {
 
 const isComposeContainer = (container) => {
   return !!container.labels?.['com.docker.compose.project']
+}
+
+const stateClass = (state) => {
+  const map = {
+    running:    'badge bg-green-lt text-green',
+    restarting: 'badge bg-yellow-lt text-yellow',
+    paused:     'badge bg-yellow-lt text-yellow',
+    created:    'badge bg-blue-lt text-blue',
+    exited:     'badge bg-secondary-lt text-secondary',
+    dead:       'badge bg-red-lt text-red',
+    removing:   'badge bg-orange-lt text-orange',
+  }
+  return map[state] || 'badge bg-secondary-lt text-secondary'
+}
+
+const formatContainerPorts = (raw) => {
+  if (!raw) return '-'
+  const hostPorts = new Set()
+  const matches = raw.matchAll(/(\d+\.\d+\.\d+\.\d+|:::?):(\d+)->/g)
+  for (const m of matches) hostPorts.add(m[2])
+  return hostPorts.size > 0 ? [...hostPorts].join(', ') : raw.split(',').slice(0, 2).join(', ')
 }
 
 const showComposeDetails = (container) => {

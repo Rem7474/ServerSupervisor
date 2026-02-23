@@ -478,7 +478,6 @@ const inferredLinks = ref([])
 const saveStatus = ref('idle') // 'idle' | 'saving' | 'saved' | 'error'
 const graphSurfaceRef = ref(null)
 const graphHeight = ref('auto')
-const auth = useAuthStore()
 
 // Save view mode to localStorage only (local UI preference)
 watch(viewMode, (newMode) => {
