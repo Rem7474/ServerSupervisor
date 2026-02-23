@@ -37,18 +37,27 @@ type DiskHealth struct {
 
 // CollectDiskMetrics collecte les informations détaillées sur tous les systèmes de fichiers montés
 func CollectDiskMetrics() ([]DiskMetrics, error) {
-	// Exécuter df -BG pour obtenir les tailles en GB
-	cmdSpace := exec.Command("df", "-BG", "--output=source,target,size,used,avail,pcent,fstype")
+	// Essayer d'abord avec les flags GNU (plus compatibles)
+	// Si cela échoue, utiliser une approche de secours
+
+	cmdSpace := exec.Command("df", "-BG")
 	outSpace, err := cmdSpace.CombinedOutput()
 	if err != nil {
-		return nil, err
+		// Essayer avec -h (human readable) comme fallback
+		cmdSpace = exec.Command("df", "-h")
+		outSpace, err = cmdSpace.CombinedOutput()
+		if err != nil {
+			return nil, err
+		}
+		return parseDfHuman(string(outSpace)), nil
 	}
 
 	// Exécuter df -i pour obtenir les informations sur les inodes
-	cmdInodes := exec.Command("df", "-i", "--output=source,target,itotal,iused,iavail,ipcent")
+	cmdInodes := exec.Command("df", "-i")
 	outInodes, err := cmdInodes.CombinedOutput()
 	if err != nil {
-		return nil, err
+		// Les inodes ne sont pas critiques, continuer sans elles
+		outInodes = []byte("")
 	}
 
 	// Parser les résultats
@@ -80,24 +89,32 @@ func parseDfSpace(output string) map[string]DiskMetrics {
 			continue // Skip header and empty lines
 		}
 		fields := strings.Fields(line)
-		if len(fields) < 7 {
+		if len(fields) < 5 {
 			continue
+		}
+
+		// Format: Filesystem 1G-blocks Used Available Use% Mounted on
+		// fields: [0]=filesystem, [1]=size, [2]=used, [3]=avail, [4]=%, [5...]=mount
+		filesystem := fields[0]
+
+		// Remove 'G' suffix from sizes
+		sizeStr := strings.TrimSuffix(fields[1], "G")
+		usedStr := strings.TrimSuffix(fields[2], "G")
+		availStr := strings.TrimSuffix(fields[3], "G")
+		pctStr := strings.TrimSuffix(fields[4], "%")
+
+		// Mount point peut avoir des espaces, donc prendre tout après le pourcentage
+		var mountPoint string
+		if len(fields) >= 6 {
+			mountPoint = strings.Join(fields[5:], " ")
 		}
 
 		// Skip pseudo-filesystems
-		fstype := fields[6]
-		if fstype == "tmpfs" || fstype == "devtmpfs" || fstype == "squashfs" ||
-			fstype == "overlay" || fstype == "devfs" {
+		if strings.HasPrefix(filesystem, "tmpfs") || strings.HasPrefix(filesystem, "devtmpfs") ||
+			strings.HasPrefix(filesystem, "squashfs") || strings.HasPrefix(filesystem, "overlay") ||
+			strings.HasPrefix(filesystem, "devfs") {
 			continue
 		}
-
-		mountPoint := fields[1]
-
-		// Parse sizes (remove 'G' suffix)
-		sizeStr := strings.TrimSuffix(fields[2], "G")
-		usedStr := strings.TrimSuffix(fields[3], "G")
-		availStr := strings.TrimSuffix(fields[4], "G")
-		pctStr := strings.TrimSuffix(fields[5], "%")
 
 		size, _ := strconv.ParseFloat(sizeStr, 64)
 		used, _ := strconv.ParseFloat(usedStr, 64)
@@ -106,7 +123,7 @@ func parseDfSpace(output string) map[string]DiskMetrics {
 
 		result[mountPoint] = DiskMetrics{
 			MountPoint:  mountPoint,
-			Filesystem:  fields[0],
+			Filesystem:  filesystem,
 			SizeGB:      size,
 			UsedGB:      used,
 			AvailGB:     avail,
@@ -115,6 +132,79 @@ func parseDfSpace(output string) map[string]DiskMetrics {
 	}
 
 	return result
+}
+
+// parseDfHuman parse df -h output (human readable format)
+func parseDfHuman(output string) []DiskMetrics {
+	var result []DiskMetrics
+	lines := strings.Split(output, "\n")
+
+	for i, line := range lines {
+		if i == 0 || line == "" {
+			continue // Skip header and empty lines
+		}
+		fields := strings.Fields(line)
+		if len(fields) < 5 {
+			continue
+		}
+
+		// Parse human-readable sizes: 10G, 5.2M, etc.
+		sizeStr := fields[1]
+		usedStr := fields[2]
+		availStr := fields[3]
+		pctStr := strings.TrimSuffix(fields[4], "%")
+
+		// Mount point
+		var mountPoint string
+		if len(fields) >= 6 {
+			mountPoint = strings.Join(fields[5:], " ")
+		}
+
+		// Skip pseudo-filesystems
+		if strings.HasPrefix(fields[0], "tmpfs") || strings.HasPrefix(fields[0], "devtmpfs") {
+			continue
+		}
+
+		size := parseHumanSize(sizeStr)
+		used := parseHumanSize(usedStr)
+		avail := parseHumanSize(availStr)
+		pct, _ := strconv.ParseFloat(pctStr, 64)
+
+		result = append(result, DiskMetrics{
+			MountPoint:  mountPoint,
+			Filesystem:  fields[0],
+			SizeGB:      size,
+			UsedGB:      used,
+			AvailGB:     avail,
+			UsedPercent: pct,
+		})
+	}
+
+	return result
+}
+
+// parseHumanSize convertit une taille lisible (1G, 500M, etc.) en GB (float64)
+func parseHumanSize(s string) float64 {
+	s = strings.TrimSpace(s)
+	s = strings.ToUpper(s)
+	multipliers := map[string]float64{
+		"K": 1.0 / (1024 * 1024), // KB to GB
+		"M": 1.0 / 1024,          // MB to GB
+		"G": 1.0,                 // GB to GB
+		"T": 1024.0,              // TB to GB
+	}
+
+	for suffix, mult := range multipliers {
+		if strings.HasSuffix(s, suffix) {
+			numStr := strings.TrimSuffix(s, suffix)
+			val, _ := strconv.ParseFloat(numStr, 64)
+			return val * mult
+		}
+	}
+
+	// Si pas de suffixe, essayer de parser directement (bytes)
+	val, _ := strconv.ParseFloat(s, 64)
+	return val / (1024 * 1024 * 1024) // Convert bytes to GB
 }
 
 func parseDfInodes(output string) map[string]DiskMetrics {
