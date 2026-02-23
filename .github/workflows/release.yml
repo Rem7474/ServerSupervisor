@@ -28,7 +28,7 @@ jobs:
       changelog: ${{ steps.changelog.outputs.changelog }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0   # nécessaire pour git log
 
@@ -86,10 +86,10 @@ jobs:
             suffix: linux-armv6
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version-file: agent/go.mod
           cache-dependency-path: agent/go.sum
@@ -115,7 +115,7 @@ jobs:
           sha256sum "agent-${{ matrix.suffix }}.gz" > "agent-${{ matrix.suffix }}.gz.sha256"
 
       - name: Upload binary artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: agent-${{ matrix.suffix }}
           path: |
@@ -132,7 +132,7 @@ jobs:
     needs: meta
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -161,7 +161,7 @@ jobs:
             type=raw,value=latest,enable=${{ needs.meta.outputs.is_prerelease == 'false' }}
 
       - name: Build and push server image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: server/Dockerfile
@@ -183,7 +183,7 @@ jobs:
     needs: meta
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -211,7 +211,7 @@ jobs:
             type=raw,value=latest,enable=${{ needs.meta.outputs.is_prerelease == 'false' }}
 
       - name: Build and push agent image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: agent
           file: agent/Dockerfile
@@ -234,7 +234,7 @@ jobs:
 
     steps:
       - name: Download all agent binaries
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           pattern: agent-*
           path: ./release-assets
