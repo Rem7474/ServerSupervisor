@@ -106,15 +106,8 @@
           </table>
         </div>
       </div>
-                  </button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <div v-if="filteredContainers.length === 0" class="text-center text-secondary py-4">
-          Aucun conteneur trouve
-        </div>
+      <div v-if="filteredContainers.length === 0" class="text-center text-secondary py-4">
+        Aucun conteneur trouve
       </div>
     </div>
 
