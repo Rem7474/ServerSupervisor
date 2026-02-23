@@ -260,20 +260,20 @@
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="link in inferredLinks" :key="`${link.source}|${link.target}|${link.type}`">
-                    <td class="fw-semibold text-truncate">{{ link.source }}</td>
+                  <tr v-for="link in inferredLinks" :key="`${link.source_container_name}|${link.target_container_name}|${link.link_type}`">
+                    <td class="fw-semibold text-truncate" :title="link.source_container_name">{{ link.source_container_name }}</td>
                     <td class="text-center text-secondary">→</td>
-                    <td class="fw-semibold text-truncate">{{ link.target }}</td>
+                    <td class="fw-semibold text-truncate" :title="link.target_container_name">{{ link.target_container_name }}</td>
                     <td>
-                      <span v-if="link.type === 'network'" class="badge bg-blue">Network</span>
-                      <span v-else-if="link.type === 'env_ref'" class="badge bg-orange">Env Ref</span>
-                      <span v-else-if="link.type === 'proxy'" class="badge bg-cyan">Proxy</span>
-                      <span v-else class="badge bg-gray">{{ link.type }}</span>
+                      <span v-if="link.link_type === 'network'" class="badge bg-blue-lt text-blue">Network</span>
+                      <span v-else-if="link.link_type === 'env_ref'" class="badge bg-orange-lt text-orange">Env Ref</span>
+                      <span v-else-if="link.link_type === 'proxy'" class="badge bg-cyan-lt text-cyan">Proxy</span>
+                      <span v-else class="badge bg-secondary-lt text-secondary">{{ link.link_type }}</span>
                     </td>
                     <td>
                       <div class="d-flex align-items-center gap-1">
                         <div class="progress flex-grow-1" style="height: 4px;">
-                          <div class="progress-bar" :style="{ width: (link.confidence || 0) + '%' }"></div>
+                          <div class="progress-bar" :style="{ width: (link.confidence || 0) + '%', backgroundColor: link.confidence >= 80 ? '#10b981' : link.confidence >= 60 ? '#f59e0b' : '#ef4444' }"></div>
                         </div>
                         <span class="text-secondary small" style="min-width: 30px;">{{ link.confidence || 0 }}%</span>
                       </div>
@@ -451,7 +451,6 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, watchEffect } from 'vue'
 import { useRouter } from 'vue-router'
-import { useAuthStore } from '../stores/auth'
 import { useWebSocket } from '../composables/useWebSocket'
 import WsStatusBar from '../components/WsStatusBar.vue'
 import NetworkGraph from '../components/NetworkGraph.vue'
@@ -784,16 +783,6 @@ function getHostPortEntry(hostId) {
   }
   if (!entry.ports) entry.ports = {}
   return entry
-}
-
-function parseStoredServices(raw) {
-  if (!raw) return []
-  try {
-    const parsed = JSON.parse(raw)
-    return Array.isArray(parsed) ? parsed : []
-  } catch (err) {
-    return []
-  }
 }
 
 function addServiceRow() {

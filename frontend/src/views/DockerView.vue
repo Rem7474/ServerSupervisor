@@ -283,8 +283,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useAuthStore } from '../stores/auth'
+import { ref, computed, onMounted } from 'vue'
 import { useWebSocket } from '../composables/useWebSocket'
 import WsStatusBar from '../components/WsStatusBar.vue'
 
@@ -298,7 +297,6 @@ const selectedContainer = ref(null)
 const selectedProject = ref(null)
 const activeTab = ref('containers')
 const copied = ref(false)
-const auth = useAuthStore()
 
 const getComposeInfo = (container) => {
   if (!container.labels) return {}
@@ -354,12 +352,5 @@ const { wsStatus, wsError, retryCount, reconnect } = useWebSocket('/api/v1/ws/do
   if (payload.type !== 'docker') return
   containers.value = payload.containers || []
   composeProjects.value = payload.compose_projects || []
-  console.log('[Docker] Updated:', {
-    containers: containers.value.length,
-    projects: composeProjects.value.length
-  })
 })
-
-onMounted(() => {})
-onUnmounted(() => {})
 </script>

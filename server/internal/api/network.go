@@ -235,16 +235,15 @@ func (h *NetworkHandler) GetTopologySnapshot(c *gin.Context) {
 func inferTopologyLinks(db *database.DB, containers []models.NetworkContainer, networks []models.DockerNetwork) []models.TopologyLink {
 	var links []models.TopologyLink
 
-	// Build container lookup map
+	// Build container lookup map for Rule 2 (env vars)
 	containerByName := make(map[string]models.NetworkContainer)
-	containerByID := make(map[string]models.NetworkContainer)
 	for _, c := range containers {
 		containerByName[c.Name] = c
-		containerByID[c.ID] = c
 	}
 
 	// Rule 1: Docker networks - star topology to avoid O(n²) explosion
 	// Only create links for custom networks (skip bridge/host/none)
+	// network.ContainerIDs contains container NAMES (not IDs) due to docker network inspect format
 	// Link first container (anchor) to others, max 8 links per network
 	for _, network := range networks {
 		if len(network.ContainerIDs) < 2 {
@@ -254,19 +253,19 @@ func inferTopologyLinks(db *database.DB, containers []models.NetworkContainer, n
 		if network.Name == "bridge" || network.Name == "host" || network.Name == "none" {
 			continue
 		}
-		// Star topology: link anchor (first container) to others
+		// Star topology: link anchor (first container name) to others
 		maxLinks := 8
 		linkCount := 0
-		anchorID := network.ContainerIDs[0]
-		anchor, okAnchor := containerByID[anchorID]
+		anchorName := network.ContainerIDs[0]
+		anchor, okAnchor := containerByName[anchorName]
 		if !okAnchor || anchor.Name == "" {
 			continue
 		}
-		for _, targetID := range network.ContainerIDs[1:] {
+		for _, targetName := range network.ContainerIDs[1:] {
 			if linkCount >= maxLinks {
 				break
 			}
-			target, okTarget := containerByID[targetID]
+			target, okTarget := containerByName[targetName]
 			if !okTarget || target.Name == "" {
 				continue
 			}
@@ -319,31 +318,23 @@ func inferTopologyLinks(db *database.DB, containers []models.NetworkContainer, n
 	}
 
 	// Rule 3: Proxy detection - only link proxy to containers on the same Docker network
-	proxyImages := []string{"nginx", "traefik", "caddy", "haproxy", "proxy"}
-
-	// Build a set of networks per container for fast lookup
-	containerNetworks := make(map[string]map[string]bool) // containerID -> set of networkIDs
+	// Build a set of networks per container name for fast lookup
+	containerNetworks := make(map[string]map[string]bool) // containerName -> set of networkIDs
 	for _, network := range networks {
-		for _, cID := range network.ContainerIDs {
-			if containerNetworks[cID] == nil {
-				containerNetworks[cID] = make(map[string]bool)
+		for _, cName := range network.ContainerIDs {
+			if containerNetworks[cName] == nil {
+				containerNetworks[cName] = make(map[string]bool)
 			}
-			containerNetworks[cID][network.ID] = true
+			containerNetworks[cName][network.ID] = true
 		}
 	}
 
 	for _, c := range containers {
-		isProxy := false
-		for _, proxyImg := range proxyImages {
-			if strings.Contains(strings.ToLower(c.Image), proxyImg) {
-				isProxy = true
-				break
-			}
-		}
-		if !isProxy {
+		// Helper to detect proxy containers with precision
+		if !isProxyContainer(c) {
 			continue
 		}
-		proxyNetworks := containerNetworks[c.ID]
+		proxyNetworks := containerNetworks[c.Name]
 		if len(proxyNetworks) == 0 {
 			continue // proxy not on any known network, skip
 		}
@@ -352,7 +343,7 @@ func inferTopologyLinks(db *database.DB, containers []models.NetworkContainer, n
 				continue
 			}
 			// Only link if they share at least one Docker network
-			targetNetworks := containerNetworks[target.ID]
+			targetNetworks := containerNetworks[target.Name]
 			sharedNetwork := false
 			for netID := range proxyNetworks {
 				if targetNetworks[netID] {
@@ -425,21 +416,45 @@ func extractContainerNameFromEnv(value string) string {
 	return ""
 }
 
-// hasServiceIndicators checks if a container looks like a service
-func hasServiceIndicators(c models.NetworkContainer) bool {
-	// Check if image contains known service keywords
-	imageWords := strings.ToLower(c.Image)
-	serviceKeywords := []string{
-		"postgres", "mysql", "redis", "mongodb", "elasticsearch",
-		"app", "api", "service", "backend", "frontend", "web",
-		"node", "python", "java", "go", "rust",
-		"nginx", "apache", "gunicorn", "uwsgi",
+// isProxyContainer detects proxy containers with precision (nginx, traefik, caddy, etc)
+func isProxyContainer(c models.NetworkContainer) bool {
+	// Only running containers can be proxies
+	if c.State != "running" {
+		return false
 	}
-	for _, keyword := range serviceKeywords {
-		if strings.Contains(imageWords, keyword) {
+
+	imageLower := strings.ToLower(c.Image)
+
+	// Extract image name without registry and tag
+	imageName := imageLower
+	if idx := strings.LastIndex(imageLower, "/"); idx >= 0 {
+		imageName = imageLower[idx+1:]
+	}
+	if idx := strings.LastIndex(imageName, ":"); idx >= 0 {
+		imageName = imageName[:idx]
+	}
+
+	// Known proxy image names (exact match)
+	exactProxies := []string{"nginx", "traefik", "caddy", "haproxy", "nginx-proxy-manager"}
+	for _, p := range exactProxies {
+		if imageName == p {
 			return true
 		}
 	}
+
+	// Match common proxy image variants (with registry)
+	proxyPatterns := []string{
+		"jc21/nginx-proxy-manager",
+		"traefik:",
+		"/nginx:",
+		":nginx",
+	}
+	for _, pattern := range proxyPatterns {
+		if strings.Contains(imageLower, pattern) {
+			return true
+		}
+	}
+
 	return false
 }
 
