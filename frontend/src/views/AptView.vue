@@ -122,6 +122,35 @@
                   />
                 </div>
 
+                <!-- Package List -->
+                <div v-if="getPackages(aptStatuses[host.id]).length > 0" class="mb-3">
+                  <div class="d-flex align-items-center mb-2">
+                    <span class="fw-semibold me-2">Paquets en attente :</span>
+                    <span class="badge bg-yellow-lt text-yellow">{{ getPackages(aptStatuses[host.id]).length }}</span>
+                  </div>
+                  <div v-if="packagesExpanded[host.id]" class="d-flex flex-wrap gap-1 mb-1">
+                    <span
+                      v-for="pkg in (packagesShowAll[host.id] ? getPackages(aptStatuses[host.id]) : getPackages(aptStatuses[host.id]).slice(0, 12))"
+                      :key="pkg"
+                      class="badge bg-blue-lt text-blue"
+                      style="font-family: monospace; font-size: 0.72rem;"
+                    >{{ pkg }}</span>
+                    <button
+                      v-if="getPackages(aptStatuses[host.id]).length > 12 && !packagesShowAll[host.id]"
+                      @click="packagesShowAll[host.id] = true"
+                      class="btn btn-sm btn-link p-0 ms-1"
+                    >+{{ getPackages(aptStatuses[host.id]).length - 12 }} plus...</button>
+                  </div>
+                  <button
+                    @click="packagesExpanded[host.id] = !packagesExpanded[host.id]"
+                    class="btn btn-sm btn-link p-0"
+                  >
+                    {{ packagesExpanded[host.id]
+                      ? 'Masquer'
+                      : `Afficher ${getPackages(aptStatuses[host.id]).length} paquet${getPackages(aptStatuses[host.id]).length > 1 ? 's' : ''}` }}
+                  </button>
+                </div>
+
                 <div v-if="aptHistories[host.id]?.length">
                   <button @click="toggleHistory(host.id)" class="btn btn-link p-0">
                     {{ expandedHistories[host.id] ? 'Masquer' : 'Voir' }} l'historique ({{ aptHistories[host.id].length }})
@@ -341,6 +370,8 @@ const selectAll = ref(false)
 const aptStatuses = ref({})
 const aptHistories = ref({})
 const expandedHistories = ref({})
+const packagesExpanded = ref({})
+const packagesShowAll = ref({})
 const auth = useAuthStore()
 const dialog = useConfirmDialog()
 const canRunApt = computed(() => auth.role === 'admin' || auth.role === 'operator')
@@ -404,6 +435,18 @@ function toggleSelectAll() {
 
 function toggleHistory(hostId) {
   expandedHistories.value[hostId] = !expandedHistories.value[hostId]
+}
+
+function getPackages(aptStatus) {
+  if (!aptStatus?.package_list) return []
+  try {
+    const parsed = typeof aptStatus.package_list === 'string'
+      ? JSON.parse(aptStatus.package_list)
+      : aptStatus.package_list
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
 }
 
 function watchCommand(cmd, host) {

@@ -325,10 +325,14 @@ func initialAptCollection(cfg *config.Config, s *sender.Sender) {
 	}
 }
 
-// executeAptUpdate runs apt update command
+// executeAptUpdate runs apt update command and logs real output
 func executeAptUpdate() error {
 	cmd := exec.Command("apt", "update")
-	if err := cmd.Run(); err != nil {
+	output, err := cmd.CombinedOutput()
+	if len(output) > 0 {
+		log.Printf("[apt update]\n%s", string(output))
+	}
+	if err != nil {
 		return fmt.Errorf("apt update failed: %w", err)
 	}
 	return nil
