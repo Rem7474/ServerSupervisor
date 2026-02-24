@@ -480,7 +480,7 @@ func (h *WSHandler) sendAptSnapshot(conn *websocket.Conn) error {
 		if err == nil {
 			aptStatuses[host.ID] = status
 		}
-		hist, err := h.db.GetAptCommandHistory(host.ID, 20)
+		hist, err := h.db.GetAptHistoryWithAgentUpdates(host.ID, 20)
 		if err == nil {
 			aptHistories[host.ID] = hist
 		}

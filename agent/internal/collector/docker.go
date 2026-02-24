@@ -485,6 +485,71 @@ func ExecuteDockerCommand(action, containerName string, chunkCB func(string)) (s
 	return fullOutput.String(), cmdErr
 }
 
+// ExecuteComposeCommand runs a docker compose action on a project and streams output.
+// action must be one of: compose_up, compose_down, compose_restart, compose_logs.
+func ExecuteComposeCommand(action, projectName, workingDir string, chunkCB func(string)) (string, error) {
+	var args []string
+	var timeout time.Duration
+
+	switch action {
+	case "compose_up":
+		args = []string{"compose", "-p", projectName, "up", "-d"}
+		timeout = 120 * time.Second
+	case "compose_down":
+		args = []string{"compose", "-p", projectName, "down"}
+		timeout = 60 * time.Second
+	case "compose_restart":
+		args = []string{"compose", "-p", projectName, "restart"}
+		timeout = 60 * time.Second
+	case "compose_logs":
+		args = []string{"compose", "-p", projectName, "logs", "--tail", "100", "--timestamps"}
+		timeout = 60 * time.Second
+	default:
+		return "", fmt.Errorf("unknown compose action: %s", action)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "docker", args...)
+	if workingDir != "" {
+		cmd.Dir = workingDir
+	}
+
+	stdoutPipe, err := cmd.StdoutPipe()
+	if err != nil {
+		return "", fmt.Errorf("failed to create stdout pipe: %w", err)
+	}
+	stderrPipe, err := cmd.StderrPipe()
+	if err != nil {
+		return "", fmt.Errorf("failed to create stderr pipe: %w", err)
+	}
+
+	if err := cmd.Start(); err != nil {
+		return "", fmt.Errorf("failed to start docker %s %s: %w", action, projectName, err)
+	}
+
+	var fullOutput strings.Builder
+	combined := io.MultiReader(stdoutPipe, stderrPipe)
+	buf := make([]byte, 4096)
+	for {
+		n, readErr := combined.Read(buf)
+		if n > 0 {
+			chunk := string(buf[:n])
+			fullOutput.WriteString(chunk)
+			if chunkCB != nil {
+				chunkCB(chunk)
+			}
+		}
+		if readErr != nil {
+			break
+		}
+	}
+
+	cmdErr := cmd.Wait()
+	return fullOutput.String(), cmdErr
+}
+
 // filterSensitiveYAML redacts lines containing sensitive keys in YAML output
 func filterSensitiveYAML(yaml string) string {
 	sensitiveKeys := []string{

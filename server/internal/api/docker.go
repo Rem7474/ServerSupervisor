@@ -165,7 +165,7 @@ func (h *DockerHandler) SendDockerCommand(c *gin.Context) {
 	}
 
 	// Create audit log
-	details := fmt.Sprintf(`{"container":"%s","action":"%s"}`, req.ContainerName, req.Action)
+	details := fmt.Sprintf(`{"container":"%s","action":"%s","working_dir":"%s"}`, req.ContainerName, req.Action, req.WorkingDir)
 	auditID, auditErr := h.db.CreateAuditLog(username, "docker_"+req.Action, req.HostID, c.ClientIP(), details, "pending")
 	var auditLogIDPtr *int64
 	if auditErr != nil {
@@ -174,7 +174,7 @@ func (h *DockerHandler) SendDockerCommand(c *gin.Context) {
 		auditLogIDPtr = &auditID
 	}
 
-	cmd, err := h.db.CreateDockerCommand(req.HostID, req.ContainerName, req.Action, username, auditLogIDPtr)
+	cmd, err := h.db.CreateDockerCommand(req.HostID, req.ContainerName, req.Action, req.WorkingDir, username, auditLogIDPtr)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create command"})
 		return

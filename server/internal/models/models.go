@@ -120,7 +120,8 @@ type DockerCommand struct {
 	ID            int64      `json:"id" db:"id"`
 	HostID        string     `json:"host_id" db:"host_id"`
 	ContainerName string     `json:"container_name" db:"container_name"`
-	Action        string     `json:"action" db:"action"` // start, stop, restart, logs
+	Action        string     `json:"action" db:"action"`       // start, stop, restart, logs, compose_up, compose_down, compose_restart, compose_logs
+	WorkingDir    string     `json:"working_dir" db:"working_dir"` // for compose commands
 	Status        string     `json:"status" db:"status"` // pending, running, completed, failed
 	Output        string     `json:"output" db:"output"`
 	TriggeredBy   string     `json:"triggered_by" db:"triggered_by"`
@@ -133,7 +134,8 @@ type DockerCommand struct {
 type DockerCommandRequest struct {
 	HostID        string `json:"host_id" binding:"required"`
 	ContainerName string `json:"container_name" binding:"required"`
-	Action        string `json:"action" binding:"required,oneof=start stop restart logs"`
+	Action        string `json:"action" binding:"required,oneof=start stop restart logs compose_up compose_down compose_restart compose_logs"`
+	WorkingDir    string `json:"working_dir"` // required for compose_* actions
 }
 
 type DockerReport struct {

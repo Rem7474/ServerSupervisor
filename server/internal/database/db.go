@@ -369,6 +369,8 @@ func (db *DB) migrate() error {
 			ended_at TIMESTAMP WITH TIME ZONE
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_docker_commands_host_status ON docker_commands(host_id, status)`,
+		// Migration: Add working_dir to docker_commands (for compose project actions)
+		`ALTER TABLE IF EXISTS docker_commands ADD COLUMN IF NOT EXISTS working_dir TEXT DEFAULT ''`,
 		// Migration: Disk metrics table (detailed usage per mount point with inodes)
 		`CREATE TABLE IF NOT EXISTS disk_metrics (
 			id BIGSERIAL PRIMARY KEY,
@@ -941,17 +943,17 @@ func (db *DB) GetAllDockerContainers() ([]models.DockerContainer, error) {
 
 // ========== Docker Commands ==========
 
-func (db *DB) CreateDockerCommand(hostID, containerName, action, triggeredBy string, auditLogID *int64) (*models.DockerCommand, error) {
+func (db *DB) CreateDockerCommand(hostID, containerName, action, workingDir, triggeredBy string, auditLogID *int64) (*models.DockerCommand, error) {
 	if triggeredBy == "" {
 		triggeredBy = "system"
 	}
 	var cmd models.DockerCommand
 	err := db.conn.QueryRow(
-		`INSERT INTO docker_commands (host_id, container_name, action, status, triggered_by, audit_log_id)
-		 VALUES ($1, $2, $3, 'pending', $4, $5)
-		 RETURNING id, host_id, container_name, action, status, triggered_by, audit_log_id, created_at`,
-		hostID, containerName, action, triggeredBy, auditLogID,
-	).Scan(&cmd.ID, &cmd.HostID, &cmd.ContainerName, &cmd.Action, &cmd.Status, &cmd.TriggeredBy, &cmd.AuditLogID, &cmd.CreatedAt)
+		`INSERT INTO docker_commands (host_id, container_name, action, working_dir, status, triggered_by, audit_log_id)
+		 VALUES ($1, $2, $3, $4, 'pending', $5, $6)
+		 RETURNING id, host_id, container_name, action, working_dir, status, triggered_by, audit_log_id, created_at`,
+		hostID, containerName, action, workingDir, triggeredBy, auditLogID,
+	).Scan(&cmd.ID, &cmd.HostID, &cmd.ContainerName, &cmd.Action, &cmd.WorkingDir, &cmd.Status, &cmd.TriggeredBy, &cmd.AuditLogID, &cmd.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -979,7 +981,7 @@ func (db *DB) GetDockerCommandByID(id int64) (*models.DockerCommand, error) {
 
 func (db *DB) GetPendingDockerCommands(hostID string) ([]models.PendingCommand, error) {
 	rows, err := db.conn.Query(
-		`SELECT id, container_name, action FROM docker_commands WHERE host_id = $1 AND status = 'pending' ORDER BY created_at ASC`, hostID,
+		`SELECT id, container_name, action, COALESCE(working_dir, '') FROM docker_commands WHERE host_id = $1 AND status = 'pending' ORDER BY created_at ASC`, hostID,
 	)
 	if err != nil {
 		return nil, err
@@ -989,11 +991,11 @@ func (db *DB) GetPendingDockerCommands(hostID string) ([]models.PendingCommand, 
 	var cmds []models.PendingCommand
 	for rows.Next() {
 		var id int64
-		var containerName, action string
-		if err := rows.Scan(&id, &containerName, &action); err != nil {
+		var containerName, action, workingDir string
+		if err := rows.Scan(&id, &containerName, &action, &workingDir); err != nil {
 			continue
 		}
-		payload := fmt.Sprintf(`{"container_name":%q,"action":%q}`, containerName, action)
+		payload := fmt.Sprintf(`{"container_name":%q,"action":%q,"working_dir":%q}`, containerName, action, workingDir)
 		cmds = append(cmds, models.PendingCommand{
 			ID:      id,
 			Type:    "docker",

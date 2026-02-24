@@ -181,29 +181,6 @@
         Aucun conteneur trouvé
       </div>
 
-      <!-- Docker live console -->
-      <div v-if="dockerLiveCmd" class="card mt-4">
-        <div class="card-header d-flex align-items-center justify-content-between">
-          <div>
-            <span class="fw-semibold">Console Docker</span>
-            <span class="ms-2 text-secondary small">{{ dockerLiveCmd.containerName }} — {{ dockerLiveCmd.action }}</span>
-            <span
-              class="badge ms-2"
-              :class="{
-                'bg-yellow text-yellow-fg': dockerLiveCmd.status === 'running',
-                'bg-green text-green-fg': dockerLiveCmd.status === 'completed',
-                'bg-red text-red-fg': dockerLiveCmd.status === 'failed'
-              }"
-            >{{ dockerLiveCmd.status }}</span>
-          </div>
-          <button class="btn btn-sm btn-ghost-secondary" @click="closeDockerConsole">Fermer</button>
-        </div>
-        <div
-          ref="dockerConsoleOutput"
-          class="card-body p-0 font-monospace small"
-          style="background:#1e1e2e;color:#cdd6f4;max-height:350px;overflow-y:auto;white-space:pre-wrap;padding:1rem!important;"
-        >{{ dockerConsoleText || '(en attente de sortie...)' }}</div>
-      </div>
     </div>
 
     <!-- ===== TAB PROJETS COMPOSE ===== -->
@@ -248,17 +225,54 @@
                 </td>
                 <td class="font-monospace small text-secondary">{{ p.config_file || p.working_dir || '-' }}</td>
                 <td class="text-end">
-                  <button @click="selectedProject = p" class="btn btn-sm btn-ghost-secondary">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                      <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                      <path d="M14 3v4a1 1 0 0 0 1 1h4" />
-                      <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" />
-                      <path d="M9 9l1 0" />
-                      <path d="M9 13l6 0" />
-                      <path d="M9 17l6 0" />
-                    </svg>
-                    Config
-                  </button>
+                  <div class="d-flex align-items-center justify-content-end gap-1">
+                    <template v-if="canRunDocker">
+                      <button
+                        @click="sendComposeAction(p, 'compose_up')"
+                        :disabled="!!composeActionLoading[p.name]"
+                        class="btn btn-sm btn-ghost-success"
+                        title="Start (up -d)"
+                      >
+                        <span v-if="composeActionLoading[p.name] === 'compose_up'" class="spinner-border spinner-border-sm"></span>
+                        <svg v-else xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M7 4v16l13 -8z" /></svg>
+                      </button>
+                      <button
+                        @click="sendComposeAction(p, 'compose_down')"
+                        :disabled="!!composeActionLoading[p.name]"
+                        class="btn btn-sm btn-ghost-danger"
+                        title="Stop (down)"
+                      >
+                        <span v-if="composeActionLoading[p.name] === 'compose_down'" class="spinner-border spinner-border-sm"></span>
+                        <svg v-else xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><rect x="4" y="4" width="16" height="16" rx="2" /></svg>
+                      </button>
+                      <button
+                        @click="sendComposeAction(p, 'compose_restart')"
+                        :disabled="!!composeActionLoading[p.name]"
+                        class="btn btn-sm btn-ghost-warning"
+                        title="Redémarrer"
+                      >
+                        <span v-if="composeActionLoading[p.name] === 'compose_restart'" class="spinner-border spinner-border-sm"></span>
+                        <svg v-else xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4" /><path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4" /></svg>
+                      </button>
+                      <button
+                        @click="sendComposeAction(p, 'compose_logs')"
+                        :disabled="!!composeActionLoading[p.name]"
+                        class="btn btn-sm btn-ghost-secondary"
+                        title="Voir les logs"
+                      >
+                        <span v-if="composeActionLoading[p.name] === 'compose_logs'" class="spinner-border spinner-border-sm"></span>
+                        <svg v-else xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 6l16 0" /><path d="M4 12l16 0" /><path d="M4 18l12 0" /></svg>
+                      </button>
+                    </template>
+                    <button @click="selectedProject = p" class="btn btn-sm btn-ghost-secondary" title="Config">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                        <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                        <path d="M14 3v4a1 1 0 0 0 1 1h4" />
+                        <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" />
+                        <path d="M9 9l1 0" /><path d="M9 13l6 0" /><path d="M9 17l6 0" />
+                      </svg>
+                    </button>
+                  </div>
                 </td>
               </tr>
             </tbody>
@@ -268,6 +282,35 @@
           Aucun projet Compose trouvé
         </div>
       </div>
+    </div>
+
+    <!-- ===== Console Docker Live (partagée entre les tabs) ===== -->
+    <div v-if="dockerLiveCmd" class="card mt-4">
+      <div class="card-header d-flex align-items-center justify-content-between" style="background:#1e293b; border-bottom: 1px solid rgba(255,255,255,0.08);">
+        <div class="d-flex align-items-center gap-3">
+          <svg xmlns="http://www.w3.org/2000/svg" class="icon text-secondary" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M8 9l3 3l-3 3" /><path d="M13 15l3 0" /><path d="M3 4m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z" /></svg>
+          <div>
+            <span class="fw-semibold text-light">{{ dockerLiveCmd.containerName }}</span>
+            <code class="ms-2 small" style="background:rgba(0,0,0,0.3);padding:0.1rem 0.4rem;border-radius:0.25rem;color:#94a3b8;">{{ dockerLiveCmd.action }}</code>
+          </div>
+          <span
+            class="badge"
+            :class="{
+              'bg-yellow-lt text-yellow': dockerLiveCmd.status === 'running' || dockerLiveCmd.status === 'pending',
+              'bg-green-lt text-green': dockerLiveCmd.status === 'completed',
+              'bg-red-lt text-red': dockerLiveCmd.status === 'failed'
+            }"
+          >{{ dockerLiveCmd.status }}</span>
+        </div>
+        <button class="btn btn-sm btn-ghost-secondary" @click="closeDockerConsole" title="Fermer">
+          <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M18 6l-12 12" /><path d="M6 6l12 12" /></svg>
+        </button>
+      </div>
+      <pre
+        ref="dockerConsoleOutput"
+        class="m-0 font-monospace small"
+        style="background:#1e1e2e;color:#cdd6f4;max-height:400px;min-height:120px;overflow-y:auto;white-space:pre-wrap;padding:1rem;border-radius:0 0 0.5rem 0.5rem;"
+      >{{ dockerConsoleText || '(en attente de sortie...)' }}</pre>
     </div>
 
     <!-- Modal conteneur (labels) -->
@@ -337,19 +380,19 @@
                 <li class="nav-item">
                   <a class="nav-link" :class="{ active: inspectTab === 'env' }" href="#" @click.prevent="inspectTab = 'env'">
                     Env Vars
-                    <span class="badge bg-secondary ms-1">{{ Object.keys(inspectTarget.env_vars || {}).length }}</span>
+                    <span class="badge bg-azure-lt text-azure ms-1">{{ Object.keys(inspectTarget.env_vars || {}).length }}</span>
                   </a>
                 </li>
                 <li class="nav-item">
                   <a class="nav-link" :class="{ active: inspectTab === 'volumes' }" href="#" @click.prevent="inspectTab = 'volumes'">
                     Volumes
-                    <span class="badge bg-secondary ms-1">{{ (inspectTarget.volumes || []).length }}</span>
+                    <span class="badge bg-azure-lt text-azure ms-1">{{ (inspectTarget.volumes || []).length }}</span>
                   </a>
                 </li>
                 <li class="nav-item">
                   <a class="nav-link" :class="{ active: inspectTab === 'networks' }" href="#" @click.prevent="inspectTab = 'networks'">
                     Réseaux
-                    <span class="badge bg-secondary ms-1">{{ (inspectTarget.networks || []).length }}</span>
+                    <span class="badge bg-azure-lt text-azure ms-1">{{ (inspectTarget.networks || []).length }}</span>
                   </a>
                 </li>
               </ul>
@@ -506,6 +549,8 @@ const canRunDocker = computed(() => auth.role === 'admin' || auth.role === 'oper
 
 // Action loading state keyed by container name
 const dockerActionLoading = ref({})
+// Action loading state keyed by compose project name
+const composeActionLoading = ref({})
 
 // Persist active tab to localStorage
 watch(activeTab, (newTab) => {
@@ -609,6 +654,33 @@ async function sendContainerAction(container, action) {
     alert(`Erreur : ${err.response?.data?.error || err.message}`)
   } finally {
     dockerActionLoading.value = { ...dockerActionLoading.value, [container.name]: null }
+  }
+}
+
+async function sendComposeAction(project, action) {
+  if (composeActionLoading.value[project.name]) return
+
+  if ((action === 'compose_down' || action === 'compose_restart') &&
+      !confirm(`Confirmer : ${action.replace('compose_', '')} du projet « ${project.name} » ?`)) {
+    return
+  }
+
+  composeActionLoading.value = { ...composeActionLoading.value, [project.name]: action }
+
+  try {
+    const res = await apiClient.sendDockerCommand(
+      project.host_id,
+      project.name,
+      action,
+      project.working_dir || ''
+    )
+    const commandId = res.data.command_id
+    connectDockerStream(commandId, project.name, action)
+  } catch (err) {
+    console.error('Compose action failed:', err)
+    alert(`Erreur : ${err.response?.data?.error || err.message}`)
+  } finally {
+    composeActionLoading.value = { ...composeActionLoading.value, [project.name]: null }
   }
 }
 

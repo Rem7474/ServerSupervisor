@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -190,6 +191,7 @@ func processCommands(s *sender.Sender, commands []sender.PendingCommand) {
 			var payload struct {
 				ContainerName string `json:"container_name"`
 				Action        string `json:"action"`
+				WorkingDir    string `json:"working_dir"`
 			}
 			if err := json.Unmarshal([]byte(cmd.Payload), &payload); err != nil {
 				log.Printf("Failed to parse docker command payload: %v", err)
@@ -209,11 +211,23 @@ func processCommands(s *sender.Sender, commands []sender.PendingCommand) {
 				Type:      "docker",
 			})
 
-			output, err := collector.ExecuteDockerCommand(payload.Action, payload.ContainerName, func(chunk string) {
-				if err := s.StreamCommandChunk(cmd.ID, chunk); err != nil {
-					log.Printf("Failed to stream docker chunk: %v", err)
-				}
-			})
+			isCompose := strings.HasPrefix(payload.Action, "compose_")
+			var output string
+			var err error
+			if isCompose {
+				output, err = collector.ExecuteComposeCommand(payload.Action, payload.ContainerName, payload.WorkingDir, func(chunk string) {
+					if streamErr := s.StreamCommandChunk(cmd.ID, chunk); streamErr != nil {
+						log.Printf("Failed to stream compose chunk: %v", streamErr)
+					}
+				})
+			} else {
+				output, err = collector.ExecuteDockerCommand(payload.Action, payload.ContainerName, func(chunk string) {
+					if streamErr := s.StreamCommandChunk(cmd.ID, chunk); streamErr != nil {
+						log.Printf("Failed to stream docker chunk: %v", streamErr)
+					}
+				})
+			}
+
 			status := "completed"
 			if err != nil {
 				status = "failed"
@@ -291,8 +305,9 @@ func initialAptCollection(cfg *config.Config, s *sender.Sender) {
 	log.Println("Performing initial APT update...")
 
 	// Execute apt update at startup to ensure latest package list
-	if err := executeAptUpdate(); err != nil {
-		log.Printf("Warning: Initial apt update failed: %v", err)
+	aptUpdateOutput, aptUpdateErr := executeAptUpdate()
+	if aptUpdateErr != nil {
+		log.Printf("Warning: Initial apt update failed: %v", aptUpdateErr)
 	} else {
 		log.Println("Initial apt update completed successfully")
 	}
@@ -320,22 +335,27 @@ func initialAptCollection(cfg *config.Config, s *sender.Sender) {
 		log.Printf("Failed to send initial APT status: %v", err)
 	} else {
 		log.Println("Initial APT status with CVE sent successfully")
-		// Log the apt update action
-		logAptAction(cfg, s, "update", "completed", "Initial startup update")
+		// Log the apt update action with the real command output
+		status := "completed"
+		if aptUpdateErr != nil {
+			status = "failed"
+		}
+		logAptAction(cfg, s, "update", status, aptUpdateOutput)
 	}
 }
 
-// executeAptUpdate runs apt update command and logs real output
-func executeAptUpdate() error {
+// executeAptUpdate runs apt update command, logs real output and returns it
+func executeAptUpdate() (string, error) {
 	cmd := exec.Command("apt", "update")
 	output, err := cmd.CombinedOutput()
+	outputStr := string(output)
 	if len(output) > 0 {
-		log.Printf("[apt update]\n%s", string(output))
+		log.Printf("[apt update]\n%s", outputStr)
 	}
 	if err != nil {
-		return fmt.Errorf("apt update failed: %w", err)
+		return outputStr, fmt.Errorf("apt update failed: %w", err)
 	}
-	return nil
+	return outputStr, nil
 }
 
 // logAptAction sends an audit log entry for APT actions to the server

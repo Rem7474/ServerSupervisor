@@ -64,8 +64,8 @@ export default {
   getAllContainers: () => api.get('/v1/docker/containers'),
   getComposeProjects: () => api.get('/v1/docker/compose'),
   getVersionComparisons: () => api.get('/v1/docker/versions'),
-  sendDockerCommand: (hostId, containerName, action) =>
-    api.post('/v1/docker/command', { host_id: hostId, container_name: containerName, action }),
+  sendDockerCommand: (hostId, containerName, action, workingDir = '') =>
+    api.post('/v1/docker/command', { host_id: hostId, container_name: containerName, action, working_dir: workingDir }),
 
   // Tracked Repos
   getTrackedRepos: () => api.get('/v1/repos'),
