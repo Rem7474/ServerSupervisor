@@ -700,7 +700,7 @@ function connectDockerStream(commandId, containerName, action) {
 
   const token = auth.token
   const proto = location.protocol === 'https:' ? 'wss' : 'ws'
-  const wsUrl = `${proto}://${location.host}/api/v1/ws/apt/stream/${commandId}`
+  const wsUrl = `${proto}://${location.host}/api/v1/ws/apt/stream/${commandId}?cmd_type=docker`
 
   const ws = new WebSocket(wsUrl)
   dockerStreamWs = ws

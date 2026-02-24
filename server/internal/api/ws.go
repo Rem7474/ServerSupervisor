@@ -313,20 +313,13 @@ func (h *WSHandler) AptStream(c *gin.Context) {
 	// Register this connection to receive streaming logs
 	h.streamHub.Register(commandID, conn)
 
-	// Send initial status (parse commandID as int64 for DB query)
+	// Send initial status. Use the "cmd_type" query param ("docker" or "apt") to
+	// avoid false matches when APT and Docker command IDs share the same integer
+	// value (they come from separate auto-increment sequences).
+	cmdType := c.DefaultQuery("cmd_type", "apt")
 	cmdID, parseErr := strconv.ParseInt(commandID, 10, 64)
 	if parseErr == nil {
-		cmd, dbErr := h.db.GetAptCommandByID(cmdID)
-		if dbErr == nil {
-			conn.WriteJSON(gin.H{
-				"type":       "apt_stream_init",
-				"command_id": commandID,
-				"status":     cmd.Status,
-				"command":    cmd.Command,
-				"output":     cmd.Output,
-			})
-		} else {
-			// Try docker command
+		if cmdType == "docker" {
 			dockerCmd, dockerErr := h.db.GetDockerCommandByID(cmdID)
 			if dockerErr == nil {
 				conn.WriteJSON(gin.H{
@@ -335,6 +328,17 @@ func (h *WSHandler) AptStream(c *gin.Context) {
 					"status":     dockerCmd.Status,
 					"command":    dockerCmd.Action,
 					"output":     dockerCmd.Output,
+				})
+			}
+		} else {
+			cmd, dbErr := h.db.GetAptCommandByID(cmdID)
+			if dbErr == nil {
+				conn.WriteJSON(gin.H{
+					"type":       "apt_stream_init",
+					"command_id": commandID,
+					"status":     cmd.Status,
+					"command":    cmd.Command,
+					"output":     cmd.Output,
 				})
 			}
 		}
