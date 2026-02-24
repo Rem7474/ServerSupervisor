@@ -331,26 +331,33 @@ const render = () => {
     }
   }
 
-  linkGroup
-    .selectAll('path')
-    .data(treeData.links())
-    .enter()
-    .append('path')
-    .attr('class', 'link')
-    .attr('d', (d) => {
-      const startX = d.source.y
-      const startY = d.source.x
-      const endX = d.target.y
-      const endY = d.target.x
-      const midX = (startX + endX) / 2
-      return `M${startX},${startY} C${midX},${startY} ${midX},${endY} ${endX},${endY}`
-    })
-    .attr('stroke', d => {
-      const protocol = d.target.data.protocol
-      return protocolColors[protocol] || protocolColors.other
-    })
-    .attr('stroke-width', 1.4)
-    .attr('opacity', 0.7)
+  // Draw tree links only when proxy links are enabled
+  // (all links in this tree go root→service/port, i.e. they are proxy connections)
+  if (props.showProxyLinks) {
+    linkGroup
+      .selectAll('path')
+      .data(treeData.links())
+      .enter()
+      .append('path')
+      .attr('class', 'link')
+      .attr('d', (d) => {
+        // Source is always the root (proxy) node — depart from its RIGHT edge
+        const startX = d.source.y + 100 + 120   // center + half rect width (240/2)
+        const startY = d.source.x + 40
+        // Target — arrive at LEFT edge of the node rect
+        const targetLeftOffset = d.target.data.type === 'service' ? -130 : -90
+        const endX = d.target.y + 100 + targetLeftOffset
+        const endY = d.target.x + 40
+        const midX = (startX + endX) / 2
+        return `M${startX},${startY} C${midX},${startY} ${midX},${endY} ${endX},${endY}`
+      })
+      .attr('stroke', d => {
+        const protocol = d.target.data.protocol
+        return protocolColors[protocol] || protocolColors.other
+      })
+      .attr('stroke-width', 1.4)
+      .attr('opacity', 0.65)
+  }
 
   const nodes = nodeGroup
     .selectAll('g')
@@ -494,7 +501,7 @@ const render = () => {
     .style('fill', '#e2e8f0')
     .text(d => d.data.name)
 
-  // Draw proxy links if enabled
+  // Draw dotted proxy-link overlays (emphasis on explicitly proxy-routed services)
   if (props.showProxyLinks) {
     const rootNode = treeData.descendants().find(d => d.data.type === 'root')
     const proxyTargets = treeData.descendants().filter(
@@ -509,9 +516,11 @@ const render = () => {
         .append('path')
         .attr('class', 'proxy-link')
         .attr('d', (d) => {
-          const sx = rootNode.y + 100
+          // Same anchor logic: right edge of proxy → left edge of target
+          const sx = rootNode.y + 100 + 120
           const sy = rootNode.x + 40
-          const ex = d.y + 100
+          const targetLeftOffset = d.data.type === 'service' ? -130 : -90
+          const ex = d.y + 100 + targetLeftOffset
           const ey = d.x + 40
           const mx = (sx + ex) / 2
           return `M${sx},${sy} C${mx},${sy} ${mx},${ey} ${ex},${ey}`
@@ -686,7 +695,7 @@ watch(
 
 .cluster-sublabel {
   font-size: 10px;
-  fill: #94a3b8;
+  fill: #cbd5e1;
   pointer-events: none;
 }
 
