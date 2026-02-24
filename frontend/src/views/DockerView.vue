@@ -685,8 +685,13 @@ async function sendComposeAction(project, action) {
 }
 
 function connectDockerStream(commandId, containerName, action) {
-  if (dockerStreamWs) {
-    dockerStreamWs.close()
+  // Silence and close the previous WS before doing anything else,
+  // so its onmessage cannot append stale content to the new console.
+  const prevWs = dockerStreamWs
+  if (prevWs) {
+    prevWs.onmessage = null
+    prevWs.onerror = null
+    prevWs.close()
     dockerStreamWs = null
   }
 
@@ -697,39 +702,61 @@ function connectDockerStream(commandId, containerName, action) {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws'
   const wsUrl = `${proto}://${location.host}/api/v1/ws/apt/stream/${commandId}`
 
-  dockerStreamWs = new WebSocket(wsUrl)
+  const ws = new WebSocket(wsUrl)
+  dockerStreamWs = ws
 
-  dockerStreamWs.onopen = () => {
-    dockerStreamWs.send(JSON.stringify({ type: 'auth', token }))
+  // Close this specific WS instance and null the ref only if it is still current.
+  const closeWs = () => {
+    setTimeout(() => {
+      ws.close()
+      if (dockerStreamWs === ws) dockerStreamWs = null
+    }, 500)
   }
 
-  dockerStreamWs.onmessage = (event) => {
+  ws.onopen = () => {
+    ws.send(JSON.stringify({ type: 'auth', token }))
+  }
+
+  ws.onmessage = (event) => {
+    // Discard messages from a superseded connection
+    if (dockerStreamWs !== ws) return
     try {
       const msg = JSON.parse(event.data)
       if (msg.type === 'apt_stream_init') {
-        if (msg.output) dockerConsoleText.value = msg.output
+        // Replace console text with whatever the DB has at connection time
+        dockerConsoleText.value = msg.output || ''
         if (dockerLiveCmd.value) dockerLiveCmd.value.status = msg.status
+        // If the command was already done before we connected, close now
+        if (msg.status === 'completed' || msg.status === 'failed') {
+          closeWs()
+        }
       } else if (msg.type === 'apt_stream') {
         dockerConsoleText.value += msg.chunk || ''
         scrollDockerConsole()
       } else if (msg.type === 'apt_status_update') {
         if (dockerLiveCmd.value) dockerLiveCmd.value.status = msg.status
         if (msg.status === 'completed' || msg.status === 'failed') {
-          setTimeout(() => {
-            if (dockerStreamWs) { dockerStreamWs.close(); dockerStreamWs = null }
-          }, 500)
+          closeWs()
         }
       }
     } catch {}
   }
 
-  dockerStreamWs.onerror = () => {
-    if (dockerLiveCmd.value) dockerLiveCmd.value.status = 'failed'
+  ws.onerror = () => {
+    if (dockerStreamWs === ws && dockerLiveCmd.value) {
+      dockerLiveCmd.value.status = 'failed'
+    }
   }
 }
 
 function closeDockerConsole() {
-  if (dockerStreamWs) { dockerStreamWs.close(); dockerStreamWs = null }
+  const ws = dockerStreamWs
+  if (ws) {
+    ws.onmessage = null
+    ws.onerror = null
+    ws.close()
+    dockerStreamWs = null
+  }
   dockerLiveCmd.value = null
   dockerConsoleText.value = ''
 }
@@ -742,7 +769,12 @@ async function scrollDockerConsole() {
 }
 
 onUnmounted(() => {
-  if (dockerStreamWs) dockerStreamWs.close()
+  if (dockerStreamWs) {
+    dockerStreamWs.onmessage = null
+    dockerStreamWs.onerror = null
+    dockerStreamWs.close()
+    dockerStreamWs = null
+  }
 })
 
 const { wsStatus, wsError, retryCount, reconnect } = useWebSocket('/api/v1/ws/docker', (payload) => {
