@@ -369,6 +369,48 @@ func (db *DB) migrate() error {
 			ended_at TIMESTAMP WITH TIME ZONE
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_docker_commands_host_status ON docker_commands(host_id, status)`,
+		// Migration: Disk metrics table (detailed usage per mount point with inodes)
+		`CREATE TABLE IF NOT EXISTS disk_metrics (
+			id BIGSERIAL PRIMARY KEY,
+			host_id VARCHAR(64) REFERENCES hosts(id) ON DELETE CASCADE,
+			timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+			mount_point VARCHAR(255) NOT NULL,
+			filesystem VARCHAR(255) NOT NULL DEFAULT '',
+			size_gb DOUBLE PRECISION DEFAULT 0,
+			used_gb DOUBLE PRECISION DEFAULT 0,
+			avail_gb DOUBLE PRECISION DEFAULT 0,
+			used_percent DOUBLE PRECISION DEFAULT 0,
+			inodes_total BIGINT DEFAULT 0,
+			inodes_used BIGINT DEFAULT 0,
+			inodes_free BIGINT DEFAULT 0,
+			inodes_percent DOUBLE PRECISION DEFAULT 0
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_disk_metrics_host_time ON disk_metrics(host_id, timestamp DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_disk_metrics_host_mount ON disk_metrics(host_id, mount_point, timestamp DESC)`,
+		// Migration: Disk health table (SMART monitoring)
+		`CREATE TABLE IF NOT EXISTS disk_health (
+			id BIGSERIAL PRIMARY KEY,
+			host_id VARCHAR(64) REFERENCES hosts(id) ON DELETE CASCADE,
+			timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+			device VARCHAR(255) NOT NULL,
+			model VARCHAR(255) NOT NULL DEFAULT '',
+			serial_number VARCHAR(255) NOT NULL DEFAULT '',
+			smart_status VARCHAR(50) NOT NULL DEFAULT 'UNKNOWN',
+			temperature INTEGER DEFAULT 0,
+			power_on_hours BIGINT DEFAULT 0,
+			power_cycles BIGINT DEFAULT 0,
+			realloc_sectors INTEGER DEFAULT 0,
+			pending_sectors INTEGER DEFAULT 0
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_disk_health_host_time ON disk_health(host_id, timestamp DESC)`,
+		// Migration: Add extra columns to alert_rules
+		`ALTER TABLE IF EXISTS alert_rules ADD COLUMN IF NOT EXISTS name VARCHAR(255)`,
+		`ALTER TABLE IF EXISTS alert_rules ADD COLUMN IF NOT EXISTS channels JSONB DEFAULT '[]'::jsonb`,
+		`ALTER TABLE IF EXISTS alert_rules ADD COLUMN IF NOT EXISTS smtp_to VARCHAR(255)`,
+		`ALTER TABLE IF EXISTS alert_rules ADD COLUMN IF NOT EXISTS ntfy_topic VARCHAR(255)`,
+		`ALTER TABLE IF EXISTS alert_rules ADD COLUMN IF NOT EXISTS cooldown INTEGER`,
+		`ALTER TABLE IF EXISTS alert_rules ADD COLUMN IF NOT EXISTS last_fired TIMESTAMP WITH TIME ZONE`,
+		`ALTER TABLE IF EXISTS alert_rules ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()`,
 	}
 
 	for _, m := range migrations {
