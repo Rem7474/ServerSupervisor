@@ -7,7 +7,29 @@
 
     <WsStatusBar :status="wsStatus" :error="wsError" :retry-count="retryCount" @reconnect="reconnect" />
 
-    <div class="apt-layout">
+    <!-- Onglets -->
+    <div class="mb-3">
+      <div class="btn-group">
+        <button
+          class="btn"
+          :class="activeTab === 'hosts' ? 'btn-primary' : 'btn-outline-secondary'"
+          @click="activeTab = 'hosts'"
+        >
+          Hôtes
+        </button>
+        <button
+          class="btn"
+          :class="activeTab === 'history' ? 'btn-primary' : 'btn-outline-secondary'"
+          @click="activeTab = 'history'"
+        >
+          Historique
+          <span v-if="allHistory.length" class="badge bg-secondary ms-1">{{ allHistory.length }}</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- === Vue Hôtes === -->
+    <div v-if="activeTab === 'hosts'" class="apt-layout">
       <!-- Colonne gauche: Liste des hôtes -->
       <div class="apt-hosts">
         <div class="card mb-3">
@@ -37,105 +59,96 @@
 
         <div class="row row-cards">
           <div v-for="host in hosts" :key="host.id" class="col-12">
-        <div class="card">
-          <div class="card-body">
-            <div class="d-flex align-items-center gap-3 mb-3">
-              <label class="form-check">
-                <input type="checkbox" class="form-check-input" :value="host.id" v-model="selectedHosts" />
-                <span class="form-check-label"></span>
-              </label>
-              <div class="flex-fill">
-                <div class="fw-semibold">{{ host.hostname || host.name }}</div>
-                <div class="text-secondary small">{{ host.ip_address }}</div>
-              </div>
-              <span :class="host.status === 'online' ? 'badge bg-green-lt text-green' : 'badge bg-red-lt text-red'">
-                {{ host.status === 'online' ? 'En ligne' : 'Hors ligne' }}
-              </span>
-            </div>
+            <div class="card">
+              <div class="card-body">
+                <div class="d-flex align-items-center gap-3 mb-3">
+                  <label class="form-check">
+                    <input type="checkbox" class="form-check-input" :value="host.id" v-model="selectedHosts" />
+                    <span class="form-check-label"></span>
+                  </label>
+                  <div class="flex-fill">
+                    <div class="fw-semibold">{{ host.hostname || host.name }}</div>
+                    <div class="text-secondary small">{{ host.ip_address }}</div>
+                  </div>
+                  <span :class="host.status === 'online' ? 'badge bg-green-lt text-green' : 'badge bg-red-lt text-red'">
+                    {{ host.status === 'online' ? 'En ligne' : 'Hors ligne' }}
+                  </span>
+                </div>
 
-            <div v-if="aptStatuses[host.id]" class="row row-cards mb-3">
-              <div class="col-sm-6 col-md-3">
-                <div class="card card-sm">
-                  <div class="card-body text-center">
-                    <div class="h2 mb-0" :class="aptStatuses[host.id].pending_packages > 0 ? 'text-yellow' : 'text-green'">
-                      {{ aptStatuses[host.id].pending_packages }}
-                    </div>
-                    <div class="text-secondary small">En attente</div>
-                  </div>
-                </div>
-              </div>
-              <div class="col-sm-6 col-md-3">
-                <div class="card card-sm">
-                  <div class="card-body text-center">
-                    <div class="h2 mb-0 text-red">{{ aptStatuses[host.id].security_updates }}</div>
-                    <div class="text-secondary small">Securite</div>
-                  </div>
-                </div>
-              </div>
-              <div class="col-sm-6 col-md-3">
-                <div class="card card-sm">
-                  <div class="card-body text-center">
-                    <div class="fw-semibold">{{ formatDate(aptStatuses[host.id].last_update) }}</div>
-                    <div class="text-secondary small">Dernier update</div>
-                  </div>
-                </div>
-              </div>
-              <div class="col-sm-6 col-md-3">
-                <div class="card card-sm">
-                  <div class="card-body text-center">
-                    <div class="fw-semibold">{{ formatDate(aptStatuses[host.id].last_upgrade) }}</div>
-                    <div class="text-secondary small">Dernière mise à jour</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- CVE Information -->
-            <div v-if="aptStatuses[host.id]?.cve_list" class="mb-3">
-              <CVEList 
-                :cveList="aptStatuses[host.id].cve_list" 
-                :showMaxSeverity="true"
-                :alwaysExpanded="false"
-                :limit="5"
-              />
-            </div>
-
-            <div v-if="aptHistories[host.id]?.length">
-              <button @click="toggleHistory(host.id)" class="btn btn-link p-0">
-                {{ expandedHistories[host.id] ? 'Masquer' : 'Voir' }} l'historique ({{ aptHistories[host.id].length }})
-              </button>
-              <div v-if="expandedHistories[host.id]" class="mt-3">
-                <div v-for="cmd in aptHistories[host.id]" :key="cmd.id" class="border rounded p-3 mb-2">
-                  <div class="d-flex align-items-center justify-content-between">
-                    <div class="fw-semibold">apt {{ cmd.command }}</div>
-                    <div class="d-flex align-items-center gap-2">
-                      <span :class="statusClass(cmd.status)">
-                        {{ cmd.status }}
-                      </span>
-                      <button
-                        @click="watchCommand(cmd, host)"
-                        class="btn btn-sm btn-outline-primary"
-                      >
-                        Voir les logs
-                      </button>
-                      <div class="d-block d-lg-none mt-2" v-if="liveCommand?.id === cmd.id">
-                        <a href="#apt-console-mobile" class="btn btn-sm btn-outline-primary w-100">
-                          ↓ Voir la console ci-dessous
-                        </a>
+                <div v-if="aptStatuses[host.id]" class="row row-cards mb-3">
+                  <div class="col-sm-6 col-md-3">
+                    <div class="card card-sm">
+                      <div class="card-body text-center">
+                        <div class="h2 mb-0" :class="aptStatuses[host.id].pending_packages > 0 ? 'text-yellow' : 'text-green'">
+                          {{ aptStatuses[host.id].pending_packages }}
+                        </div>
+                        <div class="text-secondary small">En attente</div>
                       </div>
                     </div>
                   </div>
-                  <div class="text-secondary small mt-1">
-                    {{ formatDate(cmd.created_at) }}
-                    <span v-if="cmd.triggered_by">• par {{ cmd.triggered_by }}</span>
+                  <div class="col-sm-6 col-md-3">
+                    <div class="card card-sm">
+                      <div class="card-body text-center">
+                        <div class="h2 mb-0 text-red">{{ aptStatuses[host.id].security_updates }}</div>
+                        <div class="text-secondary small">Sécurité</div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="col-sm-6 col-md-3">
+                    <div class="card card-sm">
+                      <div class="card-body text-center">
+                        <div class="fw-semibold">{{ formatDate(aptStatuses[host.id].last_update) }}</div>
+                        <div class="text-secondary small">Dernier update</div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="col-sm-6 col-md-3">
+                    <div class="card card-sm">
+                      <div class="card-body text-center">
+                        <div class="fw-semibold">{{ formatDate(aptStatuses[host.id].last_upgrade) }}</div>
+                        <div class="text-secondary small">Dernière mise à jour</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- CVE Information -->
+                <div v-if="aptStatuses[host.id]?.cve_list" class="mb-3">
+                  <CVEList
+                    :cveList="aptStatuses[host.id].cve_list"
+                    :showMaxSeverity="true"
+                    :alwaysExpanded="false"
+                    :limit="5"
+                  />
+                </div>
+
+                <div v-if="aptHistories[host.id]?.length">
+                  <button @click="toggleHistory(host.id)" class="btn btn-link p-0">
+                    {{ expandedHistories[host.id] ? 'Masquer' : 'Voir' }} l'historique ({{ aptHistories[host.id].length }})
+                  </button>
+                  <div v-if="expandedHistories[host.id]" class="mt-3">
+                    <div v-for="cmd in aptHistories[host.id]" :key="cmd.id" class="border rounded p-3 mb-2">
+                      <div class="d-flex align-items-center justify-content-between">
+                        <div class="fw-semibold">apt {{ cmd.command }}</div>
+                        <div class="d-flex align-items-center gap-2">
+                          <span :class="statusClass(cmd.status)">{{ cmd.status }}</span>
+                          <span class="text-secondary small">{{ formatDuration(cmd.started_at, cmd.ended_at) }}</span>
+                          <button @click="watchCommand(cmd, host)" class="btn btn-sm btn-outline-primary">
+                            Voir les logs
+                          </button>
+                        </div>
+                      </div>
+                      <div class="text-secondary small mt-1">
+                        {{ formatDate(cmd.created_at) }}
+                        <span v-if="cmd.triggered_by">• par {{ cmd.triggered_by }}</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
-    </div>
       </div>
 
       <!-- Colonne droite: Console Live -->
@@ -151,12 +164,7 @@
               </svg>
               Console Live
             </h3>
-            <button 
-              v-if="liveCommand" 
-              @click="closeLiveConsole" 
-              class="btn btn-sm btn-ghost-secondary"
-              title="Fermer la console"
-            >
+            <button v-if="liveCommand" @click="closeLiveConsole" class="btn btn-sm btn-ghost-secondary" title="Fermer la console">
               <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                 <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
                 <path d="M18 6l-12 12" />
@@ -165,7 +173,6 @@
             </button>
           </div>
           <div class="card-body d-flex flex-column" style="flex: 1; min-height: 0; padding: 0;">
-            <!-- État vide -->
             <div v-if="!liveCommand" class="d-flex align-items-center justify-content-center flex-fill text-secondary" style="background: #1e293b; border-radius: 0 0 0.5rem 0.5rem;">
               <div class="text-center p-4">
                 <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler mb-2" width="48" height="48" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.5;">
@@ -179,7 +186,6 @@
               </div>
             </div>
 
-            <!-- Console active -->
             <div v-else style="display: flex; flex-direction: column; height: 100%;">
               <div class="px-3 pt-3 pb-2" style="background: #1e293b; border-bottom: 1px solid rgba(255,255,255,0.1);">
                 <div class="d-flex align-items-start justify-content-between mb-2">
@@ -212,6 +218,99 @@
         </div>
       </div>
     </div>
+
+    <!-- === Vue Historique global === -->
+    <div v-else class="card">
+      <div class="card-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+        <h3 class="card-title mb-0">Historique des mises à jour</h3>
+        <div class="d-flex flex-wrap gap-2">
+          <!-- Filtre hôte -->
+          <select v-model="historyHostFilter" class="form-select form-select-sm" style="min-width: 160px;">
+            <option value="all">Tous les hôtes</option>
+            <option v-for="host in hosts" :key="host.id" :value="host.id">
+              {{ host.hostname || host.name }}
+            </option>
+          </select>
+          <!-- Filtre période -->
+          <div class="btn-group btn-group-sm">
+            <button
+              v-for="p in periodOptions"
+              :key="p.value"
+              class="btn"
+              :class="historyPeriod === p.value ? 'btn-primary' : 'btn-outline-secondary'"
+              @click="historyPeriod = p.value"
+            >
+              {{ p.label }}
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-vcenter card-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Hôte</th>
+              <th>Commande</th>
+              <th>Statut</th>
+              <th>Utilisateur</th>
+              <th>Durée</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-if="filteredHistory.length === 0">
+              <td colspan="7" class="text-center text-secondary py-4">Aucun historique pour cette période</td>
+            </tr>
+            <tr v-for="cmd in filteredHistory" :key="cmd.id">
+              <td class="text-secondary small">{{ formatDateExact(cmd.created_at) }}</td>
+              <td>
+                <div class="fw-semibold">{{ cmd.hostName }}</div>
+              </td>
+              <td><code>apt {{ cmd.command }}</code></td>
+              <td><span :class="statusClass(cmd.status)">{{ cmd.status }}</span></td>
+              <td class="text-secondary">{{ cmd.triggered_by || '—' }}</td>
+              <td class="text-secondary small">{{ formatDuration(cmd.started_at, cmd.ended_at) }}</td>
+              <td>
+                <button
+                  @click="watchCommand(cmd, { hostname: cmd.hostName, id: cmd.hostId })"
+                  class="btn btn-sm btn-outline-primary"
+                >
+                  Voir les logs
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Console flottante pour l'onglet Historique -->
+    <div v-if="activeTab === 'history' && liveCommand" class="card mt-3">
+      <div class="card-header d-flex align-items-center justify-content-between" style="background: #1e293b; border-color: rgba(255,255,255,0.1);">
+        <div class="d-flex align-items-center gap-2">
+          <code style="color: #94a3b8;">apt {{ liveCommand.command }}</code>
+          <span class="text-secondary small">— {{ liveCommand.hostname }}</span>
+          <span :class="statusClass(liveCommand.status)">{{ liveCommand.status }}</span>
+        </div>
+        <button @click="closeLiveConsole" class="btn btn-sm btn-ghost-secondary">✕</button>
+      </div>
+      <pre
+        ref="consoleOutputHistory"
+        style="
+          background: #0f172a;
+          color: #e2e8f0;
+          padding: 1rem;
+          margin: 0;
+          max-height: 400px;
+          overflow-y: auto;
+          font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+          font-size: 0.813rem;
+          line-height: 1.5;
+          border-radius: 0 0 0.5rem 0.5rem;
+        "
+      >{{ renderedConsoleOutput || 'En attente de sortie...' }}</pre>
+    </div>
   </div>
 </template>
 
@@ -232,6 +331,10 @@ dayjs.extend(relativeTime)
 dayjs.extend(utc)
 dayjs.locale('fr')
 
+// ── Tab ──────────────────────────────────────────────────────────────────────
+const activeTab = ref('hosts')
+
+// ── Hosts / APT state ────────────────────────────────────────────────────────
 const hosts = ref([])
 const selectedHosts = ref([])
 const selectAll = ref(false)
@@ -242,15 +345,55 @@ const auth = useAuthStore()
 const dialog = useConfirmDialog()
 const canRunApt = computed(() => auth.role === 'admin' || auth.role === 'operator')
 
+// ── Console ───────────────────────────────────────────────────────────────────
 const renderedConsoleOutput = computed(() => {
   if (!liveCommand.value) return ''
-  const raw = liveCommand.value.output || ''
-  return renderConsoleOutput(raw)
+  return renderConsoleOutput(liveCommand.value.output || '')
 })
 const liveCommand = ref(null)
 const consoleOutput = ref(null)
+const consoleOutputHistory = ref(null)
 let streamWs = null
 
+// ── Historique filters ────────────────────────────────────────────────────────
+const historyHostFilter = ref('all')
+const historyPeriod = ref('7d')
+
+const periodOptions = [
+  { label: '7j',  value: '7d'  },
+  { label: '30j', value: '30d' },
+  { label: '90j', value: '90d' },
+  { label: 'Tout', value: 'all' },
+]
+
+// Flatten all histories into a single array, enriched with host info
+const allHistory = computed(() => {
+  return Object.entries(aptHistories.value).flatMap(([hostId, cmds]) => {
+    const host = hosts.value.find(h => h.id === hostId)
+    const hostName = host?.hostname || host?.name || hostId
+    return (cmds || []).map(cmd => ({ ...cmd, hostId, hostName }))
+  }).sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+})
+
+const filteredHistory = computed(() => {
+  let list = allHistory.value
+
+  // Filter by host
+  if (historyHostFilter.value !== 'all') {
+    list = list.filter(cmd => cmd.hostId === historyHostFilter.value)
+  }
+
+  // Filter by period
+  if (historyPeriod.value !== 'all') {
+    const days = parseInt(historyPeriod.value)
+    const cutoff = dayjs().subtract(days, 'day')
+    list = list.filter(cmd => dayjs(cmd.created_at).isAfter(cutoff))
+  }
+
+  return list
+})
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 function toggleSelectAll() {
   if (selectAll.value) {
     selectedHosts.value = hosts.value.map(h => h.id)
@@ -268,7 +411,7 @@ function watchCommand(cmd, host) {
     id: cmd.id,
     command: cmd.command,
     status: cmd.status,
-    hostname: host.hostname || host.name,
+    hostname: host?.hostname || host?.name || '—',
     output: cmd.output || '',
   }
   connectStreamWebSocket(cmd.id)
@@ -284,15 +427,12 @@ function closeLiveConsole() {
 }
 
 function scrollToBottom() {
-  if (consoleOutput.value) {
-    consoleOutput.value.scrollTop = consoleOutput.value.scrollHeight
-  }
+  const el = consoleOutput.value || consoleOutputHistory.value
+  if (el) el.scrollTop = el.scrollHeight
 }
 
 function connectStreamWebSocket(commandId) {
-  if (streamWs) {
-    streamWs.close()
-  }
+  if (streamWs) streamWs.close()
   const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
   const wsUrl = `${protocol}://${window.location.host}/api/v1/ws/apt/stream/${commandId}`
   streamWs = new WebSocket(wsUrl)
@@ -314,19 +454,17 @@ function connectStreamWebSocket(commandId) {
       } else if (payload.type === 'apt_status_update') {
         liveCommand.value.status = payload.status
       }
-    } catch (e) {
+    } catch {
       // Ignore malformed payloads
     }
   }
 
-  streamWs.onclose = () => {
-    // Connection closed, don't reconnect automatically
-  }
+  streamWs.onclose = () => {}
 }
 
 async function bulkAptCmd(command) {
   const hostnames = hosts.value.filter(h => selectedHosts.value.includes(h.id)).map(h => h.hostname).join(', ')
-  
+
   const isDangerous = command === 'dist-upgrade'
   const confirmed = await dialog.confirm({
     title: `apt ${command}`,
@@ -335,22 +473,16 @@ async function bulkAptCmd(command) {
       : `Exécuter sur : ${hostnames} ?`,
     variant: isDangerous ? 'danger' : 'warning'
   })
-  
+
   if (!confirmed) return
-  
+
   try {
     const response = await apiClient.sendAptCommand(selectedHosts.value, command)
-    // Auto-open console if only 1 host selected
     if (selectedHosts.value.length === 1 && response.data?.commands?.length > 0) {
       const cmd = response.data.commands[0]
       const host = hosts.value.find(h => h.id === selectedHosts.value[0])
       if (cmd.command_id && host) {
-        watchCommand({
-          id: cmd.command_id,
-          command: command,
-          status: 'pending',
-          output: ''
-        }, host)
+        watchCommand({ id: cmd.command_id, command, status: 'pending', output: '' }, host)
       }
     }
   } catch (e) {
@@ -365,6 +497,24 @@ async function bulkAptCmd(command) {
 function formatDate(date) {
   if (!date || date === '0001-01-01T00:00:00Z') return 'Jamais'
   return dayjs.utc(date).local().fromNow()
+}
+
+function formatDateExact(date) {
+  if (!date || date === '0001-01-01T00:00:00Z') return '—'
+  return dayjs.utc(date).local().format('DD/MM/YYYY HH:mm')
+}
+
+function formatDuration(startedAt, endedAt) {
+  if (!startedAt || !endedAt) return '—'
+  const start = dayjs(startedAt)
+  const end = dayjs(endedAt)
+  if (!start.isValid() || !end.isValid()) return '—'
+  const totalSeconds = end.diff(start, 'second')
+  if (totalSeconds < 0) return '—'
+  if (totalSeconds < 60) return `${totalSeconds}s`
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  return seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`
 }
 
 function statusClass(status) {
@@ -404,8 +554,7 @@ const { wsStatus, wsError, retryCount, reconnect } = useWebSocket('/api/v1/ws/ap
   aptHistories.value = payload.apt_histories || {}
 })
 
-onMounted(() => {
-})
+onMounted(() => {})
 
 onUnmounted(() => {
   if (streamWs) streamWs.close()

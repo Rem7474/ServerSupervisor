@@ -158,10 +158,14 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 		}
 	}
 
-	// Return pending commands for this host
+	// Return pending commands for this host (APT + Docker)
 	commands, _ := h.db.GetPendingCommands(hostID)
 	if commands == nil {
 		commands = []models.PendingCommand{}
+	}
+	dockerCmds, _ := h.db.GetPendingDockerCommands(hostID)
+	if len(dockerCmds) > 0 {
+		commands = append(commands, dockerCmds...)
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -184,6 +188,31 @@ func (h *AgentHandler) ReportCommandResult(c *gin.Context) {
 		return
 	}
 
+	// Route based on command type
+	if result.Type == "docker" {
+		dockerCmd, cmdErr := h.db.GetDockerCommandByID(result.CommandID)
+		if cmdErr != nil || dockerCmd.HostID != hostID {
+			c.JSON(http.StatusForbidden, gin.H{"error": "command does not belong to host"})
+			return
+		}
+		if err := h.db.UpdateDockerCommandStatus(result.CommandID, result.Status, result.Output); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update command"})
+			return
+		}
+		if dockerCmd.AuditLogID != nil {
+			details := ""
+			if result.Status == "failed" {
+				details = truncateOutput(result.Output, 2000)
+			}
+			_ = h.db.UpdateAuditLogStatus(*dockerCmd.AuditLogID, result.Status, details)
+		}
+		commandIDStr := strconv.FormatInt(result.CommandID, 10)
+		h.streamHub.BroadcastStatus(commandIDStr, result.Status)
+		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+		return
+	}
+
+	// APT command path
 	cmd, cmdErr := h.db.GetAptCommandByID(result.CommandID)
 	if cmdErr != nil || cmd.HostID != hostID {
 		c.JSON(http.StatusForbidden, gin.H{"error": "command does not belong to host"})
@@ -247,8 +276,16 @@ func (h *AgentHandler) StreamCommandOutput(c *gin.Context) {
 		return
 	}
 
-	cmd, cmdErr := h.db.GetAptCommandByID(cmdID)
-	if cmdErr != nil || cmd.HostID != hostID {
+	// Check ownership: try apt_commands first, then docker_commands
+	aptCmd, aptErr := h.db.GetAptCommandByID(cmdID)
+	if aptErr != nil {
+		// Not an APT command — try docker
+		dockerCmd, dockerErr := h.db.GetDockerCommandByID(cmdID)
+		if dockerErr != nil || dockerCmd.HostID != hostID {
+			c.JSON(http.StatusForbidden, gin.H{"error": "command does not belong to host"})
+			return
+		}
+	} else if aptCmd.HostID != hostID {
 		c.JSON(http.StatusForbidden, gin.H{"error": "command does not belong to host"})
 		return
 	}

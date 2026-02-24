@@ -66,9 +66,9 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import api from '../api'
+import apiClient from '../api'
 
-defineProps({
+const props = defineProps({
   hostId: {
     type: String,
     required: true
@@ -85,7 +85,7 @@ onMounted(async () => {
 async function loadDiskHealth() {
   try {
     loading.value = true
-    const res = await api.get(`/api/v1/hosts/${hostId}/disk/health`)
+    const res = await apiClient.getDiskHealth(props.hostId)
     health.value = res.data || []
   } catch (err) {
     console.error('Failed to load disk health:', err)

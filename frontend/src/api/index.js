@@ -49,6 +49,10 @@ export default {
   deleteHost: (id) => api.delete(`/v1/hosts/${id}`),
   rotateHostKey: (id) => api.post(`/v1/hosts/${id}/rotate-key`),
 
+  // Disk
+  getDiskMetrics: (hostId) => api.get(`/v1/hosts/${hostId}/disk/metrics`),
+  getDiskHealth: (hostId) => api.get(`/v1/hosts/${hostId}/disk/health`),
+
   // Metrics
   getMetricsHistory: (hostId, hours = 24) => api.get(`/v1/hosts/${hostId}/metrics/history?hours=${hours}`),
   getMetricsAggregated: (hostId, hours = 24) => api.get(`/v1/hosts/${hostId}/metrics/aggregated?hours=${hours}`),
@@ -60,6 +64,8 @@ export default {
   getAllContainers: () => api.get('/v1/docker/containers'),
   getComposeProjects: () => api.get('/v1/docker/compose'),
   getVersionComparisons: () => api.get('/v1/docker/versions'),
+  sendDockerCommand: (hostId, containerName, action) =>
+    api.post('/v1/docker/command', { host_id: hostId, container_name: containerName, action }),
 
   // Tracked Repos
   getTrackedRepos: () => api.get('/v1/repos'),

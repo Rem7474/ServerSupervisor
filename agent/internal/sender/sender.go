@@ -48,6 +48,7 @@ type CommandResult struct {
 	Status    string      `json:"status"`
 	Output    string      `json:"output"`
 	AptStatus interface{} `json:"apt_status,omitempty"` // Full APT status after update/upgrade
+	Type      string      `json:"type,omitempty"`       // "apt" or "docker"
 }
 
 func New(cfg *config.Config) *Sender {

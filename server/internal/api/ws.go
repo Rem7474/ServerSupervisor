@@ -323,8 +323,20 @@ func (h *WSHandler) AptStream(c *gin.Context) {
 				"command_id": commandID,
 				"status":     cmd.Status,
 				"command":    cmd.Command,
-				"output":     cmd.Output, // Send existing output if any
+				"output":     cmd.Output,
 			})
+		} else {
+			// Try docker command
+			dockerCmd, dockerErr := h.db.GetDockerCommandByID(cmdID)
+			if dockerErr == nil {
+				conn.WriteJSON(gin.H{
+					"type":       "apt_stream_init",
+					"command_id": commandID,
+					"status":     dockerCmd.Status,
+					"command":    dockerCmd.Action,
+					"output":     dockerCmd.Output,
+				})
+			}
 		}
 	}
 

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -184,14 +185,93 @@ func processCommands(s *sender.Sender, commands []sender.PendingCommand) {
 	for _, cmd := range commands {
 		log.Printf("Processing command #%d: %s", cmd.ID, cmd.Type)
 
-		var aptCmd string
 		switch cmd.Type {
-		case "update":
-			aptCmd = "update"
-		case "upgrade":
-			aptCmd = "upgrade"
-		case "dist-upgrade":
-			aptCmd = "dist-upgrade"
+		case "docker":
+			var payload struct {
+				ContainerName string `json:"container_name"`
+				Action        string `json:"action"`
+			}
+			if err := json.Unmarshal([]byte(cmd.Payload), &payload); err != nil {
+				log.Printf("Failed to parse docker command payload: %v", err)
+				s.ReportCommandResult(&sender.CommandResult{
+					CommandID: cmd.ID,
+					Status:    "failed",
+					Output:    fmt.Sprintf("invalid payload: %v", err),
+					Type:      "docker",
+				})
+				continue
+			}
+
+			// Report as running
+			s.ReportCommandResult(&sender.CommandResult{
+				CommandID: cmd.ID,
+				Status:    "running",
+				Type:      "docker",
+			})
+
+			output, err := collector.ExecuteDockerCommand(payload.Action, payload.ContainerName, func(chunk string) {
+				if err := s.StreamCommandChunk(cmd.ID, chunk); err != nil {
+					log.Printf("Failed to stream docker chunk: %v", err)
+				}
+			})
+			status := "completed"
+			if err != nil {
+				status = "failed"
+				output = fmt.Sprintf("ERROR: %v\n%s", err, output)
+				log.Printf("Docker %s %s failed: %v", payload.Action, payload.ContainerName, err)
+			} else {
+				log.Printf("Docker %s %s completed successfully", payload.Action, payload.ContainerName)
+			}
+
+			s.ReportCommandResult(&sender.CommandResult{
+				CommandID: cmd.ID,
+				Status:    status,
+				Output:    output,
+				Type:      "docker",
+			})
+
+		case "update", "upgrade", "dist-upgrade":
+			aptCmd := cmd.Type
+
+			// Notify server that command is starting
+			if err := s.ReportCommandStatus(cmd.ID, "running"); err != nil {
+				log.Printf("Failed to report running status: %v", err)
+			}
+
+			// Execute the APT command with streaming
+			output, err := collector.ExecuteAptCommandWithStreaming(aptCmd, func(chunk string) {
+				if err := s.StreamCommandChunk(cmd.ID, chunk); err != nil {
+					log.Printf("Failed to stream chunk: %v", err)
+				}
+			})
+			status := "completed"
+			if err != nil {
+				status = "failed"
+				output = fmt.Sprintf("ERROR: %v\n%s", err, output)
+				log.Printf("APT %s failed: %v", aptCmd, err)
+			} else {
+				log.Printf("APT %s completed successfully", aptCmd)
+			}
+
+			// Collect APT status after command (with CVE extraction)
+			var aptStatus interface{}
+			log.Printf("Collecting APT status with CVE extraction after %s...", aptCmd)
+			apt, aptErr := collector.CollectAPT(true)
+			if aptErr != nil {
+				log.Printf("Failed to collect APT status after %s: %v", aptCmd, aptErr)
+				aptStatus = nil
+			} else {
+				aptStatus = apt
+				log.Printf("APT status collected: %d packages, %d security", apt.PendingPackages, apt.SecurityUpdates)
+			}
+
+			s.ReportCommandResult(&sender.CommandResult{
+				CommandID: cmd.ID,
+				Status:    status,
+				Output:    output,
+				AptStatus: aptStatus,
+			})
+
 		default:
 			log.Printf("Unknown command type: %s", cmd.Type)
 			s.ReportCommandResult(&sender.CommandResult{
@@ -199,49 +279,7 @@ func processCommands(s *sender.Sender, commands []sender.PendingCommand) {
 				Status:    "failed",
 				Output:    fmt.Sprintf("unknown command type: %s", cmd.Type),
 			})
-			continue
 		}
-
-		// Notify server that command is starting
-		if err := s.ReportCommandStatus(cmd.ID, "running"); err != nil {
-			log.Printf("Failed to report running status: %v", err)
-		}
-
-		// Execute the APT command with streaming
-		output, err := collector.ExecuteAptCommandWithStreaming(aptCmd, func(chunk string) {
-			// Stream each chunk to the server
-			if err := s.StreamCommandChunk(cmd.ID, chunk); err != nil {
-				log.Printf("Failed to stream chunk: %v", err)
-			}
-		})
-		status := "completed"
-		if err != nil {
-			status = "failed"
-			output = fmt.Sprintf("ERROR: %v\n%s", err, output)
-			log.Printf("APT %s failed: %v", aptCmd, err)
-		} else {
-			log.Printf("APT %s completed successfully", aptCmd)
-		}
-
-		// Collect APT status after command (with CVE extraction) - always collect on completion OR failure
-		var aptStatus interface{}
-		log.Printf("Collecting APT status with CVE extraction after %s...", aptCmd)
-		apt, aptErr := collector.CollectAPT(true) // true = extract CVE
-		if aptErr != nil {
-			log.Printf("Failed to collect APT status after %s: %v", aptCmd, aptErr)
-			aptStatus = nil
-		} else {
-			aptStatus = apt
-			log.Printf("APT status collected: %d packages, %d security", apt.PendingPackages, apt.SecurityUpdates)
-		}
-
-		// Report command result with APT status
-		s.ReportCommandResult(&sender.CommandResult{
-			CommandID: cmd.ID,
-			Status:    status,
-			Output:    output,
-			AptStatus: aptStatus,
-		})
 	}
 }
 

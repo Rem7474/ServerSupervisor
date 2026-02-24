@@ -1,6 +1,8 @@
 package api
 
 import (
+	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -11,12 +13,13 @@ import (
 )
 
 type DockerHandler struct {
-	db  *database.DB
-	cfg *config.Config
+	db        *database.DB
+	cfg       *config.Config
+	streamHub *AptStreamHub
 }
 
-func NewDockerHandler(db *database.DB, cfg *config.Config) *DockerHandler {
-	return &DockerHandler{db: db, cfg: cfg}
+func NewDockerHandler(db *database.DB, cfg *config.Config, streamHub *AptStreamHub) *DockerHandler {
+	return &DockerHandler{db: db, cfg: cfg, streamHub: streamHub}
 }
 
 // ListContainers returns Docker containers for a specific host
@@ -144,6 +147,40 @@ func (h *DockerHandler) DeleteTrackedRepo(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "repo deleted"})
+}
+
+// SendDockerCommand creates a pending docker command for an agent to execute
+func (h *DockerHandler) SendDockerCommand(c *gin.Context) {
+	username := c.GetString("username")
+	role := c.GetString("role")
+	if role != models.RoleAdmin && role != models.RoleOperator {
+		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+		return
+	}
+
+	var req models.DockerCommandRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Create audit log
+	details := fmt.Sprintf(`{"container":"%s","action":"%s"}`, req.ContainerName, req.Action)
+	auditID, auditErr := h.db.CreateAuditLog(username, "docker_"+req.Action, req.HostID, c.ClientIP(), details, "pending")
+	var auditLogIDPtr *int64
+	if auditErr != nil {
+		log.Printf("Warning: failed to create audit log for docker command: %v", auditErr)
+	} else {
+		auditLogIDPtr = &auditID
+	}
+
+	cmd, err := h.db.CreateDockerCommand(req.HostID, req.ContainerName, req.Action, username, auditLogIDPtr)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create command"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"command_id": cmd.ID, "status": "pending"})
 }
 
 // normalizeVersion strips leading 'v' from version strings for comparison

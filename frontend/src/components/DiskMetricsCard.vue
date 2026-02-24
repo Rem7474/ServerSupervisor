@@ -60,9 +60,9 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import api from '../api'
+import apiClient from '../api'
 
-defineProps({
+const props = defineProps({
   hostId: {
     type: String,
     required: true
@@ -79,7 +79,7 @@ onMounted(async () => {
 async function loadDiskMetrics() {
   try {
     loading.value = true
-    const res = await api.get(`/api/v1/hosts/${hostId}/disk/metrics`)
+    const res = await apiClient.getDiskMetrics(props.hostId)
     metrics.value = res.data || []
   } catch (err) {
     console.error('Failed to load disk metrics:', err)

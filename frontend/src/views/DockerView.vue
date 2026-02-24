@@ -98,21 +98,79 @@
                 </td>
                 <td class="d-none d-sm-table-cell text-secondary small font-monospace">{{ formatContainerPorts(c.ports) }}</td>
                 <td class="text-end">
-                  <button
-                    v-if="getComposeInfo(c).project || Object.keys(c.labels || {}).length > 0"
-                    @click="selectedContainer = c"
-                    class="btn btn-sm btn-ghost-secondary"
-                    :title="getComposeInfo(c).project ? 'Infos Compose + Labels' : 'Labels'"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm me-1" width="16" height="16"
-                         viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none">
-                      <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                      <path d="M9 5H7a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2V7a2 2 0 0 0 -2 -2h-2"/>
-                      <path d="M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2 -2a2 2 0 0 0 -2 -2h-2a2 2 0 0 0 -2 2z"/>
-                      <path d="M9 12l.01 0"/><path d="M13 12l2 0"/><path d="M9 16l.01 0"/><path d="M13 16l2 0"/>
-                    </svg>
-                    Détails
-                  </button>
+                  <div class="d-flex align-items-center justify-content-end gap-1">
+                    <!-- Action buttons: admin/operator only -->
+                    <template v-if="canRunDocker">
+                      <!-- Start: for stopped containers -->
+                      <button
+                        v-if="['exited', 'dead', 'created', 'paused'].includes(c.state)"
+                        @click="sendContainerAction(c, 'start')"
+                        :disabled="!!dockerActionLoading[c.name]"
+                        class="btn btn-sm btn-ghost-success"
+                        title="Démarrer"
+                      >
+                        <span v-if="dockerActionLoading[c.name] === 'start'" class="spinner-border spinner-border-sm"></span>
+                        <svg v-else xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M7 4v16l13 -8z" /></svg>
+                      </button>
+                      <!-- Stop: for running containers -->
+                      <button
+                        v-if="c.state === 'running'"
+                        @click="sendContainerAction(c, 'stop')"
+                        :disabled="!!dockerActionLoading[c.name]"
+                        class="btn btn-sm btn-ghost-danger"
+                        title="Arrêter"
+                      >
+                        <span v-if="dockerActionLoading[c.name] === 'stop'" class="spinner-border spinner-border-sm"></span>
+                        <svg v-else xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><rect x="4" y="4" width="16" height="16" rx="2" /></svg>
+                      </button>
+                      <!-- Restart: for running containers -->
+                      <button
+                        v-if="c.state === 'running'"
+                        @click="sendContainerAction(c, 'restart')"
+                        :disabled="!!dockerActionLoading[c.name]"
+                        class="btn btn-sm btn-ghost-warning"
+                        title="Redémarrer"
+                      >
+                        <span v-if="dockerActionLoading[c.name] === 'restart'" class="spinner-border spinner-border-sm"></span>
+                        <svg v-else xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4" /><path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4" /></svg>
+                      </button>
+                      <!-- Logs: always available -->
+                      <button
+                        @click="sendContainerAction(c, 'logs')"
+                        :disabled="!!dockerActionLoading[c.name]"
+                        class="btn btn-sm btn-ghost-secondary"
+                        title="Voir les logs"
+                      >
+                        <span v-if="dockerActionLoading[c.name] === 'logs'" class="spinner-border spinner-border-sm"></span>
+                        <svg v-else xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 6l16 0" /><path d="M4 12l16 0" /><path d="M4 18l12 0" /></svg>
+                      </button>
+                    </template>
+
+                    <!-- Inspect button -->
+                    <button
+                      @click="inspectTarget = c; inspectTab = 'env'"
+                      class="btn btn-sm btn-ghost-secondary"
+                      title="Inspecter"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><circle cx="10" cy="10" r="7" /><path d="M21 21l-6 -6" /></svg>
+                    </button>
+
+                    <!-- Compose details button -->
+                    <button
+                      v-if="getComposeInfo(c).project || Object.keys(c.labels || {}).length > 0"
+                      @click="selectedContainer = c"
+                      class="btn btn-sm btn-ghost-secondary"
+                      :title="getComposeInfo(c).project ? 'Infos Compose + Labels' : 'Labels'"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16"
+                           viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none">
+                        <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                        <path d="M9 5H7a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2V7a2 2 0 0 0 -2 -2h-2"/>
+                        <path d="M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2 -2a2 2 0 0 0 -2 -2h-2a2 2 0 0 0 -2 2z"/>
+                        <path d="M9 12l.01 0"/><path d="M13 12l2 0"/><path d="M9 16l.01 0"/><path d="M13 16l2 0"/>
+                      </svg>
+                    </button>
+                  </div>
                 </td>
               </tr>
             </tbody>
@@ -121,6 +179,30 @@
       </div>
       <div v-if="filteredContainers.length === 0" class="text-center text-secondary py-4">
         Aucun conteneur trouvé
+      </div>
+
+      <!-- Docker live console -->
+      <div v-if="dockerLiveCmd" class="card mt-4">
+        <div class="card-header d-flex align-items-center justify-content-between">
+          <div>
+            <span class="fw-semibold">Console Docker</span>
+            <span class="ms-2 text-secondary small">{{ dockerLiveCmd.containerName }} — {{ dockerLiveCmd.action }}</span>
+            <span
+              class="badge ms-2"
+              :class="{
+                'bg-yellow text-yellow-fg': dockerLiveCmd.status === 'running',
+                'bg-green text-green-fg': dockerLiveCmd.status === 'completed',
+                'bg-red text-red-fg': dockerLiveCmd.status === 'failed'
+              }"
+            >{{ dockerLiveCmd.status }}</span>
+          </div>
+          <button class="btn btn-sm btn-ghost-secondary" @click="closeDockerConsole">Fermer</button>
+        </div>
+        <div
+          ref="dockerConsoleOutput"
+          class="card-body p-0 font-monospace small"
+          style="background:#1e1e2e;color:#cdd6f4;max-height:350px;overflow-y:auto;white-space:pre-wrap;padding:1rem!important;"
+        >{{ dockerConsoleText || '(en attente de sortie...)' }}</div>
       </div>
     </div>
 
@@ -234,6 +316,97 @@
     </div>
     <div v-if="selectedContainer" class="modal-backdrop fade show"></div>
 
+    <!-- Modal Inspection (env vars / volumes / networks) -->
+    <div v-if="inspectTarget" class="modal modal-blur fade show" style="display: block;" @click.self="inspectTarget = null">
+      <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <div>
+              <h5 class="modal-title">{{ inspectTarget.name }}</h5>
+              <div class="text-secondary small">
+                {{ inspectTarget.image }}:{{ inspectTarget.image_tag }}
+                <span class="ms-2" :class="stateClass(inspectTarget.state)">{{ inspectTarget.state }}</span>
+              </div>
+            </div>
+            <button type="button" class="btn-close" @click="inspectTarget = null"></button>
+          </div>
+          <div class="modal-body p-0">
+            <!-- Tabs -->
+            <div class="border-bottom px-3">
+              <ul class="nav nav-tabs nav-tabs-alt">
+                <li class="nav-item">
+                  <a class="nav-link" :class="{ active: inspectTab === 'env' }" href="#" @click.prevent="inspectTab = 'env'">
+                    Env Vars
+                    <span class="badge bg-secondary ms-1">{{ Object.keys(inspectTarget.env_vars || {}).length }}</span>
+                  </a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" :class="{ active: inspectTab === 'volumes' }" href="#" @click.prevent="inspectTab = 'volumes'">
+                    Volumes
+                    <span class="badge bg-secondary ms-1">{{ (inspectTarget.volumes || []).length }}</span>
+                  </a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link" :class="{ active: inspectTab === 'networks' }" href="#" @click.prevent="inspectTab = 'networks'">
+                    Réseaux
+                    <span class="badge bg-secondary ms-1">{{ (inspectTarget.networks || []).length }}</span>
+                  </a>
+                </li>
+              </ul>
+            </div>
+            <div class="p-3" style="min-height: 200px; max-height: 400px; overflow-y: auto;">
+              <!-- Env Vars tab -->
+              <div v-if="inspectTab === 'env'">
+                <div v-if="Object.keys(inspectTarget.env_vars || {}).length === 0" class="text-secondary text-center py-3">
+                  Aucune variable d'environnement (non sensible) disponible
+                </div>
+                <table v-else class="table table-sm table-vcenter">
+                  <thead>
+                    <tr>
+                      <th>Variable</th>
+                      <th>Valeur</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="(val, key) in inspectTarget.env_vars" :key="key">
+                      <td class="font-monospace small fw-semibold">{{ key }}</td>
+                      <td class="font-monospace small text-secondary" style="word-break: break-all;">{{ val }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <!-- Volumes tab -->
+              <div v-if="inspectTab === 'volumes'">
+                <div v-if="!(inspectTarget.volumes || []).length" class="text-secondary text-center py-3">
+                  Aucun volume monté
+                </div>
+                <ul v-else class="list-unstyled mb-0">
+                  <li v-for="vol in inspectTarget.volumes" :key="vol" class="py-1 border-bottom font-monospace small">
+                    {{ vol }}
+                  </li>
+                </ul>
+              </div>
+              <!-- Networks tab -->
+              <div v-if="inspectTab === 'networks'">
+                <div v-if="!(inspectTarget.networks || []).length" class="text-secondary text-center py-3">
+                  Aucun réseau connecté
+                </div>
+                <div v-else class="d-flex flex-wrap gap-2 pt-1">
+                  <span v-for="net in inspectTarget.networks" :key="net" class="badge bg-blue-lt text-blue fs-6">
+                    {{ net }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn" @click="inspectTarget = null">Fermer</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div v-if="inspectTarget" class="modal-backdrop fade show"></div>
+
     <!-- Modal projet compose (raw config) -->
     <div v-if="selectedProject" class="modal modal-blur fade show" style="display: block;" @click.self="selectedProject = null">
       <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
@@ -275,7 +448,7 @@
               <div class="col-md-9">
                 <div class="d-flex align-items-center justify-content-between px-3 pt-3 pb-2 border-bottom">
                   <span class="text-secondary small fw-semibold">docker compose config (résolu)</span>
-                  <button 
+                  <button
                     :class="['btn', 'btn-sm', copied ? 'btn-success' : 'btn-ghost-secondary']"
                     @click="copyConfig(selectedProject.raw_config)">
                     {{ copied ? '✓ Copié' : 'Copier' }}
@@ -299,9 +472,13 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick, onUnmounted } from 'vue'
 import { useWebSocket } from '../composables/useWebSocket'
+import { useAuthStore } from '../stores/auth'
 import WsStatusBar from '../components/WsStatusBar.vue'
+import apiClient from '../api'
+
+const auth = useAuthStore()
 
 const containers = ref([])
 const composeProjects = ref([])
@@ -314,6 +491,21 @@ const selectedContainer = ref(null)
 const selectedProject = ref(null)
 const activeTab = ref(localStorage.getItem('dockerActiveTab') || 'containers')
 const copied = ref(false)
+
+// Inspect modal
+const inspectTarget = ref(null)
+const inspectTab = ref('env')
+
+// Docker console
+const dockerLiveCmd = ref(null) // { commandId, containerName, action, status }
+const dockerConsoleText = ref('')
+const dockerConsoleOutput = ref(null)
+let dockerStreamWs = null
+
+const canRunDocker = computed(() => auth.role === 'admin' || auth.role === 'operator')
+
+// Action loading state keyed by container name
+const dockerActionLoading = ref({})
 
 // Persist active tab to localStorage
 watch(activeTab, (newTab) => {
@@ -355,10 +547,6 @@ const formatContainerPorts = (raw) => {
   return hostPorts.size > 0 ? [...hostPorts].join(', ') : raw.split(',').slice(0, 2).join(', ')
 }
 
-const showComposeDetails = (container) => {
-  selectedContainer.value = container
-}
-
 const copyConfig = async (text) => {
   if (!text) return
   await navigator.clipboard.writeText(text)
@@ -398,6 +586,91 @@ const filteredComposeProjects = computed(() => {
     p.config_file?.toLowerCase().includes(q) ||
     p.working_dir?.toLowerCase().includes(q)
   )
+})
+
+// ===== Docker Actions =====
+
+async function sendContainerAction(container, action) {
+  if (dockerActionLoading.value[container.name]) return
+
+  if ((action === 'stop' || action === 'restart') &&
+      !confirm(`Confirmer : ${action} du conteneur « ${container.name} » ?`)) {
+    return
+  }
+
+  dockerActionLoading.value = { ...dockerActionLoading.value, [container.name]: action }
+
+  try {
+    const res = await apiClient.sendDockerCommand(container.host_id, container.name, action)
+    const commandId = res.data.command_id
+    connectDockerStream(commandId, container.name, action)
+  } catch (err) {
+    console.error('Docker action failed:', err)
+    alert(`Erreur : ${err.response?.data?.error || err.message}`)
+  } finally {
+    dockerActionLoading.value = { ...dockerActionLoading.value, [container.name]: null }
+  }
+}
+
+function connectDockerStream(commandId, containerName, action) {
+  if (dockerStreamWs) {
+    dockerStreamWs.close()
+    dockerStreamWs = null
+  }
+
+  dockerConsoleText.value = ''
+  dockerLiveCmd.value = { commandId, containerName, action, status: 'pending' }
+
+  const token = auth.token
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws'
+  const wsUrl = `${proto}://${location.host}/api/v1/ws/apt/stream/${commandId}`
+
+  dockerStreamWs = new WebSocket(wsUrl)
+
+  dockerStreamWs.onopen = () => {
+    dockerStreamWs.send(JSON.stringify({ type: 'auth', token }))
+  }
+
+  dockerStreamWs.onmessage = (event) => {
+    try {
+      const msg = JSON.parse(event.data)
+      if (msg.type === 'apt_stream_init') {
+        if (msg.output) dockerConsoleText.value = msg.output
+        if (dockerLiveCmd.value) dockerLiveCmd.value.status = msg.status
+      } else if (msg.type === 'apt_stream') {
+        dockerConsoleText.value += msg.chunk || ''
+        scrollDockerConsole()
+      } else if (msg.type === 'apt_status_update') {
+        if (dockerLiveCmd.value) dockerLiveCmd.value.status = msg.status
+        if (msg.status === 'completed' || msg.status === 'failed') {
+          setTimeout(() => {
+            if (dockerStreamWs) { dockerStreamWs.close(); dockerStreamWs = null }
+          }, 500)
+        }
+      }
+    } catch {}
+  }
+
+  dockerStreamWs.onerror = () => {
+    if (dockerLiveCmd.value) dockerLiveCmd.value.status = 'failed'
+  }
+}
+
+function closeDockerConsole() {
+  if (dockerStreamWs) { dockerStreamWs.close(); dockerStreamWs = null }
+  dockerLiveCmd.value = null
+  dockerConsoleText.value = ''
+}
+
+async function scrollDockerConsole() {
+  await nextTick()
+  if (dockerConsoleOutput.value) {
+    dockerConsoleOutput.value.scrollTop = dockerConsoleOutput.value.scrollHeight
+  }
+}
+
+onUnmounted(() => {
+  if (dockerStreamWs) dockerStreamWs.close()
 })
 
 const { wsStatus, wsError, retryCount, reconnect } = useWebSocket('/api/v1/ws/docker', (payload) => {

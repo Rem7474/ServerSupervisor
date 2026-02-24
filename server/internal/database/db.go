@@ -350,6 +350,25 @@ func (db *DB) migrate() error {
 			updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_compose_projects_host_id ON compose_projects(host_id)`,
+		// Migration: Add env_vars, volumes, networks to docker_containers
+		`ALTER TABLE IF EXISTS docker_containers ADD COLUMN IF NOT EXISTS env_vars JSONB DEFAULT '{}'::jsonb`,
+		`ALTER TABLE IF EXISTS docker_containers ADD COLUMN IF NOT EXISTS volumes JSONB DEFAULT '[]'::jsonb`,
+		`ALTER TABLE IF EXISTS docker_containers ADD COLUMN IF NOT EXISTS networks JSONB DEFAULT '[]'::jsonb`,
+		// Migration: Create docker_commands table for container management
+		`CREATE TABLE IF NOT EXISTS docker_commands (
+			id BIGSERIAL PRIMARY KEY,
+			host_id VARCHAR(64) REFERENCES hosts(id) ON DELETE CASCADE,
+			container_name VARCHAR(255) NOT NULL,
+			action VARCHAR(20) NOT NULL,
+			status VARCHAR(20) NOT NULL DEFAULT 'pending',
+			output TEXT DEFAULT '',
+			triggered_by VARCHAR(255) DEFAULT 'system',
+			audit_log_id BIGINT,
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+			started_at TIMESTAMP WITH TIME ZONE,
+			ended_at TIMESTAMP WITH TIME ZONE
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_docker_commands_host_status ON docker_commands(host_id, status)`,
 	}
 
 	for _, m := range migrations {
@@ -803,10 +822,14 @@ func (db *DB) UpsertDockerContainers(hostID string, containers []models.DockerCo
 
 	for _, c := range containers {
 		labelsJSON, _ := json.Marshal(c.Labels)
+		envVarsJSON, _ := json.Marshal(c.EnvVars)
+		volumesJSON, _ := json.Marshal(c.Volumes)
+		networksJSON, _ := json.Marshal(c.Networks)
 		_, err := db.conn.Exec(
-			`INSERT INTO docker_containers (id, host_id, container_id, name, image, image_tag, image_id, state, status, created, ports, labels, updated_at)
-			 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,NOW())`,
-			c.ID, hostID, c.ContainerID, c.Name, c.Image, c.ImageTag, c.ImageID, c.State, c.Status, c.Created, c.Ports, string(labelsJSON),
+			`INSERT INTO docker_containers (id, host_id, container_id, name, image, image_tag, image_id, state, status, created, ports, labels, env_vars, volumes, networks, updated_at)
+			 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,NOW())`,
+			c.ID, hostID, c.ContainerID, c.Name, c.Image, c.ImageTag, c.ImageID, c.State, c.Status, c.Created, c.Ports,
+			string(labelsJSON), string(envVarsJSON), string(volumesJSON), string(networksJSON),
 		)
 		if err != nil {
 			return err
@@ -817,7 +840,8 @@ func (db *DB) UpsertDockerContainers(hostID string, containers []models.DockerCo
 
 func (db *DB) GetDockerContainers(hostID string) ([]models.DockerContainer, error) {
 	rows, err := db.conn.Query(
-		`SELECT id, host_id, container_id, name, image, image_tag, image_id, state, status, created, ports, labels, updated_at
+		`SELECT id, host_id, container_id, name, image, image_tag, image_id, state, status, created, ports, labels,
+		 COALESCE(env_vars::text, '{}'), COALESCE(volumes::text, '[]'), COALESCE(networks::text, '[]'), updated_at
 		 FROM docker_containers WHERE host_id = $1 ORDER BY name`, hostID,
 	)
 	if err != nil {
@@ -828,12 +852,15 @@ func (db *DB) GetDockerContainers(hostID string) ([]models.DockerContainer, erro
 	var containers []models.DockerContainer
 	for rows.Next() {
 		var c models.DockerContainer
-		var labelsJSON string
+		var labelsJSON, envVarsJSON, volumesJSON, networksJSON string
 		if err := rows.Scan(&c.ID, &c.HostID, &c.ContainerID, &c.Name, &c.Image, &c.ImageTag, &c.ImageID,
-			&c.State, &c.Status, &c.Created, &c.Ports, &labelsJSON, &c.UpdatedAt); err != nil {
+			&c.State, &c.Status, &c.Created, &c.Ports, &labelsJSON, &envVarsJSON, &volumesJSON, &networksJSON, &c.UpdatedAt); err != nil {
 			continue
 		}
 		json.Unmarshal([]byte(labelsJSON), &c.Labels)
+		json.Unmarshal([]byte(envVarsJSON), &c.EnvVars)
+		json.Unmarshal([]byte(volumesJSON), &c.Volumes)
+		json.Unmarshal([]byte(networksJSON), &c.Networks)
 		containers = append(containers, c)
 	}
 	return containers, nil
@@ -842,7 +869,8 @@ func (db *DB) GetDockerContainers(hostID string) ([]models.DockerContainer, erro
 func (db *DB) GetAllDockerContainers() ([]models.DockerContainer, error) {
 	rows, err := db.conn.Query(
 		`SELECT dc.id, dc.host_id, h.hostname, dc.container_id, dc.name, dc.image, dc.image_tag, dc.image_id,
-		 dc.state, dc.status, dc.created, dc.ports, dc.labels, dc.updated_at
+		 dc.state, dc.status, dc.created, dc.ports, dc.labels,
+		 COALESCE(dc.env_vars::text, '{}'), COALESCE(dc.volumes::text, '[]'), COALESCE(dc.networks::text, '[]'), dc.updated_at
 		 FROM docker_containers dc
 		 JOIN hosts h ON dc.host_id = h.id
 		 ORDER BY h.hostname, dc.name`,
@@ -855,15 +883,93 @@ func (db *DB) GetAllDockerContainers() ([]models.DockerContainer, error) {
 	var containers []models.DockerContainer
 	for rows.Next() {
 		var c models.DockerContainer
-		var labelsJSON string
+		var labelsJSON, envVarsJSON, volumesJSON, networksJSON string
 		if err := rows.Scan(&c.ID, &c.HostID, &c.Hostname, &c.ContainerID, &c.Name, &c.Image, &c.ImageTag, &c.ImageID,
-			&c.State, &c.Status, &c.Created, &c.Ports, &labelsJSON, &c.UpdatedAt); err != nil {
+			&c.State, &c.Status, &c.Created, &c.Ports, &labelsJSON, &envVarsJSON, &volumesJSON, &networksJSON, &c.UpdatedAt); err != nil {
 			continue
 		}
 		json.Unmarshal([]byte(labelsJSON), &c.Labels)
+		json.Unmarshal([]byte(envVarsJSON), &c.EnvVars)
+		json.Unmarshal([]byte(volumesJSON), &c.Volumes)
+		json.Unmarshal([]byte(networksJSON), &c.Networks)
 		containers = append(containers, c)
 	}
 	return containers, nil
+}
+
+// ========== Docker Commands ==========
+
+func (db *DB) CreateDockerCommand(hostID, containerName, action, triggeredBy string, auditLogID *int64) (*models.DockerCommand, error) {
+	if triggeredBy == "" {
+		triggeredBy = "system"
+	}
+	var cmd models.DockerCommand
+	err := db.conn.QueryRow(
+		`INSERT INTO docker_commands (host_id, container_name, action, status, triggered_by, audit_log_id)
+		 VALUES ($1, $2, $3, 'pending', $4, $5)
+		 RETURNING id, host_id, container_name, action, status, triggered_by, audit_log_id, created_at`,
+		hostID, containerName, action, triggeredBy, auditLogID,
+	).Scan(&cmd.ID, &cmd.HostID, &cmd.ContainerName, &cmd.Action, &cmd.Status, &cmd.TriggeredBy, &cmd.AuditLogID, &cmd.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return &cmd, nil
+}
+
+func (db *DB) GetDockerCommandByID(id int64) (*models.DockerCommand, error) {
+	var c models.DockerCommand
+	var startedAt, endedAt sql.NullTime
+	err := db.conn.QueryRow(
+		`SELECT id, host_id, container_name, action, status, output, triggered_by, audit_log_id, created_at, started_at, ended_at
+		 FROM docker_commands WHERE id = $1`, id,
+	).Scan(&c.ID, &c.HostID, &c.ContainerName, &c.Action, &c.Status, &c.Output, &c.TriggeredBy, &c.AuditLogID, &c.CreatedAt, &startedAt, &endedAt)
+	if err != nil {
+		return nil, err
+	}
+	if startedAt.Valid {
+		c.StartedAt = &startedAt.Time
+	}
+	if endedAt.Valid {
+		c.EndedAt = &endedAt.Time
+	}
+	return &c, nil
+}
+
+func (db *DB) GetPendingDockerCommands(hostID string) ([]models.PendingCommand, error) {
+	rows, err := db.conn.Query(
+		`SELECT id, container_name, action FROM docker_commands WHERE host_id = $1 AND status = 'pending' ORDER BY created_at ASC`, hostID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var cmds []models.PendingCommand
+	for rows.Next() {
+		var id int64
+		var containerName, action string
+		if err := rows.Scan(&id, &containerName, &action); err != nil {
+			continue
+		}
+		payload := fmt.Sprintf(`{"container_name":%q,"action":%q}`, containerName, action)
+		cmds = append(cmds, models.PendingCommand{
+			ID:      id,
+			Type:    "docker",
+			Payload: payload,
+		})
+	}
+	return cmds, nil
+}
+
+func (db *DB) UpdateDockerCommandStatus(id int64, status, output string) error {
+	switch status {
+	case "running":
+		_, err := db.conn.Exec(`UPDATE docker_commands SET status = $1, started_at = NOW() WHERE id = $2`, status, id)
+		return err
+	default:
+		_, err := db.conn.Exec(`UPDATE docker_commands SET status = $1, output = $2, ended_at = NOW() WHERE id = $3`, status, output, id)
+		return err
+	}
 }
 
 // ========== APT ==========

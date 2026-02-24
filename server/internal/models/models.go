@@ -108,7 +108,32 @@ type DockerContainer struct {
 	Created     time.Time         `json:"created" db:"created"`
 	Ports       string            `json:"ports" db:"ports"`
 	Labels      map[string]string `json:"labels" db:"-"`
+	EnvVars     map[string]string `json:"env_vars" db:"-"`
+	Volumes     []string          `json:"volumes" db:"-"`
+	Networks    []string          `json:"networks" db:"-"`
 	UpdatedAt   time.Time         `json:"updated_at" db:"updated_at"`
+}
+
+// ========== Docker Commands (Management) ==========
+
+type DockerCommand struct {
+	ID            int64      `json:"id" db:"id"`
+	HostID        string     `json:"host_id" db:"host_id"`
+	ContainerName string     `json:"container_name" db:"container_name"`
+	Action        string     `json:"action" db:"action"` // start, stop, restart, logs
+	Status        string     `json:"status" db:"status"` // pending, running, completed, failed
+	Output        string     `json:"output" db:"output"`
+	TriggeredBy   string     `json:"triggered_by" db:"triggered_by"`
+	AuditLogID    *int64     `json:"audit_log_id,omitempty" db:"audit_log_id"`
+	CreatedAt     time.Time  `json:"created_at" db:"created_at"`
+	StartedAt     *time.Time `json:"started_at" db:"started_at"`
+	EndedAt       *time.Time `json:"ended_at" db:"ended_at"`
+}
+
+type DockerCommandRequest struct {
+	HostID        string `json:"host_id" binding:"required"`
+	ContainerName string `json:"container_name" binding:"required"`
+	Action        string `json:"action" binding:"required,oneof=start stop restart logs"`
 }
 
 type DockerReport struct {
@@ -284,6 +309,7 @@ type CommandResult struct {
 	Status    string     `json:"status"` // completed, failed
 	Output    string     `json:"output"`
 	AptStatus *AptStatus `json:"apt_status,omitempty"` // Full APT status after update/upgrade
+	Type      string     `json:"type,omitempty"`       // "apt" or "docker"
 }
 
 // ========== Auth ==========

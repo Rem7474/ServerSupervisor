@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"os/exec"
 	"strings"
@@ -22,6 +23,9 @@ type DockerContainer struct {
 	Created     time.Time         `json:"created"`
 	Ports       string            `json:"ports"`
 	Labels      map[string]string `json:"labels"`
+	EnvVars     map[string]string `json:"env_vars,omitempty"`
+	Volumes     []string          `json:"volumes,omitempty"`
+	Networks    []string          `json:"networks,omitempty"`
 }
 
 // CollectDocker gathers Docker container information using docker CLI
@@ -61,6 +65,7 @@ func CollectDocker() ([]DockerContainer, error) {
 		Config struct {
 			Image  string            `json:"Image"`
 			Labels map[string]string `json:"Labels"`
+			Env    []string          `json:"Env"` // "KEY=VALUE" format
 		} `json:"Config"`
 		State struct {
 			Status     string    `json:"Status"`
@@ -69,13 +74,17 @@ func CollectDocker() ([]DockerContainer, error) {
 			StartedAt  time.Time `json:"StartedAt"`
 			FinishedAt time.Time `json:"FinishedAt"`
 		} `json:"State"`
-		Created         time.Time `json:"Created"`
-		Image           string    `json:"Image"`
+		Created time.Time `json:"Created"`
+		Image   string    `json:"Image"`
+		Mounts  []struct {
+			Destination string `json:"Destination"`
+		} `json:"Mounts"`
 		NetworkSettings struct {
-			Ports map[string][]struct {
+			Ports    map[string][]struct {
 				HostIp   string `json:"HostIp"`
 				HostPort string `json:"HostPort"`
 			} `json:"Ports"`
+			Networks map[string]json.RawMessage `json:"Networks"` // keys are network names
 		} `json:"NetworkSettings"`
 	}
 
@@ -112,6 +121,32 @@ func CollectDocker() ([]DockerContainer, error) {
 		// Format ports
 		ports := formatPorts(data.NetworkSettings.Ports)
 
+		// Parse env vars (filter sensitive keys)
+		envVars := make(map[string]string)
+		for _, envLine := range data.Config.Env {
+			if idx := strings.Index(envLine, "="); idx > 0 {
+				k := envLine[:idx]
+				v := envLine[idx+1:]
+				if !isSensitiveEnvKey(k) {
+					envVars[k] = v
+				}
+			}
+		}
+
+		// Parse volume mount destinations
+		var volumes []string
+		for _, m := range data.Mounts {
+			if m.Destination != "" {
+				volumes = append(volumes, m.Destination)
+			}
+		}
+
+		// Parse network names
+		var networks []string
+		for netName := range data.NetworkSettings.Networks {
+			networks = append(networks, netName)
+		}
+
 		containers = append(containers, DockerContainer{
 			ID:          fmt.Sprintf("%s-%s", data.Id[:12], name),
 			ContainerID: data.Id[:12],
@@ -123,7 +158,10 @@ func CollectDocker() ([]DockerContainer, error) {
 			Status:      status,
 			Created:     data.Created,
 			Ports:       ports,
-			Labels:      data.Config.Labels, // Labels are now properly parsed from JSON
+			Labels:      data.Config.Labels,
+			EnvVars:     envVars,
+			Volumes:     volumes,
+			Networks:    networks,
 		})
 	}
 
@@ -389,6 +427,62 @@ func CollectComposeProjects() ([]ComposeProject, error) {
 
 	log.Printf("Collected %d Docker Compose projects", len(result))
 	return result, nil
+}
+
+// ExecuteDockerCommand runs a docker action (start/stop/restart/logs) on a container
+// and streams output chunks to chunkCB.
+func ExecuteDockerCommand(action, containerName string, chunkCB func(string)) (string, error) {
+	var args []string
+	var timeout time.Duration
+
+	switch action {
+	case "start", "stop", "restart":
+		args = []string{action, containerName}
+		timeout = 30 * time.Second
+	case "logs":
+		args = []string{"logs", "--tail", "100", "--timestamps", containerName}
+		timeout = 60 * time.Second
+	default:
+		return "", fmt.Errorf("unknown docker action: %s", action)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "docker", args...)
+
+	stdoutPipe, err := cmd.StdoutPipe()
+	if err != nil {
+		return "", fmt.Errorf("failed to create stdout pipe: %w", err)
+	}
+	stderrPipe, err := cmd.StderrPipe()
+	if err != nil {
+		return "", fmt.Errorf("failed to create stderr pipe: %w", err)
+	}
+
+	if err := cmd.Start(); err != nil {
+		return "", fmt.Errorf("failed to start docker %s %s: %w", action, containerName, err)
+	}
+
+	var fullOutput strings.Builder
+	combined := io.MultiReader(stdoutPipe, stderrPipe)
+	buf := make([]byte, 4096)
+	for {
+		n, readErr := combined.Read(buf)
+		if n > 0 {
+			chunk := string(buf[:n])
+			fullOutput.WriteString(chunk)
+			if chunkCB != nil {
+				chunkCB(chunk)
+			}
+		}
+		if readErr != nil {
+			break
+		}
+	}
+
+	cmdErr := cmd.Wait()
+	return fullOutput.String(), cmdErr
 }
 
 // filterSensitiveYAML redacts lines containing sensitive keys in YAML output

@@ -179,7 +179,7 @@ const hierarchyRoot = computed(() => {
     type: 'root',
     children: rootChildren
   })
-}
+})
 
 const render = () => {
   if (!svgRef.value) return
