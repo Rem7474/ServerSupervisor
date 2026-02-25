@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/serversupervisor/server/internal/alerts"
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/models"
@@ -354,7 +355,8 @@ func (h *AlertRulesHandler) DeleteAlertRule(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Alert rule deleted"})
 }
 
-// TestAlertRule tests an alert rule without saving it
+// TestAlertRule evaluates a rule against current metrics without saving it.
+// Returns per-host results showing the current value and whether the alert would fire.
 func (h *AlertRulesHandler) TestAlertRule(c *gin.Context) {
 	var req models.AlertRuleCreate
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -362,11 +364,59 @@ func (h *AlertRulesHandler) TestAlertRule(c *gin.Context) {
 		return
 	}
 
-	// Simulate evaluation logic
-	// In real implementation, this would check current metrics against the rule
+	// Build a temporary AlertRule from the request (no ID, not persisted)
+	threshold := req.Threshold
+	rule := models.AlertRule{
+		HostID:          req.HostID,
+		Metric:          req.Metric,
+		Operator:        req.Operator,
+		Threshold:       &threshold,
+		DurationSeconds: req.Duration,
+		Enabled:         true,
+	}
+
+	hosts, err := h.db.GetAllHosts()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch hosts"})
+		return
+	}
+
+	type TestResult struct {
+		HostID       string  `json:"host_id"`
+		HostName     string  `json:"host_name"`
+		CurrentValue float64 `json:"current_value"`
+		WouldFire    bool    `json:"would_fire"`
+		HasData      bool    `json:"has_data"`
+	}
+
+	var results []TestResult
+	anyFires := false
+
+	for _, host := range hosts {
+		if rule.HostID != nil && *rule.HostID != host.ID {
+			continue
+		}
+		value, ok := alerts.GetMetricValue(h.db, host, rule)
+		wouldFire := ok && alerts.MatchRule(rule, host, value)
+		if wouldFire {
+			anyFires = true
+		}
+		results = append(results, TestResult{
+			HostID:       host.ID,
+			HostName:     host.Name,
+			CurrentValue: value,
+			WouldFire:    wouldFire,
+			HasData:      ok,
+		})
+	}
+
+	if results == nil {
+		results = []TestResult{}
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"message":   "Test alert would fire if conditions are met",
-		"rule":      req,
-		"timestamp": time.Now(),
+		"any_fires":    anyFires,
+		"evaluated_at": time.Now(),
+		"results":      results,
 	})
 }

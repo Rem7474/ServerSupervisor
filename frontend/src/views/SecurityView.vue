@@ -3,11 +3,26 @@
     <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
       <div>
         <h2 class="page-title">Sécurité</h2>
-        <div class="text-secondary">Gestion du MFA (TOTP)</div>
+        <div class="text-secondary">MFA et activité de connexion</div>
       </div>
     </div>
 
-    <div class="card" style="max-width: 640px;">
+    <!-- Tabs -->
+    <ul class="nav nav-tabs mb-4">
+      <li class="nav-item">
+        <a class="nav-link" :class="{ active: tab === 'mfa' }" href="#" @click.prevent="tab = 'mfa'">
+          Authentification MFA
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" :class="{ active: tab === 'activity' }" href="#" @click.prevent="switchToActivity">
+          Activité de connexion
+        </a>
+      </li>
+    </ul>
+
+    <!-- MFA Tab -->
+    <div v-if="tab === 'mfa'" class="card" style="max-width: 640px;">
       <div class="card-body">
         <div class="d-flex align-items-center justify-content-between mb-3">
           <div class="fw-semibold">Authentification multi-facteur</div>
@@ -79,6 +94,53 @@
         </div>
       </div>
     </div>
+
+    <!-- Activity Tab -->
+    <div v-if="tab === 'activity'">
+      <div class="card">
+        <div class="card-header d-flex align-items-center justify-content-between">
+          <div class="card-title">Dernières connexions</div>
+          <button class="btn btn-sm btn-outline-secondary" @click="loadLoginEvents" :disabled="activityLoading">
+            <svg v-if="!activityLoading" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="me-1"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+            <span v-if="activityLoading" class="spinner-border spinner-border-sm me-1"></span>
+            Actualiser
+          </button>
+        </div>
+        <div class="card-body p-0">
+          <div v-if="activityLoading && !loginEvents.length" class="text-center py-4 text-secondary">
+            Chargement…
+          </div>
+          <div v-else-if="!loginEvents.length" class="text-center py-4 text-secondary">
+            Aucun événement de connexion trouvé.
+          </div>
+          <div v-else class="table-responsive">
+            <table class="table table-vcenter table-hover card-table mb-0">
+              <thead>
+                <tr>
+                  <th>Date / heure</th>
+                  <th>Adresse IP</th>
+                  <th>Résultat</th>
+                  <th>User agent</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="evt in loginEvents" :key="evt.id">
+                  <td class="text-secondary small text-nowrap">{{ formatDate(evt.created_at) }}</td>
+                  <td class="text-monospace small">{{ evt.ip_address || '—' }}</td>
+                  <td>
+                    <span v-if="evt.success" class="badge bg-green-lt text-green">Succès</span>
+                    <span v-else class="badge bg-red-lt text-red">Échec</span>
+                  </td>
+                  <td class="text-secondary small" style="max-width:300px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" :title="evt.user_agent">
+                    {{ evt.user_agent || '—' }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -86,6 +148,9 @@
 import { ref, onMounted } from 'vue'
 import apiClient from '../api'
 
+const tab = ref('mfa')
+
+// MFA state
 const mfaEnabled = ref(false)
 const setupVisible = ref(false)
 const setup = ref({ secret: '', qr_code: '', backup_codes: [] })
@@ -97,6 +162,10 @@ const error = ref('')
 const success = ref('')
 const copiedBackup = ref(false)
 
+// Activity state
+const loginEvents = ref([])
+const activityLoading = ref(false)
+
 async function loadStatus() {
   try {
     const res = await apiClient.getMFAStatus()
@@ -104,6 +173,31 @@ async function loadStatus() {
   } catch (e) {
     mfaEnabled.value = false
   }
+}
+
+async function loadLoginEvents() {
+  activityLoading.value = true
+  try {
+    const res = await apiClient.getLoginEvents()
+    loginEvents.value = res.data?.events || []
+  } catch (e) {
+    loginEvents.value = []
+  } finally {
+    activityLoading.value = false
+  }
+}
+
+function switchToActivity() {
+  tab.value = 'activity'
+  if (!loginEvents.value.length) loadLoginEvents()
+}
+
+function formatDate(iso) {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleString('fr-FR', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  })
 }
 
 async function startSetup() {

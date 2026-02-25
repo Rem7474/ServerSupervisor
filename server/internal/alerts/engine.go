@@ -55,12 +55,12 @@ func EvaluateAlerts(db *database.DB, cfg *config.Config) {
 				continue
 			}
 
-			value, ok := getMetricValue(db, host, rule)
+			value, ok := GetMetricValue(db, host, rule)
 			if !ok {
 				continue
 			}
 
-			matched := matchRule(rule, host, value)
+			matched := MatchRule(rule, host, value)
 			inc, err := db.GetOpenAlertIncident(rule.ID, host.ID)
 			if err != nil && err != sql.ErrNoRows {
 				log.Printf("Alerts: failed to check incidents: %v", err)
@@ -82,7 +82,10 @@ func EvaluateAlerts(db *database.DB, cfg *config.Config) {
 	}
 }
 
-func getMetricValue(db *database.DB, host models.Host, rule models.AlertRule) (float64, bool) {
+// GetMetricValue retrieves the current value of a metric for a host according to a rule.
+// Supports both legacy metric names (cpu_percent, ram_percent, disk_percent) and
+// the current short names (cpu, memory, disk) used by the frontend.
+func GetMetricValue(db *database.DB, host models.Host, rule models.AlertRule) (float64, bool) {
 	now := time.Now()
 	duration := time.Duration(rule.DurationSeconds) * time.Second
 
@@ -95,7 +98,7 @@ func getMetricValue(db *database.DB, host models.Host, rule models.AlertRule) (f
 			return 1, true
 		}
 		return 0, true
-	case "cpu_percent", "ram_percent", "disk_percent":
+	case "cpu", "cpu_percent", "memory", "ram_percent", "disk", "disk_percent", "load":
 		metrics, err := db.GetLatestMetrics(host.ID)
 		if err != nil || metrics == nil {
 			return 0, false
@@ -104,11 +107,11 @@ func getMetricValue(db *database.DB, host models.Host, rule models.AlertRule) (f
 			return 0, false
 		}
 		switch rule.Metric {
-		case "cpu_percent":
+		case "cpu", "cpu_percent":
 			return metrics.CPUUsagePercent, true
-		case "ram_percent":
+		case "memory", "ram_percent":
 			return metrics.MemoryPercent, true
-		case "disk_percent":
+		case "disk", "disk_percent":
 			maxDisk := 0.0
 			for _, d := range metrics.Disks {
 				if d.UsedPercent > maxDisk {
@@ -116,12 +119,16 @@ func getMetricValue(db *database.DB, host models.Host, rule models.AlertRule) (f
 				}
 			}
 			return maxDisk, true
+		case "load":
+			return metrics.LoadAvg1, true
 		}
 	}
 	return 0, false
 }
 
-func matchRule(rule models.AlertRule, host models.Host, value float64) bool {
+// MatchRule evaluates whether a rule condition is currently met for the given value.
+// Supports both symbol operators (">", "<", ">=", "<=") and legacy string operators ("gt", "lt").
+func MatchRule(rule models.AlertRule, host models.Host, value float64) bool {
 	if rule.Metric == "status_offline" {
 		return host.Status == "offline"
 	}
@@ -130,10 +137,14 @@ func matchRule(rule models.AlertRule, host models.Host, value float64) bool {
 	}
 
 	switch rule.Operator {
-	case "gt":
+	case "gt", ">":
 		return value > *rule.Threshold
-	case "lt":
+	case "lt", "<":
 		return value < *rule.Threshold
+	case "gte", ">=":
+		return value >= *rule.Threshold
+	case "lte", "<=":
+		return value <= *rule.Threshold
 	case "eq":
 		return value == *rule.Threshold
 	default:

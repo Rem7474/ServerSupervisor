@@ -415,6 +415,17 @@ func (db *DB) migrate() error {
 		`ALTER TABLE IF EXISTS alert_rules ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()`,
 		// Migration: Add must_change_password flag to users (for first-login enforcement)
 		`ALTER TABLE IF EXISTS users ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN NOT NULL DEFAULT FALSE`,
+		// Migration: Login events table for security auditing and brute-force detection
+		`CREATE TABLE IF NOT EXISTS login_events (
+			id BIGSERIAL PRIMARY KEY,
+			username VARCHAR(255) NOT NULL,
+			ip_address VARCHAR(45) NOT NULL DEFAULT '',
+			success BOOLEAN NOT NULL,
+			user_agent VARCHAR(500) DEFAULT '',
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_login_events_ip_time ON login_events(ip_address, created_at DESC)`,
+		`CREATE INDEX IF NOT EXISTS idx_login_events_user_time ON login_events(username, created_at DESC)`,
 	}
 
 	for _, m := range migrations {
@@ -542,6 +553,46 @@ func (db *DB) RevokeRefreshToken(tokenHash string) error {
 		tokenHash,
 	)
 	return err
+}
+
+// ========== Login Events ==========
+
+func (db *DB) CreateLoginEvent(username, ipAddress, userAgent string, success bool) error {
+	_, err := db.conn.Exec(
+		`INSERT INTO login_events (username, ip_address, user_agent, success) VALUES ($1, $2, $3, $4)`,
+		username, ipAddress, userAgent, success,
+	)
+	return err
+}
+
+func (db *DB) GetLoginEventsByUser(username string, limit int) ([]models.LoginEvent, error) {
+	rows, err := db.conn.Query(
+		`SELECT id, username, ip_address, success, user_agent, created_at
+		 FROM login_events WHERE username = $1 ORDER BY created_at DESC LIMIT $2`,
+		username, limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var events []models.LoginEvent
+	for rows.Next() {
+		var e models.LoginEvent
+		if err := rows.Scan(&e.ID, &e.Username, &e.IPAddress, &e.Success, &e.UserAgent, &e.CreatedAt); err != nil {
+			continue
+		}
+		events = append(events, e)
+	}
+	return events, nil
+}
+
+func (db *DB) CountRecentFailedLogins(ipAddress string, since time.Time) (int, error) {
+	var count int
+	err := db.conn.QueryRow(
+		`SELECT COUNT(*) FROM login_events WHERE ip_address = $1 AND success = FALSE AND created_at >= $2`,
+		ipAddress, since,
+	).Scan(&count)
+	return count, err
 }
 
 func (db *DB) DeleteUser(id int64) error {

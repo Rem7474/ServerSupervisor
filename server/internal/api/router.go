@@ -66,6 +66,7 @@ func SetupRouter(db *database.DB, cfg *config.Config) *gin.Engine {
 		// Auth
 		api.GET("/auth/profile", authH.GetProfile)
 		api.POST("/auth/change-password", authH.ChangePassword)
+		api.GET("/auth/login-events", authH.GetLoginEvents)
 		api.GET("/auth/mfa/status", authH.GetMFAStatus)
 		api.POST("/auth/mfa/setup", authH.SetupMFA)
 		api.POST("/auth/mfa/verify", authH.VerifyMFA)
@@ -95,6 +96,7 @@ func SetupRouter(db *database.DB, cfg *config.Config) *gin.Engine {
 		api.GET("/docker/containers", dockerH.ListAllContainers)
 		api.GET("/docker/versions", dockerH.CompareVersions)
 		api.POST("/docker/command", dockerH.SendDockerCommand)
+		api.POST("/system/journalctl", dockerH.SendJournalCommand)
 		api.GET("/network", networkH.GetNetworkSnapshot)
 		api.GET("/network/topology", networkH.GetTopologySnapshot)
 		api.GET("/network/config", networkH.GetTopologyConfig)

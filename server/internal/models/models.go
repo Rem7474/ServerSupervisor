@@ -347,6 +347,16 @@ type User struct {
 	CreatedAt          time.Time `json:"created_at" db:"created_at"`
 }
 
+// LoginEvent records a login attempt (success or failure) for security auditing.
+type LoginEvent struct {
+	ID        int64     `json:"id" db:"id"`
+	Username  string    `json:"username" db:"username"`
+	IPAddress string    `json:"ip_address" db:"ip_address"`
+	Success   bool      `json:"success" db:"success"`
+	UserAgent string    `json:"user_agent" db:"user_agent"`
+	CreatedAt time.Time `json:"created_at" db:"created_at"`
+}
+
 // ========== RBAC & Permissions ==========
 
 const (

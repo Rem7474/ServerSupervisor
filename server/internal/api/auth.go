@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -18,6 +19,66 @@ import (
 	"github.com/serversupervisor/server/internal/models"
 	"golang.org/x/crypto/bcrypt"
 )
+
+// loginTracker tracks failed login attempts per IP for brute-force protection.
+var loginTracker = struct {
+	mu      sync.Mutex
+	records map[string][]time.Time // ip → timestamps of recent failures
+}{records: make(map[string][]time.Time)}
+
+const (
+	bruteForceWindow   = 5 * time.Minute
+	bruteForceMaxFails = 5
+)
+
+func recordFailedLogin(ip string) {
+	loginTracker.mu.Lock()
+	defer loginTracker.mu.Unlock()
+	now := time.Now()
+	cutoff := now.Add(-bruteForceWindow)
+	recent := loginTracker.records[ip]
+	filtered := recent[:0]
+	for _, t := range recent {
+		if t.After(cutoff) {
+			filtered = append(filtered, t)
+		}
+	}
+	loginTracker.records[ip] = append(filtered, now)
+}
+
+func resetFailedLogins(ip string) {
+	loginTracker.mu.Lock()
+	defer loginTracker.mu.Unlock()
+	delete(loginTracker.records, ip)
+}
+
+func isIPBlocked(ip string) bool {
+	loginTracker.mu.Lock()
+	defer loginTracker.mu.Unlock()
+	cutoff := time.Now().Add(-bruteForceWindow)
+	count := 0
+	for _, t := range loginTracker.records[ip] {
+		if t.After(cutoff) {
+			count++
+		}
+	}
+	return count >= bruteForceMaxFails
+}
+
+func clientIP(c *gin.Context) string {
+	if xff := c.GetHeader("X-Forwarded-For"); xff != "" {
+		parts := strings.SplitN(xff, ",", 2)
+		return strings.TrimSpace(parts[0])
+	}
+	if xri := c.GetHeader("X-Real-IP"); xri != "" {
+		return strings.TrimSpace(xri)
+	}
+	ip := c.Request.RemoteAddr
+	if i := strings.LastIndex(ip, ":"); i > 0 {
+		return ip[:i]
+	}
+	return ip
+}
 
 type AuthHandler struct {
 	db  *database.DB
@@ -39,13 +100,25 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
+	ip := clientIP(c)
+	userAgent := c.GetHeader("User-Agent")
+
+	if isIPBlocked(ip) {
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": "Too many failed login attempts, try again later"})
+		return
+	}
+
 	user, err := h.db.GetUserByUsername(req.Username)
 	if err != nil {
+		recordFailedLogin(ip)
+		_ = h.db.CreateLoginEvent(req.Username, ip, userAgent, false)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
 		return
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
+		recordFailedLogin(ip)
+		_ = h.db.CreateLoginEvent(req.Username, ip, userAgent, false)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
 		return
 	}
@@ -71,6 +144,8 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		if !auth.VerifyTOTPCode(user.TOTPSecret, req.TOTPCode) {
 			// Try backup codes
 			if !auth.VerifyBackupCode(user.BackupCodes, req.TOTPCode) {
+				recordFailedLogin(ip)
+				_ = h.db.CreateLoginEvent(req.Username, ip, userAgent, false)
 				c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid TOTP code"})
 				return
 			}
@@ -81,6 +156,9 @@ func (h *AuthHandler) Login(c *gin.Context) {
 			}
 		}
 	}
+
+	resetFailedLogins(ip)
+	_ = h.db.CreateLoginEvent(req.Username, ip, userAgent, true)
 
 	expiresAt := time.Now().Add(h.cfg.JWTExpiration)
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
@@ -468,4 +546,21 @@ func (h *AuthHandler) GetProfile(c *gin.Context) {
 		"must_change_password": user.MustChangePassword,
 		"created_at":           user.CreatedAt,
 	})
+}
+
+// GetLoginEvents returns the last 50 login events for the current user
+func (h *AuthHandler) GetLoginEvents(c *gin.Context) {
+	username := c.GetString("username")
+	if username == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	events, err := h.db.GetLoginEventsByUser(username, 50)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch login events"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"events": events})
 }

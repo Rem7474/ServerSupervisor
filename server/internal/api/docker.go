@@ -183,6 +183,29 @@ func (h *DockerHandler) SendDockerCommand(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"command_id": cmd.ID, "status": "pending"})
 }
 
+// SendJournalCommand enqueues a journalctl log fetch for a specific service on a host.
+// This is a read-only operation available to all authenticated users.
+func (h *DockerHandler) SendJournalCommand(c *gin.Context) {
+	username := c.GetString("username")
+
+	var req struct {
+		HostID      string `json:"host_id" binding:"required"`
+		ServiceName string `json:"service_name" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	cmd, err := h.db.CreateDockerCommand(req.HostID, req.ServiceName, "journalctl", "", username, nil)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create command"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"command_id": cmd.ID, "status": "pending"})
+}
+
 // normalizeVersion strips leading 'v' from version strings for comparison
 func normalizeVersion(v string) string {
 	if len(v) > 0 && v[0] == 'v' {

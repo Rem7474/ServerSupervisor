@@ -35,6 +35,7 @@ export default {
   getProfile: () => api.get('/v1/auth/profile'),
   changePassword: (currentPassword, newPassword) =>
     api.post('/v1/auth/change-password', { current_password: currentPassword, new_password: newPassword }),
+  getLoginEvents: () => api.get('/v1/auth/login-events'),
   getMFAStatus: () => api.get('/v1/auth/mfa/status'),
   setupMFA: () => api.post('/v1/auth/mfa/setup'),
   verifyMFA: (secret, totpCode, backupCodes) =>
@@ -67,6 +68,8 @@ export default {
   getVersionComparisons: () => api.get('/v1/docker/versions'),
   sendDockerCommand: (hostId, containerName, action, workingDir = '') =>
     api.post('/v1/docker/command', { host_id: hostId, container_name: containerName, action, working_dir: workingDir }),
+  sendJournalCommand: (hostId, serviceName) =>
+    api.post('/v1/system/journalctl', { host_id: hostId, service_name: serviceName }),
 
   // Tracked Repos
   getTrackedRepos: () => api.get('/v1/repos'),

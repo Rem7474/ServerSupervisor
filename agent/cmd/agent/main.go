@@ -211,6 +211,29 @@ func processCommands(s *sender.Sender, commands []sender.PendingCommand) {
 				Type:      "docker",
 			})
 
+			if payload.Action == "journalctl" {
+				output, err := collector.ExecuteJournalctl(payload.ContainerName, func(chunk string) {
+					if streamErr := s.StreamCommandChunk(cmd.ID, chunk); streamErr != nil {
+						log.Printf("Failed to stream journal chunk: %v", streamErr)
+					}
+				})
+				status := "completed"
+				if err != nil {
+					status = "failed"
+					output = fmt.Sprintf("ERROR: %v\n%s", err, output)
+					log.Printf("journalctl %s failed: %v", payload.ContainerName, err)
+				} else {
+					log.Printf("journalctl %s completed successfully", payload.ContainerName)
+				}
+				s.ReportCommandResult(&sender.CommandResult{
+					CommandID: cmd.ID,
+					Status:    status,
+					Output:    output,
+					Type:      "docker",
+				})
+				continue
+			}
+
 			isCompose := strings.HasPrefix(payload.Action, "compose_")
 			var output string
 			var err error

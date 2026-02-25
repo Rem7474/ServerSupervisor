@@ -244,9 +244,57 @@
                 <span class="form-check-label">Activer immédiatement</span>
               </label>
             </div>
+
+            <!-- Test results panel (inside modal-body) -->
+            <div v-if="testResults" class="mt-3">
+              <div class="d-flex align-items-center justify-content-between mb-2">
+                <div class="fw-bold">
+                  Résultat du test
+                  <span v-if="testResults.any_fires" class="badge bg-danger-lt text-danger ms-2">Déclencherait une alerte</span>
+                  <span v-else class="badge bg-success-lt text-success ms-2">Aucune alerte déclenchée</span>
+                </div>
+                <span class="text-secondary small">{{ formatDate(testResults.evaluated_at) }}</span>
+              </div>
+              <div class="table-responsive">
+                <table class="table table-sm table-vcenter card-table">
+                  <thead>
+                    <tr>
+                      <th>Hôte</th>
+                      <th>Valeur actuelle</th>
+                      <th>Résultat</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-if="!testResults.results?.length">
+                      <td colspan="3" class="text-center text-secondary">Aucun hôte concerné</td>
+                    </tr>
+                    <tr v-for="r in testResults.results" :key="r.host_id">
+                      <td class="fw-medium">{{ r.host_name }}</td>
+                      <td>
+                        <span v-if="r.has_data">
+                          {{ r.current_value.toFixed(1) }}{{ getMetricUnit(form.metric) }}
+                        </span>
+                        <span v-else class="text-secondary">Pas de données</span>
+                      </td>
+                      <td>
+                        <span v-if="r.would_fire" class="badge bg-danger-lt text-danger">Alerte</span>
+                        <span v-else class="badge bg-success-lt text-success">OK</span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
           <div class="modal-footer">
             <button @click="closeModal" type="button" class="btn btn-link">Annuler</button>
+            <button @click="testAlert" type="button" class="btn btn-outline-secondary" :disabled="testing || saving">
+              <span v-if="testing" class="spinner-border spinner-border-sm me-2"></span>
+              <svg v-else class="icon me-1" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+              </svg>
+              {{ testing ? 'Test en cours...' : 'Tester' }}
+            </button>
             <button @click="saveAlert" type="button" class="btn btn-primary" :disabled="saving">
               <span v-if="saving" class="spinner-border spinner-border-sm me-2"></span>
               {{ editingRule ? 'Mettre à jour' : 'Créer' }}
@@ -273,6 +321,8 @@ const hosts = ref([])
 const loading = ref(true)
 const showModal = ref(false)
 const saving = ref(false)
+const testing = ref(false)
+const testResults = ref(null)
 const editingRule = ref(null)
 
 const form = ref({
@@ -413,9 +463,26 @@ async function deleteAlert(rule) {
   }
 }
 
+async function testAlert() {
+  testing.value = true
+  testResults.value = null
+  try {
+    const channels = []
+    if (channelSmtp.value) channels.push('smtp')
+    if (channelNtfy.value) channels.push('ntfy')
+    const res = await api.post('/api/v1/alert-rules/test', { ...form.value, channels })
+    testResults.value = res.data
+  } catch (err) {
+    console.error('Test alert failed:', err)
+  } finally {
+    testing.value = false
+  }
+}
+
 function closeModal() {
   showModal.value = false
   editingRule.value = null
+  testResults.value = null
 }
 
 function getHostName(hostId) {

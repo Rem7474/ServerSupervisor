@@ -337,7 +337,37 @@
       </div>
     </div>
 
-    
+    <!-- Logs système (journalctl) -->
+    <div class="card mt-4">
+      <div class="card-header">
+        <h3 class="card-title">Logs système (journalctl)</h3>
+      </div>
+      <div class="card-body">
+        <div class="d-flex gap-2">
+          <input
+            v-model="journalService"
+            type="text"
+            class="form-control"
+            placeholder="Nom du service (ex: nginx, ssh, docker)"
+            @keyup.enter="loadJournalLogs"
+            style="max-width: 320px;"
+          />
+          <button
+            class="btn btn-primary"
+            @click="loadJournalLogs"
+            :disabled="!journalService.trim() || journalLoading"
+          >
+            <span v-if="journalLoading" class="spinner-border spinner-border-sm me-1"></span>
+            {{ journalLoading ? 'Chargement...' : 'Charger les logs' }}
+          </button>
+        </div>
+        <div v-if="journalError" class="alert alert-danger mt-3 mb-0">{{ journalError }}</div>
+        <div v-if="journalCmdId" class="text-secondary small mt-2">
+          Stream → commande #{{ journalCmdId }} — les logs apparaissent dans la Console Live →
+        </div>
+      </div>
+    </div>
+
       </div>
 
       <!-- Colonne droite: Console Live -->
@@ -357,8 +387,8 @@
               Console Live
             </h3>
             <div class="d-flex gap-2">
-              <button 
-                @click="showConsole = false" 
+              <button
+                @click="closeLiveConsole(); showConsole = false"
                 class="btn btn-sm btn-ghost-secondary"
                 title="Masquer la console"
               >
@@ -491,6 +521,10 @@ const liveCommand = ref(null)
 const consoleOutput = ref(null)
 const showConsole = ref(false)
 let streamWs = null
+const journalService = ref('')
+const journalLoading = ref(false)
+const journalError = ref('')
+const journalCmdId = ref(null)
 const auth = useAuthStore()
 const dialog = useConfirmDialog()
 const canRunApt = computed(() => auth.role === 'admin' || auth.role === 'operator')
@@ -798,6 +832,52 @@ function renderConsoleOutput(raw) {
 function isAgentUpToDate(version) {
   if (!version) return false
   return version === LATEST_AGENT_VERSION
+}
+
+async function loadJournalLogs() {
+  const svc = journalService.value.trim()
+  if (!svc) return
+  journalLoading.value = true
+  journalError.value = ''
+  journalCmdId.value = null
+  try {
+    const res = await apiClient.sendJournalCommand(hostId, svc)
+    const cmdId = res.data.command_id
+    journalCmdId.value = cmdId
+    liveCommand.value = {
+      id: cmdId,
+      command: `journalctl -u ${svc}`,
+      status: 'running',
+      output: '',
+    }
+    showConsole.value = true
+    const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
+    const wsUrl = `${protocol}://${window.location.host}/api/v1/ws/apt/stream/${cmdId}?cmd_type=docker`
+    if (streamWs) streamWs.close()
+    streamWs = new WebSocket(wsUrl)
+    streamWs.onopen = () => {
+      streamWs.send(JSON.stringify({ type: 'auth', token: auth.token }))
+    }
+    streamWs.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data)
+        if (payload.type === 'apt_stream_init') {
+          liveCommand.value.status = payload.status
+          liveCommand.value.output = payload.output || ''
+          nextTick(() => scrollToBottom())
+        } else if (payload.type === 'apt_stream') {
+          liveCommand.value.output += payload.chunk
+          nextTick(() => scrollToBottom())
+        } else if (payload.type === 'apt_status_update') {
+          liveCommand.value.status = payload.status
+        }
+      } catch (e) { /* ignore */ }
+    }
+    streamWs.onclose = () => { journalLoading.value = false }
+  } catch (e) {
+    journalError.value = e.response?.data?.error || 'Impossible d\'envoyer la commande'
+    journalLoading.value = false
+  }
 }
 
 function watchCommand(cmd) {
