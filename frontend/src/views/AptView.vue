@@ -23,7 +23,7 @@
           @click="activeTab = 'history'"
         >
           Historique
-          <span v-if="allHistory.length" class="badge bg-secondary ms-1">{{ allHistory.length }}</span>
+          <span v-if="allHistory.length" class="badge bg-azure-lt text-azure ms-1">{{ allHistory.length }}</span>
         </button>
       </div>
     </div>

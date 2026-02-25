@@ -89,6 +89,36 @@ func (h *AuditHandler) GetAuditLogsByHost(c *gin.Context) {
 	c.JSON(http.StatusOK, logs)
 }
 
+// GetMyAuditLogs returns the current user's own audit logs
+func (h *AuditHandler) GetMyAuditLogs(c *gin.Context) {
+	username := c.GetString("username")
+	if username == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	limit := 10
+	if l := c.Query("limit"); l != "" {
+		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 && parsed <= 100 {
+			limit = parsed
+		}
+	}
+
+	logs, err := h.db.GetAuditLogsByUser(username, limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch logs"})
+		return
+	}
+	if logs == nil {
+		logs = []models.AuditLog{}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"user": username,
+		"logs": logs,
+	})
+}
+
 // GetAuditLogsByUser returns audit logs for a specific user (admin only)
 func (h *AuditHandler) GetAuditLogsByUser(c *gin.Context) {
 	// Check if user is admin

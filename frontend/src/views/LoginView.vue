@@ -69,7 +69,11 @@ async function handleLogin() {
 
     if (data?.token) {
       auth.setAuth(data, username.value)
-      router.push('/')
+      if (data.must_change_password) {
+        router.push('/account')
+      } else {
+        router.push('/')
+      }
     } else {
       error.value = 'Reponse de connexion invalide.'
     }

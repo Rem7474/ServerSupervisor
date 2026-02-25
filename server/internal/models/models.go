@@ -336,14 +336,15 @@ type TOTPSecretResponse struct {
 }
 
 type User struct {
-	ID           int64     `json:"id" db:"id"`
-	Username     string    `json:"username" db:"username"`
-	PasswordHash string    `json:"-" db:"password_hash"`
-	Role         string    `json:"role" db:"role"`      // admin, operator, viewer
-	TOTPSecret   string    `json:"-" db:"totp_secret"`  // Encrypted TOTP secret (empty if MFA disabled)
-	BackupCodes  string    `json:"-" db:"backup_codes"` // JSON array of backup codes (hashed)
-	MFAEnabled   bool      `json:"mfa_enabled" db:"mfa_enabled"`
-	CreatedAt    time.Time `json:"created_at" db:"created_at"`
+	ID                 int64     `json:"id" db:"id"`
+	Username           string    `json:"username" db:"username"`
+	PasswordHash       string    `json:"-" db:"password_hash"`
+	Role               string    `json:"role" db:"role"`      // admin, operator, viewer
+	TOTPSecret         string    `json:"-" db:"totp_secret"`  // Encrypted TOTP secret (empty if MFA disabled)
+	BackupCodes        string    `json:"-" db:"backup_codes"` // JSON array of backup codes (hashed)
+	MFAEnabled         bool      `json:"mfa_enabled" db:"mfa_enabled"`
+	MustChangePassword bool      `json:"must_change_password" db:"must_change_password"`
+	CreatedAt          time.Time `json:"created_at" db:"created_at"`
 }
 
 // ========== RBAC & Permissions ==========

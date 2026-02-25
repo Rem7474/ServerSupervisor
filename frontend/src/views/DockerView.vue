@@ -12,7 +12,7 @@
       <li class="nav-item">
         <a class="nav-link" :class="{ active: activeTab === 'containers' }" href="#" @click.prevent="activeTab = 'containers'">
           Conteneurs
-          <span class="badge bg-secondary text-white ms-1">
+          <span class="badge bg-azure-lt text-azure ms-1">
             {{ filteredContainers.length }}<template v-if="filteredContainers.length !== containers.length"> / {{ containers.length }}</template>
           </span>
         </a>
@@ -20,7 +20,7 @@
       <li class="nav-item">
         <a class="nav-link" :class="{ active: activeTab === 'compose' }" href="#" @click.prevent="activeTab = 'compose'">
           Projets Compose
-          <span class="badge bg-secondary text-white ms-1">
+          <span class="badge bg-azure-lt text-azure ms-1">
             {{ filteredComposeProjects.length }}<template v-if="filteredComposeProjects.length !== composeProjects.length"> / {{ composeProjects.length }}</template>
           </span>
         </a>
@@ -227,7 +227,9 @@
                 <td class="text-end">
                   <div class="d-flex align-items-center justify-content-end gap-1">
                     <template v-if="canRunDocker">
+                      <!-- Start: only when project is stopped -->
                       <button
+                        v-if="getComposeStatus(p) === 'stopped'"
                         @click="sendComposeAction(p, 'compose_up')"
                         :disabled="!!composeActionLoading[p.name]"
                         class="btn btn-sm btn-ghost-success"
@@ -236,24 +238,28 @@
                         <span v-if="composeActionLoading[p.name] === 'compose_up'" class="spinner-border spinner-border-sm"></span>
                         <svg v-else xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M7 4v16l13 -8z" /></svg>
                       </button>
-                      <button
-                        @click="sendComposeAction(p, 'compose_down')"
-                        :disabled="!!composeActionLoading[p.name]"
-                        class="btn btn-sm btn-ghost-danger"
-                        title="Stop (down)"
-                      >
-                        <span v-if="composeActionLoading[p.name] === 'compose_down'" class="spinner-border spinner-border-sm"></span>
-                        <svg v-else xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><rect x="4" y="4" width="16" height="16" rx="2" /></svg>
-                      </button>
-                      <button
-                        @click="sendComposeAction(p, 'compose_restart')"
-                        :disabled="!!composeActionLoading[p.name]"
-                        class="btn btn-sm btn-ghost-warning"
-                        title="Redémarrer"
-                      >
-                        <span v-if="composeActionLoading[p.name] === 'compose_restart'" class="spinner-border spinner-border-sm"></span>
-                        <svg v-else xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4" /><path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4" /></svg>
-                      </button>
+                      <!-- Stop + Restart: only when project is running -->
+                      <template v-if="getComposeStatus(p) === 'running'">
+                        <button
+                          @click="sendComposeAction(p, 'compose_down')"
+                          :disabled="!!composeActionLoading[p.name]"
+                          class="btn btn-sm btn-ghost-danger"
+                          title="Stop (down)"
+                        >
+                          <span v-if="composeActionLoading[p.name] === 'compose_down'" class="spinner-border spinner-border-sm"></span>
+                          <svg v-else xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><rect x="4" y="4" width="16" height="16" rx="2" /></svg>
+                        </button>
+                        <button
+                          @click="sendComposeAction(p, 'compose_restart')"
+                          :disabled="!!composeActionLoading[p.name]"
+                          class="btn btn-sm btn-ghost-warning"
+                          title="Redémarrer"
+                        >
+                          <span v-if="composeActionLoading[p.name] === 'compose_restart'" class="spinner-border spinner-border-sm"></span>
+                          <svg v-else xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4" /><path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4" /></svg>
+                        </button>
+                      </template>
+                      <!-- Logs: always available -->
                       <button
                         @click="sendComposeAction(p, 'compose_logs')"
                         :disabled="!!composeActionLoading[p.name]"
@@ -551,6 +557,25 @@ const canRunDocker = computed(() => auth.role === 'admin' || auth.role === 'oper
 const dockerActionLoading = ref({})
 // Action loading state keyed by compose project name
 const composeActionLoading = ref({})
+
+// Derive compose project status from its containers.
+// A project is considered 'running' if at least one of its containers is running.
+const composeProjectStatus = computed(() => {
+  const statusMap = {}
+  for (const project of composeProjects.value) {
+    const projectContainers = containers.value.filter(
+      c => c.labels?.['com.docker.compose.project'] === project.name &&
+           c.host_id === project.host_id
+    )
+    statusMap[`${project.host_id}:${project.name}`] =
+      projectContainers.some(c => c.state === 'running') ? 'running' : 'stopped'
+  }
+  return statusMap
+})
+
+function getComposeStatus(project) {
+  return composeProjectStatus.value[`${project.host_id}:${project.name}`] || 'stopped'
+}
 
 // Persist active tab to localStorage
 watch(activeTab, (newTab) => {

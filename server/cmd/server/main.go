@@ -54,13 +54,20 @@ func main() {
 		log.Printf("Warning: failed to cleanup stalled commands: %v", err)
 	}
 
-	// Create default admin user
+	// Create default admin user (sets must_change_password if using default "admin" password)
 	hash, err := api.HashPassword(cfg.AdminPassword)
 	if err != nil {
 		log.Fatalf("Failed to hash admin password: %v", err)
 	}
-	if err := db.CreateUser(cfg.AdminUser, hash, "admin"); err != nil {
+	mustChangePassword := cfg.AdminPassword == "admin"
+	if err := db.CreateUser(cfg.AdminUser, hash, "admin", mustChangePassword); err != nil {
 		log.Printf("Admin user creation: %v (may already exist)", err)
+	}
+	// For existing installations still using default password, ensure flag is set
+	if mustChangePassword {
+		if err := db.SetUserMustChangePassword(cfg.AdminUser, true); err != nil {
+			log.Printf("Warning: failed to set must_change_password for admin: %v", err)
+		}
 	}
 
 	// Start GitHub release tracker

@@ -108,11 +108,12 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"token":              tokenString,
-		"expires_at":         expiresAt,
-		"role":               user.Role,
-		"refresh_token":      refreshToken,
-		"refresh_expires_at": refreshExpiresAt,
+		"token":                tokenString,
+		"expires_at":           expiresAt,
+		"role":                 user.Role,
+		"refresh_token":        refreshToken,
+		"refresh_expires_at":   refreshExpiresAt,
+		"must_change_password": user.MustChangePassword,
 	})
 }
 
@@ -442,5 +443,29 @@ func (h *AuthHandler) GetMFAStatus(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"username":    user.Username,
 		"mfa_enabled": user.MFAEnabled,
+	})
+}
+
+// GetProfile returns the current authenticated user's profile
+func (h *AuthHandler) GetProfile(c *gin.Context) {
+	username := c.GetString("username")
+	if username == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	user, err := h.db.GetUserByUsername(username)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"id":                   user.ID,
+		"username":             user.Username,
+		"role":                 user.Role,
+		"mfa_enabled":          user.MFAEnabled,
+		"must_change_password": user.MustChangePassword,
+		"created_at":           user.CreatedAt,
 	})
 }

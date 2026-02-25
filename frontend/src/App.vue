@@ -105,6 +105,17 @@
                   <span class="nav-link-title">Utilisateurs</span>
                 </router-link>
               </li>
+              <li class="nav-item">
+                <router-link to="/settings" class="nav-link" active-class="active">
+                  <span class="nav-link-icon">
+                    <svg class="icon" width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    </svg>
+                  </span>
+                  <span class="nav-link-title">Paramètres</span>
+                </router-link>
+              </li>
             </ul>
 
             <div class="ms-auto d-flex align-items-center position-relative user-menu" ref="userMenuRef">
@@ -119,15 +130,8 @@
               <div v-if="userMenuOpen" class="dropdown-menu dropdown-menu-end show user-dropdown">
                 <div class="dropdown-header">Compte</div>
                 <div class="dropdown-item text-secondary small">Role: {{ auth.role || 'inconnu' }}</div>
-                <button class="dropdown-item" @click="openChangePassword">
-                  Changer le mot de passe
-                </button>
-                <router-link to="/security" class="dropdown-item" @click="userMenuOpen = false">
-                  Sécurité (MFA)
-                </router-link>
-                <div class="dropdown-divider"></div>
-                <router-link to="/settings" class="dropdown-item" @click="userMenuOpen = false">
-                  Paramètres
+                <router-link to="/account" class="dropdown-item" @click="userMenuOpen = false">
+                  Mon compte
                 </router-link>
                 <div class="dropdown-divider"></div>
                 <button class="dropdown-item text-danger" @click="handleLogout">Déconnexion</button>
@@ -147,47 +151,6 @@
 
       <!-- Global Confirm Dialog -->
       <ConfirmDialog />
-
-      <div v-if="showPasswordModal" class="modal modal-blur fade show" tabindex="-1" role="dialog" aria-modal="true" style="display: block;">
-        <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
-          <div class="modal-content">
-            <form @submit.prevent="submitChangePassword">
-              <div class="modal-header">
-                <h3 class="modal-title">Changer le mot de passe</h3>
-                <button type="button" class="btn-close" @click="closeChangePassword" aria-label="Fermer"></button>
-              </div>
-              <div class="modal-body">
-                <div class="mb-3">
-                  <label class="form-label">Mot de passe actuel</label>
-                  <input v-model="passwordForm.current" type="password" class="form-control" required />
-                </div>
-                <div class="mb-3">
-                  <label class="form-label">Nouveau mot de passe</label>
-                  <input v-model="passwordForm.next" type="password" class="form-control" required />
-                </div>
-                <div class="mb-3">
-                  <label class="form-label">Confirmer le nouveau mot de passe</label>
-                  <input v-model="passwordForm.confirm" type="password" class="form-control" required />
-                </div>
-
-                <div v-if="passwordError" class="alert alert-danger" role="alert">
-                  {{ passwordError }}
-                </div>
-                <div v-if="passwordSuccess" class="alert alert-success" role="alert">
-                  {{ passwordSuccess }}
-                </div>
-              </div>
-              <div class="modal-footer">
-                <button type="button" class="btn btn-outline-secondary" @click="closeChangePassword" :disabled="passwordLoading">Annuler</button>
-                <button type="submit" class="btn btn-primary" :disabled="passwordLoading">
-                  {{ passwordLoading ? 'Enregistrement...' : 'Mettre a jour' }}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </div>
-      <div v-if="showPasswordModal" class="modal-backdrop fade show" @click="closeChangePassword"></div>
     </div>
 
     <!-- Login page (no sidebar) -->
@@ -199,18 +162,12 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useAuthStore } from './stores/auth'
 import { useRouter } from 'vue-router'
-import apiClient from './api'
 import ConfirmDialog from './components/ConfirmDialog.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
 const userMenuOpen = ref(false)
 const userMenuRef = ref(null)
-const showPasswordModal = ref(false)
-const passwordForm = ref({ current: '', next: '', confirm: '' })
-const passwordError = ref('')
-const passwordSuccess = ref('')
-const passwordLoading = ref(false)
 
 function handleLogout() {
   userMenuOpen.value = false
@@ -227,43 +184,6 @@ function handleOutsideClick(event) {
   const el = userMenuRef.value
   if (el && el.contains(event.target)) return
   userMenuOpen.value = false
-}
-
-function openChangePassword() {
-  passwordForm.value = { current: '', next: '', confirm: '' }
-  passwordError.value = ''
-  passwordSuccess.value = ''
-  showPasswordModal.value = true
-  userMenuOpen.value = false
-}
-
-function closeChangePassword() {
-  showPasswordModal.value = false
-}
-
-async function submitChangePassword() {
-  passwordError.value = ''
-  passwordSuccess.value = ''
-
-  if (passwordForm.value.next.length < 8) {
-    passwordError.value = 'Le mot de passe doit faire au moins 8 caractères.'
-    return
-  }
-  if (passwordForm.value.next !== passwordForm.value.confirm) {
-    passwordError.value = 'La confirmation ne correspond pas.'
-    return
-  }
-
-  passwordLoading.value = true
-  try {
-    await apiClient.changePassword(passwordForm.value.current, passwordForm.value.next)
-    passwordSuccess.value = 'Mot de passe mis a jour.'
-    passwordForm.value = { current: '', next: '', confirm: '' }
-  } catch (e) {
-    passwordError.value = e.response?.data?.error || 'Erreur lors de la mise a jour.'
-  } finally {
-    passwordLoading.value = false
-  }
 }
 
 onMounted(() => {

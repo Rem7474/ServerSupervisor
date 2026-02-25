@@ -32,6 +32,7 @@ export default {
   // Auth
   login: (username, password, totpCode = '') =>
     api.post('/auth/login', { username, password, ...(totpCode ? { totp_code: totpCode } : {}) }),
+  getProfile: () => api.get('/v1/auth/profile'),
   changePassword: (currentPassword, newPassword) =>
     api.post('/v1/auth/change-password', { current_password: currentPassword, new_password: newPassword }),
   getMFAStatus: () => api.get('/v1/auth/mfa/status'),
@@ -85,6 +86,7 @@ export default {
 
   // Audit
   getAuditLogs: (page = 1, limit = 50) => api.get(`/v1/audit/logs?page=${page}&limit=${limit}`),
+  getMyAuditLogs: (limit = 10) => api.get(`/v1/audit/logs/me?limit=${limit}`),
   getAuditLogsByHost: (hostId, limit = 100) => api.get(`/v1/audit/logs/host/${hostId}?limit=${limit}`),
   getAuditLogsByUser: (username, limit = 100) => api.get(`/v1/audit/logs/user/${username}?limit=${limit}`),
 

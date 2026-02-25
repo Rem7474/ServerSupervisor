@@ -64,6 +64,7 @@ func SetupRouter(db *database.DB, cfg *config.Config) *gin.Engine {
 	api.Use(JWTMiddleware(cfg))
 	{
 		// Auth
+		api.GET("/auth/profile", authH.GetProfile)
 		api.POST("/auth/change-password", authH.ChangePassword)
 		api.GET("/auth/mfa/status", authH.GetMFAStatus)
 		api.POST("/auth/mfa/setup", authH.SetupMFA)
@@ -111,6 +112,7 @@ func SetupRouter(db *database.DB, cfg *config.Config) *gin.Engine {
 
 		// Audit logs
 		api.GET("/audit/logs", auditH.GetAuditLogs)
+		api.GET("/audit/logs/me", auditH.GetMyAuditLogs)
 		api.GET("/audit/logs/host/:host_id", auditH.GetAuditLogsByHost)
 		api.GET("/audit/logs/user/:username", auditH.GetAuditLogsByUser)
 

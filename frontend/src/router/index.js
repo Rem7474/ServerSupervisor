@@ -79,6 +79,12 @@ const routes = [
     component: () => import('../views/SettingsView.vue'),
     meta: { requiresAuth: true },
   },
+  {
+    path: '/account',
+    name: 'Account',
+    component: () => import('../views/AccountView.vue'),
+    meta: { requiresAuth: true },
+  },
 ]
 
 const router = createRouter({
@@ -86,10 +92,13 @@ const router = createRouter({
   routes,
 })
 
-router.beforeEach((to, from, next) => {
+router.beforeEach((to, _from, next) => {
   const auth = useAuthStore()
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
     next('/login')
+  } else if (auth.isAuthenticated && auth.mustChangePassword && to.path !== '/account') {
+    // Force password change before accessing any other page
+    next('/account')
   } else if (to.meta.requiresAdmin && !auth.isAdmin) {
     next('/')
   } else if (to.path === '/login' && auth.isAuthenticated) {

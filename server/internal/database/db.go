@@ -413,6 +413,8 @@ func (db *DB) migrate() error {
 		`ALTER TABLE IF EXISTS alert_rules ADD COLUMN IF NOT EXISTS cooldown INTEGER`,
 		`ALTER TABLE IF EXISTS alert_rules ADD COLUMN IF NOT EXISTS last_fired TIMESTAMP WITH TIME ZONE`,
 		`ALTER TABLE IF EXISTS alert_rules ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()`,
+		// Migration: Add must_change_password flag to users (for first-login enforcement)
+		`ALTER TABLE IF EXISTS users ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN NOT NULL DEFAULT FALSE`,
 	}
 
 	for _, m := range migrations {
@@ -426,11 +428,20 @@ func (db *DB) migrate() error {
 
 // ========== Users ==========
 
-func (db *DB) CreateUser(username, passwordHash, role string) error {
+func (db *DB) CreateUser(username, passwordHash, role string, mustChangePassword ...bool) error {
+	mcp := len(mustChangePassword) > 0 && mustChangePassword[0]
 	_, err := db.conn.Exec(
-		`INSERT INTO users (username, password_hash, role) VALUES ($1, $2, $3)
+		`INSERT INTO users (username, password_hash, role, must_change_password) VALUES ($1, $2, $3, $4)
 		 ON CONFLICT (username) DO NOTHING`,
-		username, passwordHash, role,
+		username, passwordHash, role, mcp,
+	)
+	return err
+}
+
+func (db *DB) SetUserMustChangePassword(username string, value bool) error {
+	_, err := db.conn.Exec(
+		`UPDATE users SET must_change_password = $1 WHERE username = $2`,
+		value, username,
 	)
 	return err
 }
@@ -438,9 +449,9 @@ func (db *DB) CreateUser(username, passwordHash, role string) error {
 func (db *DB) GetUserByUsername(username string) (*models.User, error) {
 	var u models.User
 	err := db.conn.QueryRow(
-		`SELECT id, username, password_hash, role, totp_secret, backup_codes, mfa_enabled, created_at FROM users WHERE username = $1`,
+		`SELECT id, username, password_hash, role, totp_secret, backup_codes, mfa_enabled, must_change_password, created_at FROM users WHERE username = $1`,
 		username,
-	).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Role, &u.TOTPSecret, &u.BackupCodes, &u.MFAEnabled, &u.CreatedAt)
+	).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Role, &u.TOTPSecret, &u.BackupCodes, &u.MFAEnabled, &u.MustChangePassword, &u.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -450,9 +461,9 @@ func (db *DB) GetUserByUsername(username string) (*models.User, error) {
 func (db *DB) GetUserByID(id int64) (*models.User, error) {
 	var u models.User
 	err := db.conn.QueryRow(
-		`SELECT id, username, password_hash, role, totp_secret, backup_codes, mfa_enabled, created_at FROM users WHERE id = $1`,
+		`SELECT id, username, password_hash, role, totp_secret, backup_codes, mfa_enabled, must_change_password, created_at FROM users WHERE id = $1`,
 		id,
-	).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Role, &u.TOTPSecret, &u.BackupCodes, &u.MFAEnabled, &u.CreatedAt)
+	).Scan(&u.ID, &u.Username, &u.PasswordHash, &u.Role, &u.TOTPSecret, &u.BackupCodes, &u.MFAEnabled, &u.MustChangePassword, &u.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -489,7 +500,7 @@ func (db *DB) UpdateUserRole(id int64, role string) error {
 
 func (db *DB) UpdateUserPassword(username, passwordHash string) error {
 	_, err := db.conn.Exec(
-		`UPDATE users SET password_hash = $1 WHERE username = $2`,
+		`UPDATE users SET password_hash = $1, must_change_password = FALSE WHERE username = $2`,
 		passwordHash, username,
 	)
 	return err
