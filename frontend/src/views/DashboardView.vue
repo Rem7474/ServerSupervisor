@@ -267,7 +267,7 @@ dayjs.extend(relativeTime)
 dayjs.extend(utc)
 dayjs.locale('fr')
 
-const LATEST_AGENT_VERSION = '1.2.0'
+const latestAgentVersion = ref('')
 
 const hosts = ref([])
 const hostMetrics = ref({})
@@ -504,15 +504,21 @@ function memColor(pct) {
 }
 
 function isAgentUpToDate(version) {
-  if (!version) return false
-  // Simple version comparison (assumes semantic versioning)
-  return version === LATEST_AGENT_VERSION
+  if (!version || !latestAgentVersion.value) return false
+  return version === latestAgentVersion.value
 }
 
+async function fetchLatestAgentVersion() {
+  try {
+    const res = await apiClient.getSettings()
+    latestAgentVersion.value = res.data?.settings?.latestAgentVersion || ''
+  } catch { /* non-critical */ }
+}
 
 onMounted(() => {
   loading.value = true
   fetchSummary()
+  fetchLatestAgentVersion()
 })
 
 onUnmounted(() => {

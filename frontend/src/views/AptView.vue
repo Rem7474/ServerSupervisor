@@ -254,7 +254,7 @@
         <h3 class="card-title mb-0">Historique des mises à jour</h3>
         <div class="d-flex flex-wrap gap-2">
           <!-- Filtre hôte -->
-          <select v-model="historyHostFilter" class="form-select form-select-sm" style="min-width: 160px;">
+          <select v-model="historyHostFilter" class="form-select form-select-sm" style="min-width: 160px;" @change="resetHistoryPage">
             <option value="all">Tous les hôtes</option>
             <option v-for="host in hosts" :key="host.id" :value="host.id">
               {{ host.hostname || host.name }}
@@ -267,7 +267,7 @@
               :key="p.value"
               class="btn"
               :class="historyPeriod === p.value ? 'btn-primary' : 'btn-outline-secondary'"
-              @click="historyPeriod = p.value"
+              @click="historyPeriod = p.value; resetHistoryPage()"
             >
               {{ p.label }}
             </button>
@@ -291,7 +291,7 @@
             <tr v-if="filteredHistory.length === 0">
               <td colspan="7" class="text-center text-secondary py-4">Aucun historique pour cette période</td>
             </tr>
-            <tr v-for="cmd in filteredHistory" :key="cmd.id">
+            <tr v-for="cmd in pagedHistory" :key="cmd.id">
               <td class="text-secondary small">{{ formatDateExact(cmd.created_at) }}</td>
               <td>
                 <div class="fw-semibold">{{ cmd.hostName }}</div>
@@ -311,6 +311,28 @@
             </tr>
           </tbody>
         </table>
+      </div>
+      <div v-if="historyTotalPages > 1" class="card-footer d-flex align-items-center justify-content-between">
+        <div class="text-secondary small">
+          {{ filteredHistory.length }} entrée{{ filteredHistory.length > 1 ? 's' : '' }} —
+          page {{ historyPage }} / {{ historyTotalPages }}
+        </div>
+        <ul class="pagination pagination-sm mb-0">
+          <li class="page-item" :class="{ disabled: historyPage === 1 }">
+            <a class="page-link" href="#" @click.prevent="historyPage--">‹</a>
+          </li>
+          <li
+            v-for="p in historyTotalPages"
+            :key="p"
+            class="page-item"
+            :class="{ active: p === historyPage }"
+          >
+            <a class="page-link" href="#" @click.prevent="historyPage = p">{{ p }}</a>
+          </li>
+          <li class="page-item" :class="{ disabled: historyPage === historyTotalPages }">
+            <a class="page-link" href="#" @click.prevent="historyPage++">›</a>
+          </li>
+        </ul>
       </div>
     </div>
 
@@ -423,6 +445,19 @@ const filteredHistory = computed(() => {
 
   return list
 })
+
+const HISTORY_PAGE_SIZE = 25
+const historyPage = ref(1)
+
+const historyTotalPages = computed(() => Math.max(1, Math.ceil(filteredHistory.value.length / HISTORY_PAGE_SIZE)))
+
+const pagedHistory = computed(() => {
+  const start = (historyPage.value - 1) * HISTORY_PAGE_SIZE
+  return filteredHistory.value.slice(start, start + HISTORY_PAGE_SIZE)
+})
+
+// Reset to page 1 when filters change
+function resetHistoryPage() { historyPage.value = 1 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function toggleSelectAll() {

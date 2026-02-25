@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"regexp"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -11,6 +12,9 @@ import (
 	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/models"
 )
+
+// validServiceName matches valid systemd service names: alphanumeric plus ._:@-
+var validServiceName = regexp.MustCompile(`^[a-zA-Z0-9._:@\-]{1,256}$`)
 
 type DockerHandler struct {
 	db        *database.DB
@@ -184,9 +188,14 @@ func (h *DockerHandler) SendDockerCommand(c *gin.Context) {
 }
 
 // SendJournalCommand enqueues a journalctl log fetch for a specific service on a host.
-// This is a read-only operation available to all authenticated users.
+// Restricted to admin and operator roles (logs can contain sensitive data).
 func (h *DockerHandler) SendJournalCommand(c *gin.Context) {
 	username := c.GetString("username")
+	role := c.GetString("role")
+	if role != models.RoleAdmin && role != models.RoleOperator {
+		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+		return
+	}
 
 	var req struct {
 		HostID      string `json:"host_id" binding:"required"`
@@ -194,6 +203,11 @@ func (h *DockerHandler) SendJournalCommand(c *gin.Context) {
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if !validServiceName.MatchString(req.ServiceName) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid service name"})
 		return
 	}
 

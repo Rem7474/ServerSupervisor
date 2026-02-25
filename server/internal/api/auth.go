@@ -65,19 +65,10 @@ func isIPBlocked(ip string) bool {
 	return count >= bruteForceMaxFails
 }
 
+// clientIP returns the real client IP using gin's trusted-proxy-aware method.
+// Configure gin.SetTrustedProxies on the engine if the app runs behind a reverse proxy.
 func clientIP(c *gin.Context) string {
-	if xff := c.GetHeader("X-Forwarded-For"); xff != "" {
-		parts := strings.SplitN(xff, ",", 2)
-		return strings.TrimSpace(parts[0])
-	}
-	if xri := c.GetHeader("X-Real-IP"); xri != "" {
-		return strings.TrimSpace(xri)
-	}
-	ip := c.Request.RemoteAddr
-	if i := strings.LastIndex(ip, ":"); i > 0 {
-		return ip[:i]
-	}
-	return ip
+	return c.ClientIP()
 }
 
 type AuthHandler struct {

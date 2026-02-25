@@ -5,15 +5,22 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"regexp"
 	"strings"
 	"time"
 )
+
+// validServiceName matches valid systemd service names.
+var validServiceName = regexp.MustCompile(`^[a-zA-Z0-9._:@\-]{1,256}$`)
 
 // ExecuteJournalctl streams systemd journal logs for a given service.
 // Lines are passed to chunkCB as they arrive. Returns the full output and any error.
 func ExecuteJournalctl(serviceName string, chunkCB func(string)) (string, error) {
 	if serviceName == "" {
 		return "", fmt.Errorf("service name is required")
+	}
+	if !validServiceName.MatchString(serviceName) {
+		return "", fmt.Errorf("invalid service name: %q", serviceName)
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)

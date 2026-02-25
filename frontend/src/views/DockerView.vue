@@ -7,6 +7,11 @@
 
     <WsStatusBar :status="wsStatus" :error="wsError" :retry-count="retryCount" @reconnect="reconnect" />
 
+    <div v-if="actionError" class="alert alert-danger alert-dismissible mb-3" role="alert">
+      {{ actionError }}
+      <button type="button" class="btn-close" @click="actionError = ''"></button>
+    </div>
+
     <!-- Tabs -->
     <ul class="nav nav-tabs mb-4">
       <li class="nav-item">
@@ -44,12 +49,12 @@
             <div class="col-md-6 col-lg-2">
               <select v-model="stateFilter" class="form-select">
                 <option value="">Tous les états</option>
-                <option value="running">Running</option>
-                <option value="restarting">Restarting</option>
-                <option value="paused">Paused</option>
-                <option value="created">Created</option>
-                <option value="exited">Exited</option>
-                <option value="dead">Dead</option>
+                <option value="running">En cours</option>
+                <option value="restarting">Redémarrage</option>
+                <option value="paused">En pause</option>
+                <option value="created">Créé</option>
+                <option value="exited">Arrêté</option>
+                <option value="dead">Mort</option>
               </select>
             </div>
             <div class="col-md-6 col-lg-2">
@@ -201,7 +206,7 @@
             <thead>
               <tr>
                 <th>Projet</th>
-                <th>Hote</th>
+                <th>Hôte</th>
                 <th>Services</th>
                 <th>Fichier de config</th>
                 <th></th>
@@ -521,13 +526,17 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, nextTick, onUnmounted } from 'vue'
+import { ref, computed, nextTick, onUnmounted } from 'vue'
 import { useWebSocket } from '../composables/useWebSocket'
 import { useAuthStore } from '../stores/auth'
+import { useConfirmDialog } from '../composables/useConfirmDialog'
+import { useLocalStorage } from '../composables/useLocalStorage'
 import WsStatusBar from '../components/WsStatusBar.vue'
 import apiClient from '../api'
 
 const auth = useAuthStore()
+const dialog = useConfirmDialog()
+const actionError = ref('')
 
 const containers = ref([])
 const composeProjects = ref([])
@@ -538,7 +547,7 @@ const composeFilter = ref('')
 const composeSearch = ref('')
 const selectedContainer = ref(null)
 const selectedProject = ref(null)
-const activeTab = ref(localStorage.getItem('dockerActiveTab') || 'containers')
+const activeTab = useLocalStorage('dockerActiveTab', 'containers')
 const copied = ref(false)
 
 // Inspect modal
@@ -577,10 +586,6 @@ function getComposeStatus(project) {
   return composeProjectStatus.value[`${project.host_id}:${project.name}`] || 'stopped'
 }
 
-// Persist active tab to localStorage
-watch(activeTab, (newTab) => {
-  localStorage.setItem('dockerActiveTab', newTab)
-})
 
 const getComposeInfo = (container) => {
   if (!container.labels) return {}
@@ -663,9 +668,13 @@ const filteredComposeProjects = computed(() => {
 async function sendContainerAction(container, action) {
   if (dockerActionLoading.value[container.name]) return
 
-  if ((action === 'stop' || action === 'restart') &&
-      !confirm(`Confirmer : ${action} du conteneur « ${container.name} » ?`)) {
-    return
+  if (action === 'stop' || action === 'restart') {
+    const ok = await dialog.confirm({
+      title: `${action === 'stop' ? 'Arrêter' : 'Redémarrer'} le conteneur`,
+      message: `Confirmer : ${action} du conteneur « ${container.name} » ?`,
+      variant: 'warning',
+    })
+    if (!ok) return
   }
 
   dockerActionLoading.value = { ...dockerActionLoading.value, [container.name]: action }
@@ -676,7 +685,8 @@ async function sendContainerAction(container, action) {
     connectDockerStream(commandId, container.name, action)
   } catch (err) {
     console.error('Docker action failed:', err)
-    alert(`Erreur : ${err.response?.data?.error || err.message}`)
+    actionError.value = err.response?.data?.error || err.message
+    setTimeout(() => { actionError.value = '' }, 6000)
   } finally {
     dockerActionLoading.value = { ...dockerActionLoading.value, [container.name]: null }
   }
@@ -685,9 +695,13 @@ async function sendContainerAction(container, action) {
 async function sendComposeAction(project, action) {
   if (composeActionLoading.value[project.name]) return
 
-  if ((action === 'compose_down' || action === 'compose_restart') &&
-      !confirm(`Confirmer : ${action.replace('compose_', '')} du projet « ${project.name} » ?`)) {
-    return
+  if (action === 'compose_down' || action === 'compose_restart') {
+    const ok = await dialog.confirm({
+      title: `${action === 'compose_down' ? 'Arrêter' : 'Redémarrer'} le projet`,
+      message: `Confirmer : ${action.replace('compose_', '')} du projet « ${project.name} » ?`,
+      variant: 'warning',
+    })
+    if (!ok) return
   }
 
   composeActionLoading.value = { ...composeActionLoading.value, [project.name]: action }
@@ -703,7 +717,8 @@ async function sendComposeAction(project, action) {
     connectDockerStream(commandId, project.name, action)
   } catch (err) {
     console.error('Compose action failed:', err)
-    alert(`Erreur : ${err.response?.data?.error || err.message}`)
+    actionError.value = err.response?.data?.error || err.message
+    setTimeout(() => { actionError.value = '' }, 6000)
   } finally {
     composeActionLoading.value = { ...composeActionLoading.value, [project.name]: null }
   }

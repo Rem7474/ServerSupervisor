@@ -64,25 +64,17 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import apiClient from '../api'
-import dayjs from 'dayjs'
-import utc from 'dayjs/plugin/utc'
+import { formatDateTime as formatDate } from '../utils/formatters'
 
 const logs = ref([])
 const page = ref(1)
 const limit = ref(50)
 const loading = ref(false)
 
-dayjs.extend(utc)
-
 function statusClass(status) {
   if (status === 'completed') return 'badge bg-green-lt text-green'
   if (status === 'failed') return 'badge bg-red-lt text-red'
   return 'badge bg-yellow-lt text-yellow'
-}
-
-function formatDate(date) {
-  if (!date) return '-'
-  return dayjs.utc(date).local().format('YYYY-MM-DD HH:mm')
 }
 
 async function fetchLogs() {

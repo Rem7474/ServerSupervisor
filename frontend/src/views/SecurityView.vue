@@ -147,6 +147,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import apiClient from '../api'
+import { formatDateTime as formatDate } from '../utils/formatters'
 
 const tab = ref('mfa')
 
@@ -192,13 +193,6 @@ function switchToActivity() {
   if (!loginEvents.value.length) loadLoginEvents()
 }
 
-function formatDate(iso) {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleString('fr-FR', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
-    hour: '2-digit', minute: '2-digit', second: '2-digit',
-  })
-}
 
 async function startSetup() {
   loading.value = true

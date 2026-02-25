@@ -81,7 +81,7 @@
                   <td>
                     <code>{{ rule.operator }} {{ rule.threshold }}{{ getMetricUnit(rule.metric) }}</code>
                   </td>
-                  <td>{{ rule.duration_seconds }}s</td>
+                  <td>{{ formatDurationSecs(rule.duration_seconds) }}</td>
                   <td>
                     <span v-for="channel in rule.channels" :key="channel" class="badge bg-azure me-1">
                       {{ channel }}
@@ -286,6 +286,9 @@
               </div>
             </div>
           </div>
+          <div v-if="saveError" class="alert alert-danger mx-3 mb-0 mt-0 py-2 small" role="alert">
+            {{ saveError }}
+          </div>
           <div class="modal-footer">
             <button @click="closeModal" type="button" class="btn btn-link">Annuler</button>
             <button @click="testAlert" type="button" class="btn btn-outline-secondary" :disabled="testing || saving">
@@ -308,9 +311,10 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
+import { formatDurationSecs } from '../utils/formatters'
 import api from '../api'
 
 const auth = useAuthStore()
@@ -321,6 +325,7 @@ const hosts = ref([])
 const loading = ref(true)
 const showModal = ref(false)
 const saving = ref(false)
+const saveError = ref('')
 const testing = ref(false)
 const testResults = ref(null)
 const editingRule = ref(null)
@@ -341,9 +346,19 @@ const form = ref({
 const channelSmtp = ref(false)
 const channelNtfy = ref(false)
 
+
+function onKeyDown(e) {
+  if (e.key === 'Escape' && showModal.value) closeModal()
+}
+
 onMounted(async () => {
   await loadRules()
   await loadHosts()
+  document.addEventListener('keydown', onKeyDown)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('keydown', onKeyDown)
 })
 
 async function loadRules() {
@@ -406,13 +421,14 @@ function startEditAlert(rule) {
 }
 
 async function saveAlert() {
+  saveError.value = ''
   try {
     saving.value = true
-    
+
     const channels = []
     if (channelSmtp.value) channels.push('smtp')
     if (channelNtfy.value) channels.push('ntfy')
-    
+
     const payload = {
       ...form.value,
       channels
@@ -428,7 +444,7 @@ async function saveAlert() {
     closeModal()
   } catch (err) {
     console.error('Failed to save alert:', err)
-    alert('Erreur lors de la sauvegarde de l\'alerte: ' + err.response?.data?.error || err.message)
+    saveError.value = 'Erreur : ' + (err.response?.data?.error || err.message)
   } finally {
     saving.value = false
   }
@@ -459,7 +475,7 @@ async function deleteAlert(rule) {
     await loadRules()
   } catch (err) {
     console.error('Failed to delete alert:', err)
-    alert('Erreur lors de la suppression: ' + err.response?.data?.error || err.message)
+    saveError.value = 'Erreur lors de la suppression : ' + (err.response?.data?.error || err.message)
   }
 }
 
@@ -483,6 +499,7 @@ function closeModal() {
   showModal.value = false
   editingRule.value = null
   testResults.value = null
+  saveError.value = ''
 }
 
 function getHostName(hostId) {

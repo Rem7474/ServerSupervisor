@@ -57,6 +57,9 @@
             <label class="form-label">OS</label>
             <input v-model="editForm.os" type="text" class="form-control" required />
           </div>
+          <div v-if="editError" class="col-12">
+            <div class="alert alert-danger py-2 mb-0">{{ editError }}</div>
+          </div>
           <div class="col-12 d-flex justify-content-end gap-2">
             <button type="button" @click="cancelEdit" class="btn btn-outline-secondary" :disabled="saving">Annuler</button>
             <button type="submit" class="btn btn-primary" :disabled="saving">
@@ -337,8 +340,8 @@
       </div>
     </div>
 
-    <!-- Logs système (journalctl) -->
-    <div class="card mt-4">
+    <!-- Logs système (journalctl) — admin/operator only -->
+    <div v-if="canRunApt" class="card mt-4">
       <div class="card-header">
         <h3 class="card-title">Logs système (journalctl)</h3>
       </div>
@@ -422,7 +425,7 @@
                   <div class="flex-fill" style="min-width: 0;">
                     <div class="fw-semibold text-light" style="font-size: 0.95rem;">{{ host?.hostname || 'Hôte' }}</div>
                     <div class="text-secondary small mt-1">
-                      <code style="background: rgba(0,0,0,0.3); padding: 0.15rem 0.4rem; border-radius: 0.25rem; color: #94a3b8;">apt {{ liveCommand.command }}</code>
+                      <code style="background: rgba(0,0,0,0.3); padding: 0.15rem 0.4rem; border-radius: 0.25rem; color: #94a3b8;">{{ liveCommand.prefix }}{{ liveCommand.command }}</code>
                     </div>
                   </div>
                   <span :class="statusClass(liveCommand.status)" style="margin-left: 0.5rem;">{{ liveCommand.status }}</span>
@@ -493,7 +496,7 @@ dayjs.extend(relativeTime)
 dayjs.extend(utc)
 dayjs.locale('fr')
 
-const LATEST_AGENT_VERSION = '1.3.0'
+const latestAgentVersion = ref('')
 
 const route = useRoute()
 const router = useRouter()
@@ -677,6 +680,7 @@ function startEdit() {
 function cancelEdit() {
   isEditing.value = false
   rotateKeyResult.value = null
+  editError.value = ''
 }
 
 async function rotateHostKey() {
@@ -710,14 +714,17 @@ async function copyRotatedConfig() {
   }, 1500)
 }
 
+const editError = ref('')
+
 async function saveEdit() {
+  editError.value = ''
   saving.value = true
   try {
     const res = await apiClient.updateHost(hostId, editForm.value)
     host.value = res.data
     isEditing.value = false
   } catch (e) {
-    alert('Erreur: ' + (e.response?.data?.error || e.message))
+    editError.value = e.response?.data?.error || e.message
   } finally {
     saving.value = false
   }
@@ -830,8 +837,15 @@ function renderConsoleOutput(raw) {
 }
 
 function isAgentUpToDate(version) {
-  if (!version) return false
-  return version === LATEST_AGENT_VERSION
+  if (!version || !latestAgentVersion.value) return false
+  return version === latestAgentVersion.value
+}
+
+async function fetchLatestAgentVersion() {
+  try {
+    const res = await apiClient.getSettings()
+    latestAgentVersion.value = res.data?.settings?.latestAgentVersion || ''
+  } catch { /* non-critical */ }
 }
 
 async function loadJournalLogs() {
@@ -846,6 +860,7 @@ async function loadJournalLogs() {
     journalCmdId.value = cmdId
     liveCommand.value = {
       id: cmdId,
+      prefix: '',
       command: `journalctl -u ${svc}`,
       status: 'running',
       output: '',
@@ -883,6 +898,7 @@ async function loadJournalLogs() {
 function watchCommand(cmd) {
   liveCommand.value = {
     id: cmd.id,
+    prefix: 'apt ',
     command: cmd.command,
     status: cmd.status,
     output: cmd.output || '',
@@ -894,10 +910,13 @@ function watchCommand(cmd) {
 
 function closeLiveConsole() {
   if (streamWs) {
+    streamWs.onclose = null
+    streamWs.onmessage = null
     streamWs.close()
     streamWs = null
   }
   liveCommand.value = null
+  journalLoading.value = false
 }
 
 function scrollToBottom() {
@@ -963,6 +982,7 @@ async function deleteHost() {
 }
 
 onMounted(() => {
+  fetchLatestAgentVersion()
   // Wait for auth to be properly initialized before loading data
   if (auth.token) {
     loadHistory(24)

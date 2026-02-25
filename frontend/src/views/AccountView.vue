@@ -172,6 +172,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import apiClient from '../api'
+import { formatDateLong as formatDate, formatDateTime } from '../utils/formatters'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -196,15 +197,6 @@ const roleLabel = computed(() => {
   return map[profile.value?.role] || profile.value?.role || auth.role
 })
 
-function formatDate(dt) {
-  if (!dt) return '-'
-  return new Date(dt).toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' })
-}
-
-function formatDateTime(dt) {
-  if (!dt) return '-'
-  return new Date(dt).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
-}
 
 function actionBadgeClass(action) {
   if (!action) return 'bg-secondary-lt text-secondary'
