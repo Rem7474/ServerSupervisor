@@ -146,6 +146,10 @@ func SetupRouter(db *database.DB, cfg *config.Config) *gin.Engine {
 	// Serve frontend static files
 	r.Static("/assets", "./frontend/dist/assets")
 	r.StaticFile("/", "./frontend/dist/index.html")
+	// Static root-level files must be explicit — the NoRoute SPA fallback would
+	// otherwise serve index.html for them, causing parse errors in the browser.
+	r.StaticFile("/manifest.json", "./frontend/dist/manifest.json")
+	r.StaticFile("/favicon.svg", "./frontend/dist/favicon.svg")
 	r.NoRoute(func(c *gin.Context) {
 		c.File("./frontend/dist/index.html")
 	})

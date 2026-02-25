@@ -318,7 +318,10 @@ const render = () => {
     cluster.append('text')
       .attr('x', rectX + 32)
       .attr('y', rectY + headerH / 2 - 4)
-      .attr('class', 'cluster-label')
+      .style('font-size', '12px')
+      .style('font-weight', '700')
+      .style('fill', '#e2e8f0')
+      .style('pointer-events', 'none')
       .text(hostName)
 
     // IP en sous-titre
@@ -326,20 +329,24 @@ const render = () => {
       cluster.append('text')
         .attr('x', rectX + 32)
         .attr('y', rectY + headerH / 2 + 10)
-        .attr('class', 'cluster-sublabel')
+        .style('font-size', '10px')
+        .style('fill', '#94a3b8')
+        .style('pointer-events', 'none')
         .text(hostIp)
     }
   }
 
   // Draw tree links only when proxy links are enabled
   // (all links in this tree go root→service/port, i.e. they are proxy connections)
+  // NOTE: all SVG styles are set via .attr()/.style() rather than CSS classes because
+  // Vue's <style scoped> does not apply to D3-created elements (they lack the data-v-* attr).
   if (props.showProxyLinks) {
     linkGroup
       .selectAll('path')
       .data(treeData.links())
       .enter()
       .append('path')
-      .attr('class', 'link')
+      .attr('fill', 'none')
       .attr('d', (d) => {
         // Source is always the root (proxy) node — depart from its RIGHT edge
         const startX = d.source.y + 100 + 120   // center + half rect width (240/2)
@@ -510,11 +517,14 @@ const render = () => {
 
     if (rootNode && proxyTargets.length > 0) {
       proxyLinkGroup
-        .selectAll('.proxy-link')
+        .selectAll('path')
         .data(proxyTargets)
         .enter()
         .append('path')
-        .attr('class', 'proxy-link')
+        .attr('fill', 'none')
+        .attr('stroke', 'rgba(56, 189, 248, 0.7)')
+        .attr('stroke-width', 1.8)
+        .attr('stroke-dasharray', '6 5')
         .attr('d', (d) => {
           // Same anchor logic: right edge of proxy → left edge of target
           const sx = rootNode.y + 100 + 120
