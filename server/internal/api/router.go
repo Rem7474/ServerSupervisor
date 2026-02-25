@@ -93,6 +93,7 @@ func SetupRouter(db *database.DB, cfg *config.Config) *gin.Engine {
 
 		// Docker
 		api.GET("/hosts/:id/containers", dockerH.ListContainers)
+		api.GET("/hosts/:id/docker/history", dockerH.GetDockerCommandHistory)
 		api.GET("/docker/containers", dockerH.ListAllContainers)
 		api.GET("/docker/versions", dockerH.CompareVersions)
 		api.POST("/docker/command", dockerH.SendDockerCommand)

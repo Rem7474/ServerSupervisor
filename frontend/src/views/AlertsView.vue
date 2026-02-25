@@ -311,13 +311,11 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useAuthStore } from '../stores/auth'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
 import { formatDurationSecs } from '../utils/formatters'
 import api from '../api'
 
-const auth = useAuthStore()
 const { confirm } = useConfirmDialog()
 
 const rules = ref([])
@@ -402,6 +400,7 @@ function startAddAlert() {
 }
 
 function startEditAlert(rule) {
+  testResults.value = null
   editingRule.value = rule
   form.value = {
     name: rule.name || '',

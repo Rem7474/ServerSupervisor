@@ -211,13 +211,36 @@ func (h *DockerHandler) SendJournalCommand(c *gin.Context) {
 		return
 	}
 
-	cmd, err := h.db.CreateDockerCommand(req.HostID, req.ServiceName, "journalctl", "", username, nil)
+	details := fmt.Sprintf(`{"service":"%s"}`, req.ServiceName)
+	auditID, auditErr := h.db.CreateAuditLog(username, "journalctl", req.HostID, c.ClientIP(), details, "pending")
+	var auditLogIDPtr *int64
+	if auditErr != nil {
+		log.Printf("Warning: failed to create audit log for journalctl command: %v", auditErr)
+	} else {
+		auditLogIDPtr = &auditID
+	}
+
+	cmd, err := h.db.CreateDockerCommand(req.HostID, req.ServiceName, "journalctl", "", username, auditLogIDPtr)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create command"})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"command_id": cmd.ID, "status": "pending"})
+}
+
+// GetDockerCommandHistory returns recent docker and journalctl commands for a host
+func (h *DockerHandler) GetDockerCommandHistory(c *gin.Context) {
+	hostID := c.Param("id")
+	cmds, err := h.db.GetDockerCommandsByHost(hostID, 50)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch command history"})
+		return
+	}
+	if cmds == nil {
+		cmds = []models.DockerCommand{}
+	}
+	c.JSON(http.StatusOK, gin.H{"commands": cmds})
 }
 
 // normalizeVersion strips leading 'v' from version strings for comparison

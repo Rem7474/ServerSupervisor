@@ -70,6 +70,7 @@ export default {
     api.post('/v1/docker/command', { host_id: hostId, container_name: containerName, action, working_dir: workingDir }),
   sendJournalCommand: (hostId, serviceName) =>
     api.post('/v1/system/journalctl', { host_id: hostId, service_name: serviceName }),
+  getDockerHistory: (hostId) => api.get(`/v1/hosts/${hostId}/docker/history`),
 
   // Tracked Repos
   getTrackedRepos: () => api.get('/v1/repos'),

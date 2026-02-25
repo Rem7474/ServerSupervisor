@@ -1067,6 +1067,27 @@ func (db *DB) GetPendingDockerCommands(hostID string) ([]models.PendingCommand, 
 	return cmds, nil
 }
 
+func (db *DB) GetDockerCommandsByHost(hostID string, limit int) ([]models.DockerCommand, error) {
+	rows, err := db.conn.Query(
+		`SELECT id, host_id, container_name, action, COALESCE(working_dir, ''), status, COALESCE(output, ''), triggered_by, created_at
+		 FROM docker_commands WHERE host_id = $1 ORDER BY created_at DESC LIMIT $2`, hostID, limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var cmds []models.DockerCommand
+	for rows.Next() {
+		var c models.DockerCommand
+		if err := rows.Scan(&c.ID, &c.HostID, &c.ContainerName, &c.Action, &c.WorkingDir, &c.Status, &c.Output, &c.TriggeredBy, &c.CreatedAt); err != nil {
+			continue
+		}
+		cmds = append(cmds, c)
+	}
+	return cmds, nil
+}
+
 func (db *DB) UpdateDockerCommandStatus(id int64, status, output string) error {
 	switch status {
 	case "running":

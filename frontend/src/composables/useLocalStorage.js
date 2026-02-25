@@ -7,7 +7,15 @@ import { ref, watch } from 'vue'
  */
 export function useLocalStorage(key, defaultValue) {
   const stored = localStorage.getItem(key)
-  const initial = stored !== null ? JSON.parse(stored) : defaultValue
+  let initial = defaultValue
+  if (stored !== null) {
+    try {
+      initial = JSON.parse(stored)
+    } catch {
+      // Legacy value stored without JSON.stringify — use as-is and re-persist in correct format
+      initial = stored
+    }
+  }
 
   const value = ref(initial)
 

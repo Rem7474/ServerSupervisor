@@ -158,48 +158,18 @@
           </div>
           <div class="card-body" style="height: 12rem;">
             <Line v-if="cpuChartData" :data="cpuChartData" :options="chartOptions" class="h-100" />
-            <div v-else class="h-100 d-flex align-items-center justify-content-center text-secondary">Aucune donnee</div>
+            <div v-else class="h-100 d-flex align-items-center justify-content-center text-secondary">Aucune donnée</div>
           </div>
         </div>
       </div>
       <div class="col-lg-6">
         <div class="card">
           <div class="card-header">
-            <h3 class="card-title">Memoire</h3>
+            <h3 class="card-title">Mémoire</h3>
           </div>
           <div class="card-body" style="height: 12rem;">
             <Line v-if="memChartData" :data="memChartData" :options="chartOptions" class="h-100" />
-            <div v-else class="h-100 d-flex align-items-center justify-content-center text-secondary">Aucune donnee</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div v-if="metrics?.disks?.length" class="card mb-4">
-      <div class="card-header">
-        <h3 class="card-title">Disques</h3>
-      </div>
-      <div class="card-body">
-        <div class="row row-cards">
-          <div v-for="disk in metrics.disks" :key="disk.mount_point" class="col-md-6">
-            <div class="border rounded p-3">
-              <div class="d-flex justify-content-between mb-2">
-                <div class="fw-semibold">{{ disk.mount_point }}</div>
-                <div class="text-secondary small">{{ disk.device }} ({{ disk.fs_type }})</div>
-              </div>
-              <div class="progress mb-2">
-                <div
-                  class="progress-bar"
-                  :class="disk.used_percent > 90 ? 'bg-red' : disk.used_percent > 75 ? 'bg-yellow' : 'bg-primary'"
-                  :style="{ width: disk.used_percent + '%' }"
-                ></div>
-              </div>
-              <div class="d-flex justify-content-between text-secondary small">
-                <span>{{ formatBytes(disk.used_bytes) }} utilises</span>
-                <span>{{ disk.used_percent?.toFixed(1) }}%</span>
-                <span>{{ formatBytes(disk.total_bytes) }} total</span>
-              </div>
-            </div>
+            <div v-else class="h-100 d-flex align-items-center justify-content-center text-secondary">Aucune donnée</div>
           </div>
         </div>
       </div>
@@ -222,7 +192,7 @@
               <th>Nom</th>
               <th>Image</th>
               <th>Tag</th>
-              <th>Etat</th>
+              <th>État</th>
               <th>Status</th>
               <th>Ports</th>
             </tr>
@@ -234,7 +204,7 @@
               <td><code>{{ c.image_tag }}</code></td>
               <td>
                 <span :class="c.state === 'running' ? 'badge bg-green-lt text-green' : 'badge bg-secondary-lt text-secondary'">
-                  {{ c.state }}
+                  {{ { running: 'En cours', exited: 'Arrêté', paused: 'En pause', created: 'Créé', restarting: 'Redémarrage', dead: 'Mort' }[c.state] || c.state }}
                 </span>
               </td>
               <td class="text-secondary small">{{ c.status }}</td>
@@ -297,45 +267,58 @@
       </div>
     </div>
 
-    <div v-if="aptHistory.length" class="card mt-4">
+    <div v-if="combinedHistoryTotal > 0" class="card mt-4">
       <div class="card-header">
-        <h3 class="card-title">Historique APT</h3>
+        <h3 class="card-title">Historique de commandes</h3>
+        <div class="card-options">
+          <span class="badge bg-secondary-lt text-secondary">{{ combinedHistoryTotal }}</span>
+        </div>
       </div>
       <div class="table-responsive">
         <table class="table table-vcenter card-table">
           <thead>
             <tr>
               <th>Date</th>
+              <th>Type</th>
               <th>Commande</th>
               <th>Statut</th>
               <th>Utilisateur</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="cmd in displayedAptHistory" :key="cmd.id">
-              <td>{{ formatDate(cmd.created_at) }}</td>
-              <td><code>apt {{ cmd.command }}</code></td>
+            <tr v-for="cmd in combinedHistory" :key="`${cmd._type}-${cmd.id}`">
+              <td class="text-secondary small">{{ formatDate(cmd.created_at) }}</td>
               <td>
-                <span :class="statusClass(cmd.status)">{{ cmd.status }}</span>
+                <span v-if="cmd._type === 'apt'" class="badge bg-blue-lt text-blue">APT</span>
+                <span v-else-if="cmd._type === 'journal'" class="badge bg-purple-lt text-purple">Journal</span>
+                <span v-else class="badge bg-cyan-lt text-cyan">Docker</span>
               </td>
               <td>
-                <div class="d-flex align-items-center justify-content-between">
-                  <span>{{ cmd.triggered_by || '-' }}</span>
-                  <button
-                    @click="watchCommand(cmd)"
-                    class="btn btn-sm btn-outline-primary ms-2"
-                  >
-                    Voir les logs
-                  </button>
-                </div>
+                <code v-if="cmd._type === 'apt'">apt {{ cmd.command }}</code>
+                <code v-else-if="cmd._type === 'journal'">journalctl -u {{ cmd.container_name }}</code>
+                <code v-else>{{ cmd.action }} {{ cmd.container_name }}</code>
+              </td>
+              <td><span :class="statusClass(cmd.status)">{{ cmd.status }}</span></td>
+              <td class="text-secondary small">{{ cmd.triggered_by || '-' }}</td>
+              <td>
+                <button
+                  @click="watchCommand(cmd, cmd._type === 'apt' ? 'apt' : 'docker')"
+                  class="btn btn-sm btn-ghost-secondary"
+                  title="Voir les logs"
+                >
+                  <svg class="icon" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                  </svg>
+                </button>
               </td>
             </tr>
           </tbody>
         </table>
       </div>
-      <div v-if="aptHistory.length > 3 && !showFullAptHistory" class="card-footer text-center">
-        <button @click="showFullAptHistory = true" class="btn btn-outline-primary btn-sm">
-          Afficher plus ({{ aptHistory.length - 3 }} autres)
+      <div v-if="combinedHistoryTotal > 5 && !showFullAptHistory" class="card-footer text-center">
+        <button @click="showFullAptHistory = true" class="btn btn-outline-secondary btn-sm">
+          Afficher tout ({{ combinedHistoryTotal - 5 }} autres)
         </button>
       </div>
     </div>
@@ -604,6 +587,15 @@ const { wsStatus, wsError, retryCount, reconnect } = useWebSocket(`/api/v1/ws/ho
   auditLogs.value = payload.audit_logs || []
 }, { debounceMs: 200 })
 
+async function loadDockerHistory() {
+  try {
+    const res = await apiClient.getDockerHistory(hostId)
+    dockerHistory.value = res.data?.commands || []
+  } catch {
+    dockerHistory.value = []
+  }
+}
+
 async function loadHistory(hours) {
   chartHours.value = hours
   try {
@@ -792,12 +784,16 @@ function cpuColor(pct) {
   return 'text-green'
 }
 
-const displayedAptHistory = computed(() => {
-  if (showFullAptHistory.value) {
-    return aptHistory.value
-  }
-  return aptHistory.value.slice(0, 3)
+const dockerHistory = ref([])
+
+const combinedHistory = computed(() => {
+  const apt = aptHistory.value.map(c => ({ ...c, _type: 'apt' }))
+  const docker = dockerHistory.value.map(c => ({ ...c, _type: c.action === 'journalctl' ? 'journal' : 'docker' }))
+  const all = [...apt, ...docker].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+  return showFullAptHistory.value ? all : all.slice(0, 5)
 })
+
+const combinedHistoryTotal = computed(() => aptHistory.value.length + dockerHistory.value.length)
 
 function memColor(pct) {
   if (!pct) return 'text-secondary'
@@ -885,6 +881,9 @@ async function loadJournalLogs() {
           nextTick(() => scrollToBottom())
         } else if (payload.type === 'apt_status_update') {
           liveCommand.value.status = payload.status
+          if (payload.status === 'completed' || payload.status === 'failed') {
+            journalLoading.value = false
+          }
         }
       } catch (e) { /* ignore */ }
     }
@@ -895,16 +894,26 @@ async function loadJournalLogs() {
   }
 }
 
-function watchCommand(cmd) {
+function watchCommand(cmd, cmdType = 'apt') {
+  let displayCommand
+  let prefix = ''
+  if (cmdType === 'apt') {
+    prefix = 'apt '
+    displayCommand = cmd.command
+  } else if (cmd.action === 'journalctl') {
+    displayCommand = `journalctl -u ${cmd.container_name}`
+  } else {
+    displayCommand = `${cmd.action} ${cmd.container_name}`
+  }
   liveCommand.value = {
     id: cmd.id,
-    prefix: 'apt ',
-    command: cmd.command,
+    prefix,
+    command: displayCommand,
     status: cmd.status,
     output: cmd.output || '',
   }
-  showConsole.value = true // Auto-show console si masquée
-  connectStreamWebSocket(cmd.id)
+  showConsole.value = true
+  connectStreamWebSocket(cmd.id, cmdType === 'docker' ? 'docker' : '')
   nextTick(() => scrollToBottom())
 }
 
@@ -925,12 +934,14 @@ function scrollToBottom() {
   }
 }
 
-function connectStreamWebSocket(commandId) {
+function connectStreamWebSocket(commandId, cmdType = '') {
   if (streamWs) {
     streamWs.close()
   }
   const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
-  const wsUrl = `${protocol}://${window.location.host}/api/v1/ws/apt/stream/${commandId}`
+  const wsUrl = cmdType
+    ? `${protocol}://${window.location.host}/api/v1/ws/apt/stream/${commandId}?cmd_type=${cmdType}`
+    : `${protocol}://${window.location.host}/api/v1/ws/apt/stream/${commandId}`
   streamWs = new WebSocket(wsUrl)
 
   streamWs.onopen = () => {
@@ -983,6 +994,7 @@ async function deleteHost() {
 
 onMounted(() => {
   fetchLatestAgentVersion()
+  loadDockerHistory()
   // Wait for auth to be properly initialized before loading data
   if (auth.token) {
     loadHistory(24)
