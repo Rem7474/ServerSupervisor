@@ -143,6 +143,10 @@
                     <th>Chemin</th>
                     <th>Port interne</th>
                     <th>Host</th>
+                    <th>Proxy</th>
+                    <th>Authelia</th>
+                    <th>Internet</th>
+                    <th>Port ext.</th>
                     <th></th>
                   </tr>
                 </thead>
@@ -160,12 +164,49 @@
                         </option>
                       </select>
                     </td>
+                    <td>
+                      <label class="form-check form-switch">
+                        <input
+                          v-model="service.linkToProxy"
+                          class="form-check-input"
+                          type="checkbox"
+                        />
+                      </label>
+                    </td>
+                    <td>
+                      <label class="form-check form-switch">
+                        <input
+                          v-model="service.linkToAuthelia"
+                          class="form-check-input"
+                          type="checkbox"
+                        />
+                      </label>
+                    </td>
+                    <td>
+                      <label class="form-check form-switch">
+                        <input
+                          v-model="service.exposedToInternet"
+                          class="form-check-input"
+                          type="checkbox"
+                        />
+                      </label>
+                    </td>
+                    <td>
+                      <input
+                        v-model.number="service.externalPort"
+                        type="number"
+                        class="form-control form-control-sm"
+                        placeholder="443"
+                        :disabled="!service.exposedToInternet"
+                        style="width: 70px;"
+                      />
+                    </td>
                     <td class="text-end">
                       <button class="btn btn-sm btn-outline-danger" @click="removeServiceRow(service.id)">Supprimer</button>
                     </td>
                   </tr>
                   <tr v-if="networkServices.length === 0">
-                    <td colspan="8" class="text-secondary text-center py-3">Aucun service configure</td>
+                    <td colspan="10" class="text-secondary text-center py-3">Aucun service configure</td>
                   </tr>
                 </tbody>
               </table>
@@ -1053,7 +1094,10 @@ function addServiceRow() {
     internalPort: null,
     externalPort: null,
     hostId: '',
-    tags: ''
+    tags: '',
+    linkToProxy: false,
+    linkToAuthelia: false,
+    exposedToInternet: false
   })
 }
 

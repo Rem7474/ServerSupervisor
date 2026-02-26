@@ -178,10 +178,10 @@ const hierarchyRoot = computed(() => {
         protocol: 'tcp',
         port: internalPort,
         tags: service.tags || '',
-        isProxyLinked: true,
-        isAutheliaLinked: autheliaPortNumbers.has(Number(internalPort)),
-        isInternetExposed: internalPort in internetExposedPorts,
-        externalPort: internetExposedPorts[internalPort] || null,
+        isProxyLinked: service.linkToProxy || false,
+        isAutheliaLinked: service.linkToAuthelia || autheliaPortNumbers.has(Number(internalPort)),
+        isInternetExposed: service.exposedToInternet || (internalPort in internetExposedPorts),
+        externalPort: service.externalPort || internetExposedPorts[internalPort] || null,
         ...hostMeta
       })
     }
@@ -617,13 +617,12 @@ const render = () => {
   const internetTargets = treeData.descendants().filter(
     d => (d.data.type === 'service' || d.data.type === 'port') && d.data.isInternetExposed
   )
-  const hasInternet = props.internetLabel && internetTargets.length > 0
 
-  if (hasInternet && rootNode) {
+  if (props.internetLabel && rootNode) {
     const rootSvgX = rootNode.y + 100
     const rootSvgY = rootNode.x + 40
-    const intX = rootSvgX
-    const intY = rootSvgY + (hasAuthelia ? 120 : 120)
+    const intX = rootSvgX - 260
+    const intY = rootSvgY
 
     // Draw Internet node (orange rounded rect)
     const intNode = specialNodeGroup.append('g')
@@ -647,17 +646,17 @@ const render = () => {
         .text(props.internetIp)
     }
 
-    // Draw arcs: root → Internet (dotted orange) and Internet → targets (dotted orange)
+    // Draw arc: Internet → root (dotted orange)
     internetLinkGroup.append('path')
       .attr('fill', 'none')
       .attr('stroke', 'rgba(251, 146, 60, 0.5)')
       .attr('stroke-width', 1.5)
       .attr('stroke-dasharray', '5 4')
       .attr('d', () => {
-        const sx = rootNode.y + 100 + 120
-        const sy = rootNode.x + 40
-        const ex = intX - 100
-        const ey = intY
+        const sx = intX + 100  // right edge of internet
+        const sy = intY
+        const ex = rootSvgX - 120  // left edge of root
+        const ey = rootSvgY
         const mx = (sx + ex) / 2
         return `M${sx},${sy} C${mx},${sy} ${mx},${ey} ${ex},${ey}`
       })
