@@ -287,7 +287,7 @@ const render = () => {
     const statusColor = statusColors[hostStatus] || statusColors.unknown
 
     const positions = nodes.map(node => ({
-      x: node.y + 100,
+      x: node.y + 60,
       y: node.x + 40
     }))
     const minX = d3.min(positions, pos => pos.x) ?? 0
@@ -318,12 +318,12 @@ const render = () => {
         tooltipRef.value.innerHTML = lines.map(l => `<div>${escapeHtml(l)}</div>`).join('')
         tooltipRef.value.style.display = 'block'
         tooltipRef.value.style.left = `${event.pageX + 8}px`
-        tooltipRef.value.style.top = `${event.pageY - 16}px`
+        tooltipRef.value.style.top = `${event.pageY - 48}px`
       })
       .on('mousemove', (event) => {
         if (!tooltipRef.value || tooltipRef.value.style.display !== 'block') return
         tooltipRef.value.style.left = `${event.pageX + 8}px`
-        tooltipRef.value.style.top = `${event.pageY - 16}px`
+        tooltipRef.value.style.top = `${event.pageY - 48}px`
       })
       .on('mouseout', () => {
         if (tooltipRef.value) tooltipRef.value.style.display = 'none'
@@ -619,9 +619,9 @@ const render = () => {
   )
 
   if (props.internetLabel && rootNode) {
-    const rootSvgX = rootNode.y + 100
+    const rootSvgX = rootNode.y + 60
     const rootSvgY = rootNode.x + 40
-    const intX = rootSvgX - 260
+    const intX = rootSvgX - 120
     const intY = rootSvgY
 
     // Draw Internet node (orange rounded rect)
