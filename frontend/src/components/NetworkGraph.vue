@@ -317,13 +317,13 @@ const render = () => {
         ].filter(Boolean)
         tooltipRef.value.innerHTML = lines.map(l => `<div>${escapeHtml(l)}</div>`).join('')
         tooltipRef.value.style.display = 'block'
-        tooltipRef.value.style.left = `${event.pageX + 12}px`
-        tooltipRef.value.style.top = `${event.pageY + 12}px`
+        tooltipRef.value.style.left = `${event.pageX + 8}px`
+        tooltipRef.value.style.top = `${event.pageY - 16}px`
       })
       .on('mousemove', (event) => {
         if (!tooltipRef.value || tooltipRef.value.style.display !== 'block') return
-        tooltipRef.value.style.left = `${event.pageX + 12}px`
-        tooltipRef.value.style.top = `${event.pageY + 12}px`
+        tooltipRef.value.style.left = `${event.pageX + 8}px`
+        tooltipRef.value.style.top = `${event.pageY - 16}px`
       })
       .on('mouseout', () => {
         if (tooltipRef.value) tooltipRef.value.style.display = 'none'
