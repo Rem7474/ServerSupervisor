@@ -266,8 +266,8 @@ const render = () => {
   const nodeGroup = g.append('g').attr('class', 'nodes')
   const specialNodeGroup = g.append('g').attr('class', 'special-nodes')
 
-  // Centrage du proxy (root)
-  const centerX = width / 2;
+  // Centrage du proxy (root) avec marge pour Internet
+  const centerX = width * 0.55;
 
   // Tous les nœuds feuilles (hiérarchie plate : root → service/port)
   const allLeafNodes = treeData.descendants().filter(
@@ -624,7 +624,7 @@ const render = () => {
   if (props.internetLabel && rootNode) {
     const rootSvgX = rootNode.y + centerX
     const rootSvgY = rootNode.x + 40
-    const intX = rootSvgX - 180
+    const intX = rootSvgX - 320
     const intY = rootSvgY
 
     // Draw Internet node (orange rounded rect)
