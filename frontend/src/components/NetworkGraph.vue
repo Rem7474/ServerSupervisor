@@ -266,8 +266,8 @@ const render = () => {
   const nodeGroup = g.append('g').attr('class', 'nodes')
   const specialNodeGroup = g.append('g').attr('class', 'special-nodes')
 
-  // Centrage du proxy (root) avec marge pour Internet
-  const centerX = width * 0.55;
+  // CORRECTIF 1 : Centrage du proxy (root) au centre exact du SVG
+  const centerX = width / 2;
 
   // Tous les nœuds feuilles (hiérarchie plate : root → service/port)
   const allLeafNodes = treeData.descendants().filter(
@@ -289,8 +289,9 @@ const render = () => {
     const hostIp = hostInfo.ip
     const statusColor = statusColors[hostStatus] || statusColors.unknown
 
+    // CORRECTIF 2 : Positionnement des clusters avec offset fixe 100 (pas centerX)
     const positions = nodes.map(node => ({
-      x: node.y + centerX,
+      x: node.y + 100,
       y: node.x + 40
     }))
     const minX = d3.min(positions, pos => pos.x) ?? 0
@@ -379,10 +380,8 @@ const render = () => {
     }
   }
 
-  // Draw tree links only when proxy links are enabled
-  // Proxy links: draw from root to all visible leaf nodes (always shown, protocol-colored)
-  // NOTE: all SVG styles are set via .attr()/.style() rather than CSS classes because
-  // Vue's <style scoped> does not apply to D3-created elements (they lack the data-v-* attr).
+  // Proxy links : arcs du root vers les services/ports avec isProxyLinked
+  // CORRECTIF 4 : startX utilise centerX pour partir du bord droit du nœud root centré
   linkGroup
     .selectAll('path')
     .data(treeData.links().filter(d => d.target.data.isProxyLinked))
@@ -390,11 +389,11 @@ const render = () => {
     .append('path')
     .attr('fill', 'none')
     .attr('d', (d) => {
-      const startX = d.source.y + 100 + 120
-      const startY = d.source.x + 40
-      const targetLeftOffset = d.target.data.type === 'service' ? -130 : -90
-      const endX = d.target.y + 100 + targetLeftOffset
-      const endY = d.target.x + 40
+      const startX = centerX + 120;
+      const startY = d.source.x + 40;
+      const targetLeftOffset = d.target.data.type === 'service' ? -130 : -90;
+      const endX = d.target.y + 100 + targetLeftOffset;
+      const endY = d.target.x + 40;
       const midX = (startX + endX) / 2
       return `M${startX},${startY} C${midX},${startY} ${midX},${endY} ${endX},${endY}`
     })
@@ -405,13 +404,19 @@ const render = () => {
     .attr('stroke-width', 1.4)
     .attr('opacity', 0.65)
 
+  // CORRECTIF 5 : Nœud root centré sur centerX, les autres sur d.y + 100
   const nodes = nodeGroup
     .selectAll('g')
     .data(treeData.descendants())
     .enter()
     .append('g')
     .attr('class', d => `node ${d.data.type}`)
-    .attr('transform', d => `translate(${d.y + 100},${d.x + 40})`)
+    .attr('transform', d => {
+      if (d.data.type === 'root') {
+        return `translate(${centerX},${d.x + 40})`;
+      }
+      return `translate(${d.y + 100},${d.x + 40})`;
+    })
     .style('cursor', 'default')
 
   const rootNodes = nodes.filter(d => d.data.type === 'root')
@@ -556,7 +561,7 @@ const render = () => {
 
   if (hasAuthelia && rootNode) {
     // Position Authelia node above the root node
-    const rootSvgX = rootNode.y + 100
+    const rootSvgX = centerX
     const rootSvgY = rootNode.x + 40
     const authX = rootSvgX
     const authY = rootSvgY - 120
@@ -583,7 +588,7 @@ const render = () => {
         .text(props.autheliaIp)
     }
 
-    // Draw arcs: root → Authelia (dotted cyan) and Authelia → targets (dotted purple)
+    // Draw arcs: root → Authelia (dotted purple) and Authelia → targets (dotted purple)
     autheliaLinkGroup.append('path')
       .attr('fill', 'none')
       .attr('stroke', 'rgba(139, 92, 246, 0.5)')
@@ -622,10 +627,11 @@ const render = () => {
   )
 
   if (props.internetLabel && rootNode) {
-    const rootSvgX = rootNode.y + centerX
-    const rootSvgY = rootNode.x + 40
-    const intX = rootSvgX - 320
-    const intY = rootSvgY
+    // CORRECTIF 3 : Positionnement Internet basé sur centerX, pas sur rootNode.y
+    const rootSvgX = centerX;
+    const rootSvgY = rootNode.x + 40;
+    const intX = centerX - 260;
+    const intY = rootSvgY;
 
     // Draw Internet node (orange rounded rect)
     const intNode = specialNodeGroup.append('g')
