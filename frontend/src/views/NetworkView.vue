@@ -458,7 +458,7 @@
             <div class="col-md-6 col-lg-3">
               <label class="form-check form-switch">
                 <input v-model="onlyPublished" class="form-check-input" type="checkbox" />
-                <span class="form-check-label">Ports publies seulement</span>
+                <span class="form-check-label">Ports publiés seulement</span>
               </label>
             </div>
           </div>
@@ -470,14 +470,15 @@
           <table class="table table-vcenter card-table">
             <thead>
               <tr>
-                <th>Hote</th>
+                <th>Hôte</th>
                 <th>Conteneur</th>
                 <th>Image</th>
-                <th>Port hote</th>
+                <th>Port hôte</th>
                 <th>Port conteneur</th>
                 <th>Proto</th>
-                <th>Bind</th>
-                <th>Etat</th>
+                <th>IPv4</th>
+                <th>IPv6</th>
+                <th>État</th>
               </tr>
             </thead>
             <tbody>
@@ -495,10 +496,17 @@
                 <td class="fw-semibold">{{ row.host_port || '-' }}</td>
                 <td class="text-secondary">{{ row.container_port || '-' }}</td>
                 <td class="text-secondary text-uppercase">{{ row.protocol || '-' }}</td>
-                <td class="text-secondary small font-monospace">{{ row.host_ip || '-' }}</td>
+                <td class="text-secondary small font-monospace">
+                  <span v-if="row.ipv4" class="badge bg-blue-lt text-blue">{{ row.ipv4 }}</span>
+                  <span v-else class="text-muted">—</span>
+                </td>
+                <td class="text-secondary small font-monospace">
+                  <span v-if="row.ipv6" class="badge bg-purple-lt text-purple">{{ row.ipv6 }}</span>
+                  <span v-else class="text-muted">—</span>
+                </td>
                 <td>
                   <span :class="row.state === 'running' ? 'badge bg-green-lt text-green' : 'badge bg-secondary-lt text-secondary'">
-                    {{ row.state || 'unknown' }}
+                    {{ { running: 'En cours', exited: 'Arrêté', paused: 'En pause', created: 'Créé', restarting: 'Redémarrage', dead: 'Mort' }[row.state] || row.state || 'inconnu' }}
                   </span>
                 </td>
               </tr>
@@ -512,7 +520,7 @@
 
       <div class="card">
         <div class="card-header">
-          <h3 class="card-title">Trafic par hote</h3>
+          <h3 class="card-title">Trafic par hôte</h3>
         </div>
         <div class="table-responsive">
           <table class="table table-vcenter card-table">
@@ -728,7 +736,8 @@ const hostPortOverrides = computed(() => {
 })
 
 const portRows = computed(() => {
-  const rows = []
+  const grouped = new Map()
+
   for (const container of containers.value) {
     const mappings = container.port_mappings || []
     for (const mapping of mappings) {
@@ -736,22 +745,37 @@ const portRows = computed(() => {
       const isPublished = hostPort > 0
       if (onlyPublished.value && !isPublished) continue
 
-      rows.push({
-        key: `${container.id}-${mapping.raw}`,
-        host_id: container.host_id,
-        host_name: container.hostname,
-        container_name: container.name,
-        image: container.image,
-        image_tag: container.image_tag,
-        state: container.state,
-        host_port: hostPort,
-        container_port: mapping.container_port,
-        protocol: mapping.protocol,
-        host_ip: mapping.host_ip,
-        raw: mapping.raw,
-      })
+      const groupKey = `${container.id}-${hostPort}-${mapping.container_port}-${mapping.protocol}`
+
+      if (!grouped.has(groupKey)) {
+        grouped.set(groupKey, {
+          key: groupKey,
+          host_id: container.host_id,
+          host_name: container.hostname,
+          container_name: container.name,
+          image: container.image,
+          image_tag: container.image_tag,
+          state: container.state,
+          host_port: hostPort,
+          container_port: mapping.container_port,
+          protocol: mapping.protocol,
+          ipv4: null,
+          ipv6: null,
+        })
+      }
+
+      const row = grouped.get(groupKey)
+      const ip = mapping.host_ip || ''
+      // IPv6: contains colon (e.g. "::", "::1", "fe80::1")
+      if (ip.includes(':')) {
+        row.ipv6 = ip
+      } else {
+        row.ipv4 = ip || '0.0.0.0'
+      }
     }
   }
+
+  const rows = [...grouped.values()]
 
   const query = search.value.trim().toLowerCase()
   return rows.filter((row) => {
@@ -766,7 +790,8 @@ const portRows = computed(() => {
       String(row.host_port || '').includes(query) ||
       String(row.container_port || '').includes(query) ||
       row.protocol?.toLowerCase().includes(query) ||
-      row.host_ip?.toLowerCase().includes(query)
+      (row.ipv4 || '').includes(query) ||
+      (row.ipv6 || '').includes(query)
 
     return matchHost && matchProto && matchSearch
   })
