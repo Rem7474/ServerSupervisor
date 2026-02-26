@@ -382,7 +382,7 @@ const render = () => {
   // Vue's <style scoped> does not apply to D3-created elements (they lack the data-v-* attr).
   linkGroup
     .selectAll('path')
-    .data(treeData.links())
+    .data(treeData.links().filter(d => d.target.data.isProxyLinked))
     .enter()
     .append('path')
     .attr('fill', 'none')
