@@ -80,7 +80,7 @@
             <span v-else-if="saveStatus === 'error'" class="text-danger small">✗ Erreur</span>
           </div>
           <div class="text-secondary small">
-            {{ hosts.length }} hotes • {{ totalPorts }} ports publies
+            {{ hosts.length }} hôtes • {{ totalPorts }} ports publiés
           </div>
         </div>
       </div>
@@ -171,19 +171,32 @@
               </table>
             </div>
           </div>
-          <!-- Options du graphe (toggle showProxyLinks) -->
+          <!-- Authelia node configuration -->
           <div class="network-config-item mt-3">
-            <label class="form-label">Options du graphe</label>
-            <div class="d-flex flex-column gap-2">
-              <label class="form-check">
-                <input v-model="showProxyLinks" class="form-check-input" type="checkbox" />
-                <span class="form-check-label">
-                  Afficher les connexions proxy (arcs pointillés)
-                </span>
-                <div class="text-secondary small mt-1">
-                  Dessine un arc du nœud racine vers chaque service lié au proxy.
-                </div>
-              </label>
+            <label class="form-label">Nœud Authelia (optionnel)</label>
+            <div class="network-config-row">
+              <div>
+                <input v-model="autheliaLabel" type="text" class="form-control form-control-sm" placeholder="Ex: Authelia" />
+                <div class="text-secondary small mt-1">Label affiché dans le graphe</div>
+              </div>
+              <div>
+                <input v-model="autheliaIp" type="text" class="form-control form-control-sm" placeholder="Ex: 192.168.1.11" />
+                <div class="text-secondary small mt-1">IP / domaine Authelia</div>
+              </div>
+            </div>
+          </div>
+          <!-- Internet/Router node configuration -->
+          <div class="network-config-item mt-3">
+            <label class="form-label">Nœud Internet / Routeur (optionnel)</label>
+            <div class="network-config-row">
+              <div>
+                <input v-model="internetLabel" type="text" class="form-control form-control-sm" placeholder="Ex: Internet" />
+                <div class="text-secondary small mt-1">Label affiché dans le graphe</div>
+              </div>
+              <div>
+                <input v-model="internetIp" type="text" class="form-control form-control-sm" placeholder="Ex: 1.2.3.4" />
+                <div class="text-secondary small mt-1">IP publique / domaine</div>
+              </div>
             </div>
           </div>
 
@@ -202,7 +215,13 @@
                       {{ countEnabled(host.id) }} / {{ (discoveredPortsByHost[host.id] || []).length }} ports affichés
                     </span>
                     <span v-if="countProxyLinked(host.id) > 0" class="badge bg-cyan-lt text-cyan text-xs">
-                      {{ countProxyLinked(host.id) }} liés au proxy
+                      {{ countProxyLinked(host.id) }} proxy
+                    </span>
+                    <span v-if="countAutheliaLinked(host.id) > 0" class="badge bg-purple-lt text-purple text-xs">
+                      {{ countAutheliaLinked(host.id) }} Authelia
+                    </span>
+                    <span v-if="countInternetExposed(host.id) > 0" class="badge bg-orange-lt text-orange text-xs">
+                      {{ countInternetExposed(host.id) }} Internet
                     </span>
                   </div>
                 </div>
@@ -210,13 +229,16 @@
                   <table class="table table-sm table-vcenter">
                     <thead>
                       <tr>
-                        <th>Port interne</th>
+                        <th>Port</th>
                         <th>Proto</th>
                         <th>Nom</th>
                         <th>Domaine</th>
                         <th>Chemin</th>
                         <th>Afficher</th>
-                        <th>Lier proxy</th>
+                        <th>Proxy</th>
+                        <th>Authelia</th>
+                        <th>Internet</th>
+                        <th>Port ext.</th>
                         <th></th>
                       </tr>
                     </thead>
@@ -249,28 +271,47 @@
                               type="checkbox"
                               @change="onEnabledChange(host.id, port.port, $event)"
                             />
-                            <span class="form-check-label">Afficher</span>
                           </label>
                         </td>
                         <td>
-                          <label
-                            class="form-check form-switch"
-                            :title="getPortProxyTooltip(host.id, port.port)"
-                          >
+                          <label class="form-check form-switch" :title="getPortProxyTooltip(host.id, port.port)">
                             <input
-                              :id="`port-proxy-${host.id}-${port.port}`"
                               v-model="getPortSetting(host.id, port.port).linkToProxy"
                               class="form-check-input"
                               type="checkbox"
                               :disabled="!getPortSetting(host.id, port.port).enabled"
                             />
-                            <span
-                              class="form-check-label"
-                              :class="{ 'text-secondary': !getPortSetting(host.id, port.port).enabled }"
-                            >
-                              Proxy
-                            </span>
                           </label>
+                        </td>
+                        <td>
+                          <label class="form-check form-switch">
+                            <input
+                              v-model="getPortSetting(host.id, port.port).linkToAuthelia"
+                              class="form-check-input"
+                              type="checkbox"
+                              :disabled="!getPortSetting(host.id, port.port).enabled"
+                            />
+                          </label>
+                        </td>
+                        <td>
+                          <label class="form-check form-switch">
+                            <input
+                              v-model="getPortSetting(host.id, port.port).exposedToInternet"
+                              class="form-check-input"
+                              type="checkbox"
+                              :disabled="!getPortSetting(host.id, port.port).enabled"
+                            />
+                          </label>
+                        </td>
+                        <td>
+                          <input
+                            v-model.number="getPortSetting(host.id, port.port).externalPort"
+                            type="number"
+                            class="form-control form-control-sm"
+                            placeholder="443"
+                            :disabled="!getPortSetting(host.id, port.port).exposedToInternet"
+                            style="width: 70px;"
+                          />
                         </td>
                         <td class="text-end">
                           <button
@@ -425,7 +466,10 @@
             :excluded-ports="excludedPorts"
             :services="combinedServices"
             :host-port-overrides="hostPortOverrides"
-            :show-proxy-links="showProxyLinks"
+            :authelia-label="autheliaLabel"
+            :authelia-ip="autheliaIp"
+            :internet-label="internetLabel"
+            :internet-ip="internetIp"
             @host-click="handleHostClick"
           />
         </div>
@@ -580,7 +624,10 @@ const viewMode = ref(localStorage.getItem('networkViewMode') || 'cards')
 const networkTab = ref('topology')
 const rootNodeName = ref('Infrastructure')
 const rootNodeIp = ref('')
-const showProxyLinks = ref(true)
+const autheliaLabel = ref('Authelia')
+const autheliaIp = ref('')
+const internetLabel = ref('Internet')
+const internetIp = ref('')
 const servicePortMapText = ref('')
 const excludedPortsText = ref('')
 const networkServices = ref([])
@@ -610,7 +657,10 @@ const debouncedSave = () => {
 // Watch for changes and trigger save
 watch(rootNodeName, () => debouncedSave())
 watch(rootNodeIp, () => debouncedSave())
-watch(showProxyLinks, () => debouncedSave())
+watch(autheliaLabel, () => debouncedSave())
+watch(autheliaIp, () => debouncedSave())
+watch(internetLabel, () => debouncedSave())
+watch(internetIp, () => debouncedSave())
 watch(servicePortMapText, () => debouncedSave())
 watch(excludedPortsText, () => debouncedSave())
 watch(networkServices, () => debouncedSave(), { deep: true })
@@ -624,7 +674,10 @@ async function loadTopologyConfig() {
       const cfg = res.data
       rootNodeName.value = cfg.root_label || 'Infrastructure'
       rootNodeIp.value = cfg.root_ip || ''
-      showProxyLinks.value = cfg.show_proxy_links !== false
+      autheliaLabel.value = cfg.authelia_label || 'Authelia'
+      autheliaIp.value = cfg.authelia_ip || ''
+      internetLabel.value = cfg.internet_label || 'Internet'
+      internetIp.value = cfg.internet_ip || ''
       networkServices.value = cfg.manual_services ? JSON.parse(cfg.manual_services) : []
       servicePortMapText.value = cfg.service_map && cfg.service_map !== '{}' ? cfg.service_map : ''
       excludedPortsText.value = (cfg.excluded_ports || []).join(', ')
@@ -653,9 +706,12 @@ async function saveTopologyConfig() {
       root_ip: rootNodeIp.value,
       excluded_ports: excludedPorts.value,
       service_map: servicePortMapText.value || '{}',
-      show_proxy_links: showProxyLinks.value,
       host_overrides: JSON.stringify(hostPortConfig.value),
-      manual_services: JSON.stringify(networkServices.value)
+      manual_services: JSON.stringify(networkServices.value),
+      authelia_label: autheliaLabel.value || 'Authelia',
+      authelia_ip: autheliaIp.value || '',
+      internet_label: internetLabel.value || 'Internet',
+      internet_ip: internetIp.value || '',
     }
     await apiClient.saveTopologyConfig(config)
     saveStatus.value = 'saved'
@@ -724,13 +780,17 @@ const hostPortOverrides = computed(() => {
     const excludedPortsList = []
     const portMap = {}
     const proxyPorts = new Set()
+    const autheliaPortNumbers = new Set()
+    const internetExposedPorts = {}
     for (const [port, settings] of Object.entries(entry.ports || {})) {
       const portNumber = Number(port)
       if (!settings?.enabled) excludedPortsList.push(portNumber)
       if (settings?.name) portMap[portNumber] = settings.name
       if (settings?.linkToProxy && settings?.enabled) proxyPorts.add(portNumber)
+      if (settings?.linkToAuthelia && settings?.enabled) autheliaPortNumbers.add(portNumber)
+      if (settings?.exposedToInternet && settings?.enabled) internetExposedPorts[portNumber] = settings?.externalPort || null
     }
-    overrides[entry.hostId] = { excludedPorts: excludedPortsList, portMap, proxyPorts }
+    overrides[entry.hostId] = { excludedPorts: excludedPortsList, portMap, proxyPorts, autheliaPortNumbers, internetExposedPorts }
   }
   return overrides
 })
@@ -891,9 +951,10 @@ function formatBytes(bytes) {
 
 function onEnabledChange(hostId, portNumber, event) {
   const setting = getPortSetting(hostId, portNumber)
-  // Si le port est masqué, forcer linkToProxy à false
   if (!event.target.checked) {
     setting.linkToProxy = false
+    setting.linkToAuthelia = false
+    setting.exposedToInternet = false
   }
 }
 
@@ -918,14 +979,26 @@ function countProxyLinked(hostId) {
   return Object.values(entry.ports || {}).filter(s => s?.linkToProxy && s?.enabled).length
 }
 
+function countAutheliaLinked(hostId) {
+  const entry = hostPortConfig.value.find(e => e.hostId === hostId)
+  if (!entry) return 0
+  return Object.values(entry.ports || {}).filter(s => s?.linkToAuthelia && s?.enabled).length
+}
+
+function countInternetExposed(hostId) {
+  const entry = hostPortConfig.value.find(e => e.hostId === hostId)
+  if (!entry) return 0
+  return Object.values(entry.ports || {}).filter(s => s?.exposedToInternet && s?.enabled).length
+}
+
 function isPortModified(hostId, portNumber) {
   const s = getPortSetting(hostId, portNumber)
-  return s.name !== '' || !s.enabled || s.linkToProxy || s.domain !== '' || (s.path !== '/' && s.path !== '')
+  return s.name !== '' || !s.enabled || s.linkToProxy || s.linkToAuthelia || s.exposedToInternet || s.domain !== '' || (s.path !== '/' && s.path !== '')
 }
 
 function resetPortSetting(hostId, portNumber) {
   const entry = getHostPortEntry(hostId)
-  entry.ports[String(portNumber)] = { name: '', domain: '', path: '/', enabled: true, linkToProxy: false }
+  entry.ports[String(portNumber)] = { name: '', domain: '', path: '/', enabled: true, linkToProxy: false, linkToAuthelia: false, exposedToInternet: false, externalPort: null }
 }
 
 function linkKey(link) {
@@ -940,8 +1013,7 @@ function hostNameById(hostId) {
 function getPortSetting(hostId, portNumber) {
   const entry = getHostPortEntry(hostId)
   const key = String(portNumber)
-  // Return a safe fallback if not yet initialized (ensureHostPortConfig handles init)
-  return entry.ports[key] ?? { name: '', domain: '', path: '/', enabled: true, linkToProxy: false }
+  return entry.ports[key] ?? { name: '', domain: '', path: '/', enabled: true, linkToProxy: false, linkToAuthelia: false, exposedToInternet: false, externalPort: null }
 }
 
 function ensureHostPortConfig() {
@@ -956,7 +1028,7 @@ function ensureHostPortConfig() {
     for (const port of ports) {
       const portKey = String(port.port)
       if (!entry.ports[portKey]) {
-        entry.ports[portKey] = { name: '', domain: '', path: '/', enabled: true, linkToProxy: false }
+        entry.ports[portKey] = { name: '', domain: '', path: '/', enabled: true, linkToProxy: false, linkToAuthelia: false, exposedToInternet: false, externalPort: null }
       }
     }
   }

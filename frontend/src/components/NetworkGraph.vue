@@ -26,6 +26,14 @@
         <span class="legend-dot port-udp"></span>
         Port UDP
       </div>
+      <div v-if="autheliaLabel" class="legend-item">
+        <span style="display:inline-block; width:18px; height:3px; background:#8b5cf6; border-radius:2px; flex-shrink:0;"></span>
+        {{ autheliaLabel }}
+      </div>
+      <div v-if="internetLabel" class="legend-item">
+        <span style="display:inline-block; width:18px; height:3px; background:#fb923c; border-radius:2px; flex-shrink:0;"></span>
+        {{ internetLabel }}
+      </div>
     </div>
     <div v-if="!hasData" class="graph-empty">
       <div class="empty-title">Aucune topologie disponible</div>
@@ -69,9 +77,21 @@ const props = defineProps({
     type: Object,
     default: () => ({})
   },
-  showProxyLinks: {
-    type: Boolean,
-    default: true
+  autheliaLabel: {
+    type: String,
+    default: 'Authelia'
+  },
+  autheliaIp: {
+    type: String,
+    default: ''
+  },
+  internetLabel: {
+    type: String,
+    default: 'Internet'
+  },
+  internetIp: {
+    type: String,
+    default: ''
   }
 })
 
@@ -80,6 +100,16 @@ const emit = defineEmits(['host-click'])
 const svgRef = ref(null)
 const tooltipRef = ref(null)
 const hasData = computed(() => Array.isArray(props.data) && props.data.length > 0)
+
+function escapeHtml(str) {
+  if (str == null) return ''
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
 const statusColors = {
   online: '#22c55e',
   warning: '#f59e0b',
@@ -113,6 +143,8 @@ const hierarchyRoot = computed(() => {
     ].map(value => Number(value)).filter(Boolean))
     const hostPortMap = hostOverride?.portMap || {}
     const proxyPorts = hostOverride?.proxyPorts || new Set()
+    const autheliaPortNumbers = hostOverride?.autheliaPortNumbers || new Set()
+    const internetExposedPorts = hostOverride?.internetExposedPorts || {}
     const rawPorts = host.ports || []
     const filteredPorts = rawPorts.filter(port => {
       const portNumber = Number(port.port || 0)
@@ -147,6 +179,9 @@ const hierarchyRoot = computed(() => {
         port: internalPort,
         tags: service.tags || '',
         isProxyLinked: true,
+        isAutheliaLinked: autheliaPortNumbers.has(Number(internalPort)),
+        isInternetExposed: internalPort in internetExposedPorts,
+        externalPort: internetExposedPorts[internalPort] || null,
         ...hostMeta
       })
     }
@@ -168,6 +203,9 @@ const hierarchyRoot = computed(() => {
         port: portNumber,
         containers: port.containers || [],
         isProxyLinked: proxyPorts.has(portNumber),
+        isAutheliaLinked: autheliaPortNumbers.has(portNumber),
+        isInternetExposed: portNumber in internetExposedPorts,
+        externalPort: internetExposedPorts[portNumber] || null,
         ...hostMeta
       })
     }
@@ -222,9 +260,11 @@ const render = () => {
   const treeData = treeLayout(root)
 
   const clusterGroup = g.append('g').attr('class', 'service-clusters')
-  const proxyLinkGroup = g.append('g').attr('class', 'proxy-links')
+  const autheliaLinkGroup = g.append('g').attr('class', 'authelia-links')
+  const internetLinkGroup = g.append('g').attr('class', 'internet-links')
   const linkGroup = g.append('g').attr('class', 'links')
   const nodeGroup = g.append('g').attr('class', 'nodes')
+  const specialNodeGroup = g.append('g').attr('class', 'special-nodes')
 
   // Tous les nœuds feuilles (hiérarchie plate : root → service/port)
   const allLeafNodes = treeData.descendants().filter(
@@ -275,7 +315,7 @@ const render = () => {
           `Statut : ${hostStatus}`,
           `${nodes.length} service(s)`
         ].filter(Boolean)
-        tooltipRef.value.innerHTML = lines.map(l => `<div>${l}</div>`).join('')
+        tooltipRef.value.innerHTML = lines.map(l => `<div>${escapeHtml(l)}</div>`).join('')
         tooltipRef.value.style.display = 'block'
         tooltipRef.value.style.left = `${event.pageX + 12}px`
         tooltipRef.value.style.top = `${event.pageY + 12}px`
@@ -337,34 +377,30 @@ const render = () => {
   }
 
   // Draw tree links only when proxy links are enabled
-  // (all links in this tree go root→service/port, i.e. they are proxy connections)
+  // Proxy links: draw from root to all visible leaf nodes (always shown, protocol-colored)
   // NOTE: all SVG styles are set via .attr()/.style() rather than CSS classes because
   // Vue's <style scoped> does not apply to D3-created elements (they lack the data-v-* attr).
-  if (props.showProxyLinks) {
-    linkGroup
-      .selectAll('path')
-      .data(treeData.links())
-      .enter()
-      .append('path')
-      .attr('fill', 'none')
-      .attr('d', (d) => {
-        // Source is always the root (proxy) node — depart from its RIGHT edge
-        const startX = d.source.y + 100 + 120   // center + half rect width (240/2)
-        const startY = d.source.x + 40
-        // Target — arrive at LEFT edge of the node rect
-        const targetLeftOffset = d.target.data.type === 'service' ? -130 : -90
-        const endX = d.target.y + 100 + targetLeftOffset
-        const endY = d.target.x + 40
-        const midX = (startX + endX) / 2
-        return `M${startX},${startY} C${midX},${startY} ${midX},${endY} ${endX},${endY}`
-      })
-      .attr('stroke', d => {
-        const protocol = d.target.data.protocol
-        return protocolColors[protocol] || protocolColors.other
-      })
-      .attr('stroke-width', 1.4)
-      .attr('opacity', 0.65)
-  }
+  linkGroup
+    .selectAll('path')
+    .data(treeData.links())
+    .enter()
+    .append('path')
+    .attr('fill', 'none')
+    .attr('d', (d) => {
+      const startX = d.source.y + 100 + 120
+      const startY = d.source.x + 40
+      const targetLeftOffset = d.target.data.type === 'service' ? -130 : -90
+      const endX = d.target.y + 100 + targetLeftOffset
+      const endY = d.target.x + 40
+      const midX = (startX + endX) / 2
+      return `M${startX},${startY} C${midX},${startY} ${midX},${endY} ${endX},${endY}`
+    })
+    .attr('stroke', d => {
+      const protocol = d.target.data.protocol
+      return protocolColors[protocol] || protocolColors.other
+    })
+    .attr('stroke-width', 1.4)
+    .attr('opacity', 0.65)
 
   const nodes = nodeGroup
     .selectAll('g')
@@ -428,7 +464,7 @@ const render = () => {
       if (!tooltipRef.value) return
       const lines = [d.data.name, d.data.subtitle, `Interne: ${d.data.internalPort || '-'} / Externe: ${d.data.externalPort || '-'}`]
       if (d.data.tags) lines.push(`Tags: ${d.data.tags}`)
-      tooltipRef.value.innerHTML = lines.map(line => `<div>${line}</div>`).join('')
+      tooltipRef.value.innerHTML = lines.map(line => `<div>${escapeHtml(line)}</div>`).join('')
       tooltipRef.value.style.display = 'block'
       tooltipRef.value.style.left = `${event.pageX + 12}px`
       tooltipRef.value.style.top = `${event.pageY + 12}px`
@@ -486,7 +522,7 @@ const render = () => {
       if (!tooltipRef.value) return
       const lines = [`Port ${d.data.name}`]
       if (d.data.containers?.length) lines.push(`Conteneurs: ${d.data.containers.length}`)
-      tooltipRef.value.innerHTML = lines.map(line => `<div>${line}</div>`).join('')
+      tooltipRef.value.innerHTML = lines.map(line => `<div>${escapeHtml(line)}</div>`).join('')
       tooltipRef.value.style.display = 'block'
       tooltipRef.value.style.left = `${event.pageX + 12}px`
       tooltipRef.value.style.top = `${event.pageY + 12}px`
@@ -508,34 +544,154 @@ const render = () => {
     .style('fill', '#e2e8f0')
     .text(d => d.data.name)
 
-  // Draw dotted proxy-link overlays (emphasis on explicitly proxy-routed services)
-  if (props.showProxyLinks) {
-    const rootNode = treeData.descendants().find(d => d.data.type === 'root')
-    const proxyTargets = treeData.descendants().filter(
-      d => (d.data.type === 'service' || d.data.type === 'port') && d.data.isProxyLinked
-    )
+  // Authelia node + arcs (purple dashed arcs to authelia-linked nodes)
+  const autheliaTargets = treeData.descendants().filter(
+    d => (d.data.type === 'service' || d.data.type === 'port') && d.data.isAutheliaLinked
+  )
+  const hasAuthelia = props.autheliaLabel && autheliaTargets.length > 0
+  const rootNode = treeData.descendants().find(d => d.data.type === 'root')
 
-    if (rootNode && proxyTargets.length > 0) {
-      proxyLinkGroup
-        .selectAll('path')
-        .data(proxyTargets)
-        .enter()
-        .append('path')
+  if (hasAuthelia && rootNode) {
+    // Position Authelia node above the root node
+    const rootSvgX = rootNode.y + 100
+    const rootSvgY = rootNode.x + 40
+    const authX = rootSvgX
+    const authY = rootSvgY - 120
+
+    // Draw Authelia node (purple rounded rect)
+    const authNode = specialNodeGroup.append('g')
+      .attr('transform', `translate(${authX},${authY})`)
+    authNode.append('rect')
+      .attr('rx', 10).attr('ry', 10)
+      .attr('x', -100).attr('y', -20)
+      .attr('width', 200).attr('height', 40)
+      .attr('fill', 'rgba(139, 92, 246, 0.15)')
+      .attr('stroke', '#8b5cf6')
+      .attr('stroke-width', 1.6)
+      .attr('filter', 'url(#node-shadow)')
+    authNode.append('text')
+      .attr('text-anchor', 'middle').attr('dy', '-0.1em')
+      .style('font-size', '12px').style('font-weight', '700').style('fill', '#c4b5fd')
+      .text(props.autheliaLabel || 'Authelia')
+    if (props.autheliaIp) {
+      authNode.append('text')
+        .attr('text-anchor', 'middle').attr('dy', '1.2em')
+        .style('font-size', '10px').style('fill', '#8b5cf6')
+        .text(props.autheliaIp)
+    }
+
+    // Draw arcs: root → Authelia (dotted cyan) and Authelia → targets (dotted purple)
+    autheliaLinkGroup.append('path')
+      .attr('fill', 'none')
+      .attr('stroke', 'rgba(139, 92, 246, 0.5)')
+      .attr('stroke-width', 1.5)
+      .attr('stroke-dasharray', '5 4')
+      .attr('d', () => {
+        const sx = rootSvgX + 120  // right edge of root
+        const sy = rootSvgY
+        const ex = authX - 100     // left edge of authelia
+        const ey = authY
+        const mx = (sx + ex) / 2
+        return `M${sx},${sy} C${mx},${sy} ${mx},${ey} ${ex},${ey}`
+      })
+
+    autheliaTargets.forEach(d => {
+      const targetLeftOffset = d.data.type === 'service' ? -130 : -90
+      autheliaLinkGroup.append('path')
         .attr('fill', 'none')
-        .attr('stroke', 'rgba(56, 189, 248, 0.7)')
+        .attr('stroke', 'rgba(167, 139, 250, 0.8)')
         .attr('stroke-width', 1.8)
-        .attr('stroke-dasharray', '6 5')
-        .attr('d', (d) => {
-          // Same anchor logic: right edge of proxy → left edge of target
-          const sx = rootNode.y + 100 + 120
-          const sy = rootNode.x + 40
-          const targetLeftOffset = d.data.type === 'service' ? -130 : -90
+        .attr('stroke-dasharray', '6 4')
+        .attr('d', () => {
+          const sx = authX + 100  // right edge of authelia
+          const sy = authY
           const ex = d.y + 100 + targetLeftOffset
           const ey = d.x + 40
           const mx = (sx + ex) / 2
           return `M${sx},${sy} C${mx},${sy} ${mx},${ey} ${ex},${ey}`
         })
+    })
+  }
+
+  // Internet node + arcs (orange dashed arcs to internet-exposed nodes)
+  const internetTargets = treeData.descendants().filter(
+    d => (d.data.type === 'service' || d.data.type === 'port') && d.data.isInternetExposed
+  )
+  const hasInternet = props.internetLabel && internetTargets.length > 0
+
+  if (hasInternet && rootNode) {
+    const rootSvgX = rootNode.y + 100
+    const rootSvgY = rootNode.x + 40
+    const intX = rootSvgX
+    const intY = rootSvgY + (hasAuthelia ? 120 : 120)
+
+    // Draw Internet node (orange rounded rect)
+    const intNode = specialNodeGroup.append('g')
+      .attr('transform', `translate(${intX},${intY})`)
+    intNode.append('rect')
+      .attr('rx', 10).attr('ry', 10)
+      .attr('x', -100).attr('y', -20)
+      .attr('width', 200).attr('height', 40)
+      .attr('fill', 'rgba(251, 146, 60, 0.12)')
+      .attr('stroke', '#fb923c')
+      .attr('stroke-width', 1.6)
+      .attr('filter', 'url(#node-shadow)')
+    intNode.append('text')
+      .attr('text-anchor', 'middle').attr('dy', '-0.1em')
+      .style('font-size', '12px').style('font-weight', '700').style('fill', '#fed7aa')
+      .text(props.internetLabel || 'Internet')
+    if (props.internetIp) {
+      intNode.append('text')
+        .attr('text-anchor', 'middle').attr('dy', '1.2em')
+        .style('font-size', '10px').style('fill', '#fb923c')
+        .text(props.internetIp)
     }
+
+    // Draw arcs: root → Internet (dotted orange) and Internet → targets (dotted orange)
+    internetLinkGroup.append('path')
+      .attr('fill', 'none')
+      .attr('stroke', 'rgba(251, 146, 60, 0.5)')
+      .attr('stroke-width', 1.5)
+      .attr('stroke-dasharray', '5 4')
+      .attr('d', () => {
+        const sx = rootNode.y + 100 + 120
+        const sy = rootNode.x + 40
+        const ex = intX - 100
+        const ey = intY
+        const mx = (sx + ex) / 2
+        return `M${sx},${sy} C${mx},${sy} ${mx},${ey} ${ex},${ey}`
+      })
+
+    internetTargets.forEach(d => {
+      const targetLeftOffset = d.data.type === 'service' ? -130 : -90
+      const extPort = d.data.externalPort
+      internetLinkGroup.append('path')
+        .attr('fill', 'none')
+        .attr('stroke', 'rgba(251, 146, 60, 0.85)')
+        .attr('stroke-width', 1.8)
+        .attr('stroke-dasharray', '6 4')
+        .attr('d', () => {
+          const sx = intX + 100
+          const sy = intY
+          const ex = d.y + 100 + targetLeftOffset
+          const ey = d.x + 40
+          const mx = (sx + ex) / 2
+          return `M${sx},${sy} C${mx},${sy} ${mx},${ey} ${ex},${ey}`
+        })
+      // Label external port on the arc
+      if (extPort) {
+        const sx = intX + 100, sy = intY
+        const ex = d.y + 100 + targetLeftOffset, ey = d.x + 40
+        internetLinkGroup.append('text')
+          .attr('x', (sx + ex) / 2)
+          .attr('y', (sy + ey) / 2 - 6)
+          .attr('text-anchor', 'middle')
+          .style('font-size', '10px')
+          .style('fill', '#fb923c')
+          .style('pointer-events', 'none')
+          .text(`:${extPort}`)
+      }
+    })
   }
 }
 
@@ -554,9 +710,9 @@ onUnmounted(() => {
 })
 
 // Watch for data changes — hierarchyRoot covers props.data/services/excludedPorts/hostPortOverrides/serviceMap/rootLabel
-// rootIp and showProxyLinks are render-only (not part of the hierarchy), so they are watched separately
+// rootIp, autheliaLabel/IP and internetLabel/IP are render-only (not part of the hierarchy)
 watch(
-  [hierarchyRoot, () => props.rootIp, () => props.showProxyLinks],
+  [hierarchyRoot, () => props.rootIp, () => props.autheliaLabel, () => props.autheliaIp, () => props.internetLabel, () => props.internetIp],
   () => { render() }
 )
 </script>

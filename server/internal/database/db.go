@@ -338,6 +338,11 @@ func (db *DB) migrate() error {
 		 SELECT 1, 'Infrastructure' WHERE NOT EXISTS (SELECT 1 FROM network_topology_config)`,
 		// Create partial unique index for singleton pattern (PostgreSQL doesn't support WHERE in UNIQUE constraints)
 		`CREATE UNIQUE INDEX IF NOT EXISTS network_topology_config_singleton ON network_topology_config (id) WHERE id = 1`,
+		// Migration: add Authelia/Internet topology node fields
+		`ALTER TABLE network_topology_config ADD COLUMN IF NOT EXISTS authelia_label VARCHAR(255) DEFAULT 'Authelia'`,
+		`ALTER TABLE network_topology_config ADD COLUMN IF NOT EXISTS authelia_ip VARCHAR(45) DEFAULT ''`,
+		`ALTER TABLE network_topology_config ADD COLUMN IF NOT EXISTS internet_label VARCHAR(255) DEFAULT 'Internet'`,
+		`ALTER TABLE network_topology_config ADD COLUMN IF NOT EXISTS internet_ip VARCHAR(45) DEFAULT ''`,
 		// Migration: Docker Compose projects
 		`CREATE TABLE IF NOT EXISTS compose_projects (
 			id VARCHAR(255) PRIMARY KEY,
@@ -2054,19 +2059,26 @@ func (db *DB) GetNetworkTopologyConfig() (*models.NetworkTopologyConfig, error) 
 	var cfg models.NetworkTopologyConfig
 	var excludedPortsJSON []byte
 	err := db.conn.QueryRow(
-		`SELECT id, root_label, root_ip, excluded_ports, service_map, show_proxy_links, host_overrides, manual_services, updated_at
+		`SELECT id, root_label, root_ip, excluded_ports, service_map, host_overrides, manual_services,
+		        COALESCE(authelia_label, 'Authelia'), COALESCE(authelia_ip, ''),
+		        COALESCE(internet_label, 'Internet'), COALESCE(internet_ip, ''),
+		        updated_at
 		 FROM network_topology_config LIMIT 1`,
-	).Scan(&cfg.ID, &cfg.RootLabel, &cfg.RootIP, &excludedPortsJSON, &cfg.ServiceMap, &cfg.ShowProxyLinks, &cfg.HostOverrides, &cfg.ManualServices, &cfg.UpdatedAt)
+	).Scan(&cfg.ID, &cfg.RootLabel, &cfg.RootIP, &excludedPortsJSON, &cfg.ServiceMap,
+		&cfg.HostOverrides, &cfg.ManualServices,
+		&cfg.AutheliaLabel, &cfg.AutheliaIP, &cfg.InternetLabel, &cfg.InternetIP,
+		&cfg.UpdatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			// Return default config if none exists
 			return &models.NetworkTopologyConfig{
 				RootLabel:      "Infrastructure",
-				ShowProxyLinks: true,
 				ExcludedPorts:  []int{},
 				ServiceMap:     "{}",
 				HostOverrides:  "{}",
 				ManualServices: "[]",
+				AutheliaLabel:  "Authelia",
+				InternetLabel:  "Internet",
 			}, nil
 		}
 		return nil, err
@@ -2081,20 +2093,24 @@ func (db *DB) GetNetworkTopologyConfig() (*models.NetworkTopologyConfig, error) 
 func (db *DB) SaveNetworkTopologyConfig(cfg *models.NetworkTopologyConfig) error {
 	excludedPortsJSON, _ := json.Marshal(cfg.ExcludedPorts)
 	_, err := db.conn.Exec(
-		`INSERT INTO network_topology_config (id, root_label, root_ip, excluded_ports, service_map, show_proxy_links, host_overrides, manual_services, updated_at)
-		 VALUES (1, $1, $2, $3::jsonb, $4, $5, $6, $7, NOW())
+		`INSERT INTO network_topology_config (id, root_label, root_ip, excluded_ports, service_map, host_overrides, manual_services,
+		        authelia_label, authelia_ip, internet_label, internet_ip, updated_at)
+		 VALUES (1, $1, $2, $3::jsonb, $4, $5, $6, $7, $8, $9, $10, NOW())
 		 ON CONFLICT(id) DO UPDATE SET
 		   root_label = EXCLUDED.root_label,
 		   root_ip = EXCLUDED.root_ip,
 		   excluded_ports = EXCLUDED.excluded_ports,
 		   service_map = EXCLUDED.service_map,
-		   show_proxy_links = EXCLUDED.show_proxy_links,
 		   host_overrides = EXCLUDED.host_overrides,
 		   manual_services = EXCLUDED.manual_services,
+		   authelia_label = EXCLUDED.authelia_label,
+		   authelia_ip = EXCLUDED.authelia_ip,
+		   internet_label = EXCLUDED.internet_label,
+		   internet_ip = EXCLUDED.internet_ip,
 		   updated_at = NOW()`,
 		cfg.RootLabel, cfg.RootIP, excludedPortsJSON,
-		cfg.ServiceMap, cfg.ShowProxyLinks, cfg.HostOverrides,
-		cfg.ManualServices,
+		cfg.ServiceMap, cfg.HostOverrides, cfg.ManualServices,
+		cfg.AutheliaLabel, cfg.AutheliaIP, cfg.InternetLabel, cfg.InternetIP,
 	)
 	return err
 }

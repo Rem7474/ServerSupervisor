@@ -217,7 +217,7 @@
 
     <div v-if="aptStatus" class="card">
       <div class="card-header d-flex align-items-center justify-content-between">
-        <h3 class="card-title">APT - Mises a jour systeme</h3>
+        <h3 class="card-title">APT - Mises à jour système</h3>
         <div class="btn-group btn-group-sm" v-if="canRunApt">
           <button @click="sendAptCmd('update')" class="btn btn-outline-secondary">apt update</button>
           <button @click="sendAptCmd('upgrade')" class="btn btn-primary">apt upgrade</button>
@@ -241,7 +241,7 @@
             <div class="card card-sm">
               <div class="card-body text-center">
                 <div class="h2 mb-0 text-red">{{ aptStatus.security_updates }}</div>
-                <div class="text-secondary small">Mises a jour securite</div>
+                <div class="text-secondary small">Mises à jour sécurité</div>
               </div>
             </div>
           </div>
@@ -249,7 +249,7 @@
             <div class="card card-sm">
               <div class="card-body text-center">
                 <div class="fw-semibold">{{ formatDate(aptStatus.last_update) }}</div>
-                <div class="text-secondary small">Dernier apt update</div>
+                <div class="text-secondary small">Dernière mise à jour</div>
               </div>
             </div>
           </div>
@@ -271,7 +271,7 @@
       <div class="card-header">
         <h3 class="card-title">Historique de commandes</h3>
         <div class="card-options">
-          <span class="badge bg-secondary-lt text-secondary">{{ combinedHistoryTotal }}</span>
+          <span class="badge bg-secondary-lt text-secondary">{{ showFullAptHistory ? combinedHistoryTotal : combinedHistory.length }}</span>
         </div>
       </div>
       <div class="table-responsive">
@@ -587,6 +587,8 @@ const { wsStatus, wsError, retryCount, reconnect } = useWebSocket(`/api/v1/ws/ho
   auditLogs.value = payload.audit_logs || []
 }, { debounceMs: 200 })
 
+const dockerHistory = ref([])
+
 async function loadDockerHistory() {
   try {
     const res = await apiClient.getDockerHistory(hostId)
@@ -784,8 +786,6 @@ function cpuColor(pct) {
   return 'text-green'
 }
 
-const dockerHistory = ref([])
-
 const combinedHistory = computed(() => {
   const apt = aptHistory.value.map(c => ({ ...c, _type: 'apt' }))
   const docker = dockerHistory.value.map(c => ({ ...c, _type: c.action === 'journalctl' ? 'journal' : 'docker' }))
@@ -863,7 +863,7 @@ async function loadJournalLogs() {
     }
     showConsole.value = true
     const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
-    const wsUrl = `${protocol}://${window.location.host}/api/v1/ws/apt/stream/${cmdId}?cmd_type=docker`
+    const wsUrl = `${protocol}://${window.location.host}/api/v1/ws/apt/stream/${cmdId}`
     if (streamWs) streamWs.close()
     streamWs = new WebSocket(wsUrl)
     streamWs.onopen = () => {

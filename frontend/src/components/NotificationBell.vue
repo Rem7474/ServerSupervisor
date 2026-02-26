@@ -80,12 +80,17 @@
               <span v-else class="badge bg-red-lt text-red flex-shrink-0" style="font-size: 0.65rem;">Actif</span>
             </div>
             <div class="d-flex align-items-center justify-content-between text-secondary" style="font-size: 0.78rem;">
-              <span class="text-truncate" style="max-width: 200px;">
+              <router-link
+                :to="`/hosts/${item.host_id}`"
+                class="text-truncate text-secondary text-decoration-none notification-host-link"
+                style="max-width: 200px;"
+                @click="isOpen = false"
+              >
                 <svg class="me-1" width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"/>
                 </svg>
                 {{ item.host_name }}
-              </span>
+              </router-link>
               <span class="flex-shrink-0 ms-2">
                 <RelativeTime :date="item.triggered_at" />
               </span>
@@ -112,6 +117,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import RelativeTime from './RelativeTime.vue'
 import apiClient from '../api'
+import { useLocalStorage } from '../composables/useLocalStorage'
 
 const STORAGE_KEY = 'notificationsReadAt'
 
@@ -119,7 +125,7 @@ const bellRef = ref(null)
 const isOpen = ref(false)
 const loading = ref(false)
 const notifications = ref([])
-const readAtRef = ref(localStorage.getItem(STORAGE_KEY))
+const readAtRef = useLocalStorage(STORAGE_KEY, null)
 let pollTimer = null
 
 const unreadCount = computed(() =>
@@ -134,7 +140,7 @@ function isUnread(item) {
 
 function metricUnit(metric) {
   if (!metric) return ''
-  if (['cpu', 'cpu_percent', 'memory', 'ram_percent', 'disk', 'disk_percent'].includes(metric)) return '%'
+  if (['cpu', 'memory', 'disk'].includes(metric)) return '%'
   return ''
 }
 
@@ -143,9 +149,7 @@ function toggleOpen() {
 }
 
 function markAllRead() {
-  const now = new Date().toISOString()
-  localStorage.setItem(STORAGE_KEY, now)
-  readAtRef.value = now
+  readAtRef.value = new Date().toISOString()
 }
 
 async function fetchNotifications() {
@@ -167,15 +171,23 @@ function onClickOutside(e) {
   }
 }
 
+function onStorageEvent(e) {
+  if (e.key === STORAGE_KEY) {
+    readAtRef.value = e.newValue
+  }
+}
+
 onMounted(() => {
   fetchNotifications()
   pollTimer = setInterval(fetchNotifications, 30_000)
   document.addEventListener('click', onClickOutside)
+  window.addEventListener('storage', onStorageEvent)
 })
 
 onUnmounted(() => {
   clearInterval(pollTimer)
   document.removeEventListener('click', onClickOutside)
+  window.removeEventListener('storage', onStorageEvent)
 })
 </script>
 
@@ -188,5 +200,8 @@ onUnmounted(() => {
 }
 .notification-item:hover {
   background: var(--tblr-active-bg, rgba(0,0,0,0.04));
+}
+.notification-host-link:hover {
+  color: var(--tblr-primary) !important;
 }
 </style>
