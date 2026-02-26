@@ -266,6 +266,9 @@ const render = () => {
   const nodeGroup = g.append('g').attr('class', 'nodes')
   const specialNodeGroup = g.append('g').attr('class', 'special-nodes')
 
+  // Centrage du proxy (root)
+  const centerX = width / 2;
+
   // Tous les nœuds feuilles (hiérarchie plate : root → service/port)
   const allLeafNodes = treeData.descendants().filter(
     d => d.data.type === 'service' || d.data.type === 'port'
@@ -287,7 +290,7 @@ const render = () => {
     const statusColor = statusColors[hostStatus] || statusColors.unknown
 
     const positions = nodes.map(node => ({
-      x: node.y + 60,
+      x: node.y + centerX,
       y: node.x + 40
     }))
     const minX = d3.min(positions, pos => pos.x) ?? 0
@@ -619,9 +622,9 @@ const render = () => {
   )
 
   if (props.internetLabel && rootNode) {
-    const rootSvgX = rootNode.y + 60
+    const rootSvgX = rootNode.y + centerX
     const rootSvgY = rootNode.x + 40
-    const intX = rootSvgX - 120
+    const intX = rootSvgX - 180
     const intY = rootSvgY
 
     // Draw Internet node (orange rounded rect)
