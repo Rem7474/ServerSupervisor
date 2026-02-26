@@ -30,6 +30,7 @@ func SetupRouter(db *database.DB, cfg *config.Config) *gin.Engine {
 	alertH := NewAlertHandler(db, cfg)
 	alertRulesH := NewAlertRulesHandler(db, cfg)
 	settingsH := NewSettingsHandler(db, cfg)
+	notifH := NewNotificationsHandler(db)
 
 	// ========== Public routes ==========
 	r.POST("/api/auth/login", authH.Login)
@@ -118,6 +119,9 @@ func SetupRouter(db *database.DB, cfg *config.Config) *gin.Engine {
 		api.GET("/audit/logs/me", auditH.GetMyAuditLogs)
 		api.GET("/audit/logs/host/:host_id", auditH.GetAuditLogsByHost)
 		api.GET("/audit/logs/user/:username", auditH.GetAuditLogsByUser)
+
+		// Notifications
+		api.GET("/notifications", notifH.GetNotifications)
 
 		// Alerts
 		api.GET("/alerts/rules", alertH.ListRules)

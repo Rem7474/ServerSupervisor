@@ -100,6 +100,16 @@ export default {
   updateUserRole: (id, role) => api.patch(`/v1/users/${id}/role`, { role }),
   deleteUser: (id) => api.delete(`/v1/users/${id}`),
 
+  // Alert Rules
+  getAlertRules: () => api.get('/v1/alert-rules'),
+  createAlertRule: (payload) => api.post('/v1/alert-rules', payload),
+  updateAlertRule: (id, payload) => api.patch(`/v1/alert-rules/${id}`, payload),
+  deleteAlertRule: (id) => api.delete(`/v1/alert-rules/${id}`),
+  testAlertRule: (payload) => api.post('/v1/alert-rules/test', payload),
+
+  // Notifications
+  getNotifications: () => api.get('/v1/notifications'),
+
   // Settings
   getSettings: () => api.get('/v1/settings'),
   testSmtp: () => api.post('/v1/settings/test-smtp'),

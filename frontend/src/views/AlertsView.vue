@@ -314,7 +314,7 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
 import { formatDurationSecs } from '../utils/formatters'
-import api from '../api'
+import apiClient from '../api'
 
 const { confirm } = useConfirmDialog()
 
@@ -362,7 +362,7 @@ onUnmounted(() => {
 async function loadRules() {
   try {
     loading.value = true
-    const res = await api.get('/api/v1/alert-rules')
+    const res = await apiClient.getAlertRules()
     rules.value = res.data || []
   } catch (err) {
     console.error('Failed to load alert rules:', err)
@@ -373,7 +373,7 @@ async function loadRules() {
 
 async function loadHosts() {
   try {
-    const res = await api.get('/api/v1/hosts')
+    const res = await apiClient.getHosts()
     hosts.value = res.data || []
   } catch (err) {
     console.error('Failed to load hosts:', err)
@@ -434,9 +434,9 @@ async function saveAlert() {
     }
 
     if (editingRule.value) {
-      await api.patch(`/api/v1/alert-rules/${editingRule.value.id}`, payload)
+      await apiClient.updateAlertRule(editingRule.value.id, payload)
     } else {
-      await api.post('/api/v1/alert-rules', payload)
+      await apiClient.createAlertRule(payload)
     }
 
     await loadRules()
@@ -451,9 +451,7 @@ async function saveAlert() {
 
 async function toggleEnabled(rule) {
   try {
-    await api.patch(`/api/v1/alert-rules/${rule.id}`, {
-      enabled: !rule.enabled
-    })
+    await apiClient.updateAlertRule(rule.id, { enabled: !rule.enabled })
     await loadRules()
   } catch (err) {
     console.error('Failed to toggle alert:', err)
@@ -470,7 +468,7 @@ async function deleteAlert(rule) {
   if (!confirmed) return
 
   try {
-    await api.delete(`/api/v1/alert-rules/${rule.id}`)
+    await apiClient.deleteAlertRule(rule.id)
     await loadRules()
   } catch (err) {
     console.error('Failed to delete alert:', err)
@@ -485,7 +483,7 @@ async function testAlert() {
     const channels = []
     if (channelSmtp.value) channels.push('smtp')
     if (channelNtfy.value) channels.push('ntfy')
-    const res = await api.post('/api/v1/alert-rules/test', { ...form.value, channels })
+    const res = await apiClient.testAlertRule({ ...form.value, channels })
     testResults.value = res.data
   } catch (err) {
     console.error('Test alert failed:', err)

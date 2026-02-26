@@ -1088,6 +1088,38 @@ func (db *DB) GetDockerCommandsByHost(hostID string, limit int) ([]models.Docker
 	return cmds, nil
 }
 
+func (db *DB) GetRecentNotifications(limit int) ([]models.NotificationItem, error) {
+	rows, err := db.conn.Query(
+		`SELECT ai.id, ai.rule_id, ai.host_id,
+		        COALESCE(h.name, ai.host_id) AS host_name,
+		        COALESCE(ar.name, ar.metric || ' ' || ar.operator || ' ' || CAST(ar.threshold AS TEXT)) AS rule_name,
+		        COALESCE(ar.metric, '') AS metric,
+		        ai.value, ai.triggered_at, ai.resolved_at
+		 FROM alert_incidents ai
+		 LEFT JOIN alert_rules ar ON ai.rule_id = ar.id
+		 LEFT JOIN hosts h ON ai.host_id = h.id
+		 ORDER BY ai.triggered_at DESC LIMIT $1`, limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var items []models.NotificationItem
+	for rows.Next() {
+		var item models.NotificationItem
+		if err := rows.Scan(
+			&item.ID, &item.RuleID, &item.HostID,
+			&item.HostName, &item.RuleName, &item.Metric,
+			&item.Value, &item.TriggeredAt, &item.ResolvedAt,
+		); err != nil {
+			continue
+		}
+		items = append(items, item)
+	}
+	return items, nil
+}
+
 func (db *DB) UpdateDockerCommandStatus(id int64, status, output string) error {
 	switch status {
 	case "running":

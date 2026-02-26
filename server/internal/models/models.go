@@ -410,6 +410,18 @@ type AlertIncident struct {
 	Value       float64    `json:"value" db:"value"`
 }
 
+type NotificationItem struct {
+	ID          int64      `json:"id"`
+	RuleID      int64      `json:"rule_id"`
+	HostID      string     `json:"host_id"`
+	HostName    string     `json:"host_name"`
+	RuleName    string     `json:"rule_name"`
+	Metric      string     `json:"metric"`
+	Value       float64    `json:"value"`
+	TriggeredAt time.Time  `json:"triggered_at"`
+	ResolvedAt  *time.Time `json:"resolved_at"`
+}
+
 // ========== Metrics Aggregation (for downsampling) ==========
 
 // MetricsAggregate stores downsampled metrics (5-min, hourly, daily)

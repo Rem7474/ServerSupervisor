@@ -118,7 +118,9 @@
               </li>
             </ul>
 
-            <div class="ms-auto d-flex align-items-center position-relative user-menu" ref="userMenuRef">
+            <div class="ms-auto d-flex align-items-center gap-2">
+            <NotificationBell />
+            <div class="position-relative user-menu" ref="userMenuRef">
               <button class="btn btn-outline-secondary d-flex align-items-center" @click="toggleUserMenu">
                 <span class="avatar avatar-sm bg-secondary-lt me-2">
                   {{ auth.username?.slice(0, 2).toUpperCase() }}
@@ -137,6 +139,7 @@
                 <button class="dropdown-item text-danger" @click="handleLogout">Déconnexion</button>
               </div>
             </div>
+            </div><!-- end ms-auto wrapper -->
           </div>
         </div>
       </header>
@@ -163,6 +166,7 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { useAuthStore } from './stores/auth'
 import { useRouter } from 'vue-router'
 import ConfirmDialog from './components/ConfirmDialog.vue'
+import NotificationBell from './components/NotificationBell.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
