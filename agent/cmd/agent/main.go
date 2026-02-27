@@ -148,7 +148,6 @@ func sendReport(cfg *config.Config, s *sender.Sender) {
 
 	// Send report
 	report := &sender.Report{
-		HostID:          cfg.HostID,
 		AgentVersion:    AgentVersion,
 		Metrics:         metrics,
 		Docker:          dockerData,
