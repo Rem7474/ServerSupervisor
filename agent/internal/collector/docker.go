@@ -99,7 +99,7 @@ func CollectDocker() ([]DockerContainer, error) {
 		image, tag := parseImageTag(fullImage)
 
 		// Build state string
-		state := "unknown"
+		var state string
 		if data.State.Running {
 			state = "running"
 		} else if data.State.Paused {
