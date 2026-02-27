@@ -1,0 +1,7 @@
+linters:
+  disable:
+    - errcheck  # Too strict on cleanup code (defer, rollback, etc.)
+    - unused    # May keep functions for future use
+  enable:
+    - govet     # Critical: nil pointers, race conditions
+    - staticcheck  # Critical: potential bugs
