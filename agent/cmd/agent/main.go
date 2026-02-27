@@ -148,6 +148,7 @@ func sendReport(cfg *config.Config, s *sender.Sender) {
 
 	// Send report
 	report := &sender.Report{
+		HostID:          cfg.HostID,
 		AgentVersion:    AgentVersion,
 		Metrics:         metrics,
 		Docker:          dockerData,
@@ -275,6 +276,86 @@ func processCommands(s *sender.Sender, commands []sender.PendingCommand) {
 				log.Printf("Failed to report command result: %v", err)
 			}
 
+		case "systemd":
+			var payload struct {
+				ContainerName string `json:"container_name"` // service name
+				Action        string `json:"action"`         // systemd_list, systemd_start, etc.
+			}
+			if err := json.Unmarshal([]byte(cmd.Payload), &payload); err != nil {
+				log.Printf("Failed to parse systemd command payload: %v", err)
+				if err := s.ReportCommandResult(&sender.CommandResult{
+					CommandID: cmd.ID,
+					Status:    "failed",
+					Output:    fmt.Sprintf("invalid payload: %v", err),
+					Type:      "systemd",
+				}); err != nil {
+					log.Printf("Failed to report command result: %v", err)
+				}
+				continue
+			}
+
+			// Report as running
+			if err := s.ReportCommandResult(&sender.CommandResult{
+				CommandID: cmd.ID,
+				Status:    "running",
+				Type:      "systemd",
+			}); err != nil {
+				log.Printf("Failed to report command result: %v", err)
+			}
+
+			// Strip "systemd_" prefix from action
+			action := strings.TrimPrefix(payload.Action, "systemd_")
+
+			if action == "list" {
+				services, listErr := collector.ListSystemdServices()
+				var output string
+				status := "completed"
+				if listErr != nil {
+					status = "failed"
+					output = fmt.Sprintf("ERROR: %v", listErr)
+					log.Printf("systemctl list-units failed: %v", listErr)
+				} else {
+					jsonBytes, jsonErr := json.Marshal(services)
+					if jsonErr != nil {
+						status = "failed"
+						output = fmt.Sprintf("ERROR marshaling services: %v", jsonErr)
+					} else {
+						output = string(jsonBytes)
+						log.Printf("systemctl list: %d services returned", len(services))
+					}
+				}
+				if err := s.ReportCommandResult(&sender.CommandResult{
+					CommandID: cmd.ID,
+					Status:    status,
+					Output:    output,
+					Type:      "systemd",
+				}); err != nil {
+					log.Printf("Failed to report systemd list result: %v", err)
+				}
+			} else {
+				output, err := collector.ExecuteSystemdCommand(payload.ContainerName, action, func(chunk string) {
+					if streamErr := s.StreamCommandChunk(cmd.ID, chunk); streamErr != nil {
+						log.Printf("Failed to stream systemd chunk: %v", streamErr)
+					}
+				})
+				status := "completed"
+				if err != nil {
+					status = "failed"
+					output = fmt.Sprintf("ERROR: %v\n%s", err, output)
+					log.Printf("systemctl %s %s failed: %v", action, payload.ContainerName, err)
+				} else {
+					log.Printf("systemctl %s %s completed", action, payload.ContainerName)
+				}
+				if err := s.ReportCommandResult(&sender.CommandResult{
+					CommandID: cmd.ID,
+					Status:    status,
+					Output:    output,
+					Type:      "systemd",
+				}); err != nil {
+					log.Printf("Failed to report systemd command result: %v", err)
+				}
+			}
+
 		case "update", "upgrade", "dist-upgrade":
 			aptCmd := cmd.Type
 
@@ -282,7 +363,7 @@ func processCommands(s *sender.Sender, commands []sender.PendingCommand) {
 			_ = s.ReportCommandResult(&sender.CommandResult{
 				CommandID: cmd.ID,
 				Status:    "running",
-				Type:      "systemd",
+				Type:      "apt",
 			})
 
 			// Execute the APT command with streaming
@@ -319,86 +400,6 @@ func processCommands(s *sender.Sender, commands []sender.PendingCommand) {
 				AptStatus: aptStatus,
 			}); err != nil {
 				log.Printf("Failed to report command result: %v", err)
-			}
-
-		case "systemd":
-			var payload struct {
-				ContainerName string `json:"container_name"` // service name
-				Action        string `json:"action"`         // systemd_list, systemd_start, etc.
-			}
-			if err := json.Unmarshal([]byte(cmd.Payload), &payload); err != nil {
-				log.Printf("Failed to parse systemd command payload: %v", err)
-				if err := s.ReportCommandResult(&sender.CommandResult{
-					CommandID: cmd.ID,
-					Status:    "failed",
-					Output:    fmt.Sprintf("invalid payload: %v", err),
-					Type:      "docker",
-				}); err != nil {
-					log.Printf("Failed to report command result: %v", err)
-				}
-				continue
-			}
-
-			// Report as running
-			if err := s.ReportCommandResult(&sender.CommandResult{
-				CommandID: cmd.ID,
-				Status:    "running",
-				Type:      "docker",
-			}); err != nil {
-				log.Printf("Failed to report command result: %v", err)
-			}
-
-			// Strip "systemd_" prefix from action
-			action := strings.TrimPrefix(payload.Action, "systemd_")
-
-			if action == "list" {
-				services, listErr := collector.ListSystemdServices()
-				var output string
-				status := "completed"
-				if listErr != nil {
-					status = "failed"
-					output = fmt.Sprintf("ERROR: %v", listErr)
-					log.Printf("systemctl list-units failed: %v", listErr)
-				} else {
-					jsonBytes, jsonErr := json.Marshal(services)
-					if jsonErr != nil {
-						status = "failed"
-						output = fmt.Sprintf("ERROR marshaling services: %v", jsonErr)
-					} else {
-						output = string(jsonBytes)
-						log.Printf("systemctl list: %d services returned", len(services))
-					}
-				}
-				if err := s.ReportCommandResult(&sender.CommandResult{
-					CommandID: cmd.ID,
-					Status:    status,
-					Output:    output,
-					Type:      "docker",
-				}); err != nil {
-					log.Printf("Failed to report systemd list result: %v", err)
-				}
-			} else {
-				output, err := collector.ExecuteSystemdCommand(payload.ContainerName, action, func(chunk string) {
-					if streamErr := s.StreamCommandChunk(cmd.ID, chunk); streamErr != nil {
-						log.Printf("Failed to stream systemd chunk: %v", streamErr)
-					}
-				})
-				status := "completed"
-				if err != nil {
-					status = "failed"
-					output = fmt.Sprintf("ERROR: %v\n%s", err, output)
-					log.Printf("systemctl %s %s failed: %v", action, payload.ContainerName, err)
-				} else {
-					log.Printf("systemctl %s %s completed", action, payload.ContainerName)
-				}
-				if err := s.ReportCommandResult(&sender.CommandResult{
-					CommandID: cmd.ID,
-					Status:    status,
-					Output:    output,
-					Type:      "docker",
-				}); err != nil {
-					log.Printf("Failed to report systemd command result: %v", err)
-				}
 			}
 
 		default:
