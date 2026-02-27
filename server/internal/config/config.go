@@ -101,6 +101,59 @@ func Load() *Config {
 	}
 }
 
+// DBSettingsLoader is a minimal interface to avoid import cycles.
+type DBSettingsLoader interface {
+	GetAllSettings() (map[string]string, error)
+}
+
+// OverrideFromDB applies DB-persisted settings on top of env vars.
+// Call this after the database is connected.
+func (c *Config) OverrideFromDB(db DBSettingsLoader) {
+	settings, err := db.GetAllSettings()
+	if err != nil {
+		return
+	}
+	if v, ok := settings["smtp_host"]; ok && v != "" {
+		c.SMTPHost = v
+	}
+	if v, ok := settings["smtp_port"]; ok && v != "" {
+		if i, err := strconv.Atoi(v); err == nil {
+			c.SMTPPort = i
+		}
+	}
+	if v, ok := settings["smtp_user"]; ok {
+		c.SMTPUser = v
+	}
+	if v, ok := settings["smtp_pass"]; ok {
+		c.SMTPPass = v
+	}
+	if v, ok := settings["smtp_from"]; ok && v != "" {
+		c.SMTPFrom = v
+	}
+	if v, ok := settings["smtp_to"]; ok && v != "" {
+		c.SMTPTo = v
+	}
+	if v, ok := settings["smtp_tls"]; ok {
+		c.SMTPTLS = v == "true" || v == "1"
+	}
+	if v, ok := settings["ntfy_url"]; ok {
+		c.NotifyURL = v
+	}
+	if v, ok := settings["github_token"]; ok {
+		c.GitHubToken = v
+	}
+	if v, ok := settings["metrics_retention_days"]; ok && v != "" {
+		if i, err := strconv.Atoi(v); err == nil {
+			c.MetricsRetentionDays = i
+		}
+	}
+	if v, ok := settings["audit_retention_days"]; ok && v != "" {
+		if i, err := strconv.Atoi(v); err == nil {
+			c.AuditRetentionDays = i
+		}
+	}
+}
+
 func (c *Config) DBDSN() string {
 	return "host=" + c.DBHost +
 		" port=" + c.DBPort +

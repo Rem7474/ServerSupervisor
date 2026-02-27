@@ -533,6 +533,21 @@ type AlertRuleUpdate struct {
 	Cooldown  *int      `json:"cooldown"`
 }
 
+// ========== Security Monitoring ==========
+
+// LoginStats aggregates login event counts for a time window.
+type LoginStats struct {
+	Total    int `json:"total"`
+	Failures int `json:"failures"`
+	UniqueIPs int `json:"unique_ips"`
+}
+
+// IPFailCount holds the number of failed logins for a single IP.
+type IPFailCount struct {
+	IPAddress string `json:"ip_address"`
+	FailCount int    `json:"fail_count"`
+}
+
 // ========== Disk Metrics ==========
 
 type DiskMetrics struct {

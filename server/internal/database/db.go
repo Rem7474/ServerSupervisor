@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/lib/pq"
@@ -431,6 +432,12 @@ func (db *DB) migrate() error {
 		)`,
 		`CREATE INDEX IF NOT EXISTS idx_login_events_ip_time ON login_events(ip_address, created_at DESC)`,
 		`CREATE INDEX IF NOT EXISTS idx_login_events_user_time ON login_events(username, created_at DESC)`,
+		// Migration: Dynamic settings table (DB overrides env vars, no restart needed)
+		`CREATE TABLE IF NOT EXISTS settings (
+			key VARCHAR(100) PRIMARY KEY,
+			value TEXT NOT NULL DEFAULT '',
+			updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)`,
 	}
 
 	for _, m := range migrations {
@@ -598,6 +605,47 @@ func (db *DB) CountRecentFailedLogins(ipAddress string, since time.Time) (int, e
 		ipAddress, since,
 	).Scan(&count)
 	return count, err
+}
+
+// GetLoginStats returns aggregate login counts for the given time window.
+func (db *DB) GetLoginStats(since time.Time) (*models.LoginStats, error) {
+	var stats models.LoginStats
+	err := db.conn.QueryRow(`
+		SELECT
+			COUNT(*) AS total,
+			COUNT(*) FILTER (WHERE NOT success) AS failures,
+			COUNT(DISTINCT ip_address) AS unique_ips
+		FROM login_events WHERE created_at > $1
+	`, since).Scan(&stats.Total, &stats.Failures, &stats.UniqueIPs)
+	if err != nil {
+		return nil, err
+	}
+	return &stats, nil
+}
+
+// GetTopFailedIPs returns the IPs with the most failed login attempts in the given window.
+func (db *DB) GetTopFailedIPs(since time.Time, limit int) ([]models.IPFailCount, error) {
+	rows, err := db.conn.Query(`
+		SELECT ip_address, COUNT(*) AS fail_count
+		FROM login_events
+		WHERE success = false AND created_at > $1
+		GROUP BY ip_address
+		ORDER BY fail_count DESC
+		LIMIT $2
+	`, since, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var result []models.IPFailCount
+	for rows.Next() {
+		var item models.IPFailCount
+		if err := rows.Scan(&item.IPAddress, &item.FailCount); err != nil {
+			return nil, err
+		}
+		result = append(result, item)
+	}
+	return result, nil
 }
 
 func (db *DB) DeleteUser(id int64) error {
@@ -1063,9 +1111,14 @@ func (db *DB) GetPendingDockerCommands(hostID string) ([]models.PendingCommand, 
 			continue
 		}
 		payload := fmt.Sprintf(`{"container_name":%q,"action":%q,"working_dir":%q}`, containerName, action, workingDir)
+		// Infer command type: actions prefixed with "systemd_" are handled by the systemd case
+		cmdType := "docker"
+		if strings.HasPrefix(action, "systemd_") {
+			cmdType = "systemd"
+		}
 		cmds = append(cmds, models.PendingCommand{
 			ID:      id,
-			Type:    "docker",
+			Type:    cmdType,
 			Payload: payload,
 		})
 	}
@@ -1125,6 +1178,39 @@ func (db *DB) GetRecentNotifications(limit int) ([]models.NotificationItem, erro
 		items = append(items, item)
 	}
 	return items, nil
+}
+
+// ========== Settings ==========
+
+func (db *DB) GetAllSettings() (map[string]string, error) {
+	rows, err := db.conn.Query(`SELECT key, value FROM settings`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := make(map[string]string)
+	for rows.Next() {
+		var k, v string
+		if err := rows.Scan(&k, &v); err == nil {
+			result[k] = v
+		}
+	}
+	return result, nil
+}
+
+func (db *DB) SetSetting(key, value string) error {
+	_, err := db.conn.Exec(
+		`INSERT INTO settings (key, value, updated_at) VALUES ($1, $2, NOW())
+		 ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()`,
+		key, value,
+	)
+	return err
+}
+
+func (db *DB) GetSetting(key string) (string, error) {
+	var value string
+	err := db.conn.QueryRow(`SELECT value FROM settings WHERE key = $1`, key).Scan(&value)
+	return value, err
 }
 
 func (db *DB) UpdateDockerCommandStatus(id int64, status, output string) error {

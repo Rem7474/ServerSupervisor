@@ -72,6 +72,8 @@ func SetupRouter(db *database.DB, cfg *config.Config) *gin.Engine {
 		api.POST("/auth/mfa/setup", authH.SetupMFA)
 		api.POST("/auth/mfa/verify", authH.VerifyMFA)
 		api.POST("/auth/mfa/disable", authH.DisableMFA)
+		api.GET("/auth/security", authH.GetSecuritySummary)
+		api.DELETE("/auth/blocked-ips/:ip", authH.UnblockIP)
 
 		// Hosts
 		api.GET("/hosts", hostH.ListHosts)
@@ -99,6 +101,7 @@ func SetupRouter(db *database.DB, cfg *config.Config) *gin.Engine {
 		api.GET("/docker/versions", dockerH.CompareVersions)
 		api.POST("/docker/command", dockerH.SendDockerCommand)
 		api.POST("/system/journalctl", dockerH.SendJournalCommand)
+		api.POST("/system/service", dockerH.SendSystemdCommand)
 		api.GET("/network", networkH.GetNetworkSnapshot)
 		api.GET("/network/topology", networkH.GetTopologySnapshot)
 		api.GET("/network/config", networkH.GetTopologyConfig)
@@ -140,6 +143,7 @@ func SetupRouter(db *database.DB, cfg *config.Config) *gin.Engine {
 
 		// Settings
 		api.GET("/settings", settingsH.GetSettings)
+		api.PUT("/settings", settingsH.UpdateSettings)
 		api.POST("/settings/test-smtp", settingsH.TestSmtp)
 		api.POST("/settings/test-ntfy", settingsH.TestNtfy)
 		api.POST("/settings/cleanup-metrics", settingsH.CleanupMetrics)

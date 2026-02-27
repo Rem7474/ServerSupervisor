@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/smtp"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -29,7 +30,6 @@ func NewSettingsHandler(db *database.DB, cfg *config.Config) *SettingsHandler {
 
 // GetSettings returns system configuration and database status
 func (h *SettingsHandler) GetSettings(c *gin.Context) {
-	// Get database status
 	dbStatus := h.getDatabaseStatus()
 
 	response := gin.H{
@@ -43,13 +43,87 @@ func (h *SettingsHandler) GetSettings(c *gin.Context) {
 			"smtpConfigured":       h.cfg.SMTPHost != "",
 			"smtpHost":             h.cfg.SMTPHost,
 			"smtpPort":             h.cfg.SMTPPort,
+			"smtpUser":             h.cfg.SMTPUser,
+			"smtpPass":             h.cfg.SMTPPass,
+			"smtpFrom":             h.cfg.SMTPFrom,
+			"smtpTo":               h.cfg.SMTPTo,
+			"smtpTls":              h.cfg.SMTPTLS,
 			"ntfyUrl":              h.cfg.NotifyURL,
+			"githubToken":          h.cfg.GitHubToken,
 			"latestAgentVersion":   LatestAgentVersion,
 		},
 		"dbStatus": dbStatus,
 	}
 
 	c.JSON(http.StatusOK, response)
+}
+
+// UpdateSettingsRequest defines the body for PUT /settings.
+type UpdateSettingsRequest struct {
+	SMTPHost             string `json:"smtp_host"`
+	SMTPPort             int    `json:"smtp_port"`
+	SMTPUser             string `json:"smtp_user"`
+	SMTPPass             string `json:"smtp_pass"`
+	SMTPFrom             string `json:"smtp_from"`
+	SMTPTo               string `json:"smtp_to"`
+	SMTPTLS              *bool  `json:"smtp_tls"`
+	NtfyURL              string `json:"ntfy_url"`
+	GitHubToken          string `json:"github_token"`
+	MetricsRetentionDays int    `json:"metrics_retention_days"`
+	AuditRetentionDays   int    `json:"audit_retention_days"`
+}
+
+// UpdateSettings persists configuration changes to the database and applies them in memory.
+func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
+	if c.GetString("role") != "admin" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+		return
+	}
+
+	var req UpdateSettingsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	save := func(key, value string) {
+		if err := h.db.SetSetting(key, value); err != nil {
+			log.Printf("Failed to persist setting %s: %v", key, err)
+		}
+	}
+
+	save("smtp_host", req.SMTPHost)
+	save("smtp_user", req.SMTPUser)
+	save("smtp_pass", req.SMTPPass)
+	save("smtp_from", req.SMTPFrom)
+	save("smtp_to", req.SMTPTo)
+	save("ntfy_url", req.NtfyURL)
+	save("github_token", req.GitHubToken)
+
+	if req.SMTPPort > 0 {
+		save("smtp_port", strconv.Itoa(req.SMTPPort))
+	}
+	if req.SMTPTLS != nil {
+		if *req.SMTPTLS {
+			save("smtp_tls", "true")
+		} else {
+			save("smtp_tls", "false")
+		}
+	}
+	if req.MetricsRetentionDays > 0 {
+		save("metrics_retention_days", strconv.Itoa(req.MetricsRetentionDays))
+	}
+	if req.AuditRetentionDays > 0 {
+		save("audit_retention_days", strconv.Itoa(req.AuditRetentionDays))
+	}
+
+	// Apply persisted settings to in-memory config immediately
+	h.cfg.OverrideFromDB(h.db)
+
+	user := c.GetString("username")
+	_, _ = h.db.CreateAuditLog(user, "update_settings", "", c.ClientIP(), "Settings updated via UI", "success")
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "message": "Paramètres mis à jour"})
 }
 
 // TestSmtp tests SMTP connectivity with full TLS/auth/envelope validation

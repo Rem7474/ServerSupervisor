@@ -354,6 +354,90 @@
       </div>
     </div>
 
+    <!-- Services système (systemd) — admin/operator only -->
+    <div v-if="canRunApt" class="card mt-4">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <h3 class="card-title">Services système (systemd)</h3>
+        <div class="d-flex align-items-center gap-2">
+          <div class="btn-group btn-group-sm">
+            <button
+              :class="systemdFilter === 'active' ? 'btn btn-primary' : 'btn btn-outline-secondary'"
+              @click="systemdFilter = 'active'"
+            >Actifs</button>
+            <button
+              :class="systemdFilter === 'all' ? 'btn btn-primary' : 'btn btn-outline-secondary'"
+              @click="systemdFilter = 'all'"
+            >Tous</button>
+          </div>
+          <button
+            class="btn btn-sm btn-outline-secondary"
+            @click="loadSystemdServices"
+            :disabled="systemdLoading"
+          >
+            <span v-if="systemdLoading" class="spinner-border spinner-border-sm me-1"></span>
+            {{ systemdLoading ? 'Chargement...' : 'Charger les services' }}
+          </button>
+        </div>
+      </div>
+      <div v-if="systemdError" class="card-body pb-0">
+        <div class="alert alert-danger mb-0">{{ systemdError }}</div>
+      </div>
+      <div v-if="!systemdServices.length && !systemdLoading && !systemdError" class="card-body">
+        <div class="text-secondary small">Cliquez sur "Charger les services" pour afficher les services systemd de cet hôte.</div>
+      </div>
+      <div v-if="filteredSystemdServices.length" class="table-responsive">
+        <table class="table table-vcenter table-hover card-table mb-0">
+          <thead>
+            <tr>
+              <th>Service</th>
+              <th>État</th>
+              <th>Mode</th>
+              <th>Description</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="svc in filteredSystemdServices" :key="svc.name">
+              <td class="font-monospace small">{{ svc.name }}</td>
+              <td>
+                <span :class="systemdStateClass(svc.active_state)">{{ svc.active_state }}</span>
+              </td>
+              <td class="text-secondary small">{{ svc.sub_state }}</td>
+              <td class="text-secondary small" style="max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" :title="svc.description">
+                {{ svc.description || '—' }}
+              </td>
+              <td class="text-nowrap">
+                <div class="btn-group btn-group-sm">
+                  <button
+                    v-if="svc.active_state !== 'active'"
+                    class="btn btn-outline-success"
+                    @click="executeSystemdAction(svc.name, 'start')"
+                    title="Démarrer"
+                  >Start</button>
+                  <button
+                    v-if="svc.active_state === 'active'"
+                    class="btn btn-outline-danger"
+                    @click="executeSystemdAction(svc.name, 'stop')"
+                    title="Arrêter"
+                  >Stop</button>
+                  <button
+                    class="btn btn-outline-secondary"
+                    @click="executeSystemdAction(svc.name, 'restart')"
+                    title="Redémarrer"
+                  >Restart</button>
+                  <button
+                    class="btn btn-outline-secondary"
+                    @click="executeSystemdAction(svc.name, 'status')"
+                    title="Statut"
+                  >Status</button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
       </div>
 
       <!-- Colonne droite: Console Live -->
@@ -508,6 +592,14 @@ const consoleOutput = ref(null)
 const showConsole = ref(false)
 let streamWs = null
 const journalService = ref('')
+const systemdServices = ref([])
+const systemdLoading = ref(false)
+const systemdError = ref('')
+const systemdFilter = ref('active')
+const filteredSystemdServices = computed(() => {
+  if (systemdFilter.value === 'all') return systemdServices.value
+  return systemdServices.value.filter(s => s.active_state === 'active')
+})
 const journalLoading = ref(false)
 const journalError = ref('')
 const journalCmdId = ref(null)
@@ -842,6 +934,79 @@ async function fetchLatestAgentVersion() {
     const res = await apiClient.getSettings()
     latestAgentVersion.value = res.data?.settings?.latestAgentVersion || ''
   } catch { /* non-critical */ }
+}
+
+async function loadSystemdServices() {
+  systemdLoading.value = true
+  systemdError.value = ''
+  try {
+    const res = await apiClient.sendSystemdCommand(hostId, '', 'list')
+    const cmdId = res.data.command_id
+    const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
+    const wsUrl = `${protocol}://${window.location.host}/api/v1/ws/apt/stream/${cmdId}?cmd_type=docker`
+
+    await new Promise((resolve, reject) => {
+      let output = ''
+      const ws = new WebSocket(wsUrl)
+      ws.onopen = () => { ws.send(JSON.stringify({ type: 'auth', token: auth.token })) }
+      ws.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data)
+          if (payload.type === 'apt_stream_init') {
+            output = payload.output || ''
+            if (payload.status === 'completed') { ws.close(); resolve(output) }
+            else if (payload.status === 'failed') { ws.close(); reject(new Error('Command failed')) }
+          } else if (payload.type === 'apt_stream') {
+            output += payload.chunk || ''
+          } else if (payload.type === 'apt_status_update') {
+            if (payload.status === 'completed') { ws.close(); resolve(output) }
+            else if (payload.status === 'failed') { ws.close(); reject(new Error('Command failed')) }
+          }
+        } catch (e) { /* ignore parse errors */ }
+      }
+      ws.onclose = () => { if (output) resolve(output) }
+      ws.onerror = () => reject(new Error('WebSocket error'))
+      setTimeout(() => { ws.close(); reject(new Error('Timeout')) }, 35000)
+    }).then(output => {
+      try {
+        systemdServices.value = JSON.parse(output)
+      } catch {
+        systemdError.value = 'Impossible de parser la liste des services'
+      }
+    }).catch(e => {
+      systemdError.value = e.message || 'Erreur lors du chargement des services'
+    })
+  } catch (e) {
+    systemdError.value = e.response?.data?.error || 'Impossible d\'envoyer la commande'
+  } finally {
+    systemdLoading.value = false
+  }
+}
+
+async function executeSystemdAction(serviceName, action) {
+  try {
+    const res = await apiClient.sendSystemdCommand(hostId, serviceName, action)
+    const cmdId = res.data.command_id
+    liveCommand.value = {
+      id: cmdId,
+      prefix: 'systemctl ',
+      command: `${action} ${serviceName}`,
+      status: 'running',
+      output: '',
+    }
+    showConsole.value = true
+    connectStreamWebSocket(cmdId, 'docker')
+    nextTick(() => scrollToBottom())
+  } catch (e) {
+    console.error('Failed to execute systemd action:', e)
+  }
+}
+
+function systemdStateClass(state) {
+  if (state === 'active') return 'badge bg-green-lt text-green'
+  if (state === 'failed') return 'badge bg-red-lt text-red'
+  if (state === 'activating' || state === 'deactivating') return 'badge bg-yellow-lt text-yellow'
+  return 'badge bg-secondary-lt text-secondary'
 }
 
 async function loadJournalLogs() {

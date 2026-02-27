@@ -539,6 +539,75 @@ func (h *AuthHandler) GetProfile(c *gin.Context) {
 	})
 }
 
+// GetSecuritySummary returns login stats, currently blocked IPs, and top failed IPs (admin only).
+func (h *AuthHandler) GetSecuritySummary(c *gin.Context) {
+	if c.GetString("role") != "admin" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+		return
+	}
+
+	since := time.Now().Add(-24 * time.Hour)
+
+	stats, err := h.db.GetLoginStats(since)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch login stats"})
+		return
+	}
+
+	topFailed, _ := h.db.GetTopFailedIPs(since, 10)
+	if topFailed == nil {
+		topFailed = []models.IPFailCount{}
+	}
+
+	// Read currently blocked IPs from the in-memory tracker
+	loginTracker.mu.Lock()
+	cutoff := time.Now().Add(-bruteForceWindow)
+	var blockedIPs []string
+	for ip, times := range loginTracker.records {
+		count := 0
+		for _, t := range times {
+			if t.After(cutoff) {
+				count++
+			}
+		}
+		if count >= bruteForceMaxFails {
+			blockedIPs = append(blockedIPs, ip)
+		}
+	}
+	loginTracker.mu.Unlock()
+	if blockedIPs == nil {
+		blockedIPs = []string{}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"stats_24h":      stats,
+		"blocked_ips":    blockedIPs,
+		"top_failed_ips": topFailed,
+	})
+}
+
+// UnblockIP removes an IP from the in-memory brute-force block list (admin only).
+func (h *AuthHandler) UnblockIP(c *gin.Context) {
+	if c.GetString("role") != "admin" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+		return
+	}
+
+	ip := c.Param("ip")
+	if ip == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "IP address required"})
+		return
+	}
+
+	loginTracker.mu.Lock()
+	delete(loginTracker.records, ip)
+	loginTracker.mu.Unlock()
+
+	user := c.GetString("username")
+	_, _ = h.db.CreateAuditLog(user, "unblock_ip", "", c.ClientIP(), "IP unblocked: "+ip, "success")
+	c.JSON(http.StatusOK, gin.H{"success": true, "message": "IP débloquée : " + ip})
+}
+
 // GetLoginEvents returns the last 50 login events for the current user
 func (h *AuthHandler) GetLoginEvents(c *gin.Context) {
 	username := c.GetString("username")

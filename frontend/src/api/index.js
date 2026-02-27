@@ -36,6 +36,8 @@ export default {
   changePassword: (currentPassword, newPassword) =>
     api.post('/v1/auth/change-password', { current_password: currentPassword, new_password: newPassword }),
   getLoginEvents: () => api.get('/v1/auth/login-events'),
+  getSecuritySummary: () => api.get('/v1/auth/security'),
+  unblockIP: (ip) => api.delete(`/v1/auth/blocked-ips/${ip}`),
   getMFAStatus: () => api.get('/v1/auth/mfa/status'),
   setupMFA: () => api.post('/v1/auth/mfa/setup'),
   verifyMFA: (secret, totpCode, backupCodes) =>
@@ -70,6 +72,8 @@ export default {
     api.post('/v1/docker/command', { host_id: hostId, container_name: containerName, action, working_dir: workingDir }),
   sendJournalCommand: (hostId, serviceName) =>
     api.post('/v1/system/journalctl', { host_id: hostId, service_name: serviceName }),
+  sendSystemdCommand: (hostId, serviceName, action) =>
+    api.post('/v1/system/service', { host_id: hostId, service_name: serviceName, action }),
   getDockerHistory: (hostId) => api.get(`/v1/hosts/${hostId}/docker/history`),
 
   // Tracked Repos
@@ -112,6 +116,7 @@ export default {
 
   // Settings
   getSettings: () => api.get('/v1/settings'),
+  updateSettings: (payload) => api.put('/v1/settings', payload),
   testSmtp: () => api.post('/v1/settings/test-smtp'),
   testNtfy: () => api.post('/v1/settings/test-ntfy'),
   cleanupMetrics: () => api.post('/v1/settings/cleanup-metrics'),

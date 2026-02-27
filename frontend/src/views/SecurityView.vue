@@ -3,7 +3,7 @@
     <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
       <div>
         <h2 class="page-title">Sécurité</h2>
-        <div class="text-secondary">MFA et activité de connexion</div>
+        <div class="text-secondary">MFA, activité de connexion et menaces</div>
       </div>
     </div>
 
@@ -17,6 +17,11 @@
       <li class="nav-item">
         <a class="nav-link" :class="{ active: tab === 'activity' }" href="#" @click.prevent="switchToActivity">
           Activité de connexion
+        </a>
+      </li>
+      <li class="nav-item" v-if="isAdmin">
+        <a class="nav-link" :class="{ active: tab === 'threats' }" href="#" @click.prevent="switchToThreats">
+          Menaces
         </a>
       </li>
     </ul>
@@ -86,12 +91,8 @@
           </div>
         </div>
 
-        <div v-if="error" class="alert alert-danger mt-3" role="alert">
-          {{ error }}
-        </div>
-        <div v-if="success" class="alert alert-success mt-3" role="alert">
-          {{ success }}
-        </div>
+        <div v-if="error" class="alert alert-danger mt-3" role="alert">{{ error }}</div>
+        <div v-if="success" class="alert alert-success mt-3" role="alert">{{ success }}</div>
       </div>
     </div>
 
@@ -107,12 +108,8 @@
           </button>
         </div>
         <div class="card-body p-0">
-          <div v-if="activityLoading && !loginEvents.length" class="text-center py-4 text-secondary">
-            Chargement…
-          </div>
-          <div v-else-if="!loginEvents.length" class="text-center py-4 text-secondary">
-            Aucun événement de connexion trouvé.
-          </div>
+          <div v-if="activityLoading && !loginEvents.length" class="text-center py-4 text-secondary">Chargement…</div>
+          <div v-else-if="!loginEvents.length" class="text-center py-4 text-secondary">Aucun événement de connexion trouvé.</div>
           <div v-else class="table-responsive">
             <table class="table table-vcenter table-hover card-table mb-0">
               <thead>
@@ -141,13 +138,108 @@
         </div>
       </div>
     </div>
+
+    <!-- Threats Tab -->
+    <div v-if="tab === 'threats'">
+      <!-- Stats cards -->
+      <div class="row row-cards mb-4">
+        <div class="col-sm-4">
+          <div class="card">
+            <div class="card-body text-center">
+              <div class="text-secondary small mb-1">Connexions (24h)</div>
+              <div class="h2 mb-0">{{ security.stats_24h?.total ?? '—' }}</div>
+            </div>
+          </div>
+        </div>
+        <div class="col-sm-4">
+          <div class="card">
+            <div class="card-body text-center">
+              <div class="text-secondary small mb-1">Échecs (24h)</div>
+              <div class="h2 mb-0 text-danger">{{ security.stats_24h?.failures ?? '—' }}</div>
+            </div>
+          </div>
+        </div>
+        <div class="col-sm-4">
+          <div class="card">
+            <div class="card-body text-center">
+              <div class="text-secondary small mb-1">IPs uniques (24h)</div>
+              <div class="h2 mb-0">{{ security.stats_24h?.unique_ips ?? '—' }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row row-cards">
+        <!-- Blocked IPs -->
+        <div class="col-lg-5">
+          <div class="card h-100">
+            <div class="card-header d-flex align-items-center justify-content-between">
+              <h3 class="card-title">IPs bloquées</h3>
+              <button class="btn btn-sm btn-outline-secondary" @click="loadSecurity" :disabled="threatsLoading">
+                <span v-if="threatsLoading" class="spinner-border spinner-border-sm"></span>
+                <span v-else>↻</span>
+              </button>
+            </div>
+            <div class="card-body p-0">
+              <div v-if="threatsLoading && !security.blocked_ips?.length" class="text-center py-4 text-secondary">Chargement…</div>
+              <div v-else-if="!security.blocked_ips?.length" class="text-center py-4 text-secondary small">
+                Aucune IP bloquée actuellement
+              </div>
+              <div v-else>
+                <div v-for="ip in security.blocked_ips" :key="ip" class="d-flex align-items-center justify-content-between px-3 py-2 border-bottom">
+                  <div class="d-flex align-items-center gap-2">
+                    <span class="badge bg-red-lt text-red">Bloquée</span>
+                    <span class="font-monospace small">{{ ip }}</span>
+                  </div>
+                  <button class="btn btn-sm btn-outline-success" @click="unblockIP(ip)" :disabled="unblockingIP === ip">
+                    {{ unblockingIP === ip ? '...' : 'Débloquer' }}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Top failed IPs -->
+        <div class="col-lg-7">
+          <div class="card h-100">
+            <div class="card-header">
+              <h3 class="card-title">Top 10 IPs — échecs de connexion (24h)</h3>
+            </div>
+            <div class="card-body p-0">
+              <div v-if="!security.top_failed_ips?.length" class="text-center py-4 text-secondary small">
+                Aucun échec enregistré sur cette période
+              </div>
+              <div v-else>
+                <div v-for="item in security.top_failed_ips" :key="item.ip_address" class="px-3 py-2 border-bottom">
+                  <div class="d-flex align-items-center justify-content-between mb-1">
+                    <span class="font-monospace small">{{ item.ip_address }}</span>
+                    <span class="badge bg-red-lt text-red">{{ item.fail_count }} échecs</span>
+                  </div>
+                  <div class="progress" style="height: 4px;">
+                    <div
+                      class="progress-bar bg-danger"
+                      :style="{ width: progressWidth(item.fail_count) + '%' }"
+                    ></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import apiClient from '../api'
+import { useAuthStore } from '../stores/auth'
 import { formatDateTime as formatDate } from '../utils/formatters'
+
+const auth = useAuthStore()
+const isAdmin = computed(() => auth.user?.role === 'admin')
 
 const tab = ref('mfa')
 
@@ -166,6 +258,11 @@ const copiedBackup = ref(false)
 // Activity state
 const loginEvents = ref([])
 const activityLoading = ref(false)
+
+// Threats state
+const security = ref({ stats_24h: null, blocked_ips: [], top_failed_ips: [] })
+const threatsLoading = ref(false)
+const unblockingIP = ref('')
 
 async function loadStatus() {
   try {
@@ -188,11 +285,44 @@ async function loadLoginEvents() {
   }
 }
 
+async function loadSecurity() {
+  threatsLoading.value = true
+  try {
+    const res = await apiClient.getSecuritySummary()
+    security.value = res.data || { stats_24h: null, blocked_ips: [], top_failed_ips: [] }
+  } catch (e) {
+    console.error('Failed to load security summary:', e)
+  } finally {
+    threatsLoading.value = false
+  }
+}
+
 function switchToActivity() {
   tab.value = 'activity'
   if (!loginEvents.value.length) loadLoginEvents()
 }
 
+function switchToThreats() {
+  tab.value = 'threats'
+  loadSecurity()
+}
+
+async function unblockIP(ip) {
+  unblockingIP.value = ip
+  try {
+    await apiClient.unblockIP(ip)
+    await loadSecurity()
+  } catch (e) {
+    console.error('Failed to unblock IP:', e)
+  } finally {
+    unblockingIP.value = ''
+  }
+}
+
+function progressWidth(failCount) {
+  const max = Math.max(...(security.value.top_failed_ips?.map(i => i.fail_count) || [1]))
+  return max > 0 ? Math.round((failCount / max) * 100) : 0
+}
 
 async function startSetup() {
   loading.value = true
@@ -247,9 +377,7 @@ async function copyBackupCodes() {
   if (!setup.value.backup_codes?.length) return
   await navigator.clipboard.writeText(setup.value.backup_codes.join('\n'))
   copiedBackup.value = true
-  setTimeout(() => {
-    copiedBackup.value = false
-  }, 1500)
+  setTimeout(() => { copiedBackup.value = false }, 1500)
 }
 
 onMounted(loadStatus)
