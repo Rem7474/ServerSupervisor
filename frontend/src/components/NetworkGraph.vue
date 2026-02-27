@@ -26,13 +26,13 @@
         <span class="legend-dot port-udp"></span>
         Port UDP
       </div>
-      <div v-if="autheliaLabel" class="legend-item">
-        <span style="display:inline-block; width:18px; height:3px; background:#8b5cf6; border-radius:2px; flex-shrink:0;"></span>
-        {{ autheliaLabel }}
+      <div v-if="hasAutheliaTargets" class="legend-item">
+        <span style="display:inline-block; width:18px; height:3px; background:#8b5cf6; border-top:2px dashed #8b5cf6; border-radius:0; flex-shrink:0;"></span>
+        {{ autheliaLabel || 'Authelia' }}
       </div>
-      <div v-if="internetLabel" class="legend-item">
-        <span style="display:inline-block; width:18px; height:3px; background:#fb923c; border-radius:2px; flex-shrink:0;"></span>
-        {{ internetLabel }}
+      <div v-if="hasInternetTargets" class="legend-item">
+        <span style="display:inline-block; width:18px; height:3px; background:#fb923c; border-top:2px dashed #fb923c; border-radius:0; flex-shrink:0;"></span>
+        {{ internetLabel || 'Internet' }}
       </div>
     </div>
     <div v-if="!hasData" class="graph-empty">
@@ -218,6 +218,14 @@ const hierarchyRoot = computed(() => {
     children: rootChildren
   })
 })
+
+// Reactive flags used by the template legend — only show entries when nodes are actually linked
+const hasAutheliaTargets = computed(() =>
+  (hierarchyRoot.value.children || []).some(d => d.data.isAutheliaLinked)
+)
+const hasInternetTargets = computed(() =>
+  (hierarchyRoot.value.children || []).some(d => d.data.isInternetExposed)
+)
 
 const render = () => {
   if (!svgRef.value) return
@@ -626,7 +634,7 @@ const render = () => {
     d => (d.data.type === 'service' || d.data.type === 'port') && d.data.isInternetExposed
   )
 
-  if (props.internetLabel && rootNode) {
+  if (internetTargets.length > 0 && rootNode) {
     // CORRECTIF 3 : Positionnement Internet basé sur centerX, pas sur rootNode.y
     const rootSvgX = centerX;
     const rootSvgY = rootNode.x + 40;
@@ -812,8 +820,8 @@ watch(
   flex-shrink: 0;
 }
 
-.legend-dot.port-tcp     { background: #2563eb; }
-.legend-dot.port-udp     { background: #f97316; }
+.legend-dot.port-tcp     { background: #60a5fa; }
+.legend-dot.port-udp     { background: #fb923c; }
 .legend-dot.service-node { background: #38bdf8; }
 
 .graph-empty {
@@ -840,15 +848,6 @@ watch(
   font-size: 13px;
 }
 
-.link { fill: none; }
-
-.proxy-link {
-  fill: none;
-  stroke: rgba(56, 189, 248, 0.65);
-  stroke-width: 1.6;
-  stroke-dasharray: 6 6;
-}
-
 .service-cluster rect {
   fill: rgba(15, 23, 42, 0.5);
   stroke: rgba(148, 163, 184, 0.3);
@@ -858,19 +857,6 @@ watch(
 .service-cluster:hover rect {
   stroke: rgba(148, 163, 184, 0.6);
   fill: rgba(15, 23, 42, 0.65);
-}
-
-.cluster-label {
-  font-size: 12px;
-  font-weight: 700;
-  fill: #e2e8f0;
-  pointer-events: none;
-}
-
-.cluster-sublabel {
-  font-size: 10px;
-  fill: #cbd5e1;
-  pointer-events: none;
 }
 
 .node { cursor: pointer; }

@@ -478,27 +478,6 @@
           </div>
         </div>
         <div v-else ref="graphSurfaceRef" class="network-graph-surface" :style="{ height: graphHeight }">
-          <div class="network-topology-toolbar">
-            <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
-              <div>
-                <div class="text-secondary small mb-1" style="font-weight: 600;">Légende</div>
-                <div class="d-flex gap-2 flex-wrap" style="font-size: 0.85rem;">
-                  <div class="d-flex align-items-center gap-1">
-                    <div style="width: 3px; height: 20px; background: #4f46e5; border-radius: 2px;"></div>
-                    <span class="text-secondary">Conteneur</span>
-                  </div>
-                  <div class="d-flex align-items-center gap-1">
-                    <div style="width: 3px; height: 20px; background: #8b5cf6; border-radius: 2px;"></div>
-                    <span class="text-secondary">Service</span>
-                  </div>
-                  <div class="d-flex align-items-center gap-1">
-                    <div style="width: 3px; height: 20px; background: #06b6d4; border-radius: 2px;"></div>
-                    <span class="text-secondary">Port interne</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
           <NetworkGraph
             :data="graphHosts"
             :root-label="rootNodeName"
@@ -1270,15 +1249,6 @@ onUnmounted(() => {
   flex-direction: column;
   overflow-y: auto;
   overflow-x: hidden;
-}
-
-.network-topology-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-  padding: 0 4px 12px;
-  color: #cbd5f5;
 }
 
 @media (max-width: 991px) {
