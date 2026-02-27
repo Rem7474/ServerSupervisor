@@ -64,6 +64,49 @@ jobs:
         run: govulncheck ./...
 
   # ─────────────────────────────────────────
+  # Nancy - CVE dans les dépendances Go
+  # ─────────────────────────────────────────
+  nancy-server:
+    name: nancy (server)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+
+      - name: Install nancy
+        run: curl -L -o nancy https://github.com/sonatype-nexus-community/nancy/releases/latest/download/nancy-linux-amd64 && chmod +x nancy
+
+      - name: Run nancy
+        working-directory: server
+        run: go list -json -deps ./... | ../nancy sleuth --quiet
+
+  nancy-agent:
+    name: nancy (agent)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: agent/go.mod
+          cache-dependency-path: agent/go.sum
+
+      - name: Install nancy
+        run: curl -L -o nancy https://github.com/sonatype-nexus-community/nancy/releases/latest/download/nancy-linux-amd64 && chmod +x nancy
+
+      - name: Run nancy
+        working-directory: agent
+        run: go list -json -deps ./... | ../nancy sleuth --quiet
+
+  # ─────────────────────────────────────────
   # Audit npm
   # ─────────────────────────────────────────
   npm-audit:
@@ -86,8 +129,8 @@ jobs:
 
       - name: Run npm audit
         working-directory: frontend
-        # --audit-level=high : échouer seulement sur high/critical
-        run: npm audit --audit-level=high --omit=dev
+        # --audit-level=moderate : échouer sur moderate/high/critical
+        run: npm audit --audit-level=moderate
 
   # ─────────────────────────────────────────
   # Scan Trivy - image Docker serveur
@@ -128,46 +171,6 @@ jobs:
         with:
           sarif_file: trivy-server.sarif
           category: trivy-server
-
-  # ─────────────────────────────────────────
-  # Scan Trivy - image Docker agent
-  # ─────────────────────────────────────────
-  trivy-agent:
-    name: Trivy scan (agent image)
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build agent image locally
-        uses: docker/build-push-action@v5
-        with:
-          context: agent
-          file: agent/Dockerfile
-          push: false
-          load: true
-          tags: serversupervisor-agent:scan
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: serversupervisor-agent:scan
-          format: sarif
-          output: trivy-agent.sarif
-          severity: CRITICAL,HIGH
-          exit-code: '0'
-
-      - name: Upload Trivy results to GitHub Security
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
-        with:
-          sarif_file: trivy-agent.sarif
-          category: trivy-agent
 
   # ─────────────────────────────────────────
   # Scan du code source (CodeQL)
