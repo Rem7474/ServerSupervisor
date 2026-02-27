@@ -1,0 +1,22 @@
+# CODEOWNERS
+# Ces propriétaires seront automatiquement requestés comme reviewers
+# lors de l'ouverture d'une PR touchant les fichiers spécifiés.
+
+# Global - tout le repository
+* @Rem7474
+
+# Backend Go
+/server/ @Rem7474
+/agent/ @Rem7474
+
+# Frontend Vue 3
+/frontend/ @Rem7474
+
+# Infrastructure & CI
+/.github/ @Rem7474
+/docker-compose*.yml @Rem7474
+**/Dockerfile @Rem7474
+
+# Documentation
+*.md @Rem7474
+/docs/ @Rem7474
