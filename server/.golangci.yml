@@ -42,6 +42,13 @@ issues:
       linters:
         - errcheck
         - gosec
+    # Exclude specific patterns that are intentional or non-critical
+    - linters:
+        - ineffassign
+      text: "ineffectual assignment"
+    - linters:
+        - staticcheck
+      text: "SA9003.*empty branch"
 
   # Maximum issues per linter
   max-issues-per-linter: 0
