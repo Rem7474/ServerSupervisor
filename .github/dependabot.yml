@@ -1,7 +1,7 @@
 version: 2
 
 updates:
-  # ── Actions GitHub ────────────────────────────────────────────────────────
+  # ── Actions GitHub ────────────────────────────────────────
   - package-ecosystem: github-actions
     directory: /
     schedule:
@@ -19,7 +19,7 @@ updates:
         patterns:
           - "*"
 
-  # ── Go - Serveur ──────────────────────────────────────────────────────────
+  # ── Go - Serveur ──────────────────────────────────────────
   - package-ecosystem: gomod
     directory: /server
     schedule:
@@ -41,8 +41,12 @@ updates:
           - patch
     # Ouvrir des PRs séparées pour les majeurs
     open-pull-requests-limit: 10
+    # Ignorer les mises à jour majeures de stdlib Go
+    ignore:
+      - dependency-name: "golang.org/x/*"
+        update-types: ["version-update:semver-major"]
 
-  # ── Go - Agent ────────────────────────────────────────────────────────────
+  # ── Go - Agent ────────────────────────────────────────────
   - package-ecosystem: gomod
     directory: /agent
     schedule:
@@ -62,8 +66,11 @@ updates:
           - minor
           - patch
     open-pull-requests-limit: 10
+    ignore:
+      - dependency-name: "golang.org/x/*"
+        update-types: ["version-update:semver-major"]
 
-  # ── npm - Frontend ────────────────────────────────────────────────────────
+  # ── npm - Frontend ────────────────────────────────────────
   - package-ecosystem: npm
     directory: /frontend
     schedule:
@@ -101,26 +108,13 @@ updates:
           - patch
     open-pull-requests-limit: 10
 
-  # ── Docker - images de base ───────────────────────────────────────────────
+  # ── Docker - images de base ───────────────────────────────────
   - package-ecosystem: docker
     directory: /server
     schedule:
       interval: weekly
       day: wednesday
       time: "08:00"
-      timezone: Europe/Paris
-    commit-message:
-      prefix: "chore(docker)"
-    labels:
-      - dependencies
-      - docker
-
-  - package-ecosystem: docker
-    directory: /agent
-    schedule:
-      interval: weekly
-      day: wednesday
-      time: "08:15"
       timezone: Europe/Paris
     commit-message:
       prefix: "chore(docker)"
