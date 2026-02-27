@@ -66,3 +66,12 @@ jobs:
 
       - name: Run tests
         run: go test -v -race ./...
+
+      # Linter avec warnings uniquement (ne bloque pas le build)
+      - name: Run linter (warnings only)
+        uses: golangci/golangci-lint-action@v4
+        with:
+          version: latest
+          working-directory: server
+          args: --timeout=5m --issues-exit-code=0
+        continue-on-error: true
