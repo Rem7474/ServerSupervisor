@@ -278,10 +278,12 @@ func processCommands(s *sender.Sender, commands []sender.PendingCommand) {
 		case "update", "upgrade", "dist-upgrade":
 			aptCmd := cmd.Type
 
-			// Notify server that command is starting
-			if err := s.ReportCommandStatus(cmd.ID, "running"); err != nil {
-				log.Printf("Failed to report running status: %v", err)
-			}
+			// Notify server that command is starting (status running)
+			_ = s.ReportCommandResult(&sender.CommandResult{
+				CommandID: cmd.ID,
+				Status:    "running",
+				Type:      "systemd",
+			})
 
 			// Execute the APT command with streaming
 			output, err := collector.ExecuteAptCommandWithStreaming(aptCmd, func(chunk string) {
@@ -322,7 +324,7 @@ func processCommands(s *sender.Sender, commands []sender.PendingCommand) {
 		case "systemd":
 			var payload struct {
 				ContainerName string `json:"container_name"` // service name
-				Action        string `json:"action"`          // systemd_list, systemd_start, etc.
+				Action        string `json:"action"`         // systemd_list, systemd_start, etc.
 			}
 			if err := json.Unmarshal([]byte(cmd.Payload), &payload); err != nil {
 				log.Printf("Failed to parse systemd command payload: %v", err)
