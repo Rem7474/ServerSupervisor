@@ -1,8 +1,0 @@
-linters:
-  disable:
-    - errcheck     # Too strict on logging/cleanup functions
-    - unused       # May keep functions for future use
-    - ineffassign  # May have intentional assignments
-  enable:
-    - govet        # Critical: nil pointers, race conditions
-    - staticcheck  # Critical: potential bugs
