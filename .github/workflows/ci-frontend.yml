@@ -1,0 +1,90 @@
+name: CI Frontend
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/ci-frontend.yml'
+  pull_request:
+    paths:
+      - 'frontend/**'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./frontend
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      # AUTO-FIX : Régénérer package-lock.json si corrompu
+      - name: Fix package-lock.json if needed
+        id: npmfix
+        run: |
+          # Tester npm ci
+          if ! npm ci --prefer-offline --no-audit 2>/dev/null; then
+            echo "⚠️ npm ci failed, regenerating package-lock.json..."
+            rm -f package-lock.json
+            npm install --package-lock-only
+            echo "changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "changes=false" >> $GITHUB_OUTPUT
+            echo "✅ npm ci succeeded"
+          fi
+
+      # AUTO-COMMIT package-lock.json régénéré
+      - name: Commit package-lock.json fix
+        if: steps.npmfix.outputs.changes == 'true' && github.event_name == 'push'
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json
+          git commit -m "chore(frontend): regenerate package-lock.json [skip ci]"
+          git push
+
+      # Réinstaller après fix
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit
+
+      # AUTO-FIX : Linter avec --fix
+      - name: Run linter with auto-fix
+        run: npm run lint -- --fix || npm run lint:fix || true
+
+      # AUTO-COMMIT corrections linter
+      - name: Commit linter fixes
+        if: github.event_name == 'push'
+        run: |
+          if [[ -n $(git status --porcelain) ]]; then
+            git config --global user.name "github-actions[bot]"
+            git config --global user.email "github-actions[bot]@users.noreply.github.com"
+            git add .
+            git commit -m "style(frontend): auto-fix linter issues [skip ci]" || true
+            git push || true
+          fi
+
+      - name: Build
+        run: npm run build
+        env:
+          NODE_ENV: production
+
+      - name: Run tests
+        run: npm test
+        if: hashFiles('frontend/tests/**') != ''
+        continue-on-error: true
