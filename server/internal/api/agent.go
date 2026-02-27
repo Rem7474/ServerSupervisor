@@ -9,8 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"encoding/json"
-
 	"github.com/gin-gonic/gin"
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/database"
