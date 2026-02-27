@@ -189,8 +189,8 @@ func (h *AgentHandler) ReportCommandResult(c *gin.Context) {
 		return
 	}
 
-	// Route based on command type
-	if result.Type == "docker" {
+	// Route docker AND systemd commands to the docker_commands table
+	if result.Type == "docker" || result.Type == "systemd" {
 		dockerCmd, cmdErr := h.db.GetDockerCommandByID(result.CommandID)
 		if cmdErr != nil || dockerCmd.HostID != hostID {
 			c.JSON(http.StatusForbidden, gin.H{"error": "command does not belong to host"})
