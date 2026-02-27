@@ -195,21 +195,25 @@ func processCommands(s *sender.Sender, commands []sender.PendingCommand) {
 			}
 			if err := json.Unmarshal([]byte(cmd.Payload), &payload); err != nil {
 				log.Printf("Failed to parse docker command payload: %v", err)
-				s.ReportCommandResult(&sender.CommandResult{
+				if err := s.ReportCommandResult(&sender.CommandResult{
 					CommandID: cmd.ID,
 					Status:    "failed",
 					Output:    fmt.Sprintf("invalid payload: %v", err),
 					Type:      "docker",
-				})
+				}); err != nil {
+					log.Printf("Failed to report command result: %v", err)
+				}
 				continue
 			}
 
 			// Report as running
-			s.ReportCommandResult(&sender.CommandResult{
+			if err := s.ReportCommandResult(&sender.CommandResult{
 				CommandID: cmd.ID,
 				Status:    "running",
 				Type:      "docker",
-			})
+			}); err != nil {
+				log.Printf("Failed to report command result: %v", err)
+			}
 
 			if payload.Action == "journalctl" {
 				output, err := collector.ExecuteJournalctl(payload.ContainerName, func(chunk string) {
@@ -225,12 +229,14 @@ func processCommands(s *sender.Sender, commands []sender.PendingCommand) {
 				} else {
 					log.Printf("journalctl %s completed successfully", payload.ContainerName)
 				}
-				s.ReportCommandResult(&sender.CommandResult{
+				if err := s.ReportCommandResult(&sender.CommandResult{
 					CommandID: cmd.ID,
 					Status:    status,
 					Output:    output,
 					Type:      "docker",
-				})
+				}); err != nil {
+					log.Printf("Failed to report command result: %v", err)
+				}
 				continue
 			}
 
@@ -260,12 +266,14 @@ func processCommands(s *sender.Sender, commands []sender.PendingCommand) {
 				log.Printf("Docker %s %s completed successfully", payload.Action, payload.ContainerName)
 			}
 
-			s.ReportCommandResult(&sender.CommandResult{
+			if err := s.ReportCommandResult(&sender.CommandResult{
 				CommandID: cmd.ID,
 				Status:    status,
 				Output:    output,
 				Type:      "docker",
-			})
+			}); err != nil {
+				log.Printf("Failed to report command result: %v", err)
+			}
 
 		case "update", "upgrade", "dist-upgrade":
 			aptCmd := cmd.Type
@@ -302,20 +310,24 @@ func processCommands(s *sender.Sender, commands []sender.PendingCommand) {
 				log.Printf("APT status collected: %d packages, %d security", apt.PendingPackages, apt.SecurityUpdates)
 			}
 
-			s.ReportCommandResult(&sender.CommandResult{
+			if err := s.ReportCommandResult(&sender.CommandResult{
 				CommandID: cmd.ID,
 				Status:    status,
 				Output:    output,
 				AptStatus: aptStatus,
-			})
+			}); err != nil {
+				log.Printf("Failed to report command result: %v", err)
+			}
 
 		default:
 			log.Printf("Unknown command type: %s", cmd.Type)
-			s.ReportCommandResult(&sender.CommandResult{
+			if err := s.ReportCommandResult(&sender.CommandResult{
 				CommandID: cmd.ID,
 				Status:    "failed",
 				Output:    fmt.Sprintf("unknown command type: %s", cmd.Type),
-			})
+			}); err != nil {
+				log.Printf("Failed to report command result: %v", err)
+			}
 		}
 	}
 }
