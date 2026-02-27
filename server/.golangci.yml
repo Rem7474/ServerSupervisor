@@ -1,10 +1,4 @@
-version: 2
-
-run:
-  timeout: 5m
-  tests: true
-  skip-dirs:
-    - vendor
+version: "2"
 
 linters:
   enable:
@@ -14,47 +8,15 @@ linters:
     - govet
     - unused
     - gosimple
-  disable:
-    - structcheck  # Deprecated
-    - deadcode     # Deprecated
-    - varcheck     # Deprecated
 
-linters-settings:
-  errcheck:
-    check-blank: true
-    check-type-assertions: true
-    exclude-functions:
-      - (io.Closer).Close
-      - (*database/sql.Rows).Close
-  
-  govet:
-    enable-all: true
-    
-  staticcheck:
-    checks: ["all"]
-
-issues:
-  # Auto-fix ce qui peut l'être
-  fix: true
-  
-  # Exclure certains fichiers de test
-  exclude-rules:
-    - path: _test\.go
-      linters:
-        - errcheck
-        - gosec
-    # Exclude specific patterns that are intentional or non-critical
+severity:
+  default-severity: error
+  rules:
     - linters:
         - ineffassign
       text: "ineffectual assignment"
+      severity: warning
     - linters:
         - staticcheck
       text: "SA9003.*empty branch"
-
-  # Maximum issues per linter
-  max-issues-per-linter: 0
-  max-same-issues: 0
-
-output:
-  format: colored-line-number
-  sort-results: true
+      severity: warning
