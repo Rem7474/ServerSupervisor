@@ -41,8 +41,12 @@ jobs:
             exit 1
           }
 
-      - name: go vet
-        run: go vet ./...
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v4
+        with:
+          version: latest
+          working-directory: server
+          args: --timeout=5m
 
       - name: Build
         run: CGO_ENABLED=0 go build -ldflags="-s -w" -o /tmp/serversupervisor ./cmd/server
@@ -88,8 +92,12 @@ jobs:
             exit 1
           }
 
-      - name: go vet
-        run: go vet ./...
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v4
+        with:
+          version: latest
+          working-directory: agent
+          args: --timeout=5m
 
       - name: Build (linux/amd64)
         run: CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o /tmp/agent-linux-amd64 ./cmd/agent
@@ -123,8 +131,16 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: frontend/node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('frontend/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-modules-
+
       - name: Install dependencies
-        run: npm install --prefer-offline --no-audit
+        run: npm ci --prefer-offline --no-audit
 
       - name: Build
         run: npm run build
@@ -167,15 +183,5 @@ jobs:
           file: server/Dockerfile
           push: false
           tags: serversupervisor/server:ci
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build agent image (no push)
-        uses: docker/build-push-action@v5
-        with:
-          context: agent
-          file: agent/Dockerfile
-          push: false
-          tags: serversupervisor/agent:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
