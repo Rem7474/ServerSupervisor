@@ -898,9 +898,12 @@ const combinedServices = computed(() => {
         domain,
         path,
         internalPort: portNumber,
-        externalPort: null,
+        externalPort: settings.externalPort || null,
         hostId: entry.hostId,
-        tags: 'proxy'
+        tags: 'proxy',
+        linkToProxy: true,
+        linkToAuthelia: settings.linkToAuthelia || false,
+        exposedToInternet: settings.exposedToInternet || false
       })
     }
   }
