@@ -127,6 +127,8 @@ const loading = ref(false)
 const notifications = ref([])
 const readAtRef = useLocalStorage(STORAGE_KEY, null)
 let pollTimer = null
+// null = premier fetch pas encore fait → pas de notification navigateur au démarrage de session
+let seenIdSet = null
 
 const unreadCount = computed(() =>
   notifications.value.filter(n =>
@@ -152,12 +154,39 @@ function markAllRead() {
   readAtRef.value = new Date().toISOString()
 }
 
+function showBrowserNotification(item) {
+  try {
+    const n = new Notification(`Alerte : ${item.rule_name}`, {
+      body: `${item.host_name} — Valeur : ${item.value?.toFixed(2)}${metricUnit(item.metric)}`,
+      icon: '/favicon.ico',
+      tag: `alert-${item.id}`,
+      requireInteraction: false
+    })
+    n.onclick = () => { window.focus(); n.close() }
+  } catch {
+    // API non supportée ou permission révoquée en cours de session
+  }
+}
+
 async function fetchNotifications() {
   if (loading.value) return
   loading.value = true
   try {
     const res = await apiClient.getNotifications()
-    notifications.value = res.data?.notifications || []
+    const incoming = res.data?.notifications || []
+
+    // Notifications navigateur — uniquement sur les fetches après le premier (évite le flood au chargement)
+    if (seenIdSet !== null && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+      for (const item of incoming) {
+        if (item.browser_notify && !seenIdSet.has(item.id)) {
+          showBrowserNotification(item)
+        }
+      }
+    }
+
+    // Mettre à jour le set des IDs connus
+    seenIdSet = new Set(incoming.map(n => n.id))
+    notifications.value = incoming
   } catch {
     // non-critical — silent fail
   } finally {

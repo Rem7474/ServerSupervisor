@@ -83,8 +83,9 @@
                   </td>
                   <td>{{ formatDurationSecs(rule.duration_seconds) }}</td>
                   <td>
-                    <span v-for="channel in rule.channels" :key="channel" class="badge bg-azure me-1">
-                      {{ channel }}
+                    <span v-for="channel in rule.channels" :key="channel" class="badge me-1"
+                      :class="channel === 'browser' ? 'bg-green-lt text-green' : 'bg-azure-lt text-azure'">
+                      {{ channel === 'browser' ? 'Navigateur' : channel }}
                     </span>
                   </td>
                   <td>
@@ -203,13 +204,35 @@
                   <span class="form-check-label">SMTP (Email)</span>
                 </label>
                 <label class="form-check form-check-inline">
-                  <input 
-                    v-model="channelNtfy" 
-                    class="form-check-input" 
+                  <input
+                    v-model="channelNtfy"
+                    class="form-check-input"
                     type="checkbox"
                   />
                   <span class="form-check-label">Ntfy (Push)</span>
                 </label>
+                <label class="form-check form-check-inline">
+                  <input
+                    v-model="channelBrowser"
+                    class="form-check-input"
+                    type="checkbox"
+                  />
+                  <span class="form-check-label">Navigateur</span>
+                </label>
+              </div>
+              <div v-if="channelBrowser" class="mt-2">
+                <div v-if="browserPermission === 'denied'" class="alert alert-warning py-2 small mb-0">
+                  Notifications bloquées par le navigateur. Autorisez-les dans les paramètres du site.
+                </div>
+                <div v-else-if="browserPermission === 'granted'" class="alert alert-success py-2 small mb-0">
+                  Notifications navigateur autorisées.
+                </div>
+                <div v-else-if="browserPermission === 'unsupported'" class="alert alert-warning py-2 small mb-0">
+                  Ce navigateur ne supporte pas les notifications.
+                </div>
+                <div v-else class="text-secondary small mt-1">
+                  La permission sera demandée à l'enregistrement.
+                </div>
               </div>
             </div>
 
@@ -343,6 +366,8 @@ const form = ref({
 
 const channelSmtp = ref(false)
 const channelNtfy = ref(false)
+const channelBrowser = ref(false)
+const browserPermission = ref(typeof Notification !== 'undefined' ? Notification.permission : 'unsupported')
 
 
 function onKeyDown(e) {
@@ -396,6 +421,7 @@ function startAddAlert() {
   }
   channelSmtp.value = false
   channelNtfy.value = false
+  channelBrowser.value = false
   showModal.value = true
 }
 
@@ -416,6 +442,7 @@ function startEditAlert(rule) {
   }
   channelSmtp.value = rule.channels?.includes('smtp') || false
   channelNtfy.value = rule.channels?.includes('ntfy') || false
+  channelBrowser.value = rule.channels?.includes('browser') || false
   showModal.value = true
 }
 
@@ -427,6 +454,13 @@ async function saveAlert() {
     const channels = []
     if (channelSmtp.value) channels.push('smtp')
     if (channelNtfy.value) channels.push('ntfy')
+    if (channelBrowser.value) channels.push('browser')
+
+    // Demande de permission navigateur si nécessaire
+    if (channelBrowser.value && typeof Notification !== 'undefined' && Notification.permission !== 'granted') {
+      const perm = await Notification.requestPermission()
+      browserPermission.value = perm
+    }
 
     const payload = {
       ...form.value,
@@ -483,6 +517,7 @@ async function testAlert() {
     const channels = []
     if (channelSmtp.value) channels.push('smtp')
     if (channelNtfy.value) channels.push('ntfy')
+    if (channelBrowser.value) channels.push('browser')
     const res = await apiClient.testAlertRule({ ...form.value, channels })
     testResults.value = res.data
   } catch (err) {

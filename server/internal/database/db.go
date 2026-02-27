@@ -1099,7 +1099,8 @@ func (db *DB) GetRecentNotifications(limit int) ([]models.NotificationItem, erro
 		        COALESCE(h.name, ai.host_id) AS host_name,
 		        COALESCE(ar.name, ar.metric || ' ' || ar.operator || ' ' || CAST(ar.threshold AS TEXT)) AS rule_name,
 		        COALESCE(ar.metric, '') AS metric,
-		        ai.value, ai.triggered_at, ai.resolved_at
+		        ai.value, ai.triggered_at, ai.resolved_at,
+		        COALESCE(ar.channels @> '["browser"]'::jsonb, FALSE) AS browser_notify
 		 FROM alert_incidents ai
 		 LEFT JOIN alert_rules ar ON ai.rule_id = ar.id
 		 LEFT JOIN hosts h ON ai.host_id = h.id
@@ -1117,6 +1118,7 @@ func (db *DB) GetRecentNotifications(limit int) ([]models.NotificationItem, erro
 			&item.ID, &item.RuleID, &item.HostID,
 			&item.HostName, &item.RuleName, &item.Metric,
 			&item.Value, &item.TriggeredAt, &item.ResolvedAt,
+			&item.BrowserNotify,
 		); err != nil {
 			continue
 		}
