@@ -77,10 +77,16 @@ func ExecuteSystemdCommand(serviceName, action string, chunkCB func(string)) (st
 		return "", fmt.Errorf("invalid systemd action: %q", action)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
+	       ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	       defer cancel()
 
-	cmd := exec.CommandContext(ctx, "systemctl", action, "--no-pager", serviceName)
+	       args := []string{action, "--no-pager"}
+	       // Pour status, ajoute --output=json
+	       if action == "status" {
+		       args = append(args, "--output=json")
+	       }
+	       args = append(args, serviceName)
+	       cmd := exec.CommandContext(ctx, "systemctl", args...)
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {

@@ -195,10 +195,29 @@ func (h *AgentHandler) ReportCommandResult(c *gin.Context) {
 			c.JSON(http.StatusForbidden, gin.H{"error": "command does not belong to host"})
 			return
 		}
+		// Si c'est une commande systemd status, tente de parser le JSON pour l'affichage frontend
+		if dockerCmd.Action == "systemd_status" && result.Status == "completed" && result.Output != "" {
+			type systemdStatusJSON struct {
+				Name        string `json:"name"`
+				Description string `json:"description"`
+				LoadState   string `json:"load_state"`
+				ActiveState string `json:"active_state"`
+				SubState    string `json:"sub_state"`
+			}
+			var parsed systemdStatusJSON
+			// systemctl --output=json renvoie un tableau JSON
+			var arr []systemdStatusJSON
+			if err := json.Unmarshal([]byte(result.Output), &arr); err == nil && len(arr) > 0 {
+				parsed = arr[0]
+				// On remplace l'output par un résumé lisible
+				result.Output = fmt.Sprintf("%s: %s (%s/%s) - %s", parsed.Name, parsed.Description, parsed.ActiveState, parsed.SubState, parsed.LoadState)
+			}
+		}
 		if err := h.db.UpdateDockerCommandStatus(result.CommandID, result.Status, result.Output); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update command"})
 			return
 		}
+
 		if dockerCmd.AuditLogID != nil {
 			details := ""
 			if result.Status == "failed" {

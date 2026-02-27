@@ -22,6 +22,9 @@ type Config struct {
 
 	// TLS
 	InsecureSkipVerify bool `yaml:"insecure_skip_verify"`
+
+	// APT behaviour
+	AptAutoUpdateOnStart bool `yaml:"apt_auto_update_on_start"`
 }
 
 func Load(path string) (*Config, error) {
@@ -62,6 +65,9 @@ func Load(path string) (*Config, error) {
 	if env := os.Getenv("SUPERVISOR_INSECURE_SKIP_VERIFY"); env != "" {
 		cfg.InsecureSkipVerify = env == "true" || env == "1"
 	}
+	if env := os.Getenv("SUPERVISOR_APT_AUTO_UPDATE_ON_START"); env != "" {
+		cfg.AptAutoUpdateOnStart = env == "true" || env == "1"
+	}
 
 	if cfg.APIKey == "" {
 		return nil, fmt.Errorf("api_key is required (set in config or SUPERVISOR_API_KEY env var)")
@@ -86,5 +92,8 @@ collect_apt: true
 
 # Skip TLS verification (for self-signed certs)
 insecure_skip_verify: false
+
+# Automatically run apt update at agent startup (opt-in, default false)
+apt_auto_update_on_start: false
 `
 }

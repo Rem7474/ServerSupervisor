@@ -14,8 +14,9 @@ import (
 )
 
 type Sender struct {
-	cfg    *config.Config
-	client *http.Client
+	cfg           *config.Config
+	reportClient  *http.Client // 30s — periodic reports
+	commandClient *http.Client // 30min — long-running command results/streaming
 }
 
 type Report struct {
@@ -52,6 +53,10 @@ type CommandResult struct {
 }
 
 func New(cfg *config.Config) *Sender {
+	if cfg.InsecureSkipVerify {
+		log.Println("WARNING: TLS certificate verification is disabled. Not suitable for production.")
+	}
+
 	transport := &http.Transport{
 		TLSClientConfig: &tls.Config{
 			InsecureSkipVerify: cfg.InsecureSkipVerify,
@@ -60,8 +65,12 @@ func New(cfg *config.Config) *Sender {
 
 	return &Sender{
 		cfg: cfg,
-		client: &http.Client{
+		reportClient: &http.Client{
 			Timeout:   30 * time.Second,
+			Transport: transport,
+		},
+		commandClient: &http.Client{
+			Timeout:   30 * time.Minute,
 			Transport: transport,
 		},
 	}
@@ -82,7 +91,7 @@ func (s *Sender) SendReport(report *Report) (*ReportResponse, error) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-API-Key", s.cfg.APIKey)
 
-	resp, err := s.client.Do(req)
+	resp, err := s.reportClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to send report: %w", err)
 	}
@@ -102,7 +111,29 @@ func (s *Sender) SendReport(report *Report) (*ReportResponse, error) {
 	return &response, nil
 }
 
-// ReportCommandResult sends the result of a command execution back to the server
+// SendReportWithRetry wraps SendReport with exponential backoff (3 attempts).
+// Only reports should be retried — command results must not be retried to avoid
+// double-execution side effects.
+func (s *Sender) SendReportWithRetry(report *Report) (*ReportResponse, error) {
+	var lastErr error
+	delays := []time.Duration{5 * time.Second, 15 * time.Second}
+	for attempt := 0; attempt <= len(delays); attempt++ {
+		if attempt > 0 {
+			log.Printf("Retrying report (attempt %d/%d) after %v: %v",
+				attempt+1, len(delays)+1, delays[attempt-1], lastErr)
+			time.Sleep(delays[attempt-1])
+		}
+		resp, err := s.SendReport(report)
+		if err == nil {
+			return resp, nil
+		}
+		lastErr = err
+	}
+	return nil, fmt.Errorf("all %d report attempts failed: %w", len(delays)+1, lastErr)
+}
+
+// ReportCommandResult sends the result of a command execution back to the server.
+// Uses the long-timeout commandClient to support lengthy operations (apt upgrade, etc.).
 func (s *Sender) ReportCommandResult(result *CommandResult) error {
 	data, err := json.Marshal(result)
 	if err != nil {
@@ -117,7 +148,7 @@ func (s *Sender) ReportCommandResult(result *CommandResult) error {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-API-Key", s.cfg.APIKey)
 
-	resp, err := s.client.Do(req)
+	resp, err := s.commandClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to send command result: %w", err)
 	}
@@ -132,43 +163,8 @@ func (s *Sender) ReportCommandResult(result *CommandResult) error {
 	return nil
 }
 
-// ReportCommandStatus sends a status update for a running command
-func (s *Sender) ReportCommandStatus(commandID int64, status string) error {
-	result := &CommandResult{
-		CommandID: commandID,
-		Status:    status,
-		Output:    "",
-	}
-
-	data, err := json.Marshal(result)
-	if err != nil {
-		return fmt.Errorf("failed to marshal status: %w", err)
-	}
-
-	req, err := http.NewRequest("POST", s.cfg.ServerURL+"/api/agent/command/result", bytes.NewReader(data))
-	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-API-Key", s.cfg.APIKey)
-
-	resp, err := s.client.Do(req)
-	if err != nil {
-		return fmt.Errorf("failed to send command status: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("server returned status %d: %s", resp.StatusCode, string(body))
-	}
-
-	log.Printf("Command #%d marked as %s", commandID, status)
-	return nil
-}
-
-// StreamCommandChunk sends a chunk of command output to the server for real-time streaming
+// StreamCommandChunk sends a chunk of command output to the server for real-time streaming.
+// Uses commandClient (30min timeout) since streaming can span long operations.
 func (s *Sender) StreamCommandChunk(commandID int64, chunk string) error {
 	payload := struct {
 		CommandID string `json:"command_id"`
@@ -191,7 +187,7 @@ func (s *Sender) StreamCommandChunk(commandID int64, chunk string) error {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-API-Key", s.cfg.APIKey)
 
-	resp, err := s.client.Do(req)
+	resp, err := s.commandClient.Do(req)
 	if err != nil {
 		// Don't fail the command if streaming fails, just log it
 		log.Printf("Failed to stream chunk for command #%d: %v", commandID, err)
@@ -227,7 +223,7 @@ func (s *Sender) SendAuditLog(action, status, details string) error {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("X-API-Key", s.cfg.APIKey)
 
-	resp, err := s.client.Do(req)
+	resp, err := s.reportClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to send audit log: %w", err)
 	}
