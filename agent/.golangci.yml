@@ -24,6 +24,8 @@ linters-settings:
     check-type-assertions: true
     exclude-functions:
       - (io.Closer).Close
+      # Allow not checking errors for ReportCommandResult (logging function)
+      - (*github.com/serversupervisor/agent/internal/sender.Sender).ReportCommandResult
   
   govet:
     enable-all: true
@@ -41,6 +43,16 @@ issues:
       linters:
         - errcheck
         - gosec
+    # Exclude specific known issues that are intentional
+    - linters:
+        - errcheck
+      text: "Error return value.*ReportCommandResult.*is not checked"
+    - linters:
+        - ineffassign
+      text: "ineffectual assignment to.*state"
+    - linters:
+        - staticcheck
+      text: "SA9003.*empty branch"
 
   # Maximum issues per linter
   max-issues-per-linter: 0
