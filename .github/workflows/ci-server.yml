@@ -1,0 +1,86 @@
+name: CI Server
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'server/**'
+      - '.github/workflows/ci-server.yml'
+  pull_request:
+    paths:
+      - 'server/**'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./server
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: true
+          cache-dependency-path: server/go.sum
+
+      # AUTO-FIX : Go mod tidy
+      - name: Auto-fix Go modules
+        id: gomod
+        run: |
+          echo "Running go mod tidy..."
+          go mod tidy
+          
+          if [[ -n $(git status --porcelain) ]]; then
+            echo "changes=true" >> $GITHUB_OUTPUT
+            echo "✅ go.mod/go.sum updated"
+          else
+            echo "changes=false" >> $GITHUB_OUTPUT
+            echo "✅ go.mod/go.sum already up to date"
+          fi
+
+      - name: Commit go mod changes
+        if: steps.gomod.outputs.changes == 'true' && github.event_name == 'push'
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add go.mod go.sum
+          git commit -m "chore(server): auto-fix go mod tidy [skip ci]"
+          git push
+
+      - name: Verify Go modules
+        run: go mod verify
+
+      - name: Build
+        run: go build -v ./...
+
+      - name: Run tests
+        run: go test -v -race ./...
+
+      - name: Lint with auto-fix
+        uses: golangci/golangci-lint-action@v4
+        with:
+          version: latest
+          working-directory: server
+          args: --timeout=5m --fix
+
+      - name: Commit linter fixes
+        if: github.event_name == 'push'
+        run: |
+          if [[ -n $(git status --porcelain) ]]; then
+            git config --global user.name "github-actions[bot]"
+            git config --global user.email "github-actions[bot]@users.noreply.github.com"
+            git add .
+            git commit -m "style(server): auto-fix linter issues [skip ci]" || true
+            git push || true
+          fi
