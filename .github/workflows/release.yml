@@ -52,29 +52,31 @@ jobs:
           else
             RANGE="HEAD"
           fi
-          
+
           # Générer changelog groupé par type (feat, fix, etc.)
           CHANGELOG=""
-          
+
           # Features
           FEATURES=$(git log "$RANGE" --pretty=format:"- %s (%h)" --no-merges --grep="^feat" | head -20)
           if [ -n "$FEATURES" ]; then
-            CHANGELOG="${CHANGELOG}### ✨ Features%0A${FEATURES}%0A%0A"
+            CHANGELOG="${CHANGELOG}### ✨ Features\n${FEATURES}\n\n"
           fi
-          
+
           # Fixes
           FIXES=$(git log "$RANGE" --pretty=format:"- %s (%h)" --no-merges --grep="^fix" | head -20)
           if [ -n "$FIXES" ]; then
-            CHANGELOG="${CHANGELOG}### 🐛 Bug Fixes%0A${FIXES}%0A%0A"
+            CHANGELOG="${CHANGELOG}### 🐛 Bug Fixes\n${FIXES}\n\n"
           fi
-          
+
           # Other changes
           OTHERS=$(git log "$RANGE" --pretty=format:"- %s (%h)" --no-merges --grep="^chore\|^refactor\|^perf" | head -10)
           if [ -n "$OTHERS" ]; then
-            CHANGELOG="${CHANGELOG}### 🔧 Other Changes%0A${OTHERS}%0A"
+            CHANGELOG="${CHANGELOG}### 🔧 Other Changes\n${OTHERS}\n"
           fi
-          
-          echo "changelog=${CHANGELOG}" >> "$GITHUB_OUTPUT"
+
+          # Échapper les caractères spéciaux pour GitHub Actions (remplacer \n par %0A, \r par %0D, % par %25)
+          SAFE_CHANGELOG=$(printf "%s" "$CHANGELOG" | sed -e 's/%/%25/g' -e 's/\r/%0D/g' -e 's/\n/%0A/g')
+          echo "changelog=$SAFE_CHANGELOG" >> "$GITHUB_OUTPUT"
 
   # ─────────────────────────────────────────
   # Binaires agent multi-plateforme
