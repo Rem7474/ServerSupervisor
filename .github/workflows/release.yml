@@ -77,9 +77,10 @@ jobs:
           # Nettoyer le changelog : supprimer les \n en trop en fin de chaîne
           CHANGELOG=$(printf "%s" "$CHANGELOG" | sed ':a;N;$!ba;s/\n\{2,\}/\n/g')
 
-          # Échapper les caractères spéciaux pour GitHub Actions (remplacer \n par %0A, \r par %0D, % par %25)
-          SAFE_CHANGELOG=$(printf "%s" "$CHANGELOG" | sed -e 's/%/%25/g' -e 's/\r/%0D/g' -e 's/\n/%0A/g')
-          echo "changelog=$SAFE_CHANGELOG" >> "$GITHUB_OUTPUT"
+          # Définir la sortie GitHub Actions en multi-lignes (évite les encodages %0A)
+          echo "changelog<<EOF" >> "$GITHUB_OUTPUT"
+          printf "%s\n" "$CHANGELOG" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
 
   # ─────────────────────────────────────────
   # Binaires agent multi-plateforme
