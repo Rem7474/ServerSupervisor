@@ -41,30 +41,36 @@ Système de supervision d'infrastructure : monitoring de VMs, conteneurs Docker,
 
 ### Dashboard
 - **Vue d'ensemble** : tous les hôtes avec statut temps réel (CPU, RAM, uptime)
-![Dashboard](./screenshot/Dashboard.png)
+  ![Dashboard](./screenshot/Dashboard.png)
 - **Détail par hôte** : graphiques CPU/RAM historiques, disques, conteneurs, APT
-![Host Detail](./screenshot/HostDetail.png)
+  ![Host Detail](./screenshot/HostDetail.png)
 - **Docker** : vue globale de tous les conteneurs sur toute l'infrastructure
-![Docker](./screenshot/Docker.png)
+  ![Docker](./screenshot/Docker.png)
 - **Network** : ports exposés et trafic réseau par hôte et topologie réseau
 - **APT** : gestion centralisée des mises à jour avec actions groupées et console live
-![APT](./screenshot/APT.png)
+  ![APT](./screenshot/APT.png)
+- **systemd** : exécution à distance des commandes systemd (start/stop/restart/status), affichage enrichi du statut et des logs (JSON)
+- **Streaming commandes** : affichage en temps réel de la sortie des commandes longues (journalctl, apt upgrade...)
 - **Versions** : suivi des releases GitHub et comparaison avec les images Docker en cours
 - **Audit** : logs d'actions utilisateurs et commandes système
-![Audit](./screenshot/Audit.png)
+  ![Audit](./screenshot/Audit.png)
 - **Alertes** : règles d'alertes configurables avec notifications webhook/email
 
 ### Agent
 - Collecte automatique : CPU, RAM, disque, réseau, uptime
 - Monitoring Docker via CLI (pas de SDK requis)
 - Détection des mises à jour APT disponibles
-- Exécution de commandes APT poussées depuis le dashboard
+- Exécution de commandes APT et systemd poussées depuis le dashboard (start/stop/restart/status)
+- Sortie des commandes systemd et journalctl en JSON (`--output=json`), parsing et reporting enrichi
+- Streaming temps réel de la sortie des commandes longues (journalctl, apt upgrade...)
 - Binaire unique sans dépendances
 
 ### Sécurité
 - Authentification JWT avec refresh tokens
 - MFA/2FA (TOTP) optionnel
 - API Keys uniques par agent avec rotation
+- Vérification stricte de l'appartenance des commandes à chaque hôte (`command does not belong to host`)
+- Gestion du champ `host_id` dans tous les échanges agent ↔ serveur
 - Rate limiting par IP avec support reverse proxy
 - Audit logs des actions administrateur
 - RBAC (admin/viewer)
@@ -93,6 +99,22 @@ Le dashboard est accessible sur `http://localhost:8080` (login: admin/admin par 
 1. Ouvrir le dashboard → **Ajouter un hôte**
 2. Renseigner hostname, IP, OS
 3. **Copier la clé API** affichée (elle ne sera plus visible)
+
+### Nouvelles fonctionnalités (2026)
+- **Support avancé systemd** :
+  - Exécution de commandes systemd (start/stop/restart/status) à distance
+  - Sortie `systemctl status` et `journalctl` en JSON (via `--output=json`)
+  - Parsing et affichage enrichi côté dashboard
+- **Reporting de commandes amélioré** :
+  - Statut détaillé (running, completed, failed) pour chaque commande
+  - Streaming temps réel de la sortie des commandes longues (journalctl, apt upgrade...)
+- **Sécurité renforcée** :
+  - Vérification stricte de l'appartenance des commandes à chaque hôte (`command does not belong to host`)
+  - Gestion du champ `host_id` dans tous les échanges agent ↔ serveur
+- **Corrections et robustesse** :
+  - Correction du reporting des types de commandes (systemd, apt, docker)
+  - Suppression des champs obsolètes (HostID dans la config agent)
+  - Compatibilité Go 1.22+, Node.js 25+
 
 ### 3. Installer l'agent sur une VM
 
@@ -336,7 +358,7 @@ npm run dev
 # Build complet via Docker
 docker compose build
 
-# Build agent pour Linux
+# Build agent pour Linux (Go 1.22+ recommandé)
 cd agent
 bash build.sh v1.0.0
 ```
