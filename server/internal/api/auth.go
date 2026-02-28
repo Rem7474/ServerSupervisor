@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -623,4 +624,45 @@ func (h *AuthHandler) GetLoginEvents(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"events": events})
+}
+
+// RevokeAllSessions revokes all refresh tokens for the current user except the one provided.
+func (h *AuthHandler) RevokeAllSessions(c *gin.Context) {
+	username := c.GetString("username")
+	if username == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	var req struct {
+		RefreshToken string `json:"refresh_token"`
+	}
+	c.ShouldBindJSON(&req)
+	currentHash := hashToken(req.RefreshToken)
+	_ = h.db.RevokeAllOtherSessions(username, currentHash)
+	c.JSON(http.StatusOK, gin.H{"status": "ok"})
+}
+
+// GetAllLoginEventsAdmin returns paginated login events for all users (admin only).
+func (h *AuthHandler) GetAllLoginEventsAdmin(c *gin.Context) {
+	if c.GetString("role") != "admin" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+		return
+	}
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	if page < 1 {
+		page = 1
+	}
+	limit := 50
+	offset := (page - 1) * limit
+
+	events, err := h.db.GetAllLoginEvents(limit, offset)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch login events"})
+		return
+	}
+	total, _ := h.db.CountLoginEvents()
+	if events == nil {
+		events = []models.LoginEvent{}
+	}
+	c.JSON(http.StatusOK, gin.H{"events": events, "total": total, "page": page, "limit": limit})
 }

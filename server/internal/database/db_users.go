@@ -138,6 +138,17 @@ func (db *DB) RevokeRefreshToken(tokenHash string) error {
 	return err
 }
 
+func (db *DB) RevokeAllOtherSessions(username, currentTokenHash string) error {
+	_, err := db.conn.Exec(
+		`UPDATE refresh_tokens SET revoked_at = NOW()
+		 WHERE user_id = (SELECT id FROM users WHERE username = $1)
+		   AND token_hash != $2
+		   AND revoked_at IS NULL`,
+		username, currentTokenHash,
+	)
+	return err
+}
+
 // ========== User TOTP / MFA ==========
 
 func (db *DB) SetUserTOTPSecret(userID int64, secret, backupCodes string, enabled bool) error {

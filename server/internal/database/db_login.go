@@ -63,6 +63,34 @@ func (db *DB) GetLoginStats(since time.Time) (*models.LoginStats, error) {
 	return &stats, nil
 }
 
+func (db *DB) GetAllLoginEvents(limit, offset int) ([]models.LoginEvent, error) {
+	rows, err := db.conn.Query(
+		`SELECT id, username, ip_address, success, user_agent, created_at
+		 FROM login_events ORDER BY created_at DESC LIMIT $1 OFFSET $2`,
+		limit, offset,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var events []models.LoginEvent
+	for rows.Next() {
+		var e models.LoginEvent
+		if err := rows.Scan(&e.ID, &e.Username, &e.IPAddress, &e.Success, &e.UserAgent, &e.CreatedAt); err != nil {
+			continue
+		}
+		events = append(events, e)
+	}
+	return events, nil
+}
+
+func (db *DB) CountLoginEvents() (int64, error) {
+	var count int64
+	err := db.conn.QueryRow(`SELECT COUNT(*) FROM login_events`).Scan(&count)
+	return count, err
+}
+
 // GetTopFailedIPs returns the IPs with the most failed login attempts in the given window.
 func (db *DB) GetTopFailedIPs(since time.Time, limit int) ([]models.IPFailCount, error) {
 	rows, err := db.conn.Query(`

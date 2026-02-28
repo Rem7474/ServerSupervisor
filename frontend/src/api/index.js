@@ -36,6 +36,8 @@ export default {
   changePassword: (currentPassword, newPassword) =>
     api.post('/v1/auth/change-password', { current_password: currentPassword, new_password: newPassword }),
   getLoginEvents: () => api.get('/v1/auth/login-events'),
+  getLoginEventsAdmin: (page = 1, limit = 50) => api.get(`/v1/auth/login-events/admin?page=${page}&limit=${limit}`),
+  revokeAllSessions: (refreshToken) => api.post('/v1/auth/revoke-all-sessions', { refresh_token: refreshToken }),
   getSecuritySummary: () => api.get('/v1/auth/security'),
   unblockIP: (ip) => api.delete(`/v1/auth/blocked-ips/${ip}`),
   getMFAStatus: () => api.get('/v1/auth/mfa/status'),

@@ -69,6 +69,8 @@ func SetupRouter(db *database.DB, cfg *config.Config) *gin.Engine {
 		api.GET("/auth/profile", authH.GetProfile)
 		api.POST("/auth/change-password", authH.ChangePassword)
 		api.GET("/auth/login-events", authH.GetLoginEvents)
+		api.GET("/auth/login-events/admin", authH.GetAllLoginEventsAdmin)
+		api.POST("/auth/revoke-all-sessions", authH.RevokeAllSessions)
 		api.GET("/auth/mfa/status", authH.GetMFAStatus)
 		api.POST("/auth/mfa/setup", authH.SetupMFA)
 		api.POST("/auth/mfa/verify", authH.VerifyMFA)
