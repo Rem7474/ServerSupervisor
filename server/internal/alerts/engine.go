@@ -167,49 +167,57 @@ func (n *notifier) notify(cfg *config.Config, rule models.AlertRule, host models
 		"triggered_at": time.Now().UTC(),
 	}
 
-	config := map[string]interface{}{}
-	if rule.ChannelConfig != "" {
-		_ = json.Unmarshal([]byte(rule.ChannelConfig), &config)
-	}
+	for _, channel := range rule.Actions.Channels {
+		switch channel {
+		case "smtp":
+			to := rule.Actions.SMTPTo
+			if to == "" {
+				to = cfg.SMTPTo
+			}
+			if to == "" || cfg.SMTPFrom == "" {
+				log.Printf("Alerts: SMTP to/from not configured for rule %d", rule.ID)
+				continue
+			}
+			n.sendSMTP(cfg, cfg.SMTPFrom, to, "[ServerSupervisor] Alert triggered", msg)
 
-	switch rule.Channel {
-	case "notify":
-		url := cfg.NotifyURL
-		if v, ok := config["url"].(string); ok && v != "" {
-			url = v
+		case "ntfy":
+			topic := rule.Actions.NtfyTopic
+			if topic == "" {
+				log.Printf("Alerts: ntfy topic not configured for rule %d", rule.ID)
+				continue
+			}
+			data, _ := json.Marshal(payload)
+			req, _ := http.NewRequest("POST", "https://ntfy.sh/"+topic, bytes.NewReader(data))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Title", "ServerSupervisor Alert")
+			if resp, err := n.client.Do(req); err != nil {
+				log.Printf("Alerts: ntfy failed: %v", err)
+			} else {
+				_ = resp.Body.Close()
+			}
+
+		case "notify":
+			// Legacy webhook channel — send to configured notify URL
+			url := cfg.NotifyURL
+			if url == "" {
+				log.Printf("Alerts: notify URL not configured")
+				continue
+			}
+			data, _ := json.Marshal(payload)
+			req, _ := http.NewRequest("POST", url, bytes.NewReader(data))
+			req.Header.Set("Content-Type", "application/json")
+			if resp, err := n.client.Do(req); err != nil {
+				log.Printf("Alerts: notify failed: %v", err)
+			} else {
+				_ = resp.Body.Close()
+			}
+
+		case "browser":
+			// Browser notifications are delivered via the WebSocket push mechanism; no backend action needed here.
+
+		default:
+			log.Printf("Alerts: unknown channel %q for rule %d", channel, rule.ID)
 		}
-		if url == "" {
-			log.Printf("Alerts: notify URL not configured")
-			return
-		}
-		data, _ := json.Marshal(payload)
-		req, _ := http.NewRequest("POST", url, bytes.NewReader(data))
-		req.Header.Set("Content-Type", "application/json")
-		if resp, err := n.client.Do(req); err != nil {
-			log.Printf("Alerts: notify failed: %v", err)
-		} else {
-			_ = resp.Body.Close()
-		}
-	case "smtp":
-		to := cfg.SMTPTo
-		from := cfg.SMTPFrom
-		if v, ok := config["to"].(string); ok && v != "" {
-			to = v
-		}
-		if v, ok := config["from"].(string); ok && v != "" {
-			from = v
-		}
-		if to == "" || from == "" {
-			log.Printf("Alerts: SMTP to/from not configured")
-			return
-		}
-		subject := "[ServerSupervisor] Alert triggered"
-		if v, ok := config["subject"].(string); ok && v != "" {
-			subject = v
-		}
-		n.sendSMTP(cfg, from, to, subject, msg)
-	default:
-		log.Printf("Alerts: unknown channel %s", rule.Channel)
 	}
 }
 

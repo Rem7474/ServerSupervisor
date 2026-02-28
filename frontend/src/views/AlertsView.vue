@@ -83,7 +83,7 @@
                   </td>
                   <td>{{ formatDurationSecs(rule.duration_seconds) }}</td>
                   <td>
-                    <span v-for="channel in rule.channels" :key="channel" class="badge me-1"
+                    <span v-for="channel in rule.actions?.channels" :key="channel" class="badge me-1"
                       :class="channel === 'browser' ? 'bg-green-lt text-green' : 'bg-azure-lt text-azure'">
                       {{ channel === 'browser' ? 'Navigateur' : channel }}
                     </span>
@@ -183,9 +183,9 @@
 
             <div class="mb-3">
               <label class="form-label">Période de silence (secondes)</label>
-              <input 
-                v-model.number="form.cooldown" 
-                type="number" 
+              <input
+                v-model.number="form.actions.cooldown"
+                type="number"
                 class="form-control"
                 placeholder="3600"
               />
@@ -238,9 +238,9 @@
 
             <div v-if="channelSmtp" class="mb-3">
               <label class="form-label">Destinataire(s) email</label>
-              <input 
-                v-model="form.smtp_to" 
-                type="text" 
+              <input
+                v-model="form.actions.smtp_to"
+                type="text"
                 class="form-control"
                 placeholder="admin@example.com, ops@example.com"
               />
@@ -249,9 +249,9 @@
 
             <div v-if="channelNtfy" class="mb-3">
               <label class="form-label">Topic ntfy</label>
-              <input 
-                v-model="form.ntfy_topic" 
-                type="text" 
+              <input
+                v-model="form.actions.ntfy_topic"
+                type="text"
                 class="form-control"
                 placeholder="mon-serveur-alerts"
               />
@@ -359,9 +359,12 @@ const form = ref({
   operator: '>',
   threshold: 80,
   duration: 300,
-  cooldown: 3600,
-  smtp_to: '',
-  ntfy_topic: ''
+  actions: {
+    channels: [],
+    smtp_to: '',
+    ntfy_topic: '',
+    cooldown: 3600
+  }
 })
 
 const channelSmtp = ref(false)
@@ -415,9 +418,7 @@ function startAddAlert() {
     operator: '>',
     threshold: 80,
     duration: 300,
-    cooldown: 3600,
-    smtp_to: '',
-    ntfy_topic: ''
+    actions: { channels: [], smtp_to: '', ntfy_topic: '', cooldown: 3600 }
   }
   channelSmtp.value = false
   channelNtfy.value = false
@@ -428,6 +429,7 @@ function startAddAlert() {
 function startEditAlert(rule) {
   testResults.value = null
   editingRule.value = rule
+  const act = rule.actions || {}
   form.value = {
     name: rule.name || '',
     enabled: rule.enabled,
@@ -436,13 +438,16 @@ function startEditAlert(rule) {
     operator: rule.operator,
     threshold: rule.threshold,
     duration: rule.duration_seconds,
-    cooldown: rule.cooldown || 3600,
-    smtp_to: rule.smtp_to || '',
-    ntfy_topic: rule.ntfy_topic || ''
+    actions: {
+      channels: act.channels || [],
+      smtp_to: act.smtp_to || '',
+      ntfy_topic: act.ntfy_topic || '',
+      cooldown: act.cooldown || 3600
+    }
   }
-  channelSmtp.value = rule.channels?.includes('smtp') || false
-  channelNtfy.value = rule.channels?.includes('ntfy') || false
-  channelBrowser.value = rule.channels?.includes('browser') || false
+  channelSmtp.value = act.channels?.includes('smtp') || false
+  channelNtfy.value = act.channels?.includes('ntfy') || false
+  channelBrowser.value = act.channels?.includes('browser') || false
   showModal.value = true
 }
 
@@ -464,7 +469,7 @@ async function saveAlert() {
 
     const payload = {
       ...form.value,
-      channels
+      actions: { ...form.value.actions, channels }
     }
 
     if (editingRule.value) {
@@ -518,7 +523,10 @@ async function testAlert() {
     if (channelSmtp.value) channels.push('smtp')
     if (channelNtfy.value) channels.push('ntfy')
     if (channelBrowser.value) channels.push('browser')
-    const res = await apiClient.testAlertRule({ ...form.value, channels })
+    const res = await apiClient.testAlertRule({
+      ...form.value,
+      actions: { ...form.value.actions, channels }
+    })
     testResults.value = res.data
   } catch (err) {
     console.error('Test alert failed:', err)

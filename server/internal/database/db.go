@@ -457,6 +457,20 @@ func (db *DB) migrate() error {
 		`CREATE INDEX IF NOT EXISTS idx_remote_commands_host_status ON remote_commands(host_id, status)`,
 		`DROP TABLE IF EXISTS docker_commands`,
 		`DROP TABLE IF EXISTS apt_commands`,
+		// Migration: Consolidate alert_rules notification config into single actions JSONB column
+		`ALTER TABLE IF EXISTS alert_rules ADD COLUMN IF NOT EXISTS actions JSONB NOT NULL DEFAULT '{}'::jsonb`,
+		`UPDATE alert_rules SET actions = jsonb_build_object(
+			'channels', COALESCE(channels, '[]'::jsonb),
+			'smtp_to', COALESCE(smtp_to, ''),
+			'ntfy_topic', COALESCE(ntfy_topic, ''),
+			'cooldown', COALESCE(cooldown, 0)
+		) WHERE actions = '{}'::jsonb OR actions IS NULL`,
+		`ALTER TABLE IF EXISTS alert_rules DROP COLUMN IF EXISTS channel`,
+		`ALTER TABLE IF EXISTS alert_rules DROP COLUMN IF EXISTS channel_config`,
+		`ALTER TABLE IF EXISTS alert_rules DROP COLUMN IF EXISTS channels`,
+		`ALTER TABLE IF EXISTS alert_rules DROP COLUMN IF EXISTS smtp_to`,
+		`ALTER TABLE IF EXISTS alert_rules DROP COLUMN IF EXISTS ntfy_topic`,
+		`ALTER TABLE IF EXISTS alert_rules DROP COLUMN IF EXISTS cooldown`,
 	}
 
 	for _, m := range migrations {
@@ -992,28 +1006,50 @@ func (db *DB) CleanOldMetrics(retentionDays int) (int64, error) {
 // ========== Docker ==========
 
 func (db *DB) UpsertDockerContainers(hostID string, containers []models.DockerContainer) error {
-	// Delete removed containers
-	_, err := db.conn.Exec(`DELETE FROM docker_containers WHERE host_id = $1`, hostID)
-	if err != nil {
-		return err
-	}
-
+	// UPSERT each container, tracking IDs to prune removed ones afterwards
+	ids := make([]string, 0, len(containers))
 	for _, c := range containers {
 		labelsJSON, _ := json.Marshal(c.Labels)
 		envVarsJSON, _ := json.Marshal(c.EnvVars)
 		volumesJSON, _ := json.Marshal(c.Volumes)
 		networksJSON, _ := json.Marshal(c.Networks)
-		_, err := db.conn.Exec(
-			`INSERT INTO docker_containers (id, host_id, container_id, name, image, image_tag, image_id, state, status, created, ports, labels, env_vars, volumes, networks, updated_at)
-			 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,NOW())`,
+		_, err := db.conn.Exec(`
+			INSERT INTO docker_containers (id, host_id, container_id, name, image, image_tag, image_id, state, status, created, ports, labels, env_vars, volumes, networks, updated_at)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,NOW())
+			ON CONFLICT (id) DO UPDATE SET
+				name       = EXCLUDED.name,
+				image      = EXCLUDED.image,
+				image_tag  = EXCLUDED.image_tag,
+				image_id   = EXCLUDED.image_id,
+				state      = EXCLUDED.state,
+				status     = EXCLUDED.status,
+				created    = EXCLUDED.created,
+				ports      = EXCLUDED.ports,
+				labels     = EXCLUDED.labels,
+				env_vars   = EXCLUDED.env_vars,
+				volumes    = EXCLUDED.volumes,
+				networks   = EXCLUDED.networks,
+				updated_at = NOW()`,
 			c.ID, hostID, c.ContainerID, c.Name, c.Image, c.ImageTag, c.ImageID, c.State, c.Status, c.Created, c.Ports,
 			string(labelsJSON), string(envVarsJSON), string(volumesJSON), string(networksJSON),
 		)
 		if err != nil {
 			return err
 		}
+		ids = append(ids, c.ID)
 	}
-	return nil
+
+	// Remove containers no longer reported by the agent
+	if len(ids) > 0 {
+		_, err := db.conn.Exec(
+			`DELETE FROM docker_containers WHERE host_id = $1 AND NOT (id = ANY($2))`,
+			hostID, pq.Array(ids),
+		)
+		return err
+	}
+	// Agent reported no containers — clear all for this host
+	_, err := db.conn.Exec(`DELETE FROM docker_containers WHERE host_id = $1`, hostID)
+	return err
 }
 
 func (db *DB) GetDockerContainers(hostID string) ([]models.DockerContainer, error) {
@@ -1301,47 +1337,87 @@ func (db *DB) GetAptStatus(hostID string) (*models.AptStatus, error) {
 	return &s, nil
 }
 
-// CleanupStalledCommands marks pending/running commands as failed if they're older than the timeout
+// CleanupStalledCommands marks pending/running commands as failed if they're older than the timeout.
+// Also closes any linked audit log entries to keep the audit trail consistent.
 func (db *DB) CleanupStalledCommands(timeoutMinutes int) error {
-	query := `
+	rows, err := db.conn.Query(`
 		UPDATE remote_commands
 		SET status = 'failed',
 		    output = 'Command timed out - agent may have crashed or restarted',
 		    ended_at = NOW()
 		WHERE status IN ('pending', 'running')
 		  AND created_at < NOW() - INTERVAL '1 minute' * $1
-	`
-	result, err := db.conn.Exec(query, timeoutMinutes)
+		RETURNING audit_log_id`,
+		timeoutMinutes)
 	if err != nil {
 		return fmt.Errorf("failed to cleanup stalled commands: %w", err)
 	}
+	defer rows.Close()
 
-	affected, _ := result.RowsAffected()
-	if affected > 0 {
-		log.Printf("Cleaned up %d stalled remote commands", affected)
+	var auditIDs []int64
+	count := 0
+	for rows.Next() {
+		count++
+		var auditLogID sql.NullInt64
+		if err := rows.Scan(&auditLogID); err == nil && auditLogID.Valid {
+			auditIDs = append(auditIDs, auditLogID.Int64)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	if count > 0 {
+		log.Printf("Cleaned up %d stalled remote commands", count)
+		if len(auditIDs) > 0 {
+			_, _ = db.conn.Exec(`
+				UPDATE audit_logs SET status = 'failed',
+				    details = 'Command timed out - agent may have crashed or restarted'
+				WHERE id = ANY($1)`,
+				pq.Array(auditIDs))
+		}
 	}
 	return nil
 }
 
-// CleanupHostStalledCommands marks old pending/running commands for a specific host as failed
+// CleanupHostStalledCommands marks old pending/running commands for a specific host as failed.
+// Also closes any linked audit log entries to keep the audit trail consistent.
 func (db *DB) CleanupHostStalledCommands(hostID string, timeoutMinutes int) error {
-	query := `
+	rows, err := db.conn.Query(`
 		UPDATE remote_commands
 		SET status = 'failed',
-			output = 'Command timed out - agent may have crashed or restarted',
-			ended_at = NOW()
+		    output = 'Command timed out - agent may have crashed or restarted',
+		    ended_at = NOW()
 		WHERE host_id = $1
 		  AND status IN ('pending', 'running')
 		  AND created_at < NOW() - INTERVAL '1 minute' * $2
-	`
-	result, err := db.conn.Exec(query, hostID, timeoutMinutes)
+		RETURNING audit_log_id`,
+		hostID, timeoutMinutes)
 	if err != nil {
 		return fmt.Errorf("failed to cleanup host stalled commands: %w", err)
 	}
+	defer rows.Close()
 
-	affected, _ := result.RowsAffected()
-	if affected > 0 {
-		log.Printf("Cleaned up %d stalled commands for host %s", affected, hostID)
+	var auditIDs []int64
+	count := 0
+	for rows.Next() {
+		count++
+		var auditLogID sql.NullInt64
+		if err := rows.Scan(&auditLogID); err == nil && auditLogID.Valid {
+			auditIDs = append(auditIDs, auditLogID.Int64)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	if count > 0 {
+		log.Printf("Cleaned up %d stalled commands for host %s", count, hostID)
+		if len(auditIDs) > 0 {
+			_, _ = db.conn.Exec(`
+				UPDATE audit_logs SET status = 'failed',
+				    details = 'Command timed out - agent may have crashed or restarted'
+				WHERE id = ANY($1)`,
+				pq.Array(auditIDs))
+		}
 	}
 	return nil
 }
@@ -1511,15 +1587,17 @@ func (db *DB) UpdateAuditLogStatus(id int64, status, details string) error {
 // ========== Alerts ==========
 
 func (db *DB) CreateAlertRule(rule *models.AlertRule) error {
+	actionsJSON, _ := json.Marshal(rule.Actions)
 	return db.conn.QueryRow(
-		`INSERT INTO alert_rules (host_id, metric, operator, threshold, duration_seconds, channel, channel_config, enabled)
-		 VALUES ($1,$2,$3,$4,$5,$6,CAST($7 AS JSONB),$8)
+		`INSERT INTO alert_rules (host_id, metric, operator, threshold, duration_seconds, actions, enabled)
+		 VALUES ($1,$2,$3,$4,$5,CAST($6 AS JSONB),$7)
 		 RETURNING id`,
-		rule.HostID, rule.Metric, rule.Operator, rule.Threshold, rule.DurationSeconds, rule.Channel, rule.ChannelConfig, rule.Enabled,
+		rule.HostID, rule.Metric, rule.Operator, rule.Threshold, rule.DurationSeconds, string(actionsJSON), rule.Enabled,
 	).Scan(&rule.ID)
 }
 
 func (db *DB) UpdateAlertRule(rule *models.AlertRule) error {
+	actionsJSON, _ := json.Marshal(rule.Actions)
 	_, err := db.conn.Exec(
 		`UPDATE alert_rules SET
 			host_id = $1,
@@ -1527,11 +1605,11 @@ func (db *DB) UpdateAlertRule(rule *models.AlertRule) error {
 			operator = $3,
 			threshold = $4,
 			duration_seconds = $5,
-			channel = $6,
-			channel_config = CAST($7 AS JSONB),
-			enabled = $8
-		 WHERE id = $9`,
-		rule.HostID, rule.Metric, rule.Operator, rule.Threshold, rule.DurationSeconds, rule.Channel, rule.ChannelConfig, rule.Enabled, rule.ID,
+			actions = CAST($6 AS JSONB),
+			enabled = $7,
+			updated_at = NOW()
+		 WHERE id = $8`,
+		rule.HostID, rule.Metric, rule.Operator, rule.Threshold, rule.DurationSeconds, string(actionsJSON), rule.Enabled, rule.ID,
 	)
 	return err
 }
@@ -1543,8 +1621,8 @@ func (db *DB) DeleteAlertRule(id int64) error {
 
 func (db *DB) GetAlertRules() ([]models.AlertRule, error) {
 	rows, err := db.conn.Query(
-		`SELECT id, name, host_id, metric, operator, threshold, duration_seconds, channel, channel_config, 
-		        channels, smtp_to, ntfy_topic, cooldown, last_fired, enabled, created_at, updated_at
+		`SELECT id, name, host_id, metric, operator, threshold, duration_seconds,
+		        actions, last_fired, enabled, created_at, updated_at
 		 FROM alert_rules ORDER BY created_at DESC`,
 	)
 	if err != nil {
@@ -1555,18 +1633,15 @@ func (db *DB) GetAlertRules() ([]models.AlertRule, error) {
 	var rules []models.AlertRule
 	for rows.Next() {
 		var r models.AlertRule
-		var name, smtpTo, ntfyTopic sql.NullString
+		var name sql.NullString
 		var hostID sql.NullString
 		var threshold sql.NullFloat64
-		var channelsJSON []byte
-		var cooldown sql.NullInt32
+		var actionsJSON []byte
 		var lastFired, updatedAt sql.NullTime
-		var channelConfig string
 
 		if err := rows.Scan(
 			&r.ID, &name, &hostID, &r.Metric, &r.Operator, &threshold, &r.DurationSeconds,
-			&r.Channel, &channelConfig, &channelsJSON, &smtpTo, &ntfyTopic, &cooldown,
-			&lastFired, &r.Enabled, &r.CreatedAt, &updatedAt,
+			&actionsJSON, &lastFired, &r.Enabled, &r.CreatedAt, &updatedAt,
 		); err != nil {
 			continue
 		}
@@ -1580,28 +1655,17 @@ func (db *DB) GetAlertRules() ([]models.AlertRule, error) {
 		if threshold.Valid {
 			r.Threshold = &threshold.Float64
 		}
-		if smtpTo.Valid {
-			r.SMTPTo = &smtpTo.String
-		}
-		if ntfyTopic.Valid {
-			r.NtfyTopic = &ntfyTopic.String
-		}
-		if cooldown.Valid {
-			cooldownInt := int(cooldown.Int32)
-			r.Cooldown = &cooldownInt
-		}
 		if lastFired.Valid {
 			r.LastFired = &lastFired.Time
 		}
 		if updatedAt.Valid {
 			r.UpdatedAt = &updatedAt.Time
 		}
-
-		r.ChannelConfig = channelConfig
-		if len(channelsJSON) > 0 {
-			json.Unmarshal(channelsJSON, &r.Channels)
-		} else {
-			r.Channels = []string{}
+		if len(actionsJSON) > 0 {
+			json.Unmarshal(actionsJSON, &r.Actions)
+		}
+		if r.Actions.Channels == nil {
+			r.Actions.Channels = []string{}
 		}
 
 		rules = append(rules, r)

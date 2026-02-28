@@ -26,114 +26,25 @@ func NewAlertRulesHandler(db *database.DB, cfg *config.Config) *AlertRulesHandle
 	}
 }
 
-// ListAlertRules returns all alert rules
-func (h *AlertRulesHandler) ListAlertRules(c *gin.Context) {
-	query := `
-		SELECT id, name, enabled, host_id, metric, operator, threshold, duration_seconds,
-		       channels, smtp_to, ntfy_topic, cooldown, last_fired, created_at, updated_at
-		FROM alert_rules
-		ORDER BY created_at DESC
-	`
-
-	rows, err := h.db.Query(query)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	defer rows.Close()
-
-	rules := []models.AlertRule{}
-	for rows.Next() {
-		var rule models.AlertRule
-		var channelsJSON []byte
-		var name, smtpTo, ntfyTopic sql.NullString
-		var hostID sql.NullString
-		var threshold sql.NullFloat64
-		var cooldown sql.NullInt32
-		var lastFired, updatedAt sql.NullTime
-
-		err := rows.Scan(
-			&rule.ID, &name, &rule.Enabled, &hostID, &rule.Metric,
-			&rule.Operator, &threshold, &rule.DurationSeconds, &channelsJSON,
-			&smtpTo, &ntfyTopic, &cooldown, &lastFired,
-			&rule.CreatedAt, &updatedAt,
-		)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
-		}
-
-		if name.Valid {
-			rule.Name = &name.String
-		}
-		if hostID.Valid {
-			rule.HostID = &hostID.String
-		}
-		if threshold.Valid {
-			rule.Threshold = &threshold.Float64
-		}
-		if smtpTo.Valid {
-			rule.SMTPTo = &smtpTo.String
-		}
-		if ntfyTopic.Valid {
-			rule.NtfyTopic = &ntfyTopic.String
-		}
-		if cooldown.Valid {
-			cooldownInt := int(cooldown.Int32)
-			rule.Cooldown = &cooldownInt
-		}
-		if lastFired.Valid {
-			rule.LastFired = &lastFired.Time
-		}
-		if updatedAt.Valid {
-			rule.UpdatedAt = &updatedAt.Time
-		}
-
-		if len(channelsJSON) > 0 {
-			json.Unmarshal(channelsJSON, &rule.Channels)
-		} else {
-			rule.Channels = []string{}
-		}
-
-		rules = append(rules, rule)
-	}
-
-	c.JSON(http.StatusOK, rules)
-}
-
-// GetAlertRule returns a single alert rule by ID
-func (h *AlertRulesHandler) GetAlertRule(c *gin.Context) {
-	id := c.Param("id")
-
-	query := `
-		SELECT id, name, enabled, host_id, metric, operator, threshold, duration_seconds,
-		       channels, smtp_to, ntfy_topic, cooldown, last_fired, created_at, updated_at
-		FROM alert_rules
-		WHERE id = $1
-	`
-
+// scanAlertRule scans a single alert rule row from the DB.
+// Expected column order: id, name, enabled, host_id, metric, operator, threshold,
+// duration_seconds, actions, last_fired, created_at, updated_at
+func scanAlertRule(row interface {
+	Scan(dest ...interface{}) error
+}) (models.AlertRule, error) {
 	var rule models.AlertRule
-	var channelsJSON []byte
-	var name, smtpTo, ntfyTopic sql.NullString
-	var hostID sql.NullString
+	var name, hostID sql.NullString
 	var threshold sql.NullFloat64
-	var cooldown sql.NullInt32
+	var actionsJSON []byte
 	var lastFired, updatedAt sql.NullTime
 
-	err := h.db.QueryRow(query, id).Scan(
+	err := row.Scan(
 		&rule.ID, &name, &rule.Enabled, &hostID, &rule.Metric,
-		&rule.Operator, &threshold, &rule.DurationSeconds, &channelsJSON,
-		&smtpTo, &ntfyTopic, &cooldown, &lastFired,
-		&rule.CreatedAt, &updatedAt,
+		&rule.Operator, &threshold, &rule.DurationSeconds,
+		&actionsJSON, &lastFired, &rule.CreatedAt, &updatedAt,
 	)
-
-	if err == sql.ErrNoRows {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Alert rule not found"})
-		return
-	}
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
+		return rule, err
 	}
 
 	if name.Valid {
@@ -145,28 +56,62 @@ func (h *AlertRulesHandler) GetAlertRule(c *gin.Context) {
 	if threshold.Valid {
 		rule.Threshold = &threshold.Float64
 	}
-	if smtpTo.Valid {
-		rule.SMTPTo = &smtpTo.String
-	}
-	if ntfyTopic.Valid {
-		rule.NtfyTopic = &ntfyTopic.String
-	}
-	if cooldown.Valid {
-		cooldownInt := int(cooldown.Int32)
-		rule.Cooldown = &cooldownInt
-	}
 	if lastFired.Valid {
 		rule.LastFired = &lastFired.Time
 	}
 	if updatedAt.Valid {
 		rule.UpdatedAt = &updatedAt.Time
 	}
-	if len(channelsJSON) > 0 {
-		json.Unmarshal(channelsJSON, &rule.Channels)
-	} else {
-		rule.Channels = []string{}
+	if len(actionsJSON) > 0 {
+		json.Unmarshal(actionsJSON, &rule.Actions)
 	}
+	if rule.Actions.Channels == nil {
+		rule.Actions.Channels = []string{}
+	}
+	return rule, nil
+}
 
+const alertRuleSelectCols = `
+	id, name, enabled, host_id, metric, operator, threshold, duration_seconds,
+	actions, last_fired, created_at, updated_at`
+
+// ListAlertRules returns all alert rules
+func (h *AlertRulesHandler) ListAlertRules(c *gin.Context) {
+	rows, err := h.db.Query(`SELECT` + alertRuleSelectCols + `
+		FROM alert_rules ORDER BY created_at DESC`)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer rows.Close()
+
+	rules := []models.AlertRule{}
+	for rows.Next() {
+		rule, err := scanAlertRule(rows)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		rules = append(rules, rule)
+	}
+	c.JSON(http.StatusOK, rules)
+}
+
+// GetAlertRule returns a single alert rule by ID
+func (h *AlertRulesHandler) GetAlertRule(c *gin.Context) {
+	id := c.Param("id")
+	row := h.db.QueryRow(`SELECT`+alertRuleSelectCols+`
+		FROM alert_rules WHERE id = $1`, id)
+
+	rule, err := scanAlertRule(row)
+	if err == sql.ErrNoRows {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Alert rule not found"})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusOK, rule)
 }
 
@@ -178,27 +123,21 @@ func (h *AlertRulesHandler) CreateAlertRule(c *gin.Context) {
 		return
 	}
 
-	// Validate operator
 	validOps := map[string]bool{">": true, "<": true, ">=": true, "<=": true}
 	if !validOps[req.Operator] {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid operator"})
 		return
 	}
-
-	// Validate metric
 	validMetrics := map[string]bool{"cpu": true, "memory": true, "disk": true, "load": true}
 	if !validMetrics[req.Metric] {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid metric"})
 		return
 	}
 
-	channelsJSON, _ := json.Marshal(req.Channels)
-
-	query := `
-		INSERT INTO alert_rules (name, enabled, host_id, metric, operator, threshold, duration_seconds, channels, smtp_to, ntfy_topic, cooldown)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-		RETURNING id, created_at, updated_at
-	`
+	if req.Actions.Channels == nil {
+		req.Actions.Channels = []string{}
+	}
+	actionsJSON, _ := json.Marshal(req.Actions)
 
 	var rule models.AlertRule
 	name := req.Name
@@ -210,29 +149,20 @@ func (h *AlertRulesHandler) CreateAlertRule(c *gin.Context) {
 	threshold := req.Threshold
 	rule.Threshold = &threshold
 	rule.DurationSeconds = req.Duration
-	rule.Channels = req.Channels
+	rule.Actions = req.Actions
 
-	if req.SMTPTo != "" {
-		rule.SMTPTo = &req.SMTPTo
-	}
-	if req.NtfyTopic != "" {
-		rule.NtfyTopic = &req.NtfyTopic
-	}
-	if req.Cooldown > 0 {
-		rule.Cooldown = &req.Cooldown
-	}
-
-	err := h.db.QueryRow(
-		query,
+	err := h.db.QueryRow(`
+		INSERT INTO alert_rules (name, enabled, host_id, metric, operator, threshold, duration_seconds, actions)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, CAST($8 AS JSONB))
+		RETURNING id, created_at, updated_at`,
 		req.Name, req.Enabled, req.HostID, req.Metric, req.Operator,
-		req.Threshold, req.Duration, channelsJSON, req.SMTPTo, req.NtfyTopic, req.Cooldown,
+		req.Threshold, req.Duration, string(actionsJSON),
 	).Scan(&rule.ID, &rule.CreatedAt, &rule.UpdatedAt)
 
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
 	c.JSON(http.StatusCreated, rule)
 }
 
@@ -285,25 +215,13 @@ func (h *AlertRulesHandler) UpdateAlertRule(c *gin.Context) {
 		args = append(args, *req.Duration)
 		argCount++
 	}
-	if req.Channels != nil {
-		channelsJSON, _ := json.Marshal(*req.Channels)
-		updates = append(updates, "channels = $"+strconv.Itoa(argCount))
-		args = append(args, channelsJSON)
-		argCount++
-	}
-	if req.SMTPTo != nil {
-		updates = append(updates, "smtp_to = $"+strconv.Itoa(argCount))
-		args = append(args, *req.SMTPTo)
-		argCount++
-	}
-	if req.NtfyTopic != nil {
-		updates = append(updates, "ntfy_topic = $"+strconv.Itoa(argCount))
-		args = append(args, *req.NtfyTopic)
-		argCount++
-	}
-	if req.Cooldown != nil {
-		updates = append(updates, "cooldown = $"+strconv.Itoa(argCount))
-		args = append(args, *req.Cooldown)
+	if req.Actions != nil {
+		if req.Actions.Channels == nil {
+			req.Actions.Channels = []string{}
+		}
+		actionsJSON, _ := json.Marshal(*req.Actions)
+		updates = append(updates, "actions = CAST($"+strconv.Itoa(argCount)+" AS JSONB)")
+		args = append(args, string(actionsJSON))
 		argCount++
 	}
 
@@ -326,37 +244,31 @@ func (h *AlertRulesHandler) UpdateAlertRule(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
 	rows, _ := result.RowsAffected()
 	if rows == 0 {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Alert rule not found"})
 		return
 	}
-
 	c.JSON(http.StatusOK, gin.H{"message": "Alert rule updated"})
 }
 
 // DeleteAlertRule deletes an alert rule
 func (h *AlertRulesHandler) DeleteAlertRule(c *gin.Context) {
 	id := c.Param("id")
-
 	result, err := h.db.Exec("DELETE FROM alert_rules WHERE id = $1", id)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
 	rows, _ := result.RowsAffected()
 	if rows == 0 {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Alert rule not found"})
 		return
 	}
-
 	c.JSON(http.StatusOK, gin.H{"message": "Alert rule deleted"})
 }
 
 // TestAlertRule evaluates a rule against current metrics without saving it.
-// Returns per-host results showing the current value and whether the alert would fire.
 func (h *AlertRulesHandler) TestAlertRule(c *gin.Context) {
 	var req models.AlertRuleCreate
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -364,7 +276,6 @@ func (h *AlertRulesHandler) TestAlertRule(c *gin.Context) {
 		return
 	}
 
-	// Build a temporary AlertRule from the request (no ID, not persisted)
 	threshold := req.Threshold
 	rule := models.AlertRule{
 		HostID:          req.HostID,
@@ -372,6 +283,7 @@ func (h *AlertRulesHandler) TestAlertRule(c *gin.Context) {
 		Operator:        req.Operator,
 		Threshold:       &threshold,
 		DurationSeconds: req.Duration,
+		Actions:         req.Actions,
 		Enabled:         true,
 	}
 
@@ -413,7 +325,6 @@ func (h *AlertRulesHandler) TestAlertRule(c *gin.Context) {
 	if results == nil {
 		results = []TestResult{}
 	}
-
 	c.JSON(http.StatusOK, gin.H{
 		"any_fires":    anyFires,
 		"evaluated_at": time.Now(),

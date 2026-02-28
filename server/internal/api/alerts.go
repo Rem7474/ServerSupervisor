@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"net/http"
 	"strconv"
 
@@ -83,10 +82,11 @@ func (h *AlertHandler) CreateRule(c *gin.Context) {
 		enabled = *req.Enabled
 	}
 
-	channelConfigJSON := "{}"
+	// Map legacy channel/channel_config to the unified actions field
+	actions := models.AlertActions{Channels: []string{req.Channel}}
 	if req.ChannelConfig != nil {
-		if data, err := json.Marshal(req.ChannelConfig); err == nil {
-			channelConfigJSON = string(data)
+		if to, ok := req.ChannelConfig["to"].(string); ok {
+			actions.SMTPTo = to
 		}
 	}
 
@@ -96,8 +96,7 @@ func (h *AlertHandler) CreateRule(c *gin.Context) {
 		Operator:        req.Operator,
 		Threshold:       req.Threshold,
 		DurationSeconds: req.DurationSeconds,
-		Channel:         req.Channel,
-		ChannelConfig:   channelConfigJSON,
+		Actions:         actions,
 		Enabled:         enabled,
 	}
 
@@ -160,10 +159,11 @@ func (h *AlertHandler) UpdateRule(c *gin.Context) {
 		enabled = *req.Enabled
 	}
 
-	channelConfigJSON := "{}"
+	// Map legacy channel/channel_config to the unified actions field
+	actions := models.AlertActions{Channels: []string{req.Channel}}
 	if req.ChannelConfig != nil {
-		if data, err := json.Marshal(req.ChannelConfig); err == nil {
-			channelConfigJSON = string(data)
+		if to, ok := req.ChannelConfig["to"].(string); ok {
+			actions.SMTPTo = to
 		}
 	}
 
@@ -174,8 +174,7 @@ func (h *AlertHandler) UpdateRule(c *gin.Context) {
 		Operator:        req.Operator,
 		Threshold:       req.Threshold,
 		DurationSeconds: req.DurationSeconds,
-		Channel:         req.Channel,
-		ChannelConfig:   channelConfigJSON,
+		Actions:         actions,
 		Enabled:         enabled,
 	}
 

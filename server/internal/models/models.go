@@ -372,24 +372,28 @@ type AuditLog struct {
 
 // ========== Alerts ==========
 
+// AlertActions holds the consolidated notification configuration for an alert rule.
+// Stored as a single JSONB column in the database.
+type AlertActions struct {
+	Channels  []string `json:"channels"`             // e.g. ["smtp", "ntfy", "browser"]
+	SMTPTo    string   `json:"smtp_to,omitempty"`    // SMTP recipient address(es)
+	NtfyTopic string   `json:"ntfy_topic,omitempty"` // ntfy push notification topic
+	Cooldown  int      `json:"cooldown,omitempty"`   // seconds between re-notifications (0 = no cooldown)
+}
+
 type AlertRule struct {
-	ID              int64      `json:"id" db:"id"`
-	Name            *string    `json:"name,omitempty" db:"name"` // New: Human-readable name
-	HostID          *string    `json:"host_id" db:"host_id"`
-	Metric          string     `json:"metric" db:"metric"`
-	Operator        string     `json:"operator" db:"operator"`
-	Threshold       *float64   `json:"threshold" db:"threshold"`
-	DurationSeconds int        `json:"duration_seconds" db:"duration_seconds"`
-	Channel         string     `json:"channel" db:"channel"`                 // Legacy channel (smtp, ntfy)
-	ChannelConfig   string     `json:"channel_config" db:"channel_config"`   // Legacy JSONB config
-	Channels        []string   `json:"channels,omitempty" db:"-"`            // New: Array of channels (from JSONB)
-	SMTPTo          *string    `json:"smtp_to,omitempty" db:"smtp_to"`       // New: Email recipients
-	NtfyTopic       *string    `json:"ntfy_topic,omitempty" db:"ntfy_topic"` // New: ntfy topic
-	Cooldown        *int       `json:"cooldown,omitempty" db:"cooldown"`     // New: Cooldown period in seconds
-	LastFired       *time.Time `json:"last_fired,omitempty" db:"last_fired"` // New: Last trigger timestamp
-	Enabled         bool       `json:"enabled" db:"enabled"`
-	CreatedAt       time.Time  `json:"created_at" db:"created_at"`
-	UpdatedAt       *time.Time `json:"updated_at,omitempty" db:"updated_at"` // New: Update timestamp
+	ID              int64        `json:"id" db:"id"`
+	Name            *string      `json:"name,omitempty" db:"name"`
+	HostID          *string      `json:"host_id" db:"host_id"`
+	Metric          string       `json:"metric" db:"metric"`
+	Operator        string       `json:"operator" db:"operator"`
+	Threshold       *float64     `json:"threshold" db:"threshold"`
+	DurationSeconds int          `json:"duration_seconds" db:"duration_seconds"`
+	Actions         AlertActions `json:"actions" db:"-"` // stored as JSONB in DB
+	LastFired       *time.Time   `json:"last_fired,omitempty" db:"last_fired"`
+	Enabled         bool         `json:"enabled" db:"enabled"`
+	CreatedAt       time.Time    `json:"created_at" db:"created_at"`
+	UpdatedAt       *time.Time   `json:"updated_at,omitempty" db:"updated_at"`
 }
 
 type AlertIncident struct {
@@ -497,31 +501,25 @@ type TopologySnapshot struct {
 // ========== Alert Rules - Create/Update Helpers ==========
 
 type AlertRuleCreate struct {
-	Name      string   `json:"name" binding:"required"`
-	Enabled   bool     `json:"enabled"`
-	HostID    *string  `json:"host_id"`
-	Metric    string   `json:"metric" binding:"required"`
-	Operator  string   `json:"operator" binding:"required"`
-	Threshold float64  `json:"threshold" binding:"required"`
-	Duration  int      `json:"duration"`
-	Channels  []string `json:"channels"`
-	SMTPTo    string   `json:"smtp_to"`
-	NtfyTopic string   `json:"ntfy_topic"`
-	Cooldown  int      `json:"cooldown"`
+	Name      string       `json:"name" binding:"required"`
+	Enabled   bool         `json:"enabled"`
+	HostID    *string      `json:"host_id"`
+	Metric    string       `json:"metric" binding:"required"`
+	Operator  string       `json:"operator" binding:"required"`
+	Threshold float64      `json:"threshold" binding:"required"`
+	Duration  int          `json:"duration"`
+	Actions   AlertActions `json:"actions"`
 }
 
 type AlertRuleUpdate struct {
-	Name      *string   `json:"name"`
-	Enabled   *bool     `json:"enabled"`
-	HostID    *string   `json:"host_id"`
-	Metric    *string   `json:"metric"`
-	Operator  *string   `json:"operator"`
-	Threshold *float64  `json:"threshold"`
-	Duration  *int      `json:"duration"`
-	Channels  *[]string `json:"channels"`
-	SMTPTo    *string   `json:"smtp_to"`
-	NtfyTopic *string   `json:"ntfy_topic"`
-	Cooldown  *int      `json:"cooldown"`
+	Name      *string       `json:"name"`
+	Enabled   *bool         `json:"enabled"`
+	HostID    *string       `json:"host_id"`
+	Metric    *string       `json:"metric"`
+	Operator  *string       `json:"operator"`
+	Threshold *float64      `json:"threshold"`
+	Duration  *int          `json:"duration"`
+	Actions   *AlertActions `json:"actions"`
 }
 
 // ========== Security Monitoring ==========
