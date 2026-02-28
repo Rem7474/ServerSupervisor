@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -24,9 +25,15 @@ import (
 // Falls back to "dev" for local builds.
 var Version = "dev"
 
-// commandQueue serialises command batches through a single worker goroutine.
+// commandQueue delivers command batches to the worker goroutine.
 // Capacity 10 lets up to 10 pending batches queue up before we start dropping.
 var commandQueue = make(chan []sender.PendingCommand, 10)
+
+// aptMu serialises APT operations — dpkg cannot run concurrently.
+var aptMu sync.Mutex
+
+// cmdSem limits concurrent non-APT commands to 4 at a time.
+var cmdSem = make(chan struct{}, 4)
 
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
@@ -194,11 +201,32 @@ func sendReport(cfg *config.Config, s *sender.Sender) {
 	}
 }
 
+// processCommands dispatches each command in its own goroutine.
+// APT commands are serialised via aptMu (dpkg cannot run concurrently).
+// All other modules share a semaphore limiting parallelism to 4.
 func processCommands(s *sender.Sender, commands []sender.PendingCommand) {
+	var wg sync.WaitGroup
 	for _, cmd := range commands {
-		log.Printf("Processing command %s: module=%s action=%s target=%s", cmd.ID, cmd.Module, cmd.Action, cmd.Target)
+		wg.Add(1)
+		go func(c sender.PendingCommand) {
+			defer wg.Done()
+			if c.Module == "apt" {
+				aptMu.Lock()
+				defer aptMu.Unlock()
+			} else {
+				cmdSem <- struct{}{}
+				defer func() { <-cmdSem }()
+			}
+			executeCommand(s, c)
+		}(cmd)
+	}
+	wg.Wait()
+}
 
-		switch cmd.Module {
+func executeCommand(s *sender.Sender, cmd sender.PendingCommand) {
+	log.Printf("Processing command %s: module=%s action=%s target=%s", cmd.ID, cmd.Module, cmd.Action, cmd.Target)
+
+	switch cmd.Module {
 		case "docker":
 			// Parse extra args (working_dir for compose operations)
 			var extra struct {
@@ -382,7 +410,6 @@ func processCommands(s *sender.Sender, commands []sender.PendingCommand) {
 			}); err != nil {
 				log.Printf("Failed to report command result: %v", err)
 			}
-		}
 	}
 }
 

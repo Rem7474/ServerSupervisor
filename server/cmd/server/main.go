@@ -44,11 +44,6 @@ func main() {
 	}
 	defer db.Close()
 
-	// Create performance indices
-	if err := db.CreateIndices(); err != nil {
-		log.Printf("Warning: failed to create database indices: %v", err)
-	}
-
 	// Cleanup stalled commands at startup (commands older than 10 minutes)
 	if err := db.CleanupStalledCommands(10); err != nil {
 		log.Printf("Warning: failed to cleanup stalled commands: %v", err)
@@ -116,72 +111,30 @@ func main() {
 		}
 	}()
 
-	// Start periodic metrics downsampling (aggregate raw metrics)
+	// Start periodic metrics downsampling (single batch SQL query for all hosts)
 	go func() {
 		ticker := time.NewTicker(5 * time.Minute)
 		defer ticker.Stop()
 		for range ticker.C {
 			now := time.Now().UTC()
-			windowEnd := now.Truncate(5 * time.Minute)
-			windowStart := windowEnd.Add(-5 * time.Minute)
+			end := now.Truncate(5 * time.Minute)
+			start5 := end.Add(-5 * time.Minute)
 
-			// Get all hosts and downsample their metrics
-			hosts, err := db.GetAllHosts()
-			if err != nil {
-				log.Printf("Failed to get hosts for downsampling: %v", err)
-				continue
+			if n, err := db.BatchAggregateMetrics(start5, end, "5min"); err != nil {
+				log.Printf("5min downsampling error: %v", err)
+			} else if n > 0 {
+				log.Printf("Downsampled 5min metrics for %d hosts", n)
 			}
-			for _, h := range hosts {
-				agg, err := db.BuildMetricsAggregate(h.ID, windowStart, windowEnd)
-				if err != nil {
-					log.Printf("Downsampling error for host %s: %v", h.ID, err)
-					continue
-				}
-				if agg == nil {
-					continue
-				}
-				agg.AggregationType = "5min"
-				agg.Timestamp = windowStart
-				if err := db.InsertMetricsAggregate(agg); err != nil {
-					log.Printf("Failed to insert 5min aggregate for host %s: %v", h.ID, err)
+
+			if end.Minute() == 0 {
+				if _, err := db.BatchAggregateMetrics(end.Add(-time.Hour), end, "hour"); err != nil {
+					log.Printf("Hourly downsampling error: %v", err)
 				}
 			}
 
-			if windowEnd.Minute() == 0 {
-				hourStart := windowEnd.Add(-1 * time.Hour)
-				for _, h := range hosts {
-					agg, err := db.BuildMetricsAggregate(h.ID, hourStart, windowEnd)
-					if err != nil {
-						log.Printf("Hourly downsampling error for host %s: %v", h.ID, err)
-						continue
-					}
-					if agg == nil {
-						continue
-					}
-					agg.AggregationType = "hour"
-					agg.Timestamp = hourStart
-					if err := db.InsertMetricsAggregate(agg); err != nil {
-						log.Printf("Failed to insert hourly aggregate for host %s: %v", h.ID, err)
-					}
-				}
-			}
-
-			if windowEnd.Hour() == 0 && windowEnd.Minute() == 0 {
-				dayStart := windowEnd.Add(-24 * time.Hour)
-				for _, h := range hosts {
-					agg, err := db.BuildMetricsAggregate(h.ID, dayStart, windowEnd)
-					if err != nil {
-						log.Printf("Daily downsampling error for host %s: %v", h.ID, err)
-						continue
-					}
-					if agg == nil {
-						continue
-					}
-					agg.AggregationType = "day"
-					agg.Timestamp = dayStart
-					if err := db.InsertMetricsAggregate(agg); err != nil {
-						log.Printf("Failed to insert daily aggregate for host %s: %v", h.ID, err)
-					}
+			if end.Hour() == 0 && end.Minute() == 0 {
+				if _, err := db.BatchAggregateMetrics(end.Add(-24*time.Hour), end, "day"); err != nil {
+					log.Printf("Daily downsampling error: %v", err)
 				}
 			}
 		}
