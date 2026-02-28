@@ -1,13 +1,13 @@
 package database
 
 import (
+	"crypto/rand"
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
-	"strings"
 	"time"
 
 	"github.com/lib/pq"
@@ -438,6 +438,25 @@ func (db *DB) migrate() error {
 			value TEXT NOT NULL DEFAULT '',
 			updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 		)`,
+		// Migration: Unified remote_commands table (replaces docker_commands + apt_commands)
+		`CREATE TABLE IF NOT EXISTS remote_commands (
+			id           VARCHAR(36)  PRIMARY KEY,
+			host_id      VARCHAR(64)  REFERENCES hosts(id) ON DELETE CASCADE,
+			module       VARCHAR(50)  NOT NULL,
+			action       VARCHAR(100) NOT NULL,
+			target       VARCHAR(255) NOT NULL DEFAULT '',
+			payload      TEXT         NOT NULL DEFAULT '{}',
+			status       VARCHAR(20)  NOT NULL DEFAULT 'pending',
+			output       TEXT         NOT NULL DEFAULT '',
+			triggered_by VARCHAR(255) NOT NULL DEFAULT 'system',
+			audit_log_id BIGINT,
+			created_at   TIMESTAMPTZ  DEFAULT NOW(),
+			started_at   TIMESTAMPTZ,
+			ended_at     TIMESTAMPTZ
+		)`,
+		`CREATE INDEX IF NOT EXISTS idx_remote_commands_host_status ON remote_commands(host_id, status)`,
+		`DROP TABLE IF EXISTS docker_commands`,
+		`DROP TABLE IF EXISTS apt_commands`,
 	}
 
 	for _, m := range migrations {
@@ -1056,47 +1075,52 @@ func (db *DB) GetAllDockerContainers() ([]models.DockerContainer, error) {
 	return containers, nil
 }
 
-// ========== Docker Commands ==========
+// ========== Remote Commands ==========
 
-func (db *DB) CreateDockerCommand(hostID, containerName, action, workingDir, triggeredBy string, auditLogID *int64) (*models.DockerCommand, error) {
+// newUUID generates a UUID v4 using crypto/rand — no external dependency.
+func newUUID() string {
+	var b [16]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		panic(err)
+	}
+	b[6] = (b[6] & 0x0f) | 0x40 // version 4
+	b[8] = (b[8] & 0x3f) | 0x80 // variant RFC 4122
+	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
+}
+
+func (db *DB) CreateRemoteCommand(hostID, module, action, target, payload, triggeredBy string, auditLogID *int64) (*models.RemoteCommand, error) {
 	if triggeredBy == "" {
 		triggeredBy = "system"
 	}
-	var cmd models.DockerCommand
-	err := db.conn.QueryRow(
-		`INSERT INTO docker_commands (host_id, container_name, action, working_dir, status, triggered_by, audit_log_id)
-		 VALUES ($1, $2, $3, $4, 'pending', $5, $6)
-		 RETURNING id, host_id, container_name, action, working_dir, status, triggered_by, audit_log_id, created_at`,
-		hostID, containerName, action, workingDir, triggeredBy, auditLogID,
-	).Scan(&cmd.ID, &cmd.HostID, &cmd.ContainerName, &cmd.Action, &cmd.WorkingDir, &cmd.Status, &cmd.TriggeredBy, &cmd.AuditLogID, &cmd.CreatedAt)
-	if err != nil {
-		return nil, err
+	if payload == "" {
+		payload = "{}"
 	}
-	return &cmd, nil
-}
-
-func (db *DB) GetDockerCommandByID(id int64) (*models.DockerCommand, error) {
-	var c models.DockerCommand
+	id := newUUID()
+	var cmd models.RemoteCommand
 	var startedAt, endedAt sql.NullTime
 	err := db.conn.QueryRow(
-		`SELECT id, host_id, container_name, action, status, output, triggered_by, audit_log_id, created_at, started_at, ended_at
-		 FROM docker_commands WHERE id = $1`, id,
-	).Scan(&c.ID, &c.HostID, &c.ContainerName, &c.Action, &c.Status, &c.Output, &c.TriggeredBy, &c.AuditLogID, &c.CreatedAt, &startedAt, &endedAt)
+		`INSERT INTO remote_commands (id, host_id, module, action, target, payload, triggered_by, audit_log_id)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		 RETURNING id, host_id, module, action, target, payload, status, output, triggered_by, audit_log_id, created_at, started_at, ended_at`,
+		id, hostID, module, action, target, payload, triggeredBy, auditLogID,
+	).Scan(&cmd.ID, &cmd.HostID, &cmd.Module, &cmd.Action, &cmd.Target, &cmd.Payload,
+		&cmd.Status, &cmd.Output, &cmd.TriggeredBy, &cmd.AuditLogID, &cmd.CreatedAt, &startedAt, &endedAt)
 	if err != nil {
 		return nil, err
 	}
 	if startedAt.Valid {
-		c.StartedAt = &startedAt.Time
+		cmd.StartedAt = &startedAt.Time
 	}
 	if endedAt.Valid {
-		c.EndedAt = &endedAt.Time
+		cmd.EndedAt = &endedAt.Time
 	}
-	return &c, nil
+	return &cmd, nil
 }
 
-func (db *DB) GetPendingDockerCommands(hostID string) ([]models.PendingCommand, error) {
+func (db *DB) GetPendingRemoteCommands(hostID string) ([]models.PendingCommand, error) {
 	rows, err := db.conn.Query(
-		`SELECT id, container_name, action, COALESCE(working_dir, '') FROM docker_commands WHERE host_id = $1 AND status = 'pending' ORDER BY created_at ASC`, hostID,
+		`SELECT id, module, action, target, payload
+		 FROM remote_commands WHERE host_id = $1 AND status = 'pending' ORDER BY created_at ASC`, hostID,
 	)
 	if err != nil {
 		return nil, err
@@ -1105,43 +1129,76 @@ func (db *DB) GetPendingDockerCommands(hostID string) ([]models.PendingCommand, 
 
 	var cmds []models.PendingCommand
 	for rows.Next() {
-		var id int64
-		var containerName, action, workingDir string
-		if err := rows.Scan(&id, &containerName, &action, &workingDir); err != nil {
+		var c models.PendingCommand
+		if err := rows.Scan(&c.ID, &c.Module, &c.Action, &c.Target, &c.Payload); err != nil {
 			continue
 		}
-		payload := fmt.Sprintf(`{"container_name":%q,"action":%q,"working_dir":%q}`, containerName, action, workingDir)
-		// Infer command type: actions prefixed with "systemd_" are handled by the systemd case
-		cmdType := "docker"
-		if strings.HasPrefix(action, "systemd_") {
-			cmdType = "systemd"
-		}
-		cmds = append(cmds, models.PendingCommand{
-			ID:      id,
-			Type:    cmdType,
-			Payload: payload,
-		})
+		cmds = append(cmds, c)
 	}
 	return cmds, nil
 }
 
-func (db *DB) GetDockerCommandsByHost(hostID string, limit int) ([]models.DockerCommand, error) {
+func (db *DB) UpdateRemoteCommandStatus(id, status, output string) error {
+	switch status {
+	case "running":
+		_, err := db.conn.Exec(
+			`UPDATE remote_commands SET status = $1, started_at = NOW() WHERE id = $2`,
+			status, id)
+		return err
+	default:
+		_, err := db.conn.Exec(
+			`UPDATE remote_commands SET status = $1, output = $2, ended_at = NOW() WHERE id = $3`,
+			status, output, id)
+		return err
+	}
+}
+
+func (db *DB) GetRemoteCommandByID(id string) (*models.RemoteCommand, error) {
+	var cmd models.RemoteCommand
+	var startedAt, endedAt sql.NullTime
+	err := db.conn.QueryRow(
+		`SELECT id, host_id, module, action, target, payload, status, output, triggered_by, audit_log_id, created_at, started_at, ended_at
+		 FROM remote_commands WHERE id = $1`, id,
+	).Scan(&cmd.ID, &cmd.HostID, &cmd.Module, &cmd.Action, &cmd.Target, &cmd.Payload,
+		&cmd.Status, &cmd.Output, &cmd.TriggeredBy, &cmd.AuditLogID, &cmd.CreatedAt, &startedAt, &endedAt)
+	if err != nil {
+		return nil, err
+	}
+	if startedAt.Valid {
+		cmd.StartedAt = &startedAt.Time
+	}
+	if endedAt.Valid {
+		cmd.EndedAt = &endedAt.Time
+	}
+	return &cmd, nil
+}
+
+func (db *DB) GetRemoteCommandsByHostAndModule(hostID, module string, limit int) ([]models.RemoteCommand, error) {
 	rows, err := db.conn.Query(
-		`SELECT id, host_id, container_name, action, COALESCE(working_dir, ''), status, COALESCE(output, ''), triggered_by, created_at
-		 FROM docker_commands WHERE host_id = $1 ORDER BY created_at DESC LIMIT $2`, hostID, limit,
+		`SELECT id, host_id, module, action, target, payload, status, output, triggered_by, audit_log_id, created_at, started_at, ended_at
+		 FROM remote_commands WHERE host_id = $1 AND module = $2 ORDER BY created_at DESC LIMIT $3`,
+		hostID, module, limit,
 	)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var cmds []models.DockerCommand
+	var cmds []models.RemoteCommand
 	for rows.Next() {
-		var c models.DockerCommand
-		if err := rows.Scan(&c.ID, &c.HostID, &c.ContainerName, &c.Action, &c.WorkingDir, &c.Status, &c.Output, &c.TriggeredBy, &c.CreatedAt); err != nil {
+		var cmd models.RemoteCommand
+		var startedAt, endedAt sql.NullTime
+		if err := rows.Scan(&cmd.ID, &cmd.HostID, &cmd.Module, &cmd.Action, &cmd.Target, &cmd.Payload,
+			&cmd.Status, &cmd.Output, &cmd.TriggeredBy, &cmd.AuditLogID, &cmd.CreatedAt, &startedAt, &endedAt); err != nil {
 			continue
 		}
-		cmds = append(cmds, c)
+		if startedAt.Valid {
+			cmd.StartedAt = &startedAt.Time
+		}
+		if endedAt.Valid {
+			cmd.EndedAt = &endedAt.Time
+		}
+		cmds = append(cmds, cmd)
 	}
 	return cmds, nil
 }
@@ -1213,17 +1270,6 @@ func (db *DB) GetSetting(key string) (string, error) {
 	return value, err
 }
 
-func (db *DB) UpdateDockerCommandStatus(id int64, status, output string) error {
-	switch status {
-	case "running":
-		_, err := db.conn.Exec(`UPDATE docker_commands SET status = $1, started_at = NOW() WHERE id = $2`, status, id)
-		return err
-	default:
-		_, err := db.conn.Exec(`UPDATE docker_commands SET status = $1, output = $2, ended_at = NOW() WHERE id = $3`, status, output, id)
-		return err
-	}
-}
-
 // ========== APT ==========
 
 func (db *DB) UpsertAptStatus(status *models.AptStatus) error {
@@ -1255,65 +1301,14 @@ func (db *DB) GetAptStatus(hostID string) (*models.AptStatus, error) {
 	return &s, nil
 }
 
-func (db *DB) CreateAptCommand(hostID, command, triggeredBy string, auditLogID *int64) (*models.AptCommand, error) {
-	if triggeredBy == "" {
-		triggeredBy = "system"
-	}
-	var cmd models.AptCommand
-	err := db.conn.QueryRow(
-		`INSERT INTO apt_commands (host_id, command, status, triggered_by, audit_log_id)
-		 VALUES ($1, $2, 'pending', $3, $4)
-		 RETURNING id, host_id, command, status, triggered_by, audit_log_id, created_at`,
-		hostID, command, triggeredBy, auditLogID,
-	).Scan(&cmd.ID, &cmd.HostID, &cmd.Command, &cmd.Status, &cmd.TriggeredBy, &cmd.AuditLogID, &cmd.CreatedAt)
-	if err != nil {
-		return nil, err
-	}
-	return &cmd, nil
-}
-
-func (db *DB) GetPendingCommands(hostID string) ([]models.PendingCommand, error) {
-	rows, err := db.conn.Query(
-		`SELECT id, command FROM apt_commands WHERE host_id = $1 AND status = 'pending' ORDER BY created_at ASC`, hostID,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var cmds []models.PendingCommand
-	for rows.Next() {
-		var c models.PendingCommand
-		if err := rows.Scan(&c.ID, &c.Type); err != nil {
-			continue
-		}
-		cmds = append(cmds, c)
-	}
-	return cmds, nil
-}
-
-func (db *DB) UpdateCommandStatus(id int64, status, output string) error {
-	var query string
-	switch status {
-	case "running":
-		query = `UPDATE apt_commands SET status = $1, started_at = NOW() WHERE id = $2`
-		_, err := db.conn.Exec(query, status, id)
-		return err
-	default:
-		query = `UPDATE apt_commands SET status = $1, output = $2, ended_at = NOW() WHERE id = $3`
-		_, err := db.conn.Exec(query, status, output, id)
-		return err
-	}
-}
-
 // CleanupStalledCommands marks pending/running commands as failed if they're older than the timeout
 func (db *DB) CleanupStalledCommands(timeoutMinutes int) error {
 	query := `
-		UPDATE apt_commands 
-		SET status = 'failed', 
-		    output = 'Command timed out - agent may have crashed or restarted', 
+		UPDATE remote_commands
+		SET status = 'failed',
+		    output = 'Command timed out - agent may have crashed or restarted',
 		    ended_at = NOW()
-		WHERE status IN ('pending', 'running') 
+		WHERE status IN ('pending', 'running')
 		  AND created_at < NOW() - INTERVAL '1 minute' * $1
 	`
 	result, err := db.conn.Exec(query, timeoutMinutes)
@@ -1323,7 +1318,7 @@ func (db *DB) CleanupStalledCommands(timeoutMinutes int) error {
 
 	affected, _ := result.RowsAffected()
 	if affected > 0 {
-		log.Printf("Cleaned up %d stalled APT commands", affected)
+		log.Printf("Cleaned up %d stalled remote commands", affected)
 	}
 	return nil
 }
@@ -1331,11 +1326,11 @@ func (db *DB) CleanupStalledCommands(timeoutMinutes int) error {
 // CleanupHostStalledCommands marks old pending/running commands for a specific host as failed
 func (db *DB) CleanupHostStalledCommands(hostID string, timeoutMinutes int) error {
 	query := `
-		UPDATE apt_commands 
-		SET status = 'failed', 
-			output = 'Command timed out - agent may have crashed or restarted', 
+		UPDATE remote_commands
+		SET status = 'failed',
+			output = 'Command timed out - agent may have crashed or restarted',
 			ended_at = NOW()
-		WHERE host_id = $1 
+		WHERE host_id = $1
 		  AND status IN ('pending', 'running')
 		  AND created_at < NOW() - INTERVAL '1 minute' * $2
 	`
@@ -1349,19 +1344,6 @@ func (db *DB) CleanupHostStalledCommands(hostID string, timeoutMinutes int) erro
 		log.Printf("Cleaned up %d stalled commands for host %s", affected, hostID)
 	}
 	return nil
-}
-
-func (db *DB) GetAptCommandByID(id int64) (*models.AptCommand, error) {
-	var c models.AptCommand
-	err := db.conn.QueryRow(
-		`SELECT id, host_id, command, status, output, triggered_by, audit_log_id, created_at, started_at, ended_at
-		 FROM apt_commands WHERE id = $1`,
-		id,
-	).Scan(&c.ID, &c.HostID, &c.Command, &c.Status, &c.Output, &c.TriggeredBy, &c.AuditLogID, &c.CreatedAt, &c.StartedAt, &c.EndedAt)
-	if err != nil {
-		return nil, err
-	}
-	return &c, nil
 }
 
 func (db *DB) TouchAptLastAction(hostID, command string) error {
@@ -1392,27 +1374,6 @@ func (db *DB) TouchAptLastAction(hostID, command string) error {
 	}
 
 	return nil
-}
-
-func (db *DB) GetAptCommandHistory(hostID string, limit int) ([]models.AptCommand, error) {
-	rows, err := db.conn.Query(
-		`SELECT id, host_id, command, status, output, triggered_by, created_at, started_at, ended_at
-		 FROM apt_commands WHERE host_id = $1 ORDER BY created_at DESC LIMIT $2`, hostID, limit,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var cmds []models.AptCommand
-	for rows.Next() {
-		var c models.AptCommand
-		if err := rows.Scan(&c.ID, &c.HostID, &c.Command, &c.Status, &c.Output, &c.TriggeredBy, &c.CreatedAt, &c.StartedAt, &c.EndedAt); err != nil {
-			continue
-		}
-		cmds = append(cmds, c)
-	}
-	return cmds, nil
 }
 
 // ========== Tracked Repos ==========
@@ -1969,44 +1930,10 @@ func (db *DB) CountHosts() (int64, error) {
 	return count, err
 }
 
-// GetAptHistoryWithAgentUpdates returns combined APT command history and agent-initiated updates from audit logs
-func (db *DB) GetAptHistoryWithAgentUpdates(hostID string, limit int) ([]models.AptCommand, error) {
-	rows, err := db.conn.Query(`
-		SELECT id, host_id, command, status, output, triggered_by, created_at, started_at, ended_at, audit_log_id FROM (
-			-- APT commands from apt_commands table
-			SELECT 
-				id, host_id, command, status, output, triggered_by, 
-				created_at, started_at, ended_at, NULL::BIGINT as audit_log_id
-			FROM apt_commands 
-			WHERE host_id = $1
-			
-			UNION ALL
-			
-			-- Agent-initiated updates from audit_logs table (only "update" actions by agent)
-			SELECT 
-				id, host_id, action as command, status, details as output, username as triggered_by,
-				created_at, NULL::TIMESTAMP, NULL::TIMESTAMP, id as audit_log_id
-			FROM audit_logs
-			WHERE host_id = $1 AND action = 'update' AND username = 'agent'
-		) combined
-		ORDER BY created_at DESC
-		LIMIT $2
-	`, hostID, limit)
-
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var cmds []models.AptCommand
-	for rows.Next() {
-		var c models.AptCommand
-		if err := rows.Scan(&c.ID, &c.HostID, &c.Command, &c.Status, &c.Output, &c.TriggeredBy, &c.CreatedAt, &c.StartedAt, &c.EndedAt, &c.AuditLogID); err != nil {
-			continue
-		}
-		cmds = append(cmds, c)
-	}
-	return cmds, nil
+// GetAptHistoryWithAgentUpdates returns APT remote commands for a host.
+// Delegates to GetRemoteCommandsByHostAndModule for the "apt" module.
+func (db *DB) GetAptHistoryWithAgentUpdates(hostID string, limit int) ([]models.RemoteCommand, error) {
+	return db.GetRemoteCommandsByHostAndModule(hostID, "apt", limit)
 }
 
 // ========== Network Topology ==========

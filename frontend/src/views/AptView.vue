@@ -158,7 +158,7 @@
                   <div v-if="expandedHistories[host.id]" class="mt-3">
                     <div v-for="cmd in aptHistories[host.id]" :key="cmd.id" class="border rounded p-3 mb-2">
                       <div class="d-flex align-items-center justify-content-between">
-                        <div class="fw-semibold">apt {{ cmd.command }}</div>
+                        <div class="fw-semibold">apt {{ cmd.action }}</div>
                         <div class="d-flex align-items-center gap-2">
                           <span :class="statusClass(cmd.status)">{{ cmd.status }}</span>
                           <span class="text-secondary small">{{ formatDuration(cmd.started_at, cmd.ended_at) }}</span>
@@ -296,7 +296,7 @@
               <td>
                 <div class="fw-semibold">{{ cmd.hostName }}</div>
               </td>
-              <td><code>apt {{ cmd.command }}</code></td>
+              <td><code>apt {{ cmd.action }}</code></td>
               <td><span :class="statusClass(cmd.status)">{{ cmd.status }}</span></td>
               <td class="text-secondary">{{ cmd.triggered_by || '—' }}</td>
               <td class="text-secondary small">{{ formatDuration(cmd.started_at, cmd.ended_at) }}</td>
@@ -487,7 +487,7 @@ function getPackages(aptStatus) {
 function watchCommand(cmd, host) {
   liveCommand.value = {
     id: cmd.id,
-    command: cmd.command,
+    command: cmd.action,
     status: cmd.status,
     hostname: host?.hostname || host?.name || '—',
     output: cmd.output || '',

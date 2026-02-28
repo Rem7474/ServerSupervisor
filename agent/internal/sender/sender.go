@@ -39,17 +39,18 @@ type ReportResponse struct {
 }
 
 type PendingCommand struct {
-	ID      int64  `json:"id"`
-	Type    string `json:"type"`
-	Payload string `json:"payload"`
+	ID      string `json:"id"`      // UUID
+	Module  string `json:"module"`  // docker | apt | systemd | journal
+	Action  string `json:"action"`  // start, stop, upgrade, logs, list, …
+	Target  string `json:"target"`  // container / service name; empty for apt
+	Payload string `json:"payload"` // JSON extra args
 }
 
 type CommandResult struct {
-	CommandID int64       `json:"command_id"`
+	CommandID string      `json:"command_id"` // UUID
 	Status    string      `json:"status"`
 	Output    string      `json:"output"`
 	AptStatus interface{} `json:"apt_status,omitempty"` // Full APT status after update/upgrade
-	Type      string      `json:"type,omitempty"`       // "apt" or "docker"
 }
 
 func New(cfg *config.Config) *Sender {
@@ -165,12 +166,12 @@ func (s *Sender) ReportCommandResult(result *CommandResult) error {
 
 // StreamCommandChunk sends a chunk of command output to the server for real-time streaming.
 // Uses commandClient (30min timeout) since streaming can span long operations.
-func (s *Sender) StreamCommandChunk(commandID int64, chunk string) error {
+func (s *Sender) StreamCommandChunk(commandID string, chunk string) error {
 	payload := struct {
 		CommandID string `json:"command_id"`
 		Chunk     string `json:"chunk"`
 	}{
-		CommandID: fmt.Sprintf("%d", commandID),
+		CommandID: commandID,
 		Chunk:     chunk,
 	}
 

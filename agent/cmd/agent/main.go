@@ -9,7 +9,6 @@ import (
 	"os/exec"
 	"os/signal"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 
@@ -18,10 +17,16 @@ import (
 	"github.com/serversupervisor/agent/internal/sender"
 )
 
-const AgentVersion = "1.3.0"
+// Version is injected at build time via:
+//
+//	go build -ldflags="-X 'main.Version=<tag>'"
+//
+// Falls back to "dev" for local builds.
+var Version = "dev"
 
-// commandMutex ensures only one APT command runs at a time
-var commandMutex sync.Mutex
+// commandQueue serialises command batches through a single worker goroutine.
+// Capacity 10 lets up to 10 pending batches queue up before we start dropping.
+var commandQueue = make(chan []sender.PendingCommand, 10)
 
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
@@ -42,14 +47,23 @@ func main() {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
-	log.Printf("ServerSupervisor Agent starting...")
+	log.Printf("ServerSupervisor Agent starting (version: %s)", Version)
 	log.Printf("Server: %s", cfg.ServerURL)
 	log.Printf("Report interval: %ds", cfg.ReportInterval)
 	log.Printf("Docker monitoring: %v", cfg.CollectDocker)
 	log.Printf("APT monitoring: %v", cfg.CollectAPT)
+	log.Printf("APT auto-update on start: %v", cfg.AptAutoUpdateOnStart)
 
 	// Create sender
 	s := sender.New(cfg)
+
+	// Start the sequential command worker — ensures commands never overlap and
+	// are never silently dropped by a failed TryLock.
+	go func() {
+		for cmds := range commandQueue {
+			processCommands(s, cmds)
+		}
+	}()
 
 	// Run first report immediately
 	sendReport(cfg, s)
@@ -146,9 +160,9 @@ func sendReport(cfg *config.Config, s *sender.Sender) {
 		log.Printf("Failed to collect disk health (smartctl may not be installed): %v", err)
 	}
 
-	// Send report
+	// Send report (with retry on transient network errors)
 	report := &sender.Report{
-		AgentVersion:    AgentVersion,
+		AgentVersion:    Version,
 		Metrics:         metrics,
 		Docker:          dockerData,
 		AptStatus:       aptData,
@@ -160,7 +174,7 @@ func sendReport(cfg *config.Config, s *sender.Sender) {
 		Timestamp:       time.Now(),
 	}
 
-	response, err := s.SendReport(report)
+	response, err := s.SendReportWithRetry(report)
 	if err != nil {
 		log.Printf("Failed to send report: %v", err)
 		return
@@ -169,88 +183,47 @@ func sendReport(cfg *config.Config, s *sender.Sender) {
 	log.Printf("Report sent successfully (CPU: %.1f%%, RAM: %.1f%%, Disks: %d)",
 		metrics.CPUUsagePercent, metrics.MemoryPercent, len(metrics.Disks))
 
-	// Process pending commands
+	// Enqueue pending commands — the worker goroutine processes them sequentially.
 	if len(response.Commands) > 0 {
-		go processCommands(s, response.Commands)
+		select {
+		case commandQueue <- response.Commands:
+		default:
+			log.Printf("Command queue full (%d batches pending), dropping batch of %d commands",
+				len(commandQueue), len(response.Commands))
+		}
 	}
 }
 
 func processCommands(s *sender.Sender, commands []sender.PendingCommand) {
-	// Try to acquire lock; if another command is running, skip this batch
-	if !commandMutex.TryLock() {
-		log.Println("A command is already running, skipping new commands")
-		return
-	}
-	defer commandMutex.Unlock()
-
 	for _, cmd := range commands {
-		log.Printf("Processing command #%d: %s", cmd.ID, cmd.Type)
+		log.Printf("Processing command %s: module=%s action=%s target=%s", cmd.ID, cmd.Module, cmd.Action, cmd.Target)
 
-		switch cmd.Type {
+		switch cmd.Module {
 		case "docker":
-			var payload struct {
-				ContainerName string `json:"container_name"`
-				Action        string `json:"action"`
-				WorkingDir    string `json:"working_dir"`
+			// Parse extra args (working_dir for compose operations)
+			var extra struct {
+				WorkingDir string `json:"working_dir"`
 			}
-			if err := json.Unmarshal([]byte(cmd.Payload), &payload); err != nil {
-				log.Printf("Failed to parse docker command payload: %v", err)
-				if err := s.ReportCommandResult(&sender.CommandResult{
-					CommandID: cmd.ID,
-					Status:    "failed",
-					Output:    fmt.Sprintf("invalid payload: %v", err),
-					Type:      "docker",
-				}); err != nil {
-					log.Printf("Failed to report command result: %v", err)
-				}
-				continue
-			}
+			_ = json.Unmarshal([]byte(cmd.Payload), &extra)
 
-			// Report as running
 			if err := s.ReportCommandResult(&sender.CommandResult{
 				CommandID: cmd.ID,
 				Status:    "running",
-				Type:      "docker",
 			}); err != nil {
-				log.Printf("Failed to report command result: %v", err)
+				log.Printf("Failed to report running status: %v", err)
 			}
 
-			if payload.Action == "journalctl" {
-				output, err := collector.ExecuteJournalctl(payload.ContainerName, func(chunk string) {
-					if streamErr := s.StreamCommandChunk(cmd.ID, chunk); streamErr != nil {
-						log.Printf("Failed to stream journal chunk: %v", streamErr)
-					}
-				})
-				status := "completed"
-				if err != nil {
-					status = "failed"
-					output = fmt.Sprintf("ERROR: %v\n%s", err, output)
-					log.Printf("journalctl %s failed: %v", payload.ContainerName, err)
-				} else {
-					log.Printf("journalctl %s completed successfully", payload.ContainerName)
-				}
-				if err := s.ReportCommandResult(&sender.CommandResult{
-					CommandID: cmd.ID,
-					Status:    status,
-					Output:    output,
-					Type:      "docker",
-				}); err != nil {
-					log.Printf("Failed to report command result: %v", err)
-				}
-				continue
-			}
-
-			isCompose := strings.HasPrefix(payload.Action, "compose_")
+			isCompose := strings.HasPrefix(cmd.Action, "compose_")
 			var output string
-			var err error
+			var execErr error
 			if isCompose {
-				output, err = collector.ExecuteComposeCommand(payload.Action, payload.ContainerName, payload.WorkingDir, func(chunk string) {
+				output, execErr = collector.ExecuteComposeCommand(cmd.Action, cmd.Target, extra.WorkingDir, func(chunk string) {
 					if streamErr := s.StreamCommandChunk(cmd.ID, chunk); streamErr != nil {
 						log.Printf("Failed to stream compose chunk: %v", streamErr)
 					}
 				})
 			} else {
-				output, err = collector.ExecuteDockerCommand(payload.Action, payload.ContainerName, func(chunk string) {
+				output, execErr = collector.ExecuteDockerCommand(cmd.Action, cmd.Target, func(chunk string) {
 					if streamErr := s.StreamCommandChunk(cmd.ID, chunk); streamErr != nil {
 						log.Printf("Failed to stream docker chunk: %v", streamErr)
 					}
@@ -258,57 +231,104 @@ func processCommands(s *sender.Sender, commands []sender.PendingCommand) {
 			}
 
 			status := "completed"
+			if execErr != nil {
+				status = "failed"
+				output = fmt.Sprintf("ERROR: %v\n%s", execErr, output)
+				log.Printf("Docker %s %s failed: %v", cmd.Action, cmd.Target, execErr)
+			} else {
+				log.Printf("Docker %s %s completed", cmd.Action, cmd.Target)
+			}
+			if err := s.ReportCommandResult(&sender.CommandResult{
+				CommandID: cmd.ID,
+				Status:    status,
+				Output:    output,
+			}); err != nil {
+				log.Printf("Failed to report command result: %v", err)
+			}
+
+		case "journal":
+			if err := s.ReportCommandResult(&sender.CommandResult{
+				CommandID: cmd.ID,
+				Status:    "running",
+			}); err != nil {
+				log.Printf("Failed to report running status: %v", err)
+			}
+
+			output, err := collector.ExecuteJournalctl(cmd.Target, func(chunk string) {
+				if streamErr := s.StreamCommandChunk(cmd.ID, chunk); streamErr != nil {
+					log.Printf("Failed to stream journal chunk: %v", streamErr)
+				}
+			})
+			status := "completed"
 			if err != nil {
 				status = "failed"
 				output = fmt.Sprintf("ERROR: %v\n%s", err, output)
-				log.Printf("Docker %s %s failed: %v", payload.Action, payload.ContainerName, err)
+				log.Printf("journalctl %s failed: %v", cmd.Target, err)
 			} else {
-				log.Printf("Docker %s %s completed successfully", payload.Action, payload.ContainerName)
+				log.Printf("journalctl %s completed", cmd.Target)
+			}
+			if err := s.ReportCommandResult(&sender.CommandResult{
+				CommandID: cmd.ID,
+				Status:    status,
+				Output:    output,
+			}); err != nil {
+				log.Printf("Failed to report command result: %v", err)
+			}
+
+		case "apt":
+			if err := s.ReportCommandResult(&sender.CommandResult{
+				CommandID: cmd.ID,
+				Status:    "running",
+			}); err != nil {
+				log.Printf("Failed to report running status: %v", err)
+			}
+
+			output, err := collector.ExecuteAptCommandWithStreaming(cmd.Action, func(chunk string) {
+				if streamErr := s.StreamCommandChunk(cmd.ID, chunk); streamErr != nil {
+					log.Printf("Failed to stream apt chunk: %v", streamErr)
+				}
+			})
+			status := "completed"
+			if err != nil {
+				status = "failed"
+				output = fmt.Sprintf("ERROR: %v\n%s", err, output)
+				log.Printf("APT %s failed: %v", cmd.Action, err)
+			} else {
+				log.Printf("APT %s completed", cmd.Action)
+			}
+
+			// Collect APT status after the command (with CVE extraction)
+			var aptStatus interface{}
+			log.Printf("Collecting APT status with CVE extraction after %s...", cmd.Action)
+			apt, aptErr := collector.CollectAPT(true)
+			if aptErr != nil {
+				log.Printf("Failed to collect APT status after %s: %v", cmd.Action, aptErr)
+			} else {
+				aptStatus = apt
+				log.Printf("APT status collected: %d packages, %d security", apt.PendingPackages, apt.SecurityUpdates)
 			}
 
 			if err := s.ReportCommandResult(&sender.CommandResult{
 				CommandID: cmd.ID,
 				Status:    status,
 				Output:    output,
-				Type:      "docker",
+				AptStatus: aptStatus,
 			}); err != nil {
 				log.Printf("Failed to report command result: %v", err)
 			}
 
 		case "systemd":
-			var payload struct {
-				ContainerName string `json:"container_name"` // service name
-				Action        string `json:"action"`         // systemd_list, systemd_start, etc.
-			}
-			if err := json.Unmarshal([]byte(cmd.Payload), &payload); err != nil {
-				log.Printf("Failed to parse systemd command payload: %v", err)
-				if err := s.ReportCommandResult(&sender.CommandResult{
-					CommandID: cmd.ID,
-					Status:    "failed",
-					Output:    fmt.Sprintf("invalid payload: %v", err),
-					Type:      "systemd",
-				}); err != nil {
-					log.Printf("Failed to report command result: %v", err)
-				}
-				continue
-			}
-
-			// Report as running
 			if err := s.ReportCommandResult(&sender.CommandResult{
 				CommandID: cmd.ID,
 				Status:    "running",
-				Type:      "systemd",
 			}); err != nil {
-				log.Printf("Failed to report command result: %v", err)
+				log.Printf("Failed to report running status: %v", err)
 			}
 
-			// Strip "systemd_" prefix from action
-			action := strings.TrimPrefix(payload.Action, "systemd_")
-
-			if action == "list" {
+			if cmd.Action == "list" {
 				services, listErr := collector.ListSystemdServices()
-				var output string
 				status := "completed"
+				var output string
 				if listErr != nil {
 					status = "failed"
 					output = fmt.Sprintf("ERROR: %v", listErr)
@@ -327,12 +347,11 @@ func processCommands(s *sender.Sender, commands []sender.PendingCommand) {
 					CommandID: cmd.ID,
 					Status:    status,
 					Output:    output,
-					Type:      "systemd",
 				}); err != nil {
 					log.Printf("Failed to report systemd list result: %v", err)
 				}
 			} else {
-				output, err := collector.ExecuteSystemdCommand(payload.ContainerName, action, func(chunk string) {
+				output, err := collector.ExecuteSystemdCommand(cmd.Target, cmd.Action, func(chunk string) {
 					if streamErr := s.StreamCommandChunk(cmd.ID, chunk); streamErr != nil {
 						log.Printf("Failed to stream systemd chunk: %v", streamErr)
 					}
@@ -341,72 +360,25 @@ func processCommands(s *sender.Sender, commands []sender.PendingCommand) {
 				if err != nil {
 					status = "failed"
 					output = fmt.Sprintf("ERROR: %v\n%s", err, output)
-					log.Printf("systemctl %s %s failed: %v", action, payload.ContainerName, err)
+					log.Printf("systemctl %s %s failed: %v", cmd.Action, cmd.Target, err)
 				} else {
-					log.Printf("systemctl %s %s completed", action, payload.ContainerName)
+					log.Printf("systemctl %s %s completed", cmd.Action, cmd.Target)
 				}
 				if err := s.ReportCommandResult(&sender.CommandResult{
 					CommandID: cmd.ID,
 					Status:    status,
 					Output:    output,
-					Type:      "systemd",
 				}); err != nil {
 					log.Printf("Failed to report systemd command result: %v", err)
 				}
 			}
 
-		case "update", "upgrade", "dist-upgrade":
-			aptCmd := cmd.Type
-
-			// Notify server that command is starting (status running)
-			_ = s.ReportCommandResult(&sender.CommandResult{
-				CommandID: cmd.ID,
-				Status:    "running",
-				Type:      "apt",
-			})
-
-			// Execute the APT command with streaming
-			output, err := collector.ExecuteAptCommandWithStreaming(aptCmd, func(chunk string) {
-				if err := s.StreamCommandChunk(cmd.ID, chunk); err != nil {
-					log.Printf("Failed to stream chunk: %v", err)
-				}
-			})
-			status := "completed"
-			if err != nil {
-				status = "failed"
-				output = fmt.Sprintf("ERROR: %v\n%s", err, output)
-				log.Printf("APT %s failed: %v", aptCmd, err)
-			} else {
-				log.Printf("APT %s completed successfully", aptCmd)
-			}
-
-			// Collect APT status after command (with CVE extraction)
-			var aptStatus interface{}
-			log.Printf("Collecting APT status with CVE extraction after %s...", aptCmd)
-			apt, aptErr := collector.CollectAPT(true)
-			if aptErr != nil {
-				log.Printf("Failed to collect APT status after %s: %v", aptCmd, aptErr)
-				aptStatus = nil
-			} else {
-				aptStatus = apt
-				log.Printf("APT status collected: %d packages, %d security", apt.PendingPackages, apt.SecurityUpdates)
-			}
-
-			if err := s.ReportCommandResult(&sender.CommandResult{
-				CommandID: cmd.ID,
-				Status:    status,
-				Output:    output,
-				AptStatus: aptStatus,
-			}); err != nil {
-				log.Printf("Failed to report command result: %v", err)
-			}
-
 		default:
-			log.Printf("Unknown command type: %s", cmd.Type)
+			log.Printf("Unknown command module: %s", cmd.Module)
 			if err := s.ReportCommandResult(&sender.CommandResult{
 				CommandID: cmd.ID,
 				Status:    "failed",
-				Output:    fmt.Sprintf("unknown command type: %s", cmd.Type),
+				Output:    fmt.Sprintf("unknown command module: %s", cmd.Module),
 			}); err != nil {
 				log.Printf("Failed to report command result: %v", err)
 			}
@@ -419,14 +391,17 @@ func initialAptCollection(cfg *config.Config, s *sender.Sender) {
 	// Wait a bit to avoid overwhelming the system at startup
 	time.Sleep(5 * time.Second)
 
-	log.Println("Performing initial APT update...")
+	var aptUpdateOutput string
+	var aptUpdateErr error
 
-	// Execute apt update at startup to ensure latest package list
-	aptUpdateOutput, aptUpdateErr := executeAptUpdate()
-	if aptUpdateErr != nil {
-		log.Printf("Warning: Initial apt update failed: %v", aptUpdateErr)
-	} else {
-		log.Println("Initial apt update completed successfully")
+	if cfg.AptAutoUpdateOnStart {
+		log.Println("Performing initial APT update (apt_auto_update_on_start=true)...")
+		aptUpdateOutput, aptUpdateErr = executeAptUpdate()
+		if aptUpdateErr != nil {
+			log.Printf("Warning: Initial apt update failed: %v", aptUpdateErr)
+		} else {
+			log.Println("Initial apt update completed successfully")
+		}
 	}
 
 	log.Println("Performing APT status collection with CVE extraction...")
@@ -441,23 +416,24 @@ func initialAptCollection(cfg *config.Config, s *sender.Sender) {
 
 	// Send updated APT status to server
 	report := &sender.Report{
-		AgentVersion: AgentVersion,
+		AgentVersion: Version,
 		Metrics:      nil, // Skip metrics in this report
 		Docker:       nil, // Skip docker in this report
 		AptStatus:    apt,
 		Timestamp:    time.Now(),
 	}
 
-	if _, err := s.SendReport(report); err != nil {
+	if _, err := s.SendReportWithRetry(report); err != nil {
 		log.Printf("Failed to send initial APT status: %v", err)
 	} else {
 		log.Println("Initial APT status with CVE sent successfully")
-		// Log the apt update action with the real command output
-		status := "completed"
-		if aptUpdateErr != nil {
-			status = "failed"
+		if cfg.AptAutoUpdateOnStart {
+			status := "completed"
+			if aptUpdateErr != nil {
+				status = "failed"
+			}
+			logAptAction(cfg, s, "update", status, aptUpdateOutput)
 		}
-		logAptAction(cfg, s, "update", status, aptUpdateOutput)
 	}
 }
 
@@ -477,11 +453,8 @@ func executeAptUpdate() (string, error) {
 
 // logAptAction sends an audit log entry for APT actions to the server
 func logAptAction(cfg *config.Config, s *sender.Sender, action, status, message string) {
-	// Create a simple audit log entry (we'll send it in the next report or via API)
 	log.Printf("APT Action: %s [%s] - %s", action, status, message)
 
-	// Send it to the server via the audit endpoint if available
-	// This ensures the action is logged in the dashboard
 	if err := s.SendAuditLog(action, status, message); err != nil {
 		log.Printf("Warning: Failed to send audit log: %v", err)
 	}

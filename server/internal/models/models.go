@@ -114,21 +114,24 @@ type DockerContainer struct {
 	UpdatedAt   time.Time         `json:"updated_at" db:"updated_at"`
 }
 
-// ========== Docker Commands (Management) ==========
+// ========== Remote Commands (unified: docker | apt | systemd | journal) ==========
 
-type DockerCommand struct {
-	ID            int64      `json:"id" db:"id"`
-	HostID        string     `json:"host_id" db:"host_id"`
-	ContainerName string     `json:"container_name" db:"container_name"`
-	Action        string     `json:"action" db:"action"`       // start, stop, restart, logs, compose_up, compose_down, compose_restart, compose_logs
-	WorkingDir    string     `json:"working_dir" db:"working_dir"` // for compose commands
-	Status        string     `json:"status" db:"status"` // pending, running, completed, failed
-	Output        string     `json:"output" db:"output"`
-	TriggeredBy   string     `json:"triggered_by" db:"triggered_by"`
-	AuditLogID    *int64     `json:"audit_log_id,omitempty" db:"audit_log_id"`
-	CreatedAt     time.Time  `json:"created_at" db:"created_at"`
-	StartedAt     *time.Time `json:"started_at" db:"started_at"`
-	EndedAt       *time.Time `json:"ended_at" db:"ended_at"`
+// RemoteCommand represents any task dispatched to a remote agent.
+// module ∈ "docker" | "apt" | "systemd" | "journal"
+type RemoteCommand struct {
+	ID          string     `json:"id" db:"id"`           // UUID v4
+	HostID      string     `json:"host_id" db:"host_id"`
+	Module      string     `json:"module" db:"module"`   // docker | apt | systemd | journal
+	Action      string     `json:"action" db:"action"`   // start, stop, upgrade, logs, list, …
+	Target      string     `json:"target" db:"target"`   // container / service name; empty for apt
+	Payload     string     `json:"payload" db:"payload"` // JSON extra args (e.g. {"working_dir": "…"})
+	Status      string     `json:"status" db:"status"`   // pending | running | completed | failed
+	Output      string     `json:"output" db:"output"`
+	TriggeredBy string     `json:"triggered_by" db:"triggered_by"`
+	AuditLogID  *int64     `json:"audit_log_id,omitempty" db:"audit_log_id"`
+	CreatedAt   time.Time  `json:"created_at" db:"created_at"`
+	StartedAt   *time.Time `json:"started_at" db:"started_at"`
+	EndedAt     *time.Time `json:"ended_at" db:"ended_at"`
 }
 
 type DockerCommandRequest struct {
@@ -219,19 +222,6 @@ type AptStatus struct {
 	UpdatedAt       time.Time `json:"updated_at" db:"updated_at"`
 }
 
-type AptCommand struct {
-	ID          int64      `json:"id" db:"id"`
-	HostID      string     `json:"host_id" db:"host_id"`
-	Command     string     `json:"command" db:"command"` // update, upgrade, dist-upgrade
-	Status      string     `json:"status" db:"status"`   // pending, running, completed, failed
-	Output      string     `json:"output" db:"output"`
-	TriggeredBy string     `json:"triggered_by" db:"triggered_by"` // Username who triggered this
-	AuditLogID  *int64     `json:"audit_log_id,omitempty" db:"audit_log_id"`
-	CreatedAt   time.Time  `json:"created_at" db:"created_at"`
-	StartedAt   *time.Time `json:"started_at" db:"started_at"`
-	EndedAt     *time.Time `json:"ended_at" db:"ended_at"`
-}
-
 type AptCommandRequest struct {
 	HostIDs []string `json:"host_ids" binding:"required"`
 	Command string   `json:"command" binding:"required,oneof=update upgrade dist-upgrade"`
@@ -301,17 +291,18 @@ type AgentReport struct {
 // ========== Commands (server → agent) ==========
 
 type PendingCommand struct {
-	ID      int64  `json:"id"`
-	Type    string `json:"type"`    // apt_update, apt_upgrade, apt_dist_upgrade
-	Payload string `json:"payload"` // JSON payload if needed
+	ID      string `json:"id"`      // UUID
+	Module  string `json:"module"`  // docker | apt | systemd | journal
+	Action  string `json:"action"`  // start, stop, upgrade, logs, list, …
+	Target  string `json:"target"`  // container / service name; empty for apt
+	Payload string `json:"payload"` // JSON extra args
 }
 
 type CommandResult struct {
-	CommandID int64      `json:"command_id"`
-	Status    string     `json:"status"` // completed, failed
+	CommandID string     `json:"command_id"` // UUID
+	Status    string     `json:"status"`     // running | completed | failed
 	Output    string     `json:"output"`
 	AptStatus *AptStatus `json:"apt_status,omitempty"` // Full APT status after update/upgrade
-	Type      string     `json:"type,omitempty"`       // "apt" or "docker"
 }
 
 // ========== Auth ==========

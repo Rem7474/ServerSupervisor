@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"regexp"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -12,9 +11,6 @@ import (
 	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/models"
 )
-
-// validServiceName matches valid systemd service names: alphanumeric plus ._:@-
-var validServiceName = regexp.MustCompile(`^[a-zA-Z0-9._:@\-]{1,256}$`)
 
 type DockerHandler struct {
 	db        *database.DB
@@ -178,7 +174,8 @@ func (h *DockerHandler) SendDockerCommand(c *gin.Context) {
 		auditLogIDPtr = &auditID
 	}
 
-	cmd, err := h.db.CreateDockerCommand(req.HostID, req.ContainerName, req.Action, req.WorkingDir, username, auditLogIDPtr)
+	payload := fmt.Sprintf(`{"working_dir":%q}`, req.WorkingDir)
+	cmd, err := h.db.CreateRemoteCommand(req.HostID, "docker", req.Action, req.ContainerName, payload, username, auditLogIDPtr)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create command"})
 		return
@@ -187,101 +184,16 @@ func (h *DockerHandler) SendDockerCommand(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"command_id": cmd.ID, "status": "pending"})
 }
 
-// SendJournalCommand enqueues a journalctl log fetch for a specific service on a host.
-// Restricted to admin and operator roles (logs can contain sensitive data).
-func (h *DockerHandler) SendJournalCommand(c *gin.Context) {
-	username := c.GetString("username")
-	role := c.GetString("role")
-	if role != models.RoleAdmin && role != models.RoleOperator {
-		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
-		return
-	}
-
-	var req struct {
-		HostID      string `json:"host_id" binding:"required"`
-		ServiceName string `json:"service_name" binding:"required"`
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	if !validServiceName.MatchString(req.ServiceName) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid service name"})
-		return
-	}
-
-	details := fmt.Sprintf(`{"service":"%s"}`, req.ServiceName)
-	auditID, auditErr := h.db.CreateAuditLog(username, "journalctl", req.HostID, c.ClientIP(), details, "pending")
-	var auditLogIDPtr *int64
-	if auditErr != nil {
-		log.Printf("Warning: failed to create audit log for journalctl command: %v", auditErr)
-	} else {
-		auditLogIDPtr = &auditID
-	}
-
-	cmd, err := h.db.CreateDockerCommand(req.HostID, req.ServiceName, "journalctl", "", username, auditLogIDPtr)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create command"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"command_id": cmd.ID, "status": "pending"})
-}
-
-// SendSystemdCommand enqueues a systemd service management command for an agent.
-func (h *DockerHandler) SendSystemdCommand(c *gin.Context) {
-	username := c.GetString("username")
-	role := c.GetString("role")
-	if role != models.RoleAdmin && role != models.RoleOperator {
-		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
-		return
-	}
-
-	var req struct {
-		HostID      string `json:"host_id" binding:"required"`
-		ServiceName string `json:"service_name"`
-		Action      string `json:"action" binding:"required,oneof=list start stop restart enable disable status"`
-	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	if req.Action != "list" && !validServiceName.MatchString(req.ServiceName) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid service name"})
-		return
-	}
-
-	details := fmt.Sprintf(`{"service":"%s","action":"%s"}`, req.ServiceName, req.Action)
-	auditID, auditErr := h.db.CreateAuditLog(username, "systemd_"+req.Action, req.HostID, c.ClientIP(), details, "pending")
-	var auditLogIDPtr *int64
-	if auditErr != nil {
-		log.Printf("Warning: failed to create audit log for systemd command: %v", auditErr)
-	} else {
-		auditLogIDPtr = &auditID
-	}
-
-	// Prefix action with "systemd_" so GetPendingDockerCommands sets Type = "systemd"
-	cmd, err := h.db.CreateDockerCommand(req.HostID, req.ServiceName, "systemd_"+req.Action, "", username, auditLogIDPtr)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create command"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"command_id": cmd.ID, "status": "pending"})
-}
-
-// GetDockerCommandHistory returns recent docker and journalctl commands for a host
+// GetDockerCommandHistory returns recent docker commands for a host
 func (h *DockerHandler) GetDockerCommandHistory(c *gin.Context) {
 	hostID := c.Param("id")
-	cmds, err := h.db.GetDockerCommandsByHost(hostID, 50)
+	cmds, err := h.db.GetRemoteCommandsByHostAndModule(hostID, "docker", 50)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch command history"})
 		return
 	}
 	if cmds == nil {
-		cmds = []models.DockerCommand{}
+		cmds = []models.RemoteCommand{}
 	}
 	c.JSON(http.StatusOK, gin.H{"commands": cmds})
 }

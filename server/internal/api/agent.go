@@ -159,14 +159,10 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 		}
 	}
 
-	// Return pending commands for this host (APT + Docker)
-	commands, _ := h.db.GetPendingCommands(hostID)
+	// Return pending commands for this host (unified remote_commands table)
+	commands, _ := h.db.GetPendingRemoteCommands(hostID)
 	if commands == nil {
 		commands = []models.PendingCommand{}
-	}
-	dockerCmds, _ := h.db.GetPendingDockerCommands(hostID)
-	if len(dockerCmds) > 0 {
-		commands = append(commands, dockerCmds...)
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -189,63 +185,36 @@ func (h *AgentHandler) ReportCommandResult(c *gin.Context) {
 		return
 	}
 
-	// Route based on command type
-	if result.Type == "docker" {
-		dockerCmd, cmdErr := h.db.GetDockerCommandByID(result.CommandID)
-		if cmdErr != nil || dockerCmd.HostID != hostID {
-			c.JSON(http.StatusForbidden, gin.H{"error": "command does not belong to host"})
-			return
-		}
-		// Si c'est une commande systemd status, tente de parser le JSON pour l'affichage frontend
-		if dockerCmd.Action == "systemd_status" && result.Status == "completed" && result.Output != "" {
-			type systemdStatusJSON struct {
-				Name        string `json:"name"`
-				Description string `json:"description"`
-				LoadState   string `json:"load_state"`
-				ActiveState string `json:"active_state"`
-				SubState    string `json:"sub_state"`
-			}
-			var parsed systemdStatusJSON
-			// systemctl --output=json renvoie un tableau JSON
-			var arr []systemdStatusJSON
-			if err := json.Unmarshal([]byte(result.Output), &arr); err == nil && len(arr) > 0 {
-				parsed = arr[0]
-				// On remplace l'output par un résumé lisible
-				result.Output = fmt.Sprintf("%s: %s (%s/%s) - %s", parsed.Name, parsed.Description, parsed.ActiveState, parsed.SubState, parsed.LoadState)
-			}
-		}
-		if err := h.db.UpdateDockerCommandStatus(result.CommandID, result.Status, result.Output); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update command"})
-			return
-		}
-
-		if dockerCmd.AuditLogID != nil {
-			details := ""
-			if result.Status == "failed" {
-				details = truncateOutput(result.Output, 2000)
-			}
-			_ = h.db.UpdateAuditLogStatus(*dockerCmd.AuditLogID, result.Status, details)
-		}
-		commandIDStr := strconv.FormatInt(result.CommandID, 10)
-		h.streamHub.BroadcastStatus(commandIDStr, result.Status)
-		c.JSON(http.StatusOK, gin.H{"status": "ok"})
-		return
-	}
-
-	// APT command path
-	cmd, cmdErr := h.db.GetAptCommandByID(result.CommandID)
+	// Lookup command by UUID — ownership verified via host_id
+	cmd, cmdErr := h.db.GetRemoteCommandByID(result.CommandID)
 	if cmdErr != nil || cmd.HostID != hostID {
 		c.JSON(http.StatusForbidden, gin.H{"error": "command does not belong to host"})
 		return
 	}
 
-	if err := h.db.UpdateCommandStatus(result.CommandID, result.Status, result.Output); err != nil {
+	// systemd status: parse JSON output into a human-readable summary
+	if cmd.Module == "systemd" && cmd.Action == "status" && result.Status == "completed" && result.Output != "" {
+		type systemdStatusJSON struct {
+			Name        string `json:"name"`
+			Description string `json:"description"`
+			LoadState   string `json:"load_state"`
+			ActiveState string `json:"active_state"`
+			SubState    string `json:"sub_state"`
+		}
+		var arr []systemdStatusJSON
+		if err := json.Unmarshal([]byte(result.Output), &arr); err == nil && len(arr) > 0 {
+			p := arr[0]
+			result.Output = fmt.Sprintf("%s: %s (%s/%s) - %s", p.Name, p.Description, p.ActiveState, p.SubState, p.LoadState)
+		}
+	}
+
+	if err := h.db.UpdateRemoteCommandStatus(result.CommandID, result.Status, result.Output); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update command"})
 		return
 	}
 
-	// Update related audit log status (if linked)
-	if cmd != nil && cmd.AuditLogID != nil {
+	// Update linked audit log
+	if cmd.AuditLogID != nil {
 		details := ""
 		if result.Status == "failed" {
 			details = truncateOutput(result.Output, 2000)
@@ -253,18 +222,15 @@ func (h *AgentHandler) ReportCommandResult(c *gin.Context) {
 		_ = h.db.UpdateAuditLogStatus(*cmd.AuditLogID, result.Status, details)
 	}
 
-	// Broadcast status update to WebSocket clients
-	commandIDStr := strconv.FormatInt(result.CommandID, 10)
-	h.streamHub.BroadcastStatus(commandIDStr, result.Status)
+	// Broadcast status to WebSocket clients (UUID string, no conversion needed)
+	h.streamHub.BroadcastStatus(result.CommandID, result.Status)
 
-	if result.Status == "completed" && cmd != nil {
-		_ = h.db.TouchAptLastAction(cmd.HostID, cmd.Command)
-
-		// Update full APT status if provided with command result
+	// APT post-processing
+	if cmd.Module == "apt" && result.Status == "completed" {
+		_ = h.db.TouchAptLastAction(cmd.HostID, cmd.Action)
 		if result.AptStatus != nil {
 			result.AptStatus.HostID = cmd.HostID
-			err := h.db.UpsertAptStatus(result.AptStatus)
-			if err != nil {
+			if err := h.db.UpsertAptStatus(result.AptStatus); err != nil {
 				log.Printf("Failed to update APT status: %v", err)
 			}
 		}
@@ -290,22 +256,9 @@ func (h *AgentHandler) StreamCommandOutput(c *gin.Context) {
 		return
 	}
 
-	cmdID, err := strconv.ParseInt(chunk.CommandID, 10, 64)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid command_id"})
-		return
-	}
-
-	// Check ownership: try apt_commands first, then docker_commands
-	aptCmd, aptErr := h.db.GetAptCommandByID(cmdID)
-	if aptErr != nil {
-		// Not an APT command — try docker
-		dockerCmd, dockerErr := h.db.GetDockerCommandByID(cmdID)
-		if dockerErr != nil || dockerCmd.HostID != hostID {
-			c.JSON(http.StatusForbidden, gin.H{"error": "command does not belong to host"})
-			return
-		}
-	} else if aptCmd.HostID != hostID {
+	// Verify ownership via unified remote_commands table
+	cmd, err := h.db.GetRemoteCommandByID(chunk.CommandID)
+	if err != nil || cmd.HostID != hostID {
 		c.JSON(http.StatusForbidden, gin.H{"error": "command does not belong to host"})
 		return
 	}

@@ -287,23 +287,23 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="cmd in combinedHistory" :key="`${cmd._type}-${cmd.id}`">
+            <tr v-for="cmd in combinedHistory" :key="cmd.id">
               <td class="text-secondary small">{{ formatDate(cmd.created_at) }}</td>
               <td>
-                <span v-if="cmd._type === 'apt'" class="badge bg-blue-lt text-blue">APT</span>
-                <span v-else-if="cmd._type === 'journal'" class="badge bg-purple-lt text-purple">Journal</span>
+                <span v-if="cmd.module === 'apt'" class="badge bg-blue-lt text-blue">APT</span>
+                <span v-else-if="cmd.module === 'journal'" class="badge bg-purple-lt text-purple">Journal</span>
                 <span v-else class="badge bg-cyan-lt text-cyan">Docker</span>
               </td>
               <td>
-                <code v-if="cmd._type === 'apt'">apt {{ cmd.command }}</code>
-                <code v-else-if="cmd._type === 'journal'">journalctl -u {{ cmd.container_name }}</code>
-                <code v-else>{{ cmd.action }} {{ cmd.container_name }}</code>
+                <code v-if="cmd.module === 'apt'">apt {{ cmd.action }}</code>
+                <code v-else-if="cmd.module === 'journal'">journalctl -u {{ cmd.target }}</code>
+                <code v-else>{{ cmd.action }} {{ cmd.target }}</code>
               </td>
               <td><span :class="statusClass(cmd.status)">{{ cmd.status }}</span></td>
               <td class="text-secondary small">{{ cmd.triggered_by || '-' }}</td>
               <td>
                 <button
-                  @click="watchCommand(cmd, cmd._type === 'apt' ? 'apt' : 'docker')"
+                  @click="watchCommand(cmd)"
                   class="btn btn-sm btn-ghost-secondary"
                   title="Voir les logs"
                 >
@@ -879,9 +879,7 @@ function cpuColor(pct) {
 }
 
 const combinedHistory = computed(() => {
-  const apt = aptHistory.value.map(c => ({ ...c, _type: 'apt' }))
-  const docker = dockerHistory.value.map(c => ({ ...c, _type: c.action === 'journalctl' ? 'journal' : 'docker' }))
-  const all = [...apt, ...docker].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+  const all = [...aptHistory.value, ...dockerHistory.value].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
   return showFullAptHistory.value ? all : all.slice(0, 5)
 })
 
@@ -943,7 +941,7 @@ async function loadSystemdServices() {
     const res = await apiClient.sendSystemdCommand(hostId, '', 'list')
     const cmdId = res.data.command_id
     const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
-    const wsUrl = `${protocol}://${window.location.host}/api/v1/ws/apt/stream/${cmdId}?cmd_type=docker`
+    const wsUrl = `${protocol}://${window.location.host}/api/v1/ws/apt/stream/${cmdId}`
 
     await new Promise((resolve, reject) => {
       let output = ''
@@ -995,7 +993,7 @@ async function executeSystemdAction(serviceName, action) {
       output: '',
     }
     showConsole.value = true
-    connectStreamWebSocket(cmdId, 'docker')
+    connectStreamWebSocket(cmdId)
     nextTick(() => scrollToBottom())
   } catch (e) {
     console.error('Failed to execute systemd action:', e)
@@ -1059,16 +1057,17 @@ async function loadJournalLogs() {
   }
 }
 
-function watchCommand(cmd, cmdType = 'apt') {
+function watchCommand(cmd) {
   let displayCommand
   let prefix = ''
-  if (cmdType === 'apt') {
+  const module = cmd.module || 'apt'
+  if (module === 'apt') {
     prefix = 'apt '
-    displayCommand = cmd.command
-  } else if (cmd.action === 'journalctl') {
-    displayCommand = `journalctl -u ${cmd.container_name}`
+    displayCommand = cmd.action || cmd.command
+  } else if (module === 'journal') {
+    displayCommand = `journalctl -u ${cmd.target || cmd.container_name}`
   } else {
-    displayCommand = `${cmd.action} ${cmd.container_name}`
+    displayCommand = `${cmd.action} ${cmd.target || cmd.container_name}`
   }
   liveCommand.value = {
     id: cmd.id,
@@ -1078,7 +1077,7 @@ function watchCommand(cmd, cmdType = 'apt') {
     output: cmd.output || '',
   }
   showConsole.value = true
-  connectStreamWebSocket(cmd.id, cmdType === 'docker' ? 'docker' : '')
+  connectStreamWebSocket(cmd.id)
   nextTick(() => scrollToBottom())
 }
 
@@ -1099,14 +1098,12 @@ function scrollToBottom() {
   }
 }
 
-function connectStreamWebSocket(commandId, cmdType = '') {
+function connectStreamWebSocket(commandId) {
   if (streamWs) {
     streamWs.close()
   }
   const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
-  const wsUrl = cmdType
-    ? `${protocol}://${window.location.host}/api/v1/ws/apt/stream/${commandId}?cmd_type=${cmdType}`
-    : `${protocol}://${window.location.host}/api/v1/ws/apt/stream/${commandId}`
+  const wsUrl = `${protocol}://${window.location.host}/api/v1/ws/apt/stream/${commandId}`
   streamWs = new WebSocket(wsUrl)
 
   streamWs.onopen = () => {

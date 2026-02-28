@@ -7,28 +7,34 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"time"
 )
 
+type NetworkInterface struct {
+	Name    string `json:"name"`
+	RxBytes uint64 `json:"rx_bytes"`
+	TxBytes uint64 `json:"tx_bytes"`
+}
+
 type SystemMetrics struct {
-	CPUUsagePercent float64    `json:"cpu_usage_percent"`
-	CPUCores        int        `json:"cpu_cores"`
-	CPUModel        string     `json:"cpu_model"`
-	LoadAvg1        float64    `json:"load_avg_1"`
-	LoadAvg5        float64    `json:"load_avg_5"`
-	LoadAvg15       float64    `json:"load_avg_15"`
-	MemoryTotal     uint64     `json:"memory_total"`
-	MemoryUsed      uint64     `json:"memory_used"`
-	MemoryFree      uint64     `json:"memory_free"`
-	MemoryPercent   float64    `json:"memory_percent"`
-	SwapTotal       uint64     `json:"swap_total"`
-	SwapUsed        uint64     `json:"swap_used"`
-	Disks           []DiskInfo `json:"disks"`
-	NetworkRxBytes  uint64     `json:"network_rx_bytes"`
-	NetworkTxBytes  uint64     `json:"network_tx_bytes"`
-	Uptime          uint64     `json:"uptime"`
-	OS              string     `json:"os"`
-	Hostname        string     `json:"hostname"`
+	CPUUsagePercent   float64            `json:"cpu_usage_percent"`
+	CPUCores          int                `json:"cpu_cores"`
+	CPUModel          string             `json:"cpu_model"`
+	LoadAvg1          float64            `json:"load_avg_1"`
+	LoadAvg5          float64            `json:"load_avg_5"`
+	LoadAvg15         float64            `json:"load_avg_15"`
+	MemoryTotal       uint64             `json:"memory_total"`
+	MemoryUsed        uint64             `json:"memory_used"`
+	MemoryFree        uint64             `json:"memory_free"`
+	MemoryPercent     float64            `json:"memory_percent"`
+	SwapTotal         uint64             `json:"swap_total"`
+	SwapUsed          uint64             `json:"swap_used"`
+	Disks             []DiskInfo         `json:"disks"`
+	NetworkRxBytes    uint64             `json:"network_rx_bytes"`
+	NetworkTxBytes    uint64             `json:"network_tx_bytes"`
+	NetworkInterfaces []NetworkInterface `json:"network_interfaces,omitempty"`
+	Uptime            uint64             `json:"uptime"`
+	OS                string             `json:"os"`
+	Hostname          string             `json:"hostname"`
 }
 
 type DiskInfo struct {
@@ -71,9 +77,10 @@ func CollectSystem() (*SystemMetrics, error) {
 
 	m.Disks = getDiskUsage()
 
-	rx, tx := getNetworkBytes()
+	rx, tx, ifaces := getNetworkBytes()
 	m.NetworkRxBytes = rx
 	m.NetworkTxBytes = tx
+	m.NetworkInterfaces = ifaces
 
 	m.Uptime = getUptime()
 
@@ -113,42 +120,52 @@ func getOSName() string {
 	return runtime.GOOS
 }
 
-func getCPUUsage() float64 {
-	// Read /proc/stat twice with a short interval
-	read := func() (idle, total uint64) {
-		data, err := os.ReadFile("/proc/stat")
-		if err != nil {
-			return 0, 0
-		}
-		lines := strings.Split(string(data), "\n")
-		if len(lines) == 0 {
-			return 0, 0
-		}
-		fields := strings.Fields(lines[0])
-		if len(fields) < 5 {
-			return 0, 0
-		}
-		var values []uint64
-		for _, f := range fields[1:] {
-			v, _ := strconv.ParseUint(f, 10, 64)
-			values = append(values, v)
-		}
-		var sum uint64
-		for _, v := range values {
-			sum += v
-		}
-		if len(values) >= 4 {
-			return values[3], sum
-		}
-		return 0, sum
+// prevCPUIdle and prevCPUTotal store the last /proc/stat sample so getCPUUsage
+// can compute a delta without sleeping.
+var (
+	prevCPUIdle  uint64
+	prevCPUTotal uint64
+)
+
+// readCPUStat returns the idle and total CPU jiffies from /proc/stat.
+func readCPUStat() (idle, total uint64) {
+	data, err := os.ReadFile("/proc/stat")
+	if err != nil {
+		return 0, 0
 	}
+	lines := strings.Split(string(data), "\n")
+	if len(lines) == 0 {
+		return 0, 0
+	}
+	fields := strings.Fields(lines[0])
+	if len(fields) < 5 {
+		return 0, 0
+	}
+	var values []uint64
+	for _, f := range fields[1:] {
+		v, _ := strconv.ParseUint(f, 10, 64)
+		values = append(values, v)
+	}
+	var sum uint64
+	for _, v := range values {
+		sum += v
+	}
+	if len(values) >= 4 {
+		return values[3], sum
+	}
+	return 0, sum
+}
 
-	idle1, total1 := read()
-	time.Sleep(500 * time.Millisecond)
-	idle2, total2 := read()
-
-	idleDelta := float64(idle2 - idle1)
-	totalDelta := float64(total2 - total1)
+// getCPUUsage computes CPU usage as the delta between successive calls.
+// The first call always returns 0 (no baseline yet). No sleep is performed.
+func getCPUUsage() float64 {
+	idle, total := readCPUStat()
+	defer func() { prevCPUIdle = idle; prevCPUTotal = total }()
+	if prevCPUTotal == 0 {
+		return 0
+	}
+	idleDelta := float64(idle - prevCPUIdle)
+	totalDelta := float64(total - prevCPUTotal)
 	if totalDelta == 0 {
 		return 0
 	}
@@ -229,10 +246,10 @@ func getDiskUsage() []DiskInfo {
 	return disks
 }
 
-func getNetworkBytes() (rx, tx uint64) {
+func getNetworkBytes() (rx, tx uint64, ifaces []NetworkInterface) {
 	data, err := os.ReadFile("/proc/net/dev")
 	if err != nil {
-		return 0, 0
+		return 0, 0, nil
 	}
 	for _, line := range strings.Split(string(data), "\n") {
 		line = strings.TrimSpace(line)
@@ -243,8 +260,7 @@ func getNetworkBytes() (rx, tx uint64) {
 		if len(parts) != 2 {
 			continue
 		}
-		iface := strings.TrimSpace(parts[0])
-		_ = iface
+		name := strings.TrimSpace(parts[0])
 		fields := strings.Fields(parts[1])
 		if len(fields) < 10 {
 			continue
@@ -253,8 +269,9 @@ func getNetworkBytes() (rx, tx uint64) {
 		t, _ := strconv.ParseUint(fields[8], 10, 64)
 		rx += r
 		tx += t
+		ifaces = append(ifaces, NetworkInterface{Name: name, RxBytes: r, TxBytes: t})
 	}
-	return rx, tx
+	return rx, tx, ifaces
 }
 
 func getUptime() uint64 {
