@@ -160,7 +160,7 @@ func (s *Sender) ReportCommandResult(result *CommandResult) error {
 		return fmt.Errorf("server returned status %d: %s", resp.StatusCode, string(body))
 	}
 
-	log.Printf("Command result for #%d reported successfully (status: %s)", result.CommandID, result.Status)
+	log.Printf("Command result for #%s reported successfully (status: %s)", result.CommandID, result.Status)
 	return nil
 }
 
@@ -191,7 +191,7 @@ func (s *Sender) StreamCommandChunk(commandID string, chunk string) error {
 	resp, err := s.commandClient.Do(req)
 	if err != nil {
 		// Don't fail the command if streaming fails, just log it
-		log.Printf("Failed to stream chunk for command #%d: %v", commandID, err)
+		log.Printf("Failed to stream chunk for command #%s: %v", commandID, err)
 		return nil
 	}
 	defer resp.Body.Close()
