@@ -59,13 +59,13 @@ jobs:
           # Features
           FEATURES=$(git log "$RANGE" --pretty=format:"- %s (%h)" --no-merges --grep="^feat" | head -20)
           if [ -n "$FEATURES" ]; then
-            CHANGELOG="${CHANGELOG}### ✨ Features\n${FEATURES}\n\n"
+            CHANGELOG="${CHANGELOG}### ✨ Features\n${FEATURES}\n"
           fi
 
           # Fixes
           FIXES=$(git log "$RANGE" --pretty=format:"- %s (%h)" --no-merges --grep="^fix" | head -20)
           if [ -n "$FIXES" ]; then
-            CHANGELOG="${CHANGELOG}### 🐛 Bug Fixes\n${FIXES}\n\n"
+            CHANGELOG="${CHANGELOG}### 🐛 Bug Fixes\n${FIXES}\n"
           fi
 
           # Other changes
@@ -73,6 +73,9 @@ jobs:
           if [ -n "$OTHERS" ]; then
             CHANGELOG="${CHANGELOG}### 🔧 Other Changes\n${OTHERS}\n"
           fi
+
+          # Nettoyer le changelog : supprimer les \n en trop en fin de chaîne
+          CHANGELOG=$(printf "%s" "$CHANGELOG" | sed ':a;N;$!ba;s/\n\{2,\}/\n/g')
 
           # Échapper les caractères spéciaux pour GitHub Actions (remplacer \n par %0A, \r par %0D, % par %25)
           SAFE_CHANGELOG=$(printf "%s" "$CHANGELOG" | sed -e 's/%/%25/g' -e 's/\r/%0D/g' -e 's/\n/%0A/g')
