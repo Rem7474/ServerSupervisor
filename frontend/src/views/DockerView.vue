@@ -740,7 +740,7 @@ function connectDockerStream(commandId, containerName, action) {
 
   const token = auth.token
   const proto = location.protocol === 'https:' ? 'wss' : 'ws'
-  const wsUrl = `${proto}://${location.host}/api/v1/ws/apt/stream/${commandId}`
+  const wsUrl = `${proto}://${location.host}/api/v1/ws/commands/stream/${commandId}`
 
   const ws = new WebSocket(wsUrl)
   dockerStreamWs = ws
@@ -762,7 +762,7 @@ function connectDockerStream(commandId, containerName, action) {
     if (dockerStreamWs !== ws) return
     try {
       const msg = JSON.parse(event.data)
-      if (msg.type === 'apt_stream_init') {
+      if (msg.type === 'cmd_stream_init') {
         // Replace console text with whatever the DB has at connection time
         dockerConsoleText.value = msg.output || ''
         if (dockerLiveCmd.value) dockerLiveCmd.value.status = msg.status
@@ -770,10 +770,10 @@ function connectDockerStream(commandId, containerName, action) {
         if (msg.status === 'completed' || msg.status === 'failed') {
           closeWs()
         }
-      } else if (msg.type === 'apt_stream') {
+      } else if (msg.type === 'cmd_stream') {
         dockerConsoleText.value += msg.chunk || ''
         scrollDockerConsole()
-      } else if (msg.type === 'apt_status_update') {
+      } else if (msg.type === 'cmd_status_update') {
         if (dockerLiveCmd.value) dockerLiveCmd.value.status = msg.status
         if (msg.status === 'completed' || msg.status === 'failed') {
           closeWs()

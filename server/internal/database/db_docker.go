@@ -182,53 +182,14 @@ func (db *DB) GetAllDockerNetworks() ([]models.DockerNetwork, error) {
 }
 
 // ========== Container Envs ==========
-
-func (db *DB) UpsertContainerEnvs(hostID string, envs []models.ContainerEnv) error {
-	if len(envs) == 0 {
-		return nil
-	}
-	for _, env := range envs {
-		envVarsJSON, _ := json.Marshal(env.EnvVars)
-		_, err := db.conn.Exec(
-			`INSERT INTO container_envs (host_id, container_name, env_vars, updated_at)
-			 VALUES ($1, $2, $3, NOW())
-			 ON CONFLICT(host_id, container_name) DO UPDATE SET
-			 env_vars = $3, updated_at = NOW()`,
-			hostID, env.ContainerName, envVarsJSON,
-		)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (db *DB) GetContainerEnvsByHost(hostID string) ([]models.ContainerEnv, error) {
-	rows, err := db.conn.Query(
-		`SELECT container_name, env_vars FROM container_envs WHERE host_id = $1`,
-		hostID,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var envs []models.ContainerEnv
-	for rows.Next() {
-		var env models.ContainerEnv
-		var envVarsJSON []byte
-		if err := rows.Scan(&env.ContainerName, &envVarsJSON); err != nil {
-			continue
-		}
-		json.Unmarshal(envVarsJSON, &env.EnvVars)
-		envs = append(envs, env)
-	}
-	return envs, nil
-}
+// Env vars are stored in docker_containers.env_vars (no separate table).
 
 func (db *DB) GetAllContainerEnvs() ([]models.ContainerEnv, error) {
 	rows, err := db.conn.Query(
-		`SELECT container_name, env_vars FROM container_envs ORDER BY host_id, container_name`,
+		`SELECT name AS container_name, COALESCE(env_vars::text, '{}')
+		 FROM docker_containers
+		 WHERE env_vars IS NOT NULL AND env_vars != '{}'::jsonb
+		 ORDER BY host_id, name`,
 	)
 	if err != nil {
 		return nil, err
@@ -238,11 +199,11 @@ func (db *DB) GetAllContainerEnvs() ([]models.ContainerEnv, error) {
 	var envs []models.ContainerEnv
 	for rows.Next() {
 		var env models.ContainerEnv
-		var envVarsJSON []byte
+		var envVarsJSON string
 		if err := rows.Scan(&env.ContainerName, &envVarsJSON); err != nil {
 			continue
 		}
-		json.Unmarshal(envVarsJSON, &env.EnvVars)
+		json.Unmarshal([]byte(envVarsJSON), &env.EnvVars)
 		envs = append(envs, env)
 	}
 	return envs, nil

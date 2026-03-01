@@ -17,10 +17,10 @@ import (
 type AgentHandler struct {
 	db        *database.DB
 	cfg       *config.Config
-	streamHub *AptStreamHub
+	streamHub *CommandStreamHub
 }
 
-func NewAgentHandler(db *database.DB, cfg *config.Config, streamHub *AptStreamHub) *AgentHandler {
+func NewAgentHandler(db *database.DB, cfg *config.Config, streamHub *CommandStreamHub) *AgentHandler {
 	return &AgentHandler{
 		db:        db,
 		cfg:       cfg,
@@ -119,13 +119,6 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 		}
 		if err := h.db.UpsertDockerNetworks(hostID, dbNetworks); err != nil {
 			log.Printf("Warning: failed to store docker networks for host %s: %v", hostID, err)
-		}
-	}
-
-	// Store container env vars (for topology inference)
-	if len(report.ContainerEnvs) > 0 {
-		if err := h.db.UpsertContainerEnvs(hostID, report.ContainerEnvs); err != nil {
-			log.Printf("Warning: failed to store container envs for host %s: %v", hostID, err)
 		}
 	}
 

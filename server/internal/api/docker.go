@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/serversupervisor/server/internal/config"
@@ -12,13 +14,25 @@ import (
 	"github.com/serversupervisor/server/internal/models"
 )
 
+// isValidWorkingDir returns true when p is either empty, an absolute path,
+// and does not escape its root via ".." components.
+func isValidWorkingDir(p string) bool {
+	if p == "" {
+		return true
+	}
+	if !filepath.IsAbs(p) {
+		return false
+	}
+	return !strings.Contains(filepath.Clean(p), "..")
+}
+
 type DockerHandler struct {
 	db        *database.DB
 	cfg       *config.Config
-	streamHub *AptStreamHub
+	streamHub *CommandStreamHub
 }
 
-func NewDockerHandler(db *database.DB, cfg *config.Config, streamHub *AptStreamHub) *DockerHandler {
+func NewDockerHandler(db *database.DB, cfg *config.Config, streamHub *CommandStreamHub) *DockerHandler {
 	return &DockerHandler{db: db, cfg: cfg, streamHub: streamHub}
 }
 
@@ -149,7 +163,7 @@ func (h *DockerHandler) DeleteTrackedRepo(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "repo deleted"})
 }
 
-// SendDockerCommand creates a pending docker command for an agent to execute
+// SendDockerCommand creates a pending docker command for an agent to execute.
 func (h *DockerHandler) SendDockerCommand(c *gin.Context) {
 	username := c.GetString("username")
 	role := c.GetString("role")
@@ -161,6 +175,12 @@ func (h *DockerHandler) SendDockerCommand(c *gin.Context) {
 	var req models.DockerCommandRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	// Validate working_dir to prevent path traversal on the agent
+	if !isValidWorkingDir(req.WorkingDir) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid working_dir: must be an absolute path"})
 		return
 	}
 
@@ -177,11 +197,27 @@ func (h *DockerHandler) SendDockerCommand(c *gin.Context) {
 	payload := fmt.Sprintf(`{"working_dir":%q}`, req.WorkingDir)
 	cmd, err := h.db.CreateRemoteCommand(req.HostID, "docker", req.Action, req.ContainerName, payload, username, auditLogIDPtr)
 	if err != nil {
+		if auditLogIDPtr != nil {
+			_ = h.db.UpdateAuditLogStatus(*auditLogIDPtr, "failed", err.Error())
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create command"})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"command_id": cmd.ID, "status": "pending"})
+}
+
+// ListComposeProjects returns all Docker Compose projects across all hosts.
+func (h *DockerHandler) ListComposeProjects(c *gin.Context) {
+	projects, err := h.db.GetAllComposeProjects()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch compose projects"})
+		return
+	}
+	if projects == nil {
+		projects = []models.ComposeProject{}
+	}
+	c.JSON(http.StatusOK, projects)
 }
 
 // GetDockerCommandHistory returns recent docker commands for a host

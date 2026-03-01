@@ -3,6 +3,7 @@ package api
 import (
 	"log"
 	"net"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -14,6 +15,7 @@ import (
 type IPRateLimiter struct {
 	mu       sync.Mutex
 	limiters map[string]*rate.Limiter
+	lastSeen map[string]time.Time
 	rps      rate.Limit
 	burst    int
 	trusted  []*net.IPNet
@@ -22,6 +24,7 @@ type IPRateLimiter struct {
 func NewIPRateLimiter(rps int, burst int, trustedProxyCIDRs []string) *IPRateLimiter {
 	rl := &IPRateLimiter{
 		limiters: make(map[string]*rate.Limiter),
+		lastSeen: make(map[string]time.Time),
 		rps:      rate.Limit(rps),
 		burst:    burst,
 		trusted:  parseTrustedProxies(trustedProxyCIDRs),
@@ -72,6 +75,7 @@ func (rl *IPRateLimiter) Allow(ip string) bool {
 		limiter = rate.NewLimiter(rl.rps, rl.burst)
 		rl.limiters[ip] = limiter
 	}
+	rl.lastSeen[ip] = time.Now()
 
 	return limiter.Allow()
 }
@@ -80,14 +84,14 @@ func (rl *IPRateLimiter) cleanup() {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
 
-	// Remove limiters that are not being actively used (still have tokens available)
-	// We check the available tokens without consuming them
-	for ip, limiter := range rl.limiters {
-		// Check if the limiter has fully recovered (enough tokens for a new burst)
-		// This doesn't consume tokens - it just checks the state
-		if limiter.Tokens() >= float64(rl.burst) {
-			// Limiter is not being used recently - safe to remove
+	// Remove limiters that have not been seen for more than 10 minutes.
+	// Using last-access time avoids the bug where a fresh (never-used) limiter
+	// starts with a full token bucket and would be immediately evicted.
+	cutoff := time.Now().Add(-10 * time.Minute)
+	for ip, t := range rl.lastSeen {
+		if t.Before(cutoff) {
 			delete(rl.limiters, ip)
+			delete(rl.lastSeen, ip)
 		}
 	}
 }
@@ -198,19 +202,25 @@ func maskSensitiveParams(query string) string {
 	return strings.Join(parts, "&")
 }
 
-// CORSMiddleware handles CORS with proper origin (WebSocket-safe)
-func CORSMiddleware(origin string) gin.HandlerFunc {
+// CORSMiddleware handles CORS with dynamic origin matching (WebSocket-safe).
+// It checks the request Origin against BASE_URL and ALLOWED_ORIGINS so that
+// additional front-end origins (e.g. dev server, reverse proxy) are accepted.
+func CORSMiddleware(baseURL string, extraOrigins []string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Skip CORS handling for WebSocket upgrades (they have their own protocol)
+		// WebSocket upgrades handle their own origin check via the upgrader.
 		if c.Request.Header.Get("Upgrade") == "websocket" {
 			c.Next()
 			return
 		}
 
-		c.Writer.Header().Set("Access-Control-Allow-Origin", origin)
+		requestOrigin := c.Request.Header.Get("Origin")
+		allowedOrigin := resolveAllowedOrigin(requestOrigin, baseURL, extraOrigins)
+
+		c.Writer.Header().Set("Access-Control-Allow-Origin", allowedOrigin)
 		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Authorization, X-API-Key")
 		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
+		c.Writer.Header().Set("Vary", "Origin")
 
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(204)
@@ -218,4 +228,30 @@ func CORSMiddleware(origin string) gin.HandlerFunc {
 		}
 		c.Next()
 	}
+}
+
+// resolveAllowedOrigin returns the origin to echo in the CORS header.
+// If the request origin matches BASE_URL or any ALLOWED_ORIGINS entry it is
+// returned as-is; otherwise the BASE_URL is used as the safe fallback.
+func resolveAllowedOrigin(requestOrigin, baseURL string, extraOrigins []string) string {
+	if requestOrigin == "" {
+		return baseURL
+	}
+
+	candidates := append([]string{baseURL}, extraOrigins...)
+	for _, candidate := range candidates {
+		candidate = strings.TrimSpace(candidate)
+		if candidate == "" {
+			continue
+		}
+		parsedCandidate, err := url.Parse(candidate)
+		parsedRequest, err2 := url.Parse(requestOrigin)
+		if err != nil || err2 != nil {
+			continue
+		}
+		if parsedRequest.Host == parsedCandidate.Host {
+			return requestOrigin
+		}
+	}
+	return baseURL
 }

@@ -85,6 +85,13 @@ const routes = [
     component: () => import('../views/AccountView.vue'),
     meta: { requiresAuth: true },
   },
+  {
+    path: '/hosts/:id/system',
+    name: 'HostSystem',
+    component: () => import('../views/SystemView.vue'),
+    meta: { requiresAuth: true },
+  },
+  { path: '/:pathMatch(.*)*', redirect: '/' },
 ]
 
 const router = createRouter({

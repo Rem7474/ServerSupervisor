@@ -335,8 +335,20 @@ func collectSmartData(device string) (DiskHealth, error) {
 		if table, ok := attrs["table"].([]interface{}); ok {
 			for _, attr := range table {
 				if attrMap, ok := attr.(map[string]interface{}); ok {
-					id := int(attrMap["id"].(float64))
-					rawValue := int64(attrMap["raw"].(map[string]interface{})["value"].(float64))
+					idVal, ok := attrMap["id"].(float64)
+					if !ok {
+						continue
+					}
+					id := int(idVal)
+					rawMap, ok2 := attrMap["raw"].(map[string]interface{})
+					if !ok2 {
+						continue
+					}
+					rawVal, ok3 := rawMap["value"].(float64)
+					if !ok3 {
+						continue
+					}
+					rawValue := int64(rawVal)
 
 					switch id {
 					case 5: // Reallocated Sectors Count

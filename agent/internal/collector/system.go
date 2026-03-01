@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 type NetworkInterface struct {
@@ -125,6 +126,7 @@ func getOSName() string {
 var (
 	prevCPUIdle  uint64
 	prevCPUTotal uint64
+	cpuMu        sync.Mutex
 )
 
 // readCPUStat returns the idle and total CPU jiffies from /proc/stat.
@@ -160,7 +162,12 @@ func readCPUStat() (idle, total uint64) {
 // The first call always returns 0 (no baseline yet). No sleep is performed.
 func getCPUUsage() float64 {
 	idle, total := readCPUStat()
-	defer func() { prevCPUIdle = idle; prevCPUTotal = total }()
+	cpuMu.Lock()
+	defer func() {
+		prevCPUIdle = idle
+		prevCPUTotal = total
+		cpuMu.Unlock()
+	}()
 	if prevCPUTotal == 0 {
 		return 0
 	}

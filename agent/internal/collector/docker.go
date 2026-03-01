@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -513,6 +514,9 @@ func ExecuteComposeCommand(action, projectName, workingDir string, chunkCB func(
 
 	cmd := exec.CommandContext(ctx, "docker", args...)
 	if workingDir != "" {
+		if !filepath.IsAbs(workingDir) {
+			return "", fmt.Errorf("invalid working directory: must be an absolute path")
+		}
 		cmd.Dir = workingDir
 	}
 

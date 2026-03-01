@@ -17,6 +17,7 @@
         </div>
         <div class="d-flex align-items-center gap-2">
           <router-link to="/" class="btn btn-outline-secondary">Retour au dashboard</router-link>
+          <router-link :to="`/hosts/${hostId}/system`" class="btn btn-outline-secondary">Système</router-link>
         <button @click="startEdit" class="btn btn-outline-secondary">Modifier</button>
         <button @click="deleteHost" class="btn btn-outline-danger">Supprimer</button>
         <span v-if="host?.agent_version" :class="isAgentUpToDate(host.agent_version) ? 'badge bg-green-lt text-green' : 'badge bg-yellow-lt text-yellow'">
@@ -1047,7 +1048,7 @@ async function loadSystemdServices() {
     const res = await apiClient.sendSystemdCommand(hostId, '', 'list')
     const cmdId = res.data.command_id
     const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
-    const wsUrl = `${protocol}://${window.location.host}/api/v1/ws/apt/stream/${cmdId}`
+    const wsUrl = `${protocol}://${window.location.host}/api/v1/ws/commands/stream/${cmdId}`
 
     await new Promise((resolve, reject) => {
       let output = ''
@@ -1056,13 +1057,13 @@ async function loadSystemdServices() {
       ws.onmessage = (event) => {
         try {
           const payload = JSON.parse(event.data)
-          if (payload.type === 'apt_stream_init') {
+          if (payload.type === 'cmd_stream_init') {
             output = payload.output || ''
             if (payload.status === 'completed') { ws.close(); resolve(output) }
             else if (payload.status === 'failed') { ws.close(); reject(new Error('Command failed')) }
-          } else if (payload.type === 'apt_stream') {
+          } else if (payload.type === 'cmd_stream') {
             output += payload.chunk || ''
-          } else if (payload.type === 'apt_status_update') {
+          } else if (payload.type === 'cmd_status_update') {
             if (payload.output) output = payload.output
             if (payload.status === 'completed') { ws.close(); resolve(output) }
             else if (payload.status === 'failed') { ws.close(); reject(new Error('Command failed')) }
@@ -1121,7 +1122,7 @@ async function loadProcesses() {
     const res = await apiClient.sendProcessesCommand(hostId)
     const cmdId = res.data.command_id
     const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
-    const wsUrl = `${protocol}://${window.location.host}/api/v1/ws/apt/stream/${cmdId}`
+    const wsUrl = `${protocol}://${window.location.host}/api/v1/ws/commands/stream/${cmdId}`
 
     await new Promise((resolve, reject) => {
       let output = ''
@@ -1130,13 +1131,13 @@ async function loadProcesses() {
       ws.onmessage = (event) => {
         try {
           const payload = JSON.parse(event.data)
-          if (payload.type === 'apt_stream_init') {
+          if (payload.type === 'cmd_stream_init') {
             output = payload.output || ''
             if (payload.status === 'completed') { ws.close(); resolve(output) }
             else if (payload.status === 'failed') { ws.close(); reject(new Error(output || 'Command failed')) }
-          } else if (payload.type === 'apt_stream') {
+          } else if (payload.type === 'cmd_stream') {
             output += payload.chunk || ''
-          } else if (payload.type === 'apt_status_update') {
+          } else if (payload.type === 'cmd_status_update') {
             if (payload.output) output = payload.output
             if (payload.status === 'completed') { ws.close(); resolve(output) }
             else if (payload.status === 'failed') { ws.close(); reject(new Error(output || 'Command failed')) }
@@ -1181,7 +1182,7 @@ async function loadJournalLogs() {
     }
     showConsole.value = true
     const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
-    const wsUrl = `${protocol}://${window.location.host}/api/v1/ws/apt/stream/${cmdId}`
+    const wsUrl = `${protocol}://${window.location.host}/api/v1/ws/commands/stream/${cmdId}`
     if (streamWs) streamWs.close()
     streamWs = new WebSocket(wsUrl)
     streamWs.onopen = () => {
@@ -1190,14 +1191,14 @@ async function loadJournalLogs() {
     streamWs.onmessage = (event) => {
       try {
         const payload = JSON.parse(event.data)
-        if (payload.type === 'apt_stream_init') {
+        if (payload.type === 'cmd_stream_init') {
           liveCommand.value.status = payload.status
           liveCommand.value.output = payload.output || ''
           nextTick(() => scrollToBottom())
-        } else if (payload.type === 'apt_stream') {
+        } else if (payload.type === 'cmd_stream') {
           liveCommand.value.output += payload.chunk
           nextTick(() => scrollToBottom())
-        } else if (payload.type === 'apt_status_update') {
+        } else if (payload.type === 'cmd_status_update') {
           liveCommand.value.status = payload.status
           if (payload.status === 'completed' || payload.status === 'failed') {
             journalLoading.value = false
@@ -1258,7 +1259,7 @@ function connectStreamWebSocket(commandId) {
     streamWs.close()
   }
   const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
-  const wsUrl = `${protocol}://${window.location.host}/api/v1/ws/apt/stream/${commandId}`
+  const wsUrl = `${protocol}://${window.location.host}/api/v1/ws/commands/stream/${commandId}`
   streamWs = new WebSocket(wsUrl)
 
   streamWs.onopen = () => {
@@ -1268,14 +1269,14 @@ function connectStreamWebSocket(commandId) {
   streamWs.onmessage = (event) => {
     try {
       const payload = JSON.parse(event.data)
-      if (payload.type === 'apt_stream_init') {
+      if (payload.type === 'cmd_stream_init') {
         liveCommand.value.status = payload.status
         liveCommand.value.output = payload.output || ''
         nextTick(() => scrollToBottom())
-      } else if (payload.type === 'apt_stream') {
+      } else if (payload.type === 'cmd_stream') {
         liveCommand.value.output += payload.chunk
         nextTick(() => scrollToBottom())
-      } else if (payload.type === 'apt_status_update') {
+      } else if (payload.type === 'cmd_status_update') {
         liveCommand.value.status = payload.status
       }
     } catch (e) {

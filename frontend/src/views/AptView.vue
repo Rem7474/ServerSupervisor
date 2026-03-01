@@ -512,7 +512,7 @@ function scrollToBottom() {
 function connectStreamWebSocket(commandId) {
   if (streamWs) streamWs.close()
   const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
-  const wsUrl = `${protocol}://${window.location.host}/api/v1/ws/apt/stream/${commandId}`
+  const wsUrl = `${protocol}://${window.location.host}/api/v1/ws/commands/stream/${commandId}`
   streamWs = new WebSocket(wsUrl)
 
   streamWs.onopen = () => {
@@ -522,14 +522,14 @@ function connectStreamWebSocket(commandId) {
   streamWs.onmessage = (event) => {
     try {
       const payload = JSON.parse(event.data)
-      if (payload.type === 'apt_stream_init') {
+      if (payload.type === 'cmd_stream_init') {
         liveCommand.value.status = payload.status
         liveCommand.value.output = payload.output || ''
         nextTick(() => scrollToBottom())
-      } else if (payload.type === 'apt_stream') {
+      } else if (payload.type === 'cmd_stream') {
         liveCommand.value.output += payload.chunk
         nextTick(() => scrollToBottom())
-      } else if (payload.type === 'apt_status_update') {
+      } else if (payload.type === 'cmd_status_update') {
         liveCommand.value.status = payload.status
       }
     } catch {

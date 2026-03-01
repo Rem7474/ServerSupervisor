@@ -18,19 +18,19 @@ import (
 type WSHandler struct {
 	db        *database.DB
 	cfg       *config.Config
-	streamHub *AptStreamHub
+	streamHub *CommandStreamHub
 }
 
 func NewWSHandler(db *database.DB, cfg *config.Config) *WSHandler {
 	return &WSHandler{
 		db:        db,
 		cfg:       cfg,
-		streamHub: NewAptStreamHub(),
+		streamHub: NewCommandStreamHub(),
 	}
 }
 
-// GetStreamHub returns the APT stream hub for use by other handlers
-func (h *WSHandler) GetStreamHub() *AptStreamHub {
+// GetStreamHub returns the command stream hub for use by other handlers.
+func (h *WSHandler) GetStreamHub() *CommandStreamHub {
 	return h.streamHub
 }
 
@@ -288,8 +288,8 @@ func (h *WSHandler) Apt(c *gin.Context) {
 	}
 }
 
-// AptStream allows clients to subscribe to real-time APT command output
-func (h *WSHandler) AptStream(c *gin.Context) {
+// CommandStream allows clients to subscribe to real-time command output (all modules).
+func (h *WSHandler) CommandStream(c *gin.Context) {
 	commandID := c.Param("command_id")
 	if commandID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "command_id required"})
@@ -309,13 +309,13 @@ func (h *WSHandler) AptStream(c *gin.Context) {
 		return
 	}
 
-	// Register this connection to receive streaming logs
+	// Register this connection to receive streaming output
 	h.streamHub.Register(commandID, conn)
 
 	// Send initial status from unified remote_commands table (UUID — no ParseInt needed)
 	if cmd, err := h.db.GetRemoteCommandByID(commandID); err == nil {
 		conn.WriteJSON(gin.H{
-			"type":       "apt_stream_init",
+			"type":       "cmd_stream_init",
 			"command_id": commandID,
 			"status":     cmd.Status,
 			"command":    cmd.Action,

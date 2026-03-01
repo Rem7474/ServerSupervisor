@@ -148,6 +148,24 @@ func (h *AuditHandler) GetCommandsHistory(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"commands": cmds, "total": total, "page": page, "limit": limit})
 }
 
+// GetCommandByID returns the status and output of a single remote command by UUID.
+// Any authenticated user can query — it only exposes non-sensitive status information.
+func (h *AuditHandler) GetCommandByID(c *gin.Context) {
+	id := c.Param("id")
+	if id == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id required"})
+		return
+	}
+
+	cmd, err := h.db.GetRemoteCommandByID(id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "command not found"})
+		return
+	}
+
+	c.JSON(http.StatusOK, cmd)
+}
+
 // GetAuditLogsByUser returns audit logs for a specific user (admin only)
 func (h *AuditHandler) GetAuditLogsByUser(c *gin.Context) {
 	// Check if user is admin

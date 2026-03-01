@@ -11,7 +11,7 @@ func SetupRouter(db *database.DB, cfg *config.Config) *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Recovery())
 	r.Use(RequestLogger())
-	r.Use(CORSMiddleware(cfg.BaseURL))
+	r.Use(CORSMiddleware(cfg.BaseURL, cfg.AllowedOrigins))
 
 	// Per-IP rate limiter
 	ipRateLimiter := NewIPRateLimiter(cfg.RateLimitRPS, cfg.RateLimitBurst, cfg.TrustedProxyCIDRs)
@@ -49,7 +49,7 @@ func SetupRouter(db *database.DB, cfg *config.Config) *gin.Engine {
 	r.GET("/api/v1/ws/docker", wsH.Docker)
 	r.GET("/api/v1/ws/network", wsH.Network)
 	r.GET("/api/v1/ws/apt", wsH.Apt)
-	r.GET("/api/v1/ws/apt/stream/:command_id", wsH.AptStream)
+	r.GET("/api/v1/ws/commands/stream/:command_id", wsH.CommandStream)
 
 	// ========== Agent routes (API Key auth) ==========
 	agent := r.Group("/api/agent")
@@ -101,6 +101,7 @@ func SetupRouter(db *database.DB, cfg *config.Config) *gin.Engine {
 		api.GET("/hosts/:id/containers", dockerH.ListContainers)
 		api.GET("/hosts/:id/docker/history", dockerH.GetDockerCommandHistory)
 		api.GET("/docker/containers", dockerH.ListAllContainers)
+		api.GET("/docker/compose", dockerH.ListComposeProjects)
 		api.GET("/docker/versions", dockerH.CompareVersions)
 		api.POST("/docker/command", dockerH.SendDockerCommand)
 		api.POST("/system/journalctl", systemH.SendJournalCommand)
@@ -127,18 +128,15 @@ func SetupRouter(db *database.DB, cfg *config.Config) *gin.Engine {
 		api.GET("/audit/logs/host/:host_id", auditH.GetAuditLogsByHost)
 		api.GET("/audit/logs/user/:username", auditH.GetAuditLogsByUser)
 		api.GET("/audit/commands", auditH.GetCommandsHistory)
+		api.GET("/commands/:id", auditH.GetCommandByID)
 
 		// Notifications
 		api.GET("/notifications", notifH.GetNotifications)
 
-		// Alerts
-		api.GET("/alerts/rules", alertH.ListRules)
-		api.POST("/alerts/rules", alertH.CreateRule)
-		api.PATCH("/alerts/rules/:id", alertH.UpdateRule)
-		api.DELETE("/alerts/rules/:id", alertH.DeleteRule)
+		// Alert incidents (read-only, legacy rules CRUD removed)
 		api.GET("/alerts/incidents", alertH.ListIncidents)
 
-		// Configurable Alert Rules (new system)
+		// Alert Rules (unified system)
 		api.GET("/alert-rules", alertRulesH.ListAlertRules)
 		api.GET("/alert-rules/:id", alertRulesH.GetAlertRule)
 		api.POST("/alert-rules", alertRulesH.CreateAlertRule)

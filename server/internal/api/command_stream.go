@@ -6,23 +6,24 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-// AptStreamHub manages real-time streaming of APT command output
-type AptStreamHub struct {
+// CommandStreamHub manages real-time streaming of remote command output.
+// It is shared across all modules (apt, docker, systemd, journal, processes).
+type CommandStreamHub struct {
 	clients    map[string]map[*websocket.Conn]bool // commandID -> set of websocket connections
 	broadcasts map[string]chan string              // commandID -> broadcast channel
 	mu         sync.RWMutex
 }
 
-// NewAptStreamHub creates a new streaming hub
-func NewAptStreamHub() *AptStreamHub {
-	return &AptStreamHub{
+// NewCommandStreamHub creates a new streaming hub.
+func NewCommandStreamHub() *CommandStreamHub {
+	return &CommandStreamHub{
 		clients:    make(map[string]map[*websocket.Conn]bool),
 		broadcasts: make(map[string]chan string),
 	}
 }
 
-// Register adds a websocket connection to receive logs for a specific command
-func (h *AptStreamHub) Register(commandID string, conn *websocket.Conn) {
+// Register adds a websocket connection to receive output for a specific command.
+func (h *CommandStreamHub) Register(commandID string, conn *websocket.Conn) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
@@ -34,8 +35,8 @@ func (h *AptStreamHub) Register(commandID string, conn *websocket.Conn) {
 	h.clients[commandID][conn] = true
 }
 
-// Unregister removes a websocket connection
-func (h *AptStreamHub) Unregister(commandID string, conn *websocket.Conn) {
+// Unregister removes a websocket connection.
+func (h *CommandStreamHub) Unregister(commandID string, conn *websocket.Conn) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
@@ -49,8 +50,8 @@ func (h *AptStreamHub) Unregister(commandID string, conn *websocket.Conn) {
 	}
 }
 
-// Broadcast sends a log chunk to all connected clients for a given command
-func (h *AptStreamHub) Broadcast(commandID string, logChunk string) {
+// Broadcast sends an output chunk to all connected clients for a given command.
+func (h *CommandStreamHub) Broadcast(commandID string, logChunk string) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 
@@ -65,14 +66,14 @@ func (h *AptStreamHub) Broadcast(commandID string, logChunk string) {
 
 // BroadcastStatus sends a status update to all connected clients for a given command.
 // output is included in the payload when non-empty (e.g. for completed commands).
-func (h *AptStreamHub) BroadcastStatus(commandID, status, output string) {
+func (h *CommandStreamHub) BroadcastStatus(commandID, status, output string) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 
 	clients := h.clients[commandID]
 	for conn := range clients {
 		payload := map[string]interface{}{
-			"type":       "apt_status_update",
+			"type":       "cmd_status_update",
 			"command_id": commandID,
 			"status":     status,
 		}
@@ -86,8 +87,8 @@ func (h *AptStreamHub) BroadcastStatus(commandID, status, output string) {
 	}
 }
 
-// runBroadcast runs the broadcast loop for a specific command
-func (h *AptStreamHub) runBroadcast(commandID string) {
+// runBroadcast runs the broadcast loop for a specific command.
+func (h *CommandStreamHub) runBroadcast(commandID string) {
 	h.mu.RLock()
 	broadcast := h.broadcasts[commandID]
 	h.mu.RUnlock()
@@ -97,7 +98,7 @@ func (h *AptStreamHub) runBroadcast(commandID string) {
 		clients := h.clients[commandID]
 		for conn := range clients {
 			payload := map[string]interface{}{
-				"type":       "apt_stream",
+				"type":       "cmd_stream",
 				"command_id": commandID,
 				"chunk":      logChunk,
 			}

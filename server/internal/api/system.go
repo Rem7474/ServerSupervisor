@@ -18,10 +18,10 @@ var validServiceName = regexp.MustCompile(`^[a-zA-Z0-9._:@\-]{1,256}$`)
 type SystemHandler struct {
 	db        *database.DB
 	cfg       *config.Config
-	streamHub *AptStreamHub
+	streamHub *CommandStreamHub
 }
 
-func NewSystemHandler(db *database.DB, cfg *config.Config, streamHub *AptStreamHub) *SystemHandler {
+func NewSystemHandler(db *database.DB, cfg *config.Config, streamHub *CommandStreamHub) *SystemHandler {
 	return &SystemHandler{db: db, cfg: cfg, streamHub: streamHub}
 }
 
@@ -60,6 +60,9 @@ func (h *SystemHandler) SendJournalCommand(c *gin.Context) {
 
 	cmd, err := h.db.CreateRemoteCommand(req.HostID, "journal", "logs", req.ServiceName, "{}", username, auditLogIDPtr)
 	if err != nil {
+		if auditLogIDPtr != nil {
+			_ = h.db.UpdateAuditLogStatus(*auditLogIDPtr, "failed", err.Error())
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create command"})
 		return
 	}
@@ -94,6 +97,9 @@ func (h *SystemHandler) SendProcessesCommand(c *gin.Context) {
 
 	cmd, err := h.db.CreateRemoteCommand(req.HostID, "processes", "list", "", "{}", username, auditLogIDPtr)
 	if err != nil {
+		if auditLogIDPtr != nil {
+			_ = h.db.UpdateAuditLogStatus(*auditLogIDPtr, "failed", err.Error())
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create command"})
 		return
 	}
@@ -136,6 +142,9 @@ func (h *SystemHandler) SendSystemdCommand(c *gin.Context) {
 
 	cmd, err := h.db.CreateRemoteCommand(req.HostID, "systemd", req.Action, req.ServiceName, "{}", username, auditLogIDPtr)
 	if err != nil {
+		if auditLogIDPtr != nil {
+			_ = h.db.UpdateAuditLogStatus(*auditLogIDPtr, "failed", err.Error())
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create command"})
 		return
 	}

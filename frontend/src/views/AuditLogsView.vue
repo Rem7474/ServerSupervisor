@@ -411,17 +411,17 @@ function closeLogViewer() {
 
 function connectStream(commandId) {
   const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
-  streamWs = new WebSocket(`${protocol}://${window.location.host}/api/v1/ws/apt/stream/${commandId}`)
+  streamWs = new WebSocket(`${protocol}://${window.location.host}/api/v1/ws/commands/stream/${commandId}`)
   streamWs.onopen = () => streamWs.send(JSON.stringify({ type: 'auth', token: auth.token }))
   streamWs.onmessage = (event) => {
     try {
       const p = JSON.parse(event.data)
-      if (p.type === 'apt_stream_init') {
+      if (p.type === 'cmd_stream_init') {
         if (selectedCmd.value) selectedCmd.value.status = p.status
         liveOutput.value = renderOutput(p.output || '')
-      } else if (p.type === 'apt_stream') {
+      } else if (p.type === 'cmd_stream') {
         liveOutput.value += p.chunk
-      } else if (p.type === 'apt_status_update') {
+      } else if (p.type === 'cmd_status_update') {
         if (selectedCmd.value) selectedCmd.value.status = p.status
         if (p.output) liveOutput.value = renderOutput(p.output)
       }
