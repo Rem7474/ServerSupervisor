@@ -126,6 +126,7 @@ func SetupRouter(db *database.DB, cfg *config.Config) *gin.Engine {
 		api.GET("/audit/logs/me", auditH.GetMyAuditLogs)
 		api.GET("/audit/logs/host/:host_id", auditH.GetAuditLogsByHost)
 		api.GET("/audit/logs/user/:username", auditH.GetAuditLogsByUser)
+		api.GET("/audit/commands", auditH.GetCommandsHistory)
 
 		// Notifications
 		api.GET("/notifications", notifH.GetNotifications)

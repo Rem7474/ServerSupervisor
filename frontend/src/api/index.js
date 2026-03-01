@@ -101,6 +101,7 @@ export default {
   getMyAuditLogs: (limit = 10) => api.get(`/v1/audit/logs/me?limit=${limit}`),
   getAuditLogsByHost: (hostId, limit = 100) => api.get(`/v1/audit/logs/host/${hostId}?limit=${limit}`),
   getAuditLogsByUser: (username, limit = 100) => api.get(`/v1/audit/logs/user/${username}?limit=${limit}`),
+  getCommandsHistory: (page = 1, limit = 50) => api.get(`/v1/audit/commands?page=${page}&limit=${limit}`),
 
   // Users
   getUsers: () => api.get('/v1/users'),

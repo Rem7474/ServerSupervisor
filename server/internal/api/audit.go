@@ -10,6 +10,7 @@ import (
 	"github.com/serversupervisor/server/internal/models"
 )
 
+
 type AuditHandler struct {
 	db  *database.DB
 	cfg *config.Config
@@ -117,6 +118,34 @@ func (h *AuditHandler) GetMyAuditLogs(c *gin.Context) {
 		"user": username,
 		"logs": logs,
 	})
+}
+
+// GetCommandsHistory returns paginated remote commands for all hosts (admin and operator).
+func (h *AuditHandler) GetCommandsHistory(c *gin.Context) {
+	role := c.GetString("role")
+	if role != models.RoleAdmin && role != models.RoleOperator {
+		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+		return
+	}
+
+	page, limit := 1, 50
+	if p := c.Query("page"); p != "" {
+		if parsed, err := strconv.Atoi(p); err == nil && parsed > 0 {
+			page = parsed
+		}
+	}
+	offset := (page - 1) * limit
+
+	cmds, err := h.db.GetAllRemoteCommands(limit, offset)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch commands history"})
+		return
+	}
+	total, _ := h.db.CountAllRemoteCommands()
+	if cmds == nil {
+		cmds = []database.RemoteCommandWithHost{}
+	}
+	c.JSON(http.StatusOK, gin.H{"commands": cmds, "total": total, "page": page, "limit": limit})
 }
 
 // GetAuditLogsByUser returns audit logs for a specific user (admin only)

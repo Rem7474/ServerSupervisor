@@ -138,6 +138,64 @@ func (db *DB) GetRemoteCommandsByHostAndModule(hostID, module string, limit int)
 	return cmds, nil
 }
 
+// RemoteCommandWithHost embeds RemoteCommand and adds a resolved host name for display.
+type RemoteCommandWithHost struct {
+	models.RemoteCommand
+	HostName string `json:"host_name"`
+}
+
+// GetAllRemoteCommands returns paginated remote commands for all hosts, joined with host name.
+func (db *DB) GetAllRemoteCommands(limit, offset int) ([]RemoteCommandWithHost, error) {
+	rows, err := db.conn.Query(`
+		SELECT rc.id, rc.host_id, rc.module, rc.action, rc.target, rc.payload,
+		       rc.status, rc.output, rc.triggered_by, rc.audit_log_id,
+		       rc.created_at, rc.started_at, rc.ended_at,
+		       COALESCE(h.name, rc.host_id) AS host_name
+		FROM remote_commands rc
+		LEFT JOIN hosts h ON h.id = rc.host_id
+		ORDER BY rc.created_at DESC
+		LIMIT $1 OFFSET $2`,
+		limit, offset,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var result []RemoteCommandWithHost
+	for rows.Next() {
+		var c RemoteCommandWithHost
+		var startedAt, endedAt sql.NullTime
+		var auditLogID sql.NullInt64
+		if err := rows.Scan(
+			&c.ID, &c.HostID, &c.Module, &c.Action, &c.Target, &c.Payload,
+			&c.Status, &c.Output, &c.TriggeredBy, &auditLogID,
+			&c.CreatedAt, &startedAt, &endedAt,
+			&c.HostName,
+		); err != nil {
+			continue
+		}
+		if auditLogID.Valid {
+			c.AuditLogID = &auditLogID.Int64
+		}
+		if startedAt.Valid {
+			c.StartedAt = &startedAt.Time
+		}
+		if endedAt.Valid {
+			c.EndedAt = &endedAt.Time
+		}
+		result = append(result, c)
+	}
+	return result, nil
+}
+
+// CountAllRemoteCommands returns the total number of remote commands.
+func (db *DB) CountAllRemoteCommands() (int64, error) {
+	var count int64
+	err := db.conn.QueryRow(`SELECT COUNT(*) FROM remote_commands`).Scan(&count)
+	return count, err
+}
+
 // GetRecentNotifications returns the latest alert incidents with enriched metadata
 // for WebSocket browser notification delivery.
 func (db *DB) GetRecentNotifications(limit int) ([]models.NotificationItem, error) {
