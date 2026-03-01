@@ -102,7 +102,8 @@ func (db *DB) Exec(query string, args ...interface{}) (sql.Result, error) {
 }
 
 // migrate runs all embedded SQL migration files in alphabetical order.
-// Each file is split on ";" — statements are trimmed and empty ones skipped.
+// Statements are split by splitSQLStatements which is aware of dollar-quoted
+// strings (DO $$ ... $$) so PL/pgSQL blocks are never split mid-block.
 // All CREATE / ALTER / INSERT statements use IF NOT EXISTS / IF EXISTS, so
 // the runner is idempotent against both fresh and existing databases.
 func (db *DB) migrate() error {
@@ -119,11 +120,7 @@ func (db *DB) migrate() error {
 		if err != nil {
 			return fmt.Errorf("failed to read migration %s: %w", e.Name(), err)
 		}
-		for _, stmt := range strings.Split(string(data), ";") {
-			stmt = strings.TrimSpace(stmt)
-			if stmt == "" {
-				continue
-			}
+		for _, stmt := range splitSQLStatements(string(data)) {
 			if _, err := db.conn.Exec(stmt); err != nil {
 				n := len(stmt)
 				if n > 80 {
@@ -136,4 +133,57 @@ func (db *DB) migrate() error {
 
 	log.Println("Database migrations completed")
 	return nil
+}
+
+// splitSQLStatements splits a SQL file into individual statements on ";",
+// but ignores semicolons that appear inside dollar-quoted strings ($$...$$)
+// or single-quoted string literals ('...').  This is necessary for files that
+// contain PL/pgSQL anonymous blocks (DO $$ ... END $$;).
+func splitSQLStatements(sql string) []string {
+	var statements []string
+	var cur strings.Builder
+	inDollarQuote := false
+	inSingleQuote := false
+
+	for i := 0; i < len(sql); i++ {
+		ch := sql[i]
+
+		// Single-quoted string literal handling.
+		if !inDollarQuote && ch == '\'' {
+			inSingleQuote = !inSingleQuote
+			cur.WriteByte(ch)
+			// Handle escaped quote '' inside a string.
+			if inSingleQuote == false && i+1 < len(sql) && sql[i+1] == '\'' {
+				inSingleQuote = true
+			}
+			continue
+		}
+
+		// Dollar-quote toggle: $$ outside a single-quoted string.
+		if !inSingleQuote && ch == '$' && i+1 < len(sql) && sql[i+1] == '$' {
+			inDollarQuote = !inDollarQuote
+			cur.WriteByte(ch)
+			cur.WriteByte(sql[i+1])
+			i++
+			continue
+		}
+
+		// Statement terminator — only when outside any quoting context.
+		if ch == ';' && !inDollarQuote && !inSingleQuote {
+			if stmt := strings.TrimSpace(cur.String()); stmt != "" {
+				statements = append(statements, stmt)
+			}
+			cur.Reset()
+			continue
+		}
+
+		cur.WriteByte(ch)
+	}
+
+	// Trailing statement without a final semicolon (e.g. last line of file).
+	if stmt := strings.TrimSpace(cur.String()); stmt != "" {
+		statements = append(statements, stmt)
+	}
+
+	return statements
 }
