@@ -220,19 +220,6 @@ func (h *DockerHandler) ListComposeProjects(c *gin.Context) {
 	c.JSON(http.StatusOK, projects)
 }
 
-// GetDockerCommandHistory returns recent docker commands for a host
-func (h *DockerHandler) GetDockerCommandHistory(c *gin.Context) {
-	hostID := c.Param("id")
-	cmds, err := h.db.GetRemoteCommandsByHostAndModule(hostID, "docker", 50)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch command history"})
-		return
-	}
-	if cmds == nil {
-		cmds = []models.RemoteCommand{}
-	}
-	c.JSON(http.StatusOK, gin.H{"commands": cmds})
-}
 
 // normalizeVersion strips leading 'v' from version strings for comparison
 func normalizeVersion(v string) string {

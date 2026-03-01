@@ -472,11 +472,15 @@ func initialAptCollection(ctx context.Context, cfg *config.Config, s *sender.Sen
 	if cfg.AptAutoUpdateOnStart {
 		log.Println("Performing initial APT update (apt_auto_update_on_start=true)...")
 		aptUpdateOutput, aptUpdateErr = executeAptUpdate()
+		status := "completed"
 		if aptUpdateErr != nil {
+			status = "failed"
 			log.Printf("Warning: Initial apt update failed: %v", aptUpdateErr)
 		} else {
 			log.Println("Initial apt update completed successfully")
 		}
+		// Log the command immediately — independently of the APT status report below.
+		logAptAction(ctx, s, "update", status, aptUpdateOutput)
 	}
 
 	log.Println("Performing APT status collection with CVE extraction...")
@@ -489,7 +493,7 @@ func initialAptCollection(ctx context.Context, cfg *config.Config, s *sender.Sen
 	log.Printf("Initial APT status: %d packages, %d security updates",
 		apt.PendingPackages, apt.SecurityUpdates)
 
-	// Send updated APT status to server
+	// Send updated APT status to server (best-effort)
 	report := &sender.Report{
 		AgentVersion: Version,
 		Metrics:      nil, // Skip metrics in this report
@@ -502,13 +506,6 @@ func initialAptCollection(ctx context.Context, cfg *config.Config, s *sender.Sen
 		log.Printf("Failed to send initial APT status: %v", err)
 	} else {
 		log.Println("Initial APT status with CVE sent successfully")
-		if cfg.AptAutoUpdateOnStart {
-			status := "completed"
-			if aptUpdateErr != nil {
-				status = "failed"
-			}
-			logAptAction(ctx, s, "update", status, aptUpdateOutput)
-		}
 	}
 }
 

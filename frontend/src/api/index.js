@@ -78,7 +78,6 @@ export default {
     api.post('/v1/system/service', { host_id: hostId, service_name: serviceName, action }),
   sendProcessesCommand: (hostId) =>
     api.post('/v1/system/processes', { host_id: hostId }),
-  getDockerHistory: (hostId) => api.get(`/v1/hosts/${hostId}/docker/history`),
   getHostCommandHistory: (hostId, limit = 50) => api.get(`/v1/hosts/${hostId}/commands/history?limit=${limit}`),
 
   // Tracked Repos
@@ -88,7 +87,6 @@ export default {
 
   // APT
   getAptStatus: (hostId) => api.get(`/v1/hosts/${hostId}/apt`),
-  getAptHistory: (hostId) => api.get(`/v1/hosts/${hostId}/apt/history`),
   sendAptCommand: (hostIds, command) => api.post('/v1/apt/command', { host_ids: hostIds, command }),
 
   // Network Topology

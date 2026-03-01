@@ -53,33 +53,36 @@ jobs:
             RANGE="HEAD"
           fi
 
+          # Séparateur de ligne réel (bash $'...' évite les \n littéraux)
+          NL=$'\n'
+
           # Générer changelog groupé par type (feat, fix, etc.)
           CHANGELOG=""
 
           # Features
           FEATURES=$(git log "$RANGE" --pretty=format:"- %s (%h)" --no-merges --grep="^feat" | head -20)
           if [ -n "$FEATURES" ]; then
-            CHANGELOG="${CHANGELOG}### ✨ Features\n${FEATURES}\n"
+            CHANGELOG="${CHANGELOG}### ✨ Features${NL}${FEATURES}${NL}"
           fi
 
           # Fixes
           FIXES=$(git log "$RANGE" --pretty=format:"- %s (%h)" --no-merges --grep="^fix" | head -20)
           if [ -n "$FIXES" ]; then
-            CHANGELOG="${CHANGELOG}### 🐛 Bug Fixes\n${FIXES}\n"
+            CHANGELOG="${CHANGELOG}### 🐛 Bug Fixes${NL}${FIXES}${NL}"
           fi
 
           # Other changes
           OTHERS=$(git log "$RANGE" --pretty=format:"- %s (%h)" --no-merges --grep="^chore\|^refactor\|^perf" | head -10)
           if [ -n "$OTHERS" ]; then
-            CHANGELOG="${CHANGELOG}### 🔧 Other Changes\n${OTHERS}\n"
+            CHANGELOG="${CHANGELOG}### 🔧 Other Changes${NL}${OTHERS}${NL}"
           fi
 
-          # Nettoyer le changelog : supprimer les \n en trop en fin de chaîne
-          CHANGELOG=$(printf "%s" "$CHANGELOG" | sed ':a;N;$!ba;s/\n\{2,\}/\n/g')
+          # Supprimer les lignes vides en double éventuelles
+          CHANGELOG=$(echo "$CHANGELOG" | sed '/^$/{ N; /^\n$/d }')
 
           # Définir la sortie GitHub Actions en multi-lignes (évite les encodages %0A)
           echo "changelog<<EOF" >> "$GITHUB_OUTPUT"
-          printf "%s\n" "$CHANGELOG" >> "$GITHUB_OUTPUT"
+          echo "$CHANGELOG" >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
 
   # ─────────────────────────────────────────

@@ -99,7 +99,6 @@ func SetupRouter(db *database.DB, cfg *config.Config) *gin.Engine {
 
 		// Docker
 		api.GET("/hosts/:id/containers", dockerH.ListContainers)
-		api.GET("/hosts/:id/docker/history", dockerH.GetDockerCommandHistory)
 		api.GET("/hosts/:id/commands/history", agentH.GetHostCommandHistory)
 		api.GET("/docker/containers", dockerH.ListAllContainers)
 		api.GET("/docker/compose", dockerH.ListComposeProjects)
@@ -120,7 +119,6 @@ func SetupRouter(db *database.DB, cfg *config.Config) *gin.Engine {
 
 		// APT
 		api.GET("/hosts/:id/apt", aptH.GetAptStatus)
-		api.GET("/hosts/:id/apt/history", aptH.GetCommandHistory)
 		api.POST("/apt/command", aptH.SendCommand)
 
 		// Audit logs

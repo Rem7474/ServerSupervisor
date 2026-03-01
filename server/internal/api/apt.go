@@ -80,16 +80,3 @@ func (h *AptHandler) GetAptStatus(c *gin.Context) {
 	c.JSON(http.StatusOK, status)
 }
 
-// GetCommandHistory returns APT command history for a host
-func (h *AptHandler) GetCommandHistory(c *gin.Context) {
-	hostID := c.Param("id")
-	cmds, err := h.db.GetRemoteCommandsByHostAndModule(hostID, "apt", 50)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch command history"})
-		return
-	}
-	if cmds == nil {
-		cmds = []models.RemoteCommand{}
-	}
-	c.JSON(http.StatusOK, cmds)
-}
