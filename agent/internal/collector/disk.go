@@ -2,6 +2,7 @@ package collector
 
 import (
 	"encoding/json"
+	"log"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -220,12 +221,13 @@ func parseDfInodes(output string) map[string]DiskMetrics {
 			continue
 		}
 
-		mountPoint := fields[1]
+		// df -i format: Filesystem Inodes IUsed IFree IUse% Mounted-on
+		mountPoint := strings.Join(fields[5:], " ")
 
-		total, _ := strconv.ParseInt(fields[2], 10, 64)
-		used, _ := strconv.ParseInt(fields[3], 10, 64)
-		free, _ := strconv.ParseInt(fields[4], 10, 64)
-		pctStr := strings.TrimSuffix(fields[5], "%")
+		total, _ := strconv.ParseInt(fields[1], 10, 64)
+		used, _ := strconv.ParseInt(fields[2], 10, 64)
+		free, _ := strconv.ParseInt(fields[3], 10, 64)
+		pctStr := strings.TrimSuffix(fields[4], "%")
 		pct, _ := strconv.ParseFloat(pctStr, 64)
 
 		result[mountPoint] = DiskMetrics{
@@ -293,8 +295,8 @@ func collectSmartData(device string) (DiskHealth, error) {
 	cmd := exec.Command("smartctl", "-A", "-i", "-H", "-j", device)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		// smartctl retourne un code d'erreur non-zéro si SMART n'est pas supporté
-		// On essaie quand même de parser la sortie
+		log.Printf("smartctl warning for %s: %v", device, err)
+		// Continue attempting to parse output (smartctl may still produce valid JSON)
 	}
 
 	// Parser la sortie JSON

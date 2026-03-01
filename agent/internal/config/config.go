@@ -19,6 +19,7 @@ type Config struct {
 	// Features
 	CollectDocker bool `yaml:"collect_docker"`
 	CollectAPT    bool `yaml:"collect_apt"`
+	CollectSMART  bool `yaml:"collect_smart"`
 
 	// TLS
 	InsecureSkipVerify bool `yaml:"insecure_skip_verify"`
@@ -33,6 +34,7 @@ func Load(path string) (*Config, error) {
 		ReportInterval: 30,
 		CollectDocker:  true,
 		CollectAPT:     true,
+		CollectSMART:   true,
 	}
 
 	data, err := os.ReadFile(path)
@@ -62,6 +64,9 @@ func Load(path string) (*Config, error) {
 	if env := os.Getenv("SUPERVISOR_COLLECT_APT"); env != "" {
 		cfg.CollectAPT = env == "true" || env == "1"
 	}
+	if env := os.Getenv("SUPERVISOR_COLLECT_SMART"); env != "" {
+		cfg.CollectSMART = env == "true" || env == "1"
+	}
 	if env := os.Getenv("SUPERVISOR_INSECURE_SKIP_VERIFY"); env != "" {
 		cfg.InsecureSkipVerify = env == "true" || env == "1"
 	}
@@ -89,6 +94,10 @@ collect_docker: true
 
 # Enable APT update monitoring
 collect_apt: true
+
+# Enable SMART disk health monitoring (requires smartmontools)
+# Disable on VMs or systems without smartctl
+collect_smart: true
 
 # Skip TLS verification (for self-signed certs)
 insecure_skip_verify: false

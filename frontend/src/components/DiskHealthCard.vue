@@ -1,13 +1,10 @@
 <template>
-  <div class="card">
+  <div v-if="loading || health.length > 0" class="card">
     <div class="card-header">
       <h3 class="card-title">État SMART des disques</h3>
     </div>
     <div v-if="loading" class="card-body text-center py-4">
       <div class="spinner-border spinner-border-sm text-muted"></div>
-    </div>
-    <div v-else-if="health.length === 0" class="card-body text-center text-muted py-4">
-      Aucune donnée SMART disponible (smartctl peut ne pas être installé)
     </div>
     <div v-else class="card-body">
       <div class="space-y-3">

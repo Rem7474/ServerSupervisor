@@ -60,6 +60,7 @@ func main() {
 	log.Printf("Docker monitoring: %v", cfg.CollectDocker)
 	log.Printf("APT monitoring: %v", cfg.CollectAPT)
 	log.Printf("APT auto-update on start: %v", cfg.AptAutoUpdateOnStart)
+	log.Printf("SMART monitoring: %v", cfg.CollectSMART)
 
 	// Create sender
 	s := sender.New(cfg)
@@ -170,9 +171,12 @@ func sendReport(ctx context.Context, cfg *config.Config, s *sender.Sender) {
 		log.Printf("Failed to collect disk metrics: %v", err)
 	}
 
-	diskHealth, err := collector.CollectDiskHealth()
-	if err != nil {
-		log.Printf("Failed to collect disk health (smartctl may not be installed): %v", err)
+	var diskHealth []collector.DiskHealth
+	if cfg.CollectSMART {
+		diskHealth, err = collector.CollectDiskHealth()
+		if err != nil {
+			log.Printf("Failed to collect disk health (smartctl may not be installed): %v", err)
+		}
 	}
 
 	// Send report (with retry on transient network errors)
