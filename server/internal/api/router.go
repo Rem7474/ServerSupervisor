@@ -6,7 +6,7 @@ import (
 	"github.com/serversupervisor/server/internal/database"
 )
 
-func SetupRouter(db *database.DB, cfg *config.Config) *gin.Engine {
+func SetupRouter(db *database.DB, cfg *config.Config, notifHub *NotificationHub) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
 	r.Use(gin.Recovery())
@@ -20,7 +20,7 @@ func SetupRouter(db *database.DB, cfg *config.Config) *gin.Engine {
 	// Handlers
 	authH := NewAuthHandler(db, cfg)
 	hostH := NewHostHandler(db, cfg)
-	wsH := NewWSHandler(db, cfg)
+	wsH := NewWSHandler(db, cfg, notifHub)
 	agentH := NewAgentHandler(db, cfg, wsH.GetStreamHub())
 	aptH := NewAptHandler(db, cfg)
 	dockerH := NewDockerHandler(db, cfg, wsH.GetStreamHub())
@@ -50,6 +50,7 @@ func SetupRouter(db *database.DB, cfg *config.Config) *gin.Engine {
 	r.GET("/api/v1/ws/network", wsH.Network)
 	r.GET("/api/v1/ws/apt", wsH.Apt)
 	r.GET("/api/v1/ws/commands/stream/:command_id", wsH.CommandStream)
+	r.GET("/api/v1/ws/notifications", wsH.NotificationStream)
 
 	// ========== Agent routes (API Key auth) ==========
 	agent := r.Group("/api/agent")

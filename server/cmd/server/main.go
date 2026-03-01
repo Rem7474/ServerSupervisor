@@ -98,12 +98,15 @@ func main() {
 		}
 	}()
 
+	// Notification hub — shared between the alert engine (push on fire) and the WS handler (client subscriptions)
+	notifHub := api.NewNotificationHub()
+
 	// Start periodic alert evaluation
 	go func() {
 		ticker := time.NewTicker(60 * time.Second)
 		defer ticker.Stop()
 		for range ticker.C {
-			alerts.EvaluateAlerts(db, cfg)
+			alerts.EvaluateAlerts(db, cfg, notifHub)
 		}
 	}()
 
@@ -137,7 +140,7 @@ func main() {
 	}()
 
 	// Setup router
-	router := api.SetupRouter(db, cfg)
+	router := api.SetupRouter(db, cfg, notifHub)
 
 	// Start server
 	srv := &http.Server{

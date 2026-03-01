@@ -19,19 +19,26 @@ type WSHandler struct {
 	db        *database.DB
 	cfg       *config.Config
 	streamHub *CommandStreamHub
+	notifHub  *NotificationHub
 }
 
-func NewWSHandler(db *database.DB, cfg *config.Config) *WSHandler {
+func NewWSHandler(db *database.DB, cfg *config.Config, notifHub *NotificationHub) *WSHandler {
 	return &WSHandler{
 		db:        db,
 		cfg:       cfg,
 		streamHub: NewCommandStreamHub(),
+		notifHub:  notifHub,
 	}
 }
 
 // GetStreamHub returns the command stream hub for use by other handlers.
 func (h *WSHandler) GetStreamHub() *CommandStreamHub {
 	return h.streamHub
+}
+
+// GetNotificationHub returns the notification broadcast hub.
+func (h *WSHandler) GetNotificationHub() *NotificationHub {
+	return h.notifHub
 }
 
 type wsAuthMessage struct {
@@ -324,6 +331,30 @@ func (h *WSHandler) CommandStream(c *gin.Context) {
 	}
 
 	// Keep connection alive until client disconnects
+	done := make(chan struct{})
+	go h.readLoop(conn, done)
+	<-done
+}
+
+// NotificationStream is a persistent WebSocket connection that receives real-time
+// alert notification events pushed by the alert engine when a new incident fires.
+func (h *WSHandler) NotificationStream(c *gin.Context) {
+	conn, err := h.upgrader().Upgrade(c.Writer, c.Request, nil)
+	if err != nil {
+		return
+	}
+	defer func() {
+		h.notifHub.Unregister(conn)
+		conn.Close()
+	}()
+
+	if !h.authenticateWS(conn) {
+		return
+	}
+
+	h.notifHub.Register(conn)
+
+	// Keep alive until client disconnects
 	done := make(chan struct{})
 	go h.readLoop(conn, done)
 	<-done

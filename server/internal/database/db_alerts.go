@@ -112,12 +112,14 @@ func (db *DB) GetOpenAlertIncident(ruleID int64, hostID string) (*models.AlertIn
 	return &inc, nil
 }
 
-func (db *DB) CreateAlertIncident(ruleID int64, hostID string, value float64) error {
-	_, err := db.conn.Exec(
-		`INSERT INTO alert_incidents (rule_id, host_id, value) VALUES ($1, $2, $3)`,
+// CreateAlertIncident inserts a new alert incident and returns its generated ID.
+func (db *DB) CreateAlertIncident(ruleID int64, hostID string, value float64) (int64, error) {
+	var id int64
+	err := db.conn.QueryRow(
+		`INSERT INTO alert_incidents (rule_id, host_id, value) VALUES ($1, $2, $3) RETURNING id`,
 		ruleID, hostID, value,
-	)
-	return err
+	).Scan(&id)
+	return id, err
 }
 
 func (db *DB) ResolveAlertIncident(id int64) error {

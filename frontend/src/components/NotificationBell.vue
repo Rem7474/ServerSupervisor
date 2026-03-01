@@ -118,6 +118,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import RelativeTime from './RelativeTime.vue'
 import apiClient from '../api'
 import { useLocalStorage } from '../composables/useLocalStorage'
+import { useWebSocket } from '../composables/useWebSocket'
 
 const STORAGE_KEY = 'notificationsReadAt'
 
@@ -168,6 +169,25 @@ function showBrowserNotification(item) {
   }
 }
 
+// WebSocket push — receives new_alert events in real time from the alert engine
+useWebSocket('/api/v1/ws/notifications', (payload) => {
+  if (payload.type !== 'new_alert' || !payload.notification) return
+  const item = payload.notification
+
+  // Show browser notification immediately (WS push is always new)
+  if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+    showBrowserNotification(item)
+  }
+
+  // Mark as seen so polling doesn't duplicate the browser notification
+  if (seenIdSet !== null) seenIdSet.add(item.id)
+
+  // Prepend to the list (keep max 30)
+  if (!notifications.value.some(n => n.id === item.id)) {
+    notifications.value = [item, ...notifications.value].slice(0, 30)
+  }
+})
+
 async function fetchNotifications() {
   if (loading.value) return
   loading.value = true
@@ -175,7 +195,8 @@ async function fetchNotifications() {
     const res = await apiClient.getNotifications()
     const incoming = res.data?.notifications || []
 
-    // Notifications navigateur — uniquement sur les fetches après le premier (évite le flood au chargement)
+    // Fallback browser notifications via polling (catches alerts missed during WS downtime)
+    // Only fires after the first fetch (seenIdSet !== null) to avoid flooding on page load
     if (seenIdSet !== null && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
       for (const item of incoming) {
         if (item.browser_notify && !seenIdSet.has(item.id)) {
@@ -184,7 +205,7 @@ async function fetchNotifications() {
       }
     }
 
-    // Mettre à jour le set des IDs connus
+    // Update known ID set
     seenIdSet = new Set(incoming.map(n => n.id))
     notifications.value = incoming
   } catch {

@@ -70,8 +70,8 @@
                     </div>
                   </td>
                   <td>
-                    <span v-if="rule.host_id" class="badge bg-secondary">{{ getHostName(rule.host_id) }}</span>
-                    <span v-else class="badge bg-info">Tous les hôtes</span>
+                    <span v-if="rule.host_id" class="badge bg-secondary-lt text-secondary">{{ getHostName(rule.host_id) }}</span>
+                    <span v-else class="badge bg-info-lt text-info">Tous les hôtes</span>
                   </td>
                   <td>
                     <span class="badge" :class="getMetricBadgeClass(rule.metric)">

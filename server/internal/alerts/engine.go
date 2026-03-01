@@ -27,7 +27,13 @@ func newNotifier() *notifier {
 	}
 }
 
-func EvaluateAlerts(db *database.DB, cfg *config.Config) {
+// NotificationPusher broadcasts a real-time alert event to connected frontend clients.
+// The api.NotificationHub implements this interface; pass nil to skip push.
+type NotificationPusher interface {
+	Broadcast(payload interface{})
+}
+
+func EvaluateAlerts(db *database.DB, cfg *config.Config, pusher NotificationPusher) {
 	rules, err := db.GetAlertRules()
 	if err != nil {
 		log.Printf("Alerts: failed to fetch rules: %v", err)
@@ -69,12 +75,14 @@ func EvaluateAlerts(db *database.DB, cfg *config.Config) {
 
 			if matched {
 				if err == sql.ErrNoRows || inc == nil {
-					if err := db.CreateAlertIncident(rule.ID, host.ID, value); err != nil {
+					incID, err := db.CreateAlertIncident(rule.ID, host.ID, value)
+					if err != nil {
 						log.Printf("Alerts: failed to create incident: %v", err)
 						continue
 					}
 					n.notify(cfg, rule, host, value)
 					triggerAlertCommand(db, rule, host)
+					pushBrowserNotification(pusher, rule, host, value, incID)
 				}
 			} else if inc != nil {
 				_ = db.ResolveAlertIncident(inc.ID)
@@ -220,6 +228,47 @@ func (n *notifier) notify(cfg *config.Config, rule models.AlertRule, host models
 			log.Printf("Alerts: unknown channel %q for rule %d", channel, rule.ID)
 		}
 	}
+}
+
+// pushBrowserNotification sends a real-time WebSocket event to all connected frontend clients
+// when a rule with the "browser" channel fires. Safe to call with a nil pusher.
+func pushBrowserNotification(pusher NotificationPusher, rule models.AlertRule, host models.Host, value float64, incID int64) {
+	if pusher == nil {
+		return
+	}
+	hasBrowser := false
+	for _, ch := range rule.Actions.Channels {
+		if ch == "browser" {
+			hasBrowser = true
+			break
+		}
+	}
+	if !hasBrowser {
+		return
+	}
+
+	ruleName := ""
+	if rule.Name != nil {
+		ruleName = *rule.Name
+	} else if rule.Threshold != nil {
+		ruleName = fmt.Sprintf("%s %s %.2f", rule.Metric, rule.Operator, *rule.Threshold)
+	}
+
+	pusher.Broadcast(map[string]interface{}{
+		"type": "new_alert",
+		"notification": map[string]interface{}{
+			"id":            incID,
+			"rule_id":       rule.ID,
+			"host_id":       host.ID,
+			"host_name":     host.Name,
+			"rule_name":     ruleName,
+			"metric":        rule.Metric,
+			"value":         value,
+			"triggered_at":  time.Now().UTC(),
+			"resolved_at":   nil,
+			"browser_notify": true,
+		},
+	})
 }
 
 // triggerAlertCommand creates a remote command on the host when an alert fires,
