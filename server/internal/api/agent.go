@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -192,22 +191,6 @@ func (h *AgentHandler) ReportCommandResult(c *gin.Context) {
 		return
 	}
 
-	// systemd status: parse JSON output into a human-readable summary
-	if cmd.Module == "systemd" && cmd.Action == "status" && result.Status == "completed" && result.Output != "" {
-		type systemdStatusJSON struct {
-			Name        string `json:"name"`
-			Description string `json:"description"`
-			LoadState   string `json:"load_state"`
-			ActiveState string `json:"active_state"`
-			SubState    string `json:"sub_state"`
-		}
-		var arr []systemdStatusJSON
-		if err := json.Unmarshal([]byte(result.Output), &arr); err == nil && len(arr) > 0 {
-			p := arr[0]
-			result.Output = fmt.Sprintf("%s: %s (%s/%s) - %s", p.Name, p.Description, p.ActiveState, p.SubState, p.LoadState)
-		}
-	}
-
 	if err := h.db.UpdateRemoteCommandStatus(result.CommandID, result.Status, result.Output); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update command"})
 		return
@@ -223,7 +206,7 @@ func (h *AgentHandler) ReportCommandResult(c *gin.Context) {
 	}
 
 	// Broadcast status to WebSocket clients (UUID string, no conversion needed)
-	h.streamHub.BroadcastStatus(result.CommandID, result.Status)
+	h.streamHub.BroadcastStatus(result.CommandID, result.Status, result.Output)
 
 	// APT post-processing
 	if cmd.Module == "apt" && result.Status == "completed" {

@@ -67,6 +67,40 @@ func (h *SystemHandler) SendJournalCommand(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"command_id": cmd.ID, "status": "pending"})
 }
 
+// SendProcessesCommand enqueues a process list snapshot request for an agent.
+func (h *SystemHandler) SendProcessesCommand(c *gin.Context) {
+	username := c.GetString("username")
+	role := c.GetString("role")
+	if role != models.RoleAdmin && role != models.RoleOperator {
+		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+		return
+	}
+
+	var req struct {
+		HostID string `json:"host_id" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	auditID, auditErr := h.db.CreateAuditLog(username, "processes_list", req.HostID, c.ClientIP(), "{}", "pending")
+	var auditLogIDPtr *int64
+	if auditErr != nil {
+		log.Printf("Warning: failed to create audit log for processes command: %v", auditErr)
+	} else {
+		auditLogIDPtr = &auditID
+	}
+
+	cmd, err := h.db.CreateRemoteCommand(req.HostID, "processes", "list", "", "{}", username, auditLogIDPtr)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create command"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"command_id": cmd.ID, "status": "pending"})
+}
+
 // SendSystemdCommand enqueues a systemd service management command for an agent.
 func (h *SystemHandler) SendSystemdCommand(c *gin.Context) {
 	username := c.GetString("username")

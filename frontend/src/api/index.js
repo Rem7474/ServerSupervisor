@@ -76,6 +76,8 @@ export default {
     api.post('/v1/system/journalctl', { host_id: hostId, service_name: serviceName }),
   sendSystemdCommand: (hostId, serviceName, action) =>
     api.post('/v1/system/service', { host_id: hostId, service_name: serviceName, action }),
+  sendProcessesCommand: (hostId) =>
+    api.post('/v1/system/processes', { host_id: hostId }),
   getDockerHistory: (hostId) => api.get(`/v1/hosts/${hostId}/docker/history`),
 
   // Tracked Repos

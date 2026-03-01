@@ -3,6 +3,7 @@ package collector
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os/exec"
 	"strings"
@@ -18,8 +19,8 @@ type SystemdService struct {
 	Description string `json:"description"`
 }
 
-// ListSystemdServices returns all systemd service units by parsing
-// the output of `systemctl list-units --type=service --all`.
+// ListSystemdServices returns all systemd service units using --output=json
+// (requires systemd >= v230, available on all modern distros).
 func ListSystemdServices() ([]SystemdService, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -27,7 +28,7 @@ func ListSystemdServices() ([]SystemdService, error) {
 	cmd := exec.CommandContext(ctx,
 		"systemctl", "list-units",
 		"--type=service", "--all",
-		"--no-pager", "--plain", "--no-legend",
+		"--no-pager", "--output=json",
 	)
 	out, err := cmd.Output()
 	if err != nil {
@@ -37,33 +38,35 @@ func ListSystemdServices() ([]SystemdService, error) {
 		return nil, fmt.Errorf("systemctl list-units: %w", err)
 	}
 
-	var services []SystemdService
-	scanner := bufio.NewScanner(strings.NewReader(string(out)))
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" {
-			continue
-		}
-		fields := strings.Fields(line)
-		if len(fields) < 4 {
-			continue
-		}
-		svc := SystemdService{
-			Name:        fields[0],
-			LoadState:   fields[1],
-			ActiveState: fields[2],
-			SubState:    fields[3],
-		}
-		if len(fields) > 4 {
-			svc.Description = strings.Join(fields[4:], " ")
-		}
-		services = append(services, svc)
+	// JSON output: array of objects with lowercase field names.
+	type rawUnit struct {
+		Unit        string `json:"unit"`
+		Load        string `json:"load"`
+		Active      string `json:"active"`
+		Sub         string `json:"sub"`
+		Description string `json:"description"`
+	}
+	var raw []rawUnit
+	if err := json.Unmarshal(out, &raw); err != nil {
+		return nil, fmt.Errorf("failed to parse systemctl JSON output: %w", err)
+	}
+
+	services := make([]SystemdService, 0, len(raw))
+	for _, u := range raw {
+		services = append(services, SystemdService{
+			Name:        u.Unit,
+			LoadState:   u.Load,
+			ActiveState: u.Active,
+			SubState:    u.Sub,
+			Description: u.Description,
+		})
 	}
 	return services, nil
 }
 
 // ExecuteSystemdCommand runs a systemctl action on a service and streams its output.
 // Valid actions: start, stop, restart, enable, disable, status.
+// For status, --output=json formats embedded journal entries as JSON objects.
 func ExecuteSystemdCommand(serviceName, action string, chunkCB func(string)) (string, error) {
 	if !validServiceName.MatchString(serviceName) {
 		return "", fmt.Errorf("invalid service name: %q", serviceName)
@@ -81,7 +84,6 @@ func ExecuteSystemdCommand(serviceName, action string, chunkCB func(string)) (st
 	defer cancel()
 
 	args := []string{action, "--no-pager"}
-	// Pour status, ajoute --output=json
 	if action == "status" {
 		args = append(args, "--output=json")
 	}

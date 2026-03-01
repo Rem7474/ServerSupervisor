@@ -105,6 +105,7 @@ func SetupRouter(db *database.DB, cfg *config.Config) *gin.Engine {
 		api.POST("/docker/command", dockerH.SendDockerCommand)
 		api.POST("/system/journalctl", systemH.SendJournalCommand)
 		api.POST("/system/service", systemH.SendSystemdCommand)
+		api.POST("/system/processes", systemH.SendProcessesCommand)
 		api.GET("/network", networkH.GetNetworkSnapshot)
 		api.GET("/network/topology", networkH.GetTopologySnapshot)
 		api.GET("/network/config", networkH.GetTopologyConfig)

@@ -401,6 +401,39 @@ func executeCommand(s *sender.Sender, cmd sender.PendingCommand) {
 				}
 			}
 
+	case "processes":
+		if err := s.ReportCommandResult(&sender.CommandResult{
+			CommandID: cmd.ID,
+			Status:    "running",
+		}); err != nil {
+			log.Printf("Failed to report running status: %v", err)
+		}
+
+		procs, procErr := collector.GetProcessList()
+		status := "completed"
+		var output string
+		if procErr != nil {
+			status = "failed"
+			output = fmt.Sprintf("ERROR: %v", procErr)
+			log.Printf("ps failed: %v", procErr)
+		} else {
+			jsonBytes, jsonErr := json.Marshal(procs)
+			if jsonErr != nil {
+				status = "failed"
+				output = fmt.Sprintf("ERROR marshaling processes: %v", jsonErr)
+			} else {
+				output = string(jsonBytes)
+				log.Printf("processes list: %d processes returned", len(procs))
+			}
+		}
+		if err := s.ReportCommandResult(&sender.CommandResult{
+			CommandID: cmd.ID,
+			Status:    status,
+			Output:    output,
+		}); err != nil {
+			log.Printf("Failed to report processes result: %v", err)
+		}
+
 		default:
 			log.Printf("Unknown command module: %s", cmd.Module)
 			if err := s.ReportCommandResult(&sender.CommandResult{
