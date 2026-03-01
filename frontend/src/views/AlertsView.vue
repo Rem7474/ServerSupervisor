@@ -87,6 +87,9 @@
                       :class="channel === 'browser' ? 'bg-green-lt text-green' : 'bg-azure-lt text-azure'">
                       {{ channel === 'browser' ? 'Navigateur' : channel }}
                     </span>
+                    <span v-if="rule.actions?.command_trigger" class="badge bg-orange-lt text-orange me-1" :title="`${rule.actions.command_trigger.module}/${rule.actions.command_trigger.action}${rule.actions.command_trigger.target ? ' → ' + rule.actions.command_trigger.target : ''}`">
+                      ⚡ cmd
+                    </span>
                   </td>
                   <td>
                     <div class="btn-group">
@@ -257,11 +260,47 @@
               />
             </div>
 
+            <!-- Command trigger -->
+            <div class="mb-3">
+              <label class="form-check mb-2">
+                <input v-model="commandTriggerEnabled" class="form-check-input" type="checkbox" />
+                <span class="form-check-label fw-medium">Déclencher une commande à l'alerte</span>
+              </label>
+              <div v-if="commandTriggerEnabled" class="border rounded p-3 bg-dark-subtle">
+                <div class="row g-2">
+                  <div class="col-md-4">
+                    <label class="form-label form-label-sm">Module</label>
+                    <select v-model="form.actions.command_trigger.module" class="form-select form-select-sm" @change="onCommandModuleChange">
+                      <option value="processes">Processus (top)</option>
+                      <option value="journal">Journal systemd</option>
+                      <option value="systemd">Service systemd</option>
+                      <option value="docker">Conteneur Docker</option>
+                    </select>
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label form-label-sm">Action</label>
+                    <select v-model="form.actions.command_trigger.action" class="form-select form-select-sm">
+                      <option v-for="a in commandActions" :key="a" :value="a">{{ a }}</option>
+                    </select>
+                  </div>
+                  <div class="col-md-4" v-if="commandNeedsTarget">
+                    <label class="form-label form-label-sm">Cible</label>
+                    <input
+                      v-model="form.actions.command_trigger.target"
+                      class="form-control form-control-sm"
+                      :placeholder="commandTargetPlaceholder"
+                    />
+                  </div>
+                </div>
+                <small class="form-hint mt-1">La commande sera créée automatiquement sur l'hôte concerné dès le déclenchement de l'alerte.</small>
+              </div>
+            </div>
+
             <div class="mb-3">
               <label class="form-check">
-                <input 
-                  v-model="form.enabled" 
-                  class="form-check-input" 
+                <input
+                  v-model="form.enabled"
+                  class="form-check-input"
                   type="checkbox"
                 />
                 <span class="form-check-label">Activer immédiatement</span>
@@ -334,7 +373,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
 import { formatDurationSecs } from '../utils/formatters'
 import apiClient from '../api'
@@ -351,6 +390,8 @@ const testing = ref(false)
 const testResults = ref(null)
 const editingRule = ref(null)
 
+const defaultCommandTrigger = () => ({ module: 'processes', action: 'list', target: '' })
+
 const form = ref({
   name: '',
   enabled: true,
@@ -363,7 +404,8 @@ const form = ref({
     channels: [],
     smtp_to: '',
     ntfy_topic: '',
-    cooldown: 3600
+    cooldown: 3600,
+    command_trigger: defaultCommandTrigger(),
   }
 })
 
@@ -371,6 +413,38 @@ const channelSmtp = ref(false)
 const channelNtfy = ref(false)
 const channelBrowser = ref(false)
 const browserPermission = ref(typeof Notification !== 'undefined' ? Notification.permission : 'unsupported')
+const commandTriggerEnabled = ref(false)
+
+const commandModuleActions = {
+  processes: ['list'],
+  journal: ['read'],
+  systemd: ['status', 'start', 'stop', 'restart'],
+  docker: ['logs', 'restart', 'start', 'stop'],
+}
+
+const commandActions = computed(() => {
+  const mod = form.value.actions.command_trigger?.module || 'processes'
+  return commandModuleActions[mod] || ['list']
+})
+
+const commandNeedsTarget = computed(() => {
+  const mod = form.value.actions.command_trigger?.module
+  return mod === 'journal' || mod === 'systemd' || mod === 'docker'
+})
+
+const commandTargetPlaceholder = computed(() => {
+  const mod = form.value.actions.command_trigger?.module
+  if (mod === 'journal' || mod === 'systemd') return 'nom du service (ex: nginx)'
+  if (mod === 'docker') return 'nom du conteneur'
+  return ''
+})
+
+function onCommandModuleChange() {
+  const mod = form.value.actions.command_trigger.module
+  const actions = commandModuleActions[mod] || ['list']
+  form.value.actions.command_trigger.action = actions[0]
+  form.value.actions.command_trigger.target = ''
+}
 
 
 function onKeyDown(e) {
@@ -418,11 +492,12 @@ function startAddAlert() {
     operator: '>',
     threshold: 80,
     duration: 300,
-    actions: { channels: [], smtp_to: '', ntfy_topic: '', cooldown: 3600 }
+    actions: { channels: [], smtp_to: '', ntfy_topic: '', cooldown: 3600, command_trigger: defaultCommandTrigger() }
   }
   channelSmtp.value = false
   channelNtfy.value = false
   channelBrowser.value = false
+  commandTriggerEnabled.value = false
   showModal.value = true
 }
 
@@ -430,6 +505,7 @@ function startEditAlert(rule) {
   testResults.value = null
   editingRule.value = rule
   const act = rule.actions || {}
+  const ct = act.command_trigger
   form.value = {
     name: rule.name || '',
     enabled: rule.enabled,
@@ -442,12 +518,14 @@ function startEditAlert(rule) {
       channels: act.channels || [],
       smtp_to: act.smtp_to || '',
       ntfy_topic: act.ntfy_topic || '',
-      cooldown: act.cooldown || 3600
+      cooldown: act.cooldown || 3600,
+      command_trigger: ct ? { module: ct.module, action: ct.action, target: ct.target || '' } : defaultCommandTrigger(),
     }
   }
   channelSmtp.value = act.channels?.includes('smtp') || false
   channelNtfy.value = act.channels?.includes('ntfy') || false
   channelBrowser.value = act.channels?.includes('browser') || false
+  commandTriggerEnabled.value = !!ct
   showModal.value = true
 }
 
@@ -467,10 +545,11 @@ async function saveAlert() {
       browserPermission.value = perm
     }
 
-    const payload = {
-      ...form.value,
-      actions: { ...form.value.actions, channels }
+    const actions = { ...form.value.actions, channels }
+    if (!commandTriggerEnabled.value) {
+      delete actions.command_trigger
     }
+    const payload = { ...form.value, actions }
 
     if (editingRule.value) {
       await apiClient.updateAlertRule(editingRule.value.id, payload)
@@ -523,9 +602,11 @@ async function testAlert() {
     if (channelSmtp.value) channels.push('smtp')
     if (channelNtfy.value) channels.push('ntfy')
     if (channelBrowser.value) channels.push('browser')
+    const testActions = { ...form.value.actions, channels }
+    if (!commandTriggerEnabled.value) delete testActions.command_trigger
     const res = await apiClient.testAlertRule({
       ...form.value,
-      actions: { ...form.value.actions, channels }
+      actions: testActions,
     })
     testResults.value = res.data
   } catch (err) {
@@ -540,6 +621,7 @@ function closeModal() {
   editingRule.value = null
   testResults.value = null
   saveError.value = ''
+  commandTriggerEnabled.value = false
 }
 
 function getHostName(hostId) {

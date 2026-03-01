@@ -304,12 +304,19 @@ func (h *AlertRulesHandler) TestAlertRule(c *gin.Context) {
 	var results []TestResult
 	anyFires := false
 
+	// For display purposes, skip staleness check so we always show the current value.
+	ruleNoStaleness := rule
+	ruleNoStaleness.DurationSeconds = 0
+
 	for _, host := range hosts {
 		if rule.HostID != nil && *rule.HostID != host.ID {
 			continue
 		}
-		value, ok := alerts.GetMetricValue(h.db, host, rule)
-		wouldFire := ok && alerts.MatchRule(rule, host, value)
+		// Fetch current value ignoring duration-based staleness (for display).
+		value, ok := alerts.GetMetricValue(h.db, host, ruleNoStaleness)
+		// would_fire respects the original rule (including staleness).
+		_, freshOk := alerts.GetMetricValue(h.db, host, rule)
+		wouldFire := ok && freshOk && alerts.MatchRule(rule, host, value)
 		if wouldFire {
 			anyFires = true
 		}

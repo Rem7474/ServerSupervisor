@@ -74,6 +74,7 @@ func EvaluateAlerts(db *database.DB, cfg *config.Config) {
 						continue
 					}
 					n.notify(cfg, rule, host, value)
+					triggerAlertCommand(db, rule, host)
 				}
 			} else if inc != nil {
 				_ = db.ResolveAlertIncident(inc.ID)
@@ -218,6 +219,25 @@ func (n *notifier) notify(cfg *config.Config, rule models.AlertRule, host models
 		default:
 			log.Printf("Alerts: unknown channel %q for rule %d", channel, rule.ID)
 		}
+	}
+}
+
+// triggerAlertCommand creates a remote command on the host when an alert fires,
+// if the rule's actions include a CommandTrigger.
+func triggerAlertCommand(db *database.DB, rule models.AlertRule, host models.Host) {
+	ct := rule.Actions.CommandTrigger
+	if ct == nil || ct.Module == "" || ct.Action == "" {
+		return
+	}
+	payload := ct.Payload
+	if payload == "" {
+		payload = "{}"
+	}
+	triggeredBy := fmt.Sprintf("alert:%d", rule.ID)
+	if _, err := db.CreateRemoteCommand(host.ID, ct.Module, ct.Action, ct.Target, payload, triggeredBy, nil); err != nil {
+		log.Printf("Alerts: failed to create command trigger for rule %d on host %s: %v", rule.ID, host.ID, err)
+	} else {
+		log.Printf("Alerts: triggered command %s/%s on host %s (rule %d)", ct.Module, ct.Action, host.Name, rule.ID)
 	}
 }
 

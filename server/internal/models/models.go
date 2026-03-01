@@ -376,13 +376,22 @@ type AuditLog struct {
 
 // ========== Alerts ==========
 
+// CommandTrigger defines a remote command to execute automatically when an alert fires.
+type CommandTrigger struct {
+	Module  string `json:"module"`           // e.g. "processes", "journal", "docker", "systemd"
+	Action  string `json:"action"`           // e.g. "list", "read", "restart"
+	Target  string `json:"target,omitempty"` // e.g. service name, container name
+	Payload string `json:"payload,omitempty"` // optional JSON payload
+}
+
 // AlertActions holds the consolidated notification configuration for an alert rule.
 // Stored as a single JSONB column in the database.
 type AlertActions struct {
-	Channels  []string `json:"channels"`             // e.g. ["smtp", "ntfy", "browser"]
-	SMTPTo    string   `json:"smtp_to,omitempty"`    // SMTP recipient address(es)
-	NtfyTopic string   `json:"ntfy_topic,omitempty"` // ntfy push notification topic
-	Cooldown  int      `json:"cooldown,omitempty"`   // seconds between re-notifications (0 = no cooldown)
+	Channels       []string        `json:"channels"`                  // e.g. ["smtp", "ntfy", "browser"]
+	SMTPTo         string          `json:"smtp_to,omitempty"`         // SMTP recipient address(es)
+	NtfyTopic      string          `json:"ntfy_topic,omitempty"`      // ntfy push notification topic
+	Cooldown       int             `json:"cooldown,omitempty"`        // seconds between re-notifications (0 = no cooldown)
+	CommandTrigger *CommandTrigger `json:"command_trigger,omitempty"` // optional command to run on alert
 }
 
 type AlertRule struct {
