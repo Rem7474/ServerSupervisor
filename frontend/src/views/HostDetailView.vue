@@ -272,7 +272,7 @@
       <div class="card-header">
         <h3 class="card-title">Historique de commandes</h3>
         <div class="card-options">
-          <span class="badge bg-secondary-lt text-secondary">{{ showFullAptHistory ? combinedHistoryTotal : combinedHistory.length }}</span>
+          <span class="badge bg-secondary-lt text-secondary">{{ showFullHistory ? combinedHistoryTotal : combinedHistory.length }}</span>
         </div>
       </div>
       <div class="table-responsive">
@@ -291,14 +291,10 @@
             <tr v-for="cmd in combinedHistory" :key="cmd.id">
               <td class="text-secondary small">{{ formatDate(cmd.created_at) }}</td>
               <td>
-                <span v-if="cmd.module === 'apt'" class="badge bg-blue-lt text-blue">APT</span>
-                <span v-else-if="cmd.module === 'journal'" class="badge bg-purple-lt text-purple">Journal</span>
-                <span v-else class="badge bg-cyan-lt text-cyan">Docker</span>
+                <span :class="cmdModuleClass(cmd.module)">{{ cmdModuleLabel(cmd.module) }}</span>
               </td>
               <td>
-                <code v-if="cmd.module === 'apt'">apt {{ cmd.action }}</code>
-                <code v-else-if="cmd.module === 'journal'">journalctl -u {{ cmd.target }}</code>
-                <code v-else>{{ cmd.action }} {{ cmd.target }}</code>
+                <code class="small">{{ cmdLabel(cmd) }}</code>
               </td>
               <td><span :class="statusClass(cmd.status)">{{ cmd.status }}</span></td>
               <td class="text-secondary small">{{ cmd.triggered_by || '-' }}</td>
@@ -317,8 +313,8 @@
           </tbody>
         </table>
       </div>
-      <div v-if="combinedHistoryTotal > 5 && !showFullAptHistory" class="card-footer text-center">
-        <button @click="showFullAptHistory = true" class="btn btn-outline-secondary btn-sm">
+      <div v-if="combinedHistoryTotal > 5 && !showFullHistory" class="card-footer text-center">
+        <button @click="showFullHistory = true" class="btn btn-outline-secondary btn-sm">
           Afficher tout ({{ combinedHistoryTotal - 5 }} autres)
         </button>
       </div>
@@ -645,8 +641,7 @@ const host = ref(null)
 const metrics = ref(null)
 const containers = ref([])
 const aptStatus = ref(null)
-const aptHistory = ref([])
-const showFullAptHistory = ref(false)
+const showFullHistory = ref(false)
 const auditLogs = ref([])
 const metricsHistory = ref([])
 const chartHours = ref(24)
@@ -782,18 +777,17 @@ const { wsStatus, wsError, retryCount, reconnect } = useWebSocket(`/api/v1/ws/ho
   metrics.value = payload.metrics
   containers.value = payload.containers || []
   aptStatus.value = payload.apt_status
-  aptHistory.value = payload.apt_history || []
   auditLogs.value = payload.audit_logs || []
 }, { debounceMs: 200 })
 
-const dockerHistory = ref([])
+const cmdHistory = ref([])
 
-async function loadDockerHistory() {
+async function loadCmdHistory() {
   try {
-    const res = await apiClient.getDockerHistory(hostId)
-    dockerHistory.value = res.data?.commands || []
+    const res = await apiClient.getHostCommandHistory(hostId)
+    cmdHistory.value = res.data?.commands || []
   } catch {
-    dockerHistory.value = []
+    cmdHistory.value = []
   }
 }
 
@@ -985,18 +979,33 @@ function cpuColor(pct) {
   return 'text-green'
 }
 
-const combinedHistory = computed(() => {
-  const all = [...aptHistory.value, ...dockerHistory.value].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-  return showFullAptHistory.value ? all : all.slice(0, 5)
-})
+const combinedHistory = computed(() =>
+  showFullHistory.value ? cmdHistory.value : cmdHistory.value.slice(0, 5)
+)
 
-const combinedHistoryTotal = computed(() => aptHistory.value.length + dockerHistory.value.length)
+const combinedHistoryTotal = computed(() => cmdHistory.value.length)
 
 function memColor(pct) {
   if (!pct) return 'text-secondary'
   if (pct > 90) return 'text-red'
   if (pct > 75) return 'text-yellow'
   return 'text-green'
+}
+
+const MODULE_META = {
+  apt:       { label: 'APT',       cls: 'badge bg-azure-lt text-azure' },
+  docker:    { label: 'Docker',    cls: 'badge bg-blue-lt text-blue' },
+  systemd:   { label: 'Systemd',   cls: 'badge bg-green-lt text-green' },
+  journal:   { label: 'Journal',   cls: 'badge bg-purple-lt text-purple' },
+  processes: { label: 'Processus', cls: 'badge bg-orange-lt text-orange' },
+}
+
+function cmdModuleLabel(module) { return MODULE_META[module]?.label ?? module }
+function cmdModuleClass(module)  { return MODULE_META[module]?.cls ?? 'badge bg-secondary' }
+function cmdLabel(cmd) {
+  const parts = [cmd.action]
+  if (cmd.target) parts.push(cmd.target)
+  return parts.join(' ')
 }
 
 function statusClass(status) {
@@ -1312,7 +1321,7 @@ async function deleteHost() {
 
 onMounted(() => {
   fetchLatestAgentVersion()
-  loadDockerHistory()
+  loadCmdHistory()
   // Wait for auth to be properly initialized before loading data
   if (auth.token) {
     loadHistory(24)

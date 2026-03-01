@@ -79,6 +79,7 @@ export default {
   sendProcessesCommand: (hostId) =>
     api.post('/v1/system/processes', { host_id: hostId }),
   getDockerHistory: (hostId) => api.get(`/v1/hosts/${hostId}/docker/history`),
+  getHostCommandHistory: (hostId, limit = 50) => api.get(`/v1/hosts/${hostId}/commands/history?limit=${limit}`),
 
   // Tracked Repos
   getTrackedRepos: () => api.get('/v1/repos'),

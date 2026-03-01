@@ -245,6 +245,24 @@ func (h *AgentHandler) StreamCommandOutput(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
 
+// GetHostCommandHistory returns all recent commands for a host across all modules.
+func (h *AgentHandler) GetHostCommandHistory(c *gin.Context) {
+	hostID := c.Param("id")
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
+	if limit <= 0 || limit > 200 {
+		limit = 50
+	}
+	cmds, err := h.db.GetRecentCommandsByHost(hostID, limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch command history"})
+		return
+	}
+	if cmds == nil {
+		cmds = []models.RemoteCommand{}
+	}
+	c.JSON(http.StatusOK, gin.H{"commands": cmds})
+}
+
 func truncateOutput(s string, max int) string {
 	if max <= 0 || len(s) <= max {
 		return s

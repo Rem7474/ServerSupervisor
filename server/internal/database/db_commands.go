@@ -138,6 +138,37 @@ func (db *DB) GetRemoteCommandsByHostAndModule(hostID, module string, limit int)
 	return cmds, nil
 }
 
+// GetRecentCommandsByHost returns the most recent remote commands for a host across all modules.
+func (db *DB) GetRecentCommandsByHost(hostID string, limit int) ([]models.RemoteCommand, error) {
+	rows, err := db.conn.Query(
+		`SELECT id, host_id, module, action, target, payload, status, output, triggered_by, audit_log_id, created_at, started_at, ended_at
+		 FROM remote_commands WHERE host_id = $1 ORDER BY created_at DESC LIMIT $2`,
+		hostID, limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var cmds []models.RemoteCommand
+	for rows.Next() {
+		var cmd models.RemoteCommand
+		var startedAt, endedAt sql.NullTime
+		if err := rows.Scan(&cmd.ID, &cmd.HostID, &cmd.Module, &cmd.Action, &cmd.Target, &cmd.Payload,
+			&cmd.Status, &cmd.Output, &cmd.TriggeredBy, &cmd.AuditLogID, &cmd.CreatedAt, &startedAt, &endedAt); err != nil {
+			continue
+		}
+		if startedAt.Valid {
+			cmd.StartedAt = &startedAt.Time
+		}
+		if endedAt.Valid {
+			cmd.EndedAt = &endedAt.Time
+		}
+		cmds = append(cmds, cmd)
+	}
+	return cmds, nil
+}
+
 // RemoteCommandWithHost embeds RemoteCommand and adds a resolved host name for display.
 type RemoteCommandWithHost struct {
 	models.RemoteCommand
