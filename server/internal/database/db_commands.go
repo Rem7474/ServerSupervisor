@@ -189,6 +189,20 @@ func (db *DB) GetAllRemoteCommands(limit, offset int) ([]RemoteCommandWithHost, 
 	return result, nil
 }
 
+// CreateCompletedRemoteCommand inserts a remote command that has already finished
+// (e.g. a command the agent ran autonomously at startup). started_at and ended_at
+// are both set to now, bypassing the usual pending→running→completed lifecycle.
+func (db *DB) CreateCompletedRemoteCommand(hostID, module, action, target, output, triggeredBy string, status string, auditLogID *int64) error {
+	id := newUUID()
+	_, err := db.conn.Exec(`
+		INSERT INTO remote_commands
+		  (id, host_id, module, action, target, payload, status, output, triggered_by, audit_log_id, started_at, ended_at)
+		VALUES ($1,$2,$3,$4,$5,'{}', $6,$7,$8,$9, NOW(), NOW())`,
+		id, hostID, module, action, target, status, output, triggeredBy, auditLogID,
+	)
+	return err
+}
+
 // CountAllRemoteCommands returns the total number of remote commands.
 func (db *DB) CountAllRemoteCommands() (int64, error) {
 	var count int64

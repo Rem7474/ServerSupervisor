@@ -203,9 +203,12 @@ func (s *Sender) StreamCommandChunk(commandID string, chunk string) error {
 	return nil
 }
 
-// SendAuditLog sends an audit log entry for agent actions
-func (s *Sender) SendAuditLog(action, status, details string) error {
+// SendAuditLog sends an audit log entry for agent actions.
+// module identifies the command type (e.g. "apt") and, when non-empty, causes the
+// server to also create a completed remote_command entry in the commands history.
+func (s *Sender) SendAuditLog(module, action, status, details string) error {
 	auditLog := map[string]string{
+		"module":  module,
 		"action":  action,
 		"status":  status,
 		"details": details,

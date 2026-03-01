@@ -359,7 +359,9 @@ func (h *AgentHandler) GetMetricsSummary(c *gin.Context) {
 	c.JSON(http.StatusOK, summary)
 }
 
-// LogAuditAction records an audit log entry from the agent (e.g., startup apt update)
+// LogAuditAction records an audit log entry from the agent (e.g., startup apt update).
+// When the optional "module" field is provided, a completed remote_command entry is also
+// created so the action appears in the unified commands history (Audit → Commandes tab).
 func (h *AgentHandler) LogAuditAction(c *gin.Context) {
 	hostID := c.GetString("host_id")
 	if hostID == "" {
@@ -368,6 +370,7 @@ func (h *AgentHandler) LogAuditAction(c *gin.Context) {
 	}
 
 	var audit struct {
+		Module  string `json:"module"`  // optional — e.g. "apt"; creates a remote_command when set
 		Action  string `json:"action" binding:"required"`
 		Status  string `json:"status" binding:"required"`
 		Details string `json:"details"`
@@ -378,12 +381,32 @@ func (h *AgentHandler) LogAuditAction(c *gin.Context) {
 		return
 	}
 
+	// Build audit action label: "apt_update", "apt_upgrade", etc.
+	auditAction := audit.Action
+	if audit.Module != "" {
+		auditAction = audit.Module + "_" + audit.Action
+	}
+
 	// Create audit log entry with "agent" as the username
-	_, err := h.db.CreateAuditLog("agent", audit.Action, hostID, c.ClientIP(), audit.Details, audit.Status)
+	auditLogID, err := h.db.CreateAuditLog("agent", auditAction, hostID, c.ClientIP(), audit.Details, audit.Status)
 	if err != nil {
 		log.Printf("Failed to log audit action: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to record audit log"})
 		return
+	}
+
+	// Also create a completed remote_command so the action appears in the
+	// Commandes history tab alongside server-dispatched commands.
+	if audit.Module != "" {
+		var auditIDPtr *int64
+		if auditLogID != 0 {
+			auditIDPtr = &auditLogID
+		}
+		if cerr := h.db.CreateCompletedRemoteCommand(
+			hostID, audit.Module, audit.Action, "", audit.Details, "agent", audit.Status, auditIDPtr,
+		); cerr != nil {
+			log.Printf("Warning: failed to create self-reported command record: %v", cerr)
+		}
 	}
 
 	// If this is an apt update action, also update the last_update timestamp

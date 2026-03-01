@@ -511,11 +511,13 @@ func executeAptUpdate() (string, error) {
 	return outputStr, nil
 }
 
-// logAptAction sends an audit log entry for APT actions to the server
+// logAptAction sends an audit log entry for APT actions to the server.
+// module="apt" tells the server to also create a remote_command record so the
+// action appears in the unified commands history (Audit → Commandes tab).
 func logAptAction(cfg *config.Config, s *sender.Sender, action, status, message string) {
 	log.Printf("APT Action: %s [%s] - %s", action, status, message)
 
-	if err := s.SendAuditLog(action, status, message); err != nil {
+	if err := s.SendAuditLog("apt", action, status, message); err != nil {
 		log.Printf("Warning: Failed to send audit log: %v", err)
 	}
 }
