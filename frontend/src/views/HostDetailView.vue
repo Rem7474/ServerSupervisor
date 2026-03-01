@@ -1090,7 +1090,7 @@ async function loadSystemdServices() {
       }
     }).catch(e => {
       systemdError.value = e.message || 'Erreur lors du chargement des services'
-    })
+    }).finally(() => { loadCmdHistory() })
   } catch (e) {
     systemdError.value = e.response?.data?.error || 'Impossible d\'envoyer la commande'
   } finally {
@@ -1164,7 +1164,7 @@ async function loadProcesses() {
       }
     }).catch(e => {
       processesError.value = e.message || 'Erreur lors du chargement des processus'
-    })
+    }).finally(() => { loadCmdHistory() })
   } catch (e) {
     processesError.value = e.response?.data?.error || 'Impossible d\'envoyer la commande'
   } finally {
@@ -1211,6 +1211,7 @@ async function loadJournalLogs() {
           liveCommand.value.status = payload.status
           if (payload.status === 'completed' || payload.status === 'failed') {
             journalLoading.value = false
+            loadCmdHistory()
           }
         }
       } catch (e) { /* ignore */ }
@@ -1287,6 +1288,9 @@ function connectStreamWebSocket(commandId) {
         nextTick(() => scrollToBottom())
       } else if (payload.type === 'cmd_status_update') {
         liveCommand.value.status = payload.status
+        if (payload.status === 'completed' || payload.status === 'failed') {
+          loadCmdHistory()
+        }
       }
     } catch (e) {
       // Ignore malformed payloads

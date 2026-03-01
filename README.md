@@ -129,6 +129,7 @@ api_key: "la-clé-api-copiée"
 report_interval: 30
 collect_docker: true
 collect_apt: true
+collect_smart: true
 apt_auto_update_on_start: false
 insecure_skip_verify: false
 EOF
