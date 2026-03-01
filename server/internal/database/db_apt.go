@@ -13,8 +13,8 @@ func (db *DB) UpsertAptStatus(status *models.AptStatus) error {
 		`INSERT INTO apt_status (host_id, last_update, last_upgrade, pending_packages, package_list, security_updates, cve_list, updated_at)
 		 VALUES ($1,$2,$3,$4,$5,$6,CAST($7 AS JSONB),NOW())
 		 ON CONFLICT (host_id) DO UPDATE SET
-			last_update = EXCLUDED.last_update,
-			last_upgrade = EXCLUDED.last_upgrade,
+			last_update  = GREATEST(EXCLUDED.last_update,  COALESCE(apt_status.last_update,  EXCLUDED.last_update)),
+			last_upgrade = GREATEST(EXCLUDED.last_upgrade, COALESCE(apt_status.last_upgrade, EXCLUDED.last_upgrade)),
 			pending_packages = EXCLUDED.pending_packages,
 			package_list = EXCLUDED.package_list,
 			security_updates = EXCLUDED.security_updates,
