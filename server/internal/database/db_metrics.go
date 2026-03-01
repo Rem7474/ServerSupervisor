@@ -128,9 +128,12 @@ func (db *DB) GetMetricsSummary(hours int, bucketMinutes int) ([]models.SystemMe
 	if bucketMinutes <= 0 {
 		bucketMinutes = 5
 	}
+	// time_bucket() requires TimescaleDB.  Falls back gracefully on plain
+	// PostgreSQL: the function simply won't exist and the query returns an error
+	// which the caller handles by returning an empty slice.
 	rows, err := db.conn.Query(
 		`SELECT
-			to_timestamp(floor(extract(epoch from timestamp) / ($2 * 60)) * ($2 * 60)) AS ts,
+			time_bucket($2 * '1 minute'::interval, timestamp) AS ts,
 			AVG(cpu_usage_percent) AS cpu_avg,
 			AVG(memory_percent) AS mem_avg,
 			COUNT(*) AS sample_count

@@ -70,18 +70,14 @@ func main() {
 	tracker.Start()
 	defer tracker.Stop()
 
-	// Start periodic cleanup of old metrics
+	// Start periodic cleanup of old audit logs (90-day retention for compliance).
+	// Metrics retention is now managed by TimescaleDB retention policies; see
+	// migration 010_timescaledb.sql.  CleanOldMetrics is available for manual use
+	// on installations without TimescaleDB.
 	go func() {
 		ticker := time.NewTicker(1 * time.Hour)
 		defer ticker.Stop()
 		for range ticker.C {
-			if deleted, err := db.CleanOldMetrics(cfg.MetricsRetentionDays); err != nil {
-				log.Printf("Metrics cleanup error: %v", err)
-			} else if deleted > 0 {
-				log.Printf("Cleaned up %d old metrics records", deleted)
-			}
-
-			// Also cleanup old audit logs (90+ days retention for compliance)
 			if deleted, err := db.CleanOldAuditLogs(90); err != nil {
 				log.Printf("Audit cleanup error: %v", err)
 			} else if deleted > 0 {
