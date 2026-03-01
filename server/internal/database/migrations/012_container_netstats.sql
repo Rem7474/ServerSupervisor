@@ -1,0 +1,2 @@
+ALTER TABLE docker_containers ADD COLUMN IF NOT EXISTS net_rx_bytes BIGINT DEFAULT 0;
+ALTER TABLE docker_containers ADD COLUMN IF NOT EXISTS net_tx_bytes BIGINT DEFAULT 0;

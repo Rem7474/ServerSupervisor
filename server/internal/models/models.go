@@ -111,6 +111,8 @@ type DockerContainer struct {
 	EnvVars     map[string]string `json:"env_vars" db:"-"`
 	Volumes     []string          `json:"volumes" db:"-"`
 	Networks    []string          `json:"networks" db:"-"`
+	NetRxBytes  uint64            `json:"net_rx_bytes" db:"net_rx_bytes"`
+	NetTxBytes  uint64            `json:"net_tx_bytes" db:"net_tx_bytes"`
 	UpdatedAt   time.Time         `json:"updated_at" db:"updated_at"`
 }
 

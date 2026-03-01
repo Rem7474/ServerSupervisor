@@ -620,6 +620,39 @@
           Aucun hote trouve
         </div>
       </div>
+
+      <div v-if="containersWithNetStats.length" class="card mt-4">
+        <div class="card-header">
+          <h3 class="card-title">Trafic réseau par conteneur</h3>
+          <div class="card-options">
+            <span class="badge bg-secondary-lt text-secondary">
+              {{ containersWithNetStats.length }} conteneur{{ containersWithNetStats.length > 1 ? 's' : '' }}
+            </span>
+          </div>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-vcenter card-table">
+            <thead>
+              <tr>
+                <th>Conteneur</th>
+                <th>Hôte</th>
+                <th class="text-end">↓ Rx</th>
+                <th class="text-end">↑ Tx</th>
+                <th class="text-end">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="c in containersWithNetStats" :key="c.id">
+                <td class="fw-semibold">{{ c.name }}</td>
+                <td class="text-secondary">{{ c.hostname }}</td>
+                <td class="text-end font-monospace small text-info">{{ formatBytes(c.net_rx_bytes) }}</td>
+                <td class="text-end font-monospace small text-warning">{{ formatBytes(c.net_tx_bytes) }}</td>
+                <td class="text-end font-monospace small fw-semibold">{{ formatBytes(c.net_rx_bytes + c.net_tx_bytes) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </template>
   </div>
 </template>
@@ -958,6 +991,12 @@ const graphHosts = computed(() => {
     }
   })
 })
+
+const containersWithNetStats = computed(() =>
+  [...containers.value]
+    .filter(c => c.state === 'running' && (c.net_rx_bytes > 0 || c.net_tx_bytes > 0))
+    .sort((a, b) => (b.net_rx_bytes + b.net_tx_bytes) - (a.net_rx_bytes + a.net_tx_bytes))
+)
 
 function formatBytes(bytes) {
   if (!bytes && bytes !== 0) return '-'

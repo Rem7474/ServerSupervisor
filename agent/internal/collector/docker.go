@@ -8,6 +8,7 @@ import (
 	"log"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -27,6 +28,8 @@ type DockerContainer struct {
 	EnvVars     map[string]string `json:"env_vars,omitempty"`
 	Volumes     []string          `json:"volumes,omitempty"`
 	Networks    []string          `json:"networks,omitempty"`
+	NetRxBytes  uint64            `json:"net_rx_bytes,omitempty"`
+	NetTxBytes  uint64            `json:"net_tx_bytes,omitempty"`
 }
 
 // CollectDocker gathers Docker container information using docker CLI
@@ -166,8 +169,74 @@ func CollectDocker() ([]DockerContainer, error) {
 		})
 	}
 
+	// Enrich running containers with network I/O stats from docker stats
+	statsCtx, statsCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer statsCancel()
+	if netStats := collectNetStats(statsCtx); netStats != nil {
+		for i := range containers {
+			if stats, ok := netStats[containers[i].Name]; ok {
+				containers[i].NetRxBytes = stats[0]
+				containers[i].NetTxBytes = stats[1]
+			}
+		}
+	}
+
 	log.Printf("Collected %d Docker containers", len(containers))
 	return containers, nil
+}
+
+// collectNetStats runs docker stats --no-stream and returns a map[containerName]{rx, tx}.
+func collectNetStats(ctx context.Context) map[string][2]uint64 {
+	out, err := exec.CommandContext(ctx, "docker", "stats", "--no-stream",
+		"--format", "{{json .}}").Output()
+	if err != nil {
+		return nil
+	}
+	result := make(map[string][2]uint64)
+	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+		if line == "" {
+			continue
+		}
+		var row struct {
+			Name  string `json:"Name"`
+			NetIO string `json:"NetIO"`
+		}
+		if json.Unmarshal([]byte(line), &row) != nil {
+			continue
+		}
+		rx, tx := parseNetIO(row.NetIO)
+		result[row.Name] = [2]uint64{rx, tx}
+	}
+	return result
+}
+
+// parseNetIO splits "1.5kB / 2.3MB" and returns (rx_bytes, tx_bytes).
+func parseNetIO(s string) (rx, tx uint64) {
+	parts := strings.SplitN(s, " / ", 2)
+	if len(parts) != 2 {
+		return
+	}
+	return parseDockerSize(strings.TrimSpace(parts[0])),
+		parseDockerSize(strings.TrimSpace(parts[1]))
+}
+
+// parseDockerSize converts Docker human-readable sizes (base-10) to bytes.
+func parseDockerSize(s string) uint64 {
+	units := []struct {
+		suffix string
+		mult   float64
+	}{
+		{"TB", 1e12}, {"GB", 1e9}, {"MB", 1e6}, {"kB", 1e3}, {"B", 1},
+	}
+	for _, u := range units {
+		if strings.HasSuffix(s, u.suffix) {
+			n, err := strconv.ParseFloat(strings.TrimSuffix(s, u.suffix), 64)
+			if err == nil {
+				return uint64(n * u.mult)
+			}
+		}
+	}
+	return 0
 }
 
 func formatDuration(d time.Duration) string {

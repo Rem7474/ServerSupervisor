@@ -79,6 +79,7 @@
                 <th>Image</th>
                 <th>État</th>
                 <th>Ports</th>
+                <th>Réseau (Rx / Tx)</th>
                 <th></th>
               </tr>
             </thead>
@@ -102,6 +103,12 @@
                   <span :class="stateClass(c.state)">{{ c.state }}</span>
                 </td>
                 <td class="d-none d-sm-table-cell text-secondary small font-monospace">{{ formatContainerPorts(c.ports) }}</td>
+                <td class="text-secondary small font-monospace">
+                  <template v-if="c.state === 'running' && (c.net_rx_bytes > 0 || c.net_tx_bytes > 0)">
+                    ↓ {{ formatBytes(c.net_rx_bytes) }} / ↑ {{ formatBytes(c.net_tx_bytes) }}
+                  </template>
+                  <span v-else class="text-muted">—</span>
+                </td>
                 <td class="text-end">
                   <div class="d-flex align-items-center justify-content-end gap-1">
                     <!-- Action buttons: admin/operator only -->
@@ -450,6 +457,20 @@
                     {{ net }}
                   </span>
                 </div>
+                <div v-if="inspectTarget?.net_rx_bytes > 0 || inspectTarget?.net_tx_bytes > 0"
+                     class="mt-3 border-top pt-3">
+                  <div class="text-secondary small fw-semibold mb-1">I/O réseau (cumulatif)</div>
+                  <div class="row row-sm">
+                    <div class="col-6">
+                      <div class="text-muted small">↓ Reçu</div>
+                      <div class="fw-semibold text-info">{{ formatBytes(inspectTarget.net_rx_bytes) }}</div>
+                    </div>
+                    <div class="col-6">
+                      <div class="text-muted small">↑ Envoyé</div>
+                      <div class="fw-semibold text-warning">{{ formatBytes(inspectTarget.net_tx_bytes) }}</div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -612,6 +633,14 @@ const stateClass = (state) => {
     removing:   'badge bg-orange-lt text-orange',
   }
   return map[state] || 'badge bg-secondary-lt text-secondary'
+}
+
+function formatBytes(bytes) {
+  if (!bytes) return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KiB', 'MiB', 'GiB', 'TiB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
 }
 
 const formatContainerPorts = (raw) => {
