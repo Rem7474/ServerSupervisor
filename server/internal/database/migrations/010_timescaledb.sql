@@ -1,9 +1,22 @@
 -- TimescaleDB activation: hypertables, compression, and retention policies.
--- Wrapped in a DO block so the server starts cleanly even if TimescaleDB
--- is not installed — a NOTICE is printed and the block exits without error.
+-- Uses pg_available_extensions to check availability upfront rather than a
+-- catch-all EXCEPTION, so real errors (e.g. bad ALTER TABLE) still propagate.
 
 DO $$
+DECLARE
+  tsdb_available BOOLEAN := FALSE;
 BEGIN
+
+  -- ── Availability check ─────────────────────────────────────────────────────
+  SELECT EXISTS(SELECT 1 FROM pg_available_extensions WHERE name = 'timescaledb')
+    INTO tsdb_available;
+
+  IF NOT tsdb_available THEN
+    RAISE NOTICE 'TimescaleDB extension package not found on this PostgreSQL installation. '
+                 'Install timescaledb-2-postgresql-XX (or equivalent) to enable time-series '
+                 'optimizations (hypertables, compression, retention policies).';
+    RETURN;
+  END IF;
 
   -- ── Extension ─────────────────────────────────────────────────────────────
   CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;
@@ -97,6 +110,4 @@ BEGIN
     PERFORM add_retention_policy('login_events', INTERVAL '90 days');
   END IF;
 
-EXCEPTION WHEN OTHERS THEN
-  RAISE NOTICE 'TimescaleDB activation skipped: %. Install TimescaleDB to enable time-series optimizations.', SQLERRM;
 END $$;

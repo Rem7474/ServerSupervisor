@@ -2,6 +2,7 @@ package sender
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
@@ -78,13 +79,13 @@ func New(cfg *config.Config) *Sender {
 }
 
 // SendReport sends a full report to the server and returns any pending commands
-func (s *Sender) SendReport(report *Report) (*ReportResponse, error) {
+func (s *Sender) SendReport(ctx context.Context, report *Report) (*ReportResponse, error) {
 	data, err := json.Marshal(report)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal report: %w", err)
 	}
 
-	req, err := http.NewRequest("POST", s.cfg.ServerURL+"/api/agent/report", bytes.NewReader(data))
+	req, err := http.NewRequestWithContext(ctx, "POST", s.cfg.ServerURL+"/api/agent/report", bytes.NewReader(data))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -115,18 +116,26 @@ func (s *Sender) SendReport(report *Report) (*ReportResponse, error) {
 // SendReportWithRetry wraps SendReport with exponential backoff (3 attempts).
 // Only reports should be retried — command results must not be retried to avoid
 // double-execution side effects.
-func (s *Sender) SendReportWithRetry(report *Report) (*ReportResponse, error) {
+func (s *Sender) SendReportWithRetry(ctx context.Context, report *Report) (*ReportResponse, error) {
 	var lastErr error
 	delays := []time.Duration{5 * time.Second, 15 * time.Second}
 	for attempt := 0; attempt <= len(delays); attempt++ {
 		if attempt > 0 {
 			log.Printf("Retrying report (attempt %d/%d) after %v: %v",
 				attempt+1, len(delays)+1, delays[attempt-1], lastErr)
-			time.Sleep(delays[attempt-1])
+			select {
+			case <-time.After(delays[attempt-1]):
+			case <-ctx.Done():
+				return nil, fmt.Errorf("report cancelled during retry backoff: %w", ctx.Err())
+			}
 		}
-		resp, err := s.SendReport(report)
+		resp, err := s.SendReport(ctx, report)
 		if err == nil {
 			return resp, nil
+		}
+		// Don't retry if the context was cancelled
+		if ctx.Err() != nil {
+			return nil, fmt.Errorf("report cancelled: %w", ctx.Err())
 		}
 		lastErr = err
 	}
@@ -135,13 +144,13 @@ func (s *Sender) SendReportWithRetry(report *Report) (*ReportResponse, error) {
 
 // ReportCommandResult sends the result of a command execution back to the server.
 // Uses the long-timeout commandClient to support lengthy operations (apt upgrade, etc.).
-func (s *Sender) ReportCommandResult(result *CommandResult) error {
+func (s *Sender) ReportCommandResult(ctx context.Context, result *CommandResult) error {
 	data, err := json.Marshal(result)
 	if err != nil {
 		return fmt.Errorf("failed to marshal result: %w", err)
 	}
 
-	req, err := http.NewRequest("POST", s.cfg.ServerURL+"/api/agent/command/result", bytes.NewReader(data))
+	req, err := http.NewRequestWithContext(ctx, "POST", s.cfg.ServerURL+"/api/agent/command/result", bytes.NewReader(data))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -166,7 +175,7 @@ func (s *Sender) ReportCommandResult(result *CommandResult) error {
 
 // StreamCommandChunk sends a chunk of command output to the server for real-time streaming.
 // Uses commandClient (30min timeout) since streaming can span long operations.
-func (s *Sender) StreamCommandChunk(commandID string, chunk string) error {
+func (s *Sender) StreamCommandChunk(ctx context.Context, commandID string, chunk string) error {
 	payload := struct {
 		CommandID string `json:"command_id"`
 		Chunk     string `json:"chunk"`
@@ -180,7 +189,7 @@ func (s *Sender) StreamCommandChunk(commandID string, chunk string) error {
 		return fmt.Errorf("failed to marshal chunk: %w", err)
 	}
 
-	req, err := http.NewRequest("POST", s.cfg.ServerURL+"/api/agent/command/stream", bytes.NewReader(data))
+	req, err := http.NewRequestWithContext(ctx, "POST", s.cfg.ServerURL+"/api/agent/command/stream", bytes.NewReader(data))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -206,7 +215,7 @@ func (s *Sender) StreamCommandChunk(commandID string, chunk string) error {
 // SendAuditLog sends an audit log entry for agent actions.
 // module identifies the command type (e.g. "apt") and, when non-empty, causes the
 // server to also create a completed remote_command entry in the commands history.
-func (s *Sender) SendAuditLog(module, action, status, details string) error {
+func (s *Sender) SendAuditLog(ctx context.Context, module, action, status, details string) error {
 	auditLog := map[string]string{
 		"module":  module,
 		"action":  action,
@@ -219,7 +228,7 @@ func (s *Sender) SendAuditLog(module, action, status, details string) error {
 		return fmt.Errorf("failed to marshal audit log: %w", err)
 	}
 
-	req, err := http.NewRequest("POST", s.cfg.ServerURL+"/api/agent/audit", bytes.NewReader(data))
+	req, err := http.NewRequestWithContext(ctx, "POST", s.cfg.ServerURL+"/api/agent/audit", bytes.NewReader(data))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
