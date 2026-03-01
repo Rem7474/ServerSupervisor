@@ -44,6 +44,12 @@ BEGIN
     SELECT data_type FROM information_schema.columns
     WHERE table_name = 'network_topology_config' AND column_name = 'service_map'
   ) = 'text' THEN
+    -- Drop existing TEXT defaults first so PostgreSQL can change the column type
+    ALTER TABLE network_topology_config
+      ALTER COLUMN service_map     DROP DEFAULT,
+      ALTER COLUMN host_overrides  DROP DEFAULT,
+      ALTER COLUMN manual_services DROP DEFAULT;
+
     ALTER TABLE network_topology_config
       ALTER COLUMN service_map     TYPE JSONB USING COALESCE(NULLIF(service_map,    '')::jsonb, '{}'::jsonb),
       ALTER COLUMN host_overrides  TYPE JSONB USING COALESCE(NULLIF(host_overrides, '')::jsonb, '{}'::jsonb),
@@ -64,6 +70,9 @@ BEGIN
     SELECT data_type FROM information_schema.columns
     WHERE table_name = 'compose_projects' AND column_name = 'services'
   ) = 'text' THEN
+    ALTER TABLE compose_projects
+      ALTER COLUMN services DROP DEFAULT;
+
     ALTER TABLE compose_projects
       ALTER COLUMN services TYPE JSONB USING COALESCE(NULLIF(services,'')::jsonb, '[]'::jsonb);
 
