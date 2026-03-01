@@ -81,6 +81,8 @@ func buildNetworkSnapshot(db *database.DB) (*models.NetworkSnapshot, error) {
 			Ports:        container.Ports,
 			PortMappings: mappings,
 			Labels:       container.Labels,
+			NetRxBytes:   container.NetRxBytes,
+			NetTxBytes:   container.NetTxBytes,
 		})
 	}
 

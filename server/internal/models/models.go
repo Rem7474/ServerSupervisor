@@ -185,6 +185,8 @@ type NetworkContainer struct {
 	Ports        string            `json:"ports"`
 	PortMappings []PortMapping     `json:"port_mappings"`
 	Labels       map[string]string `json:"labels,omitempty" db:"-"`
+	NetRxBytes   uint64            `json:"net_rx_bytes"`
+	NetTxBytes   uint64            `json:"net_tx_bytes"`
 }
 
 type NetworkHost struct {
