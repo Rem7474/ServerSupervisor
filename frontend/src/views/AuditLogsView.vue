@@ -93,31 +93,58 @@
       </div>
 
       <!-- Log viewer panel -->
-      <div v-if="selectedCmd" class="card">
-        <div class="card-header d-flex align-items-center justify-content-between" style="background: #1e293b; border-color: rgba(255,255,255,0.1);">
-          <div class="d-flex align-items-center gap-3">
-            <span :class="moduleClass(selectedCmd.module)">{{ moduleLabel(selectedCmd.module) }}</span>
-            <code style="color: #94a3b8;">{{ cmdLabel(selectedCmd) }}</code>
-            <span class="text-secondary small">— {{ selectedCmd.host_name || selectedCmd.host_id }}</span>
-            <span :class="statusClass(selectedCmd.status)">{{ selectedCmd.status }}</span>
+      <div v-if="selectedCmd">
+        <div v-show="showLogViewer" class="card">
+          <div class="card-header d-flex align-items-center justify-content-between">
+            <h3 class="card-title mb-0">Logs</h3>
+            <button class="btn btn-sm btn-ghost-secondary" @click="showLogViewer = false" title="Réduire">
+              <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                <path d="M18 6l-12 12" />
+                <path d="M6 6l12 12" />
+              </svg>
+            </button>
           </div>
-          <button class="btn btn-sm btn-ghost-secondary" @click="closeLogViewer">✕</button>
+          <div class="card-body d-flex flex-column" style="padding: 0;">
+            <div class="px-3 pt-3 pb-2" style="background: #1e293b; border-bottom: 1px solid rgba(255,255,255,0.1);">
+              <div class="d-flex align-items-center gap-3 flex-wrap">
+                <span :class="moduleClass(selectedCmd.module)">{{ moduleLabel(selectedCmd.module) }}</span>
+                <code style="color: #94a3b8;">{{ cmdLabel(selectedCmd) }}</code>
+                <span class="text-secondary small">— {{ selectedCmd.host_name || selectedCmd.host_id }}</span>
+                <span :class="statusClass(selectedCmd.status)">{{ selectedCmd.status }}</span>
+              </div>
+            </div>
+            <pre
+              ref="logViewerEl"
+              style="
+                background: #0f172a;
+                color: #e2e8f0;
+                padding: 1rem;
+                margin: 0;
+                max-height: 500px;
+                overflow-y: auto;
+                font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+                font-size: 0.813rem;
+                line-height: 1.5;
+                border-radius: 0 0 0.5rem 0.5rem;
+              "
+            >{{ liveOutput || 'Aucune sortie disponible.' }}</pre>
+          </div>
         </div>
-        <pre
-          ref="logViewerEl"
-          style="
-            background: #0f172a;
-            color: #e2e8f0;
-            padding: 1rem;
-            margin: 0;
-            max-height: 500px;
-            overflow-y: auto;
-            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-            font-size: 0.813rem;
-            line-height: 1.5;
-            border-radius: 0 0 0.5rem 0.5rem;
-          "
-        >{{ liveOutput || 'Aucune sortie disponible.' }}</pre>
+        <button
+          v-show="!showLogViewer"
+          @click="showLogViewer = true"
+          class="btn btn-primary"
+          style="position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 100;"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+            <path d="M8 9l3 3l-3 3" />
+            <path d="M13 15l3 0" />
+            <path d="M3 4m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z" />
+          </svg>
+          Logs
+        </button>
       </div>
     </div>
 
@@ -251,6 +278,7 @@ const totalCmdsPages = computed(() => Math.max(1, Math.ceil(cmdsTotal.value / cm
 
 // Log viewer
 const selectedCmd = ref(null)
+const showLogViewer = ref(true)
 const liveOutput = ref('')
 const logViewerEl = ref(null)
 let streamWs = null
@@ -327,9 +355,13 @@ function progressWidth(failCount) {
 
 // ── Log viewer ────────────────────────────────────────────────────────────────
 function openLogViewer(cmd) {
-  if (selectedCmd.value?.id === cmd.id) return
+  if (selectedCmd.value?.id === cmd.id) {
+    showLogViewer.value = true
+    return
+  }
   closeLogViewer()
   selectedCmd.value = cmd
+  showLogViewer.value = true
   liveOutput.value = renderOutput(cmd.output || '')
 
   if (cmd.status === 'running' || cmd.status === 'pending') {

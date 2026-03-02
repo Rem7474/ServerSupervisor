@@ -181,7 +181,7 @@
       </div>
 
       <!-- Colonne droite: Console Live -->
-      <div class="apt-console" :class="{ 'apt-console--active': liveCommand }" id="apt-console-mobile">
+      <div v-show="showConsole" class="apt-console" :class="{ 'apt-console--active': liveCommand }" id="apt-console-mobile">
         <div class="card" style="display: flex; flex-direction: column; height: 100%;">
           <div class="card-header d-flex align-items-center justify-content-between">
             <h3 class="card-title">
@@ -193,7 +193,7 @@
               </svg>
               Console Live
             </h3>
-            <button v-if="liveCommand" @click="closeLiveConsole" class="btn btn-sm btn-ghost-secondary" title="Fermer la console">
+            <button @click="closeLiveConsole(); showConsole = false" class="btn btn-sm btn-ghost-secondary" title="Fermer la console">
               <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                 <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
                 <path d="M18 6l-12 12" />
@@ -337,31 +337,58 @@
     </div>
 
     <!-- Console flottante pour l'onglet Historique -->
-    <div v-if="activeTab === 'history' && liveCommand" class="card mt-3">
-      <div class="card-header d-flex align-items-center justify-content-between" style="background: #1e293b; border-color: rgba(255,255,255,0.1);">
-        <div class="d-flex align-items-center gap-2">
-          <code style="color: #94a3b8;">apt {{ liveCommand.command }}</code>
-          <span class="text-secondary small">— {{ liveCommand.hostname }}</span>
-          <span :class="statusClass(liveCommand.status)">{{ liveCommand.status }}</span>
-        </div>
-        <button @click="closeLiveConsole" class="btn btn-sm btn-ghost-secondary">✕</button>
+    <div v-show="activeTab === 'history' && liveCommand && showConsole" class="card mt-3">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <h3 class="card-title mb-0">Console Live</h3>
+        <button @click="closeLiveConsole(); showConsole = false" class="btn btn-sm btn-ghost-secondary" title="Fermer la console">
+          <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+            <path d="M18 6l-12 12" />
+            <path d="M6 6l12 12" />
+          </svg>
+        </button>
       </div>
-      <pre
-        ref="consoleOutputHistory"
-        style="
-          background: #0f172a;
-          color: #e2e8f0;
-          padding: 1rem;
-          margin: 0;
-          max-height: 400px;
-          overflow-y: auto;
-          font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-          font-size: 0.813rem;
-          line-height: 1.5;
-          border-radius: 0 0 0.5rem 0.5rem;
-        "
-      >{{ renderedConsoleOutput || 'En attente de sortie...' }}</pre>
+      <div class="card-body d-flex flex-column" style="padding: 0;">
+        <div class="px-3 pt-3 pb-2" style="background: #1e293b; border-bottom: 1px solid rgba(255,255,255,0.1);">
+          <div class="d-flex align-items-center gap-2">
+            <code style="color: #94a3b8;">apt {{ liveCommand?.command }}</code>
+            <span class="text-secondary small">— {{ liveCommand?.hostname }}</span>
+            <span :class="statusClass(liveCommand?.status)">{{ liveCommand?.status }}</span>
+          </div>
+        </div>
+        <pre
+          ref="consoleOutputHistory"
+          style="
+            background: #0f172a;
+            color: #e2e8f0;
+            padding: 1rem;
+            margin: 0;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 0.813rem;
+            line-height: 1.5;
+            border-radius: 0 0 0.5rem 0.5rem;
+          "
+        >{{ renderedConsoleOutput || 'En attente de sortie...' }}</pre>
+      </div>
     </div>
+
+    <!-- Bouton pour réafficher la console -->
+    <button
+      v-show="!showConsole"
+      @click="showConsole = true"
+      class="btn btn-primary"
+      style="position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 100;"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+        <path d="M8 9l3 3l-3 3" />
+        <path d="M13 15l3 0" />
+        <path d="M3 4m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z" />
+      </svg>
+      Console
+    </button>
   </div>
 </template>
 
@@ -399,6 +426,7 @@ const dialog = useConfirmDialog()
 const canRunApt = computed(() => auth.role === 'admin' || auth.role === 'operator')
 
 // ── Console ───────────────────────────────────────────────────────────────────
+const showConsole = ref(true)
 const renderedConsoleOutput = computed(() => {
   if (!liveCommand.value) return ''
   return renderConsoleOutput(liveCommand.value.output || '')
@@ -485,6 +513,7 @@ function getPackages(aptStatus) {
 }
 
 function watchCommand(cmd, host) {
+  showConsole.value = true
   liveCommand.value = {
     id: cmd.id,
     command: cmd.action,
