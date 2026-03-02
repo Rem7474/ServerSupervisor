@@ -181,7 +181,10 @@
                 class="form-control"
                 placeholder="300"
               />
-              <small class="form-hint">Le seuil doit être dépassé pendant cette durée avant de déclencher l'alerte</small>
+              <small class="form-hint">Le seuil doit être dépassé pendant cette durée avant de déclencher l'alerte. Mettre 0 pour déclencher immédiatement.</small>
+              <small v-if="form.duration > 0" class="form-hint text-warning d-block mt-1">
+                ⚠ Définit aussi l'âge maximum accepté pour les métriques. Si l'agent reporte toutes les 60s, une durée &lt; 60 empêchera l'alerte de se déclencher.
+              </small>
             </div>
 
             <div class="mb-3">
@@ -309,6 +312,9 @@
 
             <!-- Test results panel (inside modal-body) -->
             <div v-if="testResults" class="mt-3">
+              <div v-if="hasNoDataResults" class="alert alert-warning py-2 small mb-2">
+                <strong>⚠ Aucune donnée disponible</strong> pour un ou plusieurs hôtes — l'agent n'est peut-être pas actif, ou la <strong>Durée</strong> configurée est inférieure à l'intervalle de collecte de l'agent (généralement 60s).
+              </div>
               <div class="d-flex align-items-center justify-content-between mb-2">
                 <div class="fw-bold">
                   Résultat du test
@@ -373,7 +379,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
 import { formatDurationSecs } from '../utils/formatters'
 import apiClient from '../api'
@@ -389,6 +395,10 @@ const saveError = ref('')
 const testing = ref(false)
 const testResults = ref(null)
 const editingRule = ref(null)
+
+const hasNoDataResults = computed(() =>
+  testResults.value?.results?.some(r => !r.has_data) || false
+)
 
 const defaultCommandTrigger = () => ({ module: 'processes', action: 'list', target: '' })
 
@@ -414,6 +424,16 @@ const channelNtfy = ref(false)
 const channelBrowser = ref(false)
 const browserPermission = ref(typeof Notification !== 'undefined' ? Notification.permission : 'unsupported')
 const commandTriggerEnabled = ref(false)
+
+let autoTestTimer = null
+watch(
+  () => [form.value.host_id, form.value.metric, form.value.operator, form.value.threshold, form.value.duration],
+  () => {
+    if (!showModal.value) return
+    clearTimeout(autoTestTimer)
+    autoTestTimer = setTimeout(testAlert, 600)
+  }
+)
 
 const commandModuleActions = {
   processes: ['list'],
@@ -459,6 +479,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   document.removeEventListener('keydown', onKeyDown)
+  clearTimeout(autoTestTimer)
 })
 
 async function loadRules() {

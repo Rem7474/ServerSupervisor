@@ -68,7 +68,6 @@ func EvaluateAlerts(db *database.DB, cfg *config.Config, pusher NotificationPush
 
 			value, ok := GetMetricValue(db, host, rule)
 			if !ok {
-				log.Printf("Alerts: %s host=%s — no metric value (stale or missing data)", ruleName, host.Name)
 				continue
 			}
 
@@ -87,18 +86,17 @@ func EvaluateAlerts(db *database.DB, cfg *config.Config, pusher NotificationPush
 						continue
 					}
 					log.Printf("Alerts: FIRED %s host=%s value=%.2f → incident#%d created", ruleName, host.Name, value, incID)
+					details := fmt.Sprintf(`{"rule_id":%d,"metric":"%s","operator":"%s","value":%.4f}`, rule.ID, rule.Metric, rule.Operator, value)
+					_, _ = db.CreateAuditLog("alert-engine", "alert_fired", host.ID, "", details, "success")
 					n.notify(cfg, rule, host, value)
 					triggerAlertCommand(db, rule, host)
 					pushBrowserNotification(pusher, rule, host, value, incID)
-				} else {
-					log.Printf("Alerts: %s host=%s value=%.2f — already open (incident#%d)", ruleName, host.Name, value, inc.ID)
 				}
-			} else {
-				log.Printf("Alerts: %s host=%s value=%.2f — condition not met", ruleName, host.Name, value)
-				if inc != nil {
-					_ = db.ResolveAlertIncident(inc.ID)
-					log.Printf("Alerts: %s host=%s — resolved incident#%d", ruleName, host.Name, inc.ID)
-				}
+			} else if inc != nil {
+				_ = db.ResolveAlertIncident(inc.ID)
+				log.Printf("Alerts: %s host=%s — resolved incident#%d", ruleName, host.Name, inc.ID)
+				details := fmt.Sprintf(`{"rule_id":%d,"incident_id":%d}`, rule.ID, inc.ID)
+				_, _ = db.CreateAuditLog("alert-engine", "alert_resolved", host.ID, "", details, "success")
 			}
 		}
 	}
