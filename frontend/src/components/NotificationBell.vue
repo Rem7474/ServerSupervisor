@@ -228,6 +228,10 @@ function onStorageEvent(e) {
 }
 
 onMounted(() => {
+  // Ask for browser notification permission on first load (browser only prompts once per origin)
+  if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+    Notification.requestPermission()
+  }
   fetchNotifications()
   pollTimer = setInterval(fetchNotifications, 30_000)
   document.addEventListener('click', onClickOutside)

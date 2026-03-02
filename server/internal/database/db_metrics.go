@@ -1,7 +1,7 @@
 package database
 
 import (
-	"strings"
+	"database/sql"
 
 	"github.com/serversupervisor/server/internal/models"
 )
@@ -131,24 +131,25 @@ func (db *DB) GetMetricsSummary(hours int, bucketMinutes int) ([]models.SystemMe
 		bucketMinutes = 5
 	}
 
-	// Try TimescaleDB time_bucket() first (more efficient on hypertables).
-	rows, err := db.conn.Query(
-		`SELECT
-			time_bucket($2 * '1 minute'::interval, timestamp) AS ts,
-			AVG(cpu_usage_percent) AS cpu_avg,
-			AVG(memory_percent) AS mem_avg,
-			COUNT(*) AS sample_count
-		 FROM system_metrics
-		 WHERE timestamp > NOW() - INTERVAL '1 hour' * $1
-		 GROUP BY ts
-		 ORDER BY ts ASC`,
-		hours, bucketMinutes,
+	var (
+		rows *sql.Rows
+		err  error
 	)
-	if err != nil {
-		// TimescaleDB not available — fall back to plain PostgreSQL bucketing.
-		if !strings.Contains(err.Error(), "time_bucket") && !strings.Contains(err.Error(), "does not exist") {
-			return nil, err
-		}
+
+	if db.hasTimescaleDB {
+		rows, err = db.conn.Query(
+			`SELECT
+				time_bucket($2 * '1 minute'::interval, timestamp) AS ts,
+				AVG(cpu_usage_percent) AS cpu_avg,
+				AVG(memory_percent) AS mem_avg,
+				COUNT(*) AS sample_count
+			 FROM system_metrics
+			 WHERE timestamp > NOW() - INTERVAL '1 hour' * $1
+			 GROUP BY ts
+			 ORDER BY ts ASC`,
+			hours, bucketMinutes,
+		)
+	} else {
 		rows, err = db.conn.Query(
 			`SELECT
 				to_timestamp(
@@ -163,9 +164,9 @@ func (db *DB) GetMetricsSummary(hours int, bucketMinutes int) ([]models.SystemMe
 			 ORDER BY ts ASC`,
 			hours, bucketMinutes,
 		)
-		if err != nil {
-			return nil, err
-		}
+	}
+	if err != nil {
+		return nil, err
 	}
 	defer rows.Close()
 

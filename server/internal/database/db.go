@@ -58,7 +58,8 @@ func EnsureDatabaseExists(cfg *config.Config) error {
 // DB wraps the underlying sql.DB connection and exposes domain-specific methods
 // split across db_*.go files in this package.
 type DB struct {
-	conn *sql.DB
+	conn            *sql.DB
+	hasTimescaleDB  bool
 }
 
 // New opens a connection to the database, runs migrations, and returns a DB.
@@ -78,6 +79,17 @@ func New(cfg *config.Config) (*DB, error) {
 	db := &DB{conn: conn}
 	if err := db.migrate(); err != nil {
 		return nil, fmt.Errorf("failed to run migrations: %w", err)
+	}
+
+	// Detect TimescaleDB availability once so callers never attempt time_bucket()
+	// on a plain PostgreSQL instance (avoids ERROR noise in the DB server log).
+	var hasTS bool
+	_ = conn.QueryRow(`SELECT EXISTS(SELECT 1 FROM pg_extension WHERE extname = 'timescaledb')`).Scan(&hasTS)
+	db.hasTimescaleDB = hasTS
+	if hasTS {
+		log.Println("TimescaleDB extension detected — using time_bucket() for metric bucketing")
+	} else {
+		log.Println("TimescaleDB not found — using plain PostgreSQL bucketing")
 	}
 
 	return db, nil

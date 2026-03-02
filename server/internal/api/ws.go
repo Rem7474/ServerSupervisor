@@ -352,9 +352,17 @@ func (h *WSHandler) NotificationStream(c *gin.Context) {
 		return
 	}
 
+	// Acknowledge auth so the client transitions from 'connecting' to 'connected'
+	// immediately, without waiting for the first real notification.
+	if err := conn.WriteJSON(gin.H{"type": "auth_ok"}); err != nil {
+		return
+	}
+
 	h.notifHub.Register(conn)
 
-	// Keep alive until client disconnects
+	// Keep alive until client disconnects.
+	// NOTE: do NOT add a ping ticker here — Broadcast() already writes to this conn
+	// from the alert-engine goroutine; a second goroutine writing here would race.
 	done := make(chan struct{})
 	go h.readLoop(conn, done)
 	<-done
