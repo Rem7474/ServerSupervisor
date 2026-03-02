@@ -304,31 +304,40 @@
 
     <!-- ===== Console Docker Live (partagée entre les tabs) ===== -->
     <div v-if="dockerLiveCmd" class="card mt-4">
-      <div class="card-header d-flex align-items-center justify-content-between" style="background:#1e293b; border-bottom: 1px solid rgba(255,255,255,0.08);">
-        <div class="d-flex align-items-center gap-3">
-          <svg xmlns="http://www.w3.org/2000/svg" class="icon text-secondary" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M8 9l3 3l-3 3" /><path d="M13 15l3 0" /><path d="M3 4m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z" /></svg>
-          <div>
-            <span class="fw-semibold text-light">{{ dockerLiveCmd.containerName }}</span>
-            <code class="ms-2 small" style="background:rgba(0,0,0,0.3);padding:0.1rem 0.4rem;border-radius:0.25rem;color:#94a3b8;">{{ dockerLiveCmd.action }}</code>
-          </div>
-          <span
-            class="badge"
-            :class="{
-              'bg-yellow-lt text-yellow': dockerLiveCmd.status === 'running' || dockerLiveCmd.status === 'pending',
-              'bg-green-lt text-green': dockerLiveCmd.status === 'completed',
-              'bg-red-lt text-red': dockerLiveCmd.status === 'failed'
-            }"
-          >{{ dockerLiveCmd.status }}</span>
-        </div>
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <h3 class="card-title mb-0">
+          <svg xmlns="http://www.w3.org/2000/svg" class="icon me-2" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M8 9l3 3l-3 3" /><path d="M13 15l3 0" /><path d="M3 4m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z" /></svg>
+          Console Live
+        </h3>
         <button class="btn btn-sm btn-ghost-secondary" @click="closeDockerConsole" title="Fermer">
           <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M18 6l-12 12" /><path d="M6 6l12 12" /></svg>
         </button>
       </div>
-      <pre
-        ref="dockerConsoleOutput"
-        class="m-0 font-monospace small"
-        style="background:#1e1e2e;color:#cdd6f4;max-height:400px;min-height:120px;overflow-y:auto;white-space:pre-wrap;padding:1rem;border-radius:0 0 0.5rem 0.5rem;"
-      >{{ dockerConsoleText || '(en attente de sortie...)' }}</pre>
+      <div class="card-body d-flex flex-column" style="padding: 0;">
+        <div class="px-3 pt-3 pb-2" style="background: #1e293b; border-bottom: 1px solid rgba(255,255,255,0.1);">
+          <div class="d-flex align-items-start justify-content-between mb-1">
+            <div class="flex-fill" style="min-width: 0;">
+              <div class="fw-semibold text-light" style="font-size: 0.95rem;">{{ dockerLiveCmd.containerName }}</div>
+              <div class="text-secondary small mt-1">
+                <code style="background: rgba(0,0,0,0.3); padding: 0.15rem 0.4rem; border-radius: 0.25rem; color: #94a3b8;">{{ dockerLiveCmd.action }}</code>
+              </div>
+            </div>
+            <span
+              class="badge ms-2"
+              :class="{
+                'bg-yellow-lt text-yellow': dockerLiveCmd.status === 'running' || dockerLiveCmd.status === 'pending',
+                'bg-green-lt text-green': dockerLiveCmd.status === 'completed',
+                'bg-red-lt text-red': dockerLiveCmd.status === 'failed'
+              }"
+            >{{ dockerLiveCmd.status }}</span>
+          </div>
+        </div>
+        <pre
+          ref="dockerConsoleOutput"
+          class="m-0 font-monospace small flex-fill"
+          style="background:#0f172a;color:#e2e8f0;max-height:400px;min-height:120px;overflow-y:auto;white-space:pre-wrap;padding:1rem;border-radius:0 0 0.5rem 0.5rem;"
+        >{{ dockerConsoleText || '(en attente de sortie...)' }}</pre>
+      </div>
     </div>
 
     <!-- Modal conteneur (labels) -->
@@ -529,7 +538,7 @@
                     {{ copied ? '✓ Copié' : 'Copier' }}
                   </button>
                 </div>
-                <pre v-if="selectedProject.raw_config" class="m-0 p-3 small" style="max-height: 60vh; overflow-y: auto; background: #1e1e2e; color: #cdd6f4; border-radius: 0 0 4px 0;">{{ selectedProject.raw_config }}</pre>
+                <pre v-if="selectedProject.raw_config" class="m-0 p-3 small" style="max-height: 60vh; overflow-y: auto; background: #0f172a; color: #e2e8f0; border-radius: 0 0 4px 0;">{{ selectedProject.raw_config }}</pre>
                 <div v-else class="p-4 text-secondary text-center">
                   Config non disponible (agent trop ancien ou docker compose introuvable)
                 </div>

@@ -453,7 +453,7 @@
                       <span v-else-if="link.link_type === 'proxy'" class="badge bg-cyan-lt text-cyan">
                         Proxy
                       </span>
-                      <span v-else class="badge bg-secondary-lt text-secondary">
+                      <span v-else class="badge bg-azure-lt text-azure">
                         {{ link.link_type }}
                       </span>
                     </td>
@@ -585,15 +585,20 @@
       <div class="card">
         <div class="card-header">
           <h3 class="card-title">Trafic par hôte</h3>
+          <div class="card-options">
+            <span class="badge bg-azure-lt text-azure ms-1">
+              {{ hosts.length }} hôte{{ hosts.length > 1 ? 's' : '' }}
+            </span>
+          </div>
         </div>
         <div class="table-responsive">
           <table class="table table-vcenter card-table">
             <thead>
               <tr>
-                <th>Hote</th>
+                <th>Hôte</th>
                 <th>IP</th>
-                <th>Rx</th>
-                <th>Tx</th>
+                <th class="text-end">↓ Rx</th>
+                <th class="text-end">↑ Tx</th>
                 <th>Statut</th>
               </tr>
             </thead>
@@ -605,8 +610,8 @@
                   </router-link>
                 </td>
                 <td class="text-secondary">{{ h.ip_address }}</td>
-                <td>{{ formatBytes(h.network_rx_bytes || 0) }}</td>
-                <td>{{ formatBytes(h.network_tx_bytes || 0) }}</td>
+                <td class="text-end font-monospace small text-info">{{ formatBytes(h.network_rx_bytes || 0) }}</td>
+                <td class="text-end font-monospace small text-warning">{{ formatBytes(h.network_tx_bytes || 0) }}</td>
                 <td>
                   <span :class="h.status === 'online' ? 'badge bg-green-lt text-green' : h.status === 'warning' ? 'badge bg-yellow-lt text-yellow' : 'badge bg-red-lt text-red'">
                     {{ h.status || 'unknown' }}
@@ -625,7 +630,7 @@
         <div class="card-header">
           <h3 class="card-title">Trafic réseau par conteneur</h3>
           <div class="card-options">
-            <span class="badge bg-secondary-lt text-secondary">
+            <span class="badge bg-azure-lt text-azure ms-1">
               {{ containersWithNetStats.length }} conteneur{{ containersWithNetStats.length > 1 ? 's' : '' }}
             </span>
           </div>

@@ -31,8 +31,8 @@
       <div class="card-body">
         <div class="d-flex align-items-center justify-content-between mb-3">
           <div class="fw-semibold">Authentification multi-facteur</div>
-          <span :class="mfaEnabled ? 'badge bg-green-lt text-green' : 'badge bg-secondary-lt text-secondary'">
-            {{ mfaEnabled ? 'Activé' : 'Désactivée' }}
+          <span :class="mfaEnabled ? 'badge bg-green-lt text-green' : 'badge bg-orange-lt text-orange'">
+            {{ mfaEnabled ? 'Activé' : 'Désactivé' }}
           </span>
         </div>
 

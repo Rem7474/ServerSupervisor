@@ -89,7 +89,7 @@
                   <div class="fw-bold">TOTP (Authenticator)</div>
                   <div class="text-secondary small">Google Authenticator, Authy, etc.</div>
                 </div>
-                <span class="badge" :class="profile?.mfa_enabled ? 'bg-success-lt text-success' : 'bg-secondary-lt text-secondary'">
+                <span class="badge" :class="profile?.mfa_enabled ? 'bg-green-lt text-green' : 'bg-orange-lt text-orange'">
                   {{ profile?.mfa_enabled ? 'Actif' : 'Inactif' }}
                 </span>
               </div>
@@ -245,7 +245,7 @@
                 <td class="text-secondary small">{{ parseUA(ev.user_agent).browser }}</td>
                 <td class="text-secondary small">{{ parseUA(ev.user_agent).os }}</td>
                 <td>
-                  <span class="badge" :class="ev.success ? 'bg-success' : 'bg-danger'">
+                  <span class="badge" :class="ev.success ? 'bg-green-lt text-green' : 'bg-red-lt text-red'">
                     {{ ev.success ? 'Succès' : 'Échec' }}
                   </span>
                 </td>

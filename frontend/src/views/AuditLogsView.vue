@@ -208,7 +208,7 @@
                 <td class="text-secondary small">{{ parseUA(ev.user_agent).browser }}</td>
                 <td class="text-secondary small">{{ parseUA(ev.user_agent).os }}</td>
                 <td>
-                  <span class="badge" :class="ev.success ? 'bg-success' : 'bg-danger'">
+                  <span class="badge" :class="ev.success ? 'bg-green-lt text-green' : 'bg-red-lt text-red'">
                     {{ ev.success ? 'Succès' : 'Échec' }}
                   </span>
                 </td>
@@ -282,7 +282,7 @@ function moduleLabel(module) {
 }
 
 function moduleClass(module) {
-  return MODULE_META[module]?.cls ?? 'badge bg-secondary'
+  return MODULE_META[module]?.cls ?? 'badge bg-secondary-lt text-secondary'
 }
 
 function cmdLabel(cmd) {
