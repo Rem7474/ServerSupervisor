@@ -420,7 +420,7 @@ type AlertIncident struct {
 
 type NotificationItem struct {
 	ID            int64      `json:"id"`
-	RuleID        int64      `json:"rule_id"`
+	RuleID        *int64     `json:"rule_id"`
 	HostID        string     `json:"host_id"`
 	HostName      string     `json:"host_name"`
 	RuleName      string     `json:"rule_name"`

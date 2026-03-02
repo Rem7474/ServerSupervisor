@@ -247,7 +247,9 @@ func (db *DB) GetRecentNotifications(limit int) ([]models.NotificationItem, erro
 	rows, err := db.conn.Query(
 		`SELECT ai.id, ai.rule_id, ai.host_id,
 		        COALESCE(h.name, ai.host_id) AS host_name,
-		        COALESCE(ar.name, ar.metric || ' ' || ar.operator || ' ' || CAST(ar.threshold AS TEXT)) AS rule_name,
+		        COALESCE(ar.name,
+		            ar.metric || ' ' || ar.operator || ' ' || CAST(COALESCE(ar.threshold, 0) AS TEXT),
+		            'Règle supprimée') AS rule_name,
 		        COALESCE(ar.metric, '') AS metric,
 		        ai.value, ai.triggered_at, ai.resolved_at,
 		        COALESCE(ar.actions->'channels' @> '["browser"]'::jsonb, FALSE) AS browser_notify
@@ -264,13 +266,18 @@ func (db *DB) GetRecentNotifications(limit int) ([]models.NotificationItem, erro
 	var items []models.NotificationItem
 	for rows.Next() {
 		var item models.NotificationItem
+		var ruleID sql.NullInt64
 		if err := rows.Scan(
-			&item.ID, &item.RuleID, &item.HostID,
+			&item.ID, &ruleID, &item.HostID,
 			&item.HostName, &item.RuleName, &item.Metric,
 			&item.Value, &item.TriggeredAt, &item.ResolvedAt,
 			&item.BrowserNotify,
 		); err != nil {
+			log.Printf("GetRecentNotifications: scan error: %v", err)
 			continue
+		}
+		if ruleID.Valid {
+			item.RuleID = &ruleID.Int64
 		}
 		items = append(items, item)
 	}
