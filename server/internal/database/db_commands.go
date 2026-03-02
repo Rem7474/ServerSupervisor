@@ -244,6 +244,10 @@ func (db *DB) CountAllRemoteCommands() (int64, error) {
 // GetRecentNotifications returns the latest alert incidents with enriched metadata
 // for WebSocket browser notification delivery.
 func (db *DB) GetRecentNotifications(limit int) ([]models.NotificationItem, error) {
+	var total int
+	_ = db.conn.QueryRow(`SELECT COUNT(*) FROM alert_incidents`).Scan(&total)
+	log.Printf("GetRecentNotifications: alert_incidents total=%d", total)
+
 	rows, err := db.conn.Query(
 		`SELECT ai.id, ai.rule_id, ai.host_id,
 		        COALESCE(h.name, ai.host_id) AS host_name,
