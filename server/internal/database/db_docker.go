@@ -66,7 +66,7 @@ func (db *DB) GetDockerContainers(hostID string) ([]models.DockerContainer, erro
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var containers []models.DockerContainer
 	for rows.Next() {
@@ -99,7 +99,7 @@ func (db *DB) GetAllDockerContainers() ([]models.DockerContainer, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var containers []models.DockerContainer
 	for rows.Next() {
@@ -150,7 +150,7 @@ func (db *DB) GetDockerNetworksByHost(hostID string) ([]models.DockerNetwork, er
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var networks []models.DockerNetwork
 	for rows.Next() {
@@ -173,7 +173,7 @@ func (db *DB) GetAllDockerNetworks() ([]models.DockerNetwork, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var networks []models.DockerNetwork
 	for rows.Next() {
@@ -201,7 +201,7 @@ func (db *DB) GetAllContainerEnvs() ([]models.ContainerEnv, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var envs []models.ContainerEnv
 	for rows.Next() {
