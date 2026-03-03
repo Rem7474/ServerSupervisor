@@ -44,7 +44,7 @@ func (db *DB) GetLatestDiskMetrics(hostID string) ([]models.DiskMetrics, error) 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var metrics []models.DiskMetrics
 	for rows.Next() {
@@ -78,7 +78,7 @@ func (db *DB) GetDiskMetricsHistory(hostID, mountPoint string, limit int) ([]mod
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var metrics []models.DiskMetrics
 	for rows.Next() {
@@ -133,7 +133,7 @@ func (db *DB) GetLatestDiskHealth(hostID string) ([]models.DiskHealth, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var healthData []models.DiskHealth
 	for rows.Next() {
