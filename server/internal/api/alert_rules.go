@@ -83,7 +83,7 @@ func (h *AlertRulesHandler) ListAlertRules(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	rules := []models.AlertRule{}
 	for rows.Next() {

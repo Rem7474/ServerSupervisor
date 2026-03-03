@@ -82,7 +82,7 @@ func (db *DB) GetAllHosts() ([]models.Host, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var hosts []models.Host
 	for rows.Next() {

@@ -58,7 +58,7 @@ func (db *DB) GetLatestMetrics(hostID string) (*models.SystemMetrics, error) {
 	if err != nil {
 		return &m, nil
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
 		var d models.DiskInfo
@@ -81,7 +81,7 @@ func (db *DB) GetMetricsHistory(hostID string, hours int) ([]models.SystemMetric
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var metrics []models.SystemMetrics
 	for rows.Next() {
@@ -111,7 +111,7 @@ func (db *DB) GetMetricsAggregatesByType(hostID string, hours int, aggregationTy
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var metrics []models.SystemMetrics
 	for rows.Next() {
@@ -168,7 +168,7 @@ func (db *DB) GetMetricsSummary(hours int, bucketMinutes int) ([]models.SystemMe
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var summary []models.SystemMetricsSummary
 	for rows.Next() {

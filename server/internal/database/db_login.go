@@ -25,7 +25,7 @@ func (db *DB) GetLoginEventsByUser(username string, limit int) ([]models.LoginEv
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var events []models.LoginEvent
 	for rows.Next() {
@@ -72,7 +72,7 @@ func (db *DB) GetAllLoginEvents(limit, offset int) ([]models.LoginEvent, error) 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var events []models.LoginEvent
 	for rows.Next() {
@@ -104,7 +104,7 @@ func (db *DB) GetTopFailedIPs(since time.Time, limit int) ([]models.IPFailCount,
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var result []models.IPFailCount
 	for rows.Next() {
