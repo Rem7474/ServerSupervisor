@@ -35,6 +35,8 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "host not identified"})
 		return
 	}
+	// Sanitize hostID for safe logging (prevent log forging via newlines)
+	safeHostID := strings.ReplaceAll(strings.ReplaceAll(hostID, "\n", ""), "\r", "")
 
 	var report models.AgentReport
 	if err := c.ShouldBindJSON(&report); err != nil {
@@ -118,14 +120,14 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 			})
 		}
 		if err := h.db.UpsertDockerNetworks(hostID, dbNetworks); err != nil {
-			log.Printf("Warning: failed to store docker networks for host %s: %v", hostID, err)
+			log.Printf("Warning: failed to store docker networks for host %s: %v", safeHostID, err)
 		}
 	}
 
 	// Store docker-compose projects
 	if len(report.ComposeProjects) > 0 {
 		if err := h.db.UpsertComposeProjects(hostID, report.ComposeProjects); err != nil {
-			log.Printf("Warning: failed to store compose projects for host %s: %v", hostID, err)
+			log.Printf("Warning: failed to store compose projects for host %s: %v", safeHostID, err)
 		}
 	}
 
@@ -136,7 +138,7 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 			report.DiskMetrics[i].Timestamp = time.Now()
 		}
 		if err := h.db.InsertDiskMetrics(report.DiskMetrics); err != nil {
-			log.Printf("Warning: failed to store disk metrics for host %s: %v", hostID, err)
+			log.Printf("Warning: failed to store disk metrics for host %s: %v", safeHostID, err)
 		}
 	}
 
@@ -147,7 +149,7 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 			report.DiskHealth[i].CollectedAt = time.Now()
 		}
 		if err := h.db.InsertDiskHealth(report.DiskHealth); err != nil {
-			log.Printf("Warning: failed to store disk health for host %s: %v", hostID, err)
+			log.Printf("Warning: failed to store disk health for host %s: %v", safeHostID, err)
 		}
 	}
 
