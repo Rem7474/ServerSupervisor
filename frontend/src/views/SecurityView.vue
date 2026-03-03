@@ -8,7 +8,7 @@
           <span>Sécurité</span>
         </div>
         <h2 class="page-title">Sécurité</h2>
-        <div class="text-secondary">MFA, activité de connexion et menaces</div>
+        <div class="text-secondary">MFA et protection contre les menaces</div>
       </div>
     </div>
 
@@ -17,11 +17,6 @@
       <li class="nav-item">
         <a class="nav-link" :class="{ active: tab === 'mfa' }" href="#" @click.prevent="tab = 'mfa'">
           Authentification MFA
-        </a>
-      </li>
-      <li class="nav-item">
-        <a class="nav-link" :class="{ active: tab === 'activity' }" href="#" @click.prevent="switchToActivity">
-          Activité de connexion
         </a>
       </li>
       <li class="nav-item" v-if="isAdmin">
@@ -98,49 +93,6 @@
 
         <div v-if="error" class="alert alert-danger mt-3" role="alert">{{ error }}</div>
         <div v-if="success" class="alert alert-success mt-3" role="alert">{{ success }}</div>
-      </div>
-    </div>
-
-    <!-- Activity Tab -->
-    <div v-if="tab === 'activity'">
-      <div class="card">
-        <div class="card-header d-flex align-items-center justify-content-between">
-          <div class="card-title">Dernières connexions</div>
-          <button class="btn btn-sm btn-outline-secondary" @click="loadLoginEvents" :disabled="activityLoading">
-            <svg v-if="!activityLoading" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="me-1"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
-            <span v-if="activityLoading" class="spinner-border spinner-border-sm me-1"></span>
-            Actualiser
-          </button>
-        </div>
-        <div class="card-body p-0">
-          <div v-if="activityLoading && !loginEvents.length" class="text-center py-4 text-secondary">Chargement…</div>
-          <div v-else-if="!loginEvents.length" class="text-center py-4 text-secondary">Aucun événement de connexion trouvé.</div>
-          <div v-else class="table-responsive">
-            <table class="table table-vcenter table-hover card-table mb-0">
-              <thead>
-                <tr>
-                  <th>Date / heure</th>
-                  <th>Adresse IP</th>
-                  <th>Résultat</th>
-                  <th>User agent</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="evt in loginEvents" :key="evt.id">
-                  <td class="text-secondary small text-nowrap">{{ formatDate(evt.created_at) }}</td>
-                  <td class="text-monospace small">{{ evt.ip_address || '—' }}</td>
-                  <td>
-                    <span v-if="evt.success" class="badge bg-green-lt text-green">Succès</span>
-                    <span v-else class="badge bg-red-lt text-red">Échec</span>
-                  </td>
-                  <td class="text-secondary small" style="max-width:300px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" :title="evt.user_agent">
-                    {{ evt.user_agent || '—' }}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
       </div>
     </div>
 
@@ -241,7 +193,6 @@
 import { ref, computed, onMounted } from 'vue'
 import apiClient from '../api'
 import { useAuthStore } from '../stores/auth'
-import { formatDateTime as formatDate } from '../utils/formatters'
 
 const auth = useAuthStore()
 const isAdmin = computed(() => auth.user?.role === 'admin')
@@ -260,10 +211,6 @@ const error = ref('')
 const success = ref('')
 const copiedBackup = ref(false)
 
-// Activity state
-const loginEvents = ref([])
-const activityLoading = ref(false)
-
 // Threats state
 const security = ref({ stats_24h: null, blocked_ips: [], top_failed_ips: [] })
 const threatsLoading = ref(false)
@@ -278,18 +225,6 @@ async function loadStatus() {
   }
 }
 
-async function loadLoginEvents() {
-  activityLoading.value = true
-  try {
-    const res = await apiClient.getLoginEvents()
-    loginEvents.value = res.data?.events || []
-  } catch (e) {
-    loginEvents.value = []
-  } finally {
-    activityLoading.value = false
-  }
-}
-
 async function loadSecurity() {
   threatsLoading.value = true
   try {
@@ -300,11 +235,6 @@ async function loadSecurity() {
   } finally {
     threatsLoading.value = false
   }
-}
-
-function switchToActivity() {
-  tab.value = 'activity'
-  if (!loginEvents.value.length) loadLoginEvents()
 }
 
 function switchToThreats() {
