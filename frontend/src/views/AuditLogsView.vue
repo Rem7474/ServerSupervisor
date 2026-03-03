@@ -312,7 +312,7 @@ const totalCmdsPages = computed(() => Math.max(1, Math.ceil(cmdsTotal.value / cm
 
 // Log viewer
 const selectedCmd = ref(null)
-const showLogViewer = ref(true)
+const showLogViewer = ref(false)
 const liveOutput = ref('')
 const logViewerEl = ref(null)
 let streamWs = null
