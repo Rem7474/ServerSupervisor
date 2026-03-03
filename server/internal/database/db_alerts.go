@@ -51,7 +51,7 @@ func (db *DB) GetAlertRules() ([]models.AlertRule, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var rules []models.AlertRule
 	for rows.Next() {
@@ -139,7 +139,7 @@ func (db *DB) GetAlertIncidents(limit, offset int) ([]models.AlertIncident, erro
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var incidents []models.AlertIncident
 	for rows.Next() {

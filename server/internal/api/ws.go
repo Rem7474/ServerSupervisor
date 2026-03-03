@@ -129,7 +129,7 @@ func (h *WSHandler) Dashboard(c *gin.Context) {
 	if err != nil {
 		return
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	if !h.authenticateWS(conn) {
 		return
@@ -168,7 +168,7 @@ func (h *WSHandler) HostDetail(c *gin.Context) {
 	if err != nil {
 		return
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	if !h.authenticateWS(conn) {
 		return
@@ -201,7 +201,7 @@ func (h *WSHandler) Docker(c *gin.Context) {
 	if err != nil {
 		return
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	if !h.authenticateWS(conn) {
 		return
@@ -234,7 +234,7 @@ func (h *WSHandler) Network(c *gin.Context) {
 	if err != nil {
 		return
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	if !h.authenticateWS(conn) {
 		return
@@ -267,7 +267,7 @@ func (h *WSHandler) Apt(c *gin.Context) {
 	if err != nil {
 		return
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	if !h.authenticateWS(conn) {
 		return

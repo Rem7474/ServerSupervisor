@@ -159,7 +159,7 @@ func (db *DB) GetDockerNetworksByHost(hostID string) ([]models.DockerNetwork, er
 		if err := rows.Scan(&n.ID, &n.HostID, &n.NetworkID, &n.Name, &n.Driver, &n.Scope, &containerIDsJSON, &n.UpdatedAt); err != nil {
 			continue
 		}
-		json.Unmarshal(containerIDsJSON, &n.ContainerIDs)
+		_ = json.Unmarshal(containerIDsJSON, &n.ContainerIDs)
 		networks = append(networks, n)
 	}
 	return networks, nil
@@ -182,7 +182,7 @@ func (db *DB) GetAllDockerNetworks() ([]models.DockerNetwork, error) {
 		if err := rows.Scan(&n.ID, &n.HostID, &n.NetworkID, &n.Name, &n.Driver, &n.Scope, &containerIDsJSON, &n.UpdatedAt); err != nil {
 			continue
 		}
-		json.Unmarshal(containerIDsJSON, &n.ContainerIDs)
+		_ = json.Unmarshal(containerIDsJSON, &n.ContainerIDs)
 		networks = append(networks, n)
 	}
 	return networks, nil
@@ -210,7 +210,7 @@ func (db *DB) GetAllContainerEnvs() ([]models.ContainerEnv, error) {
 		if err := rows.Scan(&env.ContainerName, &envVarsJSON); err != nil {
 			continue
 		}
-		json.Unmarshal([]byte(envVarsJSON), &env.EnvVars)
+		_ = json.Unmarshal([]byte(envVarsJSON), &env.EnvVars)
 		envs = append(envs, env)
 	}
 	return envs, nil

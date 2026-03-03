@@ -91,7 +91,7 @@ func (db *DB) GetTrackedRepos() ([]models.TrackedRepo, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var repos []models.TrackedRepo
 	for rows.Next() {
