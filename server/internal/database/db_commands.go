@@ -61,7 +61,7 @@ func (db *DB) GetPendingRemoteCommands(hostID string) ([]models.PendingCommand, 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var cmds []models.PendingCommand
 	for rows.Next() {
@@ -118,7 +118,7 @@ func (db *DB) GetRemoteCommandsByHostAndModule(hostID, module string, limit int)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var cmds []models.RemoteCommand
 	for rows.Next() {
@@ -149,7 +149,7 @@ func (db *DB) GetRecentCommandsByHost(hostID string, limit int) ([]models.Remote
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var cmds []models.RemoteCommand
 	for rows.Next() {
@@ -192,7 +192,7 @@ func (db *DB) GetAllRemoteCommands(limit, offset int) ([]RemoteCommandWithHost, 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var result []RemoteCommandWithHost
 	for rows.Next() {
@@ -262,7 +262,7 @@ func (db *DB) GetRecentNotifications(limit int) ([]models.NotificationItem, erro
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var items []models.NotificationItem
 	for rows.Next() {
@@ -298,7 +298,7 @@ func (db *DB) CleanupStalledCommands(timeoutMinutes int) error {
 	if err != nil {
 		return fmt.Errorf("failed to cleanup stalled commands: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var auditIDs []int64
 	count := 0
@@ -340,7 +340,7 @@ func (db *DB) CleanupHostStalledCommands(hostID string, timeoutMinutes int) erro
 	if err != nil {
 		return fmt.Errorf("failed to cleanup host stalled commands: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var auditIDs []int64
 	count := 0
