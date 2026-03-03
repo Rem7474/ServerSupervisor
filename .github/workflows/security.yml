@@ -39,6 +39,7 @@ jobs:
       - name: Install govulncheck
         run: go install golang.org/x/vuln/cmd/govulncheck@latest
       - name: Tidy Go modules
+        working-directory: server
         run: go mod tidy
   govulncheck-agent:
     name: govulncheck (agent)
