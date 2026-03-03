@@ -22,13 +22,13 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version-file: agent/go.mod
           cache: true
@@ -74,7 +74,7 @@ jobs:
 
       # Linter avec warnings uniquement (ne bloque pas le build)
       - name: Run linter (warnings only)
-        uses: golangci/golangci-lint-action@v4
+        uses: golangci/golangci-lint-action@v9
         with:
           version: latest
           working-directory: agent
@@ -82,7 +82,7 @@ jobs:
         continue-on-error: true
 
       - name: Upload coverage
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         if: always()
         with:
           file: ./agent/coverage.out
