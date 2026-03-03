@@ -324,7 +324,7 @@ func (n *notifier) sendSMTP(cfg *config.Config, from, to, subject, body string) 
 		log.Printf("Alerts: SMTP dial failed: %v", err)
 		return
 	}
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 
 	if cfg.SMTPTLS {
 		_ = c.StartTLS(&tls.Config{ServerName: cfg.SMTPHost})

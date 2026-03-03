@@ -636,7 +636,7 @@ func (h *AuthHandler) RevokeAllSessions(c *gin.Context) {
 	var req struct {
 		RefreshToken string `json:"refresh_token"`
 	}
-	c.ShouldBindJSON(&req)
+	_ = c.ShouldBindJSON(&req)
 	currentHash := hashToken(req.RefreshToken)
 	_ = h.db.RevokeAllOtherSessions(username, currentHash)
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})

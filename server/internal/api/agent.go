@@ -43,7 +43,7 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 	}
 
 	// Update host status
-	h.db.UpdateHostStatus(hostID, "online")
+	_ = h.db.UpdateHostStatus(hostID, "online")
 
 	// Cleanup any stalled commands for this host (in case agent restarted)
 	if err := h.db.CleanupHostStalledCommands(hostID, 60); err != nil {

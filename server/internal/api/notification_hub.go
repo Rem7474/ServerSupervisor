@@ -41,7 +41,7 @@ func (h *NotificationHub) Broadcast(payload interface{}) {
 
 	for _, conn := range conns {
 		if err := conn.WriteJSON(payload); err != nil {
-			conn.Close()
+			_ = conn.Close()
 			h.Unregister(conn)
 		}
 	}

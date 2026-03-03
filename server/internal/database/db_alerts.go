@@ -84,7 +84,7 @@ func (db *DB) GetAlertRules() ([]models.AlertRule, error) {
 			r.UpdatedAt = &updatedAt.Time
 		}
 		if len(actionsJSON) > 0 {
-			json.Unmarshal(actionsJSON, &r.Actions)
+			_ = json.Unmarshal(actionsJSON, &r.Actions)
 		}
 		if r.Actions.Channels == nil {
 			r.Actions.Channels = []string{}

@@ -77,10 +77,10 @@ func (db *DB) GetDockerContainers(hostID string) ([]models.DockerContainer, erro
 			&c.NetRxBytes, &c.NetTxBytes, &c.UpdatedAt); err != nil {
 			continue
 		}
-		json.Unmarshal([]byte(labelsJSON), &c.Labels)
-		json.Unmarshal([]byte(envVarsJSON), &c.EnvVars)
-		json.Unmarshal([]byte(volumesJSON), &c.Volumes)
-		json.Unmarshal([]byte(networksJSON), &c.Networks)
+		_ = json.Unmarshal([]byte(labelsJSON), &c.Labels)
+		_ = json.Unmarshal([]byte(envVarsJSON), &c.EnvVars)
+		_ = json.Unmarshal([]byte(volumesJSON), &c.Volumes)
+		_ = json.Unmarshal([]byte(networksJSON), &c.Networks)
 		containers = append(containers, c)
 	}
 	return containers, nil
@@ -110,10 +110,10 @@ func (db *DB) GetAllDockerContainers() ([]models.DockerContainer, error) {
 			&c.NetRxBytes, &c.NetTxBytes, &c.UpdatedAt); err != nil {
 			continue
 		}
-		json.Unmarshal([]byte(labelsJSON), &c.Labels)
-		json.Unmarshal([]byte(envVarsJSON), &c.EnvVars)
-		json.Unmarshal([]byte(volumesJSON), &c.Volumes)
-		json.Unmarshal([]byte(networksJSON), &c.Networks)
+		_ = json.Unmarshal([]byte(labelsJSON), &c.Labels)
+		_ = json.Unmarshal([]byte(envVarsJSON), &c.EnvVars)
+		_ = json.Unmarshal([]byte(volumesJSON), &c.Volumes)
+		_ = json.Unmarshal([]byte(networksJSON), &c.Networks)
 		containers = append(containers, c)
 	}
 	return containers, nil

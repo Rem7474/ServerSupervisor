@@ -15,7 +15,7 @@ func (db *DB) UpsertComposeProjects(hostID string, projects []models.ComposeProj
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	// Delete existing projects for this host
 	if _, err := tx.Exec("DELETE FROM compose_projects WHERE host_id = $1", hostID); err != nil {
@@ -51,7 +51,7 @@ func (db *DB) GetComposeProjectsByHost(hostID string) ([]models.ComposeProject, 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	return scanComposeProjects(rows)
 }
 
@@ -67,7 +67,7 @@ func (db *DB) GetAllComposeProjects() ([]models.ComposeProject, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	return scanComposeProjects(rows)
 }
 

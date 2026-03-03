@@ -157,7 +157,7 @@ func (h *SettingsHandler) TestSmtp(c *gin.Context) {
 		client, err = smtp.Dial(addr)
 		if err == nil && h.cfg.SMTPTLS {
 			if err = client.StartTLS(tlsConfig); err != nil {
-				client.Close()
+				_ = client.Close()
 				c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("STARTTLS failed: %v", err)})
 				return
 			}
@@ -167,7 +167,7 @@ func (h *SettingsHandler) TestSmtp(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("SMTP connection failed: %v", err)})
 		return
 	}
-	defer client.Close()
+	defer func() { _ = client.Close() }()
 
 	if h.cfg.SMTPUser != "" && h.cfg.SMTPPass != "" {
 		auth := smtp.PlainAuth("", h.cfg.SMTPUser, h.cfg.SMTPPass, h.cfg.SMTPHost)
@@ -189,14 +189,14 @@ func (h *SettingsHandler) TestSmtp(c *gin.Context) {
 		}
 		wc, err := client.Data()
 		if err == nil {
-			fmt.Fprintf(wc, "From: %s\r\nTo: %s\r\nSubject: ServerSupervisor - Test SMTP\r\n\r\nConfiguration SMTP valide.\r\n", h.cfg.SMTPFrom, h.cfg.SMTPTo)
-			wc.Close()
+			_, _ = fmt.Fprintf(wc, "From: %s\r\nTo: %s\r\nSubject: ServerSupervisor - Test SMTP\r\n\r\nConfiguration SMTP valide.\r\n", h.cfg.SMTPFrom, h.cfg.SMTPTo)
+			_ = wc.Close()
 		}
 		c.JSON(http.StatusOK, gin.H{"success": true, "message": fmt.Sprintf("Email test sent to %s", h.cfg.SMTPTo)})
 		return
 	}
 
-	client.Quit()
+	_ = client.Quit()
 	c.JSON(http.StatusOK, gin.H{"success": true, "message": "SMTP connection and auth successful"})
 }
 
@@ -233,7 +233,7 @@ func (h *SettingsHandler) TestNtfy(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to send notification: %v", err)})
 		return
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("ntfy.sh returned status %d", resp.StatusCode)})

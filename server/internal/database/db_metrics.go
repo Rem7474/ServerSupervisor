@@ -186,7 +186,7 @@ func (db *DB) CleanOldMetrics(retentionDays int) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	rawResult, err := tx.Exec(
 		`DELETE FROM system_metrics WHERE timestamp < NOW() - INTERVAL '1 day' * $1`,

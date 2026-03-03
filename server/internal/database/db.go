@@ -33,7 +33,7 @@ func EnsureDatabaseExists(cfg *config.Config) error {
 	if err != nil {
 		return fmt.Errorf("failed to connect to postgres database: %w", err)
 	}
-	defer tempConn.Close()
+	defer func() { _ = tempConn.Close() }()
 
 	if err := tempConn.Ping(); err != nil {
 		return fmt.Errorf("failed to ping postgres database: %w", err)
@@ -165,7 +165,7 @@ func splitSQLStatements(sql string) []string {
 			inSingleQuote = !inSingleQuote
 			cur.WriteByte(ch)
 			// Handle escaped quote '' inside a string.
-			if inSingleQuote == false && i+1 < len(sql) && sql[i+1] == '\'' {
+			if !inSingleQuote && i+1 < len(sql) && sql[i+1] == '\'' {
 				inSingleQuote = true
 			}
 			continue

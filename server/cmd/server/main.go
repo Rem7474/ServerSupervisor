@@ -42,7 +42,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// Cleanup stalled commands at startup (commands older than 10 minutes)
 	if err := db.CleanupStalledCommands(10); err != nil {

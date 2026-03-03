@@ -81,7 +81,7 @@ func (h *CommandStreamHub) BroadcastStatus(commandID, status, output string) {
 			payload["output"] = output
 		}
 		if err := conn.WriteJSON(payload); err != nil {
-			conn.Close()
+			_ = conn.Close()
 			go h.Unregister(commandID, conn)
 		}
 	}
@@ -103,7 +103,7 @@ func (h *CommandStreamHub) runBroadcast(commandID string) {
 				"chunk":      logChunk,
 			}
 			if err := conn.WriteJSON(payload); err != nil {
-				conn.Close()
+				_ = conn.Close()
 				go h.Unregister(commandID, conn)
 			}
 		}

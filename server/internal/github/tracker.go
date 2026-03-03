@@ -73,7 +73,7 @@ func (t *Tracker) checkAllRepos() {
 			log.Printf("GitHub tracker: new release for %s/%s: %s (was %s)",
 				repo.Owner, repo.Repo, release.TagName, repo.LatestVersion)
 
-			t.db.UpdateTrackedRepo(repo.ID, release.TagName, release.HTMLURL, release.PublishedAt)
+			_ = t.db.UpdateTrackedRepo(repo.ID, release.TagName, release.HTMLURL, release.PublishedAt)
 		}
 	}
 }
@@ -96,7 +96,7 @@ func (t *Tracker) getLatestRelease(owner, repo string) (*models.GitHubRelease, e
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusNotFound {
 		// Try tags instead (some repos don't use releases)
@@ -133,7 +133,7 @@ func (t *Tracker) getLatestTag(owner, repo string) (*models.GitHubRelease, error
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("GitHub API returned status %d", resp.StatusCode)

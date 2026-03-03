@@ -97,7 +97,7 @@ func (s *Sender) SendReport(ctx context.Context, report *Report) (*ReportRespons
 	if err != nil {
 		return nil, fmt.Errorf("failed to send report: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, _ := io.ReadAll(resp.Body)
 
@@ -162,7 +162,7 @@ func (s *Sender) ReportCommandResult(ctx context.Context, result *CommandResult)
 	if err != nil {
 		return fmt.Errorf("failed to send command result: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
@@ -203,7 +203,7 @@ func (s *Sender) StreamCommandChunk(ctx context.Context, commandID string, chunk
 		log.Printf("Failed to stream chunk for command #%s: %v", commandID, err)
 		return nil
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		log.Printf("Server returned status %d when streaming chunk", resp.StatusCode)
@@ -240,7 +240,7 @@ func (s *Sender) SendAuditLog(ctx context.Context, module, action, status, detai
 	if err != nil {
 		return fmt.Errorf("failed to send audit log: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
 		// Log but don't fail - audit logging is best-effort

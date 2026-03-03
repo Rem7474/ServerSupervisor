@@ -98,7 +98,7 @@ func (db *DB) GetMetricsAggregates(hostID string, aggregationType string, limit 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var aggs []models.MetricsAggregate
 	for rows.Next() {

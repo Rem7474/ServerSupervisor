@@ -321,7 +321,7 @@ func (h *WSHandler) CommandStream(c *gin.Context) {
 
 	// Send initial status from unified remote_commands table (UUID — no ParseInt needed)
 	if cmd, err := h.db.GetRemoteCommandByID(commandID); err == nil {
-		conn.WriteJSON(gin.H{
+		_ = conn.WriteJSON(gin.H{
 			"type":       "cmd_stream_init",
 			"command_id": commandID,
 			"status":     cmd.Status,
