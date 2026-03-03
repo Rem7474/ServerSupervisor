@@ -71,6 +71,7 @@ jobs:
   nancy-server:
     name: nancy (server)
     runs-on: ubuntu-latest
+    environment: Action
 
     steps:
       - uses: actions/checkout@v6
@@ -86,11 +87,12 @@ jobs:
 
       - name: Run nancy
         working-directory: server
-        run: go list -json -deps ./... | ../nancy sleuth --quiet
+        run: go list -json -deps ./... | ../nancy sleuth --quiet --username "${{ secrets.OSS_INDEX_USER }}" --token "${{ secrets.OSS_INDEX_TOKEN }}"
 
   nancy-agent:
     name: nancy (agent)
     runs-on: ubuntu-latest
+    environment: Action
 
     steps:
       - uses: actions/checkout@v6
@@ -106,7 +108,7 @@ jobs:
 
       - name: Run nancy
         working-directory: agent
-        run: go list -json -deps ./... | ../nancy sleuth --quiet
+        run: go list -json -deps ./... | ../nancy sleuth --quiet --username "${{ secrets.OSS_INDEX_USER }}" --token "${{ secrets.OSS_INDEX_TOKEN }}"
 
   # ─────────────────────────────────────────
   # Audit npm
