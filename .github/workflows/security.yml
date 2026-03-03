@@ -82,7 +82,7 @@ jobs:
           cache-dependency-path: server/go.sum
 
       - name: Install nancy
-        run: curl -L -o nancy https://github.com/sonatype-nexus-community/nancy/releases/latest/download/nancy-linux-amd64 && chmod +x nancy
+        run: curl -L -o nancy https://github.com/sonatype-nexus-community/nancy/releases/download/v1.2.0/nancy-v1.2.0-linux-amd64 && chmod +x nancy
 
       - name: Run nancy
         working-directory: server
@@ -102,7 +102,7 @@ jobs:
           cache-dependency-path: agent/go.sum
 
       - name: Install nancy
-        run: curl -L -o nancy https://github.com/sonatype-nexus-community/nancy/releases/latest/download/nancy-linux-amd64 && chmod +x nancy
+        run: curl -L -o nancy https://github.com/sonatype-nexus-community/nancy/releases/download/v1.2.0/nancy-v1.2.0-linux-amd64 && chmod +x nancy
 
       - name: Run nancy
         working-directory: agent
