@@ -3,6 +3,7 @@
     <div class="page-header d-flex flex-column flex-md-row align-items-md-center
                 justify-content-between gap-3 mb-4">
       <div>
+        <div class="page-pretitle">ServerSupervisor</div>
         <h2 class="page-title">Dashboard</h2>
         <div class="text-secondary">Vue d'ensemble de l'infrastructure</div>
       </div>
@@ -476,9 +477,6 @@ async function sendBulkApt(command) {
   }
 }
 
-function formatDate(date) {
-  return dayjs.utc(date).local().fromNow()
-}
 
 function formatUptime(seconds) {
   if (!seconds) return 'N/A'
