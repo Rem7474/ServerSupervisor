@@ -1,6 +1,8 @@
 module github.com/serversupervisor/server
 
-go 1.25.0
+go 1.25.7
+
+toolchain go1.25.7
 
 require (
 	github.com/gin-gonic/gin v1.12.0
