@@ -37,6 +37,12 @@
           <span v-if="myCommands.length" class="badge bg-azure-lt text-azure ms-1">{{ myCommands.length }}</span>
         </button>
       </li>
+      <li class="nav-item">
+        <button class="nav-link" :class="{ active: activeTab === 'connexions' }" @click="switchToConnexions">
+          Connexions
+          <span v-if="loginEvents.length" class="badge bg-secondary-lt text-secondary ms-1">{{ loginEvents.length }}</span>
+        </button>
+      </li>
     </ul>
 
     <!-- ── Onglet Profil ── -->
@@ -279,6 +285,53 @@
       </div>
     </div>
 
+    <!-- ── Onglet Connexions ── -->
+    <div v-show="activeTab === 'connexions'">
+      <div class="card">
+        <div class="card-header d-flex align-items-center justify-content-between">
+          <h3 class="card-title mb-0">
+            <svg class="icon me-2" width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/>
+            </svg>
+            Activité de connexion
+          </h3>
+          <span v-if="loginEvents.length" class="badge bg-secondary-lt text-secondary">{{ loginEvents.length }}</span>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-vcenter card-table">
+            <thead>
+              <tr>
+                <th>Date / Heure</th>
+                <th>IP</th>
+                <th>Navigateur</th>
+                <th>OS</th>
+                <th>Statut</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-if="loginEventsLoading">
+                <td colspan="5" class="text-center text-secondary py-3">Chargement...</td>
+              </tr>
+              <tr v-else-if="!loginEvents.length">
+                <td colspan="5" class="text-center text-secondary py-4">Aucune connexion enregistrée</td>
+              </tr>
+              <tr v-for="ev in loginEvents" :key="ev.id">
+                <td class="text-secondary small">{{ formatDateTime(ev.created_at) }}</td>
+                <td class="text-secondary small font-monospace">{{ ev.ip_address }}</td>
+                <td class="text-secondary small">{{ parseUA(ev.user_agent).browser }}</td>
+                <td class="text-secondary small">{{ parseUA(ev.user_agent).os }}</td>
+                <td>
+                  <span class="badge" :class="ev.success ? 'bg-green-lt text-green' : 'bg-red-lt text-red'">
+                    {{ ev.success ? 'Succès' : 'Échec' }}
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
     <!-- Bouton réafficher console (onglet Historique uniquement) -->
     <button
       v-show="activeTab === 'historique' && !showConsole"
@@ -323,6 +376,11 @@ const myCommands = computed(() =>
   allCommands.value.filter(c => c.triggered_by === auth.username).slice(0, 50)
 )
 
+// Login events
+const loginEvents = ref([])
+const loginEventsLoading = ref(false)
+const loginEventsLoaded = ref(false)
+
 // Log viewer
 const selectedCmd = ref(null)
 const liveOutput = ref('')
@@ -362,6 +420,20 @@ function statusClass(status) {
   if (status === 'completed') return 'badge bg-green-lt text-green'
   if (status === 'failed') return 'badge bg-red-lt text-red'
   return 'badge bg-yellow-lt text-yellow'
+}
+
+function parseUA(ua) {
+  if (!ua) return { browser: '—', os: '—' }
+  const browser = ua.includes('Firefox/') ? 'Firefox'
+    : ua.includes('Edg/') ? 'Edge'
+    : ua.includes('Chrome/') ? 'Chrome'
+    : ua.includes('Safari/') ? 'Safari' : 'Other'
+  const os = ua.includes('Windows') ? 'Windows'
+    : ua.includes('Mac OS X') ? 'macOS'
+    : ua.includes('Android') ? 'Android'
+    : (ua.includes('iPhone') || ua.includes('iPad')) ? 'iOS'
+    : ua.includes('Linux') ? 'Linux' : 'Other'
+  return { browser, os }
 }
 
 function renderOutput(raw) {
@@ -465,6 +537,24 @@ async function loadMyCommands() {
 function switchToHistorique() {
   activeTab.value = 'historique'
   if (!allCommands.value.length && !cmdsLoading.value) loadMyCommands()
+}
+
+async function loadLoginEvents() {
+  loginEventsLoading.value = true
+  try {
+    const res = await apiClient.getLoginEvents()
+    loginEvents.value = res.data?.events || []
+    loginEventsLoaded.value = true
+  } catch {
+    loginEvents.value = []
+  } finally {
+    loginEventsLoading.value = false
+  }
+}
+
+function switchToConnexions() {
+  activeTab.value = 'connexions'
+  if (!loginEventsLoaded.value) loadLoginEvents()
 }
 
 onMounted(() => {
