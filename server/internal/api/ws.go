@@ -309,7 +309,7 @@ func (h *WSHandler) CommandStream(c *gin.Context) {
 	}
 	defer func() {
 		h.streamHub.Unregister(commandID, conn)
-		conn.Close()
+		_ = conn.Close()
 	}()
 
 	if !h.authenticateWS(conn) {
@@ -345,7 +345,7 @@ func (h *WSHandler) NotificationStream(c *gin.Context) {
 	}
 	defer func() {
 		h.notifHub.Unregister(conn)
-		conn.Close()
+		_ = conn.Close()
 	}()
 
 	if !h.authenticateWS(conn) {

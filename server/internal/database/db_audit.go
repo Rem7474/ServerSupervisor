@@ -33,7 +33,7 @@ func (db *DB) GetAuditLogs(limit, offset int) ([]models.AuditLog, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var logs []models.AuditLog
 	for rows.Next() {
@@ -61,7 +61,7 @@ func (db *DB) GetAuditLogsByHost(hostID string, limit int) ([]models.AuditLog, e
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var logs []models.AuditLog
 	for rows.Next() {
@@ -89,7 +89,7 @@ func (db *DB) GetAuditLogsByUser(username string, limit int) ([]models.AuditLog,
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var logs []models.AuditLog
 	for rows.Next() {

@@ -37,7 +37,7 @@ func (db *DB) GetNetworkTopologyConfig() (*models.NetworkTopologyConfig, error) 
 		return nil, err
 	}
 	if len(excludedPortsJSON) > 0 {
-		json.Unmarshal(excludedPortsJSON, &cfg.ExcludedPorts)
+		_ = json.Unmarshal(excludedPortsJSON, &cfg.ExcludedPorts)
 	}
 	return &cfg, nil
 }

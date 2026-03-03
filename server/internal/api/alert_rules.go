@@ -63,7 +63,7 @@ func scanAlertRule(row interface {
 		rule.UpdatedAt = &updatedAt.Time
 	}
 	if len(actionsJSON) > 0 {
-		json.Unmarshal(actionsJSON, &rule.Actions)
+		_ = json.Unmarshal(actionsJSON, &rule.Actions)
 	}
 	if rule.Actions.Channels == nil {
 		rule.Actions.Channels = []string{}
