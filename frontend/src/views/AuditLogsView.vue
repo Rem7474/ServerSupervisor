@@ -2,6 +2,11 @@
   <div>
     <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
       <div>
+        <div class="page-pretitle">
+          <router-link to="/" class="text-decoration-none">Dashboard</router-link>
+          <span class="text-muted mx-1">/</span>
+          <span>Audit</span>
+        </div>
         <h2 class="page-title">Audit</h2>
         <div class="text-secondary">Historique des actions, connexions et commandes</div>
       </div>
@@ -25,78 +30,89 @@
     </ul>
 
     <!-- ── Commandes tab ────────────────────────────────────────────────────── -->
-    <div v-show="activeTab === 'commandes'">
-      <div class="card mb-3">
-        <div class="table-responsive">
-          <table class="table table-vcenter card-table">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Hôte</th>
-                <th>Type</th>
-                <th>Commande</th>
-                <th>Utilisateur</th>
-                <th>Statut</th>
-                <th>Durée</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-if="cmdsLoading">
-                <td colspan="8" class="text-center text-secondary py-3">Chargement...</td>
-              </tr>
-              <tr v-else-if="!cmds.length">
-                <td colspan="8" class="text-center text-secondary py-4">Aucune commande enregistrée</td>
-              </tr>
-              <tr
-                v-for="cmd in cmds"
-                :key="cmd.id"
-                :class="{ 'table-active': selectedCmd?.id === cmd.id }"
-              >
-                <td class="text-secondary small">{{ formatDate(cmd.created_at) }}</td>
-                <td>
-                  <router-link :to="`/hosts/${cmd.host_id}`" class="text-decoration-none fw-semibold">
-                    {{ cmd.host_name || cmd.host_id }}
-                  </router-link>
-                </td>
-                <td>
-                  <span :class="moduleClass(cmd.module)">{{ moduleLabel(cmd.module) }}</span>
-                </td>
-                <td>
-                  <code class="small">{{ cmdLabel(cmd) }}</code>
-                </td>
-                <td class="text-secondary small">{{ cmd.triggered_by || '—' }}</td>
-                <td>
-                  <span :class="statusClass(cmd.status)">{{ cmd.status }}</span>
-                </td>
-                <td class="text-secondary small">{{ formatDuration(cmd.started_at, cmd.ended_at) }}</td>
-                <td>
-                  <button
-                    class="btn btn-sm btn-outline-secondary"
-                    @click="openLogViewer(cmd)"
-                    :disabled="!cmd.output && cmd.status === 'pending'"
-                  >Logs</button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <div class="card-footer d-flex align-items-center justify-content-between">
-          <div class="text-secondary small">
-            {{ cmdsTotal }} commande{{ cmdsTotal !== 1 ? 's' : '' }} — page {{ cmdsPage }} / {{ totalCmdsPages }}
+    <div v-show="activeTab === 'commandes'" class="audit-layout">
+      <!-- Left: table -->
+      <div class="audit-main">
+        <div class="card">
+          <div class="table-responsive">
+            <table class="table table-vcenter card-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Hôte</th>
+                  <th>Type</th>
+                  <th>Commande</th>
+                  <th>Utilisateur</th>
+                  <th>Statut</th>
+                  <th>Durée</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-if="cmdsLoading">
+                  <td colspan="8" class="text-center text-secondary py-3">Chargement...</td>
+                </tr>
+                <tr v-else-if="!cmds.length">
+                  <td colspan="8" class="text-center text-secondary py-4">Aucune commande enregistrée</td>
+                </tr>
+                <tr
+                  v-for="cmd in cmds"
+                  :key="cmd.id"
+                  :class="{ 'table-active': selectedCmd?.id === cmd.id }"
+                >
+                  <td class="text-secondary small">{{ formatDate(cmd.created_at) }}</td>
+                  <td>
+                    <router-link :to="`/hosts/${cmd.host_id}`" class="text-decoration-none fw-semibold">
+                      {{ cmd.host_name || cmd.host_id }}
+                    </router-link>
+                  </td>
+                  <td>
+                    <span :class="moduleClass(cmd.module)">{{ moduleLabel(cmd.module) }}</span>
+                  </td>
+                  <td>
+                    <code class="small">{{ cmdLabel(cmd) }}</code>
+                  </td>
+                  <td class="text-secondary small">{{ cmd.triggered_by || '—' }}</td>
+                  <td>
+                    <span :class="statusClass(cmd.status)">{{ cmd.status }}</span>
+                  </td>
+                  <td class="text-secondary small">{{ formatDuration(cmd.started_at, cmd.ended_at) }}</td>
+                  <td>
+                    <button
+                      class="btn btn-sm btn-outline-secondary"
+                      @click="openLogViewer(cmd)"
+                      :disabled="!cmd.output && cmd.status === 'pending'"
+                    >Logs</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
-          <div class="btn-group">
-            <button class="btn btn-outline-secondary" @click="prevCmdsPage" :disabled="cmdsPage <= 1 || cmdsLoading">Précédent</button>
-            <button class="btn btn-outline-secondary" @click="nextCmdsPage" :disabled="cmdsPage >= totalCmdsPages || cmdsLoading">Suivant</button>
+          <div class="card-footer d-flex align-items-center justify-content-between">
+            <div class="text-secondary small">
+              {{ cmdsTotal }} commande{{ cmdsTotal !== 1 ? 's' : '' }} — page {{ cmdsPage }} / {{ totalCmdsPages }}
+            </div>
+            <div class="btn-group">
+              <button class="btn btn-outline-secondary" @click="prevCmdsPage" :disabled="cmdsPage <= 1 || cmdsLoading">Précédent</button>
+              <button class="btn btn-outline-secondary" @click="nextCmdsPage" :disabled="cmdsPage >= totalCmdsPages || cmdsLoading">Suivant</button>
+            </div>
           </div>
         </div>
       </div>
 
-      <!-- Log viewer panel -->
-      <div v-if="selectedCmd">
-        <div v-show="showLogViewer" class="card">
+      <!-- Right: log viewer panel (always in DOM) -->
+      <div v-show="showLogViewer" class="audit-console">
+        <div class="card" style="display: flex; flex-direction: column; height: 100%;">
           <div class="card-header d-flex align-items-center justify-content-between">
-            <h3 class="card-title mb-0">Logs</h3>
+            <h3 class="card-title">
+              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                <path d="M8 9l3 3l-3 3" />
+                <path d="M13 15l3 0" />
+                <path d="M3 4m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z" />
+              </svg>
+              Logs
+            </h3>
             <button class="btn btn-sm btn-ghost-secondary" @click="showLogViewer = false" title="Réduire">
               <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                 <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
@@ -105,47 +121,65 @@
               </svg>
             </button>
           </div>
-          <div class="card-body d-flex flex-column" style="padding: 0;">
-            <div class="px-3 pt-3 pb-2" style="background: #1e293b; border-bottom: 1px solid rgba(255,255,255,0.1);">
-              <div class="d-flex align-items-center gap-3 flex-wrap">
-                <span :class="moduleClass(selectedCmd.module)">{{ moduleLabel(selectedCmd.module) }}</span>
-                <code style="color: #94a3b8;">{{ cmdLabel(selectedCmd) }}</code>
-                <span class="text-secondary small">— {{ selectedCmd.host_name || selectedCmd.host_id }}</span>
-                <span :class="statusClass(selectedCmd.status)">{{ selectedCmd.status }}</span>
+          <div class="card-body d-flex flex-column" style="flex: 1; min-height: 0; padding: 0;">
+            <!-- Empty state -->
+            <div v-if="!selectedCmd" class="d-flex align-items-center justify-content-center flex-fill text-secondary" style="background: #1e293b; border-radius: 0 0 0.5rem 0.5rem;">
+              <div class="text-center p-4">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler mb-2" width="48" height="48" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.5;">
+                  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                  <path d="M8 9l3 3l-3 3" />
+                  <path d="M13 15l3 0" />
+                  <path d="M3 4m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z" />
+                </svg>
+                <div style="opacity: 0.7;">Aucun log sélectionné</div>
+                <div class="small mt-1" style="opacity: 0.5;">Cliquez sur "Logs" pour afficher la sortie</div>
               </div>
             </div>
-            <pre
-              ref="logViewerEl"
-              style="
-                background: #0f172a;
-                color: #e2e8f0;
-                padding: 1rem;
-                margin: 0;
-                max-height: 500px;
-                overflow-y: auto;
-                font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-                font-size: 0.813rem;
-                line-height: 1.5;
-                border-radius: 0 0 0.5rem 0.5rem;
-              "
-            >{{ liveOutput || 'Aucune sortie disponible.' }}</pre>
+            <!-- Active viewer -->
+            <div v-else style="display: flex; flex-direction: column; height: 100%;">
+              <div class="px-3 pt-3 pb-2" style="background: #1e293b; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                  <span :class="moduleClass(selectedCmd.module)">{{ moduleLabel(selectedCmd.module) }}</span>
+                  <code style="color: #94a3b8;">{{ cmdLabel(selectedCmd) }}</code>
+                  <span class="text-secondary small">— {{ selectedCmd.host_name || selectedCmd.host_id }}</span>
+                  <span :class="statusClass(selectedCmd.status)">{{ selectedCmd.status }}</span>
+                </div>
+              </div>
+              <pre
+                ref="logViewerEl"
+                class="mb-0 flex-fill"
+                style="
+                  background: #0f172a;
+                  color: #e2e8f0;
+                  padding: 1rem;
+                  margin: 0;
+                  overflow-y: auto;
+                  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+                  font-size: 0.813rem;
+                  line-height: 1.5;
+                  border-radius: 0 0 0.5rem 0.5rem;
+                "
+              >{{ liveOutput || 'Aucune sortie disponible.' }}</pre>
+            </div>
           </div>
         </div>
-        <button
-          v-show="!showLogViewer"
-          @click="showLogViewer = true"
-          class="btn btn-primary"
-          style="position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 100;"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-            <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-            <path d="M8 9l3 3l-3 3" />
-            <path d="M13 15l3 0" />
-            <path d="M3 4m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z" />
-          </svg>
-          Logs
-        </button>
       </div>
+
+      <!-- Bouton pour réafficher les logs -->
+      <button
+        v-show="!showLogViewer"
+        @click="showLogViewer = true"
+        class="btn btn-primary"
+        style="position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 100;"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+          <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+          <path d="M8 9l3 3l-3 3" />
+          <path d="M13 15l3 0" />
+          <path d="M3 4m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z" />
+        </svg>
+        Logs
+      </button>
     </div>
 
     <!-- ── Connexions tab (admin only) ────────────────────────────────────── -->
@@ -481,3 +515,39 @@ function prevConnexionsPage() {
 onMounted(fetchCmds)
 onUnmounted(() => { if (streamWs) streamWs.close() })
 </script>
+
+<style scoped>
+.audit-layout {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.audit-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.audit-console {
+  width: 38%;
+  min-width: 380px;
+  height: calc(100vh - 160px);
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 1rem;
+}
+
+@media (max-width: 991px) {
+  .audit-layout {
+    flex-direction: column;
+  }
+
+  .audit-console {
+    width: 100%;
+    min-width: 0;
+    height: 60vh;
+    position: static;
+  }
+}
+</style>

@@ -2,6 +2,11 @@
   <div>
     <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
       <div>
+        <div class="page-pretitle">
+          <router-link to="/" class="text-decoration-none">Dashboard</router-link>
+          <span class="text-muted mx-1">/</span>
+          <span>Sécurité</span>
+        </div>
         <h2 class="page-title">Sécurité</h2>
         <div class="text-secondary">MFA, activité de connexion et menaces</div>
       </div>

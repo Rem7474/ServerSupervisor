@@ -1,6 +1,11 @@
 <template>
   <div>
     <div class="page-header mb-4">
+      <div class="page-pretitle">
+        <router-link to="/" class="text-decoration-none">Dashboard</router-link>
+        <span class="text-muted mx-1">/</span>
+        <span>Docker</span>
+      </div>
       <h2 class="page-title">Docker</h2>
       <div class="text-secondary">Vue globale de tous les conteneurs sur l'infrastructure</div>
     </div>
@@ -32,6 +37,8 @@
       </li>
     </ul>
 
+    <div class="docker-layout">
+    <div class="docker-main">
     <!-- ===== TAB CONTENEURS ===== -->
     <div v-if="activeTab === 'containers'">
       <div class="card mb-4">
@@ -301,44 +308,87 @@
         </div>
       </div>
     </div>
+    </div> <!-- end docker-main -->
 
-    <!-- ===== Console Docker Live (partagée entre les tabs) ===== -->
-    <div v-if="dockerLiveCmd" class="card mt-4">
-      <div class="card-header d-flex align-items-center justify-content-between">
-        <h3 class="card-title mb-0">
-          <svg xmlns="http://www.w3.org/2000/svg" class="icon me-2" width="20" height="20" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M8 9l3 3l-3 3" /><path d="M13 15l3 0" /><path d="M3 4m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z" /></svg>
-          Console Live
-        </h3>
-        <button class="btn btn-sm btn-ghost-secondary" @click="closeDockerConsole" title="Fermer">
-          <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M18 6l-12 12" /><path d="M6 6l12 12" /></svg>
-        </button>
-      </div>
-      <div class="card-body d-flex flex-column" style="padding: 0;">
-        <div class="px-3 pt-3 pb-2" style="background: #1e293b; border-bottom: 1px solid rgba(255,255,255,0.1);">
-          <div class="d-flex align-items-start justify-content-between mb-1">
-            <div class="flex-fill" style="min-width: 0;">
-              <div class="fw-semibold text-light" style="font-size: 0.95rem;">{{ dockerLiveCmd.containerName }}</div>
-              <div class="text-secondary small mt-1">
-                <code style="background: rgba(0,0,0,0.3); padding: 0.15rem 0.4rem; border-radius: 0.25rem; color: #94a3b8;">{{ dockerLiveCmd.action }}</code>
+    <!-- ===== Console Docker Live (panel droit) ===== -->
+    <div v-show="showDockerConsole" class="docker-console">
+      <div class="card" style="display: flex; flex-direction: column; height: 100%;">
+        <div class="card-header d-flex align-items-center justify-content-between">
+          <h3 class="card-title">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+              <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+              <path d="M8 9l3 3l-3 3" />
+              <path d="M13 15l3 0" />
+              <path d="M3 4m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z" />
+            </svg>
+            Console Live
+          </h3>
+          <button class="btn btn-sm btn-ghost-secondary" @click="closeDockerConsole" title="Fermer">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+              <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+              <path d="M18 6l-12 12" />
+              <path d="M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div class="card-body d-flex flex-column" style="flex: 1; min-height: 0; padding: 0;">
+          <!-- Empty state -->
+          <div v-if="!dockerLiveCmd" class="d-flex align-items-center justify-content-center flex-fill text-secondary" style="background: #1e293b; border-radius: 0 0 0.5rem 0.5rem;">
+            <div class="text-center p-4">
+              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler mb-2" width="48" height="48" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.5;">
+                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                <path d="M8 9l3 3l-3 3" />
+                <path d="M13 15l3 0" />
+                <path d="M3 4m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z" />
+              </svg>
+              <div style="opacity: 0.7;">Aucune console active</div>
+              <div class="small mt-1" style="opacity: 0.5;">Cliquez sur les boutons logs / action pour afficher la sortie</div>
+            </div>
+          </div>
+          <!-- Active console -->
+          <div v-else style="display: flex; flex-direction: column; height: 100%;">
+            <div class="px-3 pt-3 pb-2" style="background: #1e293b; border-bottom: 1px solid rgba(255,255,255,0.1);">
+              <div class="d-flex align-items-start justify-content-between mb-1">
+                <div class="flex-fill" style="min-width: 0;">
+                  <div class="fw-semibold text-light" style="font-size: 0.95rem;">{{ dockerLiveCmd.containerName }}</div>
+                  <div class="text-secondary small mt-1">
+                    <code style="background: rgba(0,0,0,0.3); padding: 0.15rem 0.4rem; border-radius: 0.25rem; color: #94a3b8;">{{ dockerLiveCmd.action }}</code>
+                  </div>
+                </div>
+                <span class="badge ms-2" :class="{
+                  'bg-yellow-lt text-yellow': dockerLiveCmd.status === 'running' || dockerLiveCmd.status === 'pending',
+                  'bg-green-lt text-green': dockerLiveCmd.status === 'completed',
+                  'bg-red-lt text-red': dockerLiveCmd.status === 'failed'
+                }">{{ dockerLiveCmd.status }}</span>
               </div>
             </div>
-            <span
-              class="badge ms-2"
-              :class="{
-                'bg-yellow-lt text-yellow': dockerLiveCmd.status === 'running' || dockerLiveCmd.status === 'pending',
-                'bg-green-lt text-green': dockerLiveCmd.status === 'completed',
-                'bg-red-lt text-red': dockerLiveCmd.status === 'failed'
-              }"
-            >{{ dockerLiveCmd.status }}</span>
+            <pre
+              ref="dockerConsoleOutput"
+              class="mb-0 flex-fill"
+              style="background:#0f172a;color:#e2e8f0;overflow-y:auto;white-space:pre-wrap;padding:1rem;margin:0;font-family:'Consolas','Monaco','Courier New',monospace;font-size:0.813rem;line-height:1.5;border-radius:0 0 0.5rem 0.5rem;"
+            >{{ dockerConsoleText || '(en attente de sortie...)' }}</pre>
           </div>
         </div>
-        <pre
-          ref="dockerConsoleOutput"
-          class="m-0 font-monospace small flex-fill"
-          style="background:#0f172a;color:#e2e8f0;max-height:400px;min-height:120px;overflow-y:auto;white-space:pre-wrap;padding:1rem;border-radius:0 0 0.5rem 0.5rem;"
-        >{{ dockerConsoleText || '(en attente de sortie...)' }}</pre>
       </div>
     </div>
+
+    </div> <!-- end docker-layout -->
+
+    <!-- Bouton pour réafficher la console Docker -->
+    <button
+      v-show="!showDockerConsole"
+      @click="showDockerConsole = true"
+      class="btn btn-primary"
+      style="position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 100;"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+        <path d="M8 9l3 3l-3 3" />
+        <path d="M13 15l3 0" />
+        <path d="M3 4m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z" />
+      </svg>
+      Console
+    </button>
 
     <!-- Modal conteneur (labels) -->
     <div v-if="selectedContainer" class="modal modal-blur fade show" style="display: block;" @click.self="selectedContainer = null">
@@ -585,6 +635,7 @@ const inspectTarget = ref(null)
 const inspectTab = ref('env')
 
 // Docker console
+const showDockerConsole = ref(false)
 const dockerLiveCmd = ref(null) // { commandId, containerName, action, status }
 const dockerConsoleText = ref('')
 const dockerConsoleOutput = ref(null)
@@ -775,6 +826,7 @@ function connectDockerStream(commandId, containerName, action) {
 
   dockerConsoleText.value = ''
   dockerLiveCmd.value = { commandId, containerName, action, status: 'pending' }
+  showDockerConsole.value = true
 
   const token = auth.token
   const proto = location.protocol === 'https:' ? 'wss' : 'ws'
@@ -837,6 +889,7 @@ function closeDockerConsole() {
   }
   dockerLiveCmd.value = null
   dockerConsoleText.value = ''
+  showDockerConsole.value = false
 }
 
 async function scrollDockerConsole() {
@@ -861,3 +914,39 @@ const { wsStatus, wsError, retryCount, reconnect } = useWebSocket('/api/v1/ws/do
   composeProjects.value = payload.compose_projects || []
 })
 </script>
+
+<style scoped>
+.docker-layout {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.docker-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.docker-console {
+  width: 38%;
+  min-width: 380px;
+  height: calc(100vh - 160px);
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 1rem;
+}
+
+@media (max-width: 991px) {
+  .docker-layout {
+    flex-direction: column;
+  }
+
+  .docker-console {
+    width: 100%;
+    min-width: 0;
+    height: 60vh;
+    position: static;
+  }
+}
+</style>

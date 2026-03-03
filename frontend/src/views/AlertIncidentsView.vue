@@ -5,9 +5,11 @@
         <div class="row g-2 align-items-center">
           <div class="col">
             <div class="page-pretitle">
-              <router-link to="/alerts" class="text-muted text-decoration-none">
-                ← Règles d'alertes
-              </router-link>
+              <router-link to="/" class="text-decoration-none">Dashboard</router-link>
+              <span class="text-muted mx-1">/</span>
+              <router-link to="/alerts" class="text-decoration-none">Alertes</router-link>
+              <span class="text-muted mx-1">/</span>
+              <span>Incidents</span>
             </div>
             <h2 class="page-title">Historique des incidents</h2>
             <div class="text-muted mt-1">Liste des alertes déclenchées sur vos hôtes</div>

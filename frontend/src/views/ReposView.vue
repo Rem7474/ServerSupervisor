@@ -1,6 +1,11 @@
 <template>
   <div>
     <div class="page-header mb-4">
+      <div class="page-pretitle">
+        <router-link to="/" class="text-decoration-none">Dashboard</router-link>
+        <span class="text-muted mx-1">/</span>
+        <span>Dépôts</span>
+      </div>
       <h2 class="page-title">Versions & Repos suivis</h2>
       <div class="text-secondary">Suivre les releases GitHub et comparer avec les images Docker</div>
     </div>

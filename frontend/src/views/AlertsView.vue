@@ -4,15 +4,25 @@
       <div class="container-xl">
         <div class="row g-2 align-items-center">
           <div class="col">
-            <h2 class="page-title">Règles d'Alertes</h2>
-            <div class="text-muted mt-1">Configurez des alertes pour surveiller vos hôtes automatiquement</div>
+            <div class="text-secondary small">
+              <router-link to="/" class="text-decoration-none">Dashboard</router-link>
+              <span class="mx-1">/</span>
+              <span>Alertes</span>
+            </div>
+            <h2 class="page-title">Alertes</h2>
           </div>
-          <div class="col-auto ms-auto">
-            <button @click="startAddAlert" class="btn btn-primary">
+          <div class="col-auto ms-auto d-flex gap-2">
+            <button v-if="alertsTab === 'rules'" @click="startAddAlert" class="btn btn-primary">
               <svg class="icon me-1" width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
               </svg>
               Nouvelle alerte
+            </button>
+            <button v-if="alertsTab === 'incidents'" @click="loadIncidents" class="btn btn-ghost-secondary">
+              <svg class="icon" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+              </svg>
+              Actualiser
             </button>
           </div>
         </div>
@@ -21,7 +31,24 @@
 
     <div class="page-body">
       <div class="container-xl">
-        <!-- Rules Table -->
+        <!-- Tabs -->
+        <ul class="nav nav-tabs mb-4">
+          <li class="nav-item">
+            <a class="nav-link" :class="{ active: alertsTab === 'rules' }" href="#" @click.prevent="alertsTab = 'rules'">
+              Règles
+              <span class="badge bg-azure-lt text-azure ms-1">{{ rules.length }}</span>
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" :class="{ active: alertsTab === 'incidents' }" href="#" @click.prevent="switchToIncidents">
+              Incidents
+              <span v-if="activeIncidentCount > 0" class="badge bg-red-lt text-red ms-1">{{ activeIncidentCount }}</span>
+            </a>
+          </li>
+        </ul>
+
+        <!-- Rules Tab -->
+        <div v-show="alertsTab === 'rules'">
         <div class="card">
           <div class="card-header">
             <h3 class="card-title">Règles actives</h3>
@@ -108,6 +135,67 @@
                 </tr>
               </tbody>
             </table>
+          </div>
+        </div>
+        </div> <!-- end rules tab -->
+
+        <!-- Incidents Tab -->
+        <div v-show="alertsTab === 'incidents'">
+          <div class="card">
+            <div class="card-header d-flex align-items-center justify-content-between">
+              <h3 class="card-title">Incidents récents</h3>
+              <div class="d-flex align-items-center gap-2">
+                <span v-if="activeIncidentCount > 0" class="badge bg-red-lt text-red">{{ activeIncidentCount }} actif{{ activeIncidentCount > 1 ? 's' : '' }}</span>
+                <span class="text-secondary small">{{ incidents.length }} incident{{ incidents.length !== 1 ? 's' : '' }}</span>
+              </div>
+            </div>
+            <div v-if="incidentsLoading" class="card-body text-center py-5">
+              <div class="spinner-border text-primary" role="status"></div>
+              <div class="mt-2 text-muted">Chargement...</div>
+            </div>
+            <div v-else-if="incidentsError" class="card-body text-center py-5 text-danger">{{ incidentsError }}</div>
+            <div v-else-if="incidents.length === 0" class="card-body text-center py-5 text-muted">
+              <svg class="icon icon-lg mb-3" width="48" height="48" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+              </svg>
+              <div>Aucun incident enregistré</div>
+              <div class="text-muted small mt-1">Les incidents apparaîtront ici lorsqu'une règle d'alerte se déclenchera</div>
+            </div>
+            <div v-else class="table-responsive">
+              <table class="table table-vcenter card-table">
+                <thead>
+                  <tr>
+                    <th style="width: 90px;">État</th>
+                    <th>Règle</th>
+                    <th>Hôte</th>
+                    <th>Valeur</th>
+                    <th>Déclenché</th>
+                    <th>Résolu</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="inc in incidents" :key="inc.id">
+                    <td>
+                      <span v-if="inc.resolved_at" class="badge bg-green-lt text-green">Résolu</span>
+                      <span v-else class="badge bg-red-lt text-red">Actif</span>
+                    </td>
+                    <td>
+                      <div class="fw-semibold text-truncate" style="max-width: 220px;" :title="inc.rule_name">{{ inc.rule_name }}</div>
+                      <div class="text-muted small">{{ incidentMetricLabel(inc.metric) }}</div>
+                    </td>
+                    <td>
+                      <router-link :to="`/hosts/${inc.host_id}`" class="text-decoration-none">{{ inc.host_name }}</router-link>
+                    </td>
+                    <td><code>{{ incidentFormatValue(inc.value, inc.metric) }}</code></td>
+                    <td class="text-muted small">{{ formatDate(inc.triggered_at) }}</td>
+                    <td class="text-muted small">
+                      <span v-if="inc.resolved_at">{{ formatDate(inc.resolved_at) }}</span>
+                      <span v-else class="text-secondary">—</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
@@ -381,10 +469,51 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
-import { formatDurationSecs } from '../utils/formatters'
+import { formatDurationSecs, formatDateTime as formatDate } from '../utils/formatters'
 import apiClient from '../api'
 
 const { confirm } = useConfirmDialog()
+
+// Tabs
+const alertsTab = ref('rules')
+
+// Incidents tab state
+const incidents = ref([])
+const incidentsLoading = ref(false)
+const incidentsError = ref('')
+const incidentsLoaded = ref(false)
+
+const activeIncidentCount = computed(() => incidents.value.filter(i => !i.resolved_at).length)
+
+async function loadIncidents() {
+  incidentsLoading.value = true
+  incidentsError.value = ''
+  try {
+    const res = await apiClient.getNotifications()
+    incidents.value = res.data?.notifications || []
+    incidentsLoaded.value = true
+  } catch {
+    incidentsError.value = 'Impossible de charger les incidents'
+  } finally {
+    incidentsLoading.value = false
+  }
+}
+
+async function switchToIncidents() {
+  alertsTab.value = 'incidents'
+  if (!incidentsLoaded.value) await loadIncidents()
+}
+
+function incidentMetricLabel(metric) {
+  const labels = { cpu: 'CPU', cpu_percent: 'CPU', memory: 'RAM', ram_percent: 'RAM', disk: 'Disque', disk_percent: 'Disque', load: 'Load avg', status_offline: 'Statut hôte' }
+  return labels[metric] || metric || ''
+}
+
+function incidentFormatValue(value, metric) {
+  if (metric === 'status_offline') return value === 1 ? 'offline' : 'online'
+  const unit = ['cpu', 'cpu_percent', 'memory', 'ram_percent', 'disk', 'disk_percent'].includes(metric) ? '%' : ''
+  return `${Number(value).toFixed(2)}${unit}`
+}
 
 const rules = ref([])
 const hosts = ref([])
