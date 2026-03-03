@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/lib/pq"
 	"github.com/serversupervisor/server/internal/models"
@@ -354,7 +355,9 @@ func (db *DB) CleanupHostStalledCommands(hostID string, timeoutMinutes int) erro
 		return err
 	}
 	if count > 0 {
-		log.Printf("Cleaned up %d stalled commands for host %s", count, hostID)
+		safeHostID := strings.ReplaceAll(hostID, "\n", "")
+		safeHostID = strings.ReplaceAll(safeHostID, "\r", "")
+		log.Printf("Cleaned up %d stalled commands for host %s", count, safeHostID)
 		if len(auditIDs) > 0 {
 			_, _ = db.conn.Exec(`
 				UPDATE audit_logs SET status = 'failed',
