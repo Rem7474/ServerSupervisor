@@ -119,6 +119,13 @@ export default {
   // Notifications
   getNotifications: () => api.get('/v1/notifications'),
 
+  // Scheduled Tasks
+  getScheduledTasks: (hostId) => api.get(`/v1/hosts/${hostId}/scheduled-tasks`),
+  createScheduledTask: (hostId, payload) => api.post(`/v1/hosts/${hostId}/scheduled-tasks`, payload),
+  updateScheduledTask: (id, payload) => api.put(`/v1/scheduled-tasks/${id}`, payload),
+  deleteScheduledTask: (id) => api.delete(`/v1/scheduled-tasks/${id}`),
+  runScheduledTask: (id) => api.post(`/v1/scheduled-tasks/${id}/run`),
+
   // Settings
   getSettings: () => api.get('/v1/settings'),
   updateSettings: (payload) => api.put('/v1/settings', payload),

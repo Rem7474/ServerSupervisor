@@ -35,6 +35,9 @@ var aptMu sync.Mutex
 // cmdSem limits concurrent non-APT commands to 4 at a time.
 var cmdSem = make(chan struct{}, 4)
 
+// tasksConfig holds custom tasks loaded from the local YAML file at startup.
+var tasksConfig *config.TasksConfig
+
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
@@ -61,6 +64,16 @@ func main() {
 	log.Printf("APT monitoring: %v", cfg.CollectAPT)
 	log.Printf("APT auto-update on start: %v", cfg.AptAutoUpdateOnStart)
 	log.Printf("SMART monitoring: %v", cfg.CollectSMART)
+
+	// Load custom tasks config (tasks.yaml)
+	tc, err := config.LoadTasksConfig()
+	if err != nil {
+		log.Printf("Warning: failed to load tasks config: %v", err)
+		tc = &config.TasksConfig{}
+	} else {
+		log.Printf("Loaded %d custom task(s) from tasks config", len(tc.Tasks))
+	}
+	tasksConfig = tc
 
 	// Create sender
 	s := sender.New(cfg)
@@ -449,6 +462,9 @@ func executeCommand(s *sender.Sender, cmd sender.PendingCommand) {
 			log.Printf("Failed to report processes result: %v", err)
 		}
 
+	case "custom":
+		executeCustomTask(ctx, s, cmd)
+
 	default:
 		log.Printf("Unknown command module: %s", cmd.Module)
 		if err := s.ReportCommandResult(ctx, &sender.CommandResult{
@@ -458,6 +474,108 @@ func executeCommand(s *sender.Sender, cmd sender.PendingCommand) {
 		}); err != nil {
 			log.Printf("Failed to report command result: %v", err)
 		}
+	}
+}
+
+// executeCustomTask runs a task defined in the local tasks.yaml configuration.
+// cmd.Target holds the task ID; the command argv is exec'd directly (no shell).
+func executeCustomTask(ctx context.Context, s *sender.Sender, cmd sender.PendingCommand) {
+	task := tasksConfig.FindTask(cmd.Target)
+	if task == nil {
+		log.Printf("Custom task %q not found in local tasks config", cmd.Target)
+		if err := s.ReportCommandResult(ctx, &sender.CommandResult{
+			CommandID: cmd.ID,
+			Status:    "failed",
+			Output:    fmt.Sprintf("task %q not found in local tasks config (tasks.yaml)", cmd.Target),
+		}); err != nil {
+			log.Printf("Failed to report custom task result: %v", err)
+		}
+		return
+	}
+
+	if err := s.ReportCommandResult(ctx, &sender.CommandResult{
+		CommandID: cmd.ID,
+		Status:    "running",
+	}); err != nil {
+		log.Printf("Failed to report running status: %v", err)
+	}
+
+	timeout := time.Duration(task.Timeout) * time.Second
+	taskCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	// exec.CommandContext with argv — no shell, no injection possible.
+	c := exec.CommandContext(taskCtx, task.Command[0], task.Command[1:]...)
+	stdout, err := c.StdoutPipe()
+	if err != nil {
+		_ = s.ReportCommandResult(ctx, &sender.CommandResult{
+			CommandID: cmd.ID, Status: "failed",
+			Output: fmt.Sprintf("ERROR: %v", err),
+		})
+		return
+	}
+	stderr, err := c.StderrPipe()
+	if err != nil {
+		_ = s.ReportCommandResult(ctx, &sender.CommandResult{
+			CommandID: cmd.ID, Status: "failed",
+			Output: fmt.Sprintf("ERROR: %v", err),
+		})
+		return
+	}
+
+	if err := c.Start(); err != nil {
+		_ = s.ReportCommandResult(ctx, &sender.CommandResult{
+			CommandID: cmd.ID, Status: "failed",
+			Output: fmt.Sprintf("ERROR: failed to start: %v", err),
+		})
+		return
+	}
+
+	var builder strings.Builder
+	streamPipe := func(r interface{ Read([]byte) (int, error) }) {
+		buf := make([]byte, 4096)
+		for {
+			n, readErr := r.Read(buf)
+			if n > 0 {
+				chunk := string(buf[:n])
+				builder.WriteString(chunk)
+				if streamErr := s.StreamCommandChunk(ctx, cmd.ID, chunk); streamErr != nil {
+					log.Printf("Failed to stream custom task chunk: %v", streamErr)
+				}
+			}
+			if readErr != nil {
+				break
+			}
+		}
+	}
+
+	var pipeWg sync.WaitGroup
+	pipeWg.Add(2)
+	go func() { defer pipeWg.Done(); streamPipe(stdout) }()
+	go func() { defer pipeWg.Done(); streamPipe(stderr) }()
+	pipeWg.Wait()
+
+	waitErr := c.Wait()
+	status := "completed"
+	output := builder.String()
+	if waitErr != nil {
+		status = "failed"
+		if taskCtx.Err() == context.DeadlineExceeded {
+			output += fmt.Sprintf("\nERROR: task timed out after %ds", task.Timeout)
+		} else {
+			output += fmt.Sprintf("\nERROR: %v", waitErr)
+		}
+		log.Printf("Custom task %q failed: %v", task.ID, waitErr)
+	} else {
+		log.Printf("Custom task %q completed", task.ID)
+	}
+
+	if err := s.ReportCommandResult(ctx, &sender.CommandResult{
+		CommandID: cmd.ID,
+		Status:    status,
+		Output:    output,
+	}); err != nil {
+		log.Printf("Failed to report custom task result: %v", err)
 	}
 }
 

@@ -14,6 +14,7 @@ import (
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/github"
+	"github.com/serversupervisor/server/internal/scheduler"
 )
 
 func main() {
@@ -64,6 +65,11 @@ func main() {
 			log.Printf("Warning: failed to set must_change_password for admin: %v", err)
 		}
 	}
+
+	// Start task scheduler
+	sched := scheduler.New(db)
+	sched.Start()
+	defer sched.Stop()
 
 	// Start GitHub release tracker
 	tracker := github.NewTracker(db, cfg)
@@ -140,7 +146,7 @@ func main() {
 	}()
 
 	// Setup router
-	router := api.SetupRouter(db, cfg, notifHub)
+	router := api.SetupRouter(db, cfg, notifHub, sched)
 
 	// Start server
 	srv := &http.Server{

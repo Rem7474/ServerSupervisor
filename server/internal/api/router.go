@@ -4,9 +4,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/database"
+	"github.com/serversupervisor/server/internal/scheduler"
 )
 
-func SetupRouter(db *database.DB, cfg *config.Config, notifHub *NotificationHub) *gin.Engine {
+func SetupRouter(db *database.DB, cfg *config.Config, notifHub *NotificationHub, sched *scheduler.TaskScheduler) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
 	r.Use(gin.Recovery())
@@ -32,6 +33,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *NotificationHub)
 	alertRulesH := NewAlertRulesHandler(db, cfg)
 	settingsH := NewSettingsHandler(db, cfg)
 	notifH := NewNotificationsHandler(db)
+	scheduledTaskH := NewScheduledTaskHandler(db, cfg, sched)
 
 	// ========== Public routes ==========
 	r.POST("/api/auth/login", authH.Login)
@@ -151,6 +153,13 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *NotificationHub)
 		api.POST("/settings/test-ntfy", settingsH.TestNtfy)
 		api.POST("/settings/cleanup-metrics", settingsH.CleanupMetrics)
 		api.POST("/settings/cleanup-audit", settingsH.CleanupAuditLogs)
+
+		// Scheduled Tasks
+		api.GET("/hosts/:id/scheduled-tasks", scheduledTaskH.ListScheduledTasks)
+		api.POST("/hosts/:id/scheduled-tasks", scheduledTaskH.CreateScheduledTask)
+		api.PUT("/scheduled-tasks/:id", scheduledTaskH.UpdateScheduledTask)
+		api.DELETE("/scheduled-tasks/:id", scheduledTaskH.DeleteScheduledTask)
+		api.POST("/scheduled-tasks/:id/run", scheduledTaskH.RunScheduledTask)
 
 		// Users
 		api.GET("/users", userH.ListUsers)

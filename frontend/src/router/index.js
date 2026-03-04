@@ -97,6 +97,12 @@ const routes = [
     component: () => import('../views/SystemView.vue'),
     meta: { requiresAuth: true },
   },
+  {
+    path: '/hosts/:id/scheduled-tasks',
+    name: 'ScheduledTasks',
+    component: () => import('../views/ScheduledTasksView.vue'),
+    meta: { requiresAuth: true },
+  },
   { path: '/:pathMatch(.*)*', redirect: '/' },
 ]
 
