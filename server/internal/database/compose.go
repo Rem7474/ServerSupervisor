@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/serversupervisor/server/internal/models"
@@ -31,7 +32,8 @@ func (db *DB) UpsertComposeProjects(hostID string, projects []models.ComposeProj
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		`, id, hostID, p.Name, p.WorkingDir, p.ConfigFile, string(servicesJSON), p.RawConfig, time.Now())
 		if err != nil {
-			return fmt.Errorf("failed to insert compose project %s: %w", p.Name, err)
+			safeName := strings.ReplaceAll(strings.ReplaceAll(p.Name, "\n", ""), "\r", "")
+			return fmt.Errorf("failed to insert compose project %s: %w", safeName, err)
 		}
 	}
 
