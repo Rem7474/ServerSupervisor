@@ -2,9 +2,12 @@ package database
 
 import (
 	"encoding/json"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/serversupervisor/server/internal/models"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // ========== Hosts ==========
@@ -60,18 +63,29 @@ func (db *DB) GetHost(id string) (*models.Host, error) {
 }
 
 func (db *DB) GetHostByAPIKey(apiKey string) (*models.Host, error) {
-	var h models.Host
-	var tagsJSON string
-	apiKeyHash := HashAPIKey(apiKey)
-	err := db.conn.QueryRow(
-		`SELECT id, name, hostname, ip_address, os, agent_version, api_key, tags, status, last_seen, created_at, updated_at
-		 FROM hosts WHERE api_key = $1`, apiKeyHash,
-	).Scan(&h.ID, &h.Name, &h.Hostname, &h.IPAddress, &h.OS, &h.AgentVersion, &h.APIKey, &tagsJSON, &h.Status, &h.LastSeen, &h.CreatedAt, &h.UpdatedAt)
-	if err != nil {
-		return nil, err
+	// API keys use the format "{hostID}.{secret}". Split on the first dot so
+	// we can look the host up by primary key and then verify the bcrypt hash.
+	idx := strings.IndexByte(apiKey, '.')
+	if idx <= 0 || idx == len(apiKey)-1 {
+		return nil, fmt.Errorf("invalid API key format")
 	}
-	h.Tags = parseTags(tagsJSON)
-	return &h, nil
+	hostID, secret := apiKey[:idx], apiKey[idx+1:]
+
+	host, err := db.GetHost(hostID)
+	if err != nil {
+		// Perform a dummy bcrypt comparison to normalise response time and
+		// prevent an attacker from distinguishing "host not found" from
+		// "wrong secret" via timing differences.
+		// The hash below is a valid bcrypt hash of an arbitrary placeholder value.
+		const dummyHash = "$2a$10$tz.0gDET5/Bc3.ScGwT4DOemFDsphktsjzR7Bkcxy7pWpZD5ls4My"
+		_ = bcrypt.CompareHashAndPassword([]byte(dummyHash), []byte(secret))
+		return nil, fmt.Errorf("invalid API key")
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(host.APIKey), []byte(secret)); err != nil {
+		return nil, fmt.Errorf("invalid API key")
+	}
+	return host, nil
 }
 
 func (db *DB) GetAllHosts() ([]models.Host, error) {

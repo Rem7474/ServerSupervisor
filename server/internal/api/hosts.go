@@ -20,6 +20,18 @@ func NewHostHandler(db *database.DB, cfg *config.Config) *HostHandler {
 	return &HostHandler{db: db, cfg: cfg}
 }
 
+// generateAPIKey creates a new API key pair for a host.
+// The plain key (returned to the caller) has the format "{hostID}.{secret}".
+// The hashed key is a bcrypt hash of the secret and should be stored in the DB.
+func generateAPIKey(hostID string) (plainKey, hashedKey string, err error) {
+	secret := uuid.New().String()
+	hashedKey, err = database.HashAPIKey(secret)
+	if err != nil {
+		return "", "", err
+	}
+	return hostID + "." + secret, hashedKey, nil
+}
+
 // RegisterHost creates a new host and returns its API key (admin only)
 func (h *HostHandler) RegisterHost(c *gin.Context) {
 	if c.GetString("role") != models.RoleAdmin {
@@ -40,8 +52,11 @@ func (h *HostHandler) RegisterHost(c *gin.Context) {
 	}
 
 	hostID := uuid.New().String()
-	plainAPIKey := uuid.New().String()
-	hashedAPIKey := database.HashAPIKey(plainAPIKey)
+	plainAPIKey, hashedAPIKey, err := generateAPIKey(hostID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate API key"})
+		return
+	}
 
 	host := &models.Host{
 		ID:        hostID,
@@ -142,8 +157,11 @@ func (h *HostHandler) RotateAPIKey(c *gin.Context) {
 	}
 
 	hostID := c.Param("id")
-	plainAPIKey := uuid.New().String()
-	hashedAPIKey := database.HashAPIKey(plainAPIKey)
+	plainAPIKey, hashedAPIKey, err := generateAPIKey(hostID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate API key"})
+		return
+	}
 
 	if err := h.db.UpdateHostAPIKey(hostID, hashedAPIKey); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to rotate API key"})
