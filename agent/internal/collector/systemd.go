@@ -66,7 +66,6 @@ func ListSystemdServices() ([]SystemdService, error) {
 
 // ExecuteSystemdCommand runs a systemctl action on a service and streams its output.
 // Valid actions: start, stop, restart, enable, disable, status.
-// For status, --output=json formats embedded journal entries as JSON objects.
 func ExecuteSystemdCommand(serviceName, action string, chunkCB func(string)) (string, error) {
 	if !validServiceName.MatchString(serviceName) {
 		return "", fmt.Errorf("invalid service name: %q", serviceName)
@@ -83,11 +82,7 @@ func ExecuteSystemdCommand(serviceName, action string, chunkCB func(string)) (st
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	args := []string{action, "--no-pager"}
-	if action == "status" {
-		args = append(args, "--output=json")
-	}
-	args = append(args, serviceName)
+	args := []string{action, "--no-pager", serviceName}
 	cmd := exec.CommandContext(ctx, "systemctl", args...)
 
 	stdout, err := cmd.StdoutPipe()

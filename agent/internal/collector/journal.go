@@ -3,9 +3,11 @@ package collector
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os/exec"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -13,8 +15,38 @@ import (
 // validServiceName matches valid systemd service names.
 var validServiceName = regexp.MustCompile(`^[a-zA-Z0-9._:@\-]{1,256}$`)
 
+// journalEntry represents a single journald log entry in --output=json format.
+// journalctl emits one JSON object per line (NDJSON).
+type journalEntry struct {
+	RealtimeTimestamp string `json:"__REALTIME_TIMESTAMP"` // microseconds since epoch
+	Message           string `json:"MESSAGE"`
+	Priority          string `json:"PRIORITY"` // syslog priority 0-7
+	SyslogIdentifier  string `json:"SYSLOG_IDENTIFIER"`
+}
+
+var priorityLabel = [8]string{"EMERG", "ALERT", "CRIT", "ERR", "WARN", "NOTICE", "INFO", "DEBUG"}
+
+func formatJournalLine(e journalEntry) string {
+	ts := time.Now().UTC()
+	if usec, err := strconv.ParseInt(e.RealtimeTimestamp, 10, 64); err == nil {
+		ts = time.UnixMicro(usec).UTC()
+	}
+
+	prio := "INFO"
+	if p, err := strconv.Atoi(e.Priority); err == nil && p >= 0 && p < len(priorityLabel) {
+		prio = priorityLabel[p]
+	}
+
+	if e.SyslogIdentifier != "" {
+		return fmt.Sprintf("[%s] %s %s: %s", ts.Format(time.RFC3339), prio, e.SyslogIdentifier, e.Message)
+	}
+	return fmt.Sprintf("[%s] %s %s", ts.Format(time.RFC3339), prio, e.Message)
+}
+
 // ExecuteJournalctl streams systemd journal logs for a given service.
 // Lines are passed to chunkCB as they arrive. Returns the full output and any error.
+// journalctl --output=json is used for structured parsing; each JSON line is formatted
+// as "[TIMESTAMP] PRIORITY IDENTIFIER: MESSAGE" before being forwarded.
 func ExecuteJournalctl(serviceName string, chunkCB func(string)) (string, error) {
 	if serviceName == "" {
 		return "", fmt.Errorf("service name is required")
@@ -30,7 +62,7 @@ func ExecuteJournalctl(serviceName string, chunkCB func(string)) (string, error)
 		"-u", serviceName,
 		"--no-pager",
 		"-n", "200",
-		"--output=short-iso",
+		"--output=json",
 	)
 
 	stdout, err := cmd.StdoutPipe()
@@ -49,14 +81,23 @@ func ExecuteJournalctl(serviceName string, chunkCB func(string)) (string, error)
 	var builder strings.Builder
 	scanner := bufio.NewScanner(stdout)
 	for scanner.Scan() {
-		line := scanner.Text() + "\n"
+		var entry journalEntry
+		if err := json.Unmarshal(scanner.Bytes(), &entry); err != nil {
+			// Fallback: forward raw line as-is
+			line := scanner.Text() + "\n"
+			builder.WriteString(line)
+			if chunkCB != nil {
+				chunkCB(line)
+			}
+			continue
+		}
+		line := formatJournalLine(entry) + "\n"
 		builder.WriteString(line)
 		if chunkCB != nil {
 			chunkCB(line)
 		}
 	}
 
-	// Capture stderr too
 	errScanner := bufio.NewScanner(stderr)
 	for errScanner.Scan() {
 		line := errScanner.Text() + "\n"
