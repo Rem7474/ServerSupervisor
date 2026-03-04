@@ -1,10 +1,8 @@
 package database
 
 import (
-	"crypto/sha256"
 	"database/sql"
 	"embed"
-	"encoding/hex"
 	"fmt"
 	"io/fs"
 	"log"
@@ -13,15 +11,19 @@ import (
 
 	"github.com/lib/pq"
 	"github.com/serversupervisor/server/internal/config"
+	"golang.org/x/crypto/bcrypt"
 )
 
 //go:embed migrations/*.sql
 var migrationFS embed.FS
 
-// HashAPIKey returns the SHA-256 hash of an API key.
-func HashAPIKey(apiKey string) string {
-	hash := sha256.Sum256([]byte(apiKey))
-	return hex.EncodeToString(hash[:])
+// HashAPIKey returns a bcrypt hash of an API key secret.
+func HashAPIKey(apiKey string) (string, error) {
+	hash, err := bcrypt.GenerateFromPassword([]byte(apiKey), bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+	return string(hash), nil
 }
 
 // EnsureDatabaseExists creates the database if it doesn't exist.
