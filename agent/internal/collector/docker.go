@@ -2,15 +2,15 @@ package collector
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
+
+	docker "github.com/fsouza/go-dockerclient"
 )
 
 type DockerContainer struct {
@@ -32,102 +32,71 @@ type DockerContainer struct {
 	NetTxBytes  uint64            `json:"net_tx_bytes,omitempty"`
 }
 
-// CollectDocker gathers Docker container information using docker CLI
-// This avoids requiring the Docker SDK and works with any Docker setup
+const containerShutdownTimeoutSecs uint = 10 // seconds to wait before SIGKILL
+
+// newDockerClient returns a Docker client configured from environment variables
+// (DOCKER_HOST, DOCKER_TLS_VERIFY, DOCKER_CERT_PATH) or the local Unix socket.
+func newDockerClient() (*docker.Client, error) {
+	return docker.NewClientFromEnv()
+}
+
+// CollectDocker gathers Docker container information using the Docker API.
 func CollectDocker() ([]DockerContainer, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	// Check if docker is available
-	if _, err := exec.LookPath("docker"); err != nil {
-		return nil, fmt.Errorf("docker not found in PATH")
-	}
-
-	// Get all container IDs
-	out, err := exec.CommandContext(ctx, "docker", "ps", "-a", "-q").Output()
+	client, err := newDockerClient()
 	if err != nil {
-		return nil, fmt.Errorf("docker ps failed: %w", err)
+		return nil, fmt.Errorf("failed to connect to Docker: %w", err)
 	}
 
-	containerIDs := strings.Fields(strings.TrimSpace(string(out)))
-	if len(containerIDs) == 0 {
+	ctx := context.Background()
+	apiContainers, err := client.ListContainers(docker.ListContainersOptions{
+		All:     true,
+		Context: ctx,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list containers: %w", err)
+	}
+
+	if len(apiContainers) == 0 {
 		log.Printf("No Docker containers found")
 		return []DockerContainer{}, nil
 	}
 
-	// Inspect all containers at once to get JSON data
-	args := append([]string{"inspect"}, containerIDs...)
-	inspectOut, err := exec.CommandContext(ctx, "docker", args...).Output()
-	if err != nil {
-		return nil, fmt.Errorf("docker inspect failed: %w", err)
-	}
-
-	// Parse JSON output
-	var inspectData []struct {
-		Id     string `json:"Id"`
-		Name   string `json:"Name"`
-		Config struct {
-			Image  string            `json:"Image"`
-			Labels map[string]string `json:"Labels"`
-			Env    []string          `json:"Env"` // "KEY=VALUE" format
-		} `json:"Config"`
-		State struct {
-			Status     string    `json:"Status"`
-			Running    bool      `json:"Running"`
-			Paused     bool      `json:"Paused"`
-			StartedAt  time.Time `json:"StartedAt"`
-			FinishedAt time.Time `json:"FinishedAt"`
-		} `json:"State"`
-		Created time.Time `json:"Created"`
-		Image   string    `json:"Image"`
-		Mounts  []struct {
-			Destination string `json:"Destination"`
-		} `json:"Mounts"`
-		NetworkSettings struct {
-			Ports    map[string][]struct {
-				HostIp   string `json:"HostIp"`
-				HostPort string `json:"HostPort"`
-			} `json:"Ports"`
-			Networks map[string]json.RawMessage `json:"Networks"` // keys are network names
-		} `json:"NetworkSettings"`
-	}
-
-	if err := json.Unmarshal(inspectOut, &inspectData); err != nil {
-		return nil, fmt.Errorf("failed to parse docker inspect output: %w", err)
-	}
-
 	var containers []DockerContainer
-	for _, data := range inspectData {
-		name := strings.TrimPrefix(data.Name, "/")
-		fullImage := data.Config.Image
+	for _, ac := range apiContainers {
+		container, err := client.InspectContainerWithContext(ac.ID, ctx)
+		if err != nil {
+			log.Printf("Failed to inspect container %s: %v", ac.ID[:12], err)
+			continue
+		}
+
+		name := strings.TrimPrefix(container.Name, "/")
+		fullImage := container.Config.Image
 		image, tag := parseImageTag(fullImage)
 
-		// Build state string
 		var state string
-		if data.State.Running {
+		if container.State.Running {
 			state = "running"
-		} else if data.State.Paused {
+		} else if container.State.Paused {
 			state = "paused"
 		} else {
 			state = "exited"
 		}
 
-		// Build status string (similar to docker ps output)
-		status := data.State.Status
-		if data.State.Running {
-			uptime := time.Since(data.State.StartedAt)
+		var status string
+		if container.State.Running {
+			uptime := time.Since(container.State.StartedAt)
 			status = fmt.Sprintf("Up %s", formatDuration(uptime))
-		} else if !data.State.FinishedAt.IsZero() {
-			downtime := time.Since(data.State.FinishedAt)
+		} else if !container.State.FinishedAt.IsZero() {
+			downtime := time.Since(container.State.FinishedAt)
 			status = fmt.Sprintf("Exited %s ago", formatDuration(downtime))
+		} else {
+			status = container.State.StateString()
 		}
 
-		// Format ports
-		ports := formatPorts(data.NetworkSettings.Ports)
+		ports := formatPortBindings(container.NetworkSettings.Ports)
 
-		// Parse env vars (filter sensitive keys)
 		envVars := make(map[string]string)
-		for _, envLine := range data.Config.Env {
+		for _, envLine := range container.Config.Env {
 			if idx := strings.Index(envLine, "="); idx > 0 {
 				k := envLine[:idx]
 				v := envLine[idx+1:]
@@ -137,47 +106,51 @@ func CollectDocker() ([]DockerContainer, error) {
 			}
 		}
 
-		// Parse volume mount destinations
 		var volumes []string
-		for _, m := range data.Mounts {
+		for _, m := range container.Mounts {
 			if m.Destination != "" {
 				volumes = append(volumes, m.Destination)
 			}
 		}
 
-		// Parse network names
 		var networks []string
-		for netName := range data.NetworkSettings.Networks {
+		for netName := range container.NetworkSettings.Networks {
 			networks = append(networks, netName)
 		}
 
+		imageID := container.Image
+		if len(imageID) > 12 {
+			imageID = imageID[:12]
+		}
+		containerID := container.ID
+		if len(containerID) > 12 {
+			containerID = containerID[:12]
+		}
+
 		containers = append(containers, DockerContainer{
-			ID:          fmt.Sprintf("%s-%s", data.Id[:12], name),
-			ContainerID: data.Id[:12],
+			ID:          fmt.Sprintf("%s-%s", containerID, name),
+			ContainerID: containerID,
 			Name:        name,
 			Image:       image,
 			ImageTag:    tag,
-			ImageID:     data.Image[:12],
+			ImageID:     imageID,
 			State:       state,
 			Status:      status,
-			Created:     data.Created,
+			Created:     container.Created,
 			Ports:       ports,
-			Labels:      data.Config.Labels,
+			Labels:      container.Config.Labels,
 			EnvVars:     envVars,
 			Volumes:     volumes,
 			Networks:    networks,
 		})
 	}
 
-	// Enrich running containers with network I/O stats from docker stats
-	statsCtx, statsCancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer statsCancel()
-	if netStats := collectNetStats(statsCtx); netStats != nil {
-		for i := range containers {
-			if stats, ok := netStats[containers[i].Name]; ok {
-				containers[i].NetRxBytes = stats[0]
-				containers[i].NetTxBytes = stats[1]
-			}
+	// Enrich running containers with network I/O stats via the Docker API.
+	for i := range containers {
+		if containers[i].State == "running" {
+			rx, tx := collectContainerNetStats(client, containers[i].ContainerID)
+			containers[i].NetRxBytes = rx
+			containers[i].NetTxBytes = tx
 		}
 	}
 
@@ -185,58 +158,70 @@ func CollectDocker() ([]DockerContainer, error) {
 	return containers, nil
 }
 
-// collectNetStats runs docker stats --no-stream and returns a map[containerName]{rx, tx}.
-func collectNetStats(ctx context.Context) map[string][2]uint64 {
-	out, err := exec.CommandContext(ctx, "docker", "stats", "--no-stream",
-		"--format", "{{json .}}").Output()
-	if err != nil {
-		return nil
+// collectContainerNetStats fetches a single stats snapshot for the given
+// container and returns the total network rx/tx bytes.
+func collectContainerNetStats(client *docker.Client, containerID string) (rx, tx uint64) {
+	statsC := make(chan *docker.Stats, 1)
+	done := make(chan bool)
+	errC := make(chan error, 1)
+
+	go func() {
+		errC <- client.Stats(docker.StatsOptions{
+			ID:     containerID,
+			Stats:  statsC,
+			Stream: false,
+			Done:   done,
+		})
+	}()
+
+	select {
+	case stats, ok := <-statsC:
+		if ok && stats != nil {
+			for _, ns := range stats.Networks {
+				rx += ns.RxBytes
+				tx += ns.TxBytes
+			}
+		}
+		// Drain the error channel so the goroutine can exit cleanly.
+		select {
+		case err := <-errC:
+			if err != nil {
+				log.Printf("Failed to get stats for container %s: %v", containerID, err)
+			}
+		default:
+		}
+	case err := <-errC:
+		if err != nil {
+			log.Printf("Failed to get stats for container %s: %v", containerID, err)
+		}
+	case <-time.After(5 * time.Second):
+		close(done)
 	}
-	result := make(map[string][2]uint64)
-	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
-		if line == "" {
-			continue
-		}
-		var row struct {
-			Name  string `json:"Name"`
-			NetIO string `json:"NetIO"`
-		}
-		if json.Unmarshal([]byte(line), &row) != nil {
-			continue
-		}
-		rx, tx := parseNetIO(row.NetIO)
-		result[row.Name] = [2]uint64{rx, tx}
-	}
-	return result
+	return rx, tx
 }
 
-// parseNetIO splits "1.5kB / 2.3MB" and returns (rx_bytes, tx_bytes).
-func parseNetIO(s string) (rx, tx uint64) {
-	parts := strings.SplitN(s, " / ", 2)
-	if len(parts) != 2 {
-		return
+// formatPortBindings converts the Docker API port map to a human-readable string.
+func formatPortBindings(ports map[docker.Port][]docker.PortBinding) string {
+	if len(ports) == 0 {
+		return ""
 	}
-	return parseDockerSize(strings.TrimSpace(parts[0])),
-		parseDockerSize(strings.TrimSpace(parts[1]))
-}
-
-// parseDockerSize converts Docker human-readable sizes (base-10) to bytes.
-func parseDockerSize(s string) uint64 {
-	units := []struct {
-		suffix string
-		mult   float64
-	}{
-		{"TB", 1e12}, {"GB", 1e9}, {"MB", 1e6}, {"kB", 1e3}, {"B", 1},
-	}
-	for _, u := range units {
-		if strings.HasSuffix(s, u.suffix) {
-			n, err := strconv.ParseFloat(strings.TrimSuffix(s, u.suffix), 64)
-			if err == nil {
-				return uint64(n * u.mult)
+	var parts []string
+	for port, bindings := range ports {
+		if len(bindings) == 0 {
+			parts = append(parts, string(port))
+		} else {
+			for _, b := range bindings {
+				if b.HostPort != "" {
+					hostIP := b.HostIP
+					if hostIP == "" {
+						hostIP = "0.0.0.0"
+					}
+					parts = append(parts, fmt.Sprintf("%s:%s->%s", hostIP, b.HostPort, port))
+				}
 			}
 		}
 	}
-	return 0
+	return strings.Join(parts, ", ")
 }
 
 func formatDuration(d time.Duration) string {
@@ -250,35 +235,6 @@ func formatDuration(d time.Duration) string {
 	return fmt.Sprintf("%d days", int(d.Hours()/24))
 }
 
-func formatPorts(portsMap map[string][]struct {
-	HostIp   string `json:"HostIp"`
-	HostPort string `json:"HostPort"`
-}) string {
-	if len(portsMap) == 0 {
-		return ""
-	}
-
-	var parts []string
-	for containerPort, bindings := range portsMap {
-		if len(bindings) == 0 {
-			// No host binding, just exposed
-			parts = append(parts, containerPort)
-		} else {
-			for _, binding := range bindings {
-				if binding.HostPort != "" {
-					hostIp := binding.HostIp
-					if hostIp == "" || hostIp == "0.0.0.0" {
-						hostIp = "0.0.0.0"
-					}
-					parts = append(parts, fmt.Sprintf("%s:%s->%s", hostIp, binding.HostPort, containerPort))
-				}
-			}
-		}
-	}
-
-	return strings.Join(parts, ", ")
-}
-
 func parseImageTag(fullImage string) (image, tag string) {
 	// Handle images with registry prefix (e.g., ghcr.io/org/image:tag)
 	lastColon := strings.LastIndex(fullImage, ":")
@@ -288,7 +244,7 @@ func parseImageTag(fullImage string) (image, tag string) {
 	return fullImage[:lastColon], fullImage[lastColon+1:]
 }
 
-// DockerNetwork represents a Docker network and connected containers
+// DockerNetwork represents a Docker network and connected containers.
 type DockerNetwork struct {
 	NetworkID    string   `json:"network_id"`
 	Name         string   `json:"name"`
@@ -297,78 +253,70 @@ type DockerNetwork struct {
 	ContainerIDs []string `json:"container_ids"`
 }
 
-// ContainerEnv represents environment variables of a container (filtered for non-sensitive data)
+// ContainerEnv represents environment variables of a container (filtered for non-sensitive data).
 type ContainerEnv struct {
 	ContainerName string            `json:"container_name"`
 	EnvVars       map[string]string `json:"env_vars"`
 }
 
-// CollectDockerNetworks retrieves Docker networks and their connected containers
+// CollectDockerNetworks retrieves Docker networks and their connected containers via the Docker API.
 func CollectDockerNetworks() ([]DockerNetwork, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	// List all networks
-	out, err := exec.CommandContext(ctx, "docker", "network", "ls",
-		"--no-trunc", "--format", "{{.ID}}|{{.Name}}|{{.Driver}}|{{.Scope}}").Output()
+	client, err := newDockerClient()
 	if err != nil {
-		return nil, fmt.Errorf("docker network ls failed: %w", err)
+		return nil, fmt.Errorf("failed to connect to Docker: %w", err)
 	}
 
-	var networks []DockerNetwork
-	for _, line := range strings.Split(strings.TrimSpace(string(out)), "\n") {
-		if line == "" {
-			continue
-		}
-		parts := strings.SplitN(line, "|", 4)
-		if len(parts) < 4 {
-			continue
-		}
-		n := DockerNetwork{
-			NetworkID: parts[0][:12],
-			Name:      parts[1],
-			Driver:    parts[2],
-			Scope:     parts[3],
-		}
+	networks, err := client.ListNetworks()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list networks: %w", err)
+	}
+
+	var result []DockerNetwork
+	for _, net := range networks {
 		// Skip system networks
-		if n.Name == "bridge" || n.Name == "host" || n.Name == "none" {
+		if net.Name == "bridge" || net.Name == "host" || net.Name == "none" {
 			continue
 		}
 
-		// Get containers in this network
-		inspOut, err := exec.CommandContext(ctx, "docker", "network", "inspect",
-			parts[0], "--format", "{{range .Containers}}{{slice .Name 1}}|{{end}}").Output()
-		if err == nil {
-			for _, c := range strings.Split(strings.TrimSuffix(strings.TrimSpace(string(inspOut)), "|"), "|") {
-				if c != "" {
-					n.ContainerIDs = append(n.ContainerIDs, strings.TrimSpace(c))
-				}
-			}
+		networkID := net.ID
+		if len(networkID) > 12 {
+			networkID = networkID[:12]
 		}
-		networks = append(networks, n)
+
+		n := DockerNetwork{
+			NetworkID: networkID,
+			Name:      net.Name,
+			Driver:    net.Driver,
+			Scope:     net.Scope,
+		}
+		for _, ep := range net.Containers {
+			n.ContainerIDs = append(n.ContainerIDs, ep.Name)
+		}
+		result = append(result, n)
 	}
-	return networks, nil
+	return result, nil
 }
 
-// CollectContainerEnvVars retrieves environment variables from containers (filtered for sensitive data)
+// CollectContainerEnvVars retrieves environment variables from containers via the Docker API
+// (sensitive values are filtered out).
 func CollectContainerEnvVars(containerNames []string) ([]ContainerEnv, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
+	client, err := newDockerClient()
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to Docker: %w", err)
+	}
 
 	var result []ContainerEnv
 	for _, name := range containerNames {
-		out, err := exec.CommandContext(ctx, "docker", "inspect",
-			"--format", "{{range .Config.Env}}{{.}}\n{{end}}", name).Output()
+		container, err := client.InspectContainer(name)
 		if err != nil {
 			continue
 		}
 
 		envMap := make(map[string]string)
-		for _, line := range strings.Split(string(out), "\n") {
-			if idx := strings.Index(line, "="); idx > 0 {
-				k := line[:idx]
-				v := line[idx+1:]
-				// Filter: skip sensitive env vars
+		for _, envLine := range container.Config.Env {
+			if idx := strings.Index(envLine, "="); idx > 0 {
+				k := envLine[:idx]
+				v := envLine[idx+1:]
 				if !isSensitiveEnvKey(k) {
 					envMap[k] = v
 				}
@@ -381,7 +329,7 @@ func CollectContainerEnvVars(containerNames []string) ([]ContainerEnv, error) {
 	return result, nil
 }
 
-// isSensitiveEnvKey checks if an env var key should be filtered out
+// isSensitiveEnvKey checks if an env var key should be filtered out.
 func isSensitiveEnvKey(key string) bool {
 	sensitivePatterns := []string{
 		"password", "secret", "token", "key", "pass",
@@ -397,7 +345,7 @@ func isSensitiveEnvKey(key string) bool {
 	return false
 }
 
-// ComposeProject represents a docker-compose project and its resolved config
+// ComposeProject represents a docker-compose project and its resolved config.
 type ComposeProject struct {
 	Name       string   `json:"name"`
 	WorkingDir string   `json:"working_dir"`
@@ -406,50 +354,32 @@ type ComposeProject struct {
 	RawConfig  string   `json:"raw_config"`
 }
 
-// CollectComposeProjects discovers docker-compose projects via container labels
-// and retrieves their resolved configuration via `docker compose config`
+// CollectComposeProjects discovers docker-compose projects via container labels using the
+// Docker API and retrieves their resolved configuration via `docker compose config`.
 func CollectComposeProjects() ([]ComposeProject, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	if _, err := exec.LookPath("docker"); err != nil {
-		return nil, fmt.Errorf("docker not found in PATH")
-	}
-
-	// Get all container IDs with compose labels
-	out, err := exec.CommandContext(ctx, "docker", "ps", "-a", "-q",
-		"--filter", "label=com.docker.compose.project").Output()
+	client, err := newDockerClient()
 	if err != nil {
-		return nil, fmt.Errorf("docker ps compose failed: %w", err)
+		return nil, fmt.Errorf("failed to connect to Docker: %w", err)
 	}
 
-	containerIDs := strings.Fields(strings.TrimSpace(string(out)))
-	if len(containerIDs) == 0 {
+	ctx := context.Background()
+	apiContainers, err := client.ListContainers(docker.ListContainersOptions{
+		All:     true,
+		Filters: map[string][]string{"label": {"com.docker.compose.project"}},
+		Context: ctx,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list compose containers: %w", err)
+	}
+
+	if len(apiContainers) == 0 {
 		log.Printf("No Docker Compose containers found")
 		return []ComposeProject{}, nil
 	}
 
-	// Inspect all containers to get labels
-	args := append([]string{"inspect"}, containerIDs...)
-	inspectOut, err := exec.CommandContext(ctx, "docker", args...).Output()
-	if err != nil {
-		return nil, fmt.Errorf("docker inspect failed: %w", err)
-	}
-
-	// Parse JSON output
-	var inspectData []struct {
-		Config struct {
-			Labels map[string]string `json:"Labels"`
-		} `json:"Config"`
-	}
-	if err := json.Unmarshal(inspectOut, &inspectData); err != nil {
-		return nil, fmt.Errorf("failed to parse inspect output: %w", err)
-	}
-
-	// Build projects map from labels
 	projects := make(map[string]*ComposeProject)
-	for _, data := range inspectData {
-		labels := data.Config.Labels
+	for _, ac := range apiContainers {
+		labels := ac.Labels
 		name := labels["com.docker.compose.project"]
 		if name == "" {
 			continue
@@ -466,7 +396,6 @@ func CollectComposeProjects() ([]ComposeProject, error) {
 
 		service := labels["com.docker.compose.service"]
 		if service != "" {
-			// avoid duplicates
 			found := false
 			for _, s := range projects[name].Services {
 				if s == service {
@@ -480,7 +409,7 @@ func CollectComposeProjects() ([]ComposeProject, error) {
 		}
 	}
 
-	// Get raw config for each project
+	// Retrieve the resolved compose config via CLI (no Docker API equivalent).
 	var result []ComposeProject
 	for _, p := range projects {
 		if p.WorkingDir != "" {
@@ -500,45 +429,79 @@ func CollectComposeProjects() ([]ComposeProject, error) {
 }
 
 // ExecuteDockerCommand runs a docker action (start/stop/restart/logs) on a container
-// and streams output chunks to chunkCB.
+// via the Docker API and streams output chunks to chunkCB.
 func ExecuteDockerCommand(action, containerName string, chunkCB func(string)) (string, error) {
-	var args []string
-	var timeout time.Duration
+	client, err := newDockerClient()
+	if err != nil {
+		return "", fmt.Errorf("failed to connect to Docker: %w", err)
+	}
 
 	switch action {
-	case "start", "stop", "restart":
-		args = []string{action, containerName}
-		timeout = 30 * time.Second
+	case "start":
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if err := client.StartContainerWithContext(containerName, nil, ctx); err != nil {
+			return "", fmt.Errorf("failed to start container %s: %w", containerName, err)
+		}
+		msg := fmt.Sprintf("Container %s started", containerName)
+		if chunkCB != nil {
+			chunkCB(msg)
+		}
+		return msg, nil
+
+	case "stop":
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if err := client.StopContainerWithContext(containerName, containerShutdownTimeoutSecs, ctx); err != nil {
+			return "", fmt.Errorf("failed to stop container %s: %w", containerName, err)
+		}
+		msg := fmt.Sprintf("Container %s stopped", containerName)
+		if chunkCB != nil {
+			chunkCB(msg)
+		}
+		return msg, nil
+
+	case "restart":
+		if err := client.RestartContainer(containerName, containerShutdownTimeoutSecs); err != nil {
+			return "", fmt.Errorf("failed to restart container %s: %w", containerName, err)
+		}
+		msg := fmt.Sprintf("Container %s restarted", containerName)
+		if chunkCB != nil {
+			chunkCB(msg)
+		}
+		return msg, nil
+
 	case "logs":
-		args = []string{"logs", "--tail", "100", "--timestamps", containerName}
-		timeout = 60 * time.Second
+		return streamContainerLogs(client, containerName, chunkCB)
+
 	default:
 		return "", fmt.Errorf("unknown docker action: %s", action)
 	}
+}
 
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, "docker", args...)
-
-	stdoutPipe, err := cmd.StdoutPipe()
-	if err != nil {
-		return "", fmt.Errorf("failed to create stdout pipe: %w", err)
-	}
-	stderrPipe, err := cmd.StderrPipe()
-	if err != nil {
-		return "", fmt.Errorf("failed to create stderr pipe: %w", err)
-	}
-
-	if err := cmd.Start(); err != nil {
-		return "", fmt.Errorf("failed to start docker %s %s: %w", action, containerName, err)
-	}
-
+// streamContainerLogs retrieves the last 100 log lines from a container via the Docker API
+// and streams them in chunks to chunkCB.
+func streamContainerLogs(client *docker.Client, containerName string, chunkCB func(string)) (string, error) {
+	pr, pw := io.Pipe()
 	var fullOutput strings.Builder
-	combined := io.MultiReader(stdoutPipe, stderrPipe)
+
+	go func() {
+		err := client.Logs(docker.LogsOptions{
+			Context:      context.Background(),
+			Container:    containerName,
+			OutputStream: pw,
+			ErrorStream:  pw,
+			Stdout:       true,
+			Stderr:       true,
+			Tail:         "100",
+			Timestamps:   true,
+		})
+		pw.CloseWithError(err)
+	}()
+
 	buf := make([]byte, 4096)
 	for {
-		n, readErr := combined.Read(buf)
+		n, readErr := pr.Read(buf)
 		if n > 0 {
 			chunk := string(buf[:n])
 			fullOutput.WriteString(chunk)
@@ -547,16 +510,18 @@ func ExecuteDockerCommand(action, containerName string, chunkCB func(string)) (s
 			}
 		}
 		if readErr != nil {
-			break
+			if readErr == io.EOF {
+				break
+			}
+			return fullOutput.String(), readErr
 		}
 	}
-
-	cmdErr := cmd.Wait()
-	return fullOutput.String(), cmdErr
+	return fullOutput.String(), nil
 }
 
 // ExecuteComposeCommand runs a docker compose action on a project and streams output.
 // action must be one of: compose_up, compose_down, compose_restart, compose_logs.
+// Docker Compose operations have no Docker API equivalent so the CLI is used.
 func ExecuteComposeCommand(action, projectName, workingDir string, chunkCB func(string)) (string, error) {
 	var args []string
 	var timeout time.Duration
@@ -623,7 +588,7 @@ func ExecuteComposeCommand(action, projectName, workingDir string, chunkCB func(
 	return fullOutput.String(), cmdErr
 }
 
-// filterSensitiveYAML redacts lines containing sensitive keys in YAML output
+// filterSensitiveYAML redacts lines containing sensitive keys in YAML output.
 func filterSensitiveYAML(yaml string) string {
 	sensitiveKeys := []string{
 		"password", "secret", "token", "key", "pass",
