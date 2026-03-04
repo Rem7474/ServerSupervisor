@@ -3,7 +3,7 @@
 
 CREATE TABLE IF NOT EXISTS scheduled_tasks (
     id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-    host_id         UUID        NOT NULL REFERENCES hosts(id) ON DELETE CASCADE,
+    host_id         VARCHAR(64) NOT NULL REFERENCES hosts(id) ON DELETE CASCADE,
     name            TEXT        NOT NULL,
     module          TEXT        NOT NULL,
     action          TEXT        NOT NULL,
