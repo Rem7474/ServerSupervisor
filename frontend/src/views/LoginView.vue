@@ -11,11 +11,11 @@
           <h2 class="card-title text-center mb-4">Se connecter</h2>
           <div class="mb-3">
             <label class="form-label">Utilisateur</label>
-            <input v-model="username" type="text" class="form-control" placeholder="admin" required :disabled="loading || needsMFA" />
+            <input v-model="username" type="text" class="form-control" placeholder="admin" name="username" autocomplete="username" required :disabled="loading || needsMFA" />
           </div>
           <div class="mb-3">
             <label class="form-label">Mot de passe</label>
-            <input v-model="password" type="password" class="form-control" placeholder="••••••••" required :disabled="loading || needsMFA" />
+            <input v-model="password" type="password" class="form-control" placeholder="••••••••" name="password" autocomplete="current-password" required :disabled="loading || needsMFA" />
           </div>
 
           <div v-if="needsMFA" class="mb-3">
