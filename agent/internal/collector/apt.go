@@ -127,7 +127,7 @@ func ExecuteAptCommandWithStreaming(command string, streamCallback func(chunk st
 	var cmd *exec.Cmd
 	switch command {
 	case "update":
-		cmd = exec.CommandContext(ctx, "apt", "update", "-y", "-qq")
+		cmd = exec.CommandContext(ctx, "apt", "update")
 	case "upgrade":
 		cmd = exec.CommandContext(ctx, "apt", "upgrade", "-y", "-qq", "--allow-unauthenticated")
 	case "dist-upgrade":

@@ -1361,8 +1361,13 @@ function connectStreamWebSocket(commandId) {
         liveCommand.value.status = payload.status
         // Sync status in history table immediately (no reload needed for intermediate states)
         const histCmd = cmdHistory.value.find(c => c.id === liveCommand.value.id)
-        if (histCmd) histCmd.status = payload.status
-        if (payload.status === 'completed' || payload.status === 'failed') {
+        if (histCmd) {
+          histCmd.status = payload.status
+          if (payload.status === 'completed' || payload.status === 'failed') {
+            loadCmdHistory()
+          }
+        } else {
+          // Command not yet in history (auto-triggered before loadCmdHistory was called) — fetch it now
           loadCmdHistory()
         }
       }
