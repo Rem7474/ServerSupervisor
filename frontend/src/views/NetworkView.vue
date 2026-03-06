@@ -924,8 +924,13 @@ const portRows = computed(() => {
 })
 
 const totalPorts = computed(() => portRows.value.length)
-const totalRx = computed(() => hosts.value.reduce((sum, h) => sum + (h.network_rx_bytes || 0), 0))
-const totalTx = computed(() => hosts.value.reduce((sum, h) => sum + (h.network_tx_bytes || 0), 0))
+const hostsOnline = computed(() => hosts.value.filter(h => h.status === 'online').length)
+const containersRunning = computed(() => containers.value.filter(c => c.state === 'running').length)
+
+// Traffic delta: difference between the last two WS updates (not cumulative since boot)
+const trafficDelta = ref({ rx: 0, tx: 0, intervalSec: 0 })
+const prevTrafficByHost = ref({}) // host_id → { rx, tx }
+const prevTrafficTime = ref(null)
 
 const combinedServices = computed(() => {
   const linkedServices = []
@@ -1184,13 +1189,42 @@ watchEffect(() => {
 
 const { wsStatus, wsError, retryCount, reconnect } = useWebSocket('/api/v1/ws/network', (payload) => {
   if (payload.type !== 'network') return
-  hosts.value = payload.hosts || []
+
+  const now = Date.now()
+  const newHosts = payload.hosts || []
+
+  // Compute traffic delta between this update and the previous one
+  if (prevTrafficTime.value !== null) {
+    const intervalSec = Math.max(1, Math.round((now - prevTrafficTime.value) / 1000))
+    let deltaRx = 0, deltaTx = 0
+    for (const h of newHosts) {
+      const prev = prevTrafficByHost.value[h.id]
+      if (prev) {
+        const drx = (h.network_rx_bytes || 0) - prev.rx
+        const dtx = (h.network_tx_bytes || 0) - prev.tx
+        // Ignore negative deltas (counter reset / agent restart)
+        if (drx >= 0) deltaRx += drx
+        if (dtx >= 0) deltaTx += dtx
+      }
+    }
+    trafficDelta.value = { rx: deltaRx, tx: deltaTx, intervalSec }
+  }
+
+  // Save current values for next delta computation
+  const snap = {}
+  for (const h of newHosts) {
+    snap[h.id] = { rx: h.network_rx_bytes || 0, tx: h.network_tx_bytes || 0 }
+  }
+  prevTrafficByHost.value = snap
+  prevTrafficTime.value = now
+
+  hosts.value = newHosts
   containers.value = payload.containers || []
   networks.value = payload.networks || []
   inferredLinks.value = payload.links || []
-  
+
   // Config is loaded only via REST API (loadTopologyConfig), not from WebSocket
-  
+
   ensureHostPortConfig()
 })
 

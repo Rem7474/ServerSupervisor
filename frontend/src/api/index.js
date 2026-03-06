@@ -125,6 +125,7 @@ export default {
   updateScheduledTask: (id, payload) => api.put(`/v1/scheduled-tasks/${id}`, payload),
   deleteScheduledTask: (id) => api.delete(`/v1/scheduled-tasks/${id}`),
   runScheduledTask: (id) => api.post(`/v1/scheduled-tasks/${id}/run`),
+  getHostCustomTasks: (hostId) => api.get(`/v1/hosts/${hostId}/custom-tasks`),
 
   // Settings
   getSettings: () => api.get('/v1/settings'),

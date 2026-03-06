@@ -113,6 +113,15 @@ func (db *DB) UpdateScheduledTaskRun(id, status string, lastRunAt, nextRunAt tim
 	return err
 }
 
+// UpdateScheduledTaskStatus updates only last_run_status and last_run_at to NOW().
+// Used when a command result arrives (completed/failed) to reflect the final outcome.
+func (db *DB) UpdateScheduledTaskStatus(id, status string) error {
+	_, err := db.conn.Exec(`
+		UPDATE scheduled_tasks SET last_run_status = $1, last_run_at = NOW() WHERE id = $2`,
+		status, id)
+	return err
+}
+
 // SetScheduledTaskNextRun updates only the next_run_at field (used after registration).
 func (db *DB) SetScheduledTaskNextRun(id string, nextRunAt time.Time) error {
 	_, err := db.conn.Exec(`UPDATE scheduled_tasks SET next_run_at=$1 WHERE id=$2`, nextRunAt, id)

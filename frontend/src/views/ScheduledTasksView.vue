@@ -143,13 +143,19 @@
 
             <div v-if="form.module !== 'apt' && form.module !== 'processes'" class="mb-3">
               <label class="form-label">
-                {{ form.module === 'custom' ? 'ID de la tâche (tasks.yaml)' : 'Cible' }}
+                {{ form.module === 'custom' ? 'Tâche (tasks.yaml)' : 'Cible' }}
               </label>
-              <input v-model="form.target" type="text" class="form-control"
-                :placeholder="form.module === 'custom' ? 'cleanup_logs' : 'nginx.service'" />
-              <div v-if="form.module === 'custom'" class="form-hint">
-                L'ID doit correspondre à une tâche définie dans <code>tasks.yaml</code> sur l'agent.
-              </div>
+              <template v-if="form.module === 'custom'">
+                <select v-if="customTaskOptions.length" v-model="form.target" class="form-select">
+                  <option value="" disabled>-- Sélectionner une tâche --</option>
+                  <option v-for="t in customTaskOptions" :key="t.id" :value="t.id">{{ t.name }} ({{ t.id }})</option>
+                </select>
+                <template v-else>
+                  <input v-model="form.target" type="text" class="form-control" placeholder="cleanup_logs" />
+                  <div class="form-hint">Aucune tâche détectée dans <code>tasks.yaml</code> — saisissez l'ID manuellement.</div>
+                </template>
+              </template>
+              <input v-else v-model="form.target" type="text" class="form-control" placeholder="nginx.service" />
             </div>
 
             <!-- Manual-only toggle -->
@@ -219,6 +225,7 @@ const editingTask = ref(null)
 const saving = ref(false)
 const modalError = ref('')
 const manualOnly = ref(false)
+const customTaskOptions = ref([])
 
 const MANUAL_SENTINEL = '0 0 29 2 *'
 
@@ -235,12 +242,27 @@ const moduleActions = {
 
 const canManage = computed(() => auth.role === 'admin' || auth.role === 'operator')
 
-function onModuleChange() {
+async function onModuleChange() {
   const actions = moduleActions[form.value.module]
   if (actions) {
     form.value.action = actions[0]
   } else {
     form.value.action = ''
+  }
+  if (form.value.module === 'custom') {
+    await loadCustomTasks()
+  }
+}
+
+async function loadCustomTasks() {
+  try {
+    const { data } = await api.getHostCustomTasks(hostId)
+    customTaskOptions.value = Array.isArray(data) ? data : []
+    if (customTaskOptions.value.length && !form.value.target) {
+      form.value.target = customTaskOptions.value[0].id
+    }
+  } catch {
+    customTaskOptions.value = []
   }
 }
 
@@ -314,14 +336,16 @@ async function loadTasks() {
 function openCreate() {
   editingTask.value = null
   manualOnly.value = false
+  customTaskOptions.value = []
   form.value = { name: '', module: 'apt', action: 'update', target: '', cron_expression: '0 3 * * 0', enabled: true }
   modalError.value = ''
   showModal.value = true
 }
 
-function openEdit(task) {
+async function openEdit(task) {
   editingTask.value = task
   manualOnly.value = isManualOnly(task)
+  customTaskOptions.value = []
   form.value = {
     name: task.name,
     module: task.module,
@@ -332,6 +356,9 @@ function openEdit(task) {
   }
   modalError.value = ''
   showModal.value = true
+  if (task.module === 'custom') {
+    await loadCustomTasks()
+  }
 }
 
 function closeModal() {

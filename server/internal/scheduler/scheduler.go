@@ -17,6 +17,7 @@ type DB interface {
 	GetAllScheduledTasks() ([]models.ScheduledTask, error)
 	CreateRemoteCommand(hostID, module, action, target, payload, triggeredBy string, auditLogID *int64) (*models.RemoteCommand, error)
 	UpdateScheduledTaskRun(id, status string, lastRunAt, nextRunAt time.Time) error
+	LinkCommandToScheduledTask(commandID, taskID string) error
 }
 
 // TaskScheduler runs scheduled tasks using robfig/cron.
@@ -123,6 +124,9 @@ func (s *TaskScheduler) makeJob(t models.ScheduledTask) func() {
 			next := s.NextRun(t.ID)
 			_ = s.db.UpdateScheduledTaskRun(t.ID, "failed", now, next)
 			return
+		}
+		if err := s.db.LinkCommandToScheduledTask(cmd.ID, t.ID); err != nil {
+			log.Printf("[scheduler] task %s: failed to link command: %v", t.ID, err)
 		}
 		now := time.Now()
 		next := s.NextRun(t.ID)

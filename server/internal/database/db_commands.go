@@ -92,11 +92,12 @@ func (db *DB) UpdateRemoteCommandStatus(id, status, output string) error {
 func (db *DB) GetRemoteCommandByID(id string) (*models.RemoteCommand, error) {
 	var cmd models.RemoteCommand
 	var startedAt, endedAt sql.NullTime
+	var scheduledTaskID sql.NullString
 	err := db.conn.QueryRow(
-		`SELECT id, host_id, module, action, target, payload, status, output, triggered_by, audit_log_id, created_at, started_at, ended_at
+		`SELECT id, host_id, module, action, target, payload, status, output, triggered_by, audit_log_id, created_at, started_at, ended_at, scheduled_task_id
 		 FROM remote_commands WHERE id = $1`, id,
 	).Scan(&cmd.ID, &cmd.HostID, &cmd.Module, &cmd.Action, &cmd.Target, &cmd.Payload,
-		&cmd.Status, &cmd.Output, &cmd.TriggeredBy, &cmd.AuditLogID, &cmd.CreatedAt, &startedAt, &endedAt)
+		&cmd.Status, &cmd.Output, &cmd.TriggeredBy, &cmd.AuditLogID, &cmd.CreatedAt, &startedAt, &endedAt, &scheduledTaskID)
 	if err != nil {
 		return nil, err
 	}
@@ -106,7 +107,18 @@ func (db *DB) GetRemoteCommandByID(id string) (*models.RemoteCommand, error) {
 	if endedAt.Valid {
 		cmd.EndedAt = &endedAt.Time
 	}
+	if scheduledTaskID.Valid {
+		cmd.ScheduledTaskID = &scheduledTaskID.String
+	}
 	return &cmd, nil
+}
+
+// LinkCommandToScheduledTask associates a remote command with the scheduled task that triggered it.
+func (db *DB) LinkCommandToScheduledTask(commandID, taskID string) error {
+	_, err := db.conn.Exec(
+		`UPDATE remote_commands SET scheduled_task_id = $1 WHERE id = $2`,
+		taskID, commandID)
+	return err
 }
 
 func (db *DB) GetRemoteCommandsByHostAndModule(hostID, module string, limit int) ([]models.RemoteCommand, error) {
@@ -284,7 +296,8 @@ func (db *DB) GetRecentNotifications(limit int) ([]models.NotificationItem, erro
 	return items, nil
 }
 
-// CleanupStalledCommands marks old pending/running commands as failed and closes linked audit logs.
+// CleanupStalledCommands marks old pending/running commands as failed and closes linked audit logs
+// and linked scheduled tasks.
 func (db *DB) CleanupStalledCommands(timeoutMinutes int) error {
 	rows, err := db.conn.Query(`
 		UPDATE remote_commands
@@ -293,7 +306,7 @@ func (db *DB) CleanupStalledCommands(timeoutMinutes int) error {
 		    ended_at = NOW()
 		WHERE status IN ('pending', 'running')
 		  AND created_at < NOW() - INTERVAL '1 minute' * $1
-		RETURNING audit_log_id`,
+		RETURNING audit_log_id, scheduled_task_id`,
 		timeoutMinutes)
 	if err != nil {
 		return fmt.Errorf("failed to cleanup stalled commands: %w", err)
@@ -301,12 +314,19 @@ func (db *DB) CleanupStalledCommands(timeoutMinutes int) error {
 	defer func() { _ = rows.Close() }()
 
 	var auditIDs []int64
+	var taskIDs []string
 	count := 0
 	for rows.Next() {
 		count++
 		var auditLogID sql.NullInt64
-		if err := rows.Scan(&auditLogID); err == nil && auditLogID.Valid {
-			auditIDs = append(auditIDs, auditLogID.Int64)
+		var scheduledTaskID sql.NullString
+		if err := rows.Scan(&auditLogID, &scheduledTaskID); err == nil {
+			if auditLogID.Valid {
+				auditIDs = append(auditIDs, auditLogID.Int64)
+			}
+			if scheduledTaskID.Valid {
+				taskIDs = append(taskIDs, scheduledTaskID.String)
+			}
 		}
 	}
 	if err := rows.Err(); err != nil {
@@ -320,6 +340,12 @@ func (db *DB) CleanupStalledCommands(timeoutMinutes int) error {
 				    details = 'Command timed out - agent may have crashed or restarted'
 				WHERE id = ANY($1)`,
 				pq.Array(auditIDs))
+		}
+		if len(taskIDs) > 0 {
+			_, _ = db.conn.Exec(`
+				UPDATE scheduled_tasks SET last_run_status = 'failed', last_run_at = NOW()
+				WHERE id = ANY($1)`,
+				pq.Array(taskIDs))
 		}
 	}
 	return nil
@@ -335,7 +361,7 @@ func (db *DB) CleanupHostStalledCommands(hostID string, timeoutMinutes int) erro
 		WHERE host_id = $1
 		  AND status IN ('pending', 'running')
 		  AND created_at < NOW() - INTERVAL '1 minute' * $2
-		RETURNING audit_log_id`,
+		RETURNING audit_log_id, scheduled_task_id`,
 		hostID, timeoutMinutes)
 	if err != nil {
 		return fmt.Errorf("failed to cleanup host stalled commands: %w", err)
@@ -343,12 +369,19 @@ func (db *DB) CleanupHostStalledCommands(hostID string, timeoutMinutes int) erro
 	defer func() { _ = rows.Close() }()
 
 	var auditIDs []int64
+	var taskIDs []string
 	count := 0
 	for rows.Next() {
 		count++
 		var auditLogID sql.NullInt64
-		if err := rows.Scan(&auditLogID); err == nil && auditLogID.Valid {
-			auditIDs = append(auditIDs, auditLogID.Int64)
+		var scheduledTaskID sql.NullString
+		if err := rows.Scan(&auditLogID, &scheduledTaskID); err == nil {
+			if auditLogID.Valid {
+				auditIDs = append(auditIDs, auditLogID.Int64)
+			}
+			if scheduledTaskID.Valid {
+				taskIDs = append(taskIDs, scheduledTaskID.String)
+			}
 		}
 	}
 	if err := rows.Err(); err != nil {
@@ -364,6 +397,12 @@ func (db *DB) CleanupHostStalledCommands(hostID string, timeoutMinutes int) erro
 				    details = 'Command timed out - agent may have crashed or restarted'
 				WHERE id = ANY($1)`,
 				pq.Array(auditIDs))
+		}
+		if len(taskIDs) > 0 {
+			_, _ = db.conn.Exec(`
+				UPDATE scheduled_tasks SET last_run_status = 'failed', last_run_at = NOW()
+				WHERE id = ANY($1)`,
+				pq.Array(taskIDs))
 		}
 	}
 	return nil

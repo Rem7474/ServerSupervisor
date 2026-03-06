@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -153,6 +154,15 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 		}
 	}
 
+	// Store available custom tasks from agent's tasks.yaml
+	if len(report.CustomTasks) > 0 {
+		if b, err := json.Marshal(report.CustomTasks); err == nil {
+			if err := h.db.UpdateHostCustomTasks(hostID, string(b)); err != nil {
+				log.Printf("Warning: failed to store custom tasks for host %s: %v", safeHostID, err)
+			}
+		}
+	}
+
 	// Return pending commands for this host (unified remote_commands table)
 	commands, _ := h.db.GetPendingRemoteCommands(hostID)
 	if commands == nil {
@@ -202,6 +212,13 @@ func (h *AgentHandler) ReportCommandResult(c *gin.Context) {
 
 	// Broadcast status to WebSocket clients (UUID string, no conversion needed)
 	h.streamHub.BroadcastStatus(result.CommandID, result.Status, result.Output)
+
+	// Update linked scheduled task with final status
+	if cmd.ScheduledTaskID != nil && (result.Status == "completed" || result.Status == "failed") {
+		if err := h.db.UpdateScheduledTaskStatus(*cmd.ScheduledTaskID, result.Status); err != nil {
+			log.Printf("Failed to update scheduled task %s status: %v", *cmd.ScheduledTaskID, err)
+		}
+	}
 
 	// APT post-processing
 	if cmd.Module == "apt" && result.Status == "completed" {

@@ -80,6 +80,22 @@ func validateTasksConfig(cfg *TasksConfig) error {
 	return nil
 }
 
+// TaskSummary is the lightweight representation sent in agent reports so the
+// server can display available custom tasks in the UI.
+type TaskSummary struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// Summaries returns a lightweight list of all tasks (ID + Name only).
+func (c *TasksConfig) Summaries() []TaskSummary {
+	out := make([]TaskSummary, len(c.Tasks))
+	for i, t := range c.Tasks {
+		out[i] = TaskSummary{ID: t.ID, Name: t.Name}
+	}
+	return out
+}
+
 // FindTask returns the CustomTask with the given ID, or nil if not found.
 func (c *TasksConfig) FindTask(id string) *CustomTask {
 	for i := range c.Tasks {

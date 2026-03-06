@@ -157,6 +157,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *NotificationHub,
 		// Scheduled Tasks
 		api.GET("/hosts/:id/scheduled-tasks", scheduledTaskH.ListScheduledTasks)
 		api.POST("/hosts/:id/scheduled-tasks", scheduledTaskH.CreateScheduledTask)
+		api.GET("/hosts/:id/custom-tasks", scheduledTaskH.GetCustomTasks)
 		api.PUT("/scheduled-tasks/:id", scheduledTaskH.UpdateScheduledTask)
 		api.DELETE("/scheduled-tasks/:id", scheduledTaskH.DeleteScheduledTask)
 		api.POST("/scheduled-tasks/:id/run", scheduledTaskH.RunScheduledTask)

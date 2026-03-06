@@ -2,6 +2,7 @@ package api
 
 import (
 	"database/sql"
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -174,6 +175,18 @@ func (h *ScheduledTaskHandler) DeleteScheduledTask(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "deleted"})
 }
 
+// GetCustomTasks returns the list of available custom tasks for a host,
+// as reported by the agent from its local tasks.yaml.
+func (h *ScheduledTaskHandler) GetCustomTasks(c *gin.Context) {
+	hostID := c.Param("id")
+	tasksJSON, err := h.db.GetHostCustomTasks(hostID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.Data(http.StatusOK, "application/json", []byte(tasksJSON))
+}
+
 // RunScheduledTask triggers a scheduled task immediately (manual execution).
 func (h *ScheduledTaskHandler) RunScheduledTask(c *gin.Context) {
 	taskID := c.Param("id")
@@ -201,6 +214,11 @@ func (h *ScheduledTaskHandler) RunScheduledTask(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+
+	if err := h.db.LinkCommandToScheduledTask(cmd.ID, task.ID); err != nil {
+		log.Printf("Failed to link command %s to scheduled task %s: %v", cmd.ID, task.ID, err)
+	}
+	_ = h.db.UpdateScheduledTaskStatus(task.ID, "pending")
 
 	c.JSON(http.StatusOK, gin.H{"command_id": cmd.ID, "status": "pending"})
 }

@@ -130,10 +130,11 @@ type RemoteCommand struct {
 	Status      string     `json:"status" db:"status"`   // pending | running | completed | failed
 	Output      string     `json:"output" db:"output"`
 	TriggeredBy string     `json:"triggered_by" db:"triggered_by"`
-	AuditLogID  *int64     `json:"audit_log_id,omitempty" db:"audit_log_id"`
-	CreatedAt   time.Time  `json:"created_at" db:"created_at"`
-	StartedAt   *time.Time `json:"started_at" db:"started_at"`
-	EndedAt     *time.Time `json:"ended_at" db:"ended_at"`
+	AuditLogID      *int64     `json:"audit_log_id,omitempty" db:"audit_log_id"`
+	ScheduledTaskID *string    `json:"scheduled_task_id,omitempty" db:"scheduled_task_id"`
+	CreatedAt       time.Time  `json:"created_at" db:"created_at"`
+	StartedAt       *time.Time `json:"started_at" db:"started_at"`
+	EndedAt         *time.Time `json:"ended_at" db:"ended_at"`
 }
 
 type DockerCommandRequest struct {
@@ -278,18 +279,26 @@ type VersionComparison struct {
 
 // ========== Agent Heartbeat / Full Report ==========
 
+// CustomTaskSummary is the lightweight representation of a custom task sent in
+// agent reports so the server can display available tasks in the UI.
+type CustomTaskSummary struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
 type AgentReport struct {
-	HostID          string           `json:"host_id"`
-	AgentVersion    string           `json:"agent_version"`
-	Metrics         *SystemMetrics   `json:"metrics,omitempty"`
-	Docker          *DockerReport    `json:"docker,omitempty"`
-	AptStatus       *AptStatus       `json:"apt_status,omitempty"`
-	DockerNetworks  []DockerNetwork  `json:"docker_networks,omitempty"`
-	ContainerEnvs   []ContainerEnv   `json:"container_envs,omitempty"`
-	ComposeProjects []ComposeProject `json:"compose_projects,omitempty"`
-	DiskMetrics     []DiskMetrics    `json:"disk_metrics,omitempty"`
-	DiskHealth      []DiskHealth     `json:"disk_health,omitempty"`
-	Timestamp       time.Time        `json:"timestamp"`
+	HostID          string               `json:"host_id"`
+	AgentVersion    string               `json:"agent_version"`
+	Metrics         *SystemMetrics       `json:"metrics,omitempty"`
+	Docker          *DockerReport        `json:"docker,omitempty"`
+	AptStatus       *AptStatus           `json:"apt_status,omitempty"`
+	DockerNetworks  []DockerNetwork      `json:"docker_networks,omitempty"`
+	ContainerEnvs   []ContainerEnv       `json:"container_envs,omitempty"`
+	ComposeProjects []ComposeProject     `json:"compose_projects,omitempty"`
+	DiskMetrics     []DiskMetrics        `json:"disk_metrics,omitempty"`
+	DiskHealth      []DiskHealth         `json:"disk_health,omitempty"`
+	CustomTasks     []CustomTaskSummary  `json:"custom_tasks,omitempty"`
+	Timestamp       time.Time            `json:"timestamp"`
 }
 
 // ========== Commands (server → agent) ==========

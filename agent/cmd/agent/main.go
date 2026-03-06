@@ -192,6 +192,12 @@ func sendReport(ctx context.Context, cfg *config.Config, s *sender.Sender) {
 		}
 	}
 
+	// Include custom task summaries so the server can display them in the UI.
+	var customTasksList interface{}
+	if tasksConfig != nil && len(tasksConfig.Tasks) > 0 {
+		customTasksList = tasksConfig.Summaries()
+	}
+
 	// Send report (with retry on transient network errors)
 	report := &sender.Report{
 		AgentVersion:    Version,
@@ -203,6 +209,7 @@ func sendReport(ctx context.Context, cfg *config.Config, s *sender.Sender) {
 		ComposeProjects: composeProjects,
 		DiskMetrics:     diskMetrics,
 		DiskHealth:      diskHealth,
+		CustomTasks:     customTasksList,
 		Timestamp:       time.Now(),
 	}
 

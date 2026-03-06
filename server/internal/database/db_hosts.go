@@ -111,6 +111,23 @@ func (db *DB) GetAllHosts() ([]models.Host, error) {
 	return hosts, nil
 }
 
+// UpdateHostCustomTasks stores the list of available custom tasks for a host.
+// tasksJSON must be a valid JSON array (e.g. `[{"id":"x","name":"y"}]`).
+func (db *DB) UpdateHostCustomTasks(hostID, tasksJSON string) error {
+	_, err := db.conn.Exec(
+		`UPDATE hosts SET custom_tasks = $1::jsonb WHERE id = $2`,
+		tasksJSON, hostID)
+	return err
+}
+
+// GetHostCustomTasks returns the cached custom task list for a host as a JSON string.
+func (db *DB) GetHostCustomTasks(hostID string) (string, error) {
+	var tasks string
+	err := db.conn.QueryRow(
+		`SELECT custom_tasks::text FROM hosts WHERE id = $1`, hostID).Scan(&tasks)
+	return tasks, err
+}
+
 func (db *DB) UpdateHostStatus(id, status string) error {
 	_, err := db.conn.Exec(
 		`UPDATE hosts SET status = $1, last_seen = NOW(), updated_at = NOW() WHERE id = $2`,
