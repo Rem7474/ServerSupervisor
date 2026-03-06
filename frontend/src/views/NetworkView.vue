@@ -298,10 +298,7 @@
                       <tr
                         v-for="port in discoveredPortsByHost[host.id] || []"
                         :key="port.key"
-                        :class="{
-                          'opacity-50': !getPortSetting(host.id, port.port).enabled,
-                          'table-info': getPortSetting(host.id, port.port).linkToProxy
-                        }"
+                        :class="portRowClass(host.id, port.port)"
                       >
                         <td class="fw-semibold">{{ port.port }}</td>
                         <td class="text-secondary text-uppercase">{{ port.protocol }}</td>
@@ -1041,6 +1038,15 @@ function getPortProxyTooltip(hostId, portNumber) {
   return !setting.enabled ? "Activez d'abord l'affichage du port" : ''
 }
 
+function portRowClass(hostId, portNumber) {
+  const s = getPortSetting(hostId, portNumber)
+  return {
+    'opacity-50': !s.enabled,
+    'port-row-proxy': s.enabled && s.linkToProxy && !s.linkToAuthelia,
+    'port-row-authelia': s.enabled && s.linkToAuthelia,
+  }
+}
+
 function countEnabled(hostId) {
   const entry = hostPortConfig.value.find(e => e.hostId === hostId)
   if (!entry) return (discoveredPortsByHost.value[hostId] || []).length
@@ -1205,6 +1211,14 @@ onUnmounted(() => {
 <style scoped>
 .network-topology-card {
   overflow: hidden;
+}
+
+/* Network port row coloring */
+.port-row-proxy {
+  background-color: rgba(var(--tblr-cyan-rgb, 23, 162, 184), 0.07) !important;
+}
+.port-row-authelia {
+  background-color: rgba(var(--tblr-purple-rgb, 132, 90, 223), 0.08) !important;
 }
 
 .network-subnav {

@@ -304,9 +304,7 @@
                   class="btn btn-sm btn-ghost-secondary"
                   title="Voir les logs"
                 >
-                  <svg class="icon" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
-                  </svg>
+                  <svg class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" xmlns="http://www.w3.org/2000/svg"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 6l16 0" /><path d="M4 12l16 0" /><path d="M4 18l12 0" /></svg>
                 </button>
               </td>
             </tr>
@@ -555,6 +553,18 @@
                 </svg>
               </button>
               <button
+                @click="clearConsoleOutput"
+                class="btn btn-sm btn-ghost-secondary"
+                title="Vider la console"
+                :disabled="!liveCommand"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="18" height="18" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                  <path d="M4 7h16" /><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12" />
+                  <path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3" />
+                </svg>
+              </button>
+              <button
                 @click="closeLiveConsole(); showConsole = false"
                 class="btn btn-sm btn-ghost-secondary"
                 title="Masquer la console"
@@ -790,6 +800,11 @@ function downloadConsoleOutput() {
   a.download = `console-${liveCommand.value.command || 'output'}.txt`
   a.click()
   URL.revokeObjectURL(url)
+}
+
+function clearConsoleOutput() {
+  if (!liveCommand.value) return
+  liveCommand.value = { ...liveCommand.value, output: '' }
 }
 
 const chartOptions = {
@@ -1344,6 +1359,9 @@ function connectStreamWebSocket(commandId) {
         nextTick(() => scrollToBottom())
       } else if (payload.type === 'cmd_status_update') {
         liveCommand.value.status = payload.status
+        // Sync status in history table immediately (no reload needed for intermediate states)
+        const histCmd = cmdHistory.value.find(c => c.id === liveCommand.value.id)
+        if (histCmd) histCmd.status = payload.status
         if (payload.status === 'completed' || payload.status === 'failed') {
           loadCmdHistory()
         }

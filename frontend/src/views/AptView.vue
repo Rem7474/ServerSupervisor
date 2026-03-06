@@ -157,8 +157,8 @@
                           <div class="d-flex align-items-center gap-2">
                             <span :class="statusClass(cmd.status)">{{ cmd.status }}</span>
                             <span class="text-secondary small">{{ formatDuration(cmd.started_at, cmd.ended_at) }}</span>
-                            <button @click="watchCommand(cmd, host)" class="btn btn-sm btn-outline-primary">
-                              Voir les logs
+                            <button @click="watchCommand(cmd, host)" class="btn btn-sm btn-ghost-secondary" title="Voir les logs">
+                              <svg class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" xmlns="http://www.w3.org/2000/svg"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 6l16 0" /><path d="M4 12l16 0" /><path d="M4 18l12 0" /></svg>
                             </button>
                           </div>
                         </div>

@@ -15,8 +15,8 @@
           <tr>
             <th>Point de montage</th>
             <th>Utilisation</th>
-            <th style="width: 20%">Utilisation espace</th>
-            <th style="width: 15%">Inodes</th>
+            <th class="col-disk-usage">Utilisation espace</th>
+            <th class="col-disk-inodes">Inodes</th>
           </tr>
         </thead>
         <tbody>
@@ -99,3 +99,11 @@ function getProgressBarClass(percent) {
   return 'bg-success'
 }
 </script>
+
+<style scoped>
+.col-disk-usage { width: 20%; }
+.col-disk-inodes { width: 15%; }
+@media (max-width: 576px) {
+  .col-disk-usage, .col-disk-inodes { width: auto; }
+}
+</style>

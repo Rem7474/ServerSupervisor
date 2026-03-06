@@ -207,8 +207,21 @@
       <div class="card mb-4">
         <div class="card-body">
           <div class="row g-3">
-            <div class="col-md-6 col-lg-4">
+            <div class="col-12 col-md-6 col-lg-3">
               <input v-model="composeSearch" type="text" class="form-control" placeholder="Rechercher un projet..." />
+            </div>
+            <div class="col-12 col-md-6 col-lg-3">
+              <select v-model="composeHostFilter" class="form-select">
+                <option value="">Tous les hôtes</option>
+                <option v-for="h in uniqueHosts" :key="h" :value="h">{{ h }}</option>
+              </select>
+            </div>
+            <div class="col-12 col-md-6 col-lg-3">
+              <select v-model="composeStateFilter" class="form-select">
+                <option value="">Tous les états</option>
+                <option value="running">En cours</option>
+                <option value="stopped">Arrêté</option>
+              </select>
             </div>
           </div>
         </div>
@@ -221,6 +234,7 @@
               <tr>
                 <th>Projet</th>
                 <th>Hôte</th>
+                <th>État</th>
                 <th>Services</th>
                 <th>Fichier de config</th>
                 <th></th>
@@ -233,6 +247,11 @@
                   <router-link :to="`/hosts/${p.host_id}`" class="text-decoration-none">
                     {{ p.hostname }}
                   </router-link>
+                </td>
+                <td>
+                  <span :class="getComposeStatus(p) === 'running' ? 'badge bg-green-lt text-green' : 'badge bg-secondary-lt text-secondary'">
+                    {{ getComposeStatus(p) === 'running' ? 'En cours' : 'Arrêté' }}
+                  </span>
                 </td>
                 <td>
                   <div class="d-flex flex-wrap gap-1">
@@ -625,6 +644,8 @@ const stateFilter = ref('')
 const hostFilter = ref('')
 const composeFilter = ref('')
 const composeSearch = ref('')
+const composeHostFilter = ref('')
+const composeStateFilter = ref('')
 const selectedContainer = ref(null)
 const selectedProject = ref(null)
 const activeTab = useLocalStorage('dockerActiveTab', 'containers')
@@ -742,14 +763,19 @@ const uniqueHosts = computed(() => {
 })
 
 const filteredComposeProjects = computed(() => {
-  if (!composeSearch.value) return composeProjects.value
-  const q = composeSearch.value.toLowerCase()
-  return composeProjects.value.filter(p =>
-    p.name?.toLowerCase().includes(q) ||
-    p.hostname?.toLowerCase().includes(q) ||
-    p.config_file?.toLowerCase().includes(q) ||
-    p.working_dir?.toLowerCase().includes(q)
-  )
+  return composeProjects.value.filter(p => {
+    if (composeSearch.value) {
+      const q = composeSearch.value.toLowerCase()
+      const match = p.name?.toLowerCase().includes(q) ||
+        p.hostname?.toLowerCase().includes(q) ||
+        p.config_file?.toLowerCase().includes(q) ||
+        p.working_dir?.toLowerCase().includes(q)
+      if (!match) return false
+    }
+    if (composeHostFilter.value && p.hostname !== composeHostFilter.value) return false
+    if (composeStateFilter.value && getComposeStatus(p) !== composeStateFilter.value) return false
+    return true
+  })
 })
 
 // ===== Docker Actions =====
