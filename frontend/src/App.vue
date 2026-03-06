@@ -192,6 +192,11 @@ function handleOutsideClick(event) {
 
 onMounted(() => {
   document.addEventListener('click', handleOutsideClick, true)
+  // Auto-close mobile navbar after navigation
+  router.afterEach(() => {
+    const el = document.getElementById('navbar-menu')
+    if (el?.classList.contains('show')) el.classList.remove('show')
+  })
 })
 
 onUnmounted(() => {

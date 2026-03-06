@@ -4,6 +4,12 @@ html {
   overflow-x: hidden;
 }
 
+/* Mobile table scrolling */
+.table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 body {
   min-height: 100vh;
   margin: 0;

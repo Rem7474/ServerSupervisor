@@ -13,25 +13,13 @@
     <WsStatusBar :status="wsStatus" :error="wsError" :retry-count="retryCount" @reconnect="reconnect" />
 
     <!-- Onglets -->
-    <div class="mb-3">
-      <div class="btn-group">
-        <button
-          class="btn"
-          :class="activeTab === 'hosts' ? 'btn-primary' : 'btn-outline-secondary'"
-          @click="activeTab = 'hosts'"
-        >
-          Hôtes
-        </button>
-        <button
-          class="btn"
-          :class="activeTab === 'history' ? 'btn-primary' : 'btn-outline-secondary'"
-          @click="activeTab = 'history'"
-        >
-          Historique
-          <span v-if="allHistory.length" class="badge bg-azure-lt text-azure ms-1">{{ allHistory.length }}</span>
-        </button>
-      </div>
-    </div>
+    <SubNavigation
+      v-model="activeTab"
+      :tabs="[
+        { key: 'hosts', label: 'Hôtes' },
+        { key: 'history', label: 'Historique', badge: allHistory.length || undefined }
+      ]"
+    />
 
     <!-- Layout partagé pour les deux onglets -->
     <div class="apt-layout">
@@ -370,6 +358,7 @@ import { useAuthStore } from '../stores/auth'
 import { useWebSocket } from '../composables/useWebSocket'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
 import WsStatusBar from '../components/WsStatusBar.vue'
+import SubNavigation from '../components/SubNavigation.vue'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import utc from 'dayjs/plugin/utc'
