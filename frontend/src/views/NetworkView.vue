@@ -6,8 +6,8 @@
         <span class="text-muted mx-1">/</span>
         <span>Réseau</span>
       </div>
-      <h2 class="page-title">Network</h2>
-      <div class="text-secondary">Ports exposes et trafic par hote</div>
+      <h2 class="page-title">Réseau</h2>
+      <div class="text-secondary">Ports exposés et trafic par hôte</div>
     </div>
 
     <WsStatusBar :status="wsStatus" :error="wsError" :retry-count="retryCount" @reconnect="reconnect" />

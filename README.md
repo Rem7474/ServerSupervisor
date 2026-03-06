@@ -1,6 +1,6 @@
 # ServerSupervisor
 
-Système de supervision d'infrastructure : monitoring de VMs, conteneurs Docker, mises à jour APT, services systemd et suivi des releases GitHub.
+Système de supervision d'infrastructure : monitoring de VMs, conteneurs Docker, mises à jour APT, services systemd, tâches planifiées et suivi des releases GitHub.
 
 ## Architecture
 
@@ -15,6 +15,9 @@ Système de supervision d'infrastructure : monitoring de VMs, conteneurs Docker,
 │  │ Alertes  │ │ Audit    │ │ Users    │ │ System        │  │
 │  │ (rules)  │ │Commandes │ │ (RBAC)   │ │ Systemd/Proc  │  │
 │  └──────────┘ └──────────┘ └──────────┘ └───────────────┘  │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │ Tâches planifiées — cron par hôte + exéc. manuelle  │   │
+│  └──────────────────────────────────────────────────────┘   │
 ├─────────────────────────────────────────────────────────────┤
 │              Server Go (API REST + WebSocket + JWT)         │
 │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌───────────────┐  │
@@ -25,6 +28,9 @@ Système de supervision d'infrastructure : monitoring de VMs, conteneurs Docker,
 │  │ Audit    │ │ GitHub   │ │ Settings │ │ Metrics       │  │
 │  │ Logs     │ │ Tracker  │ │ (DB)     │ │ Aggregation   │  │
 │  └──────────┘ └──────────┘ └──────────┘ └───────────────┘  │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │ Task Scheduler (cron) — déclenche remote_commands    │   │
+│  └──────────────────────────────────────────────────────┘   │
 ├─────────────────────────────────────────────────────────────┤
 │                       PostgreSQL                            │
 └─────────────────────────────────────────────────────────────┘
@@ -46,11 +52,12 @@ Système de supervision d'infrastructure : monitoring de VMs, conteneurs Docker,
 - **Docker** : vue globale de tous les conteneurs et projets docker-compose sur toute l'infrastructure
 - **Network** : topologie réseau avec liens Docker (réseaux, env vars), override manuel des services
 - **APT** : gestion centralisée des mises à jour avec actions groupées et console live streamée
-- **System** : exécution à distance de commandes systemd (start/stop/restart/enable/disable), logs journalctl streamés, snapshot des processus
+- **Détail hôte** : exécution à distance de commandes systemd (start/stop/restart/enable/disable), logs journalctl streamés, snapshot des processus — directement depuis la page hôte
 - **Streaming commandes** : affichage en temps réel de la sortie des commandes longues via WebSocket
 - **Versions** : suivi des releases GitHub et comparaison avec les images Docker en cours
 - **Audit → Commandes** : historique paginé de toutes les commandes (apt/docker/systemd/journal/processus), toutes sources
 - **Audit → Connexions** : logs de connexion avec statistiques et IPs bloquées (admin)
+- **Tâches planifiées** : création de tâches cron par hôte (apt, docker, systemd, journal, processus ou custom), déclenchement manuel immédiat, historique des exécutions
 - **Alertes** : règles d'alertes configurables avec notifications email (SMTP), ntfy, webhook ou notifications navigateur
 - **Sécurité** : résumé des connexions 24h, IPs bloquées, déblocage manuel
 
@@ -60,6 +67,7 @@ Système de supervision d'infrastructure : monitoring de VMs, conteneurs Docker,
 - Détection des mises à jour APT disponibles, extraction des CVEs
 - Collecte S.M.A.R.T. et métriques disques (via `smartctl`)
 - Exécution de commandes distantes : APT, Docker/Compose, systemd, journalctl, snapshot processus
+- **Tâches custom** : exécution de scripts/binaires locaux pré-déclarés dans `tasks.yaml` (allowlist, sans shell, sans exécution de code arbitraire distant)
 - Streaming temps réel de la sortie des commandes longues (chunk par chunk)
 - Rapport de résultat des commandes autonomes au démarrage (ex: `apt update`)
 - Binaire unique sans dépendances, multi-architecture (amd64/arm64/armv7/armv6)
@@ -248,6 +256,32 @@ serversupervisor-agent --init
 
 > Toutes les options sont également configurables via variables d'environnement (préfixe `SUPERVISOR_`), utile pour les déploiements Docker/Kubernetes.
 
+### Tâches custom (`tasks.yaml`)
+
+Les tâches custom permettent de définir localement sur l'agent des scripts ou binaires déclenchables depuis le serveur. Le serveur ne peut qu'appeler une tâche par son ID — il n'envoie jamais de code arbitraire.
+
+Chemin par défaut : `/etc/serversupervisor/tasks.yaml` (override : variable `TASKS_CONFIG_PATH`)
+
+```yaml
+tasks:
+  - id: cleanup_logs
+    name: "Nettoyer les vieux logs"
+    command: ["find", "/var/log", "-name", "*.log", "-mtime", "+30", "-delete"]
+    timeout: 120          # secondes (défaut 60, max 3600)
+
+  - id: backup_db
+    name: "Backup PostgreSQL"
+    command: ["pg_dump", "-U", "postgres", "mydb", "-f", "/backups/db.sql"]
+    timeout: 300
+```
+
+| Champ | Description |
+|---|---|
+| `id` | Identifiant unique (alphanumérique + `-` + `_`, max 64 chars) |
+| `name` | Nom affiché dans le dashboard |
+| `command` | Argv (tableau) — exécuté directement, **sans shell**, pas d'injection possible |
+| `timeout` | Timeout en secondes (défaut 60, max 3600) |
+
 ---
 
 ## API REST
@@ -362,6 +396,15 @@ curl http://localhost:8080/api/v1/hosts \
 | `POST` | `/api/v1/repos` | Ajouter un repo |
 | `DELETE` | `/api/v1/repos/:id` | Supprimer un repo |
 
+#### Tâches planifiées
+| Méthode | Endpoint | Description | Rôle |
+|---|---|---|---|
+| `GET` | `/api/v1/hosts/:id/scheduled-tasks` | Lister les tâches d'un hôte | Authentifié |
+| `POST` | `/api/v1/hosts/:id/scheduled-tasks` | Créer une tâche planifiée | Operator+ |
+| `PUT` | `/api/v1/scheduled-tasks/:id` | Modifier une tâche | Operator+ |
+| `DELETE` | `/api/v1/scheduled-tasks/:id` | Supprimer une tâche | Operator+ |
+| `POST` | `/api/v1/scheduled-tasks/:id/run` | Déclencher manuellement | Operator+ |
+
 #### Settings
 | Méthode | Endpoint | Description | Rôle |
 |---|---|---|---|
@@ -455,6 +498,7 @@ ServerSupervisor/
 │       │   ├── docker.go           # Docker + Compose
 │       │   ├── system.go           # Systemd + journal + processus
 │       │   ├── apt.go              # APT management
+│       │   ├── scheduled_tasks.go  # Tâches planifiées (CRUD + run)
 │       │   ├── network.go          # Topologie réseau
 │       │   ├── alert_rules.go      # Règles d'alertes (CRUD unifié)
 │       │   ├── alerts.go           # Incidents d'alertes
@@ -466,14 +510,18 @@ ServerSupervisor/
 │       ├── alerts/engine.go        # Moteur d'évaluation des alertes
 │       ├── config/config.go        # Config + OverrideFromDB
 │       ├── database/               # Couche PostgreSQL (db_*.go)
-│       │   └── migrations/         # Migrations SQL (001 → 011)
+│       │   ├── db_scheduled_tasks.go
+│       │   └── migrations/         # Migrations SQL (001 → 014)
 │       ├── github/                 # GitHub release tracker
+│       ├── scheduler/scheduler.go  # Scheduler cron (robfig/cron)
 │       └── models/models.go        # Modèles de données partagés
 ├── agent/                          # Agent Go
 │   ├── cmd/agent/main.go
 │   └── internal/
 │       ├── collector/              # system.go, docker.go, apt.go, disk.go…
-│       ├── config/config.go        # Config YAML + env vars
+│       ├── config/
+│       │   ├── config.go           # Config YAML + env vars
+│       │   └── tasks.go            # Loader tasks.yaml (tâches custom)
 │       └── sender/sender.go        # Envoi rapports + commandes
 ├── frontend/                       # Dashboard Vue.js (Tabler CSS)
 │   └── src/
@@ -482,12 +530,12 @@ ServerSupervisor/
 │       ├── stores/auth.js          # Store Pinia (auth + rôle)
 │       └── views/
 │           ├── DashboardView.vue
-│           ├── HostDetailView.vue
-│           ├── SystemView.vue      # Systemd / journal / processus
+│           ├── HostDetailView.vue      # Dashboard hôte (métriques, docker, systemd, journal, processus)
+│           ├── ScheduledTasksView.vue  # Tâches planifiées par hôte
 │           ├── DockerView.vue
 │           ├── NetworkView.vue
 │           ├── AptView.vue
-│           ├── AuditLogsView.vue   # Commandes + Connexions
+│           ├── AuditLogsView.vue       # Commandes + Connexions
 │           ├── AlertsView.vue
 │           ├── SecurityView.vue
 │           ├── SettingsView.vue

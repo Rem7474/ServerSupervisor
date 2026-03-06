@@ -3,9 +3,9 @@
     <div class="page-header mb-3">
       <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3">
         <div>
-          <div class="text-secondary small">
+          <div class="page-pretitle">
             <router-link to="/" class="text-decoration-none">Dashboard</router-link>
-            <span class="mx-1">/</span>
+            <span class="text-muted mx-1">/</span>
             <span>Hôte</span>
           </div>
           <h2 class="page-title">{{ host?.name || host?.hostname || 'Chargement...' }}</h2>
@@ -17,7 +17,7 @@
         </div>
         <div class="d-flex align-items-center gap-2">
           <router-link to="/" class="btn btn-outline-secondary">Retour au dashboard</router-link>
-          <router-link :to="`/hosts/${hostId}/system`" class="btn btn-outline-secondary">Système</router-link>
+          <router-link :to="`/hosts/${hostId}/scheduled-tasks`" class="btn btn-outline-secondary">Tâches planifiées</router-link>
         <button @click="startEdit" class="btn btn-outline-secondary">Modifier</button>
         <button @click="deleteHost" class="btn btn-outline-danger">Supprimer</button>
         <span v-if="host?.agent_version" :class="isAgentUpToDate(host.agent_version) ? 'badge bg-green-lt text-green' : 'badge bg-yellow-lt text-yellow'">

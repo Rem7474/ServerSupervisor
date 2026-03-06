@@ -3,11 +3,11 @@
     <div class="page-header mb-3">
       <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3">
         <div>
-          <div class="text-secondary small">
+          <div class="page-pretitle">
             <router-link to="/" class="text-decoration-none">Dashboard</router-link>
-            <span class="mx-1">/</span>
+            <span class="text-muted mx-1">/</span>
             <router-link :to="`/hosts/${hostId}`" class="text-decoration-none">Hôte</router-link>
-            <span class="mx-1">/</span>
+            <span class="text-muted mx-1">/</span>
             <span>Tâches planifiées</span>
           </div>
           <h2 class="page-title">Tâches planifiées</h2>

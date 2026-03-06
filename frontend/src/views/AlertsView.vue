@@ -4,9 +4,9 @@
       <div class="container-xl">
         <div class="row g-2 align-items-center">
           <div class="col">
-            <div class="text-secondary small">
+            <div class="page-pretitle">
               <router-link to="/" class="text-decoration-none">Dashboard</router-link>
-              <span class="mx-1">/</span>
+              <span class="text-muted mx-1">/</span>
               <span>Alertes</span>
             </div>
             <h2 class="page-title">Alertes</h2>

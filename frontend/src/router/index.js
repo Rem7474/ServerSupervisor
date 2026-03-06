@@ -92,12 +92,6 @@ const routes = [
     meta: { requiresAuth: true },
   },
   {
-    path: '/hosts/:id/system',
-    name: 'HostSystem',
-    component: () => import('../views/SystemView.vue'),
-    meta: { requiresAuth: true },
-  },
-  {
     path: '/hosts/:id/scheduled-tasks',
     name: 'ScheduledTasks',
     component: () => import('../views/ScheduledTasksView.vue'),
