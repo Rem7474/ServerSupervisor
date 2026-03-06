@@ -44,16 +44,16 @@
       <div class="card mb-4">
         <div class="card-body">
           <div class="row g-3">
-            <div class="col-12 col-md-6 col-lg-3">
+            <div class="col-6 col-md-6 col-lg-3">
               <input v-model="search" type="text" class="form-control" placeholder="Rechercher..." />
             </div>
-            <div class="col-12 col-md-6 col-lg-3">
+            <div class="col-6 col-md-6 col-lg-3">
               <select v-model="hostFilter" class="form-select">
                 <option value="">Tous les hôtes</option>
                 <option v-for="h in uniqueHosts" :key="h" :value="h">{{ h }}</option>
               </select>
             </div>
-            <div class="col-12 col-md-6 col-lg-3">
+            <div class="col-6 col-md-6 col-lg-3">
               <select v-model="stateFilter" class="form-select">
                 <option value="">Tous les états</option>
                 <option value="running">En cours</option>
@@ -64,7 +64,7 @@
                 <option value="dead">Mort</option>
               </select>
             </div>
-            <div class="col-12 col-md-6 col-lg-3">
+            <div class="col-6 col-md-6 col-lg-3">
               <select v-model="composeFilter" class="form-select">
                 <option value="">Tous les conteneurs</option>
                 <option value="compose">Docker Compose</option>
@@ -207,16 +207,16 @@
       <div class="card mb-4">
         <div class="card-body">
           <div class="row g-3">
-            <div class="col-12 col-md-6 col-lg-3">
+            <div class="col-6 col-md-6 col-lg-3">
               <input v-model="composeSearch" type="text" class="form-control" placeholder="Rechercher un projet..." />
             </div>
-            <div class="col-12 col-md-6 col-lg-3">
+            <div class="col-6 col-md-6 col-lg-3">
               <select v-model="composeHostFilter" class="form-select">
                 <option value="">Tous les hôtes</option>
                 <option v-for="h in uniqueHosts" :key="h" :value="h">{{ h }}</option>
               </select>
             </div>
-            <div class="col-12 col-md-6 col-lg-3">
+            <div class="col-6 col-md-6 col-lg-3">
               <select v-model="composeStateFilter" class="form-select">
                 <option value="">Tous les états</option>
                 <option value="running">En cours</option>
@@ -966,6 +966,7 @@ const { wsStatus, wsError, retryCount, reconnect } = useWebSocket('/api/v1/ws/do
 @media (max-width: 991px) {
   .docker-layout {
     flex-direction: column;
+    align-items: stretch;
   }
 
   .docker-console {

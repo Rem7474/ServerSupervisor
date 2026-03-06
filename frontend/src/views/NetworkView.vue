@@ -16,8 +16,9 @@
       <div class="col-sm-6 col-lg-3">
         <div class="card card-sm">
           <div class="card-body">
-            <div class="subheader">Hotes</div>
+            <div class="subheader">Hôtes</div>
             <div class="h1 mb-0">{{ hosts.length }}</div>
+            <div class="text-secondary small">{{ hostsOnline }} en ligne</div>
           </div>
         </div>
       </div>
@@ -26,6 +27,7 @@
           <div class="card-body">
             <div class="subheader">Conteneurs</div>
             <div class="h1 mb-0">{{ containers.length }}</div>
+            <div class="text-secondary small">{{ containersRunning }} actifs</div>
           </div>
         </div>
       </div>
@@ -34,15 +36,19 @@
           <div class="card-body">
             <div class="subheader">Ports visibles</div>
             <div class="h1 mb-0">{{ totalPorts }}</div>
+            <div class="text-secondary small">sur {{ hosts.length }} hôte{{ hosts.length > 1 ? 's' : '' }}</div>
           </div>
         </div>
       </div>
       <div class="col-sm-6 col-lg-3">
         <div class="card card-sm">
           <div class="card-body">
-            <div class="subheader">Trafic total</div>
-            <div class="h1 mb-0">{{ formatBytes(totalRx + totalTx) }}</div>
-            <div class="text-secondary small">Rx {{ formatBytes(totalRx) }} / Tx {{ formatBytes(totalTx) }}</div>
+            <div class="subheader">Trafic (intervalle)</div>
+            <div class="h1 mb-0">{{ trafficDelta.intervalSec > 0 ? formatBytes(trafficDelta.rx + trafficDelta.tx) : '-' }}</div>
+            <div class="text-secondary small">
+              <span v-if="trafficDelta.intervalSec > 0">↓ {{ formatBytes(trafficDelta.rx) }} / ↑ {{ formatBytes(trafficDelta.tx) }}</span>
+              <span v-else>En attente de données…</span>
+            </div>
           </div>
         </div>
       </div>

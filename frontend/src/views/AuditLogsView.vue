@@ -541,6 +541,7 @@ onUnmounted(() => { if (streamWs) streamWs.close() })
 @media (max-width: 991px) {
   .audit-layout {
     flex-direction: column;
+    align-items: stretch;
   }
 
   .audit-console {
