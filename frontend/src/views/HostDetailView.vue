@@ -524,13 +524,42 @@
               </svg>
               Console Live
             </h3>
-            <div class="d-flex gap-2">
+            <div class="d-flex gap-1">
+              <button
+                @click="copyConsoleOutput"
+                class="btn btn-sm btn-ghost-secondary"
+                :title="consoleCopied ? 'Copié !' : 'Copier la sortie'"
+                :disabled="!liveCommand"
+              >
+                <svg v-if="!consoleCopied" xmlns="http://www.w3.org/2000/svg" class="icon" width="18" height="18" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                  <path d="M8 8m0 2a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2z" />
+                  <path d="M16 8v-2a2 2 0 0 0 -2 -2h-8a2 2 0 0 0 -2 2v8a2 2 0 0 0 2 2h2" />
+                </svg>
+                <svg v-else xmlns="http://www.w3.org/2000/svg" class="icon text-success" width="18" height="18" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                  <path d="M5 12l5 5l10 -10" />
+                </svg>
+              </button>
+              <button
+                @click="downloadConsoleOutput"
+                class="btn btn-sm btn-ghost-secondary"
+                title="Télécharger (.txt)"
+                :disabled="!liveCommand"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="18" height="18" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                  <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2" />
+                  <path d="M7 11l5 5l5 -5" />
+                  <path d="M12 4l0 12" />
+                </svg>
+              </button>
               <button
                 @click="closeLiveConsole(); showConsole = false"
                 class="btn btn-sm btn-ghost-secondary"
                 title="Masquer la console"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="18" height="18" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                   <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
                   <path d="M17 6l-10 10" />
                   <path d="M7 6l10 10" />
@@ -568,19 +597,9 @@
               </div>
               <pre
                 ref="consoleOutput"
-                class="mb-0 flex-fill"
-                style="
-                  background: #0f172a;
-                  color: #e2e8f0;
-                  padding: 1rem;
-                  margin: 0;
-                  overflow-y: auto;
-                  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-                  font-size: 0.813rem;
-                  line-height: 1.5;
-                  border-radius: 0 0 0.5rem 0.5rem;
-                "
-              >{{ renderedConsoleOutput || 'En attente de sortie...' }}</pre>
+                class="console-output mb-0 flex-fill"
+                v-html="colorizedOutput || '<span style=\'opacity:0.5\'>En attente de sortie...</span>'"
+              ></pre>
             </div>
           </div>
         </div>
@@ -729,11 +748,49 @@ const timeRangeOptions = [
   { hours: 8760, label: '1y' },
 ]
 
-const renderedConsoleOutput = computed(() => {
+const consoleCopied = ref(false)
+
+const colorizedOutput = computed(() => {
   if (!liveCommand.value) return ''
   const raw = liveCommand.value.output || ''
-  return renderConsoleOutput(raw)
+  const plain = renderConsoleOutput(raw)
+  if (!plain) return ''
+  return plain
+    .split('\n')
+    .map(line => {
+      const escaped = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      const lower = line.toLowerCase()
+      if (/\berror\b|err:|erreur|failed|échec|exception/i.test(lower))
+        return `<span style="color:#f87171">${escaped}</span>`
+      if (/\bwarn(?:ing)?\b|attention|deprecated/i.test(lower))
+        return `<span style="color:#fbbf24">${escaped}</span>`
+      if (/\bsuccess\b|done|ok\b|completed|✓/i.test(lower))
+        return `<span style="color:#34d399">${escaped}</span>`
+      return escaped
+    })
+    .join('\n')
 })
+
+function copyConsoleOutput() {
+  if (!liveCommand.value) return
+  const plain = renderConsoleOutput(liveCommand.value.output || '')
+  navigator.clipboard.writeText(plain).then(() => {
+    consoleCopied.value = true
+    setTimeout(() => { consoleCopied.value = false }, 2000)
+  })
+}
+
+function downloadConsoleOutput() {
+  if (!liveCommand.value) return
+  const plain = renderConsoleOutput(liveCommand.value.output || '')
+  const blob = new Blob([plain], { type: 'text/plain' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `console-${liveCommand.value.command || 'output'}.txt`
+  a.click()
+  URL.revokeObjectURL(url)
+}
 
 const chartOptions = {
   responsive: true,
@@ -1343,6 +1400,20 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.console-output {
+  background: #0f172a;
+  color: #f1f5f9;
+  padding: 1rem;
+  margin: 0;
+  overflow-y: auto;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 0.813rem;
+  line-height: 1.5;
+  border-radius: 0 0 0.5rem 0.5rem;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
 .host-detail-page {
   display: flex;
   flex-direction: column;

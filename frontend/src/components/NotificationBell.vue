@@ -22,7 +22,6 @@
     <div
       v-if="isOpen"
       class="notification-dropdown"
-      style="position: absolute; top: calc(100% + 8px); right: 0; width: 380px; z-index: 1050; background: var(--tblr-bg-surface); border: 1px solid var(--tblr-border-color); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.15);"
     >
       <!-- Header -->
       <div class="d-flex align-items-center justify-content-between px-3 py-2 border-bottom">
@@ -246,6 +245,30 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.notification-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 380px;
+  max-width: calc(100vw - 1rem);
+  z-index: 1050;
+  background: var(--tblr-bg-surface);
+  border: 1px solid var(--tblr-border-color);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+}
+
+@media (max-width: 480px) {
+  .notification-dropdown {
+    position: fixed;
+    top: 56px;
+    right: 0.5rem;
+    left: 0.5rem;
+    width: auto;
+    max-width: none;
+  }
+}
+
 .notification-item:last-child {
   border-bottom: none !important;
 }
