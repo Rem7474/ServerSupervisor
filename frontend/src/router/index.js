@@ -97,6 +97,18 @@ const routes = [
     component: () => import('../views/ScheduledTasksView.vue'),
     meta: { requiresAuth: true },
   },
+  {
+    path: '/git-webhooks',
+    name: 'GitWebhooks',
+    component: () => import('../views/GitWebhooksView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true },
+  },
+  {
+    path: '/git-webhooks/:id',
+    name: 'GitWebhookDetail',
+    component: () => import('../views/GitWebhookDetailView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true },
+  },
   { path: '/:pathMatch(.*)*', redirect: '/' },
 ]
 

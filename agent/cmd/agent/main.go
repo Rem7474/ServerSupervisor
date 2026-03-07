@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"os"
 	"os/exec"
 	"os/signal"
 	"strings"
@@ -513,6 +514,19 @@ func executeCustomTask(ctx context.Context, s *sender.Sender, cmd sender.Pending
 
 	// exec.CommandContext with argv — no shell, no injection possible.
 	c := exec.CommandContext(taskCtx, task.Command[0], task.Command[1:]...)
+
+	// Inject env vars from payload (e.g. SS_REPO_NAME, SS_BRANCH set by webhook triggers)
+	var payloadData struct {
+		Env map[string]string `json:"env"`
+	}
+	if err := json.Unmarshal([]byte(cmd.Payload), &payloadData); err == nil && len(payloadData.Env) > 0 {
+		extraEnv := make([]string, 0, len(payloadData.Env))
+		for k, v := range payloadData.Env {
+			extraEnv = append(extraEnv, k+"="+v)
+		}
+		c.Env = append(os.Environ(), extraEnv...)
+	}
+
 	stdout, err := c.StdoutPipe()
 	if err != nil {
 		_ = s.ReportCommandResult(ctx, &sender.CommandResult{

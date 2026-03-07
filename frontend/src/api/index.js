@@ -127,6 +127,15 @@ export default {
   runScheduledTask: (id) => api.post(`/v1/scheduled-tasks/${id}/run`),
   getHostCustomTasks: (hostId) => api.get(`/v1/hosts/${hostId}/custom-tasks`),
 
+  // Git Webhooks
+  getGitWebhooks: () => api.get('/v1/webhooks/git'),
+  getGitWebhook: (id) => api.get(`/v1/webhooks/git/${id}`),
+  createGitWebhook: (payload) => api.post('/v1/webhooks/git', payload),
+  updateGitWebhook: (id, payload) => api.put(`/v1/webhooks/git/${id}`, payload),
+  deleteGitWebhook: (id) => api.delete(`/v1/webhooks/git/${id}`),
+  regenerateWebhookSecret: (id) => api.post(`/v1/webhooks/git/${id}/regenerate-secret`),
+  getWebhookExecutions: (id, limit = 50) => api.get(`/v1/webhooks/git/${id}/executions?limit=${limit}`),
+
   // Settings
   getSettings: () => api.get('/v1/settings'),
   updateSettings: (payload) => api.put('/v1/settings', payload),

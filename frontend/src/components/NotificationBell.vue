@@ -6,6 +6,9 @@
       style="width: 38px; height: 38px; padding: 0;"
       @click.stop="toggleOpen"
       :title="unreadCount > 0 ? `${unreadCount} notification(s) non lue(s)` : 'Notifications'"
+      :aria-label="unreadCount > 0 ? `${unreadCount} notification(s) non lue(s)` : 'Notifications'"
+      aria-haspopup="true"
+      :aria-expanded="isOpen"
     >
       <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"

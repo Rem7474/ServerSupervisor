@@ -16,9 +16,10 @@ import (
 )
 
 type AgentHandler struct {
-	db        *database.DB
-	cfg       *config.Config
-	streamHub *CommandStreamHub
+	db         *database.DB
+	cfg        *config.Config
+	streamHub  *CommandStreamHub
+	webhookHub *GitWebhookHandler
 }
 
 func NewAgentHandler(db *database.DB, cfg *config.Config, streamHub *CommandStreamHub) *AgentHandler {
@@ -27,6 +28,10 @@ func NewAgentHandler(db *database.DB, cfg *config.Config, streamHub *CommandStre
 		cfg:       cfg,
 		streamHub: streamHub,
 	}
+}
+
+func (h *AgentHandler) SetWebhookHub(wh *GitWebhookHandler) {
+	h.webhookHub = wh
 }
 
 // ReceiveReport processes a full agent report (metrics + docker + apt)
@@ -218,6 +223,11 @@ func (h *AgentHandler) ReportCommandResult(c *gin.Context) {
 		if err := h.db.UpdateScheduledTaskStatus(*cmd.ScheduledTaskID, result.Status); err != nil {
 			log.Printf("Failed to update scheduled task %s status: %v", *cmd.ScheduledTaskID, err)
 		}
+	}
+
+	// Update linked webhook execution (if triggered by a webhook)
+	if (result.Status == "completed" || result.Status == "failed") && h.webhookHub != nil {
+		go h.webhookHub.NotifyWebhookExecutionComplete(result.CommandID, result.Status)
 	}
 
 	// APT post-processing

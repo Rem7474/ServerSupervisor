@@ -247,7 +247,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, defineAsyncComponent, onMounted, onUnmounted } from 'vue'
 import RelativeTime from '../components/RelativeTime.vue'
 import WsStatusBar from '../components/WsStatusBar.vue'
 import apiClient from '../api'
@@ -256,14 +256,20 @@ import { useWebSocket } from '../composables/useWebSocket'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
 import { formatHostStatus, hostStatusClass } from '../utils/formatHostStatus'
 import { translateError } from '../utils/translateError'
-import { Line } from 'vue-chartjs'
-import { Chart as ChartJS, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip } from 'chart.js'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import utc from 'dayjs/plugin/utc'
 import 'dayjs/locale/fr'
 
-ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip)
+// Lazy-load Chart.js — not loaded until the chart is actually rendered
+const Line = defineAsyncComponent(async () => {
+  const [{ Line }, { Chart: ChartJS, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip }] = await Promise.all([
+    import('vue-chartjs'),
+    import('chart.js'),
+  ])
+  ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip)
+  return Line
+})
 dayjs.extend(relativeTime)
 dayjs.extend(utc)
 dayjs.locale('fr')

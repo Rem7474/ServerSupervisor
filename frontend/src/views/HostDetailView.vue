@@ -635,10 +635,8 @@
 </template>
 
 <script setup>
-import { ref, shallowRef, onMounted, onUnmounted, computed, nextTick } from 'vue'
+import { ref, shallowRef, defineAsyncComponent, onMounted, onUnmounted, computed, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Line } from 'vue-chartjs'
-import { Chart as ChartJS, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip } from 'chart.js'
 import RelativeTime from '../components/RelativeTime.vue'
 import CVEList from '../components/CVEList.vue'
 import DiskMetricsCard from '../components/DiskMetricsCard.vue'
@@ -654,7 +652,15 @@ import relativeTime from 'dayjs/plugin/relativeTime'
 import utc from 'dayjs/plugin/utc'
 import 'dayjs/locale/fr'
 
-ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip)
+// Lazy-load Chart.js — not loaded until the chart is actually rendered
+const Line = defineAsyncComponent(async () => {
+  const [{ Line }, { Chart: ChartJS, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip }] = await Promise.all([
+    import('vue-chartjs'),
+    import('chart.js'),
+  ])
+  ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip)
+  return Line
+})
 dayjs.extend(relativeTime)
 dayjs.extend(utc)
 dayjs.locale('fr')

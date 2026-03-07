@@ -6,8 +6,13 @@
     <div v-if="loading" class="card-body text-center py-4">
       <div class="spinner-border spinner-border-sm text-muted"></div>
     </div>
-    <div v-else-if="metrics.length === 0" class="card-body text-center text-muted py-4">
-      Aucune donnée de disque disponible
+    <div v-else-if="metrics.length === 0" class="card-body text-center text-muted py-5">
+      <svg xmlns="http://www.w3.org/2000/svg" class="mb-2" width="36" height="36" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="opacity:.35">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 12a7 7 0 1014 0A7 7 0 005 12zm7-3v3l2 2"/>
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 6h18M3 18h18"/>
+      </svg>
+      <div class="small fw-medium">Aucune donnée de disque disponible</div>
+      <div class="mt-1" style="font-size:.78rem;opacity:.7">L'agent doit être actif pour collecter les métriques disque</div>
     </div>
     <div v-else class="table-responsive">
       <table class="table table-vcenter card-table table-sm">

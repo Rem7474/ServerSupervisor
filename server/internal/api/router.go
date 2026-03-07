@@ -34,6 +34,8 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *NotificationHub,
 	settingsH := NewSettingsHandler(db, cfg)
 	notifH := NewNotificationsHandler(db)
 	scheduledTaskH := NewScheduledTaskHandler(db, cfg, sched)
+	gitWebhookH := NewGitWebhookHandler(db, cfg, notifHub)
+	agentH.SetWebhookHub(gitWebhookH)
 
 	// ========== Public routes ==========
 	r.POST("/api/auth/login", authH.Login)
@@ -167,7 +169,19 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *NotificationHub,
 		api.POST("/users", userH.CreateUser)
 		api.PATCH("/users/:id/role", userH.UpdateUserRole)
 		api.DELETE("/users/:id", userH.DeleteUser)
+
+		// Git Webhooks (CRUD — admin only, enforced in handler)
+		api.GET("/webhooks/git", gitWebhookH.ListWebhooks)
+		api.POST("/webhooks/git", gitWebhookH.CreateWebhook)
+		api.GET("/webhooks/git/:id", gitWebhookH.GetWebhook)
+		api.PUT("/webhooks/git/:id", gitWebhookH.UpdateWebhook)
+		api.DELETE("/webhooks/git/:id", gitWebhookH.DeleteWebhook)
+		api.POST("/webhooks/git/:id/regenerate-secret", gitWebhookH.RegenerateSecret)
+		api.GET("/webhooks/git/:id/executions", gitWebhookH.GetWebhookExecutions)
 	}
+
+	// ========== Public webhook receiver (HMAC-authenticated, no JWT) ==========
+	r.POST("/api/v1/webhooks/git/:id/receive", gitWebhookH.ReceiveWebhook)
 
 	// Serve frontend static files
 	r.Static("/assets", "./frontend/dist/assets")

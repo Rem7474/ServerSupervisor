@@ -21,12 +21,30 @@
           <div class="card-body">
             <form v-if="!result" @submit.prevent="handleSubmit">
               <div class="mb-3">
-                <label class="form-label">Nom (alias personnel)</label>
-                <input v-model="form.name" type="text" class="form-control" required placeholder="Prod Web Server" />
+                <label class="form-label" for="host-name">Nom (alias personnel)</label>
+                <input
+                  id="host-name"
+                  v-model="form.name"
+                  type="text"
+                  :class="['form-control', touched.name && !form.name.trim() ? 'is-invalid' : '']"
+                  required
+                  placeholder="Ex: Prod Web Server"
+                  @blur="touched.name = true"
+                />
+                <div v-if="touched.name && !form.name.trim()" class="invalid-feedback">Ce champ est requis</div>
               </div>
               <div class="mb-3">
-                <label class="form-label">Adresse IP</label>
-                <input v-model="form.ip_address" type="text" class="form-control" required placeholder="192.168.1.100" />
+                <label class="form-label" for="host-ip">Adresse IP</label>
+                <input
+                  id="host-ip"
+                  v-model="form.ip_address"
+                  type="text"
+                  :class="['form-control', touched.ip_address && isValidIp === false ? 'is-invalid' : touched.ip_address && isValidIp ? 'is-valid' : '']"
+                  required
+                  placeholder="192.168.1.100"
+                  @blur="touched.ip_address = true"
+                />
+                <div v-if="ipFeedback" class="invalid-feedback">{{ ipFeedback }}</div>
               </div>
 
               <div v-if="error" class="alert alert-danger" role="alert">
@@ -92,6 +110,19 @@ const serverHostname =
 const form = ref({ name: '', ip_address: '' })
 const error = ref('')
 const loading = ref(false)
+const touched = ref({ name: false, ip_address: false })
+
+const IP_RE = /^(\d{1,3}\.){3}\d{1,3}$/
+const isValidIp = computed(() => {
+  const v = form.value.ip_address.trim()
+  if (!v) return null // not validated yet
+  if (!IP_RE.test(v)) return false
+  return v.split('.').every(n => Number(n) <= 255)
+})
+const ipFeedback = computed(() => {
+  if (!touched.value.ip_address || isValidIp.value === null) return ''
+  return isValidIp.value ? '' : 'Adresse IPv4 invalide (ex: 192.168.1.100)'
+})
 const result = ref(null)
 const copiedApiKey = ref(false)
 const copiedConfig = ref(false)
@@ -103,6 +134,9 @@ const agentConfig = computed(() => {
 })
 
 async function handleSubmit() {
+  touched.value.name = true
+  touched.value.ip_address = true
+  if (!form.value.name.trim() || !isValidIp.value) return
   loading.value = true
   error.value = ''
   try {

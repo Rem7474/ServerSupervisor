@@ -223,7 +223,10 @@
                     </td>
                   </tr>
                   <tr v-if="networkServices.length === 0">
-                    <td colspan="10" class="text-secondary text-center py-3">Aucun service configure</td>
+                    <td colspan="10" class="text-center py-4">
+                      <div class="text-secondary small">Aucun service configuré</div>
+                      <div class="text-muted" style="font-size:.8rem">Ajoutez un service pour le faire apparaître dans la topologie réseau</div>
+                    </td>
                   </tr>
                 </tbody>
               </table>
@@ -373,6 +376,7 @@
                             v-if="isPortModified(host.id, port.port)"
                             class="btn btn-sm btn-ghost-secondary"
                             title="Réinitialiser ce port"
+                            aria-label="Réinitialiser ce port"
                             @click="resetPortSetting(host.id, port.port)"
                           >
                             <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16"
@@ -385,7 +389,10 @@
                         </td>
                       </tr>
                       <tr v-if="(discoveredPortsByHost[host.id] || []).length === 0">
-                        <td colspan="7" class="text-secondary text-center py-3">Aucun port detecte</td>
+                        <td colspan="7" class="text-center py-4">
+                          <div class="text-secondary small">Aucun port détecté</div>
+                          <div class="text-muted" style="font-size:.8rem">L'agent doit être actif et avoir collecté les données réseau</div>
+                        </td>
                       </tr>
                     </tbody>
                   </table>

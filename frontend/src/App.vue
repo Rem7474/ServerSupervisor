@@ -1,10 +1,13 @@
 <template>
   <div class="page">
+    <!-- Skip navigation link for keyboard/screen reader users -->
+    <a href="#main-content" class="skip-link visually-hidden-focusable">Aller au contenu principal</a>
+
     <!-- Sidebar + Main -->
     <div v-if="auth.isAuthenticated">
       <header class="navbar navbar-expand-md navbar-dark">
         <div class="container-xl">
-          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar-menu">
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar-menu" aria-label="Ouvrir le menu de navigation" aria-controls="navbar-menu" aria-expanded="false">
             <span class="navbar-toggler-icon"></span>
           </button>
           <router-link to="/" class="navbar-brand navbar-brand-autodark">
@@ -105,6 +108,19 @@
                   <span class="nav-link-title">Utilisateurs</span>
                 </router-link>
               </li>
+              <li v-if="auth.isAdmin" class="nav-item">
+                <router-link to="/git-webhooks" class="nav-link" active-class="active">
+                  <span class="nav-link-icon">
+                    <svg class="icon" width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <circle cx="12" cy="5" r="3"/>
+                      <circle cx="5" cy="19" r="3"/>
+                      <circle cx="19" cy="19" r="3"/>
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v3m0 0l-4.5 5.5M12 11l4.5 5.5"/>
+                    </svg>
+                  </span>
+                  <span class="nav-link-title">Git Webhooks</span>
+                </router-link>
+              </li>
               <li class="nav-item">
                 <router-link to="/settings" class="nav-link" active-class="active">
                   <span class="nav-link-icon">
@@ -145,7 +161,7 @@
       </header>
 
       <div class="page-wrapper">
-        <div class="page-body">
+        <div id="main-content" class="page-body">
           <div class="container-xl">
             <router-view />
           </div>
@@ -205,6 +221,23 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.skip-link {
+  position: absolute;
+  top: -100%;
+  left: 1rem;
+  z-index: 9999;
+  padding: 0.5rem 1rem;
+  background: var(--tblr-primary);
+  color: #fff;
+  border-radius: 0 0 4px 4px;
+  font-size: 0.875rem;
+  text-decoration: none;
+  transition: top 0.1s;
+}
+.skip-link:focus {
+  top: 0;
+}
+
 .user-menu {
   z-index: 2000;
 }

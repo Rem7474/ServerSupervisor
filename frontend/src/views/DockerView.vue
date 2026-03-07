@@ -14,7 +14,7 @@
 
     <div v-if="actionError" class="alert alert-danger alert-dismissible mb-3" role="alert">
       {{ actionError }}
-      <button type="button" class="btn-close" @click="actionError = ''"></button>
+      <button type="button" class="btn-close" @click="actionError = ''" aria-label="Fermer le message d'erreur"></button>
     </div>
 
     <!-- Tabs -->
@@ -127,6 +127,7 @@
                         :disabled="!!dockerActionLoading[c.name]"
                         class="btn btn-sm btn-ghost-success"
                         title="Démarrer"
+                        aria-label="Démarrer le conteneur"
                       >
                         <span v-if="dockerActionLoading[c.name] === 'start'" class="spinner-border spinner-border-sm"></span>
                         <svg v-else xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M7 4v16l13 -8z" /></svg>
@@ -138,6 +139,7 @@
                         :disabled="!!dockerActionLoading[c.name]"
                         class="btn btn-sm btn-ghost-danger"
                         title="Arrêter"
+                        aria-label="Arrêter le conteneur"
                       >
                         <span v-if="dockerActionLoading[c.name] === 'stop'" class="spinner-border spinner-border-sm"></span>
                         <svg v-else xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><rect x="4" y="4" width="16" height="16" rx="2" /></svg>
@@ -149,6 +151,7 @@
                         :disabled="!!dockerActionLoading[c.name]"
                         class="btn btn-sm btn-ghost-warning"
                         title="Redémarrer"
+                        aria-label="Redémarrer le conteneur"
                       >
                         <span v-if="dockerActionLoading[c.name] === 'restart'" class="spinner-border spinner-border-sm"></span>
                         <svg v-else xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4" /><path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4" /></svg>
@@ -159,6 +162,7 @@
                         :disabled="!!dockerActionLoading[c.name]"
                         class="btn btn-sm btn-ghost-secondary"
                         title="Voir les logs"
+                        aria-label="Voir les logs du conteneur"
                       >
                         <span v-if="dockerActionLoading[c.name] === 'logs'" class="spinner-border spinner-border-sm"></span>
                         <svg v-else xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 6l16 0" /><path d="M4 12l16 0" /><path d="M4 18l12 0" /></svg>
@@ -170,6 +174,7 @@
                       @click="inspectTarget = c; inspectTab = 'env'"
                       class="btn btn-sm btn-ghost-secondary"
                       title="Inspecter"
+                      aria-label="Inspecter le conteneur"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><circle cx="10" cy="10" r="7" /><path d="M21 21l-6 -6" /></svg>
                     </button>
@@ -196,8 +201,16 @@
           </table>
         </div>
       </div>
-      <div v-if="filteredContainers.length === 0" class="text-center text-secondary py-4">
-        Aucun conteneur trouvé
+      <div v-if="filteredContainers.length === 0" class="text-center text-secondary py-5">
+        <svg xmlns="http://www.w3.org/2000/svg" class="mb-2" width="40" height="40" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="opacity:.35">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+        </svg>
+        <div class="fw-medium">{{ searchQuery || hostFilter ? 'Aucun résultat pour ces filtres' : 'Aucun conteneur trouvé' }}</div>
+        <div class="small mt-1" style="opacity:.7">
+          <template v-if="searchQuery || hostFilter">Modifiez vos critères de recherche</template>
+          <template v-else>Connectez un hôte avec l'agent Docker activé pour voir vos conteneurs ici</template>
+        </div>
+        <router-link v-if="!searchQuery && !hostFilter" to="/hosts/new" class="btn btn-sm btn-primary mt-3">Ajouter un hôte</router-link>
       </div>
 
     </div>
@@ -342,7 +355,7 @@
             </svg>
             Console Live
           </h3>
-          <button class="btn btn-sm btn-ghost-secondary" @click="closeDockerConsole" title="Fermer">
+          <button class="btn btn-sm btn-ghost-secondary" @click="closeDockerConsole" title="Fermer" aria-label="Fermer la console">
             <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
               <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
               <path d="M18 6l-12 12" />
@@ -415,7 +428,7 @@
         <div class="modal-content">
           <div class="modal-header">
             <h5 class="modal-title">Details Docker Compose</h5>
-            <button type="button" class="btn-close" @click="selectedContainer = null"></button>
+            <button type="button" class="btn-close" @click="selectedContainer = null" aria-label="Fermer"></button>
           </div>
           <div class="modal-body">
             <div class="mb-3">
@@ -467,7 +480,7 @@
                 <span class="ms-2" :class="stateClass(inspectTarget.state)">{{ inspectTarget.state }}</span>
               </div>
             </div>
-            <button type="button" class="btn-close" @click="inspectTarget = null"></button>
+            <button type="button" class="btn-close" @click="inspectTarget = null" aria-label="Fermer"></button>
           </div>
           <div class="modal-body p-0">
             <!-- Tabs -->
@@ -571,7 +584,7 @@
                 {{ selectedProject.config_file || selectedProject.working_dir || '-' }}
               </div>
             </div>
-            <button type="button" class="btn-close" @click="selectedProject = null"></button>
+            <button type="button" class="btn-close" @click="selectedProject = null" aria-label="Fermer"></button>
           </div>
           <div class="modal-body p-0">
             <div class="row g-0">
