@@ -202,10 +202,15 @@
                   <td class="text-secondary small">{{ formatDuration(cmd.started_at, cmd.ended_at) }}</td>
                   <td>
                     <button
-                      class="btn btn-sm btn-outline-primary"
+                      class="btn btn-sm btn-ghost-secondary"
                       @click="openLogViewer(cmd)"
                       :disabled="!cmd.output && cmd.status === 'pending'"
-                    >Logs</button>
+                      title="Voir les logs"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
+                      </svg>
+                    </button>
                   </td>
                 </tr>
               </tbody>
@@ -403,6 +408,7 @@ const MODULE_META = {
   systemd:   { label: 'Systemd',    cls: 'badge bg-green-lt text-green' },
   journal:   { label: 'Journal',    cls: 'badge bg-purple-lt text-purple' },
   processes: { label: 'Processus',  cls: 'badge bg-orange-lt text-orange' },
+  custom:    { label: 'Custom',     cls: 'badge bg-teal-lt text-teal' },
 }
 function moduleLabel(module) { return MODULE_META[module]?.label ?? module }
 function moduleClass(module) { return MODULE_META[module]?.cls ?? 'badge bg-secondary-lt text-secondary' }

@@ -116,9 +116,9 @@ const maxSeverityClass = computed(() => {
   const severity = maxSeverity.value
   
   const classes = {
-    'CRITICAL': 'bg-red text-white',
-    'HIGH': 'bg-orange text-white',
-    'MEDIUM': 'bg-yellow text-dark',
+    'CRITICAL': 'bg-red-lt text-red',
+    'HIGH': 'bg-orange-lt text-orange',
+    'MEDIUM': 'bg-yellow-lt text-yellow',
     'LOW': 'bg-blue-lt text-blue',
     'NEGLIGIBLE': 'bg-secondary-lt text-secondary',
     'UNKNOWN': 'bg-secondary-lt text-secondary'
@@ -137,9 +137,5 @@ const maxSeverityClass = computed(() => {
   display: flex;
   flex-wrap: wrap;
   gap: 0.25rem;
-}
-
-.bg-orange {
-  background-color: #fd7e14 !important;
 }
 </style>

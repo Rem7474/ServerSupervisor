@@ -45,9 +45,7 @@ const routes = [
   },
   {
     path: '/alerts/incidents',
-    name: 'AlertIncidents',
-    component: () => import('../views/AlertIncidentsView.vue'),
-    meta: { requiresAuth: true },
+    redirect: '/alerts?tab=incidents',
   },
   {
     path: '/hosts/new',

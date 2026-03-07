@@ -169,8 +169,8 @@
                 </template>
                 <template v-else-if="t.last_checked_at">
                   <span class="text-muted">Dernière vérif : <RelativeTime :date="t.last_checked_at" /></span>
-                  <span v-if="t.last_error" class="ms-1 badge bg-danger" :title="t.last_error">erreur</span>
-                  <span v-else-if="!t.last_release_tag" class="ms-1 badge bg-warning text-dark">aucune release trouvée</span>
+                  <span v-if="t.last_error" class="ms-1 badge bg-danger-lt text-danger" :title="t.last_error">erreur</span>
+                  <span v-else-if="!t.last_release_tag" class="ms-1 badge bg-warning-lt text-warning">aucune release trouvée</span>
                 </template>
                 <template v-else>
                   <span class="text-muted">En attente du premier check...</span>
@@ -716,10 +716,10 @@ function providerBadge(provider) {
 
 function execStatusBadge(status) {
   const map = {
-    pending: 'bg-yellow text-dark', running: 'bg-blue',
-    completed: 'bg-success', failed: 'bg-danger', skipped: 'bg-secondary',
+    pending: 'bg-yellow-lt text-yellow', running: 'bg-blue-lt text-blue',
+    completed: 'bg-success-lt text-success', failed: 'bg-danger-lt text-danger', skipped: 'bg-secondary-lt text-secondary',
   }
-  return map[status] || 'bg-secondary'
+  return map[status] || 'bg-secondary-lt text-secondary'
 }
 
 onMounted(loadAll)

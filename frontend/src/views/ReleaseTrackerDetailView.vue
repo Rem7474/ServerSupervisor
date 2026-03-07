@@ -387,9 +387,11 @@ async function saveEdit() {
 
 function providerBadge(provider) {
   const map = {
-    github: 'bg-blue-lt text-blue',
-    gitlab: 'bg-orange-lt text-orange',
-    gitea:  'bg-teal-lt text-teal',
+    github:  'bg-blue-lt text-blue',
+    gitlab:  'bg-orange-lt text-orange',
+    gitea:   'bg-teal-lt text-teal',
+    forgejo: 'bg-purple-lt text-purple',
+    custom:  'bg-secondary-lt text-secondary',
   }
   return map[provider] || 'bg-secondary-lt text-secondary'
 }

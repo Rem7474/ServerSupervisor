@@ -107,7 +107,7 @@
 
       <!-- Footer -->
       <div class="px-3 py-2 text-center border-top">
-        <router-link to="/alerts/incidents" class="text-secondary small" @click="isOpen = false">
+        <router-link to="/alerts?tab=incidents" class="text-secondary small" @click="isOpen = false">
           Voir l'historique des incidents →
         </router-link>
       </div>

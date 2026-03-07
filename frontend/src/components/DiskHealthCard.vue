@@ -93,11 +93,11 @@ async function loadDiskHealth() {
 
 function getStatusBadgeClass(status) {
   switch (status) {
-    case 'PASSED': return 'bg-success'
-    case 'FAILED': return 'bg-danger'
-    case 'UNKNOWN': return 'bg-warning'
-    case 'NOT_AVAILABLE': return 'bg-secondary'
-    default: return 'bg-secondary'
+    case 'PASSED': return 'bg-success-lt text-success'
+    case 'FAILED': return 'bg-danger-lt text-danger'
+    case 'UNKNOWN': return 'bg-warning-lt text-warning'
+    case 'NOT_AVAILABLE': return 'bg-secondary-lt text-secondary'
+    default: return 'bg-secondary-lt text-secondary'
   }
 }
 

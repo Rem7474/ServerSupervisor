@@ -468,11 +468,13 @@
 
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
 import { formatDurationSecs } from '../utils/formatters'
 import apiClient from '../api'
 
 const { confirm } = useConfirmDialog()
+const route = useRoute()
 
 // Tabs
 const alertsTab = ref('rules')
@@ -601,6 +603,7 @@ function onKeyDown(e) {
 }
 
 onMounted(async () => {
+  if (route.query.tab === 'incidents') switchToIncidents()
   await loadRules()
   await loadHosts()
   document.addEventListener('keydown', onKeyDown)

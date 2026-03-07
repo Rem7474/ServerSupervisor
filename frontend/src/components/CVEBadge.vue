@@ -46,9 +46,9 @@ const badgeClass = computed(() => {
   const severity = props.cve.severity?.toUpperCase() || 'UNKNOWN'
   
   const classes = {
-    'CRITICAL': 'bg-red text-white',
-    'HIGH': 'bg-orange text-white',
-    'MEDIUM': 'bg-yellow text-dark',
+    'CRITICAL': 'bg-red-lt text-red',
+    'HIGH': 'bg-orange-lt text-orange',
+    'MEDIUM': 'bg-yellow-lt text-yellow',
     'LOW': 'bg-blue-lt text-blue',
     'NEGLIGIBLE': 'bg-secondary-lt text-secondary',
     'UNKNOWN': 'bg-secondary-lt text-secondary'
@@ -74,7 +74,4 @@ const badgeClass = computed(() => {
   opacity: 0.9;
 }
 
-.bg-orange {
-  background-color: #fd7e14 !important;
-}
 </style>

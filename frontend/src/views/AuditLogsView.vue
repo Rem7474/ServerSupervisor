@@ -340,6 +340,7 @@ const MODULE_META = {
   systemd:   { label: 'Systemd',    cls: 'badge bg-green-lt text-green' },
   journal:   { label: 'Journal',    cls: 'badge bg-purple-lt text-purple' },
   processes: { label: 'Processus',  cls: 'badge bg-orange-lt text-orange' },
+  custom:    { label: 'Custom',     cls: 'badge bg-teal-lt text-teal' },
 }
 
 function moduleLabel(module) {
