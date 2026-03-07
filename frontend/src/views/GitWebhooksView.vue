@@ -24,7 +24,7 @@
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v3m0 0l-4.5 5.5M12 11l4.5 5.5"/>
           </svg>
           Webhooks entrants
-          <span v-if="webhooks.length" class="badge bg-secondary ms-1">{{ webhooks.length }}</span>
+          <span v-if="webhooks.length" class="badge bg-azure-lt text-azure ms-1">{{ webhooks.length }}</span>
         </a>
       </li>
       <li class="nav-item">
@@ -33,7 +33,7 @@
             <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
           </svg>
           Suivi de releases
-          <span v-if="trackers.length" class="badge bg-secondary ms-1">{{ trackers.length }}</span>
+          <span v-if="trackers.length" class="badge bg-azure-lt text-azure ms-1">{{ trackers.length }}</span>
         </a>
       </li>
     </ul>
