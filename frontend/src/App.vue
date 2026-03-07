@@ -75,16 +75,6 @@
                   <span class="nav-link-title">Alertes</span>
                 </router-link>
               </li>
-              <li class="nav-item">
-                <router-link to="/repos" class="nav-link" active-class="active">
-                  <span class="nav-link-icon">
-                    <svg class="icon" width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
-                    </svg>
-                  </span>
-                  <span class="nav-link-title">Versions & Repos</span>
-                </router-link>
-              </li>
               <li v-if="auth.isAdmin" class="nav-item">
                 <router-link to="/audit" class="nav-link" active-class="active">
                   <span class="nav-link-icon">
@@ -118,7 +108,7 @@
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v3m0 0l-4.5 5.5M12 11l4.5 5.5"/>
                     </svg>
                   </span>
-                  <span class="nav-link-title">Git Webhooks</span>
+                  <span class="nav-link-title">Git / Automatisation</span>
                 </router-link>
               </li>
               <li class="nav-item">

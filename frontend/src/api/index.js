@@ -69,8 +69,7 @@ export default {
   getContainers: (hostId) => api.get(`/v1/hosts/${hostId}/containers`),
   getAllContainers: () => api.get('/v1/docker/containers'),
   getComposeProjects: () => api.get('/v1/docker/compose'),
-  getVersionComparisons: () => api.get('/v1/docker/versions'),
-  sendDockerCommand: (hostId, containerName, action, workingDir = '') =>
+sendDockerCommand: (hostId, containerName, action, workingDir = '') =>
     api.post('/v1/docker/command', { host_id: hostId, container_name: containerName, action, working_dir: workingDir }),
   sendJournalCommand: (hostId, serviceName) =>
     api.post('/v1/system/journalctl', { host_id: hostId, service_name: serviceName }),
@@ -79,11 +78,6 @@ export default {
   sendProcessesCommand: (hostId) =>
     api.post('/v1/system/processes', { host_id: hostId }),
   getHostCommandHistory: (hostId, limit = 50) => api.get(`/v1/hosts/${hostId}/commands/history?limit=${limit}`),
-
-  // Tracked Repos
-  getTrackedRepos: () => api.get('/v1/repos'),
-  addTrackedRepo: (data) => api.post('/v1/repos', data),
-  deleteTrackedRepo: (id) => api.delete(`/v1/repos/${id}`),
 
   // APT
   getAptStatus: (hostId) => api.get(`/v1/hosts/${hostId}/apt`),
@@ -126,6 +120,15 @@ export default {
   deleteScheduledTask: (id) => api.delete(`/v1/scheduled-tasks/${id}`),
   runScheduledTask: (id) => api.post(`/v1/scheduled-tasks/${id}/run`),
   getHostCustomTasks: (hostId) => api.get(`/v1/hosts/${hostId}/custom-tasks`),
+
+  // Release Trackers
+  getReleaseTrackers: () => api.get('/v1/release-trackers'),
+  getReleaseTracker: (id) => api.get(`/v1/release-trackers/${id}`),
+  createReleaseTracker: (payload) => api.post('/v1/release-trackers', payload),
+  updateReleaseTracker: (id, payload) => api.put(`/v1/release-trackers/${id}`, payload),
+  deleteReleaseTracker: (id) => api.delete(`/v1/release-trackers/${id}`),
+  checkReleaseTrackerNow: (id) => api.post(`/v1/release-trackers/${id}/check-now`),
+  getReleaseTrackerExecutions: (id, limit = 50) => api.get(`/v1/release-trackers/${id}/executions?limit=${limit}`),
 
   // Git Webhooks
   getGitWebhooks: () => api.get('/v1/webhooks/git'),

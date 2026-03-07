@@ -50,12 +50,6 @@ const routes = [
     meta: { requiresAuth: true },
   },
   {
-    path: '/repos',
-    name: 'Repos',
-    component: () => import('../views/ReposView.vue'),
-    meta: { requiresAuth: true },
-  },
-  {
     path: '/hosts/new',
     name: 'AddHost',
     component: () => import('../views/AddHostView.vue'),
@@ -107,6 +101,12 @@ const routes = [
     path: '/git-webhooks/:id',
     name: 'GitWebhookDetail',
     component: () => import('../views/GitWebhookDetailView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true },
+  },
+  {
+    path: '/release-trackers/:id',
+    name: 'ReleaseTrackerDetail',
+    component: () => import('../views/ReleaseTrackerDetailView.vue'),
     meta: { requiresAuth: true, requiresAdmin: true },
   },
   { path: '/:pathMatch(.*)*', redirect: '/' },

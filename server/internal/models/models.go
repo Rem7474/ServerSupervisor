@@ -643,6 +643,39 @@ type GitWebhookExecution struct {
 	CompletedAt   *time.Time `json:"completed_at,omitempty"`
 }
 
+// ========== Release Trackers ==========
+
+type ReleaseTracker struct {
+	ID              string                    `json:"id"`
+	Name            string                    `json:"name"`
+	Provider        string                    `json:"provider"` // github, gitlab, gitea
+	RepoOwner       string                    `json:"repo_owner"`
+	RepoName        string                    `json:"repo_name"`
+	HostID          string                    `json:"host_id"`
+	CustomTaskID    string                    `json:"custom_task_id"`
+	LastReleaseTag  string                    `json:"last_release_tag"`
+	LastCheckedAt   *time.Time                `json:"last_checked_at,omitempty"`
+	LastTriggeredAt *time.Time                `json:"last_triggered_at,omitempty"`
+	NotifyChannels  []string                  `json:"notify_channels"`
+	NotifyOnRelease bool                      `json:"notify_on_release"`
+	Enabled         bool                      `json:"enabled"`
+	CreatedAt       time.Time                 `json:"created_at"`
+	HostName        string                    `json:"host_name,omitempty"`
+	LastExecution   *ReleaseTrackerExecution  `json:"last_execution,omitempty"`
+}
+
+type ReleaseTrackerExecution struct {
+	ID          string     `json:"id"`
+	TrackerID   string     `json:"tracker_id"`
+	CommandID   *string    `json:"command_id,omitempty"`
+	TagName     string     `json:"tag_name"`
+	ReleaseURL  string     `json:"release_url"`
+	ReleaseName string     `json:"release_name"`
+	Status      string     `json:"status"`
+	TriggeredAt time.Time  `json:"triggered_at"`
+	CompletedAt *time.Time `json:"completed_at,omitempty"`
+}
+
 // DiskHealth for SMART monitoring (optional, collected if smartctl available)
 type DiskHealth struct {
 	ID             int64     `json:"id" db:"id"`

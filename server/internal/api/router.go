@@ -36,6 +36,9 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *NotificationHub,
 	scheduledTaskH := NewScheduledTaskHandler(db, cfg, sched)
 	gitWebhookH := NewGitWebhookHandler(db, cfg, notifHub)
 	agentH.SetWebhookHub(gitWebhookH)
+	releaseTrackerH := NewReleaseTrackerHandler(db, cfg, notifHub)
+	agentH.SetReleaseTrackerHub(releaseTrackerH)
+	releaseTrackerH.StartPoller()
 
 	// ========== Public routes ==========
 	r.POST("/api/auth/login", authH.Login)
@@ -117,11 +120,6 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *NotificationHub,
 		api.GET("/network/config", networkH.GetTopologyConfig)
 		api.PUT("/network/config", networkH.SaveTopologyConfig)
 
-		// Tracked GitHub repos
-		api.GET("/repos", dockerH.ListTrackedRepos)
-		api.POST("/repos", dockerH.AddTrackedRepo)
-		api.DELETE("/repos/:id", dockerH.DeleteTrackedRepo)
-
 		// APT
 		api.GET("/hosts/:id/apt", aptH.GetAptStatus)
 		api.POST("/apt/command", aptH.SendCommand)
@@ -178,6 +176,15 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *NotificationHub,
 		api.DELETE("/webhooks/git/:id", gitWebhookH.DeleteWebhook)
 		api.POST("/webhooks/git/:id/regenerate-secret", gitWebhookH.RegenerateSecret)
 		api.GET("/webhooks/git/:id/executions", gitWebhookH.GetWebhookExecutions)
+
+		// Release Trackers (admin only, enforced in handler)
+		api.GET("/release-trackers", releaseTrackerH.List)
+		api.POST("/release-trackers", releaseTrackerH.Create)
+		api.GET("/release-trackers/:id", releaseTrackerH.Get)
+		api.PUT("/release-trackers/:id", releaseTrackerH.Update)
+		api.DELETE("/release-trackers/:id", releaseTrackerH.Delete)
+		api.POST("/release-trackers/:id/check-now", releaseTrackerH.TriggerCheck)
+		api.GET("/release-trackers/:id/executions", releaseTrackerH.GetExecutions)
 	}
 
 	// ========== Public webhook receiver (HMAC-authenticated, no JWT) ==========

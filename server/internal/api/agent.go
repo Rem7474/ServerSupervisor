@@ -16,10 +16,11 @@ import (
 )
 
 type AgentHandler struct {
-	db         *database.DB
-	cfg        *config.Config
-	streamHub  *CommandStreamHub
-	webhookHub *GitWebhookHandler
+	db             *database.DB
+	cfg            *config.Config
+	streamHub      *CommandStreamHub
+	webhookHub     *GitWebhookHandler
+	releaseTracker *ReleaseTrackerHandler
 }
 
 func NewAgentHandler(db *database.DB, cfg *config.Config, streamHub *CommandStreamHub) *AgentHandler {
@@ -32,6 +33,10 @@ func NewAgentHandler(db *database.DB, cfg *config.Config, streamHub *CommandStre
 
 func (h *AgentHandler) SetWebhookHub(wh *GitWebhookHandler) {
 	h.webhookHub = wh
+}
+
+func (h *AgentHandler) SetReleaseTrackerHub(rt *ReleaseTrackerHandler) {
+	h.releaseTracker = rt
 }
 
 // ReceiveReport processes a full agent report (metrics + docker + apt)
@@ -228,6 +233,11 @@ func (h *AgentHandler) ReportCommandResult(c *gin.Context) {
 	// Update linked webhook execution (if triggered by a webhook)
 	if (result.Status == "completed" || result.Status == "failed") && h.webhookHub != nil {
 		go h.webhookHub.NotifyWebhookExecutionComplete(result.CommandID, result.Status)
+	}
+
+	// Update linked release tracker execution (if triggered by a release tracker)
+	if (result.Status == "completed" || result.Status == "failed") && h.releaseTracker != nil {
+		go h.releaseTracker.NotifyComplete(result.CommandID, result.Status)
 	}
 
 	// APT post-processing

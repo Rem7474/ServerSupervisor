@@ -1,0 +1,543 @@
+package api
+
+import (
+	"bytes"
+	"database/sql"
+	"encoding/json"
+	"fmt"
+	"log"
+	"net/http"
+	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/serversupervisor/server/internal/config"
+	"github.com/serversupervisor/server/internal/database"
+	"github.com/serversupervisor/server/internal/models"
+)
+
+var validReleaseProviders = map[string]bool{
+	"github": true, "gitlab": true, "gitea": true,
+}
+
+type ReleaseTrackerHandler struct {
+	db       *database.DB
+	cfg      *config.Config
+	notifHub *NotificationHub
+	client   *http.Client
+	stop     chan struct{}
+}
+
+func NewReleaseTrackerHandler(db *database.DB, cfg *config.Config, notifHub *NotificationHub) *ReleaseTrackerHandler {
+	return &ReleaseTrackerHandler{
+		db:       db,
+		cfg:      cfg,
+		notifHub: notifHub,
+		client:   &http.Client{Timeout: 15 * time.Second},
+		stop:     make(chan struct{}),
+	}
+}
+
+// StartPoller begins periodic polling of release trackers.
+func (h *ReleaseTrackerHandler) StartPoller() {
+	interval := h.cfg.GitHubPollInterval
+	if interval == 0 {
+		interval = 15 * time.Minute
+	}
+	log.Printf("Release tracker poller started (interval: %v)", interval)
+
+	go h.checkAll()
+
+	ticker := time.NewTicker(interval)
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				h.checkAll()
+			case <-h.stop:
+				ticker.Stop()
+				return
+			}
+		}
+	}()
+}
+
+func (h *ReleaseTrackerHandler) StopPoller() {
+	close(h.stop)
+}
+
+func (h *ReleaseTrackerHandler) checkAll() {
+	trackers, err := h.db.GetEnabledReleaseTrackers()
+	if err != nil {
+		log.Printf("Release tracker poller: failed to fetch trackers: %v", err)
+		return
+	}
+	for _, t := range trackers {
+		h.checkOne(t)
+	}
+}
+
+func (h *ReleaseTrackerHandler) checkOne(t models.ReleaseTracker) {
+	tag, releaseURL, releaseName, err := h.fetchLatestRelease(t.Provider, t.RepoOwner, t.RepoName)
+	if err != nil {
+		log.Printf("Release tracker %s (%s/%s): fetch error: %v", t.Name, t.RepoOwner, t.RepoName, err)
+		_ = h.db.UpdateReleaseTrackerLastSeen(t.ID, "", false)
+		return
+	}
+
+	if tag == "" {
+		_ = h.db.UpdateReleaseTrackerLastSeen(t.ID, "", false)
+		return
+	}
+
+	// First check — just record the current tag without triggering
+	if t.LastReleaseTag == "" {
+		log.Printf("Release tracker %s: initial tag recorded: %s", t.Name, tag)
+		_ = h.db.UpdateReleaseTrackerLastSeen(t.ID, tag, false)
+		return
+	}
+
+	// No change
+	if tag == t.LastReleaseTag {
+		_ = h.db.UpdateReleaseTrackerLastSeen(t.ID, "", false)
+		return
+	}
+
+	// New release detected
+	log.Printf("Release tracker %s: new release %s (was %s) → dispatching task %s on host %s",
+		t.Name, tag, t.LastReleaseTag, t.CustomTaskID, t.HostID)
+
+	h.dispatchRelease(t, tag, releaseURL, releaseName)
+}
+
+func (h *ReleaseTrackerHandler) dispatchRelease(t models.ReleaseTracker, tag, releaseURL, releaseName string) {
+	// Skip if already running
+	running, _ := h.db.GetRunningExecutionForReleaseTracker(t.ID)
+	if running {
+		log.Printf("Release tracker %s: skipping dispatch (already running)", t.Name)
+		_ = h.db.UpdateReleaseTrackerLastSeen(t.ID, tag, false)
+		return
+	}
+
+	// Create execution record
+	exec, err := h.db.CreateReleaseTrackerExecution(models.ReleaseTrackerExecution{
+		TrackerID:   t.ID,
+		TagName:     tag,
+		ReleaseURL:  releaseURL,
+		ReleaseName: releaseName,
+		Status:      "pending",
+	})
+	if err != nil {
+		log.Printf("Release tracker %s: failed to create execution: %v", t.Name, err)
+		return
+	}
+
+	// Build env vars
+	envVars := map[string]string{
+		"SS_REPO_NAME":    t.RepoOwner + "/" + t.RepoName,
+		"SS_TAG_NAME":     tag,
+		"SS_RELEASE_URL":  releaseURL,
+		"SS_RELEASE_NAME": releaseName,
+		"SS_TRACKER_NAME": t.Name,
+	}
+	envPayload, _ := json.Marshal(map[string]interface{}{"env": envVars})
+
+	// Create audit log
+	username := fmt.Sprintf("tracker:%s", t.Name)
+	details := fmt.Sprintf(`{"tracker_id":%q,"repo":%q,"tag":%q}`, t.ID, t.RepoOwner+"/"+t.RepoName, tag)
+	auditID, auditErr := h.db.CreateAuditLog(username, "release_trigger", t.HostID, "poller", details, "pending")
+	var auditIDPtr *int64
+	if auditErr == nil {
+		auditIDPtr = &auditID
+	}
+
+	// Dispatch command
+	triggeredBy := fmt.Sprintf("tracker:%s", t.Name)
+	cmd, err := h.db.CreateRemoteCommand(
+		t.HostID, "custom", "run", t.CustomTaskID, string(envPayload), triggeredBy, auditIDPtr,
+	)
+	if err != nil {
+		log.Printf("Release tracker %s: failed to create command: %v", t.Name, err)
+		if auditIDPtr != nil {
+			_ = h.db.UpdateAuditLogStatus(*auditIDPtr, "failed", err.Error())
+		}
+		now := time.Now()
+		_ = h.db.UpdateReleaseTrackerExecutionStatus(exec.ID, "failed", &now)
+		return
+	}
+
+	_ = h.db.UpdateReleaseTrackerExecutionCommandID(exec.ID, cmd.ID)
+	_ = h.db.UpdateReleaseTrackerLastSeen(t.ID, tag, true)
+}
+
+// NotifyComplete is called by the agent handler when a command completes.
+func (h *ReleaseTrackerHandler) NotifyComplete(commandID, status string) {
+	trackerID, notifyOnRelease, channels, err := h.db.UpdateReleaseTrackerExecutionByCommandID(commandID, status)
+	if err != nil {
+		return // not a tracker command
+	}
+
+	if !notifyOnRelease || len(channels) == 0 {
+		return
+	}
+
+	tracker, err := h.db.GetReleaseTrackerByID(trackerID)
+	if err != nil {
+		return
+	}
+
+	emoji := "✅"
+	if status == "failed" {
+		emoji = "❌"
+	}
+	subject := fmt.Sprintf("[ServerSupervisor] Release tracker %s %s %s", tracker.Name, emoji, status)
+	msg := fmt.Sprintf("Release tracker '%s' (%s/%s) execution %s on host %s (task: %s)",
+		tracker.Name, tracker.RepoOwner, tracker.RepoName, status, tracker.HostID, tracker.CustomTaskID)
+
+	notifClient := &http.Client{Timeout: 10 * time.Second}
+	for _, ch := range channels {
+		switch ch {
+		case "smtp":
+			to := h.cfg.SMTPTo
+			if to == "" || h.cfg.SMTPFrom == "" {
+				continue
+			}
+			sendWebhookSMTP(h.cfg, h.cfg.SMTPFrom, to, subject, msg)
+
+		case "ntfy":
+			ntfyURL := h.cfg.NotifyURL
+			if ntfyURL == "" {
+				continue
+			}
+			payload, _ := json.Marshal(map[string]interface{}{
+				"title":   subject,
+				"message": msg,
+			})
+			req, _ := http.NewRequest("POST", ntfyURL, bytes.NewReader(payload))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Title", subject)
+			if resp, err := notifClient.Do(req); err != nil {
+				log.Printf("Release tracker notify ntfy: %v", err)
+			} else {
+				_ = resp.Body.Close()
+			}
+
+		case "browser":
+			if h.notifHub == nil {
+				continue
+			}
+			h.notifHub.Broadcast(map[string]interface{}{
+				"type": "release_tracker_execution",
+				"notification": map[string]interface{}{
+					"tracker_id":   trackerID,
+					"tracker_name": tracker.Name,
+					"status":       status,
+					"triggered_at": time.Now().UTC(),
+				},
+			})
+		}
+	}
+}
+
+// ========== HTTP handlers ==========
+
+func (h *ReleaseTrackerHandler) List(c *gin.Context) {
+	trackers, err := h.db.ListReleaseTrackers()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list trackers"})
+		return
+	}
+	if trackers == nil {
+		trackers = []models.ReleaseTracker{}
+	}
+	c.JSON(http.StatusOK, gin.H{"trackers": trackers})
+}
+
+func (h *ReleaseTrackerHandler) Create(c *gin.Context) {
+	role := c.GetString("role")
+	if role != models.RoleAdmin {
+		c.JSON(http.StatusForbidden, gin.H{"error": "admin role required"})
+		return
+	}
+
+	var req models.ReleaseTracker
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if req.Name == "" || req.RepoOwner == "" || req.RepoName == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "name, repo_owner and repo_name are required"})
+		return
+	}
+	if req.HostID == "" || req.CustomTaskID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "host_id and custom_task_id are required"})
+		return
+	}
+	if req.Provider == "" {
+		req.Provider = "github"
+	}
+	if !validReleaseProviders[req.Provider] {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid provider; must be github, gitlab, or gitea"})
+		return
+	}
+	if req.NotifyChannels == nil {
+		req.NotifyChannels = []string{}
+	}
+
+	created, err := h.db.CreateReleaseTracker(req)
+	if err != nil {
+		log.Printf("CreateReleaseTracker: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create tracker"})
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"tracker": created})
+}
+
+func (h *ReleaseTrackerHandler) Get(c *gin.Context) {
+	id := c.Param("id")
+	t, err := h.db.GetReleaseTrackerByID(id)
+	if err == sql.ErrNoRows {
+		c.JSON(http.StatusNotFound, gin.H{"error": "tracker not found"})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get tracker"})
+		return
+	}
+	execs, _ := h.db.ListReleaseTrackerExecutions(id, 20)
+	c.JSON(http.StatusOK, gin.H{"tracker": t, "executions": execs})
+}
+
+func (h *ReleaseTrackerHandler) Update(c *gin.Context) {
+	role := c.GetString("role")
+	if role != models.RoleAdmin {
+		c.JSON(http.StatusForbidden, gin.H{"error": "admin role required"})
+		return
+	}
+	id := c.Param("id")
+
+	var req models.ReleaseTracker
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if req.Name == "" || req.RepoOwner == "" || req.RepoName == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "name, repo_owner and repo_name are required"})
+		return
+	}
+	if req.HostID == "" || req.CustomTaskID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "host_id and custom_task_id are required"})
+		return
+	}
+	if !validReleaseProviders[req.Provider] {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid provider"})
+		return
+	}
+
+	if err := h.db.UpdateReleaseTracker(id, req); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update tracker"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "ok"})
+}
+
+func (h *ReleaseTrackerHandler) Delete(c *gin.Context) {
+	role := c.GetString("role")
+	if role != models.RoleAdmin {
+		c.JSON(http.StatusForbidden, gin.H{"error": "admin role required"})
+		return
+	}
+	id := c.Param("id")
+	if err := h.db.DeleteReleaseTracker(id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete tracker"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "deleted"})
+}
+
+func (h *ReleaseTrackerHandler) TriggerCheck(c *gin.Context) {
+	role := c.GetString("role")
+	if role != models.RoleAdmin {
+		c.JSON(http.StatusForbidden, gin.H{"error": "admin role required"})
+		return
+	}
+	id := c.Param("id")
+
+	t, err := h.db.GetReleaseTrackerByID(id)
+	if err == sql.ErrNoRows {
+		c.JSON(http.StatusNotFound, gin.H{"error": "tracker not found"})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get tracker"})
+		return
+	}
+
+	go h.checkOne(*t)
+	c.JSON(http.StatusOK, gin.H{"status": "check scheduled"})
+}
+
+func (h *ReleaseTrackerHandler) GetExecutions(c *gin.Context) {
+	id := c.Param("id")
+	execs, err := h.db.ListReleaseTrackerExecutions(id, 50)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list executions"})
+		return
+	}
+	if execs == nil {
+		execs = []models.ReleaseTrackerExecution{}
+	}
+	c.JSON(http.StatusOK, gin.H{"executions": execs})
+}
+
+// ========== Release API fetching ==========
+
+type releaseInfo struct {
+	TagName string
+	URL     string
+	Name    string
+}
+
+func (h *ReleaseTrackerHandler) fetchLatestRelease(provider, owner, repo string) (tag, url, name string, err error) {
+	switch provider {
+	case "gitlab":
+		return h.fetchGitLabRelease(owner, repo)
+	case "gitea":
+		return h.fetchGiteaRelease(owner, repo)
+	default:
+		return h.fetchGitHubRelease(owner, repo)
+	}
+}
+
+func (h *ReleaseTrackerHandler) fetchGitHubRelease(owner, repo string) (tag, url, name string, err error) {
+	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases/latest", owner, repo)
+	req, _ := http.NewRequest("GET", apiURL, nil)
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+	req.Header.Set("User-Agent", "ServerSupervisor/1.0")
+	if h.cfg.GitHubToken != "" {
+		req.Header.Set("Authorization", "Bearer "+h.cfg.GitHubToken)
+	}
+
+	resp, err := h.client.Do(req)
+	if err != nil {
+		return
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode == http.StatusNotFound {
+		// Fall back to tags
+		return h.fetchGitHubLatestTag(owner, repo)
+	}
+	if resp.StatusCode != http.StatusOK {
+		err = fmt.Errorf("GitHub API status %d", resp.StatusCode)
+		return
+	}
+
+	var r struct {
+		TagName string `json:"tag_name"`
+		Name    string `json:"name"`
+		HTMLURL string `json:"html_url"`
+	}
+	if err = json.NewDecoder(resp.Body).Decode(&r); err != nil {
+		return
+	}
+	return r.TagName, r.HTMLURL, r.Name, nil
+}
+
+func (h *ReleaseTrackerHandler) fetchGitHubLatestTag(owner, repo string) (tag, url, name string, err error) {
+	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/tags?per_page=1", owner, repo)
+	req, _ := http.NewRequest("GET", apiURL, nil)
+	req.Header.Set("Accept", "application/vnd.github.v3+json")
+	req.Header.Set("User-Agent", "ServerSupervisor/1.0")
+	if h.cfg.GitHubToken != "" {
+		req.Header.Set("Authorization", "Bearer "+h.cfg.GitHubToken)
+	}
+	resp, err := h.client.Do(req)
+	if err != nil {
+		return
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		err = fmt.Errorf("GitHub tags API status %d", resp.StatusCode)
+		return
+	}
+	var tags []struct {
+		Name string `json:"name"`
+	}
+	if err = json.NewDecoder(resp.Body).Decode(&tags); err != nil {
+		return
+	}
+	if len(tags) == 0 {
+		return
+	}
+	tag = tags[0].Name
+	url = fmt.Sprintf("https://github.com/%s/%s/releases/tag/%s", owner, repo, tag)
+	name = tag
+	return
+}
+
+func (h *ReleaseTrackerHandler) fetchGitLabRelease(owner, repo string) (tag, url, name string, err error) {
+	// GitLab API: GET /api/v4/projects/{owner%2Frepo}/releases (public)
+	encoded := fmt.Sprintf("%s%%2F%s", owner, repo)
+	apiURL := fmt.Sprintf("https://gitlab.com/api/v4/projects/%s/releases?per_page=1", encoded)
+	req, _ := http.NewRequest("GET", apiURL, nil)
+	req.Header.Set("User-Agent", "ServerSupervisor/1.0")
+
+	resp, err := h.client.Do(req)
+	if err != nil {
+		return
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		err = fmt.Errorf("GitLab API status %d", resp.StatusCode)
+		return
+	}
+	var releases []struct {
+		TagName string `json:"tag_name"`
+		Name    string `json:"name"`
+		Links   struct {
+			Self string `json:"self"`
+		} `json:"_links"`
+	}
+	if err = json.NewDecoder(resp.Body).Decode(&releases); err != nil {
+		return
+	}
+	if len(releases) == 0 {
+		return
+	}
+	tag = releases[0].TagName
+	name = releases[0].Name
+	url = fmt.Sprintf("https://gitlab.com/%s/%s/-/releases/%s", owner, repo, tag)
+	return
+}
+
+func (h *ReleaseTrackerHandler) fetchGiteaRelease(owner, repo string) (tag, url, name string, err error) {
+	// Gitea public API (Codeberg etc.)
+	apiURL := fmt.Sprintf("https://codeberg.org/api/v1/repos/%s/%s/releases?limit=1", owner, repo)
+	req, _ := http.NewRequest("GET", apiURL, nil)
+	req.Header.Set("User-Agent", "ServerSupervisor/1.0")
+
+	resp, err := h.client.Do(req)
+	if err != nil {
+		return
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		err = fmt.Errorf("Gitea API status %d", resp.StatusCode)
+		return
+	}
+	var releases []struct {
+		TagName string `json:"tag_name"`
+		Name    string `json:"name"`
+		HTMLURL string `json:"html_url"`
+	}
+	if err = json.NewDecoder(resp.Body).Decode(&releases); err != nil {
+		return
+	}
+	if len(releases) == 0 {
+		return
+	}
+	tag = releases[0].TagName
+	url = releases[0].HTMLURL
+	name = releases[0].Name
+	return
+}
