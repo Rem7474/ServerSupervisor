@@ -197,6 +197,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *NotificationHub,
 	// otherwise serve index.html for them, causing parse errors in the browser.
 	r.StaticFile("/manifest.json", "./frontend/dist/manifest.json")
 	r.StaticFile("/favicon.svg", "./frontend/dist/favicon.svg")
+	r.StaticFile("/service-worker.js", "./frontend/dist/service-worker.js")
 	r.NoRoute(func(c *gin.Context) {
 		c.File("./frontend/dist/index.html")
 	})
