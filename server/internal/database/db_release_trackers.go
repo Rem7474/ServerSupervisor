@@ -46,7 +46,7 @@ func (db *DB) ListReleaseTrackers() ([]models.ReleaseTracker, error) {
 	rows, err := db.conn.Query(
 		`SELECT t.id, t.name, t.provider, t.repo_owner, t.repo_name,
 		        t.host_id, t.custom_task_id, t.last_release_tag,
-		        t.last_checked_at, t.last_triggered_at,
+		        t.last_checked_at, t.last_triggered_at, t.last_error,
 		        t.notify_channels, t.notify_on_release, t.enabled, t.created_at,
 		        COALESCE(h.name, '') AS host_name,
 		        le.id, le.tag_name, le.release_url, le.release_name,
@@ -74,7 +74,7 @@ func (db *DB) ListReleaseTrackers() ([]models.ReleaseTracker, error) {
 		if err := rows.Scan(
 			&t.ID, &t.Name, &t.Provider, &t.RepoOwner, &t.RepoName,
 			&t.HostID, &t.CustomTaskID, &t.LastReleaseTag,
-			&t.LastCheckedAt, &t.LastTriggeredAt,
+			&t.LastCheckedAt, &t.LastTriggeredAt, &t.LastError,
 			pq.Array(&t.NotifyChannels), &t.NotifyOnRelease, &t.Enabled, &t.CreatedAt,
 			&t.HostName,
 			&leID, &leTag, &leURL, &leName, &leStatus, &leTriggered, &leCompleted,
@@ -109,7 +109,7 @@ func (db *DB) GetReleaseTrackerByID(id string) (*models.ReleaseTracker, error) {
 	err := db.conn.QueryRow(
 		`SELECT t.id, t.name, t.provider, t.repo_owner, t.repo_name,
 		        t.host_id, t.custom_task_id, t.last_release_tag,
-		        t.last_checked_at, t.last_triggered_at,
+		        t.last_checked_at, t.last_triggered_at, t.last_error,
 		        t.notify_channels, t.notify_on_release, t.enabled, t.created_at,
 		        COALESCE(h.name, '') AS host_name
 		 FROM release_trackers t
@@ -118,7 +118,7 @@ func (db *DB) GetReleaseTrackerByID(id string) (*models.ReleaseTracker, error) {
 	).Scan(
 		&t.ID, &t.Name, &t.Provider, &t.RepoOwner, &t.RepoName,
 		&t.HostID, &t.CustomTaskID, &t.LastReleaseTag,
-		&t.LastCheckedAt, &t.LastTriggeredAt,
+		&t.LastCheckedAt, &t.LastTriggeredAt, &t.LastError,
 		pq.Array(&t.NotifyChannels), &t.NotifyOnRelease, &t.Enabled, &t.CreatedAt,
 		&t.HostName,
 	)
@@ -184,24 +184,32 @@ func (db *DB) GetEnabledReleaseTrackers() ([]models.ReleaseTracker, error) {
 	return out, rows.Err()
 }
 
-// UpdateReleaseTrackerLastSeen updates the last known tag and check timestamp.
-// If newTag != "" (new release found), also updates last_triggered_at.
+// UpdateReleaseTrackerLastSeen updates the last known tag, check timestamp, and clears any error.
+// If triggered=true, also updates last_triggered_at.
 func (db *DB) UpdateReleaseTrackerLastSeen(id, newTag string, triggered bool) error {
 	now := time.Now()
 	if triggered {
 		_, err := db.conn.Exec(
-			`UPDATE release_trackers SET last_release_tag=$1, last_checked_at=$2, last_triggered_at=$2 WHERE id=$3`,
+			`UPDATE release_trackers SET last_release_tag=$1, last_checked_at=$2, last_triggered_at=$2, last_error='' WHERE id=$3`,
 			newTag, now, id)
 		return err
 	}
 	if newTag != "" {
 		_, err := db.conn.Exec(
-			`UPDATE release_trackers SET last_release_tag=$1, last_checked_at=$2 WHERE id=$3`,
+			`UPDATE release_trackers SET last_release_tag=$1, last_checked_at=$2, last_error='' WHERE id=$3`,
 			newTag, now, id)
 		return err
 	}
 	_, err := db.conn.Exec(
-		`UPDATE release_trackers SET last_checked_at=$1 WHERE id=$2`, now, id)
+		`UPDATE release_trackers SET last_checked_at=$1, last_error='' WHERE id=$2`, now, id)
+	return err
+}
+
+// UpdateReleaseTrackerError stores an error from the last check attempt.
+func (db *DB) UpdateReleaseTrackerError(id, errMsg string) error {
+	now := time.Now()
+	_, err := db.conn.Exec(
+		`UPDATE release_trackers SET last_checked_at=$1, last_error=$2 WHERE id=$3`, now, errMsg, id)
 	return err
 }
 

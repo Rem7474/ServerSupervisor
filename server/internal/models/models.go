@@ -656,6 +656,7 @@ type ReleaseTracker struct {
 	LastReleaseTag  string                    `json:"last_release_tag"`
 	LastCheckedAt   *time.Time                `json:"last_checked_at,omitempty"`
 	LastTriggeredAt *time.Time                `json:"last_triggered_at,omitempty"`
+	LastError       string                    `json:"last_error,omitempty"`
 	NotifyChannels  []string                  `json:"notify_channels"`
 	NotifyOnRelease bool                      `json:"notify_on_release"`
 	Enabled         bool                      `json:"enabled"`

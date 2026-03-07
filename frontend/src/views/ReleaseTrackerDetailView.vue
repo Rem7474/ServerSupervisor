@@ -61,6 +61,10 @@
               </dd>
               <dt v-if="tracker.last_checked_at" class="col-5 text-muted">Dernier check</dt>
               <dd v-if="tracker.last_checked_at" class="col-7"><RelativeTime :date="tracker.last_checked_at" /></dd>
+              <template v-if="tracker.last_error">
+                <dt class="col-5 text-muted">Erreur</dt>
+                <dd class="col-7 text-danger small">{{ tracker.last_error }}</dd>
+              </template>
               <dt v-if="tracker.last_triggered_at" class="col-5 text-muted">Dernier déclench.</dt>
               <dd v-if="tracker.last_triggered_at" class="col-7"><RelativeTime :date="tracker.last_triggered_at" /></dd>
               <dt v-if="tracker.notify_channels?.length" class="col-5 text-muted">Notifications</dt>
@@ -302,9 +306,12 @@ async function triggerCheck() {
   checking.value = true
   try {
     await api.checkReleaseTrackerNow(id)
+    setTimeout(async () => {
+      await load()
+      checking.value = false
+    }, 2000)
   } catch (e) {
     error.value = e.response?.data?.error || 'Erreur'
-  } finally {
     checking.value = false
   }
 }

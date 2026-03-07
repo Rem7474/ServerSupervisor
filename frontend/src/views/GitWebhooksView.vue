@@ -169,7 +169,8 @@
                 </template>
                 <template v-else-if="t.last_checked_at">
                   <span class="text-muted">Dernière vérif : <RelativeTime :date="t.last_checked_at" /></span>
-                  <span v-if="!t.last_release_tag" class="ms-1 badge bg-warning text-dark">aucune release trouvée</span>
+                  <span v-if="t.last_error" class="ms-1 badge bg-danger" :title="t.last_error">erreur</span>
+                  <span v-else-if="!t.last_release_tag" class="ms-1 badge bg-warning text-dark">aucune release trouvée</span>
                 </template>
                 <template v-else>
                   <span class="text-muted">En attente du premier check...</span>

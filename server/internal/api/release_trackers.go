@@ -80,12 +80,12 @@ func (h *ReleaseTrackerHandler) checkOne(t models.ReleaseTracker) {
 	tag, releaseURL, releaseName, err := h.fetchLatestRelease(t.Provider, t.RepoOwner, t.RepoName)
 	if err != nil {
 		log.Printf("Release tracker %s (%s/%s): fetch error: %v", t.Name, t.RepoOwner, t.RepoName, err)
-		_ = h.db.UpdateReleaseTrackerLastSeen(t.ID, "", false)
+		_ = h.db.UpdateReleaseTrackerError(t.ID, err.Error())
 		return
 	}
 
 	if tag == "" {
-		_ = h.db.UpdateReleaseTrackerLastSeen(t.ID, "", false)
+		_ = h.db.UpdateReleaseTrackerError(t.ID, "aucune release ou tag trouvé sur ce dépôt")
 		return
 	}
 
