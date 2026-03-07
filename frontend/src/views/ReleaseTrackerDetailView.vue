@@ -37,6 +37,12 @@
                 </svg>
                 {{ checking ? 'Vérification...' : 'Vérifier maintenant' }}
               </button>
+              <button class="btn btn-sm btn-primary" @click="runManually" :disabled="running">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="me-1">
+                  <polygon points="5 3 19 12 5 21 5 3"/>
+                </svg>
+                {{ running ? 'Déclenchement...' : 'Exécuter' }}
+              </button>
               <button class="btn btn-sm btn-ghost-secondary" @click="openEdit">Modifier</button>
             </div>
           </div>
@@ -69,7 +75,7 @@
               <dd v-if="tracker.last_triggered_at" class="col-7"><RelativeTime :date="tracker.last_triggered_at" /></dd>
               <dt v-if="tracker.notify_channels?.length" class="col-5 text-muted">Notifications</dt>
               <dd v-if="tracker.notify_channels?.length" class="col-7">
-                <span v-for="ch in tracker.notify_channels" :key="ch" class="badge bg-azure me-1">{{ ch }}</span>
+                <span v-for="ch in tracker.notify_channels" :key="ch" class="badge me-1" :class="channelBadge(ch)">{{ ch }}</span>
               </dd>
               <dt class="col-5 text-muted">Créé le</dt>
               <dd class="col-7">{{ formatDateTime(tracker.created_at) }}</dd>
@@ -203,8 +209,12 @@
                 </select>
               </div>
               <div class="col-md-6">
-                <label class="form-label required">ID Tâche</label>
-                <input type="text" class="form-control" v-model="form.custom_task_id">
+                <label class="form-label required">Tâche (tasks.yaml)</label>
+                <select v-if="editCustomTasks.length" class="form-select" v-model="form.custom_task_id">
+                  <option value="" disabled>-- Sélectionner une tâche --</option>
+                  <option v-for="t in editCustomTasks" :key="t.id" :value="t.id">{{ t.name }} ({{ t.id }})</option>
+                </select>
+                <input v-else type="text" class="form-control" v-model="form.custom_task_id">
               </div>
               <div class="col-12">
                 <label class="form-label">Notifications</label>
@@ -242,7 +252,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import api from '../api'
 import { formatDateTime } from '../utils/formatters'
@@ -257,11 +267,23 @@ const hosts = ref([])
 const loading = ref(false)
 const error = ref('')
 const checking = ref(false)
+const running = ref(false)
 
 const showModal = ref(false)
 const saving = ref(false)
 const modalError = ref('')
 const form = ref({})
+const editCustomTasks = ref([])
+
+watch(() => form.value.host_id, async (hostId) => {
+  if (!hostId) { editCustomTasks.value = []; return }
+  try {
+    const { data } = await api.getHostCustomTasks(hostId)
+    editCustomTasks.value = Array.isArray(data) ? data : []
+  } catch {
+    editCustomTasks.value = []
+  }
+})
 
 const envVars = [
   { name: 'SS_REPO_NAME',    desc: 'owner/repo (ex: home-assistant/core)' },
@@ -300,6 +322,20 @@ async function loadExecutions() {
     const res = await api.getReleaseTrackerExecutions(id)
     executions.value = res.data.executions || []
   } catch { /* ignore */ }
+}
+
+async function runManually() {
+  running.value = true
+  try {
+    await api.runReleaseTracker(id)
+    setTimeout(async () => {
+      await load()
+      running.value = false
+    }, 2000)
+  } catch (e) {
+    error.value = e.response?.data?.error || 'Erreur lors du déclenchement'
+    running.value = false
+  }
 }
 
 async function triggerCheck() {
@@ -350,8 +386,21 @@ async function saveEdit() {
 }
 
 function providerBadge(provider) {
-  const map = { github: 'bg-dark', gitlab: 'bg-warning text-dark', gitea: 'bg-success' }
-  return map[provider] || 'bg-secondary'
+  const map = {
+    github: 'bg-blue-lt text-blue',
+    gitlab: 'bg-orange-lt text-orange',
+    gitea:  'bg-teal-lt text-teal',
+  }
+  return map[provider] || 'bg-secondary-lt text-secondary'
+}
+
+function channelBadge(ch) {
+  const map = {
+    smtp:    'bg-blue-lt text-blue',
+    ntfy:    'bg-orange-lt text-orange',
+    browser: 'bg-purple-lt text-purple',
+  }
+  return map[ch] || 'bg-secondary-lt text-secondary'
 }
 
 function execStatusBadge(status) {

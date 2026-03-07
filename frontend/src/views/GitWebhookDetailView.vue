@@ -52,7 +52,7 @@
               <dd class="col-7"><code>{{ webhook.custom_task_id }}</code></dd>
               <dt v-if="webhook.notify_channels?.length" class="col-5 text-muted">Notifications</dt>
               <dd v-if="webhook.notify_channels?.length" class="col-7">
-                <span v-for="ch in webhook.notify_channels" :key="ch" class="badge bg-azure me-1">{{ ch }}</span>
+                <span v-for="ch in webhook.notify_channels" :key="ch" class="badge me-1" :class="channelBadge(ch)">{{ ch }}</span>
                 <span class="text-muted">({{ [webhook.notify_on_success && 'succès', webhook.notify_on_failure && 'échec'].filter(Boolean).join(', ') || 'aucune' }})</span>
               </dd>
               <dt class="col-5 text-muted">Créé le</dt>
@@ -325,8 +325,23 @@ function onSecretRegenerated(secret) {
 }
 
 function providerBadge(provider) {
-  const map = { github: 'bg-dark', gitlab: 'bg-warning text-dark', gitea: 'bg-success', forgejo: 'bg-info text-dark', custom: 'bg-secondary' }
-  return map[provider] || 'bg-secondary'
+  const map = {
+    github:  'bg-blue-lt text-blue',
+    gitlab:  'bg-orange-lt text-orange',
+    gitea:   'bg-teal-lt text-teal',
+    forgejo: 'bg-purple-lt text-purple',
+    custom:  'bg-secondary-lt text-secondary',
+  }
+  return map[provider] || 'bg-secondary-lt text-secondary'
+}
+
+function channelBadge(ch) {
+  const map = {
+    smtp:    'bg-blue-lt text-blue',
+    ntfy:    'bg-orange-lt text-orange',
+    browser: 'bg-purple-lt text-purple',
+  }
+  return map[ch] || 'bg-secondary-lt text-secondary'
 }
 
 function execStatusBadge(status) {

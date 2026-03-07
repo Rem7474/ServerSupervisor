@@ -248,9 +248,13 @@
                 </select>
               </div>
               <div class="col-md-6">
-                <label class="form-label required">ID Tâche (tasks.yaml)</label>
-                <input type="text" class="form-control" v-model="webhookForm.custom_task_id" placeholder="ex: deploy-mon-app">
-                <div class="form-hint">Correspond à l'<code>id</code> dans le fichier <code>tasks.yaml</code> de l'agent.</div>
+                <label class="form-label required">Tâche (tasks.yaml)</label>
+                <select v-if="webhookCustomTasks.length" class="form-select" v-model="webhookForm.custom_task_id">
+                  <option value="" disabled>-- Sélectionner une tâche --</option>
+                  <option v-for="t in webhookCustomTasks" :key="t.id" :value="t.id">{{ t.name }} ({{ t.id }})</option>
+                </select>
+                <input v-else type="text" class="form-control" v-model="webhookForm.custom_task_id" placeholder="ex: deploy-mon-app">
+                <div class="form-hint">Correspond à l'<code>id</code> dans <code>tasks.yaml</code> de l'agent.</div>
               </div>
               <div class="col-12">
                 <label class="form-label">Notifications</label>
@@ -351,9 +355,13 @@
                 </select>
               </div>
               <div class="col-md-6">
-                <label class="form-label required">ID Tâche (tasks.yaml)</label>
-                <input type="text" class="form-control" v-model="trackerForm.custom_task_id" placeholder="ex: update-home-assistant">
-                <div class="form-hint">Correspond à l'<code>id</code> dans le fichier <code>tasks.yaml</code> de l'agent.</div>
+                <label class="form-label required">Tâche (tasks.yaml)</label>
+                <select v-if="trackerCustomTasks.length" class="form-select" v-model="trackerForm.custom_task_id">
+                  <option value="" disabled>-- Sélectionner une tâche --</option>
+                  <option v-for="t in trackerCustomTasks" :key="t.id" :value="t.id">{{ t.name }} ({{ t.id }})</option>
+                </select>
+                <input v-else type="text" class="form-control" v-model="trackerForm.custom_task_id" placeholder="ex: update-home-assistant">
+                <div class="form-hint">Correspond à l'<code>id</code> dans <code>tasks.yaml</code> de l'agent.</div>
               </div>
               <div class="col-12">
                 <label class="form-label">Notifications</label>
@@ -406,7 +414,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
 import api from '../api'
 import RelativeTime from '../components/RelativeTime.vue'
@@ -421,6 +429,20 @@ const hosts = ref([])
 const error = ref('')
 const saving = ref(false)
 const modalError = ref('')
+
+// ========== Custom task dropdowns ==========
+const webhookCustomTasks = ref([])
+const trackerCustomTasks = ref([])
+
+async function loadCustomTasksForHost(hostId, targetRef) {
+  if (!hostId) { targetRef.value = []; return }
+  try {
+    const { data } = await api.getHostCustomTasks(hostId)
+    targetRef.value = Array.isArray(data) ? data : []
+  } catch {
+    targetRef.value = []
+  }
+}
 
 // ========== Webhooks ==========
 const webhooks = ref([])
@@ -437,6 +459,7 @@ const defaultWebhookForm = () => ({
   notify_on_success: false, notify_on_failure: true, enabled: true,
 })
 const webhookForm = ref(defaultWebhookForm())
+watch(() => webhookForm.value.host_id, (id) => loadCustomTasksForHost(id, webhookCustomTasks))
 
 // ========== Trackers ==========
 const trackers = ref([])
@@ -458,6 +481,7 @@ const defaultTrackerForm = () => ({
   notify_channels: [], notify_on_release: true, enabled: true,
 })
 const trackerForm = ref(defaultTrackerForm())
+watch(() => trackerForm.value.host_id, (id) => loadCustomTasksForHost(id, trackerCustomTasks))
 
 // ========== Data loading ==========
 
@@ -680,11 +704,15 @@ function repoURL(t) {
 
 function providerBadge(provider) {
   const map = {
-    github: 'bg-dark', gitlab: 'bg-warning text-dark',
-    gitea: 'bg-success', forgejo: 'bg-info text-dark', custom: 'bg-secondary',
+    github:  'bg-blue-lt text-blue',
+    gitlab:  'bg-orange-lt text-orange',
+    gitea:   'bg-teal-lt text-teal',
+    forgejo: 'bg-purple-lt text-purple',
+    custom:  'bg-secondary-lt text-secondary',
   }
-  return map[provider] || 'bg-secondary'
+  return map[provider] || 'bg-secondary-lt text-secondary'
 }
+
 
 function execStatusBadge(status) {
   const map = {

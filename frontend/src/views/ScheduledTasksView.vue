@@ -247,7 +247,7 @@ async function onModuleChange() {
   if (actions) {
     form.value.action = actions[0]
   } else {
-    form.value.action = ''
+    form.value.action = 'run'
   }
   if (form.value.module === 'custom') {
     await loadCustomTasks()

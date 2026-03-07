@@ -128,6 +128,7 @@ sendDockerCommand: (hostId, containerName, action, workingDir = '') =>
   updateReleaseTracker: (id, payload) => api.put(`/v1/release-trackers/${id}`, payload),
   deleteReleaseTracker: (id) => api.delete(`/v1/release-trackers/${id}`),
   checkReleaseTrackerNow: (id) => api.post(`/v1/release-trackers/${id}/check-now`),
+  runReleaseTracker: (id) => api.post(`/v1/release-trackers/${id}/run`),
   getReleaseTrackerExecutions: (id, limit = 50) => api.get(`/v1/release-trackers/${id}/executions?limit=${limit}`),
 
   // Git Webhooks

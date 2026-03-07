@@ -376,6 +376,29 @@ func (h *ReleaseTrackerHandler) TriggerCheck(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "check scheduled"})
 }
 
+// Run manually triggers the tracker's custom task with the last known release info.
+func (h *ReleaseTrackerHandler) Run(c *gin.Context) {
+	role := c.GetString("role")
+	if role != models.RoleAdmin && role != models.RoleOperator {
+		c.JSON(http.StatusForbidden, gin.H{"error": "admin or operator role required"})
+		return
+	}
+	id := c.Param("id")
+
+	t, err := h.db.GetReleaseTrackerByID(id)
+	if err == sql.ErrNoRows {
+		c.JSON(http.StatusNotFound, gin.H{"error": "tracker not found"})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get tracker"})
+		return
+	}
+
+	go h.dispatchRelease(*t, t.LastReleaseTag, "", "")
+	c.JSON(http.StatusOK, gin.H{"status": "execution scheduled"})
+}
+
 func (h *ReleaseTrackerHandler) GetExecutions(c *gin.Context) {
 	id := c.Param("id")
 	execs, err := h.db.ListReleaseTrackerExecutions(id, 50)
@@ -428,7 +451,7 @@ func (h *ReleaseTrackerHandler) fetchGitHubRelease(owner, repo string) (tag, url
 		return h.fetchGitHubLatestTag(owner, repo)
 	}
 	if resp.StatusCode != http.StatusOK {
-		err = fmt.Errorf("GitHub API status %d", resp.StatusCode)
+		err = githubAPIError(resp.StatusCode)
 		return
 	}
 
@@ -441,6 +464,19 @@ func (h *ReleaseTrackerHandler) fetchGitHubRelease(owner, repo string) (tag, url
 		return
 	}
 	return r.TagName, r.HTMLURL, r.Name, nil
+}
+
+func githubAPIError(status int) error {
+	switch status {
+	case 401:
+		return fmt.Errorf("token GitHub invalide ou expiré (401) — vérifiez GITHUB_TOKEN dans les paramètres")
+	case 403:
+		return fmt.Errorf("limite de taux GitHub atteinte (403) — configurez un GITHUB_TOKEN pour augmenter la limite")
+	case 404:
+		return fmt.Errorf("dépôt introuvable sur GitHub (404) — vérifiez owner/repo")
+	default:
+		return fmt.Errorf("erreur GitHub API (%d)", status)
+	}
 }
 
 func (h *ReleaseTrackerHandler) fetchGitHubLatestTag(owner, repo string) (tag, url, name string, err error) {
@@ -457,7 +493,7 @@ func (h *ReleaseTrackerHandler) fetchGitHubLatestTag(owner, repo string) (tag, u
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
-		err = fmt.Errorf("GitHub tags API status %d", resp.StatusCode)
+		err = githubAPIError(resp.StatusCode)
 		return
 	}
 	var tags []struct {

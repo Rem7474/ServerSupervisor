@@ -184,6 +184,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *NotificationHub,
 		api.PUT("/release-trackers/:id", releaseTrackerH.Update)
 		api.DELETE("/release-trackers/:id", releaseTrackerH.Delete)
 		api.POST("/release-trackers/:id/check-now", releaseTrackerH.TriggerCheck)
+		api.POST("/release-trackers/:id/run", releaseTrackerH.Run)
 		api.GET("/release-trackers/:id/executions", releaseTrackerH.GetExecutions)
 	}
 
