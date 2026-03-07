@@ -273,7 +273,40 @@ tasks:
     name: "Backup PostgreSQL"
     command: ["pg_dump", "-U", "postgres", "mydb", "-f", "/backups/db.sql"]
     timeout: 300
+
+  # Déclenchable via Git Webhook — reçoit les variables SS_BRANCH, SS_COMMIT_SHA, etc.
+  - id: git-pull-test
+    name: "Git pull /home/root/test"
+    command: ["bash", "-c", "cd /home/root/test && git pull origin ${SS_BRANCH:-main}"]
+    timeout: 60
+
+  # Alternative : déléguer à un script shell pour plus de contrôle
+  - id: deploy-test
+    name: "Deploy /home/root/test"
+    command: ["/opt/scripts/deploy-test.sh"]
+    timeout: 120
 ```
+
+Pour l'option script shell, `/opt/scripts/deploy-test.sh` :
+```bash
+#!/bin/bash
+set -e
+cd /home/root/test
+git pull origin ${SS_BRANCH:-main}
+echo "Déploiement terminé (commit: $SS_COMMIT_SHA)"
+```
+
+Variables d'environnement injectées automatiquement par un Git Webhook :
+
+| Variable | Contenu |
+|---|---|
+| `SS_REPO_NAME` | Nom du dépôt (`owner/repo`) |
+| `SS_BRANCH` | Branche poussée |
+| `SS_COMMIT_SHA` | SHA du dernier commit |
+| `SS_COMMIT_MESSAGE` | Message du commit |
+| `SS_PUSHER` | Auteur du push |
+| `SS_WEBHOOK_NAME` | Nom du webhook ServerSupervisor |
+| `SS_EVENT_TYPE` | Type d'événement (`push`, `tag`, `release`) |
 
 | Champ | Description |
 |---|---|

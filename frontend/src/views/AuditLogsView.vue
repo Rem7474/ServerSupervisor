@@ -79,10 +79,13 @@
                   <td class="text-secondary small">{{ formatDuration(cmd.started_at, cmd.ended_at) }}</td>
                   <td>
                     <button
-                      class="btn btn-sm btn-outline-secondary"
+                      class="btn btn-sm btn-ghost-secondary"
                       @click="openLogViewer(cmd)"
                       :disabled="!cmd.output && cmd.status === 'pending'"
-                    >Logs</button>
+                      title="Voir les logs"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 6l16 0" /><path d="M4 12l16 0" /><path d="M4 18l12 0" /></svg>
+                    </button>
                   </td>
                 </tr>
               </tbody>
