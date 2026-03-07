@@ -405,8 +405,8 @@ function channelBadge(ch) {
 
 function execStatusBadge(status) {
   const map = {
-    pending: 'bg-yellow text-dark', running: 'bg-blue',
-    completed: 'bg-success', failed: 'bg-danger', skipped: 'bg-secondary',
+    pending: 'bg-yellow-lt text-yellow', running: 'bg-blue-lt text-blue',
+    completed: 'bg-success-lt text-success', failed: 'bg-danger-lt text-danger', skipped: 'bg-secondary-lt text-secondary',
   }
   return map[status] || 'bg-secondary'
 }

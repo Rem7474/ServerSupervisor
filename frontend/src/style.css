@@ -193,3 +193,12 @@ body {
 .node text {
   pointer-events: none;
 }
+
+/* Fix badge contrast in dark mode.
+ * bg-secondary (solid gray) becomes invisible on dark card backgrounds.
+ * Force it to use the -lt (light) style: translucent bg + legible text. */
+[data-bs-theme="dark"] .badge.bg-secondary,
+[data-bs-theme="dark"] .badge.bg-dark {
+  background-color: rgba(110, 117, 130, 0.18) !important;
+  color: #9aa0ac !important;
+}
