@@ -161,13 +161,19 @@
                   <span class="badge bg-green-lt text-green">{{ t.last_release_tag }}</span>
                 </div>
               </div>
-              <div v-if="t.last_execution" class="mt-2 pt-2 border-top small">
-                <span class="text-muted">Dernière exécution :</span>
-                <span class="ms-1 badge" :class="execStatusBadge(t.last_execution.status)">{{ t.last_execution.status }}</span>
-                <span class="ms-1 text-muted"><RelativeTime :date="t.last_execution.triggered_at" /></span>
-              </div>
-              <div v-else class="mt-2 pt-2 border-top small text-muted">
-                {{ t.last_release_tag ? 'Aucune exécution' : 'En attente du premier check...' }}
+              <div class="mt-2 pt-2 border-top small">
+                <template v-if="t.last_execution">
+                  <span class="text-muted">Dernière exécution :</span>
+                  <span class="ms-1 badge" :class="execStatusBadge(t.last_execution.status)">{{ t.last_execution.status }}</span>
+                  <span class="ms-1 text-muted"><RelativeTime :date="t.last_execution.triggered_at" /></span>
+                </template>
+                <template v-else-if="t.last_checked_at">
+                  <span class="text-muted">Dernière vérif : <RelativeTime :date="t.last_checked_at" /></span>
+                  <span v-if="!t.last_release_tag" class="ms-1 badge bg-warning text-dark">aucune release trouvée</span>
+                </template>
+                <template v-else>
+                  <span class="text-muted">En attente du premier check...</span>
+                </template>
               </div>
             </div>
             <div class="card-footer d-flex gap-2">
@@ -640,6 +646,7 @@ async function toggleTracker(t) {
 async function checkNow(t) {
   try {
     await api.checkReleaseTrackerNow(t.id)
+    setTimeout(() => loadTrackers(), 2000)
   } catch (e) {
     error.value = e.response?.data?.error || 'Erreur'
   }
