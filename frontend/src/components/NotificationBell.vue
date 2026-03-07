@@ -254,7 +254,7 @@ onUnmounted(() => {
   right: 0;
   width: 380px;
   max-width: calc(100vw - 1rem);
-  z-index: 1050;
+  z-index: 2100;
   background: var(--tblr-bg-surface);
   border: 1px solid var(--tblr-border-color);
   border-radius: 8px;
@@ -269,6 +269,7 @@ onUnmounted(() => {
     left: 0.5rem;
     width: auto;
     max-width: none;
+    z-index: 2100;
   }
 }
 

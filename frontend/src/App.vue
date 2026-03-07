@@ -211,7 +211,11 @@ onMounted(() => {
   // Auto-close mobile navbar after navigation
   router.afterEach(() => {
     const el = document.getElementById('navbar-menu')
-    if (el?.classList.contains('show')) el.classList.remove('show')
+    if (el?.classList.contains('show')) {
+      el.classList.remove('show')
+      const toggler = document.querySelector('.navbar-toggler[data-bs-target="#navbar-menu"]')
+      if (toggler) toggler.setAttribute('aria-expanded', 'false')
+    }
   })
 })
 
