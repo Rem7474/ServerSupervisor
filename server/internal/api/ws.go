@@ -631,6 +631,12 @@ func (h *WSHandler) buildVersionComparisons() ([]models.VersionComparison, error
 		if tracker.DockerImage == "" || tracker.LastReleaseTag == "" {
 			continue
 		}
+		releaseURL := ""
+		if tracker.LastExecution != nil {
+			releaseURL = tracker.LastExecution.ReleaseURL
+		}
+
+		matched := false
 		for _, container := range containers {
 			if container.HostID != tracker.HostID {
 				continue
@@ -638,12 +644,8 @@ func (h *WSHandler) buildVersionComparisons() ([]models.VersionComparison, error
 			if container.Image != tracker.DockerImage && container.Image+":"+container.ImageTag != tracker.DockerImage {
 				continue
 			}
-			releaseURL := ""
-			if tracker.LastExecution != nil {
-				releaseURL = tracker.LastExecution.ReleaseURL
-			}
 			comparisons = append(comparisons, models.VersionComparison{
-				DockerImage:    container.Image,
+				DockerImage:    tracker.DockerImage,
 				RunningVersion: container.ImageTag,
 				LatestVersion:  tracker.LastReleaseTag,
 				IsUpToDate:     normalizeVersion(container.ImageTag) == normalizeVersion(tracker.LastReleaseTag),
@@ -652,6 +654,21 @@ func (h *WSHandler) buildVersionComparisons() ([]models.VersionComparison, error
 				ReleaseURL:     releaseURL,
 				HostID:         tracker.HostID,
 				Hostname:       tracker.HostName,
+			})
+			matched = true
+		}
+
+		// Show tracker even when no running container matches (image name mismatch or container stopped)
+		if !matched {
+			comparisons = append(comparisons, models.VersionComparison{
+				DockerImage:   tracker.DockerImage,
+				LatestVersion: tracker.LastReleaseTag,
+				IsUpToDate:    false,
+				RepoOwner:     tracker.RepoOwner,
+				RepoName:      tracker.RepoName,
+				ReleaseURL:    releaseURL,
+				HostID:        tracker.HostID,
+				Hostname:      tracker.HostName,
 			})
 		}
 	}

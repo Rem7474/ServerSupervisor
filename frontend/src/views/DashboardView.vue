@@ -244,7 +244,7 @@
             <tr v-for="v in versionComparisons" :key="v.docker_image + v.host_id">
               <td class="fw-semibold">{{ v.docker_image }}</td>
               <td class="text-secondary">{{ v.hostname }}</td>
-              <td><code>{{ v.running_version }}</code></td>
+              <td><code v-if="v.running_version">{{ v.running_version }}</code><span v-else class="text-secondary small">inconnue</span></td>
               <td>
                 <a v-if="v.release_url" :href="v.release_url" target="_blank" class="link-primary">
                   {{ v.latest_version }}
@@ -253,6 +253,7 @@
               </td>
               <td>
                 <span v-if="v.is_up_to_date" class="badge bg-green-lt text-green">À jour</span>
+                <span v-else-if="!v.running_version" class="badge bg-secondary-lt text-secondary">Version inconnue</span>
                 <span v-else class="badge bg-yellow-lt text-yellow">Mise à jour disponible</span>
               </td>
             </tr>
