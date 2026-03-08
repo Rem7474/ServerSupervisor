@@ -1,6 +1,9 @@
 package api
 
 import (
+	"crypto/sha256"
+	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"net/url"
@@ -14,6 +17,22 @@ import (
 	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/models"
 )
+
+// snapshotChanged returns true (and updates *lastHash) when payload differs from the
+// previously sent snapshot. It allows the caller to skip WriteJSON when nothing changed.
+func snapshotChanged(payload gin.H, lastHash *string) bool {
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return true // marshal failure → always send to be safe
+	}
+	sum := sha256.Sum256(raw)
+	h := fmt.Sprintf("%x", sum)
+	if h == *lastHash {
+		return false
+	}
+	*lastHash = h
+	return true
+}
 
 type WSHandler struct {
 	db        *database.DB
@@ -40,6 +59,11 @@ func (h *WSHandler) GetStreamHub() *CommandStreamHub {
 func (h *WSHandler) GetNotificationHub() *NotificationHub {
 	return h.notifHub
 }
+
+const (
+	wsPingInterval = 30 * time.Second
+	wsPongWait     = 60 * time.Second
+)
 
 type wsAuthMessage struct {
 	Type  string `json:"type"`
@@ -135,10 +159,18 @@ func (h *WSHandler) Dashboard(c *gin.Context) {
 		return
 	}
 
-	ticker := time.NewTicker(10 * time.Second)
-	defer ticker.Stop()
+	_ = conn.SetReadDeadline(time.Now().Add(wsPongWait))
+	conn.SetPongHandler(func(string) error {
+		return conn.SetReadDeadline(time.Now().Add(wsPongWait))
+	})
 
-	if err := h.sendDashboardSnapshot(conn); err != nil {
+	dataTicker := time.NewTicker(10 * time.Second)
+	pingTicker := time.NewTicker(wsPingInterval)
+	defer dataTicker.Stop()
+	defer pingTicker.Stop()
+
+	var lastHash string
+	if err := h.sendDashboardSnapshot(conn, &lastHash); err != nil {
 		return
 	}
 
@@ -149,8 +181,12 @@ func (h *WSHandler) Dashboard(c *gin.Context) {
 		select {
 		case <-done:
 			return
-		case <-ticker.C:
-			if err := h.sendDashboardSnapshot(conn); err != nil {
+		case <-dataTicker.C:
+			if err := h.sendDashboardSnapshot(conn, &lastHash); err != nil {
+				return
+			}
+		case <-pingTicker.C:
+			if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
 				return
 			}
 		}
@@ -174,10 +210,18 @@ func (h *WSHandler) HostDetail(c *gin.Context) {
 		return
 	}
 
-	ticker := time.NewTicker(10 * time.Second)
-	defer ticker.Stop()
+	_ = conn.SetReadDeadline(time.Now().Add(wsPongWait))
+	conn.SetPongHandler(func(string) error {
+		return conn.SetReadDeadline(time.Now().Add(wsPongWait))
+	})
 
-	if err := h.sendHostSnapshot(conn, hostID); err != nil {
+	dataTicker := time.NewTicker(10 * time.Second)
+	pingTicker := time.NewTicker(wsPingInterval)
+	defer dataTicker.Stop()
+	defer pingTicker.Stop()
+
+	var lastHash string
+	if err := h.sendHostSnapshot(conn, hostID, &lastHash); err != nil {
 		return
 	}
 
@@ -188,8 +232,12 @@ func (h *WSHandler) HostDetail(c *gin.Context) {
 		select {
 		case <-done:
 			return
-		case <-ticker.C:
-			if err := h.sendHostSnapshot(conn, hostID); err != nil {
+		case <-dataTicker.C:
+			if err := h.sendHostSnapshot(conn, hostID, &lastHash); err != nil {
+				return
+			}
+		case <-pingTicker.C:
+			if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
 				return
 			}
 		}
@@ -207,10 +255,18 @@ func (h *WSHandler) Docker(c *gin.Context) {
 		return
 	}
 
-	ticker := time.NewTicker(10 * time.Second)
-	defer ticker.Stop()
+	_ = conn.SetReadDeadline(time.Now().Add(wsPongWait))
+	conn.SetPongHandler(func(string) error {
+		return conn.SetReadDeadline(time.Now().Add(wsPongWait))
+	})
 
-	if err := h.sendDockerSnapshot(conn); err != nil {
+	dataTicker := time.NewTicker(10 * time.Second)
+	pingTicker := time.NewTicker(wsPingInterval)
+	defer dataTicker.Stop()
+	defer pingTicker.Stop()
+
+	var lastHash string
+	if err := h.sendDockerSnapshot(conn, &lastHash); err != nil {
 		return
 	}
 
@@ -221,8 +277,12 @@ func (h *WSHandler) Docker(c *gin.Context) {
 		select {
 		case <-done:
 			return
-		case <-ticker.C:
-			if err := h.sendDockerSnapshot(conn); err != nil {
+		case <-dataTicker.C:
+			if err := h.sendDockerSnapshot(conn, &lastHash); err != nil {
+				return
+			}
+		case <-pingTicker.C:
+			if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
 				return
 			}
 		}
@@ -240,10 +300,18 @@ func (h *WSHandler) Network(c *gin.Context) {
 		return
 	}
 
-	ticker := time.NewTicker(10 * time.Second)
-	defer ticker.Stop()
+	_ = conn.SetReadDeadline(time.Now().Add(wsPongWait))
+	conn.SetPongHandler(func(string) error {
+		return conn.SetReadDeadline(time.Now().Add(wsPongWait))
+	})
 
-	if err := h.sendNetworkSnapshot(conn); err != nil {
+	dataTicker := time.NewTicker(10 * time.Second)
+	pingTicker := time.NewTicker(wsPingInterval)
+	defer dataTicker.Stop()
+	defer pingTicker.Stop()
+
+	var lastHash string
+	if err := h.sendNetworkSnapshot(conn, &lastHash); err != nil {
 		return
 	}
 
@@ -254,8 +322,12 @@ func (h *WSHandler) Network(c *gin.Context) {
 		select {
 		case <-done:
 			return
-		case <-ticker.C:
-			if err := h.sendNetworkSnapshot(conn); err != nil {
+		case <-dataTicker.C:
+			if err := h.sendNetworkSnapshot(conn, &lastHash); err != nil {
+				return
+			}
+		case <-pingTicker.C:
+			if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
 				return
 			}
 		}
@@ -273,10 +345,18 @@ func (h *WSHandler) Apt(c *gin.Context) {
 		return
 	}
 
-	ticker := time.NewTicker(10 * time.Second)
-	defer ticker.Stop()
+	_ = conn.SetReadDeadline(time.Now().Add(wsPongWait))
+	conn.SetPongHandler(func(string) error {
+		return conn.SetReadDeadline(time.Now().Add(wsPongWait))
+	})
 
-	if err := h.sendAptSnapshot(conn); err != nil {
+	dataTicker := time.NewTicker(10 * time.Second)
+	pingTicker := time.NewTicker(wsPingInterval)
+	defer dataTicker.Stop()
+	defer pingTicker.Stop()
+
+	var lastHash string
+	if err := h.sendAptSnapshot(conn, &lastHash); err != nil {
 		return
 	}
 
@@ -287,8 +367,12 @@ func (h *WSHandler) Apt(c *gin.Context) {
 		select {
 		case <-done:
 			return
-		case <-ticker.C:
-			if err := h.sendAptSnapshot(conn); err != nil {
+		case <-dataTicker.C:
+			if err := h.sendAptSnapshot(conn, &lastHash); err != nil {
+				return
+			}
+		case <-pingTicker.C:
+			if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
 				return
 			}
 		}
@@ -391,18 +475,15 @@ func (h *WSHandler) validateToken(tokenString string) bool {
 	return err == nil && token.Valid
 }
 
-func (h *WSHandler) sendDashboardSnapshot(conn *websocket.Conn) error {
+func (h *WSHandler) sendDashboardSnapshot(conn *websocket.Conn, lastHash *string) error {
 	hosts, err := h.db.GetAllHosts()
 	if err != nil {
 		return err
 	}
 
-	hostMetrics := map[string]*models.SystemMetrics{}
-	for _, host := range hosts {
-		metrics, err := h.db.GetLatestMetrics(host.ID)
-		if err == nil {
-			hostMetrics[host.ID] = metrics
-		}
+	hostMetrics, _ := h.db.GetLatestMetricsAll()
+	if hostMetrics == nil {
+		hostMetrics = map[string]*models.SystemMetrics{}
 	}
 
 	comparisons, err := h.buildVersionComparisons()
@@ -415,11 +496,16 @@ func (h *WSHandler) sendDashboardSnapshot(conn *websocket.Conn) error {
 		"hosts":               hosts,
 		"host_metrics":        hostMetrics,
 		"version_comparisons": comparisons,
+		"apt_pending":         h.db.GetTotalAptPending(),
+		"disk_usage":          h.db.GetRootDiskPercentAll(),
+	}
+	if !snapshotChanged(payload, lastHash) {
+		return nil
 	}
 	return conn.WriteJSON(payload)
 }
 
-func (h *WSHandler) sendHostSnapshot(conn *websocket.Conn, hostID string) error {
+func (h *WSHandler) sendHostSnapshot(conn *websocket.Conn, hostID string, lastHash *string) error {
 	host, err := h.db.GetHost(hostID)
 	if err != nil {
 		return err
@@ -439,10 +525,13 @@ func (h *WSHandler) sendHostSnapshot(conn *websocket.Conn, hostID string) error 
 		"apt_history": aptHistory,
 		"audit_logs":  auditLogs,
 	}
+	if !snapshotChanged(payload, lastHash) {
+		return nil
+	}
 	return conn.WriteJSON(payload)
 }
 
-func (h *WSHandler) sendDockerSnapshot(conn *websocket.Conn) error {
+func (h *WSHandler) sendDockerSnapshot(conn *websocket.Conn, lastHash *string) error {
 	containers, err := h.db.GetAllDockerContainers()
 	if err != nil {
 		return err
@@ -458,10 +547,13 @@ func (h *WSHandler) sendDockerSnapshot(conn *websocket.Conn) error {
 		"containers":       containers,
 		"compose_projects": composeProjects,
 	}
+	if !snapshotChanged(payload, lastHash) {
+		return nil
+	}
 	return conn.WriteJSON(payload)
 }
 
-func (h *WSHandler) sendNetworkSnapshot(conn *websocket.Conn) error {
+func (h *WSHandler) sendNetworkSnapshot(conn *websocket.Conn, lastHash *string) error {
 	snapshot, err := buildNetworkSnapshot(h.db)
 	if err != nil {
 		return err
@@ -485,10 +577,13 @@ func (h *WSHandler) sendNetworkSnapshot(conn *websocket.Conn) error {
 		"config":     config,
 		"updated_at": snapshot.UpdatedAt,
 	}
+	if !snapshotChanged(payload, lastHash) {
+		return nil
+	}
 	return conn.WriteJSON(payload)
 }
 
-func (h *WSHandler) sendAptSnapshot(conn *websocket.Conn) error {
+func (h *WSHandler) sendAptSnapshot(conn *websocket.Conn, lastHash *string) error {
 	hosts, err := h.db.GetAllHosts()
 	if err != nil {
 		return err
@@ -513,6 +608,9 @@ func (h *WSHandler) sendAptSnapshot(conn *websocket.Conn) error {
 		"hosts":         hosts,
 		"apt_statuses":  aptStatuses,
 		"apt_histories": aptHistories,
+	}
+	if !snapshotChanged(payload, lastHash) {
+		return nil
 	}
 	return conn.WriteJSON(payload)
 }

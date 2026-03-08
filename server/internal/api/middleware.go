@@ -202,6 +202,24 @@ func maskSensitiveParams(query string) string {
 	return strings.Join(parts, "&")
 }
 
+// SecurityHeadersMiddleware sets HTTP security headers on all responses.
+func SecurityHeadersMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Header("X-Content-Type-Options", "nosniff")
+		c.Header("X-Frame-Options", "DENY")
+		c.Header("Referrer-Policy", "strict-origin-when-cross-origin")
+		c.Header("Content-Security-Policy",
+			"default-src 'self'; "+
+				"script-src 'self'; "+
+				"style-src 'self' 'unsafe-inline'; "+
+				"img-src 'self' data: blob:; "+
+				"connect-src 'self' ws: wss:; "+
+				"font-src 'self'; "+
+				"frame-ancestors 'none'")
+		c.Next()
+	}
+}
+
 // CORSMiddleware handles CORS with dynamic origin matching (WebSocket-safe).
 // It checks the request Origin against BASE_URL and ALLOWED_ORIGINS so that
 // additional front-end origins (e.g. dev server, reverse proxy) are accepted.

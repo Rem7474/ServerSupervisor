@@ -70,6 +70,69 @@ func (db *DB) GetLatestMetrics(hostID string) (*models.SystemMetrics, error) {
 	return &m, nil
 }
 
+// GetLatestMetricsAll returns the most recent SystemMetrics row for every host
+// in a single query, avoiding N+1 lookups on the dashboard.
+// Disk details are intentionally omitted (dashboard only needs CPU/mem/net).
+func (db *DB) GetLatestMetricsAll() (map[string]*models.SystemMetrics, error) {
+	rows, err := db.conn.Query(
+		`SELECT DISTINCT ON (host_id) id, host_id, timestamp,
+		 cpu_usage_percent, cpu_cores, cpu_model,
+		 load_avg_1, load_avg_5, load_avg_15,
+		 memory_total, memory_used, memory_free, memory_percent,
+		 swap_total, swap_used, network_rx_bytes, network_tx_bytes, uptime, hostname
+		 FROM system_metrics
+		 ORDER BY host_id, timestamp DESC`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	result := make(map[string]*models.SystemMetrics)
+	for rows.Next() {
+		var m models.SystemMetrics
+		if err := rows.Scan(
+			&m.ID, &m.HostID, &m.Timestamp,
+			&m.CPUUsagePercent, &m.CPUCores, &m.CPUModel,
+			&m.LoadAvg1, &m.LoadAvg5, &m.LoadAvg15,
+			&m.MemoryTotal, &m.MemoryUsed, &m.MemoryFree, &m.MemoryPercent,
+			&m.SwapTotal, &m.SwapUsed, &m.NetworkRxBytes, &m.NetworkTxBytes,
+			&m.Uptime, &m.Hostname,
+		); err != nil {
+			continue
+		}
+		result[m.HostID] = &m
+	}
+	return result, rows.Err()
+}
+
+// GetRootDiskPercentAll returns the used_percent of the root ("/") mount point for
+// each host, based on the most recent system_metrics row. Hosts with no disk_info
+// row for "/" are omitted from the map.
+func (db *DB) GetRootDiskPercentAll() map[string]float64 {
+	rows, err := db.conn.Query(
+		`SELECT DISTINCT ON (sm.host_id) sm.host_id, di.used_percent
+		 FROM system_metrics sm
+		 JOIN disk_info di ON di.metrics_id = sm.id AND di.mount_point = '/'
+		 ORDER BY sm.host_id, sm.timestamp DESC`,
+	)
+	if err != nil {
+		return map[string]float64{}
+	}
+	defer func() { _ = rows.Close() }()
+
+	result := make(map[string]float64)
+	for rows.Next() {
+		var hostID string
+		var pct float64
+		if err := rows.Scan(&hostID, &pct); err != nil {
+			continue
+		}
+		result[hostID] = pct
+	}
+	return result
+}
+
 func (db *DB) GetMetricsHistory(hostID string, hours int) ([]models.SystemMetrics, error) {
 	rows, err := db.conn.Query(
 		`SELECT id, host_id, timestamp, cpu_usage_percent, cpu_cores, load_avg_1, load_avg_5, load_avg_15,

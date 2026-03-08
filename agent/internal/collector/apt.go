@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"os/exec"
 	"regexp"
 	"strconv"
@@ -129,9 +130,9 @@ func ExecuteAptCommandWithStreaming(command string, streamCallback func(chunk st
 	case "update":
 		cmd = exec.CommandContext(ctx, "apt", "update")
 	case "upgrade":
-		cmd = exec.CommandContext(ctx, "apt", "upgrade", "-y", "-qq", "--allow-unauthenticated")
+		cmd = exec.CommandContext(ctx, "apt", "upgrade", "-y", "-qq")
 	case "dist-upgrade":
-		cmd = exec.CommandContext(ctx, "apt", "dist-upgrade", "-y", "-qq", "--allow-unauthenticated")
+		cmd = exec.CommandContext(ctx, "apt", "dist-upgrade", "-y", "-qq")
 	default:
 		return "", fmt.Errorf("unknown apt command: %s", command)
 	}
@@ -227,16 +228,19 @@ func runCommandWithStreaming(cmd *exec.Cmd, streamCallback func(chunk string)) (
 }
 
 func getLastAptAction(prefix, logFile string) time.Time {
-	out, err := exec.Command("grep", prefix, logFile).Output()
+	data, err := os.ReadFile(logFile)
 	if err != nil {
 		return time.Time{}
 	}
-	lines := strings.Split(strings.TrimSpace(string(out)), "\n")
-	if len(lines) == 0 {
+	var lastLine string
+	for _, line := range strings.Split(string(data), "\n") {
+		if strings.HasPrefix(line, prefix) {
+			lastLine = line
+		}
+	}
+	if lastLine == "" {
 		return time.Time{}
 	}
-	// Get last entry
-	lastLine := lines[len(lines)-1]
 	parts := strings.SplitN(lastLine, ":", 2)
 	if len(parts) != 2 {
 		return time.Time{}

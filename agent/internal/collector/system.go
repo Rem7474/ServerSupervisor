@@ -1,13 +1,17 @@
+//go:build linux
+
 package collector
 
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"runtime"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
+
+	"golang.org/x/sys/unix"
 )
 
 type NetworkInterface struct {
@@ -129,6 +133,17 @@ var (
 	cpuMu        sync.Mutex
 )
 
+func init() {
+	// Prime the CPU baseline with a short sample so the first CollectSystem()
+	// call returns a real value instead of 0.
+	idle0, total0 := readCPUStat()
+	time.Sleep(100 * time.Millisecond)
+	cpuMu.Lock()
+	prevCPUIdle = idle0
+	prevCPUTotal = total0
+	cpuMu.Unlock()
+}
+
 // readCPUStat returns the idle and total CPU jiffies from /proc/stat.
 func readCPUStat() (idle, total uint64) {
 	data, err := os.ReadFile("/proc/stat")
@@ -168,7 +183,7 @@ func getCPUUsage() float64 {
 		prevCPUTotal = total
 		cpuMu.Unlock()
 	}()
-	if prevCPUTotal == 0 {
+	if prevCPUTotal == 0 || idle < prevCPUIdle || total < prevCPUTotal {
 		return 0
 	}
 	idleDelta := float64(idle - prevCPUIdle)
@@ -215,35 +230,58 @@ func getMemInfo() map[string]uint64 {
 	return result
 }
 
+// pseudoFS lists filesystem types that carry no real storage and must be
+// excluded from disk reporting.
+var pseudoFS = map[string]bool{
+	"proc": true, "sysfs": true, "devtmpfs": true, "devpts": true,
+	"tmpfs": true, "cgroup": true, "cgroup2": true, "securityfs": true,
+	"pstore": true, "debugfs": true, "tracefs": true, "bpf": true,
+	"overlay": true, "squashfs": true, "fusectl": true, "mqueue": true,
+	"hugetlbfs": true, "nsfs": true, "ramfs": true, "autofs": true,
+	"binfmt_misc": true, "configfs": true, "efivarfs": true,
+}
+
 func getDiskUsage() []DiskInfo {
-	out, err := exec.Command("df", "-B1", "--output=target,source,fstype,size,used,avail,pcent").Output()
+	data, err := os.ReadFile("/proc/mounts")
 	if err != nil {
 		return nil
 	}
 
+	seen := make(map[string]bool)
 	var disks []DiskInfo
-	lines := strings.Split(string(out), "\n")
-	for _, line := range lines[1:] { // Skip header
+	for _, line := range strings.Split(string(data), "\n") {
 		fields := strings.Fields(line)
-		if len(fields) < 7 {
+		if len(fields) < 3 {
 			continue
 		}
-		// Skip pseudo-filesystems
-		if strings.HasPrefix(fields[1], "tmpfs") || strings.HasPrefix(fields[1], "devtmpfs") ||
-			fields[0] == "/boot/efi" || strings.HasPrefix(fields[2], "squashfs") {
+		device, mountPoint, fsType := fields[0], fields[1], fields[2]
+		if pseudoFS[fsType] || seen[mountPoint] {
+			continue
+		}
+		seen[mountPoint] = true
+
+		var stat unix.Statfs_t
+		if err := unix.Statfs(mountPoint, &stat); err != nil || stat.Blocks == 0 {
 			continue
 		}
 
-		total, _ := strconv.ParseUint(fields[3], 10, 64)
-		used, _ := strconv.ParseUint(fields[4], 10, 64)
-		free, _ := strconv.ParseUint(fields[5], 10, 64)
-		pctStr := strings.TrimSuffix(fields[6], "%")
-		pct, _ := strconv.ParseFloat(pctStr, 64)
+		bsize := uint64(stat.Bsize)
+		total := stat.Blocks * bsize
+		free := stat.Bavail * bsize
+		var used uint64
+		if stat.Blocks >= stat.Bfree {
+			used = (stat.Blocks - stat.Bfree) * bsize
+		}
+		// Compute used% the same way df does: used/(used+available).
+		var pct float64
+		if avail := (stat.Blocks - stat.Bfree) + stat.Bavail; avail > 0 {
+			pct = float64(stat.Blocks-stat.Bfree) / float64(avail) * 100
+		}
 
 		disks = append(disks, DiskInfo{
-			MountPoint:  fields[0],
-			Device:      fields[1],
-			FSType:      fields[2],
+			MountPoint:  mountPoint,
+			Device:      device,
+			FSType:      fsType,
 			TotalBytes:  total,
 			UsedBytes:   used,
 			FreeBytes:   free,

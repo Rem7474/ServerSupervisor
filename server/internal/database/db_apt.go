@@ -72,6 +72,13 @@ func (db *DB) GetAptHistoryWithAgentUpdates(hostID string, limit int) ([]models.
 	return db.GetRemoteCommandsByHostAndModule(hostID, "apt", limit)
 }
 
+// GetTotalAptPending returns the total number of pending APT packages across all hosts.
+func (db *DB) GetTotalAptPending() int {
+	var total int
+	_ = db.conn.QueryRow(`SELECT COALESCE(SUM(pending_packages), 0) FROM apt_status`).Scan(&total)
+	return total
+}
+
 // ========== Tracked Repos ==========
 
 func (db *DB) CreateTrackedRepo(repo *models.TrackedRepo) error {

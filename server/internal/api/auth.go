@@ -53,6 +53,33 @@ func resetFailedLogins(ip string) {
 	delete(loginTracker.records, ip)
 }
 
+// StartLoginTrackerCleanup starts a background goroutine that removes stale
+// brute-force records once per bruteForceWindow, preventing unbounded growth.
+func StartLoginTrackerCleanup() {
+	go func() {
+		ticker := time.NewTicker(bruteForceWindow)
+		defer ticker.Stop()
+		for range ticker.C {
+			cutoff := time.Now().Add(-bruteForceWindow)
+			loginTracker.mu.Lock()
+			for ip, times := range loginTracker.records {
+				filtered := times[:0]
+				for _, t := range times {
+					if t.After(cutoff) {
+						filtered = append(filtered, t)
+					}
+				}
+				if len(filtered) == 0 {
+					delete(loginTracker.records, ip)
+				} else {
+					loginTracker.records[ip] = filtered
+				}
+			}
+			loginTracker.mu.Unlock()
+		}
+	}()
+}
+
 func isIPBlocked(ip string) bool {
 	loginTracker.mu.Lock()
 	defer loginTracker.mu.Unlock()
@@ -606,7 +633,7 @@ func (h *AuthHandler) UnblockIP(c *gin.Context) {
 
 	user := c.GetString("username")
 	_, _ = h.db.CreateAuditLog(user, "unblock_ip", "", c.ClientIP(), "IP unblocked: "+ip, "success")
-	c.JSON(http.StatusOK, gin.H{"success": true, "message": "IP débloquée : " + ip})
+	c.JSON(http.StatusOK, gin.H{"success": true, "message": "IP unblocked: " + ip})
 }
 
 // GetLoginEvents returns the last 50 login events for the current user

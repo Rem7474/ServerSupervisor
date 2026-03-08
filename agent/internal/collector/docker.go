@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	docker "github.com/fsouza/go-dockerclient"
@@ -34,10 +35,22 @@ type DockerContainer struct {
 
 const containerShutdownTimeoutSecs uint = 10 // seconds to wait before SIGKILL
 
-// newDockerClient returns a Docker client configured from environment variables
-// (DOCKER_HOST, DOCKER_TLS_VERIFY, DOCKER_CERT_PATH) or the local Unix socket.
+// dockerOnce guards the shared Docker client singleton.
+var (
+	dockerOnce   sync.Once
+	dockerSingle *docker.Client
+	dockerErr    error
+)
+
+// newDockerClient returns a shared Docker client initialised once from environment
+// variables (DOCKER_HOST, DOCKER_TLS_VERIFY, DOCKER_CERT_PATH) or the local
+// Unix socket. go-dockerclient does not open a persistent connection here, so
+// the singleton is safe to share across goroutines.
 func newDockerClient() (*docker.Client, error) {
-	return docker.NewClientFromEnv()
+	dockerOnce.Do(func() {
+		dockerSingle, dockerErr = docker.NewClientFromEnv()
+	})
+	return dockerSingle, dockerErr
 }
 
 // CollectDocker gathers Docker container information using the Docker API.
@@ -145,14 +158,27 @@ func CollectDocker() ([]DockerContainer, error) {
 		})
 	}
 
-	// Enrich running containers with network I/O stats via the Docker API.
+	// Enrich running containers with network I/O stats in parallel.
+	// A semaphore limits concurrent Docker Stats calls to avoid overwhelming
+	// the daemon with many containers.
+	const maxNetStatWorkers = 8
+	sem := make(chan struct{}, maxNetStatWorkers)
+	var wg sync.WaitGroup
 	for i := range containers {
-		if containers[i].State == "running" {
-			rx, tx := collectContainerNetStats(client, containers[i].ContainerID)
-			containers[i].NetRxBytes = rx
-			containers[i].NetTxBytes = tx
+		if containers[i].State != "running" {
+			continue
 		}
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			// Each goroutine writes to a unique slice index — no mutex needed.
+			containers[idx].NetRxBytes, containers[idx].NetTxBytes =
+				collectContainerNetStats(client, containers[idx].ContainerID)
+		}(i)
 	}
+	wg.Wait()
 
 	log.Printf("Collected %d Docker containers", len(containers))
 	return containers, nil

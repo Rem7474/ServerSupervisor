@@ -118,6 +118,9 @@ func GetMetricValue(db *database.DB, host models.Host, rule models.AlertRule) (f
 			return 1, true
 		}
 		return 0, true
+	case "heartbeat_timeout":
+		// Returns seconds since the agent last reported. Threshold is the silence duration in seconds.
+		return now.Sub(host.LastSeen).Seconds(), true
 	case "cpu", "cpu_percent", "memory", "ram_percent", "disk", "disk_percent", "load":
 		metrics, err := db.GetLatestMetrics(host.ID)
 		if err != nil || metrics == nil {
@@ -172,8 +175,21 @@ func MatchRule(rule models.AlertRule, host models.Host, value float64) bool {
 	}
 }
 
+func buildAlertMessage(rule models.AlertRule, host models.Host, value float64) string {
+	if rule.Metric == "heartbeat_timeout" {
+		totalSecs := int(value)
+		if totalSecs >= 60 {
+			return fmt.Sprintf("Agent silencieux sur %s depuis %dm%ds (dernier contact : %s)",
+				host.Name, totalSecs/60, totalSecs%60, host.LastSeen.Local().Format("15:04:05"))
+		}
+		return fmt.Sprintf("Agent silencieux sur %s depuis %ds (dernier contact : %s)",
+			host.Name, totalSecs, host.LastSeen.Local().Format("15:04:05"))
+	}
+	return fmt.Sprintf("Alert %s %s %.2f on host %s (%s)", rule.Metric, rule.Operator, value, host.Name, host.ID)
+}
+
 func (n *notifier) notify(cfg *config.Config, rule models.AlertRule, host models.Host, value float64) {
-	msg := fmt.Sprintf("Alert %s %s %.2f on host %s (%s)", rule.Metric, rule.Operator, value, host.Name, host.ID)
+	msg := buildAlertMessage(rule, host, value)
 	payload := map[string]interface{}{
 		"title":        "ServerSupervisor Alert",
 		"message":      msg,

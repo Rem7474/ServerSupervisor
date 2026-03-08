@@ -739,6 +739,8 @@ watch(
   height: 100%;
   min-height: 520px;
   position: relative;
+  display: flex;
+  flex: 1;
   background: radial-gradient(circle at 15% 20%, rgba(96, 165, 250, 0.18), transparent 42%),
     radial-gradient(circle at 70% 0%, rgba(16, 185, 129, 0.12), transparent 40%),
     radial-gradient(circle at 20% 80%, rgba(244, 63, 94, 0.1), transparent 45%),
@@ -848,6 +850,21 @@ watch(
   font-size: 13px;
 }
 
+</style>
+
+<!-- Non-scoped: applies to D3-created SVG elements that bypass Vue's template -->
+<style>
+.link {
+  fill: none;
+}
+
+.proxy-link {
+  fill: none;
+  stroke: rgba(56, 189, 248, 0.65);
+  stroke-width: 1.6;
+  stroke-dasharray: 6 6;
+}
+
 .service-cluster rect {
   fill: rgba(15, 23, 42, 0.5);
   stroke: rgba(148, 163, 184, 0.3);
@@ -857,6 +874,12 @@ watch(
 .service-cluster:hover rect {
   stroke: rgba(148, 163, 184, 0.6);
   fill: rgba(15, 23, 42, 0.65);
+}
+
+.cluster-label {
+  font-size: 12px;
+  font-weight: 600;
+  fill: #cbd5f5;
 }
 
 .node { cursor: pointer; }

@@ -12,6 +12,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *NotificationHub,
 	r := gin.New()
 	r.Use(gin.Recovery())
 	r.Use(RequestLogger())
+	r.Use(SecurityHeadersMiddleware())
 	r.Use(CORSMiddleware(cfg.BaseURL, cfg.AllowedOrigins))
 
 	// Per-IP rate limiter

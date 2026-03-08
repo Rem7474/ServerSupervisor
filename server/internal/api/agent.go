@@ -49,6 +49,9 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 	// Sanitize hostID for safe logging (prevent log forging via newlines)
 	safeHostID := strings.ReplaceAll(strings.ReplaceAll(hostID, "\n", ""), "\r", "")
 
+	const maxReportSize = 5 * 1024 * 1024 // 5 MB — prevent oversized payloads from a rogue agent
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxReportSize)
+
 	var report models.AgentReport
 	if err := c.ShouldBindJSON(&report); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -101,8 +104,7 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 			report.Docker.Containers[i].HostID = hostID
 		}
 		if err := h.db.UpsertDockerContainers(hostID, report.Docker.Containers); err != nil {
-			// Log error but don't fail the entire request
-			c.Header("X-Docker-Error", err.Error())
+			log.Printf("Warning: failed to store docker containers for host %s: %v", safeHostID, err)
 		}
 	}
 
@@ -110,8 +112,7 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 	if report.AptStatus != nil {
 		report.AptStatus.HostID = hostID
 		if err := h.db.UpsertAptStatus(report.AptStatus); err != nil {
-			// Log error but don't fail the entire request
-			c.Header("X-APT-Error", err.Error())
+			log.Printf("Warning: failed to store apt status for host %s: %v", safeHostID, err)
 		}
 	}
 

@@ -31,7 +31,7 @@
         <div v-else class="text-secondary small">Mode lecture seule</div>
 
         <!-- Bouton Ajouter : icône seule sur xs, texte complet sur sm+ -->
-        <router-link to="/hosts/new" class="btn btn-primary">
+        <router-link to="/hosts/new" class="btn btn-primary btn-sm">
           <svg class="icon" width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
           </svg>
@@ -72,6 +72,11 @@
           <div class="card-body">
             <div class="subheader">Mises à jour disponibles</div>
             <div class="h1 mb-0 text-yellow">{{ outdatedVersions }}</div>
+            <div v-if="outdatedVersions > 0" class="text-secondary small mt-1">
+              <span v-if="aptPending > 0">{{ aptPending }} paquet{{ aptPending > 1 ? 's' : '' }} APT</span>
+              <span v-if="aptPending > 0 && outdatedDockerImages > 0"> · </span>
+              <span v-if="outdatedDockerImages > 0">{{ outdatedDockerImages }} image{{ outdatedDockerImages > 1 ? 's' : '' }} Docker</span>
+            </div>
           </div>
         </div>
       </div>
@@ -141,13 +146,14 @@
             <tr>
               <th style="width: 1%"></th>
               <th>Nom</th>
-              <th>Etat</th>
+              <th>État</th>
               <th>IP / OS</th>
-              <th>Agent</th>
+              <th title="Version de l'agent installé sur l'hôte. Vert = correspond à la version configurée dans les paramètres.">Agent</th>
               <th>CPU</th>
               <th>RAM</th>
+              <th>Disque</th>
               <th>Uptime</th>
-              <th>Derniere activite</th>
+              <th>Dernière activité</th>
             </tr>
           </thead>
           <tbody>
@@ -167,7 +173,7 @@
                 <router-link :to="`/hosts/${host.id}`" class="fw-semibold text-decoration-none">
                   {{ host.name || host.hostname || 'Sans nom' }}
                 </router-link>
-                <div class="text-secondary small">{{ host.hostname || 'Non connecte' }}</div>
+                <div class="text-secondary small">{{ host.hostname || 'Non connecté' }}</div>
               </td>
               <td>
                 <span :class="hostStatusClass(host.status)">
@@ -195,9 +201,19 @@
                 </span>
               </td>
               <td>
+                <span :class="diskColor(diskUsage[host.id])">
+                  {{ diskUsage[host.id] != null ? diskUsage[host.id].toFixed(1) + '%' : '-' }}
+                </span>
+              </td>
+              <td>
                 {{ hostMetrics[host.id] ? formatUptime(hostMetrics[host.id].uptime) : '-' }}
               </td>
               <td><RelativeTime :date="host.last_seen" /></td>
+            </tr>
+            <tr v-if="!loading && sortedHosts.length === 0">
+              <td colspan="10" class="text-center text-secondary py-4">
+                Aucun hôte ne correspond à votre recherche.
+              </td>
             </tr>
           </tbody>
         </table>
@@ -208,9 +224,10 @@
       </div>
     </div>
 
-    <div v-if="versionComparisons.length > 0" class="card mt-4">
+    <div class="card mt-4">
       <div class="card-header">
-        <h3 class="card-title">Versions & Mises a jour</h3>
+        <h3 class="card-title">Versions &amp; Mises à jour Docker</h3>
+        <div class="card-options text-secondary small">Suivi configuré via <router-link to="/git-webhooks">Git / Automatisation</router-link></div>
       </div>
       <div class="table-responsive">
         <table class="table table-vcenter card-table">
@@ -219,7 +236,7 @@
               <th>Image</th>
               <th>Hôte</th>
               <th>En cours</th>
-              <th>Derniere version</th>
+              <th>Dernière version</th>
               <th>Statut</th>
             </tr>
           </thead>
@@ -235,8 +252,14 @@
                 <span v-else>{{ v.latest_version }}</span>
               </td>
               <td>
-                <span v-if="v.is_up_to_date" class="badge bg-green-lt text-green">A jour</span>
-                <span v-else class="badge bg-yellow-lt text-yellow">Mise a jour disponible</span>
+                <span v-if="v.is_up_to_date" class="badge bg-green-lt text-green">À jour</span>
+                <span v-else class="badge bg-yellow-lt text-yellow">Mise à jour disponible</span>
+              </td>
+            </tr>
+            <tr v-if="versionComparisons.length === 0">
+              <td colspan="5" class="text-center text-secondary py-4">
+                Aucun suivi de version configuré. Ajoutez des release trackers dans
+                <router-link to="/git-webhooks">Git / Automatisation</router-link>.
               </td>
             </tr>
           </tbody>
@@ -279,6 +302,8 @@ const latestAgentVersion = ref('')
 const hosts = ref([])
 const hostMetrics = ref({})
 const versionComparisons = ref([])
+const aptPending = ref(0)
+const diskUsage = ref({})
 const loading = ref(true)
 const searchQuery = ref('')
 const statusFilter = ref('all')
@@ -329,7 +354,8 @@ const summaryChartOptions = {
 
 const onlineCount = computed(() => hosts.value.filter(h => h.status === 'online').length)
 const offlineCount = computed(() => hosts.value.filter(h => h.status !== 'online').length)
-const outdatedVersions = computed(() => versionComparisons.value.filter(v => !v.is_up_to_date).length)
+const outdatedDockerImages = computed(() => versionComparisons.value.filter(v => !v.is_up_to_date).length)
+const outdatedVersions = computed(() => outdatedDockerImages.value + aptPending.value)
 const selectedCount = computed(() => selectedHostIds.value.length)
 const canRunApt = computed(() => auth.role === 'admin' || auth.role === 'operator')
 
@@ -391,6 +417,8 @@ const { wsStatus, wsError, retryCount, reconnect } = useWebSocket('/api/v1/ws/da
   hosts.value = payload.hosts || []
   hostMetrics.value = payload.host_metrics || {}
   versionComparisons.value = payload.version_comparisons || []
+  aptPending.value = payload.apt_pending ?? 0
+  diskUsage.value = payload.disk_usage || {}
   selectedHostIds.value = selectedHostIds.value.filter(id => hosts.value.some(h => h.id === id))
   loading.value = false
 }, { debounceMs: 200 })
@@ -502,6 +530,13 @@ function cpuColor(pct) {
 
 function memColor(pct) {
   if (!pct) return 'text-secondary'
+  if (pct > 90) return 'text-red'
+  if (pct > 75) return 'text-yellow'
+  return 'text-green'
+}
+
+function diskColor(pct) {
+  if (pct == null) return 'text-secondary'
   if (pct > 90) return 'text-red'
   if (pct > 75) return 'text-yellow'
   return 'text-green'

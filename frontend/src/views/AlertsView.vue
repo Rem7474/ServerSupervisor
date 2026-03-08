@@ -233,14 +233,15 @@
             <div class="row">
               <div class="col-md-4 mb-3">
                 <label class="form-label required">Métrique</label>
-                <select v-model="form.metric" class="form-select">
+                <select v-model="form.metric" class="form-select" @change="onMetricChange">
                   <option value="cpu">CPU (%)</option>
                   <option value="memory">Mémoire (%)</option>
                   <option value="disk">Disque (%)</option>
                   <option value="load">Load Average</option>
+                  <option value="heartbeat_timeout">Heartbeat (agent silencieux)</option>
                 </select>
               </div>
-              <div class="col-md-4 mb-3">
+              <div class="col-md-4 mb-3" v-if="form.metric !== 'heartbeat_timeout'">
                 <label class="form-label required">Opérateur</label>
                 <select v-model="form.operator" class="form-select">
                   <option value=">">Supérieur à (>)</option>
@@ -250,22 +251,27 @@
                 </select>
               </div>
               <div class="col-md-4 mb-3">
-                <label class="form-label required">Seuil</label>
-                <input 
-                  v-model.number="form.threshold" 
-                  type="number" 
-                  step="0.1" 
+                <label class="form-label required">
+                  {{ form.metric === 'heartbeat_timeout' ? 'Silence maximum (secondes)' : 'Seuil' }}
+                </label>
+                <input
+                  v-model.number="form.threshold"
+                  type="number"
+                  :step="form.metric === 'heartbeat_timeout' ? 60 : 0.1"
                   class="form-control"
-                  placeholder="80"
+                  :placeholder="form.metric === 'heartbeat_timeout' ? '300' : '80'"
                 />
+                <small v-if="form.metric === 'heartbeat_timeout'" class="form-hint">
+                  Durée en secondes sans rapport avant alerte (ex: 300 = 5 min, 600 = 10 min)
+                </small>
               </div>
             </div>
 
-            <div class="mb-3">
+            <div class="mb-3" v-if="form.metric !== 'heartbeat_timeout'">
               <label class="form-label">Durée (secondes)</label>
-              <input 
-                v-model.number="form.duration" 
-                type="number" 
+              <input
+                v-model.number="form.duration"
+                type="number"
                 class="form-control"
                 placeholder="300"
               />
@@ -556,6 +562,16 @@ const channelBrowser = ref(false)
 const browserPermission = ref(typeof Notification !== 'undefined' ? Notification.permission : 'unsupported')
 const commandTriggerEnabled = ref(false)
 
+function onMetricChange() {
+  if (form.value.metric === 'heartbeat_timeout') {
+    form.value.operator = '>'
+    if (!form.value.threshold || form.value.threshold === 80) {
+      form.value.threshold = 300
+    }
+    form.value.duration = 0
+  }
+}
+
 let autoTestTimer = null
 watch(
   () => [form.value.host_id, form.value.metric, form.value.operator, form.value.threshold, form.value.duration],
@@ -786,7 +802,8 @@ function getMetricLabel(metric) {
     cpu: 'CPU',
     memory: 'Mémoire',
     disk: 'Disque',
-    load: 'Load'
+    load: 'Load',
+    heartbeat_timeout: 'Heartbeat'
   }
   return labels[metric] || metric
 }
@@ -796,7 +813,8 @@ function getMetricBadgeClass(metric) {
     cpu: 'bg-red-lt',
     memory: 'bg-blue-lt',
     disk: 'bg-yellow-lt',
-    load: 'bg-purple-lt'
+    load: 'bg-purple-lt',
+    heartbeat_timeout: 'bg-orange-lt'
   }
   return classes[metric] || 'bg-secondary-lt'
 }
@@ -806,7 +824,8 @@ function getMetricUnit(metric) {
     cpu: '%',
     memory: '%',
     disk: '%',
-    load: ''
+    load: '',
+    heartbeat_timeout: 's'
   }
   return units[metric] || ''
 }

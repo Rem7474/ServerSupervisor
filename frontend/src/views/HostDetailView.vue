@@ -12,20 +12,25 @@
           <div class="text-secondary">
             {{ host?.hostname || 'Non connecté' }} — {{ host?.os || 'OS inconnu' }} • {{ host?.ip_address }}
             <span v-if="host?.last_seen">• Dernière activité: <RelativeTime :date="host.last_seen" /></span>
-            <span v-if="host?.agent_version">• Agent v{{ host.agent_version }}</span>
           </div>
         </div>
         <div class="d-flex align-items-center gap-2">
-          <router-link to="/" class="btn btn-outline-secondary">Retour au dashboard</router-link>
           <router-link :to="`/hosts/${hostId}/scheduled-tasks`" class="btn btn-outline-secondary">Tâches planifiées</router-link>
-        <button @click="startEdit" class="btn btn-outline-secondary">Modifier</button>
-        <button @click="deleteHost" class="btn btn-outline-danger">Supprimer</button>
-        <span v-if="host?.agent_version" :class="isAgentUpToDate(host.agent_version) ? 'badge bg-green-lt text-green' : 'badge bg-yellow-lt text-yellow'">
-          Agent v{{ host.agent_version }}
-        </span>
-        <span v-if="host" :class="hostStatusClass(host.status)">
-          {{ formatHostStatus(host.status) }}
-        </span>
+          <button @click="startEdit" class="btn btn-outline-secondary">
+            <svg class="icon me-1" width="16" height="16" viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+              <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+            </svg>
+            Modifier
+          </button>
+          <button @click="deleteHost" class="btn btn-outline-danger">
+            <svg class="icon me-1" width="16" height="16" viewBox="0 0 24 24" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
+            </svg>
+            Supprimer
+          </button>
+          <span v-if="host" :class="hostStatusClass(host.status)">{{ formatHostStatus(host.status) }}</span>
+          <span v-if="host?.agent_version" :class="isAgentUpToDate(host.agent_version) ? 'badge bg-green-lt text-green' : 'badge bg-yellow-lt text-yellow'" :title="isAgentUpToDate(host.agent_version) ? 'Agent à jour' : 'Mise à jour disponible'">Agent v{{ host.agent_version }}</span>
         </div>
       </div>
     </div>
@@ -72,10 +77,10 @@
               <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-2">
                 <div>
                   <div class="fw-semibold">API Key agent</div>
-                  <div class="text-secondary small">Regenerer la cle pour un hote existant.</div>
+                  <div class="text-secondary small">Régénérer la clé pour un hôte existant.</div>
                 </div>
                 <button type="button" class="btn btn-outline-warning" :disabled="rotateKeyLoading" @click="rotateHostKey">
-                  {{ rotateKeyLoading ? 'Rotation...' : 'Regenerer la cle' }}
+                  {{ rotateKeyLoading ? 'Rotation...' : 'Régénérer la clé' }}
                 </button>
               </div>
               <div v-if="rotateKeyResult" class="alert alert-info mt-3 mb-0" role="alert">
@@ -103,88 +108,55 @@
       </div>
     </div>
 
-    <div v-if="metrics" class="row row-cards mb-4 g-3">
-      <div class="col-6 col-lg-3">
-        <div class="card card-sm h-100">
-          <div class="card-body">
-            <div class="subheader">CPU ({{ metrics.cpu_cores }} CORES)</div>
-            <div class="h2 mb-0" :class="cpuColor(metrics.cpu_usage_percent)">
-              {{ metrics.cpu_usage_percent?.toFixed(1) }}%
-            </div>
-            <div class="text-secondary small">{{ metrics.cpu_model }}</div>
-          </div>
-        </div>
-      </div>
-      <div class="col-6 col-lg-3">
-        <div class="card card-sm h-100">
-          <div class="card-body">
-            <div class="subheader">RAM</div>
-            <div class="h2 mb-0" :class="memColor(metrics.memory_percent)">
-              {{ metrics.memory_percent?.toFixed(1) }}%
-            </div>
-            <div class="text-secondary small">{{ formatBytes(metrics.memory_used) }} / {{ formatBytes(metrics.memory_total) }}</div>
-          </div>
-        </div>
-      </div>
-      <div class="col-6 col-lg-3">
-        <div class="card card-sm h-100">
-          <div class="card-body">
-            <div class="subheader">UPTIME</div>
-            <div class="h2 mb-0 text-primary">{{ formatUptime(metrics.uptime) }}</div>
-          </div>
-        </div>
-      </div>
-      <div class="col-6 col-lg-3">
-        <div class="card card-sm h-100">
-          <div class="card-body">
-            <div class="subheader">LOAD AVG</div>
-            <div class="h2 mb-0">{{ metrics.load_avg_1?.toFixed(2) }}</div>
-            <div class="text-secondary small">{{ metrics.load_avg_5?.toFixed(2) }} / {{ metrics.load_avg_15?.toFixed(2) }}</div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <!-- Navigation par onglets -->
+    <ul class="nav nav-tabs mb-3">
+      <li class="nav-item">
+        <a class="nav-link" :class="{ active: activeTab === 'metrics' }" href="#" @click.prevent="activeTab = 'metrics'">Métriques</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" :class="{ active: activeTab === 'docker' }" href="#" @click.prevent="activeTab = 'docker'">
+          Docker
+          <span v-if="containers.length" class="badge bg-blue-lt text-blue ms-1">{{ containers.length }}</span>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" :class="{ active: activeTab === 'apt' }" href="#" @click.prevent="activeTab = 'apt'">
+          APT
+          <span v-if="aptStatus?.pending_packages > 0" class="badge bg-yellow-lt text-yellow ms-1">{{ aptStatus.pending_packages }}</span>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" :class="{ active: activeTab === 'commandes' }" href="#" @click.prevent="activeTab = 'commandes'">
+          Commandes
+          <span v-if="combinedHistoryTotal > 0" class="badge bg-secondary-lt text-secondary ms-1">{{ combinedHistoryTotal }}</span>
+        </a>
+      </li>
+      <template v-if="canRunApt">
+        <li class="nav-item">
+          <a class="nav-link" :class="{ active: activeTab === 'systeme' }" href="#" @click.prevent="activeTab = 'systeme'">Système</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" :class="{ active: activeTab === 'processus' }" href="#" @click.prevent="activeTab = 'processus'">Processus</a>
+        </li>
+      </template>
+    </ul>
 
-    <div class="row row-cards mb-4">
-      <div class="col-lg-6">
-        <div class="card">
-          <div class="card-header d-flex align-items-center justify-content-between">
-            <h3 class="card-title">CPU</h3>
-            <div class="btn-group btn-group-sm">
-              <button v-for="opt in timeRangeOptions" :key="opt.hours" @click="loadHistory(opt.hours)"
-                :class="chartHours === opt.hours ? 'btn btn-primary' : 'btn btn-outline-secondary'">
-                {{ opt.label }}
-              </button>
-            </div>
-          </div>
-          <div class="card-body" style="height: 12rem;">
-            <Line v-if="cpuChartData" :data="cpuChartData" :options="chartOptions" class="h-100" />
-            <div v-else class="h-100 d-flex align-items-center justify-content-center text-secondary">Aucune donnée</div>
-          </div>
-        </div>
-      </div>
-      <div class="col-lg-6">
-        <div class="card">
-          <div class="card-header">
-            <h3 class="card-title">Mémoire</h3>
-          </div>
-          <div class="card-body" style="height: 12rem;">
-            <Line v-if="memChartData" :data="memChartData" :options="chartOptions" class="h-100" />
-            <div v-else class="h-100 d-flex align-items-center justify-content-center text-secondary">Aucune donnée</div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <!-- ═══ ONGLET MÉTRIQUES ═══ -->
+    <div v-show="activeTab === 'metrics'">
+    <HostMetricsPanel :hostId="hostId" :metrics="metrics" />
 
     <!-- Disk Metrics Card - Filesystem Usage -->
     <DiskMetricsCard :hostId="hostId" class="mb-4" />
 
     <!-- Disk Health Card - SMART Data -->
     <DiskHealthCard :hostId="hostId" class="mb-4" />
+    </div><!-- /onglet Métriques -->
 
-    <div v-if="containers.length" class="card mb-4">
+    <!-- ═══ ONGLET DOCKER ═══ -->
+    <div v-show="activeTab === 'docker'">
+    <div class="card mb-4">
       <div class="card-header">
-        <h3 class="card-title">Conteneurs Docker ({{ containers.length }})</h3>
+        <h3 class="card-title">Conteneurs Docker <span v-if="containers.length">({{ containers.length }})</span></h3>
       </div>
       <div class="table-responsive">
         <table class="table table-vcenter card-table">
@@ -211,11 +183,17 @@
               <td class="text-secondary small">{{ c.status }}</td>
               <td class="text-secondary small font-monospace">{{ c.ports || '-' }}</td>
             </tr>
+            <tr v-if="!containers.length">
+              <td colspan="6" class="text-center text-secondary py-4">Aucun conteneur Docker actif sur cet hôte.</td>
+            </tr>
           </tbody>
         </table>
       </div>
     </div>
+    </div><!-- /onglet Docker -->
 
+    <!-- ═══ ONGLET APT ═══ -->
+    <div v-show="activeTab === 'apt'">
     <div v-if="aptStatus" class="card">
       <div class="card-header d-flex align-items-center justify-content-between">
         <h3 class="card-title">APT - Mises à jour système</h3>
@@ -267,8 +245,12 @@
         </div>
       </div>
     </div>
+    <div v-if="!aptStatus" class="card"><div class="card-body text-secondary">Données APT non disponibles pour cet hôte.</div></div>
+    </div><!-- /onglet APT -->
 
-    <div v-if="combinedHistoryTotal > 0" class="card mt-4">
+    <!-- ═══ ONGLET COMMANDES ═══ -->
+    <div v-show="activeTab === 'commandes'">
+    <div class="card mt-0">
       <div class="card-header">
         <h3 class="card-title">Historique de commandes</h3>
         <div class="card-options">
@@ -317,9 +299,13 @@
         </button>
       </div>
     </div>
+    <div v-if="!combinedHistoryTotal" class="card"><div class="card-body text-secondary">Aucune commande exécutée sur cet hôte.</div></div>
+    </div><!-- /onglet Commandes -->
 
-    <!-- Logs système (journalctl) — admin/operator only -->
-    <div v-if="canRunApt" class="card mt-4">
+    <!-- ═══ ONGLET SYSTÈME ═══ -->
+    <div v-if="canRunApt" v-show="activeTab === 'systeme'">
+    <!-- Logs système (journalctl) -->
+    <div class="card mb-4">
       <div class="card-header">
         <h3 class="card-title">Logs système (journalctl)</h3>
       </div>
@@ -349,162 +335,16 @@
       </div>
     </div>
 
-    <!-- Services système (systemd) — admin/operator only -->
-    <div v-if="canRunApt" class="card mt-4">
-      <div class="card-header d-flex align-items-center justify-content-between">
-        <h3 class="card-title">Services système (systemd)</h3>
-        <div class="d-flex align-items-center gap-2">
-          <div class="btn-group btn-group-sm">
-            <button
-              :class="systemdFilter === 'active' ? 'btn btn-primary' : 'btn btn-outline-secondary'"
-              @click="systemdFilter = 'active'"
-            >Actifs</button>
-            <button
-              :class="systemdFilter === 'all' ? 'btn btn-primary' : 'btn btn-outline-secondary'"
-              @click="systemdFilter = 'all'"
-            >Tous</button>
-          </div>
-          <button
-            class="btn btn-sm btn-outline-secondary"
-            @click="loadSystemdServices"
-            :disabled="systemdLoading"
-          >
-            <span v-if="systemdLoading" class="spinner-border spinner-border-sm me-1"></span>
-            {{ systemdLoading ? 'Chargement...' : 'Charger les services' }}
-          </button>
-        </div>
-      </div>
-      <div v-if="systemdError" class="card-body pb-0">
-        <div class="alert alert-danger mb-0">{{ systemdError }}</div>
-      </div>
-      <div v-if="!systemdServices.length && !systemdLoading && !systemdError" class="card-body">
-        <div class="text-secondary small">Cliquez sur "Charger les services" pour afficher les services systemd de cet hôte.</div>
-      </div>
-      <div v-if="filteredSystemdServices.length" class="table-responsive">
-        <table class="table table-vcenter table-hover card-table mb-0">
-          <thead>
-            <tr>
-              <th>Service</th>
-              <th>État</th>
-              <th>Mode</th>
-              <th>Description</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="svc in filteredSystemdServices" :key="svc.name">
-              <td class="font-monospace small">{{ svc.name }}</td>
-              <td>
-                <span :class="systemdStateClass(svc.active_state)">{{ svc.active_state }}</span>
-              </td>
-              <td class="text-secondary small">{{ svc.sub_state }}</td>
-              <td class="text-secondary small" style="max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" :title="svc.description">
-                {{ svc.description || '—' }}
-              </td>
-              <td class="text-nowrap">
-                <div class="btn-group btn-group-sm">
-                  <button
-                    v-if="svc.active_state !== 'active'"
-                    class="btn btn-outline-success"
-                    @click="executeSystemdAction(svc.name, 'start')"
-                    title="Démarrer"
-                  >Start</button>
-                  <button
-                    v-if="svc.active_state === 'active'"
-                    class="btn btn-outline-danger"
-                    @click="executeSystemdAction(svc.name, 'stop')"
-                    title="Arrêter"
-                  >Stop</button>
-                  <button
-                    class="btn btn-outline-secondary"
-                    @click="executeSystemdAction(svc.name, 'restart')"
-                    title="Redémarrer"
-                  >Restart</button>
-                  <button
-                    class="btn btn-outline-secondary"
-                    @click="executeSystemdAction(svc.name, 'status')"
-                    title="Statut"
-                  >Status</button>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
+    <HostSystemdPanel :hostId="hostId" :can-run="canRunApt" @open-console="openConsoleFromPanel" @history-changed="loadCmdHistory" />
 
-    <!-- Processus (top) — admin/operator only -->
-    <div v-if="canRunApt" class="card mt-4">
-      <div class="card-header d-flex align-items-center justify-content-between">
-        <h3 class="card-title">Processus</h3>
-        <div class="d-flex align-items-center gap-2">
-          <input
-            v-model="processFilter"
-            type="text"
-            class="form-control form-control-sm"
-            placeholder="Filtrer..."
-            style="width: 160px;"
-          />
-          <button
-            class="btn btn-sm btn-outline-secondary"
-            @click="loadProcesses"
-            :disabled="processesLoading"
-          >
-            <span v-if="processesLoading" class="spinner-border spinner-border-sm me-1"></span>
-            {{ processesLoading ? 'Chargement...' : (processes.length ? 'Actualiser' : 'Charger') }}
-          </button>
-        </div>
-      </div>
-      <div v-if="processesError" class="card-body pb-0">
-        <div class="alert alert-danger mb-0">{{ processesError }}</div>
-      </div>
-      <div v-if="!processes.length && !processesLoading && !processesError" class="card-body">
-        <div class="text-secondary small">Cliquez sur "Charger" pour afficher les processus actifs de cet hôte.</div>
-      </div>
-      <div v-if="filteredProcesses.length" class="table-responsive">
-        <table class="table table-vcenter table-hover card-table mb-0" style="font-size: 0.82rem;">
-          <thead>
-            <tr>
-              <th class="cursor-pointer" @click="sortProcesses('pid')">PID <span class="text-secondary">{{ sortIcon('pid') }}</span></th>
-              <th class="cursor-pointer" @click="sortProcesses('name')">Nom <span class="text-secondary">{{ sortIcon('name') }}</span></th>
-              <th>Utilisateur</th>
-              <th class="cursor-pointer" @click="sortProcesses('cpu_pct')">CPU% <span class="text-secondary">{{ sortIcon('cpu_pct') }}</span></th>
-              <th class="cursor-pointer" @click="sortProcesses('mem_pct')">MEM% <span class="text-secondary">{{ sortIcon('mem_pct') }}</span></th>
-              <th class="cursor-pointer" @click="sortProcesses('mem_rss_kb')">RSS (KB) <span class="text-secondary">{{ sortIcon('mem_rss_kb') }}</span></th>
-              <th>État</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="proc in filteredProcesses" :key="proc.pid">
-              <td class="text-secondary font-monospace">{{ proc.pid }}</td>
-              <td class="fw-semibold font-monospace">{{ proc.name }}</td>
-              <td class="text-secondary">{{ proc.user }}</td>
-              <td>
-                <span :class="proc.cpu_pct > 50 ? 'text-danger fw-bold' : proc.cpu_pct > 10 ? 'text-warning' : ''">
-                  {{ proc.cpu_pct.toFixed(1) }}%
-                </span>
-              </td>
-              <td>
-                <span :class="proc.mem_pct > 50 ? 'text-danger fw-bold' : proc.mem_pct > 20 ? 'text-warning' : ''">
-                  {{ proc.mem_pct.toFixed(1) }}%
-                </span>
-              </td>
-              <td class="text-secondary">{{ proc.mem_rss_kb.toLocaleString() }}</td>
-              <td>
-                <span class="badge" :class="proc.state.startsWith('S') || proc.state.startsWith('I') ? 'bg-secondary-lt text-secondary' : proc.state.startsWith('R') ? 'bg-success-lt text-success' : proc.state.startsWith('Z') ? 'bg-danger-lt text-danger' : 'bg-yellow-lt text-yellow'">
-                  {{ proc.state }}
-                </span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <div v-if="processes.length" class="card-footer text-secondary small">
-        {{ filteredProcesses.length }} / {{ processes.length }} processus
-      </div>
-    </div>
+    </div><!-- /onglet Système -->
 
-      </div>
+    <!-- ═══ ONGLET PROCESSUS ═══ -->
+    <div v-if="canRunApt" v-show="activeTab === 'processus'">
+    <HostProcessesPanel :hostId="hostId" :can-run="canRunApt" @history-changed="loadCmdHistory" />
+    </div><!-- /onglet Processus -->
+
+      </div><!-- /host-panel-main -->
 
       <!-- Colonne droite: Console Live -->
       <div 
@@ -635,7 +475,7 @@
 </template>
 
 <script setup>
-import { ref, shallowRef, defineAsyncComponent, onMounted, onUnmounted, computed, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import RelativeTime from '../components/RelativeTime.vue'
 import CVEList from '../components/CVEList.vue'
@@ -646,26 +486,21 @@ import { useAuthStore } from '../stores/auth'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
 import { useWebSocket } from '../composables/useWebSocket'
 import WsStatusBar from '../components/WsStatusBar.vue'
+import HostMetricsPanel from '../components/HostMetricsPanel.vue'
+import HostSystemdPanel from '../components/HostSystemdPanel.vue'
+import HostProcessesPanel from '../components/HostProcessesPanel.vue'
 import { formatHostStatus, hostStatusClass } from '../utils/formatHostStatus'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import utc from 'dayjs/plugin/utc'
 import 'dayjs/locale/fr'
 
-// Lazy-load Chart.js — not loaded until the chart is actually rendered
-const Line = defineAsyncComponent(async () => {
-  const [{ Line }, { Chart: ChartJS, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip }] = await Promise.all([
-    import('vue-chartjs'),
-    import('chart.js'),
-  ])
-  ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip)
-  return Line
-})
 dayjs.extend(relativeTime)
 dayjs.extend(utc)
 dayjs.locale('fr')
 
 const latestAgentVersion = ref('')
+const activeTab = ref('metrics')
 
 const route = useRoute()
 const router = useRouter()
@@ -677,10 +512,6 @@ const containers = ref([])
 const aptStatus = ref(null)
 const showFullHistory = ref(false)
 const auditLogs = ref([])
-const metricsHistory = ref([])
-const chartHours = ref(24)
-const cpuChartData = shallowRef(null)
-const memChartData = shallowRef(null)
 const isEditing = ref(false)
 const saving = ref(false)
 const editForm = ref({ name: '', hostname: '', ip_address: '', os: '' })
@@ -693,49 +524,7 @@ const consoleOutput = ref(null)
 const showConsole = ref(false)
 let streamWs = null
 const journalService = ref('')
-const systemdServices = ref([])
-const systemdLoading = ref(false)
-const systemdError = ref('')
-const systemdFilter = ref('active')
-const filteredSystemdServices = computed(() => {
-  if (systemdFilter.value === 'all') return systemdServices.value
-  return systemdServices.value.filter(s => s.active_state === 'active')
-})
 
-const processes = ref([])
-const processesLoading = ref(false)
-const processesError = ref('')
-const processFilter = ref('')
-const processSortKey = ref('cpu_pct')
-const processSortDir = ref(-1) // -1 = desc, 1 = asc
-
-const filteredProcesses = computed(() => {
-  let list = processes.value
-  if (processFilter.value) {
-    const q = processFilter.value.toLowerCase()
-    list = list.filter(p => p.name.toLowerCase().includes(q) || p.user.toLowerCase().includes(q))
-  }
-  return [...list].sort((a, b) => {
-    const av = a[processSortKey.value]
-    const bv = b[processSortKey.value]
-    if (typeof av === 'string') return processSortDir.value * av.localeCompare(bv)
-    return processSortDir.value * (bv - av)
-  })
-})
-
-function sortProcesses(key) {
-  if (processSortKey.value === key) {
-    processSortDir.value *= -1
-  } else {
-    processSortKey.value = key
-    processSortDir.value = key === 'name' || key === 'user' ? 1 : -1
-  }
-}
-
-function sortIcon(key) {
-  if (processSortKey.value !== key) return ''
-  return processSortDir.value === -1 ? '▼' : '▲'
-}
 const journalLoading = ref(false)
 const journalError = ref('')
 const journalCmdId = ref(null)
@@ -753,17 +542,6 @@ const rotatedAgentConfig = computed(() => {
   return `server_url: "http://${serverHostname}:8080"\napi_key: "${rotateKeyResult.value.api_key}"\nreport_interval: 30\ncollect_docker: true\ncollect_apt: true`
 })
 
-// Time range options for metrics
-const timeRangeOptions = [
-  { hours: 1, label: '1h' },
-  { hours: 6, label: '6h' },
-  { hours: 24, label: '24h' },
-  { hours: 168, label: '7d' },
-  { hours: 720, label: '30d' },
-  { hours: 2160, label: '90d' },
-  { hours: 8760, label: '1y' },
-]
-
 const consoleCopied = ref(false)
 
 const colorizedOutput = computed(() => {
@@ -777,11 +555,11 @@ const colorizedOutput = computed(() => {
       const escaped = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       const lower = line.toLowerCase()
       if (/\berror\b|err:|erreur|failed|échec|exception/i.test(lower))
-        return `<span style="color:#f87171">${escaped}</span>`
+        return `<span style="color:var(--tblr-danger)">${escaped}</span>`
       if (/\bwarn(?:ing)?\b|attention|deprecated/i.test(lower))
-        return `<span style="color:#fbbf24">${escaped}</span>`
+        return `<span style="color:var(--tblr-warning)">${escaped}</span>`
       if (/\bsuccess\b|done|ok\b|completed|✓/i.test(lower))
-        return `<span style="color:#34d399">${escaped}</span>`
+        return `<span style="color:var(--tblr-success)">${escaped}</span>`
       return escaped
     })
     .join('\n')
@@ -813,41 +591,6 @@ function clearConsoleOutput() {
   liveCommand.value = { ...liveCommand.value, output: '' }
 }
 
-const chartOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: { display: false },
-    tooltip: {
-      enabled: true,
-      mode: 'index',
-      intersect: false,
-      backgroundColor: 'rgba(0, 0, 0, 0.8)',
-      titleColor: '#fff',
-      bodyColor: '#fff',
-      borderColor: '#555',
-      borderWidth: 1,
-      padding: 10,
-      displayColors: false,
-      callbacks: {
-        title: (items) => {
-          return items[0]?.label || ''
-        },
-        label: (context) => {
-          const value = context.parsed.y.toFixed(1)
-          return `${value}%`
-        },
-      },
-    },
-  },
-  scales: {
-    x: { display: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280', maxTicksLimit: 10 } },
-    y: { display: true, min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280' } },
-  },
-  elements: { point: { radius: 0, hitRadius: 10, hoverRadius: 5 }, line: { tension: 0.3 } },
-  interaction: { mode: 'nearest', axis: 'x', intersect: false },
-}
-
 const { wsStatus, wsError, retryCount, reconnect } = useWebSocket(`/api/v1/ws/hosts/${hostId}`, (payload) => {
   if (payload.type !== 'host_detail') return
   host.value = payload.host
@@ -865,67 +608,6 @@ async function loadCmdHistory() {
     cmdHistory.value = res.data?.commands || []
   } catch {
     cmdHistory.value = []
-  }
-}
-
-async function loadHistory(hours) {
-  chartHours.value = hours
-  try {
-    let history
-    
-    // Use aggregated metrics for periods > 24 hours
-    if (hours > 24) {
-      const res = await apiClient.getMetricsAggregated(hostId, hours)
-      history = Array.isArray(res.data?.metrics) ? res.data.metrics : []
-    } else {
-      const res = await apiClient.getMetricsHistory(hostId, hours)
-      history = Array.isArray(res.data) ? res.data : []
-    }
-    
-    metricsHistory.value = history
-    if (!history.length) {
-      cpuChartData.value = null
-      memChartData.value = null
-      return
-    }
-    buildCharts()
-  } catch (e) {
-    console.error(`Failed to fetch metrics history (${hours}h):`, e.response?.data || e.message)
-  }
-}
-
-function buildCharts() {
-  const labels = metricsHistory.value.map(m => {
-    const date = dayjs(m.timestamp)
-    // Format labels based on time range
-    if (chartHours.value <= 24) {
-      return date.format('HH:mm')
-    } else if (chartHours.value <= 720) { // 30 days
-      return date.format('DD/MM HH:mm')
-    } else {
-      return date.format('DD/MM')
-    }
-  })
-  
-  cpuChartData.value = {
-    labels,
-    datasets: [{
-      data: metricsHistory.value.map(m => m.cpu_usage_percent),
-      borderColor: '#3b82f6',
-      backgroundColor: 'rgba(59, 130, 246, 0.1)',
-      fill: true,
-      tension: 0.3,
-    }],
-  }
-  memChartData.value = {
-    labels,
-    datasets: [{
-      data: metricsHistory.value.map(m => m.memory_percent),
-      borderColor: '#10b981',
-      backgroundColor: 'rgba(16, 185, 129, 0.1)',
-      fill: true,
-      tension: 0.3,
-    }],
   }
 }
 
@@ -1027,33 +709,9 @@ async function sendAptCmd(command) {
   }
 }
 
-function formatBytes(bytes) {
-  if (!bytes) return '0 B'
-  const k = 1024
-  const sizes = ['B', 'KiB', 'MiB', 'GiB', 'TiB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
-}
-
-function formatUptime(seconds) {
-  if (!seconds) return 'N/A'
-  const days = Math.floor(seconds / 86400)
-  const hours = Math.floor((seconds % 86400) / 3600)
-  if (days > 0) return `${days}j ${hours}h`
-  const mins = Math.floor((seconds % 3600) / 60)
-  return `${hours}h ${mins}m`
-}
-
 function formatDate(date) {
   if (!date || date === '0001-01-01T00:00:00Z') return 'Jamais'
   return dayjs.utc(date).local().fromNow()
-}
-
-function cpuColor(pct) {
-  if (!pct) return 'text-secondary'
-  if (pct > 90) return 'text-red'
-  if (pct > 70) return 'text-yellow'
-  return 'text-green'
 }
 
 const combinedHistory = computed(() =>
@@ -1062,10 +720,11 @@ const combinedHistory = computed(() =>
 
 const combinedHistoryTotal = computed(() => cmdHistory.value.length)
 
-function memColor(pct) {
-  if (!pct) return 'text-secondary'
-  if (pct > 90) return 'text-red'
-  if (pct > 75) return 'text-yellow'
+function loadColor(load, cores) {
+  if (!load || !cores) return 'text-secondary'
+  const ratio = load / cores
+  if (ratio > 1) return 'text-red'
+  if (ratio > 0.7) return 'text-yellow'
   return 'text-green'
 }
 
@@ -1126,128 +785,6 @@ async function fetchLatestAgentVersion() {
     const res = await apiClient.getSettings()
     latestAgentVersion.value = res.data?.settings?.latestAgentVersion || ''
   } catch { /* non-critical */ }
-}
-
-async function loadSystemdServices() {
-  systemdLoading.value = true
-  systemdError.value = ''
-  try {
-    const res = await apiClient.sendSystemdCommand(hostId, '', 'list')
-    const cmdId = res.data.command_id
-    const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
-    const wsUrl = `${protocol}://${window.location.host}/api/v1/ws/commands/stream/${cmdId}`
-
-    await new Promise((resolve, reject) => {
-      let output = ''
-      const ws = new WebSocket(wsUrl)
-      ws.onopen = () => { ws.send(JSON.stringify({ type: 'auth', token: auth.token })) }
-      ws.onmessage = (event) => {
-        try {
-          const payload = JSON.parse(event.data)
-          if (payload.type === 'cmd_stream_init') {
-            output = payload.output || ''
-            if (payload.status === 'completed') { ws.close(); resolve(output) }
-            else if (payload.status === 'failed') { ws.close(); reject(new Error('Command failed')) }
-          } else if (payload.type === 'cmd_stream') {
-            output += payload.chunk || ''
-          } else if (payload.type === 'cmd_status_update') {
-            if (payload.output) output = payload.output
-            if (payload.status === 'completed') { ws.close(); resolve(output) }
-            else if (payload.status === 'failed') { ws.close(); reject(new Error('Command failed')) }
-          }
-        } catch (e) { /* ignore parse errors */ }
-      }
-      ws.onclose = () => { if (output) resolve(output) }
-      ws.onerror = () => reject(new Error('WebSocket error'))
-      setTimeout(() => { ws.close(); reject(new Error('Timeout')) }, 35000)
-    }).then(output => {
-      try {
-        systemdServices.value = JSON.parse(output)
-      } catch {
-        systemdError.value = 'Impossible de parser la liste des services'
-      }
-    }).catch(e => {
-      systemdError.value = e.message || 'Erreur lors du chargement des services'
-    }).finally(() => { loadCmdHistory() })
-  } catch (e) {
-    systemdError.value = e.response?.data?.error || 'Impossible d\'envoyer la commande'
-  } finally {
-    systemdLoading.value = false
-  }
-}
-
-async function executeSystemdAction(serviceName, action) {
-  try {
-    const res = await apiClient.sendSystemdCommand(hostId, serviceName, action)
-    const cmdId = res.data.command_id
-    liveCommand.value = {
-      id: cmdId,
-      prefix: 'systemctl ',
-      command: `${action} ${serviceName}`,
-      status: 'running',
-      output: '',
-    }
-    showConsole.value = true
-    connectStreamWebSocket(cmdId)
-    nextTick(() => scrollToBottom())
-  } catch (e) {
-    console.error('Failed to execute systemd action:', e)
-  }
-}
-
-function systemdStateClass(state) {
-  if (state === 'active') return 'badge bg-green-lt text-green'
-  if (state === 'failed') return 'badge bg-red-lt text-red'
-  if (state === 'activating' || state === 'deactivating') return 'badge bg-yellow-lt text-yellow'
-  return 'badge bg-secondary-lt text-secondary'
-}
-
-async function loadProcesses() {
-  processesLoading.value = true
-  processesError.value = ''
-  try {
-    const res = await apiClient.sendProcessesCommand(hostId)
-    const cmdId = res.data.command_id
-    const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
-    const wsUrl = `${protocol}://${window.location.host}/api/v1/ws/commands/stream/${cmdId}`
-
-    await new Promise((resolve, reject) => {
-      let output = ''
-      const ws = new WebSocket(wsUrl)
-      ws.onopen = () => { ws.send(JSON.stringify({ type: 'auth', token: auth.token })) }
-      ws.onmessage = (event) => {
-        try {
-          const payload = JSON.parse(event.data)
-          if (payload.type === 'cmd_stream_init') {
-            output = payload.output || ''
-            if (payload.status === 'completed') { ws.close(); resolve(output) }
-            else if (payload.status === 'failed') { ws.close(); reject(new Error(output || 'Command failed')) }
-          } else if (payload.type === 'cmd_stream') {
-            output += payload.chunk || ''
-          } else if (payload.type === 'cmd_status_update') {
-            if (payload.output) output = payload.output
-            if (payload.status === 'completed') { ws.close(); resolve(output) }
-            else if (payload.status === 'failed') { ws.close(); reject(new Error(output || 'Command failed')) }
-          }
-        } catch (e) { /* ignore parse errors */ }
-      }
-      ws.onclose = () => { if (output) resolve(output) }
-      ws.onerror = () => reject(new Error('WebSocket error'))
-      setTimeout(() => { ws.close(); reject(new Error('Timeout')) }, 20000)
-    }).then(output => {
-      try {
-        processes.value = JSON.parse(output)
-      } catch {
-        processesError.value = 'Impossible de parser la liste des processus'
-      }
-    }).catch(e => {
-      processesError.value = e.message || 'Erreur lors du chargement des processus'
-    }).finally(() => { loadCmdHistory() })
-  } catch (e) {
-    processesError.value = e.response?.data?.error || 'Impossible d\'envoyer la commande'
-  } finally {
-    processesLoading.value = false
-  }
 }
 
 async function loadJournalLogs() {
@@ -1336,6 +873,19 @@ function closeLiveConsole() {
   journalLoading.value = false
 }
 
+function openConsoleFromPanel({ commandId, prefix, command }) {
+  liveCommand.value = {
+    id: commandId,
+    prefix: prefix || '',
+    command,
+    status: 'running',
+    output: '',
+  }
+  showConsole.value = true
+  connectStreamWebSocket(commandId)
+  nextTick(() => scrollToBottom())
+}
+
 function scrollToBottom() {
   if (consoleOutput.value) {
     consoleOutput.value.scrollTop = consoleOutput.value.scrollHeight
@@ -1412,16 +962,6 @@ async function deleteHost() {
 onMounted(() => {
   fetchLatestAgentVersion()
   loadCmdHistory()
-  // Wait for auth to be properly initialized before loading data
-  if (auth.token) {
-    loadHistory(24)
-  } else {
-    // Retry after a short delay if token not yet loaded
-    const timer = setTimeout(() => {
-      if (auth.token) loadHistory(24)
-    }, 100)
-    onUnmounted(() => clearTimeout(timer))
-  }
 })
 
 onUnmounted(() => {
@@ -1492,7 +1032,7 @@ onUnmounted(() => {
   .host-panel-right {
     width: 100%;
     min-width: 0;
-    max-height: 50vh;
+    max-height: 70vh;
   }
 }
 </style>
