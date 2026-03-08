@@ -459,6 +459,12 @@ type ScheduledTask struct {
 	CreatedAt      time.Time  `json:"created_at"`
 }
 
+// ScheduledTaskWithHost embeds ScheduledTask and adds host display name.
+type ScheduledTaskWithHost struct {
+	ScheduledTask
+	HostName string `json:"host_name"`
+}
+
 type ScheduledTaskRequest struct {
 	Name           string `json:"name" binding:"required"`
 	Module         string `json:"module" binding:"required"`

@@ -24,6 +24,46 @@ func (db *DB) GetScheduledTasks(hostID string) ([]models.ScheduledTask, error) {
 	return scanScheduledTasks(rows)
 }
 
+// GetGlobalScheduledTasks returns all scheduled tasks across all hosts, with host name.
+// Used by the global scheduled-tasks view.
+func (db *DB) GetGlobalScheduledTasks() ([]models.ScheduledTaskWithHost, error) {
+	rows, err := db.conn.Query(`
+		SELECT st.id, st.host_id, st.name, st.module, st.action, st.target, st.payload::text,
+		       st.cron_expression, st.enabled, st.last_run_at, st.next_run_at, st.last_run_status,
+		       st.created_by, st.created_at, h.name
+		FROM scheduled_tasks st
+		JOIN hosts h ON h.id = st.host_id
+		ORDER BY h.name ASC, st.created_at ASC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var tasks []models.ScheduledTaskWithHost
+	for rows.Next() {
+		var t models.ScheduledTaskWithHost
+		var lastRunAt, nextRunAt sql.NullTime
+		var lastRunStatus sql.NullString
+		if err := rows.Scan(
+			&t.ID, &t.HostID, &t.Name, &t.Module, &t.Action, &t.Target, &t.Payload,
+			&t.CronExpression, &t.Enabled, &lastRunAt, &nextRunAt, &lastRunStatus,
+			&t.CreatedBy, &t.CreatedAt, &t.HostName,
+		); err != nil {
+			return nil, err
+		}
+		if lastRunAt.Valid {
+			t.LastRunAt = &lastRunAt.Time
+		}
+		if nextRunAt.Valid {
+			t.NextRunAt = &nextRunAt.Time
+		}
+		if lastRunStatus.Valid {
+			t.LastRunStatus = &lastRunStatus.String
+		}
+		tasks = append(tasks, t)
+	}
+	return tasks, rows.Err()
+}
+
 // GetAllScheduledTasks returns all enabled scheduled tasks across all hosts.
 // Used by the scheduler on startup.
 func (db *DB) GetAllScheduledTasks() ([]models.ScheduledTask, error) {

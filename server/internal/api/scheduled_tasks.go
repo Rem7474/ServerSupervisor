@@ -27,6 +27,19 @@ var validTaskModules = map[string]bool{
 	"journal": true, "processes": true, "custom": true,
 }
 
+// ListAllScheduledTasks returns all scheduled tasks across all hosts (global view).
+func (h *ScheduledTaskHandler) ListAllScheduledTasks(c *gin.Context) {
+	tasks, err := h.db.GetGlobalScheduledTasks()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if tasks == nil {
+		tasks = []models.ScheduledTaskWithHost{}
+	}
+	c.JSON(http.StatusOK, tasks)
+}
+
 // ListScheduledTasks returns all scheduled tasks for a host.
 func (h *ScheduledTaskHandler) ListScheduledTasks(c *gin.Context) {
 	hostID := c.Param("id")

@@ -156,6 +156,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *NotificationHub,
 		api.POST("/settings/cleanup-audit", settingsH.CleanupAuditLogs)
 
 		// Scheduled Tasks
+		api.GET("/scheduled-tasks", scheduledTaskH.ListAllScheduledTasks)
 		api.GET("/hosts/:id/scheduled-tasks", scheduledTaskH.ListScheduledTasks)
 		api.POST("/hosts/:id/scheduled-tasks", scheduledTaskH.CreateScheduledTask)
 		api.GET("/hosts/:id/custom-tasks", scheduledTaskH.GetCustomTasks)

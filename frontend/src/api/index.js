@@ -114,6 +114,7 @@ sendDockerCommand: (hostId, containerName, action, workingDir = '') =>
   getNotifications: () => api.get('/v1/notifications'),
 
   // Scheduled Tasks
+  getAllScheduledTasks: () => api.get('/v1/scheduled-tasks'),
   getScheduledTasks: (hostId) => api.get(`/v1/hosts/${hostId}/scheduled-tasks`),
   createScheduledTask: (hostId, payload) => api.post(`/v1/hosts/${hostId}/scheduled-tasks`, payload),
   updateScheduledTask: (id, payload) => api.put(`/v1/scheduled-tasks/${id}`, payload),
