@@ -45,7 +45,7 @@ func (db *DB) CreateReleaseTracker(t models.ReleaseTracker) (*models.ReleaseTrac
 func (db *DB) ListReleaseTrackers() ([]models.ReleaseTracker, error) {
 	rows, err := db.conn.Query(
 		`SELECT t.id, t.name, t.provider, t.repo_owner, t.repo_name, t.docker_image,
-		        t.host_id, t.custom_task_id, t.last_release_tag,
+		        t.host_id, t.custom_task_id, t.last_release_tag, t.latest_image_digest,
 		        t.last_checked_at, t.last_triggered_at, t.last_error,
 		        t.notify_channels, t.notify_on_release, t.enabled, t.created_at,
 		        COALESCE(h.name, '') AS host_name,
@@ -73,7 +73,7 @@ func (db *DB) ListReleaseTrackers() ([]models.ReleaseTracker, error) {
 		var leCompleted sql.NullTime
 		if err := rows.Scan(
 			&t.ID, &t.Name, &t.Provider, &t.RepoOwner, &t.RepoName, &t.DockerImage,
-			&t.HostID, &t.CustomTaskID, &t.LastReleaseTag,
+			&t.HostID, &t.CustomTaskID, &t.LastReleaseTag, &t.LatestImageDigest,
 			&t.LastCheckedAt, &t.LastTriggeredAt, &t.LastError,
 			pq.Array(&t.NotifyChannels), &t.NotifyOnRelease, &t.Enabled, &t.CreatedAt,
 			&t.HostName,
@@ -108,7 +108,7 @@ func (db *DB) GetReleaseTrackerByID(id string) (*models.ReleaseTracker, error) {
 	var t models.ReleaseTracker
 	err := db.conn.QueryRow(
 		`SELECT t.id, t.name, t.provider, t.repo_owner, t.repo_name, t.docker_image,
-		        t.host_id, t.custom_task_id, t.last_release_tag,
+		        t.host_id, t.custom_task_id, t.last_release_tag, t.latest_image_digest,
 		        t.last_checked_at, t.last_triggered_at, t.last_error,
 		        t.notify_channels, t.notify_on_release, t.enabled, t.created_at,
 		        COALESCE(h.name, '') AS host_name
@@ -117,7 +117,7 @@ func (db *DB) GetReleaseTrackerByID(id string) (*models.ReleaseTracker, error) {
 		 WHERE t.id = $1`, id,
 	).Scan(
 		&t.ID, &t.Name, &t.Provider, &t.RepoOwner, &t.RepoName, &t.DockerImage,
-		&t.HostID, &t.CustomTaskID, &t.LastReleaseTag,
+		&t.HostID, &t.CustomTaskID, &t.LastReleaseTag, &t.LatestImageDigest,
 		&t.LastCheckedAt, &t.LastTriggeredAt, &t.LastError,
 		pq.Array(&t.NotifyChannels), &t.NotifyOnRelease, &t.Enabled, &t.CreatedAt,
 		&t.HostName,
@@ -158,8 +158,8 @@ func (db *DB) DeleteReleaseTracker(id string) error {
 // GetEnabledReleaseTrackers returns all enabled trackers for polling.
 func (db *DB) GetEnabledReleaseTrackers() ([]models.ReleaseTracker, error) {
 	rows, err := db.conn.Query(
-		`SELECT id, name, provider, repo_owner, repo_name, host_id, custom_task_id,
-		        last_release_tag, notify_channels, notify_on_release
+		`SELECT id, name, provider, repo_owner, repo_name, docker_image, host_id, custom_task_id,
+		        last_release_tag, latest_image_digest, notify_channels, notify_on_release
 		 FROM release_trackers WHERE enabled = TRUE ORDER BY id`)
 	if err != nil {
 		return nil, err
@@ -170,8 +170,8 @@ func (db *DB) GetEnabledReleaseTrackers() ([]models.ReleaseTracker, error) {
 	for rows.Next() {
 		var t models.ReleaseTracker
 		if err := rows.Scan(
-			&t.ID, &t.Name, &t.Provider, &t.RepoOwner, &t.RepoName,
-			&t.HostID, &t.CustomTaskID, &t.LastReleaseTag,
+			&t.ID, &t.Name, &t.Provider, &t.RepoOwner, &t.RepoName, &t.DockerImage,
+			&t.HostID, &t.CustomTaskID, &t.LastReleaseTag, &t.LatestImageDigest,
 			pq.Array(&t.NotifyChannels), &t.NotifyOnRelease,
 		); err != nil {
 			return nil, err
@@ -202,6 +202,13 @@ func (db *DB) UpdateReleaseTrackerLastSeen(id, newTag string, triggered bool) er
 	}
 	_, err := db.conn.Exec(
 		`UPDATE release_trackers SET last_checked_at=$1, last_error='' WHERE id=$2`, now, id)
+	return err
+}
+
+// UpdateReleaseTrackerDigest stores the manifest digest of the latest release image.
+func (db *DB) UpdateReleaseTrackerDigest(id, digest string) error {
+	_, err := db.conn.Exec(
+		`UPDATE release_trackers SET latest_image_digest=$1 WHERE id=$2`, digest, id)
 	return err
 }
 

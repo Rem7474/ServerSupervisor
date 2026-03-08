@@ -644,11 +644,16 @@ func (h *WSHandler) buildVersionComparisons() ([]models.VersionComparison, error
 			if container.Image != tracker.DockerImage && container.Image+":"+container.ImageTag != tracker.DockerImage {
 				continue
 			}
+			runningVersion := resolveContainerVersion(container.ImageTag, container.Labels)
+			isUpToDate := isVersionUpToDate(
+				runningVersion, container.ImageDigest,
+				tracker.LastReleaseTag, tracker.LatestImageDigest,
+			)
 			comparisons = append(comparisons, models.VersionComparison{
 				DockerImage:    tracker.DockerImage,
-				RunningVersion: container.ImageTag,
+				RunningVersion: runningVersion,
 				LatestVersion:  tracker.LastReleaseTag,
-				IsUpToDate:     normalizeVersion(container.ImageTag) == normalizeVersion(tracker.LastReleaseTag),
+				IsUpToDate:     isUpToDate,
 				RepoOwner:      tracker.RepoOwner,
 				RepoName:       tracker.RepoName,
 				ReleaseURL:     releaseURL,
@@ -674,4 +679,35 @@ func (h *WSHandler) buildVersionComparisons() ([]models.VersionComparison, error
 	}
 
 	return comparisons, nil
+}
+
+// isVersionUpToDate compares versions using digest when available, falling back to tag comparison.
+func isVersionUpToDate(runningTag, runningDigest, latestTag, latestDigest string) bool {
+	// Digest comparison: most reliable (works even with :latest tag)
+	if runningDigest != "" && latestDigest != "" {
+		return runningDigest == latestDigest
+	}
+	// Tag fallback: skip if running tag is "latest" (unreliable without digest)
+	if runningTag == "latest" {
+		return false
+	}
+	return normalizeVersion(runningTag) == normalizeVersion(latestTag)
+}
+
+// resolveContainerVersion returns the best available version string for display.
+// When the image tag is "latest", checks OCI/schema.org labels for the real version.
+func resolveContainerVersion(imageTag string, labels map[string]string) string {
+	if imageTag != "latest" {
+		return imageTag
+	}
+	for _, key := range []string{
+		"org.opencontainers.image.version",
+		"org.label-schema.version",
+		"version",
+	} {
+		if v := labels[key]; v != "" {
+			return v
+		}
+	}
+	return imageTag
 }

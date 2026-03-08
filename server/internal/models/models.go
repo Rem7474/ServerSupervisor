@@ -103,6 +103,7 @@ type DockerContainer struct {
 	Image       string            `json:"image" db:"image"`
 	ImageTag    string            `json:"image_tag" db:"image_tag"`
 	ImageID     string            `json:"image_id" db:"image_id"`
+	ImageDigest string            `json:"image_digest" db:"image_digest"` // manifest sha256 (RepoDigest)
 	State       string            `json:"state" db:"state"` // running, stopped, paused, etc.
 	Status      string            `json:"status" db:"status"`
 	Created     time.Time         `json:"created" db:"created"`
@@ -661,7 +662,8 @@ type ReleaseTracker struct {
 	DockerImage     string                    `json:"docker_image"` // optional: link to a running container for version comparison
 	HostID          string                    `json:"host_id"`
 	CustomTaskID    string                    `json:"custom_task_id"`
-	LastReleaseTag  string                    `json:"last_release_tag"`
+	LastReleaseTag      string                    `json:"last_release_tag"`
+	LatestImageDigest   string                    `json:"latest_image_digest,omitempty"` // manifest sha256 of last_release_tag image
 	LastCheckedAt   *time.Time                `json:"last_checked_at,omitempty"`
 	LastTriggeredAt *time.Time                `json:"last_triggered_at,omitempty"`
 	LastError       string                    `json:"last_error,omitempty"`

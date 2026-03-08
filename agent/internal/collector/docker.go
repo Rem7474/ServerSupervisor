@@ -21,6 +21,7 @@ type DockerContainer struct {
 	Image       string            `json:"image"`
 	ImageTag    string            `json:"image_tag"`
 	ImageID     string            `json:"image_id"`
+	ImageDigest string            `json:"image_digest,omitempty"` // manifest sha256 from RepoDigests
 	State       string            `json:"state"`
 	Status      string            `json:"status"`
 	Created     time.Time         `json:"created"`
@@ -131,6 +132,19 @@ func CollectDocker() ([]DockerContainer, error) {
 			networks = append(networks, netName)
 		}
 
+		// Fetch the manifest digest (RepoDigest) from the image metadata.
+		// container.Image is the full sha256 image config ID; use it to inspect the image.
+		imageDigest := ""
+		if imgInfo, err := client.InspectImage(container.Image); err == nil {
+			for _, rd := range imgInfo.RepoDigests {
+				// RepoDigest format: "nginx@sha256:f88cbb90..."
+				if at := strings.Index(rd, "@sha256:"); at >= 0 {
+					imageDigest = rd[at+1:] // keep "sha256:..." prefix
+					break
+				}
+			}
+		}
+
 		imageID := container.Image
 		if len(imageID) > 12 {
 			imageID = imageID[:12]
@@ -147,6 +161,7 @@ func CollectDocker() ([]DockerContainer, error) {
 			Image:       image,
 			ImageTag:    tag,
 			ImageID:     imageID,
+			ImageDigest: imageDigest,
 			State:       state,
 			Status:      status,
 			Created:     container.Created,
