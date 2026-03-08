@@ -47,6 +47,7 @@
           v-if="activeTab === 'compose'"
           :compose-projects="composeProjects"
           :containers="containers"
+          :version-comparisons="versionComparisons"
           :can-run-docker="canRunDocker"
           :action-loading="composeActionLoading"
           @compose-action="handleComposeAction"

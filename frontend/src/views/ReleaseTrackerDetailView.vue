@@ -222,8 +222,8 @@
               </div>
               <div class="col-12">
                 <label class="form-label">Image Docker suivie <span class="text-muted small">(optionnel)</span></label>
-                <input type="text" class="form-control" v-model="form.docker_image" placeholder="ex: homeassistant/home-assistant">
-                <div class="form-hint">Si renseigné, la version du conteneur tournant sera comparée au dernier tag sur le dashboard.</div>
+                <input type="text" class="form-control" v-model="form.docker_image" placeholder="ex: homeassistant/home-assistant ou ghcr.io/mealie-recipes/mealie">
+                <div class="form-hint">Si renseigné, la version du conteneur tournant sera comparée au dernier tag sur le dashboard. Supporte Docker Hub et d'autres registries (ghcr.io, etc.).</div>
               </div>
               <div class="col-12">
                 <label class="form-label">Notifications</label>

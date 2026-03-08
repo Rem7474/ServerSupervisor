@@ -660,6 +660,14 @@ func (h *WSHandler) buildVersionComparisons() ([]models.VersionComparison, error
 				continue
 			}
 			runningVersion := resolveContainerVersion(container.ImageTag, container.Labels)
+			// If labels didn't resolve "latest", check digest match against tracker
+			if runningVersion == "latest" && tracker.LastReleaseTag != "" {
+				nd := normalizeDigest(container.ImageDigest)
+				ld := normalizeDigest(tracker.LatestImageDigest)
+				if nd != "" && ld != "" && nd == ld {
+					runningVersion = tracker.LastReleaseTag
+				}
+			}
 			isUpToDate := isVersionUpToDate(
 				runningVersion, container.ImageDigest,
 				tracker.LastReleaseTag, tracker.LatestImageDigest,
@@ -696,11 +704,19 @@ func (h *WSHandler) buildVersionComparisons() ([]models.VersionComparison, error
 	return comparisons, nil
 }
 
+// normalizeDigest strips the "sha256:" prefix for consistent comparison.
+// The agent reports "sha256:abc..." while the tracker stores "abc..." (after CutPrefix).
+func normalizeDigest(d string) string {
+	return strings.TrimPrefix(d, "sha256:")
+}
+
 // isVersionUpToDate compares versions using digest when available, falling back to tag comparison.
 func isVersionUpToDate(runningTag, runningDigest, latestTag, latestDigest string) bool {
 	// Digest comparison: most reliable (works even with :latest tag)
-	if runningDigest != "" && latestDigest != "" {
-		return runningDigest == latestDigest
+	nd := normalizeDigest(runningDigest)
+	ld := normalizeDigest(latestDigest)
+	if nd != "" && ld != "" {
+		return nd == ld
 	}
 	// Tag fallback: skip if running tag is "latest" (unreliable without digest)
 	if runningTag == "latest" {

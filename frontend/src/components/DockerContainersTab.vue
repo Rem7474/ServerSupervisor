@@ -65,7 +65,7 @@
               <span v-else class="text-secondary">-</span>
             </td>
             <td class="small">
-              <div>{{ c.image }}<code class="ms-1">:{{ c.image_tag }}</code></div>
+              <div>{{ c.image }}<code class="ms-1">:{{ containerVersion(c)?.running_version || c.image_tag }}</code></div>
               <template v-if="containerVersion(c)">
                 <span v-if="containerVersion(c).is_up_to_date" class="badge bg-green-lt text-green mt-1">À jour</span>
                 <span v-else-if="!containerVersion(c).running_version" class="badge bg-secondary-lt text-secondary mt-1">Version inconnue</span>
@@ -224,7 +224,7 @@
           <div>
             <h5 class="modal-title">{{ inspectTarget.name }}</h5>
             <div class="text-secondary small">
-              {{ inspectTarget.image }}:{{ inspectTarget.image_tag }}
+              {{ inspectTarget.image }}:{{ containerVersion(inspectTarget)?.running_version || inspectTarget.image_tag }}
               <span class="ms-2" :class="stateClass(inspectTarget.state)">{{ inspectTarget.state }}</span>
             </div>
           </div>

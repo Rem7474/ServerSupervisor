@@ -48,6 +48,13 @@
               <span :class="getComposeStatus(p) === 'running' ? 'badge bg-green-lt text-green' : 'badge bg-secondary-lt text-secondary'">
                 {{ getComposeStatus(p) === 'running' ? 'En cours' : 'Arrêté' }}
               </span>
+              <span
+                v-if="getComposeUpdates(p).length > 0"
+                class="badge bg-yellow-lt text-yellow ms-1"
+                :title="getComposeUpdates(p).map(v => `${v.docker_image} : ${v.latest_version} dispo`).join('\n')"
+              >
+                {{ getComposeUpdates(p).length }} MAJ
+              </span>
             </td>
             <td>
               <div class="d-flex flex-wrap gap-1">
@@ -185,6 +192,7 @@ import { ref, computed } from 'vue'
 const props = defineProps({
   composeProjects: { type: Array, default: () => [] },
   containers: { type: Array, default: () => [] },
+  versionComparisons: { type: Array, default: () => [] },
   canRunDocker: { type: Boolean, default: false },
   actionLoading: { type: Object, default: () => ({}) },
 })
@@ -212,6 +220,29 @@ const composeProjectStatus = computed(() => {
 
 function getComposeStatus(project) {
   return composeProjectStatus.value[`${project.host_id}:${project.name}`] || 'stopped'
+}
+
+const vcByImage = computed(() => {
+  const m = {}
+  for (const vc of props.versionComparisons) {
+    m[`${vc.host_id}|${vc.docker_image}`] = vc
+  }
+  return m
+})
+
+function getComposeUpdates(project) {
+  const projectContainers = props.containers.filter(
+    c => c.labels?.['com.docker.compose.project'] === project.name && c.host_id === project.host_id
+  )
+  const updates = []
+  for (const c of projectContainers) {
+    const vc = vcByImage.value[`${c.host_id}|${c.image}`] ||
+               vcByImage.value[`${c.host_id}|${c.image}:${c.image_tag}`]
+    if (vc && !vc.is_up_to_date && vc.running_version) {
+      updates.push(vc)
+    }
+  }
+  return updates
 }
 
 const uniqueHosts = computed(() => {
