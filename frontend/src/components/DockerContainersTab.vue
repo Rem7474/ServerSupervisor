@@ -64,7 +64,14 @@
               </div>
               <span v-else class="text-secondary">-</span>
             </td>
-            <td class="small">{{ c.image }}</td>
+            <td class="small">
+              <div>{{ c.image }}<code class="ms-1">:{{ c.image_tag }}</code></div>
+              <template v-if="containerVersion(c)">
+                <span v-if="containerVersion(c).is_up_to_date" class="badge bg-green-lt text-green mt-1">À jour</span>
+                <span v-else-if="!containerVersion(c).running_version" class="badge bg-secondary-lt text-secondary mt-1">Version inconnue</span>
+                <span v-else class="badge bg-yellow-lt text-yellow mt-1" :title="`Dernière version : ${containerVersion(c).latest_version}`">MAJ dispo : {{ containerVersion(c).latest_version }}</span>
+              </template>
+            </td>
             <td>
               <span :class="stateClass(c.state)">{{ c.state }}</span>
             </td>
@@ -302,9 +309,25 @@ import { ref, computed } from 'vue'
 
 const props = defineProps({
   containers: { type: Array, default: () => [] },
+  versionComparisons: { type: Array, default: () => [] },
   canRunDocker: { type: Boolean, default: false },
   actionLoading: { type: Object, default: () => ({}) },
 })
+
+// Map host_id+image → comparison for quick lookup
+const versionMap = computed(() => {
+  const m = {}
+  for (const vc of props.versionComparisons) {
+    m[vc.host_id + '|' + vc.docker_image] = vc
+  }
+  return m
+})
+
+function containerVersion(c) {
+  return versionMap.value[c.host_id + '|' + c.image] ||
+         versionMap.value[c.host_id + '|' + c.image + ':' + c.image_tag] ||
+         null
+}
 
 defineEmits(['container-action'])
 

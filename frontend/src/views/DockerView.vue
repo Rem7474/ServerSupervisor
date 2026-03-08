@@ -38,6 +38,7 @@
         <DockerContainersTab
           v-if="activeTab === 'containers'"
           :containers="containers"
+          :version-comparisons="versionComparisons"
           :can-run-docker="canRunDocker"
           :action-loading="dockerActionLoading"
           @container-action="handleContainerAction"
@@ -147,6 +148,7 @@ const dialog = useConfirmDialog()
 
 const containers = ref([])
 const composeProjects = ref([])
+const versionComparisons = ref([])
 const activeTab = useLocalStorage('dockerActiveTab', 'containers')
 const actionError = ref('')
 
@@ -283,6 +285,7 @@ const { wsStatus, wsError, retryCount, reconnect } = useWebSocket('/api/v1/ws/do
   if (payload.type !== 'docker') return
   containers.value = payload.containers || []
   composeProjects.value = payload.compose_projects || []
+  versionComparisons.value = payload.version_comparisons || []
 })
 </script>
 

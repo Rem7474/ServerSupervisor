@@ -516,14 +516,23 @@ func (h *WSHandler) sendHostSnapshot(conn *websocket.Conn, hostID string, lastHa
 	aptHistory, _ := h.db.GetAptHistoryWithAgentUpdates(hostID, 50)
 	auditLogs, _ := h.db.GetAuditLogsByHost(hostID, 50)
 
+	allComparisons, _ := h.buildVersionComparisons()
+	comparisons := make([]models.VersionComparison, 0)
+	for _, vc := range allComparisons {
+		if vc.HostID == hostID {
+			comparisons = append(comparisons, vc)
+		}
+	}
+
 	payload := gin.H{
-		"type":        "host_detail",
-		"host":        host,
-		"metrics":     metrics,
-		"containers":  containers,
-		"apt_status":  aptStatus,
-		"apt_history": aptHistory,
-		"audit_logs":  auditLogs,
+		"type":                "host_detail",
+		"host":                host,
+		"metrics":             metrics,
+		"containers":          containers,
+		"apt_status":          aptStatus,
+		"apt_history":         aptHistory,
+		"audit_logs":          auditLogs,
+		"version_comparisons": comparisons,
 	}
 	if !snapshotChanged(payload, lastHash) {
 		return nil
@@ -542,10 +551,16 @@ func (h *WSHandler) sendDockerSnapshot(conn *websocket.Conn, lastHash *string) e
 		composeProjects = []models.ComposeProject{}
 	}
 
+	comparisons, err := h.buildVersionComparisons()
+	if err != nil {
+		comparisons = []models.VersionComparison{}
+	}
+
 	payload := gin.H{
-		"type":             "docker",
-		"containers":       containers,
-		"compose_projects": composeProjects,
+		"type":                "docker",
+		"containers":          containers,
+		"compose_projects":    composeProjects,
+		"version_comparisons": comparisons,
 	}
 	if !snapshotChanged(payload, lastHash) {
 		return nil

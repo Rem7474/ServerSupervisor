@@ -179,7 +179,15 @@
             <tr v-for="c in containers" :key="c.id">
               <td class="fw-semibold">{{ c.name }}</td>
               <td class="text-secondary">{{ c.image }}</td>
-              <td><code>{{ c.image_tag }}</code></td>
+              <td>
+                <code>{{ c.image_tag }}</code>
+                <template v-if="containerVersion(c)">
+                  <br>
+                  <span v-if="containerVersion(c).is_up_to_date" class="badge bg-green-lt text-green mt-1">À jour</span>
+                  <span v-else-if="!containerVersion(c).running_version" class="badge bg-secondary-lt text-secondary mt-1">Version inconnue</span>
+                  <span v-else class="badge bg-yellow-lt text-yellow mt-1" :title="`Dernière : ${containerVersion(c).latest_version}`">MAJ dispo</span>
+                </template>
+              </td>
               <td>
                 <span :class="c.state === 'running' ? 'badge bg-green-lt text-green' : 'badge bg-secondary-lt text-secondary'">
                   {{ { running: 'En cours', exited: 'Arrêté', paused: 'En pause', created: 'Créé', restarting: 'Redémarrage', dead: 'Mort' }[c.state] || c.state }}
@@ -688,6 +696,17 @@ const hostId = route.params.id
 const host = ref(null)
 const metrics = ref(null)
 const containers = ref([])
+const versionComparisons = ref([])
+const versionMap = computed(() => {
+  const m = {}
+  for (const vc of versionComparisons.value) {
+    m[vc.docker_image] = vc
+  }
+  return m
+})
+function containerVersion(c) {
+  return versionMap.value[c.image] || versionMap.value[c.image + ':' + c.image_tag] || null
+}
 const aptStatus = ref(null)
 const showFullHistory = ref(false)
 const auditLogs = ref([])
@@ -775,6 +794,7 @@ const { wsStatus, wsError, retryCount, reconnect } = useWebSocket(`/api/v1/ws/ho
   host.value = payload.host
   metrics.value = payload.metrics
   containers.value = payload.containers || []
+  versionComparisons.value = payload.version_comparisons || []
   aptStatus.value = payload.apt_status
   auditLogs.value = payload.audit_logs || []
 }, { debounceMs: 200 })
