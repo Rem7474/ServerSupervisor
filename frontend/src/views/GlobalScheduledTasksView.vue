@@ -131,7 +131,7 @@
                     <span v-if="runningId === task.id" class="spinner-border spinner-border-sm"></span>
                     <span v-else>Exécuter</span>
                   </button>
-                  <router-link :to="`/hosts/${task.host_id}/scheduled-tasks`" class="btn btn-sm btn-outline-secondary">
+                  <router-link :to="`/hosts/${task.host_id}`" class="btn btn-sm btn-outline-secondary">
                     Gérer
                   </router-link>
                 </div>

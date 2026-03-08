@@ -8,20 +8,49 @@ import (
 	"github.com/serversupervisor/server/internal/models"
 )
 
-// GetScheduledTasks returns all scheduled tasks for a host.
+// GetScheduledTasks returns all scheduled tasks for a host, including the last command ID.
 func (db *DB) GetScheduledTasks(hostID string) ([]models.ScheduledTask, error) {
 	rows, err := db.conn.Query(`
-		SELECT id, host_id, name, module, action, target, payload::text,
-		       cron_expression, enabled, last_run_at, next_run_at, last_run_status,
-		       created_by, created_at
-		FROM scheduled_tasks
-		WHERE host_id = $1
-		ORDER BY created_at ASC`, hostID)
+		SELECT st.id, st.host_id, st.name, st.module, st.action, st.target, st.payload::text,
+		       st.cron_expression, st.enabled, st.last_run_at, st.next_run_at, st.last_run_status,
+		       st.created_by, st.created_at,
+		       (SELECT rc.id FROM remote_commands rc
+		        WHERE rc.scheduled_task_id = st.id
+		        ORDER BY rc.created_at DESC LIMIT 1) AS last_command_id
+		FROM scheduled_tasks st
+		WHERE st.host_id = $1
+		ORDER BY st.created_at ASC`, hostID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	return scanScheduledTasks(rows)
+	var tasks []models.ScheduledTask
+	for rows.Next() {
+		var t models.ScheduledTask
+		var lastRunAt, nextRunAt sql.NullTime
+		var lastRunStatus, lastCommandID sql.NullString
+		if err := rows.Scan(
+			&t.ID, &t.HostID, &t.Name, &t.Module, &t.Action, &t.Target, &t.Payload,
+			&t.CronExpression, &t.Enabled, &lastRunAt, &nextRunAt, &lastRunStatus,
+			&t.CreatedBy, &t.CreatedAt, &lastCommandID,
+		); err != nil {
+			return nil, err
+		}
+		if lastRunAt.Valid {
+			t.LastRunAt = &lastRunAt.Time
+		}
+		if nextRunAt.Valid {
+			t.NextRunAt = &nextRunAt.Time
+		}
+		if lastRunStatus.Valid {
+			t.LastRunStatus = &lastRunStatus.String
+		}
+		if lastCommandID.Valid {
+			t.LastCommandID = &lastCommandID.String
+		}
+		tasks = append(tasks, t)
+	}
+	return tasks, rows.Err()
 }
 
 // GetGlobalScheduledTasks returns all scheduled tasks across all hosts, with host name.

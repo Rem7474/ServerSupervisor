@@ -455,6 +455,7 @@ type ScheduledTask struct {
 	LastRunAt      *time.Time `json:"last_run_at"`
 	NextRunAt      *time.Time `json:"next_run_at"`
 	LastRunStatus  *string    `json:"last_run_status"` // completed | failed | nil
+	LastCommandID  *string    `json:"last_command_id,omitempty"`
 	CreatedBy      string     `json:"created_by"`
 	CreatedAt      time.Time  `json:"created_at"`
 }

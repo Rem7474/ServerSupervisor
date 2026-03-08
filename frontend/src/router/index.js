@@ -91,9 +91,7 @@ const routes = [
   },
   {
     path: '/hosts/:id/scheduled-tasks',
-    name: 'ScheduledTasks',
-    component: () => import('../views/ScheduledTasksView.vue'),
-    meta: { requiresAuth: true },
+    redirect: to => `/hosts/${to.params.id}`,
   },
   {
     path: '/git-webhooks',

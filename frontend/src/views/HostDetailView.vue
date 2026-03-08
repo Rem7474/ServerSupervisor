@@ -418,6 +418,9 @@
               </td>
               <td class="text-end">
                 <div class="d-flex gap-1 justify-content-end">
+                  <button v-if="task.last_command_id" class="btn btn-sm btn-ghost-secondary" title="Voir les logs" @click="openTaskLogs(task)">
+                    <svg class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 6l16 0" /><path d="M4 12l16 0" /><path d="M4 18l12 0" /></svg>
+                  </button>
                   <button v-if="canRunApt" class="btn btn-sm btn-outline-primary"
                     :disabled="taskRunningId === task.id" @click="runTaskNow(task)">
                     <span v-if="taskRunningId === task.id" class="spinner-border spinner-border-sm"></span>
@@ -1284,12 +1287,33 @@ async function runTaskNow(task) {
     const { data } = await apiClient.runScheduledTask(task.id)
     taskRunResult.value = { id: data.command_id, name: task.name }
     setTimeout(() => { taskRunResult.value = null }, 5000)
+    // Ouvrir automatiquement les logs dans la console live
+    watchCommand({
+      id: data.command_id,
+      module: task.module,
+      action: task.action,
+      target: task.target,
+      status: 'pending',
+      output: '',
+    })
     await loadTasks()
   } catch (e) {
     tasksError.value = e.response?.data?.error || 'Erreur'
   } finally {
     taskRunningId.value = null
   }
+}
+
+function openTaskLogs(task) {
+  if (!task.last_command_id) return
+  watchCommand({
+    id: task.last_command_id,
+    module: task.module,
+    action: task.action,
+    target: task.target,
+    status: task.last_run_status || 'completed',
+    output: '',
+  })
 }
 
 async function confirmDeleteTask(task) {
