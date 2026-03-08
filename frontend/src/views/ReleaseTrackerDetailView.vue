@@ -58,6 +58,10 @@
               </dd>
               <dt class="col-5 text-muted">VM cible</dt>
               <dd class="col-7">{{ tracker.host_name || tracker.host_id }}</dd>
+              <template v-if="tracker.docker_image">
+                <dt class="col-5 text-muted">Image Docker</dt>
+                <dd class="col-7"><code>{{ tracker.docker_image }}</code></dd>
+              </template>
               <dt class="col-5 text-muted">Tâche</dt>
               <dd class="col-7"><code>{{ tracker.custom_task_id }}</code></dd>
               <dt class="col-5 text-muted">Dernière release</dt>
@@ -217,6 +221,11 @@
                 <input v-else type="text" class="form-control" v-model="form.custom_task_id">
               </div>
               <div class="col-12">
+                <label class="form-label">Image Docker suivie <span class="text-muted small">(optionnel)</span></label>
+                <input type="text" class="form-control" v-model="form.docker_image" placeholder="ex: homeassistant/home-assistant">
+                <div class="form-hint">Si renseigné, la version du conteneur tournant sera comparée au dernier tag sur le dashboard.</div>
+              </div>
+              <div class="col-12">
                 <label class="form-label">Notifications</label>
                 <div class="d-flex flex-wrap gap-3 mt-1">
                   <label class="form-check">
@@ -356,7 +365,7 @@ function openEdit() {
   const t = tracker.value
   form.value = {
     name: t.name, provider: t.provider,
-    repo_owner: t.repo_owner, repo_name: t.repo_name,
+    repo_owner: t.repo_owner, repo_name: t.repo_name, docker_image: t.docker_image || '',
     host_id: t.host_id, custom_task_id: t.custom_task_id,
     notify_channels: [...(t.notify_channels || [])],
     notify_on_release: t.notify_on_release,

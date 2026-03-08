@@ -364,6 +364,11 @@
                 <div class="form-hint">Correspond à l'<code>id</code> dans <code>tasks.yaml</code> de l'agent.</div>
               </div>
               <div class="col-12">
+                <label class="form-label">Image Docker suivie <span class="text-muted small">(optionnel)</span></label>
+                <input type="text" class="form-control" v-model="trackerForm.docker_image" placeholder="ex: homeassistant/home-assistant">
+                <div class="form-hint">Si renseigné, la version du conteneur tournant sera comparée au dernier tag sur le dashboard.</div>
+              </div>
+              <div class="col-12">
                 <label class="form-label">Notifications</label>
                 <div class="d-flex flex-wrap gap-3 mt-1">
                   <label class="form-check">
@@ -476,7 +481,7 @@ const trackerEnvVars = [
 ]
 
 const defaultTrackerForm = () => ({
-  name: '', provider: 'github', repo_owner: '', repo_name: '',
+  name: '', provider: 'github', repo_owner: '', repo_name: '', docker_image: '',
   host_id: '', custom_task_id: '',
   notify_channels: [], notify_on_release: true, enabled: true,
 })
@@ -618,7 +623,7 @@ function openEditTracker(t) {
   editingTracker.value = t
   trackerForm.value = {
     name: t.name, provider: t.provider,
-    repo_owner: t.repo_owner, repo_name: t.repo_name,
+    repo_owner: t.repo_owner, repo_name: t.repo_name, docker_image: t.docker_image || '',
     host_id: t.host_id, custom_task_id: t.custom_task_id,
     notify_channels: [...(t.notify_channels || [])],
     notify_on_release: t.notify_on_release,

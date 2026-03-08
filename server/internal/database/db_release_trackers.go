@@ -18,17 +18,17 @@ func (db *DB) CreateReleaseTracker(t models.ReleaseTracker) (*models.ReleaseTrac
 	var result models.ReleaseTracker
 	err := db.conn.QueryRow(
 		`INSERT INTO release_trackers
-		 (name, provider, repo_owner, repo_name, host_id, custom_task_id,
+		 (name, provider, repo_owner, repo_name, docker_image, host_id, custom_task_id,
 		  notify_channels, notify_on_release, enabled)
-		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-		 RETURNING id, name, provider, repo_owner, repo_name, host_id, custom_task_id,
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+		 RETURNING id, name, provider, repo_owner, repo_name, docker_image, host_id, custom_task_id,
 		           last_release_tag, last_checked_at, last_triggered_at,
 		           notify_channels, notify_on_release, enabled, created_at`,
-		t.Name, t.Provider, t.RepoOwner, t.RepoName, t.HostID, t.CustomTaskID,
+		t.Name, t.Provider, t.RepoOwner, t.RepoName, t.DockerImage, t.HostID, t.CustomTaskID,
 		pq.Array(channels), t.NotifyOnRelease, t.Enabled,
 	).Scan(
 		&result.ID, &result.Name, &result.Provider, &result.RepoOwner, &result.RepoName,
-		&result.HostID, &result.CustomTaskID, &result.LastReleaseTag,
+		&result.DockerImage, &result.HostID, &result.CustomTaskID, &result.LastReleaseTag,
 		&result.LastCheckedAt, &result.LastTriggeredAt,
 		pq.Array(&result.NotifyChannels), &result.NotifyOnRelease,
 		&result.Enabled, &result.CreatedAt,
@@ -44,7 +44,7 @@ func (db *DB) CreateReleaseTracker(t models.ReleaseTracker) (*models.ReleaseTrac
 
 func (db *DB) ListReleaseTrackers() ([]models.ReleaseTracker, error) {
 	rows, err := db.conn.Query(
-		`SELECT t.id, t.name, t.provider, t.repo_owner, t.repo_name,
+		`SELECT t.id, t.name, t.provider, t.repo_owner, t.repo_name, t.docker_image,
 		        t.host_id, t.custom_task_id, t.last_release_tag,
 		        t.last_checked_at, t.last_triggered_at, t.last_error,
 		        t.notify_channels, t.notify_on_release, t.enabled, t.created_at,
@@ -72,7 +72,7 @@ func (db *DB) ListReleaseTrackers() ([]models.ReleaseTracker, error) {
 		var leTriggered sql.NullTime
 		var leCompleted sql.NullTime
 		if err := rows.Scan(
-			&t.ID, &t.Name, &t.Provider, &t.RepoOwner, &t.RepoName,
+			&t.ID, &t.Name, &t.Provider, &t.RepoOwner, &t.RepoName, &t.DockerImage,
 			&t.HostID, &t.CustomTaskID, &t.LastReleaseTag,
 			&t.LastCheckedAt, &t.LastTriggeredAt, &t.LastError,
 			pq.Array(&t.NotifyChannels), &t.NotifyOnRelease, &t.Enabled, &t.CreatedAt,
@@ -107,7 +107,7 @@ func (db *DB) ListReleaseTrackers() ([]models.ReleaseTracker, error) {
 func (db *DB) GetReleaseTrackerByID(id string) (*models.ReleaseTracker, error) {
 	var t models.ReleaseTracker
 	err := db.conn.QueryRow(
-		`SELECT t.id, t.name, t.provider, t.repo_owner, t.repo_name,
+		`SELECT t.id, t.name, t.provider, t.repo_owner, t.repo_name, t.docker_image,
 		        t.host_id, t.custom_task_id, t.last_release_tag,
 		        t.last_checked_at, t.last_triggered_at, t.last_error,
 		        t.notify_channels, t.notify_on_release, t.enabled, t.created_at,
@@ -116,7 +116,7 @@ func (db *DB) GetReleaseTrackerByID(id string) (*models.ReleaseTracker, error) {
 		 LEFT JOIN hosts h ON h.id = t.host_id
 		 WHERE t.id = $1`, id,
 	).Scan(
-		&t.ID, &t.Name, &t.Provider, &t.RepoOwner, &t.RepoName,
+		&t.ID, &t.Name, &t.Provider, &t.RepoOwner, &t.RepoName, &t.DockerImage,
 		&t.HostID, &t.CustomTaskID, &t.LastReleaseTag,
 		&t.LastCheckedAt, &t.LastTriggeredAt, &t.LastError,
 		pq.Array(&t.NotifyChannels), &t.NotifyOnRelease, &t.Enabled, &t.CreatedAt,
@@ -138,11 +138,11 @@ func (db *DB) UpdateReleaseTracker(id string, t models.ReleaseTracker) error {
 	}
 	_, err := db.conn.Exec(
 		`UPDATE release_trackers SET
-		   name=$1, provider=$2, repo_owner=$3, repo_name=$4,
-		   host_id=$5, custom_task_id=$6,
-		   notify_channels=$7, notify_on_release=$8, enabled=$9
-		 WHERE id=$10`,
-		t.Name, t.Provider, t.RepoOwner, t.RepoName,
+		   name=$1, provider=$2, repo_owner=$3, repo_name=$4, docker_image=$5,
+		   host_id=$6, custom_task_id=$7,
+		   notify_channels=$8, notify_on_release=$9, enabled=$10
+		 WHERE id=$11`,
+		t.Name, t.Provider, t.RepoOwner, t.RepoName, t.DockerImage,
 		t.HostID, t.CustomTaskID,
 		pq.Array(channels), t.NotifyOnRelease, t.Enabled,
 		id,

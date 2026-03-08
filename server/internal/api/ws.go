@@ -616,7 +616,7 @@ func (h *WSHandler) sendAptSnapshot(conn *websocket.Conn, lastHash *string) erro
 }
 
 func (h *WSHandler) buildVersionComparisons() ([]models.VersionComparison, error) {
-	repos, err := h.db.GetTrackedRepos()
+	trackers, err := h.db.ListReleaseTrackers()
 	if err != nil {
 		return nil, err
 	}
@@ -626,35 +626,33 @@ func (h *WSHandler) buildVersionComparisons() ([]models.VersionComparison, error
 		return nil, err
 	}
 
-	hosts, err := h.db.GetAllHosts()
-	if err != nil {
-		return nil, err
-	}
-
-	hostMap := make(map[string]string)
-	for _, host := range hosts {
-		hostMap[host.ID] = host.Hostname
-	}
-
 	var comparisons []models.VersionComparison
-	for _, repo := range repos {
-		if repo.DockerImage == "" {
+	for _, tracker := range trackers {
+		if tracker.DockerImage == "" || tracker.LastReleaseTag == "" {
 			continue
 		}
 		for _, container := range containers {
-			if container.Image == repo.DockerImage || container.Image+":"+container.ImageTag == repo.DockerImage {
-				comparisons = append(comparisons, models.VersionComparison{
-					DockerImage:    container.Image,
-					RunningVersion: container.ImageTag,
-					LatestVersion:  repo.LatestVersion,
-					IsUpToDate:     normalizeVersion(container.ImageTag) == normalizeVersion(repo.LatestVersion),
-					RepoOwner:      repo.Owner,
-					RepoName:       repo.Repo,
-					ReleaseURL:     repo.ReleaseURL,
-					HostID:         container.HostID,
-					Hostname:       hostMap[container.HostID],
-				})
+			if container.HostID != tracker.HostID {
+				continue
 			}
+			if container.Image != tracker.DockerImage && container.Image+":"+container.ImageTag != tracker.DockerImage {
+				continue
+			}
+			releaseURL := ""
+			if tracker.LastExecution != nil {
+				releaseURL = tracker.LastExecution.ReleaseURL
+			}
+			comparisons = append(comparisons, models.VersionComparison{
+				DockerImage:    container.Image,
+				RunningVersion: container.ImageTag,
+				LatestVersion:  tracker.LastReleaseTag,
+				IsUpToDate:     normalizeVersion(container.ImageTag) == normalizeVersion(tracker.LastReleaseTag),
+				RepoOwner:      tracker.RepoOwner,
+				RepoName:       tracker.RepoName,
+				ReleaseURL:     releaseURL,
+				HostID:         tracker.HostID,
+				Hostname:       tracker.HostName,
+			})
 		}
 	}
 

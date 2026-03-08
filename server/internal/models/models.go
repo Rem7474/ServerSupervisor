@@ -657,6 +657,7 @@ type ReleaseTracker struct {
 	Provider        string                    `json:"provider"` // github, gitlab, gitea
 	RepoOwner       string                    `json:"repo_owner"`
 	RepoName        string                    `json:"repo_name"`
+	DockerImage     string                    `json:"docker_image"` // optional: link to a running container for version comparison
 	HostID          string                    `json:"host_id"`
 	CustomTaskID    string                    `json:"custom_task_id"`
 	LastReleaseTag  string                    `json:"last_release_tag"`
