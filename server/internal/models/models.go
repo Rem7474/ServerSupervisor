@@ -267,15 +267,16 @@ type GitHubRelease struct {
 // ========== Version Comparison ==========
 
 type VersionComparison struct {
-	DockerImage    string `json:"docker_image"`
-	RunningVersion string `json:"running_version"`
-	LatestVersion  string `json:"latest_version"`
-	IsUpToDate     bool   `json:"is_up_to_date"`
-	RepoOwner      string `json:"repo_owner"`
-	RepoName       string `json:"repo_name"`
-	ReleaseURL     string `json:"release_url"`
-	HostID         string `json:"host_id"`
-	Hostname       string `json:"hostname"`
+	DockerImage     string `json:"docker_image"`
+	RunningVersion  string `json:"running_version"`
+	LatestVersion   string `json:"latest_version"`
+	IsUpToDate      bool   `json:"is_up_to_date"`
+	UpdateConfirmed bool   `json:"update_confirmed"` // true when digest comparison confirms an update (even if running version is unknown)
+	RepoOwner       string `json:"repo_owner"`
+	RepoName        string `json:"repo_name"`
+	ReleaseURL      string `json:"release_url"`
+	HostID          string `json:"host_id"`
+	Hostname        string `json:"hostname"`
 }
 
 // ========== Agent Heartbeat / Full Report ==========

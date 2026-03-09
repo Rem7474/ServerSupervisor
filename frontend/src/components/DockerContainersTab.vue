@@ -68,8 +68,9 @@
               <div>{{ c.image }}<code class="ms-1">:{{ containerVersion(c)?.running_version || c.image_tag }}</code></div>
               <template v-if="containerVersion(c)">
                 <span v-if="containerVersion(c).is_up_to_date" class="badge bg-green-lt text-green mt-1">À jour</span>
-                <span v-else-if="!containerVersion(c).running_version" class="badge bg-secondary-lt text-secondary mt-1">Version inconnue</span>
-                <span v-else class="badge bg-yellow-lt text-yellow mt-1" :title="`Dernière version : ${containerVersion(c).latest_version}`">MAJ dispo : {{ containerVersion(c).latest_version }}</span>
+                <span v-else-if="containerVersion(c).running_version" class="badge bg-yellow-lt text-yellow mt-1" :title="`Dernière version : ${containerVersion(c).latest_version}`">MAJ dispo : {{ containerVersion(c).latest_version }}</span>
+                <span v-else-if="containerVersion(c).update_confirmed" class="badge bg-yellow-lt text-yellow mt-1" :title="`Dernière version : ${containerVersion(c).latest_version}`">MAJ dispo</span>
+                <span v-else class="badge bg-secondary-lt text-secondary mt-1">Version inconnue</span>
               </template>
             </td>
             <td>

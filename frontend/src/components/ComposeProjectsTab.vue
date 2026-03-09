@@ -238,7 +238,7 @@ function getComposeUpdates(project) {
   for (const c of projectContainers) {
     const vc = vcByImage.value[`${c.host_id}|${c.image}`] ||
                vcByImage.value[`${c.host_id}|${c.image}:${c.image_tag}`]
-    if (vc && !vc.is_up_to_date && vc.running_version) {
+    if (vc && !vc.is_up_to_date && (vc.running_version || vc.update_confirmed)) {
       updates.push(vc)
     }
   }

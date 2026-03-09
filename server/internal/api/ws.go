@@ -659,29 +659,36 @@ func (h *WSHandler) buildVersionComparisons() ([]models.VersionComparison, error
 			if container.Image != tracker.DockerImage && container.Image+":"+container.ImageTag != tracker.DockerImage {
 				continue
 			}
+			nd := normalizeDigest(container.ImageDigest)
+			ld := normalizeDigest(tracker.LatestImageDigest)
+
+			// isVersionUpToDate uses the raw image tag so the "latest" fallback still works
+			isUpToDate := isVersionUpToDate(container.ImageTag, container.ImageDigest, tracker.LastReleaseTag, tracker.LatestImageDigest)
+
+			// UpdateConfirmed = digest comparison was performed and confirms the image is outdated
+			updateConfirmed := !isUpToDate && nd != "" && ld != ""
+
+			// Display version: try OCI labels first, then digest match
 			runningVersion := resolveContainerVersion(container.ImageTag, container.Labels)
-			// If labels didn't resolve "latest", check digest match against tracker
-			if runningVersion == "latest" && tracker.LastReleaseTag != "" {
-				nd := normalizeDigest(container.ImageDigest)
-				ld := normalizeDigest(tracker.LatestImageDigest)
-				if nd != "" && ld != "" && nd == ld {
-					runningVersion = tracker.LastReleaseTag
-				}
+			if runningVersion == "latest" && nd != "" && ld != "" && nd == ld {
+				runningVersion = tracker.LastReleaseTag
 			}
-			isUpToDate := isVersionUpToDate(
-				runningVersion, container.ImageDigest,
-				tracker.LastReleaseTag, tracker.LatestImageDigest,
-			)
+			// Still "latest" = version inconnue pour l'affichage
+			if runningVersion == "latest" {
+				runningVersion = ""
+			}
+
 			comparisons = append(comparisons, models.VersionComparison{
-				DockerImage:    tracker.DockerImage,
-				RunningVersion: runningVersion,
-				LatestVersion:  tracker.LastReleaseTag,
-				IsUpToDate:     isUpToDate,
-				RepoOwner:      tracker.RepoOwner,
-				RepoName:       tracker.RepoName,
-				ReleaseURL:     releaseURL,
-				HostID:         tracker.HostID,
-				Hostname:       tracker.HostName,
+				DockerImage:     tracker.DockerImage,
+				RunningVersion:  runningVersion,
+				LatestVersion:   tracker.LastReleaseTag,
+				IsUpToDate:      isUpToDate,
+				UpdateConfirmed: updateConfirmed,
+				RepoOwner:       tracker.RepoOwner,
+				RepoName:        tracker.RepoName,
+				ReleaseURL:      releaseURL,
+				HostID:          tracker.HostID,
+				Hostname:        tracker.HostName,
 			})
 			matched = true
 		}

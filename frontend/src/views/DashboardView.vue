@@ -253,8 +253,8 @@
               </td>
               <td>
                 <span v-if="v.is_up_to_date" class="badge bg-green-lt text-green">À jour</span>
-                <span v-else-if="!v.running_version" class="badge bg-secondary-lt text-secondary">Version inconnue</span>
-                <span v-else class="badge bg-yellow-lt text-yellow">Mise à jour disponible</span>
+                <span v-else-if="v.running_version || v.update_confirmed" class="badge bg-yellow-lt text-yellow">Mise à jour disponible</span>
+                <span v-else class="badge bg-secondary-lt text-secondary">Version inconnue</span>
               </td>
             </tr>
             <tr v-if="versionComparisons.length === 0">
@@ -355,7 +355,7 @@ const summaryChartOptions = {
 
 const onlineCount = computed(() => hosts.value.filter(h => h.status === 'online').length)
 const offlineCount = computed(() => hosts.value.filter(h => h.status !== 'online').length)
-const outdatedDockerImages = computed(() => versionComparisons.value.filter(v => !v.is_up_to_date).length)
+const outdatedDockerImages = computed(() => versionComparisons.value.filter(v => !v.is_up_to_date && (v.running_version || v.update_confirmed)).length)
 const outdatedVersions = computed(() => outdatedDockerImages.value + aptPending.value)
 const selectedCount = computed(() => selectedHostIds.value.length)
 const canRunApt = computed(() => auth.role === 'admin' || auth.role === 'operator')
