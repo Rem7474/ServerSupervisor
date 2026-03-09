@@ -211,9 +211,18 @@
       <div class="card-header d-flex align-items-center justify-content-between">
         <h3 class="card-title">APT - Mises à jour système</h3>
         <div class="btn-group btn-group-sm" v-if="canRunApt">
-          <button @click="sendAptCmd('update')" class="btn btn-outline-secondary">apt update</button>
-          <button @click="sendAptCmd('upgrade')" class="btn btn-primary">apt upgrade</button>
-          <button @click="sendAptCmd('dist-upgrade')" class="btn btn-outline-danger">apt dist-upgrade</button>
+          <button @click="sendAptCmd('update')" class="btn btn-outline-secondary" :disabled="!!aptCmdLoading">
+            <span v-if="aptCmdLoading === 'update'" class="spinner-border spinner-border-sm me-1"></span>
+            apt update
+          </button>
+          <button @click="sendAptCmd('upgrade')" class="btn btn-primary" :disabled="!!aptCmdLoading">
+            <span v-if="aptCmdLoading === 'upgrade'" class="spinner-border spinner-border-sm me-1"></span>
+            apt upgrade
+          </button>
+          <button @click="sendAptCmd('dist-upgrade')" class="btn btn-outline-danger" :disabled="!!aptCmdLoading">
+            <span v-if="aptCmdLoading === 'dist-upgrade'" class="spinner-border spinner-border-sm me-1"></span>
+            apt dist-upgrade
+          </button>
         </div>
         <span v-else class="text-secondary small">Mode lecture seule</span>
       </div>
@@ -729,6 +738,7 @@ const journalCmdId = ref(null)
 const auth = useAuthStore()
 const dialog = useConfirmDialog()
 const canRunApt = computed(() => auth.role === 'admin' || auth.role === 'operator')
+const aptCmdLoading = ref('')
 
 const serverHostname =
   typeof window !== 'undefined' && window.location?.hostname
@@ -881,12 +891,13 @@ async function sendAptCmd(command) {
     message: `Exécuter sur : ${host.value?.hostname}`,
     variant: command === 'dist-upgrade' ? 'danger' : 'warning'
   })
-  
+
   if (!confirmed) return
-  
+
+  aptCmdLoading.value = command
   try {
     const response = await apiClient.sendAptCommand([hostId], command)
-    
+
     // Auto-open console with command
     if (response.data?.commands?.length > 0) {
       const cmd = response.data.commands[0]
@@ -905,6 +916,8 @@ async function sendAptCmd(command) {
       message: e.response?.data?.error || e.message,
       variant: 'danger'
     })
+  } finally {
+    aptCmdLoading.value = ''
   }
 }
 
@@ -1355,8 +1368,9 @@ async function confirmDeleteTask(task) {
 async function deleteHost() {
   const confirmed = await dialog.confirm({
     title: 'Supprimer l\'hôte',
-    message: `Êtes-vous sûr de vouloir supprimer ${host.value?.hostname} ?\nCette action est irréversible.`,
-    variant: 'danger'
+    message: `Cette action est irréversible. Toutes les données associées seront supprimées.`,
+    variant: 'danger',
+    requiredText: host.value?.hostname || host.value?.name
   })
   
   if (!confirmed) return

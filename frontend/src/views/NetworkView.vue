@@ -410,7 +410,7 @@
                   Déduits des réseaux Docker partagés, variables d'environnement et images proxy.
                 </div>
               </div>
-              <div class="d-flex gap-2 align-items-center">
+              <div class="d-flex gap-2 align-items-center flex-wrap">
                 <!-- Filtre par type -->
                 <select v-model="autoLinkFilter" class="form-select form-select-sm" style="width: auto;">
                   <option value="">Tous les types</option>
@@ -421,6 +421,14 @@
                 <span class="text-secondary small">
                   {{ filteredAutoLinks.length }} / {{ inferredLinks.length }} lien(s)
                 </span>
+                <button
+                  class="btn btn-sm btn-outline-azure"
+                  :disabled="inferredLinks.filter(l => l.link_type === 'proxy').length === 0"
+                  @click="applyAutoLinks"
+                >
+                  Appliquer Liens Auto
+                </button>
+                <span v-if="applyResult" class="text-success small">{{ applyResult }}</span>
               </div>
             </div>
 
@@ -511,6 +519,7 @@
             :authelia-ip="autheliaIp"
             :internet-label="internetLabel"
             :internet-ip="internetIp"
+            :inferred-links="inferredLinks"
             @host-click="handleHostClick"
           />
         </div>
@@ -715,6 +724,7 @@ const topologyConfigLoaded = ref(false)
 const inferredLinks = ref([])
 const autoLinkFilter = ref('')
 const ignoredLinks = ref(new Set())
+const applyResult = ref('')
 const saveStatus = ref('idle') // 'idle' | 'saving' | 'saved' | 'error'
 const graphSurfaceRef = ref(null)
 const graphHeight = ref('auto')
@@ -1164,6 +1174,47 @@ function addServiceRow() {
 
 function removeServiceRow(serviceId) {
   networkServices.value = networkServices.value.filter((service) => service.id !== serviceId)
+}
+
+function applyAutoLinks() {
+  // Only apply proxy-type links (highest confidence / most actionable)
+  const proxyLinks = inferredLinks.value.filter(l => l.link_type === 'proxy')
+  let portsMarked = 0
+
+  for (const link of proxyLinks) {
+    // Find the target container in containers data
+    const targetContainer = containers.value.find(
+      c => c.name === link.target_container_name && c.host_id === link.target_host_id
+    )
+    if (!targetContainer) continue
+
+    const mappings = targetContainer.port_mappings || []
+    for (const mapping of mappings) {
+      const portNumber = Number(mapping.container_port || mapping.host_port || 0)
+      if (!portNumber) continue
+
+      const entry = getHostPortEntry(link.target_host_id)
+      const portKey = String(portNumber)
+      if (!entry.ports[portKey]) {
+        entry.ports[portKey] = { name: '', domain: '', path: '/', enabled: true, linkToProxy: false, linkToAuthelia: false, exposedToInternet: false, externalPort: null }
+      }
+      const portSetting = entry.ports[portKey]
+      if (!portSetting.linkToProxy) {
+        portSetting.enabled = true
+        portSetting.linkToProxy = true
+        if (!portSetting.name) portSetting.name = link.target_container_name
+        portsMarked++
+      }
+    }
+  }
+
+  if (portsMarked > 0) {
+    applyResult.value = `✓ ${portsMarked} port${portsMarked > 1 ? 's' : ''} marqué${portsMarked > 1 ? 's' : ''} comme proxy`
+    setTimeout(() => { applyResult.value = '' }, 4000)
+  } else {
+    applyResult.value = 'Aucun port nouveau à marquer'
+    setTimeout(() => { applyResult.value = '' }, 3000)
+  }
 }
 
 function handleHostClick(hostId) {

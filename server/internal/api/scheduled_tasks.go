@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/robfig/cron/v3"
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/models"
@@ -71,6 +72,12 @@ func (h *ScheduledTaskHandler) CreateScheduledTask(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid module: " + req.Module})
 		return
 	}
+	if req.CronExpression != "" {
+		if _, err := cron.ParseStandard(req.CronExpression); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "expression cron invalide : " + err.Error()})
+			return
+		}
+	}
 	if req.Payload == "" {
 		req.Payload = "{}"
 	}
@@ -119,6 +126,12 @@ func (h *ScheduledTaskHandler) UpdateScheduledTask(c *gin.Context) {
 	if !validTaskModules[req.Module] {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid module: " + req.Module})
 		return
+	}
+	if req.CronExpression != "" {
+		if _, err := cron.ParseStandard(req.CronExpression); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "expression cron invalide : " + err.Error()})
+			return
+		}
 	}
 	if req.Payload == "" {
 		req.Payload = "{}"

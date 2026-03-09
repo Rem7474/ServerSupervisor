@@ -149,8 +149,14 @@ func (h *AuditHandler) GetCommandsHistory(c *gin.Context) {
 }
 
 // GetCommandByID returns the status and output of a single remote command by UUID.
-// Any authenticated user can query — it only exposes non-sensitive status information.
+// Requires admin or operator role to prevent cross-host information disclosure.
 func (h *AuditHandler) GetCommandByID(c *gin.Context) {
+	role := c.GetString("role")
+	if role != models.RoleAdmin && role != models.RoleOperator {
+		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+		return
+	}
+
 	id := c.Param("id")
 	if id == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "id required"})

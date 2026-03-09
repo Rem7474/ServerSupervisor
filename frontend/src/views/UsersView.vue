@@ -120,11 +120,13 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
+import { useConfirmDialog } from '../composables/useConfirmDialog'
 import apiClient from '../api'
 import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc'
 
 const auth = useAuthStore()
+const dialog = useConfirmDialog()
 const users = ref([])
 const loading = ref(false)
 const saving = ref(false)
@@ -220,9 +222,13 @@ async function saveRole(user) {
 }
 
 async function deleteUser(user) {
-  if (!confirm(`Êtes-vous sûr de vouloir supprimer l'utilisateur "${user.username}" ?`)) {
-    return
-  }
+  const confirmed = await dialog.confirm({
+    title: `Supprimer l'utilisateur`,
+    message: `Cette action est irréversible.`,
+    variant: 'danger',
+    requiredText: user.username,
+  })
+  if (!confirmed) return
 
   saving.value = true
   try {

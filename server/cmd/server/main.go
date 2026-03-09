@@ -66,9 +66,6 @@ func main() {
 		}
 	}
 
-	// Start brute-force tracker cleanup (removes expired in-memory records every 5 min)
-	api.StartLoginTrackerCleanup()
-
 	// Start task scheduler
 	sched := scheduler.New(db)
 	sched.Start()

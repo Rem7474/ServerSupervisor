@@ -212,6 +212,37 @@ func (db *DB) UpdateReleaseTrackerDigest(id, digest string) error {
 	return err
 }
 
+// StoreTrackerTagDigest persists a (tag, digest) pair for historical version lookup.
+// Uses ON CONFLICT to update the digest if the tag was already recorded (re-tagged image).
+func (db *DB) StoreTrackerTagDigest(trackerID, tag, digest string) error {
+	_, err := db.conn.Exec(
+		`INSERT INTO release_tracker_tag_digests (tracker_id, tag, digest)
+		 VALUES ($1, $2, $3)
+		 ON CONFLICT (tracker_id, tag) DO UPDATE SET digest = EXCLUDED.digest`,
+		trackerID, tag, digest)
+	return err
+}
+
+// GetAllTrackerTagDigests returns all stored (trackerID, tag, digest) triples.
+// Used by buildVersionComparisons to resolve a container's image digest to a version tag.
+func (db *DB) GetAllTrackerTagDigests() (map[string]string, error) {
+	rows, err := db.conn.Query(
+		`SELECT tracker_id, tag, digest FROM release_tracker_tag_digests`)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	m := make(map[string]string)
+	for rows.Next() {
+		var trackerID, tag, digest string
+		if err := rows.Scan(&trackerID, &tag, &digest); err != nil {
+			continue
+		}
+		m[trackerID+"|"+digest] = tag
+	}
+	return m, nil
+}
+
 // UpdateReleaseTrackerError stores an error from the last check attempt.
 func (db *DB) UpdateReleaseTrackerError(id, errMsg string) error {
 	now := time.Now()

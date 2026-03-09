@@ -128,6 +128,7 @@ func (h *ReleaseTrackerHandler) tryFetchAndStoreDigest(trackerID, dockerImage, t
 	}
 	if digest != "" {
 		_ = h.db.UpdateReleaseTrackerDigest(trackerID, digest)
+		_ = h.db.StoreTrackerTagDigest(trackerID, tag, digest)
 		log.Printf("Release tracker %s: stored digest for %s:%s → %s", trackerID, dockerImage, tag, digest[:min(12, len(digest))])
 	}
 }

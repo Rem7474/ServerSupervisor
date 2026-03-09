@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -21,74 +20,20 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// loginTracker tracks failed login attempts per IP for brute-force protection.
-var loginTracker = struct {
-	mu      sync.Mutex
-	records map[string][]time.Time // ip → timestamps of recent failures
-}{records: make(map[string][]time.Time)}
-
 const (
 	bruteForceWindow   = 5 * time.Minute
 	bruteForceMaxFails = 5
 )
 
-func recordFailedLogin(ip string) {
-	loginTracker.mu.Lock()
-	defer loginTracker.mu.Unlock()
-	now := time.Now()
-	cutoff := now.Add(-bruteForceWindow)
-	recent := loginTracker.records[ip]
-	filtered := recent[:0]
-	for _, t := range recent {
-		if t.After(cutoff) {
-			filtered = append(filtered, t)
-		}
-	}
-	loginTracker.records[ip] = append(filtered, now)
-}
-
-func resetFailedLogins(ip string) {
-	loginTracker.mu.Lock()
-	defer loginTracker.mu.Unlock()
-	delete(loginTracker.records, ip)
-}
-
-// StartLoginTrackerCleanup starts a background goroutine that removes stale
-// brute-force records once per bruteForceWindow, preventing unbounded growth.
-func StartLoginTrackerCleanup() {
-	go func() {
-		ticker := time.NewTicker(bruteForceWindow)
-		defer ticker.Stop()
-		for range ticker.C {
-			cutoff := time.Now().Add(-bruteForceWindow)
-			loginTracker.mu.Lock()
-			for ip, times := range loginTracker.records {
-				filtered := times[:0]
-				for _, t := range times {
-					if t.After(cutoff) {
-						filtered = append(filtered, t)
-					}
-				}
-				if len(filtered) == 0 {
-					delete(loginTracker.records, ip)
-				} else {
-					loginTracker.records[ip] = filtered
-				}
-			}
-			loginTracker.mu.Unlock()
-		}
-	}()
-}
-
-func isIPBlocked(ip string) bool {
-	loginTracker.mu.Lock()
-	defer loginTracker.mu.Unlock()
-	cutoff := time.Now().Add(-bruteForceWindow)
-	count := 0
-	for _, t := range loginTracker.records[ip] {
-		if t.After(cutoff) {
-			count++
-		}
+// isIPBlocked checks the persistent login_events table (respecting manual unblocks)
+// so brute-force blocks survive server restarts.
+func (h *AuthHandler) isIPBlocked(ip string) bool {
+	since := time.Now().Add(-bruteForceWindow)
+	count, err := h.db.CountRecentFailedLoginsAfterUnblock(ip, since)
+	if err != nil {
+		// Fail open: don't block if DB is temporarily unavailable.
+		log.Printf("warn: isIPBlocked DB query failed for %s: %v", ip, err)
+		return false
 	}
 	return count >= bruteForceMaxFails
 }
@@ -122,21 +67,19 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	ip := clientIP(c)
 	userAgent := c.GetHeader("User-Agent")
 
-	if isIPBlocked(ip) {
+	if h.isIPBlocked(ip) {
 		c.JSON(http.StatusTooManyRequests, gin.H{"error": "Too many failed login attempts, try again later"})
 		return
 	}
 
 	user, err := h.db.GetUserByUsername(req.Username)
 	if err != nil {
-		recordFailedLogin(ip)
 		_ = h.db.CreateLoginEvent(req.Username, ip, userAgent, false)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
 		return
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
-		recordFailedLogin(ip)
 		_ = h.db.CreateLoginEvent(req.Username, ip, userAgent, false)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
 		return
@@ -163,7 +106,6 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		if !auth.VerifyTOTPCode(user.TOTPSecret, req.TOTPCode) {
 			// Try backup codes
 			if !auth.VerifyBackupCode(user.BackupCodes, req.TOTPCode) {
-				recordFailedLogin(ip)
 				_ = h.db.CreateLoginEvent(req.Username, ip, userAgent, false)
 				c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid TOTP code"})
 				return
@@ -176,7 +118,6 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		}
 	}
 
-	resetFailedLogins(ip)
 	_ = h.db.CreateLoginEvent(req.Username, ip, userAgent, true)
 
 	expiresAt := time.Now().Add(h.cfg.JWTExpiration)
@@ -587,22 +528,7 @@ func (h *AuthHandler) GetSecuritySummary(c *gin.Context) {
 		topFailed = []models.IPFailCount{}
 	}
 
-	// Read currently blocked IPs from the in-memory tracker
-	loginTracker.mu.Lock()
-	cutoff := time.Now().Add(-bruteForceWindow)
-	var blockedIPs []string
-	for ip, times := range loginTracker.records {
-		count := 0
-		for _, t := range times {
-			if t.After(cutoff) {
-				count++
-			}
-		}
-		if count >= bruteForceMaxFails {
-			blockedIPs = append(blockedIPs, ip)
-		}
-	}
-	loginTracker.mu.Unlock()
+	blockedIPs, _ := h.db.GetCurrentlyBlockedIPs(time.Now().Add(-bruteForceWindow), bruteForceMaxFails)
 	if blockedIPs == nil {
 		blockedIPs = []string{}
 	}
@@ -614,7 +540,7 @@ func (h *AuthHandler) GetSecuritySummary(c *gin.Context) {
 	})
 }
 
-// UnblockIP removes an IP from the in-memory brute-force block list (admin only).
+// UnblockIP persists an IP unblock to DB so it survives server restarts (admin only).
 func (h *AuthHandler) UnblockIP(c *gin.Context) {
 	if c.GetString("role") != "admin" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
@@ -627,11 +553,12 @@ func (h *AuthHandler) UnblockIP(c *gin.Context) {
 		return
 	}
 
-	loginTracker.mu.Lock()
-	delete(loginTracker.records, ip)
-	loginTracker.mu.Unlock()
-
 	user := c.GetString("username")
+	if err := h.db.UpsertIPUnblock(ip, user); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to unblock IP"})
+		return
+	}
+
 	_, _ = h.db.CreateAuditLog(user, "unblock_ip", "", c.ClientIP(), "IP unblocked: "+ip, "success")
 	c.JSON(http.StatusOK, gin.H{"success": true, "message": "IP unblocked: " + ip})
 }

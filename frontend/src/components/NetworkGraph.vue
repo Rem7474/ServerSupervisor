@@ -1,9 +1,10 @@
 <template>
-  <div class="d3-graph-container">
+  <div class="cy-graph-container">
+    <!-- Legend -->
     <div class="graph-legend">
       <div class="legend-title">Légende</div>
       <div class="legend-item">
-        <span style="display:inline-block; width:20px; height:12px; border:1.5px solid rgba(148,163,184,0.4); border-radius:3px; background:rgba(15,23,42,0.5); flex-shrink:0;"></span>
+        <span style="display:inline-block;width:20px;height:12px;border:1.5px solid rgba(148,163,184,0.4);border-radius:3px;background:rgba(15,23,42,0.5);flex-shrink:0;"></span>
         Hôte
       </div>
       <div class="legend-item">
@@ -27,741 +28,738 @@
         Port UDP
       </div>
       <div v-if="hasAutheliaTargets" class="legend-item">
-        <span style="display:inline-block; width:18px; height:3px; background:#8b5cf6; border-top:2px dashed #8b5cf6; border-radius:0; flex-shrink:0;"></span>
+        <span style="display:inline-block;width:18px;height:3px;background:#8b5cf6;border-top:2px dashed #8b5cf6;border-radius:0;flex-shrink:0;"></span>
         {{ autheliaLabel || 'Authelia' }}
       </div>
       <div v-if="hasInternetTargets" class="legend-item">
-        <span style="display:inline-block; width:18px; height:3px; background:#fb923c; border-top:2px dashed #fb923c; border-radius:0; flex-shrink:0;"></span>
+        <span style="display:inline-block;width:18px;height:3px;background:#fb923c;border-top:2px dashed #fb923c;border-radius:0;flex-shrink:0;"></span>
         {{ internetLabel || 'Internet' }}
       </div>
+      <div v-if="hasInferredLinks" class="legend-item">
+        <span style="display:inline-block;width:18px;height:3px;background:#a3e635;border-top:2px dashed #a3e635;border-radius:0;flex-shrink:0;"></span>
+        Lien inféré
+      </div>
     </div>
+
+    <!-- Controls -->
+    <div class="graph-controls">
+      <button class="graph-btn" title="Reset layout" @click="resetLayout">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M20 11a8.1 8.1 0 0 0-15.5-2m-.5-4v4h4"/>
+          <path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4"/>
+        </svg>
+      </button>
+      <button class="graph-btn" title="Fit to view" @click="fitView">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path d="M3 3h6M3 3v6M21 3h-6M21 3v6M3 21h6M3 21v-6M21 21h-6M21 21v-6"/>
+        </svg>
+      </button>
+    </div>
+
     <div v-if="!hasData" class="graph-empty">
       <div class="empty-title">Aucune topologie disponible</div>
-      <div class="empty-subtitle">Les hotes actifs apparaitront ici des que les donnees remontent.</div>
+      <div class="empty-subtitle">Les hôtes actifs apparaîtront ici dès que les données remontent.</div>
     </div>
-    <div ref="tooltipRef" class="d3-tooltip"></div>
-    <svg ref="svgRef" class="d3-graph"></svg>
+
+    <div ref="tooltipRef" class="cy-tooltip"></div>
+    <div ref="cyContainer" class="cy-canvas"></div>
   </div>
 </template>
 
 <script setup>
-import { ref, watch, onMounted, onUnmounted, computed } from 'vue'
-import * as d3 from 'd3'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import cytoscape from 'cytoscape'
+import fcose from 'cytoscape-fcose'
+
+cytoscape.use(fcose)
 
 const props = defineProps({
-  data: {
-    type: Array, // Array of host objects with containers
-    required: true
-  },
-  rootLabel: {
-    type: String,
-    default: 'root'
-  },
-  rootIp: {
-    type: String,
-    default: ''
-  },
-  serviceMap: {
-    type: Object,
-    default: () => ({})
-  },
-  excludedPorts: {
-    type: Array,
-    default: () => []
-  },
-  services: {
-    type: Array,
-    default: () => []
-  },
-  hostPortOverrides: {
-    type: Object,
-    default: () => ({})
-  },
-  autheliaLabel: {
-    type: String,
-    default: 'Authelia'
-  },
-  autheliaIp: {
-    type: String,
-    default: ''
-  },
-  internetLabel: {
-    type: String,
-    default: 'Internet'
-  },
-  internetIp: {
-    type: String,
-    default: ''
-  }
+  data: { type: Array, required: true },
+  rootLabel: { type: String, default: 'root' },
+  rootIp: { type: String, default: '' },
+  serviceMap: { type: Object, default: () => ({}) },
+  excludedPorts: { type: Array, default: () => [] },
+  services: { type: Array, default: () => [] },
+  hostPortOverrides: { type: Object, default: () => ({}) },
+  autheliaLabel: { type: String, default: 'Authelia' },
+  autheliaIp: { type: String, default: '' },
+  internetLabel: { type: String, default: 'Internet' },
+  internetIp: { type: String, default: '' },
+  inferredLinks: { type: Array, default: () => [] }
 })
 
 const emit = defineEmits(['host-click'])
 
-const svgRef = ref(null)
+const cyContainer = ref(null)
 const tooltipRef = ref(null)
+let cy = null
+let resizeObserver = null
+
 const hasData = computed(() => Array.isArray(props.data) && props.data.length > 0)
+
+const statusColors = { online: '#22c55e', warning: '#f59e0b', offline: '#ef4444', unknown: '#94a3b8' }
+
+// Computed: does the data contain authelia/internet/inferred targets?
+const hasAutheliaTargets = computed(() => props.services.some(s => s.linkToAuthelia))
+const hasInternetTargets = computed(() => props.services.some(s => s.exposedToInternet))
+const hasInferredLinks = computed(() => props.inferredLinks.length > 0)
 
 function escapeHtml(str) {
   if (str == null) return ''
   return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
-}
-const statusColors = {
-  online: '#22c55e',
-  warning: '#f59e0b',
-  offline: '#ef4444',
-  unknown: '#94a3b8'
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;')
 }
 
-const protocolColors = {
-  tcp: '#60a5fa',
-  udp: '#fb923c',
-  other: '#34d399'
-}
+// Build Cytoscape elements from props
+function buildElements() {
+  const elements = []
+  const globalExcluded = new Set((props.excludedPorts || []).map(Number).filter(Boolean))
 
-const hierarchyRoot = computed(() => {
-  const globalExcluded = (props.excludedPorts || []).map(value => Number(value)).filter(Boolean)
+  // container name → node id mapping (for resolving inferred links)
+  // structure: { hostId: { containerName: nodeId } }
+  const containerToNode = {}
+
+  // === Root node ===
+  const rootLabel = props.rootLabel || 'Infrastructure'
+  elements.push({
+    group: 'nodes',
+    data: { id: 'root', label: rootLabel, sublabel: props.rootIp || '', type: 'root' }
+  })
+
+  // === Services by host ===
   const servicesByHost = new Map()
-  for (const service of props.services || []) {
-    if (!service?.hostId) continue
-    if (!servicesByHost.has(service.hostId)) servicesByHost.set(service.hostId, [])
-    servicesByHost.get(service.hostId).push(service)
+  for (const svc of props.services || []) {
+    if (!svc?.hostId) continue
+    if (!servicesByHost.has(svc.hostId)) servicesByHost.set(svc.hostId, [])
+    servicesByHost.get(svc.hostId).push(svc)
   }
 
-  // Hiérarchie plate : root → services/ports (l'hôte n'est plus un nœud D3)
-  const rootChildren = []
-
+  // === Host nodes (compound parents) ===
   for (const host of props.data) {
-    const hostOverride = props.hostPortOverrides?.[host.id]
+    const hostStatus = host.status || 'unknown'
+    const statusColor = statusColors[hostStatus] || statusColors.unknown
+    elements.push({
+      group: 'nodes',
+      data: {
+        id: `host-${host.id}`,
+        label: host.name || host.hostname || host.id,
+        sublabel: host.ip_address || '',
+        type: 'host',
+        status: hostStatus,
+        statusColor,
+        hostId: host.id
+      }
+    })
+
+    const override = props.hostPortOverrides?.[host.id] || {}
     const hostExcluded = new Set([
       ...globalExcluded,
-      ...(hostOverride?.excludedPorts || [])
-    ].map(value => Number(value)).filter(Boolean))
-    const hostPortMap = hostOverride?.portMap || {}
-    const proxyPorts = hostOverride?.proxyPorts || new Set()
-    const autheliaPortNumbers = hostOverride?.autheliaPortNumbers || new Set()
-    const internetExposedPorts = hostOverride?.internetExposedPorts || {}
+      ...(override.excludedPorts || [])
+    ].map(Number).filter(Boolean))
+    const portMap = override.portMap || {}
+    const proxyPorts = override.proxyPorts || new Set()
+    const autheliaPortNumbers = override.autheliaPortNumbers || new Set()
+    const internetExposedPorts = override.internetExposedPorts || {}
+
+    // Port nodes
     const rawPorts = host.ports || []
-    const filteredPorts = rawPorts.filter(port => {
+    for (const port of rawPorts) {
       const portNumber = Number(port.port || 0)
-      return portNumber && !hostExcluded.has(portNumber)
-    })
-    const hostServices = servicesByHost.get(host.id) || []
+      if (!portNumber || hostExcluded.has(portNumber)) continue
 
-    // Métadonnées hôte portées directement par chaque nœud
-    const hostMeta = {
-      hostId: host.id,
-      hostName: host.name || host.hostname || host.id,
-      hostIp: host.ip_address || '',
-      hostStatus: host.status || 'unknown'
-    }
-
-    // Services liés au proxy
-    for (const service of hostServices) {
-      const internalPort = Number(service.internalPort || 0)
-      const externalPort = Number(service.externalPort || 0)
-      const path = service.path || '/'
-      const domain = service.domain || ''
-      const name = service.name || 'Service'
-      const label = domain ? `${domain}${path}` : path
-      rootChildren.push({
-        id: `service-${host.id}-${service.id}`,
-        name,
-        subtitle: label,
-        internalPort,
-        externalPort,
-        type: 'service',
-        protocol: 'tcp',
-        port: internalPort,
-        tags: service.tags || '',
-        isProxyLinked: service.linkToProxy || false,
-        isAutheliaLinked: service.linkToAuthelia || autheliaPortNumbers.has(Number(internalPort)),
-        isInternetExposed: service.exposedToInternet || (internalPort in internetExposedPorts),
-        externalPort: service.externalPort || internetExposedPorts[internalPort] || null,
-        ...hostMeta
-      })
-    }
-
-    // Ports non représentés comme service
-    for (const port of filteredPorts) {
-      const portNumber = Number(port.port || 0)
+      // Skip if a service already covers this port
+      const hostServices = servicesByHost.get(host.id) || []
       if (hostServices.some(s => Number(s.internalPort) === portNumber)) continue
+
       const protocol = (port.protocol || 'tcp').toLowerCase()
-      const serviceName = hostPortMap?.[portNumber] || props.serviceMap?.[portNumber]
+      const serviceName = portMap?.[portNumber] || props.serviceMap?.[portNumber]
       const label = serviceName
-        ? `${serviceName} (${portNumber}/${protocol.toUpperCase()})`
+        ? `${serviceName}\n${portNumber}/${protocol.toUpperCase()}`
         : `${portNumber}/${protocol.toUpperCase()}`
-      rootChildren.push({
-        id: `port-${host.id}-${port.port}-${protocol}`,
-        name: label,
-        type: 'port',
-        protocol,
-        port: portNumber,
-        containers: port.containers || [],
-        isProxyLinked: proxyPorts.has(portNumber),
-        isAutheliaLinked: autheliaPortNumbers.has(portNumber),
-        isInternetExposed: portNumber in internetExposedPorts,
-        externalPort: internetExposedPorts[portNumber] || null,
-        ...hostMeta
+
+      const isProxyLinked = proxyPorts.has(portNumber)
+      const isAutheliaLinked = autheliaPortNumbers.has(portNumber)
+      const isInternetExposed = portNumber in internetExposedPorts
+      const externalPort = internetExposedPorts[portNumber] || null
+
+      const nodeId = `port-${host.id}-${portNumber}-${protocol}`
+      elements.push({
+        group: 'nodes',
+        data: {
+          id: nodeId,
+          label,
+          type: 'port',
+          parent: `host-${host.id}`,
+          protocol,
+          portNumber,
+          hostId: host.id,
+          isProxyLinked,
+          isAutheliaLinked,
+          isInternetExposed,
+          externalPort,
+          containers: port.containers || []
+        }
       })
+
+      // Register containers → node id
+      if (!containerToNode[host.id]) containerToNode[host.id] = {}
+      for (const cName of (port.containers || [])) {
+        containerToNode[host.id][cName] = nodeId
+      }
+
+      // Proxy edge
+      if (isProxyLinked) {
+        elements.push({ group: 'edges', data: { id: `e-proxy-${nodeId}`, source: 'root', target: nodeId, edgeType: 'proxy' } })
+      }
+      // Authelia edge
+      if (isAutheliaLinked) {
+        elements.push({ group: 'edges', data: { id: `e-auth-${nodeId}`, source: 'authelia', target: nodeId, edgeType: 'authelia' } })
+      }
+      // Internet edge
+      if (isInternetExposed) {
+        elements.push({ group: 'edges', data: { id: `e-inet-${nodeId}`, source: 'internet', target: nodeId, edgeType: 'internet', externalPort } })
+      }
+    }
+
+    // Service nodes
+    for (const svc of servicesByHost.get(host.id) || []) {
+      const internalPort = Number(svc.internalPort || 0)
+      const domain = svc.domain || ''
+      const path = svc.path || '/'
+      const sublabel = domain ? `${domain}${path}` : path
+
+      const nodeId = `svc-${host.id}-${svc.id}`
+      elements.push({
+        group: 'nodes',
+        data: {
+          id: nodeId,
+          label: svc.name || 'Service',
+          sublabel,
+          type: 'service',
+          parent: `host-${host.id}`,
+          hostId: host.id,
+          internalPort,
+          externalPort: svc.externalPort || null,
+          isProxyLinked: svc.linkToProxy || false,
+          isAutheliaLinked: svc.linkToAuthelia || false,
+          isInternetExposed: svc.exposedToInternet || false,
+          tags: svc.tags || ''
+        }
+      })
+
+      // Register service name as container name for inferred link resolution
+      if (!containerToNode[host.id]) containerToNode[host.id] = {}
+      containerToNode[host.id][svc.name] = nodeId
+
+      if (svc.linkToProxy) {
+        elements.push({ group: 'edges', data: { id: `e-proxy-${nodeId}`, source: 'root', target: nodeId, edgeType: 'proxy' } })
+      }
+      if (svc.linkToAuthelia) {
+        elements.push({ group: 'edges', data: { id: `e-auth-${nodeId}`, source: 'authelia', target: nodeId, edgeType: 'authelia' } })
+      }
+      if (svc.exposedToInternet) {
+        elements.push({ group: 'edges', data: { id: `e-inet-${nodeId}`, source: 'internet', target: nodeId, edgeType: 'internet', externalPort: svc.externalPort } })
+      }
     }
   }
 
-  return d3.hierarchy({
-    id: 'root',
-    name: props.rootLabel || 'root',
-    type: 'root',
-    children: rootChildren
-  })
-})
-
-// Reactive flags used by the template legend — only show entries when nodes are actually linked
-const hasAutheliaTargets = computed(() =>
-  (hierarchyRoot.value.children || []).some(d => d.data.isAutheliaLinked)
-)
-const hasInternetTargets = computed(() =>
-  (hierarchyRoot.value.children || []).some(d => d.data.isInternetExposed)
-)
-
-const render = () => {
-  if (!svgRef.value) return
-
-  const width = svgRef.value.clientWidth || 1000
-  const height = svgRef.value.clientHeight || 600
-
-  d3.select(svgRef.value).selectAll('*').remove()
-  if (!hasData.value) return
-
-  const root = hierarchyRoot.value
-  if (!root || !root.children || root.children.length === 0) return
-
-  const svg = d3.select(svgRef.value)
-    .attr('width', width)
-    .attr('height', height)
-
-  const defs = svg.append('defs')
-  defs.append('filter')
-    .attr('id', 'node-shadow')
-    .append('feDropShadow')
-    .attr('dx', 0)
-    .attr('dy', 10)
-    .attr('stdDeviation', 8)
-    .attr('flood-opacity', 0.45)
-
-  const g = svg.append('g').attr('class', 'graph-root')
-
-  const zoom = d3.zoom()
-    .scaleExtent([0.6, 2.2])
-    .on('zoom', (event) => {
-      g.attr('transform', event.transform)
+  // === Authelia node (only if there are linked targets) ===
+  const needsAuthelia = elements.some(e => e.group === 'edges' && e.data.edgeType === 'authelia')
+  if (needsAuthelia && props.autheliaLabel) {
+    elements.push({
+      group: 'nodes',
+      data: { id: 'authelia', label: props.autheliaLabel || 'Authelia', sublabel: props.autheliaIp || '', type: 'authelia' }
     })
-
-  svg.call(zoom)
-
-  const treeLayout = d3.tree().size([height - 100, width - 260])
-  treeLayout.separation((a, b) => (a.parent === b.parent ? 1.2 : 2))
-
-  const treeData = treeLayout(root)
-
-  const clusterGroup = g.append('g').attr('class', 'service-clusters')
-  const autheliaLinkGroup = g.append('g').attr('class', 'authelia-links')
-  const internetLinkGroup = g.append('g').attr('class', 'internet-links')
-  const linkGroup = g.append('g').attr('class', 'links')
-  const nodeGroup = g.append('g').attr('class', 'nodes')
-  const specialNodeGroup = g.append('g').attr('class', 'special-nodes')
-
-  // CORRECTIF 1 : Centrage du proxy (root) au centre exact du SVG
-  const centerX = width / 2;
-
-  // Tous les nœuds feuilles (hiérarchie plate : root → service/port)
-  const allLeafNodes = treeData.descendants().filter(
-    d => d.data.type === 'service' || d.data.type === 'port'
-  )
-  // Infos hôte depuis props.data (plus de nœud hôte dans l'arbre D3)
-  const hostInfoById = new Map(props.data.map(h => [
-    h.id,
-    { name: h.name || h.hostname || h.id, ip: h.ip_address || '', status: h.status || 'unknown' }
-  ]))
-  const clustersByHost = d3.group(allLeafNodes, d => d.data.hostId)
-
-  // Render host clusters
-  for (const [hostId, nodes] of clustersByHost.entries()) {
-    if (nodes.length === 0) continue
-    const hostInfo = hostInfoById.get(hostId) || { name: hostId, ip: '', status: 'unknown' }
-    const hostStatus = hostInfo.status
-    const hostName = hostInfo.name
-    const hostIp = hostInfo.ip
-    const statusColor = statusColors[hostStatus] || statusColors.unknown
-
-    // CORRECTIF 2 : Positionnement des clusters avec offset fixe 100 (pas centerX)
-    const positions = nodes.map(node => ({
-      x: node.y + 100,
-      y: node.x + 40
-    }))
-    const minX = d3.min(positions, pos => pos.x) ?? 0
-    const maxX = d3.max(positions, pos => pos.x) ?? 0
-    const minY = d3.min(positions, pos => pos.y) ?? 0
-    const maxY = d3.max(positions, pos => pos.y) ?? 0
-
-    const headerH = 32
-    const clusterPadding = { x: 28, y: 16 }
-
-    const rectX = minX - 130 - clusterPadding.x
-    const rectY = minY - 22 - clusterPadding.y - headerH
-    const rectW = (maxX - minX) + 260 + clusterPadding.x * 2
-    const rectH = (maxY - minY) + 44 + clusterPadding.y * 2 + headerH
-
-    const cluster = clusterGroup.append('g')
-      .attr('class', 'service-cluster')
-      .style('cursor', 'pointer')
-      .on('click', () => emit('host-click', hostId))
-      .on('mouseover', (event) => {
-        if (!tooltipRef.value) return
-        const lines = [
-          hostName,
-          hostIp ? `IP : ${hostIp}` : null,
-          `Statut : ${hostStatus}`,
-          `${nodes.length} service(s)`
-        ].filter(Boolean)
-        tooltipRef.value.innerHTML = lines.map(l => `<div>${escapeHtml(l)}</div>`).join('')
-        tooltipRef.value.style.display = 'block'
-        tooltipRef.value.style.left = `${event.pageX + 8}px`
-        tooltipRef.value.style.top = `${event.pageY - 48}px`
-      })
-      .on('mousemove', (event) => {
-        if (!tooltipRef.value || tooltipRef.value.style.display !== 'block') return
-        tooltipRef.value.style.left = `${event.pageX + 8}px`
-        tooltipRef.value.style.top = `${event.pageY - 48}px`
-      })
-      .on('mouseout', () => {
-        if (tooltipRef.value) tooltipRef.value.style.display = 'none'
-      })
-
-    // Rectangle principal du cluster
-    cluster.append('rect')
-      .attr('x', rectX)
-      .attr('y', rectY)
-      .attr('width', rectW)
-      .attr('height', rectH)
-      .attr('rx', 14)
-      .attr('ry', 14)
-
-    // Ligne de séparation en-tête / contenu
-    cluster.append('line')
-      .attr('x1', rectX + 12)
-      .attr('y1', rectY + headerH)
-      .attr('x2', rectX + rectW - 12)
-      .attr('y2', rectY + headerH)
-      .attr('stroke', 'rgba(148, 163, 184, 0.2)')
-      .attr('stroke-width', 1)
-
-    // Pastille de statut
-    cluster.append('circle')
-      .attr('cx', rectX + 18)
-      .attr('cy', rectY + headerH / 2)
-      .attr('r', 5)
-      .attr('fill', statusColor)
-
-    // Nom de l'hôte
-    cluster.append('text')
-      .attr('x', rectX + 32)
-      .attr('y', rectY + headerH / 2 - 4)
-      .style('font-size', '12px')
-      .style('font-weight', '700')
-      .style('fill', '#e2e8f0')
-      .style('pointer-events', 'none')
-      .text(hostName)
-
-    // IP en sous-titre
-    if (hostIp) {
-      cluster.append('text')
-        .attr('x', rectX + 32)
-        .attr('y', rectY + headerH / 2 + 10)
-        .style('font-size', '10px')
-        .style('fill', '#94a3b8')
-        .style('pointer-events', 'none')
-        .text(hostIp)
-    }
+  } else {
+    // Remove any pending authelia edges
+    const toRemove = elements.filter(e => e.group === 'edges' && e.data.edgeType === 'authelia')
+    for (const e of toRemove) elements.splice(elements.indexOf(e), 1)
   }
 
-  // Proxy links : arcs du root vers les services/ports avec isProxyLinked
-  // CORRECTIF 4 : startX utilise centerX pour partir du bord droit du nœud root centré
-  linkGroup
-    .selectAll('path')
-    .data(treeData.links().filter(d => d.target.data.isProxyLinked))
-    .enter()
-    .append('path')
-    .attr('fill', 'none')
-    .attr('d', (d) => {
-      const startX = centerX + 120;
-      const startY = d.source.x + 40;
-      const targetLeftOffset = d.target.data.type === 'service' ? -130 : -90;
-      const endX = d.target.y + 100 + targetLeftOffset;
-      const endY = d.target.x + 40;
-      const midX = (startX + endX) / 2
-      return `M${startX},${startY} C${midX},${startY} ${midX},${endY} ${endX},${endY}`
+  // === Internet node (only if there are linked targets) ===
+  const needsInternet = elements.some(e => e.group === 'edges' && e.data.edgeType === 'internet')
+  if (needsInternet) {
+    elements.push({
+      group: 'nodes',
+      data: { id: 'internet', label: props.internetLabel || 'Internet', sublabel: props.internetIp || '', type: 'internet' }
     })
-    .attr('stroke', d => {
-      const protocol = d.target.data.protocol
-      return protocolColors[protocol] || protocolColors.other
-    })
-    .attr('stroke-width', 1.4)
-    .attr('opacity', 0.65)
+  } else {
+    const toRemove = elements.filter(e => e.group === 'edges' && e.data.edgeType === 'internet')
+    for (const e of toRemove) elements.splice(elements.indexOf(e), 1)
+  }
 
-  // CORRECTIF 5 : Nœud root centré sur centerX, les autres sur d.y + 100
-  const nodes = nodeGroup
-    .selectAll('g')
-    .data(treeData.descendants())
-    .enter()
-    .append('g')
-    .attr('class', d => `node ${d.data.type}`)
-    .attr('transform', d => {
-      if (d.data.type === 'root') {
-        return `translate(${centerX},${d.x + 40})`;
+  // === Inferred links ===
+  const usedInferredEdges = new Set()
+  for (let i = 0; i < props.inferredLinks.length; i++) {
+    const link = props.inferredLinks[i]
+    const srcHostNodes = containerToNode[link.source_host_id] || {}
+    const tgtHostNodes = containerToNode[link.target_host_id] || {}
+
+    const srcNodeId = srcHostNodes[link.source_container_name] || `host-${link.source_host_id}`
+    const tgtNodeId = tgtHostNodes[link.target_container_name] || `host-${link.target_host_id}`
+
+    // Skip self-loops or missing targets
+    if (srcNodeId === tgtNodeId) continue
+    // Skip if source/target host node doesn't exist
+    if (srcNodeId.startsWith('host-') && !elements.some(e => e.data?.id === srcNodeId)) continue
+    if (tgtNodeId.startsWith('host-') && !elements.some(e => e.data?.id === tgtNodeId)) continue
+
+    const edgeKey = `${srcNodeId}|${tgtNodeId}|${link.link_type}`
+    if (usedInferredEdges.has(edgeKey)) continue
+    usedInferredEdges.add(edgeKey)
+
+    elements.push({
+      group: 'edges',
+      data: {
+        id: `inferred-${i}`,
+        source: srcNodeId,
+        target: tgtNodeId,
+        edgeType: 'inferred',
+        linkType: link.link_type,
+        confidence: link.confidence || 0,
+        envKey: link.env_key || ''
       }
-      return `translate(${d.y + 100},${d.x + 40})`;
-    })
-    .style('cursor', 'default')
-
-  const rootNodes = nodes.filter(d => d.data.type === 'root')
-  const serviceNodes = nodes.filter(d => d.data.type === 'service')
-  const portNodes = nodes.filter(d => d.data.type === 'port')
-
-  rootNodes
-    .append('rect')
-    .attr('rx', 12)
-    .attr('ry', 12)
-    .attr('x', -120)
-    .attr('y', -22)
-    .attr('width', 240)
-    .attr('height', 44)
-    .attr('fill', 'rgba(15, 23, 42, 0.9)')
-    .attr('stroke', '#94a3b8')
-    .attr('stroke-width', 1.4)
-    .attr('filter', 'url(#node-shadow)')
-
-  rootNodes
-    .append('text')
-    .attr('text-anchor', 'middle')
-    .attr('dy', '-0.1em')
-    .style('font-size', '13px')
-    .style('font-weight', '700')
-    .style('fill', '#e2e8f0')
-    .each(function (d) {
-      const text = d3.select(this)
-      text.append('tspan').text(d.data.name)
-      if (props.rootIp) {
-        text.append('tspan')
-          .attr('x', 0)
-          .attr('dy', '1.2em')
-          .style('font-size', '10px')
-          .style('fill', '#94a3b8')
-          .text(props.rootIp)
-      }
-    })
-
-  serviceNodes
-    .append('rect')
-    .attr('rx', 10)
-    .attr('ry', 10)
-    .attr('x', -130)
-    .attr('y', -30)
-    .attr('width', 260)
-    .attr('height', 60)
-    .attr('fill', 'rgba(15, 23, 42, 0.86)')
-    .attr('stroke', '#38bdf8')
-    .attr('stroke-width', 1.3)
-    .attr('filter', 'url(#node-shadow)')
-    .on('mouseover', (event, d) => {
-      if (!tooltipRef.value) return
-      const lines = [d.data.name, d.data.subtitle, `Interne: ${d.data.internalPort || '-'} / Externe: ${d.data.externalPort || '-'}`]
-      if (d.data.tags) lines.push(`Tags: ${d.data.tags}`)
-      tooltipRef.value.innerHTML = lines.map(line => `<div>${escapeHtml(line)}</div>`).join('')
-      tooltipRef.value.style.display = 'block'
-      tooltipRef.value.style.left = `${event.pageX + 12}px`
-      tooltipRef.value.style.top = `${event.pageY + 12}px`
-    })
-    .on('mousemove', (event) => {
-      if (!tooltipRef.value || tooltipRef.value.style.display !== 'block') return
-      tooltipRef.value.style.left = `${event.pageX + 12}px`
-      tooltipRef.value.style.top = `${event.pageY + 12}px`
-    })
-    .on('mouseout', () => {
-      if (tooltipRef.value) tooltipRef.value.style.display = 'none'
-    })
-
-  serviceNodes
-    .append('text')
-    .attr('text-anchor', 'middle')
-    .attr('dy', '-0.7em')
-    .style('font-size', '11px')
-    .style('font-weight', '600')
-    .style('fill', '#e2e8f0')
-    .each(function (d) {
-      const text = d3.select(this)
-      text.append('tspan').text(d.data.name)
-      if (d.data.subtitle) {
-        text.append('tspan')
-          .attr('x', 0)
-          .attr('dy', '1.3em')
-          .style('font-size', '10px')
-          .style('fill', '#93c5fd')
-          .text(d.data.subtitle)
-      }
-      if (d.data.internalPort) {
-        text.append('tspan')
-          .attr('x', 0)
-          .attr('dy', '1.2em')
-          .style('font-size', '10px')
-          .style('fill', '#cbd5f5')
-          .text(`Port interne ${d.data.internalPort}`)
-      }
-    })
-
-  portNodes
-    .append('rect')
-    .attr('rx', 8)
-    .attr('ry', 8)
-    .attr('x', -90)
-    .attr('y', -16)
-    .attr('width', 180)
-    .attr('height', 32)
-    .attr('fill', 'rgba(15, 23, 42, 0.82)')
-    .attr('stroke', d => protocolColors[d.data.protocol] || protocolColors.other)
-    .attr('stroke-width', 1.2)
-    .attr('filter', 'url(#node-shadow)')
-    .on('mouseover', (event, d) => {
-      if (!tooltipRef.value) return
-      const lines = [`Port ${d.data.name}`]
-      if (d.data.containers?.length) lines.push(`Conteneurs: ${d.data.containers.length}`)
-      tooltipRef.value.innerHTML = lines.map(line => `<div>${escapeHtml(line)}</div>`).join('')
-      tooltipRef.value.style.display = 'block'
-      tooltipRef.value.style.left = `${event.pageX + 12}px`
-      tooltipRef.value.style.top = `${event.pageY + 12}px`
-    })
-    .on('mousemove', (event) => {
-      if (!tooltipRef.value || tooltipRef.value.style.display !== 'block') return
-      tooltipRef.value.style.left = `${event.pageX + 12}px`
-      tooltipRef.value.style.top = `${event.pageY + 12}px`
-    })
-    .on('mouseout', () => {
-      if (tooltipRef.value) tooltipRef.value.style.display = 'none'
-    })
-
-  portNodes
-    .append('text')
-    .attr('text-anchor', 'middle')
-    .attr('dy', '0.35em')
-    .style('font-size', '11px')
-    .style('fill', '#e2e8f0')
-    .text(d => d.data.name)
-
-  // Authelia node + arcs (purple dashed arcs to authelia-linked nodes)
-  const autheliaTargets = treeData.descendants().filter(
-    d => (d.data.type === 'service' || d.data.type === 'port') && d.data.isAutheliaLinked
-  )
-  const hasAuthelia = props.autheliaLabel && autheliaTargets.length > 0
-  const rootNode = treeData.descendants().find(d => d.data.type === 'root')
-
-  if (hasAuthelia && rootNode) {
-    // Position Authelia node above the root node
-    const rootSvgX = centerX
-    const rootSvgY = rootNode.x + 40
-    const authX = rootSvgX
-    const authY = rootSvgY - 120
-
-    // Draw Authelia node (purple rounded rect)
-    const authNode = specialNodeGroup.append('g')
-      .attr('transform', `translate(${authX},${authY})`)
-    authNode.append('rect')
-      .attr('rx', 10).attr('ry', 10)
-      .attr('x', -100).attr('y', -20)
-      .attr('width', 200).attr('height', 40)
-      .attr('fill', 'rgba(139, 92, 246, 0.15)')
-      .attr('stroke', '#8b5cf6')
-      .attr('stroke-width', 1.6)
-      .attr('filter', 'url(#node-shadow)')
-    authNode.append('text')
-      .attr('text-anchor', 'middle').attr('dy', '-0.1em')
-      .style('font-size', '12px').style('font-weight', '700').style('fill', '#c4b5fd')
-      .text(props.autheliaLabel || 'Authelia')
-    if (props.autheliaIp) {
-      authNode.append('text')
-        .attr('text-anchor', 'middle').attr('dy', '1.2em')
-        .style('font-size', '10px').style('fill', '#8b5cf6')
-        .text(props.autheliaIp)
-    }
-
-    // Draw arcs: root → Authelia (dotted purple) and Authelia → targets (dotted purple)
-    autheliaLinkGroup.append('path')
-      .attr('fill', 'none')
-      .attr('stroke', 'rgba(139, 92, 246, 0.5)')
-      .attr('stroke-width', 1.5)
-      .attr('stroke-dasharray', '5 4')
-      .attr('d', () => {
-        const sx = rootSvgX + 120  // right edge of root
-        const sy = rootSvgY
-        const ex = authX - 100     // left edge of authelia
-        const ey = authY
-        const mx = (sx + ex) / 2
-        return `M${sx},${sy} C${mx},${sy} ${mx},${ey} ${ex},${ey}`
-      })
-
-    autheliaTargets.forEach(d => {
-      const targetLeftOffset = d.data.type === 'service' ? -130 : -90
-      autheliaLinkGroup.append('path')
-        .attr('fill', 'none')
-        .attr('stroke', 'rgba(167, 139, 250, 0.8)')
-        .attr('stroke-width', 1.8)
-        .attr('stroke-dasharray', '6 4')
-        .attr('d', () => {
-          const sx = authX + 100  // right edge of authelia
-          const sy = authY
-          const ex = d.y + 100 + targetLeftOffset
-          const ey = d.x + 40
-          const mx = (sx + ex) / 2
-          return `M${sx},${sy} C${mx},${sy} ${mx},${ey} ${ex},${ey}`
-        })
     })
   }
 
-  // Internet node + arcs (orange dashed arcs to internet-exposed nodes)
-  const internetTargets = treeData.descendants().filter(
-    d => (d.data.type === 'service' || d.data.type === 'port') && d.data.isInternetExposed
-  )
+  return elements
+}
 
-  if (internetTargets.length > 0 && rootNode) {
-    // CORRECTIF 3 : Positionnement Internet basé sur centerX, pas sur rootNode.y
-    const rootSvgX = centerX;
-    const rootSvgY = rootNode.x + 40;
-    const intX = centerX - 260;
-    const intY = rootSvgY;
-
-    // Draw Internet node (orange rounded rect)
-    const intNode = specialNodeGroup.append('g')
-      .attr('transform', `translate(${intX},${intY})`)
-    intNode.append('rect')
-      .attr('rx', 10).attr('ry', 10)
-      .attr('x', -100).attr('y', -20)
-      .attr('width', 200).attr('height', 40)
-      .attr('fill', 'rgba(251, 146, 60, 0.12)')
-      .attr('stroke', '#fb923c')
-      .attr('stroke-width', 1.6)
-      .attr('filter', 'url(#node-shadow)')
-    intNode.append('text')
-      .attr('text-anchor', 'middle').attr('dy', '-0.1em')
-      .style('font-size', '12px').style('font-weight', '700').style('fill', '#fed7aa')
-      .text(props.internetLabel || 'Internet')
-    if (props.internetIp) {
-      intNode.append('text')
-        .attr('text-anchor', 'middle').attr('dy', '1.2em')
-        .style('font-size', '10px').style('fill', '#fb923c')
-        .text(props.internetIp)
-    }
-
-    // Draw arc: Internet → root (dotted orange)
-    internetLinkGroup.append('path')
-      .attr('fill', 'none')
-      .attr('stroke', 'rgba(251, 146, 60, 0.5)')
-      .attr('stroke-width', 1.5)
-      .attr('stroke-dasharray', '5 4')
-      .attr('d', () => {
-        const sx = intX + 100  // right edge of internet
-        const sy = intY
-        const ex = rootSvgX - 120  // left edge of root
-        const ey = rootSvgY
-        const mx = (sx + ex) / 2
-        return `M${sx},${sy} C${mx},${sy} ${mx},${ey} ${ex},${ey}`
-      })
-
-    internetTargets.forEach(d => {
-      const targetLeftOffset = d.data.type === 'service' ? -130 : -90
-      const extPort = d.data.externalPort
-      internetLinkGroup.append('path')
-        .attr('fill', 'none')
-        .attr('stroke', 'rgba(251, 146, 60, 0.85)')
-        .attr('stroke-width', 1.8)
-        .attr('stroke-dasharray', '6 4')
-        .attr('d', () => {
-          const sx = intX + 100
-          const sy = intY
-          const ex = d.y + 100 + targetLeftOffset
-          const ey = d.x + 40
-          const mx = (sx + ex) / 2
-          return `M${sx},${sy} C${mx},${sy} ${mx},${ey} ${ex},${ey}`
-        })
-      // Label external port on the arc
-      if (extPort) {
-        const sx = intX + 100, sy = intY
-        const ex = d.y + 100 + targetLeftOffset, ey = d.x + 40
-        internetLinkGroup.append('text')
-          .attr('x', (sx + ex) / 2)
-          .attr('y', (sy + ey) / 2 - 6)
-          .attr('text-anchor', 'middle')
-          .style('font-size', '10px')
-          .style('fill', '#fb923c')
-          .style('pointer-events', 'none')
-          .text(`:${extPort}`)
+function getCyStyle() {
+  return [
+    {
+      selector: 'node',
+      style: {
+        'font-family': 'system-ui, sans-serif',
+        'color': '#e2e8f0',
+        'text-wrap': 'wrap',
+        'text-max-width': '180px',
+        'text-valign': 'center',
+        'text-halign': 'center',
+        'overlay-padding': '4px'
       }
-    })
+    },
+    {
+      selector: 'node[type="root"]',
+      style: {
+        'background-color': 'rgba(15,23,42,0.92)',
+        'border-color': '#94a3b8',
+        'border-width': 2,
+        'label': 'data(label)',
+        'font-size': '13px',
+        'font-weight': 'bold',
+        'width': 180,
+        'height': 52,
+        'shape': 'roundrectangle',
+        'color': '#e2e8f0'
+      }
+    },
+    {
+      selector: 'node[type="host"]',
+      style: {
+        'background-color': 'rgba(15,23,42,0.42)',
+        'border-color': 'rgba(148,163,184,0.35)',
+        'border-width': 1.5,
+        'label': 'data(label)',
+        'font-size': '12px',
+        'font-weight': 'bold',
+        'text-valign': 'top',
+        'text-halign': 'center',
+        'text-margin-y': '6px',
+        'padding': '22px',
+        'shape': 'roundrectangle',
+        'color': '#e2e8f0'
+      }
+    },
+    {
+      selector: 'node[type="service"]',
+      style: {
+        'background-color': 'rgba(15,23,42,0.88)',
+        'border-color': '#38bdf8',
+        'border-width': 1.4,
+        'label': 'data(label)',
+        'font-size': '11px',
+        'font-weight': '600',
+        'width': 200,
+        'height': 52,
+        'shape': 'roundrectangle',
+        'color': '#e2e8f0'
+      }
+    },
+    {
+      selector: 'node[type="port"][protocol="tcp"]',
+      style: {
+        'background-color': 'rgba(15,23,42,0.82)',
+        'border-color': '#60a5fa',
+        'border-width': 1.3,
+        'label': 'data(label)',
+        'font-size': '11px',
+        'width': 160,
+        'height': 38,
+        'shape': 'roundrectangle',
+        'color': '#e2e8f0'
+      }
+    },
+    {
+      selector: 'node[type="port"][protocol="udp"]',
+      style: {
+        'background-color': 'rgba(15,23,42,0.82)',
+        'border-color': '#fb923c',
+        'border-width': 1.3,
+        'label': 'data(label)',
+        'font-size': '11px',
+        'width': 160,
+        'height': 38,
+        'shape': 'roundrectangle',
+        'color': '#e2e8f0'
+      }
+    },
+    {
+      selector: 'node[type="port"]',
+      style: {
+        'background-color': 'rgba(15,23,42,0.82)',
+        'border-color': '#34d399',
+        'border-width': 1.3,
+        'label': 'data(label)',
+        'font-size': '11px',
+        'width': 160,
+        'height': 38,
+        'shape': 'roundrectangle',
+        'color': '#e2e8f0'
+      }
+    },
+    {
+      selector: 'node[type="authelia"]',
+      style: {
+        'background-color': 'rgba(139,92,246,0.15)',
+        'border-color': '#8b5cf6',
+        'border-width': 1.8,
+        'label': 'data(label)',
+        'font-size': '12px',
+        'font-weight': 'bold',
+        'width': 160,
+        'height': 44,
+        'shape': 'roundrectangle',
+        'color': '#c4b5fd'
+      }
+    },
+    {
+      selector: 'node[type="internet"]',
+      style: {
+        'background-color': 'rgba(251,146,60,0.12)',
+        'border-color': '#fb923c',
+        'border-width': 1.8,
+        'label': 'data(label)',
+        'font-size': '12px',
+        'font-weight': 'bold',
+        'width': 160,
+        'height': 44,
+        'shape': 'roundrectangle',
+        'color': '#fed7aa'
+      }
+    },
+    {
+      selector: 'node:selected',
+      style: {
+        'border-width': 2.5,
+        'border-color': '#f8fafc'
+      }
+    },
+    // Edges
+    {
+      selector: 'edge[edgeType="proxy"]',
+      style: {
+        'line-color': '#60a5fa',
+        'target-arrow-color': '#60a5fa',
+        'target-arrow-shape': 'triangle',
+        'arrow-scale': 0.8,
+        'width': 1.5,
+        'curve-style': 'bezier',
+        'opacity': 0.7
+      }
+    },
+    {
+      selector: 'edge[edgeType="authelia"]',
+      style: {
+        'line-color': '#8b5cf6',
+        'target-arrow-color': '#8b5cf6',
+        'target-arrow-shape': 'triangle',
+        'arrow-scale': 0.7,
+        'width': 1.5,
+        'line-style': 'dashed',
+        'line-dash-pattern': [6, 4],
+        'curve-style': 'bezier',
+        'opacity': 0.75
+      }
+    },
+    {
+      selector: 'edge[edgeType="internet"]',
+      style: {
+        'line-color': '#fb923c',
+        'target-arrow-color': '#fb923c',
+        'target-arrow-shape': 'triangle',
+        'arrow-scale': 0.7,
+        'width': 1.5,
+        'line-style': 'dashed',
+        'line-dash-pattern': [6, 4],
+        'curve-style': 'bezier',
+        'opacity': 0.75
+      }
+    },
+    {
+      selector: 'edge[edgeType="inferred"][linkType="network"]',
+      style: {
+        'line-color': '#3b82f6',
+        'target-arrow-color': '#3b82f6',
+        'target-arrow-shape': 'triangle',
+        'arrow-scale': 0.6,
+        'width': 1.2,
+        'line-style': 'dashed',
+        'line-dash-pattern': [4, 5],
+        'curve-style': 'bezier',
+        'opacity': 0.55
+      }
+    },
+    {
+      selector: 'edge[edgeType="inferred"][linkType="env_ref"]',
+      style: {
+        'line-color': '#f59e0b',
+        'target-arrow-color': '#f59e0b',
+        'target-arrow-shape': 'triangle',
+        'arrow-scale': 0.6,
+        'width': 1.2,
+        'line-style': 'dashed',
+        'line-dash-pattern': [4, 5],
+        'curve-style': 'bezier',
+        'opacity': 0.55
+      }
+    },
+    {
+      selector: 'edge[edgeType="inferred"][linkType="proxy"]',
+      style: {
+        'line-color': '#22d3ee',
+        'target-arrow-color': '#22d3ee',
+        'target-arrow-shape': 'triangle',
+        'arrow-scale': 0.6,
+        'width': 1.2,
+        'line-style': 'dashed',
+        'line-dash-pattern': [4, 5],
+        'curve-style': 'bezier',
+        'opacity': 0.55
+      }
+    },
+    {
+      selector: 'edge[edgeType="inferred"]',
+      style: {
+        'line-color': '#a3e635',
+        'target-arrow-color': '#a3e635',
+        'target-arrow-shape': 'triangle',
+        'arrow-scale': 0.6,
+        'width': 1.2,
+        'line-style': 'dashed',
+        'line-dash-pattern': [4, 5],
+        'curve-style': 'bezier',
+        'opacity': 0.5
+      }
+    },
+    {
+      selector: 'edge:selected',
+      style: { 'opacity': 1, 'width': 2.2 }
+    }
+  ]
+}
+
+function getLayoutOptions() {
+  return {
+    name: 'fcose',
+    animate: true,
+    animationDuration: 600,
+    randomize: true,
+    nodeRepulsion: 8000,
+    idealEdgeLength: 160,
+    edgeElasticity: 0.45,
+    nestingFactor: 0.1,
+    padding: 48,
+    componentSpacing: 80,
+    fit: true,
+    numIter: 2500,
+    tile: true,
+    tilingPaddingVertical: 20,
+    tilingPaddingHorizontal: 20,
   }
 }
 
-let handleResize = null
+function showTooltip(event, lines) {
+  if (!tooltipRef.value) return
+  tooltipRef.value.innerHTML = lines.map(l => `<div>${escapeHtml(l)}</div>`).join('')
+  tooltipRef.value.style.display = 'block'
+  tooltipRef.value.style.left = `${event.originalEvent.pageX + 12}px`
+  tooltipRef.value.style.top = `${event.originalEvent.pageY + 12}px`
+}
+
+function hideTooltip() {
+  if (tooltipRef.value) tooltipRef.value.style.display = 'none'
+}
+
+function moveTooltip(event) {
+  if (!tooltipRef.value || tooltipRef.value.style.display !== 'block') return
+  tooltipRef.value.style.left = `${event.originalEvent.pageX + 12}px`
+  tooltipRef.value.style.top = `${event.originalEvent.pageY + 12}px`
+}
+
+function initCytoscape() {
+  if (!cyContainer.value) return
+  if (cy) cy.destroy()
+
+  cy = cytoscape({
+    container: cyContainer.value,
+    elements: buildElements(),
+    style: getCyStyle(),
+    layout: getLayoutOptions(),
+    minZoom: 0.2,
+    maxZoom: 3,
+    wheelSensitivity: 0.3,
+    boxSelectionEnabled: false,
+  })
+
+  // Click on host → emit event
+  cy.on('tap', 'node[type="host"]', (event) => {
+    const hostId = event.target.data('hostId')
+    if (hostId) emit('host-click', hostId)
+  })
+
+  // Hover tooltips
+  cy.on('mouseover', 'node', (event) => {
+    const d = event.target.data()
+    const lines = []
+    if (d.type === 'host') {
+      lines.push(d.label)
+      if (d.sublabel) lines.push(`IP : ${d.sublabel}`)
+      lines.push(`Statut : ${d.status || 'unknown'}`)
+    } else if (d.type === 'service') {
+      lines.push(d.label)
+      if (d.sublabel) lines.push(d.sublabel)
+      lines.push(`Port interne : ${d.internalPort || '-'}`)
+      if (d.externalPort) lines.push(`Port externe : ${d.externalPort}`)
+      if (d.tags) lines.push(`Tags : ${d.tags}`)
+    } else if (d.type === 'port') {
+      lines.push(d.label)
+      if (d.containers?.length) lines.push(`Conteneurs : ${d.containers.join(', ')}`)
+    } else if (d.type === 'root') {
+      lines.push(d.label)
+      if (d.sublabel) lines.push(`IP : ${d.sublabel}`)
+    } else if (d.type === 'authelia' || d.type === 'internet') {
+      lines.push(d.label)
+      if (d.sublabel) lines.push(d.sublabel)
+    }
+    if (lines.length) showTooltip(event, lines)
+  })
+
+  cy.on('mousemove', 'node', moveTooltip)
+  cy.on('mouseout', 'node', hideTooltip)
+
+  cy.on('mouseover', 'edge', (event) => {
+    const d = event.target.data()
+    const lines = []
+    if (d.edgeType === 'inferred') {
+      lines.push(`Lien inféré (${d.linkType || 'unknown'})`)
+      if (d.envKey) lines.push(`Variable : ${d.envKey}`)
+      if (d.confidence) lines.push(`Confiance : ${d.confidence}%`)
+    } else if (d.edgeType === 'internet' && d.externalPort) {
+      lines.push(`Exposé Internet : port ${d.externalPort}`)
+    }
+    if (lines.length) showTooltip(event, lines)
+  })
+  cy.on('mousemove', 'edge', moveTooltip)
+  cy.on('mouseout', 'edge', hideTooltip)
+}
+
+function resetLayout() {
+  if (!cy) return
+  cy.layout(getLayoutOptions()).run()
+}
+
+function fitView() {
+  if (!cy) return
+  cy.fit(undefined, 40)
+}
+
+defineExpose({ resetLayout, fitView })
 
 onMounted(() => {
-  render()
-  handleResize = () => render()
-  window.addEventListener('resize', handleResize)
+  initCytoscape()
+
+  resizeObserver = new ResizeObserver(() => {
+    if (cy) {
+      cy.resize()
+      cy.fit(undefined, 40)
+    }
+  })
+  if (cyContainer.value) resizeObserver.observe(cyContainer.value)
 })
 
 onUnmounted(() => {
-  if (handleResize) {
-    window.removeEventListener('resize', handleResize)
-  }
+  if (resizeObserver) resizeObserver.disconnect()
+  if (cy) { cy.destroy(); cy = null }
 })
 
-// Watch for data changes — hierarchyRoot covers props.data/services/excludedPorts/hostPortOverrides/serviceMap/rootLabel
-// rootIp, autheliaLabel/IP and internetLabel/IP are render-only (not part of the hierarchy)
+// Rebuild graph when data changes
 watch(
-  [hierarchyRoot, () => props.rootIp, () => props.autheliaLabel, () => props.autheliaIp, () => props.internetLabel, () => props.internetIp],
-  () => { render() }
+  [
+    () => props.data,
+    () => props.services,
+    () => props.excludedPorts,
+    () => props.hostPortOverrides,
+    () => props.serviceMap,
+    () => props.rootLabel,
+    () => props.rootIp,
+    () => props.autheliaLabel,
+    () => props.autheliaIp,
+    () => props.internetLabel,
+    () => props.internetIp,
+    () => props.inferredLinks,
+  ],
+  () => {
+    if (!cy) return
+    const elements = buildElements()
+    cy.elements().remove()
+    cy.add(elements)
+    cy.layout(getLayoutOptions()).run()
+  },
+  { deep: true }
 )
 </script>
 
 <style scoped>
-.d3-graph-container {
+.cy-graph-container {
   width: 100%;
   height: 100%;
   min-height: 520px;
   position: relative;
   display: flex;
   flex: 1;
-  background: radial-gradient(circle at 15% 20%, rgba(96, 165, 250, 0.18), transparent 42%),
-    radial-gradient(circle at 70% 0%, rgba(16, 185, 129, 0.12), transparent 40%),
-    radial-gradient(circle at 20% 80%, rgba(244, 63, 94, 0.1), transparent 45%),
+  background: radial-gradient(circle at 15% 20%, rgba(96,165,250,0.18), transparent 42%),
+    radial-gradient(circle at 70% 0%, rgba(16,185,129,0.12), transparent 40%),
+    radial-gradient(circle at 20% 80%, rgba(244,63,94,0.1), transparent 45%),
     #0b0f1a;
-  border: 1px solid rgba(148, 163, 184, 0.25);
+  border: 1px solid rgba(148,163,184,0.25);
   border-radius: 16px;
   overflow: hidden;
 }
 
-.d3-graph-container::after {
+.cy-graph-container::after {
   content: '';
   position: absolute;
   inset: 0;
-  background-image: radial-gradient(circle, rgba(148, 163, 184, 0.22) 1px, transparent 1px);
+  background-image: radial-gradient(circle, rgba(148,163,184,0.22) 1px, transparent 1px);
   background-size: 48px 48px;
   opacity: 0.35;
   pointer-events: none;
   z-index: 0;
 }
 
-.d3-graph {
+.cy-canvas {
   width: 100%;
   height: 100%;
   min-height: 520px;
@@ -769,10 +767,10 @@ watch(
   z-index: 1;
 }
 
-.d3-tooltip {
+.cy-tooltip {
   position: fixed;
   padding: 10px 12px;
-  background-color: rgba(15, 23, 42, 0.94);
+  background-color: rgba(15,23,42,0.94);
   color: #e2e8f0;
   border-radius: 8px;
   font-size: 12px;
@@ -780,7 +778,7 @@ watch(
   display: none;
   z-index: 1000;
   white-space: nowrap;
-  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.25);
+  box-shadow: 0 12px 24px rgba(15,23,42,0.25);
 }
 
 .graph-legend {
@@ -788,8 +786,8 @@ watch(
   top: 16px;
   left: 16px;
   padding: 12px 14px;
-  background: rgba(15, 23, 42, 0.75);
-  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: rgba(15,23,42,0.75);
+  border: 1px solid rgba(148,163,184,0.3);
   border-radius: 12px;
   backdrop-filter: blur(10px);
   z-index: 2;
@@ -826,6 +824,36 @@ watch(
 .legend-dot.port-udp     { background: #fb923c; }
 .legend-dot.service-node { background: #38bdf8; }
 
+.graph-controls {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 2;
+}
+
+.graph-btn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15,23,42,0.75);
+  border: 1px solid rgba(148,163,184,0.3);
+  border-radius: 8px;
+  color: #94a3b8;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  transition: background 0.15s, color 0.15s;
+}
+
+.graph-btn:hover {
+  background: rgba(15,23,42,0.9);
+  color: #e2e8f0;
+}
+
 .graph-empty {
   position: absolute;
   inset: 0;
@@ -849,39 +877,4 @@ watch(
   margin-top: 6px;
   font-size: 13px;
 }
-
-</style>
-
-<!-- Non-scoped: applies to D3-created SVG elements that bypass Vue's template -->
-<style>
-.link {
-  fill: none;
-}
-
-.proxy-link {
-  fill: none;
-  stroke: rgba(56, 189, 248, 0.65);
-  stroke-width: 1.6;
-  stroke-dasharray: 6 6;
-}
-
-.service-cluster rect {
-  fill: rgba(15, 23, 42, 0.5);
-  stroke: rgba(148, 163, 184, 0.3);
-  stroke-width: 1.5;
-}
-
-.service-cluster:hover rect {
-  stroke: rgba(148, 163, 184, 0.6);
-  fill: rgba(15, 23, 42, 0.65);
-}
-
-.cluster-label {
-  font-size: 12px;
-  font-weight: 600;
-  fill: #cbd5f5;
-}
-
-.node { cursor: pointer; }
-.node text { pointer-events: none; }
 </style>

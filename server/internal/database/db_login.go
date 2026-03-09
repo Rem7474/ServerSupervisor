@@ -47,6 +47,68 @@ func (db *DB) CountRecentFailedLogins(ipAddress string, since time.Time) (int, e
 	return count, err
 }
 
+// CountRecentFailedLoginsAfterUnblock counts failures in the window that occurred after the last
+// manual unblock for this IP (if any), so an admin unblock is respected across restarts.
+func (db *DB) CountRecentFailedLoginsAfterUnblock(ipAddress string, since time.Time) (int, error) {
+	var count int
+	err := db.conn.QueryRow(`
+		SELECT COUNT(*) FROM login_events
+		WHERE ip_address = $1
+		  AND success = FALSE
+		  AND created_at >= $2
+		  AND created_at > COALESCE(
+		        (SELECT unblocked_at FROM ip_block_overrides WHERE ip_address = $1),
+		        '1970-01-01'::timestamptz
+		      )`,
+		ipAddress, since,
+	).Scan(&count)
+	return count, err
+}
+
+// UpsertIPUnblock records a manual admin unblock for an IP, persisting it across restarts.
+func (db *DB) UpsertIPUnblock(ipAddress, unblockedBy string) error {
+	_, err := db.conn.Exec(`
+		INSERT INTO ip_block_overrides (ip_address, unblocked_at, unblocked_by)
+		VALUES ($1, NOW(), $2)
+		ON CONFLICT (ip_address) DO UPDATE
+		  SET unblocked_at = NOW(), unblocked_by = EXCLUDED.unblocked_by`,
+		ipAddress, unblockedBy,
+	)
+	return err
+}
+
+// GetCurrentlyBlockedIPs returns IPs that have >= threshold failures within the window,
+// excluding those that have been manually unblocked after their last failure.
+func (db *DB) GetCurrentlyBlockedIPs(since time.Time, threshold int) ([]string, error) {
+	rows, err := db.conn.Query(`
+		SELECT l.ip_address
+		FROM login_events l
+		WHERE l.success = FALSE
+		  AND l.created_at >= $1
+		  AND l.created_at > COALESCE(
+		        (SELECT o.unblocked_at FROM ip_block_overrides o WHERE o.ip_address = l.ip_address),
+		        '1970-01-01'::timestamptz
+		      )
+		GROUP BY l.ip_address
+		HAVING COUNT(*) >= $2`,
+		since, threshold,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var ips []string
+	for rows.Next() {
+		var ip string
+		if err := rows.Scan(&ip); err != nil {
+			continue
+		}
+		ips = append(ips, ip)
+	}
+	return ips, nil
+}
+
 // GetLoginStats returns aggregate login counts for the given time window.
 func (db *DB) GetLoginStats(since time.Time) (*models.LoginStats, error) {
 	var stats models.LoginStats

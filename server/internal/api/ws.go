@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -34,11 +35,16 @@ func snapshotChanged(payload gin.H, lastHash *string) bool {
 	return true
 }
 
+// wsMaxConnsPerIP is the maximum number of concurrent WebSocket connections allowed per client IP.
+const wsMaxConnsPerIP = 20
+
 type WSHandler struct {
 	db        *database.DB
 	cfg       *config.Config
 	streamHub *CommandStreamHub
 	notifHub  *NotificationHub
+	ipConns   map[string]int
+	ipConnsMu sync.Mutex
 }
 
 func NewWSHandler(db *database.DB, cfg *config.Config, notifHub *NotificationHub) *WSHandler {
@@ -47,6 +53,28 @@ func NewWSHandler(db *database.DB, cfg *config.Config, notifHub *NotificationHub
 		cfg:       cfg,
 		streamHub: NewCommandStreamHub(),
 		notifHub:  notifHub,
+		ipConns:   make(map[string]int),
+	}
+}
+
+func (h *WSHandler) acquireConn(ip string) bool {
+	h.ipConnsMu.Lock()
+	defer h.ipConnsMu.Unlock()
+	if h.ipConns[ip] >= wsMaxConnsPerIP {
+		return false
+	}
+	h.ipConns[ip]++
+	return true
+}
+
+func (h *WSHandler) releaseConn(ip string) {
+	h.ipConnsMu.Lock()
+	defer h.ipConnsMu.Unlock()
+	if h.ipConns[ip] > 0 {
+		h.ipConns[ip]--
+		if h.ipConns[ip] == 0 {
+			delete(h.ipConns, ip)
+		}
 	}
 }
 
@@ -149,6 +177,13 @@ func (h *WSHandler) authenticateWS(conn *websocket.Conn) bool {
 }
 
 func (h *WSHandler) Dashboard(c *gin.Context) {
+	ip := c.ClientIP()
+	if !h.acquireConn(ip) {
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": "too many WebSocket connections from this IP"})
+		return
+	}
+	defer h.releaseConn(ip)
+
 	conn, err := h.upgrader().Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		return
@@ -387,6 +422,13 @@ func (h *WSHandler) CommandStream(c *gin.Context) {
 		return
 	}
 
+	ip := c.ClientIP()
+	if !h.acquireConn(ip) {
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": "too many WebSocket connections from this IP"})
+		return
+	}
+	defer h.releaseConn(ip)
+
 	conn, err := h.upgrader().Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		return
@@ -423,6 +465,13 @@ func (h *WSHandler) CommandStream(c *gin.Context) {
 // NotificationStream is a persistent WebSocket connection that receives real-time
 // alert notification events pushed by the alert engine when a new incident fires.
 func (h *WSHandler) NotificationStream(c *gin.Context) {
+	ip := c.ClientIP()
+	if !h.acquireConn(ip) {
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": "too many WebSocket connections from this IP"})
+		return
+	}
+	defer h.releaseConn(ip)
+
 	conn, err := h.upgrader().Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		return
@@ -641,6 +690,12 @@ func (h *WSHandler) buildVersionComparisons() ([]models.VersionComparison, error
 		return nil, err
 	}
 
+	// Load historical digest→tag map: key = "trackerID|digest", value = tag
+	digestTagMap, _ := h.db.GetAllTrackerTagDigests()
+	if digestTagMap == nil {
+		digestTagMap = make(map[string]string)
+	}
+
 	var comparisons []models.VersionComparison
 	for _, tracker := range trackers {
 		if tracker.DockerImage == "" || tracker.LastReleaseTag == "" {
@@ -668,10 +723,16 @@ func (h *WSHandler) buildVersionComparisons() ([]models.VersionComparison, error
 			// UpdateConfirmed = digest comparison was performed and confirms the image is outdated
 			updateConfirmed := !isUpToDate && nd != "" && ld != ""
 
-			// Display version: try OCI labels first, then digest match
+			// Display version: try OCI labels first, then exact digest match, then historical lookup
 			runningVersion := resolveContainerVersion(container.ImageTag, container.Labels)
-			if runningVersion == "latest" && nd != "" && ld != "" && nd == ld {
-				runningVersion = tracker.LastReleaseTag
+			if runningVersion == "latest" && nd != "" {
+				if nd == ld {
+					// Running image IS the latest tracked release
+					runningVersion = tracker.LastReleaseTag
+				} else if historicTag, ok := digestTagMap[tracker.ID+"|"+nd]; ok {
+					// Running image matches a previously tracked release
+					runningVersion = historicTag
+				}
 			}
 			// Still "latest" = version inconnue pour l'affichage
 			if runningVersion == "latest" {
