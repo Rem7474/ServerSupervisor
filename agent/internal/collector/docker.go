@@ -36,6 +36,27 @@ type DockerContainer struct {
 
 const containerShutdownTimeoutSecs uint = 10 // seconds to wait before SIGKILL
 
+// readBufPool provides reusable 4 KiB read buffers for command/log streaming.
+var readBufPool = sync.Pool{
+	New: func() interface{} {
+		buf := make([]byte, 4096)
+		return &buf
+	},
+}
+
+// imageDigestCache caches Docker image RepoDigests (sha256 manifest hashes).
+// Image metadata is static until the image is replaced, so a 5-minute TTL is safe.
+type imageDigestEntry struct {
+	digest   string
+	cachedAt time.Time
+}
+
+var (
+	imageDigestCacheMu sync.RWMutex
+	imageDigestCache   = make(map[string]imageDigestEntry)
+	imageDigestTTL     = 5 * time.Minute
+)
+
 // dockerOnce guards the shared Docker client singleton.
 var (
 	dockerOnce   sync.Once
@@ -134,15 +155,26 @@ func CollectDocker() ([]DockerContainer, error) {
 
 		// Fetch the manifest digest (RepoDigest) from the image metadata.
 		// container.Image is the full sha256 image config ID; use it to inspect the image.
-		imageDigest := ""
-		if imgInfo, err := client.InspectImage(container.Image); err == nil {
-			for _, rd := range imgInfo.RepoDigests {
-				// RepoDigest format: "nginx@sha256:f88cbb90..."
-				if at := strings.Index(rd, "@sha256:"); at >= 0 {
-					imageDigest = rd[at+1:] // keep "sha256:..." prefix
-					break
+		// Results are cached for 5 minutes since image metadata is static until the image is replaced.
+		var imageDigest string
+		imageDigestCacheMu.RLock()
+		cached, ok := imageDigestCache[container.Image]
+		imageDigestCacheMu.RUnlock()
+		if ok && time.Since(cached.cachedAt) < imageDigestTTL {
+			imageDigest = cached.digest
+		} else {
+			if imgInfo, err := client.InspectImage(container.Image); err == nil {
+				for _, rd := range imgInfo.RepoDigests {
+					// RepoDigest format: "nginx@sha256:f88cbb90..."
+					if at := strings.Index(rd, "@sha256:"); at >= 0 {
+						imageDigest = rd[at+1:] // keep "sha256:..." prefix
+						break
+					}
 				}
 			}
+			imageDigestCacheMu.Lock()
+			imageDigestCache[container.Image] = imageDigestEntry{digest: imageDigest, cachedAt: time.Now()}
+			imageDigestCacheMu.Unlock()
 		}
 
 		imageID := container.Image
@@ -386,6 +418,19 @@ func isSensitiveEnvKey(key string) bool {
 	return false
 }
 
+// composeConfigCache caches the output of `docker compose config` per working directory.
+// The resolved config is expensive (subprocess) and only changes when docker-compose.yml is edited.
+type composeCacheEntry struct {
+	rawConfig string
+	cachedAt  time.Time
+}
+
+var (
+	composeCacheMu sync.RWMutex
+	composeCache   = make(map[string]composeCacheEntry)
+	composeTTL     = 10 * time.Minute
+)
+
 // ComposeProject represents a docker-compose project and its resolved config.
 type ComposeProject struct {
 	Name       string   `json:"name"`
@@ -451,15 +496,27 @@ func CollectComposeProjects() ([]ComposeProject, error) {
 	}
 
 	// Retrieve the resolved compose config via CLI (no Docker API equivalent).
+	// Results are cached for 10 minutes to avoid repeated subprocess invocations.
 	var result []ComposeProject
 	for _, p := range projects {
 		if p.WorkingDir != "" {
-			cfgCtx, cfgCancel := context.WithTimeout(context.Background(), 10*time.Second)
-			cfgOut, err := exec.CommandContext(cfgCtx, "docker", "compose",
-				"--project-directory", p.WorkingDir, "config").Output()
-			cfgCancel()
-			if err == nil {
-				p.RawConfig = filterSensitiveYAML(string(cfgOut))
+			composeCacheMu.RLock()
+			ce, hit := composeCache[p.WorkingDir]
+			composeCacheMu.RUnlock()
+			if hit && time.Since(ce.cachedAt) < composeTTL {
+				p.RawConfig = ce.rawConfig
+			} else {
+				cfgCtx, cfgCancel := context.WithTimeout(context.Background(), 10*time.Second)
+				cfgOut, err := exec.CommandContext(cfgCtx, "docker", "compose",
+					"--project-directory", p.WorkingDir, "config").Output()
+				cfgCancel()
+				if err == nil {
+					raw := filterSensitiveYAML(string(cfgOut))
+					p.RawConfig = raw
+					composeCacheMu.Lock()
+					composeCache[p.WorkingDir] = composeCacheEntry{rawConfig: raw, cachedAt: time.Now()}
+					composeCacheMu.Unlock()
+				}
 			}
 		}
 		result = append(result, *p)
@@ -540,7 +597,9 @@ func streamContainerLogs(client *docker.Client, containerName string, chunkCB fu
 		pw.CloseWithError(err)
 	}()
 
-	buf := make([]byte, 4096)
+	bufPtr := readBufPool.Get().(*[]byte)
+	buf := *bufPtr
+	defer readBufPool.Put(bufPtr)
 	for {
 		n, readErr := pr.Read(buf)
 		if n > 0 {
@@ -610,7 +669,9 @@ func ExecuteComposeCommand(action, projectName, workingDir string, chunkCB func(
 
 	var fullOutput strings.Builder
 	combined := io.MultiReader(stdoutPipe, stderrPipe)
-	buf := make([]byte, 4096)
+	bufPtr := readBufPool.Get().(*[]byte)
+	buf := *bufPtr
+	defer readBufPool.Put(bufPtr)
 	for {
 		n, readErr := combined.Read(buf)
 		if n > 0 {

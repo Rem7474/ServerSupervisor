@@ -151,14 +151,17 @@ func sendReport(ctx context.Context, cfg *config.Config, s *sender.Sender) {
 				dockerNetworks = networks
 			}
 
-			// Collect container environment variables
-			containerNames := make([]string, len(containers))
-			for i, c := range containers {
-				containerNames[i] = c.Name
+			// Build container env vars from already-collected container data (no extra Docker API calls)
+			envs := make([]collector.ContainerEnv, 0, len(containers))
+			for _, c := range containers {
+				if len(c.EnvVars) > 0 {
+					envs = append(envs, collector.ContainerEnv{
+						ContainerName: c.Name,
+						EnvVars:       c.EnvVars,
+					})
+				}
 			}
-			if envs, err := collector.CollectContainerEnvVars(containerNames); err == nil {
-				containerEnvs = envs
-			}
+			containerEnvs = envs
 
 			// Collect docker-compose projects
 			if projects, err := collector.CollectComposeProjects(); err == nil {

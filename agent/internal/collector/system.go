@@ -93,37 +93,55 @@ func CollectSystem() (*SystemMetrics, error) {
 }
 
 func getCPUModel() string {
-	data, err := os.ReadFile("/proc/cpuinfo")
-	if err != nil {
-		return "unknown"
-	}
-	for _, line := range strings.Split(string(data), "\n") {
-		if strings.HasPrefix(line, "model name") {
-			parts := strings.SplitN(line, ":", 2)
-			if len(parts) == 2 {
-				return strings.TrimSpace(parts[1])
+	cachedCPUModelOnce.Do(func() {
+		data, err := os.ReadFile("/proc/cpuinfo")
+		if err != nil {
+			cachedCPUModel = "unknown"
+			return
+		}
+		for _, line := range strings.Split(string(data), "\n") {
+			if strings.HasPrefix(line, "model name") {
+				parts := strings.SplitN(line, ":", 2)
+				if len(parts) == 2 {
+					cachedCPUModel = strings.TrimSpace(parts[1])
+					return
+				}
 			}
 		}
-	}
-	return "unknown"
+		cachedCPUModel = "unknown"
+	})
+	return cachedCPUModel
 }
 
 func getOSName() string {
-	data, err := os.ReadFile("/etc/os-release")
-	if err != nil {
-		return runtime.GOOS
-	}
-	for _, line := range strings.Split(string(data), "\n") {
-		if strings.HasPrefix(line, "PRETTY_NAME=") {
-			value := strings.TrimPrefix(line, "PRETTY_NAME=")
-			value = strings.Trim(value, "\"")
-			if value != "" {
-				return value
+	cachedOSNameOnce.Do(func() {
+		data, err := os.ReadFile("/etc/os-release")
+		if err != nil {
+			cachedOSName = runtime.GOOS
+			return
+		}
+		for _, line := range strings.Split(string(data), "\n") {
+			if strings.HasPrefix(line, "PRETTY_NAME=") {
+				value := strings.TrimPrefix(line, "PRETTY_NAME=")
+				value = strings.Trim(value, "\"")
+				if value != "" {
+					cachedOSName = value
+					return
+				}
 			}
 		}
-	}
-	return runtime.GOOS
+		cachedOSName = runtime.GOOS
+	})
+	return cachedOSName
 }
+
+// cachedCPUModel and cachedOSName are read once and never change at runtime.
+var (
+	cachedCPUModel     string
+	cachedCPUModelOnce sync.Once
+	cachedOSName       string
+	cachedOSNameOnce   sync.Once
+)
 
 // prevCPUIdle and prevCPUTotal store the last /proc/stat sample so getCPUUsage
 // can compute a delta without sleeping.

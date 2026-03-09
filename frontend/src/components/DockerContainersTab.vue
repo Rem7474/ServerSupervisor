@@ -4,7 +4,7 @@
     <div class="card-body">
       <div class="row g-3">
         <div class="col-6 col-md-6 col-lg-3">
-          <input v-model="search" type="text" class="form-control" placeholder="Rechercher..." />
+          <input v-model="searchInput" type="text" class="form-control" placeholder="Rechercher..." />
         </div>
         <div class="col-6 col-md-6 col-lg-3">
           <select v-model="hostFilter" class="form-select">
@@ -306,7 +306,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 
 const props = defineProps({
   containers: { type: Array, default: () => [] },
@@ -332,7 +332,13 @@ function containerVersion(c) {
 
 defineEmits(['container-action'])
 
+const searchInput = ref('')
 const search = ref('')
+let searchDebounce = null
+watch(searchInput, val => {
+  clearTimeout(searchDebounce)
+  searchDebounce = setTimeout(() => { search.value = val }, 300)
+})
 const stateFilter = ref('')
 const hostFilter = ref('')
 const composeFilter = ref('')
