@@ -1,9 +1,11 @@
 -- Performance indexes for common query patterns.
 -- All statements are idempotent (IF NOT EXISTS).
 
--- host_metrics: primary time-series query (latest metrics per host, history view)
+-- system_metrics: secondary composite index alias (migration 001 already creates
+-- idx_system_metrics_host_time; this distinct name ensures the index is present
+-- even on instances that skip the implicit 001 index due to timing.)
 CREATE INDEX IF NOT EXISTS idx_metrics_host_time
-    ON host_metrics(host_id, timestamp DESC);
+    ON system_metrics(host_id, timestamp DESC);
 
 -- remote_commands: pending-command lookup + history filtered by host/status
 CREATE INDEX IF NOT EXISTS idx_commands_host_status
