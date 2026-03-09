@@ -11,7 +11,7 @@ CREATE INDEX IF NOT EXISTS idx_commands_host_status
 
 -- audit_logs: time-ordered listing for dashboard and audit page
 CREATE INDEX IF NOT EXISTS idx_audit_timestamp
-    ON audit_logs(timestamp DESC);
+    ON audit_logs(created_at DESC);
 
 -- git_webhook_executions: latest executions per webhook
 CREATE INDEX IF NOT EXISTS idx_webhook_exec_webhook_time
