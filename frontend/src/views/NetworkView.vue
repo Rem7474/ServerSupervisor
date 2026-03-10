@@ -390,6 +390,7 @@
         </div>
         <div v-else ref="graphSurfaceRef" class="network-graph-surface" :style="{ height: graphHeight }">
           <NetworkGraph
+            v-if="topologyConfigLoaded"
             :data="graphHosts"
             :root-label="rootNodeName"
             :root-ip="rootNodeIp"
