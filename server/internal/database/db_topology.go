@@ -16,11 +16,13 @@ func (db *DB) GetNetworkTopologyConfig() (*models.NetworkTopologyConfig, error) 
 		`SELECT id, root_label, root_ip, excluded_ports, service_map, host_overrides, manual_services,
 		        COALESCE(authelia_label, 'Authelia'), COALESCE(authelia_ip, ''),
 		        COALESCE(internet_label, 'Internet'), COALESCE(internet_ip, ''),
+		        COALESCE(node_positions::text, '{}'),
 		        updated_at
 		 FROM network_topology_config LIMIT 1`,
 	).Scan(&cfg.ID, &cfg.RootLabel, &cfg.RootIP, &excludedPortsJSON, &cfg.ServiceMap,
 		&cfg.HostOverrides, &cfg.ManualServices,
 		&cfg.AutheliaLabel, &cfg.AutheliaIP, &cfg.InternetLabel, &cfg.InternetIP,
+		&cfg.NodePositions,
 		&cfg.UpdatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -32,6 +34,7 @@ func (db *DB) GetNetworkTopologyConfig() (*models.NetworkTopologyConfig, error) 
 				ManualServices: "[]",
 				AutheliaLabel:  "Authelia",
 				InternetLabel:  "Internet",
+				NodePositions:  "{}",
 			}, nil
 		}
 		return nil, err
@@ -44,10 +47,14 @@ func (db *DB) GetNetworkTopologyConfig() (*models.NetworkTopologyConfig, error) 
 
 func (db *DB) SaveNetworkTopologyConfig(cfg *models.NetworkTopologyConfig) error {
 	excludedPortsJSON, _ := json.Marshal(cfg.ExcludedPorts)
+	nodePositions := cfg.NodePositions
+	if nodePositions == "" {
+		nodePositions = "{}"
+	}
 	_, err := db.conn.Exec(
 		`INSERT INTO network_topology_config (id, root_label, root_ip, excluded_ports, service_map, host_overrides, manual_services,
-		        authelia_label, authelia_ip, internet_label, internet_ip, updated_at)
-		 VALUES (1, $1, $2, $3::jsonb, $4, $5, $6, $7, $8, $9, $10, NOW())
+		        authelia_label, authelia_ip, internet_label, internet_ip, node_positions, updated_at)
+		 VALUES (1, $1, $2, $3::jsonb, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, NOW())
 		 ON CONFLICT(id) DO UPDATE SET
 		   root_label = EXCLUDED.root_label,
 		   root_ip = EXCLUDED.root_ip,
@@ -59,10 +66,12 @@ func (db *DB) SaveNetworkTopologyConfig(cfg *models.NetworkTopologyConfig) error
 		   authelia_ip = EXCLUDED.authelia_ip,
 		   internet_label = EXCLUDED.internet_label,
 		   internet_ip = EXCLUDED.internet_ip,
+		   node_positions = EXCLUDED.node_positions,
 		   updated_at = NOW()`,
 		cfg.RootLabel, cfg.RootIP, excludedPortsJSON,
 		cfg.ServiceMap, cfg.HostOverrides, cfg.ManualServices,
 		cfg.AutheliaLabel, cfg.AutheliaIP, cfg.InternetLabel, cfg.InternetIP,
+		nodePositions,
 	)
 	return err
 }

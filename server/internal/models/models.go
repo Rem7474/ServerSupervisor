@@ -533,6 +533,7 @@ type NetworkTopologyConfig struct {
 	AutheliaIP     string    `json:"authelia_ip" db:"authelia_ip"`
 	InternetLabel  string    `json:"internet_label" db:"internet_label"`
 	InternetIP     string    `json:"internet_ip" db:"internet_ip"`
+	NodePositions  string    `json:"node_positions" db:"node_positions"` // JSON {nodeId: {x, y}}
 	UpdatedAt      time.Time `json:"updated_at" db:"updated_at"`
 }
 

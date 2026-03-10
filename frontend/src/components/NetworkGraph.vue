@@ -35,10 +35,6 @@
         <span style="display:inline-block;width:18px;height:3px;background:#fb923c;border-top:2px dashed #fb923c;border-radius:0;flex-shrink:0;"></span>
         {{ internetLabel || 'Internet' }}
       </div>
-      <div v-if="hasInferredLinks" class="legend-item">
-        <span style="display:inline-block;width:18px;height:3px;background:#a3e635;border-top:2px dashed #a3e635;border-radius:0;flex-shrink:0;"></span>
-        Lien inféré
-      </div>
     </div>
 
     <!-- Controls -->
@@ -77,18 +73,16 @@ const props = defineProps({
   data: { type: Array, required: true },
   rootLabel: { type: String, default: 'root' },
   rootIp: { type: String, default: '' },
-  serviceMap: { type: Object, default: () => ({}) },
-  excludedPorts: { type: Array, default: () => [] },
   services: { type: Array, default: () => [] },
   hostPortOverrides: { type: Object, default: () => ({}) },
   autheliaLabel: { type: String, default: 'Authelia' },
   autheliaIp: { type: String, default: '' },
   internetLabel: { type: String, default: 'Internet' },
   internetIp: { type: String, default: '' },
-  inferredLinks: { type: Array, default: () => [] }
+  nodePositions: { type: Object, default: () => ({}) },
 })
 
-const emit = defineEmits(['host-click'])
+const emit = defineEmits(['host-click', 'update:nodePositions'])
 
 const cyContainer = ref(null)
 const tooltipRef = ref(null)
@@ -99,10 +93,9 @@ const hasData = computed(() => Array.isArray(props.data) && props.data.length > 
 
 const statusColors = { online: '#22c55e', warning: '#f59e0b', offline: '#ef4444', unknown: '#94a3b8' }
 
-// Computed: does the data contain authelia/internet/inferred targets?
+// Computed: does the data contain authelia/internet targets?
 const hasAutheliaTargets = computed(() => props.services.some(s => s.linkToAuthelia))
 const hasInternetTargets = computed(() => props.services.some(s => s.exposedToInternet))
-const hasInferredLinks = computed(() => props.inferredLinks.length > 0)
 
 function escapeHtml(str) {
   if (str == null) return ''
@@ -114,11 +107,6 @@ function escapeHtml(str) {
 // Build Cytoscape elements from props
 function buildElements() {
   const elements = []
-  const globalExcluded = new Set((props.excludedPorts || []).map(Number).filter(Boolean))
-
-  // container name → node id mapping (for resolving inferred links)
-  // structure: { hostId: { containerName: nodeId } }
-  const containerToNode = {}
 
   // === Root node ===
   const rootLabel = props.rootLabel || 'Infrastructure'
@@ -153,10 +141,7 @@ function buildElements() {
     })
 
     const override = props.hostPortOverrides?.[host.id] || {}
-    const hostExcluded = new Set([
-      ...globalExcluded,
-      ...(override.excludedPorts || [])
-    ].map(Number).filter(Boolean))
+    const hostExcluded = new Set((override.excludedPorts || []).map(Number).filter(Boolean))
     const portMap = override.portMap || {}
     const proxyPorts = override.proxyPorts || new Set()
     const autheliaPortNumbers = override.autheliaPortNumbers || new Set()
@@ -173,7 +158,7 @@ function buildElements() {
       if (hostServices.some(s => Number(s.internalPort) === portNumber)) continue
 
       const protocol = (port.protocol || 'tcp').toLowerCase()
-      const serviceName = portMap?.[portNumber] || props.serviceMap?.[portNumber]
+      const serviceName = portMap?.[portNumber]
       const label = serviceName
         ? `${serviceName}\n${portNumber}/${protocol.toUpperCase()}`
         : `${portNumber}/${protocol.toUpperCase()}`
@@ -201,12 +186,6 @@ function buildElements() {
           containers: port.containers || []
         }
       })
-
-      // Register containers → node id
-      if (!containerToNode[host.id]) containerToNode[host.id] = {}
-      for (const cName of (port.containers || [])) {
-        containerToNode[host.id][cName] = nodeId
-      }
 
       // Proxy edge
       if (isProxyLinked) {
@@ -248,10 +227,6 @@ function buildElements() {
         }
       })
 
-      // Register service name as container name for inferred link resolution
-      if (!containerToNode[host.id]) containerToNode[host.id] = {}
-      containerToNode[host.id][svc.name] = nodeId
-
       if (svc.linkToProxy) {
         elements.push({ group: 'edges', data: { id: `e-proxy-${nodeId}`, source: 'root', target: nodeId, edgeType: 'proxy' } })
       }
@@ -287,40 +262,6 @@ function buildElements() {
   } else {
     const toRemove = elements.filter(e => e.group === 'edges' && e.data.edgeType === 'internet')
     for (const e of toRemove) elements.splice(elements.indexOf(e), 1)
-  }
-
-  // === Inferred links ===
-  const usedInferredEdges = new Set()
-  for (let i = 0; i < props.inferredLinks.length; i++) {
-    const link = props.inferredLinks[i]
-    const srcHostNodes = containerToNode[link.source_host_id] || {}
-    const tgtHostNodes = containerToNode[link.target_host_id] || {}
-
-    const srcNodeId = srcHostNodes[link.source_container_name] || `host-${link.source_host_id}`
-    const tgtNodeId = tgtHostNodes[link.target_container_name] || `host-${link.target_host_id}`
-
-    // Skip self-loops or missing targets
-    if (srcNodeId === tgtNodeId) continue
-    // Skip if source/target host node doesn't exist
-    if (srcNodeId.startsWith('host-') && !elements.some(e => e.data?.id === srcNodeId)) continue
-    if (tgtNodeId.startsWith('host-') && !elements.some(e => e.data?.id === tgtNodeId)) continue
-
-    const edgeKey = `${srcNodeId}|${tgtNodeId}|${link.link_type}`
-    if (usedInferredEdges.has(edgeKey)) continue
-    usedInferredEdges.add(edgeKey)
-
-    elements.push({
-      group: 'edges',
-      data: {
-        id: `inferred-${i}`,
-        source: srcNodeId,
-        target: tgtNodeId,
-        edgeType: 'inferred',
-        linkType: link.link_type,
-        confidence: link.confidence || 0,
-        envKey: link.env_key || ''
-      }
-    })
   }
 
   return elements
@@ -508,62 +449,6 @@ function getCyStyle() {
       }
     },
     {
-      selector: 'edge[edgeType="inferred"][linkType="network"]',
-      style: {
-        'line-color': '#3b82f6',
-        'target-arrow-color': '#3b82f6',
-        'target-arrow-shape': 'triangle',
-        'arrow-scale': 0.6,
-        'width': 1.2,
-        'line-style': 'dashed',
-        'line-dash-pattern': [4, 5],
-        'curve-style': 'bezier',
-        'opacity': 0.55
-      }
-    },
-    {
-      selector: 'edge[edgeType="inferred"][linkType="env_ref"]',
-      style: {
-        'line-color': '#f59e0b',
-        'target-arrow-color': '#f59e0b',
-        'target-arrow-shape': 'triangle',
-        'arrow-scale': 0.6,
-        'width': 1.2,
-        'line-style': 'dashed',
-        'line-dash-pattern': [4, 5],
-        'curve-style': 'bezier',
-        'opacity': 0.55
-      }
-    },
-    {
-      selector: 'edge[edgeType="inferred"][linkType="proxy"]',
-      style: {
-        'line-color': '#22d3ee',
-        'target-arrow-color': '#22d3ee',
-        'target-arrow-shape': 'triangle',
-        'arrow-scale': 0.6,
-        'width': 1.2,
-        'line-style': 'dashed',
-        'line-dash-pattern': [4, 5],
-        'curve-style': 'bezier',
-        'opacity': 0.55
-      }
-    },
-    {
-      selector: 'edge[edgeType="inferred"]',
-      style: {
-        'line-color': '#a3e635',
-        'target-arrow-color': '#a3e635',
-        'target-arrow-shape': 'triangle',
-        'arrow-scale': 0.6,
-        'width': 1.2,
-        'line-style': 'dashed',
-        'line-dash-pattern': [4, 5],
-        'curve-style': 'bezier',
-        'opacity': 0.5
-      }
-    },
-    {
       selector: 'edge:selected',
       style: { 'opacity': 1, 'width': 2.2 }
     }
@@ -608,20 +493,47 @@ function moveTooltip(event) {
   tooltipRef.value.style.top = `${event.originalEvent.pageY + 12}px`
 }
 
+let positionSaveTimeout = null
+function emitPositions() {
+  if (!cy) return
+  if (positionSaveTimeout) clearTimeout(positionSaveTimeout)
+  positionSaveTimeout = setTimeout(() => {
+    const positions = {}
+    cy.nodes().forEach(n => {
+      const pos = n.position()
+      positions[n.id()] = { x: Math.round(pos.x), y: Math.round(pos.y) }
+    })
+    emit('update:nodePositions', positions)
+  }, 600)
+}
+
 function initCytoscape() {
   if (!cyContainer.value) return
   if (cy) cy.destroy()
+
+  const savedPositions = props.nodePositions || {}
+  const hasPositions = Object.keys(savedPositions).length > 0
 
   cy = cytoscape({
     container: cyContainer.value,
     elements: buildElements(),
     style: getCyStyle(),
-    layout: getLayoutOptions(),
+    layout: hasPositions ? { name: 'preset', fit: true, padding: 48 } : getLayoutOptions(),
     minZoom: 0.2,
     maxZoom: 3,
     wheelSensitivity: 0.3,
     boxSelectionEnabled: false,
   })
+
+  if (hasPositions) {
+    cy.nodes().forEach(n => {
+      const pos = savedPositions[n.id()]
+      if (pos) n.position(pos)
+    })
+    cy.fit(undefined, 48)
+  }
+
+  cy.on('dragfree', 'node', emitPositions)
 
   // Click on host → emit event
   cy.on('tap', 'node[type="host"]', (event) => {
@@ -704,28 +616,47 @@ onUnmounted(() => {
   if (cy) { cy.destroy(); cy = null }
 })
 
-// Rebuild graph when data changes
+// Rebuild graph when data changes — preserve positions of existing nodes
 watch(
   [
     () => props.data,
     () => props.services,
-    () => props.excludedPorts,
     () => props.hostPortOverrides,
-    () => props.serviceMap,
     () => props.rootLabel,
     () => props.rootIp,
     () => props.autheliaLabel,
     () => props.autheliaIp,
     () => props.internetLabel,
     () => props.internetIp,
-    () => props.inferredLinks,
   ],
   () => {
     if (!cy) return
-    const elements = buildElements()
+
+    // Snapshot current positions before rebuild
+    const currentPositions = {}
+    cy.nodes().forEach(n => {
+      currentPositions[n.id()] = { x: n.position('x'), y: n.position('y') }
+    })
+
+    const newElements = buildElements()
     cy.elements().remove()
-    cy.add(elements)
-    cy.layout(getLayoutOptions()).run()
+    cy.add(newElements)
+
+    // Restore positions: use in-memory first, fallback to prop (DB-loaded)
+    const fallback = props.nodePositions || {}
+    let hasNewNodes = false
+    cy.nodes().forEach(n => {
+      const pos = currentPositions[n.id()] || fallback[n.id()]
+      if (pos) {
+        n.position(pos)
+      } else {
+        hasNewNodes = true
+      }
+    })
+
+    if (hasNewNodes) {
+      cy.layout({ ...getLayoutOptions(), randomize: false, fit: false }).run()
+    }
   },
   { deep: true }
 )

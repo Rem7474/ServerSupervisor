@@ -293,7 +293,10 @@
                         :key="port.key"
                         :class="portRowClass(host.id, port.port)"
                       >
-                        <td class="fw-semibold">{{ port.port }}</td>
+                        <td class="fw-semibold">
+                          {{ port.port }}
+                          <span v-if="port.internal" class="badge bg-secondary-lt text-secondary ms-1" title="Port interne Docker uniquement, non exposé sur l'hôte">interne</span>
+                        </td>
                         <td class="text-secondary text-uppercase">{{ port.protocol }}</td>
                         <td>
                           <input v-model="getPortSetting(host.id, port.port).name" class="form-control form-control-sm" placeholder="Ex: Vaultwarden" />
@@ -396,7 +399,9 @@
             :authelia-ip="autheliaIp"
             :internet-label="internetLabel"
             :internet-ip="internetIp"
+            :node-positions="nodePositions"
             @host-click="handleHostClick"
+            @update:node-positions="onNodePositionsUpdate"
           />
         </div>
       </div>
@@ -579,7 +584,6 @@ import apiClient from '../api'
 const router = useRouter()
 const hosts = ref([])
 const containers = ref([])
-const networks = ref([])
 const search = ref('')
 const protocolFilter = ref('')
 const hostFilter = ref('')
@@ -594,6 +598,7 @@ const internetLabel = ref('Internet')
 const internetIp = ref('')
 const networkServices = ref([])
 const hostPortConfig = ref([])
+const nodePositions = ref({})
 const topologyConfigLoaded = ref(false)
 const saveStatus = ref('idle') // 'idle' | 'saving' | 'saved' | 'error'
 const graphSurfaceRef = ref(null)
@@ -636,6 +641,9 @@ async function loadTopologyConfig() {
       internetLabel.value = cfg.internet_label || 'Internet'
       internetIp.value = cfg.internet_ip || ''
       networkServices.value = cfg.manual_services ? JSON.parse(cfg.manual_services) : []
+      if (cfg.node_positions) {
+        try { nodePositions.value = JSON.parse(cfg.node_positions) } catch { nodePositions.value = {} }
+      }
       if (cfg.host_overrides) {
         try {
           hostPortConfig.value = JSON.parse(cfg.host_overrides)
@@ -663,6 +671,7 @@ async function saveTopologyConfig() {
       service_map: '{}',
       host_overrides: JSON.stringify(hostPortConfig.value),
       manual_services: JSON.stringify(networkServices.value),
+      node_positions: JSON.stringify(nodePositions.value),
       authelia_label: autheliaLabel.value || 'Authelia',
       authelia_ip: autheliaIp.value || '',
       internet_label: internetLabel.value || 'Internet',
@@ -692,7 +701,9 @@ const discoveredPortsByHost = computed(() => {
       const hostId = container.host_id
       if (!hostId) continue
 
-      const portNumber = mapping.container_port || mapping.host_port || 0
+      const hostPort = mapping.host_port || 0
+      const containerPort = mapping.container_port || 0
+      const portNumber = hostPort || containerPort
       if (!portNumber) continue
 
       const protocol = (mapping.protocol || 'tcp').toLowerCase()
@@ -700,7 +711,8 @@ const discoveredPortsByHost = computed(() => {
       const key = `${portNumber}-${protocol}`
       if (map[hostId].some(entry => entry.key === key)) continue
 
-      map[hostId].push({ key, port: portNumber, protocol })
+      // internal: port exists only inside Docker (no host binding)
+      map[hostId].push({ key, port: portNumber, protocol, internal: hostPort === 0 })
     }
   }
 
@@ -833,14 +845,6 @@ const combinedServices = computed(() => {
   return [...networkServices.value, ...linkedServices]
 })
 
-const filteredAutoLinks = computed(() => {
-  return inferredLinks.value.filter(link => {
-    if (autoLinkFilter.value && link.link_type !== autoLinkFilter.value) return false
-    return true
-  })
-})
-
-
 const graphHosts = computed(() => {
   const portsByHost = new Map()
   for (const container of containers.value) {
@@ -849,8 +853,8 @@ const graphHosts = computed(() => {
       const hostId = container.host_id
       if (!hostId) continue
 
-      const portNumber = mapping.host_port || mapping.container_port || 0
-      if (!portNumber) continue
+      const portNumber = mapping.host_port || 0
+      if (!portNumber) continue  // only host-exposed ports
 
       const protocol = (mapping.protocol || 'tcp').toLowerCase()
       const key = `${portNumber}-${protocol}`
@@ -962,15 +966,6 @@ function resetPortSetting(hostId, portNumber) {
   entry.ports[String(portNumber)] = { name: '', domain: '', path: '/', enabled: true, linkToProxy: false, linkToAuthelia: false, exposedToInternet: false, externalPort: null }
 }
 
-function linkKey(link) {
-  return `${link.source_container_name}|${link.target_container_name}|${link.link_type}`
-}
-
-function hostNameById(hostId) {
-  const h = hosts.value.find(h => h.id === hostId)
-  return h ? (h.name || h.hostname || h.ip_address || hostId) : hostId
-}
-
 function getPortSetting(hostId, portNumber) {
   const entry = getHostPortEntry(hostId)
   const key = String(portNumber)
@@ -1025,49 +1020,13 @@ function removeServiceRow(serviceId) {
   networkServices.value = networkServices.value.filter((service) => service.id !== serviceId)
 }
 
-function applyAutoLinks() {
-  // Only apply proxy-type links (highest confidence / most actionable)
-  const proxyLinks = inferredLinks.value.filter(l => l.link_type === 'proxy')
-  let portsMarked = 0
-
-  for (const link of proxyLinks) {
-    // Find the target container in containers data
-    const targetContainer = containers.value.find(
-      c => c.name === link.target_container_name && c.host_id === link.target_host_id
-    )
-    if (!targetContainer) continue
-
-    const mappings = targetContainer.port_mappings || []
-    for (const mapping of mappings) {
-      const portNumber = Number(mapping.container_port || mapping.host_port || 0)
-      if (!portNumber) continue
-
-      const entry = getHostPortEntry(link.target_host_id)
-      const portKey = String(portNumber)
-      if (!entry.ports[portKey]) {
-        entry.ports[portKey] = { name: '', domain: '', path: '/', enabled: true, linkToProxy: false, linkToAuthelia: false, exposedToInternet: false, externalPort: null }
-      }
-      const portSetting = entry.ports[portKey]
-      if (!portSetting.linkToProxy) {
-        portSetting.enabled = true
-        portSetting.linkToProxy = true
-        if (!portSetting.name) portSetting.name = link.target_container_name
-        portsMarked++
-      }
-    }
-  }
-
-  if (portsMarked > 0) {
-    applyResult.value = `✓ ${portsMarked} port${portsMarked > 1 ? 's' : ''} marqué${portsMarked > 1 ? 's' : ''} comme proxy`
-    setTimeout(() => { applyResult.value = '' }, 4000)
-  } else {
-    applyResult.value = 'Aucun port nouveau à marquer'
-    setTimeout(() => { applyResult.value = '' }, 3000)
-  }
-}
-
 function handleHostClick(hostId) {
   router.push(`/hosts/${hostId}`)
+}
+
+function onNodePositionsUpdate(positions) {
+  nodePositions.value = positions
+  debouncedSave()
 }
 
 async function fetchSnapshot() {
@@ -1133,8 +1092,6 @@ const { wsStatus, wsError, retryCount, reconnect } = useWebSocket('/api/v1/ws/ne
 
   hosts.value = newHosts
   containers.value = payload.containers || []
-  networks.value = payload.networks || []
-  inferredLinks.value = payload.links || []
 
   // Config is loaded only via REST API (loadTopologyConfig), not from WebSocket
 
@@ -1193,16 +1150,10 @@ onUnmounted(() => {
 
 .network-config-row {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 16px;
   margin-bottom: 12px;
   align-items: start;
-}
-
-@media (max-width: 1400px) {
-  .network-config-row {
-    grid-template-columns: repeat(2, 1fr);
-  }
 }
 
 @media (max-width: 900px) {
