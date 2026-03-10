@@ -18,7 +18,7 @@ func (n *notifier) SendNtfy(cfg *config.Config, url, title, msg string) error {
 
 	client := &http.Client{Timeout: 10 * time.Second}
 	payload, _ := json.Marshal(map[string]string{
-		"topic": "",
+		"topic":   "",
 		"message": msg,
 	})
 

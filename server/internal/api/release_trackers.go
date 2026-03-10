@@ -134,7 +134,6 @@ func (h *ReleaseTrackerHandler) tryFetchAndStoreDigest(trackerID, dockerImage, t
 	}
 }
 
-
 func (h *ReleaseTrackerHandler) dispatchRelease(t models.ReleaseTracker, tag, releaseURL, releaseName string) {
 	// Skip if already running
 	running, _ := h.db.GetRunningExecutionForReleaseTracker(t.ID)

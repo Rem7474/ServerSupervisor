@@ -37,12 +37,12 @@ type RefreshToken struct {
 
 // APIKey allows automated access
 type APIKey struct {
-	ID        string    `json:"id" db:"id"`
-	UserID    int64     `json:"user_id" db:"user_id"`
-	KeyHash   string    `json:"-" db:"key_hash"` // hashed
-	Name      string    `json:"name" db:"name"`
+	ID        string     `json:"id" db:"id"`
+	UserID    int64      `json:"user_id" db:"user_id"`
+	KeyHash   string     `json:"-" db:"key_hash"` // hashed
+	Name      string     `json:"name" db:"name"`
 	ExpiresAt *time.Time `json:"expires_at" db:"expires_at"`
-	CreatedAt time.Time `json:"created_at" db:"created_at"`
+	CreatedAt time.Time  `json:"created_at" db:"created_at"`
 }
 
 // ========== Security Monitoring ==========

@@ -76,7 +76,7 @@ func EvaluateAlerts(db *database.DB, cfg *config.Config, pusher NotificationPush
 					log.Printf("Alerts: FIRED %s host=%s value=%.2f → incident#%d created", ruleName, host.Name, value, incID)
 					details := fmt.Sprintf(`{"rule_id":%d,"metric":"%s","operator":"%s","value":%.4f}`, rule.ID, rule.Metric, rule.Operator, value)
 					_, _ = db.CreateAuditLog("alert-engine", "alert_fired", host.ID, "", details, "success")
-				sendAlertNotifications(n, cfg, rule, host, value)
+					sendAlertNotifications(n, cfg, rule, host, value)
 					triggerAlertCommand(db, rule, host)
 					pushBrowserNotification(pusher, rule, host, value, incID)
 				}
@@ -270,15 +270,15 @@ func pushBrowserNotification(pusher NotificationPusher, rule models.AlertRule, h
 	pusher.Broadcast(map[string]interface{}{
 		"type": "new_alert",
 		"notification": map[string]interface{}{
-			"id":            incID,
-			"rule_id":       rule.ID,
-			"host_id":       host.ID,
-			"host_name":     host.Name,
-			"rule_name":     ruleName,
-			"metric":        rule.Metric,
-			"value":         value,
-			"triggered_at":  time.Now().UTC(),
-			"resolved_at":   nil,
+			"id":             incID,
+			"rule_id":        rule.ID,
+			"host_id":        host.ID,
+			"host_name":      host.Name,
+			"rule_name":      ruleName,
+			"metric":         rule.Metric,
+			"value":          value,
+			"triggered_at":   time.Now().UTC(),
+			"resolved_at":    nil,
 			"browser_notify": true,
 		},
 	})

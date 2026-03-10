@@ -5,23 +5,23 @@ import "time"
 // ========== Git Webhooks ==========
 
 type GitWebhook struct {
-	ID               string               `json:"id"`
-	Name             string               `json:"name"`
-	Secret           string               `json:"secret,omitempty"` // Only included when explicitly fetched
-	Provider         string               `json:"provider"`
-	RepoFilter       string               `json:"repo_filter"`
-	BranchFilter     string               `json:"branch_filter"`
-	EventFilter      string               `json:"event_filter"`
-	HostID           string               `json:"host_id"`
-	CustomTaskID     string               `json:"custom_task_id"`
-	NotifyChannels   []string             `json:"notify_channels"`
-	NotifyOnSuccess  bool                 `json:"notify_on_success"`
-	NotifyOnFailure  bool                 `json:"notify_on_failure"`
-	Enabled          bool                 `json:"enabled"`
-	LastTriggeredAt  *time.Time           `json:"last_triggered_at,omitempty"`
-	CreatedAt        time.Time            `json:"created_at"`
-	HostName         string               `json:"host_name,omitempty"`    // joined from hosts
-	LastExecution    *GitWebhookExecution `json:"last_execution,omitempty"` // most recent execution
+	ID              string               `json:"id"`
+	Name            string               `json:"name"`
+	Secret          string               `json:"secret,omitempty"` // Only included when explicitly fetched
+	Provider        string               `json:"provider"`
+	RepoFilter      string               `json:"repo_filter"`
+	BranchFilter    string               `json:"branch_filter"`
+	EventFilter     string               `json:"event_filter"`
+	HostID          string               `json:"host_id"`
+	CustomTaskID    string               `json:"custom_task_id"`
+	NotifyChannels  []string             `json:"notify_channels"`
+	NotifyOnSuccess bool                 `json:"notify_on_success"`
+	NotifyOnFailure bool                 `json:"notify_on_failure"`
+	Enabled         bool                 `json:"enabled"`
+	LastTriggeredAt *time.Time           `json:"last_triggered_at,omitempty"`
+	CreatedAt       time.Time            `json:"created_at"`
+	HostName        string               `json:"host_name,omitempty"`      // joined from hosts
+	LastExecution   *GitWebhookExecution `json:"last_execution,omitempty"` // most recent execution
 }
 
 type GitWebhookExecution struct {

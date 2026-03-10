@@ -489,8 +489,8 @@ func parseGitPayload(provider string, body []byte, eventHeader string) (*parsedG
 
 func parseGitHubPayload(body []byte, eventHeader string) (*parsedGitPayload, error) {
 	var p struct {
-		Ref  string `json:"ref"`
-		After string `json:"after"`
+		Ref        string `json:"ref"`
+		After      string `json:"after"`
 		HeadCommit *struct {
 			ID      string `json:"id"`
 			Message string `json:"message"`

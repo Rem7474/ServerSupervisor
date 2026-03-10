@@ -14,7 +14,7 @@ type DockerContainer struct {
 	ImageTag    string            `json:"image_tag" db:"image_tag"`
 	ImageID     string            `json:"image_id" db:"image_id"`
 	ImageDigest string            `json:"image_digest" db:"image_digest"` // manifest sha256 (RepoDigest)
-	State       string            `json:"state" db:"state"` // running, stopped, paused, etc.
+	State       string            `json:"state" db:"state"`               // running, stopped, paused, etc.
 	Status      string            `json:"status" db:"status"`
 	Created     time.Time         `json:"created" db:"created"`
 	Ports       string            `json:"ports" db:"ports"`

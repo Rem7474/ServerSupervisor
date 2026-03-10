@@ -51,9 +51,10 @@ func fetchDockerManifestDigest(client *http.Client, imageRef, tag string) (strin
 
 // parseDockerRegistry splits a Docker image reference into registry and image name.
 // Examples:
-//   "nginx"                          → "registry-1.docker.io", "library/nginx"
-//   "homeassistant/home-assistant"   → "registry-1.docker.io", "homeassistant/home-assistant"
-//   "ghcr.io/org/app"               → "ghcr.io", "org/app"
+//
+//	"nginx"                          → "registry-1.docker.io", "library/nginx"
+//	"homeassistant/home-assistant"   → "registry-1.docker.io", "homeassistant/home-assistant"
+//	"ghcr.io/org/app"               → "ghcr.io", "org/app"
 func parseDockerRegistry(imageRef string) (registry, image string) {
 	parts := strings.SplitN(imageRef, "/", 2)
 	if len(parts) == 2 {

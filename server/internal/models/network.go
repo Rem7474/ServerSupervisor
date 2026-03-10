@@ -52,8 +52,8 @@ type NetworkTopologyConfig struct {
 	ID             int64     `json:"id" db:"id"`
 	RootLabel      string    `json:"root_label" db:"root_label"`
 	RootIP         string    `json:"root_ip" db:"root_ip"`
-	ExcludedPorts  []int     `json:"excluded_ports" db:"-"`        // Stored as JSONB
-	ServiceMap     string    `json:"service_map" db:"service_map"` // JSON {port: name}
+	ExcludedPorts  []int     `json:"excluded_ports" db:"-"`                // Stored as JSONB
+	ServiceMap     string    `json:"service_map" db:"service_map"`         // JSON {port: name}
 	HostOverrides  string    `json:"host_overrides" db:"host_overrides"`   // JSON
 	ManualServices string    `json:"manual_services" db:"manual_services"` // JSON
 	AutheliaLabel  string    `json:"authelia_label" db:"authelia_label"`

@@ -9,8 +9,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/serversupervisor/server/internal/alerts"
 	"github.com/serversupervisor/server/internal/api"
+	"github.com/serversupervisor/server/internal/background"
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/github"
@@ -71,79 +71,22 @@ func main() {
 	sched.Start()
 	defer sched.Stop()
 
-	// Start GitHub release tracker
+	// Start GitHub release tracker (TrackedRepo / Docker version compare)
 	tracker := github.NewTracker(db, cfg)
 	tracker.Start()
 	defer tracker.Stop()
 
-	// Start periodic cleanup of old audit logs (90-day retention for compliance).
-	// Metrics retention is now managed by TimescaleDB retention policies; see
-	// migration 010_timescaledb.sql.  CleanOldMetrics is available for manual use
-	// on installations without TimescaleDB.
-	go func() {
-		ticker := time.NewTicker(1 * time.Hour)
-		defer ticker.Stop()
-		for range ticker.C {
-			if deleted, err := db.CleanOldAuditLogs(90); err != nil {
-				log.Printf("Audit cleanup error: %v", err)
-			} else if deleted > 0 {
-				log.Printf("Cleaned up %d old audit log records", deleted)
-			}
-		}
-	}()
-
-	// Start periodic host status check (mark offline if no heartbeat for 2 minutes)
-	go func() {
-		ticker := time.NewTicker(30 * time.Second)
-		defer ticker.Stop()
-		for range ticker.C {
-			// Update all hosts that haven't been seen in 2+ minutes
-			if err := db.UpdateHostStatusBasedOnLastSeen(2); err != nil {
-				log.Printf("Failed to update host status: %v", err)
-			}
-		}
-	}()
-
-	// Notification hub — shared between the alert engine (push on fire) and the WS handler (client subscriptions)
+	// Notification hub — shared between alert engine (push on fire) and WS handler
 	notifHub := api.NewNotificationHub()
 
-	// Start periodic alert evaluation
-	go func() {
-		ticker := time.NewTicker(60 * time.Second)
-		defer ticker.Stop()
-		for range ticker.C {
-			alerts.EvaluateAlerts(db, cfg, notifHub)
-		}
-	}()
-
-	// Start periodic metrics downsampling (single batch SQL query for all hosts)
-	go func() {
-		ticker := time.NewTicker(5 * time.Minute)
-		defer ticker.Stop()
-		for range ticker.C {
-			now := time.Now().UTC()
-			end := now.Truncate(5 * time.Minute)
-			start5 := end.Add(-5 * time.Minute)
-
-			if n, err := db.BatchAggregateMetrics(start5, end, "5min"); err != nil {
-				log.Printf("5min downsampling error: %v", err)
-			} else if n > 0 {
-				log.Printf("Downsampled 5min metrics for %d hosts", n)
-			}
-
-			if end.Minute() == 0 {
-				if _, err := db.BatchAggregateMetrics(end.Add(-time.Hour), end, "hour"); err != nil {
-					log.Printf("Hourly downsampling error: %v", err)
-				}
-			}
-
-			if end.Hour() == 0 && end.Minute() == 0 {
-				if _, err := db.BatchAggregateMetrics(end.Add(-24*time.Hour), end, "day"); err != nil {
-					log.Printf("Daily downsampling error: %v", err)
-				}
-			}
-		}
-	}()
+	// Start background jobs (each runs in its own goroutine with panic recovery)
+	bg := background.New()
+	bg.Add(background.NewAuditCleanupJob(db))
+	bg.Add(background.NewHostStatusJob(db))
+	bg.Add(background.NewAlertEvalJob(db, cfg, notifHub))
+	bg.Add(background.NewMetricsDownsampleJob(db))
+	bg.Start()
+	defer bg.Stop()
 
 	// Setup router
 	router := api.SetupRouter(db, cfg, notifHub, sched)

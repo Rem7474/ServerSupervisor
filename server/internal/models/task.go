@@ -8,7 +8,7 @@ type ScheduledTask struct {
 	ID             string     `json:"id"`
 	HostID         string     `json:"host_id"`
 	Name           string     `json:"name"`
-	Module         string     `json:"module"`  // apt | docker | systemd | journal | processes | custom
+	Module         string     `json:"module"` // apt | docker | systemd | journal | processes | custom
 	Action         string     `json:"action"`
 	Target         string     `json:"target"`
 	Payload        string     `json:"payload"` // JSON extra args

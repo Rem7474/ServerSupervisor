@@ -6,9 +6,9 @@ import "time"
 
 // CommandTrigger defines a remote command to execute automatically when an alert fires.
 type CommandTrigger struct {
-	Module  string `json:"module"`           // e.g. "processes", "journal", "docker", "systemd"
-	Action  string `json:"action"`           // e.g. "list", "read", "restart"
-	Target  string `json:"target,omitempty"` // e.g. service name, container name
+	Module  string `json:"module"`            // e.g. "processes", "journal", "docker", "systemd"
+	Action  string `json:"action"`            // e.g. "list", "read", "restart"
+	Target  string `json:"target,omitempty"`  // e.g. service name, container name
 	Payload string `json:"payload,omitempty"` // optional JSON payload
 }
 

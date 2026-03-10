@@ -7,7 +7,7 @@ import "time"
 // RemoteCommand represents any task dispatched to a remote agent.
 // module ∈ "docker" | "apt" | "systemd" | "journal"
 type RemoteCommand struct {
-	ID              string     `json:"id" db:"id"`           // UUID v4
+	ID              string     `json:"id" db:"id"` // UUID v4
 	HostID          string     `json:"host_id" db:"host_id"`
 	Module          string     `json:"module" db:"module"`   // docker | apt | systemd | journal
 	Action          string     `json:"action" db:"action"`   // start, stop, upgrade, logs, list, …
