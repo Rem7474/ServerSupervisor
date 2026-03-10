@@ -108,13 +108,6 @@
             Configuration
           </button>
         </li>
-        <li class="nav-item">
-          <button class="nav-link" :class="{ active: networkTab === 'auto' }" @click="networkTab = 'auto'">
-            <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16" class="me-1"><path d="M8 4.754a3.246 3.246 0 1 0 0 6.492 3.246 3.246 0 0 0 0-6.492zM5.754 8a2.246 2.246 0 1 1 4.492 0 2.246 2.246 0 0 1-4.492 0z"/><path d="M9.796 1.343c-.527-1.79-3.065-1.79-3.592 0l-.094.319a.873.873 0 0 1-1.255.52l-.292-.16c-1.64-.892-3.433.902-2.54 2.541l.159.292a.873.873 0 0 1-.52 1.255l-.319.094c-1.79.527-1.79 3.065 0 3.592l.319.094a.873.873 0 0 1 .52 1.255l-.16.292c-.892 1.64.901 3.434 2.541 2.54l.292-.159a.873.873 0 0 1 1.255.52l.094.319c.527 1.79 3.065 1.79 3.592 0l.094-.319a.873.873 0 0 1 1.255-.52l.292.16c1.64.893 3.434-.902 2.54-2.541l-.159-.292a.873.873 0 0 1 .52-1.255l.319-.094c1.79-.527 1.79-3.065 0-3.592l-.319-.094a.873.873 0 0 1-.52-1.255l.16-.292c.893-1.64-.902-3.433-2.541-2.54l-.292.159a.873.873 0 0 1-1.255-.52l-.094-.319zm-2.633.283c.246-.835 1.428-.835 1.674 0l.094.319a1.873 1.873 0 0 0 2.693 1.115l.291-.16c.764-.415 1.6.42 1.184 1.185l-.159.292a1.873 1.873 0 0 0 1.116 2.692l.318.094c.835.246.835 1.428 0 1.674l-.319.094a1.873 1.873 0 0 0-1.115 2.693l.16.291c.415.764-.42 1.6-1.185 1.184l-.291-.159a1.873 1.873 0 0 0-2.693 1.116l-.094.318c-.246.835-1.428.835-1.674 0l-.094-.319a1.873 1.873 0 0 0-2.692-1.115l-.292.16c-.764.415-1.6-.42-1.184-1.185l.159-.291A1.873 1.873 0 0 0 1.945 8.93l-.319-.094c-.835-.246-.835-1.428 0-1.674l.319-.094A1.873 1.873 0 0 0 3.06 4.377l-.16-.292c-.415-.764.42-1.6 1.185-1.184l.292.159a1.873 1.873 0 0 0 2.692-1.115l.094-.319z"/></svg>
-            Auto
-            <span v-if="inferredLinks.length > 0" class="badge bg-azure-lt text-azure ms-1">{{ inferredLinks.length }}</span>
-          </button>
-        </li>
       </ul>
       <div class="card-body network-topology-body">
         <div v-if="networkTab === 'config'" class="network-config">
@@ -127,15 +120,6 @@
               <label class="form-label">IP du proxy</label>
               <input v-model="rootNodeIp" type="text" class="form-control form-control-sm" placeholder="Ex: 192.168.1.10" />
             </div>
-            <div class="network-config-item">
-              <label class="form-label">Exclure ports (global)</label>
-              <input v-model="excludedPortsText" type="text" class="form-control form-control-sm" placeholder="Ex: 22, 2375, 9000" />
-              <div class="text-secondary small">Liste separee par virgules</div>
-            </div>
-          </div>
-          <div class="network-config-item">
-            <label class="form-label">Nom des services (port=nom)</label>
-            <textarea v-model="servicePortMapText" rows="2" class="form-control form-control-sm" placeholder="80=Nginx Proxy Manager&#10;3000=Vaultwarden"></textarea>
           </div>
           <div class="network-config-item mt-3">
             <div class="d-flex align-items-center justify-content-between mb-2">
@@ -401,125 +385,17 @@
             </div>
           </div>
         </div>
-        <div v-else-if="networkTab === 'auto'" class="network-config">
-          <div class="network-config-item">
-            <div class="d-flex align-items-center justify-content-between mb-3">
-              <div>
-                <label class="form-label mb-0">Liens découverts automatiquement</label>
-                <div class="text-secondary small mt-1">
-                  Déduits des réseaux Docker partagés, variables d'environnement et images proxy.
-                </div>
-              </div>
-              <div class="d-flex gap-2 align-items-center flex-wrap">
-                <!-- Filtre par type -->
-                <select v-model="autoLinkFilter" class="form-select form-select-sm" style="width: auto;">
-                  <option value="">Tous les types</option>
-                  <option value="network">Docker Network</option>
-                  <option value="env_ref">Var. d'env.</option>
-                  <option value="proxy">Proxy</option>
-                </select>
-                <span class="text-secondary small">
-                  {{ filteredAutoLinks.length }} / {{ inferredLinks.length }} lien(s)
-                </span>
-                <button
-                  class="btn btn-sm btn-outline-azure"
-                  :disabled="inferredLinks.filter(l => l.link_type === 'proxy').length === 0"
-                  @click="applyAutoLinks"
-                >
-                  Appliquer Liens Auto
-                </button>
-                <span v-if="applyResult" class="text-success small">{{ applyResult }}</span>
-              </div>
-            </div>
-
-            <div v-if="filteredAutoLinks.length === 0" class="text-secondary text-center py-4">
-              Aucun lien détecté. Les connexions sont déduites des réseaux Docker partagés,
-              variables d'environnement (*_HOST, *_URL) et labels Traefik.
-            </div>
-
-            <div v-else class="table-responsive network-config-table">
-              <table class="table table-sm table-vcenter">
-                <thead>
-                  <tr>
-                    <th>Source</th>
-                    <th>Hôte source</th>
-                    <th></th>
-                    <th>Cible</th>
-                    <th>Hôte cible</th>
-                    <th>Type</th>
-                    <th>Confiance</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr
-                    v-for="link in filteredAutoLinks"
-                    :key="`${link.source_container_name}|${link.target_container_name}|${link.link_type}`"
-                    :class="{ 'opacity-50': ignoredLinks.has(linkKey(link)) }"
-                  >
-                    <td class="fw-semibold text-truncate" style="max-width: 160px;"
-                        :title="link.source_container_name">
-                      {{ link.source_container_name }}
-                    </td>
-                    <td class="text-secondary small">
-                      {{ hostNameById(link.source_host_id) }}
-                    </td>
-                    <td class="text-center text-secondary">→</td>
-                    <td class="fw-semibold text-truncate" style="max-width: 160px;"
-                        :title="link.target_container_name">
-                      {{ link.target_container_name }}
-                    </td>
-                    <td class="text-secondary small">
-                      {{ hostNameById(link.target_host_id) }}
-                    </td>
-                    <td>
-                      <span v-if="link.link_type === 'network'" class="badge bg-blue-lt text-blue">
-                        Docker Network
-                      </span>
-                      <span v-else-if="link.link_type === 'env_ref'" class="badge bg-orange-lt text-orange"
-                            :title="link.env_key ? `Variable : ${link.env_key}` : ''">
-                        Env Ref{{ link.env_key ? ` (${link.env_key})` : '' }}
-                      </span>
-                      <span v-else-if="link.link_type === 'proxy'" class="badge bg-cyan-lt text-cyan">
-                        Proxy
-                      </span>
-                      <span v-else class="badge bg-azure-lt text-azure">
-                        {{ link.link_type }}
-                      </span>
-                    </td>
-                    <td>
-                      <div class="d-flex align-items-center gap-2">
-                        <div class="progress flex-grow-1" style="height: 4px; min-width: 60px;">
-                          <div class="progress-bar" :style="{
-                            width: (link.confidence || 0) + '%',
-                            backgroundColor: link.confidence >= 80 ? '#10b981'
-                                           : link.confidence >= 60 ? '#f59e0b' : '#ef4444'
-                          }"></div>
-                        </div>
-                        <span class="text-secondary small" style="min-width: 30px;">
-                          {{ link.confidence || 0 }}%
-                        </span>
-                      </div>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
         <div v-else ref="graphSurfaceRef" class="network-graph-surface" :style="{ height: graphHeight }">
           <NetworkGraph
             :data="graphHosts"
             :root-label="rootNodeName"
             :root-ip="rootNodeIp"
-            :service-map="servicePortMap"
-            :excluded-ports="excludedPorts"
             :services="combinedServices"
             :host-port-overrides="hostPortOverrides"
             :authelia-label="autheliaLabel"
             :authelia-ip="autheliaIp"
             :internet-label="internetLabel"
             :internet-ip="internetIp"
-            :inferred-links="inferredLinks"
             @host-click="handleHostClick"
           />
         </div>
@@ -716,15 +592,9 @@ const autheliaLabel = ref('Authelia')
 const autheliaIp = ref('')
 const internetLabel = ref('Internet')
 const internetIp = ref('')
-const servicePortMapText = ref('')
-const excludedPortsText = ref('')
 const networkServices = ref([])
 const hostPortConfig = ref([])
 const topologyConfigLoaded = ref(false)
-const inferredLinks = ref([])
-const autoLinkFilter = ref('')
-const ignoredLinks = ref(new Set())
-const applyResult = ref('')
 const saveStatus = ref('idle') // 'idle' | 'saving' | 'saved' | 'error'
 const graphSurfaceRef = ref(null)
 const graphHeight = ref('auto')
@@ -750,8 +620,6 @@ watch(autheliaLabel, () => debouncedSave())
 watch(autheliaIp, () => debouncedSave())
 watch(internetLabel, () => debouncedSave())
 watch(internetIp, () => debouncedSave())
-watch(servicePortMapText, () => debouncedSave())
-watch(excludedPortsText, () => debouncedSave())
 watch(networkServices, () => debouncedSave(), { deep: true })
 watch(hostPortConfig, () => debouncedSave(), { deep: true })
 
@@ -768,8 +636,6 @@ async function loadTopologyConfig() {
       internetLabel.value = cfg.internet_label || 'Internet'
       internetIp.value = cfg.internet_ip || ''
       networkServices.value = cfg.manual_services ? JSON.parse(cfg.manual_services) : []
-      servicePortMapText.value = cfg.service_map && cfg.service_map !== '{}' ? cfg.service_map : ''
-      excludedPortsText.value = (cfg.excluded_ports || []).join(', ')
       if (cfg.host_overrides) {
         try {
           hostPortConfig.value = JSON.parse(cfg.host_overrides)
@@ -793,8 +659,8 @@ async function saveTopologyConfig() {
     const config = {
       root_label: rootNodeName.value,
       root_ip: rootNodeIp.value,
-      excluded_ports: excludedPorts.value,
-      service_map: servicePortMapText.value || '{}',
+      excluded_ports: [],
+      service_map: '{}',
       host_overrides: JSON.stringify(hostPortConfig.value),
       manual_services: JSON.stringify(networkServices.value),
       authelia_label: autheliaLabel.value || 'Authelia',
@@ -817,23 +683,6 @@ async function saveTopologyConfig() {
   }
 }
 
-const servicePortMap = computed(() => {
-  const map = {}
-  const lines = servicePortMapText.value.split(/\r?\n|,/).map(line => line.trim()).filter(Boolean)
-  for (const line of lines) {
-    const [portRaw, ...nameParts] = line.split(/[=:]/)
-    const port = Number(portRaw?.trim())
-    const name = nameParts.join(':').trim()
-    if (!port || !name) continue
-    map[port] = name
-  }
-  return map
-})
-
-const excludedPorts = computed(() => {
-  const values = excludedPortsText.value.split(/\s*,\s*/).map(entry => Number(entry.trim())).filter(Boolean)
-  return Array.from(new Set(values))
-})
 
 const discoveredPortsByHost = computed(() => {
   const map = {}

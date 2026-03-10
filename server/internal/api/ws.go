@@ -623,21 +623,13 @@ func (h *WSHandler) sendNetworkSnapshot(conn *websocket.Conn, lastHash *string) 
 		return err
 	}
 
-	// Get Docker networks
-	networks, _ := h.db.GetAllDockerNetworks()
-
 	// Get network topology config
 	config, _ := h.db.GetNetworkTopologyConfig()
-
-	// Infer topology links
-	links := inferTopologyLinks(h.db, snapshot.Containers, networks)
 
 	payload := gin.H{
 		"type":       "network",
 		"hosts":      snapshot.Hosts,
 		"containers": snapshot.Containers,
-		"networks":   networks,
-		"links":      links,
 		"config":     config,
 		"updated_at": snapshot.UpdatedAt,
 	}

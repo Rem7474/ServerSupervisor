@@ -520,18 +520,6 @@ type ContainerEnv struct {
 	EnvVars       map[string]string `json:"env_vars"`
 }
 
-// TopologyLink represents an inferred logical link between two services
-type TopologyLink struct {
-	SourceContainerName string `json:"source_container_name"`
-	SourceHostID        string `json:"source_host_id"`
-	TargetContainerName string `json:"target_container_name"`
-	TargetHostID        string `json:"target_host_id"`
-	LinkType            string `json:"link_type"` // "network", "env_ref", "port_forward", "proxy"
-	NetworkName         string `json:"network_name,omitempty"`
-	EnvKey              string `json:"env_key,omitempty"` // Stores env var key or domain for inference
-	Confidence          int    `json:"confidence"`        // 0-100
-}
-
 // NetworkTopologyConfig stores persisted configuration (replaces localStorage)
 type NetworkTopologyConfig struct {
 	ID             int64     `json:"id" db:"id"`
@@ -552,8 +540,6 @@ type NetworkTopologyConfig struct {
 type TopologySnapshot struct {
 	Hosts      []NetworkHost          `json:"hosts"`
 	Containers []NetworkContainer     `json:"containers"`
-	Networks   []DockerNetwork        `json:"networks"`
-	Links      []TopologyLink         `json:"links"`
 	Config     *NetworkTopologyConfig `json:"config,omitempty"`
 	UpdatedAt  time.Time              `json:"updated_at"`
 }
