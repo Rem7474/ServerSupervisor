@@ -1,4 +1,4 @@
-package api
+package handlers
 
 import (
 	"fmt"
@@ -12,6 +12,7 @@ import (
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/models"
+	"github.com/serversupervisor/server/internal/ws"
 )
 
 // isValidWorkingDir returns true when p is either empty, an absolute path,
@@ -29,10 +30,10 @@ func isValidWorkingDir(p string) bool {
 type DockerHandler struct {
 	db        *database.DB
 	cfg       *config.Config
-	streamHub *CommandStreamHub
+	streamHub *ws.CommandStreamHub
 }
 
-func NewDockerHandler(db *database.DB, cfg *config.Config, streamHub *CommandStreamHub) *DockerHandler {
+func NewDockerHandler(db *database.DB, cfg *config.Config, streamHub *ws.CommandStreamHub) *DockerHandler {
 	return &DockerHandler{db: db, cfg: cfg, streamHub: streamHub}
 }
 
@@ -98,7 +99,7 @@ func (h *DockerHandler) CompareVersions(c *gin.Context) {
 					DockerImage:    container.Image,
 					RunningVersion: container.ImageTag,
 					LatestVersion:  repo.LatestVersion,
-					IsUpToDate:     normalizeVersion(container.ImageTag) == normalizeVersion(repo.LatestVersion),
+					IsUpToDate:     NormalizeVersion(container.ImageTag) == NormalizeVersion(repo.LatestVersion),
 					RepoOwner:      repo.Owner,
 					RepoName:       repo.Repo,
 					ReleaseURL:     repo.ReleaseURL,
@@ -220,9 +221,8 @@ func (h *DockerHandler) ListComposeProjects(c *gin.Context) {
 	c.JSON(http.StatusOK, projects)
 }
 
-
-// normalizeVersion strips leading 'v' from version strings for comparison
-func normalizeVersion(v string) string {
+// NormalizeVersion strips leading 'v' from version strings for comparison.
+func NormalizeVersion(v string) string {
 	if len(v) > 0 && v[0] == 'v' {
 		return v[1:]
 	}

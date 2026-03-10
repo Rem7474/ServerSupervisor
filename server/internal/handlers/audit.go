@@ -1,4 +1,4 @@
-package api
+package handlers
 
 import (
 	"net/http"
@@ -9,7 +9,6 @@ import (
 	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/models"
 )
-
 
 type AuditHandler struct {
 	db  *database.DB

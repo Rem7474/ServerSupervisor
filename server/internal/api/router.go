@@ -4,10 +4,15 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/database"
+	"github.com/serversupervisor/server/internal/handlers"
 	"github.com/serversupervisor/server/internal/scheduler"
+	"github.com/serversupervisor/server/internal/ws"
 )
 
-func SetupRouter(db *database.DB, cfg *config.Config, notifHub *NotificationHub, sched *scheduler.TaskScheduler) *gin.Engine {
+// SetupRouter wires all handlers and registers route groups.
+// The caller is responsible for starting long-running poller services
+// (e.g. releaseTrackerH.StartPoller()) after this function returns.
+func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationHub, sched *scheduler.TaskScheduler) (*gin.Engine, *handlers.ReleaseTrackerHandler) {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
 	r.Use(gin.Recovery())
@@ -15,185 +20,206 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *NotificationHub,
 	r.Use(SecurityHeadersMiddleware())
 	r.Use(CORSMiddleware(cfg.BaseURL, cfg.AllowedOrigins))
 
-	// Per-IP rate limiter
 	ipRateLimiter := NewIPRateLimiter(cfg.RateLimitRPS, cfg.RateLimitBurst, cfg.TrustedProxyCIDRs)
 	r.Use(RateLimiterMiddleware(ipRateLimiter))
 
-	// Handlers
-	authH := NewAuthHandler(db, cfg)
-	hostH := NewHostHandler(db, cfg)
-	wsH := NewWSHandler(db, cfg, notifHub)
-	agentH := NewAgentHandler(db, cfg, wsH.GetStreamHub())
-	aptH := NewAptHandler(db, cfg)
-	dockerH := NewDockerHandler(db, cfg, wsH.GetStreamHub())
-	systemH := NewSystemHandler(db, cfg, wsH.GetStreamHub())
-	networkH := NewNetworkHandler(db)
-	auditH := NewAuditHandler(db, cfg)
-	userH := NewUserHandler(db, cfg)
-	alertH := NewAlertHandler(db, cfg)
-	alertRulesH := NewAlertRulesHandler(db, cfg)
-	settingsH := NewSettingsHandler(db, cfg)
-	notifH := NewNotificationsHandler(db)
-	scheduledTaskH := NewScheduledTaskHandler(db, cfg, sched)
-	gitWebhookH := NewGitWebhookHandler(db, cfg, notifHub)
-	agentH.SetWebhookHub(gitWebhookH)
-	releaseTrackerH := NewReleaseTrackerHandler(db, cfg, notifHub)
-	agentH.SetReleaseTrackerHub(releaseTrackerH)
-	releaseTrackerH.StartPoller()
+	// Instantiate handlers
+	authH := handlers.NewAuthHandler(db, cfg)
+	hostH := handlers.NewHostHandler(db, cfg)
+	wsH := ws.NewWSHandler(db, cfg, notifHub)
+	agentH := handlers.NewAgentHandler(db, cfg, wsH.GetStreamHub())
+	aptH := handlers.NewAptHandler(db, cfg)
+	dockerH := handlers.NewDockerHandler(db, cfg, wsH.GetStreamHub())
+	systemH := handlers.NewSystemHandler(db, cfg, wsH.GetStreamHub())
+	networkH := handlers.NewNetworkHandler(db)
+	auditH := handlers.NewAuditHandler(db, cfg)
+	userH := handlers.NewUserHandler(db, cfg)
+	alertH := handlers.NewAlertHandler(db, cfg)
+	alertRulesH := handlers.NewAlertRulesHandler(db, cfg)
+	settingsH := handlers.NewSettingsHandler(db, cfg)
+	notifH := handlers.NewNotificationsHandler(db)
+	scheduledTaskH := handlers.NewScheduledTaskHandler(db, cfg, sched)
+	gitWebhookH := handlers.NewGitWebhookHandler(db, cfg, notifHub)
+	releaseTrackerH := handlers.NewReleaseTrackerHandler(db, cfg, notifHub)
+	agentH.AddCompletionListener(gitWebhookH)
+	agentH.AddCompletionListener(releaseTrackerH)
 
-	// ========== Public routes ==========
-	r.POST("/api/auth/login", authH.Login)
-	r.POST("/api/auth/refresh", authH.RefreshToken)
-	r.POST("/api/auth/logout", authH.Logout)
+	registerPublicRoutes(r, authH)
+	registerWSRoutes(r, wsH)
+	registerAgentRoutes(r, db, cfg, agentH)
 
-	// Health check
+	v1 := r.Group("/api/v1")
+	v1.Use(JWTMiddleware(cfg))
+	registerAuthRoutes(v1, authH)
+	registerHostRoutes(v1, hostH, agentH)
+	registerDockerRoutes(v1, dockerH, systemH, networkH, agentH)
+	registerAPTRoutes(v1, aptH)
+	registerAuditRoutes(v1, auditH)
+	registerAlertRoutes(v1, alertH, alertRulesH)
+	registerNotifRoutes(v1, notifH)
+	registerSettingsRoutes(v1, settingsH)
+	registerTaskRoutes(v1, scheduledTaskH)
+	registerUserRoutes(v1, userH)
+	registerGitWebhookRoutes(r, v1, gitWebhookH)
+	registerReleaseTrackerRoutes(v1, releaseTrackerH)
+
+	registerStaticFiles(r)
+
+	return r, releaseTrackerH
+}
+
+func registerPublicRoutes(r *gin.Engine, h *handlers.AuthHandler) {
+	r.POST("/api/auth/login", h.Login)
+	r.POST("/api/auth/refresh", h.RefreshToken)
+	r.POST("/api/auth/logout", h.Logout)
 	r.GET("/api/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
+}
 
-	// ========== WebSocket routes (token via query string) ==========
-	r.GET("/api/v1/ws/dashboard", wsH.Dashboard)
-	r.GET("/api/v1/ws/hosts/:id", wsH.HostDetail)
-	r.GET("/api/v1/ws/docker", wsH.Docker)
-	r.GET("/api/v1/ws/network", wsH.Network)
-	r.GET("/api/v1/ws/apt", wsH.Apt)
-	r.GET("/api/v1/ws/commands/stream/:command_id", wsH.CommandStream)
-	r.GET("/api/v1/ws/notifications", wsH.NotificationStream)
+func registerWSRoutes(r *gin.Engine, h *ws.WSHandler) {
+	r.GET("/api/v1/ws/dashboard", h.Dashboard)
+	r.GET("/api/v1/ws/hosts/:id", h.HostDetail)
+	r.GET("/api/v1/ws/docker", h.Docker)
+	r.GET("/api/v1/ws/network", h.Network)
+	r.GET("/api/v1/ws/apt", h.Apt)
+	r.GET("/api/v1/ws/commands/stream/:command_id", h.CommandStream)
+	r.GET("/api/v1/ws/notifications", h.NotificationStream)
+}
 
-	// ========== Agent routes (API Key auth) ==========
-	agent := r.Group("/api/agent")
-	agent.Use(APIKeyMiddleware(db, cfg))
-	{
-		agent.POST("/report", agentH.ReceiveReport)
-		agent.POST("/command/result", agentH.ReportCommandResult)
-		agent.POST("/command/stream", agentH.StreamCommandOutput)
-		agent.POST("/audit", agentH.LogAuditAction)
-	}
+func registerAgentRoutes(r *gin.Engine, db *database.DB, cfg *config.Config, h *handlers.AgentHandler) {
+	g := r.Group("/api/agent")
+	g.Use(APIKeyMiddleware(db, cfg))
+	g.POST("/report", h.ReceiveReport)
+	g.POST("/command/result", h.ReportCommandResult)
+	g.POST("/command/stream", h.StreamCommandOutput)
+	g.POST("/audit", h.LogAuditAction)
+}
 
-	// ========== Dashboard routes (JWT auth) ==========
-	api := r.Group("/api/v1")
-	api.Use(JWTMiddleware(cfg))
-	{
-		// Auth
-		api.GET("/auth/profile", authH.GetProfile)
-		api.POST("/auth/change-password", authH.ChangePassword)
-		api.GET("/auth/login-events", authH.GetLoginEvents)
-		api.GET("/auth/login-events/admin", authH.GetAllLoginEventsAdmin)
-		api.POST("/auth/revoke-all-sessions", authH.RevokeAllSessions)
-		api.GET("/auth/mfa/status", authH.GetMFAStatus)
-		api.POST("/auth/mfa/setup", authH.SetupMFA)
-		api.POST("/auth/mfa/verify", authH.VerifyMFA)
-		api.POST("/auth/mfa/disable", authH.DisableMFA)
-		api.GET("/auth/security", authH.GetSecuritySummary)
-		api.DELETE("/auth/blocked-ips/:ip", authH.UnblockIP)
+func registerAuthRoutes(g *gin.RouterGroup, h *handlers.AuthHandler) {
+	g.GET("/auth/profile", h.GetProfile)
+	g.POST("/auth/change-password", h.ChangePassword)
+	g.GET("/auth/login-events", h.GetLoginEvents)
+	g.GET("/auth/login-events/admin", h.GetAllLoginEventsAdmin)
+	g.POST("/auth/revoke-all-sessions", h.RevokeAllSessions)
+	g.GET("/auth/mfa/status", h.GetMFAStatus)
+	g.POST("/auth/mfa/setup", h.SetupMFA)
+	g.POST("/auth/mfa/verify", h.VerifyMFA)
+	g.POST("/auth/mfa/disable", h.DisableMFA)
+	g.GET("/auth/security", h.GetSecuritySummary)
+	g.DELETE("/auth/blocked-ips/:ip", h.UnblockIP)
+}
 
-		// Hosts
-		api.GET("/hosts", hostH.ListHosts)
-		api.POST("/hosts", hostH.RegisterHost)
-		api.GET("/hosts/:id", hostH.GetHost)
-		api.PATCH("/hosts/:id", hostH.UpdateHost)
-		api.DELETE("/hosts/:id", hostH.DeleteHost)
-		api.POST("/hosts/:id/rotate-key", hostH.RotateAPIKey)
-		api.GET("/hosts/:id/dashboard", hostH.GetHostDashboard)
+func registerHostRoutes(g *gin.RouterGroup, h *handlers.HostHandler, agentH *handlers.AgentHandler) {
+	g.GET("/hosts", h.ListHosts)
+	g.POST("/hosts", h.RegisterHost)
+	g.GET("/hosts/:id", h.GetHost)
+	g.PATCH("/hosts/:id", h.UpdateHost)
+	g.DELETE("/hosts/:id", h.DeleteHost)
+	g.POST("/hosts/:id/rotate-key", h.RotateAPIKey)
+	g.GET("/hosts/:id/dashboard", h.GetHostDashboard)
+	g.GET("/hosts/:id/metrics/history", agentH.GetMetricsHistory)
+	g.GET("/hosts/:id/metrics/aggregated", agentH.GetMetricsAggregated)
+	g.GET("/metrics/summary", agentH.GetMetricsSummary)
+	g.GET("/hosts/:id/disk/metrics", h.GetDiskMetrics)
+	g.GET("/hosts/:id/disk/metrics/history", h.GetDiskMetricsHistory)
+	g.GET("/hosts/:id/disk/health", h.GetDiskHealth)
+}
 
-		// Metrics
-		api.GET("/hosts/:id/metrics/history", agentH.GetMetricsHistory)
-		api.GET("/hosts/:id/metrics/aggregated", agentH.GetMetricsAggregated)
-		api.GET("/metrics/summary", agentH.GetMetricsSummary)
+func registerDockerRoutes(g *gin.RouterGroup, dockerH *handlers.DockerHandler, systemH *handlers.SystemHandler, networkH *handlers.NetworkHandler, agentH *handlers.AgentHandler) {
+	g.GET("/hosts/:id/containers", dockerH.ListContainers)
+	g.GET("/hosts/:id/commands/history", agentH.GetHostCommandHistory)
+	g.GET("/docker/containers", dockerH.ListAllContainers)
+	g.GET("/docker/compose", dockerH.ListComposeProjects)
+	g.GET("/docker/versions", dockerH.CompareVersions)
+	g.POST("/docker/command", dockerH.SendDockerCommand)
+	g.POST("/system/journalctl", systemH.SendJournalCommand)
+	g.POST("/system/service", systemH.SendSystemdCommand)
+	g.POST("/system/processes", systemH.SendProcessesCommand)
+	g.GET("/network", networkH.GetNetworkSnapshot)
+	g.GET("/network/topology", networkH.GetTopologySnapshot)
+	g.GET("/network/config", networkH.GetTopologyConfig)
+	g.PUT("/network/config", networkH.SaveTopologyConfig)
+}
 
-		// Disk metrics and health
-		api.GET("/hosts/:id/disk/metrics", hostH.GetDiskMetrics)
-		api.GET("/hosts/:id/disk/metrics/history", hostH.GetDiskMetricsHistory)
-		api.GET("/hosts/:id/disk/health", hostH.GetDiskHealth)
+func registerAPTRoutes(g *gin.RouterGroup, h *handlers.AptHandler) {
+	g.GET("/hosts/:id/apt", h.GetAptStatus)
+	g.POST("/apt/command", h.SendCommand)
+}
 
-		// Docker
-		api.GET("/hosts/:id/containers", dockerH.ListContainers)
-		api.GET("/hosts/:id/commands/history", agentH.GetHostCommandHistory)
-		api.GET("/docker/containers", dockerH.ListAllContainers)
-		api.GET("/docker/compose", dockerH.ListComposeProjects)
-		api.GET("/docker/versions", dockerH.CompareVersions)
-		api.POST("/docker/command", dockerH.SendDockerCommand)
-		api.POST("/system/journalctl", systemH.SendJournalCommand)
-		api.POST("/system/service", systemH.SendSystemdCommand)
-		api.POST("/system/processes", systemH.SendProcessesCommand)
-		api.GET("/network", networkH.GetNetworkSnapshot)
-		api.GET("/network/topology", networkH.GetTopologySnapshot)
-		api.GET("/network/config", networkH.GetTopologyConfig)
-		api.PUT("/network/config", networkH.SaveTopologyConfig)
+func registerAuditRoutes(g *gin.RouterGroup, h *handlers.AuditHandler) {
+	g.GET("/audit/logs", h.GetAuditLogs)
+	g.GET("/audit/logs/me", h.GetMyAuditLogs)
+	g.GET("/audit/logs/host/:host_id", h.GetAuditLogsByHost)
+	g.GET("/audit/logs/user/:username", h.GetAuditLogsByUser)
+	g.GET("/audit/commands", h.GetCommandsHistory)
+	g.GET("/commands/:id", h.GetCommandByID)
+}
 
-		// APT
-		api.GET("/hosts/:id/apt", aptH.GetAptStatus)
-		api.POST("/apt/command", aptH.SendCommand)
+func registerNotifRoutes(g *gin.RouterGroup, h *handlers.NotificationsHandler) {
+	g.GET("/notifications", h.GetNotifications)
+}
 
-		// Audit logs
-		api.GET("/audit/logs", auditH.GetAuditLogs)
-		api.GET("/audit/logs/me", auditH.GetMyAuditLogs)
-		api.GET("/audit/logs/host/:host_id", auditH.GetAuditLogsByHost)
-		api.GET("/audit/logs/user/:username", auditH.GetAuditLogsByUser)
-		api.GET("/audit/commands", auditH.GetCommandsHistory)
-		api.GET("/commands/:id", auditH.GetCommandByID)
+func registerAlertRoutes(g *gin.RouterGroup, alertH *handlers.AlertHandler, rulesH *handlers.AlertRulesHandler) {
+	g.GET("/alerts/incidents", alertH.ListIncidents)
+	g.GET("/alert-rules", rulesH.ListAlertRules)
+	g.GET("/alert-rules/:id", rulesH.GetAlertRule)
+	g.POST("/alert-rules", rulesH.CreateAlertRule)
+	g.PATCH("/alert-rules/:id", rulesH.UpdateAlertRule)
+	g.DELETE("/alert-rules/:id", rulesH.DeleteAlertRule)
+	g.POST("/alert-rules/test", rulesH.TestAlertRule)
+}
 
-		// Notifications
-		api.GET("/notifications", notifH.GetNotifications)
+func registerSettingsRoutes(g *gin.RouterGroup, h *handlers.SettingsHandler) {
+	g.GET("/settings", h.GetSettings)
+	g.PUT("/settings", h.UpdateSettings)
+	g.POST("/settings/test-smtp", h.TestSmtp)
+	g.POST("/settings/test-ntfy", h.TestNtfy)
+	g.POST("/settings/cleanup-metrics", h.CleanupMetrics)
+	g.POST("/settings/cleanup-audit", h.CleanupAuditLogs)
+}
 
-		// Alert incidents (read-only, legacy rules CRUD removed)
-		api.GET("/alerts/incidents", alertH.ListIncidents)
+func registerTaskRoutes(g *gin.RouterGroup, h *handlers.ScheduledTaskHandler) {
+	g.GET("/scheduled-tasks", h.ListAllScheduledTasks)
+	g.GET("/hosts/:id/scheduled-tasks", h.ListScheduledTasks)
+	g.POST("/hosts/:id/scheduled-tasks", h.CreateScheduledTask)
+	g.GET("/hosts/:id/custom-tasks", h.GetCustomTasks)
+	g.PUT("/scheduled-tasks/:id", h.UpdateScheduledTask)
+	g.DELETE("/scheduled-tasks/:id", h.DeleteScheduledTask)
+	g.POST("/scheduled-tasks/:id/run", h.RunScheduledTask)
+}
 
-		// Alert Rules (unified system)
-		api.GET("/alert-rules", alertRulesH.ListAlertRules)
-		api.GET("/alert-rules/:id", alertRulesH.GetAlertRule)
-		api.POST("/alert-rules", alertRulesH.CreateAlertRule)
-		api.PATCH("/alert-rules/:id", alertRulesH.UpdateAlertRule)
-		api.DELETE("/alert-rules/:id", alertRulesH.DeleteAlertRule)
-		api.POST("/alert-rules/test", alertRulesH.TestAlertRule)
+func registerUserRoutes(g *gin.RouterGroup, h *handlers.UserHandler) {
+	g.GET("/users", h.ListUsers)
+	g.POST("/users", h.CreateUser)
+	g.PATCH("/users/:id/role", h.UpdateUserRole)
+	g.DELETE("/users/:id", h.DeleteUser)
+}
 
-		// Settings
-		api.GET("/settings", settingsH.GetSettings)
-		api.PUT("/settings", settingsH.UpdateSettings)
-		api.POST("/settings/test-smtp", settingsH.TestSmtp)
-		api.POST("/settings/test-ntfy", settingsH.TestNtfy)
-		api.POST("/settings/cleanup-metrics", settingsH.CleanupMetrics)
-		api.POST("/settings/cleanup-audit", settingsH.CleanupAuditLogs)
+func registerGitWebhookRoutes(r *gin.Engine, g *gin.RouterGroup, h *handlers.GitWebhookHandler) {
+	g.GET("/webhooks/git", h.ListWebhooks)
+	g.POST("/webhooks/git", h.CreateWebhook)
+	g.GET("/webhooks/git/:id", h.GetWebhook)
+	g.PUT("/webhooks/git/:id", h.UpdateWebhook)
+	g.DELETE("/webhooks/git/:id", h.DeleteWebhook)
+	g.POST("/webhooks/git/:id/regenerate-secret", h.RegenerateSecret)
+	g.GET("/webhooks/git/:id/executions", h.GetWebhookExecutions)
+	// Public receiver — HMAC-authenticated, no JWT
+	r.POST("/api/v1/webhooks/git/:id/receive", h.ReceiveWebhook)
+}
 
-		// Scheduled Tasks
-		api.GET("/scheduled-tasks", scheduledTaskH.ListAllScheduledTasks)
-		api.GET("/hosts/:id/scheduled-tasks", scheduledTaskH.ListScheduledTasks)
-		api.POST("/hosts/:id/scheduled-tasks", scheduledTaskH.CreateScheduledTask)
-		api.GET("/hosts/:id/custom-tasks", scheduledTaskH.GetCustomTasks)
-		api.PUT("/scheduled-tasks/:id", scheduledTaskH.UpdateScheduledTask)
-		api.DELETE("/scheduled-tasks/:id", scheduledTaskH.DeleteScheduledTask)
-		api.POST("/scheduled-tasks/:id/run", scheduledTaskH.RunScheduledTask)
+func registerReleaseTrackerRoutes(g *gin.RouterGroup, h *handlers.ReleaseTrackerHandler) {
+	g.GET("/release-trackers", h.List)
+	g.POST("/release-trackers", h.Create)
+	g.GET("/release-trackers/:id", h.Get)
+	g.PUT("/release-trackers/:id", h.Update)
+	g.DELETE("/release-trackers/:id", h.Delete)
+	g.POST("/release-trackers/:id/check-now", h.TriggerCheck)
+	g.POST("/release-trackers/:id/run", h.Run)
+	g.GET("/release-trackers/:id/executions", h.GetExecutions)
+}
 
-		// Users
-		api.GET("/users", userH.ListUsers)
-		api.POST("/users", userH.CreateUser)
-		api.PATCH("/users/:id/role", userH.UpdateUserRole)
-		api.DELETE("/users/:id", userH.DeleteUser)
-
-		// Git Webhooks (CRUD — admin only, enforced in handler)
-		api.GET("/webhooks/git", gitWebhookH.ListWebhooks)
-		api.POST("/webhooks/git", gitWebhookH.CreateWebhook)
-		api.GET("/webhooks/git/:id", gitWebhookH.GetWebhook)
-		api.PUT("/webhooks/git/:id", gitWebhookH.UpdateWebhook)
-		api.DELETE("/webhooks/git/:id", gitWebhookH.DeleteWebhook)
-		api.POST("/webhooks/git/:id/regenerate-secret", gitWebhookH.RegenerateSecret)
-		api.GET("/webhooks/git/:id/executions", gitWebhookH.GetWebhookExecutions)
-
-		// Release Trackers (admin only, enforced in handler)
-		api.GET("/release-trackers", releaseTrackerH.List)
-		api.POST("/release-trackers", releaseTrackerH.Create)
-		api.GET("/release-trackers/:id", releaseTrackerH.Get)
-		api.PUT("/release-trackers/:id", releaseTrackerH.Update)
-		api.DELETE("/release-trackers/:id", releaseTrackerH.Delete)
-		api.POST("/release-trackers/:id/check-now", releaseTrackerH.TriggerCheck)
-		api.POST("/release-trackers/:id/run", releaseTrackerH.Run)
-		api.GET("/release-trackers/:id/executions", releaseTrackerH.GetExecutions)
-	}
-
-	// ========== Public webhook receiver (HMAC-authenticated, no JWT) ==========
-	r.POST("/api/v1/webhooks/git/:id/receive", gitWebhookH.ReceiveWebhook)
-
-	// Serve frontend static files
+func registerStaticFiles(r *gin.Engine) {
 	r.Static("/assets", "./frontend/dist/assets")
 	r.StaticFile("/", "./frontend/dist/index.html")
 	// Static root-level files must be explicit — the NoRoute SPA fallback would
@@ -204,6 +230,4 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *NotificationHub,
 	r.NoRoute(func(c *gin.Context) {
 		c.File("./frontend/dist/index.html")
 	})
-
-	return r
 }

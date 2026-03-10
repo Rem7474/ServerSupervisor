@@ -1,4 +1,4 @@
-package api
+package ws
 
 import (
 	"sync"

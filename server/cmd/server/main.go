@@ -14,7 +14,9 @@ import (
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/github"
+	"github.com/serversupervisor/server/internal/handlers"
 	"github.com/serversupervisor/server/internal/scheduler"
+	"github.com/serversupervisor/server/internal/ws"
 )
 
 func main() {
@@ -51,7 +53,7 @@ func main() {
 	}
 
 	// Create default admin user (sets must_change_password if using default "admin" password)
-	hash, err := api.HashPassword(cfg.AdminPassword)
+	hash, err := handlers.HashPassword(cfg.AdminPassword)
 	if err != nil {
 		log.Fatalf("Failed to hash admin password: %v", err)
 	}
@@ -77,7 +79,7 @@ func main() {
 	defer tracker.Stop()
 
 	// Notification hub — shared between alert engine (push on fire) and WS handler
-	notifHub := api.NewNotificationHub()
+	notifHub := ws.NewNotificationHub()
 
 	// Start background jobs (each runs in its own goroutine with panic recovery)
 	bg := background.New()
@@ -89,7 +91,9 @@ func main() {
 	defer bg.Stop()
 
 	// Setup router
-	router := api.SetupRouter(db, cfg, notifHub, sched)
+	router, releaseTrackerH := api.SetupRouter(db, cfg, notifHub, sched)
+	releaseTrackerH.StartPoller()
+	defer releaseTrackerH.StopPoller()
 
 	// Start server
 	srv := &http.Server{

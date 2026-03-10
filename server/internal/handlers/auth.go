@@ -1,4 +1,4 @@
-package api
+package handlers
 
 import (
 	"crypto/rand"
@@ -8,7 +8,6 @@ import (
 	"log"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -273,72 +272,6 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": "password updated"})
-}
-
-// JWTMiddleware validates JWT tokens for dashboard access
-func JWTMiddleware(cfg *config.Config) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		authHeader := c.GetHeader("Authorization")
-		if authHeader == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "missing authorization header"})
-			c.Abort()
-			return
-		}
-
-		parts := strings.SplitN(authHeader, " ", 2)
-		if len(parts) != 2 || parts[0] != "Bearer" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid authorization header"})
-			c.Abort()
-			return
-		}
-
-		token, err := jwt.Parse(parts[1], func(token *jwt.Token) (interface{}, error) {
-			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, jwt.ErrSignatureInvalid
-			}
-			return []byte(cfg.JWTSecret), nil
-		})
-
-		if err != nil || !token.Valid {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
-			c.Abort()
-			return
-		}
-
-		claims, ok := token.Claims.(jwt.MapClaims)
-		if !ok {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token claims"})
-			c.Abort()
-			return
-		}
-
-		c.Set("username", claims["sub"])
-		c.Set("role", claims["role"])
-		c.Next()
-	}
-}
-
-// APIKeyMiddleware validates agent API keys
-func APIKeyMiddleware(db *database.DB, cfg *config.Config) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		apiKey := c.GetHeader(cfg.APIKeyHeader)
-		if apiKey == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "missing API key"})
-			c.Abort()
-			return
-		}
-
-		host, err := db.GetHostByAPIKey(apiKey)
-		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid API key"})
-			c.Abort()
-			return
-		}
-
-		c.Set("host_id", host.ID)
-		c.Set("host", host)
-		c.Next()
-	}
 }
 
 func HashPassword(password string) (string, error) {

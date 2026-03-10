@@ -1,4 +1,4 @@
-package api
+package handlers
 
 import (
 	"crypto/hmac"
@@ -20,6 +20,7 @@ import (
 	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/models"
 	"github.com/serversupervisor/server/internal/notify"
+	"github.com/serversupervisor/server/internal/ws"
 )
 
 var validWebhookProviders = map[string]bool{
@@ -29,10 +30,10 @@ var validWebhookProviders = map[string]bool{
 type GitWebhookHandler struct {
 	db       *database.DB
 	cfg      *config.Config
-	notifHub *NotificationHub
+	notifHub *ws.NotificationHub
 }
 
-func NewGitWebhookHandler(db *database.DB, cfg *config.Config, notifHub *NotificationHub) *GitWebhookHandler {
+func NewGitWebhookHandler(db *database.DB, cfg *config.Config, notifHub *ws.NotificationHub) *GitWebhookHandler {
 	return &GitWebhookHandler{db: db, cfg: cfg, notifHub: notifHub}
 }
 
@@ -427,6 +428,10 @@ func (h *GitWebhookHandler) NotifyWebhookExecutionComplete(commandID, status str
 			})
 		}
 	}
+}
+
+func (h *GitWebhookHandler) HandleCommandCompletion(commandID, status string) {
+	h.NotifyWebhookExecutionComplete(commandID, status)
 }
 
 // ========== Signature verification ==========

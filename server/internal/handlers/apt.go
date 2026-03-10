@@ -1,4 +1,4 @@
-package api
+package handlers
 
 import (
 	"net/http"
@@ -79,4 +79,3 @@ func (h *AptHandler) GetAptStatus(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, status)
 }
-

@@ -1,4 +1,4 @@
-package api
+package handlers
 
 import (
 	"encoding/json"
@@ -13,17 +13,21 @@ import (
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/models"
+	"github.com/serversupervisor/server/internal/ws"
 )
 
-type AgentHandler struct {
-	db             *database.DB
-	cfg            *config.Config
-	streamHub      *CommandStreamHub
-	webhookHub     *GitWebhookHandler
-	releaseTracker *ReleaseTrackerHandler
+type CommandCompletionListener interface {
+	HandleCommandCompletion(commandID, status string)
 }
 
-func NewAgentHandler(db *database.DB, cfg *config.Config, streamHub *CommandStreamHub) *AgentHandler {
+type AgentHandler struct {
+	db                  *database.DB
+	cfg                 *config.Config
+	streamHub           *ws.CommandStreamHub
+	completionListeners []CommandCompletionListener
+}
+
+func NewAgentHandler(db *database.DB, cfg *config.Config, streamHub *ws.CommandStreamHub) *AgentHandler {
 	return &AgentHandler{
 		db:        db,
 		cfg:       cfg,
@@ -31,12 +35,11 @@ func NewAgentHandler(db *database.DB, cfg *config.Config, streamHub *CommandStre
 	}
 }
 
-func (h *AgentHandler) SetWebhookHub(wh *GitWebhookHandler) {
-	h.webhookHub = wh
-}
-
-func (h *AgentHandler) SetReleaseTrackerHub(rt *ReleaseTrackerHandler) {
-	h.releaseTracker = rt
+func (h *AgentHandler) AddCompletionListener(listener CommandCompletionListener) {
+	if listener == nil {
+		return
+	}
+	h.completionListeners = append(h.completionListeners, listener)
 }
 
 // ReceiveReport processes a full agent report (metrics + docker + apt)
@@ -231,14 +234,11 @@ func (h *AgentHandler) ReportCommandResult(c *gin.Context) {
 		}
 	}
 
-	// Update linked webhook execution (if triggered by a webhook)
-	if (result.Status == "completed" || result.Status == "failed") && h.webhookHub != nil {
-		go h.webhookHub.NotifyWebhookExecutionComplete(result.CommandID, result.Status)
-	}
-
-	// Update linked release tracker execution (if triggered by a release tracker)
-	if (result.Status == "completed" || result.Status == "failed") && h.releaseTracker != nil {
-		go h.releaseTracker.NotifyComplete(result.CommandID, result.Status)
+	// Notify any registered listeners about terminal command states.
+	if result.Status == "completed" || result.Status == "failed" {
+		for _, listener := range h.completionListeners {
+			go listener.HandleCommandCompletion(result.CommandID, result.Status)
+		}
 	}
 
 	// APT post-processing
@@ -421,7 +421,7 @@ func (h *AgentHandler) LogAuditAction(c *gin.Context) {
 	}
 
 	var audit struct {
-		Module  string `json:"module"`  // optional — e.g. "apt"; creates a remote_command when set
+		Module  string `json:"module"` // optional — e.g. "apt"; creates a remote_command when set
 		Action  string `json:"action" binding:"required"`
 		Status  string `json:"status" binding:"required"`
 		Details string `json:"details"`

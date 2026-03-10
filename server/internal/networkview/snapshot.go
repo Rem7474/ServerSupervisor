@@ -1,34 +1,15 @@
-package api
+package networkview
 
 import (
-	"net/http"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/models"
 )
 
-type NetworkHandler struct {
-	db *database.DB
-}
-
-func NewNetworkHandler(db *database.DB) *NetworkHandler {
-	return &NetworkHandler{db: db}
-}
-
-func (h *NetworkHandler) GetNetworkSnapshot(c *gin.Context) {
-	snapshot, err := buildNetworkSnapshot(h.db)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch network snapshot"})
-		return
-	}
-	c.JSON(http.StatusOK, snapshot)
-}
-
-func buildNetworkSnapshot(db *database.DB) (*models.NetworkSnapshot, error) {
+func BuildSnapshot(db *database.DB) (*models.NetworkSnapshot, error) {
 	hosts, err := db.GetAllHosts()
 	if err != nil {
 		return nil, err
@@ -119,102 +100,45 @@ func parseDockerPorts(raw string) []models.PortMapping {
 		}
 		mappings = append(mappings, mapping)
 	}
-
 	return mappings
 }
 
 func splitHostBinding(hostSide string) (string, int) {
+	hostSide = strings.TrimSpace(hostSide)
 	if hostSide == "" {
 		return "", 0
 	}
-	lastColon := strings.LastIndex(hostSide, ":")
-	if lastColon == -1 {
+
+	if strings.Count(hostSide, ":") == 0 {
 		return "", parsePortNumber(hostSide)
 	}
 
-	hostIP := strings.TrimSpace(hostSide[:lastColon])
-	hostPortStr := strings.TrimSpace(hostSide[lastColon+1:])
-
-	if strings.HasPrefix(hostIP, "[") && strings.HasSuffix(hostIP, "]") {
-		hostIP = strings.TrimPrefix(strings.TrimSuffix(hostIP, "]"), "[")
-	}
-	if hostIP == ":::" {
-		hostIP = "::"
+	parts := strings.Split(hostSide, ":")
+	if len(parts) == 2 {
+		return strings.TrimSpace(parts[0]), parsePortNumber(parts[1])
 	}
 
-	return hostIP, parsePortNumber(hostPortStr)
+	hostPort := parts[len(parts)-1]
+	hostIP := strings.Join(parts[:len(parts)-1], ":")
+	return strings.TrimSpace(hostIP), parsePortNumber(hostPort)
 }
 
 func parseContainerPort(raw string) (int, string) {
-	if raw == "" {
-		return 0, ""
-	}
-	parts := strings.SplitN(raw, "/", 2)
+	parts := strings.SplitN(strings.TrimSpace(raw), "/", 2)
 	port := parsePortNumber(parts[0])
-	proto := ""
-	if len(parts) > 1 {
-		proto = strings.ToLower(strings.TrimSpace(parts[1]))
+	protocol := "tcp"
+	if len(parts) == 2 && strings.TrimSpace(parts[1]) != "" {
+		protocol = strings.ToLower(strings.TrimSpace(parts[1]))
 	}
-	return port, proto
+	return port, protocol
 }
 
 func parsePortNumber(raw string) int {
-	clean := strings.TrimSpace(raw)
-	if clean == "" {
-		return 0
+	value := strings.TrimSpace(raw)
+	value = strings.Trim(value, "[]")
+	if idx := strings.LastIndex(value, ":"); idx >= 0 {
+		value = value[idx+1:]
 	}
-	if strings.Contains(clean, "-") {
-		clean = strings.SplitN(clean, "-", 2)[0]
-	}
-	value, err := strconv.Atoi(clean)
-	if err != nil {
-		return 0
-	}
-	return value
-}
-
-// GetTopologyConfig returns persisted network configuration
-func (h *NetworkHandler) GetTopologyConfig(c *gin.Context) {
-	cfg, err := h.db.GetNetworkTopologyConfig()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	c.JSON(http.StatusOK, cfg)
-}
-
-// SaveTopologyConfig persists network configuration
-func (h *NetworkHandler) SaveTopologyConfig(c *gin.Context) {
-	var cfg models.NetworkTopologyConfig
-	if err := c.ShouldBindJSON(&cfg); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	if err := h.db.SaveNetworkTopologyConfig(&cfg); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"success": true})
-}
-
-// GetTopologySnapshot returns topology with config
-func (h *NetworkHandler) GetTopologySnapshot(c *gin.Context) {
-	baseSnapshot, err := buildNetworkSnapshot(h.db)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch network snapshot"})
-		return
-	}
-
-	config, _ := h.db.GetNetworkTopologyConfig()
-
-	snapshot := &models.TopologySnapshot{
-		Hosts:      baseSnapshot.Hosts,
-		Containers: baseSnapshot.Containers,
-		Config:     config,
-		UpdatedAt:  time.Now(),
-	}
-
-	c.JSON(http.StatusOK, snapshot)
+	port, _ := strconv.Atoi(value)
+	return port
 }

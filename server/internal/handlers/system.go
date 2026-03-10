@@ -1,4 +1,4 @@
-package api
+package handlers
 
 import (
 	"fmt"
@@ -10,6 +10,7 @@ import (
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/models"
+	"github.com/serversupervisor/server/internal/ws"
 )
 
 // validServiceName matches valid systemd service names: alphanumeric plus ._:@-
@@ -18,10 +19,10 @@ var validServiceName = regexp.MustCompile(`^[a-zA-Z0-9._:@\-]{1,256}$`)
 type SystemHandler struct {
 	db        *database.DB
 	cfg       *config.Config
-	streamHub *CommandStreamHub
+	streamHub *ws.CommandStreamHub
 }
 
-func NewSystemHandler(db *database.DB, cfg *config.Config, streamHub *CommandStreamHub) *SystemHandler {
+func NewSystemHandler(db *database.DB, cfg *config.Config, streamHub *ws.CommandStreamHub) *SystemHandler {
 	return &SystemHandler{db: db, cfg: cfg, streamHub: streamHub}
 }
 

@@ -1,4 +1,4 @@
-package api
+package ws
 
 import (
 	"crypto/sha256"
@@ -17,6 +17,7 @@ import (
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/models"
+	"github.com/serversupervisor/server/internal/networkview"
 )
 
 // snapshotChanged returns true (and updates *lastHash) when payload differs from the
@@ -618,7 +619,7 @@ func (h *WSHandler) sendDockerSnapshot(conn *websocket.Conn, lastHash *string) e
 }
 
 func (h *WSHandler) sendNetworkSnapshot(conn *websocket.Conn, lastHash *string) error {
-	snapshot, err := buildNetworkSnapshot(h.db)
+	snapshot, err := networkview.BuildSnapshot(h.db)
 	if err != nil {
 		return err
 	}
@@ -783,6 +784,13 @@ func isVersionUpToDate(runningTag, runningDigest, latestTag, latestDigest string
 		return false
 	}
 	return normalizeVersion(runningTag) == normalizeVersion(latestTag)
+}
+
+func normalizeVersion(v string) string {
+	if len(v) > 0 && v[0] == 'v' {
+		return v[1:]
+	}
+	return v
 }
 
 // resolveContainerVersion returns the best available version string for display.

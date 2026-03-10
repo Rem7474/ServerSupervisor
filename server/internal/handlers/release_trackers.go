@@ -1,4 +1,4 @@
-package api
+package handlers
 
 import (
 	"database/sql"
@@ -14,6 +14,7 @@ import (
 	"github.com/serversupervisor/server/internal/gitprovider"
 	"github.com/serversupervisor/server/internal/models"
 	"github.com/serversupervisor/server/internal/notify"
+	"github.com/serversupervisor/server/internal/ws"
 )
 
 var validReleaseProviders = map[string]bool{
@@ -23,11 +24,11 @@ var validReleaseProviders = map[string]bool{
 type ReleaseTrackerHandler struct {
 	db       *database.DB
 	cfg      *config.Config
-	notifHub *NotificationHub
+	notifHub *ws.NotificationHub
 	stop     chan struct{}
 }
 
-func NewReleaseTrackerHandler(db *database.DB, cfg *config.Config, notifHub *NotificationHub) *ReleaseTrackerHandler {
+func NewReleaseTrackerHandler(db *database.DB, cfg *config.Config, notifHub *ws.NotificationHub) *ReleaseTrackerHandler {
 	return &ReleaseTrackerHandler{
 		db:       db,
 		cfg:      cfg,
@@ -254,6 +255,10 @@ func (h *ReleaseTrackerHandler) NotifyComplete(commandID, status string) {
 			})
 		}
 	}
+}
+
+func (h *ReleaseTrackerHandler) HandleCommandCompletion(commandID, status string) {
+	h.NotifyComplete(commandID, status)
 }
 
 // ========== HTTP handlers ==========
