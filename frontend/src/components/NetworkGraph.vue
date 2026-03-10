@@ -632,7 +632,18 @@ watch(
   () => {
     if (!cy) return
 
-    // Snapshot current positions before rebuild
+    const hasSavedPositions = Object.keys(props.nodePositions || {}).length > 0
+
+    if (!hasSavedPositions) {
+      // No user-saved positions: always run full auto-layout
+      const newElements = buildElements()
+      cy.elements().remove()
+      cy.add(newElements)
+      cy.layout(getLayoutOptions()).run()
+      return
+    }
+
+    // Snapshot current in-memory positions before rebuild
     const currentPositions = {}
     cy.nodes().forEach(n => {
       currentPositions[n.id()] = { x: n.position('x'), y: n.position('y') }
@@ -643,10 +654,9 @@ watch(
     cy.add(newElements)
 
     // Restore positions: use in-memory first, fallback to prop (DB-loaded)
-    const fallback = props.nodePositions || {}
     let hasNewNodes = false
     cy.nodes().forEach(n => {
-      const pos = currentPositions[n.id()] || fallback[n.id()]
+      const pos = currentPositions[n.id()] || (props.nodePositions || {})[n.id()]
       if (pos) {
         n.position(pos)
       } else {
