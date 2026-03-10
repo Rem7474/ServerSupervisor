@@ -11,6 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/database"
+	"github.com/serversupervisor/server/internal/dispatch"
 	"github.com/serversupervisor/server/internal/gitprovider"
 	"github.com/serversupervisor/server/internal/models"
 	"github.com/serversupervisor/server/internal/notify"
@@ -22,18 +23,20 @@ var validReleaseProviders = map[string]bool{
 }
 
 type ReleaseTrackerHandler struct {
-	db       *database.DB
-	cfg      *config.Config
-	notifHub *ws.NotificationHub
-	stop     chan struct{}
+	db         *database.DB
+	cfg        *config.Config
+	dispatcher *dispatch.Dispatcher
+	notifHub   *ws.NotificationHub
+	stop       chan struct{}
 }
 
-func NewReleaseTrackerHandler(db *database.DB, cfg *config.Config, notifHub *ws.NotificationHub) *ReleaseTrackerHandler {
+func NewReleaseTrackerHandler(db *database.DB, cfg *config.Config, dispatcher *dispatch.Dispatcher, notifHub *ws.NotificationHub) *ReleaseTrackerHandler {
 	return &ReleaseTrackerHandler{
-		db:       db,
-		cfg:      cfg,
-		notifHub: notifHub,
-		stop:     make(chan struct{}),
+		db:         db,
+		cfg:        cfg,
+		dispatcher: dispatcher,
+		notifHub:   notifHub,
+		stop:       make(chan struct{}),
 	}
 }
 
@@ -167,31 +170,31 @@ func (h *ReleaseTrackerHandler) dispatchRelease(t models.ReleaseTracker, tag, re
 	}
 	envPayload, _ := json.Marshal(map[string]interface{}{"env": envVars})
 
-	// Create audit log
 	username := fmt.Sprintf("tracker:%s", t.Name)
-	details := fmt.Sprintf(`{"tracker_id":%q,"repo":%q,"tag":%q}`, t.ID, t.RepoOwner+"/"+t.RepoName, tag)
-	auditID, auditErr := h.db.CreateAuditLog(username, "release_trigger", t.HostID, "poller", details, "pending")
-	var auditIDPtr *int64
-	if auditErr == nil {
-		auditIDPtr = &auditID
-	}
-
-	// Dispatch command
 	triggeredBy := fmt.Sprintf("tracker:%s", t.Name)
-	cmd, err := h.db.CreateRemoteCommand(
-		t.HostID, "custom", "run", t.CustomTaskID, string(envPayload), triggeredBy, auditIDPtr,
-	)
+	result, err := h.dispatcher.Create(dispatch.Request{
+		HostID:      t.HostID,
+		Module:      "custom",
+		Action:      "run",
+		Target:      t.CustomTaskID,
+		Payload:     string(envPayload),
+		TriggeredBy: triggeredBy,
+		Audit: &dispatch.AuditLogRequest{
+			Username:  username,
+			Action:    "release_trigger",
+			HostID:    t.HostID,
+			IPAddress: "poller",
+			Details:   fmt.Sprintf(`{"tracker_id":%q,"repo":%q,"tag":%q}`, t.ID, t.RepoOwner+"/"+t.RepoName, tag),
+		},
+	})
 	if err != nil {
 		log.Printf("Release tracker %s: failed to create command: %v", t.Name, err)
-		if auditIDPtr != nil {
-			_ = h.db.UpdateAuditLogStatus(*auditIDPtr, "failed", err.Error())
-		}
 		now := time.Now()
 		_ = h.db.UpdateReleaseTrackerExecutionStatus(exec.ID, "failed", &now)
 		return
 	}
 
-	_ = h.db.UpdateReleaseTrackerExecutionCommandID(exec.ID, cmd.ID)
+	_ = h.db.UpdateReleaseTrackerExecutionCommandID(exec.ID, result.Command.ID)
 	_ = h.db.UpdateReleaseTrackerLastSeen(t.ID, tag, true)
 }
 

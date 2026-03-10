@@ -4,6 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/database"
+	"github.com/serversupervisor/server/internal/dispatch"
 	"github.com/serversupervisor/server/internal/handlers"
 	"github.com/serversupervisor/server/internal/scheduler"
 	"github.com/serversupervisor/server/internal/ws"
@@ -12,7 +13,7 @@ import (
 // SetupRouter wires all handlers and registers route groups.
 // The caller is responsible for starting long-running poller services
 // (e.g. releaseTrackerH.StartPoller()) after this function returns.
-func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationHub, sched *scheduler.TaskScheduler) (*gin.Engine, *handlers.ReleaseTrackerHandler) {
+func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationHub, sched *scheduler.TaskScheduler, dispatcher *dispatch.Dispatcher) (*gin.Engine, *handlers.ReleaseTrackerHandler) {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
 	r.Use(gin.Recovery())
@@ -28,9 +29,9 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	hostH := handlers.NewHostHandler(db, cfg)
 	wsH := ws.NewWSHandler(db, cfg, notifHub)
 	agentH := handlers.NewAgentHandler(db, cfg, wsH.GetStreamHub())
-	aptH := handlers.NewAptHandler(db, cfg)
-	dockerH := handlers.NewDockerHandler(db, cfg, wsH.GetStreamHub())
-	systemH := handlers.NewSystemHandler(db, cfg, wsH.GetStreamHub())
+	aptH := handlers.NewAptHandler(db, cfg, dispatcher)
+	dockerH := handlers.NewDockerHandler(db, cfg, dispatcher, wsH.GetStreamHub())
+	systemH := handlers.NewSystemHandler(db, cfg, dispatcher, wsH.GetStreamHub())
 	networkH := handlers.NewNetworkHandler(db)
 	auditH := handlers.NewAuditHandler(db, cfg)
 	userH := handlers.NewUserHandler(db, cfg)
@@ -38,9 +39,9 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	alertRulesH := handlers.NewAlertRulesHandler(db, cfg)
 	settingsH := handlers.NewSettingsHandler(db, cfg)
 	notifH := handlers.NewNotificationsHandler(db)
-	scheduledTaskH := handlers.NewScheduledTaskHandler(db, cfg, sched)
-	gitWebhookH := handlers.NewGitWebhookHandler(db, cfg, notifHub)
-	releaseTrackerH := handlers.NewReleaseTrackerHandler(db, cfg, notifHub)
+	scheduledTaskH := handlers.NewScheduledTaskHandler(db, cfg, dispatcher, sched)
+	gitWebhookH := handlers.NewGitWebhookHandler(db, cfg, dispatcher, notifHub)
+	releaseTrackerH := handlers.NewReleaseTrackerHandler(db, cfg, dispatcher, notifHub)
 	agentH.AddCompletionListener(gitWebhookH)
 	agentH.AddCompletionListener(releaseTrackerH)
 

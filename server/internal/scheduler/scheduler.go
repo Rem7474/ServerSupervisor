@@ -9,31 +9,33 @@ import (
 	"time"
 
 	"github.com/robfig/cron/v3"
+	"github.com/serversupervisor/server/internal/dispatch"
 	"github.com/serversupervisor/server/internal/models"
 )
 
 // DB is the subset of database.DB methods needed by the scheduler.
 type DB interface {
 	GetAllScheduledTasks() ([]models.ScheduledTask, error)
-	CreateRemoteCommand(hostID, module, action, target, payload, triggeredBy string, auditLogID *int64) (*models.RemoteCommand, error)
 	UpdateScheduledTaskRun(id, status string, lastRunAt, nextRunAt time.Time) error
 	LinkCommandToScheduledTask(commandID, taskID string) error
 }
 
 // TaskScheduler runs scheduled tasks using robfig/cron.
 type TaskScheduler struct {
-	c    *cron.Cron
-	db   DB
-	jobs map[string]cron.EntryID // scheduled_task.id → cron entry
-	mu   sync.Mutex
+	c          *cron.Cron
+	db         DB
+	dispatcher *dispatch.Dispatcher
+	jobs       map[string]cron.EntryID // scheduled_task.id → cron entry
+	mu         sync.Mutex
 }
 
 // New creates a TaskScheduler. Call Start() to begin scheduling.
-func New(db DB) *TaskScheduler {
+func New(db DB, dispatcher *dispatch.Dispatcher) *TaskScheduler {
 	return &TaskScheduler{
-		c:    cron.New(), // standard 5-field cron expressions
-		db:   db,
-		jobs: make(map[string]cron.EntryID),
+		c:          cron.New(), // standard 5-field cron expressions
+		db:         db,
+		dispatcher: dispatcher,
+		jobs:       make(map[string]cron.EntryID),
 	}
 }
 
@@ -117,7 +119,14 @@ func (s *TaskScheduler) makeJob(t models.ScheduledTask) func() {
 		if payload == "" {
 			payload = "{}"
 		}
-		cmd, err := s.db.CreateRemoteCommand(t.HostID, t.Module, t.Action, t.Target, payload, "scheduler", nil)
+		result, err := s.dispatcher.Create(dispatch.Request{
+			HostID:      t.HostID,
+			Module:      t.Module,
+			Action:      t.Action,
+			Target:      t.Target,
+			Payload:     payload,
+			TriggeredBy: "scheduler",
+		})
 		if err != nil {
 			log.Printf("[scheduler] task %s (%s): failed to create command: %v", t.ID, t.Name, err)
 			now := time.Now()
@@ -125,7 +134,7 @@ func (s *TaskScheduler) makeJob(t models.ScheduledTask) func() {
 			_ = s.db.UpdateScheduledTaskRun(t.ID, "failed", now, next)
 			return
 		}
-		if err := s.db.LinkCommandToScheduledTask(cmd.ID, t.ID); err != nil {
+		if err := s.db.LinkCommandToScheduledTask(result.Command.ID, t.ID); err != nil {
 			log.Printf("[scheduler] task %s: failed to link command: %v", t.ID, err)
 		}
 		now := time.Now()
@@ -133,6 +142,6 @@ func (s *TaskScheduler) makeJob(t models.ScheduledTask) func() {
 		if err := s.db.UpdateScheduledTaskRun(t.ID, "pending", now, next); err != nil {
 			log.Printf("[scheduler] task %s: failed to update run metadata: %v", t.ID, err)
 		}
-		log.Printf("[scheduler] task %s (%s): queued command %s on host %s", t.ID, t.Name, cmd.ID, t.HostID)
+		log.Printf("[scheduler] task %s (%s): queued command %s on host %s", t.ID, t.Name, result.Command.ID, t.HostID)
 	}
 }

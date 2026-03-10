@@ -12,19 +12,16 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/database"
+	"github.com/serversupervisor/server/internal/events"
 	"github.com/serversupervisor/server/internal/models"
 	"github.com/serversupervisor/server/internal/ws"
 )
-
-type CommandCompletionListener interface {
-	HandleCommandCompletion(commandID, status string)
-}
 
 type AgentHandler struct {
 	db                  *database.DB
 	cfg                 *config.Config
 	streamHub           *ws.CommandStreamHub
-	completionListeners []CommandCompletionListener
+	completionListeners []events.CommandCompletionListener
 }
 
 func NewAgentHandler(db *database.DB, cfg *config.Config, streamHub *ws.CommandStreamHub) *AgentHandler {
@@ -35,7 +32,7 @@ func NewAgentHandler(db *database.DB, cfg *config.Config, streamHub *ws.CommandS
 	}
 }
 
-func (h *AgentHandler) AddCompletionListener(listener CommandCompletionListener) {
+func (h *AgentHandler) AddCompletionListener(listener events.CommandCompletionListener) {
 	if listener == nil {
 		return
 	}

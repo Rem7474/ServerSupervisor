@@ -2,13 +2,13 @@ package handlers
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"regexp"
 
 	"github.com/gin-gonic/gin"
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/database"
+	"github.com/serversupervisor/server/internal/dispatch"
 	"github.com/serversupervisor/server/internal/models"
 	"github.com/serversupervisor/server/internal/ws"
 )
@@ -17,13 +17,14 @@ import (
 var validServiceName = regexp.MustCompile(`^[a-zA-Z0-9._:@\-]{1,256}$`)
 
 type SystemHandler struct {
-	db        *database.DB
-	cfg       *config.Config
-	streamHub *ws.CommandStreamHub
+	db         *database.DB
+	cfg        *config.Config
+	dispatcher *dispatch.Dispatcher
+	streamHub  *ws.CommandStreamHub
 }
 
-func NewSystemHandler(db *database.DB, cfg *config.Config, streamHub *ws.CommandStreamHub) *SystemHandler {
-	return &SystemHandler{db: db, cfg: cfg, streamHub: streamHub}
+func NewSystemHandler(db *database.DB, cfg *config.Config, dispatcher *dispatch.Dispatcher, streamHub *ws.CommandStreamHub) *SystemHandler {
+	return &SystemHandler{db: db, cfg: cfg, dispatcher: dispatcher, streamHub: streamHub}
 }
 
 // SendJournalCommand enqueues a journalctl log fetch for a specific service on a host.
@@ -50,25 +51,27 @@ func (h *SystemHandler) SendJournalCommand(c *gin.Context) {
 		return
 	}
 
-	details := fmt.Sprintf(`{"service":"%s"}`, req.ServiceName)
-	auditID, auditErr := h.db.CreateAuditLog(username, "journalctl", req.HostID, c.ClientIP(), details, "pending")
-	var auditLogIDPtr *int64
-	if auditErr != nil {
-		log.Printf("Warning: failed to create audit log for journalctl command: %v", auditErr)
-	} else {
-		auditLogIDPtr = &auditID
-	}
-
-	cmd, err := h.db.CreateRemoteCommand(req.HostID, "journal", "logs", req.ServiceName, "{}", username, auditLogIDPtr)
+	result, err := h.dispatcher.Create(dispatch.Request{
+		HostID:      req.HostID,
+		Module:      "journal",
+		Action:      "logs",
+		Target:      req.ServiceName,
+		Payload:     "{}",
+		TriggeredBy: username,
+		Audit: &dispatch.AuditLogRequest{
+			Username:  username,
+			Action:    "journalctl",
+			HostID:    req.HostID,
+			IPAddress: c.ClientIP(),
+			Details:   fmt.Sprintf(`{"service":"%s"}`, req.ServiceName),
+		},
+	})
 	if err != nil {
-		if auditLogIDPtr != nil {
-			_ = h.db.UpdateAuditLogStatus(*auditLogIDPtr, "failed", err.Error())
-		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create command"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"command_id": cmd.ID, "status": "pending"})
+	c.JSON(http.StatusOK, gin.H{"command_id": result.Command.ID, "status": "pending"})
 }
 
 // SendProcessesCommand enqueues a process list snapshot request for an agent.
@@ -88,24 +91,26 @@ func (h *SystemHandler) SendProcessesCommand(c *gin.Context) {
 		return
 	}
 
-	auditID, auditErr := h.db.CreateAuditLog(username, "processes_list", req.HostID, c.ClientIP(), "{}", "pending")
-	var auditLogIDPtr *int64
-	if auditErr != nil {
-		log.Printf("Warning: failed to create audit log for processes command: %v", auditErr)
-	} else {
-		auditLogIDPtr = &auditID
-	}
-
-	cmd, err := h.db.CreateRemoteCommand(req.HostID, "processes", "list", "", "{}", username, auditLogIDPtr)
+	result, err := h.dispatcher.Create(dispatch.Request{
+		HostID:      req.HostID,
+		Module:      "processes",
+		Action:      "list",
+		Payload:     "{}",
+		TriggeredBy: username,
+		Audit: &dispatch.AuditLogRequest{
+			Username:  username,
+			Action:    "processes_list",
+			HostID:    req.HostID,
+			IPAddress: c.ClientIP(),
+			Details:   "{}",
+		},
+	})
 	if err != nil {
-		if auditLogIDPtr != nil {
-			_ = h.db.UpdateAuditLogStatus(*auditLogIDPtr, "failed", err.Error())
-		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create command"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"command_id": cmd.ID, "status": "pending"})
+	c.JSON(http.StatusOK, gin.H{"command_id": result.Command.ID, "status": "pending"})
 }
 
 // SendSystemdCommand enqueues a systemd service management command for an agent.
@@ -132,23 +137,25 @@ func (h *SystemHandler) SendSystemdCommand(c *gin.Context) {
 		return
 	}
 
-	details := fmt.Sprintf(`{"service":"%s","action":"%s"}`, req.ServiceName, req.Action)
-	auditID, auditErr := h.db.CreateAuditLog(username, "systemd_"+req.Action, req.HostID, c.ClientIP(), details, "pending")
-	var auditLogIDPtr *int64
-	if auditErr != nil {
-		log.Printf("Warning: failed to create audit log for systemd command: %v", auditErr)
-	} else {
-		auditLogIDPtr = &auditID
-	}
-
-	cmd, err := h.db.CreateRemoteCommand(req.HostID, "systemd", req.Action, req.ServiceName, "{}", username, auditLogIDPtr)
+	result, err := h.dispatcher.Create(dispatch.Request{
+		HostID:      req.HostID,
+		Module:      "systemd",
+		Action:      req.Action,
+		Target:      req.ServiceName,
+		Payload:     "{}",
+		TriggeredBy: username,
+		Audit: &dispatch.AuditLogRequest{
+			Username:  username,
+			Action:    "systemd_" + req.Action,
+			HostID:    req.HostID,
+			IPAddress: c.ClientIP(),
+			Details:   fmt.Sprintf(`{"service":"%s","action":"%s"}`, req.ServiceName, req.Action),
+		},
+	})
 	if err != nil {
-		if auditLogIDPtr != nil {
-			_ = h.db.UpdateAuditLogStatus(*auditLogIDPtr, "failed", err.Error())
-		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create command"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"command_id": cmd.ID, "status": "pending"})
+	c.JSON(http.StatusOK, gin.H{"command_id": result.Command.ID, "status": "pending"})
 }

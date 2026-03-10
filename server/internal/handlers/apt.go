@@ -6,16 +6,18 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/database"
+	"github.com/serversupervisor/server/internal/dispatch"
 	"github.com/serversupervisor/server/internal/models"
 )
 
 type AptHandler struct {
-	db  *database.DB
-	cfg *config.Config
+	db         *database.DB
+	cfg        *config.Config
+	dispatcher *dispatch.Dispatcher
 }
 
-func NewAptHandler(db *database.DB, cfg *config.Config) *AptHandler {
-	return &AptHandler{db: db, cfg: cfg}
+func NewAptHandler(db *database.DB, cfg *config.Config, dispatcher *dispatch.Dispatcher) *AptHandler {
+	return &AptHandler{db: db, cfg: cfg, dispatcher: dispatcher}
 }
 
 // SendCommand sends an apt command to one or more hosts
@@ -40,30 +42,26 @@ func (h *AptHandler) SendCommand(c *gin.Context) {
 
 	var results []gin.H
 	for _, hostID := range req.HostIDs {
-		// Log to audit trail
-		ip := c.ClientIP()
-		auditDetails := "apt " + req.Command
-		auditLogID, err := h.db.CreateAuditLog(username, "apt_"+req.Command, hostID, ip, auditDetails, "pending")
+		result, err := h.dispatcher.Create(dispatch.Request{
+			HostID:      hostID,
+			Module:      "apt",
+			Action:      req.Command,
+			Payload:     "{}",
+			TriggeredBy: username,
+			Audit: &dispatch.AuditLogRequest{
+				Username:  username,
+				Action:    "apt_" + req.Command,
+				HostID:    hostID,
+				IPAddress: c.ClientIP(),
+				Details:   "apt " + req.Command,
+			},
+		})
 		if err != nil {
-			// Log audit failure but don't block the request
-			auditLogID = 0
-		}
-
-		var auditLogIDPtr *int64
-		if auditLogID != 0 {
-			auditLogIDPtr = &auditLogID
-		}
-
-		cmd, err := h.db.CreateRemoteCommand(hostID, "apt", req.Command, "", "{}", username, auditLogIDPtr)
-		if err != nil {
-			if auditLogIDPtr != nil {
-				_ = h.db.UpdateAuditLogStatus(*auditLogIDPtr, "failed", err.Error())
-			}
 			results = append(results, gin.H{"host_id": hostID, "error": err.Error()})
 			continue
 		}
 
-		results = append(results, gin.H{"host_id": hostID, "command_id": cmd.ID, "status": "pending"})
+		results = append(results, gin.H{"host_id": hostID, "command_id": result.Command.ID, "status": "pending"})
 	}
 
 	c.JSON(http.StatusOK, gin.H{"commands": results})

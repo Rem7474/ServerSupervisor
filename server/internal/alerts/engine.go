@@ -11,6 +11,7 @@ import (
 
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/database"
+	"github.com/serversupervisor/server/internal/dispatch"
 	"github.com/serversupervisor/server/internal/models"
 	"github.com/serversupervisor/server/internal/notify"
 )
@@ -21,7 +22,7 @@ type NotificationPusher interface {
 	Broadcast(payload interface{})
 }
 
-func EvaluateAlerts(db *database.DB, cfg *config.Config, pusher NotificationPusher) {
+func EvaluateAlerts(db *database.DB, cfg *config.Config, dispatcher *dispatch.Dispatcher, pusher NotificationPusher) {
 	rules, err := db.GetAlertRules()
 	if err != nil {
 		log.Printf("Alerts: failed to fetch rules: %v", err)
@@ -77,7 +78,7 @@ func EvaluateAlerts(db *database.DB, cfg *config.Config, pusher NotificationPush
 					details := fmt.Sprintf(`{"rule_id":%d,"metric":"%s","operator":"%s","value":%.4f}`, rule.ID, rule.Metric, rule.Operator, value)
 					_, _ = db.CreateAuditLog("alert-engine", "alert_fired", host.ID, "", details, "success")
 					sendAlertNotifications(n, cfg, rule, host, value)
-					triggerAlertCommand(db, rule, host)
+					triggerAlertCommand(dispatcher, rule, host)
 					pushBrowserNotification(pusher, rule, host, value, incID)
 				}
 			} else if inc != nil {
@@ -286,7 +287,10 @@ func pushBrowserNotification(pusher NotificationPusher, rule models.AlertRule, h
 
 // triggerAlertCommand creates a remote command on the host when an alert fires,
 // if the rule's actions include a CommandTrigger.
-func triggerAlertCommand(db *database.DB, rule models.AlertRule, host models.Host) {
+func triggerAlertCommand(dispatcher *dispatch.Dispatcher, rule models.AlertRule, host models.Host) {
+	if dispatcher == nil {
+		return
+	}
 	ct := rule.Actions.CommandTrigger
 	if ct == nil || ct.Module == "" || ct.Action == "" {
 		return
@@ -296,7 +300,14 @@ func triggerAlertCommand(db *database.DB, rule models.AlertRule, host models.Hos
 		payload = "{}"
 	}
 	triggeredBy := fmt.Sprintf("alert:%d", rule.ID)
-	if _, err := db.CreateRemoteCommand(host.ID, ct.Module, ct.Action, ct.Target, payload, triggeredBy, nil); err != nil {
+	if _, err := dispatcher.Create(dispatch.Request{
+		HostID:      host.ID,
+		Module:      ct.Module,
+		Action:      ct.Action,
+		Target:      ct.Target,
+		Payload:     payload,
+		TriggeredBy: triggeredBy,
+	}); err != nil {
 		log.Printf("Alerts: failed to create command trigger for rule %d on host %s: %v", rule.ID, host.ID, err)
 	} else {
 		log.Printf("Alerts: triggered command %s/%s on host %s (rule %d)", ct.Module, ct.Action, host.Name, rule.ID)

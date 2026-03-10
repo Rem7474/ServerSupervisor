@@ -13,6 +13,7 @@ import (
 	"github.com/serversupervisor/server/internal/background"
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/database"
+	"github.com/serversupervisor/server/internal/dispatch"
 	"github.com/serversupervisor/server/internal/github"
 	"github.com/serversupervisor/server/internal/handlers"
 	"github.com/serversupervisor/server/internal/scheduler"
@@ -68,8 +69,10 @@ func main() {
 		}
 	}
 
+	dispatcher := dispatch.New(db)
+
 	// Start task scheduler
-	sched := scheduler.New(db)
+	sched := scheduler.New(db, dispatcher)
 	sched.Start()
 	defer sched.Stop()
 
@@ -85,13 +88,13 @@ func main() {
 	bg := background.New()
 	bg.Add(background.NewAuditCleanupJob(db))
 	bg.Add(background.NewHostStatusJob(db))
-	bg.Add(background.NewAlertEvalJob(db, cfg, notifHub))
+	bg.Add(background.NewAlertEvalJob(db, cfg, dispatcher, notifHub))
 	bg.Add(background.NewMetricsDownsampleJob(db))
 	bg.Start()
 	defer bg.Stop()
 
 	// Setup router
-	router, releaseTrackerH := api.SetupRouter(db, cfg, notifHub, sched)
+	router, releaseTrackerH := api.SetupRouter(db, cfg, notifHub, sched, dispatcher)
 	releaseTrackerH.StartPoller()
 	defer releaseTrackerH.StopPoller()
 

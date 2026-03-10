@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"path/filepath"
 	"strconv"
@@ -11,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/database"
+	"github.com/serversupervisor/server/internal/dispatch"
 	"github.com/serversupervisor/server/internal/models"
 	"github.com/serversupervisor/server/internal/ws"
 )
@@ -28,13 +28,14 @@ func isValidWorkingDir(p string) bool {
 }
 
 type DockerHandler struct {
-	db        *database.DB
-	cfg       *config.Config
-	streamHub *ws.CommandStreamHub
+	db         *database.DB
+	cfg        *config.Config
+	dispatcher *dispatch.Dispatcher
+	streamHub  *ws.CommandStreamHub
 }
 
-func NewDockerHandler(db *database.DB, cfg *config.Config, streamHub *ws.CommandStreamHub) *DockerHandler {
-	return &DockerHandler{db: db, cfg: cfg, streamHub: streamHub}
+func NewDockerHandler(db *database.DB, cfg *config.Config, dispatcher *dispatch.Dispatcher, streamHub *ws.CommandStreamHub) *DockerHandler {
+	return &DockerHandler{db: db, cfg: cfg, dispatcher: dispatcher, streamHub: streamHub}
 }
 
 // ListContainers returns Docker containers for a specific host
@@ -185,27 +186,28 @@ func (h *DockerHandler) SendDockerCommand(c *gin.Context) {
 		return
 	}
 
-	// Create audit log
-	details := fmt.Sprintf(`{"container":"%s","action":"%s","working_dir":"%s"}`, req.ContainerName, req.Action, req.WorkingDir)
-	auditID, auditErr := h.db.CreateAuditLog(username, "docker_"+req.Action, req.HostID, c.ClientIP(), details, "pending")
-	var auditLogIDPtr *int64
-	if auditErr != nil {
-		log.Printf("Warning: failed to create audit log for docker command: %v", auditErr)
-	} else {
-		auditLogIDPtr = &auditID
-	}
-
 	payload := fmt.Sprintf(`{"working_dir":%q}`, req.WorkingDir)
-	cmd, err := h.db.CreateRemoteCommand(req.HostID, "docker", req.Action, req.ContainerName, payload, username, auditLogIDPtr)
+	result, err := h.dispatcher.Create(dispatch.Request{
+		HostID:      req.HostID,
+		Module:      "docker",
+		Action:      req.Action,
+		Target:      req.ContainerName,
+		Payload:     payload,
+		TriggeredBy: username,
+		Audit: &dispatch.AuditLogRequest{
+			Username:  username,
+			Action:    "docker_" + req.Action,
+			HostID:    req.HostID,
+			IPAddress: c.ClientIP(),
+			Details:   fmt.Sprintf(`{"container":"%s","action":"%s","working_dir":"%s"}`, req.ContainerName, req.Action, req.WorkingDir),
+		},
+	})
 	if err != nil {
-		if auditLogIDPtr != nil {
-			_ = h.db.UpdateAuditLogStatus(*auditLogIDPtr, "failed", err.Error())
-		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create command"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"command_id": cmd.ID, "status": "pending"})
+	c.JSON(http.StatusOK, gin.H{"command_id": result.Command.ID, "status": "pending"})
 }
 
 // ListComposeProjects returns all Docker Compose projects across all hosts.

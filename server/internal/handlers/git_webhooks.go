@@ -18,6 +18,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/database"
+	"github.com/serversupervisor/server/internal/dispatch"
 	"github.com/serversupervisor/server/internal/models"
 	"github.com/serversupervisor/server/internal/notify"
 	"github.com/serversupervisor/server/internal/ws"
@@ -28,13 +29,14 @@ var validWebhookProviders = map[string]bool{
 }
 
 type GitWebhookHandler struct {
-	db       *database.DB
-	cfg      *config.Config
-	notifHub *ws.NotificationHub
+	db         *database.DB
+	cfg        *config.Config
+	dispatcher *dispatch.Dispatcher
+	notifHub   *ws.NotificationHub
 }
 
-func NewGitWebhookHandler(db *database.DB, cfg *config.Config, notifHub *ws.NotificationHub) *GitWebhookHandler {
-	return &GitWebhookHandler{db: db, cfg: cfg, notifHub: notifHub}
+func NewGitWebhookHandler(db *database.DB, cfg *config.Config, dispatcher *dispatch.Dispatcher, notifHub *ws.NotificationHub) *GitWebhookHandler {
+	return &GitWebhookHandler{db: db, cfg: cfg, dispatcher: dispatcher, notifHub: notifHub}
 }
 
 // ========== CRUD (authenticated, admin only) ==========
@@ -317,42 +319,42 @@ func (h *GitWebhookHandler) ReceiveWebhook(c *gin.Context) {
 	}
 	envPayload, _ := json.Marshal(map[string]interface{}{"env": envVars})
 
-	// Create audit log
 	username := fmt.Sprintf("webhook:%s", wh.Name)
-	details := fmt.Sprintf(`{"webhook_id":%q,"repo":%q,"branch":%q,"commit":%q}`,
-		id, parsed.RepoName, parsed.Branch, parsed.CommitSHA)
-	auditID, auditErr := h.db.CreateAuditLog(username, "webhook_trigger", wh.HostID, c.ClientIP(), details, "pending")
-	var auditIDPtr *int64
-	if auditErr == nil {
-		auditIDPtr = &auditID
-	}
-
-	// Create remote command
 	triggeredBy := fmt.Sprintf("webhook:%s", wh.Name)
-	cmd, err := h.db.CreateRemoteCommand(
-		wh.HostID, "custom", "run", wh.CustomTaskID, string(envPayload), triggeredBy, auditIDPtr,
-	)
+	result, err := h.dispatcher.Create(dispatch.Request{
+		HostID:      wh.HostID,
+		Module:      "custom",
+		Action:      "run",
+		Target:      wh.CustomTaskID,
+		Payload:     string(envPayload),
+		TriggeredBy: triggeredBy,
+		Audit: &dispatch.AuditLogRequest{
+			Username:  username,
+			Action:    "webhook_trigger",
+			HostID:    wh.HostID,
+			IPAddress: c.ClientIP(),
+			Details: fmt.Sprintf(`{"webhook_id":%q,"repo":%q,"branch":%q,"commit":%q}`,
+				id, parsed.RepoName, parsed.Branch, parsed.CommitSHA),
+		},
+	})
 	if err != nil {
 		log.Printf("Webhook %s: failed to create remote command: %v", id, err)
-		if auditIDPtr != nil {
-			_ = h.db.UpdateAuditLogStatus(*auditIDPtr, "failed", err.Error())
-		}
 		_ = h.db.UpdateWebhookExecutionStatus(createdExec.ID, "failed", ptrNow())
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to dispatch command"})
 		return
 	}
 
 	// Link execution to command
-	_ = h.db.UpdateWebhookExecutionCommandID(createdExec.ID, cmd.ID)
+	_ = h.db.UpdateWebhookExecutionCommandID(createdExec.ID, result.Command.ID)
 	_ = h.db.UpdateGitWebhookLastTriggered(id)
 
 	log.Printf("Webhook %s: dispatched command %s → host %s task %s (repo=%s branch=%s)",
-		id, cmd.ID, wh.HostID, wh.CustomTaskID, parsed.RepoName, parsed.Branch)
+		id, result.Command.ID, wh.HostID, wh.CustomTaskID, parsed.RepoName, parsed.Branch)
 
 	c.JSON(http.StatusOK, gin.H{
 		"status":       "dispatched",
 		"execution_id": createdExec.ID,
-		"command_id":   cmd.ID,
+		"command_id":   result.Command.ID,
 	})
 }
 

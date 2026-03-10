@@ -9,18 +9,20 @@ import (
 	"github.com/robfig/cron/v3"
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/database"
+	"github.com/serversupervisor/server/internal/dispatch"
 	"github.com/serversupervisor/server/internal/models"
 	"github.com/serversupervisor/server/internal/scheduler"
 )
 
 type ScheduledTaskHandler struct {
-	db        *database.DB
-	cfg       *config.Config
-	scheduler *scheduler.TaskScheduler
+	db         *database.DB
+	cfg        *config.Config
+	dispatcher *dispatch.Dispatcher
+	scheduler  *scheduler.TaskScheduler
 }
 
-func NewScheduledTaskHandler(db *database.DB, cfg *config.Config, sched *scheduler.TaskScheduler) *ScheduledTaskHandler {
-	return &ScheduledTaskHandler{db: db, cfg: cfg, scheduler: sched}
+func NewScheduledTaskHandler(db *database.DB, cfg *config.Config, dispatcher *dispatch.Dispatcher, sched *scheduler.TaskScheduler) *ScheduledTaskHandler {
+	return &ScheduledTaskHandler{db: db, cfg: cfg, dispatcher: dispatcher, scheduler: sched}
 }
 
 var validTaskModules = map[string]bool{
@@ -235,16 +237,23 @@ func (h *ScheduledTaskHandler) RunScheduledTask(c *gin.Context) {
 	if payload == "" {
 		payload = "{}"
 	}
-	cmd, err := h.db.CreateRemoteCommand(task.HostID, task.Module, task.Action, task.Target, payload, username, nil)
+	result, err := h.dispatcher.Create(dispatch.Request{
+		HostID:      task.HostID,
+		Module:      task.Module,
+		Action:      task.Action,
+		Target:      task.Target,
+		Payload:     payload,
+		TriggeredBy: username,
+	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	if err := h.db.LinkCommandToScheduledTask(cmd.ID, task.ID); err != nil {
-		log.Printf("Failed to link command %s to scheduled task %s: %v", cmd.ID, task.ID, err)
+	if err := h.db.LinkCommandToScheduledTask(result.Command.ID, task.ID); err != nil {
+		log.Printf("Failed to link command %s to scheduled task %s: %v", result.Command.ID, task.ID, err)
 	}
 	_ = h.db.UpdateScheduledTaskStatus(task.ID, "pending")
 
-	c.JSON(http.StatusOK, gin.H{"command_id": cmd.ID, "status": "pending"})
+	c.JSON(http.StatusOK, gin.H{"command_id": result.Command.ID, "status": "pending"})
 }
