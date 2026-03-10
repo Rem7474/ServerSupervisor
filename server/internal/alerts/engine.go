@@ -2,30 +2,18 @@ package alerts
 
 import (
 	"bytes"
-	"crypto/tls"
 	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
-	"net/smtp"
-	"strings"
 	"time"
 
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/models"
+	"github.com/serversupervisor/server/internal/notify"
 )
-
-type notifier struct {
-	client *http.Client
-}
-
-func newNotifier() *notifier {
-	return &notifier{
-		client: &http.Client{Timeout: 10 * time.Second},
-	}
-}
 
 // NotificationPusher broadcasts a real-time alert event to connected frontend clients.
 // The api.NotificationHub implements this interface; pass nil to skip push.
@@ -49,7 +37,7 @@ func EvaluateAlerts(db *database.DB, cfg *config.Config, pusher NotificationPush
 		return
 	}
 
-	n := newNotifier()
+	n := notify.New()
 
 	for _, rule := range rules {
 		if !rule.Enabled {
@@ -88,7 +76,7 @@ func EvaluateAlerts(db *database.DB, cfg *config.Config, pusher NotificationPush
 					log.Printf("Alerts: FIRED %s host=%s value=%.2f → incident#%d created", ruleName, host.Name, value, incID)
 					details := fmt.Sprintf(`{"rule_id":%d,"metric":"%s","operator":"%s","value":%.4f}`, rule.ID, rule.Metric, rule.Operator, value)
 					_, _ = db.CreateAuditLog("alert-engine", "alert_fired", host.ID, "", details, "success")
-					n.notify(cfg, rule, host, value)
+				sendAlertNotifications(n, cfg, rule, host, value)
 					triggerAlertCommand(db, rule, host)
 					pushBrowserNotification(pusher, rule, host, value, incID)
 				}
@@ -188,7 +176,7 @@ func buildAlertMessage(rule models.AlertRule, host models.Host, value float64) s
 	return fmt.Sprintf("Alert %s %s %.2f on host %s (%s)", rule.Metric, rule.Operator, value, host.Name, host.ID)
 }
 
-func (n *notifier) notify(cfg *config.Config, rule models.AlertRule, host models.Host, value float64) {
+func sendAlertNotifications(n notify.Notifier, cfg *config.Config, rule models.AlertRule, host models.Host, value float64) {
 	msg := buildAlertMessage(rule, host, value)
 	payload := map[string]interface{}{
 		"title":        "ServerSupervisor Alert",
@@ -214,7 +202,9 @@ func (n *notifier) notify(cfg *config.Config, rule models.AlertRule, host models
 				log.Printf("Alerts: SMTP to/from not configured for rule %d", rule.ID)
 				continue
 			}
-			n.sendSMTP(cfg, cfg.SMTPFrom, to, "[ServerSupervisor] Alert triggered", msg)
+			if err := n.SendSMTP(cfg, cfg.SMTPFrom, to, "[ServerSupervisor] Alert triggered", msg); err != nil {
+				log.Printf("Alerts: SMTP send failed for rule %d: %v", rule.ID, err)
+			}
 
 		case "ntfy":
 			topic := rule.Actions.NtfyTopic
@@ -222,27 +212,23 @@ func (n *notifier) notify(cfg *config.Config, rule models.AlertRule, host models
 				log.Printf("Alerts: ntfy topic not configured for rule %d", rule.ID)
 				continue
 			}
-			data, _ := json.Marshal(payload)
-			req, _ := http.NewRequest("POST", "https://ntfy.sh/"+topic, bytes.NewReader(data))
-			req.Header.Set("Content-Type", "application/json")
-			req.Header.Set("Title", "ServerSupervisor Alert")
-			if resp, err := n.client.Do(req); err != nil {
-				log.Printf("Alerts: ntfy failed: %v", err)
-			} else {
-				_ = resp.Body.Close()
+			ntfyURL := "https://ntfy.sh/" + topic
+			if err := n.SendNtfy(cfg, ntfyURL, "ServerSupervisor Alert", msg); err != nil {
+				log.Printf("Alerts: ntfy failed for rule %d: %v", rule.ID, err)
 			}
 
 		case "notify":
 			// Legacy webhook channel — send to configured notify URL
-			url := cfg.NotifyURL
-			if url == "" {
+			notifyURL := cfg.NotifyURL
+			if notifyURL == "" {
 				log.Printf("Alerts: notify URL not configured")
 				continue
 			}
 			data, _ := json.Marshal(payload)
-			req, _ := http.NewRequest("POST", url, bytes.NewReader(data))
+			req, _ := http.NewRequest("POST", notifyURL, bytes.NewReader(data))
 			req.Header.Set("Content-Type", "application/json")
-			if resp, err := n.client.Do(req); err != nil {
+			client := &http.Client{Timeout: 10 * time.Second}
+			if resp, err := client.Do(req); err != nil {
 				log.Printf("Alerts: notify failed: %v", err)
 			} else {
 				_ = resp.Body.Close()
@@ -315,52 +301,4 @@ func triggerAlertCommand(db *database.DB, rule models.AlertRule, host models.Hos
 	} else {
 		log.Printf("Alerts: triggered command %s/%s on host %s (rule %d)", ct.Module, ct.Action, host.Name, rule.ID)
 	}
-}
-
-func (n *notifier) sendSMTP(cfg *config.Config, from, to, subject, body string) {
-	if cfg.SMTPHost == "" || cfg.SMTPPort == 0 {
-		log.Printf("Alerts: SMTP host/port not configured")
-		return
-	}
-
-	addr := fmt.Sprintf("%s:%d", cfg.SMTPHost, cfg.SMTPPort)
-	msg := strings.Join([]string{
-		"From: " + from,
-		"To: " + to,
-		"Subject: " + subject,
-		"MIME-Version: 1.0",
-		"Content-Type: text/plain; charset=utf-8",
-		"",
-		body,
-	}, "\r\n")
-
-	auth := smtp.PlainAuth("", cfg.SMTPUser, cfg.SMTPPass, cfg.SMTPHost)
-	c, err := smtp.Dial(addr)
-	if err != nil {
-		log.Printf("Alerts: SMTP dial failed: %v", err)
-		return
-	}
-	defer func() { _ = c.Close() }()
-
-	if cfg.SMTPTLS {
-		_ = c.StartTLS(&tls.Config{ServerName: cfg.SMTPHost})
-	}
-	if cfg.SMTPUser != "" {
-		_ = c.Auth(auth)
-	}
-	if err := c.Mail(from); err != nil {
-		log.Printf("Alerts: SMTP mail failed: %v", err)
-		return
-	}
-	if err := c.Rcpt(to); err != nil {
-		log.Printf("Alerts: SMTP rcpt failed: %v", err)
-		return
-	}
-	w, err := c.Data()
-	if err != nil {
-		log.Printf("Alerts: SMTP data failed: %v", err)
-		return
-	}
-	_, _ = w.Write([]byte(msg))
-	_ = w.Close()
 }

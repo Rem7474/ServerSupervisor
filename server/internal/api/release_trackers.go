@@ -1,19 +1,19 @@
 package api
 
 import (
-	"bytes"
 	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/database"
+	"github.com/serversupervisor/server/internal/gitprovider"
 	"github.com/serversupervisor/server/internal/models"
+	"github.com/serversupervisor/server/internal/notify"
 )
 
 var validReleaseProviders = map[string]bool{
@@ -24,7 +24,6 @@ type ReleaseTrackerHandler struct {
 	db       *database.DB
 	cfg      *config.Config
 	notifHub *NotificationHub
-	client   *http.Client
 	stop     chan struct{}
 }
 
@@ -33,7 +32,6 @@ func NewReleaseTrackerHandler(db *database.DB, cfg *config.Config, notifHub *Not
 		db:       db,
 		cfg:      cfg,
 		notifHub: notifHub,
-		client:   &http.Client{Timeout: 15 * time.Second},
 		stop:     make(chan struct{}),
 	}
 }
@@ -78,7 +76,8 @@ func (h *ReleaseTrackerHandler) checkAll() {
 }
 
 func (h *ReleaseTrackerHandler) checkOne(t models.ReleaseTracker) {
-	tag, releaseURL, releaseName, err := h.fetchLatestRelease(t.Provider, t.RepoOwner, t.RepoName)
+	providerClient := gitprovider.NewClient(t.Provider, h.cfg.GitHubToken)
+	tag, releaseURL, releaseName, err := providerClient.FetchLatestRelease(t.RepoOwner, t.RepoName)
 	if err != nil {
 		log.Printf("Release tracker %s (%s/%s): fetch error: %v", t.Name, t.RepoOwner, t.RepoName, err)
 		_ = h.db.UpdateReleaseTrackerError(t.ID, err.Error())
@@ -121,7 +120,9 @@ func (h *ReleaseTrackerHandler) tryFetchAndStoreDigest(trackerID, dockerImage, t
 	if dockerImage == "" || tag == "" {
 		return
 	}
-	digest, err := fetchDockerManifestDigest(h.client, dockerImage, tag)
+	// Use any client (provider doesn't matter for Docker registry)
+	providerClient := gitprovider.NewClient("github", h.cfg.GitHubToken)
+	digest, err := providerClient.FetchDockerManifestDigest(dockerImage, tag)
 	if err != nil {
 		log.Printf("Release tracker %s: could not fetch digest for %s:%s: %v", trackerID, dockerImage, tag, err)
 		return
@@ -218,7 +219,7 @@ func (h *ReleaseTrackerHandler) NotifyComplete(commandID, status string) {
 	msg := fmt.Sprintf("Release tracker '%s' (%s/%s) execution %s on host %s (task: %s)",
 		tracker.Name, tracker.RepoOwner, tracker.RepoName, status, tracker.HostID, tracker.CustomTaskID)
 
-	notifClient := &http.Client{Timeout: 10 * time.Second}
+	notifier := notify.New()
 	for _, ch := range channels {
 		switch ch {
 		case "smtp":
@@ -226,24 +227,17 @@ func (h *ReleaseTrackerHandler) NotifyComplete(commandID, status string) {
 			if to == "" || h.cfg.SMTPFrom == "" {
 				continue
 			}
-			sendWebhookSMTP(h.cfg, h.cfg.SMTPFrom, to, subject, msg)
+			if err := notifier.SendSMTP(h.cfg, h.cfg.SMTPFrom, to, subject, msg); err != nil {
+				log.Printf("Release tracker SMTP send: %v", err)
+			}
 
 		case "ntfy":
 			ntfyURL := h.cfg.NotifyURL
 			if ntfyURL == "" {
 				continue
 			}
-			payload, _ := json.Marshal(map[string]interface{}{
-				"title":   subject,
-				"message": msg,
-			})
-			req, _ := http.NewRequest("POST", ntfyURL, bytes.NewReader(payload))
-			req.Header.Set("Content-Type", "application/json")
-			req.Header.Set("Title", subject)
-			if resp, err := notifClient.Do(req); err != nil {
+			if err := notifier.SendNtfy(h.cfg, ntfyURL, subject, msg); err != nil {
 				log.Printf("Release tracker notify ntfy: %v", err)
-			} else {
-				_ = resp.Body.Close()
 			}
 
 		case "browser":
@@ -435,264 +429,4 @@ func (h *ReleaseTrackerHandler) GetExecutions(c *gin.Context) {
 		execs = []models.ReleaseTrackerExecution{}
 	}
 	c.JSON(http.StatusOK, gin.H{"executions": execs})
-}
-
-// ========== Release API fetching ==========
-
-type releaseInfo struct {
-	TagName string
-	URL     string
-	Name    string
-}
-
-func (h *ReleaseTrackerHandler) fetchLatestRelease(provider, owner, repo string) (tag, url, name string, err error) {
-	switch provider {
-	case "gitlab":
-		return h.fetchGitLabRelease(owner, repo)
-	case "gitea":
-		return h.fetchGiteaRelease(owner, repo)
-	default:
-		return h.fetchGitHubRelease(owner, repo)
-	}
-}
-
-func (h *ReleaseTrackerHandler) fetchGitHubRelease(owner, repo string) (tag, url, name string, err error) {
-	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases/latest", owner, repo)
-	req, _ := http.NewRequest("GET", apiURL, nil)
-	req.Header.Set("Accept", "application/vnd.github.v3+json")
-	req.Header.Set("User-Agent", "ServerSupervisor/1.0")
-	if h.cfg.GitHubToken != "" {
-		req.Header.Set("Authorization", "Bearer "+h.cfg.GitHubToken)
-	}
-
-	resp, err := h.client.Do(req)
-	if err != nil {
-		return
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode == http.StatusNotFound {
-		// Fall back to tags
-		return h.fetchGitHubLatestTag(owner, repo)
-	}
-	if resp.StatusCode != http.StatusOK {
-		err = githubAPIError(resp.StatusCode)
-		return
-	}
-
-	var r struct {
-		TagName string `json:"tag_name"`
-		Name    string `json:"name"`
-		HTMLURL string `json:"html_url"`
-	}
-	if err = json.NewDecoder(resp.Body).Decode(&r); err != nil {
-		return
-	}
-	return r.TagName, r.HTMLURL, r.Name, nil
-}
-
-func githubAPIError(status int) error {
-	switch status {
-	case 401:
-		return fmt.Errorf("token GitHub invalide ou expiré (401) — vérifiez GITHUB_TOKEN dans les paramètres")
-	case 403:
-		return fmt.Errorf("limite de taux GitHub atteinte (403) — configurez un GITHUB_TOKEN pour augmenter la limite")
-	case 404:
-		return fmt.Errorf("dépôt introuvable sur GitHub (404) — vérifiez owner/repo")
-	default:
-		return fmt.Errorf("erreur GitHub API (%d)", status)
-	}
-}
-
-func (h *ReleaseTrackerHandler) fetchGitHubLatestTag(owner, repo string) (tag, url, name string, err error) {
-	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/tags?per_page=1", owner, repo)
-	req, _ := http.NewRequest("GET", apiURL, nil)
-	req.Header.Set("Accept", "application/vnd.github.v3+json")
-	req.Header.Set("User-Agent", "ServerSupervisor/1.0")
-	if h.cfg.GitHubToken != "" {
-		req.Header.Set("Authorization", "Bearer "+h.cfg.GitHubToken)
-	}
-	resp, err := h.client.Do(req)
-	if err != nil {
-		return
-	}
-	defer func() { _ = resp.Body.Close() }()
-	if resp.StatusCode != http.StatusOK {
-		err = githubAPIError(resp.StatusCode)
-		return
-	}
-	var tags []struct {
-		Name string `json:"name"`
-	}
-	if err = json.NewDecoder(resp.Body).Decode(&tags); err != nil {
-		return
-	}
-	if len(tags) == 0 {
-		return
-	}
-	tag = tags[0].Name
-	url = fmt.Sprintf("https://github.com/%s/%s/releases/tag/%s", owner, repo, tag)
-	name = tag
-	return
-}
-
-func (h *ReleaseTrackerHandler) fetchGitLabRelease(owner, repo string) (tag, url, name string, err error) {
-	// GitLab API: GET /api/v4/projects/{owner%2Frepo}/releases (public)
-	encoded := fmt.Sprintf("%s%%2F%s", owner, repo)
-	apiURL := fmt.Sprintf("https://gitlab.com/api/v4/projects/%s/releases?per_page=1", encoded)
-	req, _ := http.NewRequest("GET", apiURL, nil)
-	req.Header.Set("User-Agent", "ServerSupervisor/1.0")
-
-	resp, err := h.client.Do(req)
-	if err != nil {
-		return
-	}
-	defer func() { _ = resp.Body.Close() }()
-	if resp.StatusCode != http.StatusOK {
-		err = fmt.Errorf("GitLab API status %d", resp.StatusCode)
-		return
-	}
-	var releases []struct {
-		TagName string `json:"tag_name"`
-		Name    string `json:"name"`
-		Links   struct {
-			Self string `json:"self"`
-		} `json:"_links"`
-	}
-	if err = json.NewDecoder(resp.Body).Decode(&releases); err != nil {
-		return
-	}
-	if len(releases) == 0 {
-		return
-	}
-	tag = releases[0].TagName
-	name = releases[0].Name
-	url = fmt.Sprintf("https://gitlab.com/%s/%s/-/releases/%s", owner, repo, tag)
-	return
-}
-
-func (h *ReleaseTrackerHandler) fetchGiteaRelease(owner, repo string) (tag, url, name string, err error) {
-	// Gitea public API (Codeberg etc.)
-	apiURL := fmt.Sprintf("https://codeberg.org/api/v1/repos/%s/%s/releases?limit=1", owner, repo)
-	req, _ := http.NewRequest("GET", apiURL, nil)
-	req.Header.Set("User-Agent", "ServerSupervisor/1.0")
-
-	resp, err := h.client.Do(req)
-	if err != nil {
-		return
-	}
-	defer func() { _ = resp.Body.Close() }()
-	if resp.StatusCode != http.StatusOK {
-		err = fmt.Errorf("Gitea API status %d", resp.StatusCode)
-		return
-	}
-	var releases []struct {
-		TagName string `json:"tag_name"`
-		Name    string `json:"name"`
-		HTMLURL string `json:"html_url"`
-	}
-	if err = json.NewDecoder(resp.Body).Decode(&releases); err != nil {
-		return
-	}
-	if len(releases) == 0 {
-		return
-	}
-	tag = releases[0].TagName
-	url = releases[0].HTMLURL
-	name = releases[0].Name
-	return
-}
-
-// ========== Docker registry manifest digest ==========
-
-// fetchDockerManifestDigest queries the Docker registry for the manifest digest
-// of imageRef:tag (e.g. "nginx:v1.25.3" or "ghcr.io/org/app:v2.0.0").
-// Returns the digest without "sha256:" prefix, e.g. "f88cbb90...".
-func fetchDockerManifestDigest(client *http.Client, imageRef, tag string) (string, error) {
-	registry, image := parseDockerRegistry(imageRef)
-
-	token, err := getRegistryToken(client, registry, image)
-	if err != nil {
-		return "", fmt.Errorf("auth: %w", err)
-	}
-
-	manifestURL := fmt.Sprintf("https://%s/v2/%s/manifests/%s", registry, image, tag)
-	req, _ := http.NewRequest("GET", manifestURL, nil)
-	req.Header.Set("Accept", strings.Join([]string{
-		"application/vnd.docker.distribution.manifest.v2+json",
-		"application/vnd.docker.distribution.manifest.list.v2+json",
-		"application/vnd.oci.image.manifest.v1+json",
-		"application/vnd.oci.image.index.v1+json",
-	}, ", "))
-	req.Header.Set("User-Agent", "ServerSupervisor/1.0")
-	if token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
-	}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("registry %s returned status %d for %s:%s", registry, resp.StatusCode, image, tag)
-	}
-
-	digest := resp.Header.Get("Docker-Content-Digest")
-	// Strip "sha256:" prefix for storage
-	if after, ok := strings.CutPrefix(digest, "sha256:"); ok {
-		return after, nil
-	}
-	return digest, nil
-}
-
-// parseDockerRegistry splits a Docker image reference into registry and image name.
-// Examples:
-//   "nginx"                          → "registry-1.docker.io", "library/nginx"
-//   "homeassistant/home-assistant"   → "registry-1.docker.io", "homeassistant/home-assistant"
-//   "ghcr.io/org/app"               → "ghcr.io", "org/app"
-func parseDockerRegistry(imageRef string) (registry, image string) {
-	parts := strings.SplitN(imageRef, "/", 2)
-	if len(parts) == 2 {
-		first := parts[0]
-		if strings.Contains(first, ".") || strings.Contains(first, ":") || first == "localhost" {
-			return first, parts[1]
-		}
-	}
-	// Docker Hub
-	if !strings.Contains(imageRef, "/") {
-		return "registry-1.docker.io", "library/" + imageRef
-	}
-	return "registry-1.docker.io", imageRef
-}
-
-// getRegistryToken fetches an anonymous pull token for the given registry and image.
-func getRegistryToken(client *http.Client, registry, image string) (string, error) {
-	var authURL string
-	switch registry {
-	case "registry-1.docker.io":
-		authURL = fmt.Sprintf("https://auth.docker.io/token?service=registry.docker.io&scope=repository:%s:pull", image)
-	case "ghcr.io":
-		authURL = fmt.Sprintf("https://ghcr.io/token?scope=repository:%s:pull&service=ghcr.io", image)
-	default:
-		// For unknown registries, attempt unauthenticated access
-		return "", nil
-	}
-
-	req, _ := http.NewRequest("GET", authURL, nil)
-	req.Header.Set("User-Agent", "ServerSupervisor/1.0")
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	var result struct {
-		Token string `json:"token"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", err
-	}
-	return result.Token, nil
 }

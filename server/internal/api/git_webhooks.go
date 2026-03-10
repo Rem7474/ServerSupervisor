@@ -1,10 +1,8 @@
 package api
 
 import (
-	"bytes"
 	"crypto/hmac"
 	"crypto/sha256"
-	"crypto/tls"
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
@@ -12,7 +10,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"net/smtp"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -22,6 +19,7 @@ import (
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/models"
+	"github.com/serversupervisor/server/internal/notify"
 )
 
 var validWebhookProviders = map[string]bool{
@@ -393,7 +391,7 @@ func (h *GitWebhookHandler) NotifyWebhookExecutionComplete(commandID, status str
 	msg := fmt.Sprintf("Webhook '%s' execution %s on host %s (task: %s)",
 		wh.Name, status, wh.HostID, wh.CustomTaskID)
 
-	notifClient := &http.Client{Timeout: 10 * time.Second}
+	n := notify.New()
 	for _, ch := range channels {
 		switch ch {
 		case "smtp":
@@ -401,24 +399,17 @@ func (h *GitWebhookHandler) NotifyWebhookExecutionComplete(commandID, status str
 			if to == "" || h.cfg.SMTPFrom == "" {
 				continue
 			}
-			sendWebhookSMTP(h.cfg, h.cfg.SMTPFrom, to, subject, msg)
+			if err := n.SendSMTP(h.cfg, h.cfg.SMTPFrom, to, subject, msg); err != nil {
+				log.Printf("Webhook SMTP send: %v", err)
+			}
 
 		case "ntfy":
 			ntfyURL := h.cfg.NotifyURL
 			if ntfyURL == "" {
 				continue
 			}
-			payload, _ := json.Marshal(map[string]interface{}{
-				"title":   subject,
-				"message": msg,
-			})
-			req, _ := http.NewRequest("POST", ntfyURL, bytes.NewReader(payload))
-			req.Header.Set("Content-Type", "application/json")
-			req.Header.Set("Title", subject)
-			if resp, err := notifClient.Do(req); err != nil {
+			if err := n.SendNtfy(h.cfg, ntfyURL, subject, msg); err != nil {
 				log.Printf("Webhook notify ntfy: %v", err)
-			} else {
-				_ = resp.Body.Close()
 			}
 
 		case "browser":
@@ -436,45 +427,6 @@ func (h *GitWebhookHandler) NotifyWebhookExecutionComplete(commandID, status str
 			})
 		}
 	}
-}
-
-func sendWebhookSMTP(cfg *config.Config, from, to, subject, body string) {
-	if cfg.SMTPHost == "" || cfg.SMTPPort == 0 {
-		return
-	}
-	addr := fmt.Sprintf("%s:%d", cfg.SMTPHost, cfg.SMTPPort)
-	msg := strings.Join([]string{
-		"From: " + from, "To: " + to, "Subject: " + subject,
-		"MIME-Version: 1.0", "Content-Type: text/plain; charset=utf-8", "", body,
-	}, "\r\n")
-	auth := smtp.PlainAuth("", cfg.SMTPUser, cfg.SMTPPass, cfg.SMTPHost)
-	c, err := smtp.Dial(addr)
-	if err != nil {
-		log.Printf("Webhook SMTP dial: %v", err)
-		return
-	}
-	defer func() { _ = c.Close() }()
-	if cfg.SMTPTLS {
-		_ = c.StartTLS(&tls.Config{ServerName: cfg.SMTPHost})
-	}
-	if cfg.SMTPUser != "" {
-		_ = c.Auth(auth)
-	}
-	if err := c.Mail(from); err != nil {
-		log.Printf("Webhook SMTP mail: %v", err)
-		return
-	}
-	if err := c.Rcpt(to); err != nil {
-		log.Printf("Webhook SMTP rcpt: %v", err)
-		return
-	}
-	w, err := c.Data()
-	if err != nil {
-		log.Printf("Webhook SMTP data: %v", err)
-		return
-	}
-	defer func() { _ = w.Close() }()
-	_, _ = fmt.Fprint(w, msg)
 }
 
 // ========== Signature verification ==========
