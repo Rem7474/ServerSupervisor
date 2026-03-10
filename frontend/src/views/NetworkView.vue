@@ -296,6 +296,7 @@
                         <td class="fw-semibold">
                           {{ port.port }}
                           <span v-if="port.internal" class="badge bg-secondary-lt text-secondary ms-1" title="Port interne Docker uniquement, non exposé sur l'hôte">interne</span>
+                          <div v-if="port.containers?.length" class="text-secondary fw-normal" style="font-size:.75rem;line-height:1.3">{{ port.containers.join(', ') }}</div>
                         </td>
                         <td class="text-secondary text-uppercase">{{ port.protocol }}</td>
                         <td>
@@ -710,10 +711,14 @@ const discoveredPortsByHost = computed(() => {
       const protocol = (mapping.protocol || 'tcp').toLowerCase()
       if (!map[hostId]) map[hostId] = []
       const key = `${portNumber}-${protocol}`
-      if (map[hostId].some(entry => entry.key === key)) continue
+      const existing = map[hostId].find(entry => entry.key === key)
+      if (existing) {
+        if (container.name && !existing.containers.includes(container.name)) existing.containers.push(container.name)
+        continue
+      }
 
       // internal: port exists only inside Docker (no host binding)
-      map[hostId].push({ key, port: portNumber, protocol, internal: hostPort === 0 })
+      map[hostId].push({ key, port: portNumber, protocol, internal: hostPort === 0, containers: container.name ? [container.name] : [] })
     }
   }
 
