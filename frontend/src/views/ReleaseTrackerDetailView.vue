@@ -135,7 +135,7 @@
               </thead>
               <tbody>
                 <tr v-for="ex in executions" :key="ex.id">
-                  <td class="text-muted small" style="white-space:nowrap">
+                  <td class="text-muted small text-nowrap">
                     <RelativeTime :date="ex.triggered_at" />
                   </td>
                   <td class="small">

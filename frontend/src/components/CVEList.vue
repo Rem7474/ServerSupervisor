@@ -1,5 +1,5 @@
 <template>
-  <div v-if="cves.length > 0" class="cve-container">
+  <div v-if="cves.length > 0" class="my-2">
     <div v-if="showMaxSeverity" class="d-flex align-items-center mb-2">
       <span class="fw-semibold me-2">Criticité max:</span>
       <span :class="maxSeverityClass" class="badge">
@@ -8,7 +8,7 @@
       <span class="text-secondary small ms-2">({{ cves.length }} CVE{{ cves.length > 1 ? 's' : '' }})</span>
     </div>
     
-    <div v-if="!collapsed || alwaysExpanded" class="cve-list">
+    <div v-if="!collapsed || alwaysExpanded" class="d-flex flex-wrap gap-1">
       <CVEBadge 
         v-for="(cve, index) in displayedCves" 
         :key="`${cve.id}-${index}`"
@@ -128,14 +128,4 @@ const maxSeverityClass = computed(() => {
 })
 </script>
 
-<style scoped>
-.cve-container {
-  margin: 0.5rem 0;
-}
 
-.cve-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem;
-}
-</style>

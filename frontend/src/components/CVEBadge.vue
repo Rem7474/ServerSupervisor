@@ -58,20 +58,4 @@ const badgeClass = computed(() => {
 })
 </script>
 
-<style scoped>
-.badge {
-  font-size: 0.75rem;
-  padding: 0.25rem 0.5rem;
-  cursor: pointer;
-  transition: all 0.2s;
-  display: inline-flex;
-  align-items: center;
-}
 
-.badge:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-  opacity: 0.9;
-}
-
-</style>

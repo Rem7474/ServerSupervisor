@@ -7,7 +7,7 @@
       <div class="spinner-border spinner-border-sm text-muted"></div>
     </div>
     <div v-else class="card-body">
-      <div class="space-y-3">
+      <div class="d-flex flex-column gap-3">
         <div 
           v-for="disk in health" 
           :key="disk.device"
@@ -111,8 +111,4 @@ function getCardClass(status) {
 }
 </script>
 
-<style scoped>
-.space-y-3 > div + div {
-  margin-top: 1rem;
-}
-</style>
+

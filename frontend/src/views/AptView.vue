@@ -266,7 +266,7 @@
 
       <!-- Colonne droite: Console Live (partagée entre les deux onglets) -->
       <div v-show="showConsole" class="apt-console" :class="{ 'apt-console--active': liveCommand }" id="apt-console-mobile">
-        <div class="card" style="display: flex; flex-direction: column; height: 100%;">
+        <div class="card d-flex flex-column h-100">
           <div class="card-header d-flex align-items-center justify-content-between">
             <h3 class="card-title">
               <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
@@ -285,21 +285,21 @@
               </svg>
             </button>
           </div>
-          <div class="card-body d-flex flex-column" style="flex: 1; min-height: 0; padding: 0;">
+          <div class="card-body d-flex flex-column flex-fill p-0" style="min-height: 0;">
             <div v-if="!liveCommand" class="d-flex align-items-center justify-content-center flex-fill text-secondary" style="background: #1e293b; border-radius: 0 0 0.5rem 0.5rem;">
               <div class="text-center p-4">
-                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler mb-2" width="48" height="48" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.5;">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler mb-2 opacity-50" width="48" height="48" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                   <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
                   <path d="M8 9l3 3l-3 3" />
                   <path d="M13 15l3 0" />
                   <path d="M3 4m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z" />
                 </svg>
-                <div style="opacity: 0.7;">Aucune console active</div>
-                <div class="small mt-1" style="opacity: 0.5;">Cliquez sur "Logs" pour afficher la sortie d'une commande</div>
+                <div class="opacity-75">Aucune console active</div>
+                <div class="small mt-1 opacity-50">Cliquez sur "Logs" pour afficher la sortie d'une commande</div>
               </div>
             </div>
 
-            <div v-else style="display: flex; flex-direction: column; height: 100%;">
+            <div v-else class="d-flex flex-column h-100">
               <div class="px-3 pt-3 pb-2" style="background: #1e293b; border-bottom: 1px solid rgba(255,255,255,0.1);">
                 <div class="d-flex align-items-start justify-content-between mb-2">
                   <div class="flex-fill" style="min-width: 0;">
@@ -308,7 +308,7 @@
                       <code style="background: rgba(0,0,0,0.3); padding: 0.15rem 0.4rem; border-radius: 0.25rem; color: #94a3b8;">apt {{ liveCommand.command }}</code>
                     </div>
                   </div>
-                  <span :class="statusClass(liveCommand.status)" style="margin-left: 0.5rem;">{{ liveCommand.status }}</span>
+                  <span :class="statusClass(liveCommand.status)" class="ms-2">{{ liveCommand.status }}</span>
                 </div>
               </div>
               <pre

@@ -1,5 +1,5 @@
 <template>
-  <div class="cron-builder">
+  <div class="border p-3 rounded">
     <div class="d-flex align-items-center justify-content-between mb-2">
       <label class="form-label mb-0">Expression cron</label>
       <div class="btn-group btn-group-sm">
@@ -263,11 +263,4 @@ watch(() => props.modelValue, (val) => {
 }, { immediate: false })
 </script>
 
-<style scoped>
-.cron-builder {
-  border: 1px solid var(--tblr-border-color, #e6e7e9);
-  border-radius: 4px;
-  padding: 0.75rem;
-  background: var(--tblr-bg-surface-secondary, #f8fafc);
-}
-</style>
+

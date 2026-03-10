@@ -43,7 +43,7 @@
               <span :class="stateClass(svc.active_state)">{{ svc.active_state }}</span>
             </td>
             <td class="text-secondary small">{{ svc.sub_state }}</td>
-            <td class="text-secondary small" style="max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" :title="svc.description">
+            <td class="text-secondary small text-truncate" style="max-width: 250px;" :title="svc.description">
               {{ svc.description || '—' }}
             </td>
             <td class="text-nowrap">

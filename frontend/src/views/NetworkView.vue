@@ -60,7 +60,7 @@
         <div class="btn-group" role="group">
           <input type="radio" class="btn-check" id="viewCards" value="cards" v-model="viewMode" />
           <label class="btn btn-outline-primary" for="viewCards">
-            <svg width="18" height="18" fill="currentColor" viewBox="0 0 16 16" style="margin-right: 0.25rem;">
+            <svg width="18" height="18" fill="currentColor" viewBox="0 0 16 16" class="me-1">
               <path d="M1 1a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V1zm10 0a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1V1zM1 11a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1v-4zm10 0a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-4z"/>
             </svg>
             <span class="d-none d-sm-inline">Cards</span>
@@ -68,7 +68,7 @@
           
           <input type="radio" class="btn-check" id="viewGraph" value="graph" v-model="viewMode" />
           <label class="btn btn-outline-primary" for="viewGraph">
-            <svg width="18" height="18" fill="currentColor" viewBox="0 0 16 16" style="margin-right: 0.25rem;">
+            <svg width="18" height="18" fill="currentColor" viewBox="0 0 16 16" class="me-1">
               <path d="M0 2a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V2zm2.5 7a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-1zm2-4a.5.5 0 0 0-.5.5v5a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-5a.5.5 0 0 0-.5-.5h-1zm2-2a.5.5 0 0 0-.5.5v8a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5V3.5a.5.5 0 0 0-.5-.5h-1zm2-1a.5.5 0 0 0-.5.5v9a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5V2.5a.5.5 0 0 0-.5-.5h-1z"/>
             </svg>
             <span class="d-none d-sm-inline">Graph</span>

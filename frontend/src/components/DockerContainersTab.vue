@@ -164,7 +164,7 @@
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
     </svg>
     <div class="fw-medium">{{ search || hostFilter ? 'Aucun résultat pour ces filtres' : 'Aucun conteneur trouvé' }}</div>
-    <div class="small mt-1" style="opacity:.7">
+    <div class="small mt-1 opacity-75">
       <template v-if="search || hostFilter">Modifiez vos critères de recherche</template>
       <template v-else>Connectez un hôte avec l'agent Docker activé pour voir vos conteneurs ici</template>
     </div>

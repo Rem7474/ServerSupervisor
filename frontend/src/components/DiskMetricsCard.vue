@@ -12,7 +12,7 @@
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 6h18M3 18h18"/>
       </svg>
       <div class="small fw-medium">Aucune donnée de disque disponible</div>
-      <div class="mt-1" style="font-size:.78rem;opacity:.7">L'agent doit être actif pour collecter les métriques disque</div>
+      <div class="mt-1 opacity-75" style="font-size:.78rem">L'agent doit être actif pour collecter les métriques disque</div>
     </div>
     <div v-else class="table-responsive">
       <table class="table table-vcenter card-table table-sm">
