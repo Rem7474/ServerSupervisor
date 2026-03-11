@@ -68,21 +68,24 @@ func (h *CommandStreamHub) Broadcast(commandID string, logChunk string) {
 // output is included in the payload when non-empty (e.g. for completed commands).
 func (h *CommandStreamHub) BroadcastStatus(commandID, status, output string) {
 	h.mu.RLock()
-	defer h.mu.RUnlock()
+	conns := make([]*websocket.Conn, 0, len(h.clients[commandID]))
+	for conn := range h.clients[commandID] {
+		conns = append(conns, conn)
+	}
+	h.mu.RUnlock()
 
-	clients := h.clients[commandID]
-	for conn := range clients {
-		payload := map[string]interface{}{
-			"type":       "cmd_status_update",
-			"command_id": commandID,
-			"status":     status,
-		}
-		if output != "" {
-			payload["output"] = output
-		}
+	payload := map[string]interface{}{
+		"type":       "cmd_status_update",
+		"command_id": commandID,
+		"status":     status,
+	}
+	if output != "" {
+		payload["output"] = output
+	}
+	for _, conn := range conns {
 		if err := conn.WriteJSON(payload); err != nil {
 			_ = conn.Close()
-			go h.Unregister(commandID, conn)
+			h.Unregister(commandID, conn)
 		}
 	}
 }
@@ -94,19 +97,24 @@ func (h *CommandStreamHub) runBroadcast(commandID string) {
 	h.mu.RUnlock()
 
 	for logChunk := range broadcast {
+		// Snapshot client list under read lock so I/O doesn't block the hub.
 		h.mu.RLock()
-		clients := h.clients[commandID]
-		for conn := range clients {
-			payload := map[string]interface{}{
-				"type":       "cmd_stream",
-				"command_id": commandID,
-				"chunk":      logChunk,
-			}
-			if err := conn.WriteJSON(payload); err != nil {
-				_ = conn.Close()
-				go h.Unregister(commandID, conn)
-			}
+		conns := make([]*websocket.Conn, 0, len(h.clients[commandID]))
+		for conn := range h.clients[commandID] {
+			conns = append(conns, conn)
 		}
 		h.mu.RUnlock()
+
+		payload := map[string]interface{}{
+			"type":       "cmd_stream",
+			"command_id": commandID,
+			"chunk":      logChunk,
+		}
+		for _, conn := range conns {
+			if err := conn.WriteJSON(payload); err != nil {
+				_ = conn.Close()
+				h.Unregister(commandID, conn)
+			}
+		}
 	}
 }
