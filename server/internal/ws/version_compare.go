@@ -44,9 +44,9 @@ func (h *WSHandler) buildVersionComparisons() ([]models.VersionComparison, error
 
 			nd := normalizeDigest(container.ImageDigest)
 			ld := normalizeDigest(tracker.LatestImageDigest)
-			isUpToDate := isVersionUpToDate(container.ImageTag, container.ImageDigest, tracker.LastReleaseTag, tracker.LatestImageDigest)
-			updateConfirmed := !isUpToDate && nd != "" && ld != ""
 
+			// Resolve display version first — OCI labels may carry an explicit version
+			// even when the image is tagged "latest".
 			runningVersion := resolveContainerVersion(container.ImageTag, container.Labels)
 			if runningVersion == "latest" && nd != "" {
 				if nd == ld {
@@ -58,6 +58,15 @@ func (h *WSHandler) buildVersionComparisons() ([]models.VersionComparison, error
 			if runningVersion == "latest" {
 				runningVersion = ""
 			}
+
+			// Use the resolved version as effective tag so that containers running
+			// "latest" with an OCI label matching the release tag are considered up to date.
+			effectiveTag := container.ImageTag
+			if effectiveTag == "latest" && runningVersion != "" {
+				effectiveTag = runningVersion
+			}
+			isUpToDate := isVersionUpToDate(effectiveTag, container.ImageDigest, tracker.LastReleaseTag, tracker.LatestImageDigest)
+			updateConfirmed := !isUpToDate && nd != "" && ld != ""
 
 			comparisons = append(comparisons, models.VersionComparison{
 				DockerImage:     tracker.DockerImage,
