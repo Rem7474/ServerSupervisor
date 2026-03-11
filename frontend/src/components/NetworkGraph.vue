@@ -82,7 +82,7 @@ const props = defineProps({
   nodePositions: { type: Object, default: () => ({}) },
 })
 
-const emit = defineEmits(['host-click', 'update:nodePositions'])
+const emit = defineEmits(['host-click', 'node-select', 'update:nodePositions'])
 
 const cyContainer = ref(null)
 const tooltipRef = ref(null)
@@ -534,6 +534,10 @@ function initCytoscape() {
   }
 
   cy.on('dragfree', 'node', emitPositions)
+
+  cy.on('tap', 'node', (event) => {
+    emit('node-select', { ...event.target.data() })
+  })
 
   // Click on host → emit event
   cy.on('tap', 'node[type="host"]', (event) => {

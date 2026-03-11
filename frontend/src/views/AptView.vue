@@ -246,7 +246,7 @@
             </div>
             <ul class="pagination pagination-sm mb-0">
               <li class="page-item" :class="{ disabled: historyPage === 1 }">
-                <a class="page-link" href="#" @click.prevent="historyPage--">‹</a>
+                <a class="page-link" href="#" @click.prevent="prevHistoryPage">‹</a>
               </li>
               <li
                 v-for="p in historyTotalPages"
@@ -254,10 +254,10 @@
                 class="page-item"
                 :class="{ active: p === historyPage }"
               >
-                <a class="page-link" href="#" @click.prevent="historyPage = p">{{ p }}</a>
+                <a class="page-link" href="#" @click.prevent="setHistoryPage(p)">{{ p }}</a>
               </li>
               <li class="page-item" :class="{ disabled: historyPage === historyTotalPages }">
-                <a class="page-link" href="#" @click.prevent="historyPage++">›</a>
+                <a class="page-link" href="#" @click.prevent="nextHistoryPage">›</a>
               </li>
             </ul>
           </div>
@@ -357,16 +357,14 @@ import apiClient from '../api'
 import { useAuthStore } from '../stores/auth'
 import { useWebSocket } from '../composables/useWebSocket'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
+import { useDateFormatter } from '../composables/useDateFormatter'
+import { usePagination } from '../composables/usePagination'
+import { useStatusBadge } from '../composables/useStatusBadge'
 import WsStatusBar from '../components/WsStatusBar.vue'
 import SubNavigation from '../components/SubNavigation.vue'
-import dayjs from 'dayjs'
-import relativeTime from 'dayjs/plugin/relativeTime'
-import utc from 'dayjs/plugin/utc'
-import 'dayjs/locale/fr'
 
-dayjs.extend(relativeTime)
-dayjs.extend(utc)
-dayjs.locale('fr')
+const { dayjs, formatRelativeDate, formatExactDate } = useDateFormatter()
+const { getStatusBadgeClass } = useStatusBadge()
 
 // ── Tab ──────────────────────────────────────────────────────────────────────
 const activeTab = ref('hosts')
@@ -433,17 +431,22 @@ const filteredHistory = computed(() => {
 })
 
 const HISTORY_PAGE_SIZE = 25
-const historyPage = ref(1)
-
-const historyTotalPages = computed(() => Math.max(1, Math.ceil(filteredHistory.value.length / HISTORY_PAGE_SIZE)))
-
-const pagedHistory = computed(() => {
-  const start = (historyPage.value - 1) * HISTORY_PAGE_SIZE
-  return filteredHistory.value.slice(start, start + HISTORY_PAGE_SIZE)
-})
+const {
+  currentPage: historyPage,
+  totalPages: historyTotalPages,
+  pagedItems: pagedHistory,
+  resetPage: resetHistoryPage,
+  setPage: setHistoryPage,
+} = usePagination({ items: filteredHistory, pageSize: HISTORY_PAGE_SIZE })
 
 // Reset to page 1 when filters change
-function resetHistoryPage() { historyPage.value = 1 }
+function prevHistoryPage() {
+  setHistoryPage(historyPage.value - 1)
+}
+
+function nextHistoryPage() {
+  setHistoryPage(historyPage.value + 1)
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function toggleSelectAll() {
@@ -559,13 +562,11 @@ async function bulkAptCmd(command) {
 }
 
 function formatDate(date) {
-  if (!date || date === '0001-01-01T00:00:00Z') return 'Jamais'
-  return dayjs.utc(date).local().fromNow()
+  return formatRelativeDate(date)
 }
 
 function formatDateExact(date) {
-  if (!date || date === '0001-01-01T00:00:00Z') return '—'
-  return dayjs.utc(date).local().format('DD/MM/YYYY HH:mm')
+  return formatExactDate(date, '—')
 }
 
 function formatDuration(startedAt, endedAt) {
@@ -582,9 +583,7 @@ function formatDuration(startedAt, endedAt) {
 }
 
 function statusClass(status) {
-  if (status === 'completed') return 'badge bg-green-lt text-green'
-  if (status === 'failed') return 'badge bg-red-lt text-red'
-  return 'badge bg-yellow-lt text-yellow'
+  return getStatusBadgeClass(status, 'badge bg-yellow-lt text-yellow')
 }
 
 function renderConsoleOutput(raw) {

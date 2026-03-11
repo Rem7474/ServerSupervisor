@@ -97,11 +97,7 @@
                       <code style="background: rgba(0,0,0,0.3); padding: 0.15rem 0.4rem; border-radius: 0.25rem; color: #94a3b8;">{{ dockerLiveCmd.action }}</code>
                     </div>
                   </div>
-                  <span class="badge ms-2" :class="{
-                    'bg-yellow-lt text-yellow': dockerLiveCmd.status === 'running' || dockerLiveCmd.status === 'pending',
-                    'bg-green-lt text-green': dockerLiveCmd.status === 'completed',
-                    'bg-red-lt text-red': dockerLiveCmd.status === 'failed'
-                  }">{{ dockerLiveCmd.status }}</span>
+                  <span class="badge ms-2" :class="dockerLiveStatusClass">{{ dockerLiveCmd.status }}</span>
                 </div>
               </div>
               <pre
@@ -139,6 +135,8 @@ import { useWebSocket } from '../composables/useWebSocket'
 import { useAuthStore } from '../stores/auth'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
 import { useLocalStorage } from '../composables/useLocalStorage'
+import { useStatusBadge } from '../composables/useStatusBadge'
+import { useToast } from '../composables/useToast'
 import WsStatusBar from '../components/WsStatusBar.vue'
 import DockerContainersTab from '../components/DockerContainersTab.vue'
 import ComposeProjectsTab from '../components/ComposeProjectsTab.vue'
@@ -151,7 +149,8 @@ const containers = ref([])
 const composeProjects = ref([])
 const versionComparisons = ref([])
 const activeTab = useLocalStorage('dockerActiveTab', 'containers')
-const actionError = ref('')
+const { getStatusBadgeClass } = useStatusBadge()
+const { value: actionError, showToast: showActionError } = useToast('')
 
 const canRunDocker = computed(() => auth.role === 'admin' || auth.role === 'operator')
 
@@ -164,6 +163,10 @@ const dockerLiveCmd = ref(null)
 const dockerConsoleText = ref('')
 const dockerConsoleOutput = ref(null)
 let dockerStreamWs = null
+
+const dockerLiveStatusClass = computed(() => {
+  return getStatusBadgeClass(dockerLiveCmd.value?.status, 'badge bg-yellow-lt text-yellow')
+})
 
 async function handleContainerAction({ hostId, name, action }) {
   if (dockerActionLoading.value[name]) return
@@ -183,8 +186,7 @@ async function handleContainerAction({ hostId, name, action }) {
     const res = await apiClient.sendDockerCommand(hostId, name, action)
     connectDockerStream(res.data.command_id, name, action)
   } catch (err) {
-    actionError.value = err.response?.data?.error || err.message
-    setTimeout(() => { actionError.value = '' }, 6000)
+    showActionError(err.response?.data?.error || err.message, 6000)
   } finally {
     dockerActionLoading.value = { ...dockerActionLoading.value, [name]: null }
   }
@@ -208,8 +210,7 @@ async function handleComposeAction({ hostId, name, action, workingDir }) {
     const res = await apiClient.sendDockerCommand(hostId, name, action, workingDir)
     connectDockerStream(res.data.command_id, name, action)
   } catch (err) {
-    actionError.value = err.response?.data?.error || err.message
-    setTimeout(() => { actionError.value = '' }, 6000)
+    showActionError(err.response?.data?.error || err.message, 6000)
   } finally {
     composeActionLoading.value = { ...composeActionLoading.value, [name]: null }
   }

@@ -115,7 +115,7 @@
       </div>
       <div class="card-footer d-flex align-items-center gap-2">
         <button
-          v-if="auth.user?.role === 'admin'"
+          v-if="auth.isAdmin"
           class="btn btn-primary"
           @click="saveSmtp"
           :disabled="savingSmtp"
@@ -164,7 +164,7 @@
           </div>
           <div class="card-footer d-flex align-items-center gap-2">
             <button
-              v-if="auth.user?.role === 'admin'"
+              v-if="auth.isAdmin"
               class="btn btn-primary"
               @click="saveNotifications"
               :disabled="savingNotif"
@@ -208,7 +208,7 @@
           </div>
           <div class="card-footer d-flex align-items-center gap-2">
             <button
-              v-if="auth.user?.role === 'admin'"
+              v-if="auth.isAdmin"
               class="btn btn-primary"
               @click="saveRetention"
               :disabled="savingRetention"
@@ -314,7 +314,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
-import apiClient from '../api'
+import apiClient, { getApiErrorMessage } from '../api'
 
 const auth = useAuthStore()
 
@@ -436,7 +436,7 @@ async function saveSmtp() {
     setTimeout(() => { smtpSaveMsg.value = '' }, 4000)
   } catch (e) {
     smtpSaveOk.value = false
-    smtpSaveMsg.value = `Erreur : ${e.response?.data?.error || e.message}`
+    smtpSaveMsg.value = `Erreur : ${getApiErrorMessage(e)}`
     setTimeout(() => { smtpSaveMsg.value = '' }, 5000)
   } finally {
     savingSmtp.value = false
@@ -457,7 +457,7 @@ async function saveNotifications() {
     setTimeout(() => { notifSaveMsg.value = '' }, 4000)
   } catch (e) {
     notifSaveOk.value = false
-    notifSaveMsg.value = `Erreur : ${e.response?.data?.error || e.message}`
+    notifSaveMsg.value = `Erreur : ${getApiErrorMessage(e)}`
     setTimeout(() => { notifSaveMsg.value = '' }, 5000)
   } finally {
     savingNotif.value = false
@@ -478,7 +478,7 @@ async function saveRetention() {
     setTimeout(() => { retentionSaveMsg.value = '' }, 4000)
   } catch (e) {
     retentionSaveOk.value = false
-    retentionSaveMsg.value = `Erreur : ${e.response?.data?.error || e.message}`
+    retentionSaveMsg.value = `Erreur : ${getApiErrorMessage(e)}`
     setTimeout(() => { retentionSaveMsg.value = '' }, 5000)
   } finally {
     savingRetention.value = false
@@ -495,7 +495,7 @@ async function testSmtp() {
     setTimeout(() => { smtpTestMessage.value = '' }, 5000)
   } catch (e) {
     smtpTestSuccess.value = false
-    smtpTestMessage.value = `Erreur : ${e.response?.data?.error || e.message}`
+    smtpTestMessage.value = `Erreur : ${getApiErrorMessage(e)}`
     setTimeout(() => { smtpTestMessage.value = '' }, 5000)
   } finally {
     testingSmtp.value = false
@@ -512,7 +512,7 @@ async function testNtfy() {
     setTimeout(() => { ntfyTestMessage.value = '' }, 5000)
   } catch (e) {
     ntfyTestSuccess.value = false
-    ntfyTestMessage.value = `Erreur : ${e.response?.data?.error || e.message}`
+    ntfyTestMessage.value = `Erreur : ${getApiErrorMessage(e)}`
     setTimeout(() => { ntfyTestMessage.value = '' }, 5000)
   } finally {
     testingNtfy.value = false
@@ -538,7 +538,7 @@ async function cleanMetrics() {
     setTimeout(() => { cleanMessage.value = '' }, 5000)
   } catch (e) {
     cleanSuccess.value = false
-    cleanMessage.value = `Erreur : ${e.response?.data?.error || e.message}`
+    cleanMessage.value = `Erreur : ${getApiErrorMessage(e)}`
     setTimeout(() => { cleanMessage.value = '' }, 5000)
   } finally {
     cleaningMetrics.value = false
@@ -556,7 +556,7 @@ async function cleanAuditLogs() {
     setTimeout(() => { auditCleanMessage.value = '' }, 5000)
   } catch (e) {
     auditCleanSuccess.value = false
-    auditCleanMessage.value = `Erreur : ${e.response?.data?.error || e.message}`
+    auditCleanMessage.value = `Erreur : ${getApiErrorMessage(e)}`
     setTimeout(() => { auditCleanMessage.value = '' }, 5000)
   } finally {
     cleaningAuditLogs.value = false

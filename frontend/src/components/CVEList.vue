@@ -7,20 +7,39 @@
       </span>
       <span class="text-secondary small ms-2">({{ cves.length }} CVE{{ cves.length > 1 ? 's' : '' }})</span>
     </div>
+
+    <div class="text-secondary small mb-2">
+      {{ packageGroups.length }} paquet{{ packageGroups.length > 1 ? 's' : '' }} avec CVE
+    </div>
     
-    <div v-if="!collapsed || alwaysExpanded" class="d-flex flex-wrap gap-1">
-      <CVEBadge 
-        v-for="(cve, index) in displayedCves" 
-        :key="`${cve.id}-${index}`"
-        :cve="cve"
-        :showIcon="true"
-      />
-      <button 
-        v-if="cves.length > limit && !showAll" 
-        @click="showAll = true"
-        class="btn btn-sm btn-link p-0 ms-1"
+    <div v-if="!collapsed || alwaysExpanded" class="cve-groups">
+      <div
+        v-for="group in displayedPackageGroups"
+        :key="group.packageName"
+        class="cve-group-row"
       >
-        +{{ cves.length - limit }} plus...
+        <div class="cve-group-package">
+          <div class="fw-semibold">{{ group.packageName }}</div>
+          <div class="text-secondary small">{{ group.cves.length }} CVE{{ group.cves.length > 1 ? 's' : '' }}</div>
+        </div>
+        <div class="cve-group-items">
+          <div
+            v-for="(cve, index) in group.cves"
+            :key="`${group.packageName}-${cve.id}-${index}`"
+            class="d-flex align-items-center gap-2"
+          >
+            <CVEBadge :cve="cve" :showIcon="true" />
+            <span :class="severityClass(cve.severity)" class="badge">{{ normalizeSeverity(cve.severity) }}</span>
+          </div>
+        </div>
+      </div>
+
+      <button
+        v-if="packageGroups.length > limit && !showAll"
+        @click="showAll = true"
+        class="btn btn-sm btn-link p-0 mt-2"
+      >
+        +{{ packageGroups.length - limit }} paquet{{ packageGroups.length - limit > 1 ? 's' : '' }}...
       </button>
     </div>
     
@@ -78,11 +97,28 @@ const cves = computed(() => {
   }
 })
 
-const displayedCves = computed(() => {
-  if (showAll.value || props.alwaysExpanded) {
-    return cves.value
+const packageGroups = computed(() => {
+  const grouped = new Map()
+
+  for (const cve of cves.value) {
+    const packageName = String(cve?.package || '').trim() || 'Paquet non specifie'
+    if (!grouped.has(packageName)) {
+      grouped.set(packageName, [])
+    }
+    grouped.get(packageName).push(cve)
   }
-  return cves.value.slice(0, props.limit)
+
+  return Array.from(grouped.entries()).map(([packageName, groupedCves]) => ({
+    packageName,
+    cves: groupedCves,
+  }))
+})
+
+const displayedPackageGroups = computed(() => {
+  if (showAll.value || props.alwaysExpanded) {
+    return packageGroups.value
+  }
+  return packageGroups.value.slice(0, props.limit)
 })
 
 const severityOrder = {
@@ -113,8 +149,15 @@ const maxSeverity = computed(() => {
 })
 
 const maxSeverityClass = computed(() => {
-  const severity = maxSeverity.value
-  
+  return severityClass(maxSeverity.value)
+})
+
+function normalizeSeverity(severity) {
+  return severity?.toUpperCase() || 'UNKNOWN'
+}
+
+function severityClass(severity) {
+  const normalized = normalizeSeverity(severity)
   const classes = {
     'CRITICAL': 'bg-red-lt text-red',
     'HIGH': 'bg-orange-lt text-orange',
@@ -123,9 +166,46 @@ const maxSeverityClass = computed(() => {
     'NEGLIGIBLE': 'bg-secondary-lt text-secondary',
     'UNKNOWN': 'bg-secondary-lt text-secondary'
   }
-  
-  return classes[severity] || classes['UNKNOWN']
-})
+  return classes[normalized] || classes.UNKNOWN
+}
 </script>
+
+<style scoped>
+.cve-groups {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.cve-group-row {
+  display: grid;
+  grid-template-columns: minmax(140px, 220px) 1fr;
+  border: 1px solid var(--tblr-border-color, #e6e7e9);
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.cve-group-package {
+  background: var(--tblr-bg-surface-secondary, #f8fafc);
+  padding: 0.625rem 0.75rem;
+  border-right: 1px solid var(--tblr-border-color, #e6e7e9);
+}
+
+.cve-group-items {
+  padding: 0.625rem 0.75rem;
+  display: grid;
+  gap: 0.35rem;
+}
+
+@media (max-width: 768px) {
+  .cve-group-row {
+    grid-template-columns: 1fr;
+  }
+
+  .cve-group-package {
+    border-right: 0;
+    border-bottom: 1px solid var(--tblr-border-color, #e6e7e9);
+  }
+}
+</style>
 
 

@@ -5,7 +5,7 @@
     rel="noopener noreferrer"
     :class="badgeClass"
     class="badge text-decoration-none me-1 mb-1"
-    :title="`${cve.id} - ${cve.severity} - Package: ${cve.package}`"
+    :title="cveTitle"
   >
     {{ cve.id }}
     <svg v-if="showIcon" xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler ms-1" width="14" height="14" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
@@ -55,6 +55,11 @@ const badgeClass = computed(() => {
   }
   
   return classes[severity] || classes['UNKNOWN']
+})
+
+const cveTitle = computed(() => {
+  const packageName = String(props.cve.package || '').trim() || 'N/A'
+  return `${props.cve.id} - ${props.cve.severity} - Package: ${packageName}`
 })
 </script>
 

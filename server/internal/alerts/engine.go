@@ -5,10 +5,12 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"time"
 
+	webpush "github.com/SherClockHolmes/webpush-go"
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/dispatch"
@@ -80,6 +82,7 @@ func EvaluateAlerts(db *database.DB, cfg *config.Config, dispatcher *dispatch.Di
 					sendAlertNotifications(n, cfg, rule, host, value)
 					triggerAlertCommand(dispatcher, rule, host)
 					pushBrowserNotification(pusher, rule, host, value, incID)
+					go pushWebNotifications(db, cfg, rule, host, value)
 				}
 			} else if inc != nil {
 				_ = db.ResolveAlertIncident(inc.ID)
@@ -242,6 +245,87 @@ func sendAlertNotifications(n notify.Notifier, cfg *config.Config, rule models.A
 			log.Printf("Alerts: unknown channel %q for rule %d", channel, rule.ID)
 		}
 	}
+}
+
+// pushWebNotifications delivers a Web Push notification to every registered device subscription
+// when a rule with the "browser" channel fires. Runs in a goroutine; VAPID keys are fetched
+// from the settings table (generated on first alert if not yet present).
+func pushWebNotifications(db *database.DB, cfg *config.Config, rule models.AlertRule, host models.Host, value float64) {
+	hasBrowser := false
+	for _, ch := range rule.Actions.Channels {
+		if ch == "browser" {
+			hasBrowser = true
+			break
+		}
+	}
+	if !hasBrowser {
+		return
+	}
+
+	privateKey, err := db.GetSetting("vapid_private_key")
+	if err != nil || privateKey == "" {
+		return
+	}
+	publicKey, err := db.GetSetting("vapid_public_key")
+	if err != nil || publicKey == "" {
+		return
+	}
+
+	ruleName := ""
+	if rule.Name != nil {
+		ruleName = *rule.Name
+	} else if rule.Threshold != nil {
+		ruleName = fmt.Sprintf("%s %s %.2f", rule.Metric, rule.Operator, *rule.Threshold)
+	}
+
+	unit := ""
+	switch rule.Metric {
+	case "cpu", "cpu_percent", "memory", "ram_percent", "disk", "disk_percent":
+		unit = "%"
+	}
+
+	payload, _ := json.Marshal(map[string]interface{}{
+		"title": "Alerte : " + ruleName,
+		"body":  fmt.Sprintf("%s — Valeur : %.2f%s", host.Name, value, unit),
+		"tag":   fmt.Sprintf("alert-%d-%s", rule.ID, host.ID),
+		"url":   "/alerts?tab=incidents",
+	})
+
+	subs, err := db.GetAllPushSubscriptions()
+	if err != nil || len(subs) == 0 {
+		return
+	}
+	for _, sub := range subs {
+		wpSub := &webpush.Subscription{
+			Endpoint: sub.Endpoint,
+			Keys: webpush.Keys{
+				P256dh: sub.P256DHKey,
+				Auth:   sub.AuthKey,
+			},
+		}
+		resp, sendErr := webpush.SendNotification(payload, wpSub, &webpush.Options{
+			Subscriber:      cfg.BaseURL,
+			VAPIDPublicKey:  publicKey,
+			VAPIDPrivateKey: privateKey,
+			TTL:             120,
+		})
+		if sendErr != nil {
+			log.Printf("Push: delivery failed (%s…): %v", truncateStr(sub.Endpoint, 40), sendErr)
+			if resp != nil && resp.StatusCode == http.StatusGone {
+				_ = db.DeletePushSubscription(sub.Endpoint)
+			}
+			continue
+		}
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}
+}
+
+func truncateStr(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n]
 }
 
 // pushBrowserNotification sends a real-time WebSocket event to all connected frontend clients

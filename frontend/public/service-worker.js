@@ -133,6 +133,51 @@ self.addEventListener('fetch', (event) => {
   )
 })
 
+// Handle incoming Web Push notifications (background / app closed on mobile)
+self.addEventListener('push', (event) => {
+  let data = {}
+  if (event.data) {
+    try {
+      data = event.data.json()
+    } catch {
+      data.body = event.data.text()
+    }
+  }
+  const title = data.title || 'ServerSupervisor'
+  const options = {
+    body: data.body || 'Nouvelle alerte détectée',
+    icon: '/favicon.ico',
+    badge: '/favicon.ico',
+    tag: data.tag || 'ss-alert',
+    data: { url: data.url || '/alerts?tab=incidents' },
+    requireInteraction: false,
+    renotify: true,
+  }
+  event.waitUntil(
+    self.registration.showNotification(title, options)
+  )
+})
+
+// Open / focus the app when a push notification is clicked
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close()
+  const targetUrl = (event.notification.data && event.notification.data.url) || '/alerts?tab=incidents'
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      // Focus first open tab if available
+      for (const client of clientList) {
+        if (client.url.includes(self.location.origin) && 'focus' in client) {
+          return client.focus()
+        }
+      }
+      // No open tab — open the target URL in a new window
+      if (clients.openWindow) {
+        return clients.openWindow(targetUrl)
+      }
+    })
+  )
+})
+
 // Background sync for failed requests (optional future feature)
 self.addEventListener('sync', (event) => {
   if (event.tag === 'sync-api-requests') {

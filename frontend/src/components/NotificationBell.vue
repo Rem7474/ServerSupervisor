@@ -119,18 +119,20 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import RelativeTime from './RelativeTime.vue'
 import apiClient from '../api'
-import { useLocalStorage } from '../composables/useLocalStorage'
 import { useWebSocket } from '../composables/useWebSocket'
-
-const STORAGE_KEY = 'notificationsReadAt'
 
 const bellRef = ref(null)
 const isOpen = ref(false)
 const loading = ref(false)
 const notifications = ref([])
-const readAtRef = useLocalStorage(STORAGE_KEY, null)
+
+// readAtRef is now server-driven (cross-device sync).
+// Populated from GET /api/v1/notifications (includes read_at field per user).
+// Updated via POST /api/v1/notifications/mark-read and on every 30s poll.
+const readAtRef = ref(null)
+
 let pollTimer = null
-// null = premier fetch pas encore fait → pas de notification navigateur au démarrage de session
+// null = first fetch not done yet → avoid flooding on page load
 let seenIdSet = null
 
 const unreadCount = computed(() =>
@@ -153,8 +155,14 @@ function toggleOpen() {
   isOpen.value = !isOpen.value
 }
 
-function markAllRead() {
-  readAtRef.value = new Date().toISOString()
+async function markAllRead() {
+  try {
+    const { data } = await apiClient.markNotificationsRead()
+    readAtRef.value = data.read_at ?? new Date().toISOString()
+  } catch {
+    // Fallback: mark locally if API is temporarily unavailable
+    readAtRef.value = new Date().toISOString()
+  }
 }
 
 function showBrowserNotification(item) {
@@ -163,11 +171,43 @@ function showBrowserNotification(item) {
       body: `${item.host_name} — Valeur : ${item.value?.toFixed(2)}${metricUnit(item.metric)}`,
       icon: '/favicon.ico',
       tag: `alert-${item.id}`,
-      requireInteraction: false
+      requireInteraction: false,
     })
     n.onclick = () => { window.focus(); n.close() }
   } catch {
-    // API non supportée ou permission révoquée en cours de session
+    // API not supported or permission revoked mid-session
+  }
+}
+
+// Convert URL-safe base64 to Uint8Array for PushManager.subscribe()
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
+  const rawData = atob(base64)
+  return Uint8Array.from(rawData, (c) => c.charCodeAt(0))
+}
+
+// Register a Web Push subscription so the backend can push alerts to this device
+// even when the app is closed (required for mobile PWA).
+async function setupPushNotifications() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
+  if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return
+  try {
+    const reg = await navigator.serviceWorker.ready
+    let sub = await reg.pushManager.getSubscription()
+    if (!sub) {
+      const { data } = await apiClient.getPushVapidPublicKey()
+      if (!data?.public_key) return
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(data.public_key),
+      })
+    }
+    // Always sync the current subscription to the server (covers new login / key rotation)
+    await apiClient.subscribePush(sub.toJSON())
+  } catch (err) {
+    // Non-critical: push not supported or user declined — desktop Notification API still works
+    console.debug('[Push] subscription setup failed:', err)
   }
 }
 
@@ -176,15 +216,15 @@ useWebSocket('/api/v1/ws/notifications', (payload) => {
   if (payload.type !== 'new_alert' || !payload.notification) return
   const item = payload.notification
 
-  // Show browser notification immediately (WS push is always new)
+  // Show in-app notification immediately (WS push is always new)
   if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
     showBrowserNotification(item)
   }
 
-  // Mark as seen so polling doesn't duplicate the browser notification
+  // Mark as seen so the polling cycle doesn't re-trigger the browser notification
   if (seenIdSet !== null) seenIdSet.add(item.id)
 
-  // Prepend to the list (keep max 30)
+  // Prepend to the in-app list (max 30)
   if (!notifications.value.some(n => n.id === item.id)) {
     notifications.value = [item, ...notifications.value].slice(0, 30)
   }
@@ -197,8 +237,13 @@ async function fetchNotifications() {
     const res = await apiClient.getNotifications()
     const incoming = res.data?.notifications || []
 
-    // Fallback browser notifications via polling (catches alerts missed during WS downtime)
-    // Only fires after the first fetch (seenIdSet !== null) to avoid flooding on page load
+    // Sync server-side readAt (cross-device: if another device marked as read, update here)
+    const serverReadAt = res.data?.read_at
+    if (serverReadAt !== undefined) {
+      readAtRef.value = serverReadAt  // null (never marked) or ISO timestamp
+    }
+
+    // Fallback browser notifications via polling — only for IDs not already seen via WS
     if (seenIdSet !== null && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
       for (const item of incoming) {
         if (item.browser_notify && !seenIdSet.has(item.id)) {
@@ -207,11 +252,10 @@ async function fetchNotifications() {
       }
     }
 
-    // Update known ID set
     seenIdSet = new Set(incoming.map(n => n.id))
     notifications.value = incoming
   } catch {
-    // non-critical — silent fail
+    // Non-critical — silent fail
   } finally {
     loading.value = false
   }
@@ -223,27 +267,25 @@ function onClickOutside(e) {
   }
 }
 
-function onStorageEvent(e) {
-  if (e.key === STORAGE_KEY) {
-    readAtRef.value = e.newValue
-  }
-}
-
-onMounted(() => {
-  // Ask for browser notification permission on first load (browser only prompts once per origin)
+onMounted(async () => {
+  // Request notification permission on first visit
   if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
-    Notification.requestPermission()
+    const perm = await Notification.requestPermission()
+    if (perm === 'granted') {
+      await setupPushNotifications()
+    }
+  } else if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+    // Already granted (e.g. page reload) — ensure subscription is registered with server
+    await setupPushNotifications()
   }
   fetchNotifications()
   pollTimer = setInterval(fetchNotifications, 30_000)
   document.addEventListener('click', onClickOutside)
-  window.addEventListener('storage', onStorageEvent)
 })
 
 onUnmounted(() => {
   clearInterval(pollTimer)
   document.removeEventListener('click', onClickOutside)
-  window.removeEventListener('storage', onStorageEvent)
 })
 </script>
 

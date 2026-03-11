@@ -3,7 +3,9 @@ import { ref, watch } from 'vue'
 /**
  * A reactive ref that is persisted to localStorage.
  * @param {string} key - localStorage key
- * @param {*} defaultValue - value to use if the key does not exist
+ * @template T
+ * @param {T} defaultValue - value to use if the key does not exist
+ * @returns {import('vue').Ref<T>}
  */
 export function useLocalStorage(key, defaultValue) {
   const stored = localStorage.getItem(key)

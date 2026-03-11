@@ -296,7 +296,12 @@
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import apiClient from '../api'
-import { formatDateTime as formatDate } from '../utils/formatters'
+import { useDateFormatter } from '../composables/useDateFormatter'
+import { useStatusBadge } from '../composables/useStatusBadge'
+import { useRemotePagination } from '../composables/usePagination'
+
+const { formatLocaleDateTime: formatDate } = useDateFormatter()
+const { getStatusBadgeClass } = useStatusBadge()
 
 const auth = useAuthStore()
 const canViewCommands = computed(() => auth.role === 'admin' || auth.role === 'operator')
@@ -319,6 +324,7 @@ const showLogViewer = ref(false)
 const liveOutput = ref('')
 const logViewerEl = ref(null)
 let streamWs = null
+let auditPollTimer = null
 
 // ── Connexions (admin) ───────────────────────────────────────────────────────
 const connexions = ref([])
@@ -367,9 +373,7 @@ function formatDuration(startedAt, endedAt) {
 
 // ── Status / UA helpers ───────────────────────────────────────────────────────
 function statusClass(status) {
-  if (status === 'completed') return 'badge bg-green-lt text-green'
-  if (status === 'failed') return 'badge bg-red-lt text-red'
-  return 'badge bg-yellow-lt text-yellow'
+  return getStatusBadgeClass(status, 'badge bg-yellow-lt text-yellow')
 }
 
 function parseUA(ua) {
@@ -499,25 +503,54 @@ function refresh() {
 
 // ── Pagination ────────────────────────────────────────────────────────────────
 function nextCmdsPage() {
-  if (cmdsPage.value >= totalCmdsPages.value) return
-  cmdsPage.value += 1; closeLogViewer(); fetchCmds()
+  const prev = cmdsPage.value
+  cmdsPager.nextPage()
+  if (cmdsPage.value === prev) return
+  closeLogViewer()
+  fetchCmds()
 }
 function prevCmdsPage() {
-  if (cmdsPage.value <= 1) return
-  cmdsPage.value -= 1; closeLogViewer(); fetchCmds()
+  const prev = cmdsPage.value
+  cmdsPager.prevPage()
+  if (cmdsPage.value === prev) return
+  closeLogViewer()
+  fetchCmds()
 }
 
 function nextConnexionsPage() {
-  if (connexionsPage.value >= totalConnexionsPages.value) return
-  connexionsPage.value += 1; fetchConnexions()
+  const prev = connexionsPage.value
+  connexionsPager.nextPage()
+  if (connexionsPage.value === prev) return
+  fetchConnexions()
 }
 function prevConnexionsPage() {
-  if (connexionsPage.value <= 1) return
-  connexionsPage.value -= 1; fetchConnexions()
+  const prev = connexionsPage.value
+  connexionsPager.prevPage()
+  if (connexionsPage.value === prev) return
+  fetchConnexions()
 }
 
+const cmdsPager = useRemotePagination({ currentPage: cmdsPage, totalPages: totalCmdsPages })
+const connexionsPager = useRemotePagination({ currentPage: connexionsPage, totalPages: totalConnexionsPages })
+
 onMounted(fetchCmds)
-onUnmounted(() => { if (streamWs) streamWs.close() })
+onMounted(() => {
+  auditPollTimer = setInterval(() => {
+    if (activeTab.value === 'commandes') {
+      fetchCmds()
+    } else if (auth.role === 'admin') {
+      fetchConnexions()
+    }
+  }, 30_000)
+})
+
+onUnmounted(() => {
+  if (auditPollTimer) {
+    clearInterval(auditPollTimer)
+    auditPollTimer = null
+  }
+  if (streamWs) streamWs.close()
+})
 </script>
 
 <style scoped>

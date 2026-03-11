@@ -6,6 +6,17 @@ const api = axios.create({
   timeout: 30000,
 })
 
+/**
+ * Normalize API/Network error objects into a user-facing message.
+ * @param {unknown} error
+ * @param {string} [fallback='Une erreur est survenue']
+ * @returns {string}
+ */
+export function getApiErrorMessage(error, fallback = 'Une erreur est survenue') {
+  const message = error?.response?.data?.error || error?.response?.data?.message || error?.message
+  return message ? String(message) : fallback
+}
+
 // Add JWT token to requests
 api.interceptors.request.use((config) => {
   const auth = useAuthStore()
@@ -36,7 +47,7 @@ export default {
   changePassword: (currentPassword, newPassword) =>
     api.post('/v1/auth/change-password', { current_password: currentPassword, new_password: newPassword }),
   getLoginEvents: () => api.get('/v1/auth/login-events'),
-  getLoginEventsAdmin: (page = 1, limit = 50) => api.get(`/v1/auth/login-events/admin?page=${page}&limit=${limit}`),
+  getLoginEventsAdmin: (page = 1, limit = 50) => api.get('/v1/auth/login-events/admin', { params: { page, limit } }),
   revokeAllSessions: (refreshToken) => api.post('/v1/auth/revoke-all-sessions', { refresh_token: refreshToken }),
   getSecuritySummary: () => api.get('/v1/auth/security'),
   unblockIP: (ip) => api.delete(`/v1/auth/blocked-ips/${ip}`),
@@ -60,16 +71,16 @@ export default {
   getDiskHealth: (hostId) => api.get(`/v1/hosts/${hostId}/disk/health`),
 
   // Metrics
-  getMetricsHistory: (hostId, hours = 24) => api.get(`/v1/hosts/${hostId}/metrics/history?hours=${hours}`),
-  getMetricsAggregated: (hostId, hours = 24) => api.get(`/v1/hosts/${hostId}/metrics/aggregated?hours=${hours}`),
+  getMetricsHistory: (hostId, hours = 24) => api.get(`/v1/hosts/${hostId}/metrics/history`, { params: { hours } }),
+  getMetricsAggregated: (hostId, hours = 24) => api.get(`/v1/hosts/${hostId}/metrics/aggregated`, { params: { hours } }),
   getMetricsSummary: (hours = 24, bucketMinutes = 5) =>
-    api.get(`/v1/metrics/summary?hours=${hours}&bucket_minutes=${bucketMinutes}`),
+    api.get('/v1/metrics/summary', { params: { hours, bucket_minutes: bucketMinutes } }),
 
   // Docker
   getContainers: (hostId) => api.get(`/v1/hosts/${hostId}/containers`),
   getAllContainers: () => api.get('/v1/docker/containers'),
   getComposeProjects: () => api.get('/v1/docker/compose'),
-sendDockerCommand: (hostId, containerName, action, workingDir = '') =>
+  sendDockerCommand: (hostId, containerName, action, workingDir = '') =>
     api.post('/v1/docker/command', { host_id: hostId, container_name: containerName, action, working_dir: workingDir }),
   sendJournalCommand: (hostId, serviceName) =>
     api.post('/v1/system/journalctl', { host_id: hostId, service_name: serviceName }),
@@ -77,7 +88,7 @@ sendDockerCommand: (hostId, containerName, action, workingDir = '') =>
     api.post('/v1/system/service', { host_id: hostId, service_name: serviceName, action }),
   sendProcessesCommand: (hostId) =>
     api.post('/v1/system/processes', { host_id: hostId }),
-  getHostCommandHistory: (hostId, limit = 50) => api.get(`/v1/hosts/${hostId}/commands/history?limit=${limit}`),
+  getHostCommandHistory: (hostId, limit = 50) => api.get(`/v1/hosts/${hostId}/commands/history`, { params: { limit } }),
 
   // APT
   getAptStatus: (hostId) => api.get(`/v1/hosts/${hostId}/apt`),
@@ -90,11 +101,11 @@ sendDockerCommand: (hostId, containerName, action, workingDir = '') =>
   saveTopologyConfig: (config) => api.put('/v1/network/config', config),
 
   // Audit
-  getAuditLogs: (page = 1, limit = 50) => api.get(`/v1/audit/logs?page=${page}&limit=${limit}`),
-  getMyAuditLogs: (limit = 10) => api.get(`/v1/audit/logs/me?limit=${limit}`),
-  getAuditLogsByHost: (hostId, limit = 100) => api.get(`/v1/audit/logs/host/${hostId}?limit=${limit}`),
-  getAuditLogsByUser: (username, limit = 100) => api.get(`/v1/audit/logs/user/${username}?limit=${limit}`),
-  getCommandsHistory: (page = 1, limit = 50) => api.get(`/v1/audit/commands?page=${page}&limit=${limit}`),
+  getAuditLogs: (page = 1, limit = 50) => api.get('/v1/audit/logs', { params: { page, limit } }),
+  getMyAuditLogs: (limit = 10) => api.get('/v1/audit/logs/me', { params: { limit } }),
+  getAuditLogsByHost: (hostId, limit = 100) => api.get(`/v1/audit/logs/host/${hostId}`, { params: { limit } }),
+  getAuditLogsByUser: (username, limit = 100) => api.get(`/v1/audit/logs/user/${username}`, { params: { limit } }),
+  getCommandsHistory: (page = 1, limit = 50) => api.get('/v1/audit/commands', { params: { page, limit } }),
   getCommandStatus: (id) => api.get(`/v1/commands/${id}`),
 
   // Users
@@ -112,6 +123,12 @@ sendDockerCommand: (hostId, containerName, action, workingDir = '') =>
 
   // Notifications
   getNotifications: () => api.get('/v1/notifications'),
+  markNotificationsRead: () => api.post('/v1/notifications/mark-read'),
+
+  // Push (Web Push / VAPID)
+  getPushVapidPublicKey: () => api.get('/v1/push/vapid-public-key'),
+  subscribePush: (subscription) => api.post('/v1/push/subscribe', subscription),
+  unsubscribePush: (endpoint) => api.delete('/v1/push/subscribe', { data: { endpoint } }),
 
   // Scheduled Tasks
   getAllScheduledTasks: () => api.get('/v1/scheduled-tasks'),
@@ -130,7 +147,7 @@ sendDockerCommand: (hostId, containerName, action, workingDir = '') =>
   deleteReleaseTracker: (id) => api.delete(`/v1/release-trackers/${id}`),
   checkReleaseTrackerNow: (id) => api.post(`/v1/release-trackers/${id}/check-now`),
   runReleaseTracker: (id) => api.post(`/v1/release-trackers/${id}/run`),
-  getReleaseTrackerExecutions: (id, limit = 50) => api.get(`/v1/release-trackers/${id}/executions?limit=${limit}`),
+  getReleaseTrackerExecutions: (id, limit = 50) => api.get(`/v1/release-trackers/${id}/executions`, { params: { limit } }),
 
   // Git Webhooks
   getGitWebhooks: () => api.get('/v1/webhooks/git'),
@@ -139,7 +156,7 @@ sendDockerCommand: (hostId, containerName, action, workingDir = '') =>
   updateGitWebhook: (id, payload) => api.put(`/v1/webhooks/git/${id}`, payload),
   deleteGitWebhook: (id) => api.delete(`/v1/webhooks/git/${id}`),
   regenerateWebhookSecret: (id) => api.post(`/v1/webhooks/git/${id}/regenerate-secret`),
-  getWebhookExecutions: (id, limit = 50) => api.get(`/v1/webhooks/git/${id}/executions?limit=${limit}`),
+  getWebhookExecutions: (id, limit = 50) => api.get(`/v1/webhooks/git/${id}/executions`, { params: { limit } }),
 
   // Settings
   getSettings: () => api.get('/v1/settings'),

@@ -2,6 +2,31 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
 
 /**
+ * @typedef {'connecting' | 'connected' | 'reconnecting' | 'error' | 'disconnected'} WebSocketStatus
+ */
+
+/**
+ * @typedef {Object} UseWebSocketOptions
+ * @property {number} [debounceMs]
+ */
+
+/**
+ * @typedef {Object} SendOptions
+ * @property {boolean} [stringify]
+ */
+
+/**
+ * @template TPayload
+ * @typedef {Object} UseWebSocketApi
+ * @property {import('vue').Ref<WebSocketStatus>} wsStatus
+ * @property {import('vue').Ref<string>} wsError
+ * @property {import('vue').Ref<number>} retryCount
+ * @property {() => void} reconnect
+ * @property {() => void} disconnect
+ * @property {(message: unknown, options?: SendOptions) => boolean} send
+ */
+
+/**
  * WebSocket status values:
  *   'connecting'   — initial connection attempt
  *   'connected'    — open and authenticated
@@ -10,15 +35,27 @@ import { useAuthStore } from '../stores/auth'
  *   'disconnected' — manually closed
  */
 
-export function useWebSocket(path, onMessage, { debounceMs = 0 } = {}) {
+/**
+ * @template TPayload
+ * @param {string} path
+ * @param {(payload: TPayload) => void} onMessage
+ * @param {UseWebSocketOptions} [options]
+ * @returns {UseWebSocketApi<TPayload>}
+ */
+export function useWebSocket(path, onMessage, options = {}) {
+  const { debounceMs = 0 } = options
   const auth = useAuthStore()
 
+  /** @type {import('vue').Ref<WebSocketStatus>} */
   const wsStatus = ref('connecting')
   const wsError = ref('')       // human-readable error message
   const retryCount = ref(0)
 
+  /** @type {WebSocket | null} */
   let ws = null
+  /** @type {ReturnType<typeof setTimeout> | null} */
   let retryTimer = null
+  /** @type {ReturnType<typeof setTimeout> | null} */
   let debounceTimer = null
   let manualClose = false
 
@@ -123,8 +160,23 @@ export function useWebSocket(path, onMessage, { debounceMs = 0 } = {}) {
     wsStatus.value = 'disconnected'
   }
 
+  /**
+   * @param {unknown} message
+   * @param {SendOptions} [sendOptions]
+   * @returns {boolean}
+   */
+  function send(message, { stringify = true } = {}) {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return false
+    try {
+      ws.send(stringify ? JSON.stringify(message) : message)
+      return true
+    } catch {
+      return false
+    }
+  }
+
   onMounted(connect)
   onUnmounted(disconnect)
 
-  return { wsStatus, wsError, retryCount, reconnect: connect }
+  return { wsStatus, wsError, retryCount, reconnect: connect, disconnect, send }
 }

@@ -126,7 +126,7 @@ router.beforeEach((to, _from, next) => {
   } else if (auth.isAuthenticated && auth.mustChangePassword && to.path !== '/account') {
     // Force password change before accessing any other page
     next('/account')
-  } else if (to.meta.requiresAdmin && !auth.isAdmin) {
+  } else if (to.meta.requiresAdmin && !auth.hasPermission('*')) {
     next('/')
   } else if (to.path === '/login' && auth.isAuthenticated) {
     next('/')

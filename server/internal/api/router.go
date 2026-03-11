@@ -39,6 +39,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	alertRulesH := handlers.NewAlertRulesHandler(db, cfg)
 	settingsH := handlers.NewSettingsHandler(db, cfg)
 	notifH := handlers.NewNotificationsHandler(db)
+	pushH := handlers.NewPushHandler(db, cfg)
 	scheduledTaskH := handlers.NewScheduledTaskHandler(db, cfg, dispatcher, sched)
 	gitWebhookH := handlers.NewGitWebhookHandler(db, cfg, dispatcher, notifHub)
 	releaseTrackerH := handlers.NewReleaseTrackerHandler(db, cfg, dispatcher, notifHub)
@@ -58,6 +59,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	registerAuditRoutes(v1, auditH)
 	registerAlertRoutes(v1, alertH, alertRulesH)
 	registerNotifRoutes(v1, notifH)
+	registerPushRoutes(v1, pushH)
 	registerSettingsRoutes(v1, settingsH)
 	registerTaskRoutes(v1, scheduledTaskH)
 	registerUserRoutes(v1, userH)
@@ -159,6 +161,13 @@ func registerAuditRoutes(g *gin.RouterGroup, h *handlers.AuditHandler) {
 
 func registerNotifRoutes(g *gin.RouterGroup, h *handlers.NotificationsHandler) {
 	g.GET("/notifications", h.GetNotifications)
+	g.POST("/notifications/mark-read", h.MarkRead)
+}
+
+func registerPushRoutes(g *gin.RouterGroup, h *handlers.PushHandler) {
+	g.GET("/push/vapid-public-key", h.GetVapidPublicKey)
+	g.POST("/push/subscribe", h.Subscribe)
+	g.DELETE("/push/subscribe", h.Unsubscribe)
 }
 
 func registerAlertRoutes(g *gin.RouterGroup, alertH *handlers.AlertHandler, rulesH *handlers.AlertRulesHandler) {

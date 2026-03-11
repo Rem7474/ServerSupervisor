@@ -59,6 +59,18 @@ type NotificationItem struct {
 	BrowserNotify bool       `json:"browser_notify"`
 }
 
+// PushSubscription represents a Web Push (VAPID) subscription for a user's browser/device.
+// Stored server-side so that alert notifications can be delivered even when the app is closed.
+type PushSubscription struct {
+	ID        int64     `json:"id"`
+	Username  string    `json:"username"`
+	Endpoint  string    `json:"endpoint"`
+	P256DHKey string    `json:"p256dh"`
+	AuthKey   string    `json:"auth"`
+	UserAgent string    `json:"user_agent,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 // ========== Alert Rules - Create/Update Helpers ==========
 
 type AlertRuleCreate struct {

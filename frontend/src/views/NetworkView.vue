@@ -110,486 +110,58 @@
         </li>
       </ul>
       <div class="card-body network-topology-body">
-        <div v-if="networkTab === 'config'" class="network-config">
-          <div class="network-config-row">
-            <div class="network-config-item">
-              <label class="form-label">Reverse proxy</label>
-              <input v-model="rootNodeName" type="text" class="form-control form-control-sm" placeholder="Ex: Nginx Proxy Manager" />
-            </div>
-            <div class="network-config-item">
-              <label class="form-label">IP du proxy</label>
-              <input v-model="rootNodeIp" type="text" class="form-control form-control-sm" placeholder="Ex: 192.168.1.10" />
-            </div>
+        <NetworkTopologyConfig
+          v-if="networkTab === 'config'"
+          v-model:root-node-name="rootNodeName"
+          v-model:root-node-ip="rootNodeIp"
+          v-model:authelia-label="autheliaLabel"
+          v-model:authelia-ip="autheliaIp"
+          v-model:internet-label="internetLabel"
+          v-model:internet-ip="internetIp"
+          v-model:network-services="networkServices"
+          v-model:host-port-config="hostPortConfig"
+          :hosts="hosts"
+          :containers="containers"
+        />
+        <div v-else class="network-topology-graph-layout">
+          <div ref="graphSurfaceRef" class="network-graph-surface" :style="{ height: graphHeight }">
+            <NetworkGraph
+              v-if="topologyConfigLoaded"
+              :data="graphHosts"
+              :root-label="rootNodeName"
+              :root-ip="rootNodeIp"
+              :services="combinedServices"
+              :host-port-overrides="hostPortOverrides"
+              :authelia-label="autheliaLabel"
+              :authelia-ip="autheliaIp"
+              :internet-label="internetLabel"
+              :internet-ip="internetIp"
+              :node-positions="nodePositions"
+              @node-select="selectedNode = $event"
+              @update:node-positions="onNodePositionsUpdate"
+            />
           </div>
-          <div class="network-config-item mt-3">
-            <div class="d-flex align-items-center justify-content-between mb-2">
-              <div>
-                <label class="form-label mb-0">Services manuels via proxy</label>
-                <div class="text-secondary small mt-1">
-                  Services définis manuellement, non détectés automatiquement.
-                  Pour les ports découverts, utilisez la section "Ports découverts" ci-dessous
-                  et cochez "Proxy".
-                </div>
-              </div>
-              <button class="btn btn-outline-light btn-sm ms-2" @click="addServiceRow">
-                + Ajouter
-              </button>
-            </div>
-            <div class="table-responsive network-config-table">
-              <table class="table table-sm table-vcenter">
-                <thead>
-                  <tr>
-                    <th>Nom</th>
-                    <th>Domaine</th>
-                    <th>Chemin</th>
-                    <th>Port interne</th>
-                    <th>Host</th>
-                    <th>Proxy</th>
-                    <th>Authelia</th>
-                    <th>Internet</th>
-                    <th>Port ext.</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-for="service in networkServices" :key="service.id">
-                    <td><input v-model="service.name" class="form-control form-control-sm" placeholder="Ex: Vaultwarden" /></td>
-                    <td><input v-model="service.domain" class="form-control form-control-sm" placeholder="vault.example.com" /></td>
-                    <td><input v-model="service.path" class="form-control form-control-sm" placeholder="/" /></td>
-                    <td><input v-model.number="service.internalPort" type="number" class="form-control form-control-sm" placeholder="3000" /></td>
-                    <td>
-                      <select v-model="service.hostId" class="form-select form-select-sm">
-                        <option value="">Choisir...</option>
-                        <option v-for="h in hosts" :key="h.id" :value="h.id">
-                          {{ h.name || h.hostname || h.ip_address || h.id }}
-                        </option>
-                      </select>
-                    </td>
-                    <td>
-                      <label class="form-check form-switch">
-                        <input
-                          v-model="service.linkToProxy"
-                          class="form-check-input"
-                          type="checkbox"
-                        />
-                      </label>
-                    </td>
-                    <td>
-                      <label class="form-check form-switch">
-                        <input
-                          v-model="service.linkToAuthelia"
-                          class="form-check-input"
-                          type="checkbox"
-                        />
-                      </label>
-                    </td>
-                    <td>
-                      <label class="form-check form-switch">
-                        <input
-                          v-model="service.exposedToInternet"
-                          class="form-check-input"
-                          type="checkbox"
-                        />
-                      </label>
-                    </td>
-                    <td>
-                      <input
-                        v-model.number="service.externalPort"
-                        type="number"
-                        class="form-control form-control-sm"
-                        placeholder="443"
-                        :disabled="!service.exposedToInternet"
-                        style="width: 70px;"
-                      />
-                    </td>
-                    <td class="text-end">
-                      <button class="btn btn-sm btn-outline-danger" @click="removeServiceRow(service.id)">Supprimer</button>
-                    </td>
-                  </tr>
-                  <tr v-if="networkServices.length === 0">
-                    <td colspan="10" class="text-center py-4">
-                      <div class="text-secondary small">Aucun service configuré</div>
-                      <div class="text-muted" style="font-size:.8rem">Ajoutez un service pour le faire apparaître dans la topologie réseau</div>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-          <!-- Authelia node configuration -->
-          <div class="network-config-item mt-3">
-            <label class="form-label">Nœud Authelia (optionnel)</label>
-            <div class="network-config-row">
-              <div>
-                <input v-model="autheliaLabel" type="text" class="form-control form-control-sm" placeholder="Ex: Authelia" />
-                <div class="text-secondary small mt-1">Label affiché dans le graphe</div>
-              </div>
-              <div>
-                <input v-model="autheliaIp" type="text" class="form-control form-control-sm" placeholder="Ex: 192.168.1.11" />
-                <div class="text-secondary small mt-1">IP / domaine Authelia</div>
-              </div>
-            </div>
-          </div>
-          <!-- Internet/Router node configuration -->
-          <div class="network-config-item mt-3">
-            <label class="form-label">Nœud Internet / Routeur (optionnel)</label>
-            <div class="network-config-row">
-              <div>
-                <input v-model="internetLabel" type="text" class="form-control form-control-sm" placeholder="Ex: Internet" />
-                <div class="text-secondary small mt-1">Label affiché dans le graphe</div>
-              </div>
-              <div>
-                <input v-model="internetIp" type="text" class="form-control form-control-sm" placeholder="Ex: 1.2.3.4" />
-                <div class="text-secondary small mt-1">IP publique / domaine</div>
-              </div>
-            </div>
-          </div>
-
-          <div class="network-config-item mt-4">
-            <div class="d-flex align-items-center justify-content-between mb-2">
-              <label class="form-label mb-0">Ports decouverts par host</label>
-              <div class="text-secondary small">Nommer, masquer, lier au proxy</div>
-            </div>
-            <div class="network-discovered">
-              <div v-for="host in hosts" :key="host.id" class="network-host-block">
-                <div class="network-host-header">
-                  <div class="fw-semibold">{{ host.name || host.hostname || host.ip_address || host.id }}</div>
-                  <div class="text-secondary small">{{ host.ip_address || 'IP inconnue' }}</div>
-                  <div class="d-flex gap-2 mt-1">
-                    <span class="badge bg-blue-lt text-blue text-xs">
-                      {{ countEnabled(host.id) }} / {{ (discoveredPortsByHost[host.id] || []).length }} ports affichés
-                    </span>
-                    <span v-if="countProxyLinked(host.id) > 0" class="badge bg-cyan-lt text-cyan text-xs">
-                      {{ countProxyLinked(host.id) }} proxy
-                    </span>
-                    <span v-if="countAutheliaLinked(host.id) > 0" class="badge bg-purple-lt text-purple text-xs">
-                      {{ countAutheliaLinked(host.id) }} Authelia
-                    </span>
-                    <span v-if="countInternetExposed(host.id) > 0" class="badge bg-orange-lt text-orange text-xs">
-                      {{ countInternetExposed(host.id) }} Internet
-                    </span>
-                  </div>
-                </div>
-                <div class="table-responsive network-config-table">
-                  <table class="table table-sm table-vcenter">
-                    <thead>
-                      <tr>
-                        <th>Port</th>
-                        <th>Proto</th>
-                        <th>Nom</th>
-                        <th>Domaine</th>
-                        <th>Chemin</th>
-                        <th>Afficher</th>
-                        <th>Proxy</th>
-                        <th>Authelia</th>
-                        <th>Internet</th>
-                        <th>Port ext.</th>
-                        <th></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr
-                        v-for="port in discoveredPortsByHost[host.id] || []"
-                        :key="port.key"
-                        :class="portRowClass(host.id, port.port)"
-                      >
-                        <td class="fw-semibold">
-                          {{ port.port }}
-                          <span v-if="port.internal" class="badge bg-secondary-lt text-secondary ms-1" title="Port interne Docker uniquement, non exposé sur l'hôte">interne</span>
-                          <div v-if="port.containers?.length" class="text-secondary fw-normal" style="font-size:.75rem;line-height:1.3">{{ port.containers.join(', ') }}</div>
-                        </td>
-                        <td class="text-secondary text-uppercase">{{ port.protocol }}</td>
-                        <td>
-                          <input v-model="getPortSetting(host.id, port.port).name" class="form-control form-control-sm" placeholder="Ex: Vaultwarden" />
-                        </td>
-                        <td>
-                          <input v-model="getPortSetting(host.id, port.port).domain" class="form-control form-control-sm" placeholder="vault.example.com" />
-                        </td>
-                        <td>
-                          <input v-model="getPortSetting(host.id, port.port).path" class="form-control form-control-sm" placeholder="/" />
-                        </td>
-                        <td>
-                          <label class="form-check">
-                            <input
-                              :id="`port-enabled-${host.id}-${port.port}`"
-                              v-model="getPortSetting(host.id, port.port).enabled"
-                              class="form-check-input"
-                              type="checkbox"
-                              @change="onEnabledChange(host.id, port.port, $event)"
-                            />
-                          </label>
-                        </td>
-                        <td>
-                          <label class="form-check form-switch" :title="getPortProxyTooltip(host.id, port.port)">
-                            <input
-                              v-model="getPortSetting(host.id, port.port).linkToProxy"
-                              class="form-check-input"
-                              type="checkbox"
-                              :disabled="!getPortSetting(host.id, port.port).enabled"
-                            />
-                          </label>
-                        </td>
-                        <td>
-                          <label class="form-check form-switch">
-                            <input
-                              v-model="getPortSetting(host.id, port.port).linkToAuthelia"
-                              class="form-check-input"
-                              type="checkbox"
-                              :disabled="!getPortSetting(host.id, port.port).enabled"
-                            />
-                          </label>
-                        </td>
-                        <td>
-                          <label class="form-check form-switch">
-                            <input
-                              v-model="getPortSetting(host.id, port.port).exposedToInternet"
-                              class="form-check-input"
-                              type="checkbox"
-                              :disabled="!getPortSetting(host.id, port.port).enabled"
-                            />
-                          </label>
-                        </td>
-                        <td>
-                          <input
-                            v-model.number="getPortSetting(host.id, port.port).externalPort"
-                            type="number"
-                            class="form-control form-control-sm"
-                            placeholder="443"
-                            :disabled="!getPortSetting(host.id, port.port).exposedToInternet"
-                            style="width: 70px;"
-                          />
-                        </td>
-                        <td class="text-end">
-                          <button
-                            v-if="isPortModified(host.id, port.port)"
-                            class="btn btn-sm btn-ghost-secondary"
-                            title="Réinitialiser ce port"
-                            aria-label="Réinitialiser ce port"
-                            @click="resetPortSetting(host.id, port.port)"
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16"
-                                 viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none">
-                              <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                              <path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4"/>
-                              <path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4"/>
-                            </svg>
-                          </button>
-                        </td>
-                      </tr>
-                      <tr v-if="(discoveredPortsByHost[host.id] || []).length === 0">
-                        <td colspan="7" class="text-center py-4">
-                          <div class="text-secondary small">Aucun port détecté</div>
-                          <div class="text-muted" style="font-size:.8rem">L'agent doit être actif et avoir collecté les données réseau</div>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div v-else ref="graphSurfaceRef" class="network-graph-surface" :style="{ height: graphHeight }">
-          <NetworkGraph
-            v-if="topologyConfigLoaded"
-            :data="graphHosts"
-            :root-label="rootNodeName"
-            :root-ip="rootNodeIp"
-            :services="combinedServices"
-            :host-port-overrides="hostPortOverrides"
-            :authelia-label="autheliaLabel"
-            :authelia-ip="autheliaIp"
-            :internet-label="internetLabel"
-            :internet-ip="internetIp"
-            :node-positions="nodePositions"
-            @host-click="handleHostClick"
-            @update:node-positions="onNodePositionsUpdate"
-          />
+          <NetworkNodeDetail :selected-node="selectedNode" :hosts="hosts" :containers="containers" />
         </div>
       </div>
     </div>
 
-    <!-- Cards View (Original) -->
-    <template v-if="viewMode === 'cards'">
-      <div class="card mb-4">
-        <div class="card-body">
-          <div class="row g-3">
-            <div class="col-md-6 col-lg-3">
-              <input v-model="search" type="text" class="form-control" placeholder="Rechercher un port, conteneur, image..." />
-            </div>
-            <div class="col-md-6 col-lg-3">
-              <select v-model="protocolFilter" class="form-select">
-                <option value="">Tous les protocoles</option>
-                <option value="tcp">TCP</option>
-                <option value="udp">UDP</option>
-              </select>
-            </div>
-            <div class="col-md-6 col-lg-3">
-              <select v-model="hostFilter" class="form-select">
-                <option value="">Tous les hotes</option>
-                <option v-for="h in hosts" :key="h.id" :value="h.id">
-                  {{ h.name || h.hostname || h.id }}
-                </option>
-              </select>
-            </div>
-            <div class="col-md-6 col-lg-3">
-              <label class="form-check form-switch">
-                <input v-model="onlyPublished" class="form-check-input" type="checkbox" />
-                <span class="form-check-label">Ports publiés seulement</span>
-              </label>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="card mb-4">
-        <div class="table-responsive">
-          <table class="table table-vcenter card-table">
-            <thead>
-              <tr>
-                <th>Hôte</th>
-                <th>Conteneur</th>
-                <th>Image</th>
-                <th>Port hôte</th>
-                <th>Port conteneur</th>
-                <th>Proto</th>
-                <th>IPv4</th>
-                <th>IPv6</th>
-                <th>État</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="row in portRows" :key="row.key">
-                <td>
-                  <router-link :to="`/hosts/${row.host_id}`" class="text-decoration-none">
-                    {{ row.host_name || row.host_id }}
-                  </router-link>
-                </td>
-                <td class="fw-semibold">{{ row.container_name }}</td>
-                <td>
-                  <div>{{ row.image }}</div>
-                  <div class="text-secondary small"><code>{{ row.image_tag || '-' }}</code></div>
-                </td>
-                <td class="fw-semibold">{{ row.host_port || '-' }}</td>
-                <td class="text-secondary">{{ row.container_port || '-' }}</td>
-                <td class="text-secondary text-uppercase">{{ row.protocol || '-' }}</td>
-                <td class="text-secondary small font-monospace">
-                  <span v-if="row.ipv4" class="badge bg-blue-lt text-blue">{{ row.ipv4 }}</span>
-                  <span v-else class="text-muted">—</span>
-                </td>
-                <td class="text-secondary small font-monospace">
-                  <span v-if="row.ipv6" class="badge bg-purple-lt text-purple">{{ row.ipv6 }}</span>
-                  <span v-else class="text-muted">—</span>
-                </td>
-                <td>
-                  <span :class="row.state === 'running' ? 'badge bg-green-lt text-green' : 'badge bg-secondary-lt text-secondary'">
-                    {{ { running: 'En cours', exited: 'Arrêté', paused: 'En pause', created: 'Créé', restarting: 'Redémarrage', dead: 'Mort' }[row.state] || row.state || 'inconnu' }}
-                  </span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <div v-if="portRows.length === 0" class="text-center text-secondary py-4">
-          Aucun port visible
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-header">
-          <h3 class="card-title">Trafic par hôte</h3>
-          <div class="card-options">
-            <span class="badge bg-azure-lt text-azure ms-1">
-              {{ hosts.length }} hôte{{ hosts.length > 1 ? 's' : '' }}
-            </span>
-          </div>
-        </div>
-        <div class="table-responsive">
-          <table class="table table-vcenter card-table">
-            <thead>
-              <tr>
-                <th>Hôte</th>
-                <th>IP</th>
-                <th class="text-end">↓ Rx</th>
-                <th class="text-end">↑ Tx</th>
-                <th>Statut</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="h in hosts" :key="h.id">
-                <td>
-                  <router-link :to="`/hosts/${h.id}`" class="fw-semibold text-decoration-none">
-                    {{ h.name || h.hostname || h.id }}
-                  </router-link>
-                </td>
-                <td class="text-secondary">{{ h.ip_address }}</td>
-                <td class="text-end font-monospace small text-info">{{ formatBytes(h.network_rx_bytes || 0) }}</td>
-                <td class="text-end font-monospace small text-warning">{{ formatBytes(h.network_tx_bytes || 0) }}</td>
-                <td>
-                  <span :class="h.status === 'online' ? 'badge bg-green-lt text-green' : h.status === 'warning' ? 'badge bg-yellow-lt text-yellow' : 'badge bg-red-lt text-red'">
-                    {{ h.status || 'unknown' }}
-                  </span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <div v-if="hosts.length === 0" class="text-center text-secondary py-4">
-          Aucun hote trouve
-        </div>
-      </div>
-
-      <div v-if="containersWithNetStats.length" class="card mt-4">
-        <div class="card-header">
-          <h3 class="card-title">Trafic réseau par conteneur</h3>
-          <div class="card-options">
-            <span class="badge bg-azure-lt text-azure ms-1">
-              {{ containersWithNetStats.length }} conteneur{{ containersWithNetStats.length > 1 ? 's' : '' }}
-            </span>
-          </div>
-        </div>
-        <div class="table-responsive">
-          <table class="table table-vcenter card-table">
-            <thead>
-              <tr>
-                <th>Conteneur</th>
-                <th>Hôte</th>
-                <th class="text-end">↓ Rx</th>
-                <th class="text-end">↑ Tx</th>
-                <th class="text-end">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="c in containersWithNetStats" :key="c.id">
-                <td class="fw-semibold">{{ c.name }}</td>
-                <td class="text-secondary">{{ c.hostname }}</td>
-                <td class="text-end font-monospace small text-info">{{ formatBytes(c.net_rx_bytes) }}</td>
-                <td class="text-end font-monospace small text-warning">{{ formatBytes(c.net_tx_bytes) }}</td>
-                <td class="text-end font-monospace small fw-semibold">{{ formatBytes(c.net_rx_bytes + c.net_tx_bytes) }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </template>
+    <NetworkPortList v-if="viewMode === 'cards'" :hosts="hosts" :containers="containers" />
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, watchEffect } from 'vue'
-import { useRouter } from 'vue-router'
 import { useWebSocket } from '../composables/useWebSocket'
 import WsStatusBar from '../components/WsStatusBar.vue'
 import NetworkGraph from '../components/NetworkGraph.vue'
+import NetworkNodeDetail from '../components/network/NetworkNodeDetail.vue'
+import NetworkPortList from '../components/network/NetworkPortList.vue'
+import NetworkTopologyConfig from '../components/network/NetworkTopologyConfig.vue'
 import apiClient from '../api'
 
-const router = useRouter()
 const hosts = ref([])
 const containers = ref([])
-const search = ref('')
-const protocolFilter = ref('')
-const hostFilter = ref('')
-const onlyPublished = ref(true)
 const viewMode = ref(localStorage.getItem('networkViewMode') || 'cards')
 const networkTab = ref('topology')
 const rootNodeName = ref('Infrastructure')
@@ -605,6 +177,7 @@ const topologyConfigLoaded = ref(false)
 const saveStatus = ref('idle') // 'idle' | 'saving' | 'saved' | 'error'
 const graphSurfaceRef = ref(null)
 const graphHeight = ref('auto')
+const selectedNode = ref(null)
 
 // Save view mode to localStorage only (local UI preference)
 watch(viewMode, (newMode) => {
@@ -751,69 +324,7 @@ const hostPortOverrides = computed(() => {
   return overrides
 })
 
-const portRows = computed(() => {
-  const grouped = new Map()
-
-  for (const container of containers.value) {
-    const mappings = container.port_mappings || []
-    for (const mapping of mappings) {
-      const hostPort = Number(mapping.host_port || 0)
-      const isPublished = hostPort > 0
-      if (onlyPublished.value && !isPublished) continue
-
-      const groupKey = `${container.id}-${hostPort}-${mapping.container_port}-${mapping.protocol}`
-
-      if (!grouped.has(groupKey)) {
-        grouped.set(groupKey, {
-          key: groupKey,
-          host_id: container.host_id,
-          host_name: container.hostname,
-          container_name: container.name,
-          image: container.image,
-          image_tag: container.image_tag,
-          state: container.state,
-          host_port: hostPort,
-          container_port: mapping.container_port,
-          protocol: mapping.protocol,
-          ipv4: null,
-          ipv6: null,
-        })
-      }
-
-      const row = grouped.get(groupKey)
-      const ip = mapping.host_ip || ''
-      // IPv6: contains colon (e.g. "::", "::1", "fe80::1")
-      if (ip.includes(':')) {
-        row.ipv6 = ip
-      } else {
-        row.ipv4 = ip || '0.0.0.0'
-      }
-    }
-  }
-
-  const rows = [...grouped.values()]
-
-  const query = search.value.trim().toLowerCase()
-  return rows.filter((row) => {
-    const matchHost = !hostFilter.value || row.host_id === hostFilter.value
-    const matchProto = !protocolFilter.value || row.protocol === protocolFilter.value
-    const matchSearch =
-      !query ||
-      row.container_name?.toLowerCase().includes(query) ||
-      row.image?.toLowerCase().includes(query) ||
-      row.image_tag?.toLowerCase().includes(query) ||
-      row.host_name?.toLowerCase().includes(query) ||
-      String(row.host_port || '').includes(query) ||
-      String(row.container_port || '').includes(query) ||
-      row.protocol?.toLowerCase().includes(query) ||
-      (row.ipv4 || '').includes(query) ||
-      (row.ipv6 || '').includes(query)
-
-    return matchHost && matchProto && matchSearch
-  })
-})
-
-const totalPorts = computed(() => portRows.value.length)
+const totalPorts = computed(() => graphHosts.value.reduce((sum, host) => sum + (host.ports?.length || 0), 0))
 const hostsOnline = computed(() => hosts.value.filter(h => h.status === 'online').length)
 const containersRunning = computed(() => containers.value.filter(c => c.state === 'running').length)
 
@@ -892,12 +403,6 @@ const graphHosts = computed(() => {
   })
 })
 
-const containersWithNetStats = computed(() =>
-  [...containers.value]
-    .filter(c => c.state === 'running' && (c.net_rx_bytes > 0 || c.net_tx_bytes > 0))
-    .sort((a, b) => (b.net_rx_bytes + b.net_tx_bytes) - (a.net_rx_bytes + a.net_tx_bytes))
-)
-
 function formatBytes(bytes) {
   if (!bytes && bytes !== 0) return '-'
   if (bytes < 1024) return `${bytes} B`
@@ -909,73 +414,6 @@ function formatBytes(bytes) {
     idx += 1
   }
   return `${value.toFixed(1)} ${units[idx]}`
-}
-
-function onEnabledChange(hostId, portNumber, event) {
-  const setting = getPortSetting(hostId, portNumber)
-  if (!event.target.checked) {
-    setting.linkToProxy = false
-    setting.linkToAuthelia = false
-    setting.exposedToInternet = false
-  }
-}
-
-function getPortProxyTooltip(hostId, portNumber) {
-  const setting = getPortSetting(hostId, portNumber)
-  return !setting.enabled ? "Activez d'abord l'affichage du port" : ''
-}
-
-function portRowClass(hostId, portNumber) {
-  const s = getPortSetting(hostId, portNumber)
-  return {
-    'opacity-50': !s.enabled,
-    'port-row-proxy': s.enabled && s.linkToProxy && !s.linkToAuthelia,
-    'port-row-authelia': s.enabled && s.linkToAuthelia,
-  }
-}
-
-function countEnabled(hostId) {
-  const entry = hostPortConfig.value.find(e => e.hostId === hostId)
-  if (!entry) return (discoveredPortsByHost.value[hostId] || []).length
-  const ports = discoveredPortsByHost.value[hostId] || []
-  return ports.filter(p => {
-    const s = entry.ports?.[String(p.port)]
-    return s === undefined || s.enabled !== false
-  }).length
-}
-
-function countProxyLinked(hostId) {
-  const entry = hostPortConfig.value.find(e => e.hostId === hostId)
-  if (!entry) return 0
-  return Object.values(entry.ports || {}).filter(s => s?.linkToProxy && s?.enabled).length
-}
-
-function countAutheliaLinked(hostId) {
-  const entry = hostPortConfig.value.find(e => e.hostId === hostId)
-  if (!entry) return 0
-  return Object.values(entry.ports || {}).filter(s => s?.linkToAuthelia && s?.enabled).length
-}
-
-function countInternetExposed(hostId) {
-  const entry = hostPortConfig.value.find(e => e.hostId === hostId)
-  if (!entry) return 0
-  return Object.values(entry.ports || {}).filter(s => s?.exposedToInternet && s?.enabled).length
-}
-
-function isPortModified(hostId, portNumber) {
-  const s = getPortSetting(hostId, portNumber)
-  return s.name !== '' || !s.enabled || s.linkToProxy || s.linkToAuthelia || s.exposedToInternet || s.domain !== '' || (s.path !== '/' && s.path !== '')
-}
-
-function resetPortSetting(hostId, portNumber) {
-  const entry = getHostPortEntry(hostId)
-  entry.ports[String(portNumber)] = { name: '', domain: '', path: '/', enabled: true, linkToProxy: false, linkToAuthelia: false, exposedToInternet: false, externalPort: null }
-}
-
-function getPortSetting(hostId, portNumber) {
-  const entry = getHostPortEntry(hostId)
-  const key = String(portNumber)
-  return entry.ports[key] ?? { name: '', domain: '', path: '/', enabled: true, linkToProxy: false, linkToAuthelia: false, exposedToInternet: false, externalPort: null }
 }
 
 function ensureHostPortConfig() {
@@ -1004,30 +442,6 @@ function getHostPortEntry(hostId) {
   }
   if (!entry.ports) entry.ports = {}
   return entry
-}
-
-function addServiceRow() {
-  networkServices.value.push({
-    id: `svc-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-    name: '',
-    domain: '',
-    path: '/',
-    internalPort: null,
-    externalPort: null,
-    hostId: '',
-    tags: '',
-    linkToProxy: false,
-    linkToAuthelia: false,
-    exposedToInternet: false
-  })
-}
-
-function removeServiceRow(serviceId) {
-  networkServices.value = networkServices.value.filter((service) => service.id !== serviceId)
-}
-
-function handleHostClick(hostId) {
-  router.push(`/hosts/${hostId}`)
 }
 
 function onNodePositionsUpdate(positions) {
@@ -1146,6 +560,13 @@ onUnmounted(() => {
   flex-direction: column;
 }
 
+.network-topology-graph-layout {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  align-items: stretch;
+}
+
 .network-config {
   padding: 16px 18px 24px;
   border-bottom: 1px solid rgba(148, 163, 184, 0.2);
@@ -1230,6 +651,10 @@ onUnmounted(() => {
 @media (max-width: 991px) {
   .network-topology-body {
     min-height: 420px;
+  }
+
+  .network-topology-graph-layout {
+    flex-direction: column;
   }
 
   .network-graph-surface {
