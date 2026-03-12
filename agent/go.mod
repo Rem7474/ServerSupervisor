@@ -1,6 +1,6 @@
 module github.com/serversupervisor/agent
 
-go 1.25.7
+go 1.25.8
 
 require (
 	github.com/fsouza/go-dockerclient v1.13.0
