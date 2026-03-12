@@ -63,8 +63,8 @@
 
         <div v-show="activeTab === 'metrics'">
           <HostMetricsPanel :hostId="hostId" :metrics="metrics" />
-          <DiskMetricsCard :hostId="hostId" class="mb-4" />
-          <DiskHealthCard :hostId="hostId" class="mb-4" />
+          <DiskMetricsCard :hostId="hostId" :initialMetrics="diskMetrics" class="mb-4" />
+          <DiskHealthCard :hostId="hostId" :initialHealth="diskHealth" class="mb-4" />
         </div>
 
         <div v-show="activeTab === 'docker'">
@@ -85,11 +85,11 @@
         </div>
 
         <div v-if="canRunApt" v-show="activeTab === 'systeme'">
-          <HostSystemTab :host-id="hostId" :can-run-apt="canRunApt" @open-command="openCommand" @history-changed="loadCmdHistory" />
+          <HostSystemTab :host-id="hostId" :can-run-apt="canRunApt" @open-command="openCommand" @history-changed="loadCmdHistoryRefresh" />
         </div>
 
         <div v-if="canRunApt" v-show="activeTab === 'processus'">
-          <HostProcessesPanel :hostId="hostId" :can-run="canRunApt" @history-changed="loadCmdHistory" />
+          <HostProcessesPanel :hostId="hostId" :can-run="canRunApt" @history-changed="loadCmdHistoryRefresh" />
         </div>
 
         <div v-show="activeTab === 'planifiees'">
@@ -99,7 +99,7 @@
             :active="activeTab === 'planifiees'"
             @open-command="openCommand"
             @tasks-count="tasksCount = $event"
-            @history-changed="loadCmdHistory"
+            @history-changed="loadCmdHistoryRefresh"
           />
         </div>
       </div>
@@ -111,7 +111,7 @@
         @show="showConsole = true"
         @hide="closeConsole"
         @update:command="updateCommand"
-        @history-changed="loadCmdHistory"
+        @history-changed="loadCmdHistoryRefresh"
       />
     </div>
   </div>
@@ -160,6 +160,8 @@ const containers = ref([])
 const versionComparisons = ref([])
 const aptStatus = ref(null)
 const cmdHistory = ref([])
+const diskMetrics = ref(null)
+const diskHealth = ref(null)
 const latestAgentVersion = ref('')
 
 const { liveCommand, showConsole, openCommand, closeConsole, updateCommand } = useHostCommandConsole()
@@ -172,15 +174,6 @@ const { wsStatus, wsError, retryCount, reconnect } = useWebSocket(`/api/v1/ws/ho
   versionComparisons.value = payload.version_comparisons || []
   aptStatus.value = payload.apt_status
 }, { debounceMs: 200 })
-
-async function loadCmdHistory() {
-  try {
-    const res = await apiClient.getHostCommandHistory(hostId)
-    cmdHistory.value = res.data?.commands || []
-  } catch {
-    cmdHistory.value = []
-  }
-}
 
 async function sendAptCmd(command) {
   const confirmed = await dialog.confirm({
@@ -216,12 +209,29 @@ function isAgentUpToDate(version) {
   return version === latestAgentVersion.value
 }
 
-async function fetchLatestAgentVersion() {
+async function loadComplete() {
   try {
-    const res = await apiClient.getSettings()
-    latestAgentVersion.value = res.data?.settings?.latestAgentVersion || ''
+    const res = await apiClient.getHostComplete(hostId)
+    const d = res.data
+    if (d.host) host.value = d.host
+    if (d.metrics) metrics.value = d.metrics
+    if (d.containers) containers.value = d.containers
+    if (d.apt_status) aptStatus.value = d.apt_status
+    if (d.disk_metrics) diskMetrics.value = d.disk_metrics
+    if (d.disk_health) diskHealth.value = d.disk_health
+    if (d.command_history) cmdHistory.value = d.command_history
+    if (d.latest_agent_version) latestAgentVersion.value = d.latest_agent_version
   } catch {
-    // Non-critical
+    // Non-critical — WS will populate live data
+  }
+}
+
+async function loadCmdHistoryRefresh() {
+  try {
+    const res = await apiClient.getHostCommandHistory(hostId)
+    cmdHistory.value = res.data?.commands || []
+  } catch {
+    cmdHistory.value = []
   }
 }
 
@@ -248,8 +258,7 @@ async function deleteHost() {
 }
 
 onMounted(() => {
-  fetchLatestAgentVersion()
-  loadCmdHistory()
+  loadComplete()
 })
 </script>
 

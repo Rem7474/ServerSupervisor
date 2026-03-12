@@ -66,16 +66,15 @@ import { ref, onMounted } from 'vue'
 import apiClient from '../api'
 
 const props = defineProps({
-  hostId: {
-    type: String,
-    required: true
-  }
+  hostId: { type: String, required: true },
+  initialHealth: { type: Array, default: null },
 })
 
-const health = ref([])
-const loading = ref(true)
+const health = ref(props.initialHealth || [])
+const loading = ref(!props.initialHealth)
 
 onMounted(async () => {
+  if (props.initialHealth) return
   await loadDiskHealth()
 })
 

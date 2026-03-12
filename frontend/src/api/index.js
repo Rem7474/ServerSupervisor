@@ -60,6 +60,7 @@ export default {
   // Hosts
   getHosts: () => api.get('/v1/hosts'),
   getHost: (id) => api.get(`/v1/hosts/${id}`),
+  getHostComplete: (id) => api.get(`/v1/hosts/${id}/complete`),
   getHostDashboard: (id) => api.get(`/v1/hosts/${id}/dashboard`),
   registerHost: (data) => api.post('/v1/hosts', data),
   updateHost: (id, data) => api.patch(`/v1/hosts/${id}`, data),

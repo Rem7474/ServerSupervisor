@@ -127,6 +127,7 @@ func registerHostRoutes(g *gin.RouterGroup, h *handlers.HostHandler, agentH *han
 	g.GET("/hosts/:id/disk/metrics", h.GetDiskMetrics)
 	g.GET("/hosts/:id/disk/metrics/history", h.GetDiskMetricsHistory)
 	g.GET("/hosts/:id/disk/health", h.GetDiskHealth)
+	g.GET("/hosts/:id/complete", h.GetHostComplete)
 }
 
 func registerDockerRoutes(g *gin.RouterGroup, dockerH *handlers.DockerHandler, systemH *handlers.SystemHandler, networkH *handlers.NetworkHandler, agentH *handlers.AgentHandler) {

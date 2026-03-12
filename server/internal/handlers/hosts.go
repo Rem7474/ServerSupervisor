@@ -3,6 +3,7 @@ package handlers
 import (
 	"net"
 	"net/http"
+	"sync"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -147,6 +148,61 @@ func (h *HostHandler) DeleteHost(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "host deleted"})
+}
+
+// GetHostComplete returns a comprehensive snapshot used for initial page load,
+// running all DB queries in parallel to minimise latency.
+func (h *HostHandler) GetHostComplete(c *gin.Context) {
+	hostID := c.Param("id")
+
+	host, err := h.db.GetHost(hostID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "host not found"})
+		return
+	}
+
+	var (
+		metrics     *models.SystemMetrics
+		containers  []models.DockerContainer
+		aptStatus   *models.AptStatus
+		diskMetrics []models.DiskMetrics
+		diskHealth  []models.DiskHealth
+		cmdHistory  []models.RemoteCommand
+	)
+
+	var wg sync.WaitGroup
+	wg.Add(6)
+	go func() { defer wg.Done(); metrics, _ = h.db.GetLatestMetrics(hostID) }()
+	go func() { defer wg.Done(); containers, _ = h.db.GetDockerContainers(hostID) }()
+	go func() { defer wg.Done(); aptStatus, _ = h.db.GetAptStatus(hostID) }()
+	go func() { defer wg.Done(); diskMetrics, _ = h.db.GetLatestDiskMetrics(hostID) }()
+	go func() { defer wg.Done(); diskHealth, _ = h.db.GetLatestDiskHealth(hostID) }()
+	go func() { defer wg.Done(); cmdHistory, _ = h.db.GetRecentCommandsByHost(hostID, 20) }()
+	wg.Wait()
+
+	if containers == nil {
+		containers = []models.DockerContainer{}
+	}
+	if diskMetrics == nil {
+		diskMetrics = []models.DiskMetrics{}
+	}
+	if diskHealth == nil {
+		diskHealth = []models.DiskHealth{}
+	}
+	if cmdHistory == nil {
+		cmdHistory = []models.RemoteCommand{}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"host":                 host,
+		"metrics":              metrics,
+		"containers":           containers,
+		"apt_status":           aptStatus,
+		"disk_metrics":         diskMetrics,
+		"disk_health":          diskHealth,
+		"command_history":      cmdHistory,
+		"latest_agent_version": LatestAgentVersion,
+	})
 }
 
 // RotateAPIKey regenerates an API key for a host (admin only)

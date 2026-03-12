@@ -1,29 +1,35 @@
 import { computed, ref } from 'vue'
 import { useConfirmDialog } from './useConfirmDialog'
 import { useDateFormatter } from './useDateFormatter'
+import { useHostsStore } from '../stores/hosts'
+import { useAlertRulesStore } from '../stores/alertRules'
 import apiClient from '../api'
 
 export function useAlertsPage() {
   const { confirm } = useConfirmDialog()
   const { formatLocaleDateTime } = useDateFormatter()
+  const hostsStore = useHostsStore()
+  const rulesStore = useAlertRulesStore()
 
   const alertsTab = ref('rules')
   const incidents = ref([])
   const incidentsLoading = ref(false)
   const incidentsError = ref('')
   const incidentsLoaded = ref(false)
-  const rules = ref([])
-  const hosts = ref([])
-  const loading = ref(true)
   const showModal = ref(false)
   const saving = ref(false)
   const saveError = ref('')
   const editingRule = ref(null)
 
+  // Expose store state (reactive refs shared across navigations)
+  const rules = rulesStore.rules
+  const hosts = hostsStore.hosts
+  const loading = rulesStore.loading
+
   const activeIncidentCount = computed(() => incidents.value.filter((incident) => !incident.resolved_at).length)
 
   async function init() {
-    await Promise.all([loadRules(), loadHosts()])
+    await Promise.all([rulesStore.fetchRules(), hostsStore.fetchHosts()])
   }
 
   async function loadIncidents() {
@@ -43,25 +49,6 @@ export function useAlertsPage() {
   async function switchToIncidents() {
     alertsTab.value = 'incidents'
     if (!incidentsLoaded.value) await loadIncidents()
-  }
-
-  async function loadRules() {
-    try {
-      loading.value = true
-      const response = await apiClient.getAlertRules()
-      rules.value = response.data || []
-    } finally {
-      loading.value = false
-    }
-  }
-
-  async function loadHosts() {
-    try {
-      const response = await apiClient.getHosts()
-      hosts.value = response.data || []
-    } catch {
-      hosts.value = []
-    }
   }
 
   function startAddAlert() {
@@ -85,7 +72,7 @@ export function useAlertsPage() {
       } else {
         await apiClient.createAlertRule(payload)
       }
-      await loadRules()
+      await rulesStore.fetchRules(true)
       closeModal()
     } catch (err) {
       saveError.value = 'Erreur : ' + (err.response?.data?.error || err.message)
@@ -97,7 +84,7 @@ export function useAlertsPage() {
   async function toggleEnabled(rule) {
     try {
       await apiClient.updateAlertRule(rule.id, { enabled: !rule.enabled })
-      await loadRules()
+      await rulesStore.fetchRules(true)
     } catch {
       // ignore
     }
@@ -113,7 +100,7 @@ export function useAlertsPage() {
 
     try {
       await apiClient.deleteAlertRule(rule.id)
-      await loadRules()
+      await rulesStore.fetchRules(true)
     } catch (err) {
       saveError.value = 'Erreur lors de la suppression : ' + (err.response?.data?.error || err.message)
     }

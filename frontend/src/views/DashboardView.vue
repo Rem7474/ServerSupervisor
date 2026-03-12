@@ -210,7 +210,7 @@
               </td>
               <td><RelativeTime :date="host.last_seen" /></td>
             </tr>
-            <tr v-if="!loading && sortedHosts.length === 0">
+            <tr v-if="!loading && hosts.length > 0 && sortedHosts.length === 0">
               <td colspan="10" class="text-center text-secondary py-4">
                 Aucun hôte ne correspond à votre recherche.
               </td>
@@ -221,6 +221,16 @@
 
       <div v-if="loading" class="text-center py-4">
         <div class="spinner-border" role="status"></div>
+      </div>
+
+      <div v-if="!loading && hosts.length === 0" class="text-center py-5 text-secondary">
+        <svg xmlns="http://www.w3.org/2000/svg" class="mb-3" width="48" height="48" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="opacity:.35">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 12h2m10 0h2M12 5v2m0 10v2M7.05 7.05l1.414 1.414m7.072 7.072 1.414 1.414M7.05 16.95l1.414-1.414m7.072-7.072 1.414-1.414"/>
+          <circle cx="12" cy="12" r="4" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/>
+        </svg>
+        <div class="fw-medium">Aucun hôte enregistré</div>
+        <div class="small mt-1 mb-3 opacity-75">Ajoutez votre premier hôte pour commencer à surveiller votre infrastructure</div>
+        <router-link to="/hosts/new" class="btn btn-primary btn-sm">Ajouter un hôte</router-link>
       </div>
     </div>
 

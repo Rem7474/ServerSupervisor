@@ -34,7 +34,7 @@
     </div>
   </div>
 
-  <div class="card">
+  <div v-if="filteredContainers.length > 0" class="card">
     <div class="table-responsive">
       <table class="table table-vcenter card-table">
         <thead>
