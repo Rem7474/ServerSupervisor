@@ -65,13 +65,15 @@
               <span v-else class="text-secondary">-</span>
             </td>
             <td class="small">
-              <div>{{ c.image }}<code class="ms-1">:{{ containerVersion(c)?.running_version || c.image_tag }}</code></div>
-              <template v-if="containerVersion(c)">
-                <span v-if="containerVersion(c).is_up_to_date" class="badge bg-green-lt text-green mt-1">À jour</span>
-                <span v-else-if="containerVersion(c).running_version" class="badge bg-yellow-lt text-yellow mt-1" :title="`Dernière version : ${containerVersion(c).latest_version}`">MAJ dispo : {{ containerVersion(c).latest_version }}</span>
-                <span v-else-if="containerVersion(c).update_confirmed" class="badge bg-yellow-lt text-yellow mt-1" :title="`Dernière version : ${containerVersion(c).latest_version}`">MAJ dispo</span>
-                <span v-else class="badge bg-secondary-lt text-secondary mt-1">Version inconnue</span>
-              </template>
+              <div>{{ c.image }}</div>
+              <div class="mt-1 d-flex align-items-center gap-1 flex-wrap">
+                <code>{{ containerVersion(c)?.running_version || c.image_tag }}</code>
+                <template v-if="containerVersion(c)">
+                  <span v-if="containerVersion(c).is_up_to_date" class="badge bg-green-lt text-green">À jour</span>
+                  <span v-else-if="containerVersion(c).running_version || containerVersion(c).update_confirmed" class="badge bg-yellow-lt text-yellow" :title="`Dernière version : ${containerVersion(c).latest_version}`">Mise à jour disponible</span>
+                  <span v-else class="badge bg-secondary-lt text-secondary">Version inconnue</span>
+                </template>
+              </div>
             </td>
             <td>
               <span :class="stateClass(c.state)">{{ c.state }}</span>
@@ -225,7 +227,7 @@
           <div>
             <h5 class="modal-title">{{ inspectTarget.name }}</h5>
             <div class="text-secondary small">
-              {{ inspectTarget.image }}:{{ containerVersion(inspectTarget)?.running_version || inspectTarget.image_tag }}
+              {{ inspectTarget.image }}:<code>{{ containerVersion(inspectTarget)?.running_version || inspectTarget.image_tag }}</code>
               <span class="ms-2" :class="stateClass(inspectTarget.state)">{{ inspectTarget.state }}</span>
             </div>
           </div>

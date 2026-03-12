@@ -219,75 +219,15 @@
         </div>
       </div>
 
-      <!-- Console côte-à-côte -->
-      <div v-show="showConsole" class="account-console">
-        <div class="card d-flex flex-column h-100">
-          <div class="card-header d-flex align-items-center justify-content-between">
-            <h3 class="card-title">
-              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                <path d="M8 9l3 3l-3 3" />
-                <path d="M13 15l3 0" />
-                <path d="M3 4m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z" />
-              </svg>
-              Console
-            </h3>
-            <button @click="closeLogViewer" class="btn btn-sm btn-ghost-secondary" title="Fermer la console">
-              <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                <path d="M18 6l-12 12" />
-                <path d="M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-          <div class="card-body d-flex flex-column flex-fill p-0" style="min-height: 0;">
-            <!-- Empty state -->
-            <div v-if="!selectedCmd" class="d-flex align-items-center justify-content-center flex-fill text-secondary" style="background: #1e293b; border-radius: 0 0 0.5rem 0.5rem;">
-              <div class="text-center p-4">
-                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler mb-2 opacity-50" width="48" height="48" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                  <path d="M8 9l3 3l-3 3" />
-                  <path d="M13 15l3 0" />
-                  <path d="M3 4m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z" />
-                </svg>
-                <div class="opacity-75">Aucune console active</div>
-                <div class="small mt-1 opacity-50">Cliquez sur "Logs" pour afficher la sortie d'une commande</div>
-              </div>
-            </div>
-
-            <!-- Active viewer -->
-            <div v-else class="d-flex flex-column h-100">
-              <div class="px-3 pt-3 pb-2" style="background: #1e293b; border-bottom: 1px solid rgba(255,255,255,0.1);">
-                <div class="d-flex align-items-start justify-content-between mb-2">
-                  <div class="flex-fill" style="min-width: 0;">
-                    <div class="fw-semibold text-light" style="font-size: 0.95rem;">{{ selectedCmd.host_name || selectedCmd.host_id }}</div>
-                    <div class="d-flex align-items-center gap-2 mt-1 flex-wrap">
-                      <span :class="moduleClass(selectedCmd.module)">{{ moduleLabel(selectedCmd.module) }}</span>
-                      <code style="background: rgba(0,0,0,0.3); padding: 0.15rem 0.4rem; border-radius: 0.25rem; color: #94a3b8;">{{ cmdLabel(selectedCmd) }}</code>
-                    </div>
-                  </div>
-                  <span :class="statusClass(selectedCmd.status)" class="ms-2">{{ selectedCmd.status }}</span>
-                </div>
-              </div>
-              <pre
-                ref="logViewerEl"
-                class="mb-0 flex-fill"
-                style="
-                  background: #0f172a;
-                  color: #e2e8f0;
-                  padding: 1rem;
-                  margin: 0;
-                  overflow-y: auto;
-                  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-                  font-size: 0.813rem;
-                  line-height: 1.5;
-                  border-radius: 0 0 0.5rem 0.5rem;
-                "
-              >{{ liveOutput || 'Aucune sortie disponible.' }}</pre>
-            </div>
-          </div>
-        </div>
-      </div>
+      <CommandLogPanel
+        :command="selectedCmd"
+        :show="showConsole"
+        wrapper-class="account-console"
+        title="Console"
+        empty-text="Aucune console active"
+        @close="closeLogViewer"
+        @open="showConsole = true"
+      />
     </div>
 
     <!-- ── Onglet Connexions ── -->
@@ -337,21 +277,6 @@
       </div>
     </div>
 
-    <!-- Bouton réafficher console (onglet Historique uniquement) -->
-    <button
-      v-show="activeTab === 'historique' && !showConsole"
-      @click="showConsole = true"
-      class="btn btn-primary"
-      style="position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 100;"
-    >
-      <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-        <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-        <path d="M8 9l3 3l-3 3" />
-        <path d="M13 15l3 0" />
-        <path d="M3 4m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z" />
-      </svg>
-      Console
-    </button>
   </div>
 </template>
 
@@ -360,6 +285,8 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import apiClient from '../api'
 import { formatDateLong as formatDate, formatDateTime } from '../utils/formatters'
+import { useCommandStream } from '../composables/useCommandStream'
+import CommandLogPanel from '../components/CommandLogPanel.vue'
 
 const auth = useAuthStore()
 
@@ -388,9 +315,8 @@ const loginEventsLoaded = ref(false)
 
 // Log viewer
 const selectedCmd = ref(null)
-const liveOutput = ref('')
-const logViewerEl = ref(null)
-let streamWs = null
+
+const { openCommandStream, closeStream } = useCommandStream({ token: () => auth.token })
 
 const roleBadgeClass = computed(() => {
   const map = { admin: 'bg-danger-lt text-danger', operator: 'bg-warning-lt text-warning', viewer: 'bg-secondary-lt text-secondary' }
@@ -410,9 +336,6 @@ const MODULE_META = {
   processes: { label: 'Processus',  cls: 'badge bg-orange-lt text-orange' },
   custom:    { label: 'Custom',     cls: 'badge bg-teal-lt text-teal' },
 }
-function moduleLabel(module) { return MODULE_META[module]?.label ?? module }
-function moduleClass(module) { return MODULE_META[module]?.cls ?? 'badge bg-secondary-lt text-secondary' }
-function cmdLabel(cmd) { return [cmd.action, cmd.target].filter(Boolean).join(' ') }
 
 function formatDuration(startedAt, endedAt) {
   if (!startedAt || !endedAt) return '—'
@@ -420,12 +343,6 @@ function formatDuration(startedAt, endedAt) {
   if (diff < 60) return `${diff}s`
   const m = Math.floor(diff / 60), s = diff % 60
   return s > 0 ? `${m}m ${s}s` : `${m}m`
-}
-
-function statusClass(status) {
-  if (status === 'completed') return 'badge bg-green-lt text-green'
-  if (status === 'failed') return 'badge bg-red-lt text-red'
-  return 'badge bg-yellow-lt text-yellow'
 }
 
 function parseUA(ua) {
@@ -442,52 +359,32 @@ function parseUA(ua) {
   return { browser, os }
 }
 
-function renderOutput(raw) {
-  if (!raw) return ''
-  const lines = ['']
-  let cur = ''
-  for (const ch of raw) {
-    if (ch === '\r') { cur = ''; lines[lines.length - 1] = ''; continue }
-    if (ch === '\n') { cur = ''; lines.push(''); continue }
-    cur += ch; lines[lines.length - 1] = cur
-  }
-  return lines.join('\n')
-}
-
 function openLogViewer(cmd) {
   if (selectedCmd.value?.id === cmd.id) { closeLogViewer(); return }
   closeLogViewer()
-  selectedCmd.value = cmd
-  liveOutput.value = renderOutput(cmd.output || '')
+  selectedCmd.value = { ...cmd }
   showConsole.value = true
   if (cmd.status === 'running' || cmd.status === 'pending') connectStream(cmd.id)
 }
 
 function closeLogViewer() {
-  if (streamWs) { streamWs.close(); streamWs = null }
+  closeStream()
   selectedCmd.value = null
-  liveOutput.value = ''
   showConsole.value = false
 }
 
 function connectStream(commandId) {
-  const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
-  streamWs = new WebSocket(`${protocol}://${window.location.host}/api/v1/ws/commands/stream/${commandId}`)
-  streamWs.onopen = () => streamWs.send(JSON.stringify({ type: 'auth', token: auth.token }))
-  streamWs.onmessage = (event) => {
-    try {
-      const p = JSON.parse(event.data)
-      if (p.type === 'cmd_stream_init') {
-        if (selectedCmd.value) selectedCmd.value.status = p.status
-        liveOutput.value = renderOutput(p.output || '')
-      } else if (p.type === 'cmd_stream') {
-        liveOutput.value += p.chunk
-      } else if (p.type === 'cmd_status_update') {
-        if (selectedCmd.value) selectedCmd.value.status = p.status
-        if (p.output) liveOutput.value = renderOutput(p.output)
-      }
-    } catch { /* ignore */ }
-  }
+  openCommandStream(commandId, {
+    onInit(p) {
+      if (selectedCmd.value) { selectedCmd.value.status = p.status; selectedCmd.value.output = p.output || '' }
+    },
+    onChunk(p) {
+      if (selectedCmd.value) selectedCmd.value.output = (selectedCmd.value.output || '') + p.chunk
+    },
+    onStatus(p) {
+      if (selectedCmd.value) { selectedCmd.value.status = p.status; if (p.output) selectedCmd.value.output = p.output }
+    },
+  })
 }
 
 function resetPwForm() {
@@ -568,7 +465,7 @@ onMounted(() => {
   loadMyCommands()
 })
 
-onUnmounted(() => { if (streamWs) streamWs.close() })
+onUnmounted(() => { closeStream() })
 </script>
 
 <style scoped>

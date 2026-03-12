@@ -29,6 +29,7 @@ func (h *WSHandler) sendDashboardSnapshot(conn *websocket.Conn, lastHash *string
 		"host_metrics":        hostMetrics,
 		"version_comparisons": comparisons,
 		"apt_pending":         h.db.GetTotalAptPending(),
+		"apt_pending_hosts":   h.db.GetAptPendingAll(),
 		"disk_usage":          h.db.GetRootDiskPercentAll(),
 	}
 	if !snapshotChanged(payload, lastHash) {

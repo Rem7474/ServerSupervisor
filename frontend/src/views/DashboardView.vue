@@ -101,6 +101,7 @@
               <option value="name">Trier par nom</option>
               <option value="status">Trier par statut</option>
               <option value="cpu">Trier par CPU</option>
+              <option value="apt">Trier par APT en attente</option>
               <option value="last_seen">Trier par derniere activite</option>
             </select>
           </div>
@@ -152,6 +153,7 @@
               <th>CPU</th>
               <th>RAM</th>
               <th>Disque</th>
+              <th title="Paquets APT en attente de mise à jour">APT</th>
               <th>Uptime</th>
               <th>Dernière activité</th>
             </tr>
@@ -206,12 +208,18 @@
                 </span>
               </td>
               <td>
+                <span v-if="aptPendingHosts[host.id]" class="badge bg-yellow-lt text-yellow">
+                  {{ aptPendingHosts[host.id] }}
+                </span>
+                <span v-else class="text-secondary">—</span>
+              </td>
+              <td>
                 {{ hostMetrics[host.id] ? formatUptime(hostMetrics[host.id].uptime) : '-' }}
               </td>
               <td><RelativeTime :date="host.last_seen" /></td>
             </tr>
             <tr v-if="!loading && hosts.length > 0 && sortedHosts.length === 0">
-              <td colspan="10" class="text-center text-secondary py-4">
+              <td colspan="11" class="text-center text-secondary py-4">
                 Aucun hôte ne correspond à votre recherche.
               </td>
             </tr>
@@ -281,7 +289,7 @@
 </template>
 
 <script setup>
-import { ref, computed, defineAsyncComponent, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, defineAsyncComponent, onMounted, onUnmounted } from 'vue'
 import RelativeTime from '../components/RelativeTime.vue'
 import WsStatusBar from '../components/WsStatusBar.vue'
 import apiClient from '../api'
@@ -314,12 +322,15 @@ const hosts = ref([])
 const hostMetrics = ref({})
 const versionComparisons = ref([])
 const aptPending = ref(0)
+const aptPendingHosts = ref({})
 const diskUsage = ref({})
 const loading = ref(true)
 const searchQuery = ref('')
 const statusFilter = ref('all')
-const sortKey = ref('name')
-const sortDir = ref('asc')
+const sortKey = ref(localStorage.getItem('dashboard.sortKey') || 'name')
+const sortDir = ref(localStorage.getItem('dashboard.sortDir') || 'asc')
+watch(sortKey, v => localStorage.setItem('dashboard.sortKey', v))
+watch(sortDir, v => localStorage.setItem('dashboard.sortDir', v))
 const selectedHostIds = ref([])
 const aptLoading = ref('')   // '' | 'update' | 'upgrade'
 const auth = useAuthStore()
@@ -406,6 +417,10 @@ const sortedHosts = computed(() => {
         aVal = getCpu(a)
         bVal = getCpu(b)
         break
+      case 'apt':
+        aVal = aptPendingHosts.value[a.id] ?? 0
+        bVal = aptPendingHosts.value[b.id] ?? 0
+        break
       case 'last_seen':
         aVal = a.last_seen ? new Date(a.last_seen).getTime() : 0
         bVal = b.last_seen ? new Date(b.last_seen).getTime() : 0
@@ -429,6 +444,7 @@ const { wsStatus, wsError, retryCount, reconnect } = useWebSocket('/api/v1/ws/da
   hostMetrics.value = payload.host_metrics || {}
   versionComparisons.value = payload.version_comparisons || []
   aptPending.value = payload.apt_pending ?? 0
+  aptPendingHosts.value = payload.apt_pending_hosts || {}
   diskUsage.value = payload.disk_usage || {}
   selectedHostIds.value = selectedHostIds.value.filter(id => hosts.value.some(h => h.id === id))
   loading.value = false

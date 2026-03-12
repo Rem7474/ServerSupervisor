@@ -49,7 +49,7 @@ export default {
   getLoginEvents: () => api.get('/v1/auth/login-events'),
   getLoginEventsAdmin: (page = 1, limit = 50) => api.get('/v1/auth/login-events/admin', { params: { page, limit } }),
   revokeAllSessions: (refreshToken) => api.post('/v1/auth/revoke-all-sessions', { refresh_token: refreshToken }),
-  getSecuritySummary: () => api.get('/v1/auth/security'),
+  getSecuritySummary: (hours = 24) => api.get('/v1/auth/security', { params: { hours } }),
   unblockIP: (ip) => api.delete(`/v1/auth/blocked-ips/${ip}`),
   getMFAStatus: () => api.get('/v1/auth/mfa/status'),
   setupMFA: () => api.post('/v1/auth/mfa/setup'),
@@ -138,6 +138,7 @@ export default {
   updateScheduledTask: (id, payload) => api.put(`/v1/scheduled-tasks/${id}`, payload),
   deleteScheduledTask: (id) => api.delete(`/v1/scheduled-tasks/${id}`),
   runScheduledTask: (id) => api.post(`/v1/scheduled-tasks/${id}/run`),
+  getScheduledTaskExecutions: (id, limit = 20) => api.get(`/v1/scheduled-tasks/${id}/executions`, { params: { limit } }),
   getHostCustomTasks: (hostId) => api.get(`/v1/hosts/${hostId}/custom-tasks`),
 
   // Release Trackers

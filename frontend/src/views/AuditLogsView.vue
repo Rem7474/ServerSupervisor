@@ -95,94 +95,24 @@
             <div class="text-secondary small">
               {{ cmdsTotal }} commande{{ cmdsTotal !== 1 ? 's' : '' }} — page {{ cmdsPage }} / {{ totalCmdsPages }}
             </div>
-            <div class="btn-group">
-              <button class="btn btn-outline-secondary" @click="prevCmdsPage" :disabled="cmdsPage <= 1 || cmdsLoading">Précédent</button>
-              <button class="btn btn-outline-secondary" @click="nextCmdsPage" :disabled="cmdsPage >= totalCmdsPages || cmdsLoading">Suivant</button>
-            </div>
+            <PaginationNav
+              :current-page="cmdsPage"
+              :total-pages="totalCmdsPages"
+              @select="selectCmdsPage"
+            />
           </div>
         </div>
       </div>
 
-      <!-- Right: log viewer panel (always in DOM) -->
-      <div v-show="showLogViewer" class="audit-console">
-        <div class="card d-flex flex-column h-100">
-          <div class="card-header d-flex align-items-center justify-content-between">
-            <h3 class="card-title">
-              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                <path d="M8 9l3 3l-3 3" />
-                <path d="M13 15l3 0" />
-                <path d="M3 4m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z" />
-              </svg>
-              Logs
-            </h3>
-            <button class="btn btn-sm btn-ghost-secondary" @click="showLogViewer = false" title="Réduire">
-              <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                <path d="M18 6l-12 12" />
-                <path d="M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-          <div class="card-body d-flex flex-column flex-fill p-0" style="min-height: 0;">
-            <!-- Empty state -->
-            <div v-if="!selectedCmd" class="d-flex align-items-center justify-content-center flex-fill text-secondary" style="background: #1e293b; border-radius: 0 0 0.5rem 0.5rem;">
-              <div class="text-center p-4">
-                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler mb-2 opacity-50" width="48" height="48" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                  <path d="M8 9l3 3l-3 3" />
-                  <path d="M13 15l3 0" />
-                  <path d="M3 4m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z" />
-                </svg>
-                <div class="opacity-75">Aucun log sélectionné</div>
-                <div class="small mt-1 opacity-50">Cliquez sur "Logs" pour afficher la sortie</div>
-              </div>
-            </div>
-            <!-- Active viewer -->
-            <div v-else class="d-flex flex-column h-100">
-              <div class="px-3 pt-3 pb-2" style="background: #1e293b; border-bottom: 1px solid rgba(255,255,255,0.1);">
-                <div class="d-flex align-items-center gap-2 flex-wrap">
-                  <span :class="moduleClass(selectedCmd.module)">{{ moduleLabel(selectedCmd.module) }}</span>
-                  <code style="color: #94a3b8;">{{ cmdLabel(selectedCmd) }}</code>
-                  <span class="text-secondary small">— {{ selectedCmd.host_name || selectedCmd.host_id }}</span>
-                  <span :class="statusClass(selectedCmd.status)">{{ selectedCmd.status }}</span>
-                </div>
-              </div>
-              <pre
-                ref="logViewerEl"
-                class="mb-0 flex-fill"
-                style="
-                  background: #0f172a;
-                  color: #e2e8f0;
-                  padding: 1rem;
-                  margin: 0;
-                  overflow-y: auto;
-                  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-                  font-size: 0.813rem;
-                  line-height: 1.5;
-                  border-radius: 0 0 0.5rem 0.5rem;
-                "
-              >{{ liveOutput || 'Aucune sortie disponible.' }}</pre>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Bouton pour réafficher les logs -->
-      <button
-        v-show="!showLogViewer"
-        @click="showLogViewer = true"
-        class="btn btn-primary"
-        style="position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 100;"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-          <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-          <path d="M8 9l3 3l-3 3" />
-          <path d="M13 15l3 0" />
-          <path d="M3 4m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z" />
-        </svg>
-        Logs
-      </button>
+      <CommandLogPanel
+        :command="selectedCmd"
+        :show="showLogViewer"
+        wrapper-class="audit-console"
+        title="Logs"
+        empty-text="Aucun log sélectionné"
+        @close="closeLogViewer"
+        @open="showLogViewer = true"
+      />
     </div>
 
     <!-- ── Connexions tab (admin only) ────────────────────────────────────── -->
@@ -282,10 +212,11 @@
         </div>
         <div class="card-footer d-flex align-items-center justify-content-between">
           <div class="text-secondary small">Page {{ connexionsPage }} / {{ totalConnexionsPages }}</div>
-          <div class="btn-group">
-            <button class="btn btn-outline-secondary" @click="prevConnexionsPage" :disabled="connexionsPage <= 1 || connexionsLoading">Précédent</button>
-            <button class="btn btn-outline-secondary" @click="nextConnexionsPage" :disabled="connexionsPage >= totalConnexionsPages || connexionsLoading">Suivant</button>
-          </div>
+          <PaginationNav
+            :current-page="connexionsPage"
+            :total-pages="totalConnexionsPages"
+            @select="selectConnexionsPage"
+          />
         </div>
       </div>
     </div>
@@ -293,13 +224,15 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import apiClient from '../api'
 import { useDateFormatter } from '../composables/useDateFormatter'
 import { useStatusBadge } from '../composables/useStatusBadge'
-import { useRemotePagination } from '../composables/usePagination'
+import { useCommandStream } from '../composables/useCommandStream'
+import PaginationNav from '../components/PaginationNav.vue'
+import CommandLogPanel from '../components/CommandLogPanel.vue'
 
 const { formatLocaleDateTime: formatDate } = useDateFormatter()
 const { getStatusBadgeClass } = useStatusBadge()
@@ -323,10 +256,9 @@ const totalCmdsPages = computed(() => Math.max(1, Math.ceil(cmdsTotal.value / cm
 // Log viewer
 const selectedCmd = ref(null)
 const showLogViewer = ref(false)
-const liveOutput = ref('')
-const logViewerEl = ref(null)
-let streamWs = null
 let auditPollTimer = null
+
+const { openCommandStream, closeStream } = useCommandStream({ token: () => auth.token })
 
 // ── Connexions (admin) ───────────────────────────────────────────────────────
 const connexions = ref([])
@@ -404,58 +336,31 @@ function openLogViewer(cmd) {
     return
   }
   closeLogViewer()
-  selectedCmd.value = cmd
+  selectedCmd.value = { ...cmd }
   showLogViewer.value = true
-  liveOutput.value = renderOutput(cmd.output || '')
 
   if (cmd.status === 'running' || cmd.status === 'pending') {
     connectStream(cmd.id)
   }
-
-  nextTick(() => {
-    if (logViewerEl.value) logViewerEl.value.scrollTop = logViewerEl.value.scrollHeight
-  })
 }
 
 function closeLogViewer() {
-  if (streamWs) { streamWs.close(); streamWs = null }
+  closeStream()
   selectedCmd.value = null
-  liveOutput.value = ''
 }
 
 function connectStream(commandId) {
-  const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
-  streamWs = new WebSocket(`${protocol}://${window.location.host}/api/v1/ws/commands/stream/${commandId}`)
-  streamWs.onopen = () => streamWs.send(JSON.stringify({ type: 'auth', token: auth.token }))
-  streamWs.onmessage = (event) => {
-    try {
-      const p = JSON.parse(event.data)
-      if (p.type === 'cmd_stream_init') {
-        if (selectedCmd.value) selectedCmd.value.status = p.status
-        liveOutput.value = renderOutput(p.output || '')
-      } else if (p.type === 'cmd_stream') {
-        liveOutput.value += p.chunk
-      } else if (p.type === 'cmd_status_update') {
-        if (selectedCmd.value) selectedCmd.value.status = p.status
-        if (p.output) liveOutput.value = renderOutput(p.output)
-      }
-      nextTick(() => {
-        if (logViewerEl.value) logViewerEl.value.scrollTop = logViewerEl.value.scrollHeight
-      })
-    } catch { /* ignore */ }
-  }
-}
-
-function renderOutput(raw) {
-  if (!raw) return ''
-  const lines = ['']
-  let cur = ''
-  for (const ch of raw) {
-    if (ch === '\r') { cur = ''; lines[lines.length - 1] = ''; continue }
-    if (ch === '\n') { cur = ''; lines.push(''); continue }
-    cur += ch; lines[lines.length - 1] = cur
-  }
-  return lines.join('\n')
+  openCommandStream(commandId, {
+    onInit(p) {
+      if (selectedCmd.value) { selectedCmd.value.status = p.status; selectedCmd.value.output = p.output || '' }
+    },
+    onChunk(p) {
+      if (selectedCmd.value) selectedCmd.value.output = (selectedCmd.value.output || '') + p.chunk
+    },
+    onStatus(p) {
+      if (selectedCmd.value) { selectedCmd.value.status = p.status; if (p.output) selectedCmd.value.output = p.output }
+    },
+  })
 }
 
 // ── Data fetching ─────────────────────────────────────────────────────────────
@@ -504,36 +409,18 @@ function refresh() {
 }
 
 // ── Pagination ────────────────────────────────────────────────────────────────
-function nextCmdsPage() {
-  const prev = cmdsPage.value
-  cmdsPager.nextPage()
-  if (cmdsPage.value === prev) return
-  closeLogViewer()
-  fetchCmds()
-}
-function prevCmdsPage() {
-  const prev = cmdsPage.value
-  cmdsPager.prevPage()
-  if (cmdsPage.value === prev) return
+function selectCmdsPage(page) {
+  if (page === cmdsPage.value) return
+  cmdsPage.value = page
   closeLogViewer()
   fetchCmds()
 }
 
-function nextConnexionsPage() {
-  const prev = connexionsPage.value
-  connexionsPager.nextPage()
-  if (connexionsPage.value === prev) return
+function selectConnexionsPage(page) {
+  if (page === connexionsPage.value) return
+  connexionsPage.value = page
   fetchConnexions()
 }
-function prevConnexionsPage() {
-  const prev = connexionsPage.value
-  connexionsPager.prevPage()
-  if (connexionsPage.value === prev) return
-  fetchConnexions()
-}
-
-const cmdsPager = useRemotePagination({ currentPage: cmdsPage, totalPages: totalCmdsPages })
-const connexionsPager = useRemotePagination({ currentPage: connexionsPage, totalPages: totalConnexionsPages })
 
 onMounted(fetchCmds)
 onMounted(async () => {
@@ -560,7 +447,6 @@ onUnmounted(() => {
     clearInterval(auditPollTimer)
     auditPollTimer = null
   }
-  if (streamWs) streamWs.close()
 })
 </script>
 

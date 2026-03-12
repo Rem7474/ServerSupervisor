@@ -448,7 +448,13 @@ func (h *AuthHandler) GetSecuritySummary(c *gin.Context) {
 		return
 	}
 
-	since := time.Now().Add(-24 * time.Hour)
+	hours := 24
+	if h := c.Query("hours"); h != "" {
+		if n, err := strconv.Atoi(h); err == nil && n > 0 && n <= 8760 {
+			hours = n
+		}
+	}
+	since := time.Now().Add(-time.Duration(hours) * time.Hour)
 
 	stats, err := h.db.GetLoginStats(since)
 	if err != nil {
@@ -467,7 +473,7 @@ func (h *AuthHandler) GetSecuritySummary(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"stats_24h":      stats,
+		"stats":          stats,
 		"blocked_ips":    blockedIPs,
 		"top_failed_ips": topFailed,
 	})

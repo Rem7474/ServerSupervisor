@@ -198,6 +198,7 @@ func registerTaskRoutes(g *gin.RouterGroup, h *handlers.ScheduledTaskHandler) {
 	g.PUT("/scheduled-tasks/:id", h.UpdateScheduledTask)
 	g.DELETE("/scheduled-tasks/:id", h.DeleteScheduledTask)
 	g.POST("/scheduled-tasks/:id/run", h.RunScheduledTask)
+	g.GET("/scheduled-tasks/:id/executions", h.GetScheduledTaskExecutions)
 }
 
 func registerUserRoutes(g *gin.RouterGroup, h *handlers.UserHandler) {

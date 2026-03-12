@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"log"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/robfig/cron/v3"
@@ -213,6 +214,26 @@ func (h *ScheduledTaskHandler) GetCustomTasks(c *gin.Context) {
 		return
 	}
 	c.Data(http.StatusOK, "application/json", []byte(tasksJSON))
+}
+
+// GetScheduledTaskExecutions returns the last N executions (remote_commands) for a task.
+func (h *ScheduledTaskHandler) GetScheduledTaskExecutions(c *gin.Context) {
+	taskID := c.Param("id")
+	limit := 20
+	if l := c.Query("limit"); l != "" {
+		if n, err := strconv.Atoi(l); err == nil && n > 0 && n <= 100 {
+			limit = n
+		}
+	}
+	cmds, err := h.db.GetScheduledTaskExecutions(taskID, limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if cmds == nil {
+		cmds = []models.RemoteCommand{}
+	}
+	c.JSON(http.StatusOK, cmds)
 }
 
 // RunScheduledTask triggers a scheduled task immediately (manual execution).

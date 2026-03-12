@@ -126,14 +126,26 @@
               </td>
               <td class="text-end">
                 <div class="d-flex gap-1 justify-content-end">
+                  <button class="btn btn-sm btn-outline-secondary" @click="openHistory(task)" title="Historique d'exécutions">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                    </svg>
+                  </button>
                   <button v-if="canManage" class="btn btn-sm btn-outline-primary"
                     :disabled="runningId === task.id" @click="runNow(task)">
                     <span v-if="runningId === task.id" class="spinner-border spinner-border-sm"></span>
                     <span v-else>Exécuter</span>
                   </button>
-                  <router-link :to="`/hosts/${task.host_id}`" class="btn btn-sm btn-outline-secondary">
-                    Gérer
-                  </router-link>
+                  <button v-if="canManage" class="btn btn-sm btn-outline-secondary" @click="openEdit(task)" title="Modifier">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                    </svg>
+                  </button>
+                  <button v-if="canManage" class="btn btn-sm btn-outline-danger" @click="confirmDelete(task)" title="Supprimer">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
+                    </svg>
+                  </button>
                 </div>
               </td>
             </tr>
@@ -150,6 +162,139 @@
             <strong>{{ runResult.name }}</strong> déclenchée — commande <code>{{ runResult.id }}</code>
           </div>
           <button type="button" class="btn-close btn-close-white me-2 m-auto" @click="runResult = null"></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Edit task modal -->
+    <div v-if="editTask" class="modal modal-blur show d-block" tabindex="-1" style="background:rgba(0,0,0,.5);z-index:1050" @click.self="editTask = null">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Modifier la tâche</h5>
+            <button type="button" class="btn-close" @click="editTask = null"></button>
+          </div>
+          <div class="modal-body">
+            <div class="mb-3">
+              <label class="form-label">Nom</label>
+              <input v-model="editForm.name" type="text" class="form-control" />
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Expression cron</label>
+              <input v-model="editForm.cron_expression" type="text" class="form-control font-monospace" placeholder="ex: 0 3 * * *" />
+              <div v-if="editForm.cron_expression && describeCron(editForm.cron_expression)" class="form-hint">
+                {{ describeCron(editForm.cron_expression) }}
+              </div>
+            </div>
+            <div class="mb-3 form-check">
+              <input v-model="editForm.enabled" type="checkbox" class="form-check-input" id="editEnabled" :disabled="isManualOnly(editTask)" />
+              <label class="form-check-label" for="editEnabled">Activée</label>
+            </div>
+            <div v-if="editError" class="alert alert-danger py-2">{{ editError }}</div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" @click="editTask = null">Annuler</button>
+            <button class="btn btn-primary" :disabled="editSaving" @click="saveEdit">
+              <span v-if="editSaving" class="spinner-border spinner-border-sm me-1"></span>
+              Enregistrer
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Delete confirm modal -->
+    <div v-if="deleteTask" class="modal modal-blur show d-block" tabindex="-1" style="background:rgba(0,0,0,.5);z-index:1050" @click.self="deleteTask = null">
+      <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Supprimer la tâche</h5>
+            <button type="button" class="btn-close" @click="deleteTask = null"></button>
+          </div>
+          <div class="modal-body">
+            Supprimer <strong>{{ deleteTask.name }}</strong> sur <strong>{{ deleteTask.host_name }}</strong> ?
+            <div v-if="deleteError" class="alert alert-danger py-2 mt-2">{{ deleteError }}</div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" @click="deleteTask = null">Annuler</button>
+            <button class="btn btn-danger" :disabled="deleteSaving" @click="doDelete">
+              <span v-if="deleteSaving" class="spinner-border spinner-border-sm me-1"></span>
+              Supprimer
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Execution history modal -->
+    <div v-if="historyTask" class="modal modal-blur show d-block" tabindex="-1" style="background:rgba(0,0,0,.5);z-index:1050" @click.self="historyTask = null">
+      <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content">
+          <div class="modal-header">
+            <div>
+              <h5 class="modal-title mb-0">Historique d'exécutions</h5>
+              <div class="text-muted small mt-1">
+                <span class="badge bg-blue-lt me-1">{{ historyTask.module }}</span>
+                {{ historyTask.name }}
+                <span class="text-muted ms-1">— {{ historyTask.host_name }}</span>
+              </div>
+            </div>
+            <button type="button" class="btn-close" @click="historyTask = null"></button>
+          </div>
+          <div class="modal-body p-0">
+            <div v-if="historyLoading" class="text-center py-5">
+              <span class="spinner-border text-primary"></span>
+            </div>
+            <div v-else-if="historyError" class="alert alert-danger m-3">{{ historyError }}</div>
+            <div v-else-if="!executions.length" class="text-center py-5 text-muted">
+              Aucune exécution enregistrée pour cette tâche.
+            </div>
+            <div v-else>
+              <table class="table table-vcenter table-hover mb-0">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Statut</th>
+                    <th>Durée</th>
+                    <th>Déclenché par</th>
+                    <th>Sortie</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="ex in executions" :key="ex.id" :class="expandedId === ex.id ? 'table-active' : ''">
+                    <td class="text-nowrap">{{ formatDate(ex.created_at) }}</td>
+                    <td>
+                      <span :class="statusBadge(ex.status)">{{ ex.status }}</span>
+                    </td>
+                    <td class="text-nowrap">
+                      <span v-if="ex.ended_at && ex.started_at">{{ durationSec(ex.started_at, ex.ended_at) }}s</span>
+                      <span v-else class="text-muted">—</span>
+                    </td>
+                    <td>{{ ex.triggered_by || '—' }}</td>
+                    <td style="max-width:400px">
+                      <div v-if="!ex.output" class="text-muted small">—</div>
+                      <template v-else>
+                        <div v-if="expandedId !== ex.id" class="d-flex align-items-center gap-2">
+                          <span class="text-truncate small font-monospace" style="max-width:300px">{{ firstLine(ex.output) }}</span>
+                          <button class="btn btn-xs btn-ghost-secondary ms-auto flex-shrink-0" @click="expandedId = ex.id">
+                            Voir tout
+                          </button>
+                        </div>
+                        <div v-else>
+                          <pre class="mb-1 small" style="max-height:300px;overflow-y:auto;white-space:pre-wrap;word-break:break-all">{{ ex.output }}</pre>
+                          <button class="btn btn-xs btn-ghost-secondary" @click="expandedId = null">Réduire</button>
+                        </div>
+                      </template>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <span class="text-muted small me-auto">{{ executions.length }} exécution{{ executions.length !== 1 ? 's' : '' }} (20 dernières)</span>
+            <button class="btn btn-secondary" @click="historyTask = null">Fermer</button>
+          </div>
         </div>
       </div>
     </div>
@@ -173,6 +318,24 @@ const filterText = ref('')
 const filterHost = ref('')
 const filterModule = ref('')
 const filterStatus = ref('')
+
+// Edit modal state
+const editTask = ref(null)
+const editForm = ref({ name: '', cron_expression: '', enabled: false })
+const editSaving = ref(false)
+const editError = ref('')
+
+// Delete modal state
+const deleteTask = ref(null)
+const deleteSaving = ref(false)
+const deleteError = ref('')
+
+// History modal state
+const historyTask = ref(null)
+const executions = ref([])
+const historyLoading = ref(false)
+const historyError = ref('')
+const expandedId = ref(null)
 
 const MANUAL_SENTINEL = '0 0 29 2 *'
 
@@ -216,20 +379,52 @@ function describeCron(expr) {
   if (presets[expr]) return presets[expr]
   const parts = expr.split(' ')
   if (parts.length !== 5) return ''
-  const [min, hour, dom, , dow] = parts
+  const [min, hour, dom, month, dow] = parts
   const dayNames = ['dim', 'lun', 'mar', 'mer', 'jeu', 'ven', 'sam']
-  if (dom === '*' && dow === '*' && hour !== '*' && min !== '*') {
+
+  // */N * * * * — every N minutes
+  const stepMinMatch = min.match(/^\*\/(\d+)$/)
+  if (stepMinMatch && hour === '*' && dom === '*' && month === '*' && dow === '*') {
+    const n = parseInt(stepMinMatch[1])
+    return n === 1 ? 'toutes les minutes' : `toutes les ${n} minutes`
+  }
+
+  // 0 */N * * * — every N hours on the hour
+  const stepHourMatch = hour.match(/^\*\/(\d+)$/)
+  if (stepHourMatch && dom === '*' && month === '*' && dow === '*') {
+    const n = parseInt(stepHourMatch[1])
+    const minLabel = min === '0' ? '' : ` (min ${min})`
+    return n === 1 ? `toutes les heures${minLabel}` : `toutes les ${n} heures${minLabel}`
+  }
+
+  // 0 H-H * * * — hourly within a time range
+  const rangeHourMatch = hour.match(/^(\d+)-(\d+)$/)
+  if (rangeHourMatch && dom === '*' && dow === '*') {
+    const [, h1, h2] = rangeHourMatch
+    const minLabel = min === '0' ? '' : ` (min ${min})`
+    return `chaque heure de ${h1.padStart(2,'0')}h à ${h2.padStart(2,'0')}h${minLabel}`
+  }
+
+  // N * * * * — every hour at minute N
+  if (/^\d+$/.test(min) && hour === '*' && dom === '*' && month === '*' && dow === '*') {
+    return `toutes les heures à :${min.padStart(2,'0')}`
+  }
+
+  // Standard: every day at H:M
+  if (dom === '*' && dow === '*' && hour !== '*' && min !== '*' && !/[*/,-]/.test(hour) && !/[*/,-]/.test(min)) {
     return `tous les jours à ${hour.padStart(2, '0')}h${min.padStart(2, '0')}`
   }
-  if (dom !== '*' && dow === '*' && hour !== '*' && min !== '*') {
+  // Specific day of month
+  if (dom !== '*' && !dom.includes('*') && !dom.includes('/') && dow === '*' && !/[*/,-]/.test(hour) && !/[*/,-]/.test(min)) {
     return `le ${dom} du mois à ${hour.padStart(2, '0')}h${min.padStart(2, '0')}`
   }
+  // Day(s) of week
   if (dom === '*' && dow !== '*') {
     const days = dow.split(',').map(d => {
       const n = parseInt(d)
       return !isNaN(n) && n <= 6 ? dayNames[n] : d
     })
-    if (hour !== '*' && min !== '*') {
+    if (!/[*/,-]/.test(hour) && !/[*/,-]/.test(min)) {
       return `chaque ${days.join(', ')} à ${hour.padStart(2, '0')}h${min.padStart(2, '0')}`
     }
     return `chaque ${days.join(', ')}`
@@ -240,6 +435,85 @@ function describeCron(expr) {
 function formatDate(iso) {
   if (!iso) return ''
   return new Date(iso).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
+}
+
+function statusBadge(status) {
+  if (status === 'completed') return 'badge bg-success-lt'
+  if (status === 'failed') return 'badge bg-danger-lt'
+  if (status === 'running') return 'badge bg-info-lt'
+  return 'badge bg-warning-lt'
+}
+
+function durationSec(start, end) {
+  const ms = new Date(end) - new Date(start)
+  return (ms / 1000).toFixed(1)
+}
+
+function firstLine(output) {
+  return (output || '').split('\n')[0].trim()
+}
+
+function openEdit(task) {
+  editTask.value = task
+  editForm.value = { name: task.name, cron_expression: task.cron_expression, enabled: task.enabled }
+  editError.value = ''
+}
+
+async function saveEdit() {
+  editSaving.value = true
+  editError.value = ''
+  try {
+    await api.updateScheduledTask(editTask.value.id, {
+      name: editForm.value.name,
+      module: editTask.value.module,
+      action: editTask.value.action,
+      target: editTask.value.target,
+      payload: editTask.value.payload,
+      cron_expression: editForm.value.cron_expression,
+      enabled: editForm.value.enabled,
+    })
+    editTask.value = null
+    await loadTasks()
+  } catch (e) {
+    editError.value = e.response?.data?.error || 'Erreur lors de la sauvegarde'
+  } finally {
+    editSaving.value = false
+  }
+}
+
+function confirmDelete(task) {
+  deleteTask.value = task
+  deleteError.value = ''
+}
+
+async function doDelete() {
+  deleteSaving.value = true
+  deleteError.value = ''
+  try {
+    await api.deleteScheduledTask(deleteTask.value.id)
+    deleteTask.value = null
+    await loadTasks()
+  } catch (e) {
+    deleteError.value = e.response?.data?.error || 'Erreur lors de la suppression'
+  } finally {
+    deleteSaving.value = false
+  }
+}
+
+async function openHistory(task) {
+  historyTask.value = task
+  executions.value = []
+  expandedId.value = null
+  historyError.value = ''
+  historyLoading.value = true
+  try {
+    const { data } = await api.getScheduledTaskExecutions(task.id, 20)
+    executions.value = data
+  } catch (e) {
+    historyError.value = e.response?.data?.error || 'Erreur de chargement'
+  } finally {
+    historyLoading.value = false
+  }
 }
 
 async function loadTasks() {

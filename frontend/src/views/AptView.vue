@@ -68,6 +68,12 @@
                     <span :class="host.status === 'online' ? 'badge bg-green-lt text-green' : 'badge bg-red-lt text-red'">
                       {{ host.status === 'online' ? 'En ligne' : 'Hors ligne' }}
                     </span>
+                    <button v-if="canRunApt" class="btn btn-sm btn-outline-secondary" @click="openScheduleModal(host)" title="Planifier une commande APT">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm me-1" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                      </svg>
+                      Planifier
+                    </button>
                   </div>
 
                   <div v-if="aptStatuses[host.id]" class="row row-cards mb-3">
@@ -369,6 +375,50 @@
       Console
     </button>
 
+    <!-- Schedule APT modal -->
+    <div v-if="scheduleModal.open" class="modal modal-blur show d-block" tabindex="-1" style="background:rgba(0,0,0,.5);z-index:1050" @click.self="scheduleModal.open = false">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <div>
+              <h5 class="modal-title">Planifier une commande APT</h5>
+              <div class="text-muted small mt-1">{{ scheduleModal.hostname }}</div>
+            </div>
+            <button type="button" class="btn-close" @click="scheduleModal.open = false"></button>
+          </div>
+          <div class="modal-body">
+            <div class="mb-3">
+              <label class="form-label">Nom de la tâche</label>
+              <input v-model="scheduleModal.name" type="text" class="form-control" placeholder="ex: apt upgrade hebdo" />
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Commande</label>
+              <select v-model="scheduleModal.action" class="form-select">
+                <option value="update">apt update</option>
+                <option value="upgrade">apt upgrade</option>
+                <option value="dist-upgrade">apt dist-upgrade</option>
+              </select>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Expression cron</label>
+              <input v-model="scheduleModal.cron_expression" type="text" class="form-control font-monospace" placeholder="ex: 0 3 * * 0 (dimanche 3h)" />
+              <div class="form-hint">
+                Laissez vide pour une tâche manuelle uniquement.
+              </div>
+            </div>
+            <div v-if="scheduleModal.error" class="alert alert-danger py-2">{{ scheduleModal.error }}</div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" @click="scheduleModal.open = false">Annuler</button>
+            <button class="btn btn-primary" :disabled="scheduleModal.saving" @click="saveSchedule">
+              <span v-if="scheduleModal.saving" class="spinner-border spinner-border-sm me-1"></span>
+              Créer la tâche
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div v-if="bulkActionFeedback" class="position-fixed bottom-0 end-0 p-3" style="z-index: 1100;">
       <div class="toast show align-items-center border-0" :class="bulkActionFeedback.variantClass">
         <div class="d-flex">
@@ -422,6 +472,46 @@ const packagesShowAll = ref({})
 const auth = useAuthStore()
 const dialog = useConfirmDialog()
 const canRunApt = computed(() => auth.role === 'admin' || auth.role === 'operator')
+
+// ── Schedule modal ────────────────────────────────────────────────────────────
+const scheduleModal = ref({ open: false, hostId: '', hostname: '', name: '', action: 'update', cron_expression: '', saving: false, error: '' })
+
+function openScheduleModal(host) {
+  scheduleModal.value = {
+    open: true,
+    hostId: host.id,
+    hostname: host.hostname || host.name,
+    name: '',
+    action: 'update',
+    cron_expression: '',
+    saving: false,
+    error: '',
+  }
+}
+
+const MANUAL_SENTINEL = '0 0 29 2 *'
+
+async function saveSchedule() {
+  scheduleModal.value.error = ''
+  scheduleModal.value.saving = true
+  const cronExpr = scheduleModal.value.cron_expression.trim() || MANUAL_SENTINEL
+  try {
+    await apiClient.createScheduledTask(scheduleModal.value.hostId, {
+      name: scheduleModal.value.name || `apt ${scheduleModal.value.action}`,
+      module: 'apt',
+      action: scheduleModal.value.action,
+      target: '',
+      payload: '{}',
+      cron_expression: cronExpr,
+      enabled: !!scheduleModal.value.cron_expression.trim(),
+    })
+    scheduleModal.value.open = false
+  } catch (e) {
+    scheduleModal.value.error = e.response?.data?.error || 'Erreur lors de la création'
+  } finally {
+    scheduleModal.value.saving = false
+  }
+}
 
 // ── Console ───────────────────────────────────────────────────────────────────
 const showConsole = ref(false)

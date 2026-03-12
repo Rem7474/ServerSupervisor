@@ -227,6 +227,43 @@ func (db *DB) GetScheduledTask(id string) (*models.ScheduledTask, error) {
 	return &out, nil
 }
 
+// GetScheduledTaskExecutions returns the last N remote_commands linked to a scheduled task.
+func (db *DB) GetScheduledTaskExecutions(taskID string, limit int) ([]models.RemoteCommand, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	rows, err := db.conn.Query(`
+		SELECT id, host_id, module, action, target, payload::text,
+		       status, output, triggered_by, created_at, started_at, ended_at
+		FROM remote_commands
+		WHERE scheduled_task_id = $1
+		ORDER BY created_at DESC
+		LIMIT $2`, taskID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var cmds []models.RemoteCommand
+	for rows.Next() {
+		var c models.RemoteCommand
+		var startedAt, endedAt sql.NullTime
+		if err := rows.Scan(
+			&c.ID, &c.HostID, &c.Module, &c.Action, &c.Target, &c.Payload,
+			&c.Status, &c.Output, &c.TriggeredBy, &c.CreatedAt, &startedAt, &endedAt,
+		); err != nil {
+			return nil, err
+		}
+		if startedAt.Valid {
+			c.StartedAt = &startedAt.Time
+		}
+		if endedAt.Valid {
+			c.EndedAt = &endedAt.Time
+		}
+		cmds = append(cmds, c)
+	}
+	return cmds, rows.Err()
+}
+
 func scanScheduledTasks(rows *sql.Rows) ([]models.ScheduledTask, error) {
 	var tasks []models.ScheduledTask
 	for rows.Next() {

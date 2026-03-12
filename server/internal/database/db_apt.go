@@ -79,6 +79,24 @@ func (db *DB) GetTotalAptPending() int {
 	return total
 }
 
+// GetAptPendingAll returns a map of host_id → pending_packages for hosts with pending > 0.
+func (db *DB) GetAptPendingAll() map[string]int {
+	rows, err := db.conn.Query(`SELECT host_id, pending_packages FROM apt_status WHERE pending_packages > 0`)
+	if err != nil {
+		return map[string]int{}
+	}
+	defer func() { _ = rows.Close() }()
+	result := map[string]int{}
+	for rows.Next() {
+		var hostID string
+		var pending int
+		if err := rows.Scan(&hostID, &pending); err == nil {
+			result[hostID] = pending
+		}
+	}
+	return result
+}
+
 // ========== Tracked Repos ==========
 
 func (db *DB) CreateTrackedRepo(repo *models.TrackedRepo) error {

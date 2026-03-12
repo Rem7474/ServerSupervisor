@@ -98,29 +98,46 @@
 
     <!-- Threats Tab -->
     <div v-if="tab === 'threats'">
+      <!-- Period selector + refresh -->
+      <div class="d-flex align-items-center justify-content-between mb-3">
+        <div class="btn-group btn-group-sm">
+          <button
+            v-for="p in periodOptions"
+            :key="p.hours"
+            class="btn"
+            :class="threatsPeriod === p.hours ? 'btn-primary' : 'btn-outline-secondary'"
+            @click="setThreatsPeriod(p.hours)"
+          >{{ p.label }}</button>
+        </div>
+        <button class="btn btn-sm btn-outline-secondary" @click="loadSecurity" :disabled="threatsLoading">
+          <span v-if="threatsLoading" class="spinner-border spinner-border-sm"></span>
+          <span v-else>↻</span>
+        </button>
+      </div>
+
       <!-- Stats cards -->
       <div class="row row-cards mb-4">
         <div class="col-sm-4">
           <div class="card">
             <div class="card-body text-center">
-              <div class="text-secondary small mb-1">Connexions (24h)</div>
-              <div class="h2 mb-0">{{ security.stats_24h?.total ?? '—' }}</div>
+              <div class="text-secondary small mb-1">Connexions ({{ periodLabel }})</div>
+              <div class="h2 mb-0">{{ security.stats?.total ?? '—' }}</div>
             </div>
           </div>
         </div>
         <div class="col-sm-4">
           <div class="card">
             <div class="card-body text-center">
-              <div class="text-secondary small mb-1">Échecs (24h)</div>
-              <div class="h2 mb-0 text-danger">{{ security.stats_24h?.failures ?? '—' }}</div>
+              <div class="text-secondary small mb-1">Échecs ({{ periodLabel }})</div>
+              <div class="h2 mb-0 text-danger">{{ security.stats?.failures ?? '—' }}</div>
             </div>
           </div>
         </div>
         <div class="col-sm-4">
           <div class="card">
             <div class="card-body text-center">
-              <div class="text-secondary small mb-1">IPs uniques (24h)</div>
-              <div class="h2 mb-0">{{ security.stats_24h?.unique_ips ?? '—' }}</div>
+              <div class="text-secondary small mb-1">IPs uniques ({{ periodLabel }})</div>
+              <div class="h2 mb-0">{{ security.stats?.unique_ips ?? '—' }}</div>
             </div>
           </div>
         </div>
@@ -132,10 +149,6 @@
           <div class="card h-100">
             <div class="card-header d-flex align-items-center justify-content-between">
               <h3 class="card-title">IPs bloquées</h3>
-              <button class="btn btn-sm btn-outline-secondary" @click="loadSecurity" :disabled="threatsLoading">
-                <span v-if="threatsLoading" class="spinner-border spinner-border-sm"></span>
-                <span v-else>↻</span>
-              </button>
             </div>
             <div class="card-body p-0">
               <div v-if="threatsLoading && !security.blocked_ips?.length" class="text-center py-4 text-secondary">Chargement…</div>
@@ -161,7 +174,7 @@
         <div class="col-lg-7">
           <div class="card h-100">
             <div class="card-header">
-              <h3 class="card-title">Top 10 IPs — échecs de connexion (24h)</h3>
+              <h3 class="card-title">Top 10 IPs — échecs de connexion ({{ periodLabel }})</h3>
             </div>
             <div class="card-body p-0">
               <div v-if="!security.top_failed_ips?.length" class="text-center py-4 text-secondary small">
@@ -191,6 +204,12 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+
+const periodOptions = [
+  { hours: 24,  label: '24h' },
+  { hours: 168, label: '7j' },
+  { hours: 720, label: '30j' },
+]
 import apiClient from '../api'
 import { useAuthStore } from '../stores/auth'
 
@@ -212,9 +231,11 @@ const success = ref('')
 const copiedBackup = ref(false)
 
 // Threats state
-const security = ref({ stats_24h: null, blocked_ips: [], top_failed_ips: [] })
+const security = ref({ stats: null, blocked_ips: [], top_failed_ips: [] })
 const threatsLoading = ref(false)
 const unblockingIP = ref('')
+const threatsPeriod = ref(24)
+const periodLabel = computed(() => periodOptions.find(p => p.hours === threatsPeriod.value)?.label ?? '24h')
 
 async function loadStatus() {
   try {
@@ -228,8 +249,8 @@ async function loadStatus() {
 async function loadSecurity() {
   threatsLoading.value = true
   try {
-    const res = await apiClient.getSecuritySummary()
-    security.value = res.data || { stats_24h: null, blocked_ips: [], top_failed_ips: [] }
+    const res = await apiClient.getSecuritySummary(threatsPeriod.value)
+    security.value = res.data || { stats: null, blocked_ips: [], top_failed_ips: [] }
   } catch (e) {
     console.error('Failed to load security summary:', e)
   } finally {
@@ -239,6 +260,11 @@ async function loadSecurity() {
 
 function switchToThreats() {
   tab.value = 'threats'
+  loadSecurity()
+}
+
+function setThreatsPeriod(hours) {
+  threatsPeriod.value = hours
   loadSecurity()
 }
 
