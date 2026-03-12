@@ -77,7 +77,7 @@
 						</div>
 					</div>
 
-					<div v-else class="d-flex flex-column h-100">
+					<div v-else class="d-flex flex-column flex-fill" style="min-width: 0; overflow: hidden;">
 						<div class="px-3 pt-3 pb-2" style="background: #1e293b; border-bottom: 1px solid rgba(255,255,255,0.1);">
 							<div class="d-flex align-items-start justify-content-between mb-2">
 								<div class="flex-fill" style="min-width: 0;">
@@ -248,6 +248,8 @@ onUnmounted(() => {
 	padding: 1rem;
 	margin: 0;
 	overflow-y: auto;
+	overflow-x: hidden;
+	width: 100%;
 	font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
 	font-size: 0.813rem;
 	line-height: 1.5;
