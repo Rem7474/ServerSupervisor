@@ -152,14 +152,15 @@ var (
 )
 
 func init() {
-	// Prime the CPU baseline with a short sample so the first CollectSystem()
-	// call returns a real value instead of 0.
+	// Store the t=0 baseline BEFORE sleeping so that main()'s first
+	// CollectSystem() call measures a ~500ms window instead of ~5ms.
+	// (Previously the sleep came before the store, making it a no-op.)
 	idle0, total0 := readCPUStat()
-	time.Sleep(100 * time.Millisecond)
 	cpuMu.Lock()
 	prevCPUIdle = idle0
 	prevCPUTotal = total0
 	cpuMu.Unlock()
+	time.Sleep(500 * time.Millisecond)
 }
 
 // readCPUStat returns the idle and total CPU jiffies from /proc/stat.

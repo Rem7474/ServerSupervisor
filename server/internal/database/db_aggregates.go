@@ -13,11 +13,11 @@ import (
 func (db *DB) InsertMetricsAggregate(agg *models.MetricsAggregate) error {
 	_, err := db.conn.Exec(
 		`INSERT INTO metrics_aggregates (host_id, aggregation_type, timestamp, cpu_usage_avg, cpu_usage_max,
-		 memory_usage_avg, memory_usage_max, disk_usage_avg, network_rx_bytes, network_tx_bytes, sample_count)
-		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+		 memory_usage_avg, memory_usage_max, memory_percent_avg, disk_usage_avg, network_rx_bytes, network_tx_bytes, sample_count)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
 		 ON CONFLICT (host_id, aggregation_type, timestamp) DO NOTHING`,
 		agg.HostID, agg.AggregationType, agg.Timestamp, agg.CPUUsageAvg, agg.CPUUsageMax,
-		agg.MemoryUsageAvg, agg.MemoryUsageMax, agg.DiskUsageAvg, agg.NetworkRxBytes, agg.NetworkTxBytes, agg.SampleCount,
+		agg.MemoryUsageAvg, agg.MemoryUsageMax, agg.MemoryPercentAvg, agg.DiskUsageAvg, agg.NetworkRxBytes, agg.NetworkTxBytes, agg.SampleCount,
 	)
 	return err
 }
@@ -27,7 +27,7 @@ func (db *DB) BuildMetricsAggregate(hostID string, start, end time.Time) (*model
 	var sampleCount int
 	var diskAvg sql.NullFloat64
 	var rxDelta, txDelta sql.NullInt64
-	var cpuAvg, cpuMax, memAvg, memMax sql.NullFloat64
+	var cpuAvg, cpuMax, memAvg, memMax, memPctAvg sql.NullFloat64
 
 	err := db.conn.QueryRow(
 		`SELECT
@@ -35,13 +35,14 @@ func (db *DB) BuildMetricsAggregate(hostID string, start, end time.Time) (*model
 			MAX(cpu_usage_percent) AS cpu_max,
 			AVG(memory_used) AS mem_avg,
 			MAX(memory_used) AS mem_max,
+			AVG(memory_percent) AS mem_pct_avg,
 			COUNT(*) AS sample_count,
 			MAX(network_rx_bytes) - MIN(network_rx_bytes) AS rx_delta,
 			MAX(network_tx_bytes) - MIN(network_tx_bytes) AS tx_delta
 		 FROM system_metrics
 		 WHERE host_id = $1 AND timestamp >= $2 AND timestamp < $3`,
 		hostID, start, end,
-	).Scan(&cpuAvg, &cpuMax, &memAvg, &memMax, &sampleCount, &rxDelta, &txDelta)
+	).Scan(&cpuAvg, &cpuMax, &memAvg, &memMax, &memPctAvg, &sampleCount, &rxDelta, &txDelta)
 	if err != nil {
 		return nil, err
 	}
@@ -74,6 +75,9 @@ func (db *DB) BuildMetricsAggregate(hostID string, start, end time.Time) (*model
 	}
 	if memMax.Valid {
 		agg.MemoryUsageMax = uint64(memMax.Float64)
+	}
+	if memPctAvg.Valid {
+		agg.MemoryPercentAvg = memPctAvg.Float64
 	}
 	if rxDelta.Valid {
 		agg.NetworkRxBytes = uint64(rxDelta.Int64)
@@ -137,7 +141,7 @@ func (db *DB) BatchAggregateMetrics(start, end time.Time, aggType string) (int, 
 		INSERT INTO metrics_aggregates (
 			host_id, aggregation_type, timestamp,
 			cpu_usage_avg, cpu_usage_max,
-			memory_usage_avg, memory_usage_max,
+			memory_usage_avg, memory_usage_max, memory_percent_avg,
 			disk_usage_avg,
 			network_rx_bytes, network_tx_bytes,
 			sample_count
@@ -150,6 +154,7 @@ func (db *DB) BatchAggregateMetrics(start, end time.Time, aggType string) (int, 
 			COALESCE(MAX(sm.cpu_usage_percent), 0),
 			COALESCE(AVG(sm.memory_used)::BIGINT, 0),
 			COALESCE(MAX(sm.memory_used)::BIGINT, 0),
+			COALESCE(AVG(sm.memory_percent), 0),
 			COALESCE(da.avg_disk, 0),
 			COALESCE(MAX(sm.network_rx_bytes) - MIN(sm.network_rx_bytes), 0),
 			COALESCE(MAX(sm.network_tx_bytes) - MIN(sm.network_tx_bytes), 0),

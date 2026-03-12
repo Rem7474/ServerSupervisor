@@ -136,8 +136,9 @@ type MetricsAggregate struct {
 	// Metrics (averages for the period)
 	CPUUsageAvg    float64 `json:"cpu_usage_avg" db:"cpu_usage_avg"`
 	CPUUsageMax    float64 `json:"cpu_usage_max" db:"cpu_usage_max"`
-	MemoryUsageAvg uint64  `json:"memory_usage_avg" db:"memory_usage_avg"`
-	MemoryUsageMax uint64  `json:"memory_usage_max" db:"memory_usage_max"`
+	MemoryUsageAvg    uint64  `json:"memory_usage_avg" db:"memory_usage_avg"`
+	MemoryUsageMax    uint64  `json:"memory_usage_max" db:"memory_usage_max"`
+	MemoryPercentAvg  float64 `json:"memory_percent_avg" db:"memory_percent_avg"`
 	DiskUsageAvg   float64 `json:"disk_usage_avg" db:"disk_usage_avg"`
 	NetworkRxBytes uint64  `json:"network_rx_bytes" db:"network_rx_bytes"`
 	NetworkTxBytes uint64  `json:"network_tx_bytes" db:"network_tx_bytes"`

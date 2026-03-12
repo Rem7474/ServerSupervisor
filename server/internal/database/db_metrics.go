@@ -164,7 +164,7 @@ func (db *DB) GetMetricsAggregatesByType(hostID string, hours int, aggregationTy
 	rows, err := db.conn.Query(
 		`SELECT id, host_id, timestamp, cpu_usage_avg as cpu_usage_percent, 0 as cpu_cores,
 		 0 as load_avg_1, 0 as load_avg_5, 0 as load_avg_15,
-		 0 as memory_total, memory_usage_avg as memory_used, 0 as memory_free, 0 as memory_percent,
+		 0 as memory_total, memory_usage_avg as memory_used, 0 as memory_free, memory_percent_avg as memory_percent,
 		 0 as swap_total, 0 as swap_used,
 		 network_rx_bytes, network_tx_bytes, 0 as uptime
 		 FROM metrics_aggregates

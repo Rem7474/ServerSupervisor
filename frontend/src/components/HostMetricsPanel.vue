@@ -67,7 +67,7 @@
           <h3 class="card-title">Mémoire</h3>
         </div>
         <div class="card-body" style="height: 12rem;">
-          <Line v-if="memChartData" :data="memChartData" :options="chartOptions" class="h-100" />
+          <Line v-if="memChartData" :data="memChartData" :options="memChartOptions" class="h-100" />
           <div v-else class="h-100 d-flex align-items-center justify-content-center text-secondary">Aucune donnée</div>
         </div>
       </div>
@@ -137,6 +137,27 @@ const chartOptions = {
   },
   elements: { point: { radius: 0, hitRadius: 10, hoverRadius: 5 }, line: { tension: 0.3 } },
   interaction: { mode: 'nearest', axis: 'x', intersect: false },
+}
+
+const memChartOptions = {
+  ...chartOptions,
+  plugins: {
+    ...chartOptions.plugins,
+    tooltip: {
+      ...chartOptions.plugins.tooltip,
+      callbacks: {
+        title: (items) => items[0]?.label || '',
+        label: (ctx) => {
+          const pct = ctx.parsed.y.toFixed(1)
+          const m = metricsHistory.value[ctx.dataIndex]
+          if (m?.memory_used && m?.memory_total) {
+            return `${pct}%  (${formatBytes(m.memory_used)} / ${formatBytes(m.memory_total)})`
+          }
+          return `${pct}%`
+        },
+      },
+    },
+  },
 }
 
 function formatBytes(bytes) {

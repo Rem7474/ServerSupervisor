@@ -192,12 +192,12 @@
               </td>
               <td>
                 <span :class="cpuColor(hostMetrics[host.id]?.cpu_usage_percent)">
-                  {{ hostMetrics[host.id]?.cpu_usage_percent?.toFixed(1) ?? '-' }}
+                  {{ hostMetrics[host.id]?.cpu_usage_percent != null ? hostMetrics[host.id].cpu_usage_percent.toFixed(1) + '%' : '-' }}
                 </span>
               </td>
               <td>
                 <span :class="memColor(hostMetrics[host.id]?.memory_percent)">
-                  {{ hostMetrics[host.id]?.memory_percent?.toFixed(1) ?? '-' }}
+                  {{ hostMetrics[host.id]?.memory_percent != null ? hostMetrics[host.id].memory_percent.toFixed(1) + '%' : '-' }}
                 </span>
               </td>
               <td>

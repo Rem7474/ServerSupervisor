@@ -294,6 +294,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import apiClient from '../api'
 import { useDateFormatter } from '../composables/useDateFormatter'
@@ -303,6 +304,7 @@ import { useRemotePagination } from '../composables/usePagination'
 const { formatLocaleDateTime: formatDate } = useDateFormatter()
 const { getStatusBadgeClass } = useStatusBadge()
 
+const route = useRoute()
 const auth = useAuthStore()
 const canViewCommands = computed(() => auth.role === 'admin' || auth.role === 'operator')
 
@@ -534,6 +536,15 @@ const cmdsPager = useRemotePagination({ currentPage: cmdsPage, totalPages: total
 const connexionsPager = useRemotePagination({ currentPage: connexionsPage, totalPages: totalConnexionsPages })
 
 onMounted(fetchCmds)
+onMounted(async () => {
+  const cmdId = route.query.command
+  if (cmdId) {
+    try {
+      const res = await apiClient.getCommandStatus(cmdId)
+      if (res.data?.id) openLogViewer(res.data)
+    } catch { /* ignore — command may not exist */ }
+  }
+})
 onMounted(() => {
   auditPollTimer = setInterval(() => {
     if (activeTab.value === 'commandes') {
