@@ -400,11 +400,17 @@
               </select>
             </div>
             <div class="mb-3">
-              <label class="form-label">Expression cron</label>
-              <input v-model="scheduleModal.cron_expression" type="text" class="form-control font-monospace" placeholder="ex: 0 3 * * 0 (dimanche 3h)" />
-              <div class="form-hint">
-                Laissez vide pour une tâche manuelle uniquement.
-              </div>
+              <label class="form-check form-switch">
+                <input v-model="scheduleModal.manualOnly" type="checkbox" class="form-check-input" />
+                <span class="form-check-label">Exécution manuelle uniquement (pas de planification automatique)</span>
+              </label>
+            </div>
+            <div v-if="!scheduleModal.manualOnly" class="mb-3">
+              <CronBuilder v-model="scheduleModal.cron_expression" />
+            </div>
+            <div v-if="!scheduleModal.manualOnly" class="form-check form-switch mb-2">
+              <input v-model="scheduleModal.enabled" type="checkbox" class="form-check-input" id="schedEnabled" />
+              <label class="form-check-label" for="schedEnabled">Activée</label>
             </div>
             <div v-if="scheduleModal.error" class="alert alert-danger py-2">{{ scheduleModal.error }}</div>
           </div>
@@ -453,6 +459,7 @@ import {
 import PaginationNav from '../components/PaginationNav.vue'
 import WsStatusBar from '../components/WsStatusBar.vue'
 import SubNavigation from '../components/SubNavigation.vue'
+import CronBuilder from '../components/CronBuilder.vue'
 
 const { dayjs, formatRelativeDate, formatExactDate } = useDateFormatter()
 const { getStatusBadgeClass } = useStatusBadge()
@@ -474,7 +481,13 @@ const dialog = useConfirmDialog()
 const canRunApt = computed(() => auth.role === 'admin' || auth.role === 'operator')
 
 // ── Schedule modal ────────────────────────────────────────────────────────────
-const scheduleModal = ref({ open: false, hostId: '', hostname: '', name: '', action: 'update', cron_expression: '', saving: false, error: '' })
+import { MANUAL_SENTINEL } from '../utils/cron'
+
+const scheduleModal = ref({
+  open: false, hostId: '', hostname: '', name: '',
+  action: 'update', cron_expression: '0 3 * * 0',
+  manualOnly: false, enabled: true, saving: false, error: '',
+})
 
 function openScheduleModal(host) {
   scheduleModal.value = {
@@ -483,18 +496,18 @@ function openScheduleModal(host) {
     hostname: host.hostname || host.name,
     name: '',
     action: 'update',
-    cron_expression: '',
+    cron_expression: '0 3 * * 0',
+    manualOnly: false,
+    enabled: true,
     saving: false,
     error: '',
   }
 }
 
-const MANUAL_SENTINEL = '0 0 29 2 *'
-
 async function saveSchedule() {
   scheduleModal.value.error = ''
   scheduleModal.value.saving = true
-  const cronExpr = scheduleModal.value.cron_expression.trim() || MANUAL_SENTINEL
+  const cronExpr = scheduleModal.value.manualOnly ? MANUAL_SENTINEL : scheduleModal.value.cron_expression
   try {
     await apiClient.createScheduledTask(scheduleModal.value.hostId, {
       name: scheduleModal.value.name || `apt ${scheduleModal.value.action}`,
@@ -503,7 +516,7 @@ async function saveSchedule() {
       target: '',
       payload: '{}',
       cron_expression: cronExpr,
-      enabled: !!scheduleModal.value.cron_expression.trim(),
+      enabled: scheduleModal.value.manualOnly ? false : scheduleModal.value.enabled,
     })
     scheduleModal.value.open = false
   } catch (e) {

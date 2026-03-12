@@ -19,15 +19,19 @@
         <h3 class="card-title">Ajouter un utilisateur</h3>
       </div>
       <div class="card-body">
-        <form @submit.prevent="createUser">
+        <form @submit.prevent="createUser" autocomplete="off">
           <div class="row g-3">
             <div class="col-md-4">
               <label class="form-label">Nom d'utilisateur</label>
               <input 
                 v-model="newUserForm.username"
+                name="username"
                 type="text" 
                 class="form-control"
                 placeholder="john_doe"
+                autocomplete="username"
+                autocapitalize="none"
+                spellcheck="false"
                 required
                 :disabled="creatingUser"
               />
@@ -36,16 +40,18 @@
               <label class="form-label">Mot de passe</label>
               <input 
                 v-model="newUserForm.password"
+                name="new-password"
                 type="password" 
                 class="form-control"
                 placeholder="••••••••"
+                autocomplete="new-password"
                 required
                 :disabled="creatingUser"
               />
             </div>
             <div class="col-md-3">
               <label class="form-label">Role</label>
-              <select v-model="newUserForm.role" class="form-select" :disabled="creatingUser">
+              <select v-model="newUserForm.role" class="form-select" :disabled="creatingUser" name="role" autocomplete="off">
                 <option value="viewer">viewer</option>
                 <option value="operator">operator</option>
                 <option value="admin">admin</option>

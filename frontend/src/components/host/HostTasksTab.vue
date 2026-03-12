@@ -176,8 +176,7 @@ import CronBuilder from '../CronBuilder.vue'
 import apiClient from '../../api'
 import { useConfirmDialog } from '../../composables/useConfirmDialog'
 import { useToast } from '../../composables/useToast'
-
-const MANUAL_SENTINEL = '0 0 29 2 *'
+import { MANUAL_SENTINEL, isManualOnly, describeCron } from '../../utils/cron'
 
 const taskModuleActions = {
   apt: ['update', 'upgrade', 'dist-upgrade'],
@@ -248,42 +247,6 @@ watch(taskManualOnly, (val) => {
     }
   }
 })
-
-function isManualOnly(task) {
-  return task.cron_expression === MANUAL_SENTINEL && !task.enabled
-}
-
-function describeCron(expr) {
-  if (!expr) return ''
-  const presets = {
-    '@daily': 'tous les jours a minuit',
-    '@hourly': 'toutes les heures',
-    '@weekly': 'hebdomadaire (dim. minuit)',
-    '@monthly': 'mensuel (1er a minuit)',
-  }
-  if (presets[expr]) return presets[expr]
-  const parts = expr.split(' ')
-  if (parts.length !== 5) return ''
-  const [min, hour, dom, , dow] = parts
-  const dayNames = ['dim', 'lun', 'mar', 'mer', 'jeu', 'ven', 'sam']
-  if (dom === '*' && dow === '*' && hour !== '*' && min !== '*') {
-    return `tous les jours a ${hour.padStart(2, '0')}h${min.padStart(2, '0')}`
-  }
-  if (dom !== '*' && dow === '*' && hour !== '*' && min !== '*') {
-    return `le ${dom} du mois a ${hour.padStart(2, '0')}h${min.padStart(2, '0')}`
-  }
-  if (dom === '*' && dow !== '*') {
-    const days = dow.split(',').map((d) => {
-      const n = parseInt(d, 10)
-      return !isNaN(n) && n <= 6 ? dayNames[n] : d
-    })
-    if (hour !== '*' && min !== '*') {
-      return `chaque ${days.join(', ')} a ${hour.padStart(2, '0')}h${min.padStart(2, '0')}`
-    }
-    return `chaque ${days.join(', ')}`
-  }
-  return ''
-}
 
 function formatTaskDate(iso) {
   if (!iso) return ''

@@ -96,6 +96,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
+import { describeCron } from '../utils/cron'
 
 const props = defineProps({
   modelValue: {
@@ -132,42 +133,7 @@ const daysOfWeek = [
 
 const minuteOptions = [0, 5, 10, 15, 20, 30, 45, 59]
 
-const dayNames = ['dim', 'lun', 'mar', 'mer', 'jeu', 'ven', 'sam']
-
-const preview = computed(() => {
-  const expr = props.modelValue?.trim()
-  if (!expr) return ''
-  const presets = {
-    '@daily': 'tous les jours à minuit',
-    '@hourly': 'toutes les heures',
-    '@weekly': 'hebdomadaire (dimanche minuit)',
-    '@monthly': 'mensuel (1er du mois à minuit)',
-    '@yearly': 'annuel (1er janvier à minuit)'
-  }
-  if (presets[expr]) return presets[expr]
-  const parts = expr.split(' ')
-  if (parts.length !== 5) return ''
-  const [min, hr, dom, , dow] = parts
-
-  if (dom === '*' && dow === '*' && hr !== '*' && min !== '*') {
-    return `tous les jours à ${hr.padStart(2, '0')}h${min.padStart(2, '0')}`
-  }
-  if (dom !== '*' && dow === '*' && hr !== '*' && min !== '*') {
-    return `le ${dom} de chaque mois à ${hr.padStart(2, '0')}h${min.padStart(2, '0')}`
-  }
-  if (dom === '*' && dow !== '*') {
-    const days = dow.split(',').map(d => {
-      const n = parseInt(d)
-      return !isNaN(n) && n <= 6 ? dayNames[n] : d
-    })
-    const dayStr = days.join(', ')
-    if (hr !== '*' && min !== '*') {
-      return `chaque ${dayStr} à ${hr.padStart(2, '0')}h${min.padStart(2, '0')}`
-    }
-    return `chaque ${dayStr}`
-  }
-  return ''
-})
+const preview = computed(() => describeCron(props.modelValue?.trim() ?? ''))
 
 function buildCron() {
   const m = String(minute.value)

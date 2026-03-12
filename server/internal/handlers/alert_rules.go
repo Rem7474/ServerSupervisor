@@ -270,7 +270,16 @@ func (h *AlertRulesHandler) DeleteAlertRule(c *gin.Context) {
 
 // TestAlertRule evaluates a rule against current metrics without saving it.
 func (h *AlertRulesHandler) TestAlertRule(c *gin.Context) {
-	var req models.AlertRuleCreate
+	// Use a dedicated payload for test-only evaluation so draft rules can be
+	// validated without requiring fields needed only for persistence (like name).
+	var req struct {
+		HostID    *string             `json:"host_id"`
+		Metric    string              `json:"metric" binding:"required"`
+		Operator  string              `json:"operator" binding:"required"`
+		Threshold float64             `json:"threshold" binding:"required"`
+		Duration  int                 `json:"duration"`
+		Actions   models.AlertActions `json:"actions"`
+	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
