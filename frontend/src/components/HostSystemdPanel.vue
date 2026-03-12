@@ -82,7 +82,9 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useAuthStore } from '../stores/auth'
-import apiClient from '../api'
+import apiClient, { getApiErrorMessage } from '../api'
+import { useCommandStream } from '../composables/useCommandStream'
+import { useLocalStorage } from '../composables/useLocalStorage'
 
 const props = defineProps({
   hostId: { type: String, required: true },
@@ -95,7 +97,9 @@ const auth = useAuthStore()
 const services = ref([])
 const loading = ref(false)
 const error = ref('')
-const filter = ref('active')
+const filter = useLocalStorage(`host-systemd-filter:${props.hostId}`, 'active')
+const STREAM_TIMEOUT_MS = 20000
+const { collectCommandOutput } = useCommandStream({ token: () => auth.token })
 
 const filteredServices = computed(() => {
   if (filter.value === 'all') return services.value
@@ -115,33 +119,8 @@ async function loadServices() {
   try {
     const res = await apiClient.sendSystemdCommand(props.hostId, '', 'list')
     const cmdId = res.data.command_id
-    const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
-    const wsUrl = `${protocol}://${window.location.host}/api/v1/ws/commands/stream/${cmdId}`
 
-    await new Promise((resolve, reject) => {
-      let output = ''
-      const ws = new WebSocket(wsUrl)
-      ws.onopen = () => { ws.send(JSON.stringify({ type: 'auth', token: auth.token })) }
-      ws.onmessage = (event) => {
-        try {
-          const payload = JSON.parse(event.data)
-          if (payload.type === 'cmd_stream_init') {
-            output = payload.output || ''
-            if (payload.status === 'completed') { ws.close(); resolve(output) }
-            else if (payload.status === 'failed') { ws.close(); reject(new Error('Command failed')) }
-          } else if (payload.type === 'cmd_stream') {
-            output += payload.chunk || ''
-          } else if (payload.type === 'cmd_status_update') {
-            if (payload.output) output = payload.output
-            if (payload.status === 'completed') { ws.close(); resolve(output) }
-            else if (payload.status === 'failed') { ws.close(); reject(new Error('Command failed')) }
-          }
-        } catch { /* ignore parse errors */ }
-      }
-      ws.onclose = () => { if (output) resolve(output) }
-      ws.onerror = () => reject(new Error('WebSocket error'))
-      setTimeout(() => { ws.close(); reject(new Error('Timeout')) }, 35000)
-    }).then(output => {
+    await collectCommandOutput(cmdId, { timeoutMs: STREAM_TIMEOUT_MS }).then(output => {
       try {
         services.value = JSON.parse(output)
       } catch {
@@ -151,13 +130,14 @@ async function loadServices() {
       error.value = e.message || 'Erreur lors du chargement des services'
     }).finally(() => { emit('history-changed') })
   } catch (e) {
-    error.value = e.response?.data?.error || "Impossible d'envoyer la commande"
+    error.value = getApiErrorMessage(e, "Impossible d'envoyer la commande")
   } finally {
     loading.value = false
   }
 }
 
 async function runAction(serviceName, action) {
+  error.value = ''
   try {
     const res = await apiClient.sendSystemdCommand(props.hostId, serviceName, action)
     emit('open-console', {
@@ -166,7 +146,7 @@ async function runAction(serviceName, action) {
       command: `${action} ${serviceName}`,
     })
   } catch (e) {
-    console.error('Failed to execute systemd action:', e)
+    error.value = getApiErrorMessage(e, `Impossible d'exécuter systemctl ${action}`)
   }
 }
 </script>

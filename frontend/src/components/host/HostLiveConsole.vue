@@ -119,6 +119,12 @@
 <script setup>
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { useAuthStore } from '../../stores/auth'
+import { useCommandStream } from '../../composables/useCommandStream'
+import {
+	colorizeConsoleOutput,
+	copyConsoleOutput as copyConsoleOutputToClipboard,
+	downloadConsoleOutput as downloadConsoleOutputToFile,
+} from '../../utils/consoleOutput'
 
 const emit = defineEmits(['hide', 'show', 'update:command', 'history-changed'])
 
@@ -140,32 +146,13 @@ const props = defineProps({
 const auth = useAuthStore()
 const consoleCopied = ref(false)
 const consoleOutput = ref(null)
-let streamWs = null
+const { openCommandStream, closeStream } = useCommandStream({ token: () => auth.token })
 
 const currentCommand = computed(() => props.command)
 
 const colorizedOutput = computed(() => {
 	if (!currentCommand.value) return ''
-	const raw = currentCommand.value.output || ''
-	const plain = renderConsoleOutput(raw)
-	if (!plain) return ''
-	return plain
-		.split('\n')
-		.map((line) => {
-			const escaped = line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-			const lower = line.toLowerCase()
-			if (/\berror\b|err:|erreur|failed|echec|exception/i.test(lower)) {
-				return `<span style="color:var(--tblr-danger)">${escaped}</span>`
-			}
-			if (/\bwarn(?:ing)?\b|attention|deprecated/i.test(lower)) {
-				return `<span style="color:var(--tblr-warning)">${escaped}</span>`
-			}
-			if (/\bsuccess\b|done|ok\b|completed|✓/i.test(lower)) {
-				return `<span style="color:var(--tblr-success)">${escaped}</span>`
-			}
-			return escaped
-		})
-		.join('\n')
+	return colorizeConsoleOutput(currentCommand.value.output || '')
 })
 
 watch(
@@ -180,7 +167,7 @@ watch(
 	() => props.show,
 	(show) => {
 		if (!show) {
-			closeSocket()
+			closeStream()
 			return
 		}
 		if (props.command?.id) {
@@ -196,8 +183,7 @@ function updateCommand(patch) {
 
 function copyConsoleOutput() {
 	if (!currentCommand.value) return
-	const plain = renderConsoleOutput(currentCommand.value.output || '')
-	navigator.clipboard.writeText(plain).then(() => {
+	copyConsoleOutputToClipboard(currentCommand.value.output || '').then(() => {
 		consoleCopied.value = true
 		setTimeout(() => {
 			consoleCopied.value = false
@@ -207,14 +193,7 @@ function copyConsoleOutput() {
 
 function downloadConsoleOutput() {
 	if (!currentCommand.value) return
-	const plain = renderConsoleOutput(currentCommand.value.output || '')
-	const blob = new Blob([plain], { type: 'text/plain' })
-	const url = URL.createObjectURL(blob)
-	const a = document.createElement('a')
-	a.href = url
-	a.download = `console-${currentCommand.value.command || 'output'}.txt`
-	a.click()
-	URL.revokeObjectURL(url)
+	downloadConsoleOutputToFile(currentCommand.value.output || '', `console-${currentCommand.value.command || 'output'}.txt`)
 }
 
 function clearConsoleOutput() {
@@ -222,78 +201,33 @@ function clearConsoleOutput() {
 }
 
 function hideConsole() {
-	closeSocket()
+	closeStream()
 	emit('hide')
 }
 
-function closeSocket() {
-	if (streamWs) {
-		streamWs.onclose = null
-		streamWs.onmessage = null
-		streamWs.close()
-		streamWs = null
-	}
-}
-
 function connectStreamWebSocket(commandId) {
-	closeSocket()
-	const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
-	const wsUrl = `${protocol}://${window.location.host}/api/v1/ws/commands/stream/${commandId}`
-	streamWs = new WebSocket(wsUrl)
-
-	streamWs.onopen = () => {
-		streamWs.send(JSON.stringify({ type: 'auth', token: auth.token }))
-	}
-
-	streamWs.onmessage = (event) => {
-		try {
-			const payload = JSON.parse(event.data)
-			if (payload.type === 'cmd_stream_init') {
-				updateCommand({ status: payload.status, output: payload.output || '' })
-				nextTick(() => scrollToBottom())
-			} else if (payload.type === 'cmd_stream') {
-				updateCommand({ output: (currentCommand.value?.output || '') + payload.chunk })
-				nextTick(() => scrollToBottom())
-			} else if (payload.type === 'cmd_status_update') {
-				updateCommand({ status: payload.status })
-				if (payload.status === 'completed' || payload.status === 'failed') {
-					emit('history-changed')
-				}
+	openCommandStream(commandId, {
+		onInit: (payload) => {
+			updateCommand({ status: payload.status, output: payload.output || '' })
+			nextTick(() => scrollToBottom())
+		},
+		onChunk: (payload) => {
+			updateCommand({ output: (currentCommand.value?.output || '') + payload.chunk })
+			nextTick(() => scrollToBottom())
+		},
+		onStatus: (payload) => {
+			updateCommand({ status: payload.status })
+			if (payload.status === 'completed' || payload.status === 'failed') {
+				emit('history-changed')
 			}
-		} catch {
-			// Ignore malformed payloads
-		}
-	}
+		},
+	})
 }
 
 function statusClass(status) {
 	if (status === 'completed') return 'badge bg-green-lt text-green'
 	if (status === 'failed') return 'badge bg-red-lt text-red'
 	return 'badge bg-yellow-lt text-yellow'
-}
-
-function renderConsoleOutput(raw) {
-	if (!raw) return ''
-	const lines = ['']
-	let currentLine = ''
-
-	for (let i = 0; i < raw.length; i++) {
-		const ch = raw[i]
-		if (ch === '\r') {
-			currentLine = ''
-			lines[lines.length - 1] = ''
-			continue
-		}
-		if (ch === '\n') {
-			currentLine = ''
-			lines.push('')
-			continue
-		}
-		currentLine += ch
-		lines[lines.length - 1] = currentLine
-	}
-
-	return lines.join('\n')
 }
 
 function scrollToBottom() {
@@ -303,7 +237,7 @@ function scrollToBottom() {
 }
 
 onUnmounted(() => {
-	closeSocket()
+	closeStream()
 })
 </script>
 

@@ -244,22 +244,11 @@
               {{ filteredHistory.length }} entrée{{ filteredHistory.length > 1 ? 's' : '' }} —
               page {{ historyPage }} / {{ historyTotalPages }}
             </div>
-            <ul class="pagination pagination-sm mb-0">
-              <li class="page-item" :class="{ disabled: historyPage === 1 }">
-                <a class="page-link" href="#" @click.prevent="prevHistoryPage">‹</a>
-              </li>
-              <li
-                v-for="p in historyTotalPages"
-                :key="p"
-                class="page-item"
-                :class="{ active: p === historyPage }"
-              >
-                <a class="page-link" href="#" @click.prevent="setHistoryPage(p)">{{ p }}</a>
-              </li>
-              <li class="page-item" :class="{ disabled: historyPage === historyTotalPages }">
-                <a class="page-link" href="#" @click.prevent="nextHistoryPage">›</a>
-              </li>
-            </ul>
+            <PaginationNav
+              :current-page="historyPage"
+              :total-pages="historyTotalPages"
+              @select="setHistoryPage"
+            />
           </div>
         </div>
       </div>
@@ -277,13 +266,44 @@
               </svg>
               Console Live
             </h3>
-            <button @click="closeLiveConsole(); showConsole = false" class="btn btn-sm btn-ghost-secondary" title="Fermer la console">
-              <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                <path d="M18 6l-12 12" />
-                <path d="M6 6l12 12" />
-              </svg>
-            </button>
+            <div class="d-flex gap-1">
+              <button
+                @click="copyLiveConsoleOutput"
+                class="btn btn-sm btn-ghost-secondary"
+                :title="consoleCopied ? 'Copie !' : 'Copier la sortie'"
+                :disabled="!liveCommand"
+              >
+                <svg v-if="!consoleCopied" xmlns="http://www.w3.org/2000/svg" class="icon" width="18" height="18" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                  <path d="M8 8m0 2a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2z" />
+                  <path d="M16 8v-2a2 2 0 0 0 -2 -2h-8a2 2 0 0 0 -2 2v8a2 2 0 0 0 2 2h2" />
+                </svg>
+                <svg v-else xmlns="http://www.w3.org/2000/svg" class="icon text-success" width="18" height="18" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                  <path d="M5 12l5 5l10 -10" />
+                </svg>
+              </button>
+              <button
+                @click="downloadLiveConsoleOutput"
+                class="btn btn-sm btn-ghost-secondary"
+                title="Telecharger (.txt)"
+                :disabled="!liveCommand"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="18" height="18" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                  <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2" />
+                  <path d="M7 11l5 5l5 -5" />
+                  <path d="M12 4l0 12" />
+                </svg>
+              </button>
+              <button @click="closeLiveConsole(); showConsole = false" class="btn btn-sm btn-ghost-secondary" title="Fermer la console">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                  <path d="M18 6l-12 12" />
+                  <path d="M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
           </div>
           <div class="card-body d-flex flex-column flex-fill p-0" style="min-height: 0;">
             <div v-if="!liveCommand" class="d-flex align-items-center justify-content-center flex-fill text-secondary" style="background: #1e293b; border-radius: 0 0 0.5rem 0.5rem;">
@@ -313,7 +333,7 @@
               </div>
               <pre
                 ref="consoleOutput"
-                class="mb-0 flex-fill"
+                class="console-output mb-0 flex-fill"
                 style="
                   background: #0f172a;
                   color: #e2e8f0;
@@ -325,7 +345,8 @@
                   line-height: 1.5;
                   border-radius: 0 0 0.5rem 0.5rem;
                 "
-              >{{ renderedConsoleOutput || 'En attente de sortie...' }}</pre>
+                v-html="colorizedConsoleOutput || '<span style=\'opacity:0.5\'>En attente de sortie...</span>'"
+              ></pre>
             </div>
           </div>
         </div>
@@ -347,19 +368,39 @@
       </svg>
       Console
     </button>
+
+    <div v-if="bulkActionFeedback" class="position-fixed bottom-0 end-0 p-3" style="z-index: 1100;">
+      <div class="toast show align-items-center border-0" :class="bulkActionFeedback.variantClass">
+        <div class="d-flex">
+          <div class="toast-body">
+            <strong>apt {{ bulkActionFeedback.command }}</strong> {{ bulkActionFeedback.message }}
+            <div v-if="bulkActionFeedback.details" class="small mt-1">{{ bulkActionFeedback.details }}</div>
+          </div>
+          <button type="button" class="btn-close me-2 m-auto" :class="bulkActionFeedback.closeClass" @click="bulkActionFeedback = null"></button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, computed, nextTick } from 'vue'
+import { ref, onUnmounted, computed, nextTick } from 'vue'
 import CVEList from '../components/CVEList.vue'
-import apiClient from '../api'
+import apiClient, { getApiErrorMessage } from '../api'
 import { useAuthStore } from '../stores/auth'
 import { useWebSocket } from '../composables/useWebSocket'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
 import { useDateFormatter } from '../composables/useDateFormatter'
 import { usePagination } from '../composables/usePagination'
 import { useStatusBadge } from '../composables/useStatusBadge'
+import { useToast } from '../composables/useToast'
+import { useCommandStream } from '../composables/useCommandStream'
+import {
+  colorizeConsoleOutput,
+  copyConsoleOutput as copyConsoleOutputToClipboard,
+  downloadConsoleOutput as downloadConsoleOutputToFile,
+} from '../utils/consoleOutput'
+import PaginationNav from '../components/PaginationNav.vue'
 import WsStatusBar from '../components/WsStatusBar.vue'
 import SubNavigation from '../components/SubNavigation.vue'
 
@@ -384,13 +425,15 @@ const canRunApt = computed(() => auth.role === 'admin' || auth.role === 'operato
 
 // ── Console ───────────────────────────────────────────────────────────────────
 const showConsole = ref(false)
-const renderedConsoleOutput = computed(() => {
+const colorizedConsoleOutput = computed(() => {
   if (!liveCommand.value) return ''
-  return renderConsoleOutput(liveCommand.value.output || '')
+  return colorizeConsoleOutput(liveCommand.value.output || '')
 })
 const liveCommand = ref(null)
+const consoleCopied = ref(false)
 const consoleOutput = ref(null)
-let streamWs = null
+const { value: bulkActionFeedback, showToast: showBulkActionFeedback } = useToast(null)
+const { openCommandStream, closeStream } = useCommandStream({ token: () => auth.token })
 
 // ── Historique filters ────────────────────────────────────────────────────────
 const historyHostFilter = ref('all')
@@ -477,7 +520,8 @@ function watchCommand(cmd, host) {
   showConsole.value = true
   liveCommand.value = {
     id: cmd.id,
-    command: cmd.action,
+    hostId: host?.id || cmd.hostId || cmd.host_id || null,
+    command: cmd.action || cmd.command || '—',
     status: cmd.status,
     hostname: host?.hostname || host?.name || '—',
     output: cmd.output || '',
@@ -486,47 +530,114 @@ function watchCommand(cmd, host) {
   nextTick(() => scrollToBottom())
 }
 
+function closeStreamSocket() {
+  closeStream()
+}
+
 function closeLiveConsole() {
-  if (streamWs) {
-    streamWs.close()
-    streamWs = null
-  }
+  closeStreamSocket()
   liveCommand.value = null
+}
+
+function copyLiveConsoleOutput() {
+  if (!liveCommand.value) return
+  copyConsoleOutputToClipboard(liveCommand.value.output || '').then(() => {
+    consoleCopied.value = true
+    window.setTimeout(() => {
+      consoleCopied.value = false
+    }, 2000)
+  })
+}
+
+function downloadLiveConsoleOutput() {
+  if (!liveCommand.value) return
+  downloadConsoleOutputToFile(liveCommand.value.output || '', `console-apt-${liveCommand.value.command || 'output'}.txt`)
 }
 
 function scrollToBottom() {
   if (consoleOutput.value) consoleOutput.value.scrollTop = consoleOutput.value.scrollHeight
 }
 
-function connectStreamWebSocket(commandId) {
-  if (streamWs) streamWs.close()
-  const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
-  const wsUrl = `${protocol}://${window.location.host}/api/v1/ws/commands/stream/${commandId}`
-  streamWs = new WebSocket(wsUrl)
+function upsertAptHistory(hostId, nextCommand) {
+  if (!hostId || !nextCommand?.id) return
 
-  streamWs.onopen = () => {
-    streamWs.send(JSON.stringify({ type: 'auth', token: auth.token }))
-  }
+  const currentHistory = Array.isArray(aptHistories.value[hostId]) ? [...aptHistories.value[hostId]] : []
+  const currentIndex = currentHistory.findIndex(cmd => cmd.id === nextCommand.id)
 
-  streamWs.onmessage = (event) => {
-    try {
-      const payload = JSON.parse(event.data)
-      if (payload.type === 'cmd_stream_init') {
-        liveCommand.value.status = payload.status
-        liveCommand.value.output = payload.output || ''
-        nextTick(() => scrollToBottom())
-      } else if (payload.type === 'cmd_stream') {
-        liveCommand.value.output += payload.chunk
-        nextTick(() => scrollToBottom())
-      } else if (payload.type === 'cmd_status_update') {
-        liveCommand.value.status = payload.status
-      }
-    } catch {
-      // Ignore malformed payloads
+  if (currentIndex >= 0) {
+    currentHistory[currentIndex] = {
+      ...currentHistory[currentIndex],
+      ...nextCommand,
     }
+  } else {
+    currentHistory.unshift(nextCommand)
   }
 
-  streamWs.onclose = () => {}
+  currentHistory.sort((left, right) => new Date(right.created_at || 0) - new Date(left.created_at || 0))
+  aptHistories.value = {
+    ...aptHistories.value,
+    [hostId]: currentHistory,
+  }
+}
+
+function syncLiveCommand(commandId, patch) {
+  if (!liveCommand.value || liveCommand.value.id !== commandId) return
+  liveCommand.value = {
+    ...liveCommand.value,
+    ...patch,
+  }
+}
+
+function syncAptHistoryCommand(commandId, patch) {
+  const hostId = liveCommand.value?.id === commandId ? liveCommand.value.hostId : null
+  if (!hostId) return
+  upsertAptHistory(hostId, {
+    id: commandId,
+    action: liveCommand.value?.command || patch.action,
+    output: liveCommand.value?.output || '',
+    ...patch,
+  })
+}
+
+function buildBulkActionFeedback(command, launchedHosts, failedHosts) {
+  const hasFailures = failedHosts.length > 0
+  const launchedLabel = launchedHosts.length === 1
+    ? `lancée sur ${launchedHosts[0]}`
+    : `lancée sur ${launchedHosts.length} hôtes`
+  const failedLabel = hasFailures
+    ? `Échec d'envoi sur ${failedHosts.join(', ')}.`
+    : 'Suivi disponible dans l’historique par hôte.'
+
+  return {
+    command,
+    message: launchedHosts.length > 0 ? `commande ${launchedLabel}.` : 'aucune commande n’a été lancée.',
+    details: failedLabel,
+    variantClass: hasFailures ? 'text-bg-warning' : 'text-bg-success',
+    closeClass: hasFailures ? '' : 'btn-close-white',
+  }
+}
+
+function connectStreamWebSocket(commandId) {
+  closeStreamSocket()
+  openCommandStream(commandId, {
+    closeOnTerminalStatus: true,
+    onInit: (payload) => {
+      syncLiveCommand(commandId, { status: payload.status, output: payload.output || '' })
+      syncAptHistoryCommand(commandId, { status: payload.status })
+      nextTick(() => scrollToBottom())
+    },
+    onChunk: (payload) => {
+      const nextOutput = `${liveCommand.value?.output || ''}${payload.chunk || ''}`
+      syncLiveCommand(commandId, { output: nextOutput })
+      nextTick(() => scrollToBottom())
+    },
+    onStatus: (payload) => {
+      const patch = { status: payload.status }
+      if (typeof payload.output === 'string') patch.output = payload.output
+      syncLiveCommand(commandId, patch)
+      syncAptHistoryCommand(commandId, patch)
+    },
+  })
 }
 
 async function bulkAptCmd(command) {
@@ -545,17 +656,47 @@ async function bulkAptCmd(command) {
 
   try {
     const response = await apiClient.sendAptCommand(selectedHosts.value, command)
-    if (selectedHosts.value.length === 1 && response.data?.commands?.length > 0) {
-      const cmd = response.data.commands[0]
-      const host = hosts.value.find(h => h.id === selectedHosts.value[0])
-      if (cmd.command_id && host) {
-        watchCommand({ id: cmd.command_id, command, status: 'pending', output: '' }, host)
+    const commandResults = Array.isArray(response.data?.commands) ? response.data.commands : []
+    const hostNameById = new Map(hosts.value.map(host => [host.id, host.hostname || host.name || host.id]))
+    const launchedCommands = commandResults.filter(item => item.command_id)
+    const failedCommands = commandResults.filter(item => item.error)
+    const createdAt = new Date().toISOString()
+
+    launchedCommands.forEach((item) => {
+      upsertAptHistory(item.host_id, {
+        id: item.command_id,
+        action: command,
+        status: item.status || 'pending',
+        output: '',
+        created_at: createdAt,
+        started_at: null,
+        ended_at: null,
+        triggered_by: auth.username || '',
+      })
+    })
+
+    if (selectedHosts.value.length === 1 && launchedCommands.length > 0) {
+      const launchedCommand = launchedCommands[0]
+      const host = hosts.value.find(h => h.id === launchedCommand.host_id)
+      if (host) {
+        watchCommand({ id: launchedCommand.command_id, action: command, status: launchedCommand.status || 'pending', output: '' }, host)
       }
+    }
+
+    if (selectedHosts.value.length > 1 || failedCommands.length > 0) {
+      showBulkActionFeedback(
+        buildBulkActionFeedback(
+          command,
+          launchedCommands.map(item => hostNameById.get(item.host_id) || item.host_id),
+          failedCommands.map(item => hostNameById.get(item.host_id) || item.host_id),
+        ),
+        7000,
+      )
     }
   } catch (e) {
     await dialog.confirm({
       title: 'Erreur',
-      message: e.response?.data?.error || e.message,
+      message: getApiErrorMessage(e),
       variant: 'danger'
     })
   }
@@ -586,30 +727,6 @@ function statusClass(status) {
   return getStatusBadgeClass(status, 'badge bg-yellow-lt text-yellow')
 }
 
-function renderConsoleOutput(raw) {
-  if (!raw) return ''
-  const lines = ['']
-  let currentLine = ''
-
-  for (let i = 0; i < raw.length; i++) {
-    const ch = raw[i]
-    if (ch === '\r') {
-      currentLine = ''
-      lines[lines.length - 1] = ''
-      continue
-    }
-    if (ch === '\n') {
-      currentLine = ''
-      lines.push('')
-      continue
-    }
-    currentLine += ch
-    lines[lines.length - 1] = currentLine
-  }
-
-  return lines.join('\n')
-}
-
 const { wsStatus, wsError, retryCount, reconnect } = useWebSocket('/api/v1/ws/apt', (payload) => {
   if (payload.type !== 'apt') return
   hosts.value = payload.hosts || []
@@ -617,10 +734,8 @@ const { wsStatus, wsError, retryCount, reconnect } = useWebSocket('/api/v1/ws/ap
   aptHistories.value = payload.apt_histories || {}
 })
 
-onMounted(() => {})
-
 onUnmounted(() => {
-  if (streamWs) streamWs.close()
+  closeStreamSocket()
 })
 </script>
 
@@ -651,6 +766,11 @@ onUnmounted(() => {
   min-width: 380px;
   display: flex;
   flex-direction: column;
+}
+
+.console-output {
+  white-space: pre-wrap;
+  word-break: break-all;
 }
 
 @media (max-width: 991px) {
