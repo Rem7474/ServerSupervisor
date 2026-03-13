@@ -40,6 +40,7 @@ export const useAuthStore = defineStore('auth', () => {
   const isAdmin = computed(() => role.value === 'admin')
   const isOperator = computed(() => role.value === 'operator')
   const isViewer = computed(() => role.value === 'viewer')
+  const canManage = computed(() => role.value === 'admin' || role.value === 'operator')
 
   function setAuth(data, usernameValue) {
     token.value = data.token
@@ -92,6 +93,7 @@ export const useAuthStore = defineStore('auth', () => {
     isAdmin,
     isOperator,
     isViewer,
+    canManage,
     hasPermission,
     setAuth,
     clearMustChangePassword,

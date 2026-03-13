@@ -53,7 +53,7 @@
               </td>
               <td>
                 <span v-if="task.last_run_status"
-                  :class="task.last_run_status === 'completed' ? 'badge bg-success-lt' : 'badge bg-danger-lt'">
+                  :class="task.last_run_status === 'completed' ? 'badge bg-success-lt' : task.last_run_status === 'pending' || task.last_run_status === 'running' ? 'badge bg-warning-lt' : 'badge bg-danger-lt'">
                   {{ task.last_run_status }}
                   <span v-if="task.last_run_at" class="ms-1 text-muted small">{{ formatTaskDate(task.last_run_at) }}</span>
                 </span>
@@ -85,79 +85,85 @@
       </div>
     </div>
 
-    <div v-if="showTaskModal" class="modal modal-blur show d-block" tabindex="-1" style="background: rgba(0,0,0,.5)">
-      <div class="modal-dialog modal-dialog-centered modal-lg">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">{{ editingTask ? 'Modifier la tache' : 'Nouvelle tache planifiee' }}</h5>
-            <button type="button" class="btn-close" @click="closeTaskModal"></button>
-          </div>
-          <div class="modal-body">
-            <div v-if="taskModalError" class="alert alert-danger">{{ taskModalError }}</div>
-            <div class="mb-3">
-              <label class="form-label">Nom</label>
-              <input v-model="taskForm.name" type="text" class="form-control" placeholder="Mise a jour APT hebdomadaire">
+  </div>
+
+  <Teleport to="body">
+    <template v-if="showTaskModal">
+      <div class="modal modal-blur fade show d-block" tabindex="-1" role="dialog" aria-modal="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title">{{ editingTask ? 'Modifier la tache' : 'Nouvelle tache planifiee' }}</h5>
+              <button type="button" class="btn-close" @click="closeTaskModal"></button>
             </div>
-            <div class="row g-3 mb-3">
-              <div class="col">
-                <label class="form-label">Module</label>
-                <select v-model="taskForm.module" class="form-select" @change="onTaskModuleChange">
-                  <option value="apt">apt</option>
-                  <option value="docker">docker</option>
-                  <option value="systemd">systemd</option>
-                  <option value="journal">journal</option>
-                  <option value="processes">processes</option>
-                  <option value="custom">custom</option>
-                </select>
+            <div class="modal-body">
+              <div v-if="taskModalError" class="alert alert-danger">{{ taskModalError }}</div>
+              <div class="mb-3">
+                <label class="form-label">Nom</label>
+                <input v-model="taskForm.name" type="text" class="form-control" placeholder="Mise a jour APT hebdomadaire">
               </div>
-              <div class="col">
-                <label class="form-label">Action</label>
-                <select v-if="taskModuleActions[taskForm.module]" v-model="taskForm.action" class="form-select">
-                  <option v-for="a in taskModuleActions[taskForm.module]" :key="a" :value="a">{{ a }}</option>
-                </select>
-                <input v-else v-model="taskForm.action" type="text" class="form-control" placeholder="run">
+              <div class="row g-3 mb-3">
+                <div class="col">
+                  <label class="form-label">Module</label>
+                  <select v-model="taskForm.module" class="form-select" @change="onTaskModuleChange">
+                    <option value="apt">apt</option>
+                    <option value="docker">docker</option>
+                    <option value="systemd">systemd</option>
+                    <option value="journal">journal</option>
+                    <option value="processes">processes</option>
+                    <option value="custom">custom</option>
+                  </select>
+                </div>
+                <div class="col">
+                  <label class="form-label">Action</label>
+                  <select v-if="taskModuleActions[taskForm.module]" v-model="taskForm.action" class="form-select">
+                    <option v-for="a in taskModuleActions[taskForm.module]" :key="a" :value="a">{{ a }}</option>
+                  </select>
+                  <input v-else v-model="taskForm.action" type="text" class="form-control" placeholder="run">
+                </div>
               </div>
-            </div>
-            <div v-if="taskForm.module !== 'apt' && taskForm.module !== 'processes'" class="mb-3">
-              <label class="form-label">{{ taskForm.module === 'custom' ? 'Tache (tasks.yaml)' : 'Cible' }}</label>
-              <template v-if="taskForm.module === 'custom'">
-                <select v-if="customTaskOptions.length" v-model="taskForm.target" class="form-select">
-                  <option value="" disabled>-- Selectionner une tache --</option>
-                  <option v-for="t in customTaskOptions" :key="t.id" :value="t.id">{{ t.name }} ({{ t.id }})</option>
-                </select>
-                <template v-else>
-                  <input v-model="taskForm.target" type="text" class="form-control" placeholder="cleanup_logs">
-                  <div class="form-hint">Aucune tache detectee dans <code>tasks.yaml</code> - saisissez l'ID manuellement.</div>
+              <div v-if="taskForm.module !== 'apt' && taskForm.module !== 'processes'" class="mb-3">
+                <label class="form-label">{{ taskForm.module === 'custom' ? 'Tache (tasks.yaml)' : 'Cible' }}</label>
+                <template v-if="taskForm.module === 'custom'">
+                  <select v-if="customTaskOptions.length" v-model="taskForm.target" class="form-select">
+                    <option value="" disabled>-- Selectionner une tache --</option>
+                    <option v-for="t in customTaskOptions" :key="t.id" :value="t.id">{{ t.name }} ({{ t.id }})</option>
+                  </select>
+                  <template v-else>
+                    <input v-model="taskForm.target" type="text" class="form-control" placeholder="cleanup_logs">
+                    <div class="form-hint">Aucune tache detectee dans <code>tasks.yaml</code> - saisissez l'ID manuellement.</div>
+                  </template>
                 </template>
-              </template>
-              <input v-else v-model="taskForm.target" type="text" class="form-control" placeholder="nginx.service">
+                <input v-else v-model="taskForm.target" type="text" class="form-control" placeholder="nginx.service">
+              </div>
+              <div class="mb-3">
+                <label class="form-check form-switch">
+                  <input v-model="taskManualOnly" type="checkbox" class="form-check-input">
+                  <span class="form-check-label">Execution manuelle uniquement (pas de planification automatique)</span>
+                </label>
+              </div>
+              <div v-if="!taskManualOnly" class="mb-3">
+                <CronBuilder v-model="taskForm.cron_expression" />
+              </div>
+              <div class="form-check form-switch mb-1" v-if="!taskManualOnly">
+                <input v-model="taskForm.enabled" type="checkbox" class="form-check-input" id="taskEnabled">
+                <label class="form-check-label" for="taskEnabled">Activee</label>
+              </div>
             </div>
-            <div class="mb-3">
-              <label class="form-check form-switch">
-                <input v-model="taskManualOnly" type="checkbox" class="form-check-input">
-                <span class="form-check-label">Execution manuelle uniquement (pas de planification automatique)</span>
-              </label>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" @click="closeTaskModal">Annuler</button>
+              <button type="button" class="btn btn-primary" :disabled="taskSaving" @click="saveTask">
+                <span v-if="taskSaving" class="spinner-border spinner-border-sm me-1"></span>
+                {{ editingTask ? 'Enregistrer' : 'Creer' }}
+              </button>
             </div>
-            <div v-if="!taskManualOnly" class="mb-3">
-              <CronBuilder v-model="taskForm.cron_expression" />
-            </div>
-            <div class="form-check form-switch mb-1" v-if="!taskManualOnly">
-              <input v-model="taskForm.enabled" type="checkbox" class="form-check-input" id="taskEnabled">
-              <label class="form-check-label" for="taskEnabled">Activee</label>
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-outline-secondary" @click="closeTaskModal">Annuler</button>
-            <button type="button" class="btn btn-primary" :disabled="taskSaving" @click="saveTask">
-              <span v-if="taskSaving" class="spinner-border spinner-border-sm me-1"></span>
-              {{ editingTask ? 'Enregistrer' : 'Creer' }}
-            </button>
           </div>
         </div>
       </div>
-    </div>
+      <div class="modal-backdrop fade show"></div>
+    </template>
 
-    <div v-if="taskRunResult" class="position-fixed bottom-0 end-0 p-3" style="z-index:1100">
+    <div v-if="taskRunResult" class="position-fixed bottom-0 end-0 p-3" style="z-index: var(--tblr-zindex-toast, 1090);">
       <div class="toast show align-items-center text-bg-success border-0">
         <div class="d-flex">
           <div class="toast-body">
@@ -167,7 +173,7 @@
         </div>
       </div>
     </div>
-  </div>
+  </Teleport>
 </template>
 
 <script setup>
@@ -175,6 +181,7 @@ import { ref, watch } from 'vue'
 import CronBuilder from '../CronBuilder.vue'
 import apiClient from '../../api'
 import { useConfirmDialog } from '../../composables/useConfirmDialog'
+import { useDateFormatter } from '../../composables/useDateFormatter'
 import { useToast } from '../../composables/useToast'
 import { MANUAL_SENTINEL, isManualOnly, describeCron } from '../../utils/cron'
 
@@ -205,6 +212,7 @@ const props = defineProps({
 })
 
 const dialog = useConfirmDialog()
+const { formatExactDate: formatTaskDate } = useDateFormatter()
 const tasks = ref([])
 const tasksLoading = ref(false)
 const tasksError = ref('')
@@ -247,11 +255,6 @@ watch(taskManualOnly, (val) => {
     }
   }
 })
-
-function formatTaskDate(iso) {
-  if (!iso) return ''
-  return new Date(iso).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
-}
 
 async function loadTasks() {
   tasksLoading.value = true

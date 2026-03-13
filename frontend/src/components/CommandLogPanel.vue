@@ -52,6 +52,22 @@
               <path d="M12 4l0 12" />
             </svg>
           </button>
+          <!-- Clear (optional) -->
+          <button
+            v-if="clearable"
+            class="btn btn-sm btn-ghost-secondary"
+            title="Vider la console"
+            :disabled="!command"
+            @click="$emit('clear')"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="18" height="18"
+              viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+              <path d="M4 7h16" /><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12" />
+              <path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3" />
+            </svg>
+          </button>
           <!-- Close -->
           <button
             class="btn btn-sm btn-ghost-secondary"
@@ -69,12 +85,11 @@
         </div>
       </div>
 
-      <div class="card-body d-flex flex-column flex-fill p-0" style="min-height: 0;">
+      <div class="card-body d-flex flex-column flex-fill p-0 console-body">
         <!-- Empty state -->
         <div
           v-if="!command"
-          class="d-flex align-items-center justify-content-center flex-fill text-secondary"
-          style="background: #1e293b; border-radius: 0 0 0.5rem 0.5rem;"
+          class="d-flex align-items-center justify-content-center flex-fill text-secondary console-empty"
         >
           <div class="text-center p-4">
             <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler mb-2 opacity-50" width="48" height="48"
@@ -92,7 +107,7 @@
 
         <!-- Active viewer -->
         <div v-else class="d-flex flex-column h-100">
-          <div class="px-3 pt-3 pb-2" style="background: #1e293b; border-bottom: 1px solid rgba(255,255,255,0.1);">
+          <div class="console-header px-3 pt-3 pb-2">
             <div class="d-flex align-items-start justify-content-between mb-2">
               <div class="flex-fill" style="min-width: 0;">
                 <div class="fw-semibold text-light" style="font-size: 0.95rem;">
@@ -100,7 +115,7 @@
                 </div>
                 <div class="d-flex align-items-center gap-2 mt-1 flex-wrap">
                   <span :class="moduleClass(command.module)">{{ moduleLabel(command.module) }}</span>
-                  <code style="background: rgba(0,0,0,0.3); padding: 0.15rem 0.4rem; border-radius: 0.25rem; color: #94a3b8;">
+                  <code class="console-cmd-label">
                     {{ cmdLabel(command) }}
                   </code>
                 </div>
@@ -110,18 +125,7 @@
           </div>
           <pre
             ref="outputEl"
-            class="mb-0 flex-fill"
-            style="
-              background: #0f172a;
-              color: #e2e8f0;
-              padding: 1rem;
-              margin: 0;
-              overflow-y: auto;
-              font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-              font-size: 0.813rem;
-              line-height: 1.5;
-              border-radius: 0 0 0.5rem 0.5rem;
-            "
+            class="console-output mb-0 flex-fill"
             v-html="colorizedOutput || '<span style=\'opacity:0.5\'>Aucune sortie disponible.</span>'"
           ></pre>
         </div>
@@ -132,8 +136,7 @@
   <!-- Floating reopen button -->
   <button
     v-show="!show"
-    class="btn btn-primary"
-    style="position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 100;"
+    class="btn btn-primary console-fab"
     @click="$emit('open')"
   >
     <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24"
@@ -151,6 +154,7 @@
 <script setup>
 import { computed, nextTick, ref, watch } from 'vue'
 import { colorizeConsoleOutput, copyConsoleOutput, downloadConsoleOutput } from '../utils/consoleOutput'
+import { moduleLabel, moduleClass } from '../utils/moduleMeta'
 import { useStatusBadge } from '../composables/useStatusBadge'
 
 const props = defineProps({
@@ -175,31 +179,18 @@ const props = defineProps({
     type: String,
     default: '',
   },
+  clearable: {
+    type: Boolean,
+    default: false,
+  },
 })
 
-const emit = defineEmits(['close', 'open'])
+const emit = defineEmits(['close', 'open', 'clear'])
 
 const { getStatusBadgeClass } = useStatusBadge()
 
 const outputEl = ref(null)
 const copied = ref(false)
-
-const MODULE_META = {
-  apt:       { label: 'APT',       cls: 'badge bg-azure-lt text-azure' },
-  docker:    { label: 'Docker',    cls: 'badge bg-blue-lt text-blue' },
-  systemd:   { label: 'Systemd',   cls: 'badge bg-green-lt text-green' },
-  journal:   { label: 'Journal',   cls: 'badge bg-purple-lt text-purple' },
-  processes: { label: 'Processus', cls: 'badge bg-orange-lt text-orange' },
-  custom:    { label: 'Custom',    cls: 'badge bg-teal-lt text-teal' },
-}
-
-function moduleLabel(module) {
-  return MODULE_META[module]?.label ?? module
-}
-
-function moduleClass(module) {
-  return MODULE_META[module]?.cls ?? 'badge bg-secondary-lt text-secondary'
-}
 
 function cmdLabel(cmd) {
   return [cmd.action, cmd.target].filter(Boolean).join(' ')
@@ -230,3 +221,47 @@ function download() {
   downloadConsoleOutput(props.command?.output || '', `log-${name || 'command'}.txt`)
 }
 </script>
+
+<style scoped>
+.console-body {
+  min-height: 0;
+}
+
+.console-empty {
+  background: #1e293b;
+  border-radius: 0 0 0.5rem 0.5rem;
+}
+
+.console-header {
+  background: #1e293b;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.console-cmd-label {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 0.15rem 0.4rem;
+  border-radius: 0.25rem;
+  color: #94a3b8;
+}
+
+.console-output {
+  background: #0f172a;
+  color: #e2e8f0;
+  padding: 1rem;
+  margin: 0;
+  overflow-y: auto;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 0.813rem;
+  line-height: 1.5;
+  border-radius: 0 0 0.5rem 0.5rem;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.console-fab {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  z-index: 100;
+}
+</style>

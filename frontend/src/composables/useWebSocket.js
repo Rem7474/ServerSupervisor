@@ -68,6 +68,13 @@ export function useWebSocket(path, onMessage, options = {}) {
     if (!auth.token) return
     manualClose = false
 
+    // Close any existing socket before opening a new one (prevents double-instance on reconnect)
+    if (ws && ws.readyState !== WebSocket.CLOSED) {
+      ws.onclose = null
+      ws.close()
+      ws = null
+    }
+
     const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
     const url = `${protocol}://${window.location.host}${path}`
     ws = new WebSocket(url)
@@ -134,12 +141,10 @@ export function useWebSocket(path, onMessage, options = {}) {
 
       // For 403 (gorilla sends this as HTTP before upgrade), code will be 1006 (abnormal closure)
       // We detect it via the fact that we never reached 'connected'
-      if (wsStatus.value === 'connecting' && retryCount.value === 0) {
-        wsStatus.value = 'error'
+      wsStatus.value = 'reconnecting'
+      if (retryCount.value === 0) {
         wsError.value = 'Impossible de se connecter — vérifiez que le serveur est accessible et que BASE_URL est correctement configuré'
-        // Still retry, maybe it's a temporary glitch
       } else {
-        wsStatus.value = 'reconnecting'
         wsError.value = ''
       }
 

@@ -347,6 +347,7 @@ function openLogViewer(cmd) {
 function closeLogViewer() {
   closeStream()
   selectedCmd.value = null
+  showLogViewer.value = false
 }
 
 function connectStream(commandId) {

@@ -56,6 +56,7 @@ import { computed, ref } from 'vue'
 import { useDateFormatter } from '../../composables/useDateFormatter'
 import { usePagination } from '../../composables/usePagination'
 import { useStatusBadge } from '../../composables/useStatusBadge'
+import { moduleLabel as cmdModuleLabel, moduleClass as cmdModuleClass } from '../../utils/moduleMeta'
 
 defineEmits(['watch-command'])
 
@@ -76,23 +77,6 @@ const { pagedItems: firstPageCommands } = usePagination({
   pageSize: 5,
 })
 const displayedCommands = computed(() => (showFullHistory.value ? props.commands : firstPageCommands.value))
-
-const MODULE_META = {
-  apt: { label: 'APT', cls: 'badge bg-azure-lt text-azure' },
-  docker: { label: 'Docker', cls: 'badge bg-blue-lt text-blue' },
-  systemd: { label: 'Systemd', cls: 'badge bg-green-lt text-green' },
-  journal: { label: 'Journal', cls: 'badge bg-purple-lt text-purple' },
-  processes: { label: 'Processus', cls: 'badge bg-orange-lt text-orange' },
-  custom: { label: 'Custom', cls: 'badge bg-teal-lt text-teal' },
-}
-
-function cmdModuleLabel(module) {
-  return MODULE_META[module]?.label ?? module
-}
-
-function cmdModuleClass(module) {
-  return MODULE_META[module]?.cls ?? 'badge bg-secondary'
-}
 
 function cmdLabel(cmd) {
   const parts = [cmd.action]

@@ -40,9 +40,15 @@ export function useHostCommandConsole() {
   function normalizeCommand(command) {
     if (!command) return null
 
+    const host_name = command.host_name || ''
+
     if (command.commandId) {
       return {
         id: command.commandId,
+        host_name,
+        module: command.module || 'custom',
+        action: command.action || command.command || '',
+        target: command.target || '',
         prefix: command.prefix || '',
         command: command.command || '',
         status: command.status || 'running',
@@ -53,6 +59,10 @@ export function useHostCommandConsole() {
     if (command.command && Object.prototype.hasOwnProperty.call(command, 'prefix')) {
       return {
         id: command.id,
+        host_name,
+        module: command.module || 'custom',
+        action: command.action || command.command || '',
+        target: command.target || '',
         prefix: command.prefix || '',
         command: command.command || '',
         status: command.status || 'pending',
@@ -74,6 +84,10 @@ export function useHostCommandConsole() {
 
     return {
       id: command.id,
+      host_name,
+      module,
+      action: command.action || '',
+      target: command.target || command.container_name || '',
       prefix,
       command: displayCommand,
       status: command.status || 'pending',

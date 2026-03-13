@@ -1,4 +1,4 @@
-import { onUnmounted } from 'vue'
+import { getCurrentInstance, onUnmounted } from 'vue'
 
 function resolveToken(tokenSource) {
   if (typeof tokenSource === 'function') return tokenSource() || ''
@@ -56,6 +56,7 @@ export function useCommandStream({ token }) {
     }
 
     ws.onopen = () => {
+      if (activeStream !== ws) return
       ws.send(JSON.stringify({ type: 'auth', token: resolveToken(token) }))
     }
 
@@ -149,9 +150,11 @@ export function useCommandStream({ token }) {
     })
   }
 
-  onUnmounted(() => {
-    closeStream()
-  })
+  if (getCurrentInstance()) {
+    onUnmounted(() => {
+      closeStream()
+    })
+  }
 
   return {
     openCommandStream,

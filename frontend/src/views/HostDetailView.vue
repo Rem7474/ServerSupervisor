@@ -6,12 +6,12 @@
           <div class="page-pretitle">
             <router-link to="/" class="text-decoration-none">Dashboard</router-link>
             <span class="text-muted mx-1">/</span>
-            <span>Hote</span>
+            <span>Hôte</span>
           </div>
           <h2 class="page-title">{{ host?.name || host?.hostname || 'Chargement...' }}</h2>
           <div class="text-secondary">
-            {{ host?.hostname || 'Non connecte' }} - {{ host?.os || 'OS inconnu' }} - {{ host?.ip_address }}
-            <span v-if="host?.last_seen">- Derniere activite: <RelativeTime :date="host.last_seen" /></span>
+            {{ host?.hostname || 'Non connecté' }} - {{ host?.os || 'OS inconnu' }} - {{ host?.ip_address }}
+            <span v-if="host?.last_seen">- Dernière activité: <RelativeTime :date="host.last_seen" /></span>
           </div>
         </div>
         <div class="d-flex align-items-center gap-2">
@@ -32,7 +32,7 @@
           <span
             v-if="host?.agent_version"
             :class="isAgentUpToDate(host.agent_version) ? 'badge bg-green-lt text-green' : 'badge bg-yellow-lt text-yellow'"
-            :title="isAgentUpToDate(host.agent_version) ? 'Agent a jour' : 'Mise a jour disponible'"
+            :title="isAgentUpToDate(host.agent_version) ? 'Agent à jour' : 'Mise à jour disponible'"
           >
             Agent v{{ host.agent_version }}
           </span>
@@ -84,12 +84,12 @@
           <HostCommandsTab :commands="cmdHistory" @watch-command="openCommand" />
         </div>
 
-        <div v-if="canRunApt" v-show="activeTab === 'systeme'">
-          <HostSystemTab :host-id="hostId" :can-run-apt="canRunApt" @open-command="openCommand" @history-changed="loadCmdHistoryRefresh" />
+        <div v-show="activeTab === 'systeme'">
+          <HostSystemTab v-if="canRunApt" :host-id="hostId" :can-run-apt="canRunApt" @open-command="openCommand" @history-changed="loadCmdHistoryRefresh" />
         </div>
 
-        <div v-if="canRunApt" v-show="activeTab === 'processus'">
-          <HostProcessesPanel :hostId="hostId" :can-run="canRunApt" @history-changed="loadCmdHistoryRefresh" />
+        <div v-show="activeTab === 'processus'">
+          <HostProcessesPanel v-if="canRunApt" :hostId="hostId" :can-run="canRunApt" @history-changed="loadCmdHistoryRefresh" />
         </div>
 
         <div v-show="activeTab === 'planifiees'">
@@ -104,21 +104,23 @@
         </div>
       </div>
 
-      <HostLiveConsole
-        :host="host"
+      <CommandLogPanel
         :command="liveCommand"
         :show="showConsole"
-        @show="showConsole = true"
-        @hide="closeConsole"
-        @update:command="updateCommand"
-        @history-changed="loadCmdHistoryRefresh"
+        title="Console Live"
+        empty-text="Aucune console active"
+        wrapper-class="host-panel-right"
+        :clearable="true"
+        @open="showConsole = true"
+        @close="closeConsoleAndStream"
+        @clear="clearConsoleOutput"
       />
     </div>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import RelativeTime from '../components/RelativeTime.vue'
 import DiskMetricsCard from '../components/DiskMetricsCard.vue'
@@ -131,11 +133,12 @@ import HostCommandsTab from '../components/host/HostCommandsTab.vue'
 import HostDetailTabs from '../components/host/HostDetailTabs.vue'
 import HostDockerTab from '../components/host/HostDockerTab.vue'
 import HostEditForm from '../components/host/HostEditForm.vue'
-import HostLiveConsole from '../components/host/HostLiveConsole.vue'
 import HostSystemTab from '../components/host/HostSystemTab.vue'
 import HostTasksTab from '../components/host/HostTasksTab.vue'
+import CommandLogPanel from '../components/CommandLogPanel.vue'
 import apiClient from '../api'
 import { useHostCommandConsole } from '../composables/useHostCommandConsole'
+import { useCommandStream } from '../composables/useCommandStream'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
 import { useWebSocket } from '../composables/useWebSocket'
 import { useAuthStore } from '../stores/auth'
@@ -147,7 +150,7 @@ const hostId = route.params.id
 
 const auth = useAuthStore()
 const dialog = useConfirmDialog()
-const canRunApt = computed(() => auth.role === 'admin' || auth.role === 'operator')
+const canRunApt = computed(() => auth.canManage)
 
 const activeTab = ref('metrics')
 const isEditing = ref(false)
@@ -164,7 +167,52 @@ const diskMetrics = ref(null)
 const diskHealth = ref(null)
 const latestAgentVersion = ref('')
 
-const { liveCommand, showConsole, openCommand, closeConsole, updateCommand } = useHostCommandConsole()
+const { liveCommand, showConsole, openCommand: _openCommand, closeConsole, updateCommand } = useHostCommandConsole()
+const { openCommandStream, closeStream } = useCommandStream({ token: () => auth.token })
+
+function openCommand(rawCmd) {
+  _openCommand({ ...rawCmd, host_name: host.value?.hostname })
+}
+
+function connectStream(commandId) {
+  openCommandStream(commandId, {
+    onInit: (p) => {
+      updateCommand({ ...liveCommand.value, status: p.status, output: p.output || '' })
+      nextTick(() => {})
+    },
+    onChunk: (p) => {
+      updateCommand({ ...liveCommand.value, output: (liveCommand.value?.output || '') + p.chunk })
+    },
+    onStatus: (p) => {
+      updateCommand({ ...liveCommand.value, status: p.status })
+      if (p.status === 'completed' || p.status === 'failed') {
+        loadCmdHistoryRefresh()
+      }
+    },
+  })
+}
+
+watch(() => liveCommand.value?.id, (id) => {
+  if (!id || !showConsole.value) return
+  connectStream(id)
+})
+
+watch(showConsole, (show) => {
+  if (!show) {
+    closeStream()
+  } else if (liveCommand.value?.id) {
+    connectStream(liveCommand.value.id)
+  }
+})
+
+function closeConsoleAndStream() {
+  closeStream()
+  closeConsole()
+}
+
+function clearConsoleOutput() {
+  if (liveCommand.value) updateCommand({ ...liveCommand.value, output: '' })
+}
 
 const { wsStatus, wsError, retryCount, reconnect } = useWebSocket(`/api/v1/ws/hosts/${hostId}`, (payload) => {
   if (payload.type !== 'host_detail') return
@@ -178,7 +226,7 @@ const { wsStatus, wsError, retryCount, reconnect } = useWebSocket(`/api/v1/ws/ho
 async function sendAptCmd(command) {
   const confirmed = await dialog.confirm({
     title: `apt ${command}`,
-    message: `Executer sur : ${host.value?.hostname}`,
+    message: `Exécuter sur : ${host.value?.hostname}`,
     variant: command === 'dist-upgrade' ? 'danger' : 'warning',
   })
 
@@ -237,8 +285,8 @@ async function loadCmdHistoryRefresh() {
 
 async function deleteHost() {
   const confirmed = await dialog.confirm({
-    title: "Supprimer l'hote",
-    message: 'Cette action est irreversible. Toutes les donnees associees seront supprimees.',
+    title: "Supprimer l'hôte",
+    message: "Cette action est irréversible. Toutes les données associées seront supprimées.",
     variant: 'danger',
     requiredText: host.value?.hostname || host.value?.name,
   })
@@ -284,6 +332,15 @@ onMounted(() => {
   min-width: 0;
 }
 
+.host-panel-right {
+  width: 38%;
+  min-width: 380px;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.3s ease-in-out;
+  overflow: hidden;
+}
+
 @media (max-width: 991px) {
   .host-detail-page {
     height: auto;
@@ -297,6 +354,12 @@ onMounted(() => {
 
   .host-panel-main {
     overflow-y: visible;
+  }
+
+  .host-panel-right {
+    width: 100%;
+    min-width: 0;
+    max-height: 70vh;
   }
 }
 </style>
