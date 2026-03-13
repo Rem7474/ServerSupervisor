@@ -1,47 +1,47 @@
 # ServerSupervisor
 
-Système de supervision d'infrastructure : monitoring de VMs, conteneurs Docker, mises à jour APT, services systemd, tâches planifiées et suivi des releases GitHub.
+Système de supervision d'infrastructure : monitoring de VMs, conteneurs Docker, mises à jour APT, services systemd, tâches planifiées, suivi des releases GitHub et supervision Proxmox VE via API.
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                      Dashboard (Vue.js)                     │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌───────────────┐  │
-│  │ Hosts    │ │ Docker   │ │ Network  │ │ APT Console   │  │
-│  │ Dashboard│ │ Versions │ │Topology  │ │ Commandes     │  │
-│  └──────────┘ └──────────┘ └──────────┘ └───────────────┘  │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌───────────────┐  │
-│  │ Alertes  │ │ Audit    │ │ Users    │ │ System        │  │
-│  │ (rules)  │ │Commandes │ │ (RBAC)   │ │ Systemd/Proc  │  │
-│  └──────────┘ └──────────┘ └──────────┘ └───────────────┘  │
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │ Tâches planifiées — cron par hôte + exéc. manuelle  │   │
-│  └──────────────────────────────────────────────────────┘   │
-├─────────────────────────────────────────────────────────────┤
-│              Server Go (API REST + WebSocket + JWT)         │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌───────────────┐  │
-│  │ Auth+MFA │ │ Rate     │ │ Alert    │ │ Command       │  │
-│  │ JWT+Keys │ │ Limiting │ │ Engine   │ │ Stream Hub    │  │
-│  └──────────┘ └──────────┘ └──────────┘ └───────────────┘  │
-│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌───────────────┐  │
-│  │ Audit    │ │ GitHub   │ │ Settings │ │ Metrics       │  │
-│  │ Logs     │ │ Tracker  │ │ (DB)     │ │ Aggregation   │  │
-│  └──────────┘ └──────────┘ └──────────┘ └───────────────┘  │
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │ Task Scheduler (cron) — déclenche remote_commands    │   │
-│  └──────────────────────────────────────────────────────┘   │
-├─────────────────────────────────────────────────────────────┤
-│                       PostgreSQL                            │
-└─────────────────────────────────────────────────────────────┘
-         ▲              ▲              ▲
-    Push (30s)     Push (30s)     Push (30s)
-         │              │              │
-    ┌────┴────┐    ┌────┴────┐    ┌────┴────┐
-    │ Agent   │    │ Agent   │    │ Agent   │
-    │ (Go)    │    │ (Go)    │    │ (Go)    │
-    │ VM-1    │    │ VM-2    │    │ VM-N    │
-    └─────────┘    └─────────┘    └─────────┘
+┌────────────────────────────────────────────────────────────────┐
+│                       Dashboard (Vue.js)                       │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌────────────────┐   │
+│  │ Hosts    │ │ Docker   │ │ Network  │ │ APT Console    │   │
+│  │ Dashboard│ │ Versions │ │Topology  │ │ Commandes      │   │
+│  └──────────┘ └──────────┘ └──────────┘ └────────────────┘   │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌────────────────┐   │
+│  │ Alertes  │ │ Audit    │ │ Users    │ │ System         │   │
+│  │ (rules)  │ │Commandes │ │ (RBAC)   │ │ Systemd/Proc   │   │
+│  └──────────┘ └──────────┘ └──────────┘ └────────────────┘   │
+│  ┌──────────────────────────┐ ┌─────────────────────────┐    │
+│  │ Tâches planifiées (cron) │ │ Proxmox VE (nœuds/VMs)  │    │
+│  └──────────────────────────┘ └─────────────────────────┘    │
+├────────────────────────────────────────────────────────────────┤
+│               Server Go (API REST + WebSocket + JWT)           │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌────────────────┐   │
+│  │ Auth+MFA │ │ Rate     │ │ Alert    │ │ Command        │   │
+│  │ JWT+Keys │ │ Limiting │ │ Engine   │ │ Stream Hub     │   │
+│  └──────────┘ └──────────┘ └──────────┘ └────────────────┘   │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌────────────────┐   │
+│  │ Audit    │ │ GitHub   │ │ Settings │ │ Metrics        │   │
+│  │ Logs     │ │ Tracker  │ │ (DB)     │ │ Aggregation    │   │
+│  └──────────┘ └──────────┘ └──────────┘ └────────────────┘   │
+│  ┌──────────────────────────┐ ┌─────────────────────────┐    │
+│  │ Task Scheduler (cron)    │ │ Proxmox Poller (HTTP API)│    │
+│  └──────────────────────────┘ └─────────────────────────┘    │
+├────────────────────────────────────────────────────────────────┤
+│                         PostgreSQL                             │
+└────────────────────────────────────────────────────────────────┘
+         ▲              ▲              ▲              ▲
+    Push (30s)     Push (30s)     Push (30s)    Poll API PVE
+         │              │              │              │
+    ┌────┴────┐    ┌────┴────┐    ┌────┴────┐   ┌────┴──────┐
+    │ Agent   │    │ Agent   │    │ Agent   │   │ Proxmox   │
+    │ (Go)    │    │ (Go)    │    │ (Go)    │   │ VE API    │
+    │ VM-1    │    │ VM-2    │    │ VM-N    │   │(pas agent)│
+    └─────────┘    └─────────┘    └─────────┘   └───────────┘
 ```
 
 ## Fonctionnalités

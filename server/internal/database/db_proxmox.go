@@ -355,7 +355,7 @@ func (db *DB) UpsertProxmoxGuest(connectionID, nodeName, guestType string, vmid 
 		    uptime      = EXCLUDED.uptime,
 		    last_seen_at = NOW()`,
 		connectionID, nodeName, guestType, vmid, name, status,
-		cpuAlloc, cpuUsage, memAlloc, memUsage, diskAlloc, uptime, tags,
+		cpuAlloc, cpuUsage, memAlloc, memUsage, diskAlloc, tags, uptime,
 	)
 	return err
 }
