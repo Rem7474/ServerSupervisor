@@ -54,92 +54,31 @@
         />
       </div>
 
-      <!-- Console Docker Live (panel droit) -->
-      <div v-show="showDockerConsole" class="docker-console">
-        <div class="card d-flex flex-column h-100">
-          <div class="card-header d-flex align-items-center justify-content-between">
-            <h3 class="card-title">
-              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                <path d="M8 9l3 3l-3 3" />
-                <path d="M13 15l3 0" />
-                <path d="M3 4m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z" />
-              </svg>
-              Console Live
-            </h3>
-            <button class="btn btn-sm btn-ghost-secondary" @click="closeDockerConsole" title="Fermer" aria-label="Fermer la console">
-              <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                <path d="M18 6l-12 12" />
-                <path d="M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-          <div class="card-body d-flex flex-column flex-fill p-0" style="min-height: 0;">
-            <div v-if="!dockerLiveCmd" class="d-flex align-items-center justify-content-center flex-fill text-secondary" style="background: #1e293b; border-radius: 0 0 0.5rem 0.5rem;">
-              <div class="text-center p-4">
-                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler mb-2 opacity-50" width="48" height="48" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                  <path d="M8 9l3 3l-3 3" />
-                  <path d="M13 15l3 0" />
-                  <path d="M3 4m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z" />
-                </svg>
-                <div class="opacity-75">Aucune console active</div>
-                <div class="small mt-1 opacity-50">Cliquez sur les boutons logs / action pour afficher la sortie</div>
-              </div>
-            </div>
-            <div v-else class="d-flex flex-column h-100">
-              <div class="px-3 pt-3 pb-2" style="background: #1e293b; border-bottom: 1px solid rgba(255,255,255,0.1);">
-                <div class="d-flex align-items-start justify-content-between mb-1">
-                  <div class="flex-fill" style="min-width: 0;">
-                    <div class="fw-semibold text-light" style="font-size: 0.95rem;">{{ dockerLiveCmd.containerName }}</div>
-                    <div class="text-secondary small mt-1">
-                      <code style="background: rgba(0,0,0,0.3); padding: 0.15rem 0.4rem; border-radius: 0.25rem; color: #94a3b8;">{{ dockerLiveCmd.action }}</code>
-                    </div>
-                  </div>
-                  <span class="badge ms-2" :class="dockerLiveStatusClass">{{ dockerLiveCmd.status }}</span>
-                </div>
-              </div>
-              <pre
-                ref="dockerConsoleOutput"
-                class="mb-0 flex-fill"
-                style="background:#0f172a;color:#e2e8f0;overflow-y:auto;white-space:pre-wrap;padding:1rem;margin:0;font-family:'Consolas','Monaco','Courier New',monospace;font-size:0.813rem;line-height:1.5;border-radius:0 0 0.5rem 0.5rem;"
-              >{{ dockerConsoleText || '(en attente de sortie...)' }}</pre>
-            </div>
-          </div>
-        </div>
-      </div>
+      <CommandLogPanel
+        :command="dockerLiveCmd"
+        :show="showDockerConsole"
+        title="Console Live"
+        empty-text="Aucune console active"
+        wrapper-class="docker-console"
+        @open="showDockerConsole = true"
+        @close="closeDockerConsole"
+      />
     </div>
-
-    <!-- Bouton pour réafficher la console Docker -->
-    <button
-      v-show="!showDockerConsole"
-      @click="showDockerConsole = true"
-      class="btn btn-primary"
-      style="position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 100;"
-    >
-      <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-        <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-        <path d="M8 9l3 3l-3 3" />
-        <path d="M13 15l3 0" />
-        <path d="M3 4m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z" />
-      </svg>
-      Console
-    </button>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, nextTick, onUnmounted } from 'vue'
+import { ref, computed } from 'vue'
 import { useWebSocket } from '../composables/useWebSocket'
 import { useAuthStore } from '../stores/auth'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
 import { useLocalStorage } from '../composables/useLocalStorage'
-import { useStatusBadge } from '../composables/useStatusBadge'
 import { useToast } from '../composables/useToast'
 import WsStatusBar from '../components/WsStatusBar.vue'
 import DockerContainersTab from '../components/DockerContainersTab.vue'
 import ComposeProjectsTab from '../components/ComposeProjectsTab.vue'
+import CommandLogPanel from '../components/CommandLogPanel.vue'
+import { useCommandStream } from '../composables/useCommandStream'
 import apiClient from '../api'
 
 const auth = useAuthStore()
@@ -149,7 +88,6 @@ const containers = ref([])
 const composeProjects = ref([])
 const versionComparisons = ref([])
 const activeTab = useLocalStorage('dockerActiveTab', 'containers')
-const { getStatusBadgeClass } = useStatusBadge()
 const { value: actionError, showToast: showActionError } = useToast('')
 
 const canRunDocker = computed(() => auth.role === 'admin' || auth.role === 'operator')
@@ -160,12 +98,14 @@ const composeActionLoading = ref({})
 // Docker console
 const showDockerConsole = ref(false)
 const dockerLiveCmd = ref(null)
-const dockerConsoleText = ref('')
-const dockerConsoleOutput = ref(null)
-let dockerStreamWs = null
 
-const dockerLiveStatusClass = computed(() => {
-  return getStatusBadgeClass(dockerLiveCmd.value?.status, 'badge bg-yellow-lt text-yellow')
+const { openCommandStream, closeStream: closeDockerStream } = useCommandStream({ token: () => auth.token })
+
+const hostMap = computed(() => {
+  const map = {}
+  containers.value.forEach(c => { if (c.host_id) map[c.host_id] = c.hostname })
+  composeProjects.value.forEach(p => { if (p.host_id) map[p.host_id] = p.hostname })
+  return map
 })
 
 async function handleContainerAction({ hostId, name, action }) {
@@ -184,7 +124,7 @@ async function handleContainerAction({ hostId, name, action }) {
 
   try {
     const res = await apiClient.sendDockerCommand(hostId, name, action)
-    connectDockerStream(res.data.command_id, name, action)
+    connectDockerStream(res.data.command_id, hostId, name, action)
   } catch (err) {
     showActionError(err.response?.data?.error || err.message, 6000)
   } finally {
@@ -208,7 +148,7 @@ async function handleComposeAction({ hostId, name, action, workingDir }) {
 
   try {
     const res = await apiClient.sendDockerCommand(hostId, name, action, workingDir)
-    connectDockerStream(res.data.command_id, name, action)
+    connectDockerStream(res.data.command_id, hostId, name, action)
   } catch (err) {
     showActionError(err.response?.data?.error || err.message, 6000)
   } finally {
@@ -216,72 +156,31 @@ async function handleComposeAction({ hostId, name, action, workingDir }) {
   }
 }
 
-function connectDockerStream(commandId, containerName, action) {
-  const prevWs = dockerStreamWs
-  if (prevWs) {
-    prevWs.onmessage = null
-    prevWs.onerror = null
-    prevWs.close()
-    dockerStreamWs = null
-  }
-
-  dockerConsoleText.value = ''
-  dockerLiveCmd.value = { commandId, containerName, action, status: 'pending' }
+function connectDockerStream(commandId, hostId, containerName, action) {
+  const hostName = hostMap.value[hostId] || containerName
+  dockerLiveCmd.value = { id: commandId, host_name: hostName, module: 'docker', action, target: containerName, status: 'pending', output: '' }
   showDockerConsole.value = true
-
-  const token = auth.token
-  const proto = location.protocol === 'https:' ? 'wss' : 'ws'
-  const ws = new WebSocket(`${proto}://${location.host}/api/v1/ws/commands/stream/${commandId}`)
-  dockerStreamWs = ws
-
-  const closeWs = () => {
-    setTimeout(() => {
-      ws.close()
-      if (dockerStreamWs === ws) dockerStreamWs = null
-    }, 500)
-  }
-
-  ws.onopen = () => { ws.send(JSON.stringify({ type: 'auth', token })) }
-
-  ws.onmessage = (event) => {
-    if (dockerStreamWs !== ws) return
-    try {
-      const msg = JSON.parse(event.data)
-      if (msg.type === 'cmd_stream_init') {
-        dockerConsoleText.value = msg.output || ''
-        if (dockerLiveCmd.value) dockerLiveCmd.value.status = msg.status
-        if (msg.status === 'completed' || msg.status === 'failed') closeWs()
-      } else if (msg.type === 'cmd_stream') {
-        dockerConsoleText.value += msg.chunk || ''
-        scrollDockerConsole()
-      } else if (msg.type === 'cmd_status_update') {
-        if (dockerLiveCmd.value) dockerLiveCmd.value.status = msg.status
-        if (msg.status === 'completed' || msg.status === 'failed') closeWs()
-      }
-    } catch {}
-  }
-
-  ws.onerror = () => {
-    if (dockerStreamWs === ws && dockerLiveCmd.value) dockerLiveCmd.value.status = 'failed'
-  }
+  openCommandStream(commandId, {
+    onInit: (p) => {
+      if (dockerLiveCmd.value?.id !== commandId) return
+      dockerLiveCmd.value = { ...dockerLiveCmd.value, status: p.status, output: p.output || '' }
+    },
+    onChunk: (p) => {
+      if (dockerLiveCmd.value?.id !== commandId) return
+      dockerLiveCmd.value = { ...dockerLiveCmd.value, output: (dockerLiveCmd.value.output || '') + (p.chunk || '') }
+    },
+    onStatus: (p) => {
+      if (dockerLiveCmd.value?.id !== commandId) return
+      dockerLiveCmd.value = { ...dockerLiveCmd.value, status: p.status }
+    },
+  })
 }
 
 function closeDockerConsole() {
-  const ws = dockerStreamWs
-  if (ws) { ws.onmessage = null; ws.onerror = null; ws.close(); dockerStreamWs = null }
+  closeDockerStream()
   dockerLiveCmd.value = null
-  dockerConsoleText.value = ''
   showDockerConsole.value = false
 }
-
-async function scrollDockerConsole() {
-  await nextTick()
-  if (dockerConsoleOutput.value) dockerConsoleOutput.value.scrollTop = dockerConsoleOutput.value.scrollHeight
-}
-
-onUnmounted(() => {
-  if (dockerStreamWs) { dockerStreamWs.onmessage = null; dockerStreamWs.onerror = null; dockerStreamWs.close(); dockerStreamWs = null }
-})
 
 const { wsStatus, wsError, retryCount, reconnect } = useWebSocket('/api/v1/ws/docker', (payload) => {
   if (payload.type !== 'docker') return
@@ -303,8 +202,8 @@ const { wsStatus, wsError, retryCount, reconnect } = useWebSocket('/api/v1/ws/do
   min-width: 0;
 }
 
-.docker-console {
-  width: 38%;
+:deep(.docker-console) {
+  width: 40%;
   min-width: 380px;
   height: calc(100vh - 160px);
   display: flex;
@@ -315,6 +214,6 @@ const { wsStatus, wsError, retryCount, reconnect } = useWebSocket('/api/v1/ws/do
 
 @media (max-width: 991px) {
   .docker-layout { flex-direction: column; align-items: stretch; }
-  .docker-console { width: 100%; min-width: 0; height: 60vh; position: static; }
+  :deep(.docker-console) { width: 100%; min-width: 0; height: 60vh; position: static; }
 }
 </style>

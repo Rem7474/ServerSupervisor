@@ -259,121 +259,16 @@
         </div>
       </div>
 
-      <!-- Colonne droite: Console Live (partagée entre les deux onglets) -->
-      <div v-show="showConsole" class="apt-console" :class="{ 'apt-console--active': liveCommand }" id="apt-console-mobile">
-        <div class="card d-flex flex-column h-100">
-          <div class="card-header d-flex align-items-center justify-content-between">
-            <h3 class="card-title">
-              <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                <path d="M8 9l3 3l-3 3" />
-                <path d="M13 15l3 0" />
-                <path d="M3 4m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z" />
-              </svg>
-              Console Live
-            </h3>
-            <div class="d-flex gap-1">
-              <button
-                @click="copyLiveConsoleOutput"
-                class="btn btn-sm btn-ghost-secondary"
-                :title="consoleCopied ? 'Copie !' : 'Copier la sortie'"
-                :disabled="!liveCommand"
-              >
-                <svg v-if="!consoleCopied" xmlns="http://www.w3.org/2000/svg" class="icon" width="18" height="18" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                  <path d="M8 8m0 2a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2z" />
-                  <path d="M16 8v-2a2 2 0 0 0 -2 -2h-8a2 2 0 0 0 -2 2v8a2 2 0 0 0 2 2h2" />
-                </svg>
-                <svg v-else xmlns="http://www.w3.org/2000/svg" class="icon text-success" width="18" height="18" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                  <path d="M5 12l5 5l10 -10" />
-                </svg>
-              </button>
-              <button
-                @click="downloadLiveConsoleOutput"
-                class="btn btn-sm btn-ghost-secondary"
-                title="Telecharger (.txt)"
-                :disabled="!liveCommand"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="18" height="18" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                  <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2" />
-                  <path d="M7 11l5 5l5 -5" />
-                  <path d="M12 4l0 12" />
-                </svg>
-              </button>
-              <button @click="closeLiveConsole(); showConsole = false" class="btn btn-sm btn-ghost-secondary" title="Fermer la console">
-                <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                  <path d="M18 6l-12 12" />
-                  <path d="M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-          </div>
-          <div class="card-body d-flex flex-column flex-fill p-0" style="min-height: 0;">
-            <div v-if="!liveCommand" class="d-flex align-items-center justify-content-center flex-fill text-secondary" style="background: #1e293b; border-radius: 0 0 0.5rem 0.5rem;">
-              <div class="text-center p-4">
-                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler mb-2 opacity-50" width="48" height="48" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-                  <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                  <path d="M8 9l3 3l-3 3" />
-                  <path d="M13 15l3 0" />
-                  <path d="M3 4m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z" />
-                </svg>
-                <div class="opacity-75">Aucune console active</div>
-                <div class="small mt-1 opacity-50">Cliquez sur "Logs" pour afficher la sortie d'une commande</div>
-              </div>
-            </div>
-
-            <div v-else class="d-flex flex-column h-100">
-              <div class="px-3 pt-3 pb-2" style="background: #1e293b; border-bottom: 1px solid rgba(255,255,255,0.1);">
-                <div class="d-flex align-items-start justify-content-between mb-2">
-                  <div class="flex-fill" style="min-width: 0;">
-                    <div class="fw-semibold text-light" style="font-size: 0.95rem;">{{ liveCommand.hostname }}</div>
-                    <div class="text-secondary small mt-1">
-                      <code style="background: rgba(0,0,0,0.3); padding: 0.15rem 0.4rem; border-radius: 0.25rem; color: #94a3b8;">apt {{ liveCommand.command }}</code>
-                    </div>
-                  </div>
-                  <span :class="statusClass(liveCommand.status)" class="ms-2">{{ liveCommand.status }}</span>
-                </div>
-              </div>
-              <pre
-                ref="consoleOutput"
-                class="console-output mb-0 flex-fill"
-                style="
-                  background: #0f172a;
-                  color: #e2e8f0;
-                  padding: 1rem;
-                  margin: 0;
-                  overflow-y: auto;
-                  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-                  font-size: 0.813rem;
-                  line-height: 1.5;
-                  border-radius: 0 0 0.5rem 0.5rem;
-                "
-                v-html="colorizedConsoleOutput || '<span style=\'opacity:0.5\'>En attente de sortie...</span>'"
-              ></pre>
-            </div>
-          </div>
-        </div>
-      </div>
+      <CommandLogPanel
+        :command="liveCommand"
+        :show="showConsole"
+        title="Console Live"
+        empty-text="Aucune console active"
+        wrapper-class="apt-console"
+        @open="showConsole = true"
+        @close="closeLiveConsole"
+      />
     </div>
-
-    <!-- Bouton pour réafficher la console -->
-    <button
-      v-show="!showConsole"
-      @click="showConsole = true"
-      class="btn btn-primary"
-      style="position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 100;"
-    >
-      <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
-        <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-        <path d="M8 9l3 3l-3 3" />
-        <path d="M13 15l3 0" />
-        <path d="M3 4m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z" />
-      </svg>
-      Console
-    </button>
 
     <!-- Schedule APT modal -->
     <div v-if="scheduleModal.open" class="modal modal-blur show d-block" tabindex="-1" style="background:rgba(0,0,0,.5);z-index:1050" @click.self="scheduleModal.open = false">
@@ -440,7 +335,7 @@
 </template>
 
 <script setup>
-import { ref, onUnmounted, computed, nextTick } from 'vue'
+import { ref, onUnmounted, computed } from 'vue'
 import CVEList from '../components/CVEList.vue'
 import apiClient, { getApiErrorMessage } from '../api'
 import { useAuthStore } from '../stores/auth'
@@ -451,11 +346,7 @@ import { usePagination } from '../composables/usePagination'
 import { useStatusBadge } from '../composables/useStatusBadge'
 import { useToast } from '../composables/useToast'
 import { useCommandStream } from '../composables/useCommandStream'
-import {
-  colorizeConsoleOutput,
-  copyConsoleOutput as copyConsoleOutputToClipboard,
-  downloadConsoleOutput as downloadConsoleOutputToFile,
-} from '../utils/consoleOutput'
+import CommandLogPanel from '../components/CommandLogPanel.vue'
 import PaginationNav from '../components/PaginationNav.vue'
 import WsStatusBar from '../components/WsStatusBar.vue'
 import SubNavigation from '../components/SubNavigation.vue'
@@ -528,13 +419,7 @@ async function saveSchedule() {
 
 // ── Console ───────────────────────────────────────────────────────────────────
 const showConsole = ref(false)
-const colorizedConsoleOutput = computed(() => {
-  if (!liveCommand.value) return ''
-  return colorizeConsoleOutput(liveCommand.value.output || '')
-})
 const liveCommand = ref(null)
-const consoleCopied = ref(false)
-const consoleOutput = ref(null)
 const { value: bulkActionFeedback, showToast: showBulkActionFeedback } = useToast(null)
 const { openCommandStream, closeStream } = useCommandStream({ token: () => auth.token })
 
@@ -624,13 +509,14 @@ function watchCommand(cmd, host) {
   liveCommand.value = {
     id: cmd.id,
     hostId: host?.id || cmd.hostId || cmd.host_id || null,
-    command: cmd.action || cmd.command || '—',
+    host_name: host?.hostname || host?.name || '—',
+    module: 'apt',
+    action: cmd.action || cmd.command || '—',
+    target: '',
     status: cmd.status,
-    hostname: host?.hostname || host?.name || '—',
     output: cmd.output || '',
   }
   connectStreamWebSocket(cmd.id)
-  nextTick(() => scrollToBottom())
 }
 
 function closeStreamSocket() {
@@ -640,25 +526,7 @@ function closeStreamSocket() {
 function closeLiveConsole() {
   closeStreamSocket()
   liveCommand.value = null
-}
-
-function copyLiveConsoleOutput() {
-  if (!liveCommand.value) return
-  copyConsoleOutputToClipboard(liveCommand.value.output || '').then(() => {
-    consoleCopied.value = true
-    window.setTimeout(() => {
-      consoleCopied.value = false
-    }, 2000)
-  })
-}
-
-function downloadLiveConsoleOutput() {
-  if (!liveCommand.value) return
-  downloadConsoleOutputToFile(liveCommand.value.output || '', `console-apt-${liveCommand.value.command || 'output'}.txt`)
-}
-
-function scrollToBottom() {
-  if (consoleOutput.value) consoleOutput.value.scrollTop = consoleOutput.value.scrollHeight
+  showConsole.value = false
 }
 
 function upsertAptHistory(hostId, nextCommand) {
@@ -696,7 +564,7 @@ function syncAptHistoryCommand(commandId, patch) {
   if (!hostId) return
   upsertAptHistory(hostId, {
     id: commandId,
-    action: liveCommand.value?.command || patch.action,
+    action: liveCommand.value?.action || patch.action,
     output: liveCommand.value?.output || '',
     ...patch,
   })
@@ -727,12 +595,10 @@ function connectStreamWebSocket(commandId) {
     onInit: (payload) => {
       syncLiveCommand(commandId, { status: payload.status, output: payload.output || '' })
       syncAptHistoryCommand(commandId, { status: payload.status })
-      nextTick(() => scrollToBottom())
     },
     onChunk: (payload) => {
       const nextOutput = `${liveCommand.value?.output || ''}${payload.chunk || ''}`
       syncLiveCommand(commandId, { output: nextOutput })
-      nextTick(() => scrollToBottom())
     },
     onStatus: (payload) => {
       const patch = { status: payload.status }
@@ -864,16 +730,11 @@ onUnmounted(() => {
   min-width: 0;
 }
 
-.apt-console {
-  width: 38%;
+:deep(.apt-console) {
+  width: 40%;
   min-width: 380px;
   display: flex;
   flex-direction: column;
-}
-
-.console-output {
-  white-space: pre-wrap;
-  word-break: break-all;
 }
 
 @media (max-width: 991px) {
@@ -891,15 +752,10 @@ onUnmounted(() => {
     overflow-y: visible;
   }
 
-  .apt-console {
+  :deep(.apt-console) {
     width: 100%;
     min-width: 0;
     max-height: 60vh;
-    display: none;
-  }
-
-  .apt-console--active {
-    display: flex;
   }
 }
 </style>
