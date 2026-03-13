@@ -169,6 +169,7 @@
             <router-view />
           </div>
         </div>
+        <AppFooter />
       </div>
 
       <!-- Global Confirm Dialog -->
@@ -186,6 +187,7 @@ import { useAuthStore } from './stores/auth'
 import { useRouter } from 'vue-router'
 import ConfirmDialog from './components/ConfirmDialog.vue'
 import NotificationBell from './components/NotificationBell.vue'
+import AppFooter from './components/AppFooter.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
