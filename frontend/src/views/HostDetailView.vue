@@ -332,8 +332,8 @@ onMounted(() => {
   min-width: 0;
 }
 
-.host-panel-right {
-  width: 38%;
+:deep(.host-panel-right) {
+  width: 40%;
   min-width: 380px;
   display: flex;
   flex-direction: column;
@@ -356,7 +356,7 @@ onMounted(() => {
     overflow-y: visible;
   }
 
-  .host-panel-right {
+  :deep(.host-panel-right) {
     width: 100%;
     min-width: 0;
     max-height: 70vh;

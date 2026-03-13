@@ -463,8 +463,8 @@ onUnmounted(() => {
   min-width: 0;
 }
 
-.audit-console {
-  width: 38%;
+:deep(.audit-console) {
+  width: 40%;
   min-width: 380px;
   height: calc(100vh - 160px);
   display: flex;
@@ -479,7 +479,7 @@ onUnmounted(() => {
     align-items: stretch;
   }
 
-  .audit-console {
+  :deep(.audit-console) {
     width: 100%;
     min-width: 0;
     height: 60vh;

@@ -480,8 +480,8 @@ onUnmounted(() => { closeStream() })
   min-width: 0;
 }
 
-.account-console {
-  width: 38%;
+:deep(.account-console) {
+  width: 40%;
   min-width: 380px;
   height: calc(100vh - 220px);
   position: sticky;
@@ -495,7 +495,7 @@ onUnmounted(() => { closeStream() })
     flex-direction: column;
   }
 
-  .account-console {
+  :deep(.account-console) {
     width: 100%;
     min-width: 0;
     height: 400px;
