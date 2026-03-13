@@ -10,6 +10,23 @@ import (
 	"github.com/serversupervisor/server/internal/config"
 )
 
+func sanitizeHeader(value string) string {
+	// Remove CR, LF, and other control characters to prevent header injection.
+	value = strings.ReplaceAll(value, "\r", "")
+	value = strings.ReplaceAll(value, "\n", "")
+	// Optionally, further restriction could be applied here if needed.
+	return value
+}
+
+func sanitizeBody(value string) string {
+	// Prevent body from injecting additional headers before the blank line
+	// by stripping raw CR/LF. Since this is a short text notification,
+	// replacing newlines with spaces is acceptable.
+	value = strings.ReplaceAll(value, "\r", " ")
+	value = strings.ReplaceAll(value, "\n", " ")
+	return value
+}
+
 func (n *notifier) SendSMTP(cfg *config.Config, from, to, subject, body string) error {
 	if cfg.SMTPHost == "" || cfg.SMTPPort == 0 {
 		log.Printf("notify: SMTP host/port not configured")
@@ -18,13 +35,13 @@ func (n *notifier) SendSMTP(cfg *config.Config, from, to, subject, body string) 
 
 	addr := fmt.Sprintf("%s:%d", cfg.SMTPHost, cfg.SMTPPort)
 	msg := strings.Join([]string{
-		"From: " + from,
-		"To: " + to,
-		"Subject: " + subject,
+		"From: " + sanitizeHeader(from),
+		"To: " + sanitizeHeader(to),
+		"Subject: " + sanitizeHeader(subject),
 		"MIME-Version: 1.0",
 		"Content-Type: text/plain; charset=utf-8",
 		"",
-		body,
+		sanitizeBody(body),
 	}, "\r\n")
 
 	auth := smtp.PlainAuth("", cfg.SMTPUser, cfg.SMTPPass, cfg.SMTPHost)
