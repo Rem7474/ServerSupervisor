@@ -167,4 +167,18 @@ export default {
   testNtfy: () => api.post('/v1/settings/test-ntfy'),
   cleanupMetrics: () => api.post('/v1/settings/cleanup-metrics'),
   cleanupAudit: () => api.post('/v1/settings/cleanup-audit'),
+
+  // Proxmox
+  getProxmoxSummary: () => api.get('/v1/proxmox/summary'),
+  getProxmoxInstances: () => api.get('/v1/proxmox/instances'),
+  getProxmoxInstance: (id) => api.get(`/v1/proxmox/instances/${id}`),
+  createProxmoxInstance: (payload) => api.post('/v1/proxmox/instances', payload),
+  updateProxmoxInstance: (id, payload) => api.put(`/v1/proxmox/instances/${id}`, payload),
+  deleteProxmoxInstance: (id) => api.delete(`/v1/proxmox/instances/${id}`),
+  testProxmoxConnection: (payload) => api.post('/v1/proxmox/instances/test', payload),
+  testProxmoxInstanceById: (id) => api.post(`/v1/proxmox/instances/${id}/test`),
+  pollProxmoxNow: (id) => api.post(`/v1/proxmox/instances/${id}/poll-now`),
+  getProxmoxNodes: (connectionId = '') => api.get('/v1/proxmox/nodes', { params: connectionId ? { connection_id: connectionId } : {} }),
+  getProxmoxNode: (id) => api.get(`/v1/proxmox/nodes/${id}`),
+  getProxmoxGuests: (params = {}) => api.get('/v1/proxmox/guests', { params }),
 }

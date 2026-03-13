@@ -76,6 +76,18 @@
                 </router-link>
               </li>
               <li class="nav-item">
+                <router-link to="/proxmox" class="nav-link" active-class="active">
+                  <span class="nav-link-icon">
+                    <svg class="icon" width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <rect x="2" y="3" width="20" height="14" rx="2" stroke-width="2"/>
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 21h8M12 17v4"/>
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h2v3H7zM11 8h2v3h-2zM15 8h2v3h-2z"/>
+                    </svg>
+                  </span>
+                  <span class="nav-link-title">Proxmox</span>
+                </router-link>
+              </li>
+              <li class="nav-item">
                 <router-link to="/network" class="nav-link" active-class="active">
                   <span class="nav-link-icon">
                     <svg class="icon" width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">

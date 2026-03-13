@@ -11,9 +11,8 @@ import (
 )
 
 // SetupRouter wires all handlers and registers route groups.
-// The caller is responsible for starting long-running poller services
-// (e.g. releaseTrackerH.StartPoller()) after this function returns.
-func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationHub, sched *scheduler.TaskScheduler, dispatcher *dispatch.Dispatcher) (*gin.Engine, *handlers.ReleaseTrackerHandler) {
+// The caller is responsible for starting long-running poller services after this function returns.
+func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationHub, sched *scheduler.TaskScheduler, dispatcher *dispatch.Dispatcher) (*gin.Engine, *handlers.ReleaseTrackerHandler, *handlers.ProxmoxHandler) {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
 	r.Use(gin.Recovery())
@@ -46,6 +45,8 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	agentH.AddCompletionListener(gitWebhookH)
 	agentH.AddCompletionListener(releaseTrackerH)
 
+	proxmoxH := handlers.NewProxmoxHandler(db, cfg)
+
 	registerPublicRoutes(r, authH)
 	registerWSRoutes(r, wsH)
 	registerAgentRoutes(r, db, cfg, agentH)
@@ -65,10 +66,11 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	registerUserRoutes(v1, userH)
 	registerGitWebhookRoutes(r, v1, gitWebhookH)
 	registerReleaseTrackerRoutes(v1, releaseTrackerH)
+	registerProxmoxRoutes(v1, proxmoxH)
 
 	registerStaticFiles(r)
 
-	return r, releaseTrackerH
+	return r, releaseTrackerH, proxmoxH
 }
 
 func registerPublicRoutes(r *gin.Engine, h *handlers.AuthHandler) {
@@ -229,6 +231,24 @@ func registerReleaseTrackerRoutes(g *gin.RouterGroup, h *handlers.ReleaseTracker
 	g.POST("/release-trackers/:id/check-now", h.TriggerCheck)
 	g.POST("/release-trackers/:id/run", h.Run)
 	g.GET("/release-trackers/:id/executions", h.GetExecutions)
+}
+
+func registerProxmoxRoutes(g *gin.RouterGroup, h *handlers.ProxmoxHandler) {
+	// Summary & read-only data (all authenticated users)
+	g.GET("/proxmox/summary", h.GetSummary)
+	g.GET("/proxmox/nodes", h.ListNodes)
+	g.GET("/proxmox/nodes/:id", h.GetNode)
+	g.GET("/proxmox/guests", h.ListGuests)
+	// Connection management (admin only enforced in handler via RequireAdmin middleware if needed;
+	// for now protected by JWT — tighten with AdminMiddleware if desired)
+	g.GET("/proxmox/instances", h.ListConnections)
+	g.POST("/proxmox/instances", h.CreateConnection)
+	g.GET("/proxmox/instances/:id", h.GetConnection)
+	g.PUT("/proxmox/instances/:id", h.UpdateConnection)
+	g.DELETE("/proxmox/instances/:id", h.DeleteConnection)
+	g.POST("/proxmox/instances/test", h.TestConnection)
+	g.POST("/proxmox/instances/:id/test", h.TestConnectionByID)
+	g.POST("/proxmox/instances/:id/poll-now", h.PollNow)
 }
 
 func registerStaticFiles(r *gin.Engine) {

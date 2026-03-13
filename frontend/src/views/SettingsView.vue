@@ -75,6 +75,8 @@
       @clean-metrics="cleanMetrics"
       @clean-audit="cleanAuditLogs"
     />
+
+    <SettingsProxmoxCard :auth-is-admin="auth.isAdmin" />
   </div>
 </template>
 
@@ -88,6 +90,7 @@ import SettingsNotificationsCard from '../components/settings/SettingsNotificati
 import SettingsRetentionCard from '../components/settings/SettingsRetentionCard.vue'
 import SettingsSmtpCard from '../components/settings/SettingsSmtpCard.vue'
 import SettingsSystemInfoCard from '../components/settings/SettingsSystemInfoCard.vue'
+import SettingsProxmoxCard from '../components/settings/SettingsProxmoxCard.vue'
 
 const auth = useAuthStore()
 

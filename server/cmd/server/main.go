@@ -94,9 +94,11 @@ func main() {
 	defer bg.Stop()
 
 	// Setup router
-	router, releaseTrackerH := api.SetupRouter(db, cfg, notifHub, sched, dispatcher)
+	router, releaseTrackerH, proxmoxH := api.SetupRouter(db, cfg, notifHub, sched, dispatcher)
 	releaseTrackerH.StartPoller()
 	defer releaseTrackerH.StopPoller()
+	proxmoxH.StartPoller()
+	defer proxmoxH.StopPoller()
 
 	// Start server
 	srv := &http.Server{

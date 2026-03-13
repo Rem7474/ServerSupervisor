@@ -111,6 +111,18 @@ const routes = [
     component: () => import('../views/ReleaseTrackerDetailView.vue'),
     meta: { requiresAuth: true, requiresAdmin: true },
   },
+  {
+    path: '/proxmox',
+    name: 'Proxmox',
+    component: () => import('../views/ProxmoxView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/proxmox/nodes/:id',
+    name: 'ProxmoxNode',
+    component: () => import('../views/ProxmoxNodeView.vue'),
+    meta: { requiresAuth: true },
+  },
   { path: '/:pathMatch(.*)*', redirect: '/' },
 ]
 
