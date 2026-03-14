@@ -98,3 +98,37 @@ type ProxmoxSummary struct {
 	StorageTotal    int64 `json:"storage_total"`
 	StorageUsed     int64 `json:"storage_used"`
 }
+
+// ProxmoxGuestLink maps a Proxmox guest (VM/LXC) to a ServerSupervisor host (agent).
+// Status lifecycle: suggested (auto-detected) → confirmed (validated) or ignored (dismissed).
+// MetricsSource controls which data source feeds CPU/RAM/disk in host views.
+type ProxmoxGuestLink struct {
+	ID            string    `json:"id"`
+	GuestID       string    `json:"guest_id"`
+	HostID        string    `json:"host_id"`
+	Status        string    `json:"status"`         // suggested | confirmed | ignored
+	MetricsSource string    `json:"metrics_source"` // auto | agent | proxmox
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+	// Joined display fields (populated on list/get)
+	GuestName    string `json:"guest_name,omitempty"`
+	GuestType    string `json:"guest_type,omitempty"`
+	NodeName     string `json:"node_name,omitempty"`
+	VMID         int    `json:"vmid,omitempty"`
+	HostName     string `json:"host_name,omitempty"`
+	HostHostname string `json:"host_hostname,omitempty"`
+}
+
+// ProxmoxGuestLinkRequest is the body for POST /proxmox/links.
+type ProxmoxGuestLinkRequest struct {
+	GuestID       string `json:"guest_id" binding:"required"`
+	HostID        string `json:"host_id" binding:"required"`
+	Status        string `json:"status"`         // defaults to "confirmed"
+	MetricsSource string `json:"metrics_source"` // defaults to "auto"
+}
+
+// ProxmoxGuestLinkUpdate is the body for PUT /proxmox/links/:id.
+type ProxmoxGuestLinkUpdate struct {
+	Status        *string `json:"status"`
+	MetricsSource *string `json:"metrics_source"`
+}

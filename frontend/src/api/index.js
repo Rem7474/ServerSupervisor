@@ -181,4 +181,14 @@ export default {
   getProxmoxNodes: (connectionId = '') => api.get('/v1/proxmox/nodes', { params: connectionId ? { connection_id: connectionId } : {} }),
   getProxmoxNode: (id) => api.get(`/v1/proxmox/nodes/${id}`),
   getProxmoxGuests: (params = {}) => api.get('/v1/proxmox/guests', { params }),
+  getProxmoxGuestLink: (guestId) => api.get(`/v1/proxmox/guests/${guestId}/link`),
+  // Guest ↔ host links
+  getProxmoxLinks: (status = '') => api.get('/v1/proxmox/links', { params: status ? { status } : {} }),
+  getProxmoxLink: (id) => api.get(`/v1/proxmox/links/${id}`),
+  createProxmoxLink: (payload) => api.post('/v1/proxmox/links', payload),
+  updateProxmoxLink: (id, payload) => api.put(`/v1/proxmox/links/${id}`, payload),
+  deleteProxmoxLink: (id) => api.delete(`/v1/proxmox/links/${id}`),
+  // Per-host Proxmox link
+  getHostProxmoxLink: (hostId) => api.get(`/v1/hosts/${hostId}/proxmox-link`),
+  getHostProxmoxCandidates: (hostId) => api.get(`/v1/hosts/${hostId}/proxmox-candidates`),
 }

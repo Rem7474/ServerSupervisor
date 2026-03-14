@@ -106,11 +106,12 @@
                 <th>Disque</th>
                 <th>Uptime</th>
                 <th>Tags</th>
+                <th>Hôte lié</th>
               </tr>
             </thead>
             <tbody>
               <tr v-if="vms.length === 0">
-                <td colspan="10" class="text-center text-muted py-4">Aucune VM sur ce nœud.</td>
+                <td colspan="11" class="text-center text-muted py-4">Aucune VM sur ce nœud.</td>
               </tr>
               <tr v-for="g in vms" :key="g.id">
                 <td class="text-muted">{{ g.vmid }}</td>
@@ -126,6 +127,9 @@
                   <template v-if="g.tags">
                     <span v-for="tag in g.tags.split(';').filter(Boolean)" :key="tag" class="badge bg-blue-lt text-blue me-1">{{ tag.trim() }}</span>
                   </template>
+                </td>
+                <td>
+                  <GuestLinkCell :link="linkForGuest(g)" @confirm="confirmGuestLink(g)" @ignore="ignoreGuestLink(g)" @go="goToHost(linkForGuest(g))" />
                 </td>
               </tr>
             </tbody>
@@ -146,11 +150,12 @@
                 <th>RAM utilisée</th>
                 <th>Disque</th>
                 <th>Uptime</th>
+                <th>Hôte lié</th>
               </tr>
             </thead>
             <tbody>
               <tr v-if="lxcs.length === 0">
-                <td colspan="9" class="text-center text-muted py-4">Aucun conteneur LXC sur ce nœud.</td>
+                <td colspan="10" class="text-center text-muted py-4">Aucun conteneur LXC sur ce nœud.</td>
               </tr>
               <tr v-for="g in lxcs" :key="g.id">
                 <td class="text-muted">{{ g.vmid }}</td>
@@ -162,9 +167,17 @@
                 <td>{{ formatBytes(g.mem_usage) }}</td>
                 <td>{{ formatBytes(g.disk_alloc) }}</td>
                 <td>{{ g.status === 'running' ? formatUptime(g.uptime) : '—' }}</td>
+                <td>
+                  <GuestLinkCell :link="linkForGuest(g)" @confirm="confirmGuestLink(g)" @ignore="ignoreGuestLink(g)" @go="goToHost(linkForGuest(g))" />
+                </td>
               </tr>
             </tbody>
           </table>
+        </div>
+
+        <!-- Link action feedback -->
+        <div v-if="linkMsg" class="card-footer py-2">
+          <span :class="['small', linkMsgOk ? 'text-success' : 'text-danger']">{{ linkMsg }}</span>
         </div>
 
         <!-- Storage tab -->
@@ -218,15 +231,52 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, computed, onMounted, defineComponent, h } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import api from '../api/index.js'
 
+// Inline component — renders the "Hôte lié" cell without a separate file.
+const GuestLinkCell = defineComponent({
+  props: { link: { type: Object, default: null } },
+  emits: ['confirm', 'ignore', 'go'],
+  setup(props, { emit }) {
+    return () => {
+      const link = props.link
+      if (!link) return h('span', { class: 'text-muted small' }, '—')
+      if (link.status === 'suggested') {
+        return h('div', { class: 'd-flex align-items-center gap-1' }, [
+          h('span', { class: 'badge bg-warning-lt text-warning' }, 'Suggéré'),
+          h('span', { class: 'text-muted small' }, link.host_hostname || link.host_name),
+          h('button', { class: 'btn btn-xs btn-success ms-1', onClick: () => emit('confirm') }, '✓'),
+          h('button', { class: 'btn btn-xs btn-outline-secondary', onClick: () => emit('ignore') }, '✗'),
+        ])
+      }
+      if (link.status === 'confirmed') {
+        return h('div', { class: 'd-flex align-items-center gap-1' }, [
+          h('span', { class: 'badge bg-success-lt text-success' }, 'Lié'),
+          h('button', {
+            class: 'btn btn-xs btn-outline-primary ms-1',
+            onClick: () => emit('go'),
+            title: 'Voir la fiche hôte',
+          }, link.host_hostname || link.host_name),
+        ])
+      }
+      return h('span', { class: 'text-muted small' }, '—')
+    }
+  },
+})
+
 const route = useRoute()
+const router = useRouter()
 const node = ref(null)
 const loading = ref(true)
 const error = ref('')
 const tab = ref('vms')
+
+// guest_id → link object (loaded after node data)
+const guestLinks = ref({})
+const linkMsg = ref('')
+const linkMsgOk = ref(false)
 
 const vms = computed(() => node.value?.guests?.filter(g => g.guest_type === 'vm') ?? [])
 const lxcs = computed(() => node.value?.guests?.filter(g => g.guest_type === 'lxc') ?? [])
@@ -237,11 +287,69 @@ async function load() {
   try {
     const res = await api.getProxmoxNode(route.params.id)
     node.value = res.data
+    await loadGuestLinks()
   } catch (e) {
     error.value = e?.response?.data?.error || 'Erreur lors du chargement.'
   } finally {
     loading.value = false
   }
+}
+
+async function loadGuestLinks() {
+  const guests = node.value?.guests ?? []
+  if (guests.length === 0) return
+  // Fetch all links for this node's connection filtered by node (via all links list).
+  // We fetch per-guest to keep it simple (no server-side bulk endpoint needed).
+  const results = await Promise.allSettled(
+    guests.map(g => api.getProxmoxGuestLink(g.id).then(r => ({ guestId: g.id, link: r.data })).catch(() => null))
+  )
+  const map = {}
+  for (const r of results) {
+    if (r.status === 'fulfilled' && r.value) {
+      map[r.value.guestId] = r.value.link
+    }
+  }
+  guestLinks.value = map
+}
+
+function linkForGuest(g) {
+  return guestLinks.value[g.id] ?? null
+}
+
+async function confirmGuestLink(g) {
+  const link = linkForGuest(g)
+  if (!link) return
+  try {
+    const res = await api.updateProxmoxLink(link.id, { status: 'confirmed' })
+    guestLinks.value = { ...guestLinks.value, [g.id]: res.data }
+    showMsg(`[${g.name}] Lien confirmé.`, true)
+  } catch (e) {
+    showMsg(e?.response?.data?.error || 'Erreur.', false)
+  }
+}
+
+async function ignoreGuestLink(g) {
+  const link = linkForGuest(g)
+  if (!link) return
+  try {
+    await api.deleteProxmoxLink(link.id)
+    const m = { ...guestLinks.value }
+    delete m[g.id]
+    guestLinks.value = m
+    showMsg(`[${g.name}] Suggestion ignorée.`, true)
+  } catch (e) {
+    showMsg(e?.response?.data?.error || 'Erreur.', false)
+  }
+}
+
+function goToHost(link) {
+  if (link?.host_id) router.push(`/hosts/${link.host_id}`)
+}
+
+function showMsg(msg, ok) {
+  linkMsg.value = msg
+  linkMsgOk.value = ok
+  setTimeout(() => { linkMsg.value = '' }, 4000)
 }
 
 function memPct(n) {

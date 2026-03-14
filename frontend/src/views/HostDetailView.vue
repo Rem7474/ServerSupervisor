@@ -42,6 +42,86 @@
 
     <WsStatusBar :status="wsStatus" :error="wsError" :retry-count="retryCount" @reconnect="reconnect" />
 
+    <!-- Proxmox link panel -->
+    <div v-if="proxmoxLink && proxmoxLink.status !== 'ignored'" class="card mb-3 border-0 shadow-sm">
+      <div class="card-body py-2 px-3 d-flex flex-wrap align-items-center gap-3">
+        <!-- Guest info -->
+        <div class="d-flex align-items-center gap-2">
+          <span class="badge bg-purple-lt text-purple">Proxmox</span>
+          <span class="fw-medium">{{ proxmoxLink.guest_name || `VMID ${proxmoxLink.vmid}` }}</span>
+          <span class="text-muted small">({{ proxmoxLink.guest_type?.toUpperCase() }} · {{ proxmoxLink.node_name }})</span>
+        </div>
+
+        <!-- Status badge + suggestion actions -->
+        <div class="d-flex align-items-center gap-2">
+          <span v-if="proxmoxLink.status === 'suggested'" class="badge bg-warning-lt text-warning">Suggestion</span>
+          <span v-else class="badge bg-success-lt text-success">Lié</span>
+          <template v-if="proxmoxLink.status === 'suggested'">
+            <button class="btn btn-sm btn-success" :disabled="linkSaving" @click="confirmLink">Confirmer</button>
+            <button class="btn btn-sm btn-outline-secondary" :disabled="linkSaving" @click="ignoreLink">Ignorer</button>
+          </template>
+        </div>
+
+        <!-- Metrics source selector (shown only when confirmed) -->
+        <div v-if="proxmoxLink.status === 'confirmed'" class="d-flex align-items-center gap-2 ms-auto">
+          <label class="form-label mb-0 text-muted small">Source métriques :</label>
+          <select class="form-select form-select-sm" style="width:auto" :value="proxmoxLink.metrics_source" @change="changeMetricsSource($event.target.value)">
+            <option value="auto">Automatique</option>
+            <option value="agent">Agent</option>
+            <option value="proxmox">Proxmox</option>
+          </select>
+          <button class="btn btn-sm btn-outline-danger" :disabled="linkSaving" @click="deleteLink" title="Supprimer le lien">
+            <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
+              <path d="M10 11v6M14 11v6M9 6V4h6v2"/>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Guest live metrics (source = proxmox) -->
+        <template v-if="proxmoxLink.status === 'confirmed' && proxmoxLink.metrics_source !== 'agent'">
+          <div class="d-flex align-items-center gap-3 ms-2 border-start ps-3">
+            <div class="text-muted small">
+              CPU <strong class="text-body">{{ ((proxmoxLink.cpu_usage ?? 0) * 100).toFixed(1) }}%</strong>
+            </div>
+            <div class="text-muted small">
+              RAM <strong class="text-body">{{ formatBytesLink(proxmoxLink.mem_usage) }}</strong> / {{ formatBytesLink(proxmoxLink.mem_alloc) }}
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- No link banner + manual link button -->
+    <div v-else-if="!proxmoxLink && showLinkButton" class="d-flex align-items-center gap-2 mb-3">
+      <button class="btn btn-sm btn-outline-purple" @click="openLinkForm">
+        <svg class="icon icon-sm me-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+        </svg>
+        Lier à Proxmox
+      </button>
+    </div>
+
+    <!-- Manual link form -->
+    <div v-if="showLinkForm" class="card mb-3">
+      <div class="card-body">
+        <div class="fw-medium mb-2">Lier cet hôte à un guest Proxmox</div>
+        <div v-if="linkCandidatesLoading" class="text-muted small">Chargement...</div>
+        <div v-else-if="linkCandidates.length === 0" class="text-muted small">Aucun guest Proxmox disponible (non encore lié).</div>
+        <div v-else class="d-flex align-items-center gap-2">
+          <select v-model="selectedCandidate" class="form-select form-select-sm" style="max-width:320px">
+            <option value="">-- Choisir un guest --</option>
+            <option v-for="g in linkCandidates" :key="g.id" :value="g.id">
+              {{ g.name || `VMID ${g.vmid}` }} ({{ g.guest_type?.toUpperCase() }} · {{ g.node_name }})
+            </option>
+          </select>
+          <button class="btn btn-sm btn-primary" :disabled="!selectedCandidate || linkSaving" @click="createManualLink">Lier</button>
+          <button class="btn btn-sm btn-outline-secondary" @click="showLinkForm = false; selectedCandidate = ''">Annuler</button>
+        </div>
+      </div>
+    </div>
+
     <div class="host-layout">
       <div class="host-panel-main">
         <HostEditForm
@@ -166,6 +246,15 @@ const cmdHistory = ref([])
 const diskMetrics = ref(null)
 const diskHealth = ref(null)
 const latestAgentVersion = ref('')
+
+// Proxmox link state
+const proxmoxLink = ref(null)
+const linkSaving = ref(false)
+const showLinkForm = ref(false)
+const showLinkButton = ref(false)
+const linkCandidates = ref([])
+const linkCandidatesLoading = ref(false)
+const selectedCandidate = ref('')
 
 const { liveCommand, showConsole, openCommand: _openCommand, closeConsole, updateCommand } = useHostCommandConsole()
 const { openCommandStream, closeStream } = useCommandStream({ token: () => auth.token })
@@ -305,8 +394,112 @@ async function deleteHost() {
   }
 }
 
+// ─── Proxmox link helpers ─────────────────────────────────────────────────────
+
+async function loadProxmoxLink() {
+  try {
+    const res = await apiClient.getHostProxmoxLink(hostId)
+    proxmoxLink.value = res.data
+  } catch {
+    proxmoxLink.value = null
+    // Only show the "Lier à Proxmox" button if there are candidates available.
+    try {
+      const res = await apiClient.getHostProxmoxCandidates(hostId)
+      showLinkButton.value = res.data?.length > 0
+    } catch {
+      showLinkButton.value = false
+    }
+  }
+}
+
+async function confirmLink() {
+  if (!proxmoxLink.value) return
+  linkSaving.value = true
+  try {
+    const res = await apiClient.updateProxmoxLink(proxmoxLink.value.id, { status: 'confirmed' })
+    proxmoxLink.value = res.data
+  } finally {
+    linkSaving.value = false
+  }
+}
+
+async function ignoreLink() {
+  if (!proxmoxLink.value) return
+  linkSaving.value = true
+  try {
+    await apiClient.updateProxmoxLink(proxmoxLink.value.id, { status: 'ignored' })
+    proxmoxLink.value = null
+    showLinkButton.value = true
+  } finally {
+    linkSaving.value = false
+  }
+}
+
+async function changeMetricsSource(source) {
+  if (!proxmoxLink.value) return
+  linkSaving.value = true
+  try {
+    const res = await apiClient.updateProxmoxLink(proxmoxLink.value.id, { metrics_source: source })
+    proxmoxLink.value = res.data
+  } finally {
+    linkSaving.value = false
+  }
+}
+
+async function deleteLink() {
+  if (!proxmoxLink.value) return
+  linkSaving.value = true
+  try {
+    await apiClient.deleteProxmoxLink(proxmoxLink.value.id)
+    proxmoxLink.value = null
+    showLinkButton.value = true
+  } finally {
+    linkSaving.value = false
+  }
+}
+
+async function openLinkForm() {
+  showLinkForm.value = true
+  if (linkCandidates.value.length > 0) return
+  linkCandidatesLoading.value = true
+  try {
+    const res = await apiClient.getHostProxmoxCandidates(hostId)
+    linkCandidates.value = res.data || []
+  } finally {
+    linkCandidatesLoading.value = false
+  }
+}
+
+async function createManualLink() {
+  if (!selectedCandidate.value) return
+  linkSaving.value = true
+  try {
+    const res = await apiClient.createProxmoxLink({
+      guest_id: selectedCandidate.value,
+      host_id: hostId,
+      status: 'confirmed',
+      metrics_source: 'auto',
+    })
+    proxmoxLink.value = res.data
+    showLinkForm.value = false
+    showLinkButton.value = false
+    selectedCandidate.value = ''
+  } finally {
+    linkSaving.value = false
+  }
+}
+
+function formatBytesLink(bytes) {
+  if (!bytes) return '0 B'
+  const units = ['B', 'Ko', 'Mo', 'Go', 'To']
+  let i = 0, v = bytes
+  while (v >= 1024 && i < units.length - 1) { v /= 1024; i++ }
+  return `${v.toFixed(i === 0 ? 0 : 1)} ${units[i]}`
+}
+
 onMounted(() => {
   loadComplete()
+  loadProxmoxLink()
 })
 </script>
 

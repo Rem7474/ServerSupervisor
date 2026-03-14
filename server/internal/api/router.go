@@ -239,6 +239,7 @@ func registerProxmoxRoutes(g *gin.RouterGroup, h *handlers.ProxmoxHandler) {
 	g.GET("/proxmox/nodes", h.ListNodes)
 	g.GET("/proxmox/nodes/:id", h.GetNode)
 	g.GET("/proxmox/guests", h.ListGuests)
+	g.GET("/proxmox/guests/:id/link", h.GetLinkByGuest)
 	// Connection management (admin only enforced in handler via RequireAdmin middleware if needed;
 	// for now protected by JWT — tighten with AdminMiddleware if desired)
 	g.GET("/proxmox/instances", h.ListConnections)
@@ -249,6 +250,15 @@ func registerProxmoxRoutes(g *gin.RouterGroup, h *handlers.ProxmoxHandler) {
 	g.POST("/proxmox/instances/test", h.TestConnection)
 	g.POST("/proxmox/instances/:id/test", h.TestConnectionByID)
 	g.POST("/proxmox/instances/:id/poll-now", h.PollNow)
+	// Guest ↔ host link management
+	g.GET("/proxmox/links", h.ListLinks)
+	g.POST("/proxmox/links", h.CreateLink)
+	g.GET("/proxmox/links/:id", h.GetLink)
+	g.PUT("/proxmox/links/:id", h.UpdateLink)
+	g.DELETE("/proxmox/links/:id", h.DeleteLink)
+	// Per-host Proxmox link lookup + candidate guests for manual linking
+	g.GET("/hosts/:id/proxmox-link", h.GetLinkByHost)
+	g.GET("/hosts/:id/proxmox-candidates", h.ListLinkCandidates)
 }
 
 func registerStaticFiles(r *gin.Engine) {

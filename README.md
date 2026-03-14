@@ -60,6 +60,16 @@ Système de supervision d'infrastructure : monitoring de VMs, conteneurs Docker,
 - **Tâches planifiées** : création de tâches cron par hôte (apt, docker, systemd, journal, processus ou custom), déclenchement manuel immédiat, historique des exécutions
 - **Alertes** : règles d'alertes configurables avec notifications email (SMTP), ntfy, webhook ou notifications navigateur
 - **Sécurité** : résumé des connexions 24h, IPs bloquées, déblocage manuel
+- **Proxmox VE** : supervision de l'infrastructure de virtualisation via API Proxmox (sans agent sur l'hyperviseur) — nœuds, VMs QEMU, conteneurs LXC, stockage ; polling configurable par connexion
+
+### Proxmox VE (supervision sans agent)
+- Connexion à un ou plusieurs clusters / nœuds Proxmox via l'API REST officielle (token API)
+- Collecte périodique configurable : nœuds (CPU, RAM, uptime, version PVE), VMs QEMU, conteneurs LXC, pools de stockage
+- UPSERT en base à chaque cycle + nettoyage automatique des ressources disparues
+- Vue globale `/proxmox` : cartes de synthèse (connexions, nœuds, VMs, LXC, stockage) + tableau de tous les nœuds avec barres de progression CPU/RAM
+- Vue détail `/proxmox/nodes/:id` : stats nœud + onglets VMs / LXC / Stockage avec utilisation disque
+- Configuration dans **Paramètres** : ajout/édition/suppression de connexions, bouton **Tester** (sans sauvegarder), déclenchement manuel d'un poll
+- Sécurité : `token_secret` stocké en base, jamais retourné au frontend ; `insecure_skip_verify` désactivé par défaut
 
 ### Agent
 - Collecte automatique : CPU, RAM, disques, réseau, uptime
@@ -164,9 +174,31 @@ sudo systemctl enable --now serversupervisor-agent
 sudo journalctl -u serversupervisor-agent -f
 ```
 
-### 4. Suivre des repos GitHub
+### 4. Superviser un cluster Proxmox VE
 
-1. Dashboard → **Versions & Repos**
+1. Dans Proxmox, créer un token API avec les permissions minimales en lecture :
+   ```
+   pveum role add Supervision -privs "Datastore.Audit Sys.Audit VM.Audit"
+   pveum user add supervision@pve
+   pveum aclmod / -user supervision@pve -role Supervision
+   pveum user token add supervision@pve monitoring --privsep 0
+   ```
+   Copier le `token ID` (ex : `supervision@pve!monitoring`) et le `secret` affiché.
+
+2. Dans ServerSupervisor → **Paramètres** → carte **Proxmox VE** → **Ajouter une connexion** :
+   - Nom : label interne (ex : `Cluster prod`)
+   - URL API : `https://pve.example.com:8006/api2/json`
+   - Token ID : `supervision@pve!monitoring`
+   - Token secret : le secret copié
+   - Cocher **Ignorer TLS** uniquement si le certificat est auto-signé
+
+3. Cliquer **Tester la connexion** pour valider, puis **Créer**.
+
+4. La première collecte démarre automatiquement. L'entrée **Proxmox** apparaît dans la navigation.
+
+### 5. Suivre des repos GitHub
+
+1. Dashboard → **Git / Automatisation** → onglet **Suivi de releases**
 2. Ajouter un repo (ex: `home-assistant` / `core`)
 3. Optionnel : associer un nom d'image Docker pour la comparaison automatique
 4. Le serveur vérifie les nouvelles releases toutes les 15 minutes
@@ -422,12 +454,19 @@ curl http://localhost:8080/api/v1/hosts \
 | `PATCH` | `/api/v1/users/:id/role` | Changer le rôle (`admin`/`operator`/`viewer`) |
 | `DELETE` | `/api/v1/users/:id` | Supprimer un utilisateur |
 
-#### Repos GitHub
-| Méthode | Endpoint | Description |
-|---|---|---|
-| `GET` | `/api/v1/repos` | Repos suivis |
-| `POST` | `/api/v1/repos` | Ajouter un repo |
-| `DELETE` | `/api/v1/repos/:id` | Supprimer un repo |
+#### Git Webhooks & Suivi de releases
+| Méthode | Endpoint | Description | Rôle |
+|---|---|---|---|
+| `GET/POST` | `/api/v1/webhooks/git` | Webhooks Git | Admin |
+| `GET/PUT/DELETE` | `/api/v1/webhooks/git/:id` | Détail / modification / suppression | Admin |
+| `POST` | `/api/v1/webhooks/git/:id/regenerate-secret` | Regénérer le secret HMAC | Admin |
+| `GET` | `/api/v1/webhooks/git/:id/executions` | Historique exécutions | Admin |
+| `POST` | `/api/v1/webhooks/git/:id/receive` | Réception webhook (public, HMAC) | Public |
+| `GET/POST` | `/api/v1/release-trackers` | Suivi releases GitHub/GitLab | Admin |
+| `GET/PUT/DELETE` | `/api/v1/release-trackers/:id` | Détail / modification / suppression | Admin |
+| `POST` | `/api/v1/release-trackers/:id/check-now` | Vérification immédiate | Admin |
+| `POST` | `/api/v1/release-trackers/:id/run` | Déclencher manuellement | Admin |
+| `GET` | `/api/v1/release-trackers/:id/executions` | Historique exécutions | Admin |
 
 #### Tâches planifiées
 | Méthode | Endpoint | Description | Rôle |
@@ -437,6 +476,22 @@ curl http://localhost:8080/api/v1/hosts \
 | `PUT` | `/api/v1/scheduled-tasks/:id` | Modifier une tâche | Operator+ |
 | `DELETE` | `/api/v1/scheduled-tasks/:id` | Supprimer une tâche | Operator+ |
 | `POST` | `/api/v1/scheduled-tasks/:id/run` | Déclencher manuellement | Operator+ |
+
+#### Proxmox VE
+| Méthode | Endpoint | Description | Rôle |
+|---|---|---|---|
+| `GET` | `/api/v1/proxmox/summary` | Compteurs globaux (nœuds, VMs, LXC, stockage) | Authentifié |
+| `GET` | `/api/v1/proxmox/nodes` | Tous les nœuds (`?connection_id=` optionnel) | Authentifié |
+| `GET` | `/api/v1/proxmox/nodes/:id` | Détail nœud avec guests + stockages | Authentifié |
+| `GET` | `/api/v1/proxmox/guests` | Tous les guests (`?type=vm\|lxc`, `?status=running`) | Authentifié |
+| `GET` | `/api/v1/proxmox/instances` | Liste des connexions (sans secrets) | Authentifié |
+| `POST` | `/api/v1/proxmox/instances` | Créer une connexion | Admin |
+| `GET` | `/api/v1/proxmox/instances/:id` | Détail d'une connexion | Admin |
+| `PUT` | `/api/v1/proxmox/instances/:id` | Modifier une connexion | Admin |
+| `DELETE` | `/api/v1/proxmox/instances/:id` | Supprimer une connexion | Admin |
+| `POST` | `/api/v1/proxmox/instances/test` | Tester sans sauvegarder | Admin |
+| `POST` | `/api/v1/proxmox/instances/:id/test` | Tester une connexion existante | Admin |
+| `POST` | `/api/v1/proxmox/instances/:id/poll-now` | Déclencher un poll immédiat | Admin |
 
 #### Settings
 | Méthode | Endpoint | Description | Rôle |
@@ -523,7 +578,7 @@ ServerSupervisor/
 │   ├── cmd/server/main.go
 │   └── internal/
 │       ├── api/
-│       │   ├── router.go           # Routes & middleware
+│       │   ├── router.go           # Routes & middleware (retourne ReleaseTrackerHandler + ProxmoxHandler)
 │       │   ├── auth.go             # Auth + MFA + login events
 │       │   ├── agent.go            # API agent (rapport, commandes, audit)
 │       │   ├── audit.go            # Audit logs + historique commandes
@@ -543,12 +598,23 @@ ServerSupervisor/
 │       ├── alerts/engine.go        # Moteur d'évaluation des alertes
 │       ├── config/config.go        # Config + OverrideFromDB
 │       ├── database/               # Couche PostgreSQL (db_*.go)
+│       │   ├── db_proxmox.go       # CRUD + upsert Proxmox (connexions, nœuds, guests, storages)
 │       │   ├── db_scheduled_tasks.go
-│       │   └── migrations/         # Migrations SQL (001 → 014)
+│       │   ├── db_webhooks.go
+│       │   ├── db_release_trackers.go
+│       │   └── migrations/         # Migrations SQL (001 → 027)
 │       ├── github/                 # GitHub release tracker
+│       ├── handlers/
+│       │   ├── proxmox.go          # ProxmoxHandler : CRUD connexions + poller (30s tick)
+│       │   ├── release_trackers.go
+│       │   └── git_webhooks.go
+│       ├── proxmoxclient/
+│       │   └── client.go           # Client HTTP Proxmox VE (PVEAPIToken, TLS, endpoints)
 │       ├── scheduler/scheduler.go  # Scheduler cron (robfig/cron)
-│       └── models/models.go        # Modèles de données partagés
-├── agent/                          # Agent Go
+│       └── models/
+│           ├── proxmox.go          # ProxmoxConnection, ProxmoxNode, ProxmoxGuest, ProxmoxStorage
+│           └── models.go           # Autres modèles partagés
+├── agent/                          # Agent Go (déployé dans les VMs — pas sur Proxmox)
 │   ├── cmd/agent/main.go
 │   └── internal/
 │       ├── collector/              # system.go, docker.go, apt.go, disk.go…
@@ -558,17 +624,21 @@ ServerSupervisor/
 │       └── sender/sender.go        # Envoi rapports + commandes
 ├── frontend/                       # Dashboard Vue.js (Tabler CSS)
 │   └── src/
-│       ├── api/index.js            # Client API axios
+│       ├── api/index.js            # Client API axios (inclut méthodes Proxmox)
 │       ├── router/index.js         # Routes SPA
 │       ├── stores/auth.js          # Store Pinia (auth + rôle)
+│       ├── components/settings/
+│       │   ├── SettingsProxmoxCard.vue  # Gestion connexions Proxmox (admin)
+│       │   └── …                        # Autres cartes Settings
 │       └── views/
 │           ├── DashboardView.vue
-│           ├── HostDetailView.vue      # Dashboard hôte (métriques, docker, systemd, journal, processus)
-│           ├── ScheduledTasksView.vue  # Tâches planifiées par hôte
+│           ├── HostDetailView.vue       # Dashboard hôte (métriques, docker, systemd, journal, processus)
+│           ├── ProxmoxView.vue          # Vue globale Proxmox (/proxmox)
+│           ├── ProxmoxNodeView.vue      # Détail nœud (/proxmox/nodes/:id)
 │           ├── DockerView.vue
 │           ├── NetworkView.vue
 │           ├── AptView.vue
-│           ├── AuditLogsView.vue       # Commandes + Connexions
+│           ├── AuditLogsView.vue        # Commandes + Connexions
 │           ├── AlertsView.vue
 │           ├── SecurityView.vue
 │           ├── SettingsView.vue
