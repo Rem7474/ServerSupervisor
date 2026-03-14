@@ -57,6 +57,8 @@ func (h *WSHandler) sendHostSnapshot(conn *websocket.Conn, hostID string, lastHa
 		}
 	}
 
+	proxmoxLink, _ := h.db.GetProxmoxGuestLinkByHost(hostID)
+
 	payload := gin.H{
 		"type":                "host_detail",
 		"host":                host,
@@ -66,6 +68,7 @@ func (h *WSHandler) sendHostSnapshot(conn *websocket.Conn, hostID string, lastHa
 		"apt_history":         aptHistory,
 		"audit_logs":          auditLogs,
 		"version_comparisons": comparisons,
+		"proxmox_link":        proxmoxLink,
 	}
 	if !snapshotChanged(payload, lastHash) {
 		return nil

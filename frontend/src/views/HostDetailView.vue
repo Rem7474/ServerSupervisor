@@ -310,6 +310,9 @@ const { wsStatus, wsError, retryCount, reconnect } = useWebSocket(`/api/v1/ws/ho
   containers.value = payload.containers || []
   versionComparisons.value = payload.version_comparisons || []
   aptStatus.value = payload.apt_status
+  if ('proxmox_link' in payload) {
+    proxmoxLink.value = payload.proxmox_link
+  }
 }, { debounceMs: 200 })
 
 async function sendAptCmd(command) {
@@ -503,24 +506,14 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.host-detail-page {
-  display: flex;
-  flex-direction: column;
-  height: calc(100vh - 100px);
-}
-
 .host-layout {
   display: flex;
-  flex: 1;
   gap: 1rem;
-  overflow: hidden;
-  min-height: 0;
+  align-items: flex-start;
 }
 
 .host-panel-main {
   flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
   min-width: 0;
 }
 
@@ -529,29 +522,24 @@ onMounted(() => {
   min-width: 380px;
   display: flex;
   flex-direction: column;
-  transition: all 0.3s ease-in-out;
+  height: calc(100vh - 160px);
+  position: sticky;
+  top: 1rem;
+  transition: width 0.3s ease-in-out;
   overflow: hidden;
 }
 
 @media (max-width: 991px) {
-  .host-detail-page {
-    height: auto;
-  }
-
   .host-layout {
     flex-direction: column;
-    overflow: visible;
-    height: auto;
-  }
-
-  .host-panel-main {
-    overflow-y: visible;
+    align-items: stretch;
   }
 
   :deep(.host-panel-right) {
     width: 100%;
     min-width: 0;
-    max-height: 70vh;
+    height: 60vh;
+    position: static;
   }
 }
 </style>
