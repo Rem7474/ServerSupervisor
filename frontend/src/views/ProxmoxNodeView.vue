@@ -298,18 +298,20 @@ async function load() {
 async function loadGuestLinks() {
   const guests = node.value?.guests ?? []
   if (guests.length === 0) return
-  // Fetch all links for this node's connection filtered by node (via all links list).
-  // We fetch per-guest to keep it simple (no server-side bulk endpoint needed).
-  const results = await Promise.allSettled(
-    guests.map(g => api.getProxmoxGuestLink(g.id).then(r => ({ guestId: g.id, link: r.data })).catch(() => null))
-  )
-  const map = {}
-  for (const r of results) {
-    if (r.status === 'fulfilled' && r.value) {
-      map[r.value.guestId] = r.value.link
+  // One request for all links, then index by guest_id — avoids N individual requests.
+  try {
+    const res = await api.getProxmoxLinks()
+    const guestIds = new Set(guests.map(g => g.id))
+    const map = {}
+    for (const link of res.data ?? []) {
+      if (guestIds.has(link.guest_id)) {
+        map[link.guest_id] = link
+      }
     }
+    guestLinks.value = map
+  } catch {
+    guestLinks.value = {}
   }
-  guestLinks.value = map
 }
 
 function linkForGuest(g) {

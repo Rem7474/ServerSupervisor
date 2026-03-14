@@ -399,16 +399,15 @@ async function deleteHost() {
 async function loadProxmoxLink() {
   try {
     const res = await apiClient.getHostProxmoxLink(hostId)
-    proxmoxLink.value = res.data
+    proxmoxLink.value = res.data  // null when no link exists (server returns 200 null)
+    if (!res.data) {
+      // No link — show the button only if there are linkable candidates.
+      const cands = await apiClient.getHostProxmoxCandidates(hostId).catch(() => ({ data: [] }))
+      showLinkButton.value = (cands.data?.length ?? 0) > 0
+    }
   } catch {
     proxmoxLink.value = null
-    // Only show the "Lier à Proxmox" button if there are candidates available.
-    try {
-      const res = await apiClient.getHostProxmoxCandidates(hostId)
-      showLinkButton.value = res.data?.length > 0
-    } catch {
-      showLinkButton.value = false
-    }
+    showLinkButton.value = false
   }
 }
 

@@ -489,32 +489,26 @@ func (h *ProxmoxHandler) DeleteLink(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "link deleted"})
 }
 
-// GetLinkByGuest returns the link for a specific Proxmox guest (404 if none).
+// GetLinkByGuest returns the link for a specific Proxmox guest, or null when none exists.
+// Returns 200 in both cases to avoid spurious 404s in the browser console.
 func (h *ProxmoxHandler) GetLinkByGuest(c *gin.Context) {
 	link, err := h.db.GetProxmoxGuestLinkByGuest(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	if link == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "no link for this guest"})
-		return
-	}
-	c.JSON(http.StatusOK, link)
+	c.JSON(http.StatusOK, link) // nil marshals to JSON null
 }
 
-// GetLinkByHost returns the confirmed/suggested Proxmox link for a host (404 if none).
+// GetLinkByHost returns the confirmed/suggested Proxmox link for a host, or null when none exists.
+// Returns 200 in both cases to avoid spurious 404s in the browser console.
 func (h *ProxmoxHandler) GetLinkByHost(c *gin.Context) {
 	link, err := h.db.GetProxmoxGuestLinkByHost(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	if link == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "no proxmox link for this host"})
-		return
-	}
-	c.JSON(http.StatusOK, link)
+	c.JSON(http.StatusOK, link) // nil marshals to JSON null
 }
 
 // ListLinkCandidates returns Proxmox guests that could be linked to a host,
