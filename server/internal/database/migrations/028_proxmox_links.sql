@@ -4,8 +4,8 @@ CREATE TABLE IF NOT EXISTS proxmox_guest_links (
     id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     -- Reference to the Proxmox guest (deleted automatically when the guest is cleaned up)
     guest_id       UUID NOT NULL REFERENCES proxmox_guests(id) ON DELETE CASCADE,
-    -- Reference to the ServerSupervisor host (agent)
-    host_id        UUID NOT NULL REFERENCES hosts(id) ON DELETE CASCADE,
+    -- Reference to the ServerSupervisor host (agent) — TEXT to match hosts.id (VARCHAR)
+    host_id        TEXT NOT NULL REFERENCES hosts(id) ON DELETE CASCADE,
     -- Link lifecycle: suggested (auto-detected) | confirmed (user-validated) | ignored (user-dismissed)
     status         TEXT NOT NULL DEFAULT 'suggested'
                        CHECK (status IN ('suggested', 'confirmed', 'ignored')),
