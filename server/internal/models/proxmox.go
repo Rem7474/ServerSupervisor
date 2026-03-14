@@ -111,12 +111,16 @@ type ProxmoxGuestLink struct {
 	CreatedAt     time.Time `json:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at"`
 	// Joined display fields (populated on list/get)
-	GuestName    string `json:"guest_name,omitempty"`
-	GuestType    string `json:"guest_type,omitempty"`
-	NodeName     string `json:"node_name,omitempty"`
-	VMID         int    `json:"vmid,omitempty"`
-	HostName     string `json:"host_name,omitempty"`
-	HostHostname string `json:"host_hostname,omitempty"`
+	GuestName    string  `json:"guest_name,omitempty"`
+	GuestType    string  `json:"guest_type,omitempty"`
+	NodeName     string  `json:"node_name,omitempty"`
+	VMID         int     `json:"vmid,omitempty"`
+	HostName     string  `json:"host_name,omitempty"`
+	HostHostname string  `json:"host_hostname,omitempty"`
+	// Live metrics from the Proxmox guest (populated on list/get)
+	CPUUsage float64 `json:"cpu_usage"`
+	MemAlloc int64   `json:"mem_alloc"`
+	MemUsage int64   `json:"mem_usage"`
 }
 
 // ProxmoxGuestLinkRequest is the body for POST /proxmox/links.

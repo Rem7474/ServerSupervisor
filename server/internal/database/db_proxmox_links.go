@@ -103,7 +103,8 @@ func (db *DB) GetProxmoxGuestLink(id string) (*models.ProxmoxGuestLink, error) {
 	err := db.conn.QueryRow(`
 		SELECT l.id, l.guest_id, l.host_id, l.status, l.metrics_source, l.created_at, l.updated_at,
 		       g.name, g.guest_type, g.node_name, g.vmid,
-		       h.name, h.hostname
+		       h.name, h.hostname,
+		       g.cpu_usage, g.mem_alloc, g.mem_usage
 		FROM proxmox_guest_links l
 		JOIN proxmox_guests g ON g.id = l.guest_id
 		JOIN hosts           h ON h.id = l.host_id
@@ -112,6 +113,7 @@ func (db *DB) GetProxmoxGuestLink(id string) (*models.ProxmoxGuestLink, error) {
 		&l.ID, &l.GuestID, &l.HostID, &l.Status, &l.MetricsSource, &l.CreatedAt, &l.UpdatedAt,
 		&l.GuestName, &l.GuestType, &l.NodeName, &l.VMID,
 		&l.HostName, &l.HostHostname,
+		&l.CPUUsage, &l.MemAlloc, &l.MemUsage,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -125,7 +127,8 @@ func (db *DB) GetProxmoxGuestLinkByGuest(guestID string) (*models.ProxmoxGuestLi
 	err := db.conn.QueryRow(`
 		SELECT l.id, l.guest_id, l.host_id, l.status, l.metrics_source, l.created_at, l.updated_at,
 		       g.name, g.guest_type, g.node_name, g.vmid,
-		       h.name, h.hostname
+		       h.name, h.hostname,
+		       g.cpu_usage, g.mem_alloc, g.mem_usage
 		FROM proxmox_guest_links l
 		JOIN proxmox_guests g ON g.id = l.guest_id
 		JOIN hosts           h ON h.id = l.host_id
@@ -134,6 +137,7 @@ func (db *DB) GetProxmoxGuestLinkByGuest(guestID string) (*models.ProxmoxGuestLi
 		&l.ID, &l.GuestID, &l.HostID, &l.Status, &l.MetricsSource, &l.CreatedAt, &l.UpdatedAt,
 		&l.GuestName, &l.GuestType, &l.NodeName, &l.VMID,
 		&l.HostName, &l.HostHostname,
+		&l.CPUUsage, &l.MemAlloc, &l.MemUsage,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -147,7 +151,8 @@ func (db *DB) GetProxmoxGuestLinkByHost(hostID string) (*models.ProxmoxGuestLink
 	err := db.conn.QueryRow(`
 		SELECT l.id, l.guest_id, l.host_id, l.status, l.metrics_source, l.created_at, l.updated_at,
 		       g.name, g.guest_type, g.node_name, g.vmid,
-		       h.name, h.hostname
+		       h.name, h.hostname,
+		       g.cpu_usage, g.mem_alloc, g.mem_usage
 		FROM proxmox_guest_links l
 		JOIN proxmox_guests g ON g.id = l.guest_id
 		JOIN hosts           h ON h.id = l.host_id
@@ -158,6 +163,7 @@ func (db *DB) GetProxmoxGuestLinkByHost(hostID string) (*models.ProxmoxGuestLink
 		&l.ID, &l.GuestID, &l.HostID, &l.Status, &l.MetricsSource, &l.CreatedAt, &l.UpdatedAt,
 		&l.GuestName, &l.GuestType, &l.NodeName, &l.VMID,
 		&l.HostName, &l.HostHostname,
+		&l.CPUUsage, &l.MemAlloc, &l.MemUsage,
 	)
 	if err == sql.ErrNoRows {
 		return nil, nil
@@ -170,7 +176,8 @@ func (db *DB) ListProxmoxGuestLinks(status string) ([]models.ProxmoxGuestLink, e
 	q := `
 		SELECT l.id, l.guest_id, l.host_id, l.status, l.metrics_source, l.created_at, l.updated_at,
 		       g.name, g.guest_type, g.node_name, g.vmid,
-		       h.name, h.hostname
+		       h.name, h.hostname,
+		       g.cpu_usage, g.mem_alloc, g.mem_usage
 		FROM proxmox_guest_links l
 		JOIN proxmox_guests g ON g.id = l.guest_id
 		JOIN hosts           h ON h.id = l.host_id`
@@ -263,6 +270,7 @@ func scanGuestLinks(rows *sql.Rows) ([]models.ProxmoxGuestLink, error) {
 			&l.ID, &l.GuestID, &l.HostID, &l.Status, &l.MetricsSource, &l.CreatedAt, &l.UpdatedAt,
 			&l.GuestName, &l.GuestType, &l.NodeName, &l.VMID,
 			&l.HostName, &l.HostHostname,
+			&l.CPUUsage, &l.MemAlloc, &l.MemUsage,
 		); err != nil {
 			return nil, err
 		}
