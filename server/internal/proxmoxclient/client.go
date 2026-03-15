@@ -296,10 +296,12 @@ func (c *Client) GetNodeAptUpdate(node string) ([]PVEAptPackage, error) {
 }
 
 // GetNodeDisksList returns physical disks on the given node.
+// Returns an empty slice (no error) if the endpoint is not accessible.
 func (c *Client) GetNodeDisksList(node string) ([]PVEDisk, error) {
 	var disks []PVEDisk
 	if err := c.get(fmt.Sprintf("/nodes/%s/disks/list", node), &disks); err != nil {
-		return nil, err
+		// Graceful degradation — requires Sys.Audit privilege which PVEAuditor may not have.
+		return []PVEDisk{}, nil
 	}
 	return disks, nil
 }

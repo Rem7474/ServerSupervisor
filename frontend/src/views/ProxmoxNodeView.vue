@@ -91,27 +91,27 @@
           <ul class="nav nav-tabs card-header-tabs">
             <li class="nav-item">
               <button class="nav-link" :class="{ active: tab === 'vms' }" @click="tab = 'vms'">
-                VMs ({{ vms.length }})
+                VMs <span class="badge bg-azure-lt text-azure ms-1">{{ vms.length }}</span>
               </button>
             </li>
             <li class="nav-item">
               <button class="nav-link" :class="{ active: tab === 'lxc' }" @click="tab = 'lxc'">
-                LXC ({{ lxcs.length }})
+                LXC <span class="badge bg-azure-lt text-azure ms-1">{{ lxcs.length }}</span>
               </button>
             </li>
             <li class="nav-item">
               <button class="nav-link" :class="{ active: tab === 'storage' }" @click="tab = 'storage'">
-                Stockage ({{ node.storages?.length ?? 0 }})
+                Stockage <span class="badge bg-azure-lt text-azure ms-1">{{ node.storages?.length ?? 0 }}</span>
               </button>
             </li>
             <li class="nav-item">
               <button class="nav-link" :class="{ active: tab === 'disks' }" @click="tab = 'disks'">
-                Disques ({{ node.disks?.length ?? 0 }})
+                Disques <span class="badge bg-azure-lt text-azure ms-1">{{ node.disks?.length ?? 0 }}</span>
               </button>
             </li>
             <li class="nav-item">
               <button class="nav-link" :class="{ active: tab === 'tasks' }" @click="tab = 'tasks'">
-                Tâches ({{ node.tasks?.length ?? 0 }})
+                Tâches <span class="badge bg-azure-lt text-azure ms-1">{{ node.tasks?.length ?? 0 }}</span>
                 <span v-if="failedTaskCount > 0" class="badge bg-warning ms-1">{{ failedTaskCount }}</span>
               </button>
             </li>
