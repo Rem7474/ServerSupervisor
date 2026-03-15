@@ -52,6 +52,42 @@
       </div>
     </div>
 
+    <!-- Cluster health signals (only shown when there are issues) -->
+    <div v-if="hasHealthAlerts" class="row row-cards mb-4">
+      <div v-if="summary.nodes_down > 0" class="col-6 col-lg-3">
+        <div class="card border-danger">
+          <div class="card-body">
+            <div class="subheader text-danger">Nœuds hors ligne</div>
+            <div class="h1 mt-2 mb-0 text-danger">{{ summary.nodes_down }}</div>
+          </div>
+        </div>
+      </div>
+      <div v-if="summary.storage_near_full > 0" class="col-6 col-lg-3">
+        <div class="card border-warning">
+          <div class="card-body">
+            <div class="subheader text-warning">Stockages &gt; 80 %</div>
+            <div class="h1 mt-2 mb-0 text-warning">{{ summary.storage_near_full }}</div>
+          </div>
+        </div>
+      </div>
+      <div v-if="summary.storage_offline > 0" class="col-6 col-lg-3">
+        <div class="card border-danger">
+          <div class="card-body">
+            <div class="subheader text-danger">Stockages inactifs</div>
+            <div class="h1 mt-2 mb-0 text-danger">{{ summary.storage_offline }}</div>
+          </div>
+        </div>
+      </div>
+      <div v-if="summary.recent_failed_tasks > 0" class="col-6 col-lg-3">
+        <div class="card border-warning">
+          <div class="card-body">
+            <div class="subheader text-warning">Tâches échouées (24 h)</div>
+            <div class="h1 mt-2 mb-0 text-warning">{{ summary.recent_failed_tasks }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Error / loading state -->
     <div v-if="loading" class="text-center py-5 text-muted">Chargement...</div>
     <div v-else-if="error" class="alert alert-danger">{{ error }}</div>
@@ -157,6 +193,13 @@ const filteredNodes = computed(() =>
   filterConnection.value
     ? nodes.value.filter(n => n.connection_id === filterConnection.value)
     : nodes.value
+)
+
+const hasHealthAlerts = computed(() =>
+  (summary.value.nodes_down ?? 0) > 0 ||
+  (summary.value.storage_near_full ?? 0) > 0 ||
+  (summary.value.storage_offline ?? 0) > 0 ||
+  (summary.value.recent_failed_tasks ?? 0) > 0
 )
 
 async function load() {

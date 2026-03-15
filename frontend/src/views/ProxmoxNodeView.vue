@@ -69,6 +69,22 @@
         </div>
       </div>
 
+      <!-- Updates banner (only shown when pending updates exist) -->
+      <div v-if="node.pending_updates > 0" class="alert mb-4" :class="node.security_updates > 0 ? 'alert-danger' : 'alert-warning'">
+        <div class="d-flex align-items-center gap-3">
+          <div>
+            <strong>Mises à jour disponibles sur ce nœud :</strong>
+            {{ node.pending_updates }} paquet(s) en attente
+            <span v-if="node.security_updates > 0" class="ms-2 badge bg-danger">
+              dont {{ node.security_updates }} de sécurité
+            </span>
+          </div>
+          <div class="ms-auto text-muted small" v-if="node.last_update_check_at">
+            Dernière vérification : {{ formatDate(node.last_update_check_at) }}
+          </div>
+        </div>
+      </div>
+
       <!-- Tabs -->
       <div class="card">
         <div class="card-header">
@@ -86,6 +102,25 @@
             <li class="nav-item">
               <button class="nav-link" :class="{ active: tab === 'storage' }" @click="tab = 'storage'">
                 Stockage ({{ node.storages?.length ?? 0 }})
+              </button>
+            </li>
+            <li class="nav-item">
+              <button class="nav-link" :class="{ active: tab === 'disks' }" @click="tab = 'disks'">
+                Disques ({{ node.disks?.length ?? 0 }})
+              </button>
+            </li>
+            <li class="nav-item">
+              <button class="nav-link" :class="{ active: tab === 'tasks' }" @click="tab = 'tasks'">
+                Tâches ({{ node.tasks?.length ?? 0 }})
+                <span v-if="failedTaskCount > 0" class="badge bg-warning ms-1">{{ failedTaskCount }}</span>
+              </button>
+            </li>
+            <li class="nav-item">
+              <button class="nav-link" :class="{ active: tab === 'updates' }" @click="tab = 'updates'">
+                Mises à jour
+                <span v-if="node.pending_updates > 0" class="badge ms-1" :class="node.security_updates > 0 ? 'bg-danger' : 'bg-warning'">
+                  {{ node.pending_updates }}
+                </span>
               </button>
             </li>
           </ul>
@@ -178,6 +213,114 @@
         <!-- Link action feedback -->
         <div v-if="linkMsg" class="card-footer py-2">
           <span :class="['small', linkMsgOk ? 'text-success' : 'text-danger']">{{ linkMsg }}</span>
+        </div>
+
+        <!-- Disks tab -->
+        <div v-if="tab === 'disks'" class="table-responsive">
+          <table class="table table-vcenter card-table">
+            <thead>
+              <tr>
+                <th>Périphérique</th>
+                <th>Modèle</th>
+                <th>Type</th>
+                <th>Taille</th>
+                <th>Santé SMART</th>
+                <th>Usure SSD</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-if="!node.disks?.length">
+                <td colspan="6" class="text-center text-muted py-4">Aucun disque détecté sur ce nœud.</td>
+              </tr>
+              <tr v-for="d in node.disks" :key="d.id">
+                <td class="fw-medium font-monospace">{{ d.dev_path }}</td>
+                <td>{{ d.model || '—' }}<div class="text-muted small">{{ d.serial }}</div></td>
+                <td><span class="badge bg-secondary-lt text-secondary text-uppercase">{{ d.disk_type || '?' }}</span></td>
+                <td>{{ formatBytes(d.size_bytes) }}</td>
+                <td>
+                  <span v-if="d.health === 'PASSED'" class="badge bg-success-lt text-success">PASSED</span>
+                  <span v-else-if="d.health === 'FAILED'" class="badge bg-danger-lt text-danger">FAILED</span>
+                  <span v-else class="badge bg-secondary-lt text-secondary">{{ d.health }}</span>
+                </td>
+                <td>
+                  <template v-if="d.wearout >= 0">
+                    <div class="d-flex align-items-center gap-2">
+                      <div class="progress progress-xs flex-grow-1" style="min-width:60px">
+                        <div class="progress-bar" :class="wearoutColor(d.wearout)" :style="`width:${d.wearout}%`"></div>
+                      </div>
+                      <span class="text-muted small">{{ d.wearout }}%</span>
+                    </div>
+                  </template>
+                  <span v-else class="text-muted">—</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Tasks tab -->
+        <div v-if="tab === 'tasks'" class="table-responsive">
+          <table class="table table-vcenter card-table">
+            <thead>
+              <tr>
+                <th>Type</th>
+                <th>Objet</th>
+                <th>Utilisateur</th>
+                <th>Début</th>
+                <th>Durée</th>
+                <th>Statut</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-if="!node.tasks?.length">
+                <td colspan="6" class="text-center text-muted py-4">Aucune tâche récente pour ce nœud.</td>
+              </tr>
+              <tr v-for="t in node.tasks" :key="t.id">
+                <td><span class="badge bg-azure-lt text-azure font-monospace">{{ t.task_type }}</span></td>
+                <td class="text-muted">{{ t.object_id || '—' }}</td>
+                <td class="text-muted small">{{ t.user_name }}</td>
+                <td class="text-muted small">{{ formatDate(t.start_time) }}</td>
+                <td class="text-muted small">{{ taskDuration(t) }}</td>
+                <td>
+                  <span v-if="t.status === 'running'" class="badge bg-blue-lt text-blue">En cours</span>
+                  <span v-else-if="t.exit_status === 'OK'" class="badge bg-success-lt text-success">OK</span>
+                  <span v-else-if="t.exit_status" class="badge bg-danger-lt text-danger" :title="t.exit_status">Erreur</span>
+                  <span v-else class="badge bg-secondary-lt text-secondary">{{ t.status }}</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Updates tab -->
+        <div v-if="tab === 'updates'" class="card-body">
+          <div v-if="node.pending_updates === 0" class="text-center text-muted py-4">
+            <div class="mb-1">Aucune mise à jour en attente détectée.</div>
+            <div v-if="node.last_update_check_at" class="small">
+              Dernière vérification : {{ formatDate(node.last_update_check_at) }}
+            </div>
+            <div v-else class="small">Données non encore disponibles (prochain cycle de polling).</div>
+          </div>
+          <div v-else>
+            <div class="d-flex align-items-center gap-3 mb-3">
+              <div class="h2 mb-0">{{ node.pending_updates }}</div>
+              <div>
+                <div class="fw-medium">paquet(s) en attente de mise à jour</div>
+                <div v-if="node.last_update_check_at" class="text-muted small">
+                  Détecté le {{ formatDate(node.last_update_check_at) }}
+                </div>
+              </div>
+              <div v-if="node.security_updates > 0" class="ms-auto">
+                <span class="badge bg-danger fs-5 px-3 py-2">
+                  {{ node.security_updates }} mise(s) à jour de sécurité
+                </span>
+              </div>
+            </div>
+            <div class="alert alert-info mb-0">
+              Ces informations proviennent du cache apt du nœud Proxmox (lecture seule).
+              Pour appliquer les mises à jour, connectez-vous directement au nœud.
+            </div>
+          </div>
         </div>
 
         <!-- Storage tab -->
@@ -280,6 +423,9 @@ const linkMsgOk = ref(false)
 
 const vms = computed(() => node.value?.guests?.filter(g => g.guest_type === 'vm') ?? [])
 const lxcs = computed(() => node.value?.guests?.filter(g => g.guest_type === 'lxc') ?? [])
+const failedTaskCount = computed(() =>
+  (node.value?.tasks ?? []).filter(t => t.status === 'stopped' && t.exit_status && t.exit_status !== 'OK').length
+)
 
 async function load() {
   loading.value = true
@@ -411,6 +557,32 @@ function formatUptime(seconds) {
   if (d > 0) return `${d}j ${h}h`
   if (h > 0) return `${h}h ${m}m`
   return `${m}m`
+}
+
+function formatDate(iso) {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
+}
+
+// wearout for SSD: 100=new, lower=more worn → invert to show wear percentage
+function wearoutColor(wearout) {
+  // wearout is wear level remaining (100=new). Low value = danger.
+  if (wearout < 20) return 'bg-danger'
+  if (wearout < 50) return 'bg-warning'
+  return 'bg-success'
+}
+
+function taskDuration(t) {
+  if (!t.start_time) return '—'
+  const end = t.end_time ? new Date(t.end_time) : (t.status === 'running' ? new Date() : null)
+  if (!end) return '—'
+  const secs = Math.floor((end - new Date(t.start_time)) / 1000)
+  if (secs < 60) return `${secs}s`
+  const m = Math.floor(secs / 60)
+  const s = secs % 60
+  if (m < 60) return `${m}m ${s}s`
+  const h = Math.floor(m / 60)
+  return `${h}h ${m % 60}m`
 }
 
 onMounted(load)

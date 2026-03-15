@@ -217,3 +217,99 @@ func ClusterName(statuses []PVEClusterStatus) string {
 	}
 	return ""
 }
+
+// ─── Extended API types ───────────────────────────────────────────────────────
+
+// PVETask is an element returned by GET /nodes/{node}/tasks.
+// starttime/endtime are Unix epoch seconds.
+type PVETask struct {
+	UPID       string  `json:"upid"`
+	Type       string  `json:"type"`
+	Status     string  `json:"status"`              // running | stopped
+	User       string  `json:"user"`
+	StartTime  int64   `json:"starttime"`
+	EndTime    int64   `json:"endtime,omitempty"`
+	ID         string  `json:"id,omitempty"`        // vmid or other Proxmox object
+	Node       string  `json:"node,omitempty"`
+	ExitStatus string  `json:"exitstatus,omitempty"` // OK | error msg (only when stopped)
+}
+
+// PVEAptPackage is an element returned by GET /nodes/{node}/apt/update.
+type PVEAptPackage struct {
+	Package    string `json:"Package"`
+	Version    string `json:"Version"`
+	OldVersion string `json:"OldVersion"`
+	Priority   string `json:"Priority"`
+	Section    string `json:"Section"`
+	Origin     string `json:"Origin"`
+	Description string `json:"Description"`
+}
+
+// PVEDisk is an element returned by GET /nodes/{node}/disks/list.
+type PVEDisk struct {
+	DevPath string `json:"devpath"`
+	Model   string `json:"model"`
+	Serial  string `json:"serial"`
+	Size    int64  `json:"size"`
+	Type    string `json:"type"`    // ssd | hdd | nvme | unknown
+	Health  string `json:"health"`  // PASSED | FAILED | UNKNOWN
+	Wearout int    `json:"wearout"` // SSD wear % (100=new, absent for HDD)
+}
+
+// PVEBackupJob is an element returned by GET /cluster/backup.
+type PVEBackupJob struct {
+	ID       string `json:"id"`
+	Enabled  int    `json:"enabled"` // 0 or 1
+	Schedule string `json:"schedule,omitempty"`
+	Storage  string `json:"storage,omitempty"`
+	Mode     string `json:"mode,omitempty"`     // snapshot | suspend | stop
+	Compress string `json:"compress,omitempty"`
+	VMIDs    string `json:"vmid,omitempty"`     // comma-separated or "all"
+	MailTo   string `json:"mailto,omitempty"`
+}
+
+// ─── Extended API methods ─────────────────────────────────────────────────────
+
+// GetNodeTasks returns up to limit recent tasks for the given node.
+// limit ≤ 0 defaults to 50.
+func (c *Client) GetNodeTasks(node string, limit int) ([]PVETask, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	var tasks []PVETask
+	if err := c.get(fmt.Sprintf("/nodes/%s/tasks?limit=%d", node, limit), &tasks); err != nil {
+		return nil, err
+	}
+	return tasks, nil
+}
+
+// GetNodeAptUpdate returns the list of pending apt packages on the given node.
+// This endpoint reads the cached package list; it never triggers an update.
+// Returns an empty slice (no error) if the endpoint is not accessible.
+func (c *Client) GetNodeAptUpdate(node string) ([]PVEAptPackage, error) {
+	var pkgs []PVEAptPackage
+	if err := c.get(fmt.Sprintf("/nodes/%s/apt/update", node), &pkgs); err != nil {
+		// Graceful degradation — some PVE configurations deny this endpoint.
+		return []PVEAptPackage{}, nil
+	}
+	return pkgs, nil
+}
+
+// GetNodeDisksList returns physical disks on the given node.
+func (c *Client) GetNodeDisksList(node string) ([]PVEDisk, error) {
+	var disks []PVEDisk
+	if err := c.get(fmt.Sprintf("/nodes/%s/disks/list", node), &disks); err != nil {
+		return nil, err
+	}
+	return disks, nil
+}
+
+// GetClusterBackup returns backup job configurations from /cluster/backup.
+// Returns an empty slice (no error) if the cluster backup endpoint is unavailable.
+func (c *Client) GetClusterBackup() ([]PVEBackupJob, error) {
+	var jobs []PVEBackupJob
+	if err := c.get("/cluster/backup", &jobs); err != nil {
+		return []PVEBackupJob{}, nil
+	}
+	return jobs, nil
+}

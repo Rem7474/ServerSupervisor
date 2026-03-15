@@ -12,6 +12,9 @@ import (
 	"github.com/serversupervisor/server/internal/proxmoxclient"
 )
 
+// taskLimit is the number of recent tasks fetched per node per poll cycle.
+const taskLimit = 50
+
 // ProxmoxHandler manages Proxmox connections, exposes read-only data,
 // and runs the background polling loop.
 type ProxmoxHandler struct {
@@ -167,11 +170,98 @@ func (h *ProxmoxHandler) pollOne(conn database.ProxmoxConnectionFull) {
 				}
 			}
 		}
+
+		// Tasks (recent history)
+		tasks, err := client.GetNodeTasks(n.Node, taskLimit)
+		if err != nil {
+			log.Printf("proxmox poller [%s/%s]: get tasks: %v", conn.Name, n.Node, err)
+		} else {
+			for _, t := range tasks {
+				var startTime, endTime *time.Time
+				if t.StartTime > 0 {
+					v := time.Unix(t.StartTime, 0).UTC()
+					startTime = &v
+				}
+				if t.EndTime > 0 {
+					v := time.Unix(t.EndTime, 0).UTC()
+					endTime = &v
+				}
+				if err := h.db.UpsertProxmoxTask(
+					conn.ID, n.Node, t.UPID, t.Type, t.Status, t.User,
+					startTime, endTime, t.ExitStatus, t.ID,
+				); err != nil {
+					log.Printf("proxmox poller [%s/%s]: upsert task %s: %v", conn.Name, n.Node, t.UPID, err)
+				}
+				// Track latest vzdump run per VM for backup overview.
+				if t.Type == "vzdump" && t.Status == "stopped" && t.ID != "" {
+					if vmid := parseVMID(t.ID); vmid > 0 {
+						_ = h.db.UpsertProxmoxBackupRun(
+							conn.ID, n.Node, vmid, t.UPID, t.ExitStatus,
+							startTime, endTime, t.ExitStatus,
+						)
+					}
+				}
+			}
+		}
+
+		// Physical disks
+		disks, err := client.GetNodeDisksList(n.Node)
+		if err != nil {
+			log.Printf("proxmox poller [%s/%s]: get disks: %v", conn.Name, n.Node, err)
+		} else {
+			for _, d := range disks {
+				health := d.Health
+				if health == "" {
+					health = "UNKNOWN"
+				}
+				wearout := d.Wearout
+				if d.Type != "ssd" && d.Type != "nvme" {
+					wearout = -1
+				}
+				if err := h.db.UpsertProxmoxDisk(
+					conn.ID, n.Node, d.DevPath, d.Model, d.Serial,
+					d.Size, d.Type, health, wearout,
+				); err != nil {
+					log.Printf("proxmox poller [%s/%s]: upsert disk %s: %v", conn.Name, n.Node, d.DevPath, err)
+				}
+			}
+		}
+
+		// Pending apt updates (graceful — may be denied by some PVE configurations)
+		pkgs, _ := client.GetNodeAptUpdate(n.Node)
+		pending, security := 0, 0
+		for _, p := range pkgs {
+			pending++
+			if isSecurityPackage(p.Origin, p.Section) {
+				security++
+			}
+		}
+		if err := h.db.UpdateProxmoxNodeUpdates(conn.ID, n.Node, pending, security); err != nil {
+			log.Printf("proxmox poller [%s/%s]: update node updates: %v", conn.Name, n.Node, err)
+		}
+	}
+
+	// Backup job configurations (once per connection)
+	backupJobs, err := client.GetClusterBackup()
+	if err != nil {
+		log.Printf("proxmox poller [%s]: get backup jobs: %v", conn.Name, err)
+	} else {
+		for _, j := range backupJobs {
+			if err := h.db.UpsertProxmoxBackupJob(
+				conn.ID, j.ID, j.Enabled != 0,
+				j.Schedule, j.Storage, j.Mode, j.Compress, j.VMIDs, j.MailTo,
+			); err != nil {
+				log.Printf("proxmox poller [%s]: upsert backup job %s: %v", conn.Name, j.ID, err)
+			}
+		}
+		_ = h.db.DeleteStaleProxmoxBackupJobs(conn.ID, cutoff)
 	}
 
 	// Cleanup stale records.
 	_ = h.db.DeleteStaleProxmoxGuests(conn.ID, cutoff)
 	_ = h.db.DeleteStaleProxmoxNodes(conn.ID, cutoff)
+	_ = h.db.DeleteStaleProxmoxTasks(conn.ID, cutoff)
+	_ = h.db.DeleteStaleProxmoxDisks(conn.ID, cutoff)
 
 	_ = h.db.UpdateProxmoxConnectionSuccess(conn.ID)
 	log.Printf("proxmox poller [%s]: poll complete (%d node(s))", conn.Name, len(nodes))

@@ -259,6 +259,13 @@ func registerProxmoxRoutes(g *gin.RouterGroup, h *handlers.ProxmoxHandler) {
 	// Per-host Proxmox link lookup + candidate guests for manual linking
 	g.GET("/hosts/:id/proxmox-link", h.GetLinkByHost)
 	g.GET("/hosts/:id/proxmox-candidates", h.ListLinkCandidates)
+
+	// Extended read-only data (tasks, backups, disks)
+	g.GET("/proxmox/tasks", h.ListTasks)
+	g.GET("/proxmox/nodes/:id/tasks", h.ListNodeTasks)
+	g.GET("/proxmox/nodes/:id/disks", h.ListNodeDisks)
+	g.GET("/proxmox/backup-jobs", h.ListBackupJobs)
+	g.GET("/proxmox/backup-runs", h.ListBackupRuns)
 }
 
 func registerStaticFiles(r *gin.Engine) {

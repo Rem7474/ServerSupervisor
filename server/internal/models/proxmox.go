@@ -23,25 +23,31 @@ type ProxmoxConnection struct {
 }
 
 type ProxmoxNode struct {
-	ID           string    `json:"id"`
-	ConnectionID string    `json:"connection_id"`
-	NodeName     string    `json:"node_name"`
-	Status       string    `json:"status"`
-	CPUCount     int       `json:"cpu_count"`
-	CPUUsage     float64   `json:"cpu_usage"`
-	MemTotal     int64     `json:"mem_total"`
-	MemUsed      int64     `json:"mem_used"`
-	Uptime       int64     `json:"uptime"`
-	PVEVersion   string    `json:"pve_version"`
-	ClusterName  string    `json:"cluster_name"`
-	IPAddress    string    `json:"ip_address"`
-	LastSeenAt   time.Time `json:"last_seen_at"`
+	ID           string     `json:"id"`
+	ConnectionID string     `json:"connection_id"`
+	NodeName     string     `json:"node_name"`
+	Status       string     `json:"status"`
+	CPUCount     int        `json:"cpu_count"`
+	CPUUsage     float64    `json:"cpu_usage"`
+	MemTotal     int64      `json:"mem_total"`
+	MemUsed      int64      `json:"mem_used"`
+	Uptime       int64      `json:"uptime"`
+	PVEVersion   string     `json:"pve_version"`
+	ClusterName  string     `json:"cluster_name"`
+	IPAddress    string     `json:"ip_address"`
+	LastSeenAt   time.Time  `json:"last_seen_at"`
+	// Pending apt updates (polled from /nodes/{node}/apt/update)
+	PendingUpdates    int        `json:"pending_updates"`
+	SecurityUpdates   int        `json:"security_updates"`
+	LastUpdateCheckAt *time.Time `json:"last_update_check_at,omitempty"`
 	// Computed counts
 	VMCount  int `json:"vm_count,omitempty"`
 	LXCCount int `json:"lxc_count,omitempty"`
 	// Detail view (populated on single-node fetch)
 	Guests   []ProxmoxGuest   `json:"guests,omitempty"`
 	Storages []ProxmoxStorage `json:"storages,omitempty"`
+	Disks    []ProxmoxDisk    `json:"disks,omitempty"`
+	Tasks    []ProxmoxTask    `json:"tasks,omitempty"`
 }
 
 type ProxmoxGuest struct {
@@ -77,6 +83,68 @@ type ProxmoxStorage struct {
 	LastSeenAt   time.Time `json:"last_seen_at"`
 }
 
+// ProxmoxTask represents a single Proxmox task (from GET /nodes/{node}/tasks).
+type ProxmoxTask struct {
+	ID           string     `json:"id"`
+	ConnectionID string     `json:"connection_id"`
+	NodeName     string     `json:"node_name"`
+	UPID         string     `json:"upid"`
+	TaskType     string     `json:"task_type"`
+	Status       string     `json:"status"`      // running | stopped
+	UserName     string     `json:"user_name"`
+	StartTime    *time.Time `json:"start_time,omitempty"`
+	EndTime      *time.Time `json:"end_time,omitempty"`
+	ExitStatus   string     `json:"exit_status"` // OK | error message | ""
+	ObjectID     string     `json:"object_id"`   // vmid or other Proxmox object
+	LastSeenAt   time.Time  `json:"last_seen_at"`
+}
+
+// ProxmoxBackupJob represents a Proxmox backup job configuration (GET /cluster/backup).
+type ProxmoxBackupJob struct {
+	ID           string    `json:"id"`
+	ConnectionID string    `json:"connection_id"`
+	JobID        string    `json:"job_id"`
+	Enabled      bool      `json:"enabled"`
+	Schedule     string    `json:"schedule"`
+	Storage      string    `json:"storage"`
+	Mode         string    `json:"mode"`     // snapshot | suspend | stop
+	Compress     string    `json:"compress"`
+	VMIDs        string    `json:"vmids"`    // comma-separated VMIDs or "all"
+	MailTo       string    `json:"mail_to"`
+	LastSeenAt   time.Time `json:"last_seen_at"`
+}
+
+// ProxmoxBackupRun stores the latest backup result per VM (derived from vzdump tasks).
+type ProxmoxBackupRun struct {
+	ID           string     `json:"id"`
+	ConnectionID string     `json:"connection_id"`
+	NodeName     string     `json:"node_name"`
+	VMID         int        `json:"vmid"`
+	TaskUPID     string     `json:"task_upid"`
+	Status       string     `json:"status"`    // OK | error | running
+	StartTime    *time.Time `json:"start_time,omitempty"`
+	EndTime      *time.Time `json:"end_time,omitempty"`
+	ExitStatus   string     `json:"exit_status"`
+	LastSeenAt   time.Time  `json:"last_seen_at"`
+	// Joined from proxmox_guests
+	GuestName string `json:"guest_name,omitempty"`
+}
+
+// ProxmoxDisk represents a physical disk in a Proxmox node (GET /nodes/{node}/disks/list).
+type ProxmoxDisk struct {
+	ID           string    `json:"id"`
+	ConnectionID string    `json:"connection_id"`
+	NodeName     string    `json:"node_name"`
+	DevPath      string    `json:"dev_path"`
+	Model        string    `json:"model"`
+	Serial       string    `json:"serial"`
+	SizeBytes    int64     `json:"size_bytes"`
+	DiskType     string    `json:"disk_type"` // ssd | hdd | nvme | unknown
+	Health       string    `json:"health"`    // PASSED | FAILED | UNKNOWN
+	Wearout      int       `json:"wearout"`   // SSD wear % (100=new), -1 if N/A
+	LastSeenAt   time.Time `json:"last_seen_at"`
+}
+
 // ProxmoxConnectionRequest is the body for create/update endpoints.
 // TokenSecret is optional on update (empty means "keep existing").
 type ProxmoxConnectionRequest struct {
@@ -97,6 +165,11 @@ type ProxmoxSummary struct {
 	LXCCount        int   `json:"lxc_count"`
 	StorageTotal    int64 `json:"storage_total"`
 	StorageUsed     int64 `json:"storage_used"`
+	// Health signals (computed, read-only)
+	NodesDown         int `json:"nodes_down"`
+	StorageNearFull   int `json:"storage_near_full"`   // usage > 80 %
+	StorageOffline    int `json:"storage_offline"`     // active=false or enabled=false
+	RecentFailedTasks int `json:"recent_failed_tasks"` // exit_status != 'OK' in last 24 h
 }
 
 // ProxmoxGuestLink maps a Proxmox guest (VM/LXC) to a ServerSupervisor host (agent).

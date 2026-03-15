@@ -191,4 +191,12 @@ export default {
   // Per-host Proxmox link
   getHostProxmoxLink: (hostId) => api.get(`/v1/hosts/${hostId}/proxmox-link`),
   getHostProxmoxCandidates: (hostId) => api.get(`/v1/hosts/${hostId}/proxmox-candidates`),
+  // Extended: tasks
+  getProxmoxTasks: (params = {}) => api.get('/v1/proxmox/tasks', { params }),
+  getProxmoxNodeTasks: (nodeId, limit = 50) => api.get(`/v1/proxmox/nodes/${nodeId}/tasks`, { params: { limit } }),
+  // Extended: disks
+  getProxmoxNodeDisks: (nodeId) => api.get(`/v1/proxmox/nodes/${nodeId}/disks`),
+  // Extended: backups
+  getProxmoxBackupJobs: (connectionId = '') => api.get('/v1/proxmox/backup-jobs', { params: connectionId ? { connection_id: connectionId } : {} }),
+  getProxmoxBackupRuns: (connectionId = '') => api.get('/v1/proxmox/backup-runs', { params: connectionId ? { connection_id: connectionId } : {} }),
 }

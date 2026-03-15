@@ -229,15 +229,19 @@ func (db *DB) UpsertProxmoxNode(connectionID, nodeName, status string, cpuCount 
 	return err
 }
 
+// nodeSelectCols is the shared SELECT list used by list + get queries.
+const nodeSelectCols = `
+	n.id, n.connection_id, n.node_name, n.status,
+	n.cpu_count, n.cpu_usage, n.mem_total, n.mem_used,
+	n.uptime, n.pve_version, n.cluster_name, n.ip_address, n.last_seen_at,
+	n.pending_updates, n.security_updates, n.last_update_check_at,
+	COUNT(CASE WHEN g.guest_type='vm'  THEN 1 END) AS vm_count,
+	COUNT(CASE WHEN g.guest_type='lxc' THEN 1 END) AS lxc_count`
+
 // ListProxmoxNodes returns all nodes with VM/LXC counts.
 func (db *DB) ListProxmoxNodes() ([]models.ProxmoxNode, error) {
 	rows, err := db.conn.Query(`
-		SELECT
-			n.id, n.connection_id, n.node_name, n.status,
-			n.cpu_count, n.cpu_usage, n.mem_total, n.mem_used,
-			n.uptime, n.pve_version, n.cluster_name, n.ip_address, n.last_seen_at,
-			COUNT(CASE WHEN g.guest_type='vm'  THEN 1 END) AS vm_count,
-			COUNT(CASE WHEN g.guest_type='lxc' THEN 1 END) AS lxc_count
+		SELECT ` + nodeSelectCols + `
 		FROM proxmox_nodes n
 		LEFT JOIN proxmox_guests g ON g.connection_id=n.connection_id AND g.node_name=n.node_name
 		GROUP BY n.id
@@ -252,12 +256,7 @@ func (db *DB) ListProxmoxNodes() ([]models.ProxmoxNode, error) {
 // ListProxmoxNodesByConnection returns nodes for one connection.
 func (db *DB) ListProxmoxNodesByConnection(connectionID string) ([]models.ProxmoxNode, error) {
 	rows, err := db.conn.Query(`
-		SELECT
-			n.id, n.connection_id, n.node_name, n.status,
-			n.cpu_count, n.cpu_usage, n.mem_total, n.mem_used,
-			n.uptime, n.pve_version, n.cluster_name, n.ip_address, n.last_seen_at,
-			COUNT(CASE WHEN g.guest_type='vm'  THEN 1 END) AS vm_count,
-			COUNT(CASE WHEN g.guest_type='lxc' THEN 1 END) AS lxc_count
+		SELECT `+nodeSelectCols+`
 		FROM proxmox_nodes n
 		LEFT JOIN proxmox_guests g ON g.connection_id=n.connection_id AND g.node_name=n.node_name
 		WHERE n.connection_id=$1
@@ -270,16 +269,12 @@ func (db *DB) ListProxmoxNodesByConnection(connectionID string) ([]models.Proxmo
 	return scanNodes(rows)
 }
 
-// GetProxmoxNode returns a node by ID including its guests and storages.
+// GetProxmoxNode returns a node by ID including its guests, storages, disks and recent tasks.
 func (db *DB) GetProxmoxNode(id string) (*models.ProxmoxNode, error) {
 	var n models.ProxmoxNode
+	var lastUpdateCheckAt sql.NullTime
 	err := db.conn.QueryRow(`
-		SELECT
-			n.id, n.connection_id, n.node_name, n.status,
-			n.cpu_count, n.cpu_usage, n.mem_total, n.mem_used,
-			n.uptime, n.pve_version, n.cluster_name, n.ip_address, n.last_seen_at,
-			COUNT(CASE WHEN g.guest_type='vm'  THEN 1 END) AS vm_count,
-			COUNT(CASE WHEN g.guest_type='lxc' THEN 1 END) AS lxc_count
+		SELECT `+nodeSelectCols+`
 		FROM proxmox_nodes n
 		LEFT JOIN proxmox_guests g ON g.connection_id=n.connection_id AND g.node_name=n.node_name
 		WHERE n.id=$1
@@ -287,6 +282,7 @@ func (db *DB) GetProxmoxNode(id string) (*models.ProxmoxNode, error) {
 		&n.ID, &n.ConnectionID, &n.NodeName, &n.Status,
 		&n.CPUCount, &n.CPUUsage, &n.MemTotal, &n.MemUsed,
 		&n.Uptime, &n.PVEVersion, &n.ClusterName, &n.IPAddress, &n.LastSeenAt,
+		&n.PendingUpdates, &n.SecurityUpdates, &lastUpdateCheckAt,
 		&n.VMCount, &n.LXCCount,
 	)
 	if err == sql.ErrNoRows {
@@ -294,6 +290,10 @@ func (db *DB) GetProxmoxNode(id string) (*models.ProxmoxNode, error) {
 	}
 	if err != nil {
 		return nil, err
+	}
+	if lastUpdateCheckAt.Valid {
+		t := lastUpdateCheckAt.Time
+		n.LastUpdateCheckAt = &t
 	}
 
 	// Load guests
@@ -310,6 +310,20 @@ func (db *DB) GetProxmoxNode(id string) (*models.ProxmoxNode, error) {
 	}
 	n.Storages = storages
 
+	// Load physical disks
+	disks, err := db.ListProxmoxDisksByNode(n.ConnectionID, n.NodeName)
+	if err != nil {
+		return nil, err
+	}
+	n.Disks = disks
+
+	// Load 50 most recent tasks
+	tasks, err := db.ListProxmoxTasksByNode(n.ConnectionID, n.NodeName, 50)
+	if err != nil {
+		return nil, err
+	}
+	n.Tasks = tasks
+
 	return &n, nil
 }
 
@@ -317,13 +331,19 @@ func scanNodes(rows *sql.Rows) ([]models.ProxmoxNode, error) {
 	var nodes []models.ProxmoxNode
 	for rows.Next() {
 		var n models.ProxmoxNode
+		var lastUpdateCheckAt sql.NullTime
 		if err := rows.Scan(
 			&n.ID, &n.ConnectionID, &n.NodeName, &n.Status,
 			&n.CPUCount, &n.CPUUsage, &n.MemTotal, &n.MemUsed,
 			&n.Uptime, &n.PVEVersion, &n.ClusterName, &n.IPAddress, &n.LastSeenAt,
+			&n.PendingUpdates, &n.SecurityUpdates, &lastUpdateCheckAt,
 			&n.VMCount, &n.LXCCount,
 		); err != nil {
 			return nil, err
+		}
+		if lastUpdateCheckAt.Valid {
+			t := lastUpdateCheckAt.Time
+			n.LastUpdateCheckAt = &t
 		}
 		nodes = append(nodes, n)
 	}
@@ -477,26 +497,30 @@ func (db *DB) ListProxmoxStoragesByNode(connectionID, nodeName string) ([]models
 	return scanStorages(rows)
 }
 
-// GetProxmoxSummary returns aggregate stats across all connections.
+// GetProxmoxSummary returns aggregate stats and health signals across all connections.
 func (db *DB) GetProxmoxSummary() (models.ProxmoxSummary, error) {
 	var s models.ProxmoxSummary
-	err := db.conn.QueryRow(`SELECT COUNT(*) FROM proxmox_connections`).Scan(&s.ConnectionCount)
-	if err != nil {
-		return s, err
+
+	queries := []struct {
+		dest *int
+		q    string
+	}{
+		{&s.ConnectionCount, `SELECT COUNT(*) FROM proxmox_connections`},
+		{&s.NodeCount, `SELECT COUNT(*) FROM proxmox_nodes`},
+		{&s.VMCount, `SELECT COUNT(*) FROM proxmox_guests WHERE guest_type='vm'`},
+		{&s.LXCCount, `SELECT COUNT(*) FROM proxmox_guests WHERE guest_type='lxc'`},
+		{&s.NodesDown, `SELECT COUNT(*) FROM proxmox_nodes WHERE status != 'online'`},
+		{&s.StorageNearFull, `SELECT COUNT(*) FROM proxmox_storages WHERE total > 0 AND (used::float / total::float) > 0.80`},
+		{&s.StorageOffline, `SELECT COUNT(*) FROM proxmox_storages WHERE active = FALSE OR enabled = FALSE`},
+		{&s.RecentFailedTasks, `SELECT COUNT(*) FROM proxmox_tasks WHERE status='stopped' AND exit_status != '' AND exit_status != 'OK' AND start_time >= NOW() - INTERVAL '24 hours'`},
 	}
-	err = db.conn.QueryRow(`SELECT COUNT(*) FROM proxmox_nodes`).Scan(&s.NodeCount)
-	if err != nil {
-		return s, err
+	for _, q := range queries {
+		if err := db.conn.QueryRow(q.q).Scan(q.dest); err != nil {
+			return s, err
+		}
 	}
-	err = db.conn.QueryRow(`SELECT COUNT(*) FROM proxmox_guests WHERE guest_type='vm'`).Scan(&s.VMCount)
-	if err != nil {
-		return s, err
-	}
-	err = db.conn.QueryRow(`SELECT COUNT(*) FROM proxmox_guests WHERE guest_type='lxc'`).Scan(&s.LXCCount)
-	if err != nil {
-		return s, err
-	}
-	err = db.conn.QueryRow(`SELECT COALESCE(SUM(total),0), COALESCE(SUM(used),0) FROM proxmox_storages`).
+
+	err := db.conn.QueryRow(`SELECT COALESCE(SUM(total),0), COALESCE(SUM(used),0) FROM proxmox_storages`).
 		Scan(&s.StorageTotal, &s.StorageUsed)
 	return s, err
 }
