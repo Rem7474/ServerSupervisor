@@ -4,18 +4,24 @@
     <div class="col-6 col-lg-3">
       <div class="card card-sm h-100">
         <div class="card-body">
-          <div class="subheader">CPU ({{ metrics.cpu_cores }} CORES)</div>
+          <div class="subheader d-flex align-items-center gap-2">
+            CPU ({{ metrics.cpu_cores }} CORES)
+            <span v-if="metricsSource === 'proxmox'" class="badge bg-purple-lt text-purple" style="font-size:0.65rem">Proxmox</span>
+          </div>
           <div class="h2 mb-0" :class="cpuColor(metrics.cpu_usage_percent)">
             {{ metrics.cpu_usage_percent?.toFixed(1) }}%
           </div>
-          <div class="text-secondary small">{{ metrics.cpu_model }}</div>
+          <div class="text-secondary small">{{ metricsSource === 'proxmox' ? 'Source : hyperviseur' : metrics.cpu_model }}</div>
         </div>
       </div>
     </div>
     <div class="col-6 col-lg-3">
       <div class="card card-sm h-100">
         <div class="card-body">
-          <div class="subheader">RAM</div>
+          <div class="subheader d-flex align-items-center gap-2">
+            RAM
+            <span v-if="metricsSource === 'proxmox'" class="badge bg-purple-lt text-purple" style="font-size:0.65rem">Proxmox</span>
+          </div>
           <div class="h2 mb-0" :class="memColor(metrics.memory_percent)">
             {{ metrics.memory_percent?.toFixed(1) }}%
           </div>
@@ -99,6 +105,7 @@ const Line = defineAsyncComponent(async () => {
 const props = defineProps({
   hostId: { type: String, required: true },
   metrics: { type: Object, default: null },
+  metricsSource: { type: String, default: 'agent' }, // 'agent' | 'proxmox'
 })
 
 const chartHours = ref(24)

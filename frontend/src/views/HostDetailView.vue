@@ -142,7 +142,7 @@
         />
 
         <div v-show="activeTab === 'metrics'">
-          <HostMetricsPanel :hostId="hostId" :metrics="metrics" />
+          <HostMetricsPanel :hostId="hostId" :metrics="effectiveMetrics" :metricsSource="effectiveMetricsSource" />
           <DiskMetricsCard :hostId="hostId" :initialMetrics="diskMetrics" class="mb-4" />
           <DiskHealthCard :hostId="hostId" :initialHealth="diskHealth" class="mb-4" />
         </div>
@@ -250,6 +250,41 @@ const latestAgentVersion = ref('')
 // Proxmox link state
 const proxmoxLink = ref(null)
 const linkSaving = ref(false)
+
+// Effective metrics — substitutes Proxmox CPU/RAM when metrics_source demands it.
+// proxmoxLink.cpu_usage is a 0–1 fraction; mem_usage / mem_alloc are bytes.
+const effectiveMetrics = computed(() => {
+  const m = metrics.value
+  const link = proxmoxLink.value
+  if (!m || !link || link.status !== 'confirmed') return m
+
+  const src = link.metrics_source ?? 'auto'
+  const useProxmox =
+    src === 'proxmox' ||
+    (src === 'auto' && (link.mem_alloc ?? 0) > 0)
+
+  if (!useProxmox) return m
+
+  const cpuPct = (link.cpu_usage ?? 0) * 100
+  const memUsed = link.mem_usage ?? 0
+  const memTotal = link.mem_alloc ?? 0
+  return {
+    ...m,
+    cpu_usage_percent: cpuPct,
+    memory_used: memUsed,
+    memory_total: memTotal,
+    memory_percent: memTotal > 0 ? (memUsed / memTotal) * 100 : 0,
+  }
+})
+
+const effectiveMetricsSource = computed(() => {
+  const link = proxmoxLink.value
+  if (!link || link.status !== 'confirmed') return 'agent'
+  const src = link.metrics_source ?? 'auto'
+  if (src === 'proxmox') return 'proxmox'
+  if (src === 'auto' && (link.mem_alloc ?? 0) > 0) return 'proxmox'
+  return 'agent'
+})
 const showLinkForm = ref(false)
 const showLinkButton = ref(false)
 const linkCandidates = ref([])
