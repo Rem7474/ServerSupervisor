@@ -834,15 +834,12 @@ function buildRRDCharts(points, timeframe) {
     }],
   }
 
-  // RAM: p.maxmem from RRD (same unit as p.mem) → node.mem_total from DB → treat mem as fraction
-  const rrdMaxMem = points.find(p => p.maxmem != null && p.maxmem > 0)?.maxmem ?? 0
-  const maxMem = rrdMaxMem || (node.value?.mem_total ?? 0)
-  const ramData = points.map(p => {
-    if (p.mem == null) return null
-    if (maxMem > 1) return (p.mem / maxMem) * 100   // bytes denominator
-    if (p.mem <= 1) return p.mem * 100               // already a 0-1 fraction
-    return null
-  })
+  // RAM: memused / memtotal are raw bytes from PVE RRD
+  const ramData = points.map(p =>
+    (p.mem_used != null && p.mem_total != null && p.mem_total > 0)
+      ? (p.mem_used / p.mem_total) * 100
+      : null
+  )
   rrdRamChart.value = ramData.some(v => v != null) ? {
     labels,
     datasets: [{

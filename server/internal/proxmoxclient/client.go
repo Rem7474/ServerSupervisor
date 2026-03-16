@@ -424,29 +424,20 @@ func (c *Client) GetClusterBackup() ([]PVEBackupJob, error) {
 type PVERRDPoint struct {
 	Time      int64    `json:"time"`
 	CPU       *float64 `json:"cpu"`
-	Mem       *float64 `json:"mem"`
-	MaxMem    *float64 `json:"maxmem"`
+	MemUsed   *float64 `json:"memused"`
+	MemTotal  *float64 `json:"memtotal"`
+	SwapUsed  *float64 `json:"swapused"`
+	SwapTotal *float64 `json:"swaptotal"`
 	NetIn     *float64 `json:"netin"`
 	NetOut    *float64 `json:"netout"`
-	DiskRead  *float64 `json:"diskread"`
-	DiskWrite *float64 `json:"diskwrite"`
 	IOWait    *float64 `json:"iowait"`
 }
 
 // GetNodeRRDData returns time-series metrics for a node.
 // timeframe must be one of: hour | day | week | month | year.
 func (c *Client) GetNodeRRDData(node, timeframe string) ([]PVERRDPoint, error) {
-	path := fmt.Sprintf("/nodes/%s/rrddata?timeframe=%s&cf=AVERAGE", node, timeframe)
-	// Temporary: log raw first element to identify actual field names
-	var raw []json.RawMessage
-	if err := c.get(path, &raw); err != nil {
-		return nil, err
-	}
-	if len(raw) > 0 {
-		fmt.Printf("[DEBUG rrd raw] first point: %s\n", string(raw[0]))
-	}
 	var points []PVERRDPoint
-	if err := c.get(path, &points); err != nil {
+	if err := c.get(fmt.Sprintf("/nodes/%s/rrddata?timeframe=%s&cf=AVERAGE", node, timeframe), &points); err != nil {
 		return nil, err
 	}
 	return points, nil
