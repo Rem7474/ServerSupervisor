@@ -9,9 +9,32 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
+
+// FlexInt unmarshals a JSON value that Proxmox sometimes returns as a quoted
+// string ("100") and sometimes as a plain number (100). Absent values unmarshal
+// to 0.
+type FlexInt int
+
+func (f *FlexInt) UnmarshalJSON(b []byte) error {
+	// Unquote if it's a JSON string.
+	s := strings.Trim(string(b), `"`)
+	if s == "" || s == "null" {
+		*f = 0
+		return nil
+	}
+	v, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		// Non-numeric string (e.g. "N/A") — treat as 0.
+		*f = 0
+		return nil
+	}
+	*f = FlexInt(v)
+	return nil
+}
 
 // Client talks to one Proxmox VE instance.
 type Client struct {
@@ -247,13 +270,13 @@ type PVEAptPackage struct {
 
 // PVEDisk is an element returned by GET /nodes/{node}/disks/list.
 type PVEDisk struct {
-	DevPath string `json:"devpath"`
-	Model   string `json:"model"`
-	Serial  string `json:"serial"`
-	Size    int64  `json:"size"`
-	Type    string `json:"type"`    // ssd | hdd | nvme | unknown
-	Health  string `json:"health"`  // PASSED | FAILED | UNKNOWN
-	Wearout int    `json:"wearout"` // SSD wear % (100=new, absent for HDD)
+	DevPath string  `json:"devpath"`
+	Model   string  `json:"model"`
+	Serial  string  `json:"serial"`
+	Size    int64   `json:"size"`
+	Type    string  `json:"type"`    // ssd | hdd | nvme | unknown
+	Health  string  `json:"health"`  // PASSED | FAILED | UNKNOWN
+	Wearout FlexInt `json:"wearout"` // SSD wear % (100=new, absent for HDD) — may be quoted string in PVE API
 }
 
 // PVEBackupJob is an element returned by GET /cluster/backup.

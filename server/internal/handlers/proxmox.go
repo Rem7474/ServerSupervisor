@@ -215,7 +215,7 @@ func (h *ProxmoxHandler) pollOne(conn database.ProxmoxConnectionFull) {
 				if health == "" {
 					health = "UNKNOWN"
 				}
-				wearout := d.Wearout
+				wearout := int(d.Wearout)
 				if d.Type != "ssd" && d.Type != "nvme" {
 					wearout = -1
 				}
