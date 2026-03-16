@@ -116,11 +116,61 @@ func (db *DB) Exec(query string, args ...interface{}) (sql.Result, error) {
 }
 
 // migrate runs all embedded SQL migration files in alphabetical order.
-// Statements are split by splitSQLStatements which is aware of dollar-quoted
-// strings (DO $$ ... $$) so PL/pgSQL blocks are never split mid-block.
-// All CREATE / ALTER / INSERT statements use IF NOT EXISTS / IF EXISTS, so
-// the runner is idempotent against both fresh and existing databases.
+// Applied migrations are tracked in the schema_migrations table so each file
+// runs exactly once, even across server restarts.
 func (db *DB) migrate() error {
+	// Ensure the tracking table exists.
+	if _, err := db.conn.Exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
+		filename   TEXT PRIMARY KEY,
+		applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+	)`); err != nil {
+		return fmt.Errorf("create schema_migrations: %w", err)
+	}
+
+	// Load already-applied filenames.
+	rows, err := db.conn.Query(`SELECT filename FROM schema_migrations`)
+	if err != nil {
+		return fmt.Errorf("query schema_migrations: %w", err)
+	}
+	applied := make(map[string]struct{})
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			rows.Close()
+			return fmt.Errorf("scan schema_migrations: %w", err)
+		}
+		applied[name] = struct{}{}
+	}
+	rows.Close()
+
+	// Bootstrap: if schema_migrations is empty but the DB already has the core
+	// schema (hosts table exists), mark all existing migration files as applied
+	// without re-running them. This handles databases that were set up before
+	// migration versioning was introduced.
+	if len(applied) == 0 {
+		var exists bool
+		_ = db.conn.QueryRow(`SELECT EXISTS (
+			SELECT 1 FROM information_schema.tables
+			WHERE table_schema = 'public' AND table_name = 'hosts'
+		)`).Scan(&exists)
+		if exists {
+			entries, err := fs.ReadDir(migrationFS, "migrations")
+			if err != nil {
+				return fmt.Errorf("failed to read migrations dir: %w", err)
+			}
+			for _, e := range entries {
+				if !strings.HasSuffix(e.Name(), ".sql") {
+					continue
+				}
+				if _, err := db.conn.Exec(`INSERT INTO schema_migrations (filename) VALUES ($1) ON CONFLICT DO NOTHING`, e.Name()); err != nil {
+					return fmt.Errorf("backfill schema_migrations %s: %w", e.Name(), err)
+				}
+				applied[e.Name()] = struct{}{}
+			}
+			log.Printf("schema_migrations bootstrapped: %d existing migrations marked as applied", len(applied))
+		}
+	}
+
 	entries, err := fs.ReadDir(migrationFS, "migrations")
 	if err != nil {
 		return fmt.Errorf("failed to read migrations dir: %w", err)
@@ -129,6 +179,9 @@ func (db *DB) migrate() error {
 	for _, e := range entries {
 		if !strings.HasSuffix(e.Name(), ".sql") {
 			continue
+		}
+		if _, ok := applied[e.Name()]; ok {
+			continue // already applied
 		}
 		data, err := migrationFS.ReadFile("migrations/" + e.Name())
 		if err != nil {
@@ -143,6 +196,10 @@ func (db *DB) migrate() error {
 				return fmt.Errorf("migration %s failed at [%s]: %w", e.Name(), stmt[:n], err)
 			}
 		}
+		if _, err := db.conn.Exec(`INSERT INTO schema_migrations (filename) VALUES ($1)`, e.Name()); err != nil {
+			return fmt.Errorf("record migration %s: %w", e.Name(), err)
+		}
+		log.Printf("Migration applied: %s", e.Name())
 	}
 
 	log.Println("Database migrations completed")
