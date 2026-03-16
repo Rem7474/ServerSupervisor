@@ -282,13 +282,34 @@ const (
 )
 
 // ubuntuCVEResponse is the subset of the Ubuntu CVE JSON API we care about.
+// cvss3 can be null, a plain number, or an object — use RawMessage to handle all cases.
 type ubuntuCVEResponse struct {
-	ID       string  `json:"id"`
-	Priority string  `json:"priority"` // critical / high / medium / low / negligible / unknown
-	CVSS3    *struct {
-		Score  float64 `json:"score"`
-		Vector string  `json:"vector"`
-	} `json:"cvss3"`
+	ID       string          `json:"id"`
+	Priority string          `json:"priority"` // critical / high / medium / low / negligible / unknown
+	CVSS3Raw json.RawMessage `json:"cvss3"`
+}
+
+type ubuntuCVSS3 struct {
+	Score  float64 `json:"score"`
+	Vector string  `json:"vector"`
+}
+
+// cvss3 parses the raw cvss3 field, tolerating number, object, or null.
+func (r *ubuntuCVEResponse) cvss3() *ubuntuCVSS3 {
+	if len(r.CVSS3Raw) == 0 {
+		return nil
+	}
+	// Try object form first
+	var obj ubuntuCVSS3
+	if err := json.Unmarshal(r.CVSS3Raw, &obj); err == nil && obj.Score > 0 {
+		return &obj
+	}
+	// Try plain number (score only, no vector)
+	var score float64
+	if err := json.Unmarshal(r.CVSS3Raw, &score); err == nil && score > 0 {
+		return &ubuntuCVSS3{Score: score}
+	}
+	return nil
 }
 
 // ubuntuPriorityToSeverity maps an Ubuntu priority label to an upper-cased severity string.
@@ -386,9 +407,9 @@ func enrichCVEsWithUbuntuData(cves []CVEInfo) []CVEInfo {
 			mu.Lock()
 			cves[idx].UbuntuPriority = data.Priority
 			cves[idx].Severity = ubuntuPriorityToSeverity(data.Priority)
-			if data.CVSS3 != nil {
-				cves[idx].CVSSScore = data.CVSS3.Score
-				cves[idx].CVSSVector = data.CVSS3.Vector
+			if cvss := data.cvss3(); cvss != nil {
+				cves[idx].CVSSScore = cvss.Score
+				cves[idx].CVSSVector = cvss.Vector
 			}
 			mu.Unlock()
 		}(i)
