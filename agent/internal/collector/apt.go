@@ -277,8 +277,8 @@ const (
 	ubuntuCVEAPIBase = "https://ubuntu.com/security/cves/%s.json"
 	cveCacheDir      = "/tmp/ss-cve-cache"
 	cveCacheTTL      = 24 * time.Hour
-	cveAPITimeout    = 8 * time.Second
-	cveParallelLimit = 5 // max concurrent Ubuntu API requests
+	cveAPITimeout    = 20 * time.Second
+	cveParallelLimit = 3 // keep low to avoid rate-limiting from ubuntu.com
 )
 
 // ubuntuCVEResponse is the subset of the Ubuntu CVE JSON API we care about.
@@ -330,7 +330,9 @@ func ubuntuPriorityToSeverity(priority string) string {
 	}
 }
 
-// fetchUbuntuCVE fetches CVE data from Ubuntu's security API.
+var cveHTTPClient = &http.Client{Timeout: cveAPITimeout}
+
+// fetchUbuntuCVE fetches CVE data from Ubuntu's security API with one retry.
 // Results are cached on disk for cveCacheTTL to avoid hammering the API.
 func fetchUbuntuCVE(cveID string) (*ubuntuCVEResponse, error) {
 	cacheFile := filepath.Join(cveCacheDir, cveID+".json")
@@ -346,41 +348,62 @@ func fetchUbuntuCVE(cveID string) (*ubuntuCVEResponse, error) {
 		}
 	}
 
+	url := fmt.Sprintf(ubuntuCVEAPIBase, cveID)
+
+	var lastErr error
+	for attempt := range 2 {
+		if attempt > 0 {
+			time.Sleep(2 * time.Second)
+		}
+
+		result, body, err := doUbuntuCVERequest(url)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+
+		// Persist to cache (best-effort).
+		_ = os.MkdirAll(cveCacheDir, 0o755)
+		_ = os.WriteFile(cacheFile, body, 0o644)
+
+		return result, nil
+	}
+
+	return nil, lastErr
+}
+
+func doUbuntuCVERequest(url string) (*ubuntuCVEResponse, []byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), cveAPITimeout)
 	defer cancel()
 
-	url := fmt.Sprintf(ubuntuCVEAPIBase, cveID)
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", "ServerSupervisor-Agent/1.0")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := cveHTTPClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("ubuntu CVE API returned %d for %s", resp.StatusCode, cveID)
+		return nil, nil, fmt.Errorf("ubuntu CVE API returned %d", resp.StatusCode)
 	}
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 64*1024))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	var result ubuntuCVEResponse
 	if err := json.Unmarshal(body, &result); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	// Persist to cache (best-effort).
-	_ = os.MkdirAll(cveCacheDir, 0o755)
-	_ = os.WriteFile(cacheFile, body, 0o644)
-
-	return &result, nil
+	return &result, body, nil
 }
 
 // enrichCVEsWithUbuntuData queries the Ubuntu CVE API for each CVE ID (in parallel)
