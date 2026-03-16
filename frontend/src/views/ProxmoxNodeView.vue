@@ -69,9 +69,9 @@
         </div>
       </div>
 
-      <!-- Live status row (iowait, swap, rootfs) — loaded on demand -->
-      <div v-if="liveStatus" class="row row-cards mb-4">
-        <div class="col-6 col-lg-3">
+      <!-- Live status row (iowait, swap, rootfs) — auto-refreshed -->
+      <div v-if="liveStatus" class="row row-cards mb-1">
+        <div class="col-6 col-lg-4">
           <div class="card card-sm h-100">
             <div class="card-body">
               <div class="subheader">IO Wait</div>
@@ -82,7 +82,7 @@
             </div>
           </div>
         </div>
-        <div class="col-6 col-lg-3">
+        <div class="col-6 col-lg-4">
           <div class="card card-sm h-100">
             <div class="card-body">
               <div class="subheader">Swap</div>
@@ -95,7 +95,7 @@
             </div>
           </div>
         </div>
-        <div class="col-6 col-lg-3">
+        <div class="col-6 col-lg-4">
           <div class="card card-sm h-100">
             <div class="card-body">
               <div class="subheader">Rootfs</div>
@@ -108,24 +108,13 @@
             </div>
           </div>
         </div>
-        <div class="col-6 col-lg-3">
-          <div class="card card-sm h-100">
-            <div class="card-body d-flex align-items-center justify-content-between">
-              <div>
-                <div class="subheader">Statut live</div>
-                <div class="text-muted small mt-1">Actualisé à {{ liveStatusTime }}</div>
-              </div>
-              <button class="btn btn-sm btn-outline-secondary" :disabled="liveStatusLoading" @click="loadLiveStatus">
-                <span v-if="liveStatusLoading" class="spinner-border spinner-border-sm"></span>
-                <span v-else>↻</span>
-              </button>
-            </div>
-          </div>
-        </div>
       </div>
-      <div v-else-if="liveStatusLoading" class="row row-cards mb-4">
-        <div class="col-12 text-center text-muted small py-2">Chargement du statut live…</div>
+      <div v-if="liveStatus" class="text-end text-muted small mb-3" style="font-size:0.7rem">
+        <span v-if="liveStatusLoading" class="spinner-border spinner-border-sm me-1" style="width:.7rem;height:.7rem"></span>
+        Actualisé à {{ liveStatusTime }}
+        <span v-if="liveStatusError" class="text-danger ms-2">{{ liveStatusError }}</span>
       </div>
+      <div v-else-if="liveStatusLoading" class="text-muted small text-center mb-3">Chargement du statut live…</div>
       <div v-else-if="liveStatusError" class="mb-3">
         <span class="text-danger small">Statut live : {{ liveStatusError }}</span>
       </div>
@@ -706,6 +695,7 @@ const showConsole = ref(false)
 const liveTask = ref(null)
 const activeUpid = ref(null)  // tracks which row is highlighted — separate from display target
 let pollTimer = null
+let liveStatusTimer = null
 
 // guest network interfaces (live)
 const guestNetworks = ref({})       // { [vmid]: [{name, mac, ips}] }
@@ -851,12 +841,19 @@ function buildRRDCharts(points, timeframe) {
     }],
   }
 
-  // Use node.mem_total as denominator — more reliable than p.maxmem which may be absent in RRD data
-  const maxMem = node.value?.mem_total ?? 0
-  rrdRamChart.value = maxMem > 0 ? {
+  // RAM: p.maxmem from RRD (same unit as p.mem) → node.mem_total from DB → treat mem as fraction
+  const rrdMaxMem = points.find(p => p.maxmem != null && p.maxmem > 0)?.maxmem ?? 0
+  const maxMem = rrdMaxMem || (node.value?.mem_total ?? 0)
+  const ramData = points.map(p => {
+    if (p.mem == null) return null
+    if (maxMem > 1) return (p.mem / maxMem) * 100   // bytes denominator
+    if (p.mem <= 1) return p.mem * 100               // already a 0-1 fraction
+    return null
+  })
+  rrdRamChart.value = ramData.some(v => v != null) ? {
     labels,
     datasets: [{
-      data: points.map(p => p.mem != null ? (p.mem / maxMem) * 100 : null),
+      data: ramData,
       borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.1)',
       fill: true, tension: 0.3, spanGaps: true,
     }],
@@ -1070,8 +1067,14 @@ function taskDuration(t) {
   return `${h}h ${m % 60}m`
 }
 
-onMounted(load)
-onUnmounted(stopPolling)
+onMounted(() => {
+  load()
+  liveStatusTimer = setInterval(loadLiveStatus, 60_000)
+})
+onUnmounted(() => {
+  stopPolling()
+  if (liveStatusTimer) clearInterval(liveStatusTimer)
+})
 </script>
 
 <style scoped>
