@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/gin-gonic/gin"
 	"github.com/serversupervisor/server/internal/models"
@@ -298,6 +299,69 @@ func (h *ProxmoxHandler) ListNodeServices(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, services)
+}
+
+// ─── Guest network interfaces ─────────────────────────────────────────────────
+
+// GetNodeGuestNetworks returns a map of vmid → []GuestNetworkIface for all guests of a node.
+// VM interfaces are fetched via the QEMU guest agent (errors are silently skipped).
+// LXC interfaces are fetched natively (always available).
+func (h *ProxmoxHandler) GetNodeGuestNetworks(c *gin.Context) {
+	node, err := h.db.GetProxmoxNode(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if node == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "node not found"})
+		return
+	}
+
+	secret, conn, err := h.resolveSecret(node.ConnectionID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	guests, err := h.db.ListProxmoxGuestsByNode(node.ConnectionID, node.NodeName)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	client := proxmoxclient.New(conn.APIURL, conn.TokenID, secret, conn.InsecureSkipVerify)
+
+	result := make(map[int][]proxmoxclient.GuestNetworkIface)
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+
+	for _, g := range guests {
+		if g.Status != "running" {
+			continue
+		}
+		wg.Add(1)
+		go func(guest models.ProxmoxGuest) {
+			defer wg.Done()
+			var ifaces []proxmoxclient.GuestNetworkIface
+			var ferr error
+			if guest.GuestType == "vm" {
+				ifaces, ferr = client.GetVMNetworkInterfaces(node.NodeName, guest.VMID)
+			} else {
+				ifaces, ferr = client.GetLXCInterfaces(node.NodeName, guest.VMID)
+			}
+			if ferr != nil {
+				return // agent not running or no permission — skip silently
+			}
+			if len(ifaces) > 0 {
+				mu.Lock()
+				result[guest.VMID] = ifaces
+				mu.Unlock()
+			}
+		}(g)
+	}
+
+	wg.Wait()
+	c.JSON(http.StatusOK, result)
 }
 
 // validServiceAction is the set of allowed service action verbs.

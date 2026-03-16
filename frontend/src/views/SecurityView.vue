@@ -118,7 +118,7 @@
       <!-- Stats cards -->
       <div class="row row-cards mb-4">
         <div class="col-sm-4">
-          <div class="card">
+          <div class="card card-sm h-100">
             <div class="card-body text-center">
               <div class="text-secondary small mb-1">Connexions ({{ periodLabel }})</div>
               <div class="h2 mb-0">{{ security.stats?.total ?? '—' }}</div>
@@ -126,7 +126,7 @@
           </div>
         </div>
         <div class="col-sm-4">
-          <div class="card">
+          <div class="card card-sm h-100">
             <div class="card-body text-center">
               <div class="text-secondary small mb-1">Échecs ({{ periodLabel }})</div>
               <div class="h2 mb-0 text-danger">{{ security.stats?.failures ?? '—' }}</div>
@@ -134,7 +134,7 @@
           </div>
         </div>
         <div class="col-sm-4">
-          <div class="card">
+          <div class="card card-sm h-100">
             <div class="card-body text-center">
               <div class="text-secondary small mb-1">IPs uniques ({{ periodLabel }})</div>
               <div class="h2 mb-0">{{ security.stats?.unique_ips ?? '—' }}</div>

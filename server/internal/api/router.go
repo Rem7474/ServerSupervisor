@@ -276,6 +276,9 @@ func registerProxmoxRoutes(g *gin.RouterGroup, h *handlers.ProxmoxHandler) {
 	g.GET("/proxmox/nodes/:id/services", h.ListNodeServices)
 	g.POST("/proxmox/nodes/:id/services/:service/:action", h.NodeServiceAction)
 
+	// Guest network interfaces (live — VM via QEMU agent, LXC native)
+	g.GET("/proxmox/nodes/:id/guest-networks", h.GetNodeGuestNetworks)
+
 	// Node actions (write — require Sys.Modify on the Proxmox token)
 	g.POST("/proxmox/nodes/:id/apt-refresh", h.RefreshNodeApt)
 }

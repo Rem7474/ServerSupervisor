@@ -464,6 +464,78 @@ func (c *Client) GetNodeServices(node string) ([]PVEService, error) {
 	return services, nil
 }
 
+// ─── Guest network interfaces ─────────────────────────────────────────────────
+
+// GuestNetworkIface is a normalized network interface for a guest (VM or LXC).
+type GuestNetworkIface struct {
+	Name string   `json:"name"` // e.g. eth0, ens18
+	MAC  string   `json:"mac"`
+	IPs  []string `json:"ips"` // CIDR notation, e.g. ["192.168.1.10/24"]
+}
+
+// GetVMNetworkInterfaces fetches guest network interfaces via the QEMU guest agent.
+// Returns an error if the agent is not running; callers should handle this gracefully.
+func (c *Client) GetVMNetworkInterfaces(node string, vmid int) ([]GuestNetworkIface, error) {
+	type pveIPAddr struct {
+		Type    string `json:"ip-address-type"` // ipv4 | ipv6
+		Address string `json:"ip-address"`
+		Prefix  int    `json:"prefix"`
+	}
+	type pveIface struct {
+		Name     string      `json:"name"`
+		MAC      string      `json:"hardware-address"`
+		IPAddrs  []pveIPAddr `json:"ip-addresses"`
+	}
+	var raw []pveIface
+	if err := c.get(fmt.Sprintf("/nodes/%s/qemu/%d/agent/network-get-interfaces", node, vmid), &raw); err != nil {
+		return nil, err
+	}
+	var result []GuestNetworkIface
+	for _, iface := range raw {
+		if iface.Name == "lo" {
+			continue
+		}
+		g := GuestNetworkIface{Name: iface.Name, MAC: iface.MAC}
+		for _, ip := range iface.IPAddrs {
+			if ip.Address == "" {
+				continue
+			}
+			g.IPs = append(g.IPs, fmt.Sprintf("%s/%d", ip.Address, ip.Prefix))
+		}
+		result = append(result, g)
+	}
+	return result, nil
+}
+
+// GetLXCInterfaces fetches the network interfaces of an LXC container.
+func (c *Client) GetLXCInterfaces(node string, vmid int) ([]GuestNetworkIface, error) {
+	type pveIface struct {
+		Name  string `json:"name"`
+		MAC   string `json:"hwaddr"`
+		Inet  string `json:"inet,omitempty"`  // IPv4 CIDR
+		Inet6 string `json:"inet6,omitempty"` // IPv6 CIDR
+	}
+	var raw []pveIface
+	if err := c.get(fmt.Sprintf("/nodes/%s/lxc/%d/interfaces", node, vmid), &raw); err != nil {
+		return nil, err
+	}
+	var result []GuestNetworkIface
+	for _, iface := range raw {
+		if iface.Name == "lo" {
+			continue
+		}
+		g := GuestNetworkIface{Name: iface.Name, MAC: iface.MAC}
+		if iface.Inet != "" {
+			g.IPs = append(g.IPs, iface.Inet)
+		}
+		if iface.Inet6 != "" {
+			g.IPs = append(g.IPs, iface.Inet6)
+		}
+		result = append(result, g)
+	}
+	return result, nil
+}
+
 // NodeServiceAction performs an action on a service. Requires Sys.Modify.
 // action must be one of: start | stop | restart | reload.
 func (c *Client) NodeServiceAction(node, service, action string) (string, error) {

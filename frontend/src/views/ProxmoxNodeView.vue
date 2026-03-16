@@ -23,7 +23,7 @@
       <!-- Stats row -->
       <div class="row row-cards mb-4">
         <div class="col-6 col-lg-3">
-          <div class="card">
+          <div class="card card-sm h-100">
             <div class="card-body">
               <div class="subheader">CPU</div>
               <div class="h1 mt-2 mb-1">{{ (node.cpu_usage * 100).toFixed(1) }}%</div>
@@ -35,7 +35,7 @@
           </div>
         </div>
         <div class="col-6 col-lg-3">
-          <div class="card">
+          <div class="card card-sm h-100">
             <div class="card-body">
               <div class="subheader">RAM</div>
               <div class="h1 mt-2 mb-1">{{ formatBytes(node.mem_used) }}</div>
@@ -47,7 +47,7 @@
           </div>
         </div>
         <div class="col-6 col-lg-3">
-          <div class="card">
+          <div class="card card-sm h-100">
             <div class="card-body">
               <div class="subheader">Uptime</div>
               <div class="h1 mt-2 mb-0">{{ formatUptime(node.uptime) }}</div>
@@ -55,7 +55,7 @@
           </div>
         </div>
         <div class="col-6 col-lg-3">
-          <div class="card">
+          <div class="card card-sm h-100">
             <div class="card-body">
               <div class="subheader">Guests</div>
               <div class="h1 mt-2 mb-0">
@@ -72,7 +72,7 @@
       <!-- Live status row (iowait, swap, rootfs) — loaded on demand -->
       <div v-if="liveStatus" class="row row-cards mb-4">
         <div class="col-6 col-lg-3">
-          <div class="card">
+          <div class="card card-sm h-100">
             <div class="card-body">
               <div class="subheader">IO Wait</div>
               <div class="h1 mt-2 mb-1" :class="liveStatus.wait > 0.2 ? 'text-danger' : liveStatus.wait > 0.05 ? 'text-warning' : 'text-success'">
@@ -83,7 +83,7 @@
           </div>
         </div>
         <div class="col-6 col-lg-3">
-          <div class="card">
+          <div class="card card-sm h-100">
             <div class="card-body">
               <div class="subheader">Swap</div>
               <div class="h1 mt-2 mb-1">{{ formatBytes(liveStatus.swap.used) }}</div>
@@ -96,7 +96,7 @@
           </div>
         </div>
         <div class="col-6 col-lg-3">
-          <div class="card">
+          <div class="card card-sm h-100">
             <div class="card-body">
               <div class="subheader">Rootfs</div>
               <div class="h1 mt-2 mb-1">{{ formatBytes(liveStatus.rootfs.used) }}</div>
@@ -109,7 +109,7 @@
           </div>
         </div>
         <div class="col-6 col-lg-3">
-          <div class="card">
+          <div class="card card-sm h-100">
             <div class="card-body d-flex align-items-center justify-content-between">
               <div>
                 <div class="subheader">Statut live</div>
@@ -192,12 +192,12 @@
         <div class="card-header">
           <ul class="nav nav-tabs card-header-tabs">
             <li class="nav-item">
-              <button class="nav-link" :class="{ active: tab === 'vms' }" @click="tab = 'vms'">
+              <button class="nav-link" :class="{ active: tab === 'vms' }" @click="tab = 'vms'; loadGuestNetworks()">
                 VMs <span class="badge bg-azure-lt text-azure ms-1">{{ vms.length }}</span>
               </button>
             </li>
             <li class="nav-item">
-              <button class="nav-link" :class="{ active: tab === 'lxc' }" @click="tab = 'lxc'">
+              <button class="nav-link" :class="{ active: tab === 'lxc' }" @click="tab = 'lxc'; loadGuestNetworks()">
                 LXC <span class="badge bg-azure-lt text-azure ms-1">{{ lxcs.length }}</span>
               </button>
             </li>
@@ -241,6 +241,7 @@
                 <th>VMID</th>
                 <th>Nom</th>
                 <th>Statut</th>
+                <th>IP</th>
                 <th>CPU alloué</th>
                 <th>CPU utilisé</th>
                 <th>RAM allouée</th>
@@ -253,12 +254,22 @@
             </thead>
             <tbody>
               <tr v-if="vms.length === 0">
-                <td colspan="11" class="text-center text-muted py-4">Aucune VM sur ce nœud.</td>
+                <td colspan="12" class="text-center text-muted py-4">Aucune VM sur ce nœud.</td>
               </tr>
               <tr v-for="g in vms" :key="g.id">
                 <td class="text-muted">{{ g.vmid }}</td>
                 <td class="fw-medium">{{ g.name || '—' }}</td>
                 <td><span :class="guestStatusClass(g.status)">{{ g.status }}</span></td>
+                <td>
+                  <span v-if="guestNetworksLoading" class="text-muted small">…</span>
+                  <template v-else-if="guestNetworks[g.vmid]?.length">
+                    <div v-for="iface in guestNetworks[g.vmid]" :key="iface.name" class="small lh-sm">
+                      <span class="text-muted me-1">{{ iface.name }}</span>
+                      <span v-for="ip in iface.ips.filter(i => !i.startsWith('fe80'))" :key="ip">{{ ip.split('/')[0] }}</span>
+                    </div>
+                  </template>
+                  <span v-else class="text-muted">—</span>
+                </td>
                 <td>{{ g.cpu_alloc }} vCPU</td>
                 <td>{{ (g.cpu_usage * 100).toFixed(1) }}%</td>
                 <td>{{ formatBytes(g.mem_alloc) }}</td>
@@ -286,6 +297,7 @@
                 <th>CT ID</th>
                 <th>Nom</th>
                 <th>Statut</th>
+                <th>IP</th>
                 <th>CPU alloué</th>
                 <th>CPU utilisé</th>
                 <th>RAM allouée</th>
@@ -297,12 +309,22 @@
             </thead>
             <tbody>
               <tr v-if="lxcs.length === 0">
-                <td colspan="10" class="text-center text-muted py-4">Aucun conteneur LXC sur ce nœud.</td>
+                <td colspan="11" class="text-center text-muted py-4">Aucun conteneur LXC sur ce nœud.</td>
               </tr>
               <tr v-for="g in lxcs" :key="g.id">
                 <td class="text-muted">{{ g.vmid }}</td>
                 <td class="fw-medium">{{ g.name || '—' }}</td>
                 <td><span :class="guestStatusClass(g.status)">{{ g.status }}</span></td>
+                <td>
+                  <span v-if="guestNetworksLoading" class="text-muted small">…</span>
+                  <template v-else-if="guestNetworks[g.vmid]?.length">
+                    <div v-for="iface in guestNetworks[g.vmid]" :key="iface.name" class="small lh-sm">
+                      <span class="text-muted me-1">{{ iface.name }}</span>
+                      <span v-for="ip in iface.ips.filter(i => !i.startsWith('fe80'))" :key="ip">{{ ip.split('/')[0] }}</span>
+                    </div>
+                  </template>
+                  <span v-else class="text-muted">—</span>
+                </td>
                 <td>{{ g.cpu_alloc }}</td>
                 <td>{{ (g.cpu_usage * 100).toFixed(1) }}%</td>
                 <td>{{ formatBytes(g.mem_alloc) }}</td>
@@ -685,6 +707,20 @@ const liveTask = ref(null)
 const activeUpid = ref(null)  // tracks which row is highlighted — separate from display target
 let pollTimer = null
 
+// guest network interfaces (live)
+const guestNetworks = ref({})       // { [vmid]: [{name, mac, ips}] }
+const guestNetworksLoading = ref(false)
+
+async function loadGuestNetworks() {
+  if (guestNetworksLoading.value || Object.keys(guestNetworks.value).length > 0) return
+  guestNetworksLoading.value = true
+  try {
+    const res = await api.getProxmoxNodeGuestNetworks(route.params.id)
+    guestNetworks.value = res.data ?? {}
+  } catch { /* non-bloquant */ }
+  finally { guestNetworksLoading.value = false }
+}
+
 // services
 const services = ref([])
 const servicesLoading = ref(false)
@@ -815,14 +851,16 @@ function buildRRDCharts(points, timeframe) {
     }],
   }
 
-  rrdRamChart.value = {
+  // Use node.mem_total as denominator — more reliable than p.maxmem which may be absent in RRD data
+  const maxMem = node.value?.mem_total ?? 0
+  rrdRamChart.value = maxMem > 0 ? {
     labels,
     datasets: [{
-      data: points.map(p => (p.mem != null && p.maxmem) ? (p.mem / p.maxmem) * 100 : null),
+      data: points.map(p => p.mem != null ? (p.mem / maxMem) * 100 : null),
       borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.1)',
       fill: true, tension: 0.3, spanGaps: true,
     }],
-  }
+  } : null
 
   const hasIowait = points.some(p => p.iowait != null)
   rrdIowaitChart.value = hasIowait ? {

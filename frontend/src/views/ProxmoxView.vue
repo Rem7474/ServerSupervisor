@@ -13,7 +13,7 @@
     <!-- Summary cards -->
     <div class="row row-cards mb-4">
       <div class="col-6 col-lg-3">
-        <div class="card">
+        <div class="card card-sm h-100">
           <div class="card-body">
             <div class="d-flex align-items-center">
               <div class="subheader">Connexions</div>
@@ -23,7 +23,7 @@
         </div>
       </div>
       <div class="col-6 col-lg-3">
-        <div class="card">
+        <div class="card card-sm h-100">
           <div class="card-body">
             <div class="subheader">Nœuds</div>
             <div class="h1 mt-2 mb-0">{{ summary.node_count ?? '—' }}</div>
@@ -31,7 +31,7 @@
         </div>
       </div>
       <div class="col-6 col-lg-3">
-        <div class="card">
+        <div class="card card-sm h-100">
           <div class="card-body">
             <div class="subheader">VMs / LXC</div>
             <div class="h1 mt-2 mb-0">
@@ -42,7 +42,7 @@
         </div>
       </div>
       <div class="col-6 col-lg-3">
-        <div class="card">
+        <div class="card card-sm h-100">
           <div class="card-body">
             <div class="subheader">Stockage utilisé</div>
             <div class="h1 mt-2 mb-0">{{ formatBytes(summary.storage_used) }}</div>
@@ -55,7 +55,7 @@
     <!-- Cluster health signals (only shown when there are issues) -->
     <div v-if="hasHealthAlerts" class="row row-cards mb-4">
       <div v-if="summary.nodes_down > 0" class="col-6 col-lg-3">
-        <div class="card border-danger">
+        <div class="card card-sm h-100 border-danger">
           <div class="card-body">
             <div class="subheader text-danger">Nœuds hors ligne</div>
             <div class="h1 mt-2 mb-0 text-danger">{{ summary.nodes_down }}</div>
@@ -63,7 +63,7 @@
         </div>
       </div>
       <div v-if="summary.storage_near_full > 0" class="col-6 col-lg-3">
-        <div class="card border-warning">
+        <div class="card card-sm h-100 border-warning">
           <div class="card-body">
             <div class="subheader text-warning">Stockages &gt; 80 %</div>
             <div class="h1 mt-2 mb-0 text-warning">{{ summary.storage_near_full }}</div>
@@ -71,7 +71,7 @@
         </div>
       </div>
       <div v-if="summary.storage_offline > 0" class="col-6 col-lg-3">
-        <div class="card border-danger">
+        <div class="card card-sm h-100 border-danger">
           <div class="card-body">
             <div class="subheader text-danger">Stockages inactifs</div>
             <div class="h1 mt-2 mb-0 text-danger">{{ summary.storage_offline }}</div>
@@ -79,7 +79,7 @@
         </div>
       </div>
       <div v-if="summary.recent_failed_tasks > 0" class="col-6 col-lg-3">
-        <div class="card border-warning">
+        <div class="card card-sm h-100 border-warning">
           <div class="card-body">
             <div class="subheader text-warning">Tâches échouées (24 h)</div>
             <div class="h1 mt-2 mb-0 text-warning">{{ summary.recent_failed_tasks }}</div>

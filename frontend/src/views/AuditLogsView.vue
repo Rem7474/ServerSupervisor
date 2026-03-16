@@ -120,7 +120,7 @@
       <!-- Stats cards -->
       <div class="row row-cards mb-4">
         <div class="col-sm-4">
-          <div class="card">
+          <div class="card card-sm h-100">
             <div class="card-body text-center">
               <div class="text-secondary small mb-1">Connexions (24h)</div>
               <div class="h2 mb-0">{{ security.stats_24h?.total ?? '—' }}</div>
@@ -128,7 +128,7 @@
           </div>
         </div>
         <div class="col-sm-4">
-          <div class="card">
+          <div class="card card-sm h-100">
             <div class="card-body text-center">
               <div class="text-secondary small mb-1">Échecs (24h)</div>
               <div class="h2 mb-0 text-danger">{{ security.stats_24h?.failures ?? '—' }}</div>
@@ -136,7 +136,7 @@
           </div>
         </div>
         <div class="col-sm-4">
-          <div class="card">
+          <div class="card card-sm h-100">
             <div class="card-body text-center">
               <div class="text-secondary small mb-1">IPs uniques (24h)</div>
               <div class="h2 mb-0 text-azure">{{ security.stats_24h?.unique_ips ?? '—' }}</div>

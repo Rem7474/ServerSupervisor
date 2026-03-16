@@ -206,6 +206,8 @@ export default {
   // Node services
   getProxmoxNodeServices: (nodeId) => api.get(`/v1/proxmox/nodes/${nodeId}/services`),
   proxmoxNodeServiceAction: (nodeId, service, action) => api.post(`/v1/proxmox/nodes/${nodeId}/services/${encodeURIComponent(service)}/${action}`),
+  // Guest network interfaces (live)
+  getProxmoxNodeGuestNetworks: (nodeId) => api.get(`/v1/proxmox/nodes/${nodeId}/guest-networks`),
   // Node actions
   refreshProxmoxNodeApt: (nodeId) => api.post(`/v1/proxmox/nodes/${nodeId}/apt-refresh`),
 }
