@@ -26,7 +26,7 @@
           <div class="row g-4 align-items-start">
 
             <!-- CPU -->
-            <div class="col-6 col-sm-4 col-lg-auto" style="min-width:8rem">
+            <div class="col-6 col-sm-4 col-lg">
               <div class="subheader mb-1">CPU</div>
               <div class="h3 mb-1">{{ (node.cpu_usage * 100).toFixed(1) }}%</div>
               <div class="progress progress-xs mb-1"><div class="progress-bar" :class="cpuColor(node.cpu_usage)" :style="`width:${(node.cpu_usage*100).toFixed(1)}%`"></div></div>
@@ -34,7 +34,7 @@
             </div>
 
             <!-- RAM -->
-            <div class="col-6 col-sm-4 col-lg-auto" style="min-width:9rem">
+            <div class="col-6 col-sm-4 col-lg">
               <div class="subheader mb-1">RAM</div>
               <div class="h3 mb-1">{{ formatBytes(node.mem_used) }}</div>
               <div class="progress progress-xs mb-1"><div class="progress-bar" :class="ramColor(node.mem_used, node.mem_total)" :style="`width:${memPct(node)}%`"></div></div>
@@ -42,13 +42,13 @@
             </div>
 
             <!-- Uptime -->
-            <div class="col-6 col-sm-4 col-lg-auto" style="min-width:7rem">
+            <div class="col-6 col-sm-4 col-lg">
               <div class="subheader mb-1">Uptime</div>
               <div class="h3 mb-0">{{ formatUptime(node.uptime) }}</div>
             </div>
 
             <!-- Guests -->
-            <div class="col-6 col-sm-4 col-lg-auto" style="min-width:8rem">
+            <div class="col-6 col-sm-4 col-lg">
               <div class="subheader mb-1">Guests</div>
               <div class="h3 mb-0">
                 <span class="text-primary">{{ node.vm_count }}</span><span class="text-muted fs-5 ms-1">VM</span>
@@ -63,7 +63,7 @@
               </div>
 
               <!-- IO Wait -->
-              <div class="col-6 col-sm-4 col-lg-auto" style="min-width:7rem">
+              <div class="col-6 col-sm-4 col-lg">
                 <div class="subheader mb-1">IO Wait</div>
                 <div class="h3 mb-0" :class="liveStatus.wait > 0.2 ? 'text-danger' : liveStatus.wait > 0.05 ? 'text-warning' : 'text-success'">
                   {{ (liveStatus.wait * 100).toFixed(2) }}%
@@ -72,7 +72,7 @@
               </div>
 
               <!-- Swap -->
-              <div class="col-6 col-sm-4 col-lg-auto" style="min-width:9rem">
+              <div class="col-6 col-sm-4 col-lg">
                 <div class="subheader mb-1">Swap</div>
                 <div class="h3 mb-1">{{ formatBytes(liveStatus.swap.used) }}</div>
                 <div class="progress progress-xs mb-1" v-if="liveStatus.swap.total">
@@ -83,7 +83,7 @@
               </div>
 
               <!-- Rootfs -->
-              <div class="col-6 col-sm-4 col-lg-auto" style="min-width:9rem">
+              <div class="col-6 col-sm-4 col-lg">
                 <div class="subheader mb-1">Rootfs</div>
                 <div class="h3 mb-1">{{ formatBytes(liveStatus.rootfs.used) }}</div>
                 <div class="progress progress-xs mb-1">
@@ -95,7 +95,7 @@
             </template>
 
             <!-- Live loading placeholder -->
-            <div v-else-if="liveStatusLoading" class="col-auto align-self-center text-muted small">
+            <div v-else-if="liveStatusLoading" class="col align-self-center text-muted small">
               <span class="spinner-border spinner-border-sm me-1"></span>Chargement…
             </div>
 
