@@ -149,6 +149,15 @@
             </div>
           </div>
         </div>
+        <div class="col-12 col-lg-4">
+          <div class="card">
+            <div class="card-header"><h3 class="card-title mb-0">Réseau</h3></div>
+            <div class="card-body" style="height:11rem">
+              <Line v-if="rrdNetChart" :data="rrdNetChart" :options="rrdNetOptions" class="h-100" />
+              <div v-else class="h-100 d-flex align-items-center justify-content-center text-secondary small">{{ rrdError || 'Aucune donnée' }}</div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Updates banner (only shown when pending updates exist) -->
@@ -648,6 +657,7 @@ const rrdTimeframeOptions = [
 const rrdCpuChart = shallowRef(null)
 const rrdRamChart = shallowRef(null)
 const rrdIowaitChart = shallowRef(null)
+const rrdNetChart = shallowRef(null)
 const rrdLoading = ref(false)
 const rrdError = ref('')
 
@@ -681,6 +691,29 @@ const rrdRamOptions = {
       },
     },
   },
+}
+
+function formatBytesPerSec(v) {
+  if (v == null) return '—'
+  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)} MB/s`
+  if (v >= 1_000) return `${(v / 1_000).toFixed(1)} KB/s`
+  return `${v.toFixed(0)} B/s`
+}
+
+const rrdNetOptions = {
+  responsive: true, maintainAspectRatio: false,
+  plugins: {
+    legend: { display: true, position: 'top', labels: { color: '#6b7280', boxWidth: 10, padding: 8 } },
+    tooltip: { enabled: true, mode: 'index', intersect: false, backgroundColor: 'rgba(0,0,0,0.8)', titleColor: '#fff', bodyColor: '#fff', borderColor: '#555', borderWidth: 1, padding: 8,
+      callbacks: { label: (ctx) => `${ctx.dataset.label}: ${formatBytesPerSec(ctx.parsed.y)}` },
+    },
+  },
+  scales: {
+    x: { display: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280', maxTicksLimit: 8 } },
+    y: { display: true, min: 0, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280', callback: (v) => formatBytesPerSec(v) } },
+  },
+  elements: { point: { radius: 0, hitRadius: 10, hoverRadius: 4 }, line: { tension: 0.3 } },
+  interaction: { mode: 'nearest', axis: 'x', intersect: false },
 }
 
 // PVE task console (side panel + polling)
@@ -810,6 +843,7 @@ async function loadRRD(timeframe = rrdTimeframe.value) {
     rrdCpuChart.value = null
     rrdRamChart.value = null
     rrdIowaitChart.value = null
+    rrdNetChart.value = null
   } finally {
     rrdLoading.value = false
   }
@@ -834,10 +868,10 @@ function buildRRDCharts(points, timeframe) {
     }],
   }
 
-  // RAM: memused / memtotal are raw bytes from PVE RRD
+  // RAM: memused / memtotal are raw bytes from PVE RRD (JSON keys: memused, memtotal)
   const ramData = points.map(p =>
-    (p.mem_used != null && p.mem_total != null && p.mem_total > 0)
-      ? (p.mem_used / p.mem_total) * 100
+    (p.memused != null && p.memtotal != null && p.memtotal > 0)
+      ? (p.memused / p.memtotal) * 100
       : null
   )
   rrdRamChart.value = ramData.some(v => v != null) ? {
@@ -857,6 +891,25 @@ function buildRRDCharts(points, timeframe) {
       borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.1)',
       fill: true, tension: 0.3, spanGaps: true,
     }],
+  } : null
+
+  const hasNet = points.some(p => p.netin != null || p.netout != null)
+  rrdNetChart.value = hasNet ? {
+    labels,
+    datasets: [
+      {
+        label: 'Entrante',
+        data: points.map(p => p.netin ?? null),
+        borderColor: '#6366f1', backgroundColor: 'rgba(99,102,241,0.1)',
+        fill: true, tension: 0.3, spanGaps: true,
+      },
+      {
+        label: 'Sortante',
+        data: points.map(p => p.netout ?? null),
+        borderColor: '#ec4899', backgroundColor: 'rgba(236,72,153,0.05)',
+        fill: false, tension: 0.3, spanGaps: true,
+      },
+    ],
   } : null
 }
 
