@@ -69,6 +69,67 @@
         </div>
       </div>
 
+      <!-- Live status row (iowait, swap, rootfs) — loaded on demand -->
+      <div v-if="liveStatus" class="row row-cards mb-4">
+        <div class="col-6 col-lg-3">
+          <div class="card">
+            <div class="card-body">
+              <div class="subheader">IO Wait</div>
+              <div class="h1 mt-2 mb-1" :class="liveStatus.wait > 0.2 ? 'text-danger' : liveStatus.wait > 0.05 ? 'text-warning' : 'text-success'">
+                {{ (liveStatus.wait * 100).toFixed(2) }}%
+              </div>
+              <div class="text-muted small">Attente I/O disque</div>
+            </div>
+          </div>
+        </div>
+        <div class="col-6 col-lg-3">
+          <div class="card">
+            <div class="card-body">
+              <div class="subheader">Swap</div>
+              <div class="h1 mt-2 mb-1">{{ formatBytes(liveStatus.swap.used) }}</div>
+              <div class="text-muted small">sur {{ formatBytes(liveStatus.swap.total) }}</div>
+              <div class="progress progress-xs mt-2" v-if="liveStatus.swap.total">
+                <div class="progress-bar" :class="ramColor(liveStatus.swap.used, liveStatus.swap.total)"
+                  :style="`width:${(liveStatus.swap.used/liveStatus.swap.total*100).toFixed(1)}%`"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-6 col-lg-3">
+          <div class="card">
+            <div class="card-body">
+              <div class="subheader">Rootfs</div>
+              <div class="h1 mt-2 mb-1">{{ formatBytes(liveStatus.rootfs.used) }}</div>
+              <div class="text-muted small">sur {{ formatBytes(liveStatus.rootfs.total) }}</div>
+              <div class="progress progress-xs mt-2">
+                <div class="progress-bar" :class="storageColor(liveStatus.rootfs.used, liveStatus.rootfs.total)"
+                  :style="`width:${(liveStatus.rootfs.used/liveStatus.rootfs.total*100).toFixed(1)}%`"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-6 col-lg-3">
+          <div class="card">
+            <div class="card-body d-flex align-items-center justify-content-between">
+              <div>
+                <div class="subheader">Statut live</div>
+                <div class="text-muted small mt-1">Actualisé à {{ liveStatusTime }}</div>
+              </div>
+              <button class="btn btn-sm btn-outline-secondary" :disabled="liveStatusLoading" @click="loadLiveStatus">
+                <span v-if="liveStatusLoading" class="spinner-border spinner-border-sm"></span>
+                <span v-else>↻</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div v-else-if="node.status === 'online'" class="mb-3">
+        <button class="btn btn-sm btn-outline-secondary" :disabled="liveStatusLoading" @click="loadLiveStatus">
+          <span v-if="liveStatusLoading" class="spinner-border spinner-border-sm me-1"></span>
+          Charger le statut live (IO wait, swap, rootfs)
+        </button>
+      </div>
+
       <!-- Updates banner (only shown when pending updates exist) -->
       <div v-if="node.pending_updates > 0" class="alert mb-4" :class="node.security_updates > 0 ? 'alert-danger' : 'alert-warning'">
         <div class="d-flex align-items-center gap-3">
@@ -259,42 +320,81 @@
         </div>
 
         <!-- Tasks tab -->
-        <div v-if="tab === 'tasks'" class="table-responsive">
-          <table class="table table-vcenter card-table">
-            <thead>
-              <tr>
-                <th>Type</th>
-                <th>Objet</th>
-                <th>Utilisateur</th>
-                <th>Début</th>
-                <th>Durée</th>
-                <th>Statut</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-if="!node.tasks?.length">
-                <td colspan="6" class="text-center text-muted py-4">Aucune tâche récente pour ce nœud.</td>
-              </tr>
-              <tr v-for="t in node.tasks" :key="t.id">
-                <td><span class="badge bg-azure-lt text-azure font-monospace">{{ t.task_type }}</span></td>
-                <td class="text-muted">{{ t.object_id || '—' }}</td>
-                <td class="text-muted small">{{ t.user_name }}</td>
-                <td class="text-muted small">{{ formatDate(t.start_time) }}</td>
-                <td class="text-muted small">{{ taskDuration(t) }}</td>
-                <td>
-                  <span v-if="t.status === 'running'" class="badge bg-blue-lt text-blue">En cours</span>
-                  <span v-else-if="t.exit_status === 'OK'" class="badge bg-success-lt text-success">OK</span>
-                  <span v-else-if="t.exit_status" class="badge bg-danger-lt text-danger" :title="t.exit_status">Erreur</span>
-                  <span v-else class="badge bg-secondary-lt text-secondary">{{ t.status }}</span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+        <div v-if="tab === 'tasks'">
+          <div class="table-responsive">
+            <table class="table table-vcenter card-table">
+              <thead>
+                <tr>
+                  <th>Type</th>
+                  <th>Objet</th>
+                  <th>Utilisateur</th>
+                  <th>Début</th>
+                  <th>Durée</th>
+                  <th>Statut</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <template v-if="!node.tasks?.length">
+                  <tr><td colspan="7" class="text-center text-muted py-4">Aucune tâche récente pour ce nœud.</td></tr>
+                </template>
+                <template v-else v-for="t in node.tasks" :key="t.id">
+                  <tr :class="taskLogOpen === t.upid ? 'table-active' : ''">
+                    <td><span class="badge bg-azure-lt text-azure font-monospace">{{ t.task_type }}</span></td>
+                    <td class="text-muted">{{ t.object_id || '—' }}</td>
+                    <td class="text-muted small">{{ t.user_name }}</td>
+                    <td class="text-muted small">{{ formatDate(t.start_time) }}</td>
+                    <td class="text-muted small">{{ taskDuration(t) }}</td>
+                    <td>
+                      <span v-if="t.status === 'running'" class="badge bg-blue-lt text-blue">En cours</span>
+                      <span v-else-if="t.exit_status === 'OK'" class="badge bg-success-lt text-success">OK</span>
+                      <span v-else-if="t.exit_status" class="badge bg-danger-lt text-danger" :title="t.exit_status">Erreur</span>
+                      <span v-else class="badge bg-secondary-lt text-secondary">{{ t.status }}</span>
+                    </td>
+                    <td>
+                      <button class="btn btn-sm btn-ghost-secondary" @click="toggleTaskLog(t)" :title="taskLogOpen === t.upid ? 'Fermer les logs' : 'Voir les logs'">
+                        {{ taskLogOpen === t.upid ? '▲' : '▼' }}
+                      </button>
+                    </td>
+                  </tr>
+                  <!-- Inline log console -->
+                  <tr v-if="taskLogOpen === t.upid">
+                    <td colspan="7" class="p-0">
+                      <div class="bg-dark text-success font-monospace small p-3" style="max-height:400px;overflow-y:auto;white-space:pre-wrap;word-break:break-all" ref="logConsole">
+                        <div v-if="taskLogLoading" class="text-muted">Chargement des logs…</div>
+                        <div v-else-if="taskLogError" class="text-danger">{{ taskLogError }}</div>
+                        <template v-else-if="taskLogLines.length">
+                          <div v-for="line in taskLogLines" :key="line.n"
+                            :class="line.t.startsWith('TASK OK') ? 'text-success fw-bold' : line.t.startsWith('TASK ERROR') ? 'text-danger fw-bold' : ''">{{ line.t }}</div>
+                        </template>
+                        <div v-else class="text-muted">Aucun log disponible.</div>
+                      </div>
+                      <div class="d-flex gap-2 px-3 py-2 bg-dark border-top border-secondary">
+                        <button class="btn btn-sm btn-outline-secondary" @click="loadTaskLog(t)">↻ Rafraîchir</button>
+                        <span class="text-muted small align-self-center">{{ taskLogLines.length }} ligne(s)</span>
+                        <button class="btn btn-sm btn-ghost-secondary ms-auto" @click="taskLogOpen = null">Fermer</button>
+                      </div>
+                    </td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <!-- Updates tab -->
         <div v-if="tab === 'updates'" class="card-body">
-          <div v-if="node.pending_updates === 0" class="text-center text-muted py-4">
+          <!-- Refresh action bar -->
+          <div class="d-flex align-items-center gap-2 mb-3">
+            <button class="btn btn-sm btn-outline-primary" :disabled="aptRefreshing" @click="triggerAptRefresh">
+              <span v-if="aptRefreshing" class="spinner-border spinner-border-sm me-1"></span>
+              <span v-else>↻</span>
+              Rafraîchir le cache apt
+            </button>
+            <span v-if="aptRefreshMsg" :class="['small', aptRefreshOk ? 'text-success' : 'text-danger']">{{ aptRefreshMsg }}</span>
+          </div>
+
+          <div v-if="node.pending_updates === 0" class="text-center text-muted py-3">
             <div class="mb-1">Aucune mise à jour en attente détectée.</div>
             <div v-if="node.last_update_check_at" class="small">
               Dernière vérification : {{ formatDate(node.last_update_check_at) }}
@@ -421,6 +521,22 @@ const guestLinks = ref({})
 const linkMsg = ref('')
 const linkMsgOk = ref(false)
 
+// apt refresh
+const aptRefreshing = ref(false)
+const aptRefreshMsg = ref('')
+const aptRefreshOk = ref(false)
+
+// live status (iowait, swap, rootfs)
+const liveStatus = ref(null)
+const liveStatusLoading = ref(false)
+const liveStatusTime = ref('')
+
+// task log viewer
+const taskLogOpen = ref(null)   // upid of the open task
+const taskLogLines = ref([])
+const taskLogLoading = ref(false)
+const taskLogError = ref('')
+
 const vms = computed(() => node.value?.guests?.filter(g => g.guest_type === 'vm') ?? [])
 const lxcs = computed(() => node.value?.guests?.filter(g => g.guest_type === 'lxc') ?? [])
 const failedTaskCount = computed(() =>
@@ -498,6 +614,58 @@ function showMsg(msg, ok) {
   linkMsg.value = msg
   linkMsgOk.value = ok
   setTimeout(() => { linkMsg.value = '' }, 4000)
+}
+
+async function loadLiveStatus() {
+  liveStatusLoading.value = true
+  try {
+    const res = await api.getProxmoxNodeStatus(route.params.id)
+    liveStatus.value = res.data
+    liveStatusTime.value = new Date().toLocaleTimeString('fr-FR')
+  } catch {
+    // silently ignore — live status is optional
+  } finally {
+    liveStatusLoading.value = false
+  }
+}
+
+async function toggleTaskLog(task) {
+  if (taskLogOpen.value === task.upid) {
+    taskLogOpen.value = null
+    return
+  }
+  taskLogOpen.value = task.upid
+  await loadTaskLog(task)
+}
+
+async function loadTaskLog(task) {
+  taskLogLoading.value = true
+  taskLogError.value = ''
+  taskLogLines.value = []
+  try {
+    const res = await api.getProxmoxTaskLog(route.params.id, task.upid)
+    taskLogLines.value = res.data ?? []
+  } catch (e) {
+    taskLogError.value = e?.response?.data?.error || 'Erreur lors du chargement des logs.'
+  } finally {
+    taskLogLoading.value = false
+  }
+}
+
+async function triggerAptRefresh() {
+  aptRefreshing.value = true
+  aptRefreshMsg.value = ''
+  try {
+    const res = await api.refreshProxmoxNodeApt(route.params.id)
+    aptRefreshMsg.value = res.data?.message || 'Tâche lancée — le compteur se mettra à jour au prochain poll.'
+    aptRefreshOk.value = true
+  } catch (e) {
+    aptRefreshMsg.value = e?.response?.data?.error || 'Erreur lors du lancement de apt update.'
+    aptRefreshOk.value = false
+  } finally {
+    aptRefreshing.value = false
+    setTimeout(() => { aptRefreshMsg.value = '' }, 6000)
+  }
 }
 
 function memPct(n) {

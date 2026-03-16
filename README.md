@@ -65,9 +65,14 @@ Système de supervision d'infrastructure : monitoring de VMs, conteneurs Docker,
 ### Proxmox VE (supervision sans agent)
 - Connexion à un ou plusieurs clusters / nœuds Proxmox via l'API REST officielle (token API)
 - Collecte périodique configurable : nœuds (CPU, RAM, uptime, version PVE), VMs QEMU, conteneurs LXC, pools de stockage
+- **Disques physiques** : liste, modèle, type (SSD/HDD/NVMe), santé SMART, usure SSD (`Sys.Audit` requis)
+- **Mises à jour apt** : compteur de paquets en attente (pending/security), rafraîchissement du cache depuis le dashboard (`Sys.Modify` requis)
+- **Tâches récentes** : 50 dernières tâches par nœud (vzdump, migration, création VM…)
+- **Sauvegardes** : jobs configurés + dernier résultat de backup par VM (issu des tâches vzdump)
+- **Liaison guest↔hôte** : détection automatique par nom, confirmation manuelle, sélection de la source de métriques (agent / proxmox / auto)
 - UPSERT en base à chaque cycle + nettoyage automatique des ressources disparues
-- Vue globale `/proxmox` : cartes de synthèse (connexions, nœuds, VMs, LXC, stockage) + tableau de tous les nœuds avec barres de progression CPU/RAM
-- Vue détail `/proxmox/nodes/:id` : stats nœud + onglets VMs / LXC / Stockage avec utilisation disque
+- Vue globale `/proxmox` : cartes de synthèse (connexions, nœuds, VMs, LXC, stockage) + alertes de santé + tableau des nœuds
+- Vue détail `/proxmox/nodes/:id` : stats nœud + onglets VMs / LXC / Stockage / Disques / Tâches / Mises à jour
 - Configuration dans **Paramètres** : ajout/édition/suppression de connexions, bouton **Tester** (sans sauvegarder), déclenchement manuel d'un poll
 - Sécurité : `token_secret` stocké en base, jamais retourné au frontend ; `insecure_skip_verify` désactivé par défaut
 
@@ -178,12 +183,25 @@ sudo journalctl -u serversupervisor-agent -f
 
 1. Dans Proxmox, créer un token API avec les permissions minimales en lecture :
    ```
-   pveum role add Supervision -privs "Datastore.Audit Sys.Audit VM.Audit"
+   # Rôle lecture seule (nœuds, VMs, LXC, stockage, disques)
+   pveum role add SSAuditor -privs "Datastore.Audit Sys.Audit VM.Audit"
    pveum user add supervision@pve
-   pveum aclmod / -user supervision@pve -role Supervision
+   pveum aclmod / -user supervision@pve -role SSAuditor
    pveum user token add supervision@pve monitoring --privsep 0
    ```
    Copier le `token ID` (ex : `supervision@pve!monitoring`) et le `secret` affiché.
+
+   > **Mises à jour apt (optionnel)** : l'endpoint `/nodes/{node}/apt/update` requiert `Sys.Modify`.
+   > Si vous souhaitez voir les paquets en attente et rafraîchir le cache depuis le dashboard,
+   > ajoutez ce privilege au rôle ou créez un second rôle complémentaire :
+   > ```
+   > pveum role modify SSAuditor -privs "Datastore.Audit Sys.Audit Sys.Modify VM.Audit"
+   > ```
+   > **Important** : si votre token a "Privilege Separation" activé (coché par défaut à la création),
+   > les permissions doivent être assignées **directement au token** et pas seulement à l'utilisateur :
+   > ```
+   > pveum aclmod / -token supervision@pve!monitoring -role SSAuditor
+   > ```
 
 2. Dans ServerSupervisor → **Paramètres** → carte **Proxmox VE** → **Ajouter une connexion** :
    - Nom : label interne (ex : `Cluster prod`)
@@ -492,6 +510,15 @@ curl http://localhost:8080/api/v1/hosts \
 | `POST` | `/api/v1/proxmox/instances/test` | Tester sans sauvegarder | Admin |
 | `POST` | `/api/v1/proxmox/instances/:id/test` | Tester une connexion existante | Admin |
 | `POST` | `/api/v1/proxmox/instances/:id/poll-now` | Déclencher un poll immédiat | Admin |
+| `POST` | `/api/v1/proxmox/nodes/:id/apt-refresh` | Déclencher `apt update` sur le nœud (Sys.Modify requis) | Admin |
+| `GET` | `/api/v1/proxmox/tasks` | Toutes les tâches récentes (`?connection_id=`) | Authentifié |
+| `GET` | `/api/v1/proxmox/nodes/:id/tasks` | Tâches d'un nœud | Authentifié |
+| `GET` | `/api/v1/proxmox/nodes/:id/disks` | Disques physiques d'un nœud | Authentifié |
+| `GET` | `/api/v1/proxmox/backup-jobs` | Configurations des jobs de sauvegarde | Authentifié |
+| `GET` | `/api/v1/proxmox/backup-runs` | Derniers résultats de sauvegarde par VM | Authentifié |
+| `GET` | `/api/v1/proxmox/links` | Liens guest↔hôte (`?status=`) | Authentifié |
+| `POST` | `/api/v1/proxmox/links` | Créer/remplacer un lien | Admin |
+| `GET/PUT/DELETE` | `/api/v1/proxmox/links/:id` | Détail / modification / suppression d'un lien | Admin |
 
 #### Settings
 | Méthode | Endpoint | Description | Rôle |

@@ -323,6 +323,90 @@ func (c *Client) GetNodeDisksList(node string) ([]PVEDisk, error) {
 	return disks, nil
 }
 
+// PVENodeStatus is the response from GET /nodes/{node}/status.
+type PVENodeStatus struct {
+	CPU    float64 `json:"cpu"`
+	Wait   float64 `json:"wait"` // IO wait fraction (0–1)
+	Memory struct {
+		Free  int64 `json:"free"`
+		Total int64 `json:"total"`
+		Used  int64 `json:"used"`
+	} `json:"memory"`
+	Swap struct {
+		Free  int64 `json:"free"`
+		Total int64 `json:"total"`
+		Used  int64 `json:"used"`
+	} `json:"swap"`
+	RootFS struct {
+		Avail int64 `json:"avail"`
+		Free  int64 `json:"free"`
+		Total int64 `json:"total"`
+		Used  int64 `json:"used"`
+	} `json:"rootfs"`
+	Uptime int64  `json:"uptime"`
+	KSMed  int64  `json:"ksm,omitempty"`
+}
+
+// GetNodeStatus returns detailed real-time status for a node.
+func (c *Client) GetNodeStatus(node string) (*PVENodeStatus, error) {
+	var status PVENodeStatus
+	if err := c.get(fmt.Sprintf("/nodes/%s/status", node), &status); err != nil {
+		return nil, err
+	}
+	return &status, nil
+}
+
+// PVETaskLogLine is one line from GET /nodes/{node}/tasks/{upid}/log.
+type PVETaskLogLine struct {
+	N int    `json:"n"` // line number (1-based)
+	T string `json:"t"` // text
+}
+
+// GetNodeTaskLog returns the log lines for a given task UPID.
+func (c *Client) GetNodeTaskLog(node, upid string) ([]PVETaskLogLine, error) {
+	var lines []PVETaskLogLine
+	if err := c.get(fmt.Sprintf("/nodes/%s/tasks/%s/log", node, upid), &lines); err != nil {
+		return nil, err
+	}
+	return lines, nil
+}
+
+// TriggerNodeAptUpdate triggers an `apt-get update` on the given node via
+// POST /nodes/{node}/apt/update. Requires Sys.Modify privilege.
+// Returns the task UPID on success.
+func (c *Client) TriggerNodeAptUpdate(node string) (string, error) {
+	url := c.baseURL + fmt.Sprintf("/nodes/%s/apt/update", node)
+	req, err := http.NewRequest(http.MethodPost, url, nil)
+	if err != nil {
+		return "", fmt.Errorf("build request: %w", err)
+	}
+	req.Header.Set("Authorization", fmt.Sprintf("PVEAPIToken=%s=%s", c.tokenID, c.tokenSecret))
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("request: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		snippet := string(body)
+		if len(snippet) > 300 {
+			snippet = snippet[:300]
+		}
+		return "", fmt.Errorf("HTTP %d: %s", resp.StatusCode, snippet)
+	}
+
+	var envelope struct {
+		Data string `json:"data"` // UPID of the created task
+	}
+	if err := json.Unmarshal(body, &envelope); err != nil {
+		return "", fmt.Errorf("parse response: %w", err)
+	}
+	return envelope.Data, nil
+}
+
 // GetClusterBackup returns backup job configurations from /cluster/backup.
 // Returns an empty slice (no error) if the cluster backup endpoint is unavailable.
 func (c *Client) GetClusterBackup() ([]PVEBackupJob, error) {

@@ -266,6 +266,13 @@ func registerProxmoxRoutes(g *gin.RouterGroup, h *handlers.ProxmoxHandler) {
 	g.GET("/proxmox/nodes/:id/disks", h.ListNodeDisks)
 	g.GET("/proxmox/backup-jobs", h.ListBackupJobs)
 	g.GET("/proxmox/backup-runs", h.ListBackupRuns)
+
+	// Node live data (proxied from PVE, not cached in DB)
+	g.GET("/proxmox/nodes/:id/status", h.GetNodeStatus)
+	g.GET("/proxmox/nodes/:id/tasks/:upid/log", h.GetTaskLog)
+
+	// Node actions (write — require Sys.Modify on the Proxmox token)
+	g.POST("/proxmox/nodes/:id/apt-refresh", h.RefreshNodeApt)
 }
 
 func registerStaticFiles(r *gin.Engine) {

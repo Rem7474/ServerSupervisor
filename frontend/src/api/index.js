@@ -199,4 +199,9 @@ export default {
   // Extended: backups
   getProxmoxBackupJobs: (connectionId = '') => api.get('/v1/proxmox/backup-jobs', { params: connectionId ? { connection_id: connectionId } : {} }),
   getProxmoxBackupRuns: (connectionId = '') => api.get('/v1/proxmox/backup-runs', { params: connectionId ? { connection_id: connectionId } : {} }),
+  // Node live data (proxied from PVE, not cached)
+  getProxmoxNodeStatus: (nodeId) => api.get(`/v1/proxmox/nodes/${nodeId}/status`),
+  getProxmoxTaskLog: (nodeId, upid) => api.get(`/v1/proxmox/nodes/${nodeId}/tasks/${encodeURIComponent(upid)}/log`),
+  // Node actions
+  refreshProxmoxNodeApt: (nodeId) => api.post(`/v1/proxmox/nodes/${nodeId}/apt-refresh`),
 }
