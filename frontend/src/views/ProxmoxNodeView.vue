@@ -22,7 +22,7 @@
 
       <!-- Compact node stats (static + live in one card) -->
       <div class="card mb-4">
-        <div class="card-body">
+        <div class="card-body position-relative">
           <div class="row g-4 align-items-start">
 
             <!-- CPU -->
@@ -101,9 +101,9 @@
 
           </div>
 
-          <!-- Live refresh timestamp + error -->
-          <div class="d-flex align-items-center justify-content-end mt-2 gap-2" style="min-height:1.1rem">
-            <span v-if="liveStatusError" class="text-danger small">{{ liveStatusError }}</span>
+          <!-- Live refresh timestamp + error (absolute, no added height) -->
+          <div class="position-absolute bottom-0 end-0 pb-2 pe-3 d-flex align-items-center gap-2">
+            <span v-if="liveStatusError" class="text-danger" style="font-size:0.7rem">{{ liveStatusError }}</span>
             <span v-if="liveStatus" class="text-muted" style="font-size:0.7rem">
               <span v-if="liveStatusLoading" class="spinner-border me-1" style="width:.65rem;height:.65rem;border-width:.1em"></span>
               Actualisé à {{ liveStatusTime }}

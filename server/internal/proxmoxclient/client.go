@@ -436,8 +436,17 @@ type PVERRDPoint struct {
 // GetNodeRRDData returns time-series metrics for a node.
 // timeframe must be one of: hour | day | week | month | year.
 func (c *Client) GetNodeRRDData(node, timeframe string) ([]PVERRDPoint, error) {
+	path := fmt.Sprintf("/nodes/%s/rrddata?timeframe=%s&cf=AVERAGE", node, timeframe)
+	// Temporary: log raw first element to identify actual field names
+	var raw []json.RawMessage
+	if err := c.get(path, &raw); err != nil {
+		return nil, err
+	}
+	if len(raw) > 0 {
+		fmt.Printf("[DEBUG rrd raw] first point: %s\n", string(raw[0]))
+	}
 	var points []PVERRDPoint
-	if err := c.get(fmt.Sprintf("/nodes/%s/rrddata?timeframe=%s&cf=AVERAGE", node, timeframe), &points); err != nil {
+	if err := c.get(path, &points); err != nil {
 		return nil, err
 	}
 	return points, nil
