@@ -123,12 +123,50 @@
           </div>
         </div>
       </div>
-      <div v-else-if="node.status === 'online'" class="mb-3 d-flex align-items-center gap-2">
-        <button class="btn btn-sm btn-outline-secondary" :disabled="liveStatusLoading" @click="loadLiveStatus">
-          <span v-if="liveStatusLoading" class="spinner-border spinner-border-sm me-1"></span>
-          Charger le statut live (IO wait, swap, rootfs)
-        </button>
-        <span v-if="liveStatusError" class="text-danger small">{{ liveStatusError }}</span>
+      <div v-else-if="liveStatusLoading" class="row row-cards mb-4">
+        <div class="col-12 text-center text-muted small py-2">Chargement du statut live…</div>
+      </div>
+      <div v-else-if="liveStatusError" class="mb-3">
+        <span class="text-danger small">Statut live : {{ liveStatusError }}</span>
+      </div>
+
+      <!-- RRD Charts -->
+      <div class="row row-cards mb-4">
+        <div class="col-12 col-lg-4">
+          <div class="card">
+            <div class="card-header d-flex align-items-center justify-content-between">
+              <h3 class="card-title mb-0">CPU</h3>
+              <div v-if="!rrdLoading" class="btn-group btn-group-sm">
+                <button v-for="opt in rrdTimeframeOptions" :key="opt.value"
+                  :class="rrdTimeframe === opt.value ? 'btn btn-primary' : 'btn btn-outline-secondary'"
+                  @click="loadRRD(opt.value)">{{ opt.label }}</button>
+              </div>
+              <span v-else class="spinner-border spinner-border-sm text-muted"></span>
+            </div>
+            <div class="card-body" style="height:11rem">
+              <Line v-if="rrdCpuChart" :data="rrdCpuChart" :options="rrdPctOptions" class="h-100" />
+              <div v-else class="h-100 d-flex align-items-center justify-content-center text-secondary small">{{ rrdError || 'Aucune donnée' }}</div>
+            </div>
+          </div>
+        </div>
+        <div class="col-12 col-lg-4">
+          <div class="card">
+            <div class="card-header"><h3 class="card-title mb-0">RAM</h3></div>
+            <div class="card-body" style="height:11rem">
+              <Line v-if="rrdRamChart" :data="rrdRamChart" :options="rrdRamOptions" class="h-100" />
+              <div v-else class="h-100 d-flex align-items-center justify-content-center text-secondary small">{{ rrdError || 'Aucune donnée' }}</div>
+            </div>
+          </div>
+        </div>
+        <div class="col-12 col-lg-4">
+          <div class="card">
+            <div class="card-header"><h3 class="card-title mb-0">IO Wait</h3></div>
+            <div class="card-body" style="height:11rem">
+              <Line v-if="rrdIowaitChart" :data="rrdIowaitChart" :options="rrdPctOptions" class="h-100" />
+              <div v-else class="h-100 d-flex align-items-center justify-content-center text-secondary small">{{ rrdError || 'Aucune donnée' }}</div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- Updates banner (only shown when pending updates exist) -->
@@ -371,12 +409,11 @@
 
         <!-- Updates tab -->
         <div v-if="tab === 'updates'" class="card-body">
-          <!-- Refresh action bar -->
+          <!-- Apt update action bar -->
           <div class="d-flex align-items-center gap-2 mb-3">
-            <button class="btn btn-sm btn-outline-primary" :disabled="aptRefreshing" @click="triggerAptRefresh">
+            <button class="btn btn-outline-secondary" :disabled="aptRefreshing" @click="triggerAptRefresh">
               <span v-if="aptRefreshing" class="spinner-border spinner-border-sm me-1"></span>
-              <span v-else>↻</span>
-              Rafraîchir le cache apt
+              apt update
             </button>
             <span v-if="aptRefreshMsg" :class="['small', aptRefreshOk ? 'text-success' : 'text-danger']">{{ aptRefreshMsg }}</span>
           </div>
@@ -527,10 +564,19 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, defineComponent, h } from 'vue'
+import { ref, computed, shallowRef, onMounted, onUnmounted, defineAsyncComponent, defineComponent, h } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import CommandLogPanel from '../components/CommandLogPanel.vue'
 import api from '../api/index.js'
+
+const Line = defineAsyncComponent(async () => {
+  const [{ Line }, { Chart: ChartJS, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip }] = await Promise.all([
+    import('vue-chartjs'),
+    import('chart.js'),
+  ])
+  ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip)
+  return Line
+})
 
 // Inline component — renders the "Hôte lié" cell without a separate file.
 const GuestLinkCell = defineComponent({
@@ -580,11 +626,58 @@ const aptRefreshing = ref(false)
 const aptRefreshMsg = ref('')
 const aptRefreshOk = ref(false)
 
-// live status (iowait, swap, rootfs)
+// live status (iowait, swap, rootfs) — auto-loaded on mount
 const liveStatus = ref(null)
 const liveStatusLoading = ref(false)
 const liveStatusTime = ref('')
 const liveStatusError = ref('')
+
+// RRD charts
+const rrdTimeframe = ref('hour')
+const rrdTimeframeOptions = [
+  { value: 'hour', label: '1h' },
+  { value: 'day', label: '24h' },
+  { value: 'week', label: '7j' },
+  { value: 'month', label: '30j' },
+  { value: 'year', label: '1 an' },
+]
+const rrdCpuChart = shallowRef(null)
+const rrdRamChart = shallowRef(null)
+const rrdIowaitChart = shallowRef(null)
+const rrdLoading = ref(false)
+const rrdError = ref('')
+
+const rrdPctOptions = {
+  responsive: true, maintainAspectRatio: false,
+  plugins: {
+    legend: { display: false },
+    tooltip: { enabled: true, mode: 'index', intersect: false, backgroundColor: 'rgba(0,0,0,0.8)', titleColor: '#fff', bodyColor: '#fff', borderColor: '#555', borderWidth: 1, padding: 8, displayColors: false,
+      callbacks: { label: (ctx) => `${ctx.parsed.y != null ? ctx.parsed.y.toFixed(1) : '—'}%` },
+    },
+  },
+  scales: {
+    x: { display: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280', maxTicksLimit: 8 } },
+    y: { display: true, min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280', callback: (v) => `${v}%` } },
+  },
+  elements: { point: { radius: 0, hitRadius: 10, hoverRadius: 4 }, line: { tension: 0.3 } },
+  interaction: { mode: 'nearest', axis: 'x', intersect: false },
+}
+
+const rrdRamOptions = {
+  ...rrdPctOptions,
+  plugins: {
+    ...rrdPctOptions.plugins,
+    tooltip: {
+      ...rrdPctOptions.plugins.tooltip,
+      callbacks: {
+        label: (ctx) => {
+          const pct = ctx.parsed.y != null ? ctx.parsed.y.toFixed(1) : '—'
+          return `${pct}%`
+        },
+      },
+    },
+  },
+}
 
 // PVE task console (side panel + polling)
 const showConsole = ref(false)

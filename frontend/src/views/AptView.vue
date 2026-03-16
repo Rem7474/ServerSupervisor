@@ -78,7 +78,7 @@
 
                   <div v-if="aptStatuses[host.id]" class="row row-cards mb-3">
                     <div class="col-sm-6 col-md-3">
-                      <div class="card card-sm">
+                      <div class="card card-sm h-100">
                         <div class="card-body text-center">
                           <div class="h2 mb-0" :class="aptStatuses[host.id].pending_packages > 0 ? 'text-yellow' : 'text-green'">
                             {{ aptStatuses[host.id].pending_packages }}
@@ -88,7 +88,7 @@
                       </div>
                     </div>
                     <div class="col-sm-6 col-md-3">
-                      <div class="card card-sm">
+                      <div class="card card-sm h-100">
                         <div class="card-body text-center">
                           <div class="h2 mb-0 text-red">{{ aptStatuses[host.id].security_updates }}</div>
                           <div class="text-secondary small">Sécurité</div>
@@ -96,7 +96,7 @@
                       </div>
                     </div>
                     <div class="col-sm-6 col-md-3">
-                      <div class="card card-sm">
+                      <div class="card card-sm h-100">
                         <div class="card-body text-center">
                           <div class="fw-semibold">{{ formatDate(aptStatuses[host.id].last_update) }}</div>
                           <div class="text-secondary small">Dernier update</div>
@@ -104,7 +104,7 @@
                       </div>
                     </div>
                     <div class="col-sm-6 col-md-3">
-                      <div class="card card-sm">
+                      <div class="card card-sm h-100">
                         <div class="card-body text-center">
                           <div class="fw-semibold">{{ formatDate(aptStatuses[host.id].last_upgrade) }}</div>
                           <div class="text-secondary small">Dernière mise à jour</div>

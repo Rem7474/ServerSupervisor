@@ -202,6 +202,7 @@ export default {
   // Node live data (proxied from PVE, not cached)
   getProxmoxNodeStatus: (nodeId) => api.get(`/v1/proxmox/nodes/${nodeId}/status`),
   getProxmoxTaskLog: (nodeId, upid) => api.get(`/v1/proxmox/nodes/${nodeId}/tasks/${encodeURIComponent(upid)}/log`),
+  getProxmoxNodeRRD: (nodeId, timeframe = 'hour') => api.get(`/v1/proxmox/nodes/${nodeId}/rrd`, { params: { timeframe } }),
   // Node services
   getProxmoxNodeServices: (nodeId) => api.get(`/v1/proxmox/nodes/${nodeId}/services`),
   proxmoxNodeServiceAction: (nodeId, service, action) => api.post(`/v1/proxmox/nodes/${nodeId}/services/${encodeURIComponent(service)}/${action}`),

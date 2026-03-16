@@ -417,6 +417,32 @@ func (c *Client) GetClusterBackup() ([]PVEBackupJob, error) {
 	return jobs, nil
 }
 
+// ─── RRD metrics ──────────────────────────────────────────────────────────────
+
+// PVERRDPoint is one data point from GET /nodes/{node}/rrddata.
+// Numeric fields use *float64 to handle JSON null (absent data in PVE round-robin DB).
+type PVERRDPoint struct {
+	Time      int64    `json:"time"`
+	CPU       *float64 `json:"cpu"`
+	Mem       *float64 `json:"mem"`
+	MaxMem    *float64 `json:"maxmem"`
+	NetIn     *float64 `json:"netin"`
+	NetOut    *float64 `json:"netout"`
+	DiskRead  *float64 `json:"diskread"`
+	DiskWrite *float64 `json:"diskwrite"`
+	IOWait    *float64 `json:"iowait"`
+}
+
+// GetNodeRRDData returns time-series metrics for a node.
+// timeframe must be one of: hour | day | week | month | year.
+func (c *Client) GetNodeRRDData(node, timeframe string) ([]PVERRDPoint, error) {
+	var points []PVERRDPoint
+	if err := c.get(fmt.Sprintf("/nodes/%s/rrddata?timeframe=%s&cf=AVERAGE", node, timeframe), &points); err != nil {
+		return nil, err
+	}
+	return points, nil
+}
+
 // ─── Services ─────────────────────────────────────────────────────────────────
 
 // PVEService is an element returned by GET /nodes/{node}/services.

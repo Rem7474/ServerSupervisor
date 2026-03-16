@@ -14,7 +14,7 @@
 
     <div class="row row-cards mb-4">
       <div class="col-sm-6 col-lg-3">
-        <div class="card card-sm">
+        <div class="card card-sm h-100">
           <div class="card-body">
             <div class="subheader">Hôtes</div>
             <div class="h1 mb-0">{{ hosts.length }}</div>
@@ -23,7 +23,7 @@
         </div>
       </div>
       <div class="col-sm-6 col-lg-3">
-        <div class="card card-sm">
+        <div class="card card-sm h-100">
           <div class="card-body">
             <div class="subheader">Conteneurs</div>
             <div class="h1 mb-0">{{ containers.length }}</div>
@@ -32,7 +32,7 @@
         </div>
       </div>
       <div class="col-sm-6 col-lg-3">
-        <div class="card card-sm">
+        <div class="card card-sm h-100">
           <div class="card-body">
             <div class="subheader">Ports visibles</div>
             <div class="h1 mb-0">{{ totalPorts }}</div>
@@ -41,7 +41,7 @@
         </div>
       </div>
       <div class="col-sm-6 col-lg-3">
-        <div class="card card-sm">
+        <div class="card card-sm h-100">
           <div class="card-body">
             <div class="subheader">Trafic (intervalle)</div>
             <div class="h1 mb-0">{{ trafficDelta.intervalSec > 0 ? formatBytes(trafficDelta.rx + trafficDelta.tx) : '-' }}</div>

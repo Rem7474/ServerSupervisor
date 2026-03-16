@@ -210,6 +210,45 @@ func (h *ProxmoxHandler) RefreshNodeApt(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"upid": upid, "message": "apt update lancé sur le nœud"})
 }
 
+// ─── RRD metrics ──────────────────────────────────────────────────────────────
+
+// GetNodeRRD proxies GET /nodes/{node}/rrddata from PVE.
+// Accepts ?timeframe=hour|day|week|month|year (default: hour).
+func (h *ProxmoxHandler) GetNodeRRD(c *gin.Context) {
+	node, err := h.db.GetProxmoxNode(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if node == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "node not found"})
+		return
+	}
+
+	timeframe := c.DefaultQuery("timeframe", "hour")
+	switch timeframe {
+	case "hour", "day", "week", "month", "year":
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid timeframe; allowed: hour day week month year"})
+		return
+	}
+
+	secret, conn, err := h.resolveSecret(node.ConnectionID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	client := proxmoxclient.New(conn.APIURL, conn.TokenID, secret, conn.InsecureSkipVerify)
+	points, err := client.GetNodeRRDData(node.NodeName, timeframe)
+	if err != nil {
+		log.Printf("proxmox rrd [%s/%s] %s: %v", conn.Name, node.NodeName, timeframe, err)
+		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, points)
+}
+
 // ─── Disks ────────────────────────────────────────────────────────────────────
 
 // ListNodeDisks returns physical disks for a node identified by its UUID.

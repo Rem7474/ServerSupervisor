@@ -44,7 +44,7 @@
 
     <div class="row row-cards mb-4">
       <div class="col-sm-6 col-lg-3">
-        <div class="card card-sm">
+        <div class="card card-sm h-100">
           <div class="card-body">
             <div class="subheader">Hôtes</div>
             <div class="h1 mb-0">{{ hosts.length }}</div>
@@ -52,7 +52,7 @@
         </div>
       </div>
       <div class="col-sm-6 col-lg-3">
-        <div class="card card-sm">
+        <div class="card card-sm h-100">
           <div class="card-body">
             <div class="subheader">En ligne</div>
             <div class="h1 mb-0 text-green">{{ onlineCount }}</div>
@@ -60,7 +60,7 @@
         </div>
       </div>
       <div class="col-sm-6 col-lg-3">
-        <div class="card card-sm">
+        <div class="card card-sm h-100">
           <div class="card-body">
             <div class="subheader">Hors ligne</div>
             <div class="h1 mb-0 text-red">{{ offlineCount }}</div>
@@ -68,7 +68,7 @@
         </div>
       </div>
       <div class="col-sm-6 col-lg-3">
-        <div class="card card-sm">
+        <div class="card card-sm h-100">
           <div class="card-body">
             <div class="subheader">Mises à jour disponibles</div>
             <div class="h1 mb-0 text-yellow">{{ outdatedVersions }}</div>
