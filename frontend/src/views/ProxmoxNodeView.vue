@@ -20,103 +20,96 @@
         <div class="text-secondary">{{ node.cluster_name || 'Nœud standalone' }} · PVE {{ node.pve_version || 'N/A' }} · {{ node.ip_address }}</div>
       </div>
 
-      <!-- Stats row -->
-      <div class="row row-cards mb-4">
-        <div class="col-6 col-lg-3">
-          <div class="card card-sm h-100">
-            <div class="card-body">
-              <div class="subheader">CPU</div>
-              <div class="h1 mt-2 mb-1">{{ (node.cpu_usage * 100).toFixed(1) }}%</div>
-              <div class="text-muted small">{{ node.cpu_count }} cœurs</div>
-              <div class="progress progress-xs mt-2">
-                <div class="progress-bar" :class="cpuColor(node.cpu_usage)" :style="`width:${(node.cpu_usage*100).toFixed(1)}%`"></div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="col-6 col-lg-3">
-          <div class="card card-sm h-100">
-            <div class="card-body">
-              <div class="subheader">RAM</div>
-              <div class="h1 mt-2 mb-1">{{ formatBytes(node.mem_used) }}</div>
-              <div class="text-muted small">sur {{ formatBytes(node.mem_total) }}</div>
-              <div class="progress progress-xs mt-2">
-                <div class="progress-bar" :class="ramColor(node.mem_used, node.mem_total)" :style="`width:${memPct(node)}%`"></div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="col-6 col-lg-3">
-          <div class="card card-sm h-100">
-            <div class="card-body">
-              <div class="subheader">Uptime</div>
-              <div class="h1 mt-2 mb-0">{{ formatUptime(node.uptime) }}</div>
-            </div>
-          </div>
-        </div>
-        <div class="col-6 col-lg-3">
-          <div class="card card-sm h-100">
-            <div class="card-body">
-              <div class="subheader">Guests</div>
-              <div class="h1 mt-2 mb-0">
-                <span class="text-primary">{{ node.vm_count }}</span>
-                <span class="text-muted fs-5 ms-1">VMs</span>
-                <span class="ms-2 text-info">{{ node.lxc_count }}</span>
-                <span class="text-muted fs-5 ms-1">LXC</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <!-- Compact node stats (static + live in one card) -->
+      <div class="card mb-4">
+        <div class="card-body">
+          <div class="row g-4 align-items-start">
 
-      <!-- Live status row (iowait, swap, rootfs) — auto-refreshed -->
-      <div v-if="liveStatus" class="row row-cards mb-1">
-        <div class="col-6 col-lg-4">
-          <div class="card card-sm h-100">
-            <div class="card-body">
-              <div class="subheader">IO Wait</div>
-              <div class="h1 mt-2 mb-1" :class="liveStatus.wait > 0.2 ? 'text-danger' : liveStatus.wait > 0.05 ? 'text-warning' : 'text-success'">
-                {{ (liveStatus.wait * 100).toFixed(2) }}%
-              </div>
-              <div class="text-muted small">Attente I/O disque</div>
+            <!-- CPU -->
+            <div class="col-6 col-sm-4 col-lg-auto" style="min-width:8rem">
+              <div class="subheader mb-1">CPU</div>
+              <div class="h3 mb-1">{{ (node.cpu_usage * 100).toFixed(1) }}%</div>
+              <div class="progress progress-xs mb-1"><div class="progress-bar" :class="cpuColor(node.cpu_usage)" :style="`width:${(node.cpu_usage*100).toFixed(1)}%`"></div></div>
+              <div class="text-muted small">{{ node.cpu_count }} cœurs</div>
             </div>
-          </div>
-        </div>
-        <div class="col-6 col-lg-4">
-          <div class="card card-sm h-100">
-            <div class="card-body">
-              <div class="subheader">Swap</div>
-              <div class="h1 mt-2 mb-1">{{ formatBytes(liveStatus.swap.used) }}</div>
-              <div class="text-muted small">sur {{ formatBytes(liveStatus.swap.total) }}</div>
-              <div class="progress progress-xs mt-2" v-if="liveStatus.swap.total">
-                <div class="progress-bar" :class="ramColor(liveStatus.swap.used, liveStatus.swap.total)"
-                  :style="`width:${(liveStatus.swap.used/liveStatus.swap.total*100).toFixed(1)}%`"></div>
-              </div>
+
+            <!-- RAM -->
+            <div class="col-6 col-sm-4 col-lg-auto" style="min-width:9rem">
+              <div class="subheader mb-1">RAM</div>
+              <div class="h3 mb-1">{{ formatBytes(node.mem_used) }}</div>
+              <div class="progress progress-xs mb-1"><div class="progress-bar" :class="ramColor(node.mem_used, node.mem_total)" :style="`width:${memPct(node)}%`"></div></div>
+              <div class="text-muted small">/ {{ formatBytes(node.mem_total) }}</div>
             </div>
-          </div>
-        </div>
-        <div class="col-6 col-lg-4">
-          <div class="card card-sm h-100">
-            <div class="card-body">
-              <div class="subheader">Rootfs</div>
-              <div class="h1 mt-2 mb-1">{{ formatBytes(liveStatus.rootfs.used) }}</div>
-              <div class="text-muted small">sur {{ formatBytes(liveStatus.rootfs.total) }}</div>
-              <div class="progress progress-xs mt-2">
-                <div class="progress-bar" :class="storageColor(liveStatus.rootfs.used, liveStatus.rootfs.total)"
-                  :style="`width:${(liveStatus.rootfs.used/liveStatus.rootfs.total*100).toFixed(1)}%`"></div>
+
+            <!-- Uptime -->
+            <div class="col-6 col-sm-4 col-lg-auto" style="min-width:7rem">
+              <div class="subheader mb-1">Uptime</div>
+              <div class="h3 mb-0">{{ formatUptime(node.uptime) }}</div>
+            </div>
+
+            <!-- Guests -->
+            <div class="col-6 col-sm-4 col-lg-auto" style="min-width:8rem">
+              <div class="subheader mb-1">Guests</div>
+              <div class="h3 mb-0">
+                <span class="text-primary">{{ node.vm_count }}</span><span class="text-muted fs-5 ms-1">VM</span>
+                <span class="ms-2 text-info">{{ node.lxc_count }}</span><span class="text-muted fs-5 ms-1">LXC</span>
               </div>
             </div>
+
+            <!-- Live data separator -->
+            <template v-if="liveStatus">
+              <div class="col-auto d-none d-lg-flex align-items-stretch py-1">
+                <div class="vr"></div>
+              </div>
+
+              <!-- IO Wait -->
+              <div class="col-6 col-sm-4 col-lg-auto" style="min-width:7rem">
+                <div class="subheader mb-1">IO Wait</div>
+                <div class="h3 mb-0" :class="liveStatus.wait > 0.2 ? 'text-danger' : liveStatus.wait > 0.05 ? 'text-warning' : 'text-success'">
+                  {{ (liveStatus.wait * 100).toFixed(2) }}%
+                </div>
+                <div class="text-muted small">disque</div>
+              </div>
+
+              <!-- Swap -->
+              <div class="col-6 col-sm-4 col-lg-auto" style="min-width:9rem">
+                <div class="subheader mb-1">Swap</div>
+                <div class="h3 mb-1">{{ formatBytes(liveStatus.swap.used) }}</div>
+                <div class="progress progress-xs mb-1" v-if="liveStatus.swap.total">
+                  <div class="progress-bar" :class="ramColor(liveStatus.swap.used, liveStatus.swap.total)"
+                    :style="`width:${(liveStatus.swap.used/liveStatus.swap.total*100).toFixed(1)}%`"></div>
+                </div>
+                <div class="text-muted small">/ {{ formatBytes(liveStatus.swap.total) }}</div>
+              </div>
+
+              <!-- Rootfs -->
+              <div class="col-6 col-sm-4 col-lg-auto" style="min-width:9rem">
+                <div class="subheader mb-1">Rootfs</div>
+                <div class="h3 mb-1">{{ formatBytes(liveStatus.rootfs.used) }}</div>
+                <div class="progress progress-xs mb-1">
+                  <div class="progress-bar" :class="storageColor(liveStatus.rootfs.used, liveStatus.rootfs.total)"
+                    :style="`width:${(liveStatus.rootfs.used/liveStatus.rootfs.total*100).toFixed(1)}%`"></div>
+                </div>
+                <div class="text-muted small">/ {{ formatBytes(liveStatus.rootfs.total) }}</div>
+              </div>
+            </template>
+
+            <!-- Live loading placeholder -->
+            <div v-else-if="liveStatusLoading" class="col-auto align-self-center text-muted small">
+              <span class="spinner-border spinner-border-sm me-1"></span>Chargement…
+            </div>
+
+          </div>
+
+          <!-- Live refresh timestamp + error -->
+          <div class="d-flex align-items-center justify-content-end mt-2 gap-2" style="min-height:1.1rem">
+            <span v-if="liveStatusError" class="text-danger small">{{ liveStatusError }}</span>
+            <span v-if="liveStatus" class="text-muted" style="font-size:0.7rem">
+              <span v-if="liveStatusLoading" class="spinner-border me-1" style="width:.65rem;height:.65rem;border-width:.1em"></span>
+              Actualisé à {{ liveStatusTime }}
+            </span>
           </div>
         </div>
-      </div>
-      <div v-if="liveStatus" class="text-end text-muted small mb-3" style="font-size:0.7rem">
-        <span v-if="liveStatusLoading" class="spinner-border spinner-border-sm me-1" style="width:.7rem;height:.7rem"></span>
-        Actualisé à {{ liveStatusTime }}
-        <span v-if="liveStatusError" class="text-danger ms-2">{{ liveStatusError }}</span>
-      </div>
-      <div v-else-if="liveStatusLoading" class="text-muted small text-center mb-3">Chargement du statut live…</div>
-      <div v-else-if="liveStatusError" class="mb-3">
-        <span class="text-danger small">Statut live : {{ liveStatusError }}</span>
       </div>
 
       <!-- RRD Charts -->
