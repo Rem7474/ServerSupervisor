@@ -265,10 +265,13 @@ func getLastAptUpgrade() time.Time {
 	return time.Unix(epoch, 0).In(time.Local)
 }
 
-// extractCVEsForPackage extracts CVE information from package changelog and USN
+// extractCVEsForPackage extracts CVE information from package changelog and USN,
+// restricted to changelog entries strictly newer than the currently installed version.
 func extractCVEsForPackage(packageName string) []CVEInfo {
 	var cves []CVEInfo
-	cveMap := make(map[string]bool) // To avoid duplicates
+	cveMap := make(map[string]bool)
+
+	installedVersion := getInstalledPackageVersion(packageName)
 
 	// Try to get changelog (with timeout)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -281,15 +284,18 @@ func extractCVEsForPackage(packageName string) []CVEInfo {
 		return extractCVEsFromPolicy(packageName)
 	}
 
-	changelog := string(output)
+	// Only scan the portion of the changelog that is newer than the installed version.
+	// This prevents surfacing CVEs that were already fixed in the currently running package.
+	changelog := extractChangelogSinceVersion(string(output), installedVersion, packageName)
+	if changelog == "" {
+		return cves
+	}
 
 	// Extract CVE IDs using regex (CVE-YYYY-NNNNN format)
 	cveRegex := regexp.MustCompile(`CVE-\d{4}-\d{4,7}`)
 	cveIDs := cveRegex.FindAllString(changelog, -1)
 
 	// Extract severity from USN (Ubuntu Security Notice) format
-	// Format: * SECURITY UPDATE: ... (LP: #NNNNNN, CVE-XXXX-YYYY)
-	// or: - debian/patches/CVE-XXXX-YYYY.patch: fix ...
 	severityRegex := regexp.MustCompile(`(?i)(critical|high|medium|low|negligible).*?(CVE-\d{4}-\d{4,7})`)
 	severityMatches := severityRegex.FindAllStringSubmatch(changelog, -1)
 
@@ -322,6 +328,65 @@ func extractCVEsForPackage(packageName string) []CVEInfo {
 	}
 
 	return cves
+}
+
+// getInstalledPackageVersion returns the currently installed version of a package via dpkg-query.
+func getInstalledPackageVersion(packageName string) string {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, "dpkg-query", "-W", "-f=${Version}", packageName).Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(out))
+}
+
+// extractChangelogSinceVersion returns only the changelog text for versions strictly
+// newer than installedVersion. If installedVersion is empty, returns only the first
+// (most recent) changelog entry to avoid scanning the entire history.
+func extractChangelogSinceVersion(changelog, installedVersion, packageName string) string {
+	// Debian changelog entry headers: "packagename (version) suite; urgency=level"
+	entryHeaderRegex := regexp.MustCompile(`(?m)^` + regexp.QuoteMeta(packageName) + `\s+\(([^)]+)\)`)
+
+	type entryBound struct {
+		version string
+		start   int
+	}
+	var bounds []entryBound
+	for _, loc := range entryHeaderRegex.FindAllStringSubmatchIndex(changelog, -1) {
+		version := changelog[loc[2]:loc[3]]
+		bounds = append(bounds, entryBound{version: version, start: loc[0]})
+	}
+
+	if len(bounds) == 0 {
+		// Cannot parse entries; fall back to the first 3000 chars only
+		if len(changelog) > 3000 {
+			return changelog[:3000]
+		}
+		return changelog
+	}
+
+	// If we don't know the installed version, only look at the most recent entry.
+	if installedVersion == "" {
+		if len(bounds) > 1 {
+			return changelog[bounds[0].start:bounds[1].start]
+		}
+		return changelog[bounds[0].start:]
+	}
+
+	// Walk entries (newest-first) and stop at the first one that is <= installedVersion.
+	cutoff := len(changelog)
+	for _, b := range bounds {
+		if err := exec.Command("dpkg", "--compare-versions", b.version, "le", installedVersion).Run(); err == nil {
+			cutoff = b.start
+			break
+		}
+	}
+
+	if cutoff == 0 {
+		return ""
+	}
+	return changelog[:cutoff]
 }
 
 // extractCVEsFromPolicy extracts CVE info from apt-cache policy (fallback method)
