@@ -205,10 +205,11 @@ func (h *ProxmoxHandler) pollOne(conn database.ProxmoxConnectionFull) {
 		}
 
 		// Physical disks
-		disks, err := client.GetNodeDisksList(n.Node)
-		if err != nil {
-			log.Printf("proxmox poller [%s/%s]: get disks: %v", conn.Name, n.Node, err)
+		disks, diskErr := client.GetNodeDisksList(n.Node)
+		if diskErr != nil {
+			log.Printf("proxmox poller [%s/%s]: get disks FAILED (check Sys.Audit privilege on API token): %v", conn.Name, n.Node, diskErr)
 		} else {
+			log.Printf("proxmox poller [%s/%s]: got %d disk(s)", conn.Name, n.Node, len(disks))
 			for _, d := range disks {
 				health := d.Health
 				if health == "" {
@@ -228,7 +229,12 @@ func (h *ProxmoxHandler) pollOne(conn database.ProxmoxConnectionFull) {
 		}
 
 		// Pending apt updates (graceful — may be denied by some PVE configurations)
-		pkgs, _ := client.GetNodeAptUpdate(n.Node)
+		pkgs, aptErr := client.GetNodeAptUpdate(n.Node)
+		if aptErr != nil {
+			log.Printf("proxmox poller [%s/%s]: get apt/update FAILED (check Sys.Modify or PVEAuditor permissions): %v", conn.Name, n.Node, aptErr)
+		} else {
+			log.Printf("proxmox poller [%s/%s]: got %d pending apt package(s)", conn.Name, n.Node, len(pkgs))
+		}
 		pending, security := 0, 0
 		for _, p := range pkgs {
 			pending++

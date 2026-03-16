@@ -285,23 +285,21 @@ func (c *Client) GetNodeTasks(node string, limit int) ([]PVETask, error) {
 
 // GetNodeAptUpdate returns the list of pending apt packages on the given node.
 // This endpoint reads the cached package list; it never triggers an update.
-// Returns an empty slice (no error) if the endpoint is not accessible.
+// Returns the actual error so callers can log it; use graceful handling at call site.
 func (c *Client) GetNodeAptUpdate(node string) ([]PVEAptPackage, error) {
 	var pkgs []PVEAptPackage
 	if err := c.get(fmt.Sprintf("/nodes/%s/apt/update", node), &pkgs); err != nil {
-		// Graceful degradation — some PVE configurations deny this endpoint.
-		return []PVEAptPackage{}, nil
+		return []PVEAptPackage{}, err
 	}
 	return pkgs, nil
 }
 
 // GetNodeDisksList returns physical disks on the given node.
-// Returns an empty slice (no error) if the endpoint is not accessible.
+// Returns the actual error so callers can log it; use graceful handling at call site.
 func (c *Client) GetNodeDisksList(node string) ([]PVEDisk, error) {
 	var disks []PVEDisk
 	if err := c.get(fmt.Sprintf("/nodes/%s/disks/list", node), &disks); err != nil {
-		// Graceful degradation — requires Sys.Audit privilege which PVEAuditor may not have.
-		return []PVEDisk{}, nil
+		return []PVEDisk{}, err
 	}
 	return disks, nil
 }
