@@ -710,6 +710,9 @@ async function load() {
     const res = await api.getProxmoxNode(route.params.id)
     node.value = res.data
     await loadGuestLinks()
+    // fire-and-forget: live status + RRD charts load in parallel
+    loadLiveStatus()
+    loadRRD('hour')
   } catch (e) {
     error.value = e?.response?.data?.error || 'Erreur lors du chargement.'
   } finally {
@@ -774,6 +777,62 @@ function showMsg(msg, ok) {
   linkMsg.value = msg
   linkMsgOk.value = ok
   setTimeout(() => { linkMsg.value = '' }, 4000)
+}
+
+async function loadRRD(timeframe = rrdTimeframe.value) {
+  rrdTimeframe.value = timeframe
+  rrdLoading.value = true
+  rrdError.value = ''
+  try {
+    const res = await api.getProxmoxNodeRRD(route.params.id, timeframe)
+    buildRRDCharts(res.data ?? [], timeframe)
+  } catch (e) {
+    rrdError.value = e?.response?.data?.error || 'Erreur lors du chargement des métriques.'
+    rrdCpuChart.value = null
+    rrdRamChart.value = null
+    rrdIowaitChart.value = null
+  } finally {
+    rrdLoading.value = false
+  }
+}
+
+function buildRRDCharts(points, timeframe) {
+  const labels = points.map(p => {
+    const d = new Date(p.time * 1000)
+    if (timeframe === 'hour' || timeframe === 'day')
+      return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+    if (timeframe === 'week')
+      return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }) + ' ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+    return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })
+  })
+
+  rrdCpuChart.value = {
+    labels,
+    datasets: [{
+      data: points.map(p => p.cpu != null ? p.cpu * 100 : null),
+      borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.1)',
+      fill: true, tension: 0.3, spanGaps: true,
+    }],
+  }
+
+  rrdRamChart.value = {
+    labels,
+    datasets: [{
+      data: points.map(p => (p.mem != null && p.maxmem) ? (p.mem / p.maxmem) * 100 : null),
+      borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.1)',
+      fill: true, tension: 0.3, spanGaps: true,
+    }],
+  }
+
+  const hasIowait = points.some(p => p.iowait != null)
+  rrdIowaitChart.value = hasIowait ? {
+    labels,
+    datasets: [{
+      data: points.map(p => p.iowait != null ? p.iowait * 100 : null),
+      borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.1)',
+      fill: true, tension: 0.3, spanGaps: true,
+    }],
+  } : null
 }
 
 async function loadLiveStatus() {
