@@ -247,6 +247,12 @@ func (h *ProxmoxHandler) GetNodeRRD(c *gin.Context) {
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 		return
 	}
+	// DEBUG: log the first RRD point to inspect mem/maxmem field values
+	if len(points) > 0 {
+		p := points[0]
+		log.Printf("proxmox rrd [%s/%s] first point: time=%d cpu=%v mem=%v maxmem=%v iowait=%v",
+			conn.Name, node.NodeName, p.Time, p.CPU, p.Mem, p.MaxMem, p.IOWait)
+	}
 	c.JSON(http.StatusOK, points)
 }
 
