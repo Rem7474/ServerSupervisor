@@ -123,11 +123,12 @@
           </div>
         </div>
       </div>
-      <div v-else-if="node.status === 'online'" class="mb-3">
+      <div v-else-if="node.status === 'online'" class="mb-3 d-flex align-items-center gap-2">
         <button class="btn btn-sm btn-outline-secondary" :disabled="liveStatusLoading" @click="loadLiveStatus">
           <span v-if="liveStatusLoading" class="spinner-border spinner-border-sm me-1"></span>
           Charger le statut live (IO wait, swap, rootfs)
         </button>
+        <span v-if="liveStatusError" class="text-danger small">{{ liveStatusError }}</span>
       </div>
 
       <!-- Updates banner (only shown when pending updates exist) -->
@@ -181,7 +182,7 @@
             <li class="nav-item">
               <button class="nav-link" :class="{ active: tab === 'updates' }" @click="tab = 'updates'">
                 Mises à jour
-                <span v-if="node.pending_updates > 0" class="badge ms-1" :class="node.security_updates > 0 ? 'bg-danger' : 'bg-warning'">
+                <span v-if="node.pending_updates > 0" class="badge ms-1" :class="node.security_updates > 0 ? 'bg-danger-lt text-danger' : 'bg-warning-lt text-warning'">
                   {{ node.pending_updates }}
                 </span>
               </button>
@@ -345,7 +346,7 @@
                 <template v-if="!node.tasks?.length">
                   <tr><td colspan="7" class="text-center text-muted py-4">Aucune tâche récente pour ce nœud.</td></tr>
                 </template>
-                <tr v-else v-for="t in node.tasks" :key="t.id" :class="liveTask?.target === t.upid ? 'table-active' : ''">
+                <tr v-else v-for="t in node.tasks" :key="t.id" :class="activeUpid === t.upid ? 'table-active' : ''">
                   <td><span class="badge bg-azure-lt text-azure font-monospace">{{ t.task_type }}</span></td>
                   <td class="text-muted">{{ t.object_id || '—' }}</td>
                   <td class="text-muted small">{{ t.user_name }}</td>
@@ -459,8 +460,8 @@
               </tbody>
             </table>
           </div>
-          <div class="card-footer text-muted small">
-            Lecture : Sys.Audit · Actions (start/stop/restart/reload) : Sys.Modify requis sur le token API.
+          <div v-if="servicesError" class="card-footer text-muted small">
+            Lecture : Sys.Audit requis · Actions (start/stop/restart/reload) : Sys.Modify requis sur le token API.
           </div>
         </div>
 
@@ -583,10 +584,12 @@ const aptRefreshOk = ref(false)
 const liveStatus = ref(null)
 const liveStatusLoading = ref(false)
 const liveStatusTime = ref('')
+const liveStatusError = ref('')
 
 // PVE task console (side panel + polling)
 const showConsole = ref(false)
 const liveTask = ref(null)
+const activeUpid = ref(null)  // tracks which row is highlighted — separate from display target
 let pollTimer = null
 
 // services
@@ -682,12 +685,13 @@ function showMsg(msg, ok) {
 
 async function loadLiveStatus() {
   liveStatusLoading.value = true
+  liveStatusError.value = ''
   try {
     const res = await api.getProxmoxNodeStatus(route.params.id)
     liveStatus.value = res.data
     liveStatusTime.value = new Date().toLocaleTimeString('fr-FR')
-  } catch {
-    // silently ignore — live status is optional
+  } catch (e) {
+    liveStatusError.value = e?.response?.data?.error || `Erreur ${e?.response?.status ?? ''} — vérifiez la connectivité au nœud.`
   } finally {
     liveStatusLoading.value = false
   }
@@ -702,15 +706,17 @@ function closeConsole() {
   stopPolling()
   showConsole.value = false
   liveTask.value = null
+  activeUpid.value = null
 }
 
 async function startPollingTask(upid, { action = '', label = '' } = {}) {
   stopPolling()
+  activeUpid.value = upid
   liveTask.value = {
     host_name: node.value?.node_name ?? '',
     module: 'proxmox',
     action: action || upid,
-    target: upid,
+    target: label || '',   // short display label, not the raw UPID
     status: 'running',
     output: '',
   }
@@ -725,7 +731,7 @@ async function startPollingTask(upid, { action = '', label = '' } = {}) {
       const status = done
         ? (lastLine.startsWith('TASK OK') ? 'completed' : 'failed')
         : 'running'
-      liveTask.value = { ...liveTask.value, output: lines, status, target: upid }
+      liveTask.value = { ...liveTask.value, output: lines, status }
       if (!done) pollTimer = setTimeout(poll, 2000)
     } catch {
       pollTimer = setTimeout(poll, 3000)
@@ -881,6 +887,7 @@ onUnmounted(stopPolling)
 <style scoped>
 .pve-layout {
   display: flex;
+  align-items: flex-start;
   gap: 1rem;
 }
 
@@ -891,9 +898,12 @@ onUnmounted(stopPolling)
 
 :deep(.pve-console) {
   width: 40%;
-  min-width: 380px;
+  min-width: 360px;
+  height: 520px;
   display: flex;
   flex-direction: column;
+  position: sticky;
+  top: 1rem;
 }
 
 @media (max-width: 991px) {
@@ -904,6 +914,8 @@ onUnmounted(stopPolling)
   :deep(.pve-console) {
     width: 100%;
     min-width: 0;
+    position: static;
+    height: 400px;
   }
 }
 </style>
