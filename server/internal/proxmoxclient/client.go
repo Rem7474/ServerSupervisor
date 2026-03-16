@@ -82,14 +82,10 @@ func (c *Client) get(path string, result interface{}) error {
 		return fmt.Errorf("read response from %s: %w", path, err)
 	}
 
-	switch resp.StatusCode {
-	case http.StatusUnauthorized, http.StatusForbidden:
-		return fmt.Errorf("authentication failed (HTTP %d) — check token_id and token_secret", resp.StatusCode)
-	}
 	if resp.StatusCode != http.StatusOK {
 		snippet := string(body)
-		if len(snippet) > 200 {
-			snippet = snippet[:200]
+		if len(snippet) > 300 {
+			snippet = snippet[:300]
 		}
 		return fmt.Errorf("API %s returned HTTP %d: %s", path, resp.StatusCode, snippet)
 	}

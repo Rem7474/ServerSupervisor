@@ -231,7 +231,7 @@ func (h *ProxmoxHandler) pollOne(conn database.ProxmoxConnectionFull) {
 		// Pending apt updates (graceful — may be denied by some PVE configurations)
 		pkgs, aptErr := client.GetNodeAptUpdate(n.Node)
 		if aptErr != nil {
-			log.Printf("proxmox poller [%s/%s]: get apt/update FAILED (check Sys.Modify or PVEAuditor permissions): %v", conn.Name, n.Node, aptErr)
+			log.Printf("proxmox poller [%s/%s]: get apt/update FAILED (requires Sys.Modify — PVEAuditor is insufficient; create a custom role or add Sys.Modify to your token): %v", conn.Name, n.Node, aptErr)
 		} else {
 			log.Printf("proxmox poller [%s/%s]: got %d pending apt package(s)", conn.Name, n.Node, len(pkgs))
 		}
