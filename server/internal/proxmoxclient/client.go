@@ -416,3 +416,59 @@ func (c *Client) GetClusterBackup() ([]PVEBackupJob, error) {
 	}
 	return jobs, nil
 }
+
+// ─── Services ─────────────────────────────────────────────────────────────────
+
+// PVEService is an element returned by GET /nodes/{node}/services.
+type PVEService struct {
+	Name        string `json:"name"`
+	State       string `json:"state"`       // running | stopped
+	ActiveState string `json:"active-state"` // active | inactive | failed
+	SubState    string `json:"sub-state"`
+	Description string `json:"desc"`
+	UnitState   string `json:"unit-state,omitempty"` // enabled | disabled | static
+}
+
+// GetNodeServices returns all services on the given node. Requires Sys.Audit.
+func (c *Client) GetNodeServices(node string) ([]PVEService, error) {
+	var services []PVEService
+	if err := c.get(fmt.Sprintf("/nodes/%s/services", node), &services); err != nil {
+		return nil, err
+	}
+	return services, nil
+}
+
+// NodeServiceAction performs an action on a service. Requires Sys.Modify.
+// action must be one of: start | stop | restart | reload.
+func (c *Client) NodeServiceAction(node, service, action string) (string, error) {
+	url := c.baseURL + fmt.Sprintf("/nodes/%s/services/%s/%s", node, service, action)
+	req, err := http.NewRequest(http.MethodPost, url, nil)
+	if err != nil {
+		return "", fmt.Errorf("build request: %w", err)
+	}
+	req.Header.Set("Authorization", fmt.Sprintf("PVEAPIToken=%s=%s", c.tokenID, c.tokenSecret))
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("request: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		snippet := string(body)
+		if len(snippet) > 300 {
+			snippet = snippet[:300]
+		}
+		return "", fmt.Errorf("HTTP %d: %s", resp.StatusCode, snippet)
+	}
+
+	var envelope struct {
+		Data string `json:"data"` // UPID of the created task
+	}
+	if err := json.Unmarshal(body, &envelope); err != nil {
+		return "", fmt.Errorf("parse response: %w", err)
+	}
+	return envelope.Data, nil
+}

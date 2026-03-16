@@ -230,3 +230,77 @@ func (h *ProxmoxHandler) ListNodeDisks(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, disks)
 }
+
+// ─── Services ─────────────────────────────────────────────────────────────────
+
+// ListNodeServices returns all systemd services on a Proxmox node. Requires Sys.Audit.
+func (h *ProxmoxHandler) ListNodeServices(c *gin.Context) {
+	node, err := h.db.GetProxmoxNode(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if node == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "node not found"})
+		return
+	}
+
+	secret, conn, err := h.resolveSecret(node.ConnectionID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	client := proxmoxclient.New(conn.APIURL, conn.TokenID, secret, conn.InsecureSkipVerify)
+	services, err := client.GetNodeServices(node.NodeName)
+	if err != nil {
+		log.Printf("proxmox services list [%s/%s]: %v", conn.Name, node.NodeName, err)
+		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, services)
+}
+
+// validServiceAction is the set of allowed service action verbs.
+var validServiceAction = map[string]bool{
+	"start": true, "stop": true, "restart": true, "reload": true,
+}
+
+// NodeServiceAction proxies a service action to PVE. Requires Sys.Modify.
+// Returns the task UPID so the frontend can poll for completion.
+func (h *ProxmoxHandler) NodeServiceAction(c *gin.Context) {
+	action := c.Param("action")
+	if !validServiceAction[action] {
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("invalid action %q; allowed: start stop restart reload", action)})
+		return
+	}
+
+	node, err := h.db.GetProxmoxNode(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if node == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "node not found"})
+		return
+	}
+
+	service := c.Param("service")
+
+	secret, conn, err := h.resolveSecret(node.ConnectionID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	client := proxmoxclient.New(conn.APIURL, conn.TokenID, secret, conn.InsecureSkipVerify)
+	upid, err := client.NodeServiceAction(node.NodeName, service, action)
+	if err != nil {
+		log.Printf("proxmox service-action [%s/%s] %s %s: %v", conn.Name, node.NodeName, action, service, err)
+		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+		return
+	}
+
+	log.Printf("proxmox service-action [%s/%s] %s %s: upid=%s", conn.Name, node.NodeName, action, service, upid)
+	c.JSON(http.StatusOK, gin.H{"upid": upid})
+}

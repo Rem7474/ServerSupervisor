@@ -271,6 +271,10 @@ func registerProxmoxRoutes(g *gin.RouterGroup, h *handlers.ProxmoxHandler) {
 	g.GET("/proxmox/nodes/:id/status", h.GetNodeStatus)
 	g.GET("/proxmox/nodes/:id/tasks/:upid/log", h.GetTaskLog)
 
+	// Node services (list requires Sys.Audit; actions require Sys.Modify)
+	g.GET("/proxmox/nodes/:id/services", h.ListNodeServices)
+	g.POST("/proxmox/nodes/:id/services/:service/:action", h.NodeServiceAction)
+
 	// Node actions (write — require Sys.Modify on the Proxmox token)
 	g.POST("/proxmox/nodes/:id/apt-refresh", h.RefreshNodeApt)
 }

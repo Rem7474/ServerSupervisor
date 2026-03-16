@@ -5,6 +5,7 @@ export const MODULE_META = {
   journal:   { label: 'Journal',   cls: 'badge bg-purple-lt text-purple' },
   processes: { label: 'Processus', cls: 'badge bg-orange-lt text-orange' },
   custom:    { label: 'Custom',    cls: 'badge bg-teal-lt text-teal' },
+  proxmox:   { label: 'Proxmox',  cls: 'badge bg-yellow-lt text-yellow' },
 }
 
 export function moduleLabel(module) {

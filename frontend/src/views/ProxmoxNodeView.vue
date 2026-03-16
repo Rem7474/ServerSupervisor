@@ -2,7 +2,7 @@
   <div>
     <div v-if="loading" class="text-center py-5 text-muted">Chargement...</div>
     <div v-else-if="error" class="alert alert-danger">{{ error }}</div>
-    <template v-else-if="node">
+    <div v-else-if="node">
       <!-- Header -->
       <div class="page-header mb-4">
         <div class="page-pretitle">
@@ -146,7 +146,9 @@
         </div>
       </div>
 
-      <!-- Tabs -->
+      <!-- Tabs + side console -->
+      <div class="pve-layout">
+      <div class="pve-main">
       <div class="card">
         <div class="card-header">
           <ul class="nav nav-tabs card-header-tabs">
@@ -182,6 +184,11 @@
                 <span v-if="node.pending_updates > 0" class="badge ms-1" :class="node.security_updates > 0 ? 'bg-danger' : 'bg-warning'">
                   {{ node.pending_updates }}
                 </span>
+              </button>
+            </li>
+            <li class="nav-item">
+              <button class="nav-link" :class="{ active: tab === 'services' }" @click="tab = 'services'; loadServices()">
+                Services
               </button>
             </li>
           </ul>
@@ -338,45 +345,24 @@
                 <template v-if="!node.tasks?.length">
                   <tr><td colspan="7" class="text-center text-muted py-4">Aucune tâche récente pour ce nœud.</td></tr>
                 </template>
-                <template v-else v-for="t in node.tasks" :key="t.id">
-                  <tr :class="taskLogOpen === t.upid ? 'table-active' : ''">
-                    <td><span class="badge bg-azure-lt text-azure font-monospace">{{ t.task_type }}</span></td>
-                    <td class="text-muted">{{ t.object_id || '—' }}</td>
-                    <td class="text-muted small">{{ t.user_name }}</td>
-                    <td class="text-muted small">{{ formatDate(t.start_time) }}</td>
-                    <td class="text-muted small">{{ taskDuration(t) }}</td>
-                    <td>
-                      <span v-if="t.status === 'running'" class="badge bg-blue-lt text-blue">En cours</span>
-                      <span v-else-if="t.exit_status === 'OK'" class="badge bg-success-lt text-success">OK</span>
-                      <span v-else-if="t.exit_status" class="badge bg-danger-lt text-danger" :title="t.exit_status">Erreur</span>
-                      <span v-else class="badge bg-secondary-lt text-secondary">{{ t.status }}</span>
-                    </td>
-                    <td>
-                      <button class="btn btn-sm btn-ghost-secondary" @click="toggleTaskLog(t)" :title="taskLogOpen === t.upid ? 'Fermer les logs' : 'Voir les logs'">
-                        {{ taskLogOpen === t.upid ? '▲' : '▼' }}
-                      </button>
-                    </td>
-                  </tr>
-                  <!-- Inline log console -->
-                  <tr v-if="taskLogOpen === t.upid">
-                    <td colspan="7" class="p-0">
-                      <div class="bg-dark text-success font-monospace small p-3" style="max-height:400px;overflow-y:auto;white-space:pre-wrap;word-break:break-all" ref="logConsole">
-                        <div v-if="taskLogLoading" class="text-muted">Chargement des logs…</div>
-                        <div v-else-if="taskLogError" class="text-danger">{{ taskLogError }}</div>
-                        <template v-else-if="taskLogLines.length">
-                          <div v-for="line in taskLogLines" :key="line.n"
-                            :class="line.t.startsWith('TASK OK') ? 'text-success fw-bold' : line.t.startsWith('TASK ERROR') ? 'text-danger fw-bold' : ''">{{ line.t }}</div>
-                        </template>
-                        <div v-else class="text-muted">Aucun log disponible.</div>
-                      </div>
-                      <div class="d-flex gap-2 px-3 py-2 bg-dark border-top border-secondary">
-                        <button class="btn btn-sm btn-outline-secondary" @click="loadTaskLog(t)">↻ Rafraîchir</button>
-                        <span class="text-muted small align-self-center">{{ taskLogLines.length }} ligne(s)</span>
-                        <button class="btn btn-sm btn-ghost-secondary ms-auto" @click="taskLogOpen = null">Fermer</button>
-                      </div>
-                    </td>
-                  </tr>
-                </template>
+                <tr v-else v-for="t in node.tasks" :key="t.id" :class="liveTask?.target === t.upid ? 'table-active' : ''">
+                  <td><span class="badge bg-azure-lt text-azure font-monospace">{{ t.task_type }}</span></td>
+                  <td class="text-muted">{{ t.object_id || '—' }}</td>
+                  <td class="text-muted small">{{ t.user_name }}</td>
+                  <td class="text-muted small">{{ formatDate(t.start_time) }}</td>
+                  <td class="text-muted small">{{ taskDuration(t) }}</td>
+                  <td>
+                    <span v-if="t.status === 'running'" class="badge bg-blue-lt text-blue">En cours</span>
+                    <span v-else-if="t.exit_status === 'OK'" class="badge bg-success-lt text-success">OK</span>
+                    <span v-else-if="t.exit_status" class="badge bg-danger-lt text-danger" :title="t.exit_status">Erreur</span>
+                    <span v-else class="badge bg-secondary-lt text-secondary">{{ t.status }}</span>
+                  </td>
+                  <td>
+                    <button class="btn btn-sm btn-outline-secondary" @click="startPollingTask(t.upid, {action: t.task_type, label: t.object_id})" title="Voir les logs">
+                      Logs
+                    </button>
+                  </td>
+                </tr>
               </tbody>
             </table>
           </div>
@@ -420,6 +406,61 @@
               Ces informations proviennent du cache apt du nœud Proxmox (lecture seule).
               Pour appliquer les mises à jour, connectez-vous directement au nœud.
             </div>
+          </div>
+        </div>
+
+        <!-- Services tab -->
+        <div v-if="tab === 'services'">
+          <div class="card-header d-flex align-items-center gap-2">
+            <div class="btn-group btn-group-sm">
+              <button :class="servicesFilter === 'active' ? 'btn btn-primary' : 'btn btn-outline-secondary'" @click="servicesFilter = 'active'">Actifs</button>
+              <button :class="servicesFilter === 'all' ? 'btn btn-primary' : 'btn btn-outline-secondary'" @click="servicesFilter = 'all'">Tous</button>
+            </div>
+            <button class="btn btn-sm btn-outline-secondary ms-2" :disabled="servicesLoading" @click="loadServices">
+              <span v-if="servicesLoading" class="spinner-border spinner-border-sm me-1"></span>
+              {{ servicesLoading ? 'Chargement...' : '↻ Actualiser' }}
+            </button>
+            <span v-if="svcActionMsg" :class="['small ms-2', svcActionOk ? 'text-success' : 'text-danger']">{{ svcActionMsg }}</span>
+          </div>
+          <div v-if="servicesError" class="card-body pb-0">
+            <div class="alert alert-danger mb-0">{{ servicesError }}</div>
+          </div>
+          <div v-if="!services.length && !servicesLoading && !servicesError" class="card-body">
+            <div class="text-secondary small">Cliquez sur "Actualiser" pour charger les services du nœud Proxmox.</div>
+          </div>
+          <div v-if="filteredServices.length" class="table-responsive">
+            <table class="table table-vcenter table-hover card-table mb-0">
+              <thead>
+                <tr>
+                  <th>Service</th>
+                  <th>État</th>
+                  <th>Sous-état</th>
+                  <th>Démarrage</th>
+                  <th>Description</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="svc in filteredServices" :key="svc.name">
+                  <td class="font-monospace small fw-medium">{{ svc.name }}</td>
+                  <td><span :class="svcStateClass(svc['active-state'])">{{ svc['active-state'] || svc.state }}</span></td>
+                  <td class="text-secondary small">{{ svc['sub-state'] || '—' }}</td>
+                  <td class="text-secondary small">{{ svc['unit-state'] || '—' }}</td>
+                  <td class="text-secondary small text-truncate" style="max-width:240px" :title="svc.desc">{{ svc.desc || '—' }}</td>
+                  <td class="text-nowrap">
+                    <div class="btn-group btn-group-sm">
+                      <button v-if="svc['active-state'] !== 'active'" class="btn btn-outline-success" @click="svcAction(svc.name, 'start')" title="Démarrer">Start</button>
+                      <button v-if="svc['active-state'] === 'active'" class="btn btn-outline-danger" @click="svcAction(svc.name, 'stop')" title="Arrêter">Stop</button>
+                      <button class="btn btn-outline-secondary" @click="svcAction(svc.name, 'restart')" title="Redémarrer">Restart</button>
+                      <button class="btn btn-outline-secondary" @click="svcAction(svc.name, 'reload')" title="Recharger">Reload</button>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="card-footer text-muted small">
+            Lecture : Sys.Audit · Actions (start/stop/restart/reload) : Sys.Modify requis sur le token API.
           </div>
         </div>
 
@@ -469,13 +510,25 @@
           </table>
         </div>
       </div>
-    </template>
+      </div> <!-- /pve-main -->
+      <CommandLogPanel
+        :command="liveTask"
+        :show="showConsole"
+        title="Logs tâche PVE"
+        empty-text="Cliquez sur 'Logs' dans une tâche pour suivre l'exécution"
+        wrapper-class="pve-console"
+        @open="showConsole = true"
+        @close="closeConsole"
+      />
+      </div> <!-- /pve-layout -->
+    </div> <!-- /v-else-if node -->
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, defineComponent, h } from 'vue'
+import { ref, computed, onMounted, onUnmounted, defineComponent, h } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import CommandLogPanel from '../components/CommandLogPanel.vue'
 import api from '../api/index.js'
 
 // Inline component — renders the "Hôte lié" cell without a separate file.
@@ -531,17 +584,28 @@ const liveStatus = ref(null)
 const liveStatusLoading = ref(false)
 const liveStatusTime = ref('')
 
-// task log viewer
-const taskLogOpen = ref(null)   // upid of the open task
-const taskLogLines = ref([])
-const taskLogLoading = ref(false)
-const taskLogError = ref('')
+// PVE task console (side panel + polling)
+const showConsole = ref(false)
+const liveTask = ref(null)
+let pollTimer = null
+
+// services
+const services = ref([])
+const servicesLoading = ref(false)
+const servicesError = ref('')
+const servicesFilter = ref('active')
+const svcActionMsg = ref('')
+const svcActionOk = ref(false)
 
 const vms = computed(() => node.value?.guests?.filter(g => g.guest_type === 'vm') ?? [])
 const lxcs = computed(() => node.value?.guests?.filter(g => g.guest_type === 'lxc') ?? [])
 const failedTaskCount = computed(() =>
   (node.value?.tasks ?? []).filter(t => t.status === 'stopped' && t.exit_status && t.exit_status !== 'OK').length
 )
+const filteredServices = computed(() => {
+  if (servicesFilter.value === 'all') return services.value
+  return services.value.filter(s => s['active-state'] === 'active' || s.state === 'running')
+})
 
 async function load() {
   loading.value = true
@@ -629,27 +693,45 @@ async function loadLiveStatus() {
   }
 }
 
-async function toggleTaskLog(task) {
-  if (taskLogOpen.value === task.upid) {
-    taskLogOpen.value = null
-    return
-  }
-  taskLogOpen.value = task.upid
-  await loadTaskLog(task)
+function stopPolling() {
+  if (pollTimer) clearTimeout(pollTimer)
+  pollTimer = null
 }
 
-async function loadTaskLog(task) {
-  taskLogLoading.value = true
-  taskLogError.value = ''
-  taskLogLines.value = []
-  try {
-    const res = await api.getProxmoxTaskLog(route.params.id, task.upid)
-    taskLogLines.value = res.data ?? []
-  } catch (e) {
-    taskLogError.value = e?.response?.data?.error || 'Erreur lors du chargement des logs.'
-  } finally {
-    taskLogLoading.value = false
+function closeConsole() {
+  stopPolling()
+  showConsole.value = false
+  liveTask.value = null
+}
+
+async function startPollingTask(upid, { action = '', label = '' } = {}) {
+  stopPolling()
+  liveTask.value = {
+    host_name: node.value?.node_name ?? '',
+    module: 'proxmox',
+    action: action || upid,
+    target: upid,
+    status: 'running',
+    output: '',
   }
+  showConsole.value = true
+
+  const poll = async () => {
+    try {
+      const res = await api.getProxmoxTaskLog(route.params.id, upid)
+      const lines = (res.data ?? []).map(l => l.t).join('\n')
+      const lastLine = res.data?.[res.data.length - 1]?.t ?? ''
+      const done = lastLine.startsWith('TASK OK') || lastLine.startsWith('TASK ERROR')
+      const status = done
+        ? (lastLine.startsWith('TASK OK') ? 'completed' : 'failed')
+        : 'running'
+      liveTask.value = { ...liveTask.value, output: lines, status, target: upid }
+      if (!done) pollTimer = setTimeout(poll, 2000)
+    } catch {
+      pollTimer = setTimeout(poll, 3000)
+    }
+  }
+  await poll()
 }
 
 async function triggerAptRefresh() {
@@ -657,8 +739,10 @@ async function triggerAptRefresh() {
   aptRefreshMsg.value = ''
   try {
     const res = await api.refreshProxmoxNodeApt(route.params.id)
-    aptRefreshMsg.value = res.data?.message || 'Tâche lancée — le compteur se mettra à jour au prochain poll.'
+    const upid = res.data?.upid
+    aptRefreshMsg.value = upid ? 'Tâche lancée — logs en cours…' : (res.data?.message || 'Tâche lancée.')
     aptRefreshOk.value = true
+    if (upid) startPollingTask(upid, { action: 'apt update' })
   } catch (e) {
     aptRefreshMsg.value = e?.response?.data?.error || 'Erreur lors du lancement de apt update.'
     aptRefreshOk.value = false
@@ -740,6 +824,43 @@ function wearoutColor(wearout) {
   return 'bg-success'
 }
 
+async function loadServices() {
+  if (servicesLoading.value) return
+  servicesLoading.value = true
+  servicesError.value = ''
+  try {
+    const res = await api.getProxmoxNodeServices(route.params.id)
+    services.value = res.data ?? []
+  } catch (e) {
+    servicesError.value = e?.response?.data?.error || 'Erreur lors du chargement des services.'
+  } finally {
+    servicesLoading.value = false
+  }
+}
+
+async function svcAction(name, action) {
+  svcActionMsg.value = ''
+  try {
+    const res = await api.proxmoxNodeServiceAction(route.params.id, name, action)
+    const upid = res.data?.upid
+    svcActionMsg.value = upid ? `${action} ${name} lancé — logs en cours…` : `${action} ${name} lancé.`
+    svcActionOk.value = true
+    if (upid) startPollingTask(upid, { action: `service ${action}`, label: name })
+    else setTimeout(() => loadServices(), 2000)
+  } catch (e) {
+    svcActionMsg.value = e?.response?.data?.error || `Erreur lors de ${action} ${name}.`
+    svcActionOk.value = false
+  }
+  setTimeout(() => { svcActionMsg.value = '' }, 6000)
+}
+
+function svcStateClass(state) {
+  if (state === 'active') return 'badge bg-green-lt text-green'
+  if (state === 'failed') return 'badge bg-red-lt text-red'
+  if (state === 'activating' || state === 'deactivating') return 'badge bg-yellow-lt text-yellow'
+  return 'badge bg-secondary-lt text-secondary'
+}
+
 function taskDuration(t) {
   if (!t.start_time) return '—'
   const end = t.end_time ? new Date(t.end_time) : (t.status === 'running' ? new Date() : null)
@@ -754,4 +875,35 @@ function taskDuration(t) {
 }
 
 onMounted(load)
+onUnmounted(stopPolling)
 </script>
+
+<style scoped>
+.pve-layout {
+  display: flex;
+  gap: 1rem;
+}
+
+.pve-main {
+  flex: 1;
+  min-width: 0;
+}
+
+:deep(.pve-console) {
+  width: 40%;
+  min-width: 380px;
+  display: flex;
+  flex-direction: column;
+}
+
+@media (max-width: 991px) {
+  .pve-layout {
+    flex-direction: column;
+  }
+
+  :deep(.pve-console) {
+    width: 100%;
+    min-width: 0;
+  }
+}
+</style>
