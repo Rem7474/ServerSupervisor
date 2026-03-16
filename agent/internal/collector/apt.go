@@ -1,6 +1,7 @@
 package collector
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -357,6 +358,13 @@ func fetchUbuntuCVE(cveID string) (*ubuntuCVEResponse, error) {
 		}
 
 		result, body, err := doUbuntuCVERequest(url)
+		if err == errCVENotFound {
+			// Cache a sentinel so we don't retry for cveCacheTTL.
+			sentinel, _ := json.Marshal(ubuntuCVEResponse{ID: cveID, Priority: "unknown"})
+			_ = os.MkdirAll(cveCacheDir, 0o755)
+			_ = os.WriteFile(cacheFile, sentinel, 0o644)
+			return nil, err
+		}
 		if err != nil {
 			lastErr = err
 			continue
@@ -371,6 +379,10 @@ func fetchUbuntuCVE(cveID string) (*ubuntuCVEResponse, error) {
 
 	return nil, lastErr
 }
+
+// errCVENotFound is returned when the Ubuntu API has no data for a CVE ID.
+// The caller caches a sentinel so we don't retry for cveCacheTTL.
+var errCVENotFound = fmt.Errorf("CVE not found in Ubuntu database")
 
 func doUbuntuCVERequest(url string) (*ubuntuCVEResponse, []byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), cveAPITimeout)
@@ -389,6 +401,9 @@ func doUbuntuCVERequest(url string) (*ubuntuCVEResponse, []byte, error) {
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, nil, errCVENotFound
+	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, nil, fmt.Errorf("ubuntu CVE API returned %d", resp.StatusCode)
 	}
@@ -398,9 +413,13 @@ func doUbuntuCVERequest(url string) (*ubuntuCVEResponse, []byte, error) {
 		return nil, nil, err
 	}
 
+	if len(bytes.TrimSpace(body)) == 0 {
+		return nil, nil, errCVENotFound
+	}
+
 	var result ubuntuCVEResponse
 	if err := json.Unmarshal(body, &result); err != nil {
-		return nil, nil, err
+		return nil, nil, errCVENotFound
 	}
 
 	return &result, body, nil
@@ -499,36 +518,42 @@ func getInstalledPackageVersion(packageName string) string {
 	return strings.TrimSpace(string(out))
 }
 
+// debChangelogHeaderRe matches any standard Debian changelog entry header:
+//
+//	packagename (version) suite; urgency=level
+//
+// We intentionally ignore the package name so that source-package changelogs
+// (e.g. "openssl" for the binary "libssl3") are parsed correctly.
+var debChangelogHeaderRe = regexp.MustCompile(`(?m)^[\w.+-]+\s+\(([^)]+)\)\s+[^;]+;\s+urgency=`)
+
 // extractChangelogSinceVersion returns only the changelog text for versions strictly
 // newer than installedVersion. If installedVersion is empty, returns only the first
 // (most recent) changelog entry to avoid scanning the entire history.
-func extractChangelogSinceVersion(changelog, installedVersion, packageName string) string {
-	entryHeaderRegex := regexp.MustCompile(`(?m)^` + regexp.QuoteMeta(packageName) + `\s+\(([^)]+)\)`)
-
+func extractChangelogSinceVersion(changelog, installedVersion, _ string) string {
 	type entryBound struct {
 		version string
 		start   int
 	}
 	var bounds []entryBound
-	for _, loc := range entryHeaderRegex.FindAllStringSubmatchIndex(changelog, -1) {
+	for _, loc := range debChangelogHeaderRe.FindAllStringSubmatchIndex(changelog, -1) {
 		version := changelog[loc[2]:loc[3]]
 		bounds = append(bounds, entryBound{version: version, start: loc[0]})
 	}
 
 	if len(bounds) == 0 {
-		if len(changelog) > 3000 {
-			return changelog[:3000]
-		}
-		return changelog
+		// Unrecognised format — return nothing rather than risk surfacing old CVEs.
+		return ""
 	}
 
 	if installedVersion == "" {
+		// Unknown installed version: only scan the single most-recent entry.
 		if len(bounds) > 1 {
 			return changelog[bounds[0].start:bounds[1].start]
 		}
 		return changelog[bounds[0].start:]
 	}
 
+	// Walk entries (newest-first) and stop at the first one that is <= installedVersion.
 	cutoff := len(changelog)
 	for _, b := range bounds {
 		if err := exec.Command("dpkg", "--compare-versions", b.version, "le", installedVersion).Run(); err == nil {
