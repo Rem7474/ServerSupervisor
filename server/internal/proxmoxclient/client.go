@@ -343,8 +343,8 @@ type PVENodeStatus struct {
 		Total int64 `json:"total"`
 		Used  int64 `json:"used"`
 	} `json:"rootfs"`
-	Uptime int64  `json:"uptime"`
-	KSMed  int64  `json:"ksm,omitempty"`
+	Uptime int64           `json:"uptime"`
+	KSM    json.RawMessage `json:"ksm,omitempty"` // PVE returns an object {shared:int64}, not a scalar
 }
 
 // GetNodeStatus returns detailed real-time status for a node.
