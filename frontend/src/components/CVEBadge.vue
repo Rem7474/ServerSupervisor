@@ -59,7 +59,10 @@ const badgeClass = computed(() => {
 
 const cveTitle = computed(() => {
   const packageName = String(props.cve.package || '').trim() || 'N/A'
-  return `${props.cve.id} - ${props.cve.severity} - Package: ${packageName}`
+  const parts = [`${props.cve.id}`, `Package: ${packageName}`]
+  if (props.cve.ubuntu_priority) parts.push(`Ubuntu priority: ${props.cve.ubuntu_priority}`)
+  if (props.cve.cvss_score) parts.push(`CVSS: ${props.cve.cvss_score.toFixed(1)}`)
+  return parts.join(' — ')
 })
 </script>
 

@@ -107,9 +107,12 @@ type ContainerEnv struct {
 // ========== APT Updates (belongs to host, included here for convenience) ==========
 
 type CVEInfo struct {
-	ID       string `json:"id"`
-	Severity string `json:"severity"`
-	Package  string `json:"package"`
+	ID             string  `json:"id"`
+	Severity       string  `json:"severity"`        // Mapped from UbuntuPriority
+	UbuntuPriority string  `json:"ubuntu_priority"` // Raw Ubuntu priority (critical/high/medium/low/negligible)
+	CVSSScore      float64 `json:"cvss_score"`      // CVSS v3 score (0 if unavailable)
+	CVSSVector     string  `json:"cvss_vector,omitempty"`
+	Package        string  `json:"package"`
 }
 
 type AptStatus struct {

@@ -4,9 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -15,9 +18,12 @@ import (
 )
 
 type CVEInfo struct {
-	ID       string `json:"id"`
-	Severity string `json:"severity"`
-	Package  string `json:"package"`
+	ID             string  `json:"id"`
+	Severity       string  `json:"severity"`        // Mapped from UbuntuPriority
+	UbuntuPriority string  `json:"ubuntu_priority"` // Raw Ubuntu priority (critical/high/medium/low/negligible)
+	CVSSScore      float64 `json:"cvss_score"`      // CVSS v3 score (0 if unavailable)
+	CVSSVector     string  `json:"cvss_vector,omitempty"`
+	Package        string  `json:"package"`
 }
 
 type AptStatus struct {
@@ -233,7 +239,7 @@ func getLastAptAction(prefix, logFile string) time.Time {
 		return time.Time{}
 	}
 	var lastLine string
-	for _, line := range strings.Split(string(data), "\n") {
+	for line := range strings.SplitSeq(string(data), "\n") {
 		if strings.HasPrefix(line, prefix) {
 			lastLine = line
 		}
@@ -265,66 +271,174 @@ func getLastAptUpgrade() time.Time {
 	return time.Unix(epoch, 0).In(time.Local)
 }
 
-// extractCVEsForPackage extracts CVE information from package changelog and USN,
-// restricted to changelog entries strictly newer than the currently installed version.
+// ─── Ubuntu CVE API ───────────────────────────────────────────────────────────
+
+const (
+	ubuntuCVEAPIBase = "https://ubuntu.com/security/cves/%s.json"
+	cveCacheDir      = "/tmp/ss-cve-cache"
+	cveCacheTTL      = 24 * time.Hour
+	cveAPITimeout    = 8 * time.Second
+	cveParallelLimit = 5 // max concurrent Ubuntu API requests
+)
+
+// ubuntuCVEResponse is the subset of the Ubuntu CVE JSON API we care about.
+type ubuntuCVEResponse struct {
+	ID       string  `json:"id"`
+	Priority string  `json:"priority"` // critical / high / medium / low / negligible / unknown
+	CVSS3    *struct {
+		Score  float64 `json:"score"`
+		Vector string  `json:"vector"`
+	} `json:"cvss3"`
+}
+
+// ubuntuPriorityToSeverity maps an Ubuntu priority label to an upper-cased severity string.
+func ubuntuPriorityToSeverity(priority string) string {
+	switch strings.ToLower(priority) {
+	case "critical":
+		return "CRITICAL"
+	case "high":
+		return "HIGH"
+	case "medium":
+		return "MEDIUM"
+	case "low":
+		return "LOW"
+	case "negligible":
+		return "NEGLIGIBLE"
+	default:
+		return "UNKNOWN"
+	}
+}
+
+// fetchUbuntuCVE fetches CVE data from Ubuntu's security API.
+// Results are cached on disk for cveCacheTTL to avoid hammering the API.
+func fetchUbuntuCVE(cveID string) (*ubuntuCVEResponse, error) {
+	cacheFile := filepath.Join(cveCacheDir, cveID+".json")
+
+	// Return cached result if still fresh.
+	if info, err := os.Stat(cacheFile); err == nil && time.Since(info.ModTime()) < cveCacheTTL {
+		data, err := os.ReadFile(cacheFile)
+		if err == nil {
+			var cached ubuntuCVEResponse
+			if json.Unmarshal(data, &cached) == nil {
+				return &cached, nil
+			}
+		}
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), cveAPITimeout)
+	defer cancel()
+
+	url := fmt.Sprintf(ubuntuCVEAPIBase, cveID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("ubuntu CVE API returned %d for %s", resp.StatusCode, cveID)
+	}
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 64*1024))
+	if err != nil {
+		return nil, err
+	}
+
+	var result ubuntuCVEResponse
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, err
+	}
+
+	// Persist to cache (best-effort).
+	_ = os.MkdirAll(cveCacheDir, 0o755)
+	_ = os.WriteFile(cacheFile, body, 0o644)
+
+	return &result, nil
+}
+
+// enrichCVEsWithUbuntuData queries the Ubuntu CVE API for each CVE ID (in parallel)
+// and fills in UbuntuPriority, Severity, CVSSScore, and CVSSVector.
+// Falls back to "UNKNOWN" if the API is unreachable.
+func enrichCVEsWithUbuntuData(cves []CVEInfo) []CVEInfo {
+	sem := make(chan struct{}, cveParallelLimit)
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+
+	for i := range cves {
+		wg.Add(1)
+		go func(idx int) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			data, err := fetchUbuntuCVE(cves[idx].ID)
+			if err != nil {
+				log.Printf("CVE API: could not fetch %s: %v", cves[idx].ID, err)
+				return
+			}
+
+			mu.Lock()
+			cves[idx].UbuntuPriority = data.Priority
+			cves[idx].Severity = ubuntuPriorityToSeverity(data.Priority)
+			if data.CVSS3 != nil {
+				cves[idx].CVSSScore = data.CVSS3.Score
+				cves[idx].CVSSVector = data.CVSS3.Vector
+			}
+			mu.Unlock()
+		}(i)
+	}
+
+	wg.Wait()
+	return cves
+}
+
+// ─── Changelog parsing ────────────────────────────────────────────────────────
+
+// extractCVEsForPackage extracts CVE IDs from the package changelog (entries
+// strictly newer than the installed version) then enriches them with official
+// Ubuntu priority and CVSS data from the Ubuntu Security API.
 func extractCVEsForPackage(packageName string) []CVEInfo {
-	var cves []CVEInfo
 	cveMap := make(map[string]bool)
 
 	installedVersion := getInstalledPackageVersion(packageName)
 
-	// Try to get changelog (with timeout)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, "apt-get", "changelog", packageName)
 	output, err := cmd.Output()
 	if err != nil {
-		// If changelog fails, try apt-cache policy
 		return extractCVEsFromPolicy(packageName)
 	}
 
-	// Only scan the portion of the changelog that is newer than the installed version.
-	// This prevents surfacing CVEs that were already fixed in the currently running package.
 	changelog := extractChangelogSinceVersion(string(output), installedVersion, packageName)
 	if changelog == "" {
-		return cves
+		return nil
 	}
 
-	// Extract CVE IDs using regex (CVE-YYYY-NNNNN format)
 	cveRegex := regexp.MustCompile(`CVE-\d{4}-\d{4,7}`)
-	cveIDs := cveRegex.FindAllString(changelog, -1)
-
-	// Extract severity from USN (Ubuntu Security Notice) format
-	severityRegex := regexp.MustCompile(`(?i)(critical|high|medium|low|negligible).*?(CVE-\d{4}-\d{4,7})`)
-	severityMatches := severityRegex.FindAllStringSubmatch(changelog, -1)
-
-	severityMap := make(map[string]string)
-	for _, match := range severityMatches {
-		if len(match) >= 3 {
-			severity := strings.ToUpper(match[1])
-			cveID := match[2]
-			severityMap[cveID] = severity
-		}
-	}
-
-	// Build CVE list with severity
-	for _, cveID := range cveIDs {
+	var cves []CVEInfo
+	for _, cveID := range cveRegex.FindAllString(changelog, -1) {
 		if cveMap[cveID] {
-			continue // Skip duplicates
+			continue
 		}
 		cveMap[cveID] = true
-
-		severity := severityMap[cveID]
-		if severity == "" {
-			severity = detectSeverityFromChangelog(changelog, cveID)
-		}
-
 		cves = append(cves, CVEInfo{
-			ID:       cveID,
-			Severity: severity,
-			Package:  packageName,
+			ID:             cveID,
+			Severity:       "UNKNOWN",
+			UbuntuPriority: "unknown",
+			Package:        packageName,
 		})
+	}
+
+	if len(cves) > 0 {
+		cves = enrichCVEsWithUbuntuData(cves)
 	}
 
 	return cves
@@ -345,7 +459,6 @@ func getInstalledPackageVersion(packageName string) string {
 // newer than installedVersion. If installedVersion is empty, returns only the first
 // (most recent) changelog entry to avoid scanning the entire history.
 func extractChangelogSinceVersion(changelog, installedVersion, packageName string) string {
-	// Debian changelog entry headers: "packagename (version) suite; urgency=level"
 	entryHeaderRegex := regexp.MustCompile(`(?m)^` + regexp.QuoteMeta(packageName) + `\s+\(([^)]+)\)`)
 
 	type entryBound struct {
@@ -359,14 +472,12 @@ func extractChangelogSinceVersion(changelog, installedVersion, packageName strin
 	}
 
 	if len(bounds) == 0 {
-		// Cannot parse entries; fall back to the first 3000 chars only
 		if len(changelog) > 3000 {
 			return changelog[:3000]
 		}
 		return changelog
 	}
 
-	// If we don't know the installed version, only look at the most recent entry.
 	if installedVersion == "" {
 		if len(bounds) > 1 {
 			return changelog[bounds[0].start:bounds[1].start]
@@ -374,7 +485,6 @@ func extractChangelogSinceVersion(changelog, installedVersion, packageName strin
 		return changelog[bounds[0].start:]
 	}
 
-	// Walk entries (newest-first) and stop at the first one that is <= installedVersion.
 	cutoff := len(changelog)
 	for _, b := range bounds {
 		if err := exec.Command("dpkg", "--compare-versions", b.version, "le", installedVersion).Run(); err == nil {
@@ -382,97 +492,56 @@ func extractChangelogSinceVersion(changelog, installedVersion, packageName strin
 			break
 		}
 	}
-
 	if cutoff == 0 {
 		return ""
 	}
 	return changelog[:cutoff]
 }
 
-// extractCVEsFromPolicy extracts CVE info from apt-cache policy (fallback method)
+// extractCVEsFromPolicy is a fallback when the changelog is unavailable.
+// It detects that a security update exists but cannot provide CVE-level detail.
 func extractCVEsFromPolicy(packageName string) []CVEInfo {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "apt-cache", "policy", packageName)
-	output, err := cmd.Output()
+	out, err := exec.CommandContext(ctx, "apt-cache", "policy", packageName).Output()
 	if err != nil {
-		return []CVEInfo{}
+		return nil
 	}
 
-	policy := string(output)
+	policy := string(out)
+	cveRegex := regexp.MustCompile(`CVE-\d{4}-\d{4,7}`)
+	cveIDs := cveRegex.FindAllString(policy, -1)
+
 	var cves []CVEInfo
 	cveMap := make(map[string]bool)
 
-	// Look for security repositories in policy output
-	// Format: *** 1.2.3ubuntu1.1 500
-	//         500 http://security.ubuntu.com/ubuntu focal-security/main amd64 Packages
-	if strings.Contains(policy, "security.ubuntu.com") || strings.Contains(policy, "-security") {
-		// This is a security update, but we can't extract specific CVEs from policy
-		// Return a generic CVE marker
+	for _, id := range cveIDs {
+		if cveMap[id] {
+			continue
+		}
+		cveMap[id] = true
 		cves = append(cves, CVEInfo{
-			ID:       "SECURITY-UPDATE",
-			Severity: "UNKNOWN",
-			Package:  packageName,
+			ID:             id,
+			Severity:       "UNKNOWN",
+			UbuntuPriority: "unknown",
+			Package:        packageName,
 		})
 	}
 
-	cveRegex := regexp.MustCompile(`CVE-\d{4}-\d{4,7}`)
-	cveIDs := cveRegex.FindAllString(policy, -1)
-	for _, cveID := range cveIDs {
-		if !cveMap[cveID] {
-			cveMap[cveID] = true
-			cves = append(cves, CVEInfo{
-				ID:       cveID,
-				Severity: "MEDIUM", // Default severity when unknown
-				Package:  packageName,
-			})
-		}
+	// Changelog unavailable but we know it's a security update.
+	if len(cves) == 0 && (strings.Contains(policy, "security.ubuntu.com") || strings.Contains(policy, "-security")) {
+		cves = append(cves, CVEInfo{
+			ID:             "SECURITY-UPDATE",
+			Severity:       "UNKNOWN",
+			UbuntuPriority: "unknown",
+			Package:        packageName,
+		})
+	}
+
+	if len(cves) > 0 {
+		cves = enrichCVEsWithUbuntuData(cves)
 	}
 
 	return cves
-}
-
-// detectSeverityFromChangelog tries to infer severity from changelog context
-func detectSeverityFromChangelog(changelog, cveID string) string {
-	// Find the CVE in changelog and look for severity keywords nearby
-	cveIndex := strings.Index(changelog, cveID)
-	if cveIndex == -1 {
-		return "MEDIUM" // Default
-	}
-
-	// Extract 500 chars before and after CVE mention
-	start := cveIndex - 500
-	if start < 0 {
-		start = 0
-	}
-	end := cveIndex + 500
-	if end > len(changelog) {
-		end = len(changelog)
-	}
-	context := strings.ToLower(changelog[start:end])
-
-	// Look for severity keywords in context
-	if strings.Contains(context, "critical") {
-		return "CRITICAL"
-	}
-	if strings.Contains(context, "high") || strings.Contains(context, "important") {
-		return "HIGH"
-	}
-	if strings.Contains(context, "low") || strings.Contains(context, "negligible") {
-		return "LOW"
-	}
-	if strings.Contains(context, "medium") || strings.Contains(context, "moderate") {
-		return "MEDIUM"
-	}
-
-	// Check for severity indicators
-	if strings.Contains(context, "remote code execution") || strings.Contains(context, "privilege escalation") {
-		return "CRITICAL"
-	}
-	if strings.Contains(context, "denial of service") || strings.Contains(context, "information disclosure") {
-		return "MEDIUM"
-	}
-
-	return "MEDIUM" // Default when we can't determine
 }

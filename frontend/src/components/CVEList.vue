@@ -30,6 +30,7 @@
           >
             <CVEBadge :cve="cve" :showIcon="true" />
             <span :class="severityClass(cve.severity)" class="badge">{{ normalizeSeverity(cve.severity) }}</span>
+            <span v-if="cve.cvss_score" class="text-secondary small">CVSS {{ cve.cvss_score.toFixed(1) }}</span>
           </div>
         </div>
       </div>
