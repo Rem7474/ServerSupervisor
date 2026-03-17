@@ -238,6 +238,7 @@ func registerProxmoxRoutes(g *gin.RouterGroup, h *handlers.ProxmoxHandler) {
 	// Summary & read-only data (all authenticated users)
 	g.GET("/proxmox/summary", h.GetSummary)
 	g.GET("/proxmox/nodes", h.ListNodes)
+	g.GET("/proxmox/nodes/metrics", h.GetNodeMetricsSummary)
 	g.GET("/proxmox/nodes/:id", h.GetNode)
 	g.GET("/proxmox/guests", h.ListGuests)
 	g.GET("/proxmox/guests/:id/link", h.GetLinkByGuest)

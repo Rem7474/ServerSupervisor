@@ -181,6 +181,8 @@ export default {
   pollProxmoxNow: (id) => api.post(`/v1/proxmox/instances/${id}/poll-now`),
   getProxmoxNodes: (connectionId = '') => api.get('/v1/proxmox/nodes', { params: connectionId ? { connection_id: connectionId } : {} }),
   getProxmoxNode: (id) => api.get(`/v1/proxmox/nodes/${id}`),
+  getProxmoxNodeMetrics: (hours = 24, bucketMinutes = 5) =>
+    api.get('/v1/proxmox/nodes/metrics', { params: { hours, bucket_minutes: bucketMinutes } }),
   getProxmoxGuests: (params = {}) => api.get('/v1/proxmox/guests', { params }),
   getProxmoxGuestLink: (guestId) => api.get(`/v1/proxmox/guests/${guestId}/link`),
   // Guest ↔ host links

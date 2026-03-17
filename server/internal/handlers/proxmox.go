@@ -3,6 +3,7 @@ package handlers
 import (
 	"log"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -109,6 +110,13 @@ func (h *ProxmoxHandler) pollOne(conn database.ProxmoxConnectionFull) {
 			n.MaxMem, n.Mem, n.Uptime, pveVersion, clusterName, n.IP,
 		); err != nil {
 			log.Printf("proxmox poller [%s]: upsert node %s: %v", conn.Name, n.Node, err)
+		} else if n.Status == "online" {
+			// Store a historical metrics snapshot for trend charts.
+			if nodeID, err := h.db.GetProxmoxNodeID(conn.ID, n.Node); err == nil {
+				if err := h.db.InsertProxmoxNodeMetric(nodeID, conn.ID, n.Node, n.CPU, n.MaxMem, n.Mem); err != nil {
+					log.Printf("proxmox poller [%s/%s]: insert node metric: %v", conn.Name, n.Node, err)
+				}
+			}
 		}
 
 		if n.Status != "online" {
@@ -477,6 +485,32 @@ func (h *ProxmoxHandler) GetNode(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, node)
+}
+
+// GetNodeMetricsSummary returns time-bucketed avg CPU% and RAM% across all Proxmox nodes.
+// Same query parameters as GET /metrics/summary for agent hosts.
+func (h *ProxmoxHandler) GetNodeMetricsSummary(c *gin.Context) {
+	hours, _ := strconv.Atoi(c.DefaultQuery("hours", "24"))
+	bucketMinutes, _ := strconv.Atoi(c.DefaultQuery("bucket_minutes", "5"))
+	if hours <= 0 {
+		hours = 24
+	}
+	if hours > 8760 {
+		hours = 8760
+	}
+	if bucketMinutes <= 0 {
+		bucketMinutes = 5
+	}
+
+	summary, err := h.db.GetProxmoxNodeMetricsSummary(hours, bucketMinutes)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if summary == nil {
+		summary = []models.ProxmoxNodeMetricsSummary{}
+	}
+	c.JSON(http.StatusOK, summary)
 }
 
 // ListGuests returns all guests with optional filters: connection_id, type (vm|lxc), status.

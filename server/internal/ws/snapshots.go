@@ -23,6 +23,11 @@ func (h *WSHandler) sendDashboardSnapshot(conn *websocket.Conn, lastHash *string
 		comparisons = []models.VersionComparison{}
 	}
 
+	proxmoxNodes, _ := h.db.ListProxmoxNodes()
+	if proxmoxNodes == nil {
+		proxmoxNodes = []models.ProxmoxNode{}
+	}
+
 	payload := gin.H{
 		"type":                "dashboard",
 		"hosts":               hosts,
@@ -31,6 +36,7 @@ func (h *WSHandler) sendDashboardSnapshot(conn *websocket.Conn, lastHash *string
 		"apt_pending":         h.db.GetTotalAptPending(),
 		"apt_pending_hosts":   h.db.GetAptPendingAll(),
 		"disk_usage":          h.db.GetRootDiskPercentAll(),
+		"proxmox_nodes":       proxmoxNodes,
 	}
 	if !snapshotChanged(payload, lastHash) {
 		return nil

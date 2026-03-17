@@ -172,6 +172,15 @@ type ProxmoxSummary struct {
 	RecentFailedTasks int `json:"recent_failed_tasks"` // exit_status != 'OK' in last 24 h
 }
 
+// ProxmoxNodeMetricsSummary is a time-bucketed aggregate used for dashboard trend charts.
+// cpu_avg is expressed as a percentage (0‒100).
+type ProxmoxNodeMetricsSummary struct {
+	Timestamp   time.Time `json:"timestamp"`
+	CPUAvg      float64   `json:"cpu_avg"`
+	MemoryAvg   float64   `json:"memory_avg"`
+	SampleCount int       `json:"sample_count"`
+}
+
 // ProxmoxGuestLink maps a Proxmox guest (VM/LXC) to a ServerSupervisor host (agent).
 // Status lifecycle: suggested (auto-detected) → confirmed (validated) or ignored (dismissed).
 // MetricsSource controls which data source feeds CPU/RAM/disk in host views.
