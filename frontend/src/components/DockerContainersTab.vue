@@ -141,6 +141,14 @@
                   <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><circle cx="10" cy="10" r="7" /><path d="M21 21l-6 -6" /></svg>
                 </button>
                 <button
+                  @click="trackImage(c)"
+                  class="btn btn-sm btn-ghost-secondary"
+                  title="Suivre les mises à jour de cette image"
+                  aria-label="Créer un tracker de mise à jour"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                </button>
+                <button
                   v-if="getComposeInfo(c).project || Object.keys(c.labels || {}).length > 0"
                   @click="selectedContainer = c"
                   class="btn btn-sm btn-ghost-secondary"
@@ -309,6 +317,9 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
+import { useRouter } from 'vue-router'
+
+const router = useRouter()
 
 const props = defineProps({
   containers: { type: Array, default: () => [] },
@@ -333,6 +344,12 @@ function containerVersion(c) {
 }
 
 defineEmits(['container-action'])
+
+function trackImage(c) {
+  const image = c.image || ''
+  const tag = c.image_tag || 'latest'
+  router.push({ path: '/git-webhooks', query: { tab: 'trackers', docker_image: image, docker_tag: tag } })
+}
 
 const searchInput = ref('')
 const search = ref('')

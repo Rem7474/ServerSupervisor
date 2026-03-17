@@ -1,9 +1,11 @@
 import { computed, onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import api from '../api'
 import { useConfirmDialog } from './useConfirmDialog'
 
 export function useGitWebhooksPage() {
   const dialog = useConfirmDialog()
+  const route = useRoute()
 
   const activeTab = ref('webhooks')
   const hosts = ref([])
@@ -20,6 +22,10 @@ export function useGitWebhooksPage() {
   const loadingTrackers = ref(false)
   const showTrackerModal = ref(false)
   const editingTracker = ref(null)
+
+  // Pre-fill values passed from Docker page via query params
+  const prefillDockerImage = ref('')
+  const prefillDockerTag = ref('')
 
   const recentWebhookExecutions = computed(() =>
     webhooks.value
@@ -46,11 +52,22 @@ export function useGitWebhooksPage() {
       .sort((left, right) => new Date(right.triggered_at) - new Date(left.triggered_at))
   )
 
-  onMounted(loadAll)
-
-  async function loadAll() {
+  onMounted(async () => {
+    // Handle query params from Docker page: ?tab=trackers&docker_image=X&docker_tag=Y
+    if (route.query.tab === 'trackers') {
+      activeTab.value = 'trackers'
+    }
+    if (route.query.docker_image) {
+      prefillDockerImage.value = route.query.docker_image
+      prefillDockerTag.value = route.query.docker_tag || 'latest'
+      activeTab.value = 'trackers'
+      // Open the create modal after data is loaded
+      await Promise.all([loadWebhooks(), loadTrackers(), loadHosts()])
+      openCreateTracker()
+      return
+    }
     await Promise.all([loadWebhooks(), loadTrackers(), loadHosts()])
-  }
+  })
 
   async function loadWebhooks() {
     loadingWebhooks.value = true
@@ -164,6 +181,9 @@ export function useGitWebhooksPage() {
   }
 
   function openEditTracker(tracker) {
+    // Clear prefill when editing an existing tracker
+    prefillDockerImage.value = ''
+    prefillDockerTag.value = ''
     editingTracker.value = tracker
     modalError.value = ''
     showTrackerModal.value = true
@@ -173,6 +193,9 @@ export function useGitWebhooksPage() {
     showTrackerModal.value = false
     editingTracker.value = null
     modalError.value = ''
+    // Clear prefill after closing
+    prefillDockerImage.value = ''
+    prefillDockerTag.value = ''
   }
 
   async function saveTracker(payload) {
@@ -280,6 +303,8 @@ export function useGitWebhooksPage() {
     loadingTrackers,
     showTrackerModal,
     editingTracker,
+    prefillDockerImage,
+    prefillDockerTag,
     recentWebhookExecutions,
     recentTrackerExecutions,
     openCreateWebhook,

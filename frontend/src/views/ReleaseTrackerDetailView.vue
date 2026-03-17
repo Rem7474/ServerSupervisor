@@ -3,15 +3,16 @@
     <div class="page-header mb-3">
       <div>
         <div class="page-pretitle">
-          <router-link to="/git-webhooks" class="text-decoration-none">Git / Automatisation</router-link>
-          <span class="text-muted mx-1">/</span>
-          <span>Suivi de releases</span>
+          <router-link to="/git-webhooks?tab=trackers" class="text-decoration-none">Suivi de versions</router-link>
           <span class="text-muted mx-1">/</span>
           <span>{{ tracker?.name || id }}</span>
         </div>
         <h2 class="page-title d-flex align-items-center gap-2">
           {{ tracker?.name }}
-          <span v-if="tracker" class="badge" :class="providerBadge(tracker.provider)">{{ tracker.provider }}</span>
+          <template v-if="tracker">
+            <span v-if="tracker.tracker_type === 'docker'" class="badge bg-cyan-lt text-cyan">docker</span>
+            <span v-else class="badge" :class="providerBadge(tracker.provider)">{{ tracker.provider }}</span>
+          </template>
           <span v-if="tracker && !tracker.enabled" class="badge bg-secondary">Désactivé</span>
         </h2>
       </div>
@@ -26,7 +27,6 @@
     <div v-else-if="tracker" class="row g-3">
       <!-- Left column: config -->
       <div class="col-lg-5">
-        <!-- Config card -->
         <div class="card">
           <div class="card-header d-flex align-items-center justify-content-between">
             <h3 class="card-title">Configuration</h3>
@@ -48,29 +48,57 @@
           </div>
           <div class="card-body">
             <dl class="row mb-0 small">
-              <dt class="col-5 text-muted">Provider</dt>
-              <dd class="col-7">{{ tracker.provider }}</dd>
-              <dt class="col-5 text-muted">Dépôt</dt>
+              <dt class="col-5 text-muted">Type</dt>
               <dd class="col-7">
-                <a :href="repoURL" target="_blank" class="link-primary">
-                  {{ tracker.repo_owner }}/{{ tracker.repo_name }}
-                </a>
+                <span v-if="tracker.tracker_type === 'docker'" class="badge bg-cyan-lt text-cyan">Image Docker</span>
+                <span v-else class="badge bg-blue-lt text-blue">Release Git</span>
               </dd>
+
+              <!-- Git-specific -->
+              <template v-if="tracker.tracker_type !== 'docker'">
+                <dt class="col-5 text-muted">Provider</dt>
+                <dd class="col-7">{{ tracker.provider }}</dd>
+                <dt class="col-5 text-muted">Dépôt</dt>
+                <dd class="col-7">
+                  <a :href="repoURL" target="_blank" class="link-primary">
+                    {{ tracker.repo_owner }}/{{ tracker.repo_name }}
+                  </a>
+                </dd>
+                <dt class="col-5 text-muted">Dernière release</dt>
+                <dd class="col-7">
+                  <span v-if="tracker.last_release_tag" class="badge bg-green-lt text-green">{{ tracker.last_release_tag }}</span>
+                  <span v-else class="text-muted">En attente...</span>
+                </dd>
+              </template>
+
+              <!-- Docker-specific -->
+              <template v-else>
+                <dt class="col-5 text-muted">Image</dt>
+                <dd class="col-7"><code>{{ tracker.docker_image }}</code></dd>
+                <dt class="col-5 text-muted">Tag surveillé</dt>
+                <dd class="col-7"><code>{{ tracker.docker_tag || 'latest' }}</code></dd>
+                <template v-if="tracker.latest_image_digest">
+                  <dt class="col-5 text-muted">Dernier digest</dt>
+                  <dd class="col-7">
+                    <code class="small text-muted" :title="tracker.latest_image_digest">
+                      {{ tracker.latest_image_digest.slice(0, 19) }}…
+                    </code>
+                  </dd>
+                </template>
+                <dt class="col-5 text-muted">Dernier check</dt>
+                <dd class="col-7">
+                  <span v-if="tracker.last_checked_at"><RelativeTime :date="tracker.last_checked_at" /></span>
+                  <span v-else class="text-muted">Jamais</span>
+                </dd>
+              </template>
+
+              <!-- Common fields -->
               <dt class="col-5 text-muted">VM cible</dt>
               <dd class="col-7">{{ tracker.host_name || tracker.host_id }}</dd>
-              <template v-if="tracker.docker_image">
-                <dt class="col-5 text-muted">Image Docker</dt>
-                <dd class="col-7"><code>{{ tracker.docker_image }}</code></dd>
-              </template>
               <dt class="col-5 text-muted">Tâche</dt>
               <dd class="col-7"><code>{{ tracker.custom_task_id }}</code></dd>
-              <dt class="col-5 text-muted">Dernière release</dt>
-              <dd class="col-7">
-                <span v-if="tracker.last_release_tag" class="badge bg-green-lt text-green">{{ tracker.last_release_tag }}</span>
-                <span v-else class="text-muted">En attente...</span>
-              </dd>
-              <dt v-if="tracker.last_checked_at" class="col-5 text-muted">Dernier check</dt>
-              <dd v-if="tracker.last_checked_at" class="col-7"><RelativeTime :date="tracker.last_checked_at" /></dd>
+              <dt v-if="tracker.tracker_type !== 'docker' && tracker.last_checked_at" class="col-5 text-muted">Dernier check</dt>
+              <dd v-if="tracker.tracker_type !== 'docker' && tracker.last_checked_at" class="col-7"><RelativeTime :date="tracker.last_checked_at" /></dd>
               <template v-if="tracker.last_error">
                 <dt class="col-5 text-muted">Erreur</dt>
                 <dd class="col-7 text-danger small">{{ tracker.last_error }}</dd>
@@ -156,7 +184,7 @@ const showModal = ref(false)
 const saving = ref(false)
 const modalError = ref('')
 
-const envVars = [
+const gitEnvVars = [
   { name: 'SS_REPO_NAME',    desc: 'owner/repo (ex: home-assistant/core)' },
   { name: 'SS_TAG_NAME',     desc: 'Tag de la nouvelle release (ex: v1.2.3)' },
   { name: 'SS_RELEASE_URL',  desc: 'URL de la release sur le provider' },
@@ -164,12 +192,24 @@ const envVars = [
   { name: 'SS_TRACKER_NAME', desc: 'Nom du tracker dans ServerSupervisor' },
 ]
 
+const dockerEnvVars = [
+  { name: 'SS_IMAGE_NAME',   desc: 'image:tag surveille (ex: nginx:latest)' },
+  { name: 'SS_IMAGE_TAG',    desc: 'Tag surveille (ex: latest)' },
+  { name: 'SS_OLD_DIGEST',   desc: 'Digest manifest SHA256 precedent' },
+  { name: 'SS_NEW_DIGEST',   desc: 'Nouveau digest manifest SHA256' },
+  { name: 'SS_TRACKER_NAME', desc: 'Nom du tracker dans ServerSupervisor' },
+]
+
+const envVars = computed(() =>
+  tracker.value?.tracker_type === 'docker' ? dockerEnvVars : gitEnvVars
+)
+
 const repoURL = computed(() => {
-  if (!tracker.value) return '#'
+  if (!tracker.value || tracker.value.tracker_type === 'docker') return '#'
   switch (tracker.value.provider) {
     case 'gitlab': return `https://gitlab.com/${tracker.value.repo_owner}/${tracker.value.repo_name}`
-    case 'gitea': return `https://codeberg.org/${tracker.value.repo_owner}/${tracker.value.repo_name}`
-    default: return `https://github.com/${tracker.value.repo_owner}/${tracker.value.repo_name}`
+    case 'gitea':  return `https://codeberg.org/${tracker.value.repo_owner}/${tracker.value.repo_name}`
+    default:       return `https://github.com/${tracker.value.repo_owner}/${tracker.value.repo_name}`
   }
 })
 
@@ -265,14 +305,6 @@ function channelBadge(ch) {
     browser: 'bg-purple-lt text-purple',
   }
   return map[ch] || 'bg-secondary-lt text-secondary'
-}
-
-function execStatusBadge(status) {
-  const map = {
-    pending: 'bg-yellow-lt text-yellow', running: 'bg-blue-lt text-blue',
-    completed: 'bg-success-lt text-success', failed: 'bg-danger-lt text-danger', skipped: 'bg-secondary-lt text-secondary',
-  }
-  return map[status] || 'bg-secondary'
 }
 
 onMounted(load)

@@ -9,18 +9,13 @@
         <div class="modal-body">
           <div v-if="errorMessage" class="alert alert-danger">{{ errorMessage }}</div>
 
-          <template v-if="mode === 'tracker'">
-            <div class="alert alert-info small mb-3">
-              Le tracker surveille automatiquement les nouvelles releases d'un depot externe et declenche un script sur une VM des qu'une nouvelle version est publiee.
-            </div>
-          </template>
-
           <div class="row g-3">
             <div class="col-12">
               <label class="form-label required">Nom</label>
               <input v-model="form.name" type="text" class="form-control" :placeholder="mode === 'webhook' ? 'ex: Deploy mon-app' : 'ex: Mise a jour Home Assistant'" />
             </div>
 
+            <!-- ===== WEBHOOK FIELDS ===== -->
             <template v-if="mode === 'webhook'">
               <div class="col-md-6">
                 <label class="form-label required">Provider</label>
@@ -50,25 +45,69 @@
               </div>
             </template>
 
+            <!-- ===== TRACKER FIELDS ===== -->
             <template v-else>
-              <div class="col-md-4">
-                <label class="form-label required">Provider</label>
-                <select class="form-select" v-model="form.provider">
-                  <option value="github">GitHub</option>
-                  <option value="gitlab">GitLab</option>
-                  <option value="gitea">Gitea (Codeberg)</option>
-                </select>
+              <!-- Type selector (hidden when pre-set from Docker page) -->
+              <div class="col-12">
+                <label class="form-label required">Type de suivi</label>
+                <div class="row g-2">
+                  <div class="col-6">
+                    <label class="form-check form-check-inline w-100 p-3 border rounded cursor-pointer" :class="form.tracker_type === 'git' ? 'border-primary bg-primary-lt' : 'border-muted'">
+                      <input class="form-check-input" type="radio" v-model="form.tracker_type" value="git" />
+                      <span class="ms-2">
+                        <span class="fw-semibold d-block">Release Git</span>
+                        <span class="text-muted small">Surveille les nouvelles releases/tags sur GitHub, GitLab ou Gitea</span>
+                      </span>
+                    </label>
+                  </div>
+                  <div class="col-6">
+                    <label class="form-check form-check-inline w-100 p-3 border rounded cursor-pointer" :class="form.tracker_type === 'docker' ? 'border-primary bg-primary-lt' : 'border-muted'">
+                      <input class="form-check-input" type="radio" v-model="form.tracker_type" value="docker" />
+                      <span class="ms-2">
+                        <span class="fw-semibold d-block">Image Docker</span>
+                        <span class="text-muted small">Detecte quand une nouvelle image est poussee sur le registre</span>
+                      </span>
+                    </label>
+                  </div>
+                </div>
               </div>
-              <div class="col-md-4">
-                <label class="form-label required">Owner / Org</label>
-                <input type="text" class="form-control" v-model="form.repo_owner" placeholder="ex: home-assistant" />
-              </div>
-              <div class="col-md-4">
-                <label class="form-label required">Depot</label>
-                <input type="text" class="form-control" v-model="form.repo_name" placeholder="ex: core" />
-              </div>
+
+              <!-- Git-specific fields -->
+              <template v-if="form.tracker_type === 'git'">
+                <div class="col-md-4">
+                  <label class="form-label required">Provider</label>
+                  <select class="form-select" v-model="form.provider">
+                    <option value="github">GitHub</option>
+                    <option value="gitlab">GitLab</option>
+                    <option value="gitea">Gitea (Codeberg)</option>
+                  </select>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label required">Owner / Org</label>
+                  <input type="text" class="form-control" v-model="form.repo_owner" placeholder="ex: home-assistant" />
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label required">Depot</label>
+                  <input type="text" class="form-control" v-model="form.repo_name" placeholder="ex: core" />
+                </div>
+              </template>
+
+              <!-- Docker-specific fields -->
+              <template v-else>
+                <div class="col-md-8">
+                  <label class="form-label required">Image Docker</label>
+                  <input type="text" class="form-control" v-model="form.docker_image" placeholder="ex: homeassistant/home-assistant, nginx, ghcr.io/user/app" />
+                  <div class="form-hint">Nom de l'image sans le tag (registre Docker Hub par defaut).</div>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label required">Tag surveille</label>
+                  <input type="text" class="form-control" v-model="form.docker_tag" placeholder="latest" />
+                  <div class="form-hint">Tag de l'image a surveiller.</div>
+                </div>
+              </template>
             </template>
 
+            <!-- VM + Task (common to tracker types) -->
             <div class="col-md-6">
               <label class="form-label required">VM cible</label>
               <select class="form-select" v-model="form.host_id">
@@ -86,14 +125,7 @@
               <div class="form-hint">Correspond a l'<code>id</code> dans <code>tasks.yaml</code> de l'agent.</div>
             </div>
 
-            <template v-if="mode === 'tracker'">
-              <div class="col-12">
-                <label class="form-label">Image Docker suivie <span class="text-muted small">(optionnel)</span></label>
-                <input type="text" class="form-control" v-model="form.docker_image" placeholder="ex: homeassistant/home-assistant" />
-                <div class="form-hint">Si renseigne, la version du conteneur tournant sera comparee au dernier tag sur le dashboard.</div>
-              </div>
-            </template>
-
+            <!-- Notifications -->
             <div class="col-12">
               <label class="form-label">Notifications</label>
               <div class="d-flex flex-wrap gap-3 mt-1">
@@ -107,7 +139,7 @@
                 </label>
                 <label v-if="mode === 'tracker'" class="form-check">
                   <input class="form-check-input" type="checkbox" v-model="form.notify_on_release" />
-                  <span class="form-check-label">Notifier a chaque nouvelle release</span>
+                  <span class="form-check-label">Notifier a chaque mise a jour detectee</span>
                 </label>
               </div>
               <div class="d-flex flex-wrap gap-3 mt-2">
@@ -126,12 +158,13 @@
             </div>
           </div>
 
+          <!-- Env vars table for trackers -->
           <div v-if="mode === 'tracker'" class="mt-3 pt-3 border-top">
             <div class="text-muted small mb-2">Variables injectees dans votre script :</div>
             <div class="table-responsive">
               <table class="table table-sm mb-0">
                 <tbody>
-                  <tr v-for="variable in trackerEnvVars" :key="variable.name">
+                  <tr v-for="variable in currentEnvVars" :key="variable.name">
                     <td class="py-1"><code class="small">{{ variable.name }}</code></td>
                     <td class="py-1 text-muted small">{{ variable.desc }}</td>
                   </tr>
@@ -180,6 +213,15 @@ const props = defineProps({
     type: String,
     default: '',
   },
+  // Pre-fill for Docker tracker created from Docker page
+  prefillDockerImage: {
+    type: String,
+    default: '',
+  },
+  prefillDockerTag: {
+    type: String,
+    default: '',
+  },
 })
 
 const emit = defineEmits(['close', 'submit'])
@@ -187,13 +229,25 @@ const emit = defineEmits(['close', 'submit'])
 const customTasks = ref([])
 const validationError = ref('')
 
-const trackerEnvVars = [
-  { name: 'SS_REPO_NAME', desc: 'owner/repo (ex: home-assistant/core)' },
-  { name: 'SS_TAG_NAME', desc: 'Tag de la nouvelle release (ex: v1.2.3)' },
-  { name: 'SS_RELEASE_URL', desc: 'URL de la release sur le provider' },
+const gitEnvVars = [
+  { name: 'SS_REPO_NAME',    desc: 'owner/repo (ex: home-assistant/core)' },
+  { name: 'SS_TAG_NAME',     desc: 'Tag de la nouvelle release (ex: v1.2.3)' },
+  { name: 'SS_RELEASE_URL',  desc: 'URL de la release sur le provider' },
   { name: 'SS_RELEASE_NAME', desc: 'Titre de la release' },
   { name: 'SS_TRACKER_NAME', desc: 'Nom du tracker dans ServerSupervisor' },
 ]
+
+const dockerEnvVars = [
+  { name: 'SS_IMAGE_NAME',   desc: 'image:tag surveille (ex: nginx:latest)' },
+  { name: 'SS_IMAGE_TAG',    desc: 'Tag surveille (ex: latest)' },
+  { name: 'SS_OLD_DIGEST',   desc: 'Digest manifest SHA256 precedent' },
+  { name: 'SS_NEW_DIGEST',   desc: 'Nouveau digest manifest SHA256' },
+  { name: 'SS_TRACKER_NAME', desc: 'Nom du tracker dans ServerSupervisor' },
+]
+
+const currentEnvVars = computed(() =>
+  form.value.tracker_type === 'docker' ? dockerEnvVars : gitEnvVars
+)
 
 const defaultWebhookForm = () => ({
   name: '',
@@ -211,10 +265,12 @@ const defaultWebhookForm = () => ({
 
 const defaultTrackerForm = () => ({
   name: '',
+  tracker_type: props.prefillDockerImage ? 'docker' : 'git',
   provider: 'github',
   repo_owner: '',
   repo_name: '',
-  docker_image: '',
+  docker_image: props.prefillDockerImage || '',
+  docker_tag: props.prefillDockerTag || 'latest',
   host_id: '',
   custom_task_id: '',
   notify_channels: [],
@@ -226,7 +282,8 @@ const form = ref(defaultWebhookForm())
 
 const title = computed(() => {
   if (props.mode === 'tracker') {
-    return props.item ? 'Modifier le tracker' : 'Nouveau tracker de release'
+    if (props.item) return 'Modifier le tracker'
+    return form.value.tracker_type === 'docker' ? 'Nouveau tracker Docker' : 'Nouveau tracker de release Git'
   }
   return props.item ? 'Modifier le webhook' : 'Nouveau webhook Git'
 })
@@ -274,10 +331,12 @@ function hydrateForm() {
     form.value = props.item
       ? {
           name: props.item.name,
+          tracker_type: props.item.tracker_type || 'git',
           provider: props.item.provider,
           repo_owner: props.item.repo_owner,
           repo_name: props.item.repo_name,
           docker_image: props.item.docker_image || '',
+          docker_tag: props.item.docker_tag || 'latest',
           host_id: props.item.host_id,
           custom_task_id: props.item.custom_task_id,
           notify_channels: [...(props.item.notify_channels || [])],
@@ -320,11 +379,18 @@ async function loadCustomTasks(hostId) {
 
 function validate() {
   if (props.mode === 'tracker') {
-    if (!form.value.name || !form.value.repo_owner || !form.value.repo_name) {
-      return 'Nom, owner et depot sont obligatoires.'
-    }
+    if (!form.value.name) return 'Le nom est obligatoire.'
     if (!form.value.host_id || !form.value.custom_task_id) {
       return 'VM cible et ID de tache sont obligatoires.'
+    }
+    if (form.value.tracker_type === 'git') {
+      if (!form.value.repo_owner || !form.value.repo_name) {
+        return 'Owner et depot sont obligatoires pour un tracker Git.'
+      }
+    } else {
+      if (!form.value.docker_image) {
+        return "L'image Docker est obligatoire pour un tracker Docker."
+      }
     }
     return ''
   }

@@ -7,14 +7,16 @@ import "time"
 type ReleaseTracker struct {
 	ID                string                   `json:"id"`
 	Name              string                   `json:"name"`
-	Provider          string                   `json:"provider"` // github, gitlab, gitea
+	TrackerType       string                   `json:"tracker_type"` // "git" | "docker"
+	Provider          string                   `json:"provider"`     // github, gitlab, gitea (git type only)
 	RepoOwner         string                   `json:"repo_owner"`
 	RepoName          string                   `json:"repo_name"`
-	DockerImage       string                   `json:"docker_image"` // optional: link to a running container for version comparison
+	DockerImage       string                   `json:"docker_image"` // docker image name (docker type: required; git type: unused)
+	DockerTag         string                   `json:"docker_tag"`   // docker tag to monitor (docker type, e.g. "latest")
 	HostID            string                   `json:"host_id"`
 	CustomTaskID      string                   `json:"custom_task_id"`
 	LastReleaseTag    string                   `json:"last_release_tag"`
-	LatestImageDigest string                   `json:"latest_image_digest,omitempty"` // manifest sha256 of last_release_tag image
+	LatestImageDigest string                   `json:"latest_image_digest,omitempty"` // manifest sha256 for docker trackers
 	LastCheckedAt     *time.Time               `json:"last_checked_at,omitempty"`
 	LastTriggeredAt   *time.Time               `json:"last_triggered_at,omitempty"`
 	LastError         string                   `json:"last_error,omitempty"`

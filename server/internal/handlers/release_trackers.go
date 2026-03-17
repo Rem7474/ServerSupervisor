@@ -80,10 +80,20 @@ func (h *ReleaseTrackerHandler) checkAll() {
 }
 
 func (h *ReleaseTrackerHandler) checkOne(t models.ReleaseTracker) {
+	switch t.TrackerType {
+	case "docker":
+		h.checkOneDocker(t)
+	default: // "git"
+		h.checkOneGit(t)
+	}
+}
+
+// checkOneGit polls a git provider for new releases.
+func (h *ReleaseTrackerHandler) checkOneGit(t models.ReleaseTracker) {
 	providerClient := gitprovider.NewClient(t.Provider, h.cfg.GitHubToken)
 	tag, releaseURL, releaseName, err := providerClient.FetchLatestRelease(t.RepoOwner, t.RepoName)
 	if err != nil {
-		log.Printf("Release tracker %s (%s/%s): fetch error: %v", t.Name, t.RepoOwner, t.RepoName, err)
+		log.Printf("Git tracker %s (%s/%s): fetch error: %v", t.Name, t.RepoOwner, t.RepoName, err)
 		_ = h.db.UpdateReleaseTrackerError(t.ID, err.Error())
 		return
 	}
@@ -95,59 +105,79 @@ func (h *ReleaseTrackerHandler) checkOne(t models.ReleaseTracker) {
 
 	// First check — just record the current tag without triggering
 	if t.LastReleaseTag == "" {
-		log.Printf("Release tracker %s: initial tag recorded: %s", t.Name, tag)
+		log.Printf("Git tracker %s: initial tag recorded: %s", t.Name, tag)
 		_ = h.db.UpdateReleaseTrackerLastSeen(t.ID, tag, false)
-		h.tryFetchAndStoreDigest(t.ID, t.DockerImage, tag)
 		return
 	}
 
-	// No change — still try to fill the digest if missing
+	// No change
 	if tag == t.LastReleaseTag {
 		_ = h.db.UpdateReleaseTrackerLastSeen(t.ID, "", false)
-		if t.LatestImageDigest == "" {
-			h.tryFetchAndStoreDigest(t.ID, t.DockerImage, tag)
-		}
 		return
 	}
 
 	// New release detected
-	log.Printf("Release tracker %s: new release %s (was %s) → dispatching task %s on host %s",
+	log.Printf("Git tracker %s: new release %s (was %s) → dispatching task %s on host %s",
 		t.Name, tag, t.LastReleaseTag, t.CustomTaskID, t.HostID)
 
-	h.dispatchRelease(t, tag, releaseURL, releaseName)
-	h.tryFetchAndStoreDigest(t.ID, t.DockerImage, tag)
+	h.dispatchGitRelease(t, tag, releaseURL, releaseName)
 }
 
-// tryFetchAndStoreDigest fetches the manifest digest for docker_image:tag from the registry
-// and stores it in the DB. Errors are logged but non-fatal.
-func (h *ReleaseTrackerHandler) tryFetchAndStoreDigest(trackerID, dockerImage, tag string) {
-	if dockerImage == "" || tag == "" {
+// checkOneDocker polls the Docker registry for a new image digest.
+func (h *ReleaseTrackerHandler) checkOneDocker(t models.ReleaseTracker) {
+	if t.DockerImage == "" {
+		_ = h.db.UpdateReleaseTrackerError(t.ID, "docker_image manquant")
 		return
 	}
-	// Use any client (provider doesn't matter for Docker registry)
+	tag := t.DockerTag
+	if tag == "" {
+		tag = "latest"
+	}
+
 	providerClient := gitprovider.NewClient("github", h.cfg.GitHubToken)
-	digest, err := providerClient.FetchDockerManifestDigest(dockerImage, tag)
+	digest, err := providerClient.FetchDockerManifestDigest(t.DockerImage, tag)
 	if err != nil {
-		log.Printf("Release tracker %s: could not fetch digest for %s:%s: %v", trackerID, dockerImage, tag, err)
+		log.Printf("Docker tracker %s (%s:%s): fetch error: %v", t.Name, t.DockerImage, tag, err)
+		_ = h.db.UpdateReleaseTrackerError(t.ID, err.Error())
 		return
 	}
-	if digest != "" {
-		_ = h.db.UpdateReleaseTrackerDigest(trackerID, digest)
-		_ = h.db.StoreTrackerTagDigest(trackerID, tag, digest)
-		log.Printf("Release tracker %s: stored digest for %s:%s → %s", trackerID, dockerImage, tag, digest[:min(12, len(digest))])
+	if digest == "" {
+		_ = h.db.UpdateReleaseTrackerError(t.ID, "digest vide retourné par le registre")
+		return
 	}
-}
 
-func (h *ReleaseTrackerHandler) dispatchRelease(t models.ReleaseTracker, tag, releaseURL, releaseName string) {
-	// Skip if already running
-	running, _ := h.db.GetRunningExecutionForReleaseTracker(t.ID)
-	if running {
-		log.Printf("Release tracker %s: skipping dispatch (already running)", t.Name)
+	// First check — record current digest without triggering
+	if t.LatestImageDigest == "" {
+		log.Printf("Docker tracker %s: initial digest recorded for %s:%s", t.Name, t.DockerImage, tag)
+		_ = h.db.UpdateReleaseTrackerDigest(t.ID, digest)
 		_ = h.db.UpdateReleaseTrackerLastSeen(t.ID, tag, false)
 		return
 	}
 
-	// Create execution record
+	// No change
+	if digest == t.LatestImageDigest {
+		_ = h.db.UpdateReleaseTrackerLastSeen(t.ID, "", false)
+		return
+	}
+
+	// New image detected
+	log.Printf("Docker tracker %s: new digest for %s:%s → dispatching task %s on host %s",
+		t.Name, t.DockerImage, tag, t.CustomTaskID, t.HostID)
+
+	oldDigest := t.LatestImageDigest
+	_ = h.db.UpdateReleaseTrackerDigest(t.ID, digest)
+	h.dispatchDockerUpdate(t, tag, oldDigest, digest)
+}
+
+func (h *ReleaseTrackerHandler) dispatchGitRelease(t models.ReleaseTracker, tag, releaseURL, releaseName string) {
+	// Skip if already running
+	running, _ := h.db.GetRunningExecutionForReleaseTracker(t.ID)
+	if running {
+		log.Printf("Git tracker %s: skipping dispatch (already running)", t.Name)
+		_ = h.db.UpdateReleaseTrackerLastSeen(t.ID, tag, false)
+		return
+	}
+
 	exec, err := h.db.CreateReleaseTrackerExecution(models.ReleaseTrackerExecution{
 		TrackerID:   t.ID,
 		TagName:     tag,
@@ -156,11 +186,10 @@ func (h *ReleaseTrackerHandler) dispatchRelease(t models.ReleaseTracker, tag, re
 		Status:      "pending",
 	})
 	if err != nil {
-		log.Printf("Release tracker %s: failed to create execution: %v", t.Name, err)
+		log.Printf("Git tracker %s: failed to create execution: %v", t.Name, err)
 		return
 	}
 
-	// Build env vars
 	envVars := map[string]string{
 		"SS_REPO_NAME":    t.RepoOwner + "/" + t.RepoName,
 		"SS_TAG_NAME":     tag,
@@ -171,14 +200,13 @@ func (h *ReleaseTrackerHandler) dispatchRelease(t models.ReleaseTracker, tag, re
 	envPayload, _ := json.Marshal(map[string]interface{}{"env": envVars})
 
 	username := fmt.Sprintf("tracker:%s", t.Name)
-	triggeredBy := fmt.Sprintf("tracker:%s", t.Name)
 	result, err := h.dispatcher.Create(dispatch.Request{
 		HostID:      t.HostID,
 		Module:      "custom",
 		Action:      "run",
 		Target:      t.CustomTaskID,
 		Payload:     string(envPayload),
-		TriggeredBy: triggeredBy,
+		TriggeredBy: username,
 		Audit: &dispatch.AuditLogRequest{
 			Username:  username,
 			Action:    "release_trigger",
@@ -188,7 +216,64 @@ func (h *ReleaseTrackerHandler) dispatchRelease(t models.ReleaseTracker, tag, re
 		},
 	})
 	if err != nil {
-		log.Printf("Release tracker %s: failed to create command: %v", t.Name, err)
+		log.Printf("Git tracker %s: failed to create command: %v", t.Name, err)
+		now := time.Now()
+		_ = h.db.UpdateReleaseTrackerExecutionStatus(exec.ID, "failed", &now)
+		return
+	}
+
+	_ = h.db.UpdateReleaseTrackerExecutionCommandID(exec.ID, result.Command.ID)
+	_ = h.db.UpdateReleaseTrackerLastSeen(t.ID, tag, true)
+}
+
+func (h *ReleaseTrackerHandler) dispatchDockerUpdate(t models.ReleaseTracker, tag, oldDigest, newDigest string) {
+	running, _ := h.db.GetRunningExecutionForReleaseTracker(t.ID)
+	if running {
+		log.Printf("Docker tracker %s: skipping dispatch (already running)", t.Name)
+		_ = h.db.UpdateReleaseTrackerLastSeen(t.ID, tag, false)
+		return
+	}
+
+	imageFull := t.DockerImage + ":" + tag
+	exec, err := h.db.CreateReleaseTrackerExecution(models.ReleaseTrackerExecution{
+		TrackerID:   t.ID,
+		TagName:     tag,
+		ReleaseURL:  "",
+		ReleaseName: imageFull,
+		Status:      "pending",
+	})
+	if err != nil {
+		log.Printf("Docker tracker %s: failed to create execution: %v", t.Name, err)
+		return
+	}
+
+	envVars := map[string]string{
+		"SS_IMAGE_NAME":   imageFull,
+		"SS_IMAGE_TAG":    tag,
+		"SS_OLD_DIGEST":   oldDigest,
+		"SS_NEW_DIGEST":   newDigest,
+		"SS_TRACKER_NAME": t.Name,
+	}
+	envPayload, _ := json.Marshal(map[string]interface{}{"env": envVars})
+
+	username := fmt.Sprintf("tracker:%s", t.Name)
+	result, err := h.dispatcher.Create(dispatch.Request{
+		HostID:      t.HostID,
+		Module:      "custom",
+		Action:      "run",
+		Target:      t.CustomTaskID,
+		Payload:     string(envPayload),
+		TriggeredBy: username,
+		Audit: &dispatch.AuditLogRequest{
+			Username:  username,
+			Action:    "docker_tracker_trigger",
+			HostID:    t.HostID,
+			IPAddress: "poller",
+			Details:   fmt.Sprintf(`{"tracker_id":%q,"image":%q,"digest":%q}`, t.ID, imageFull, newDigest),
+		},
+	})
+	if err != nil {
+		log.Printf("Docker tracker %s: failed to create command: %v", t.Name, err)
 		now := time.Now()
 		_ = h.db.UpdateReleaseTrackerExecutionStatus(exec.ID, "failed", &now)
 		return
@@ -218,9 +303,21 @@ func (h *ReleaseTrackerHandler) NotifyComplete(commandID, status string) {
 	if status == "failed" {
 		emoji = "❌"
 	}
-	subject := fmt.Sprintf("[ServerSupervisor] Release tracker %s %s %s", tracker.Name, emoji, status)
-	msg := fmt.Sprintf("Release tracker '%s' (%s/%s) execution %s on host %s (task: %s)",
-		tracker.Name, tracker.RepoOwner, tracker.RepoName, status, tracker.HostID, tracker.CustomTaskID)
+
+	var subject, msg string
+	if tracker.TrackerType == "docker" {
+		imageFull := tracker.DockerImage + ":" + tracker.DockerTag
+		if tracker.DockerTag == "" {
+			imageFull = tracker.DockerImage + ":latest"
+		}
+		subject = fmt.Sprintf("[ServerSupervisor] Docker tracker %s %s %s", tracker.Name, emoji, status)
+		msg = fmt.Sprintf("Docker tracker '%s' (%s) execution %s on host %s (task: %s)",
+			tracker.Name, imageFull, status, tracker.HostID, tracker.CustomTaskID)
+	} else {
+		subject = fmt.Sprintf("[ServerSupervisor] Release tracker %s %s %s", tracker.Name, emoji, status)
+		msg = fmt.Sprintf("Release tracker '%s' (%s/%s) execution %s on host %s (task: %s)",
+			tracker.Name, tracker.RepoOwner, tracker.RepoName, status, tracker.HostID, tracker.CustomTaskID)
+	}
 
 	notifier := notify.New()
 	for _, ch := range channels {
@@ -252,6 +349,7 @@ func (h *ReleaseTrackerHandler) NotifyComplete(commandID, status string) {
 				"notification": map[string]interface{}{
 					"tracker_id":   trackerID,
 					"tracker_name": tracker.Name,
+					"tracker_type": tracker.TrackerType,
 					"status":       status,
 					"triggered_at": time.Now().UTC(),
 				},
@@ -290,21 +388,45 @@ func (h *ReleaseTrackerHandler) Create(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if req.Name == "" || req.RepoOwner == "" || req.RepoName == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "name, repo_owner and repo_name are required"})
+	if req.TrackerType == "" {
+		req.TrackerType = "git"
+	}
+	if req.TrackerType != "git" && req.TrackerType != "docker" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "tracker_type must be 'git' or 'docker'"})
+		return
+	}
+
+	if req.Name == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "name is required"})
 		return
 	}
 	if req.HostID == "" || req.CustomTaskID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "host_id and custom_task_id are required"})
 		return
 	}
-	if req.Provider == "" {
-		req.Provider = "github"
+
+	if req.TrackerType == "git" {
+		if req.RepoOwner == "" || req.RepoName == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "repo_owner and repo_name are required for git trackers"})
+			return
+		}
+		if req.Provider == "" {
+			req.Provider = "github"
+		}
+		if !validReleaseProviders[req.Provider] {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid provider; must be github, gitlab, or gitea"})
+			return
+		}
+	} else { // docker
+		if req.DockerImage == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "docker_image is required for docker trackers"})
+			return
+		}
+		if req.DockerTag == "" {
+			req.DockerTag = "latest"
+		}
 	}
-	if !validReleaseProviders[req.Provider] {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid provider; must be github, gitlab, or gitea"})
-		return
-	}
+
 	if req.NotifyChannels == nil {
 		req.NotifyChannels = []string{}
 	}
@@ -346,17 +468,38 @@ func (h *ReleaseTrackerHandler) Update(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if req.Name == "" || req.RepoOwner == "" || req.RepoName == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "name, repo_owner and repo_name are required"})
+	if req.TrackerType == "" {
+		req.TrackerType = "git"
+	}
+	if req.TrackerType != "git" && req.TrackerType != "docker" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "tracker_type must be 'git' or 'docker'"})
+		return
+	}
+	if req.Name == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "name is required"})
 		return
 	}
 	if req.HostID == "" || req.CustomTaskID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "host_id and custom_task_id are required"})
 		return
 	}
-	if !validReleaseProviders[req.Provider] {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid provider"})
-		return
+	if req.TrackerType == "git" {
+		if req.RepoOwner == "" || req.RepoName == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "repo_owner and repo_name are required for git trackers"})
+			return
+		}
+		if !validReleaseProviders[req.Provider] {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid provider"})
+			return
+		}
+	} else {
+		if req.DockerImage == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "docker_image is required for docker trackers"})
+			return
+		}
+		if req.DockerTag == "" {
+			req.DockerTag = "latest"
+		}
 	}
 
 	if err := h.db.UpdateReleaseTracker(id, req); err != nil {
@@ -421,7 +564,15 @@ func (h *ReleaseTrackerHandler) Run(c *gin.Context) {
 		return
 	}
 
-	go h.dispatchRelease(*t, t.LastReleaseTag, "", "")
+	if t.TrackerType == "docker" {
+		tag := t.DockerTag
+		if tag == "" {
+			tag = "latest"
+		}
+		go h.dispatchDockerUpdate(*t, tag, t.LatestImageDigest, t.LatestImageDigest)
+	} else {
+		go h.dispatchGitRelease(*t, t.LastReleaseTag, "", "")
+	}
 	c.JSON(http.StatusOK, gin.H{"status": "execution scheduled"})
 }
 

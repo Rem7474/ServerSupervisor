@@ -31,7 +31,7 @@
           <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
           </svg>
-          Suivi de releases
+          Suivi de versions
           <span v-if="trackers.length" class="badge bg-azure-lt text-azure ms-1">{{ trackers.length }}</span>
         </a>
       </li>
@@ -131,8 +131,8 @@
           <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" class="mb-3 d-block mx-auto opacity-50">
             <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
           </svg>
-          <p class="mb-2">Aucun tracker de release configure.</p>
-          <p class="text-muted small">Surveillez les releases de depots externes et declenchez automatiquement un script sur une VM lors d'une nouvelle version.</p>
+          <p class="mb-2">Aucun tracker configure.</p>
+          <p class="text-muted small">Surveillez les releases Git ou les images Docker et declenchez automatiquement un script sur une VM lors d'une mise a jour.</p>
           <button class="btn btn-sm btn-primary" @click="openCreateTracker">Creer le premier tracker</button>
         </div>
       </div>
@@ -143,7 +143,9 @@
             <div class="card h-100" :class="{ 'opacity-50': !tracker.enabled }">
               <div class="card-header">
                 <div class="d-flex align-items-center gap-2 flex-grow-1 min-w-0">
-                  <span class="badge" :class="providerBadge(tracker.provider)">{{ tracker.provider }}</span>
+                  <!-- Type badge -->
+                  <span v-if="tracker.tracker_type === 'docker'" class="badge bg-cyan-lt text-cyan">docker</span>
+                  <span v-else class="badge" :class="providerBadge(tracker.provider)">{{ tracker.provider }}</span>
                   <span class="fw-medium text-truncate">{{ tracker.name }}</span>
                 </div>
                 <div class="ms-auto">
@@ -152,10 +154,20 @@
               </div>
               <div class="card-body">
                 <div class="mb-2 small">
-                  <div class="d-flex gap-2 mb-1">
-                    <span class="text-muted" style="min-width:60px">Repo</span>
-                    <a :href="repoURL(tracker)" target="_blank" class="link-primary text-truncate">{{ tracker.repo_owner }}/{{ tracker.repo_name }}</a>
-                  </div>
+                  <!-- Docker tracker info -->
+                  <template v-if="tracker.tracker_type === 'docker'">
+                    <div class="d-flex gap-2 mb-1">
+                      <span class="text-muted" style="min-width:60px">Image</span>
+                      <code class="text-truncate">{{ tracker.docker_image }}:{{ tracker.docker_tag || 'latest' }}</code>
+                    </div>
+                  </template>
+                  <!-- Git tracker info -->
+                  <template v-else>
+                    <div class="d-flex gap-2 mb-1">
+                      <span class="text-muted" style="min-width:60px">Repo</span>
+                      <a :href="repoURL(tracker)" target="_blank" class="link-primary text-truncate">{{ tracker.repo_owner }}/{{ tracker.repo_name }}</a>
+                    </div>
+                  </template>
                   <div class="d-flex gap-2 mb-1">
                     <span class="text-muted" style="min-width:60px">VM</span>
                     <span class="text-truncate">{{ tracker.host_name || tracker.host_id }}</span>
@@ -178,7 +190,7 @@
                   <template v-else-if="tracker.last_checked_at">
                     <span class="text-muted">Derniere verif : {{ formatRelative(tracker.last_checked_at) }}</span>
                     <span v-if="tracker.last_error" class="ms-1 badge bg-danger-lt text-danger" :title="tracker.last_error">erreur</span>
-                    <span v-else-if="!tracker.last_release_tag" class="ms-1 badge bg-warning-lt text-warning">aucune release trouvee</span>
+                    <span v-else-if="!tracker.last_release_tag && tracker.tracker_type !== 'docker'" class="ms-1 badge bg-warning-lt text-warning">aucune release trouvee</span>
                   </template>
                   <template v-else>
                     <span class="text-muted">En attente du premier check...</span>
@@ -234,6 +246,8 @@
       :hosts="hosts"
       :saving="saving"
       :error="modalError"
+      :prefill-docker-image="prefillDockerImage"
+      :prefill-docker-tag="prefillDockerTag"
       @close="closeTrackerModal"
       @submit="saveTracker"
     />
@@ -278,6 +292,8 @@ const {
   loadingTrackers,
   showTrackerModal,
   editingTracker,
+  prefillDockerImage,
+  prefillDockerTag,
   recentWebhookExecutions,
   recentTrackerExecutions,
   openCreateWebhook,
