@@ -29,6 +29,39 @@
         <template v-if="activeTab === 'hosts'">
           <div class="card mb-3">
             <div class="card-body">
+              <div class="row g-3 align-items-center mb-3">
+                <div class="col-md-4">
+                  <input
+                    v-model="hostSearch"
+                    type="text"
+                    class="form-control"
+                    placeholder="Rechercher un hôte..."
+                  />
+                </div>
+                <div class="col-md-4">
+                  <div class="btn-group w-100">
+                    <button
+                      v-for="f in hostFilterOptions"
+                      :key="f.value"
+                      class="btn btn-sm"
+                      :class="hostQuickFilter === f.value ? 'btn-primary' : 'btn-outline-secondary'"
+                      @click="hostQuickFilter = f.value"
+                    >{{ f.label }}</button>
+                  </div>
+                </div>
+                <div class="col-md-4 d-flex gap-2 ms-auto justify-content-md-end">
+                  <select v-model="hostSortKey" class="form-select form-select-sm" style="width: auto;">
+                    <option value="name">Trier par nom</option>
+                    <option value="pending">Trier par paquets en attente</option>
+                    <option value="security">Trier par mises à jour sécurité</option>
+                    <option value="cve">Trier par CVE</option>
+                  </select>
+                  <button class="btn btn-sm btn-outline-secondary" @click="hostSortDir = hostSortDir === 'asc' ? 'desc' : 'asc'" :title="hostSortDir === 'asc' ? 'Croissant' : 'Décroissant'">
+                    <svg v-if="hostSortDir === 'asc'" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 8l4-4 4 4M7 4v16M13 16l4 4 4-4M17 20V4"/></svg>
+                    <svg v-else xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 16l4 4 4-4M7 20V4M13 8l4-4 4 4M17 4v16"/></svg>
+                  </button>
+                </div>
+              </div>
               <div class="d-flex flex-wrap align-items-center gap-3">
                 <label class="form-check">
                   <input type="checkbox" class="form-check-input" v-model="selectAll" @change="toggleSelectAll" />
@@ -53,7 +86,12 @@
           </div>
 
           <div class="row row-cards">
-            <div v-for="host in hosts" :key="host.id" class="col-12">
+            <div v-if="filteredHosts.length === 0" class="col-12">
+              <div class="card">
+                <div class="card-body text-center text-secondary py-4">Aucun hôte ne correspond aux filtres.</div>
+              </div>
+            </div>
+            <div v-for="host in filteredHosts" :key="host.id" class="col-12">
               <div class="card">
                 <div class="card-body">
                   <div class="d-flex align-items-center gap-3 mb-3">
@@ -422,6 +460,61 @@ const showConsole = ref(false)
 const liveCommand = ref(null)
 const { value: bulkActionFeedback, showToast: showBulkActionFeedback } = useToast(null)
 const { openCommandStream, closeStream } = useCommandStream({ token: () => auth.token })
+
+// ── Hosts filters / sort ─────────────────────────────────────────────────────
+const hostSearch = ref('')
+const hostQuickFilter = ref('all')
+const hostSortKey = ref('name')
+const hostSortDir = ref('asc')
+
+const hostFilterOptions = [
+  { value: 'all', label: 'Tous' },
+  { value: 'critical', label: 'CVE critiques' },
+  { value: 'security', label: 'Sécu > 0' },
+]
+
+const filteredHosts = computed(() => {
+  let list = [...hosts.value]
+
+  // Search by name
+  const q = hostSearch.value.trim().toLowerCase()
+  if (q) {
+    list = list.filter(h => (h.hostname || h.name || '').toLowerCase().includes(q) || (h.ip_address || '').includes(q))
+  }
+
+  // Quick filter
+  if (hostQuickFilter.value === 'critical') {
+    list = list.filter(h => {
+      const cves = aptStatuses.value[h.id]?.cve_list
+      return Array.isArray(cves) && cves.some(c => c.severity === 'CRITICAL')
+    })
+  } else if (hostQuickFilter.value === 'security') {
+    list = list.filter(h => (aptStatuses.value[h.id]?.security_updates || 0) > 0)
+  }
+
+  // Sort
+  list.sort((a, b) => {
+    let va, vb
+    if (hostSortKey.value === 'pending') {
+      va = aptStatuses.value[a.id]?.pending_packages || 0
+      vb = aptStatuses.value[b.id]?.pending_packages || 0
+    } else if (hostSortKey.value === 'security') {
+      va = aptStatuses.value[a.id]?.security_updates || 0
+      vb = aptStatuses.value[b.id]?.security_updates || 0
+    } else if (hostSortKey.value === 'cve') {
+      va = (aptStatuses.value[a.id]?.cve_list || []).length
+      vb = (aptStatuses.value[b.id]?.cve_list || []).length
+    } else {
+      va = (a.hostname || a.name || '').toLowerCase()
+      vb = (b.hostname || b.name || '').toLowerCase()
+    }
+    if (va < vb) return hostSortDir.value === 'asc' ? -1 : 1
+    if (va > vb) return hostSortDir.value === 'asc' ? 1 : -1
+    return 0
+  })
+
+  return list
+})
 
 // ── Historique filters ────────────────────────────────────────────────────────
 const historyHostFilter = ref('all')

@@ -93,6 +93,7 @@ export default {
 
   // APT
   getAptStatus: (hostId) => api.get(`/v1/hosts/${hostId}/apt`),
+  getAptCVESummary: () => api.get('/v1/apt/summary'),
   sendAptCommand: (hostIds, command) => api.post('/v1/apt/command', { host_ids: hostIds, command }),
 
   // Network Topology

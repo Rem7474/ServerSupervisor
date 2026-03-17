@@ -52,8 +52,7 @@
         <CVEList
           :cveList="aptStatus.cve_list"
           :showMaxSeverity="true"
-          :alwaysExpanded="false"
-          :limit="5"
+          :alwaysExpanded="true"
         />
       </div>
     </div>

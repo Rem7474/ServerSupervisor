@@ -123,8 +123,8 @@ onMounted(async () => {
   }
   await init()
 
-  // Fallback safety net in case WS notifications are missed.
-  incidentsPollTimer = setInterval(loadIncidents, 30_000)
+  // Fallback safety net — incidents are now event-driven via WS (alert_incident_update).
+  incidentsPollTimer = setInterval(loadIncidents, 300_000)
 })
 
 onUnmounted(() => {

@@ -525,6 +525,18 @@ func (db *DB) GetProxmoxSummary() (models.ProxmoxSummary, error) {
 	return s, err
 }
 
+// GetMaxProxmoxStorageUsagePercent returns the max used/total ratio (0-100) across all active Proxmox storages.
+// Returns 0 if no storage data is available.
+func (db *DB) GetMaxProxmoxStorageUsagePercent() float64 {
+	var pct float64
+	_ = db.conn.QueryRow(`
+		SELECT COALESCE(MAX(used::float / NULLIF(total,0) * 100), 0)
+		FROM proxmox_storages
+		WHERE total > 0 AND enabled = TRUE AND active = TRUE
+	`).Scan(&pct)
+	return pct
+}
+
 func scanStorages(rows *sql.Rows) ([]models.ProxmoxStorage, error) {
 	var storages []models.ProxmoxStorage
 	for rows.Next() {

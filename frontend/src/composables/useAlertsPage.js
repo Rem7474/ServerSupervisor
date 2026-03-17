@@ -117,6 +117,12 @@ export function useAlertsPage() {
   }
 
   function onWebSocketAlert(payload) {
+    // Incident created or resolved — refresh the list
+    if (payload.type === 'alert_incident_update') {
+      loadIncidents()
+      return
+    }
+
     if (payload.type !== 'new_alert' || !payload.notification) return
 
     const incoming = payload.notification

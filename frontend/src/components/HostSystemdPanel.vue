@@ -85,6 +85,7 @@ import { useAuthStore } from '../stores/auth'
 import apiClient, { getApiErrorMessage } from '../api'
 import { useCommandStream } from '../composables/useCommandStream'
 import { useLocalStorage } from '../composables/useLocalStorage'
+import { useConfirmDialog } from '../composables/useConfirmDialog'
 
 const props = defineProps({
   hostId: { type: String, required: true },
@@ -94,6 +95,7 @@ const props = defineProps({
 const emit = defineEmits(['open-console', 'history-changed'])
 
 const auth = useAuthStore()
+const dialog = useConfirmDialog()
 const services = ref([])
 const loading = ref(false)
 const error = ref('')
@@ -138,6 +140,14 @@ async function loadServices() {
 
 async function runAction(serviceName, action) {
   error.value = ''
+  if (action === 'stop' || action === 'restart') {
+    const ok = await dialog.confirm({
+      title: `${action === 'stop' ? 'Arrêter' : 'Redémarrer'} le service`,
+      message: `Confirmer : systemctl ${action} ${serviceName}`,
+      variant: action === 'stop' ? 'danger' : 'warning',
+    })
+    if (!ok) return
+  }
   try {
     const res = await apiClient.sendSystemdCommand(props.hostId, serviceName, action)
     emit('open-console', {

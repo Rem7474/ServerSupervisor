@@ -23,8 +23,8 @@
       </div>
     </div>
 
-    <!-- Filters -->
-    <div class="row g-2 mb-3">
+    <!-- Filters & Sort -->
+    <div class="row g-3 mb-3 align-items-center">
       <div class="col-auto">
         <input v-model="filterText" type="text" class="form-control form-control-sm" placeholder="Rechercher…" style="min-width:200px" />
       </div>
@@ -52,6 +52,19 @@
           <option value="disabled">Désactivées</option>
           <option value="manual">Manuelles</option>
         </select>
+      </div>
+      <div class="col-auto ms-auto d-flex gap-2">
+        <select v-model="sortKey" class="form-select form-select-sm" style="min-width:160px">
+          <option value="name">Nom</option>
+          <option value="host_name">Hôte</option>
+          <option value="module">Module</option>
+          <option value="next_run_at">Prochain run</option>
+          <option value="last_run_at">Dernier run</option>
+        </select>
+        <button class="btn btn-sm btn-outline-secondary" @click="sortDir = sortDir === 'asc' ? 'desc' : 'asc'" :title="sortDir === 'asc' ? 'Croissant' : 'Décroissant'">
+          <svg v-if="sortDir === 'asc'" xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l7 0"/><path d="M4 12l7 0"/><path d="M4 18l9 0"/><path d="M15 9l3 -3l3 3"/><path d="M18 6l0 12"/></svg>
+          <svg v-else xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6l9 0"/><path d="M4 12l7 0"/><path d="M4 18l7 0"/><path d="M15 15l3 3l3 -3"/><path d="M18 6l0 12"/></svg>
+        </button>
       </div>
     </div>
 
@@ -203,28 +216,6 @@
       </div>
     </div>
 
-    <!-- Delete confirm modal -->
-    <div v-if="deleteTask" class="modal modal-blur show d-block" tabindex="-1" style="background:rgba(0,0,0,.5);z-index:1050" @click.self="deleteTask = null">
-      <div class="modal-dialog modal-sm modal-dialog-centered">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">Supprimer la tâche</h5>
-            <button type="button" class="btn-close" @click="deleteTask = null"></button>
-          </div>
-          <div class="modal-body">
-            Supprimer <strong>{{ deleteTask.name }}</strong> sur <strong>{{ deleteTask.host_name }}</strong> ?
-            <div v-if="deleteError" class="alert alert-danger py-2 mt-2">{{ deleteError }}</div>
-          </div>
-          <div class="modal-footer">
-            <button class="btn btn-secondary" @click="deleteTask = null">Annuler</button>
-            <button class="btn btn-danger" :disabled="deleteSaving" @click="doDelete">
-              <span v-if="deleteSaving" class="spinner-border spinner-border-sm me-1"></span>
-              Supprimer
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
 
     <!-- Execution history modal -->
     <div v-if="historyTask" class="modal modal-blur show d-block" tabindex="-1" style="background:rgba(0,0,0,.5);z-index:1050" @click.self="historyTask = null">
@@ -306,8 +297,10 @@ import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import api from '../api'
 import { isManualOnly, describeCron } from '../utils/cron'
+import { useConfirmDialog } from '../composables/useConfirmDialog'
 
 const auth = useAuthStore()
+const dialog = useConfirmDialog()
 
 const tasks = ref([])
 const loading = ref(false)
@@ -319,17 +312,14 @@ const filterText = ref('')
 const filterHost = ref('')
 const filterModule = ref('')
 const filterStatus = ref('')
+const sortKey = ref('name')
+const sortDir = ref('asc')
 
 // Edit modal state
 const editTask = ref(null)
 const editForm = ref({ name: '', cron_expression: '', enabled: false })
 const editSaving = ref(false)
 const editError = ref('')
-
-// Delete modal state
-const deleteTask = ref(null)
-const deleteSaving = ref(false)
-const deleteError = ref('')
 
 // History modal state
 const historyTask = ref(null)
@@ -346,7 +336,7 @@ const hostList = computed(() => {
 })
 
 const filteredTasks = computed(() => {
-  return tasks.value.filter(task => {
+  const filtered = tasks.value.filter(task => {
     if (filterHost.value && task.host_name !== filterHost.value) return false
     if (filterModule.value && task.module !== filterModule.value) return false
     if (filterStatus.value === 'enabled' && (!task.enabled || isManualOnly(task))) return false
@@ -360,6 +350,14 @@ const filteredTasks = computed(() => {
           !(task.target || '').toLowerCase().includes(q)) return false
     }
     return true
+  })
+
+  return [...filtered].sort((a, b) => {
+    const key = sortKey.value
+    const av = a[key] ?? ''
+    const bv = b[key] ?? ''
+    const cmp = String(av).localeCompare(String(bv), 'fr', { numeric: true })
+    return sortDir.value === 'asc' ? cmp : -cmp
   })
 })
 
@@ -412,22 +410,18 @@ async function saveEdit() {
   }
 }
 
-function confirmDelete(task) {
-  deleteTask.value = task
-  deleteError.value = ''
-}
-
-async function doDelete() {
-  deleteSaving.value = true
-  deleteError.value = ''
+async function confirmDelete(task) {
+  const ok = await dialog.confirm({
+    title: 'Supprimer la tâche',
+    message: `Supprimer « ${task.name} » sur ${task.host_name} ?`,
+    variant: 'danger',
+  })
+  if (!ok) return
   try {
-    await api.deleteScheduledTask(deleteTask.value.id)
-    deleteTask.value = null
+    await api.deleteScheduledTask(task.id)
     await loadTasks()
   } catch (e) {
-    deleteError.value = e.response?.data?.error || 'Erreur lors de la suppression'
-  } finally {
-    deleteSaving.value = false
+    error.value = e.response?.data?.error || 'Erreur lors de la suppression'
   }
 }
 

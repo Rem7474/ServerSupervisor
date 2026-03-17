@@ -127,6 +127,16 @@ type AptStatus struct {
 	UpdatedAt       time.Time `json:"updated_at" db:"updated_at"`
 }
 
+// AptCVESummary aggregates CVE severity counts across all hosts.
+type AptCVESummary struct {
+	HostsWithCritical int `json:"hosts_with_critical"`
+	HostsWithHigh     int `json:"hosts_with_high"`
+	CriticalCount     int `json:"critical_count"`
+	HighCount         int `json:"high_count"`
+	MediumCount       int `json:"medium_count"`
+	TotalCVECount     int `json:"total_cve_count"`
+}
+
 type AptCommandRequest struct {
 	HostIDs []string `json:"host_ids" binding:"required"`
 	Command string   `json:"command" binding:"required,oneof=update upgrade dist-upgrade"`

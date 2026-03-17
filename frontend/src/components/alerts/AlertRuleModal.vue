@@ -25,11 +25,20 @@
               <div class="col-md-4 mb-3">
                 <label class="form-label required">Metrique</label>
                 <select v-model="form.metric" class="form-select" @change="onMetricChange">
-                  <option value="cpu">CPU (%)</option>
-                  <option value="memory">Memoire (%)</option>
-                  <option value="disk">Disque (%)</option>
-                  <option value="load">Load Average</option>
-                  <option value="heartbeat_timeout">Heartbeat (agent silencieux)</option>
+                  <optgroup label="Système">
+                    <option value="cpu">CPU (%)</option>
+                    <option value="memory">Mémoire (%)</option>
+                    <option value="disk">Disque (%)</option>
+                    <option value="load">Load Average</option>
+                    <option value="heartbeat_timeout">Heartbeat (agent silencieux)</option>
+                  </optgroup>
+                  <optgroup label="Disques (SMART)">
+                    <option value="disk_smart_status">État SMART (0=OK, 1=FAILED)</option>
+                    <option value="disk_temperature">Température disque max (°C)</option>
+                  </optgroup>
+                  <optgroup label="Proxmox">
+                    <option value="proxmox_storage_percent">Stockage Proxmox max (%)</option>
+                  </optgroup>
                 </select>
               </div>
               <div v-if="form.metric !== 'heartbeat_timeout'" class="col-md-4 mb-3">
@@ -314,6 +323,9 @@ function getMetricUnit(metric) {
     disk: '%',
     load: '',
     heartbeat_timeout: 's',
+    disk_smart_status: '',
+    disk_temperature: '°C',
+    proxmox_storage_percent: '%',
   }
   return units[metric] || ''
 }

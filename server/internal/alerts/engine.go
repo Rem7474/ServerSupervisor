@@ -83,12 +83,14 @@ func EvaluateAlerts(db *database.DB, cfg *config.Config, dispatcher *dispatch.Di
 					triggerAlertCommand(dispatcher, rule, host)
 					pushBrowserNotification(pusher, rule, host, value, incID)
 					go pushWebNotifications(db, cfg, rule, host, value)
+					broadcastIncidentUpdate(pusher, "fired", rule, host.ID)
 				}
 			} else if inc != nil {
 				_ = db.ResolveAlertIncident(inc.ID)
 				log.Printf("Alerts: %s host=%s — resolved incident#%d", ruleName, host.Name, inc.ID)
 				details := fmt.Sprintf(`{"rule_id":%d,"incident_id":%d}`, rule.ID, inc.ID)
 				_, _ = db.CreateAuditLog("alert-engine", "alert_resolved", host.ID, "", details, "success")
+				broadcastIncidentUpdate(pusher, "resolved", rule, host.ID)
 			}
 		}
 	}
@@ -137,6 +139,35 @@ func GetMetricValue(db *database.DB, host models.Host, rule models.AlertRule) (f
 		case "load":
 			return metrics.LoadAvg1, true
 		}
+	case "disk_smart_status":
+		// Returns 1 if any disk has FAILED SMART status, 0 otherwise.
+		healthData, err := db.GetLatestDiskHealth(host.ID)
+		if err != nil || len(healthData) == 0 {
+			return 0, false
+		}
+		for _, h := range healthData {
+			if h.SmartStatus == "FAILED" {
+				return 1, true
+			}
+		}
+		return 0, true
+	case "disk_temperature":
+		// Returns the maximum temperature (°C) across all disks for this host.
+		healthData, err := db.GetLatestDiskHealth(host.ID)
+		if err != nil || len(healthData) == 0 {
+			return 0, false
+		}
+		maxTemp := 0.0
+		for _, h := range healthData {
+			if float64(h.Temperature) > maxTemp {
+				maxTemp = float64(h.Temperature)
+			}
+		}
+		return maxTemp, true
+	case "proxmox_storage_percent":
+		// Global metric: max storage usage % across all active Proxmox storages.
+		pct := db.GetMaxProxmoxStorageUsagePercent()
+		return pct, true
 	}
 	return 0, false
 }
@@ -366,6 +397,20 @@ func pushBrowserNotification(pusher NotificationPusher, rule models.AlertRule, h
 			"resolved_at":    nil,
 			"browser_notify": true,
 		},
+	})
+}
+
+// broadcastIncidentUpdate pushes a lightweight WS event so the frontend can refresh its incidents list
+// without a polling interval. Fired for both new incidents and resolutions, regardless of channels.
+func broadcastIncidentUpdate(pusher NotificationPusher, event string, rule models.AlertRule, hostID string) {
+	if pusher == nil {
+		return
+	}
+	pusher.Broadcast(map[string]interface{}{
+		"type":    "alert_incident_update",
+		"event":   event, // "fired" | "resolved"
+		"rule_id": rule.ID,
+		"host_id": hostID,
 	})
 }
 

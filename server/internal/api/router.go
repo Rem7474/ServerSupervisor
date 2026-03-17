@@ -150,6 +150,7 @@ func registerDockerRoutes(g *gin.RouterGroup, dockerH *handlers.DockerHandler, s
 
 func registerAPTRoutes(g *gin.RouterGroup, h *handlers.AptHandler) {
 	g.GET("/hosts/:id/apt", h.GetAptStatus)
+	g.GET("/apt/summary", h.GetCVESummary)
 	g.POST("/apt/command", h.SendCommand)
 }
 

@@ -67,6 +67,16 @@ func (h *AptHandler) SendCommand(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"commands": results})
 }
 
+// GetCVESummary returns aggregated CVE severity counts across all hosts.
+func (h *AptHandler) GetCVESummary(c *gin.Context) {
+	summary, err := h.db.GetAptCVESummary()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, summary)
+}
+
 // GetAptStatus returns APT status for a host
 func (h *AptHandler) GetAptStatus(c *gin.Context) {
 	hostID := c.Param("id")

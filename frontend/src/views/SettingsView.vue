@@ -7,10 +7,28 @@
         <span>Paramètres</span>
       </div>
       <h2 class="page-title">Paramètres</h2>
-      <div class="text-secondary">Configuration et diagnostics du système</div>
     </div>
 
-    <div class="row row-cards mb-4">
+    <ul class="nav nav-tabs mb-4">
+      <li class="nav-item">
+        <a class="nav-link" :class="{ active: tab === 'general' }" href="#" @click.prevent="tab = 'general'">Général</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" :class="{ active: tab === 'notifications' }" href="#" @click.prevent="tab = 'notifications'">Notifications</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" :class="{ active: tab === 'integrations' }" href="#" @click.prevent="tab = 'integrations'">Intégrations</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" :class="{ active: tab === 'retention' }" href="#" @click.prevent="tab = 'retention'">Rétention</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" :class="{ active: tab === 'maintenance' }" href="#" @click.prevent="tab = 'maintenance'">Maintenance</a>
+      </li>
+    </ul>
+
+    <!-- Général -->
+    <div v-show="tab === 'general'" class="row row-cards">
       <div class="col-lg-6">
         <SettingsSystemInfoCard :settings="settings" />
       </div>
@@ -19,23 +37,23 @@
       </div>
     </div>
 
-    <SettingsSmtpCard
-      :form="form"
-      :auth-is-admin="auth.isAdmin"
-      :show-smtp-pass="showSmtpPass"
-      :saving-smtp="savingSmtp"
-      :smtp-save-msg="smtpSaveMsg"
-      :smtp-save-ok="smtpSaveOk"
-      :testing-smtp="testingSmtp"
-      :smtp-test-message="smtpTestMessage"
-      :smtp-test-success="smtpTestSuccess"
-      @update:show-smtp-pass="showSmtpPass = $event"
-      @save="saveSmtp"
-      @test="testSmtp"
-    />
-
-    <div class="row row-cards mb-4">
-      <div class="col-lg-6">
+    <!-- Notifications -->
+    <div v-show="tab === 'notifications'">
+      <SettingsSmtpCard
+        :form="form"
+        :auth-is-admin="auth.isAdmin"
+        :show-smtp-pass="showSmtpPass"
+        :saving-smtp="savingSmtp"
+        :smtp-save-msg="smtpSaveMsg"
+        :smtp-save-ok="smtpSaveOk"
+        :testing-smtp="testingSmtp"
+        :smtp-test-message="smtpTestMessage"
+        :smtp-test-success="smtpTestSuccess"
+        @update:show-smtp-pass="showSmtpPass = $event"
+        @save="saveSmtp"
+        @test="testSmtp"
+      />
+      <div class="mt-4">
         <SettingsNotificationsCard
           :form="form"
           :auth-is-admin="auth.isAdmin"
@@ -51,32 +69,39 @@
           @test="testNtfy"
         />
       </div>
-
-      <div class="col-lg-6">
-        <SettingsRetentionCard
-          :form="form"
-          :auth-is-admin="auth.isAdmin"
-          :saving-retention="savingRetention"
-          :retention-save-msg="retentionSaveMsg"
-          :retention-save-ok="retentionSaveOk"
-          @save="saveRetention"
-        />
-      </div>
     </div>
 
-    <SettingsMaintenanceCard
-      :settings="settings"
-      :cleaning-metrics="cleaningMetrics"
-      :clean-message="cleanMessage"
-      :clean-success="cleanSuccess"
-      :cleaning-audit-logs="cleaningAuditLogs"
-      :audit-clean-message="auditCleanMessage"
-      :audit-clean-success="auditCleanSuccess"
-      @clean-metrics="cleanMetrics"
-      @clean-audit="cleanAuditLogs"
-    />
+    <!-- Intégrations -->
+    <div v-show="tab === 'integrations'">
+      <SettingsProxmoxCard :auth-is-admin="auth.isAdmin" />
+    </div>
 
-    <SettingsProxmoxCard :auth-is-admin="auth.isAdmin" />
+    <!-- Rétention -->
+    <div v-show="tab === 'retention'">
+      <SettingsRetentionCard
+        :form="form"
+        :auth-is-admin="auth.isAdmin"
+        :saving-retention="savingRetention"
+        :retention-save-msg="retentionSaveMsg"
+        :retention-save-ok="retentionSaveOk"
+        @save="saveRetention"
+      />
+    </div>
+
+    <!-- Maintenance -->
+    <div v-show="tab === 'maintenance'">
+      <SettingsMaintenanceCard
+        :settings="settings"
+        :cleaning-metrics="cleaningMetrics"
+        :clean-message="cleanMessage"
+        :clean-success="cleanSuccess"
+        :cleaning-audit-logs="cleaningAuditLogs"
+        :audit-clean-message="auditCleanMessage"
+        :audit-clean-success="auditCleanSuccess"
+        @clean-metrics="cleanMetrics"
+        @clean-audit="cleanAuditLogs"
+      />
+    </div>
   </div>
 </template>
 
@@ -93,6 +118,8 @@ import SettingsSystemInfoCard from '../components/settings/SettingsSystemInfoCar
 import SettingsProxmoxCard from '../components/settings/SettingsProxmoxCard.vue'
 
 const auth = useAuthStore()
+
+const tab = ref('general')
 
 const settings = ref({
   baseUrl: '',

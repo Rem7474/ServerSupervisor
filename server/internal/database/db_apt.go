@@ -72,6 +72,29 @@ func (db *DB) GetAptHistoryWithAgentUpdates(hostID string, limit int) ([]models.
 	return db.GetRemoteCommandsByHostAndModule(hostID, "apt", limit)
 }
 
+// GetAptCVESummary returns aggregated CVE severity counts across all hosts.
+func (db *DB) GetAptCVESummary() (*models.AptCVESummary, error) {
+	var s models.AptCVESummary
+	err := db.conn.QueryRow(`
+		SELECT
+			COUNT(DISTINCT CASE WHEN cve->>'severity' = 'CRITICAL' THEN host_id END),
+			COUNT(DISTINCT CASE WHEN cve->>'severity' = 'HIGH'     THEN host_id END),
+			COUNT(CASE WHEN cve->>'severity' = 'CRITICAL' THEN 1 END),
+			COUNT(CASE WHEN cve->>'severity' = 'HIGH'     THEN 1 END),
+			COUNT(CASE WHEN cve->>'severity' = 'MEDIUM'   THEN 1 END),
+			COUNT(*)
+		FROM apt_status,
+			jsonb_array_elements(
+				CASE WHEN cve_list IS NOT NULL AND cve_list::text NOT IN ('null','[]','')
+					THEN cve_list ELSE '[]'::jsonb END
+			) AS cve
+	`).Scan(&s.HostsWithCritical, &s.HostsWithHigh, &s.CriticalCount, &s.HighCount, &s.MediumCount, &s.TotalCVECount)
+	if err != nil {
+		return &models.AptCVESummary{}, nil
+	}
+	return &s, nil
+}
+
 // GetTotalAptPending returns the total number of pending APT packages across all hosts.
 func (db *DB) GetTotalAptPending() int {
 	var total int
