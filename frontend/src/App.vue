@@ -19,7 +19,7 @@
 
           <div class="collapse navbar-collapse" id="navbar-menu">
             <ul class="navbar-nav">
-              <!-- Items accessibles à tous -->
+              <!-- Éléments principaux -->
               <li class="nav-item">
                 <router-link to="/" class="nav-link" active-class="active">
                   <span class="nav-link-icon">
@@ -51,31 +51,6 @@
                 </router-link>
               </li>
               <li class="nav-item">
-                <router-link to="/scheduled-tasks" class="nav-link" active-class="active">
-                  <span class="nav-link-icon">
-                    <svg class="icon" width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <circle cx="12" cy="12" r="10"/>
-                      <polyline points="12 6 12 12 16 14"/>
-                    </svg>
-                  </span>
-                  <span class="nav-link-title">Tâches planifiées</span>
-                </router-link>
-              </li>
-              <!-- Items admin uniquement -->
-              <li v-if="auth.isAdmin" class="nav-item">
-                <router-link to="/git-webhooks" class="nav-link" active-class="active">
-                  <span class="nav-link-icon">
-                    <svg class="icon" width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <circle cx="12" cy="5" r="3"/>
-                      <circle cx="5" cy="19" r="3"/>
-                      <circle cx="19" cy="19" r="3"/>
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v3m0 0l-4.5 5.5M12 11l4.5 5.5"/>
-                    </svg>
-                  </span>
-                  <span class="nav-link-title">Git / Automatisation</span>
-                </router-link>
-              </li>
-              <li class="nav-item">
                 <router-link to="/proxmox" class="nav-link" active-class="active">
                   <span class="nav-link-icon">
                     <svg class="icon" width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -88,56 +63,6 @@
                 </router-link>
               </li>
               <li class="nav-item">
-                <router-link to="/network" class="nav-link" active-class="active">
-                  <span class="nav-link-icon">
-                    <svg class="icon" width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <circle cx="12" cy="12" r="2.5" stroke-width="2"/>
-                      <circle cx="5" cy="5" r="2" stroke-width="2"/>
-                      <circle cx="19" cy="5" r="2" stroke-width="2"/>
-                      <circle cx="12" cy="20" r="2" stroke-width="2"/>
-                      <line x1="6.5" y1="6.5" x2="10.5" y2="10.5" stroke-width="1.8" stroke-linecap="round"/>
-                      <line x1="17.5" y1="6.5" x2="13.5" y2="10.5" stroke-width="1.8" stroke-linecap="round"/>
-                      <line x1="12" y1="14.5" x2="12" y2="18" stroke-width="1.8" stroke-linecap="round"/>
-                    </svg>
-                  </span>
-                  <span class="nav-link-title">Réseau</span>
-                </router-link>
-              </li>
-              <li v-if="auth.isAdmin" class="nav-item">
-                <router-link to="/audit" class="nav-link" active-class="active">
-                  <span class="nav-link-icon">
-                    <svg class="icon" width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6M5 7h14a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V9a2 2 0 012-2z"/>
-                    </svg>
-                  </span>
-                  <span class="nav-link-title">Audit</span>
-                </router-link>
-              </li>
-              <li v-if="auth.isAdmin" class="nav-item">
-                <router-link to="/users" class="nav-link" active-class="active">
-                  <span class="nav-link-icon">
-                    <svg class="icon" width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-4-4h-1" />
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20H4v-2a4 4 0 014-4h1" />
-                      <circle cx="9" cy="7" r="4" />
-                      <circle cx="17" cy="9" r="3" />
-                    </svg>
-                  </span>
-                  <span class="nav-link-title">Utilisateurs</span>
-                </router-link>
-              </li>
-              <li class="nav-item">
-                <router-link to="/settings" class="nav-link" active-class="active">
-                  <span class="nav-link-icon">
-                    <svg class="icon" width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                    </svg>
-                  </span>
-                  <span class="nav-link-title">Paramètres</span>
-                </router-link>
-              </li>
-              <li class="nav-item">
                 <router-link to="/alerts" class="nav-link" active-class="active">
                   <span class="nav-link-icon">
                     <svg class="icon" width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -146,6 +71,58 @@
                   </span>
                   <span class="nav-link-title">Alertes</span>
                 </router-link>
+              </li>
+
+              <!-- Dropdown "Plus" — éléments secondaires -->
+              <li class="nav-item dropdown" :class="{ active: isSecondaryActive }">
+                <a class="nav-link dropdown-toggle" href="#" @click.prevent="toggleSecondaryMenu" :aria-expanded="secondaryMenuOpen">
+                  <span class="nav-link-icon">
+                    <svg class="icon" width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <circle cx="5" cy="12" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="19" cy="12" r="1.5" fill="currentColor"/>
+                    </svg>
+                  </span>
+                  <span class="nav-link-title">Plus</span>
+                </a>
+                <div class="dropdown-menu" :class="{ show: secondaryMenuOpen }">
+                  <router-link to="/scheduled-tasks" class="dropdown-item" @click="secondaryMenuOpen = false">
+                    <svg class="icon icon-sm me-2" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    Tâches planifiées
+                  </router-link>
+                  <router-link to="/network" class="dropdown-item" @click="secondaryMenuOpen = false">
+                    <svg class="icon icon-sm me-2" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.5" stroke-width="2"/><circle cx="5" cy="5" r="2" stroke-width="2"/><circle cx="19" cy="5" r="2" stroke-width="2"/><circle cx="12" cy="20" r="2" stroke-width="2"/><line x1="6.5" y1="6.5" x2="10.5" y2="10.5" stroke-width="1.8" stroke-linecap="round"/><line x1="17.5" y1="6.5" x2="13.5" y2="10.5" stroke-width="1.8" stroke-linecap="round"/><line x1="12" y1="14.5" x2="12" y2="18" stroke-width="1.8" stroke-linecap="round"/></svg>
+                    Réseau
+                  </router-link>
+                  <router-link to="/settings" class="dropdown-item" @click="secondaryMenuOpen = false">
+                    <svg class="icon icon-sm me-2" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                    Paramètres
+                  </router-link>
+                </div>
+              </li>
+
+              <!-- Dropdown "Administration" — admin uniquement -->
+              <li v-if="auth.isAdmin" class="nav-item dropdown" :class="{ active: isAdminActive }">
+                <a class="nav-link dropdown-toggle" href="#" @click.prevent="toggleAdminMenu" :aria-expanded="adminMenuOpen">
+                  <span class="nav-link-icon">
+                    <svg class="icon" width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                    </svg>
+                  </span>
+                  <span class="nav-link-title">Admin</span>
+                </a>
+                <div class="dropdown-menu" :class="{ show: adminMenuOpen }">
+                  <router-link to="/git-webhooks" class="dropdown-item" @click="adminMenuOpen = false">
+                    <svg class="icon icon-sm me-2" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="5" r="3"/><circle cx="5" cy="19" r="3"/><circle cx="19" cy="19" r="3"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v3m0 0l-4.5 5.5M12 11l4.5 5.5"/></svg>
+                    Git / Automatisation
+                  </router-link>
+                  <router-link to="/audit" class="dropdown-item" @click="adminMenuOpen = false">
+                    <svg class="icon icon-sm me-2" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6M5 7h14a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V9a2 2 0 012-2z"/></svg>
+                    Audit
+                  </router-link>
+                  <router-link to="/users" class="dropdown-item" @click="adminMenuOpen = false">
+                    <svg class="icon icon-sm me-2" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-4-4h-1"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20H4v-2a4 4 0 014-4h1"/><circle cx="9" cy="7" r="4"/><circle cx="17" cy="9" r="3"/></svg>
+                    Utilisateurs
+                  </router-link>
+                </div>
               </li>
             </ul>
 
@@ -194,17 +171,26 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useAuthStore } from './stores/auth'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import ConfirmDialog from './components/ConfirmDialog.vue'
 import NotificationBell from './components/NotificationBell.vue'
 import AppFooter from './components/AppFooter.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
+const route = useRoute()
 const userMenuOpen = ref(false)
 const userMenuRef = ref(null)
+const secondaryMenuOpen = ref(false)
+const adminMenuOpen = ref(false)
+
+const secondaryRoutes = ['/scheduled-tasks', '/network', '/settings']
+const adminRoutes = ['/git-webhooks', '/audit', '/users']
+
+const isSecondaryActive = computed(() => secondaryRoutes.some(r => route.path.startsWith(r)))
+const isAdminActive = computed(() => adminRoutes.some(r => route.path.startsWith(r)))
 
 function handleLogout() {
   userMenuOpen.value = false
@@ -213,20 +199,45 @@ function handleLogout() {
 }
 
 function toggleUserMenu() {
+  secondaryMenuOpen.value = false
+  adminMenuOpen.value = false
   userMenuOpen.value = !userMenuOpen.value
 }
 
-function handleOutsideClick(event) {
-  if (!userMenuOpen.value) return
-  const el = userMenuRef.value
-  if (el && el.contains(event.target)) return
+function toggleSecondaryMenu() {
   userMenuOpen.value = false
+  adminMenuOpen.value = false
+  secondaryMenuOpen.value = !secondaryMenuOpen.value
+}
+
+function toggleAdminMenu() {
+  userMenuOpen.value = false
+  secondaryMenuOpen.value = false
+  adminMenuOpen.value = !adminMenuOpen.value
+}
+
+function handleOutsideClick(event) {
+  if (!userMenuOpen.value && !secondaryMenuOpen.value && !adminMenuOpen.value) return
+  const el = userMenuRef.value
+  // Close user menu if click is outside
+  if (userMenuOpen.value && el && !el.contains(event.target)) {
+    userMenuOpen.value = false
+  }
+  // Close dropdowns if click is outside the navbar
+  const navbar = document.getElementById('navbar-menu')
+  if (navbar && !navbar.contains(event.target)) {
+    secondaryMenuOpen.value = false
+    adminMenuOpen.value = false
+  }
 }
 
 onMounted(() => {
   document.addEventListener('click', handleOutsideClick, true)
-  // Auto-close mobile navbar after navigation
+  // Auto-close all menus after navigation
   router.afterEach(() => {
+    secondaryMenuOpen.value = false
+    adminMenuOpen.value = false
+    userMenuOpen.value = false
     const el = document.getElementById('navbar-menu')
     if (el?.classList.contains('show')) {
       el.classList.remove('show')
@@ -261,6 +272,14 @@ onUnmounted(() => {
 
 .user-menu {
   z-index: 2000;
+}
+
+.nav-item.dropdown .dropdown-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 200px;
+  z-index: 1050;
 }
 
 .user-dropdown {

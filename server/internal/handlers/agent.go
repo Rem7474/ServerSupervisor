@@ -66,6 +66,14 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 		log.Printf("Warning: failed to cleanup stalled commands for host %s: %v", hostID, err)
 	}
 
+	// Check if Proxmox is the designated metrics source for this host.
+	// When metrics_source = "proxmox", CPU/RAM/load come from Proxmox polling
+	// so we skip storing redundant agent metrics.
+	proxmoxIsMetricsSource := false
+	if link, err := h.db.GetProxmoxGuestLinkByHost(hostID); err == nil && link != nil {
+		proxmoxIsMetricsSource = link.MetricsSource == "proxmox"
+	}
+
 	// Update host info from agent report (only if metrics are provided)
 	if report.Metrics != nil {
 		update := models.HostUpdate{
@@ -79,12 +87,15 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 			}
 		}
 
-		// Store metrics
-		report.Metrics.HostID = hostID
-		report.Metrics.Timestamp = time.Now()
-		if _, err := h.db.InsertMetrics(report.Metrics); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store metrics"})
-			return
+		// Skip storing metrics when Proxmox is the designated source —
+		// Proxmox polling already stores CPU/RAM for this host.
+		if !proxmoxIsMetricsSource {
+			report.Metrics.HostID = hostID
+			report.Metrics.Timestamp = time.Now()
+			if _, err := h.db.InsertMetrics(report.Metrics); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store metrics"})
+				return
+			}
 		}
 	} else {
 		// If no metrics, still update agent version
@@ -181,8 +192,9 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"status":   "ok",
-		"commands": commands,
+		"status":       "ok",
+		"commands":     commands,
+		"skip_metrics": proxmoxIsMetricsSource,
 	})
 }
 
