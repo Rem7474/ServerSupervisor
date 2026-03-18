@@ -28,6 +28,13 @@ func (h *WSHandler) sendDashboardSnapshot(conn *websocket.Conn, lastHash *string
 		proxmoxNodes = []models.ProxmoxNode{}
 	}
 
+	// Confirmed guest↔host links with live guest metrics (cpu_usage, mem_alloc, mem_usage).
+	// Used by the dashboard to override agent CPU/RAM when metrics_source=proxmox.
+	proxmoxLinks, _ := h.db.ListProxmoxGuestLinks("confirmed")
+	if proxmoxLinks == nil {
+		proxmoxLinks = []models.ProxmoxGuestLink{}
+	}
+
 	payload := gin.H{
 		"type":                "dashboard",
 		"hosts":               hosts,
@@ -37,6 +44,7 @@ func (h *WSHandler) sendDashboardSnapshot(conn *websocket.Conn, lastHash *string
 		"apt_pending_hosts":   h.db.GetAptPendingAll(),
 		"disk_usage":          h.db.GetRootDiskPercentAll(),
 		"proxmox_nodes":       proxmoxNodes,
+		"proxmox_links":       proxmoxLinks,
 	}
 	if !snapshotChanged(payload, lastHash) {
 		return nil

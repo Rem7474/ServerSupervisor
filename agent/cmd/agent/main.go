@@ -11,6 +11,7 @@ import (
 	"os/signal"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -32,6 +33,11 @@ var commandQueue = make(chan []sender.PendingCommand, 10)
 
 // aptMu serialises APT operations — dpkg cannot run concurrently.
 var aptMu sync.Mutex
+
+// skipSystemMetrics is set to true when the server signals that Proxmox is the
+// designated metrics source for this host. System metrics (CPU/RAM/load) are then
+// omitted from reports to avoid redundant collection and storage.
+var skipSystemMetrics atomic.Bool
 
 // cmdSem limits concurrent non-APT commands to 4 at a time.
 var cmdSem = make(chan struct{}, 4)
@@ -122,11 +128,21 @@ func main() {
 }
 
 func sendReport(ctx context.Context, cfg *config.Config, s *sender.Sender) {
-	// Collect system metrics
-	metrics, err := collector.CollectSystem()
-	if err != nil {
-		log.Printf("Failed to collect system metrics: %v", err)
-		return
+	// When the server designates Proxmox as the metrics source for this host,
+	// skip CPU/RAM/load collection entirely — Proxmox polling already covers it.
+	// Use interface{} so the JSON field is truly null (not a typed nil interface).
+	var metricsPayload interface{}
+	var collectedMetrics *collector.SystemMetrics
+	if skipSystemMetrics.Load() {
+		log.Printf("System metrics collection skipped (Proxmox is the designated metrics source)")
+	} else {
+		m, err := collector.CollectSystem()
+		if err != nil {
+			log.Printf("Failed to collect system metrics: %v", err)
+			return
+		}
+		collectedMetrics = m
+		metricsPayload = m
 	}
 
 	// Collect Docker containers
@@ -205,7 +221,7 @@ func sendReport(ctx context.Context, cfg *config.Config, s *sender.Sender) {
 	// Send report (with retry on transient network errors)
 	report := &sender.Report{
 		AgentVersion:    Version,
-		Metrics:         metrics,
+		Metrics:         metricsPayload,
 		Docker:          dockerData,
 		AptStatus:       aptData,
 		DockerNetworks:  dockerNetworks,
@@ -223,8 +239,15 @@ func sendReport(ctx context.Context, cfg *config.Config, s *sender.Sender) {
 		return
 	}
 
-	log.Printf("Report sent successfully (CPU: %.1f%%, RAM: %.1f%%, Disks: %d)",
-		metrics.CPUUsagePercent, metrics.MemoryPercent, len(metrics.Disks))
+	if collectedMetrics != nil {
+		log.Printf("Report sent successfully (CPU: %.1f%%, RAM: %.1f%%, Disks: %d)",
+			collectedMetrics.CPUUsagePercent, collectedMetrics.MemoryPercent, len(collectedMetrics.Disks))
+	} else {
+		log.Printf("Report sent successfully (system metrics skipped — Proxmox source)")
+	}
+
+	// Update the skip flag for the next cycle based on server directive.
+	skipSystemMetrics.Store(response.SkipMetrics)
 
 	// Enqueue pending commands — the worker goroutine processes them sequentially.
 	if len(response.Commands) > 0 {

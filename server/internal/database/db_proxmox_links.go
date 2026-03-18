@@ -262,6 +262,27 @@ func (db *DB) ListProxmoxLinkCandidates(hostID string) ([]models.ProxmoxGuest, e
 	return scanGuests(rows)
 }
 
+// IsProxmoxGuestDataFresh returns true when the confirmed 'auto' link for the given
+// host has Proxmox guest data that was updated within 3× the connection's poll interval.
+// Returns (false, nil) when no qualifying link exists (caller should treat Proxmox as absent).
+func (db *DB) IsProxmoxGuestDataFresh(hostID string) (bool, error) {
+	var fresh bool
+	err := db.conn.QueryRow(`
+		SELECT g.last_seen_at >= NOW() - (c.poll_interval_sec * 3 || ' seconds')::interval
+		FROM proxmox_guest_links l
+		JOIN proxmox_guests g      ON g.id = l.guest_id
+		JOIN proxmox_connections c ON c.id = g.connection_id
+		WHERE l.host_id = $1
+		  AND l.status = 'confirmed'
+		  AND l.metrics_source = 'auto'
+		LIMIT 1
+	`, hostID).Scan(&fresh)
+	if err == sql.ErrNoRows {
+		return false, nil
+	}
+	return fresh, err
+}
+
 func scanGuestLinks(rows *sql.Rows) ([]models.ProxmoxGuestLink, error) {
 	var links []models.ProxmoxGuestLink
 	for rows.Next() {

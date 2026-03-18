@@ -276,13 +276,17 @@
                 <span v-else class="text-secondary small">-</span>
               </td>
               <td>
-                <span :class="cpuColor(hostMetrics[host.id]?.cpu_usage_percent)">
-                  {{ hostMetrics[host.id]?.cpu_usage_percent != null ? hostMetrics[host.id].cpu_usage_percent.toFixed(1) + '%' : '-' }}
+                <span :class="cpuColor(effectiveMetrics(host.id).cpu)"
+                      :title="effectiveMetrics(host.id).source === 'proxmox' ? 'Source : Proxmox' : ''">
+                  {{ effectiveMetrics(host.id).cpu != null ? effectiveMetrics(host.id).cpu.toFixed(1) + '%' : '-' }}
+                  <span v-if="effectiveMetrics(host.id).source === 'proxmox'" class="text-orange ms-1" style="font-size:.65em" title="Métriques Proxmox">⬡</span>
                 </span>
               </td>
               <td>
-                <span :class="memColor(hostMetrics[host.id]?.memory_percent)">
-                  {{ hostMetrics[host.id]?.memory_percent != null ? hostMetrics[host.id].memory_percent.toFixed(1) + '%' : '-' }}
+                <span :class="memColor(effectiveMetrics(host.id).memPct)"
+                      :title="effectiveMetrics(host.id).source === 'proxmox' ? 'Source : Proxmox' : ''">
+                  {{ effectiveMetrics(host.id).memPct != null ? effectiveMetrics(host.id).memPct.toFixed(1) + '%' : '-' }}
+                  <span v-if="effectiveMetrics(host.id).source === 'proxmox'" class="text-orange ms-1" style="font-size:.65em" title="Métriques Proxmox">⬡</span>
                 </span>
               </td>
               <td>
@@ -408,6 +412,7 @@ const latestAgentVersion = ref('')
 const cveSummary = ref(null)
 const proxmoxSummary = ref(null)
 const proxmoxNodes = ref([])
+const proxmoxLinks = ref([]) // confirmed links { host_id, metrics_source, cpu_usage, mem_alloc, mem_usage }
 
 const hosts = ref([])
 const hostMetrics = ref({})
@@ -431,7 +436,7 @@ const showDockerVersions = ref(false)
 const summaryHours = ref(24)
 const summaryChartData = ref(null)
 const summaryLoading = ref(false)
-// 'agents' | 'proxmox'
+// 'agents' | 'proxmox' — auto-switches to proxmox on first load if configured
 const chartSource = ref('agents')
 const chartSources = [
   { key: 'agents', label: 'Agents hôtes' },
@@ -456,6 +461,37 @@ const proxmoxStoragePct = computed(() => {
   return (s.storage_used / s.storage_total) * 100
 })
 
+// Map host_id → confirmed ProxmoxGuestLink (with live guest metrics)
+const proxmoxLinkByHostId = computed(() => {
+  const m = {}
+  for (const link of proxmoxLinks.value) {
+    m[link.host_id] = link
+  }
+  return m
+})
+
+// Returns { cpu: number|null, memPct: number|null } for a host.
+// Uses Proxmox guest data when metrics_source is 'proxmox', or 'auto' with a confirmed link.
+function effectiveMetrics(hostId) {
+  const link = proxmoxLinkByHostId.value[hostId]
+  const agent = hostMetrics.value[hostId]
+
+  if (link) {
+    const src = link.metrics_source
+    const useProxmox = src === 'proxmox' || (src === 'auto' && link.cpu_usage != null)
+    if (useProxmox) {
+      const cpu = link.cpu_usage != null ? link.cpu_usage * 100 : null
+      const memPct = link.mem_alloc > 0 ? (link.mem_usage / link.mem_alloc) * 100 : null
+      return { cpu, memPct, source: 'proxmox' }
+    }
+  }
+  return {
+    cpu: agent?.cpu_usage_percent ?? null,
+    memPct: agent?.memory_percent ?? null,
+    source: 'agent',
+  }
+}
+
 const filteredHosts = computed(() => {
   const query = searchQuery.value.trim().toLowerCase()
   return hosts.value.filter((host) => {
@@ -479,8 +515,8 @@ const sortedHosts = computed(() => {
         bVal = statusOrder[b.status] ?? 99
         break
       case 'cpu':
-        aVal = hostMetrics.value[a.id]?.cpu_usage_percent ?? -1
-        bVal = hostMetrics.value[b.id]?.cpu_usage_percent ?? -1
+        aVal = effectiveMetrics(a.id).cpu ?? -1
+        bVal = effectiveMetrics(b.id).cpu ?? -1
         break
       case 'apt':
         aVal = aptPendingHosts.value[a.id] ?? 0
@@ -531,6 +567,8 @@ const summaryChartOptions = computed(() => ({
 }))
 
 // ─── WebSocket ────────────────────────────────────────────────────────────────
+const proxmoxAutoSwitched = ref(false)
+
 const { wsStatus, wsError, retryCount, reconnect } = useWebSocket('/api/v1/ws/dashboard', (payload) => {
   if (payload.type !== 'dashboard') return
   hosts.value = payload.hosts || []
@@ -540,8 +578,16 @@ const { wsStatus, wsError, retryCount, reconnect } = useWebSocket('/api/v1/ws/da
   aptPendingHosts.value = payload.apt_pending_hosts || {}
   diskUsage.value = payload.disk_usage || {}
   proxmoxNodes.value = payload.proxmox_nodes || []
+  proxmoxLinks.value = payload.proxmox_links || []
   selectedHostIds.value = selectedHostIds.value.filter(id => hosts.value.some(h => h.id === id))
   loading.value = false
+
+  // Auto-switch chart to Proxmox nodes on first load when Proxmox is configured
+  if (!proxmoxAutoSwitched.value && proxmoxNodes.value.length > 0) {
+    proxmoxAutoSwitched.value = true
+    chartSource.value = 'proxmox'
+    fetchSummary()
+  }
 }, { debounceMs: 200 })
 
 // ─── Chart fetch ──────────────────────────────────────────────────────────────

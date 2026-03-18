@@ -66,12 +66,27 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 		log.Printf("Warning: failed to cleanup stalled commands for host %s: %v", hostID, err)
 	}
 
-	// Check if Proxmox is the designated metrics source for this host.
-	// When metrics_source = "proxmox", CPU/RAM/load come from Proxmox polling
-	// so we skip storing redundant agent metrics.
+	// Check if Proxmox is the exclusive metrics source for this host.
+	//
+	// metrics_source semantics:
+	//   "proxmox" → Proxmox is the sole source; skip storing agent metrics and signal
+	//               the agent to stop collecting CPU/RAM (saves resources).
+	//   "auto"    → Proxmox is preferred for display, but agent data is kept as fallback.
+	//               Agent continues collecting; server still stores agent metrics so that
+	//               a Proxmox outage doesn't leave the host with no data at all.
+	//   "agent"   → Agent is always used; Proxmox data is ignored.
 	proxmoxIsMetricsSource := false
 	if link, err := h.db.GetProxmoxGuestLinkByHost(hostID); err == nil && link != nil {
-		proxmoxIsMetricsSource = link.MetricsSource == "proxmox"
+		switch link.MetricsSource {
+		case "proxmox":
+			proxmoxIsMetricsSource = true
+		case "auto":
+			// Skip agent collection only when Proxmox data is recent (within 3× poll interval).
+			// If Proxmox becomes unavailable, the freshness check fails and the agent resumes.
+			if fresh, err := h.db.IsProxmoxGuestDataFresh(hostID); err == nil {
+				proxmoxIsMetricsSource = fresh
+			}
+		}
 	}
 
 	// Update host info from agent report (only if metrics are provided)

@@ -38,6 +38,10 @@ type Report struct {
 type ReportResponse struct {
 	Status   string           `json:"status"`
 	Commands []PendingCommand `json:"commands"`
+	// SkipMetrics is true when the server designates Proxmox as the metrics source
+	// for this host. The agent should omit system metrics (CPU/RAM/load) from the
+	// next report cycles to avoid redundant collection and storage.
+	SkipMetrics bool `json:"skip_metrics"`
 }
 
 type PendingCommand struct {
