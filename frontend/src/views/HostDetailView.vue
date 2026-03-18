@@ -142,7 +142,7 @@
         />
 
         <div v-show="activeTab === 'metrics'">
-          <HostMetricsPanel :hostId="hostId" :metrics="effectiveMetrics" :metricsSource="effectiveMetricsSource" />
+          <HostMetricsPanel :hostId="hostId" :metrics="effectiveMetrics" :metricsSource="effectiveMetricsSource" :proxmoxGuestId="proxmoxLink?.guest_id ?? null" />
           <DiskMetricsCard :hostId="hostId" :initialMetrics="diskMetrics" class="mb-4" />
           <DiskHealthCard :hostId="hostId" :initialHealth="diskHealth" class="mb-4" />
         </div>

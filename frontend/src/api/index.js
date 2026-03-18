@@ -184,6 +184,8 @@ export default {
   getProxmoxNodeMetrics: (hours = 24, bucketMinutes = 5) =>
     api.get('/v1/proxmox/nodes/metrics', { params: { hours, bucket_minutes: bucketMinutes } }),
   getProxmoxGuests: (params = {}) => api.get('/v1/proxmox/guests', { params }),
+  getProxmoxGuestMetrics: (guestId, hours = 24, bucketMinutes = 5) =>
+    api.get(`/v1/proxmox/guests/${guestId}/metrics`, { params: { hours, bucket_minutes: bucketMinutes } }),
   getProxmoxGuestLink: (guestId) => api.get(`/v1/proxmox/guests/${guestId}/link`),
   // Guest ↔ host links
   getProxmoxLinks: (status = '') => api.get('/v1/proxmox/links', { params: status ? { status } : {} }),

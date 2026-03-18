@@ -82,7 +82,7 @@
 </template>
 
 <script setup>
-import { ref, shallowRef, defineAsyncComponent, onMounted, watch } from 'vue'
+import { ref, shallowRef, defineAsyncComponent, onMounted, watch, toRef } from 'vue'
 import apiClient from '../api'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
@@ -106,6 +106,7 @@ const props = defineProps({
   hostId: { type: String, required: true },
   metrics: { type: Object, default: null },
   metricsSource: { type: String, default: 'agent' }, // 'agent' | 'proxmox'
+  proxmoxGuestId: { type: String, default: null },
 })
 
 const chartHours = ref(24)
@@ -202,7 +203,18 @@ async function loadHistory(hours) {
   chartHours.value = hours
   try {
     let history
-    if (hours > 24) {
+    if (props.metricsSource === 'proxmox' && props.proxmoxGuestId) {
+      // Proxmox-sourced: fetch per-guest time-series from the Proxmox poller snapshots.
+      // Response shape: [{timestamp, cpu_avg, memory_avg}] — remap to chart field names.
+      const bucketMinutes = hours <= 1 ? 1 : hours <= 6 ? 2 : hours <= 24 ? 5 : hours <= 168 ? 30 : 60
+      const res = await apiClient.getProxmoxGuestMetrics(props.proxmoxGuestId, hours, bucketMinutes)
+      const raw = Array.isArray(res.data) ? res.data : []
+      history = raw.map(p => ({
+        timestamp: p.timestamp,
+        cpu_usage_percent: p.cpu_avg,
+        memory_percent: p.memory_avg,
+      }))
+    } else if (hours > 24) {
       const res = await apiClient.getMetricsAggregated(props.hostId, hours)
       history = Array.isArray(res.data?.metrics) ? res.data.metrics : []
     } else {
@@ -233,6 +245,9 @@ function buildCharts() {
     datasets: [{ data: metricsHistory.value.map(m => m.memory_percent), borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.1)', fill: true, tension: 0.3 }],
   }
 }
+
+// Reload chart when the metrics source changes (e.g. user switches agent ↔ proxmox).
+watch(toRef(props, 'metricsSource'), () => loadHistory(chartHours.value))
 
 onMounted(() => loadHistory(24))
 </script>

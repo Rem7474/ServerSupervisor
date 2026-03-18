@@ -136,9 +136,14 @@ func (h *ProxmoxHandler) pollOne(conn database.ProxmoxConnectionFull) {
 					log.Printf("proxmox poller [%s/%s]: upsert vm %d: %v", conn.Name, n.Node, vm.VMID, err)
 					continue
 				}
-				// Auto-suggest a host link by name matching (best-effort).
+				// Auto-suggest a host link and record metrics history (best-effort).
 				if guestID, err := h.db.GetProxmoxGuestIDByVMID(conn.ID, n.Node, vm.VMID); err == nil && guestID != "" {
 					_ = h.db.AutoSuggestProxmoxLink(guestID, vm.Name)
+					if vm.Status == "running" {
+						if err := h.db.InsertProxmoxGuestMetric(guestID, vm.CPU, vm.MaxMem, vm.Mem); err != nil {
+							log.Printf("proxmox poller [%s/%s]: insert vm metric %d: %v", conn.Name, n.Node, vm.VMID, err)
+						}
+					}
 				}
 			}
 		}
@@ -156,9 +161,14 @@ func (h *ProxmoxHandler) pollOne(conn database.ProxmoxConnectionFull) {
 					log.Printf("proxmox poller [%s/%s]: upsert lxc %d: %v", conn.Name, n.Node, lxc.VMID, err)
 					continue
 				}
-				// Auto-suggest a host link by name matching (best-effort).
+				// Auto-suggest a host link and record metrics history (best-effort).
 				if guestID, err := h.db.GetProxmoxGuestIDByVMID(conn.ID, n.Node, lxc.VMID); err == nil && guestID != "" {
 					_ = h.db.AutoSuggestProxmoxLink(guestID, lxc.Name)
+					if lxc.Status == "running" {
+						if err := h.db.InsertProxmoxGuestMetric(guestID, lxc.CPU, lxc.MaxMem, lxc.Mem); err != nil {
+							log.Printf("proxmox poller [%s/%s]: insert lxc metric %d: %v", conn.Name, n.Node, lxc.VMID, err)
+						}
+					}
 				}
 			}
 		}
@@ -503,6 +513,33 @@ func (h *ProxmoxHandler) GetNodeMetricsSummary(c *gin.Context) {
 	}
 
 	summary, err := h.db.GetProxmoxNodeMetricsSummary(hours, bucketMinutes)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if summary == nil {
+		summary = []models.ProxmoxNodeMetricsSummary{}
+	}
+	c.JSON(http.StatusOK, summary)
+}
+
+// GetGuestMetricsSummary returns time-bucketed CPU%/RAM% history for a single guest.
+// Used by HostDetailView when metrics_source=proxmox to populate the trend charts.
+func (h *ProxmoxHandler) GetGuestMetricsSummary(c *gin.Context) {
+	guestID := c.Param("id")
+	hours, _ := strconv.Atoi(c.DefaultQuery("hours", "24"))
+	bucketMinutes, _ := strconv.Atoi(c.DefaultQuery("bucket_minutes", "5"))
+	if hours <= 0 {
+		hours = 24
+	}
+	if hours > 8760 {
+		hours = 8760
+	}
+	if bucketMinutes <= 0 {
+		bucketMinutes = 5
+	}
+
+	summary, err := h.db.GetProxmoxGuestMetricsSummary(guestID, hours, bucketMinutes)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

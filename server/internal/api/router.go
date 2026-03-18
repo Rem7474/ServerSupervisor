@@ -241,6 +241,7 @@ func registerProxmoxRoutes(g *gin.RouterGroup, h *handlers.ProxmoxHandler) {
 	g.GET("/proxmox/nodes/metrics", h.GetNodeMetricsSummary)
 	g.GET("/proxmox/nodes/:id", h.GetNode)
 	g.GET("/proxmox/guests", h.ListGuests)
+	g.GET("/proxmox/guests/:id/metrics", h.GetGuestMetricsSummary)
 	g.GET("/proxmox/guests/:id/link", h.GetLinkByGuest)
 	// Connection management (admin only enforced in handler via RequireAdmin middleware if needed;
 	// for now protected by JWT — tighten with AdminMiddleware if desired)
