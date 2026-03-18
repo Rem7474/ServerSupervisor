@@ -46,6 +46,11 @@ func (c *gitHubClient) FetchDockerManifestDigest(imageName, tag string) (string,
 	return fetchDockerManifestDigest(c.client, imageName, tag)
 }
 
+// FetchDockerVersionForDigest finds a versioned tag matching the given digest.
+func (c *gitHubClient) FetchDockerVersionForDigest(imageName, digest string) string {
+	return fetchDockerVersionForDigest(c.client, imageName, digest)
+}
+
 func (c *gitHubClient) fetchGitHubRelease(owner, repo string) (*models.GitHubRelease, error) {
 	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases/latest", owner, repo)
 

@@ -146,17 +146,37 @@ func (h *ReleaseTrackerHandler) checkOneDocker(t models.ReleaseTracker) {
 		return
 	}
 
+	// For "latest" tags, attempt to resolve the actual version from the registry.
+	// Docker Hub: uses hub.docker.com API (tags + digest in one call).
+	// Others: enumerates semver-looking tags and HEADs each manifest.
+	resolvedVersion := tag
+	if tag == "latest" {
+		if v := providerClient.FetchDockerVersionForDigest(t.DockerImage, digest); v != "" {
+			resolvedVersion = v
+			log.Printf("Docker tracker %s: resolved 'latest' → %s", t.Name, v)
+		}
+	}
+
 	// First check — record current digest without triggering
 	if t.LatestImageDigest == "" {
 		log.Printf("Docker tracker %s: initial digest recorded for %s:%s", t.Name, t.DockerImage, tag)
 		_ = h.db.UpdateReleaseTrackerDigest(t.ID, digest)
-		_ = h.db.UpdateReleaseTrackerLastSeen(t.ID, tag, false)
+		_ = h.db.UpdateReleaseTrackerLastSeen(t.ID, resolvedVersion, false)
+		if resolvedVersion != tag {
+			_ = h.db.StoreTrackerTagDigest(t.ID, resolvedVersion, digest)
+		}
 		return
 	}
 
 	// No change
 	if digest == t.LatestImageDigest {
-		_ = h.db.UpdateReleaseTrackerLastSeen(t.ID, "", false)
+		// If we previously stored "latest" as the tag but can now resolve a version, update it.
+		if resolvedVersion != tag && t.LastReleaseTag == tag {
+			_ = h.db.UpdateReleaseTrackerLastSeen(t.ID, resolvedVersion, false)
+			_ = h.db.StoreTrackerTagDigest(t.ID, resolvedVersion, digest)
+		} else {
+			_ = h.db.UpdateReleaseTrackerLastSeen(t.ID, "", false)
+		}
 		return
 	}
 
@@ -166,7 +186,10 @@ func (h *ReleaseTrackerHandler) checkOneDocker(t models.ReleaseTracker) {
 
 	oldDigest := t.LatestImageDigest
 	_ = h.db.UpdateReleaseTrackerDigest(t.ID, digest)
-	h.dispatchDockerUpdate(t, tag, oldDigest, digest)
+	if resolvedVersion != tag {
+		_ = h.db.StoreTrackerTagDigest(t.ID, resolvedVersion, digest)
+	}
+	h.dispatchDockerUpdate(t, tag, resolvedVersion, oldDigest, digest)
 }
 
 func (h *ReleaseTrackerHandler) dispatchGitRelease(t models.ReleaseTracker, tag, releaseURL, releaseName string) {
@@ -226,18 +249,18 @@ func (h *ReleaseTrackerHandler) dispatchGitRelease(t models.ReleaseTracker, tag,
 	_ = h.db.UpdateReleaseTrackerLastSeen(t.ID, tag, true)
 }
 
-func (h *ReleaseTrackerHandler) dispatchDockerUpdate(t models.ReleaseTracker, tag, oldDigest, newDigest string) {
+func (h *ReleaseTrackerHandler) dispatchDockerUpdate(t models.ReleaseTracker, tag, resolvedVersion, oldDigest, newDigest string) {
 	running, _ := h.db.GetRunningExecutionForReleaseTracker(t.ID)
 	if running {
 		log.Printf("Docker tracker %s: skipping dispatch (already running)", t.Name)
-		_ = h.db.UpdateReleaseTrackerLastSeen(t.ID, tag, false)
+		_ = h.db.UpdateReleaseTrackerLastSeen(t.ID, resolvedVersion, false)
 		return
 	}
 
 	imageFull := t.DockerImage + ":" + tag
 	exec, err := h.db.CreateReleaseTrackerExecution(models.ReleaseTrackerExecution{
 		TrackerID:   t.ID,
-		TagName:     tag,
+		TagName:     resolvedVersion,
 		ReleaseURL:  "",
 		ReleaseName: imageFull,
 		Status:      "pending",
@@ -248,11 +271,12 @@ func (h *ReleaseTrackerHandler) dispatchDockerUpdate(t models.ReleaseTracker, ta
 	}
 
 	envVars := map[string]string{
-		"SS_IMAGE_NAME":   imageFull,
-		"SS_IMAGE_TAG":    tag,
-		"SS_OLD_DIGEST":   oldDigest,
-		"SS_NEW_DIGEST":   newDigest,
-		"SS_TRACKER_NAME": t.Name,
+		"SS_IMAGE_NAME":    imageFull,
+		"SS_IMAGE_TAG":     tag,
+		"SS_IMAGE_VERSION": resolvedVersion, // actual version ("1.25.3") or same as tag if unresolved
+		"SS_OLD_DIGEST":    oldDigest,
+		"SS_NEW_DIGEST":    newDigest,
+		"SS_TRACKER_NAME":  t.Name,
 	}
 	envPayload, _ := json.Marshal(map[string]interface{}{"env": envVars})
 
@@ -280,7 +304,7 @@ func (h *ReleaseTrackerHandler) dispatchDockerUpdate(t models.ReleaseTracker, ta
 	}
 
 	_ = h.db.UpdateReleaseTrackerExecutionCommandID(exec.ID, result.Command.ID)
-	_ = h.db.UpdateReleaseTrackerLastSeen(t.ID, tag, true)
+	_ = h.db.UpdateReleaseTrackerLastSeen(t.ID, resolvedVersion, true)
 }
 
 // NotifyComplete is called by the agent handler when a command completes.
@@ -569,7 +593,7 @@ func (h *ReleaseTrackerHandler) Run(c *gin.Context) {
 		if tag == "" {
 			tag = "latest"
 		}
-		go h.dispatchDockerUpdate(*t, tag, t.LatestImageDigest, t.LatestImageDigest)
+		go h.dispatchDockerUpdate(*t, tag, t.LastReleaseTag, t.LatestImageDigest, t.LatestImageDigest)
 	} else {
 		go h.dispatchGitRelease(*t, t.LastReleaseTag, "", "")
 	}

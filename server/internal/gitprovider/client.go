@@ -15,6 +15,10 @@ type Client interface {
 
 	// FetchDockerManifestDigest returns the SHA256 digest of a Docker image manifest for tag.
 	FetchDockerManifestDigest(imageName, tag string) (string, error)
+
+	// FetchDockerVersionForDigest finds a versioned tag that matches the given manifest digest.
+	// Returns "" if the version cannot be resolved.
+	FetchDockerVersionForDigest(imageName, digest string) string
 }
 
 // Release contains metadata about a Git release

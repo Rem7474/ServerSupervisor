@@ -46,6 +46,11 @@ func (c *gitLabClient) FetchDockerManifestDigest(imageName, tag string) (string,
 	return fetchDockerManifestDigest(c.client, imageName, tag)
 }
 
+// FetchDockerVersionForDigest finds a versioned tag matching the given digest.
+func (c *gitLabClient) FetchDockerVersionForDigest(imageName, digest string) string {
+	return fetchDockerVersionForDigest(c.client, imageName, digest)
+}
+
 func (c *gitLabClient) fetchGitLabRelease(owner, repo string) (*models.GitHubRelease, error) {
 	// GitLab API: GET /projects/:id/releases
 	projectID := fmt.Sprintf("%s%%2F%s", owner, repo)

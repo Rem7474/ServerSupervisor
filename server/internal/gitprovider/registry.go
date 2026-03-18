@@ -70,6 +70,145 @@ func parseDockerRegistry(imageRef string) (registry, image string) {
 	return "registry-1.docker.io", imageRef
 }
 
+// fetchDockerVersionForDigest finds a versioned tag matching targetDigest for the given image.
+// For Docker Hub, it uses the hub.docker.com API (tags with digest in one call).
+// For other registries, it enumerates tags and HEADs each semver-looking tag.
+// Returns "" if resolution fails.
+func fetchDockerVersionForDigest(client *http.Client, imageRef, targetDigest string) string {
+	if targetDigest == "" {
+		return ""
+	}
+	registry, image := parseDockerRegistry(imageRef)
+	normTarget := strings.TrimPrefix(targetDigest, "sha256:")
+
+	if registry == "registry-1.docker.io" {
+		if v := dockerHubVersionForDigest(client, image, normTarget); v != "" {
+			return v
+		}
+	}
+	return registryVersionForDigest(client, registry, image, normTarget)
+}
+
+// dockerHubVersionForDigest queries hub.docker.com to find a versioned tag for a digest.
+func dockerHubVersionForDigest(client *http.Client, image, normDigest string) string {
+	url := fmt.Sprintf("https://hub.docker.com/v2/repositories/%s/tags?page_size=100&ordering=last_updated", image)
+	req, _ := http.NewRequest("GET", url, nil)
+	req.Header.Set("User-Agent", "ServerSupervisor/1.0")
+	resp, err := client.Do(req)
+	if err != nil || resp.StatusCode != http.StatusOK {
+		if resp != nil {
+			_ = resp.Body.Close()
+		}
+		return ""
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	var result struct {
+		Results []struct {
+			Name   string `json:"name"`
+			Digest string `json:"digest"`
+		} `json:"results"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return ""
+	}
+
+	for _, t := range result.Results {
+		if !looksLikeVersion(t.Name) {
+			continue
+		}
+		if strings.TrimPrefix(t.Digest, "sha256:") == normDigest {
+			return t.Name
+		}
+	}
+	return ""
+}
+
+// registryVersionForDigest uses the v2 tags/list API + HEAD manifest per tag
+// to find a versioned tag matching normDigest. Checks up to 30 semver-looking tags.
+func registryVersionForDigest(client *http.Client, registry, image, normDigest string) string {
+	token, err := getRegistryToken(client, registry, image)
+	if err != nil {
+		return ""
+	}
+
+	tagsURL := fmt.Sprintf("https://%s/v2/%s/tags/list", registry, image)
+	req, _ := http.NewRequest("GET", tagsURL, nil)
+	req.Header.Set("User-Agent", "ServerSupervisor/1.0")
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	resp, err := client.Do(req)
+	if err != nil || resp.StatusCode != http.StatusOK {
+		if resp != nil {
+			_ = resp.Body.Close()
+		}
+		return ""
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	var result struct {
+		Tags []string `json:"tags"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return ""
+	}
+
+	acceptHeader := strings.Join([]string{
+		"application/vnd.docker.distribution.manifest.v2+json",
+		"application/vnd.docker.distribution.manifest.list.v2+json",
+		"application/vnd.oci.image.manifest.v1+json",
+		"application/vnd.oci.image.index.v1+json",
+	}, ", ")
+
+	checked := 0
+	for _, tag := range result.Tags {
+		if !looksLikeVersion(tag) || checked >= 30 {
+			continue
+		}
+		checked++
+
+		hreq, _ := http.NewRequest("HEAD", fmt.Sprintf("https://%s/v2/%s/manifests/%s", registry, image, tag), nil)
+		hreq.Header.Set("Accept", acceptHeader)
+		hreq.Header.Set("User-Agent", "ServerSupervisor/1.0")
+		if token != "" {
+			hreq.Header.Set("Authorization", "Bearer "+token)
+		}
+		hresp, err := client.Do(hreq)
+		if hresp != nil {
+			_ = hresp.Body.Close()
+		}
+		if err != nil || hresp.StatusCode != http.StatusOK {
+			continue
+		}
+		d := strings.TrimPrefix(hresp.Header.Get("Docker-Content-Digest"), "sha256:")
+		if d == normDigest {
+			return tag
+		}
+	}
+	return ""
+}
+
+// looksLikeVersion returns true for tags that appear to be version numbers (e.g. "1.25.3", "v2.0.1").
+// Rejects well-known non-version tags like "latest", "stable", "edge", "main".
+func looksLikeVersion(tag string) bool {
+	if tag == "" {
+		return false
+	}
+	switch tag {
+	case "latest", "stable", "edge", "nightly", "dev", "main", "master", "beta", "alpha", "rc":
+		return false
+	}
+	t := tag
+	if len(t) > 0 && t[0] == 'v' {
+		t = t[1:]
+	}
+	if len(t) == 0 || t[0] < '0' || t[0] > '9' {
+		return false
+	}
+	return strings.Contains(t, ".")
+}
+
 // getRegistryToken fetches an anonymous pull token for the given registry and image.
 func getRegistryToken(client *http.Client, registry, image string) (string, error) {
 	var authURL string

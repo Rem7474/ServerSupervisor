@@ -46,6 +46,11 @@ func (c *giteaClient) FetchDockerManifestDigest(imageName, tag string) (string, 
 	return fetchDockerManifestDigest(c.client, imageName, tag)
 }
 
+// FetchDockerVersionForDigest finds a versioned tag matching the given digest.
+func (c *giteaClient) FetchDockerVersionForDigest(imageName, digest string) string {
+	return fetchDockerVersionForDigest(c.client, imageName, digest)
+}
+
 func (c *giteaClient) fetchGiteaRelease(owner, repo string) (*models.GitHubRelease, error) {
 	// Gitea API is compatible with GitHub API structure
 	// Typically hosted at custom URL, but we'll assume api.gitea.io or use owner/repo path base
