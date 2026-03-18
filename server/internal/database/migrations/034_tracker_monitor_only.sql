@@ -1,5 +1,5 @@
 -- Allow Docker trackers to work in "monitor-only" mode without a linked host/task.
--- host_id becomes nullable; custom_task_id defaults to empty string.
+-- host_id becomes nullable and custom_task_id defaults to empty string.
 ALTER TABLE release_trackers
     ALTER COLUMN host_id       DROP NOT NULL,
     ALTER COLUMN custom_task_id SET DEFAULT '';
