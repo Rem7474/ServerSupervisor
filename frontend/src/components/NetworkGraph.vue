@@ -601,7 +601,17 @@ function fitView() {
   cy.fit(undefined, 40)
 }
 
-defineExpose({ resetLayout, fitView })
+function zoomIn() {
+  if (!cy) return
+  cy.zoom({ level: cy.zoom() * 1.3, renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 } })
+}
+
+function zoomOut() {
+  if (!cy) return
+  cy.zoom({ level: cy.zoom() / 1.3, renderedPosition: { x: cy.width() / 2, y: cy.height() / 2 } })
+}
+
+defineExpose({ resetLayout, fitView, zoomIn, zoomOut })
 
 onMounted(() => {
   initCytoscape()

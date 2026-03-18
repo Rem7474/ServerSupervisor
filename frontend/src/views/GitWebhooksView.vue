@@ -168,14 +168,22 @@
                       <a :href="repoURL(tracker)" target="_blank" class="link-primary text-truncate">{{ tracker.repo_owner }}/{{ tracker.repo_name }}</a>
                     </div>
                   </template>
-                  <div class="d-flex gap-2 mb-1">
-                    <span class="text-muted" style="min-width:60px">VM</span>
-                    <span class="text-truncate">{{ tracker.host_name || tracker.host_id }}</span>
-                  </div>
-                  <div class="d-flex gap-2 mb-1">
-                    <span class="text-muted" style="min-width:60px">Tache</span>
-                    <code class="small text-truncate">{{ tracker.custom_task_id }}</code>
-                  </div>
+                  <template v-if="tracker.host_id && tracker.custom_task_id">
+                    <div class="d-flex gap-2 mb-1">
+                      <span class="text-muted" style="min-width:60px">VM</span>
+                      <span class="text-truncate">{{ tracker.host_name || tracker.host_id }}</span>
+                    </div>
+                    <div class="d-flex gap-2 mb-1">
+                      <span class="text-muted" style="min-width:60px">Tache</span>
+                      <code class="small text-truncate">{{ tracker.custom_task_id }}</code>
+                    </div>
+                  </template>
+                  <template v-else-if="tracker.tracker_type === 'docker'">
+                    <div class="d-flex gap-2 mb-1">
+                      <span class="text-muted" style="min-width:60px">Mode</span>
+                      <span class="badge bg-blue-lt text-blue">Surveillance seule</span>
+                    </div>
+                  </template>
                   <div v-if="tracker.last_release_tag" class="d-flex gap-2 mb-1">
                     <span class="text-muted" style="min-width:60px">Derniere</span>
                     <span class="badge bg-green-lt text-green">{{ tracker.last_release_tag }}</span>

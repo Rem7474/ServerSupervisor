@@ -181,14 +181,21 @@ func (h *ReleaseTrackerHandler) checkOneDocker(t models.ReleaseTracker) {
 	}
 
 	// New image detected
-	log.Printf("Docker tracker %s: new digest for %s:%s → dispatching task %s on host %s",
-		t.Name, t.DockerImage, tag, t.CustomTaskID, t.HostID)
-
 	oldDigest := t.LatestImageDigest
 	_ = h.db.UpdateReleaseTrackerDigest(t.ID, digest)
 	if resolvedVersion != tag {
 		_ = h.db.StoreTrackerTagDigest(t.ID, resolvedVersion, digest)
 	}
+
+	// Monitor-only mode: no task configured, just record the new version.
+	if t.CustomTaskID == "" || t.HostID == "" {
+		log.Printf("Docker tracker %s: new digest for %s:%s (monitor-only, no task dispatched)", t.Name, t.DockerImage, tag)
+		_ = h.db.UpdateReleaseTrackerLastSeen(t.ID, resolvedVersion, false)
+		return
+	}
+
+	log.Printf("Docker tracker %s: new digest for %s:%s → dispatching task %s on host %s",
+		t.Name, t.DockerImage, tag, t.CustomTaskID, t.HostID)
 	h.dispatchDockerUpdate(t, tag, resolvedVersion, oldDigest, digest)
 }
 
@@ -424,12 +431,13 @@ func (h *ReleaseTrackerHandler) Create(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "name is required"})
 		return
 	}
-	if req.HostID == "" || req.CustomTaskID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "host_id and custom_task_id are required"})
-		return
-	}
 
 	if req.TrackerType == "git" {
+		// Git trackers always need a host+task to dispatch to.
+		if req.HostID == "" || req.CustomTaskID == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "host_id and custom_task_id are required for git trackers"})
+			return
+		}
 		if req.RepoOwner == "" || req.RepoName == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "repo_owner and repo_name are required for git trackers"})
 			return
@@ -442,6 +450,11 @@ func (h *ReleaseTrackerHandler) Create(c *gin.Context) {
 			return
 		}
 	} else { // docker
+		// Docker trackers can run in monitor-only mode (no host/task).
+		if req.HostID != "" && req.CustomTaskID == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "custom_task_id is required when host_id is set"})
+			return
+		}
 		if req.DockerImage == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "docker_image is required for docker trackers"})
 			return
@@ -503,11 +516,11 @@ func (h *ReleaseTrackerHandler) Update(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "name is required"})
 		return
 	}
-	if req.HostID == "" || req.CustomTaskID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "host_id and custom_task_id are required"})
-		return
-	}
 	if req.TrackerType == "git" {
+		if req.HostID == "" || req.CustomTaskID == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "host_id and custom_task_id are required for git trackers"})
+			return
+		}
 		if req.RepoOwner == "" || req.RepoName == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "repo_owner and repo_name are required for git trackers"})
 			return
@@ -516,7 +529,11 @@ func (h *ReleaseTrackerHandler) Update(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid provider"})
 			return
 		}
-	} else {
+	} else { // docker
+		if req.HostID != "" && req.CustomTaskID == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "custom_task_id is required when host_id is set"})
+			return
+		}
 		if req.DockerImage == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "docker_image is required for docker trackers"})
 			return

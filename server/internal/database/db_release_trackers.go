@@ -19,6 +19,11 @@ func (db *DB) CreateReleaseTracker(t models.ReleaseTracker) (*models.ReleaseTrac
 		t.TrackerType = "git"
 	}
 	var result models.ReleaseTracker
+	var hostID sql.NullString
+	if t.HostID != "" {
+		hostID = sql.NullString{String: t.HostID, Valid: true}
+	}
+	var scannedHostID sql.NullString
 	err := db.conn.QueryRow(
 		`INSERT INTO release_trackers
 		 (name, tracker_type, provider, repo_owner, repo_name, docker_image, docker_tag, host_id, custom_task_id,
@@ -28,14 +33,15 @@ func (db *DB) CreateReleaseTracker(t models.ReleaseTracker) (*models.ReleaseTrac
 		           host_id, custom_task_id, last_release_tag, last_checked_at, last_triggered_at,
 		           notify_channels, notify_on_release, enabled, created_at`,
 		t.Name, t.TrackerType, t.Provider, t.RepoOwner, t.RepoName, t.DockerImage, t.DockerTag,
-		t.HostID, t.CustomTaskID, pq.Array(channels), t.NotifyOnRelease, t.Enabled,
+		hostID, t.CustomTaskID, pq.Array(channels), t.NotifyOnRelease, t.Enabled,
 	).Scan(
 		&result.ID, &result.Name, &result.TrackerType, &result.Provider, &result.RepoOwner, &result.RepoName,
-		&result.DockerImage, &result.DockerTag, &result.HostID, &result.CustomTaskID, &result.LastReleaseTag,
+		&result.DockerImage, &result.DockerTag, &scannedHostID, &result.CustomTaskID, &result.LastReleaseTag,
 		&result.LastCheckedAt, &result.LastTriggeredAt,
 		pq.Array(&result.NotifyChannels), &result.NotifyOnRelease,
 		&result.Enabled, &result.CreatedAt,
 	)
+	result.HostID = scannedHostID.String
 	if err != nil {
 		return nil, err
 	}
@@ -72,13 +78,14 @@ func (db *DB) ListReleaseTrackers() ([]models.ReleaseTracker, error) {
 	var out []models.ReleaseTracker
 	for rows.Next() {
 		var t models.ReleaseTracker
+		var hostID sql.NullString
 		var leID, leTag, leURL, leName, leStatus sql.NullString
 		var leTriggered sql.NullTime
 		var leCompleted sql.NullTime
 		if err := rows.Scan(
 			&t.ID, &t.Name, &t.TrackerType, &t.Provider, &t.RepoOwner, &t.RepoName,
 			&t.DockerImage, &t.DockerTag,
-			&t.HostID, &t.CustomTaskID, &t.LastReleaseTag, &t.LatestImageDigest,
+			&hostID, &t.CustomTaskID, &t.LastReleaseTag, &t.LatestImageDigest,
 			&t.LastCheckedAt, &t.LastTriggeredAt, &t.LastError,
 			pq.Array(&t.NotifyChannels), &t.NotifyOnRelease, &t.Enabled, &t.CreatedAt,
 			&t.HostName,
@@ -86,6 +93,7 @@ func (db *DB) ListReleaseTrackers() ([]models.ReleaseTracker, error) {
 		); err != nil {
 			return nil, err
 		}
+		t.HostID = hostID.String
 		if t.NotifyChannels == nil {
 			t.NotifyChannels = []string{}
 		}
@@ -111,6 +119,7 @@ func (db *DB) ListReleaseTrackers() ([]models.ReleaseTracker, error) {
 
 func (db *DB) GetReleaseTrackerByID(id string) (*models.ReleaseTracker, error) {
 	var t models.ReleaseTracker
+	var hostID sql.NullString
 	err := db.conn.QueryRow(
 		`SELECT t.id, t.name, t.tracker_type, t.provider, t.repo_owner, t.repo_name,
 		        t.docker_image, t.docker_tag,
@@ -124,11 +133,12 @@ func (db *DB) GetReleaseTrackerByID(id string) (*models.ReleaseTracker, error) {
 	).Scan(
 		&t.ID, &t.Name, &t.TrackerType, &t.Provider, &t.RepoOwner, &t.RepoName,
 		&t.DockerImage, &t.DockerTag,
-		&t.HostID, &t.CustomTaskID, &t.LastReleaseTag, &t.LatestImageDigest,
+		&hostID, &t.CustomTaskID, &t.LastReleaseTag, &t.LatestImageDigest,
 		&t.LastCheckedAt, &t.LastTriggeredAt, &t.LastError,
 		pq.Array(&t.NotifyChannels), &t.NotifyOnRelease, &t.Enabled, &t.CreatedAt,
 		&t.HostName,
 	)
+	t.HostID = hostID.String
 	if err != nil {
 		return nil, err
 	}
@@ -146,6 +156,10 @@ func (db *DB) UpdateReleaseTracker(id string, t models.ReleaseTracker) error {
 	if t.TrackerType == "" {
 		t.TrackerType = "git"
 	}
+	var hostID sql.NullString
+	if t.HostID != "" {
+		hostID = sql.NullString{String: t.HostID, Valid: true}
+	}
 	_, err := db.conn.Exec(
 		`UPDATE release_trackers SET
 		   name=$1, tracker_type=$2, provider=$3, repo_owner=$4, repo_name=$5,
@@ -155,7 +169,7 @@ func (db *DB) UpdateReleaseTracker(id string, t models.ReleaseTracker) error {
 		 WHERE id=$13`,
 		t.Name, t.TrackerType, t.Provider, t.RepoOwner, t.RepoName,
 		t.DockerImage, t.DockerTag,
-		t.HostID, t.CustomTaskID,
+		hostID, t.CustomTaskID,
 		pq.Array(channels), t.NotifyOnRelease, t.Enabled,
 		id,
 	)
@@ -182,14 +196,16 @@ func (db *DB) GetEnabledReleaseTrackers() ([]models.ReleaseTracker, error) {
 	var out []models.ReleaseTracker
 	for rows.Next() {
 		var t models.ReleaseTracker
+		var hostID sql.NullString
 		if err := rows.Scan(
 			&t.ID, &t.Name, &t.TrackerType, &t.Provider, &t.RepoOwner, &t.RepoName,
-			&t.DockerImage, &t.DockerTag, &t.HostID, &t.CustomTaskID,
+			&t.DockerImage, &t.DockerTag, &hostID, &t.CustomTaskID,
 			&t.LastReleaseTag, &t.LatestImageDigest,
 			pq.Array(&t.NotifyChannels), &t.NotifyOnRelease,
 		); err != nil {
 			return nil, err
 		}
+		t.HostID = hostID.String
 		if t.NotifyChannels == nil {
 			t.NotifyChannels = []string{}
 		}
