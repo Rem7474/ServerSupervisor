@@ -1,5 +1,5 @@
 <template>
-  <div class="apt-page">
+  <div>
     <div class="page-header mb-3">
       <div class="page-pretitle">
         <router-link to="/" class="text-decoration-none">Dashboard</router-link>
@@ -22,9 +22,9 @@
     />
 
     <!-- Layout partagé pour les deux onglets -->
-    <div class="apt-layout">
+    <div class="side-layout">
       <!-- Contenu principal (bascule entre hôtes et historique) -->
-      <div class="apt-hosts">
+      <div class="side-main">
         <!-- === Vue Hôtes === -->
         <template v-if="activeTab === 'hosts'">
           <div class="card mb-3">
@@ -302,7 +302,7 @@
         :show="showConsole"
         title="Console Live"
         empty-text="Aucune console active"
-        wrapper-class="apt-console"
+        wrapper-class="side-panel"
         @open="showConsole = true"
         @close="closeLiveConsole"
       />
@@ -800,55 +800,3 @@ onUnmounted(() => {
   closeStreamSocket()
 })
 </script>
-
-<style scoped>
-.apt-page {
-  display: flex;
-  flex-direction: column;
-  height: calc(100vh - 120px);
-}
-
-.apt-layout {
-  display: flex;
-  flex: 1;
-  gap: 1rem;
-  overflow: hidden;
-  min-height: 0;
-}
-
-.apt-hosts {
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-  min-width: 0;
-}
-
-:deep(.apt-console) {
-  width: 40%;
-  min-width: 380px;
-  display: flex;
-  flex-direction: column;
-}
-
-@media (max-width: 991px) {
-  .apt-page {
-    height: auto;
-  }
-
-  .apt-layout {
-    flex-direction: column;
-    overflow: visible;
-    height: auto;
-  }
-
-  .apt-hosts {
-    overflow-y: visible;
-  }
-
-  :deep(.apt-console) {
-    width: 100%;
-    min-width: 0;
-    max-height: 60vh;
-  }
-}
-</style>

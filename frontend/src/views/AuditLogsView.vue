@@ -30,9 +30,9 @@
     </ul>
 
     <!-- ── Commandes tab ────────────────────────────────────────────────────── -->
-    <div v-show="activeTab === 'commandes'" class="audit-layout">
+    <div v-show="activeTab === 'commandes'" class="side-layout">
       <!-- Left: table -->
-      <div class="audit-main">
+      <div class="side-main">
         <div class="card">
           <div class="table-responsive">
             <table class="table table-vcenter card-table">
@@ -107,7 +107,7 @@
       <CommandLogPanel
         :command="selectedCmd"
         :show="showLogViewer"
-        wrapper-class="audit-console"
+        wrapper-class="side-panel"
         title="Logs"
         empty-text="Aucun log sélectionné"
         @close="closeLogViewer"
@@ -450,40 +450,3 @@ onUnmounted(() => {
   }
 })
 </script>
-
-<style scoped>
-.audit-layout {
-  display: flex;
-  gap: 1rem;
-  align-items: flex-start;
-}
-
-.audit-main {
-  flex: 1;
-  min-width: 0;
-}
-
-:deep(.audit-console) {
-  width: 40%;
-  min-width: 380px;
-  height: calc(100vh - 160px);
-  display: flex;
-  flex-direction: column;
-  position: sticky;
-  top: 1rem;
-}
-
-@media (max-width: 991px) {
-  .audit-layout {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  :deep(.audit-console) {
-    width: 100%;
-    min-width: 0;
-    height: 60vh;
-    position: static;
-  }
-}
-</style>

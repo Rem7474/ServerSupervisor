@@ -33,8 +33,8 @@
       </li>
     </ul>
 
-    <div class="docker-layout">
-      <div class="docker-main">
+    <div class="side-layout">
+      <div class="side-main">
         <DockerContainersTab
           v-if="activeTab === 'containers'"
           :containers="containers"
@@ -59,7 +59,7 @@
         :show="showDockerConsole"
         title="Console Live"
         empty-text="Aucune console active"
-        wrapper-class="docker-console"
+        wrapper-class="side-panel"
         @open="showDockerConsole = true"
         @close="closeDockerConsole"
       />
@@ -189,31 +189,3 @@ const { wsStatus, wsError, retryCount, reconnect } = useWebSocket('/api/v1/ws/do
   versionComparisons.value = payload.version_comparisons || []
 })
 </script>
-
-<style scoped>
-.docker-layout {
-  display: flex;
-  gap: 1rem;
-  align-items: flex-start;
-}
-
-.docker-main {
-  flex: 1;
-  min-width: 0;
-}
-
-:deep(.docker-console) {
-  width: 40%;
-  min-width: 380px;
-  height: calc(100vh - 160px);
-  display: flex;
-  flex-direction: column;
-  position: sticky;
-  top: 1rem;
-}
-
-@media (max-width: 991px) {
-  .docker-layout { flex-direction: column; align-items: stretch; }
-  :deep(.docker-console) { width: 100%; min-width: 0; height: 60vh; position: static; }
-}
-</style>

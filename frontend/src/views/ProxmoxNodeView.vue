@@ -177,8 +177,8 @@
       </div>
 
       <!-- Tabs + side console -->
-      <div class="pve-layout">
-      <div class="pve-main">
+      <div class="side-layout">
+      <div class="side-main">
       <div class="card">
         <div class="card-header">
           <ul class="nav nav-tabs card-header-tabs">
@@ -561,17 +561,17 @@
           </table>
         </div>
       </div>
-      </div> <!-- /pve-main -->
+      </div> <!-- /side-main -->
       <CommandLogPanel
         :command="liveTask"
         :show="showConsole"
         title="Logs tâche PVE"
         empty-text="Cliquez sur 'Logs' dans une tâche pour suivre l'exécution"
-        wrapper-class="pve-console"
+        wrapper-class="side-panel"
         @open="showConsole = true"
         @close="closeConsole"
       />
-      </div> <!-- /pve-layout -->
+      </div> <!-- /side-layout -->
     </div> <!-- /v-else-if node -->
   </div>
 </template>
@@ -1119,39 +1119,3 @@ onUnmounted(() => {
   if (liveStatusTimer) clearInterval(liveStatusTimer)
 })
 </script>
-
-<style scoped>
-.pve-layout {
-  display: flex;
-  align-items: flex-start;
-  gap: 1rem;
-}
-
-.pve-main {
-  flex: 1;
-  min-width: 0;
-}
-
-:deep(.pve-console) {
-  width: 40%;
-  min-width: 360px;
-  height: 520px;
-  display: flex;
-  flex-direction: column;
-  position: sticky;
-  top: 1rem;
-}
-
-@media (max-width: 991px) {
-  .pve-layout {
-    flex-direction: column;
-  }
-
-  :deep(.pve-console) {
-    width: 100%;
-    min-width: 0;
-    position: static;
-    height: 400px;
-  }
-}
-</style>

@@ -156,9 +156,9 @@
     </div>
 
     <!-- ── Onglet Historique ── -->
-    <div v-show="activeTab === 'historique'" class="account-layout">
+    <div v-show="activeTab === 'historique'" class="side-layout">
       <!-- Table principale -->
-      <div class="account-main">
+      <div class="side-main">
         <div class="card">
           <div class="card-header d-flex align-items-center justify-content-between">
             <h3 class="card-title mb-0">
@@ -222,7 +222,7 @@
       <CommandLogPanel
         :command="selectedCmd"
         :show="showConsole"
-        wrapper-class="account-console"
+        wrapper-class="side-panel"
         title="Console"
         empty-text="Aucune console active"
         @close="closeLogViewer"
@@ -467,39 +467,3 @@ onMounted(() => {
 
 onUnmounted(() => { closeStream() })
 </script>
-
-<style scoped>
-.account-layout {
-  display: flex;
-  gap: 1rem;
-  align-items: flex-start;
-}
-
-.account-main {
-  flex: 1;
-  min-width: 0;
-}
-
-:deep(.account-console) {
-  width: 40%;
-  min-width: 380px;
-  height: calc(100vh - 220px);
-  position: sticky;
-  top: 1rem;
-  display: flex;
-  flex-direction: column;
-}
-
-@media (max-width: 991px) {
-  .account-layout {
-    flex-direction: column;
-  }
-
-  :deep(.account-console) {
-    width: 100%;
-    min-width: 0;
-    height: 400px;
-    position: static;
-  }
-}
-</style>

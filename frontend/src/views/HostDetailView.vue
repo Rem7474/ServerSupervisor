@@ -122,8 +122,8 @@
       </div>
     </div>
 
-    <div class="host-layout">
-      <div class="host-panel-main">
+    <div class="side-layout">
+      <div class="side-main">
         <HostEditForm
           v-if="isEditing"
           :host-id="hostId"
@@ -189,7 +189,7 @@
         :show="showConsole"
         title="Console Live"
         empty-text="Aucune console active"
-        wrapper-class="host-panel-right"
+        wrapper-class="side-panel"
         :clearable="true"
         @open="showConsole = true"
         @close="closeConsoleAndStream"
@@ -541,40 +541,14 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.host-layout {
-  display: flex;
-  gap: 1rem;
-  align-items: flex-start;
-}
-
-.host-panel-main {
-  flex: 1;
-  min-width: 0;
-}
-
-:deep(.host-panel-right) {
-  width: 40%;
-  min-width: 380px;
-  display: flex;
-  flex-direction: column;
-  height: calc(100vh - 160px);
-  position: sticky;
-  top: 1rem;
+:deep(.side-panel) {
   transition: width 0.3s ease-in-out;
   overflow: hidden;
 }
 
 @media (max-width: 991px) {
-  .host-layout {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  :deep(.host-panel-right) {
+  :deep(.side-panel) {
     width: 100%;
-    min-width: 0;
-    height: 60vh;
-    position: static;
   }
 }
 </style>
