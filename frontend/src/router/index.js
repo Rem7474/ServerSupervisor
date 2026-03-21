@@ -147,4 +147,17 @@ router.beforeEach((to, _from, next) => {
   }
 })
 
+// Recover from chunk load failures (network hiccup during lazy route import).
+// The browser caches the old chunk references after a deployment; a hard
+// reload fetches the new manifest and resolves the mismatch.
+router.onError((error) => {
+  const isChunkError =
+    error?.name === 'ChunkLoadError' ||
+    /loading chunk/i.test(error?.message || '') ||
+    /failed to fetch dynamically imported module/i.test(error?.message || '')
+  if (isChunkError) {
+    window.location.reload()
+  }
+})
+
 export default router

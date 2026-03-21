@@ -17,19 +17,29 @@ export function getApiErrorMessage(error, fallback = 'Une erreur est survenue') 
   return message ? String(message) : fallback
 }
 
-// Add JWT token to requests
+// Add JWT token and standard headers to every request.
+// X-Requested-With is a defense-in-depth measure: browsers prevent
+// cross-origin scripts from setting this header, so its presence proves
+// the request originated from our own JS (not a cross-site form post).
 api.interceptors.request.use((config) => {
   const auth = useAuthStore()
   if (auth.token) {
     config.headers.Authorization = `Bearer ${auth.token}`
   }
+  config.headers['X-Requested-With'] = 'XMLHttpRequest'
   return config
 })
 
-// Handle 401 responses
+// Handle 401 — log out and redirect to login.
+// Silently swallow aborted requests (AbortController / component unmount).
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    if (axios.isCancel(error)) {
+      // Request was intentionally cancelled (component unmounted, new search, etc.)
+      // Re-reject so callers can distinguish cancellations from real errors.
+      return Promise.reject(error)
+    }
     if (error.response?.status === 401) {
       const auth = useAuthStore()
       auth.logout()
@@ -38,6 +48,20 @@ api.interceptors.response.use(
     return Promise.reject(error)
   }
 )
+
+/**
+ * Returns true when an axios error was caused by an AbortController abort
+ * or an axios CancelToken cancel. Use this in catch blocks to silently
+ * ignore intentional cancellations:
+ *
+ *   api.getHosts({ signal }).catch(err => {
+ *     if (isApiAbort(err)) return
+ *     showError(err)
+ *   })
+ */
+export function isApiAbort(error) {
+  return axios.isCancel(error) || error?.name === 'CanceledError' || error?.name === 'AbortError'
+}
 
 export default {
   // Auth

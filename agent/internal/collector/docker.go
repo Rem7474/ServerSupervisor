@@ -57,22 +57,39 @@ var (
 	imageDigestTTL     = 5 * time.Minute
 )
 
-// dockerOnce guards the shared Docker client singleton.
+// dockerMu guards the shared Docker client singleton.
+// A regular sync.Once cannot be used here because we need to retry when the
+// initial creation fails (e.g. Docker daemon not yet started at agent boot).
 var (
-	dockerOnce   sync.Once
+	dockerMu     sync.Mutex
 	dockerSingle *docker.Client
-	dockerErr    error
+	dockerInitOK bool
 )
 
-// newDockerClient returns a shared Docker client initialised once from environment
+// newDockerClient returns a shared Docker client initialised from environment
 // variables (DOCKER_HOST, DOCKER_TLS_VERIFY, DOCKER_CERT_PATH) or the local
-// Unix socket. go-dockerclient does not open a persistent connection here, so
-// the singleton is safe to share across goroutines.
+// Unix socket. go-dockerclient does not open a persistent connection in the
+// constructor, so the singleton is safe to share across goroutines.
+//
+// Unlike sync.Once, this implementation retries on failure so that a transient
+// error at agent startup (daemon not yet ready) does not permanently disable
+// Docker monitoring for the lifetime of the process.
 func newDockerClient() (*docker.Client, error) {
-	dockerOnce.Do(func() {
-		dockerSingle, dockerErr = docker.NewClientFromEnv()
-	})
-	return dockerSingle, dockerErr
+	dockerMu.Lock()
+	defer dockerMu.Unlock()
+
+	if dockerInitOK {
+		return dockerSingle, nil
+	}
+
+	c, err := docker.NewClientFromEnv()
+	if err != nil {
+		log.Printf("Docker client init failed (will retry on next collection): %v", err)
+		return nil, err
+	}
+	dockerSingle = c
+	dockerInitOK = true
+	return dockerSingle, nil
 }
 
 // CollectDocker gathers Docker container information using the Docker API.
@@ -560,8 +577,19 @@ func ExecuteDockerCommand(action, containerName string, chunkCB func(string)) (s
 		return msg, nil
 
 	case "restart":
-		if err := client.RestartContainer(containerName, containerShutdownTimeoutSecs); err != nil {
-			return "", fmt.Errorf("failed to restart container %s: %w", containerName, err)
+		// go-dockerclient has no RestartContainerWithContext, so enforce the timeout manually.
+		// 60s = stop grace period (10s) + start + safety margin.
+		restartDone := make(chan error, 1)
+		go func() {
+			restartDone <- client.RestartContainer(containerName, containerShutdownTimeoutSecs)
+		}()
+		select {
+		case err := <-restartDone:
+			if err != nil {
+				return "", fmt.Errorf("failed to restart container %s: %w", containerName, err)
+			}
+		case <-time.After(60 * time.Second):
+			return "", fmt.Errorf("restart of container %s timed out after 60s", containerName)
 		}
 		msg := fmt.Sprintf("Container %s restarted", containerName)
 		if chunkCB != nil {
@@ -580,12 +608,15 @@ func ExecuteDockerCommand(action, containerName string, chunkCB func(string)) (s
 // streamContainerLogs retrieves the last 100 log lines from a container via the Docker API
 // and streams them in chunks to chunkCB.
 func streamContainerLogs(client *docker.Client, containerName string, chunkCB func(string)) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
 	pr, pw := io.Pipe()
 	var fullOutput strings.Builder
 
 	go func() {
 		err := client.Logs(docker.LogsOptions{
-			Context:      context.Background(),
+			Context:      ctx,
 			Container:    containerName,
 			OutputStream: pw,
 			ErrorStream:  pw,

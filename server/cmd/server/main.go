@@ -28,12 +28,9 @@ func main() {
 	cfg := config.Load()
 	log.Printf("Database Config: host=%s port=%s user=%s dbname=%s", cfg.DBHost, cfg.DBPort, cfg.DBUser, cfg.DBName)
 
-	// ⚠️  Security warnings for default configuration
-	if cfg.JWTSecret == config.DefaultJWTSecret {
-		log.Println("⚠️  WARNING: JWT_SECRET is using the default insecure value. Change it in production!")
-	}
-	if cfg.AdminPassword == "admin" {
-		log.Println("⚠️  WARNING: ADMIN_PASSWORD is 'admin'. Change it immediately!")
+	// ⚠️  Validate configuration — log all warnings before connecting to the database
+	for _, w := range cfg.Validate() {
+		log.Printf("⚠️  WARNING: %s", w)
 	}
 
 	// Ensure database exists

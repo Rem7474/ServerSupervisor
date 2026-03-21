@@ -254,8 +254,20 @@ func sendReport(ctx context.Context, cfg *config.Config, s *sender.Sender) {
 		select {
 		case commandQueue <- response.Commands:
 		default:
-			log.Printf("Command queue full (%d batches pending), dropping batch of %d commands",
+			// Queue is full. Report each command as failed immediately so the server
+			// doesn't leave them in "pending" state waiting for the stalled-command
+			// cleanup timeout (10 minutes). The user will see a clear failure reason.
+			log.Printf("Command queue full (%d batches pending), reporting %d commands as failed",
 				len(commandQueue), len(response.Commands))
+			for _, cmd := range response.Commands {
+				if err := s.ReportCommandResult(ctx, &sender.CommandResult{
+					CommandID: cmd.ID,
+					Status:    "failed",
+					Output:    "command dropped: agent command queue was full — try again",
+				}); err != nil {
+					log.Printf("Failed to report dropped command %s as failed: %v", cmd.ID, err)
+				}
+			}
 		}
 	}
 }

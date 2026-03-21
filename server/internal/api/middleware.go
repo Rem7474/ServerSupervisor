@@ -321,6 +321,20 @@ func JWTMiddleware(cfg *config.Config) gin.HandlerFunc {
 	}
 }
 
+// AdminOnlyMiddleware rejects requests from non-admin users with 403.
+// Must be placed after JWTMiddleware so the "role" context value is set.
+func AdminOnlyMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		role, _ := c.Get("role")
+		if role != "admin" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "admin access required"})
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
 // APIKeyMiddleware validates agent API keys.
 func APIKeyMiddleware(db *database.DB, cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {

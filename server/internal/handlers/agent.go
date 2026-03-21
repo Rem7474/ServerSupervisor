@@ -59,7 +59,9 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 	}
 
 	// Update host status
-	_ = h.db.UpdateHostStatus(hostID, "online")
+	if err := h.db.UpdateHostStatus(hostID, "online"); err != nil {
+		log.Printf("Warning: failed to update host %s status to online: %v", safeHostID, err)
+	}
 
 	// Cleanup any stalled commands for this host (in case agent restarted)
 	if err := h.db.CleanupHostStalledCommands(hostID, 60); err != nil {
@@ -201,7 +203,10 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 	}
 
 	// Return pending commands for this host (unified remote_commands table)
-	commands, _ := h.db.GetPendingRemoteCommands(hostID)
+	commands, err := h.db.GetPendingRemoteCommands(hostID)
+	if err != nil {
+		log.Printf("Warning: failed to get pending commands for host %s: %v", safeHostID, err)
+	}
 	if commands == nil {
 		commands = []models.PendingCommand{}
 	}
@@ -245,7 +250,9 @@ func (h *AgentHandler) ReportCommandResult(c *gin.Context) {
 		if result.Status == "failed" {
 			details = truncateOutput(result.Output, 2000)
 		}
-		_ = h.db.UpdateAuditLogStatus(*cmd.AuditLogID, result.Status, details)
+		if err := h.db.UpdateAuditLogStatus(*cmd.AuditLogID, result.Status, details); err != nil {
+			log.Printf("Warning: failed to update audit log %d for command %s: %v", *cmd.AuditLogID, result.CommandID, err)
+		}
 	}
 
 	// Broadcast status to WebSocket clients (UUID string, no conversion needed)

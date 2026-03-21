@@ -47,7 +47,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 
 	proxmoxH := handlers.NewProxmoxHandler(db, cfg)
 
-	registerPublicRoutes(r, authH)
+	registerPublicRoutes(r, authH, db)
 	registerWSRoutes(r, wsH)
 	registerAgentRoutes(r, db, cfg, agentH)
 
@@ -73,12 +73,16 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	return r, releaseTrackerH, proxmoxH
 }
 
-func registerPublicRoutes(r *gin.Engine, h *handlers.AuthHandler) {
+func registerPublicRoutes(r *gin.Engine, h *handlers.AuthHandler, db *database.DB) {
 	r.POST("/api/auth/login", h.Login)
 	r.POST("/api/auth/refresh", h.RefreshToken)
 	r.POST("/api/auth/logout", h.Logout)
 	r.GET("/api/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{"status": "ok"})
+		if err := db.Ping(); err != nil {
+			c.JSON(503, gin.H{"status": "degraded", "db": "unreachable", "error": err.Error()})
+			return
+		}
+		c.JSON(200, gin.H{"status": "ok", "db": "ok"})
 	})
 }
 
@@ -243,16 +247,17 @@ func registerProxmoxRoutes(g *gin.RouterGroup, h *handlers.ProxmoxHandler) {
 	g.GET("/proxmox/guests", h.ListGuests)
 	g.GET("/proxmox/guests/:id/metrics", h.GetGuestMetricsSummary)
 	g.GET("/proxmox/guests/:id/link", h.GetLinkByGuest)
-	// Connection management (admin only enforced in handler via RequireAdmin middleware if needed;
-	// for now protected by JWT — tighten with AdminMiddleware if desired)
-	g.GET("/proxmox/instances", h.ListConnections)
-	g.POST("/proxmox/instances", h.CreateConnection)
-	g.GET("/proxmox/instances/:id", h.GetConnection)
-	g.PUT("/proxmox/instances/:id", h.UpdateConnection)
-	g.DELETE("/proxmox/instances/:id", h.DeleteConnection)
-	g.POST("/proxmox/instances/test", h.TestConnection)
-	g.POST("/proxmox/instances/:id/test", h.TestConnectionByID)
-	g.POST("/proxmox/instances/:id/poll-now", h.PollNow)
+	// Connection management — admin only
+	proxmoxAdmin := g.Group("")
+	proxmoxAdmin.Use(AdminOnlyMiddleware())
+	proxmoxAdmin.GET("/proxmox/instances", h.ListConnections)
+	proxmoxAdmin.POST("/proxmox/instances", h.CreateConnection)
+	proxmoxAdmin.GET("/proxmox/instances/:id", h.GetConnection)
+	proxmoxAdmin.PUT("/proxmox/instances/:id", h.UpdateConnection)
+	proxmoxAdmin.DELETE("/proxmox/instances/:id", h.DeleteConnection)
+	proxmoxAdmin.POST("/proxmox/instances/test", h.TestConnection)
+	proxmoxAdmin.POST("/proxmox/instances/:id/test", h.TestConnectionByID)
+	proxmoxAdmin.POST("/proxmox/instances/:id/poll-now", h.PollNow)
 	// Guest ↔ host link management
 	g.GET("/proxmox/links", h.ListLinks)
 	g.POST("/proxmox/links", h.CreateLink)

@@ -80,6 +80,10 @@ export function useCommandStream({ token }) {
 
     ws.onerror = () => {
       if (activeStream !== ws) return
+      // Close before calling the error callback so the dead socket doesn't
+      // linger. closeStream() nullifies all handlers first, so onclose won't
+      // fire a second time after this.
+      closeStream()
       onError?.(new Error('WebSocket error'))
     }
 

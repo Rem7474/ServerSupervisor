@@ -152,6 +152,16 @@
         </div>
       </header>
 
+      <!-- Offline / server-unreachable banner -->
+      <div v-if="!isOnline" class="alert alert-warning alert-dismissible mb-0 rounded-0 border-0 border-bottom" role="alert" style="position:sticky;top:0;z-index:1040;">
+        <div class="container-xl d-flex align-items-center gap-2">
+          <svg class="icon flex-shrink-0" width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+          </svg>
+          <span>Connexion au serveur perdue — les données affichées peuvent être obsolètes.</span>
+        </div>
+      </div>
+
       <div class="page-wrapper">
         <div id="main-content" class="page-body">
           <div class="container-xl">
@@ -185,6 +195,14 @@ const userMenuOpen = ref(false)
 const userMenuRef = ref(null)
 const secondaryMenuOpen = ref(false)
 const adminMenuOpen = ref(false)
+
+// Offline detection — tracks browser connectivity via navigator.onLine events.
+// A "false" value means the browser has no network; the server may still be
+// reachable on a local network even when this is false, but it's the best
+// signal available without polling.
+const isOnline = ref(navigator.onLine)
+function handleOnline() { isOnline.value = true }
+function handleOffline() { isOnline.value = false }
 
 const secondaryRoutes = ['/scheduled-tasks', '/network', '/settings']
 const adminRoutes = ['/git-webhooks', '/audit', '/users']
@@ -232,6 +250,8 @@ function handleOutsideClick(event) {
 }
 
 onMounted(() => {
+  window.addEventListener('online', handleOnline)
+  window.addEventListener('offline', handleOffline)
   document.addEventListener('click', handleOutsideClick, true)
   // Auto-close all menus after navigation
   router.afterEach(() => {
@@ -248,6 +268,8 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  window.removeEventListener('online', handleOnline)
+  window.removeEventListener('offline', handleOffline)
   document.removeEventListener('click', handleOutsideClick, true)
 })
 </script>

@@ -154,6 +154,29 @@ func (c *Config) OverrideFromDB(db DBSettingsLoader) {
 	}
 }
 
+// Validate returns a list of human-readable warnings for insecure or invalid
+// configuration values. The server can still start when warnings are present,
+// but they should be addressed before deploying to production.
+func (c *Config) Validate() []string {
+	var warnings []string
+	if c.JWTSecret == DefaultJWTSecret {
+		warnings = append(warnings, "JWT_SECRET is using the default insecure value — set a unique secret in production")
+	}
+	if c.AdminPassword == "admin" {
+		warnings = append(warnings, "ADMIN_PASSWORD is 'admin' — change it immediately")
+	}
+	if c.DBPassword == "supervisor" {
+		warnings = append(warnings, "DB_PASSWORD is using the default value — change it in production")
+	}
+	if c.MetricsRetentionDays <= 0 {
+		warnings = append(warnings, "METRICS_RETENTION_DAYS must be a positive integer")
+	}
+	if c.AuditRetentionDays <= 0 {
+		warnings = append(warnings, "AUDIT_RETENTION_DAYS must be a positive integer")
+	}
+	return warnings
+}
+
 func (c *Config) DBDSN() string {
 	return "host=" + c.DBHost +
 		" port=" + c.DBPort +
