@@ -69,13 +69,16 @@
                 </label>
                 <div class="ms-auto d-flex flex-wrap gap-2">
                   <template v-if="canRunApt">
-                    <button @click="bulkAptCmd('update')" class="btn btn-outline-secondary" :disabled="selectedHosts.length === 0">
+                    <button @click="bulkAptCmd('update')" class="btn btn-outline-secondary" :disabled="selectedHosts.length === 0 || !!aptBulkLoading">
+                      <span v-if="aptBulkLoading === 'update'" class="spinner-border spinner-border-sm me-1" role="status"></span>
                       apt update ({{ selectedHosts.length }})
                     </button>
-                    <button @click="bulkAptCmd('upgrade')" class="btn btn-primary" :disabled="selectedHosts.length === 0">
+                    <button @click="bulkAptCmd('upgrade')" class="btn btn-primary" :disabled="selectedHosts.length === 0 || !!aptBulkLoading">
+                      <span v-if="aptBulkLoading === 'upgrade'" class="spinner-border spinner-border-sm me-1" role="status"></span>
                       apt upgrade ({{ selectedHosts.length }})
                     </button>
-                    <button @click="bulkAptCmd('dist-upgrade')" class="btn btn-outline-danger" :disabled="selectedHosts.length === 0">
+                    <button @click="bulkAptCmd('dist-upgrade')" class="btn btn-outline-danger" :disabled="selectedHosts.length === 0 || !!aptBulkLoading">
+                      <span v-if="aptBulkLoading === 'dist-upgrade'" class="spinner-border spinner-border-sm me-1" role="status"></span>
                       apt dist-upgrade ({{ selectedHosts.length }})
                     </button>
                   </template>
@@ -460,6 +463,7 @@ const showConsole = ref(false)
 const liveCommand = ref(null)
 const { value: bulkActionFeedback, showToast: showBulkActionFeedback } = useToast(null)
 const { openCommandStream, closeStream } = useCommandStream({ token: () => auth.token })
+const aptBulkLoading = ref(null) // null | 'update' | 'upgrade' | 'dist-upgrade'
 
 // ── Hosts filters / sort ─────────────────────────────────────────────────────
 const hostSearch = ref('')
@@ -716,6 +720,7 @@ async function bulkAptCmd(command) {
 
   if (!confirmed) return
 
+  aptBulkLoading.value = command
   try {
     const response = await apiClient.sendAptCommand(selectedHosts.value, command)
     const commandResults = Array.isArray(response.data?.commands) ? response.data.commands : []
@@ -761,6 +766,8 @@ async function bulkAptCmd(command) {
       message: getApiErrorMessage(e),
       variant: 'danger'
     })
+  } finally {
+    aptBulkLoading.value = null
   }
 }
 

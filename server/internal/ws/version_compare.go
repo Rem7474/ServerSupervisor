@@ -96,6 +96,7 @@ func (h *WSHandler) buildVersionComparisons() ([]models.VersionComparison, error
 				LatestVersion:   tracker.LastReleaseTag,
 				IsUpToDate:      aggIsUpToDate,
 				UpdateConfirmed: aggUpdateConfirmed,
+				ContainerCount:  matchCount,
 				RepoOwner:       tracker.RepoOwner,
 				RepoName:        tracker.RepoName,
 				ReleaseURL:      releaseURL,

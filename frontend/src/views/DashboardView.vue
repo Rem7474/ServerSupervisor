@@ -346,6 +346,7 @@
             <tr>
               <th>Image</th>
               <th>Hôte</th>
+              <th>Conteneurs</th>
               <th>En cours</th>
               <th>Dernière version</th>
               <th>Statut</th>
@@ -355,6 +356,10 @@
             <tr v-for="v in versionComparisons" :key="v.docker_image + v.host_id">
               <td class="fw-semibold">{{ v.docker_image }}</td>
               <td class="text-secondary">{{ v.hostname }}</td>
+              <td>
+                <span v-if="v.container_count > 0" class="badge bg-azure-lt text-azure" :title="`${v.container_count} conteneur${v.container_count > 1 ? 's' : ''} utilisent cette image`">{{ v.container_count }}</span>
+                <span v-else class="text-secondary small">—</span>
+              </td>
               <td><code v-if="v.running_version">{{ v.running_version }}</code><span v-else class="text-secondary small">inconnue</span></td>
               <td>
                 <a v-if="v.release_url" :href="v.release_url" target="_blank" class="link-primary">{{ v.latest_version }}</a>
@@ -367,7 +372,7 @@
               </td>
             </tr>
             <tr v-if="versionComparisons.length === 0">
-              <td colspan="5" class="text-center text-secondary py-4">
+              <td colspan="6" class="text-center text-secondary py-4">
                 Aucun suivi de version configuré. Ajoutez des release trackers dans
                 <router-link to="/git-webhooks">Git / Automatisation</router-link>.
               </td>

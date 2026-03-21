@@ -258,8 +258,14 @@ func (h *SettingsHandler) CleanupMetrics(c *gin.Context) {
 		return
 	}
 
-	message := fmt.Sprintf("Deleted %d old metrics records", deleted)
-	c.JSON(http.StatusOK, gin.H{"success": true, "message": message, "deleted": deleted})
+	// Also trim old tracker tag digests (keep last 100 per tracker).
+	deletedDigests, digestErr := h.db.CleanupTrackerTagDigests(100)
+	if digestErr != nil {
+		log.Printf("CleanupMetrics: failed to trim tracker tag digests: %v", digestErr)
+	}
+
+	message := fmt.Sprintf("Deleted %d old metrics records, %d old tracker tag digest entries", deleted, deletedDigests)
+	c.JSON(http.StatusOK, gin.H{"success": true, "message": message, "deleted": deleted, "deleted_digests": deletedDigests})
 
 	// Log the action
 	_, _ = h.db.CreateAuditLog(user, "cleanup_metrics", "", c.ClientIP(), message, "success")

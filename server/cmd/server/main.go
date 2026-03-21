@@ -83,10 +83,11 @@ func main() {
 
 	// Start background jobs (each runs in its own goroutine with panic recovery)
 	bg := background.New()
-	bg.Add(background.NewAuditCleanupJob(db))
+	bg.Add(background.NewAuditCleanupJob(db, cfg))
 	bg.Add(background.NewHostStatusJob(db))
 	bg.Add(background.NewAlertEvalJob(db, cfg, dispatcher, notifHub))
 	bg.Add(background.NewMetricsDownsampleJob(db))
+	bg.Add(background.NewMetricsRetentionJob(db, cfg))
 	bg.Start()
 	defer bg.Stop()
 

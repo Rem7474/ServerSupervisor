@@ -52,8 +52,18 @@ func (h *DockerHandler) ListContainers(c *gin.Context) {
 	c.JSON(http.StatusOK, containers)
 }
 
-// ListAllContainers returns all Docker containers across all hosts
+// ListAllContainers returns Docker containers across all hosts.
+// Accepts optional ?limit (default 500, max 2000) and ?offset query params.
 func (h *DockerHandler) ListAllContainers(c *gin.Context) {
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "500"))
+	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	if limit <= 0 || limit > 2000 {
+		limit = 500
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
 	containers, err := h.db.GetAllDockerContainers()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch containers"})
@@ -62,7 +72,19 @@ func (h *DockerHandler) ListAllContainers(c *gin.Context) {
 	if containers == nil {
 		containers = []models.DockerContainer{}
 	}
-	c.JSON(http.StatusOK, containers)
+
+	total := len(containers)
+	end := offset + limit
+	if offset >= total {
+		containers = []models.DockerContainer{}
+	} else {
+		if end > total {
+			end = total
+		}
+		containers = containers[offset:end]
+	}
+
+	c.JSON(http.StatusOK, gin.H{"containers": containers, "total": total, "limit": limit, "offset": offset})
 }
 
 // CompareVersions compares running docker images with tracked GitHub releases

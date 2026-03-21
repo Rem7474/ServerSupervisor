@@ -629,6 +629,18 @@ func (h *ProxmoxHandler) UpdateLink(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+
+	validStatuses := map[string]bool{"suggested": true, "confirmed": true, "ignored": true}
+	validMetricsSources := map[string]bool{"auto": true, "agent": true, "proxmox": true}
+	if req.Status != nil && !validStatuses[*req.Status] {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "status invalide : doit être suggested, confirmed ou ignored"})
+		return
+	}
+	if req.MetricsSource != nil && !validMetricsSources[*req.MetricsSource] {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "metrics_source invalide : doit être auto, agent ou proxmox"})
+		return
+	}
+
 	link, err := h.db.UpdateProxmoxGuestLink(id, req.Status, req.MetricsSource)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

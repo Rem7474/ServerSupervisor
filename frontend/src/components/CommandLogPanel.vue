@@ -249,13 +249,13 @@ function download() {
   color: #e2e8f0;
   padding: 1rem;
   margin: 0;
-  overflow-y: auto;
+  overflow: auto;
   font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
   font-size: 0.813rem;
   line-height: 1.5;
   border-radius: 0 0 0.5rem 0.5rem;
-  white-space: pre-wrap;
-  word-break: break-all;
+  white-space: pre;
+  word-break: normal;
 }
 
 .console-fab {

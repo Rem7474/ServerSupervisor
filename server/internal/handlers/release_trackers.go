@@ -606,12 +606,20 @@ func (h *ReleaseTrackerHandler) Run(c *gin.Context) {
 	}
 
 	if t.TrackerType == "docker" {
+		if t.LatestImageDigest == "" {
+			c.JSON(http.StatusConflict, gin.H{"error": "aucune vérification initiale effectuée — attendez le prochain cycle de polling avant de déclencher manuellement"})
+			return
+		}
 		tag := t.DockerTag
 		if tag == "" {
 			tag = "latest"
 		}
 		go h.dispatchDockerUpdate(*t, tag, t.LastReleaseTag, t.LatestImageDigest, t.LatestImageDigest)
 	} else {
+		if t.LastReleaseTag == "" {
+			c.JSON(http.StatusConflict, gin.H{"error": "aucune release initiale enregistrée — attendez le prochain cycle de polling avant de déclencher manuellement"})
+			return
+		}
 		go h.dispatchGitRelease(*t, t.LastReleaseTag, "", "")
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "execution scheduled"})

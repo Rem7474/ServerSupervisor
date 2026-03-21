@@ -206,16 +206,26 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const [sumRes, nodesRes, instRes] = await Promise.all([
+    const [sumRes, nodesRes, instRes] = await Promise.allSettled([
       api.getProxmoxSummary(),
       api.getProxmoxNodes(),
       api.getProxmoxInstances(),
     ])
-    summary.value = sumRes.data
-    nodes.value = nodesRes.data
-    instances.value = instRes.data
-  } catch (e) {
-    error.value = e?.response?.data?.error || 'Erreur lors du chargement.'
+    if (sumRes.status === 'fulfilled') summary.value = sumRes.value.data
+    if (nodesRes.status === 'fulfilled') nodes.value = nodesRes.value.data
+    // getProxmoxInstances() is admin-only — silently skip on 403
+    if (instRes.status === 'fulfilled') {
+      instances.value = instRes.value.data
+    } else if (instRes.reason?.response?.status !== 403) {
+      error.value = instRes.reason?.response?.data?.error || 'Erreur lors du chargement.'
+    }
+    // Surface non-403 errors from summary/nodes
+    if (sumRes.status === 'rejected' && sumRes.reason?.response?.status !== 403) {
+      error.value = sumRes.reason?.response?.data?.error || 'Erreur lors du chargement.'
+    }
+    if (nodesRes.status === 'rejected' && nodesRes.reason?.response?.status !== 403) {
+      error.value = nodesRes.reason?.response?.data?.error || 'Erreur lors du chargement.'
+    }
   } finally {
     loading.value = false
   }

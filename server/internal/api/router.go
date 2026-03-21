@@ -46,6 +46,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	agentH.AddCompletionListener(releaseTrackerH)
 
 	proxmoxH := handlers.NewProxmoxHandler(db, cfg)
+	hostPermH := handlers.NewHostPermissionHandler(db)
 
 	registerPublicRoutes(r, authH, db)
 	registerWSRoutes(r, wsH)
@@ -54,7 +55,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	v1 := r.Group("/api/v1")
 	v1.Use(JWTMiddleware(cfg))
 	registerAuthRoutes(v1, authH)
-	registerHostRoutes(v1, hostH, agentH)
+	registerHostRoutes(v1, hostH, agentH, db)
 	registerDockerRoutes(v1, dockerH, systemH, networkH, agentH)
 	registerAPTRoutes(v1, aptH)
 	registerAuditRoutes(v1, auditH)
@@ -67,6 +68,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	registerGitWebhookRoutes(r, v1, gitWebhookH)
 	registerReleaseTrackerRoutes(v1, releaseTrackerH)
 	registerProxmoxRoutes(v1, proxmoxH)
+	registerHostPermissionRoutes(v1, hostPermH)
 
 	registerStaticFiles(r)
 
@@ -119,21 +121,40 @@ func registerAuthRoutes(g *gin.RouterGroup, h *handlers.AuthHandler) {
 	g.DELETE("/auth/blocked-ips/:ip", h.UnblockIP)
 }
 
-func registerHostRoutes(g *gin.RouterGroup, h *handlers.HostHandler, agentH *handlers.AgentHandler) {
+func registerHostRoutes(g *gin.RouterGroup, h *handlers.HostHandler, agentH *handlers.AgentHandler, db *database.DB) {
 	g.GET("/hosts", h.ListHosts)
 	g.POST("/hosts", h.RegisterHost)
-	g.GET("/hosts/:id", h.GetHost)
-	g.PATCH("/hosts/:id", h.UpdateHost)
-	g.DELETE("/hosts/:id", h.DeleteHost)
-	g.POST("/hosts/:id/rotate-key", h.RotateAPIKey)
-	g.GET("/hosts/:id/dashboard", h.GetHostDashboard)
-	g.GET("/hosts/:id/metrics/history", agentH.GetMetricsHistory)
-	g.GET("/hosts/:id/metrics/aggregated", agentH.GetMetricsAggregated)
 	g.GET("/metrics/summary", agentH.GetMetricsSummary)
-	g.GET("/hosts/:id/disk/metrics", h.GetDiskMetrics)
-	g.GET("/hosts/:id/disk/metrics/history", h.GetDiskMetricsHistory)
-	g.GET("/hosts/:id/disk/health", h.GetDiskHealth)
-	g.GET("/hosts/:id/complete", h.GetHostComplete)
+
+	// Per-host routes protected by HostPermissionMiddleware (viewer level).
+	hostViewer := g.Group("/hosts/:id")
+	hostViewer.Use(HostPermissionMiddleware(db, "viewer"))
+	hostViewer.GET("", h.GetHost)
+	hostViewer.GET("/dashboard", h.GetHostDashboard)
+	hostViewer.GET("/metrics/history", agentH.GetMetricsHistory)
+	hostViewer.GET("/metrics/aggregated", agentH.GetMetricsAggregated)
+	hostViewer.GET("/disk/metrics", h.GetDiskMetrics)
+	hostViewer.GET("/disk/metrics/history", h.GetDiskMetricsHistory)
+	hostViewer.GET("/disk/health", h.GetDiskHealth)
+	hostViewer.GET("/complete", h.GetHostComplete)
+
+	// Write operations on hosts require operator level.
+	hostOperator := g.Group("/hosts/:id")
+	hostOperator.Use(HostPermissionMiddleware(db, "operator"))
+	hostOperator.PATCH("", h.UpdateHost)
+	hostOperator.DELETE("", h.DeleteHost)
+	hostOperator.POST("/rotate-key", h.RotateAPIKey)
+}
+
+func registerHostPermissionRoutes(g *gin.RouterGroup, h *handlers.HostPermissionHandler) {
+	// Admin-only: manage per-host permissions
+	admin := g.Group("")
+	admin.Use(AdminOnlyMiddleware())
+	admin.GET("/hosts/:id/permissions", h.ListHostPermissions)
+	admin.PUT("/hosts/:id/permissions/:username", h.SetHostPermission)
+	admin.DELETE("/hosts/:id/permissions/:username", h.DeleteHostPermission)
+	// Any authenticated user: view own permissions
+	g.GET("/auth/host-permissions", h.GetMyHostPermissions)
 }
 
 func registerDockerRoutes(g *gin.RouterGroup, dockerH *handlers.DockerHandler, systemH *handlers.SystemHandler, networkH *handlers.NetworkHandler, agentH *handlers.AgentHandler) {

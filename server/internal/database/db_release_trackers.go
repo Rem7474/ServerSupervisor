@@ -273,6 +273,30 @@ func (db *DB) GetAllTrackerTagDigests() (map[string]string, error) {
 	return m, nil
 }
 
+// CleanupTrackerTagDigests removes old digest entries, keeping only the most recent
+// keepPerTracker rows per tracker. This prevents unbounded growth of the table.
+// Returns the total number of deleted rows.
+func (db *DB) CleanupTrackerTagDigests(keepPerTracker int) (int64, error) {
+	if keepPerTracker <= 0 {
+		keepPerTracker = 100
+	}
+	res, err := db.conn.Exec(`
+		DELETE FROM release_tracker_tag_digests
+		WHERE (tracker_id, tag) NOT IN (
+		    SELECT tracker_id, tag
+		    FROM (
+		        SELECT tracker_id, tag,
+		               ROW_NUMBER() OVER (PARTITION BY tracker_id ORDER BY created_at DESC) AS rn
+		        FROM release_tracker_tag_digests
+		    ) ranked
+		    WHERE rn <= $1
+		)`, keepPerTracker)
+	if err != nil {
+		return 0, err
+	}
+	return res.RowsAffected()
+}
+
 // UpdateReleaseTrackerError stores an error from the last check attempt.
 func (db *DB) UpdateReleaseTrackerError(id, errMsg string) error {
 	now := time.Now()

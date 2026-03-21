@@ -335,6 +335,56 @@ func AdminOnlyMiddleware() gin.HandlerFunc {
 	}
 }
 
+// HostPermissionMiddleware enforces per-host access control.
+// Admins always pass. Non-admins with NO host_permissions entries use their
+// global role (backward-compatible). Non-admins WITH entries are restricted
+// to the listed hosts; if the requested host is not in their list, 403 is returned.
+// requiredLevel: "viewer" (any entry) or "operator" (must have operator entry).
+func HostPermissionMiddleware(db *database.DB, requiredLevel string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		role, _ := c.Get("role")
+		if role == "admin" {
+			c.Next()
+			return
+		}
+
+		hostID := c.Param("id")
+		if hostID == "" {
+			c.Next()
+			return
+		}
+
+		username := c.GetString("username")
+		restricted, level, err := db.GetHostAccess(username, hostID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "permission check failed"})
+			c.Abort()
+			return
+		}
+
+		if !restricted {
+			// No host-specific restrictions — global role applies.
+			c.Next()
+			return
+		}
+
+		if level == "" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "accès refusé à cet hôte"})
+			c.Abort()
+			return
+		}
+
+		if requiredLevel == "operator" && level != "operator" {
+			c.JSON(http.StatusForbidden, gin.H{"error": "droits opérateur requis sur cet hôte"})
+			c.Abort()
+			return
+		}
+
+		c.Set("host_access_level", level)
+		c.Next()
+	}
+}
+
 // APIKeyMiddleware validates agent API keys.
 func APIKeyMiddleware(db *database.DB, cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {

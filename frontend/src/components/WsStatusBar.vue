@@ -1,6 +1,6 @@
 <template>
   <!-- Connected: nothing shown -->
-  <div v-if="status === 'reconnecting'" class="alert alert-warning d-flex align-items-center gap-2 py-2 px-3 mb-3" role="alert">
+  <div v-if="status === 'reconnecting'" class="alert alert-warning d-flex align-items-center gap-2 py-2 px-3 mb-3 ws-status-bar" role="alert">
     <div class="spinner-border spinner-border-sm text-warning flex-shrink-0" role="status"></div>
     <span>
       Reconnexion en cours
@@ -9,12 +9,12 @@
     </span>
   </div>
 
-  <div v-else-if="status === 'connecting'" class="alert alert-secondary d-flex align-items-center gap-2 py-2 px-3 mb-3" role="alert">
+  <div v-else-if="status === 'connecting'" class="alert alert-secondary d-flex align-items-center gap-2 py-2 px-3 mb-3 ws-status-bar" role="alert">
     <div class="spinner-border spinner-border-sm flex-shrink-0" role="status"></div>
     <span>Connexion au serveur…</span>
   </div>
 
-  <div v-else-if="status === 'error'" class="alert alert-danger d-flex align-items-center justify-content-between gap-2 py-2 px-3 mb-3" role="alert">
+  <div v-else-if="status === 'error'" class="alert alert-danger d-flex align-items-center justify-content-between gap-2 py-2 px-3 mb-3 ws-status-bar" role="alert">
     <div class="d-flex align-items-center gap-2">
       <!-- X icon -->
       <svg class="flex-shrink-0" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -49,3 +49,11 @@ defineProps({
 
 defineEmits(['reconnect'])
 </script>
+
+<style scoped>
+.ws-status-bar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+</style>

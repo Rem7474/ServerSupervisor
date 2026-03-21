@@ -2,6 +2,14 @@ package models
 
 import "time"
 
+// HostPermission records per-host access granted to a user.
+type HostPermission struct {
+	Username  string `json:"username"`
+	HostID    string `json:"host_id"`
+	Level     string `json:"level"` // "viewer" | "operator"
+	CreatedAt string `json:"created_at"`
+}
+
 // ========== Host (VM) ==========
 
 type Host struct {

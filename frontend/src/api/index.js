@@ -140,6 +140,12 @@ export default {
   updateUserRole: (id, role) => api.patch(`/v1/users/${id}/role`, { role }),
   deleteUser: (id) => api.delete(`/v1/users/${id}`),
 
+  // Host permissions (per-host RBAC)
+  getHostPermissions: (hostId) => api.get(`/v1/hosts/${hostId}/permissions`),
+  setHostPermission: (hostId, username, level) => api.put(`/v1/hosts/${hostId}/permissions/${username}`, { level }),
+  deleteHostPermission: (hostId, username) => api.delete(`/v1/hosts/${hostId}/permissions/${username}`),
+  getMyHostPermissions: () => api.get('/v1/auth/host-permissions'),
+
   // Alert Rules
   getAlertRules: () => api.get('/v1/alert-rules'),
   createAlertRule: (payload) => api.post('/v1/alert-rules', payload),

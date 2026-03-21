@@ -196,6 +196,84 @@
         @clear="clearConsoleOutput"
       />
     </div>
+
+    <!-- Per-host permissions (admin only) -->
+    <div v-if="auth.isAdmin" class="card mt-4">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <h3 class="card-title mb-0">Permissions par hôte</h3>
+        <button class="btn btn-sm btn-outline-primary" @click="openAddPermission">
+          + Ajouter
+        </button>
+      </div>
+      <div class="card-body p-0">
+        <div v-if="permLoading" class="text-center py-3"><span class="spinner-border spinner-border-sm"></span></div>
+        <div v-else-if="!hostPerms.length" class="text-center py-3 text-muted small">
+          Aucune restriction — tous les utilisateurs accèdent à cet hôte selon leur rôle global.
+        </div>
+        <table v-else class="table table-vcenter mb-0">
+          <thead>
+            <tr>
+              <th>Utilisateur</th>
+              <th>Niveau</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="p in hostPerms" :key="p.username">
+              <td>{{ p.username }}</td>
+              <td>
+                <span :class="p.level === 'operator' ? 'badge bg-blue-lt' : 'badge bg-secondary-lt'">
+                  {{ p.level }}
+                </span>
+              </td>
+              <td class="text-end">
+                <button class="btn btn-sm btn-ghost-danger" @click="revokePermission(p.username)" title="Révoquer">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M18 6l-12 12"/><path d="M6 6l12 12"/>
+                  </svg>
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Add permission modal -->
+    <div v-if="addPermModal" class="modal modal-blur show d-block" tabindex="-1" style="background:rgba(0,0,0,.5);z-index:1050" @click.self="addPermModal = false">
+      <div class="modal-dialog modal-dialog-centered" style="max-width:380px">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">Ajouter une permission</h5>
+            <button type="button" class="btn-close" @click="addPermModal = false"></button>
+          </div>
+          <div class="modal-body">
+            <div class="mb-3">
+              <label class="form-label">Utilisateur</label>
+              <select v-model="newPermUsername" class="form-select">
+                <option value="">-- Choisir --</option>
+                <option v-for="u in availableUsers" :key="u.username" :value="u.username">{{ u.username }}</option>
+              </select>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Niveau</label>
+              <select v-model="newPermLevel" class="form-select">
+                <option value="viewer">viewer — lecture seule</option>
+                <option value="operator">operator — lecture + commandes</option>
+              </select>
+            </div>
+            <div v-if="permError" class="alert alert-danger py-2">{{ permError }}</div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" @click="addPermModal = false">Annuler</button>
+            <button class="btn btn-primary" :disabled="!newPermUsername || permSaving" @click="savePermission">
+              <span v-if="permSaving" class="spinner-border spinner-border-sm me-1"></span>
+              Enregistrer
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -534,9 +612,69 @@ function formatBytesLink(bytes) {
   return `${v.toFixed(i === 0 ? 0 : 1)} ${units[i]}`
 }
 
+// ========== Per-host permissions (admin only) ==========
+const hostPerms = ref([])
+const permLoading = ref(false)
+const addPermModal = ref(false)
+const newPermUsername = ref('')
+const newPermLevel = ref('viewer')
+const permSaving = ref(false)
+const permError = ref('')
+const allUsers = ref([])
+
+const availableUsers = computed(() =>
+  allUsers.value.filter(u => u.role !== 'admin' && !hostPerms.value.some(p => p.username === u.username))
+)
+
+async function loadHostPerms() {
+  if (!auth.isAdmin) return
+  permLoading.value = true
+  try {
+    const [permsRes, usersRes] = await Promise.all([
+      apiClient.getHostPermissions(hostId),
+      apiClient.getUsers(),
+    ])
+    hostPerms.value = permsRes.data || []
+    allUsers.value = usersRes.data || []
+  } finally {
+    permLoading.value = false
+  }
+}
+
+function openAddPermission() {
+  newPermUsername.value = ''
+  newPermLevel.value = 'viewer'
+  permError.value = ''
+  addPermModal.value = true
+}
+
+async function savePermission() {
+  permSaving.value = true
+  permError.value = ''
+  try {
+    await apiClient.setHostPermission(hostId, newPermUsername.value, newPermLevel.value)
+    addPermModal.value = false
+    await loadHostPerms()
+  } catch (e) {
+    permError.value = e?.response?.data?.error || 'Erreur lors de l\'enregistrement'
+  } finally {
+    permSaving.value = false
+  }
+}
+
+async function revokePermission(username) {
+  try {
+    await apiClient.deleteHostPermission(hostId, username)
+    await loadHostPerms()
+  } catch (e) {
+    // ignore
+  }
+}
+
 onMounted(() => {
   loadComplete()
   loadProxmoxLink()
+  loadHostPerms()
 })
 </script>
 
