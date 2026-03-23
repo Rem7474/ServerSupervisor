@@ -123,7 +123,7 @@
           <div class="card card-sm h-100">
             <div class="card-body text-center">
               <div class="text-secondary small mb-1">Connexions (24h)</div>
-              <div class="h2 mb-0">{{ security.stats_24h?.total ?? '—' }}</div>
+              <div class="h2 mb-0">{{ security.stats?.total ?? '—' }}</div>
             </div>
           </div>
         </div>
@@ -131,7 +131,7 @@
           <div class="card card-sm h-100">
             <div class="card-body text-center">
               <div class="text-secondary small mb-1">Échecs (24h)</div>
-              <div class="h2 mb-0 text-danger">{{ security.stats_24h?.failures ?? '—' }}</div>
+              <div class="h2 mb-0 text-danger">{{ security.stats?.failures ?? '—' }}</div>
             </div>
           </div>
         </div>
@@ -139,7 +139,7 @@
           <div class="card card-sm h-100">
             <div class="card-body text-center">
               <div class="text-secondary small mb-1">IPs uniques (24h)</div>
-              <div class="h2 mb-0 text-azure">{{ security.stats_24h?.unique_ips ?? '—' }}</div>
+              <div class="h2 mb-0 text-azure">{{ security.stats?.unique_ips ?? '—' }}</div>
             </div>
           </div>
         </div>
@@ -267,7 +267,7 @@ const connexionsLimit = 50
 const connexionsTotal = ref(0)
 const connexionsLoading = ref(false)
 const connexionsLoaded = ref(false)
-const security = ref({ stats_24h: null, top_failed_ips: [] })
+const security = ref({ stats: null, top_failed_ips: [] })
 
 const totalConnexionsPages = computed(() =>
   Math.max(1, Math.ceil(connexionsTotal.value / connexionsLimit))
@@ -378,15 +378,26 @@ async function fetchCmds() {
 async function fetchConnexions() {
   connexionsLoading.value = true
   try {
-    const [evRes, secRes] = await Promise.all([
+    const [evRes, secRes] = await Promise.allSettled([
       apiClient.getLoginEventsAdmin(connexionsPage.value, connexionsLimit),
       apiClient.getSecuritySummary(),
     ])
-    connexions.value = evRes.data?.events || []
-    connexionsTotal.value = evRes.data?.total || 0
-    security.value = secRes.data || { stats_24h: null, top_failed_ips: [] }
-    connexionsLoaded.value = true
-  } catch { connexions.value = [] } finally { connexionsLoading.value = false }
+
+    if (evRes.status === 'fulfilled') {
+      connexions.value = evRes.value.data?.events || []
+      connexionsTotal.value = evRes.value.data?.total || 0
+      connexionsLoaded.value = true
+    } else {
+      connexions.value = []
+      connexionsTotal.value = 0
+    }
+
+    if (secRes.status === 'fulfilled') {
+      security.value = secRes.value.data || { stats: null, top_failed_ips: [] }
+    } else {
+      security.value = { stats: null, top_failed_ips: [] }
+    }
+  } finally { connexionsLoading.value = false }
 }
 
 async function switchToCommandes() {
