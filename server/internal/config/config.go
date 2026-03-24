@@ -44,14 +44,15 @@ type Config struct {
 	GitHubPollInterval time.Duration
 
 	// Alerts
-	NotifyURL string
-	SMTPHost  string
-	SMTPPort  int
-	SMTPUser  string
-	SMTPPass  string
-	SMTPFrom  string
-	SMTPTo    string
-	SMTPTLS   bool
+	NotifyURL     string
+	NtfyAuthToken string
+	SMTPHost      string
+	SMTPPort      int
+	SMTPUser      string
+	SMTPPass      string
+	SMTPFrom      string
+	SMTPTo        string
+	SMTPTLS       bool
 
 	// Metrics and Audit retention
 	MetricsRetentionDays int
@@ -87,14 +88,15 @@ func Load() *Config {
 		GitHubToken:        getEnv("GITHUB_TOKEN", ""),
 		GitHubPollInterval: getDurationEnv("GITHUB_POLL_INTERVAL", 15*time.Minute),
 
-		NotifyURL: getEnv("NOTIFY_URL", ""),
-		SMTPHost:  getEnv("SMTP_HOST", ""),
-		SMTPPort:  getIntEnv("SMTP_PORT", 587),
-		SMTPUser:  getEnv("SMTP_USER", ""),
-		SMTPPass:  getEnv("SMTP_PASS", ""),
-		SMTPFrom:  getEnv("SMTP_FROM", ""),
-		SMTPTo:    getEnv("SMTP_TO", ""),
-		SMTPTLS:   getBoolEnv("SMTP_TLS", true),
+		NotifyURL:     getEnv("NOTIFY_URL", ""),
+		NtfyAuthToken: getEnv("NTFY_AUTH_TOKEN", ""),
+		SMTPHost:      getEnv("SMTP_HOST", ""),
+		SMTPPort:      getIntEnv("SMTP_PORT", 587),
+		SMTPUser:      getEnv("SMTP_USER", ""),
+		SMTPPass:      getEnv("SMTP_PASS", ""),
+		SMTPFrom:      getEnv("SMTP_FROM", ""),
+		SMTPTo:        getEnv("SMTP_TO", ""),
+		SMTPTLS:       getBoolEnv("SMTP_TLS", true),
 
 		MetricsRetentionDays: getIntEnv("METRICS_RETENTION_DAYS", 30),
 		AuditRetentionDays:   getIntEnv("AUDIT_RETENTION_DAYS", 90),

@@ -75,7 +75,7 @@
 
               <!-- Dropdown "Plus" — éléments secondaires -->
               <li class="nav-item dropdown" :class="{ active: isSecondaryActive }">
-                <a class="nav-link dropdown-toggle" href="#" @click.prevent="toggleSecondaryMenu" :aria-expanded="secondaryMenuOpen">
+                <a class="nav-link dropdown-toggle" href="#" role="button" @click.prevent="toggleSecondaryMenu" :aria-expanded="secondaryMenuOpen" aria-label="Plus d'options" aria-haspopup="menu">
                   <span class="nav-link-icon">
                     <svg class="icon" width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <circle cx="5" cy="12" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="19" cy="12" r="1.5" fill="currentColor"/>
@@ -83,16 +83,16 @@
                   </span>
                   <span class="nav-link-title">Plus</span>
                 </a>
-                <div class="dropdown-menu" :class="{ show: secondaryMenuOpen }">
-                  <router-link to="/scheduled-tasks" class="dropdown-item" @click="secondaryMenuOpen = false">
+                <div class="dropdown-menu" :class="{ show: secondaryMenuOpen }" role="menu">
+                  <router-link to="/scheduled-tasks" class="dropdown-item" role="menuitem" @click="secondaryMenuOpen = false">
                     <svg class="icon icon-sm me-2" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                     Tâches planifiées
                   </router-link>
-                  <router-link to="/network" class="dropdown-item" @click="secondaryMenuOpen = false">
+                  <router-link to="/network" class="dropdown-item" role="menuitem" @click="secondaryMenuOpen = false">
                     <svg class="icon icon-sm me-2" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.5" stroke-width="2"/><circle cx="5" cy="5" r="2" stroke-width="2"/><circle cx="19" cy="5" r="2" stroke-width="2"/><circle cx="12" cy="20" r="2" stroke-width="2"/><line x1="6.5" y1="6.5" x2="10.5" y2="10.5" stroke-width="1.8" stroke-linecap="round"/><line x1="17.5" y1="6.5" x2="13.5" y2="10.5" stroke-width="1.8" stroke-linecap="round"/><line x1="12" y1="14.5" x2="12" y2="18" stroke-width="1.8" stroke-linecap="round"/></svg>
                     Réseau
                   </router-link>
-                  <router-link to="/settings" class="dropdown-item" @click="secondaryMenuOpen = false">
+                  <router-link to="/settings" class="dropdown-item" role="menuitem" @click="secondaryMenuOpen = false">
                     <svg class="icon icon-sm me-2" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                     Paramètres
                   </router-link>
@@ -101,7 +101,7 @@
 
               <!-- Dropdown "Administration" — admin uniquement -->
               <li v-if="auth.isAdmin" class="nav-item dropdown" :class="{ active: isAdminActive }">
-                <a class="nav-link dropdown-toggle" href="#" @click.prevent="toggleAdminMenu" :aria-expanded="adminMenuOpen">
+                <a class="nav-link dropdown-toggle" href="#" role="button" @click.prevent="toggleAdminMenu" :aria-expanded="adminMenuOpen" aria-label="Options administrateur" aria-haspopup="menu">
                   <span class="nav-link-icon">
                     <svg class="icon" width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
@@ -109,16 +109,16 @@
                   </span>
                   <span class="nav-link-title">Admin</span>
                 </a>
-                <div class="dropdown-menu" :class="{ show: adminMenuOpen }">
-                  <router-link to="/git-webhooks" class="dropdown-item" @click="adminMenuOpen = false">
+                <div class="dropdown-menu" :class="{ show: adminMenuOpen }" role="menu">
+                  <router-link to="/git-webhooks" class="dropdown-item" role="menuitem" @click="adminMenuOpen = false">
                     <svg class="icon icon-sm me-2" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="5" r="3"/><circle cx="5" cy="19" r="3"/><circle cx="19" cy="19" r="3"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v3m0 0l-4.5 5.5M12 11l4.5 5.5"/></svg>
                     Git / Automatisation
                   </router-link>
-                  <router-link to="/audit" class="dropdown-item" @click="adminMenuOpen = false">
+                  <router-link to="/audit" class="dropdown-item" role="menuitem" @click="adminMenuOpen = false">
                     <svg class="icon icon-sm me-2" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6M5 7h14a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V9a2 2 0 012-2z"/></svg>
                     Audit
                   </router-link>
-                  <router-link to="/users" class="dropdown-item" @click="adminMenuOpen = false">
+                  <router-link to="/users" class="dropdown-item" role="menuitem" @click="adminMenuOpen = false">
                     <svg class="icon icon-sm me-2" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-4-4h-1"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20H4v-2a4 4 0 014-4h1"/><circle cx="9" cy="7" r="4"/><circle cx="17" cy="9" r="3"/></svg>
                     Utilisateurs
                   </router-link>

@@ -18,7 +18,6 @@ func (n *notifier) SendNtfy(cfg *config.Config, url, title, msg string) error {
 
 	client := &http.Client{Timeout: 10 * time.Second}
 	payload, _ := json.Marshal(map[string]string{
-		"topic":   "",
 		"message": msg,
 	})
 
@@ -29,6 +28,11 @@ func (n *notifier) SendNtfy(cfg *config.Config, url, title, msg string) error {
 	req.Header.Set("Content-Type", "application/json")
 	if title != "" {
 		req.Header.Set("Title", title)
+	}
+
+	// Add Authorization header if token is configured (e.g., "Bearer <token>")
+	if cfg.NtfyAuthToken != "" {
+		req.Header.Set("Authorization", "Bearer "+cfg.NtfyAuthToken)
 	}
 
 	resp, err := client.Do(req)

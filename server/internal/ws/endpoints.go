@@ -145,6 +145,7 @@ func (h *WSHandler) CommandStream(c *gin.Context) {
 
 // NotificationStream is a persistent WebSocket connection that receives real-time
 // alert notification events pushed by the alert engine when a new incident fires.
+// It includes ping/pong heartbeat to detect stale connections.
 func (h *WSHandler) NotificationStream(c *gin.Context) {
 	ip := c.ClientIP()
 	if !h.acquireConn(ip) {
@@ -166,13 +167,35 @@ func (h *WSHandler) NotificationStream(c *gin.Context) {
 		return
 	}
 
+	// Setup read deadline and pong handler for heartbeat
+	_ = conn.SetReadDeadline(time.Now().Add(wsPongWait))
+	conn.SetPongHandler(func(string) error {
+		return conn.SetReadDeadline(time.Now().Add(wsPongWait))
+	})
+
+	// Send auth_ok response
 	if err := conn.WriteJSON(gin.H{"type": "auth_ok"}); err != nil {
 		return
 	}
 
 	h.notifHub.Register(conn)
 
+	// Setup ping ticker for heartbeat
+	pingTicker := time.NewTicker(wsPingInterval)
+	defer pingTicker.Stop()
+
 	done := make(chan struct{})
 	go h.readLoop(conn, done)
-	<-done
+
+	// Send ping messages periodically
+	for {
+		select {
+		case <-done:
+			return
+		case <-pingTicker.C:
+			if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+				return
+			}
+		}
+	}
 }

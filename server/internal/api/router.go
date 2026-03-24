@@ -34,7 +34,6 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	networkH := handlers.NewNetworkHandler(db)
 	auditH := handlers.NewAuditHandler(db, cfg)
 	userH := handlers.NewUserHandler(db, cfg)
-	alertH := handlers.NewAlertHandler(db, cfg)
 	alertRulesH := handlers.NewAlertRulesHandler(db, cfg)
 	settingsH := handlers.NewSettingsHandler(db, cfg)
 	notifH := handlers.NewNotificationsHandler(db)
@@ -59,7 +58,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	registerDockerRoutes(v1, dockerH, systemH, networkH, agentH)
 	registerAPTRoutes(v1, aptH)
 	registerAuditRoutes(v1, auditH)
-	registerAlertRoutes(v1, alertH, alertRulesH)
+	registerAlertRoutes(v1, alertRulesH)
 	registerNotifRoutes(v1, notifH)
 	registerPushRoutes(v1, pushH)
 	registerSettingsRoutes(v1, settingsH)
@@ -199,8 +198,8 @@ func registerPushRoutes(g *gin.RouterGroup, h *handlers.PushHandler) {
 	g.DELETE("/push/subscribe", h.Unsubscribe)
 }
 
-func registerAlertRoutes(g *gin.RouterGroup, alertH *handlers.AlertHandler, rulesH *handlers.AlertRulesHandler) {
-	g.GET("/alerts/incidents", alertH.ListIncidents)
+func registerAlertRoutes(g *gin.RouterGroup, rulesH *handlers.AlertRulesHandler) {
+	g.GET("/alerts/incidents", rulesH.ListIncidents)
 	g.GET("/alert-rules", rulesH.ListAlertRules)
 	g.GET("/alert-rules/:id", rulesH.GetAlertRule)
 	g.POST("/alert-rules", rulesH.CreateAlertRule)

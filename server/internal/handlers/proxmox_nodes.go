@@ -1,12 +1,9 @@
 package handlers
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 	"strconv"
-	"strings"
-	"sync"
 
 	"github.com/gin-gonic/gin"
 	"github.com/serversupervisor/server/internal/errors"
@@ -14,21 +11,64 @@ import (
 	"github.com/serversupervisor/server/internal/proxmoxclient"
 )
 
-// parseVMID converts a Proxmox task object ID string to an integer VMID.
-// Returns 0 if the string is not a valid positive integer.
-func parseVMID(s string) int {
-	v, err := strconv.Atoi(s)
-	if err != nil || v <= 0 {
-		return 0
+// ListNodes returns all nodes, optionally filtered by connection_id query param.
+func (h *ProxmoxHandler) ListNodes(c *gin.Context) {
+	connID := c.Query("connection_id")
+	var (
+		nodes []models.ProxmoxNode
+		err   error
+	)
+	if connID != "" {
+		nodes, err = h.db.ListProxmoxNodesByConnection(connID)
+	} else {
+		nodes, err = h.db.ListProxmoxNodes()
 	}
-	return v
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, nodes)
 }
 
-// isSecurityPackage returns true when the package origin or section signals a security update.
-func isSecurityPackage(origin, section string) bool {
-	lOrigin := strings.ToLower(origin)
-	lSection := strings.ToLower(section)
-	return strings.Contains(lOrigin, "security") || strings.Contains(lSection, "security")
+// GetNode returns a single node with its guests and storages.
+func (h *ProxmoxHandler) GetNode(c *gin.Context) {
+	node, err := h.db.GetProxmoxNode(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if node == nil {
+		lang := errors.GetLanguageFromAcceptLanguage(c.GetHeader("Accept-Language"))
+		c.JSON(http.StatusNotFound, errors.NewErrorResponse(errors.CodeNodeNotFound, lang))
+		return
+	}
+	c.JSON(http.StatusOK, node)
+}
+
+// GetNodeMetricsSummary returns time-bucketed avg CPU% and RAM% across all Proxmox nodes.
+// Same query parameters as GET /metrics/summary for agent hosts.
+func (h *ProxmoxHandler) GetNodeMetricsSummary(c *gin.Context) {
+	hours, _ := strconv.Atoi(c.DefaultQuery("hours", "24"))
+	bucketMinutes, _ := strconv.Atoi(c.DefaultQuery("bucket_minutes", "5"))
+	if hours <= 0 {
+		hours = 24
+	}
+	if hours > 8760 {
+		hours = 8760
+	}
+	if bucketMinutes <= 0 {
+		bucketMinutes = 5
+	}
+
+	summary, err := h.db.GetProxmoxNodeMetricsSummary(hours, bucketMinutes)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if summary == nil {
+		summary = []models.ProxmoxNodeMetricsSummary{}
+	}
+	c.JSON(http.StatusOK, summary)
 }
 
 // ─── Tasks ────────────────────────────────────────────────────────────────────
@@ -100,7 +140,8 @@ func (h *ProxmoxHandler) GetNodeStatus(c *gin.Context) {
 		return
 	}
 	if node == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "node not found"})
+		lang := errors.GetLanguageFromAcceptLanguage(c.GetHeader("Accept-Language"))
+		c.JSON(http.StatusNotFound, errors.NewErrorResponse(errors.CodeNodeNotFound, lang))
 		return
 	}
 
@@ -130,7 +171,8 @@ func (h *ProxmoxHandler) GetTaskLog(c *gin.Context) {
 		return
 	}
 	if node == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "node not found"})
+		lang := errors.GetLanguageFromAcceptLanguage(c.GetHeader("Accept-Language"))
+		c.JSON(http.StatusNotFound, errors.NewErrorResponse(errors.CodeNodeNotFound, lang))
 		return
 	}
 
@@ -157,63 +199,6 @@ func (h *ProxmoxHandler) GetTaskLog(c *gin.Context) {
 	c.JSON(http.StatusOK, lines)
 }
 
-// resolveSecret returns the token secret and connection details for a connection ID.
-// It reads the secret from GetEnabledProxmoxConnections (which includes TokenSecret).
-func (h *ProxmoxHandler) resolveSecret(connectionID string) (secret string, conn *models.ProxmoxConnection, err error) {
-	conns, err := h.db.GetEnabledProxmoxConnections()
-	if err != nil {
-		return "", nil, err
-	}
-	for _, co := range conns {
-		if co.ID == connectionID {
-			secret = co.TokenSecret
-			break
-		}
-	}
-	if secret == "" {
-		return "", nil, fmt.Errorf("connection not found or disabled")
-	}
-	c, err := h.db.GetProxmoxConnectionByID(connectionID)
-	if err != nil || c == nil {
-		return "", nil, fmt.Errorf("failed to load connection")
-	}
-	return secret, c, nil
-}
-
-// ─── Apt refresh ──────────────────────────────────────────────────────────────
-
-// RefreshNodeApt triggers `apt-get update` on a Proxmox node via the PVE API.
-// Requires Sys.Modify privilege on the token.
-// Returns the task UPID so the frontend can poll the task list for completion.
-func (h *ProxmoxHandler) RefreshNodeApt(c *gin.Context) {
-	node, err := h.db.GetProxmoxNode(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	if node == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "node not found"})
-		return
-	}
-
-	secret, conn, err := h.resolveSecret(node.ConnectionID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	client := proxmoxclient.New(conn.APIURL, conn.TokenID, secret, conn.InsecureSkipVerify)
-	upid, err := client.TriggerNodeAptUpdate(node.NodeName)
-	if err != nil {
-		log.Printf("proxmox apt-refresh [%s/%s]: %v", conn.Name, node.NodeName, err)
-		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
-		return
-	}
-
-	log.Printf("proxmox apt-refresh [%s/%s]: triggered, upid=%s", conn.Name, node.NodeName, upid)
-	c.JSON(http.StatusOK, gin.H{"upid": upid, "message": "apt update lancé sur le nœud"})
-}
-
 // ─── RRD metrics ──────────────────────────────────────────────────────────────
 
 // GetNodeRRD proxies GET /nodes/{node}/rrddata from PVE.
@@ -225,7 +210,8 @@ func (h *ProxmoxHandler) GetNodeRRD(c *gin.Context) {
 		return
 	}
 	if node == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "node not found"})
+		lang := errors.GetLanguageFromAcceptLanguage(c.GetHeader("Accept-Language"))
+		c.JSON(http.StatusNotFound, errors.NewErrorResponse(errors.CodeNodeNotFound, lang))
 		return
 	}
 
@@ -264,7 +250,8 @@ func (h *ProxmoxHandler) ListNodeDisks(c *gin.Context) {
 		return
 	}
 	if node == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "node not found"})
+		lang := errors.GetLanguageFromAcceptLanguage(c.GetHeader("Accept-Language"))
+		c.JSON(http.StatusNotFound, errors.NewErrorResponse(errors.CodeNodeNotFound, lang))
 		return
 	}
 	disks, err := h.db.ListProxmoxDisksByNode(node.ConnectionID, node.NodeName)
@@ -285,7 +272,8 @@ func (h *ProxmoxHandler) ListNodeServices(c *gin.Context) {
 		return
 	}
 	if node == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "node not found"})
+		lang := errors.GetLanguageFromAcceptLanguage(c.GetHeader("Accept-Language"))
+		c.JSON(http.StatusNotFound, errors.NewErrorResponse(errors.CodeNodeNotFound, lang))
 		return
 	}
 
@@ -303,111 +291,4 @@ func (h *ProxmoxHandler) ListNodeServices(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, services)
-}
-
-// ─── Guest network interfaces ─────────────────────────────────────────────────
-
-// GetNodeGuestNetworks returns a map of vmid → []GuestNetworkIface for all guests of a node.
-// VM interfaces are fetched via the QEMU guest agent (errors are silently skipped).
-// LXC interfaces are fetched natively (always available).
-func (h *ProxmoxHandler) GetNodeGuestNetworks(c *gin.Context) {
-	node, err := h.db.GetProxmoxNode(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	if node == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "node not found"})
-		return
-	}
-
-	secret, conn, err := h.resolveSecret(node.ConnectionID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	guests, err := h.db.ListProxmoxGuestsByNode(node.ConnectionID, node.NodeName)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	client := proxmoxclient.New(conn.APIURL, conn.TokenID, secret, conn.InsecureSkipVerify)
-
-	result := make(map[int][]proxmoxclient.GuestNetworkIface)
-	var mu sync.Mutex
-	var wg sync.WaitGroup
-
-	for _, g := range guests {
-		if g.Status != "running" {
-			continue
-		}
-		wg.Add(1)
-		go func(guest models.ProxmoxGuest) {
-			defer wg.Done()
-			var ifaces []proxmoxclient.GuestNetworkIface
-			var ferr error
-			if guest.GuestType == "vm" {
-				ifaces, ferr = client.GetVMNetworkInterfaces(node.NodeName, guest.VMID)
-			} else {
-				ifaces, ferr = client.GetLXCInterfaces(node.NodeName, guest.VMID)
-			}
-			if ferr != nil {
-				return // agent not running or no permission — skip silently
-			}
-			if len(ifaces) > 0 {
-				mu.Lock()
-				result[guest.VMID] = ifaces
-				mu.Unlock()
-			}
-		}(g)
-	}
-
-	wg.Wait()
-	c.JSON(http.StatusOK, result)
-}
-
-// validServiceAction is the set of allowed service action verbs.
-var validServiceAction = map[string]bool{
-	"start": true, "stop": true, "restart": true, "reload": true,
-}
-
-// NodeServiceAction proxies a service action to PVE. Requires Sys.Modify.
-// Returns the task UPID so the frontend can poll for completion.
-func (h *ProxmoxHandler) NodeServiceAction(c *gin.Context) {
-	action := c.Param("action")
-	if !validServiceAction[action] {
-		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("invalid action %q; allowed: start stop restart reload", action)})
-		return
-	}
-
-	node, err := h.db.GetProxmoxNode(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	if node == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "node not found"})
-		return
-	}
-
-	service := c.Param("service")
-
-	secret, conn, err := h.resolveSecret(node.ConnectionID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	client := proxmoxclient.New(conn.APIURL, conn.TokenID, secret, conn.InsecureSkipVerify)
-	upid, err := client.NodeServiceAction(node.NodeName, service, action)
-	if err != nil {
-		log.Printf("proxmox service-action [%s/%s] %s %s: %v", conn.Name, node.NodeName, action, service, err)
-		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
-		return
-	}
-
-	log.Printf("proxmox service-action [%s/%s] %s %s: upid=%s", conn.Name, node.NodeName, action, service, upid)
-	c.JSON(http.StatusOK, gin.H{"upid": upid})
 }

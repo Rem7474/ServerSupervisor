@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; background: #f5f5f5; }
+    .alert-header { background: #dc3545; color: white; padding: 20px; border-radius: 4px 4px 0 0; margin-bottom: 0; }
+    .alert-body { background: white; padding: 20px; border-radius: 0 0 4px 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .alert-header h1 { margin: 0; font-size: 24px; }
+    .alert-header p { margin: 8px 0 0 0; font-size: 14px; opacity: 0.9; }
+    .metric-box { background: #f9f9f9; padding: 15px; margin: 15px 0; border-left: 4px solid #dc3545; border-radius: 4px; }
+    .metric-label { font-weight: 600; color: #555; font-size: 12px; text-transform: uppercase; }
+    .metric-value { font-size: 32px; font-weight: bold; color: #dc3545; margin: 8px 0; }
+    .metric-unit { font-size: 14px; color: #999; }
+    .details-row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 20px 0; }
+    .detail-item { border: 1px solid #e0e0e0; padding: 12px; border-radius: 4px; background: #fafafa; }
+    .detail-label { font-size: 12px; color: #999; text-transform: uppercase; font-weight: 600; }
+    .detail-value { font-size: 16px; color: #333; margin-top: 4px; word-break: break-all; }
+    .action-btn { display: inline-block; background: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 4px; margin-top: 20px; font-weight: 600; }
+    .action-btn:hover { background: #0056b3; }
+    .footer { text-align: center; padding: 20px; font-size: 12px; color: #999; }
+    .timestamp { color: #999; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="alert-header">
+      <h1>🚨 {{.RuleName}}</h1>
+      <p>Alert triggered on {{.HostName}}</p>
+    </div>
+    
+    <div class="alert-body">
+      <!-- Metric Value -->
+      <div class="metric-box">
+        <div class="metric-label">Current Value</div>
+        <div class="metric-value">{{.Value}}<span class="metric-unit">{{.Unit}}</span></div>
+      </div>
+
+      <!-- Details Grid -->
+      <div class="details-row">
+        <div class="detail-item">
+          <div class="detail-label">Metric</div>
+          <div class="detail-value">{{.Metric}}</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Condition</div>
+          <div class="detail-value">{{.Operator}} {{.Threshold}}{{.Unit}}</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Host</div>
+          <div class="detail-value">{{.HostName}}</div>
+        </div>
+        <div class="detail-item">
+          <div class="detail-label">Triggered At</div>
+          <div class="detail-value timestamp">{{.TriggeredAt}}</div>
+        </div>
+      </div>
+
+      <!-- Action Button -->
+      <a href="{{.IncidentLink}}" class="action-btn">View Incident Details</a>
+
+      <!-- Footer Message -->
+      <p style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0; font-size: 13px; color: #666;">
+        This alert was triggered by rule <strong>{{.RuleName}}</strong> (ID: {{.RuleID}}) configured in ServerSupervisor.
+        {{ if .CooldownMessage }}<br>No further notifications will be sent from this rule for {{.CooldownMessage}}.{{ end }}
+      </p>
+    </div>
+
+    <div class="footer">
+      <p>ServerSupervisor &copy; 2024</p>
+    </div>
+  </div>
+</body>
+</html>

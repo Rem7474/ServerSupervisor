@@ -27,6 +27,11 @@ func sanitizeBody(value string) string {
 	return value
 }
 
+// isHTMLContent checks if body contains HTML tags (simple heuristic)
+func isHTMLContent(body string) bool {
+	return strings.Contains(body, "<html>") || strings.Contains(body, "<!DOCTYPE") || strings.Contains(body, "<body>")
+}
+
 func (n *notifier) SendSMTP(cfg *config.Config, from, to, subject, body string) error {
 	if cfg.SMTPHost == "" || cfg.SMTPPort == 0 {
 		log.Printf("notify: SMTP host/port not configured")
@@ -34,14 +39,24 @@ func (n *notifier) SendSMTP(cfg *config.Config, from, to, subject, body string) 
 	}
 
 	addr := fmt.Sprintf("%s:%d", cfg.SMTPHost, cfg.SMTPPort)
+
+	// Detect if body is HTML and set appropriate Content-Type
+	contentType := "text/plain; charset=utf-8"
+	if isHTMLContent(body) {
+		contentType = "text/html; charset=utf-8"
+	} else {
+		// Sanitize plain text body
+		body = sanitizeBody(body)
+	}
+
 	msg := strings.Join([]string{
 		"From: " + sanitizeHeader(from),
 		"To: " + sanitizeHeader(to),
 		"Subject: " + sanitizeHeader(subject),
 		"MIME-Version: 1.0",
-		"Content-Type: text/plain; charset=utf-8",
+		"Content-Type: " + contentType,
 		"",
-		sanitizeBody(body),
+		body,
 	}, "\r\n")
 
 	auth := smtp.PlainAuth("", cfg.SMTPUser, cfg.SMTPPass, cfg.SMTPHost)

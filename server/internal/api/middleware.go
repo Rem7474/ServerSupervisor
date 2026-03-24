@@ -13,6 +13,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/database"
+	errs "github.com/serversupervisor/server/internal/errors"
 	"golang.org/x/time/rate"
 )
 
@@ -327,7 +328,8 @@ func AdminOnlyMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		role, _ := c.Get("role")
 		if role != "admin" {
-			c.JSON(http.StatusForbidden, gin.H{"error": "admin access required"})
+			lang := errs.GetLanguageFromAcceptLanguage(c.GetHeader("Accept-Language"))
+			c.JSON(http.StatusForbidden, gin.H{"error": errs.GetMessage(errs.CodeAdminRequired, lang)})
 			c.Abort()
 			return
 		}
@@ -357,7 +359,8 @@ func HostPermissionMiddleware(db *database.DB, requiredLevel string) gin.Handler
 		username := c.GetString("username")
 		restricted, level, err := db.GetHostAccess(username, hostID)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "permission check failed"})
+			lang := errs.GetLanguageFromAcceptLanguage(c.GetHeader("Accept-Language"))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": errs.GetMessage(errs.CodePermissionFailed, lang)})
 			c.Abort()
 			return
 		}
@@ -368,14 +371,16 @@ func HostPermissionMiddleware(db *database.DB, requiredLevel string) gin.Handler
 			return
 		}
 
+		lang := errs.GetLanguageFromAcceptLanguage(c.GetHeader("Accept-Language"))
+
 		if level == "" {
-			c.JSON(http.StatusForbidden, gin.H{"error": "accès refusé à cet hôte"})
+			c.JSON(http.StatusForbidden, gin.H{"error": errs.GetMessage(errs.CodeHostAccessDenied, lang)})
 			c.Abort()
 			return
 		}
 
 		if requiredLevel == "operator" && level != "operator" {
-			c.JSON(http.StatusForbidden, gin.H{"error": "droits opérateur requis sur cet hôte"})
+			c.JSON(http.StatusForbidden, gin.H{"error": errs.GetMessage(errs.CodeOperatorRequired, lang)})
 			c.Abort()
 			return
 		}

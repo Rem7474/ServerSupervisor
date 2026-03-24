@@ -350,3 +350,31 @@ func (h *AlertRulesHandler) TestAlertRule(c *gin.Context) {
 		"results":      results,
 	})
 }
+
+// ListIncidents returns all alert incidents with pagination
+func (h *AlertRulesHandler) ListIncidents(c *gin.Context) {
+	if c.GetString("role") == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
+	if page < 1 {
+		page = 1
+	}
+	if limit <= 0 {
+		limit = 50
+	}
+
+	offset := (page - 1) * limit
+	incidents, err := h.db.GetAlertIncidents(limit, offset)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch incidents"})
+		return
+	}
+	if incidents == nil {
+		incidents = []models.AlertIncident{}
+	}
+	c.JSON(http.StatusOK, incidents)
+}
