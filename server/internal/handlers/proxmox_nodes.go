@@ -71,47 +71,6 @@ func (h *ProxmoxHandler) GetNodeMetricsSummary(c *gin.Context) {
 	c.JSON(http.StatusOK, summary)
 }
 
-// ─── RRD metrics ──────────────────────────────────────────────────────────────
-
-// GetNodeRRD proxies GET /nodes/{node}/rrddata from PVE.
-// Accepts ?timeframe=hour|day|week|month|year (default: hour).
-func (h *ProxmoxHandler) GetNodeRRD(c *gin.Context) {
-	node, err := h.db.GetProxmoxNode(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	if node == nil {
-		lang := errors.GetLanguageFromAcceptLanguage(c.GetHeader("Accept-Language"))
-		c.JSON(http.StatusNotFound, errors.NewErrorResponse(errors.CodeNodeNotFound, lang))
-		return
-	}
-
-	timeframe := c.DefaultQuery("timeframe", "hour")
-	switch timeframe {
-	case "hour", "day", "week", "month", "year":
-	default:
-		lang := errors.GetLanguageFromAcceptLanguage(c.GetHeader("Accept-Language"))
-		c.JSON(http.StatusBadRequest, errors.NewErrorResponse(errors.CodeInvalidTimeframe, lang))
-		return
-	}
-
-	secret, conn, err := h.resolveSecret(node.ConnectionID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	client := proxmoxclient.New(conn.APIURL, conn.TokenID, secret, conn.InsecureSkipVerify)
-	points, err := client.GetNodeRRDData(node.NodeName, timeframe)
-	if err != nil {
-		log.Printf("proxmox rrd [%s/%s] %s: %v", conn.Name, node.NodeName, timeframe, err)
-		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
-		return
-	}
-	c.JSON(http.StatusOK, points)
-}
-
 // ─── Disks ────────────────────────────────────────────────────────────────────
 
 // ListNodeDisks returns physical disks for a node identified by its UUID.
@@ -122,8 +81,7 @@ func (h *ProxmoxHandler) ListNodeDisks(c *gin.Context) {
 		return
 	}
 	if node == nil {
-		lang := errors.GetLanguageFromAcceptLanguage(c.GetHeader("Accept-Language"))
-		c.JSON(http.StatusNotFound, errors.NewErrorResponse(errors.CodeNodeNotFound, lang))
+		c.JSON(http.StatusNotFound, gin.H{"error": "node not found"})
 		return
 	}
 	disks, err := h.db.ListProxmoxDisksByNode(node.ConnectionID, node.NodeName)
@@ -144,8 +102,7 @@ func (h *ProxmoxHandler) ListNodeServices(c *gin.Context) {
 		return
 	}
 	if node == nil {
-		lang := errors.GetLanguageFromAcceptLanguage(c.GetHeader("Accept-Language"))
-		c.JSON(http.StatusNotFound, errors.NewErrorResponse(errors.CodeNodeNotFound, lang))
+		c.JSON(http.StatusNotFound, errors.NewErrorResponse(errors.CodeNodeNotFound, errors.GetLanguageFromAcceptLanguage(c.GetHeader("Accept-Language"))))
 		return
 	}
 

@@ -110,6 +110,11 @@ func (h *ProxmoxHandler) GetNodeGuestNetworks(c *gin.Context) {
 
 // ─── Services (systemd) ────────────────────────────────────────────────────────
 
+// validServiceAction is the set of allowed service action verbs.
+var validServiceAction = map[string]bool{
+	"start": true, "stop": true, "restart": true, "reload": true,
+}
+
 // NodeServiceAction proxies a service action to PVE. Requires Sys.Modify.
 // Returns the task UPID so the frontend can poll for completion.
 func (h *ProxmoxHandler) NodeServiceAction(c *gin.Context) {
