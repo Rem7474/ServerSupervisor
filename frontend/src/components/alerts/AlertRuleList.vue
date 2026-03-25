@@ -12,7 +12,8 @@
 
     <div v-if="error" class="alert alert-danger m-3 mb-0">{{ error }}</div>
 
-    <div v-if="loading" class="card-body text-center py-5">
+    <!-- Spinner : en cours de chargement OU pas encore chargé une première fois -->
+    <div v-if="loading || !fetched" class="card-body text-center py-5">
       <div class="spinner-border text-primary" role="status"></div>
       <div class="mt-2">Chargement...</div>
     </div>
@@ -101,6 +102,11 @@ const props = defineProps({
     default: () => [],
   },
   loading: {
+    type: Boolean,
+    default: false,
+  },
+  // fetched = true une fois que le premier fetch a abouti (succès ou erreur)
+  fetched: {
     type: Boolean,
     default: false,
   },

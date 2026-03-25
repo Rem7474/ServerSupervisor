@@ -21,21 +21,21 @@ export function useAlertsPage() {
   const saveError = ref('')
   const editingRule = ref(null)
 
-  // Expose store state (reactive refs shared across navigations)
+  // Refs réactives du store (pas de déstructuration = garde la réactivité)
   const rules = rulesStore.rules
   const hosts = hostsStore.hosts
   const loading = rulesStore.loading
+  const fetched = rulesStore.fetched
   const fetchError = rulesStore.error
 
   const activeIncidentCount = computed(() => incidents.value.filter((incident) => !incident.resolved_at).length)
 
   async function init() {
-    // Forcer le rechargement à chaque montage de la page (cold start / F5)
-    // pour éviter qu'un TTL résiduel cache un état vide post-logout.
+    // Invalider le TTL à chaque montage pour forcer un fetch frais (F5 / cold start)
     rulesStore.invalidate()
     hostsStore.invalidate()
 
-    // Charger règles, hosts et incidents en parallèle dès le montage
+    // Charger règles, hosts et incidents en parallèle
     await Promise.all([
       rulesStore.fetchRules(),
       hostsStore.fetchHosts(),
@@ -59,7 +59,6 @@ export function useAlertsPage() {
 
   async function switchToIncidents() {
     alertsTab.value = 'incidents'
-    // Toujours rafraîchir à la navigation vers l'onglet
     await loadIncidents()
   }
 
@@ -129,7 +128,6 @@ export function useAlertsPage() {
   }
 
   function onWebSocketAlert(payload) {
-    // Incident créé ou résolu — rafraîchir la liste
     if (payload.type === 'alert_incident_update') {
       loadIncidents()
       return
@@ -163,6 +161,7 @@ export function useAlertsPage() {
     rules,
     hosts,
     loading,
+    fetched,
     fetchError,
     showModal,
     saving,

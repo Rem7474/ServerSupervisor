@@ -26,7 +26,6 @@
     <div class="page-body">
       <div class="container-xl">
 
-        <!-- Erreur de chargement des règles -->
         <div v-if="fetchError" class="alert alert-danger mb-3">
           <svg xmlns="http://www.w3.org/2000/svg" class="icon alert-icon" width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
@@ -54,6 +53,7 @@
             :rules="rules"
             :hosts="hosts"
             :loading="loading"
+            :fetched="fetched"
             :error="saveError"
             :format-date="formatDate"
             @add="startAddAlert"
@@ -88,7 +88,7 @@
 </template>
 
 <script setup>
-import { onMounted, onUnmounted, ref } from 'vue'
+import { onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import AlertIncidentList from '../components/alerts/AlertIncidentList.vue'
 import AlertRuleList from '../components/alerts/AlertRuleList.vue'
@@ -106,6 +106,7 @@ const {
   rules,
   hosts,
   loading,
+  fetched,
   fetchError,
   showModal,
   saving,
@@ -134,7 +135,6 @@ onMounted(async () => {
     alertsTab.value = 'incidents'
   }
 
-  // Polling de sécurité toutes les 5 min (complément au WebSocket)
   incidentsPollTimer = setInterval(loadIncidents, 300_000)
 })
 

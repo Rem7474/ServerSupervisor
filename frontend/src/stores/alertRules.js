@@ -8,6 +8,7 @@ export const useAlertRulesStore = defineStore('alertRules', () => {
   const rules = ref([])
   const loading = ref(false)
   const error = ref('')
+  const fetched = ref(false)  // true après le premier fetch abouti (succès ou erreur)
   const fetchedAt = ref(null)
 
   async function fetchRules(force = false) {
@@ -20,15 +21,16 @@ export const useAlertRulesStore = defineStore('alertRules', () => {
       fetchedAt.value = Date.now()
     } catch (err) {
       error.value = err?.response?.data?.error || err?.message || 'Erreur de chargement'
-      // Ne pas effacer les données en cache si dispo
     } finally {
       loading.value = false
+      fetched.value = true
     }
   }
 
   function invalidate() {
     fetchedAt.value = null
+    fetched.value = false
   }
 
-  return { rules, loading, error, fetchRules, invalidate }
+  return { rules, loading, error, fetched, fetchRules, invalidate }
 })
