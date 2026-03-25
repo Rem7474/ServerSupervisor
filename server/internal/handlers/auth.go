@@ -5,9 +5,12 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
 	"log"
 	"net/http"
+	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -472,11 +475,166 @@ func (h *AuthHandler) GetSecuritySummary(c *gin.Context) {
 		blockedIPs = []string{}
 	}
 
+	botDetection, _ := h.buildBotDetectionSummary()
+
 	c.JSON(http.StatusOK, gin.H{
 		"stats":          stats,
 		"blocked_ips":    blockedIPs,
 		"top_failed_ips": topFailed,
+		"bot_detection":  botDetection,
 	})
+}
+
+func (h *AuthHandler) buildBotDetectionSummary() (map[string]any, error) {
+	hostRows, err := h.db.GetAllHostsBotDetection()
+	if err != nil {
+		return map[string]any{"hosts": []any{}, "top_suspicious_ips": []any{}, "top_suspicious_paths": []any{}}, err
+	}
+
+	type ipAgg struct {
+		Hits        int
+		UniquePaths int
+		Hosts       map[string]struct{}
+	}
+
+	ipMap := map[string]*ipAgg{}
+	pathMap := map[string]int{}
+	hosts := make([]map[string]any, 0, len(hostRows))
+	totalSuspicious := 0
+
+	for _, row := range hostRows {
+		if strings.TrimSpace(row.BotDetectionJSON) == "" {
+			continue
+		}
+		var data map[string]any
+		if err := json.Unmarshal([]byte(row.BotDetectionJSON), &data); err != nil {
+			continue
+		}
+
+		hostHits := toInt(data["suspicious_requests"])
+		totalSuspicious += hostHits
+		hosts = append(hosts, map[string]any{
+			"host_id":               row.HostID,
+			"host_name":             row.HostName,
+			"suspicious_requests":   hostHits,
+			"unique_suspicious_ips": toInt(data["unique_suspicious_ips"]),
+		})
+
+		if topIPs, ok := data["top_suspicious_ips"].([]any); ok {
+			for _, item := range topIPs {
+				m, ok := item.(map[string]any)
+				if !ok {
+					continue
+				}
+				ip := strings.TrimSpace(toString(m["ip"]))
+				if ip == "" {
+					continue
+				}
+				entry := ipMap[ip]
+				if entry == nil {
+					entry = &ipAgg{Hosts: map[string]struct{}{}}
+					ipMap[ip] = entry
+				}
+				entry.Hits += toInt(m["hits"])
+				entry.UniquePaths += toInt(m["unique_paths"])
+				entry.Hosts[row.HostName] = struct{}{}
+			}
+		}
+
+		if topPaths, ok := data["top_suspicious_paths"].([]any); ok {
+			for _, item := range topPaths {
+				m, ok := item.(map[string]any)
+				if !ok {
+					continue
+				}
+				path := strings.TrimSpace(toString(m["path"]))
+				if path == "" {
+					continue
+				}
+				pathMap[path] += toInt(m["hits"])
+			}
+		}
+	}
+
+	sort.Slice(hosts, func(i, j int) bool {
+		return toInt(hosts[i]["suspicious_requests"]) > toInt(hosts[j]["suspicious_requests"])
+	})
+	if len(hosts) > 10 {
+		hosts = hosts[:10]
+	}
+
+	type ipView struct {
+		IP          string
+		Hits        int
+		UniquePaths int
+		HostCount   int
+	}
+	ipViews := make([]ipView, 0, len(ipMap))
+	for ip, agg := range ipMap {
+		ipViews = append(ipViews, ipView{IP: ip, Hits: agg.Hits, UniquePaths: agg.UniquePaths, HostCount: len(agg.Hosts)})
+	}
+	sort.Slice(ipViews, func(i, j int) bool { return ipViews[i].Hits > ipViews[j].Hits })
+	topIPs := make([]map[string]any, 0, min(10, len(ipViews)))
+	for i := 0; i < len(ipViews) && i < 10; i++ {
+		topIPs = append(topIPs, map[string]any{
+			"ip":           ipViews[i].IP,
+			"hits":         ipViews[i].Hits,
+			"unique_paths": ipViews[i].UniquePaths,
+			"host_count":   ipViews[i].HostCount,
+		})
+	}
+
+	type pathView struct {
+		Path string
+		Hits int
+	}
+	pathViews := make([]pathView, 0, len(pathMap))
+	for path, hits := range pathMap {
+		pathViews = append(pathViews, pathView{Path: path, Hits: hits})
+	}
+	sort.Slice(pathViews, func(i, j int) bool { return pathViews[i].Hits > pathViews[j].Hits })
+	topPaths := make([]map[string]any, 0, min(10, len(pathViews)))
+	for i := 0; i < len(pathViews) && i < 10; i++ {
+		topPaths = append(topPaths, map[string]any{"path": pathViews[i].Path, "hits": pathViews[i].Hits})
+	}
+
+	return map[string]any{
+		"total_suspicious_requests": totalSuspicious,
+		"hosts":                     hosts,
+		"top_suspicious_ips":        topIPs,
+		"top_suspicious_paths":      topPaths,
+	}, nil
+}
+
+func toInt(v any) int {
+	switch t := v.(type) {
+	case int:
+		return t
+	case int32:
+		return int(t)
+	case int64:
+		return int(t)
+	case float32:
+		return int(t)
+	case float64:
+		return int(t)
+	default:
+		return 0
+	}
+}
+
+func toString(v any) string {
+	if s, ok := v.(string); ok {
+		return s
+	}
+	return ""
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 // UnblockIP persists an IP unblock to DB so it survives server restarts (admin only).

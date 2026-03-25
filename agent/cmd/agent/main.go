@@ -218,12 +218,23 @@ func sendReport(ctx context.Context, cfg *config.Config, s *sender.Sender) {
 		customTasksList = tasksConfig.Summaries()
 	}
 
+	// Detect suspicious automated scans from web access logs (nginx/apache/NPM).
+	var botDetection interface{}
+	if cfg.CollectBotDetection {
+		if summary, err := collector.CollectBotDetection(cfg.BotDetectionLogPaths, cfg.BotDetectionTailLines, cfg.BotDetectionTopN); err != nil {
+			log.Printf("Bot detection collection skipped: %v", err)
+		} else {
+			botDetection = summary
+		}
+	}
+
 	// Send report (with retry on transient network errors)
 	report := &sender.Report{
 		AgentVersion:    Version,
 		Metrics:         metricsPayload,
 		Docker:          dockerData,
 		AptStatus:       aptData,
+		BotDetection:    botDetection,
 		DockerNetworks:  dockerNetworks,
 		ContainerEnvs:   containerEnvs,
 		ComposeProjects: composeProjects,

@@ -143,6 +143,33 @@
         </div>
       </div>
 
+      <div class="row row-cards mb-4">
+        <div class="col-sm-4">
+          <div class="card card-sm h-100">
+            <div class="card-body text-center">
+              <div class="text-secondary small mb-1">Requêtes suspectes (logs web)</div>
+              <div class="h2 mb-0 text-orange">{{ security.bot_detection?.total_suspicious_requests ?? 0 }}</div>
+            </div>
+          </div>
+        </div>
+        <div class="col-sm-4">
+          <div class="card card-sm h-100">
+            <div class="card-body text-center">
+              <div class="text-secondary small mb-1">IPs suspectes (logs web)</div>
+              <div class="h2 mb-0">{{ botTopIPs.length }}</div>
+            </div>
+          </div>
+        </div>
+        <div class="col-sm-4">
+          <div class="card card-sm h-100">
+            <div class="card-body text-center">
+              <div class="text-secondary small mb-1">Hôtes impactés</div>
+              <div class="h2 mb-0">{{ botHosts.length }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="row row-cards">
         <!-- Blocked IPs -->
         <div class="col-lg-5">
@@ -198,6 +225,81 @@
           </div>
         </div>
       </div>
+
+      <div class="row row-cards mt-4">
+        <div class="col-lg-7">
+          <div class="card h-100">
+            <div class="card-header">
+              <h3 class="card-title">Top IPs suspectes (logs Nginx/Apache/NPM)</h3>
+            </div>
+            <div class="card-body p-0">
+              <div v-if="!botTopIPs.length" class="text-center py-4 text-secondary small">
+                Aucune activité suspecte détectée dans les logs web.
+              </div>
+              <div v-else>
+                <div v-for="item in botTopIPs" :key="item.ip" class="px-3 py-2 border-bottom">
+                  <div class="d-flex align-items-center justify-content-between mb-1">
+                    <span class="font-monospace small">{{ item.ip }}</span>
+                    <span class="badge bg-orange-lt text-orange">{{ item.hits }} hits</span>
+                  </div>
+                  <div class="d-flex align-items-center justify-content-between text-secondary small mb-1">
+                    <span>Hosts: {{ item.host_count || 1 }}</span>
+                    <span>Paths: {{ item.unique_paths || 0 }}</span>
+                  </div>
+                  <div class="progress" style="height: 4px;">
+                    <div class="progress-bar bg-orange" :style="{ width: progressWidthBot(item.hits) + '%' }"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-5">
+          <div class="card h-100">
+            <div class="card-header">
+              <h3 class="card-title">Top chemins scannés</h3>
+            </div>
+            <div class="card-body p-0">
+              <div v-if="!botTopPaths.length" class="text-center py-4 text-secondary small">
+                Aucun chemin suspect détecté.
+              </div>
+              <div v-else>
+                <div v-for="item in botTopPaths" :key="item.path" class="d-flex align-items-center justify-content-between px-3 py-2 border-bottom">
+                  <span class="font-monospace small text-truncate me-2" style="max-width: 70%;">{{ item.path }}</span>
+                  <span class="badge bg-yellow-lt text-yellow">{{ item.hits }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mt-4">
+        <div class="card-header">
+          <h3 class="card-title">Hôtes les plus ciblés (logs web)</h3>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-vcenter card-table">
+            <thead>
+              <tr>
+                <th>Hôte</th>
+                <th class="text-end">Requêtes suspectes</th>
+                <th class="text-end">IPs suspectes</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-if="!botHosts.length">
+                <td colspan="3" class="text-center text-secondary py-4">Aucune donnée bot-detection remontée par les agents.</td>
+              </tr>
+              <tr v-for="item in botHosts" :key="item.host_id">
+                <td>{{ item.host_name || item.host_id }}</td>
+                <td class="text-end">{{ item.suspicious_requests || 0 }}</td>
+                <td class="text-end">{{ item.unique_suspicious_ips || 0 }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -236,6 +338,9 @@ const threatsLoading = ref(false)
 const unblockingIP = ref('')
 const threatsPeriod = ref(24)
 const periodLabel = computed(() => periodOptions.find(p => p.hours === threatsPeriod.value)?.label ?? '24h')
+const botTopIPs = computed(() => security.value.bot_detection?.top_suspicious_ips || [])
+const botTopPaths = computed(() => security.value.bot_detection?.top_suspicious_paths || [])
+const botHosts = computed(() => security.value.bot_detection?.hosts || [])
 
 async function loadStatus() {
   try {
@@ -283,6 +388,11 @@ async function unblockIP(ip) {
 function progressWidth(failCount) {
   const max = Math.max(...(security.value.top_failed_ips?.map(i => i.fail_count) || [1]))
   return max > 0 ? Math.round((failCount / max) * 100) : 0
+}
+
+function progressWidthBot(hits) {
+  const max = Math.max(...(botTopIPs.value.map(i => i.hits) || [1]))
+  return max > 0 ? Math.round((hits / max) * 100) : 0
 }
 
 async function startSetup() {

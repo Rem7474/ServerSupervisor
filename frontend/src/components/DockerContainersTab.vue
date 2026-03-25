@@ -1,18 +1,20 @@
 <template>
   <!-- Filters -->
-  <div class="card mb-4">
-    <div class="card-body">
+  <DataToolbar
+    searchable
+    :search="searchInput"
+    search-placeholder="Rechercher un conteneur..."
+    @update:search="searchInput = $event"
+  >
+    <template #bottom>
       <div class="row g-3">
-        <div class="col-6 col-md-6 col-lg-3">
-          <input v-model="searchInput" type="text" class="form-control" placeholder="Rechercher..." />
-        </div>
-        <div class="col-6 col-md-6 col-lg-3">
+        <div class="col-6 col-md-6 col-lg-4">
           <select v-model="hostFilter" class="form-select">
             <option value="">Tous les hôtes</option>
             <option v-for="h in uniqueHosts" :key="h" :value="h">{{ h }}</option>
           </select>
         </div>
-        <div class="col-6 col-md-6 col-lg-3">
+        <div class="col-6 col-md-6 col-lg-4">
           <select v-model="stateFilter" class="form-select">
             <option value="">Tous les états</option>
             <option value="running">En cours</option>
@@ -23,7 +25,7 @@
             <option value="dead">Mort</option>
           </select>
         </div>
-        <div class="col-6 col-md-6 col-lg-3">
+        <div class="col-12 col-md-12 col-lg-4">
           <select v-model="composeFilter" class="form-select">
             <option value="">Tous les conteneurs</option>
             <option value="compose">Docker Compose</option>
@@ -31,26 +33,34 @@
           </select>
         </div>
       </div>
-    </div>
-  </div>
+    </template>
+  </DataToolbar>
 
-  <div v-if="filteredContainers.length > 0" class="card">
+  <div v-if="sortedContainers.length > 0" class="card">
     <div class="table-responsive">
       <table class="table table-vcenter card-table">
         <thead>
           <tr>
-            <th>Nom</th>
-            <th>Hôte</th>
+            <th>
+              <SortableHeader label="Nom" :active="sortBy === 'name'" :direction="sortDir" @toggle="toggleSort('name')" />
+            </th>
+            <th>
+              <SortableHeader label="Hôte" :active="sortBy === 'hostname'" :direction="sortDir" @toggle="toggleSort('hostname')" />
+            </th>
             <th>Compose</th>
-            <th>Image</th>
-            <th>État</th>
+            <th>
+              <SortableHeader label="Image" :active="sortBy === 'image'" :direction="sortDir" @toggle="toggleSort('image')" />
+            </th>
+            <th>
+              <SortableHeader label="État" :active="sortBy === 'state'" :direction="sortDir" @toggle="toggleSort('state')" />
+            </th>
             <th>Ports</th>
             <th>Réseau (Rx / Tx)</th>
             <th></th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="c in filteredContainers" :key="c.id">
+          <tr v-for="c in sortedContainers" :key="c.id">
             <td class="fw-semibold">{{ c.name }}</td>
             <td>
               <router-link :to="`/hosts/${c.host_id}`" class="text-decoration-none">
@@ -169,7 +179,7 @@
     </div>
   </div>
 
-  <div v-if="filteredContainers.length === 0" class="text-center text-secondary py-5">
+  <div v-if="sortedContainers.length === 0" class="text-center text-secondary py-5">
     <svg xmlns="http://www.w3.org/2000/svg" class="mb-2" width="40" height="40" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="opacity:.35">
       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
     </svg>
@@ -318,6 +328,8 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import DataToolbar from './common/DataToolbar.vue'
+import SortableHeader from './common/SortableHeader.vue'
 
 const router = useRouter()
 
@@ -361,9 +373,20 @@ watch(searchInput, val => {
 const stateFilter = ref('')
 const hostFilter = ref('')
 const composeFilter = ref('')
+const sortBy = ref('hostname')
+const sortDir = ref('asc')
 const inspectTarget = ref(null)
 const inspectTab = ref('env')
 const selectedContainer = ref(null)
+
+function toggleSort(key) {
+  if (sortBy.value === key) {
+    sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
+    return
+  }
+  sortBy.value = key
+  sortDir.value = 'asc'
+}
 
 function getComposeInfo(container) {
   if (!container.labels) return {}
@@ -421,6 +444,25 @@ const filteredContainers = computed(() => {
     const matchHost = !hostFilter.value || c.hostname === hostFilter.value
     return matchSearch && matchState && matchCompose && matchHost
   })
+})
+
+const sortedContainers = computed(() => {
+  const dir = sortDir.value === 'asc' ? 1 : -1
+  const sorted = [...filteredContainers.value]
+  sorted.sort((a, b) => {
+    let av = a[sortBy.value]
+    let bv = b[sortBy.value]
+
+    if (sortBy.value === 'image') {
+      av = `${a.image || ''}:${a.image_tag || ''}`
+      bv = `${b.image || ''}:${b.image_tag || ''}`
+    }
+
+    const aVal = String(av || '').toLowerCase()
+    const bVal = String(bv || '').toLowerCase()
+    return aVal.localeCompare(bVal) * dir
+  })
+  return sorted
 })
 
 const uniqueHosts = computed(() => {

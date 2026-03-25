@@ -37,6 +37,8 @@ interface UseAlertsPageApi {
   rules: Ref<AlertRule[]>
   hosts: Ref<Host[]>
   loading: Ref<boolean>
+  fetched: Ref<boolean>
+  fetchError: Ref<string>
   showModal: Ref<boolean>
   saving: Ref<boolean>
   saveError: Ref<string>
@@ -75,6 +77,8 @@ export function useAlertsPage(): UseAlertsPageApi {
   const rules = rulesStore.rules
   const hosts = hostsStore.hosts
   const loading = rulesStore.loading
+  const fetched = rulesStore.fetched
+  const fetchError = rulesStore.error
 
   const activeIncidentCount: ComputedRef<number> = computed(
     () => incidents.value.filter((incident) => !incident.resolved_at).length
@@ -203,6 +207,8 @@ export function useAlertsPage(): UseAlertsPageApi {
     rules: rules as any,
     hosts: hosts as any,
     loading: loading as any,
+    fetched: fetched as any,
+    fetchError: fetchError as any,
     showModal,
     saving,
     saveError,

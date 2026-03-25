@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -17,9 +18,13 @@ type Config struct {
 	ReportInterval int `yaml:"report_interval"` // seconds
 
 	// Features
-	CollectDocker bool `yaml:"collect_docker"`
-	CollectAPT    bool `yaml:"collect_apt"`
-	CollectSMART  bool `yaml:"collect_smart"`
+	CollectDocker         bool     `yaml:"collect_docker"`
+	CollectAPT            bool     `yaml:"collect_apt"`
+	CollectSMART          bool     `yaml:"collect_smart"`
+	CollectBotDetection   bool     `yaml:"collect_bot_detection"`
+	BotDetectionLogPaths  []string `yaml:"bot_detection_log_paths"`
+	BotDetectionTailLines int      `yaml:"bot_detection_tail_lines"`
+	BotDetectionTopN      int      `yaml:"bot_detection_top_n"`
 
 	// TLS
 	InsecureSkipVerify bool `yaml:"insecure_skip_verify"`
@@ -30,11 +35,20 @@ type Config struct {
 
 func Load(path string) (*Config, error) {
 	cfg := &Config{
-		ServerURL:      "http://localhost:8080",
-		ReportInterval: 30,
-		CollectDocker:  true,
-		CollectAPT:     true,
-		CollectSMART:   true,
+		ServerURL:           "http://localhost:8080",
+		ReportInterval:      30,
+		CollectDocker:       true,
+		CollectAPT:          true,
+		CollectSMART:        true,
+		CollectBotDetection: true,
+		BotDetectionLogPaths: []string{
+			"/var/log/nginx/access.log",
+			"/var/log/apache2/access.log",
+			"/var/log/httpd/access_log",
+			"/data/logs/proxy-host-*.log",
+		},
+		BotDetectionTailLines: 5000,
+		BotDetectionTopN:      10,
 	}
 
 	data, err := os.ReadFile(path)
@@ -67,6 +81,31 @@ func Load(path string) (*Config, error) {
 	if env := os.Getenv("SUPERVISOR_COLLECT_SMART"); env != "" {
 		cfg.CollectSMART = env == "true" || env == "1"
 	}
+	if env := os.Getenv("SUPERVISOR_COLLECT_BOT_DETECTION"); env != "" {
+		cfg.CollectBotDetection = env == "true" || env == "1"
+	}
+	if env := os.Getenv("SUPERVISOR_BOT_DETECTION_LOG_PATHS"); env != "" {
+		parts := []string{}
+		for _, p := range strings.Split(env, ",") {
+			p = strings.TrimSpace(p)
+			if p != "" {
+				parts = append(parts, p)
+			}
+		}
+		if len(parts) > 0 {
+			cfg.BotDetectionLogPaths = parts
+		}
+	}
+	if env := os.Getenv("SUPERVISOR_BOT_DETECTION_TAIL_LINES"); env != "" {
+		if n, err := strconv.Atoi(env); err == nil && n > 0 {
+			cfg.BotDetectionTailLines = n
+		}
+	}
+	if env := os.Getenv("SUPERVISOR_BOT_DETECTION_TOP_N"); env != "" {
+		if n, err := strconv.Atoi(env); err == nil && n > 0 {
+			cfg.BotDetectionTopN = n
+		}
+	}
 	if env := os.Getenv("SUPERVISOR_INSECURE_SKIP_VERIFY"); env != "" {
 		cfg.InsecureSkipVerify = env == "true" || env == "1"
 	}
@@ -98,6 +137,22 @@ collect_apt: true
 # Enable SMART disk health monitoring (requires smartmontools)
 # Disable on VMs or systems without smartctl
 collect_smart: true
+
+# Detect automated scans/bots from web access logs (nginx/apache/NPM)
+collect_bot_detection: true
+
+# Glob paths to parse (supports wildcards)
+bot_detection_log_paths:
+  - "/var/log/nginx/access.log"
+  - "/var/log/apache2/access.log"
+  - "/var/log/httpd/access_log"
+  - "/data/logs/proxy-host-*.log"
+
+# Number of latest log lines to inspect per file
+bot_detection_tail_lines: 5000
+
+# Number of top suspicious IPs/paths returned
+bot_detection_top_n: 10
 
 # Skip TLS verification (for self-signed certs)
 insecure_skip_verify: false

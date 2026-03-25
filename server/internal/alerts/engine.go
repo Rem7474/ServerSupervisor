@@ -116,6 +116,23 @@ func GetMetricValue(db *database.DB, host models.Host, rule models.AlertRule) (f
 		// Returns seconds since the agent last reported. Threshold is the silence duration in seconds.
 		return now.Sub(host.LastSeen).Seconds(), true
 	case "cpu", "cpu_percent", "memory", "ram_percent", "disk", "disk_percent", "load":
+		// When a host is explicitly linked to a Proxmox guest in confirmed+auto mode,
+		// CPU/RAM alerts must use guest metrics collected from Proxmox (hypervisor view).
+		if rule.Metric == "cpu" || rule.Metric == "cpu_percent" || rule.Metric == "memory" || rule.Metric == "ram_percent" {
+			if link, err := db.GetProxmoxGuestLinkByHost(host.ID); err == nil && link != nil && link.Status == "confirmed" && link.MetricsSource == "auto" {
+				cpuPct, memPct, ts, err := db.GetLatestProxmoxGuestMetricPercent(link.GuestID)
+				if err == nil {
+					if rule.DurationSeconds > 0 && now.Sub(ts) > duration {
+						return 0, false
+					}
+					if rule.Metric == "cpu" || rule.Metric == "cpu_percent" {
+						return cpuPct, true
+					}
+					return memPct, true
+				}
+			}
+		}
+
 		metrics, err := db.GetLatestMetrics(host.ID)
 		if err != nil || metrics == nil {
 			return 0, false

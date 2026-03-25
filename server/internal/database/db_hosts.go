@@ -128,6 +128,37 @@ func (db *DB) GetHostCustomTasks(hostID string) (string, error) {
 	return tasks, err
 }
 
+// UpdateHostBotDetection stores the latest bot-detection summary JSON for a host.
+func (db *DB) UpdateHostBotDetection(hostID, botDetectionJSON string) error {
+	_, err := db.conn.Exec(
+		`UPDATE hosts SET bot_detection = $1::jsonb, updated_at = NOW() WHERE id = $2`,
+		botDetectionJSON, hostID)
+	return err
+}
+
+// GetAllHostsBotDetection returns host metadata with cached bot-detection JSON.
+func (db *DB) GetAllHostsBotDetection() ([]models.HostBotDetection, error) {
+	rows, err := db.conn.Query(
+		`SELECT id, name, bot_detection::text
+		 FROM hosts
+		 WHERE bot_detection IS NOT NULL`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	out := []models.HostBotDetection{}
+	for rows.Next() {
+		var item models.HostBotDetection
+		if err := rows.Scan(&item.HostID, &item.HostName, &item.BotDetectionJSON); err != nil {
+			return nil, err
+		}
+		out = append(out, item)
+	}
+	return out, nil
+}
+
 func (db *DB) UpdateHostStatus(id, status string) error {
 	_, err := db.conn.Exec(
 		`UPDATE hosts SET status = $1, last_seen = NOW(), updated_at = NOW() WHERE id = $2`,

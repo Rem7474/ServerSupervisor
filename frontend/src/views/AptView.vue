@@ -27,41 +27,29 @@
       <div class="side-main">
         <!-- === Vue Hôtes === -->
         <template v-if="activeTab === 'hosts'">
-          <div class="card mb-3">
-            <div class="card-body">
-              <div class="row g-3 align-items-center mb-3">
-                <div class="col-md-4">
-                  <input
-                    v-model="hostSearch"
-                    type="text"
-                    class="form-control"
-                    placeholder="Rechercher un hôte..."
-                  />
-                </div>
-                <div class="col-md-4">
-                  <div class="btn-group w-100">
-                    <button
-                      v-for="f in hostFilterOptions"
-                      :key="f.value"
-                      class="btn btn-sm"
-                      :class="hostQuickFilter === f.value ? 'btn-primary' : 'btn-outline-secondary'"
-                      @click="hostQuickFilter = f.value"
-                    >{{ f.label }}</button>
-                  </div>
-                </div>
-                <div class="col-md-4 d-flex gap-2 ms-auto justify-content-md-end">
-                  <select v-model="hostSortKey" class="form-select form-select-sm" style="width: auto;">
-                    <option value="name">Trier par nom</option>
-                    <option value="pending">Trier par paquets en attente</option>
-                    <option value="security">Trier par mises à jour sécurité</option>
-                    <option value="cve">Trier par CVE</option>
-                  </select>
-                  <button class="btn btn-sm btn-outline-secondary" @click="hostSortDir = hostSortDir === 'asc' ? 'desc' : 'asc'" :title="hostSortDir === 'asc' ? 'Croissant' : 'Décroissant'">
-                    <svg v-if="hostSortDir === 'asc'" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 8l4-4 4 4M7 4v16M13 16l4 4 4-4M17 20V4"/></svg>
-                    <svg v-else xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 16l4 4 4-4M7 20V4M13 8l4-4 4 4M17 4v16"/></svg>
-                  </button>
-                </div>
+          <DataToolbar searchable :search="hostSearch" search-placeholder="Rechercher un hôte..." @update:search="hostSearch = $event">
+            <template #right>
+              <div class="btn-group">
+                <button
+                  v-for="f in hostFilterOptions"
+                  :key="f.value"
+                  class="btn btn-sm"
+                  :class="hostQuickFilter === f.value ? 'btn-primary' : 'btn-outline-secondary'"
+                  @click="hostQuickFilter = f.value"
+                >{{ f.label }}</button>
               </div>
+              <select v-model="hostSortKey" class="form-select form-select-sm" style="width: auto;">
+                <option value="name">Trier par nom</option>
+                <option value="pending">Trier par paquets en attente</option>
+                <option value="security">Trier par mises à jour sécurité</option>
+                <option value="cve">Trier par CVE</option>
+              </select>
+              <button class="btn btn-sm btn-outline-secondary" @click="hostSortDir = hostSortDir === 'asc' ? 'desc' : 'asc'" :title="hostSortDir === 'asc' ? 'Croissant' : 'Décroissant'">
+                <svg v-if="hostSortDir === 'asc'" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 8l4-4 4 4M7 4v16M13 16l4 4 4-4M17 20V4"/></svg>
+                <svg v-else xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 16l4 4 4-4M7 20V4M13 8l4-4 4 4M17 4v16"/></svg>
+              </button>
+            </template>
+            <template #bottom>
               <div class="d-flex flex-wrap align-items-center gap-3">
                 <label class="form-check">
                   <input type="checkbox" class="form-check-input" v-model="selectAll" @change="toggleSelectAll" />
@@ -85,8 +73,8 @@
                   <div v-else class="text-secondary small">Mode lecture seule</div>
                 </div>
               </div>
-            </div>
-          </div>
+            </template>
+          </DataToolbar>
 
           <div class="row row-cards">
             <div v-if="filteredHosts.length === 0" class="col-12">
@@ -392,6 +380,7 @@ import PaginationNav from '../components/PaginationNav.vue'
 import WsStatusBar from '../components/WsStatusBar.vue'
 import SubNavigation from '../components/SubNavigation.vue'
 import CronBuilder from '../components/CronBuilder.vue'
+import DataToolbar from '../components/common/DataToolbar.vue'
 
 const { dayjs, formatRelativeDate, formatExactDate } = useDateFormatter()
 const { getStatusBadgeClass } = useStatusBadge()

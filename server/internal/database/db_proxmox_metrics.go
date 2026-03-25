@@ -1,6 +1,8 @@
 package database
 
 import (
+	"time"
+
 	"github.com/serversupervisor/server/internal/models"
 )
 
@@ -133,6 +135,23 @@ func (db *DB) GetProxmoxGuestMetricsSummary(guestID string, hours, bucketMinutes
 		summary = append(summary, s)
 	}
 	return summary, rows.Err()
+}
+
+// GetLatestProxmoxGuestMetricPercent returns the freshest guest CPU% and RAM% sample.
+// cpu_usage is stored as 0-1 ratio in DB and is converted to 0-100 percentage.
+func (db *DB) GetLatestProxmoxGuestMetricPercent(guestID string) (cpuPercent float64, memoryPercent float64, ts time.Time, err error) {
+	err = db.conn.QueryRow(`
+		SELECT
+			cpu_usage * 100,
+			CASE WHEN mem_total > 0 THEN mem_used::float / mem_total * 100 ELSE 0 END,
+			timestamp
+		FROM proxmox_guest_metrics
+		WHERE guest_id = $1
+		ORDER BY timestamp DESC
+		LIMIT 1`,
+		guestID,
+	).Scan(&cpuPercent, &memoryPercent, &ts)
+	return cpuPercent, memoryPercent, ts, err
 }
 
 // CleanOldProxmoxGuestMetrics removes guest snapshots older than retentionDays.

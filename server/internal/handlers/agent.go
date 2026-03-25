@@ -206,6 +206,15 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 		}
 	}
 
+	// Store cached bot-detection summary for this host.
+	if report.BotDetection != nil {
+		if b, err := json.Marshal(report.BotDetection); err == nil {
+			if err := h.db.UpdateHostBotDetection(hostID, string(b)); err != nil {
+				log.Printf("Warning: failed to store bot detection for host %s: %v", safeHostID, err)
+			}
+		}
+	}
+
 	// Return pending commands for this host (unified remote_commands table)
 	commands, err := h.db.GetPendingRemoteCommands(hostID)
 	if err != nil {
