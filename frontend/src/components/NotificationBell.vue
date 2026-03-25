@@ -2,8 +2,7 @@
   <div ref="bellRef" class="position-relative">
     <!-- Bell button -->
     <button
-      class="btn btn-ghost-secondary d-flex align-items-center justify-content-center position-relative"
-      style="width: 38px; height: 38px; padding: 0;"
+      class="btn btn-ghost-secondary d-flex align-items-center justify-content-center position-relative notification-bell-btn"
       @click.stop="toggleOpen"
       :title="unreadCount > 0 ? `${unreadCount} notification(s) non lue(s)` : 'Notifications'"
       :aria-label="unreadCount > 0 ? `${unreadCount} notification(s) non lue(s)` : 'Notifications'"
@@ -16,8 +15,7 @@
       </svg>
       <span
         v-if="unreadCount > 0"
-        class="badge bg-red text-white position-absolute"
-        style="top: 2px; right: 2px; font-size: 0.6rem; min-width: 16px; height: 16px; padding: 0 3px; border-radius: 8px; line-height: 16px;"
+        class="badge bg-red text-white position-absolute notification-bell-counter"
       >{{ unreadCount > 99 ? '99+' : unreadCount }}</span>
     </button>
 
@@ -42,7 +40,7 @@
       </div>
 
       <!-- List -->
-      <div style="max-height: 340px; overflow-y: auto;">
+      <div class="notification-list-scroll">
         <!-- Loading -->
         <div v-if="loading" class="text-center text-secondary py-4 small">Chargement…</div>
 
@@ -59,33 +57,30 @@
         <div
           v-for="item in notifications"
           :key="item.id"
-          class="d-flex align-items-start px-3 py-2 border-bottom notification-item"
+          class="d-flex align-items-start px-3 py-2 border-bottom notification-item notification-item-layout"
           :class="isUnread(item) ? 'notification-unread' : ''"
-          style="cursor: default; gap: 10px;"
         >
           <!-- Status dot -->
           <div class="flex-shrink-0 mt-1">
             <span
-              class="badge"
+              class="badge notification-status-dot"
               :class="item.resolved_at ? 'bg-secondary-lt text-secondary' : 'bg-red-lt text-red'"
-              style="width: 8px; height: 8px; padding: 0; border-radius: 50%; display: inline-block;"
             ></span>
           </div>
 
           <!-- Content -->
-          <div class="flex-fill" style="min-width: 0;">
+          <div class="flex-fill notification-content">
             <div class="d-flex align-items-center justify-content-between gap-2 mb-1">
-              <div class="fw-semibold text-truncate small" style="max-width: 220px;" :title="item.rule_name">
+              <div class="fw-semibold text-truncate small notification-rule" :title="item.rule_name">
                 {{ item.rule_name }}
               </div>
-              <span v-if="item.resolved_at" class="badge bg-success-lt text-success flex-shrink-0" style="font-size: 0.65rem;">Résolu</span>
-              <span v-else class="badge bg-red-lt text-red flex-shrink-0" style="font-size: 0.65rem;">Actif</span>
+              <span v-if="item.resolved_at" class="badge bg-success-lt text-success flex-shrink-0 notification-state-badge">Résolu</span>
+              <span v-else class="badge bg-red-lt text-red flex-shrink-0 notification-state-badge">Actif</span>
             </div>
-            <div class="d-flex align-items-center justify-content-between text-secondary" style="font-size: 0.78rem;">
+            <div class="d-flex align-items-center justify-content-between text-secondary notification-meta">
               <router-link
                 :to="`/hosts/${item.host_id}`"
-                class="text-truncate text-secondary text-decoration-none notification-host-link"
-                style="max-width: 200px;"
+                class="text-truncate text-secondary text-decoration-none notification-host-link notification-host"
                 @click="isOpen = false"
               >
                 <svg class="me-1" width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -97,8 +92,8 @@
                 <RelativeTime :date="item.triggered_at" />
               </span>
             </div>
-            <div class="text-secondary mt-1" style="font-size: 0.75rem;">
-              Valeur : <code style="font-size: 0.75rem;">{{ item.value?.toFixed(2) }}</code>
+            <div class="text-secondary mt-1 notification-value-row">
+              Valeur : <code class="notification-value">{{ item.value?.toFixed(2) }}</code>
               <span class="ms-1">{{ metricUnit(item.metric) }}</span>
             </div>
           </div>
@@ -313,6 +308,69 @@ onUnmounted(() => {
   border: 1px solid var(--tblr-border-color);
   border-radius: 8px;
   box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+}
+
+.notification-bell-btn {
+  width: 38px;
+  height: 38px;
+  padding: 0;
+}
+
+.notification-bell-counter {
+  top: 2px;
+  right: 2px;
+  font-size: 0.6rem;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 3px;
+  border-radius: 8px;
+  line-height: 16px;
+}
+
+.notification-list-scroll {
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+.notification-item-layout {
+  cursor: default;
+  gap: 10px;
+}
+
+.notification-status-dot {
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.notification-content {
+  min-width: 0;
+}
+
+.notification-rule {
+  max-width: 220px;
+}
+
+.notification-state-badge {
+  font-size: 0.65rem;
+}
+
+.notification-meta {
+  font-size: 0.78rem;
+}
+
+.notification-host {
+  max-width: 200px;
+}
+
+.notification-value {
+  font-size: 0.75rem;
+}
+
+.notification-value-row {
+  font-size: 0.75rem;
 }
 
 @media (max-width: 480px) {

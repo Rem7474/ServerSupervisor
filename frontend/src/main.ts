@@ -12,12 +12,13 @@ app.use(router)
 app.mount('#app')
 
 // Register service worker for PWA support
-if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
+if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/service-worker.js')
+    navigator.serviceWorker
+      .register('/service-worker.js')
       .then((registration) => {
         console.log('[PWA] Service worker registered successfully:', registration)
-        
+
         // Check for updates every hour
         setInterval(() => {
           registration.update()
@@ -27,10 +28,8 @@ if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
         console.error('[PWA] Service worker registration failed:', error)
       })
 
-    // Listen for controller change (new version available)
     navigator.serviceWorker.addEventListener('controllerchange', () => {
       console.log('[PWA] New version of app is available, reloading...')
-      // Optionally notify user and reload
       window.location.reload()
     })
   })

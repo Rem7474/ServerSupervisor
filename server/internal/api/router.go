@@ -22,6 +22,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 
 	ipRateLimiter := NewIPRateLimiter(cfg.RateLimitRPS, cfg.RateLimitBurst, cfg.TrustedProxyCIDRs)
 	r.Use(RateLimiterMiddleware(ipRateLimiter))
+	agentRateLimiter := NewIPRateLimiter(cfg.AgentRateLimitRPS, cfg.AgentRateLimitBurst, cfg.TrustedProxyCIDRs)
 
 	// Instantiate handlers
 	authH := handlers.NewAuthHandler(db, cfg)
@@ -49,7 +50,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 
 	registerPublicRoutes(r, authH, db)
 	registerWSRoutes(r, wsH)
-	registerAgentRoutes(r, db, cfg, agentH)
+	registerAgentRoutes(r, db, cfg, agentH, agentRateLimiter)
 
 	v1 := r.Group("/api/v1")
 	v1.Use(JWTMiddleware(cfg))
@@ -97,8 +98,9 @@ func registerWSRoutes(r *gin.Engine, h *ws.WSHandler) {
 	r.GET("/api/v1/ws/notifications", h.NotificationStream)
 }
 
-func registerAgentRoutes(r *gin.Engine, db *database.DB, cfg *config.Config, h *handlers.AgentHandler) {
+func registerAgentRoutes(r *gin.Engine, db *database.DB, cfg *config.Config, h *handlers.AgentHandler, rl *IPRateLimiter) {
 	g := r.Group("/api/agent")
+	g.Use(RateLimiterMiddleware(rl))
 	g.Use(APIKeyMiddleware(db, cfg))
 	g.POST("/report", h.ReceiveReport)
 	g.POST("/command/result", h.ReportCommandResult)

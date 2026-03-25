@@ -1,5 +1,6 @@
 import axios, { AxiosInstance, AxiosError } from 'axios'
 import { useAuthStore } from '../stores/auth'
+import { emitHttpError } from '../utils/httpErrorBus'
 
 const api: AxiosInstance = axios.create({
   baseURL: '/api',
@@ -44,10 +45,17 @@ api.interceptors.response.use(
     if (axios.isCancel(error)) {
       return Promise.reject(error)
     }
-    if (error.response?.status === 401) {
+    const status = error.response?.status ?? null
+    if (status === 401) {
       const auth = useAuthStore()
       auth.logout()
       window.location.href = '/login'
+    } else if (status === 403) {
+      emitHttpError(403, "Vous n'avez pas les droits nécessaires pour cette action")
+    } else if (status && status >= 500) {
+      emitHttpError(status, 'Le serveur a rencontré une erreur. Réessayez dans quelques instants.')
+    } else if (status === null) {
+      emitHttpError(null, 'Erreur réseau: impossible de joindre le serveur')
     }
     return Promise.reject(error)
   }

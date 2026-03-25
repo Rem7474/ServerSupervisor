@@ -11,9 +11,7 @@
             <span class="navbar-toggler-icon"></span>
           </button>
           <router-link to="/" class="navbar-brand navbar-brand-autodark">
-            <svg class="icon me-2" width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"/>
-            </svg>
+            <AppIcon name="brand" css-class="icon me-2" />
             ServerSupervisor
           </router-link>
 
@@ -23,9 +21,7 @@
               <li class="nav-item">
                 <router-link to="/" class="nav-link" active-class="active">
                   <span class="nav-link-icon">
-                    <svg class="icon" width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/>
-                    </svg>
+                    <AppIcon name="dashboard" />
                   </span>
                   <span class="nav-link-title">Dashboard</span>
                 </router-link>
@@ -33,9 +29,7 @@
               <li class="nav-item">
                 <router-link to="/docker" class="nav-link" active-class="active">
                   <span class="nav-link-icon">
-                    <svg class="icon" width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
-                    </svg>
+                    <AppIcon name="docker" />
                   </span>
                   <span class="nav-link-title">Docker</span>
                 </router-link>
@@ -43,9 +37,7 @@
               <li class="nav-item">
                 <router-link to="/apt" class="nav-link" active-class="active">
                   <span class="nav-link-icon">
-                    <svg class="icon" width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-                    </svg>
+                    <AppIcon name="updates" />
                   </span>
                   <span class="nav-link-title">Mises à jour</span>
                 </router-link>
@@ -53,11 +45,7 @@
               <li class="nav-item">
                 <router-link to="/proxmox" class="nav-link" active-class="active">
                   <span class="nav-link-icon">
-                    <svg class="icon" width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <rect x="2" y="3" width="20" height="14" rx="2" stroke-width="2"/>
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 21h8M12 17v4"/>
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h2v3H7zM11 8h2v3h-2zM15 8h2v3h-2z"/>
-                    </svg>
+                    <AppIcon name="proxmox" />
                   </span>
                   <span class="nav-link-title">Proxmox</span>
                 </router-link>
@@ -65,9 +53,7 @@
               <li class="nav-item">
                 <router-link to="/alerts" class="nav-link" active-class="active">
                   <span class="nav-link-icon">
-                    <svg class="icon" width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
-                    </svg>
+                    <AppIcon name="alerts" />
                   </span>
                   <span class="nav-link-title">Alertes</span>
                 </router-link>
@@ -77,9 +63,7 @@
               <li class="nav-item dropdown" :class="{ active: isSecondaryActive }">
                 <a class="nav-link dropdown-toggle" href="#" role="button" @click.prevent="toggleSecondaryMenu" :aria-expanded="secondaryMenuOpen" aria-label="Plus d'options" aria-haspopup="menu">
                   <span class="nav-link-icon">
-                    <svg class="icon" width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <circle cx="5" cy="12" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="19" cy="12" r="1.5" fill="currentColor"/>
-                    </svg>
+                    <AppIcon name="more" />
                   </span>
                   <span class="nav-link-title">Plus</span>
                 </a>
@@ -103,9 +87,7 @@
               <li v-if="auth.isAdmin" class="nav-item dropdown" :class="{ active: isAdminActive }">
                 <a class="nav-link dropdown-toggle" href="#" role="button" @click.prevent="toggleAdminMenu" :aria-expanded="adminMenuOpen" aria-label="Options administrateur" aria-haspopup="menu">
                   <span class="nav-link-icon">
-                    <svg class="icon" width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
-                    </svg>
+                    <AppIcon name="admin" />
                   </span>
                   <span class="nav-link-title">Admin</span>
                 </a>
@@ -155,17 +137,24 @@
       <!-- Offline / server-unreachable banner -->
       <div v-if="!isOnline" class="alert alert-warning alert-dismissible mb-0 rounded-0 border-0 border-bottom" role="alert" style="position:sticky;top:0;z-index:1040;">
         <div class="container-xl d-flex align-items-center gap-2">
-          <svg class="icon flex-shrink-0" width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
-          </svg>
+          <AppIcon name="warning" :size="20" css-class="icon flex-shrink-0" />
           <span>Connexion au serveur perdue — les données affichées peuvent être obsolètes.</span>
+        </div>
+      </div>
+
+      <div v-if="httpError" class="alert alert-danger alert-dismissible mb-0 rounded-0 border-0 border-bottom" role="alert" style="position:sticky;top:0;z-index:1039;">
+        <div class="container-xl d-flex align-items-center justify-content-between gap-3">
+          <span>{{ httpError }}</span>
+          <button type="button" class="btn-close" aria-label="Fermer" @click="httpError = ''"></button>
         </div>
       </div>
 
       <div class="page-wrapper">
         <div id="main-content" class="page-body">
           <div class="container-xl">
-            <router-view />
+            <ErrorBoundary>
+              <router-view />
+            </ErrorBoundary>
           </div>
         </div>
         <AppFooter />
@@ -187,6 +176,9 @@ import { useRouter, useRoute } from 'vue-router'
 import ConfirmDialog from './components/ConfirmDialog.vue'
 import NotificationBell from './components/NotificationBell.vue'
 import AppFooter from './components/AppFooter.vue'
+import AppIcon from './components/AppIcon.vue'
+import ErrorBoundary from './components/ErrorBoundary.vue'
+import { subscribeHttpErrors } from './utils/httpErrorBus'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -195,6 +187,8 @@ const userMenuOpen = ref(false)
 const userMenuRef = ref(null)
 const secondaryMenuOpen = ref(false)
 const adminMenuOpen = ref(false)
+const httpError = ref('')
+let unsubscribeHttpErrors = () => {}
 
 // Offline detection — tracks browser connectivity via navigator.onLine events.
 // A "false" value means the browser has no network; the server may still be
@@ -250,6 +244,9 @@ function handleOutsideClick(event) {
 }
 
 onMounted(() => {
+  unsubscribeHttpErrors = subscribeHttpErrors((event) => {
+    httpError.value = event.message
+  })
   window.addEventListener('online', handleOnline)
   window.addEventListener('offline', handleOffline)
   document.addEventListener('click', handleOutsideClick, true)
@@ -268,6 +265,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  unsubscribeHttpErrors()
   window.removeEventListener('online', handleOnline)
   window.removeEventListener('offline', handleOffline)
   document.removeEventListener('click', handleOutsideClick, true)

@@ -30,7 +30,7 @@ const ROLE_PERMISSIONS: RolePermissions = {
 }
 
 export const useAuthStore = defineStore('auth', () => {
-  let persistedUser: User | null = null
+  let persistedUser: User | null
   try {
     persistedUser = JSON.parse(localStorage.getItem('user') || 'null')
   } catch {

@@ -66,6 +66,7 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import cytoscape from 'cytoscape'
 import fcose from 'cytoscape-fcose'
+import { createCytoscapeInstance, bindCytoscapeResize, destroyCytoscapeInstance } from '../composables/useCytoscape'
 
 cytoscape.use(fcose)
 
@@ -87,7 +88,7 @@ const emit = defineEmits(['host-click', 'node-select', 'update:nodePositions'])
 const cyContainer = ref(null)
 const tooltipRef = ref(null)
 let cy = null
-let resizeObserver = null
+let resizeBinding = null
 
 const hasData = computed(() => Array.isArray(props.data) && props.data.length > 0)
 
@@ -514,7 +515,7 @@ function initCytoscape() {
   const savedPositions = props.nodePositions || {}
   const hasPositions = Object.keys(savedPositions).length > 0
 
-  cy = cytoscape({
+  cy = createCytoscapeInstance({
     container: cyContainer.value,
     elements: buildElements(),
     style: getCyStyle(),
@@ -616,18 +617,19 @@ defineExpose({ resetLayout, fitView, zoomIn, zoomOut })
 onMounted(() => {
   initCytoscape()
 
-  resizeObserver = new ResizeObserver(() => {
-    if (cy) {
+  if (cyContainer.value) {
+    resizeBinding = bindCytoscapeResize(cyContainer.value, () => {
+      if (!cy) return
       cy.resize()
       cy.fit(undefined, 40)
-    }
-  })
-  if (cyContainer.value) resizeObserver.observe(cyContainer.value)
+    })
+  }
 })
 
 onUnmounted(() => {
-  if (resizeObserver) resizeObserver.disconnect()
-  if (cy) { cy.destroy(); cy = null }
+  if (resizeBinding) resizeBinding.disconnect()
+  destroyCytoscapeInstance(cy)
+  cy = null
 })
 
 // Rebuild graph when data changes — preserve positions of existing nodes

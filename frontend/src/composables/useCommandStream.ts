@@ -130,7 +130,7 @@ export function useCommandStream({ token }: { token: TokenSource }): UseCommandS
     return new Promise((resolve, reject) => {
       let output = ''
       let settled = false
-      let timeoutId: ReturnType<typeof setTimeout> | null = null
+      let timeoutId: number | null = null
 
       const finishResolve = (value: string): void => {
         if (settled) return

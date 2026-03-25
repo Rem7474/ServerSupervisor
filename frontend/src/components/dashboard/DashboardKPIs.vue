@@ -75,34 +75,20 @@
 </template>
 
 <script setup>
-import { defineProps, computed } from 'vue'
-import { formatBytes } from '../utils/formatters'
+import { storeToRefs } from 'pinia'
+import { formatBytes } from '../../utils/formatters'
+import { useDashboardStore } from '../../stores/dashboard'
 
-const props = defineProps({
-  hosts: { type: Array, default: () => [] },
-  proxmoxSummary: { type: Object, default: null },
-  aptPending: { type: Number, default: 0 },
-  outdatedDockerImages: { type: Number, default: 0 },
-  versionComparisons: { type: Array, default: () => [] },
-})
-
-const hasProxmox = computed(() => !!props.proxmoxSummary?.node_count)
-
-const onlineCount = computed(() => 
-  props.hosts.filter(h => h.status === 'online').length
-)
-
-const offlineCount = computed(() => 
-  props.hosts.filter(h => h.status !== 'online').length
-)
-
-const outdatedVersions = computed(() => 
-  props.versionComparisons.filter(v => v.newer_version).length + props.aptPending + props.outdatedDockerImages
-)
-
-const proxmoxStoragePct = computed(() => {
-  const s = props.proxmoxSummary
-  if (!s?.storage_total) return 0
-  return (s.storage_used / s.storage_total) * 100
-})
+const dashboardStore = useDashboardStore()
+const {
+  hosts,
+  aptPending,
+  proxmoxSummary,
+  hasProxmox,
+  onlineCount,
+  offlineCount,
+  outdatedDockerImages,
+  outdatedVersions,
+  proxmoxStoragePct,
+} = storeToRefs(dashboardStore)
 </script>

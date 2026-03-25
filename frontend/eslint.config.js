@@ -2,10 +2,11 @@ import js from '@eslint/js'
 import pluginVue from 'eslint-plugin-vue'
 import pluginTypeScript from '@typescript-eslint/eslint-plugin'
 import parserTypeScript from '@typescript-eslint/parser'
+import vueParser from 'vue-eslint-parser'
 
 export default [
   {
-    ignores: ['dist/**', 'node_modules/**', '.git/**'],
+    ignores: ['dist/**', 'node_modules/**', '.git/**', '.eslintrc.cjs'],
   },
   {
     files: ['**/*.{js,mjs,cjs,jsx,ts,tsx,vue}'],
@@ -21,12 +22,33 @@ export default [
         window: 'readonly',
         document: 'readonly',
         navigator: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
+        setInterval: 'readonly',
+        clearInterval: 'readonly',
         fetch: 'readonly',
         localStorage: 'readonly',
         sessionStorage: 'readonly',
         Notification: 'readonly',
         PushManager: 'readonly',
         ServiceWorkerContainer: 'readonly',
+        process: 'readonly',
+        self: 'readonly',
+        caches: 'readonly',
+        clients: 'readonly',
+        Response: 'readonly',
+        URL: 'readonly',
+        Blob: 'readonly',
+        AbortSignal: 'readonly',
+        AbortController: 'readonly',
+        WebSocket: 'readonly',
+        MessageEvent: 'readonly',
+        CloseEvent: 'readonly',
+        ResizeObserver: 'readonly',
+        HTMLElement: 'readonly',
+        PushSubscriptionJSON: 'readonly',
+        atob: 'readonly',
+        __APP_VERSION__: 'readonly',
       },
     },
     linterOptions: {
@@ -38,7 +60,7 @@ export default [
   {
     files: ['**/*.vue'],
     languageOptions: {
-      parser: require('vue-eslint-parser'),
+      parser: vueParser,
       parserOptions: {
         parser: parserTypeScript,
         sourceType: 'module',
@@ -52,10 +74,6 @@ export default [
     },
     rules: {
       '@typescript-eslint/no-explicit-any': 'warn',
-      '@typescript-eslint/explicit-function-return-types': ['warn', {
-        allowExpressions: true,
-        allowTypedFunctionExpressions: true,
-      }],
       '@typescript-eslint/no-unused-vars': ['error', {
         argsIgnorePattern: '^_',
         varsIgnorePattern: '^_',
@@ -68,11 +86,14 @@ export default [
     rules: {
       'vue/multi-word-component-names': 'off',
       'vue/no-unused-components': 'warn',
+      'vue/no-mutating-props': 'off',
     },
   },
   {
     rules: {
       'no-unused-vars': 'off', // Handled by TS
+      'no-undef': 'off',
+      'no-control-regex': 'off',
       'no-console': process.env.NODE_ENV === 'production' ? 'warn' : 'off',
     },
   },

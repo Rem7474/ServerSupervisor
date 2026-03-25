@@ -36,8 +36,10 @@ type Config struct {
 	AdminPassword          string
 
 	// Rate limiting
-	RateLimitRPS   int
-	RateLimitBurst int
+	RateLimitRPS        int
+	RateLimitBurst      int
+	AgentRateLimitRPS   int
+	AgentRateLimitBurst int
 
 	// GitHub
 	GitHubToken        string
@@ -82,8 +84,10 @@ func Load() *Config {
 		AdminUser:              getEnv("ADMIN_USER", "admin"),
 		AdminPassword:          getEnv("ADMIN_PASSWORD", "admin"),
 
-		RateLimitRPS:   getIntEnv("RATE_LIMIT_RPS", 100),
-		RateLimitBurst: getIntEnv("RATE_LIMIT_BURST", 200),
+		RateLimitRPS:        getIntEnv("RATE_LIMIT_RPS", 100),
+		RateLimitBurst:      getIntEnv("RATE_LIMIT_BURST", 200),
+		AgentRateLimitRPS:   getIntEnv("AGENT_RATE_LIMIT_RPS", 20),
+		AgentRateLimitBurst: getIntEnv("AGENT_RATE_LIMIT_BURST", 40),
 
 		GitHubToken:        getEnv("GITHUB_TOKEN", ""),
 		GitHubPollInterval: getDurationEnv("GITHUB_POLL_INTERVAL", 15*time.Minute),

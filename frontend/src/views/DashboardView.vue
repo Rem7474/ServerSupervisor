@@ -79,79 +79,7 @@
     </div>
 
     <!-- ─── KPIs ─────────────────────────────────────────────────────────────── -->
-    <div class="row row-cards mb-4">
-      <div class="col-6 col-lg-3">
-        <div class="card card-sm h-100">
-          <div class="card-body">
-            <div class="subheader">Hôtes</div>
-            <div class="h1 mb-0">{{ hosts.length }}</div>
-            <div class="text-secondary small mt-1">
-              <span class="text-green me-2">{{ onlineCount }} en ligne</span>
-              <span v-if="offlineCount > 0" class="text-red">{{ offlineCount }} hors ligne</span>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="col-6 col-lg-3">
-        <div class="card card-sm h-100">
-          <div class="card-body">
-            <div class="subheader">Mises à jour</div>
-            <div class="h1 mb-0" :class="outdatedVersions > 0 ? 'text-yellow' : 'text-green'">{{ outdatedVersions }}</div>
-            <div class="text-secondary small mt-1">
-              <span v-if="aptPending > 0" class="me-2">{{ aptPending }} paquet{{ aptPending > 1 ? 's' : '' }} APT</span>
-              <span v-if="outdatedDockerImages > 0">{{ outdatedDockerImages }} image{{ outdatedDockerImages > 1 ? 's' : '' }} Docker</span>
-              <span v-if="outdatedVersions === 0">Tout est à jour</span>
-            </div>
-          </div>
-        </div>
-      </div>
-      <!-- Proxmox KPIs (masqués si non configuré) -->
-      <template v-if="hasProxmox">
-        <div class="col-6 col-lg-3">
-          <div class="card card-sm h-100">
-            <div class="card-body">
-              <div class="subheader">Proxmox — Nœuds</div>
-              <div class="h1 mb-0" :class="proxmoxSummary?.nodes_down > 0 ? 'text-red' : 'text-green'">
-                {{ (proxmoxSummary?.node_count ?? 0) - (proxmoxSummary?.nodes_down ?? 0) }}
-                <span class="text-secondary fs-4">/ {{ proxmoxSummary?.node_count ?? 0 }}</span>
-              </div>
-              <div class="text-secondary small mt-1">{{ proxmoxSummary?.vm_count ?? 0 }} VM · {{ proxmoxSummary?.lxc_count ?? 0 }} LXC</div>
-            </div>
-          </div>
-        </div>
-        <div class="col-6 col-lg-3">
-          <div class="card card-sm h-100">
-            <div class="card-body">
-              <div class="subheader">Proxmox — Stockage</div>
-              <div class="h1 mb-0" :class="proxmoxStoragePct > 80 ? 'text-red' : proxmoxStoragePct > 60 ? 'text-yellow' : 'text-green'">
-                {{ proxmoxStoragePct.toFixed(0) }}%
-              </div>
-              <div class="text-secondary small mt-1">
-                {{ formatBytes(proxmoxSummary?.storage_used ?? 0) }} / {{ formatBytes(proxmoxSummary?.storage_total ?? 0) }}
-              </div>
-            </div>
-          </div>
-        </div>
-      </template>
-      <template v-else>
-        <div class="col-6 col-lg-3">
-          <div class="card card-sm h-100">
-            <div class="card-body">
-              <div class="subheader">En ligne</div>
-              <div class="h1 mb-0 text-green">{{ onlineCount }}</div>
-            </div>
-          </div>
-        </div>
-        <div class="col-6 col-lg-3">
-          <div class="card card-sm h-100">
-            <div class="card-body">
-              <div class="subheader">Hors ligne</div>
-              <div class="h1 mb-0 text-red">{{ offlineCount }}</div>
-            </div>
-          </div>
-        </div>
-      </template>
-    </div>
+    <DashboardKPIs />
 
     <!-- ─── Cluster Proxmox (conditionnel) ──────────────────────────────────── -->
     <ProxmoxClusterCard v-if="hasProxmox && proxmoxNodes.length" :nodes="proxmoxNodes" />
@@ -308,8 +236,8 @@
         </table>
       </div>
 
-      <div v-if="loading" class="text-center py-4">
-        <div class="spinner-border" role="status"></div>
+      <div v-if="loading" class="p-3">
+        <LoadingSkeleton :lines="8" variant="table" />
       </div>
 
       <div v-if="!loading && hosts.length === 0" class="text-center py-5 text-secondary">
@@ -385,20 +313,14 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, defineAsyncComponent, onMounted } from 'vue'
+import { defineAsyncComponent } from 'vue'
 import RelativeTime from '../components/RelativeTime.vue'
 import WsStatusBar from '../components/WsStatusBar.vue'
 import ProxmoxClusterCard from '../components/ProxmoxClusterCard.vue'
-import apiClient from '../api'
-import { useAuthStore } from '../stores/auth'
-import { useWebSocket } from '../composables/useWebSocket'
-import { useConfirmDialog } from '../composables/useConfirmDialog'
+import DashboardKPIs from '../components/dashboard/DashboardKPIs.vue'
+import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import { formatHostStatus, hostStatusClass } from '../utils/formatHostStatus'
-import { translateError } from '../utils/translateError'
-import dayjs from 'dayjs'
-import relativeTime from 'dayjs/plugin/relativeTime'
-import utc from 'dayjs/plugin/utc'
-import 'dayjs/locale/fr'
+import { useDashboard } from '../composables/useDashboard'
 
 const Line = defineAsyncComponent(async () => {
   const [{ Line }, { Chart: ChartJS, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip, Legend }] = await Promise.all([
@@ -408,335 +330,49 @@ const Line = defineAsyncComponent(async () => {
   ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip, Legend)
   return Line
 })
-dayjs.extend(relativeTime)
-dayjs.extend(utc)
-dayjs.locale('fr')
-
-// ─── State ────────────────────────────────────────────────────────────────────
-const latestAgentVersion = ref('')
-const cveSummary = ref(null)
-const proxmoxSummary = ref(null)
-const proxmoxNodes = ref([])
-const proxmoxLinks = ref([]) // confirmed links { host_id, metrics_source, cpu_usage, mem_alloc, mem_usage }
-
-const hosts = ref([])
-const hostMetrics = ref({})
-const versionComparisons = ref([])
-const aptPending = ref(0)
-const aptPendingHosts = ref({})
-const diskUsage = ref({})
-const loading = ref(true)
-
-const searchQuery = ref('')
-const statusFilter = ref('all')
-const sortKey = ref(localStorage.getItem('dashboard.sortKey') || 'name')
-const sortDir = ref(localStorage.getItem('dashboard.sortDir') || 'asc')
-watch(sortKey, v => localStorage.setItem('dashboard.sortKey', v))
-watch(sortDir, v => localStorage.setItem('dashboard.sortDir', v))
-
-const selectedHostIds = ref([])
-const aptLoading = ref('')
-const showDockerVersions = ref(false)
-
-const summaryHours = ref(24)
-const summaryChartData = ref(null)
-const summaryLoading = ref(false)
-// 'agents' | 'proxmox' — auto-switches to proxmox on first load if configured
-const chartSource = ref('agents')
-const chartSources = [
-  { key: 'agents', label: 'Agents hôtes' },
-  { key: 'proxmox', label: 'Nœuds Proxmox' },
-]
-
-const auth = useAuthStore()
-const dialog = useConfirmDialog()
-
-// ─── Computed ─────────────────────────────────────────────────────────────────
-const hasProxmox = computed(() => (proxmoxSummary.value?.connection_count ?? 0) > 0)
-const onlineCount = computed(() => hosts.value.filter(h => h.status === 'online').length)
-const offlineCount = computed(() => hosts.value.filter(h => h.status !== 'online').length)
-const outdatedDockerImages = computed(() => versionComparisons.value.filter(v => !v.is_up_to_date && (v.running_version || v.update_confirmed)).length)
-const outdatedVersions = computed(() => outdatedDockerImages.value + aptPending.value)
-const selectedCount = computed(() => selectedHostIds.value.length)
-const canRunApt = computed(() => auth.role === 'admin' || auth.role === 'operator')
-
-const proxmoxStoragePct = computed(() => {
-  const s = proxmoxSummary.value
-  if (!s || !s.storage_total) return 0
-  return (s.storage_used / s.storage_total) * 100
-})
-
-// Map host_id → confirmed ProxmoxGuestLink (with live guest metrics)
-const proxmoxLinkByHostId = computed(() => {
-  const m = {}
-  for (const link of proxmoxLinks.value) {
-    m[link.host_id] = link
-  }
-  return m
-})
-
-// Returns { cpu: number|null, memPct: number|null } for a host.
-// Uses Proxmox guest data when metrics_source is 'proxmox', or 'auto' with a confirmed link.
-function effectiveMetrics(hostId) {
-  const link = proxmoxLinkByHostId.value[hostId]
-  const agent = hostMetrics.value[hostId]
-
-  if (link) {
-    const src = link.metrics_source
-    const useProxmox = src === 'proxmox' || (src === 'auto' && link.cpu_usage != null)
-    if (useProxmox) {
-      const cpu = link.cpu_usage != null ? link.cpu_usage * 100 : null
-      const memPct = link.mem_alloc > 0 ? (link.mem_usage / link.mem_alloc) * 100 : null
-      return { cpu, memPct, source: 'proxmox' }
-    }
-  }
-  return {
-    cpu: agent?.cpu_usage_percent ?? null,
-    memPct: agent?.memory_percent ?? null,
-    source: 'agent',
-  }
-}
-
-const filteredHosts = computed(() => {
-  const query = searchQuery.value.trim().toLowerCase()
-  return hosts.value.filter((host) => {
-    if (statusFilter.value !== 'all' && host.status !== statusFilter.value) return false
-    if (!query) return true
-    return [host.name, host.hostname, host.ip_address, host.os]
-      .filter(Boolean).join(' ').toLowerCase().includes(query)
-  })
-})
-
-const sortedHosts = computed(() => {
-  const list = [...filteredHosts.value]
-  const direction = sortDir.value === 'asc' ? 1 : -1
-  const statusOrder = { online: 0, warning: 1, offline: 2 }
-
-  list.sort((a, b) => {
-    let aVal, bVal
-    switch (sortKey.value) {
-      case 'status':
-        aVal = statusOrder[a.status] ?? 99
-        bVal = statusOrder[b.status] ?? 99
-        break
-      case 'cpu':
-        aVal = effectiveMetrics(a.id).cpu ?? -1
-        bVal = effectiveMetrics(b.id).cpu ?? -1
-        break
-      case 'apt':
-        aVal = aptPendingHosts.value[a.id] ?? 0
-        bVal = aptPendingHosts.value[b.id] ?? 0
-        break
-      case 'last_seen':
-        aVal = a.last_seen ? new Date(a.last_seen).getTime() : 0
-        bVal = b.last_seen ? new Date(b.last_seen).getTime() : 0
-        break
-      default:
-        aVal = (a.name || a.hostname || '').toLowerCase()
-        bVal = (b.name || b.hostname || '').toLowerCase()
-    }
-    if (aVal < bVal) return -1 * direction
-    if (aVal > bVal) return 1 * direction
-    return 0
-  })
-  return list
-})
-
-// ─── Chart options ────────────────────────────────────────────────────────────
-const summaryChartOptions = computed(() => ({
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: { display: true, position: 'top', labels: { color: '#6b7280', boxWidth: 12, padding: 12 } },
-    tooltip: {
-      enabled: true,
-      mode: 'index',
-      intersect: false,
-      backgroundColor: 'rgba(0,0,0,0.8)',
-      titleColor: '#fff',
-      bodyColor: '#fff',
-      borderColor: '#555',
-      borderWidth: 1,
-      padding: 10,
-      callbacks: {
-        label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1)}%`,
-      },
-    },
-  },
-  scales: {
-    x: { display: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280', maxTicksLimit: 10 } },
-    y: { display: true, min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280' } },
-  },
-  elements: { point: { radius: 0, hitRadius: 10, hoverRadius: 5 }, line: { tension: 0.3 } },
-  interaction: { mode: 'nearest', axis: 'x', intersect: false },
-}))
-
-// ─── WebSocket ────────────────────────────────────────────────────────────────
-const proxmoxAutoSwitched = ref(false)
-
-const { wsStatus, wsError, retryCount, reconnect } = useWebSocket('/api/v1/ws/dashboard', (payload) => {
-  if (payload.type !== 'dashboard') return
-  hosts.value = payload.hosts || []
-  hostMetrics.value = payload.host_metrics || {}
-  versionComparisons.value = payload.version_comparisons || []
-  aptPending.value = payload.apt_pending ?? 0
-  aptPendingHosts.value = payload.apt_pending_hosts || {}
-  diskUsage.value = payload.disk_usage || {}
-  proxmoxNodes.value = payload.proxmox_nodes || []
-  proxmoxLinks.value = payload.proxmox_links || []
-  selectedHostIds.value = selectedHostIds.value.filter(id => hosts.value.some(h => h.id === id))
-  loading.value = false
-
-  // Auto-switch chart to Proxmox nodes on first load when Proxmox is configured
-  if (!proxmoxAutoSwitched.value && proxmoxNodes.value.length > 0) {
-    proxmoxAutoSwitched.value = true
-    chartSource.value = 'proxmox'
-    fetchSummary()
-  }
-}, { debounceMs: 200 })
-
-// ─── Chart fetch ──────────────────────────────────────────────────────────────
-function bucketMinutesFor(hours) {
-  if (hours <= 6) return 1
-  if (hours <= 24) return 5
-  if (hours <= 168) return 15
-  return 60
-}
-
-async function fetchSummary() {
-  summaryLoading.value = true
-  try {
-    const bucketMinutes = bucketMinutesFor(summaryHours.value)
-    const isProxmox = chartSource.value === 'proxmox'
-    const res = isProxmox
-      ? await apiClient.getProxmoxNodeMetrics(summaryHours.value, bucketMinutes)
-      : await apiClient.getMetricsSummary(summaryHours.value, bucketMinutes)
-
-    const points = Array.isArray(res.data) ? res.data : []
-    if (!points.length) { summaryChartData.value = null; return }
-
-    const labels = points.map(p =>
-      summaryHours.value >= 24 ? dayjs(p.timestamp).format('DD/MM HH:mm') : dayjs(p.timestamp).format('HH:mm')
-    )
-    summaryChartData.value = {
-      labels,
-      datasets: [
-        {
-          label: 'CPU %',
-          data: points.map(p => p.cpu_avg),
-          borderColor: '#3b82f6',
-          backgroundColor: 'rgba(59,130,246,0.10)',
-          fill: true,
-        },
-        {
-          label: 'RAM %',
-          data: points.map(p => p.memory_avg),
-          borderColor: '#10b981',
-          backgroundColor: 'rgba(16,185,129,0.10)',
-          fill: true,
-        },
-      ],
-    }
-  } catch {
-    summaryChartData.value = null
-  } finally {
-    summaryLoading.value = false
-  }
-}
-
-function changeSummaryRange(hours) {
-  summaryHours.value = hours
-  fetchSummary()
-}
-
-// ─── Bulk APT ─────────────────────────────────────────────────────────────────
-function selectAllFiltered() {
-  const ids = sortedHosts.value.map(h => h.id)
-  selectedHostIds.value = Array.from(new Set([...selectedHostIds.value, ...ids]))
-}
-
-function clearSelection() { selectedHostIds.value = [] }
-
-async function sendBulkApt(command) {
-  if (!selectedHostIds.value.length || aptLoading.value) return
-  const hostnames = hosts.value
-    .filter(h => selectedHostIds.value.includes(h.id))
-    .map(h => h.hostname || h.name).join(', ')
-  const confirmed = await dialog.confirm({
-    title: `apt ${command}`,
-    message: `Exécuter sur ${selectedHostIds.value.length} hôte(s) :\n${hostnames}`,
-    variant: 'warning',
-  })
-  if (!confirmed) return
-  aptLoading.value = command
-  try {
-    await apiClient.sendAptCommand(selectedHostIds.value, command)
-  } catch (e) {
-    await dialog.confirm({ title: 'Erreur', message: translateError(e), variant: 'danger' })
-  } finally {
-    aptLoading.value = ''
-  }
-}
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-function formatUptime(seconds) {
-  if (!seconds) return 'N/A'
-  const days = Math.floor(seconds / 86400)
-  const hours = Math.floor((seconds % 86400) / 3600)
-  if (days > 0) return `${days}j ${hours}h`
-  return `${hours}h ${Math.floor((seconds % 3600) / 60)}m`
-}
-
-function cpuColor(pct) {
-  if (!pct) return 'text-secondary'
-  if (pct > 90) return 'text-red'
-  if (pct > 70) return 'text-yellow'
-  return 'text-green'
-}
-
-function memColor(pct) {
-  if (!pct) return 'text-secondary'
-  if (pct > 90) return 'text-red'
-  if (pct > 75) return 'text-yellow'
-  return 'text-green'
-}
-
-function diskColor(pct) {
-  if (pct == null) return 'text-secondary'
-  if (pct > 90) return 'text-red'
-  if (pct > 75) return 'text-yellow'
-  return 'text-green'
-}
-
-function isAgentUpToDate(version) {
-  return version && latestAgentVersion.value && version === latestAgentVersion.value
-}
-
-function formatBytes(bytes) {
-  if (!bytes) return '0 B'
-  const units = ['B', 'Ko', 'Mo', 'Go', 'To']
-  let i = 0, v = bytes
-  while (v >= 1024 && i < units.length - 1) { v /= 1024; i++ }
-  return v.toFixed(i === 0 ? 0 : 1) + ' ' + units[i]
-}
-
-// ─── Init ─────────────────────────────────────────────────────────────────────
-async function fetchProxmoxSummary() {
-  try {
-    const res = await apiClient.getProxmoxSummary()
-    proxmoxSummary.value = res.data
-  } catch { /* non-critique */ }
-}
-
-onMounted(() => {
-  loading.value = true
-  fetchSummary()
-  fetchProxmoxSummary()
-  apiClient.getSettings().then(r => {
-    latestAgentVersion.value = r.data?.settings?.latestAgentVersion || ''
-  }).catch(() => {})
-  apiClient.getAptCVESummary().then(r => {
-    cveSummary.value = r.data
-  }).catch(() => {})
-})
+const {
+  hosts,
+  aptPending,
+  versionComparisons,
+  proxmoxSummary,
+  hasProxmox,
+  outdatedDockerImages,
+  cveSummary,
+  proxmoxNodes,
+  hostMetrics,
+  aptPendingHosts,
+  diskUsage,
+  loading,
+  searchQuery,
+  statusFilter,
+  sortKey,
+  sortDir,
+  selectedHostIds,
+  aptLoading,
+  showDockerVersions,
+  summaryHours,
+  summaryChartData,
+  summaryLoading,
+  chartSource,
+  chartSources,
+  selectedCount,
+  canRunApt,
+  wsStatus,
+  wsError,
+  retryCount,
+  reconnect,
+  effectiveMetrics,
+  sortedHosts,
+  summaryChartOptions,
+  fetchSummary,
+  changeSummaryRange,
+  selectAllFiltered,
+  clearSelection,
+  sendBulkApt,
+  formatUptime,
+  cpuColor,
+  memColor,
+  diskColor,
+  isAgentUpToDate,
+} = useDashboard()
 </script>

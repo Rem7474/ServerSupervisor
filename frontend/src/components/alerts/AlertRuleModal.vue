@@ -10,20 +10,20 @@
           <div class="modal-body">
             <div class="mb-3">
               <label class="form-label required">Nom</label>
-              <input v-model="form.name" type="text" class="form-control" placeholder="Ex: CPU eleve sur serveur web" />
+              <input v-model="form.name" type="text" class="form-control" placeholder="Ex: CPU élevé sur serveur web" />
             </div>
 
             <div class="mb-3">
-              <label class="form-label">Hote cible</label>
+              <label class="form-label">Hôte cible</label>
               <select v-model="form.host_id" class="form-select">
-                <option :value="null">Tous les hotes</option>
+                <option :value="null">Tous les hôtes</option>
                 <option v-for="host in hosts" :key="host.id" :value="host.id">{{ host.name }}</option>
               </select>
             </div>
 
             <div class="row">
               <div class="col-md-4 mb-3">
-                <label class="form-label required">Metrique</label>
+                <label class="form-label required">Métrique</label>
                 <select v-model="form.metric" class="form-select" @change="onMetricChange">
                   <optgroup label="Système">
                     <option value="cpu">CPU (%)</option>
@@ -42,12 +42,12 @@
                 </select>
               </div>
               <div v-if="form.metric !== 'heartbeat_timeout'" class="col-md-4 mb-3">
-                <label class="form-label required">Operateur</label>
+                <label class="form-label required">Opérateur</label>
                 <select v-model="form.operator" class="form-select">
-                  <option value=">">Superieur a (>)</option>
-                  <option value=">=">Superieur ou egal (>=)</option>
-                  <option value="<">Inferieur a (<)</option>
-                  <option value="<=">Inferieur ou egal (<=)</option>
+                  <option value=">">Supérieur à (>)</option>
+                  <option value=">=">Supérieur ou égal (>=)</option>
+                  <option value="<">Inférieur à (&lt;)</option>
+                  <option value="<=">Inférieur ou égal (&lt;=)</option>
                 </select>
               </div>
               <div class="col-md-4 mb-3">
@@ -60,17 +60,17 @@
                   :placeholder="form.metric === 'heartbeat_timeout' ? '300' : '80'"
                 />
                 <small v-if="form.metric === 'heartbeat_timeout'" class="form-hint">
-                  Duree en secondes sans rapport avant alerte.
+                  Durée en secondes sans rapport avant alerte.
                 </small>
               </div>
             </div>
 
             <div v-if="form.metric !== 'heartbeat_timeout'" class="mb-3">
-              <label class="form-label">Duree (secondes)</label>
+              <label class="form-label">Durée (secondes)</label>
               <input v-model.number="form.duration" type="number" class="form-control" placeholder="300" />
-              <small class="form-hint">Le seuil doit etre depasse pendant cette duree avant de declencher l'alerte.</small>
+              <small class="form-hint">Le seuil doit être dépassé pendant cette durée avant de déclencher l'alerte.</small>
               <small v-if="form.duration > 0" class="form-hint text-warning d-block mt-1">
-                Si l'agent reporte toutes les 60s, une duree inferieure peut empecher le declenchement.
+                Si l'agent reporte toutes les 60s, une durée inférieure peut empêcher le déclenchement.
               </small>
             </div>
 
@@ -98,22 +98,22 @@
               </div>
               <div v-if="channelBrowser" class="mt-2">
                 <div v-if="browserPermission === 'denied'" class="alert alert-warning py-2 small mb-0">
-                  Notifications bloquees par le navigateur.
+                  Notifications bloquées par le navigateur.
                 </div>
                 <div v-else-if="browserPermission === 'granted'" class="alert alert-success py-2 small mb-0">
-                  Notifications navigateur autorisees.
+                  Notifications navigateur autorisées.
                 </div>
                 <div v-else-if="browserPermission === 'unsupported'" class="alert alert-warning py-2 small mb-0">
                   Ce navigateur ne supporte pas les notifications.
                 </div>
-                <div v-else class="text-secondary small mt-1">La permission sera demandee a l'enregistrement.</div>
+                <div v-else class="text-secondary small mt-1">La permission sera demandée à l'enregistrement.</div>
               </div>
             </div>
 
             <div v-if="channelSmtp" class="mb-3">
               <label class="form-label">Destinataire(s) email</label>
               <input v-model="form.actions.smtp_to" type="text" class="form-control" placeholder="admin@example.com, ops@example.com" />
-              <small class="form-hint">Separez plusieurs emails par des virgules</small>
+              <small class="form-hint">Séparez plusieurs emails par des virgules</small>
             </div>
 
             <div v-if="channelNtfy" class="mb-3">
@@ -130,19 +130,19 @@
             <div class="mb-3">
               <label class="form-check">
                 <input v-model="form.enabled" class="form-check-input" type="checkbox" />
-                <span class="form-check-label">Activer immediatement</span>
+                <span class="form-check-label">Activer immédiatement</span>
               </label>
             </div>
 
             <div v-if="testResults" class="mt-3">
               <div v-if="hasNoDataResults" class="alert alert-warning py-2 small mb-2">
-                <strong>Aucune donnee disponible</strong> pour un ou plusieurs hotes.
+                <strong>Aucune donnée disponible</strong> pour un ou plusieurs hôtes.
               </div>
               <div class="d-flex align-items-center justify-content-between mb-2">
                 <div class="fw-bold">
-                  Resultat du test
+                  Résultat du test
                   <span v-if="testResults.any_fires" class="badge bg-danger-lt text-danger ms-2">Declencherait une alerte</span>
-                  <span v-else class="badge bg-success-lt text-success ms-2">Aucune alerte declenchee</span>
+                  <span v-else class="badge bg-success-lt text-success ms-2">Aucune alerte déclenchée</span>
                 </div>
                 <span class="text-secondary small">{{ formatDate(testResults.evaluated_at) }}</span>
               </div>
@@ -150,20 +150,20 @@
                 <table class="table table-sm table-vcenter card-table">
                   <thead>
                     <tr>
-                      <th>Hote</th>
+                      <th>Hôte</th>
                       <th>Valeur actuelle</th>
-                      <th>Resultat</th>
+                      <th>Résultat</th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr v-if="!testResults.results?.length">
-                      <td colspan="3" class="text-center text-secondary">Aucun hote concerne</td>
+                      <td colspan="3" class="text-center text-secondary">Aucun hôte concerné</td>
                     </tr>
                     <tr v-for="result in testResults.results" :key="result.host_id">
                       <td class="fw-medium">{{ result.host_name }}</td>
                       <td>
                         <span v-if="result.has_data">{{ result.current_value.toFixed(1) }}{{ getMetricUnit(form.metric) }}</span>
-                        <span v-else class="text-secondary">Pas de donnees</span>
+                        <span v-else class="text-secondary">Pas de données</span>
                       </td>
                       <td>
                         <span v-if="result.would_fire" class="badge bg-danger-lt text-danger">Alerte</span>
@@ -187,7 +187,7 @@
             </button>
             <button @click="submit" type="button" class="btn btn-primary" :disabled="saving">
               <span v-if="saving" class="spinner-border spinner-border-sm me-2"></span>
-              {{ rule ? 'Mettre a jour' : 'Creer' }}
+              {{ rule ? 'Mettre à jour' : 'Créer' }}
             </button>
           </div>
         </div>

@@ -1,0 +1,403 @@
+import { ref, computed, watch, onMounted } from 'vue'
+import { storeToRefs } from 'pinia'
+import apiClient from '../api'
+import { useAuthStore } from '../stores/auth'
+import { useDashboardStore } from '../stores/dashboard'
+import { useWebSocket } from './useWebSocket'
+import { useConfirmDialog } from './useConfirmDialog'
+import { translateError } from '../utils/translateError'
+import dayjs from 'dayjs'
+import relativeTime from 'dayjs/plugin/relativeTime'
+import utc from 'dayjs/plugin/utc'
+import 'dayjs/locale/fr'
+
+dayjs.extend(relativeTime)
+dayjs.extend(utc)
+dayjs.locale('fr')
+
+type AnyRecord = Record<string, any>
+type SortDirection = 'asc' | 'desc'
+type HostStatus = 'online' | 'warning' | 'offline'
+
+interface SummaryDataset {
+  label: string
+  data: number[]
+  borderColor: string
+  backgroundColor: string
+  fill: boolean
+}
+
+interface SummaryChartData {
+  labels: string[]
+  datasets: SummaryDataset[]
+}
+
+export function useDashboard() {
+  const dashboardStore = useDashboardStore()
+  const {
+    hosts,
+    aptPending,
+    versionComparisons,
+    proxmoxSummary,
+    hasProxmox,
+    outdatedDockerImages,
+  } = storeToRefs(dashboardStore)
+
+  const latestAgentVersion = ref('')
+  const cveSummary = ref<AnyRecord | null>(null)
+  const proxmoxNodes = ref<AnyRecord[]>([])
+  const proxmoxLinks = ref<AnyRecord[]>([])
+
+  const hostMetrics = ref<Record<string, AnyRecord>>({})
+  const aptPendingHosts = ref<Record<string, number>>({})
+  const diskUsage = ref<Record<string, number>>({})
+  const loading = ref(true)
+
+  const searchQuery = ref('')
+  const statusFilter = ref('all')
+  const sortKey = ref(localStorage.getItem('dashboard.sortKey') || 'name')
+  const sortDir = ref<SortDirection>((localStorage.getItem('dashboard.sortDir') as SortDirection) || 'asc')
+  watch(sortKey, (v) => localStorage.setItem('dashboard.sortKey', v))
+  watch(sortDir, (v) => localStorage.setItem('dashboard.sortDir', v))
+
+  const selectedHostIds = ref<string[]>([])
+  const aptLoading = ref('')
+  const showDockerVersions = ref(false)
+
+  const summaryHours = ref(24)
+  const summaryChartData = ref<SummaryChartData | null>(null)
+  const summaryLoading = ref(false)
+  const chartSource = ref('agents')
+  const chartSources = [
+    { key: 'agents', label: 'Agents hôtes' },
+    { key: 'proxmox', label: 'Nœuds Proxmox' },
+  ]
+
+  const auth = useAuthStore()
+  const dialog = useConfirmDialog()
+
+  const selectedCount = computed(() => selectedHostIds.value.length)
+  const canRunApt = computed(() => auth.role === 'admin' || auth.role === 'operator')
+
+  const proxmoxLinkByHostId = computed(() => {
+    const m: Record<string, AnyRecord> = {}
+    for (const link of proxmoxLinks.value) {
+      m[link.host_id] = link
+    }
+    return m
+  })
+
+  function effectiveMetrics(hostId: string) {
+    const link = proxmoxLinkByHostId.value[hostId]
+    const agent = hostMetrics.value[hostId]
+
+    if (link) {
+      const src = link.metrics_source
+      const useProxmox = src === 'proxmox' || (src === 'auto' && link.cpu_usage != null)
+      if (useProxmox) {
+        const cpu = link.cpu_usage != null ? link.cpu_usage * 100 : null
+        const memPct = link.mem_alloc > 0 ? (link.mem_usage / link.mem_alloc) * 100 : null
+        return { cpu, memPct, source: 'proxmox' }
+      }
+    }
+    return {
+      cpu: agent?.cpu_usage_percent ?? null,
+      memPct: agent?.memory_percent ?? null,
+      source: 'agent',
+    }
+  }
+
+  const filteredHosts = computed(() => {
+    const query = searchQuery.value.trim().toLowerCase()
+    return hosts.value.filter((host: AnyRecord) => {
+      if (statusFilter.value !== 'all' && host.status !== statusFilter.value) return false
+      if (!query) return true
+      return [host.name, host.hostname, host.ip_address, host.os]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+        .includes(query)
+    })
+  })
+
+  const sortedHosts = computed(() => {
+    const list = [...filteredHosts.value]
+    const direction = sortDir.value === 'asc' ? 1 : -1
+    const statusOrder: Record<HostStatus, number> = { online: 0, warning: 1, offline: 2 }
+
+    list.sort((a: AnyRecord, b: AnyRecord) => {
+      let aVal, bVal
+      switch (sortKey.value) {
+        case 'status':
+          aVal = statusOrder[(a.status as HostStatus)] ?? 99
+          bVal = statusOrder[(b.status as HostStatus)] ?? 99
+          break
+        case 'cpu':
+          aVal = effectiveMetrics(a.id).cpu ?? -1
+          bVal = effectiveMetrics(b.id).cpu ?? -1
+          break
+        case 'apt':
+          aVal = aptPendingHosts.value[a.id] ?? 0
+          bVal = aptPendingHosts.value[b.id] ?? 0
+          break
+        case 'last_seen':
+          aVal = a.last_seen ? new Date(a.last_seen).getTime() : 0
+          bVal = b.last_seen ? new Date(b.last_seen).getTime() : 0
+          break
+        default:
+          aVal = (a.name || a.hostname || '').toLowerCase()
+          bVal = (b.name || b.hostname || '').toLowerCase()
+      }
+      if (aVal < bVal) return -1 * direction
+      if (aVal > bVal) return 1 * direction
+      return 0
+    })
+    return list
+  })
+
+  const summaryChartOptions = computed(() => ({
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: true, position: 'top', labels: { color: '#6b7280', boxWidth: 12, padding: 12 } },
+      tooltip: {
+        enabled: true,
+        mode: 'index',
+        intersect: false,
+        backgroundColor: 'rgba(0,0,0,0.8)',
+        titleColor: '#fff',
+        bodyColor: '#fff',
+        borderColor: '#555',
+        borderWidth: 1,
+        padding: 10,
+        callbacks: {
+          label: (ctx: AnyRecord) => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1)}%`,
+        },
+      },
+    },
+    scales: {
+      x: { display: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280', maxTicksLimit: 10 } },
+      y: { display: true, min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280' } },
+    },
+    elements: { point: { radius: 0, hitRadius: 10, hoverRadius: 5 }, line: { tension: 0.3 } },
+    interaction: { mode: 'nearest', axis: 'x', intersect: false },
+  }))
+
+  const proxmoxAutoSwitched = ref(false)
+
+  const { wsStatus, wsError, retryCount, reconnect } = useWebSocket('/api/v1/ws/dashboard', (payload: AnyRecord) => {
+    if (payload.type !== 'dashboard') return
+    dashboardStore.setHosts(payload.hosts || [])
+    hostMetrics.value = payload.host_metrics || {}
+    dashboardStore.setVersionComparisons(payload.version_comparisons || [])
+    dashboardStore.setAptPending(payload.apt_pending ?? 0)
+    aptPendingHosts.value = payload.apt_pending_hosts || {}
+    diskUsage.value = payload.disk_usage || {}
+    proxmoxNodes.value = payload.proxmox_nodes || []
+    proxmoxLinks.value = payload.proxmox_links || []
+    selectedHostIds.value = selectedHostIds.value.filter((id) => hosts.value.some((h: AnyRecord) => h.id === id))
+    loading.value = false
+
+    if (!proxmoxAutoSwitched.value && proxmoxNodes.value.length > 0) {
+      proxmoxAutoSwitched.value = true
+      chartSource.value = 'proxmox'
+      fetchSummary()
+    }
+  }, { debounceMs: 200 })
+
+  function bucketMinutesFor(hours: number) {
+    if (hours <= 6) return 1
+    if (hours <= 24) return 5
+    if (hours <= 168) return 15
+    return 60
+  }
+
+  async function fetchSummary() {
+    summaryLoading.value = true
+    try {
+      const bucketMinutes = bucketMinutesFor(summaryHours.value)
+      const isProxmox = chartSource.value === 'proxmox'
+      const res = isProxmox
+        ? await apiClient.getProxmoxNodeMetrics(summaryHours.value, bucketMinutes)
+        : await apiClient.getMetricsSummary(summaryHours.value, bucketMinutes)
+
+      const points: AnyRecord[] = Array.isArray(res.data) ? res.data : []
+      if (!points.length) {
+        summaryChartData.value = null
+        return
+      }
+
+      const labels = points.map((p: AnyRecord) =>
+        summaryHours.value >= 24 ? dayjs(p.timestamp).format('DD/MM HH:mm') : dayjs(p.timestamp).format('HH:mm')
+      )
+      summaryChartData.value = {
+        labels,
+        datasets: [
+          {
+            label: 'CPU %',
+            data: points.map((p: AnyRecord) => Number(p.cpu_avg ?? 0)),
+            borderColor: '#3b82f6',
+            backgroundColor: 'rgba(59,130,246,0.10)',
+            fill: true,
+          },
+          {
+            label: 'RAM %',
+            data: points.map((p: AnyRecord) => Number(p.memory_avg ?? 0)),
+            borderColor: '#10b981',
+            backgroundColor: 'rgba(16,185,129,0.10)',
+            fill: true,
+          },
+        ],
+      }
+    } catch {
+      summaryChartData.value = null
+    } finally {
+      summaryLoading.value = false
+    }
+  }
+
+  function changeSummaryRange(hours: number) {
+    summaryHours.value = hours
+    fetchSummary()
+  }
+
+  function selectAllFiltered() {
+    const ids = sortedHosts.value.map((h: AnyRecord) => h.id)
+    selectedHostIds.value = Array.from(new Set([...selectedHostIds.value, ...ids]))
+  }
+
+  function clearSelection() {
+    selectedHostIds.value = []
+  }
+
+  async function sendBulkApt(command: string) {
+    if (!selectedHostIds.value.length || aptLoading.value) return
+    const hostnames = hosts.value
+      .filter((h: AnyRecord) => selectedHostIds.value.includes(h.id))
+      .map((h: AnyRecord) => h.hostname || h.name)
+      .join(', ')
+    const confirmed = await dialog.confirm({
+      title: `apt ${command}`,
+      message: `Exécuter sur ${selectedHostIds.value.length} hôte(s) :\n${hostnames}`,
+      variant: 'warning',
+    })
+    if (!confirmed) return
+    aptLoading.value = command
+    try {
+      await apiClient.sendAptCommand(selectedHostIds.value, command)
+    } catch (e: any) {
+      await dialog.confirm({ title: 'Erreur', message: translateError(e), variant: 'danger' })
+    } finally {
+      aptLoading.value = ''
+    }
+  }
+
+  function formatUptime(seconds: number) {
+    if (!seconds) return 'N/A'
+    const days = Math.floor(seconds / 86400)
+    const hours = Math.floor((seconds % 86400) / 3600)
+    if (days > 0) return `${days}j ${hours}h`
+    return `${hours}h ${Math.floor((seconds % 3600) / 60)}m`
+  }
+
+  function cpuColor(pct: number | null | undefined) {
+    if (!pct) return 'text-secondary'
+    if (pct > 90) return 'text-red'
+    if (pct > 70) return 'text-yellow'
+    return 'text-green'
+  }
+
+  function memColor(pct: number | null | undefined) {
+    if (!pct) return 'text-secondary'
+    if (pct > 90) return 'text-red'
+    if (pct > 75) return 'text-yellow'
+    return 'text-green'
+  }
+
+  function diskColor(pct: number | null | undefined) {
+    if (pct == null) return 'text-secondary'
+    if (pct > 90) return 'text-red'
+    if (pct > 75) return 'text-yellow'
+    return 'text-green'
+  }
+
+  function isAgentUpToDate(version: string) {
+    return version && latestAgentVersion.value && version === latestAgentVersion.value
+  }
+
+  async function fetchProxmoxSummary() {
+    try {
+      const res = await apiClient.getProxmoxSummary()
+      dashboardStore.setProxmoxSummary(res.data)
+    } catch {
+      // non-critique
+    }
+  }
+
+  onMounted(() => {
+    loading.value = true
+    fetchSummary()
+    fetchProxmoxSummary()
+    apiClient
+      .getSettings()
+      .then((r) => {
+        latestAgentVersion.value = r.data?.settings?.latestAgentVersion || ''
+      })
+      .catch(() => {})
+    apiClient
+      .getAptCVESummary()
+      .then((r) => {
+        cveSummary.value = r.data
+      })
+      .catch(() => {})
+  })
+
+  return {
+    hosts,
+    aptPending,
+    versionComparisons,
+    proxmoxSummary,
+    hasProxmox,
+    outdatedDockerImages,
+    latestAgentVersion,
+    cveSummary,
+    proxmoxNodes,
+    proxmoxLinks,
+    hostMetrics,
+    aptPendingHosts,
+    diskUsage,
+    loading,
+    searchQuery,
+    statusFilter,
+    sortKey,
+    sortDir,
+    selectedHostIds,
+    aptLoading,
+    showDockerVersions,
+    summaryHours,
+    summaryChartData,
+    summaryLoading,
+    chartSource,
+    chartSources,
+    selectedCount,
+    canRunApt,
+    wsStatus,
+    wsError,
+    retryCount,
+    reconnect,
+    effectiveMetrics,
+    filteredHosts,
+    sortedHosts,
+    summaryChartOptions,
+    fetchSummary,
+    changeSummaryRange,
+    selectAllFiltered,
+    clearSelection,
+    sendBulkApt,
+    formatUptime,
+    cpuColor,
+    memColor,
+    diskColor,
+    isAgentUpToDate,
+  }
+}
