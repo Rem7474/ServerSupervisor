@@ -249,7 +249,11 @@
               </tr>
               <tr v-for="g in vms" :key="g.id">
                 <td class="text-muted">{{ g.vmid }}</td>
-                <td class="fw-medium">{{ g.name || '—' }}</td>
+                <td class="fw-medium">
+                  <router-link :to="`/proxmox/guests/${g.id}?nodeId=${route.params.id}`" class="text-decoration-none">
+                    {{ g.name || '—' }}
+                  </router-link>
+                </td>
                 <td><span :class="guestStatusClass(g.status)">{{ g.status }}</span></td>
                 <td>
                   <span v-if="guestNetworksLoading" class="text-muted small">…</span>
@@ -304,7 +308,11 @@
               </tr>
               <tr v-for="g in lxcs" :key="g.id">
                 <td class="text-muted">{{ g.vmid }}</td>
-                <td class="fw-medium">{{ g.name || '—' }}</td>
+                <td class="fw-medium">
+                  <router-link :to="`/proxmox/guests/${g.id}?nodeId=${route.params.id}`" class="text-decoration-none">
+                    {{ g.name || '—' }}
+                  </router-link>
+                </td>
                 <td><span :class="guestStatusClass(g.status)">{{ g.status }}</span></td>
                 <td>
                   <span v-if="guestNetworksLoading" class="text-muted small">…</span>
@@ -580,7 +588,7 @@
 import { ref, computed, shallowRef, onMounted, onUnmounted, defineAsyncComponent, defineComponent, h } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import CommandLogPanel from '../components/CommandLogPanel.vue'
-import api from '../api/index.js'
+import api from '../api'
 
 const Line = defineAsyncComponent(async () => {
   const [{ Line }, { Chart: ChartJS, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip }] = await Promise.all([
@@ -759,6 +767,10 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
+    const requestedTab = String(route.query.tab || '')
+    if (requestedTab === 'vms' || requestedTab === 'lxc' || requestedTab === 'storage' || requestedTab === 'disks' || requestedTab === 'tasks' || requestedTab === 'updates' || requestedTab === 'services') {
+      tab.value = requestedTab
+    }
     const res = await api.getProxmoxNode(route.params.id)
     node.value = res.data
     await loadGuestLinks()

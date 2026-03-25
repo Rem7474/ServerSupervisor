@@ -128,6 +128,12 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../views/ProxmoxNodeView.vue'),
     meta: { requiresAuth: true },
   },
+  {
+    path: '/proxmox/guests/:id',
+    name: 'ProxmoxGuest',
+    component: () => import('../views/ProxmoxGuestView.vue'),
+    meta: { requiresAuth: true },
+  },
   { path: '/:pathMatch(.*)*', redirect: '/' },
 ]
 

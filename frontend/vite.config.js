@@ -26,5 +26,21 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined
+
+          if (id.includes('cytoscape') || id.includes('d3-force')) return 'vendor-graph'
+          if (id.includes('chart.js') || id.includes('vue-chartjs')) return 'vendor-chart'
+          if (id.includes('vue') || id.includes('pinia') || id.includes('vue-router')) return 'vendor-vue'
+          if (id.includes('axios')) return 'vendor-http'
+          if (id.includes('dayjs')) return 'vendor-date'
+          if (id.includes('@tabler')) return 'vendor-tabler'
+
+          return 'vendor-misc'
+        },
+      },
+    },
   },
 })

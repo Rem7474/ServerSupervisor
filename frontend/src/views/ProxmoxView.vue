@@ -139,8 +139,16 @@
                 <span v-if="node.cluster_name" class="text-secondary">{{ node.cluster_name }}</span>
                 <span v-else class="text-muted">—</span>
               </td>
-              <td>{{ node.vm_count }}</td>
-              <td>{{ node.lxc_count }}</td>
+              <td>
+                <router-link :to="`/proxmox/nodes/${node.id}?tab=vms`" class="badge bg-azure-lt text-azure text-decoration-none">
+                  {{ node.vm_count }}
+                </router-link>
+              </td>
+              <td>
+                <router-link :to="`/proxmox/nodes/${node.id}?tab=lxc`" class="badge bg-azure-lt text-azure text-decoration-none">
+                  {{ node.lxc_count }}
+                </router-link>
+              </td>
               <td>
                 <div class="d-flex align-items-center gap-2">
                   <div class="progress progress-xs flex-grow-1" style="min-width:60px">
@@ -178,7 +186,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
-import api from '../api/index.js'
+import api from '../api'
 
 const auth = useAuthStore()
 

@@ -189,6 +189,11 @@
                   {{ host.name || host.hostname || 'Sans nom' }}
                 </router-link>
                 <div class="text-secondary small">{{ host.hostname || 'Non connecté' }}</div>
+                <div v-if="proxmoxGuestPath(host.id)" class="mt-1">
+                  <router-link :to="proxmoxGuestPath(host.id)" class="badge bg-orange-lt text-orange text-decoration-none">
+                    Stats VM/LXC Proxmox
+                  </router-link>
+                </div>
               </td>
               <td>
                 <span :class="hostStatusClass(host.status)">{{ formatHostStatus(host.status) }}</span>
@@ -313,7 +318,7 @@
 </template>
 
 <script setup>
-import { defineAsyncComponent } from 'vue'
+import { computed, defineAsyncComponent } from 'vue'
 import RelativeTime from '../components/RelativeTime.vue'
 import WsStatusBar from '../components/WsStatusBar.vue'
 import ProxmoxClusterCard from '../components/ProxmoxClusterCard.vue'
@@ -339,6 +344,7 @@ const {
   outdatedDockerImages,
   cveSummary,
   proxmoxNodes,
+  proxmoxLinks,
   hostMetrics,
   aptPendingHosts,
   diskUsage,
@@ -375,4 +381,19 @@ const {
   diskColor,
   isAgentUpToDate,
 } = useDashboard()
+
+const proxmoxLinkByHostId = computed(() => {
+  const map = {}
+  for (const link of proxmoxLinks.value || []) {
+    if (!link?.host_id || !link?.guest_id) continue
+    map[link.host_id] = link
+  }
+  return map
+})
+
+function proxmoxGuestPath(hostId) {
+  const link = proxmoxLinkByHostId.value[hostId]
+  if (!link || !link.guest_id || link.status === 'ignored') return ''
+  return `/proxmox/guests/${link.guest_id}`
+}
 </script>
