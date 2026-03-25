@@ -33,17 +33,55 @@
     <div v-show="activeTab === 'commandes'" class="side-layout">
       <!-- Left: table -->
       <div class="side-main">
+        <DataToolbar
+          searchable
+          :search="cmdSearch"
+          search-placeholder="Rechercher une commande..."
+          @update:search="cmdSearch = $event"
+        >
+          <template #bottom>
+            <div class="row g-2">
+              <div class="col-12 col-md-4">
+                <select v-model="cmdHostFilter" class="form-select form-select-sm">
+                  <option value="">Tous les hôtes</option>
+                  <option v-for="h in cmdHosts" :key="h" :value="h">{{ h }}</option>
+                </select>
+              </div>
+              <div class="col-6 col-md-4">
+                <select v-model="cmdStatusFilter" class="form-select form-select-sm">
+                  <option value="">Tous les états</option>
+                  <option value="pending">pending</option>
+                  <option value="running">running</option>
+                  <option value="completed">completed</option>
+                  <option value="failed">failed</option>
+                </select>
+              </div>
+              <div class="col-6 col-md-4">
+                <select v-model="cmdModuleFilter" class="form-select form-select-sm">
+                  <option value="">Tous les modules</option>
+                  <option value="apt">APT</option>
+                  <option value="docker">Docker</option>
+                  <option value="systemd">Systemd</option>
+                  <option value="journal">Journal</option>
+                  <option value="processes">Processus</option>
+                  <option value="custom">Custom</option>
+                </select>
+              </div>
+            </div>
+          </template>
+        </DataToolbar>
+
         <div class="card">
           <div class="table-responsive">
             <table class="table table-vcenter card-table">
               <thead>
                 <tr>
-                  <th>Date</th>
-                  <th>Hôte</th>
-                  <th>Type</th>
-                  <th>Commande</th>
-                  <th>Utilisateur</th>
-                  <th>Statut</th>
+                  <th><SortableHeader label="Date" :active="cmdSortBy === 'created_at'" :direction="cmdSortDir" @toggle="toggleCmdSort('created_at')" /></th>
+                  <th><SortableHeader label="Hôte" :active="cmdSortBy === 'host_name'" :direction="cmdSortDir" @toggle="toggleCmdSort('host_name')" /></th>
+                  <th><SortableHeader label="Type" :active="cmdSortBy === 'module'" :direction="cmdSortDir" @toggle="toggleCmdSort('module')" /></th>
+                  <th><SortableHeader label="Commande" :active="cmdSortBy === 'command'" :direction="cmdSortDir" @toggle="toggleCmdSort('command')" /></th>
+                  <th><SortableHeader label="Utilisateur" :active="cmdSortBy === 'triggered_by'" :direction="cmdSortDir" @toggle="toggleCmdSort('triggered_by')" /></th>
+                  <th><SortableHeader label="Statut" :active="cmdSortBy === 'status'" :direction="cmdSortDir" @toggle="toggleCmdSort('status')" /></th>
                   <th>Durée</th>
                   <th></th>
                 </tr>
@@ -52,11 +90,11 @@
                 <tr v-if="cmdsLoading">
                   <td colspan="8" class="text-center text-secondary py-3">Chargement...</td>
                 </tr>
-                <tr v-else-if="!cmds.length">
+                <tr v-else-if="!displayedCmds.length">
                   <td colspan="8" class="text-center text-secondary py-4">Aucune commande enregistrée</td>
                 </tr>
                 <tr
-                  v-for="cmd in cmds"
+                  v-for="cmd in displayedCmds"
                   :key="cmd.id"
                   :class="{ 'table-active': selectedCmd?.id === cmd.id }"
                 >
@@ -233,6 +271,8 @@ import { useStatusBadge } from '../composables/useStatusBadge'
 import { useCommandStream } from '../composables/useCommandStream'
 import PaginationNav from '../components/PaginationNav.vue'
 import CommandLogPanel from '../components/CommandLogPanel.vue'
+import DataToolbar from '../components/common/DataToolbar.vue'
+import SortableHeader from '../components/common/SortableHeader.vue'
 
 const { formatLocaleDateTime: formatDate } = useDateFormatter()
 const { getStatusBadgeClass } = useStatusBadge()
@@ -252,6 +292,75 @@ const cmdsLoading = ref(false)
 const cmdsLoaded = ref(false)
 
 const totalCmdsPages = computed(() => Math.max(1, Math.ceil(cmdsTotal.value / cmdsLimit)))
+const cmdSearch = ref('')
+const cmdHostFilter = ref('')
+const cmdStatusFilter = ref('')
+const cmdModuleFilter = ref('')
+const cmdSortBy = ref('created_at')
+const cmdSortDir = ref('desc')
+
+const cmdHosts = computed(() => {
+  const seen = new Set()
+  return cmds.value
+    .map((c) => c.host_name || c.host_id || '')
+    .filter((h) => {
+      if (!h || seen.has(h)) return false
+      seen.add(h)
+      return true
+    })
+    .sort((a, b) => a.localeCompare(b))
+})
+
+const displayedCmds = computed(() => {
+  const q = cmdSearch.value.trim().toLowerCase()
+  const arr = cmds.value.filter((c) => {
+    const hostName = (c.host_name || c.host_id || '').toLowerCase()
+    const cmdText = cmdLabel(c).toLowerCase()
+    const user = (c.triggered_by || '').toLowerCase()
+
+    const matchSearch = !q || hostName.includes(q) || cmdText.includes(q) || user.includes(q)
+    const matchHost = !cmdHostFilter.value || (c.host_name || c.host_id || '') === cmdHostFilter.value
+    const matchStatus = !cmdStatusFilter.value || c.status === cmdStatusFilter.value
+    const matchModule = !cmdModuleFilter.value || c.module === cmdModuleFilter.value
+    return matchSearch && matchHost && matchStatus && matchModule
+  })
+
+  const dir = cmdSortDir.value === 'asc' ? 1 : -1
+  arr.sort((a, b) => {
+    const key = cmdSortBy.value
+    let av
+    let bv
+
+    if (key === 'created_at') {
+      av = new Date(a.created_at || 0).getTime()
+      bv = new Date(b.created_at || 0).getTime()
+      if (av < bv) return -1 * dir
+      if (av > bv) return 1 * dir
+      return 0
+    }
+
+    if (key === 'command') {
+      av = cmdLabel(a)
+      bv = cmdLabel(b)
+    } else {
+      av = a[key] || ''
+      bv = b[key] || ''
+    }
+
+    return String(av).toLowerCase().localeCompare(String(bv).toLowerCase()) * dir
+  })
+
+  return arr
+})
+
+function toggleCmdSort(key) {
+  if (cmdSortBy.value === key) {
+    cmdSortDir.value = cmdSortDir.value === 'asc' ? 'desc' : 'asc'
+    return
+  }
+  cmdSortBy.value = key
+  cmdSortDir.value = key === 'created_at' ? 'desc' : 'asc'
+}
 
 // Log viewer
 const selectedCmd = ref(null)

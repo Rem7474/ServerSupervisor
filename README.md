@@ -59,7 +59,8 @@ Système de supervision d'infrastructure : monitoring de VMs, conteneurs Docker,
 - **Audit → Connexions** : logs de connexion avec statistiques et IPs bloquées (admin)
 - **Tâches planifiées** : création de tâches cron par hôte (apt, docker, systemd, journal, processus ou custom), déclenchement manuel immédiat, historique des exécutions
 - **Alertes** : règles d'alertes configurables avec notifications email (SMTP), ntfy, webhook ou notifications navigateur
-- **Sécurité** : résumé des connexions 24h, IPs bloquées, déblocage manuel
+- **Sécurité** : résumé des connexions 24h, IPs bloquées, déblocage manuel, et détection des scans/bots web (logs Nginx/Apache/NPM)
+- **UI cohérente** : barres de recherche/filtres/tri harmonisées sur les vues principales (Docker, APT, Audit)
 - **Proxmox VE** : supervision de l'infrastructure de virtualisation via API Proxmox (sans agent sur l'hyperviseur) — nœuds, VMs QEMU, conteneurs LXC, stockage ; polling configurable par connexion
 
 ### Proxmox VE (supervision sans agent)
@@ -81,6 +82,7 @@ Système de supervision d'infrastructure : monitoring de VMs, conteneurs Docker,
 - Monitoring Docker via CLI (conteneurs, réseaux, projets compose, variables d'environnement)
 - Détection des mises à jour APT disponibles, extraction des CVEs
 - Collecte S.M.A.R.T. et métriques disques (via `smartctl`)
+- Détection d'activité bot/scanner web (parsing access logs Nginx/Apache/httpd/NPM, top IPs/paths suspects)
 - Exécution de commandes distantes : APT, Docker/Compose, systemd, journalctl, snapshot processus
 - **Tâches custom** : exécution de scripts/binaires locaux pré-déclarés dans `tasks.yaml` (allowlist, sans shell, sans exécution de code arbitraire distant)
 - Streaming temps réel de la sortie des commandes longues (chunk par chunk)
@@ -153,6 +155,14 @@ report_interval: 30
 collect_docker: true
 collect_apt: true
 collect_smart: true
+collect_bot_detection: true
+bot_detection_log_paths:
+  - "/var/log/nginx/access.log"
+  - "/var/log/apache2/access.log"
+  - "/var/log/httpd/access_log"
+  - "/data/logs/proxy-host-*.log"
+bot_detection_tail_lines: 5000
+bot_detection_top_n: 10
 apt_auto_update_on_start: false
 insecure_skip_verify: false
 EOF
@@ -301,10 +311,35 @@ serversupervisor-agent --init
 | `report_interval` | Intervalle d'envoi en secondes | `30` | `SUPERVISOR_REPORT_INTERVAL` |
 | `collect_docker` | Activer le monitoring Docker | `true` | `SUPERVISOR_COLLECT_DOCKER` |
 | `collect_apt` | Activer le monitoring APT | `true` | `SUPERVISOR_COLLECT_APT` |
+| `collect_smart` | Activer la collecte S.M.A.R.T. | `true` | `SUPERVISOR_COLLECT_SMART` |
+| `collect_bot_detection` | Activer la détection bot/scanner depuis les logs web | `true` | `SUPERVISOR_COLLECT_BOT_DETECTION` |
+| `bot_detection_log_paths` | Liste de paths/globs de logs access à parser | voir exemple | `SUPERVISOR_BOT_DETECTION_LOG_PATHS` |
+| `bot_detection_tail_lines` | Nombre de lignes lues (par fichier) | `5000` | `SUPERVISOR_BOT_DETECTION_TAIL_LINES` |
+| `bot_detection_top_n` | Nombre max d'IP/paths retournés | `10` | `SUPERVISOR_BOT_DETECTION_TOP_N` |
 | `apt_auto_update_on_start` | Lancer `apt update` au démarrage de l'agent | `false` | `SUPERVISOR_APT_AUTO_UPDATE_ON_START` |
 | `insecure_skip_verify` | Ignorer les erreurs TLS (certificats auto-signés) | `false` | `SUPERVISOR_INSECURE_SKIP_VERIFY` |
 
 > Toutes les options sont également configurables via variables d'environnement (préfixe `SUPERVISOR_`), utile pour les déploiements Docker/Kubernetes.
+
+### Bot detection (logs web)
+
+L'agent peut analyser les access logs web pour identifier des comportements de scan automatisé.
+
+Détection actuelle :
+- chemins sensibles fréquemment scannés (`/.env`, `wp-admin`, `phpmyadmin`, etc.)
+- user-agents typiques d'outils de scan (`masscan`, `sqlmap`, `nikto`, etc.)
+- méthodes HTTP atypiques (`TRACE`, `PROPFIND`, ...)
+
+Agrégations remontées :
+- `top_suspicious_ips`
+- `top_suspicious_paths`
+- `suspicious_requests`
+
+Affichage :
+- onglet **Sécurité → Menaces** (agrégation globale multi-hôtes)
+
+API :
+- `GET /api/v1/auth/security` inclut un champ `bot_detection` pour les admins.
 
 ### Tâches custom (`tasks.yaml`)
 

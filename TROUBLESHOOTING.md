@@ -219,3 +219,39 @@ Quand vous modifiez `docker-init.sh`, vous devez soit :
 - **Ou appliquer manuellement** avec `apply-migrations.sh`
 
 Le script d'init ne s'exécute que si le répertoire de données PostgreSQL est vide.
+
+---
+
+## Bot detection (logs web) ne remonte rien
+
+### Symptômes
+
+- L'onglet **Sécurité → Menaces** n'affiche pas d'IPs/paths suspects
+- `total_suspicious_requests` reste à 0 malgré du trafic
+
+### Vérifications
+
+1. **Config agent**
+   - `collect_bot_detection: true`
+   - `bot_detection_log_paths` contient les vrais chemins de logs sur l'hôte
+
+2. **Permissions de lecture**
+   - L'utilisateur systemd de l'agent doit pouvoir lire les logs (`/var/log/nginx/*`, `/var/log/apache2/*`, etc.)
+
+3. **Présence de logs**
+   - Vérifier que les fichiers matchent bien les globs configurés
+   - Vérifier qu'ils contiennent des lignes au format access log standard
+
+4. **Pipeline serveur**
+   - Le serveur doit avoir appliqué la migration ajoutant le cache bot detection sur `hosts`
+   - Endpoint admin de contrôle : `GET /api/v1/auth/security` (champ `bot_detection`)
+
+### Commandes utiles
+
+```bash
+# Vérifier les options bot detection prises en compte par l'agent (logs systemd)
+journalctl -u serversupervisor-agent -n 200 --no-pager | grep -i "bot\|detection\|report"
+
+# Vérifier les fichiers de logs cibles
+ls -lah /var/log/nginx/access.log /var/log/apache2/access.log /var/log/httpd/access_log 2>/dev/null
+```

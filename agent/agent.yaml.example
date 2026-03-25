@@ -11,5 +11,24 @@ collect_docker: true
 # Enable APT update monitoring  
 collect_apt: true
 
+# Enable SMART disk health monitoring (requires smartmontools)
+collect_smart: true
+
+# Detect automated scans/bots from web access logs (nginx/apache/NPM)
+collect_bot_detection: true
+
+# Glob paths to parse (supports wildcards)
+bot_detection_log_paths:
+	- "/var/log/nginx/access.log"
+	- "/var/log/apache2/access.log"
+	- "/var/log/httpd/access_log"
+	- "/data/logs/proxy-host-*.log"
+
+# Number of latest log lines to inspect per file
+bot_detection_tail_lines: 5000
+
+# Number of top suspicious IPs/paths returned
+bot_detection_top_n: 10
+
 # Skip TLS verification (for self-signed certs)
 insecure_skip_verify: false
