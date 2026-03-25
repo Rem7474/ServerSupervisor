@@ -12,6 +12,7 @@ type AgentReport struct {
 	Docker          *DockerReport       `json:"docker,omitempty"`
 	AptStatus       *AptStatus          `json:"apt_status,omitempty"`
 	BotDetection    map[string]any      `json:"bot_detection,omitempty"`
+	NPMAnalytics    map[string]any      `json:"npm_analytics,omitempty"`
 	DockerNetworks  []DockerNetwork     `json:"docker_networks,omitempty"`
 	ContainerEnvs   []ContainerEnv      `json:"container_envs,omitempty"`
 	ComposeProjects []ComposeProject    `json:"compose_projects,omitempty"`

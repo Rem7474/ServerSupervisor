@@ -8,6 +8,8 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	webpush "github.com/SherClockHolmes/webpush-go"
@@ -185,8 +187,107 @@ func GetMetricValue(db *database.DB, host models.Host, rule models.AlertRule) (f
 		// Global metric: max storage usage % across all active Proxmox storages.
 		pct := db.GetMaxProxmoxStorageUsagePercent()
 		return pct, true
+	case "npm_requests", "npm_traffic_bytes", "npm_5xx_errors":
+		npmAnalyticsJSON, err := db.GetHostNPMAnalytics(host.ID)
+		if err != nil || npmAnalyticsJSON == "" {
+			return 0, false
+		}
+
+		var payload map[string]interface{}
+		if err := json.Unmarshal([]byte(npmAnalyticsJSON), &payload); err != nil || payload == nil {
+			return 0, false
+		}
+
+		if rule.DurationSeconds > 0 {
+			collectedAtRaw, ok := payload["collected_at"]
+			if !ok {
+				return 0, false
+			}
+			collectedAtStr, ok := collectedAtRaw.(string)
+			if !ok {
+				return 0, false
+			}
+			collectedAt, err := time.Parse(time.RFC3339, collectedAtStr)
+			if err != nil || now.Sub(collectedAt) > duration {
+				return 0, false
+			}
+		}
+
+		return extractNPMMetricValue(payload, rule.Metric)
 	}
 	return 0, false
+}
+
+func parseNumberFromAny(value interface{}) (float64, bool) {
+	switch v := value.(type) {
+	case int:
+		return float64(v), true
+	case int64:
+		return float64(v), true
+	case float64:
+		return v, true
+	case float32:
+		return float64(v), true
+	case json.Number:
+		n, err := v.Float64()
+		if err != nil {
+			return 0, false
+		}
+		return n, true
+	case string:
+		n, err := strconv.ParseFloat(strings.TrimSpace(v), 64)
+		if err != nil {
+			return 0, false
+		}
+		return n, true
+	default:
+		return 0, false
+	}
+}
+
+func extractNPMMetricValue(payload map[string]interface{}, metric string) (float64, bool) {
+	switch metric {
+	case "npm_requests":
+		v, ok := payload["total_requests"]
+		if !ok {
+			return 0, false
+		}
+		return parseNumberFromAny(v)
+	case "npm_traffic_bytes":
+		v, ok := payload["total_bytes"]
+		if !ok {
+			return 0, false
+		}
+		return parseNumberFromAny(v)
+	case "npm_5xx_errors":
+		topDomainsRaw, ok := payload["top_domains"]
+		if !ok {
+			return 0, false
+		}
+		topDomains, ok := topDomainsRaw.([]interface{})
+		if !ok {
+			return 0, false
+		}
+		total5xx := 0.0
+		for _, domainRaw := range topDomains {
+			domainObj, ok := domainRaw.(map[string]interface{})
+			if !ok {
+				return 0, false
+			}
+			errors5xxRaw, ok := domainObj["errors_5xx"]
+			if !ok {
+				return 0, false
+			}
+			errors5xx, ok := parseNumberFromAny(errors5xxRaw)
+			if !ok {
+				return 0, false
+			}
+			total5xx += errors5xx
+		}
+		return total5xx, true
+	default:
+		return 0, false
+	}
 }
 
 // MatchRule evaluates whether a rule condition is currently met for the given value.

@@ -27,6 +27,7 @@ type Report struct {
 	Docker          interface{} `json:"docker"`
 	AptStatus       interface{} `json:"apt_status"`
 	BotDetection    interface{} `json:"bot_detection,omitempty"`
+	NPMAnalytics    interface{} `json:"npm_analytics,omitempty"`
 	DockerNetworks  interface{} `json:"docker_networks,omitempty"`  // Network topology data
 	ContainerEnvs   interface{} `json:"container_envs,omitempty"`   // Container environment variables
 	ComposeProjects interface{} `json:"compose_projects,omitempty"` // Docker Compose projects

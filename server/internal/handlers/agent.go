@@ -215,6 +215,15 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 		}
 	}
 
+	// Store cached npm analytics summary for this host.
+	if report.NPMAnalytics != nil {
+		if b, err := json.Marshal(report.NPMAnalytics); err == nil {
+			if err := h.db.UpdateHostNPMAnalytics(hostID, string(b)); err != nil {
+				log.Printf("Warning: failed to store npm analytics for host %s: %v", safeHostID, err)
+			}
+		}
+	}
+
 	// Return pending commands for this host (unified remote_commands table)
 	commands, err := h.db.GetPendingRemoteCommands(hostID)
 	if err != nil {

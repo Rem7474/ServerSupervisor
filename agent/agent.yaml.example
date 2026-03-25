@@ -30,5 +30,21 @@ bot_detection_tail_lines: 5000
 # Number of top suspicious IPs/paths returned
 bot_detection_top_n: 10
 
+# Analyze Nginx Proxy Manager request patterns from web access logs
+collect_npm_analytics: true
+
+# Glob paths to parse for NPM analytics (supports wildcards)
+npm_analytics_log_paths:
+	- "/var/log/nginx/access.log"
+	- "/var/log/apache2/access.log"
+	- "/var/log/httpd/access_log"
+	- "/data/logs/proxy-host-*.log"
+
+# Number of latest log lines to inspect per file
+npm_analytics_tail_lines: 5000
+
+# Number of top domains/hosts returned in analytics
+npm_analytics_top_n: 10
+
 # Skip TLS verification (for self-signed certs)
 insecure_skip_verify: false

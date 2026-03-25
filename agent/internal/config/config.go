@@ -25,6 +25,10 @@ type Config struct {
 	BotDetectionLogPaths  []string `yaml:"bot_detection_log_paths"`
 	BotDetectionTailLines int      `yaml:"bot_detection_tail_lines"`
 	BotDetectionTopN      int      `yaml:"bot_detection_top_n"`
+	CollectNPMAnalytics   bool     `yaml:"collect_npm_analytics"`
+	NPMAnalyticsLogPaths  []string `yaml:"npm_analytics_log_paths"`
+	NPMAnalyticsTailLines int      `yaml:"npm_analytics_tail_lines"`
+	NPMAnalyticsTopN      int      `yaml:"npm_analytics_top_n"`
 
 	// TLS
 	InsecureSkipVerify bool `yaml:"insecure_skip_verify"`
@@ -41,6 +45,7 @@ func Load(path string) (*Config, error) {
 		CollectAPT:          true,
 		CollectSMART:        true,
 		CollectBotDetection: true,
+		CollectNPMAnalytics: true,
 		BotDetectionLogPaths: []string{
 			"/var/log/nginx/access.log",
 			"/var/log/apache2/access.log",
@@ -49,6 +54,14 @@ func Load(path string) (*Config, error) {
 		},
 		BotDetectionTailLines: 5000,
 		BotDetectionTopN:      10,
+		NPMAnalyticsLogPaths: []string{
+			"/var/log/nginx/access.log",
+			"/var/log/apache2/access.log",
+			"/var/log/httpd/access_log",
+			"/data/logs/proxy-host-*.log",
+		},
+		NPMAnalyticsTailLines: 5000,
+		NPMAnalyticsTopN:      10,
 	}
 
 	data, err := os.ReadFile(path)
@@ -106,6 +119,31 @@ func Load(path string) (*Config, error) {
 			cfg.BotDetectionTopN = n
 		}
 	}
+	if env := os.Getenv("SUPERVISOR_COLLECT_NPM_ANALYTICS"); env != "" {
+		cfg.CollectNPMAnalytics = env == "true" || env == "1"
+	}
+	if env := os.Getenv("SUPERVISOR_NPM_ANALYTICS_LOG_PATHS"); env != "" {
+		parts := []string{}
+		for _, p := range strings.Split(env, ",") {
+			p = strings.TrimSpace(p)
+			if p != "" {
+				parts = append(parts, p)
+			}
+		}
+		if len(parts) > 0 {
+			cfg.NPMAnalyticsLogPaths = parts
+		}
+	}
+	if env := os.Getenv("SUPERVISOR_NPM_ANALYTICS_TAIL_LINES"); env != "" {
+		if n, err := strconv.Atoi(env); err == nil && n > 0 {
+			cfg.NPMAnalyticsTailLines = n
+		}
+	}
+	if env := os.Getenv("SUPERVISOR_NPM_ANALYTICS_TOP_N"); env != "" {
+		if n, err := strconv.Atoi(env); err == nil && n > 0 {
+			cfg.NPMAnalyticsTopN = n
+		}
+	}
 	if env := os.Getenv("SUPERVISOR_INSECURE_SKIP_VERIFY"); env != "" {
 		cfg.InsecureSkipVerify = env == "true" || env == "1"
 	}
@@ -153,6 +191,22 @@ bot_detection_tail_lines: 5000
 
 # Number of top suspicious IPs/paths returned
 bot_detection_top_n: 10
+
+# Analyze Nginx Proxy Manager request patterns from web access logs
+collect_npm_analytics: true
+
+# Glob paths to parse for NPM analytics (supports wildcards)
+npm_analytics_log_paths:
+  - "/var/log/nginx/access.log"
+  - "/var/log/apache2/access.log"
+  - "/var/log/httpd/access_log"
+  - "/data/logs/proxy-host-*.log"
+
+# Number of latest log lines to inspect per file
+npm_analytics_tail_lines: 5000
+
+# Number of top domains/hosts returned in analytics
+npm_analytics_top_n: 10
 
 # Skip TLS verification (for self-signed certs)
 insecure_skip_verify: false

@@ -262,6 +262,9 @@ const metricCards = [
   { value: 'heartbeat_timeout', label: 'Heartbeat', icon: '🫀' },
   { value: 'disk_temperature', label: 'Temp. disque', icon: '🌡' },
   { value: 'proxmox_storage_percent', label: 'Proxmox', icon: '🖥' },
+  { value: 'npm_requests', label: 'NPM requetes', icon: '🌐' },
+  { value: 'npm_traffic_bytes', label: 'NPM trafic', icon: '📦' },
+  { value: 'npm_5xx_errors', label: 'NPM 5xx', icon: '🚨' },
 ]
 
 const {
@@ -379,6 +382,9 @@ function getMetricUnit(metric) {
     disk_smart_status: '',
     disk_temperature: '°C',
     proxmox_storage_percent: '%',
+    npm_requests: 'req',
+    npm_traffic_bytes: 'B',
+    npm_5xx_errors: 'err',
   }
   return units[metric] || ''
 }

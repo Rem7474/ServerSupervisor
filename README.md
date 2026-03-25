@@ -59,7 +59,8 @@ Système de supervision d'infrastructure : monitoring de VMs, conteneurs Docker,
 - **Audit → Connexions** : logs de connexion avec statistiques et IPs bloquées (admin)
 - **Tâches planifiées** : création de tâches cron par hôte (apt, docker, systemd, journal, processus ou custom), déclenchement manuel immédiat, historique des exécutions
 - **Alertes** : règles d'alertes configurables avec notifications email (SMTP), ntfy, webhook ou notifications navigateur
-- **Sécurité** : résumé des connexions 24h, IPs bloquées, déblocage manuel, et détection des scans/bots web (logs Nginx/Apache/NPM)
+- **Compte → Sécurité** : gestion MFA/2FA du compte utilisateur sur `/account/security`
+- **Sécurité (admin)** : analytics sécurité hôtes sur `/security` (connexions, IPs bloquées, détection bots/scans, NPM analytics)
 - **UI cohérente** : barres de recherche/filtres/tri harmonisées sur les vues principales (Docker, APT, Audit)
 - **Proxmox VE** : supervision de l'infrastructure de virtualisation via API Proxmox (sans agent sur l'hyperviseur) — nœuds, VMs QEMU, conteneurs LXC, stockage ; polling configurable par connexion
 
@@ -83,6 +84,7 @@ Système de supervision d'infrastructure : monitoring de VMs, conteneurs Docker,
 - Détection des mises à jour APT disponibles, extraction des CVEs
 - Collecte S.M.A.R.T. et métriques disques (via `smartctl`)
 - Détection d'activité bot/scanner web (parsing access logs Nginx/Apache/httpd/NPM, top IPs/paths suspects)
+- Collecte d'analytics NPM (style GoAccess) depuis les logs web : top domaines/hôtes, hits, bytes, erreurs 4xx/5xx
 - Exécution de commandes distantes : APT, Docker/Compose, systemd, journalctl, snapshot processus
 - **Tâches custom** : exécution de scripts/binaires locaux pré-déclarés dans `tasks.yaml` (allowlist, sans shell, sans exécution de code arbitraire distant)
 - Streaming temps réel de la sortie des commandes longues (chunk par chunk)
@@ -163,6 +165,14 @@ bot_detection_log_paths:
   - "/data/logs/proxy-host-*.log"
 bot_detection_tail_lines: 5000
 bot_detection_top_n: 10
+collect_npm_analytics: true
+npm_analytics_log_paths:
+  - "/var/log/nginx/access.log"
+  - "/var/log/apache2/access.log"
+  - "/var/log/httpd/access_log"
+  - "/data/logs/proxy-host-*.log"
+npm_analytics_tail_lines: 5000
+npm_analytics_top_n: 10
 apt_auto_update_on_start: false
 insecure_skip_verify: false
 EOF
@@ -316,6 +326,10 @@ serversupervisor-agent --init
 | `bot_detection_log_paths` | Liste de paths/globs de logs access à parser | voir exemple | `SUPERVISOR_BOT_DETECTION_LOG_PATHS` |
 | `bot_detection_tail_lines` | Nombre de lignes lues (par fichier) | `5000` | `SUPERVISOR_BOT_DETECTION_TAIL_LINES` |
 | `bot_detection_top_n` | Nombre max d'IP/paths retournés | `10` | `SUPERVISOR_BOT_DETECTION_TOP_N` |
+| `collect_npm_analytics` | Activer la collecte analytics NPM depuis les logs web | `true` | `SUPERVISOR_COLLECT_NPM_ANALYTICS` |
+| `npm_analytics_log_paths` | Liste de paths/globs de logs access à parser pour NPM analytics | voir exemple | `SUPERVISOR_NPM_ANALYTICS_LOG_PATHS` |
+| `npm_analytics_tail_lines` | Nombre de lignes lues (par fichier) pour NPM analytics | `5000` | `SUPERVISOR_NPM_ANALYTICS_TAIL_LINES` |
+| `npm_analytics_top_n` | Nombre max de domaines retournés dans les analytics | `10` | `SUPERVISOR_NPM_ANALYTICS_TOP_N` |
 | `apt_auto_update_on_start` | Lancer `apt update` au démarrage de l'agent | `false` | `SUPERVISOR_APT_AUTO_UPDATE_ON_START` |
 | `insecure_skip_verify` | Ignorer les erreurs TLS (certificats auto-signés) | `false` | `SUPERVISOR_INSECURE_SKIP_VERIFY` |
 
@@ -340,6 +354,21 @@ Affichage :
 
 API :
 - `GET /api/v1/auth/security` inclut un champ `bot_detection` pour les admins.
+
+### NPM analytics (logs web)
+
+L'agent peut également agréger les access logs pour remonter des statistiques de trafic web façon "GoAccess".
+
+Payload remonté par hôte :
+- `total_requests`
+- `total_bytes`
+- `top_domains` (avec `domain`, `hits`, `bytes`, `errors_4xx`, `errors_5xx`)
+
+Affichage :
+- page **Sécurité** (`/security`) côté admin, section analytics hôtes
+
+API :
+- `GET /api/v1/auth/security` inclut aussi un champ `npm_analytics` (agrégation multi-hôtes pour les admins)
 
 ### Tâches custom (`tasks.yaml`)
 
@@ -433,7 +462,7 @@ curl http://localhost:8080/api/v1/hosts \
 | `GET` | `/api/v1/auth/login-events` | Ses propres connexions | Authentifié |
 | `GET` | `/api/v1/auth/login-events/admin` | Toutes les connexions | Admin |
 | `POST` | `/api/v1/auth/revoke-all-sessions` | Révoquer toutes les sessions | Authentifié |
-| `GET` | `/api/v1/auth/security` | Résumé sécurité + IPs bloquées | Admin |
+| `GET` | `/api/v1/auth/security` | Résumé sécurité + IPs bloquées + agrégats `bot_detection` et `npm_analytics` | Admin |
 | `DELETE` | `/api/v1/auth/blocked-ips/:ip` | Débloquer une IP | Admin |
 | `GET/POST` | `/api/v1/auth/mfa/*` | Gestion MFA/2FA (setup/verify/disable) | Authentifié |
 
@@ -498,6 +527,11 @@ curl http://localhost:8080/api/v1/hosts \
 | `PATCH` | `/api/v1/alert-rules/:id` | Modifier une règle | Admin |
 | `DELETE` | `/api/v1/alert-rules/:id` | Supprimer une règle | Admin |
 | `POST` | `/api/v1/alert-rules/test` | Tester une règle | Admin |
+
+Métriques additionnelles disponibles pour les règles d'alertes :
+- `npm_requests`
+- `npm_traffic_bytes`
+- `npm_5xx_errors`
 
 #### Utilisateurs (admin)
 | Méthode | Endpoint | Description |

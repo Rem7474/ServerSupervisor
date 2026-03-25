@@ -56,7 +56,7 @@
     </div>
 
     <div class="row row-cards mb-4">
-      <div class="col-sm-4">
+      <div class="col-6 col-lg-3">
         <div class="card card-sm h-100">
           <div class="card-body text-center">
             <div class="text-secondary small mb-1">Requetes suspectes (logs web)</div>
@@ -64,7 +64,7 @@
           </div>
         </div>
       </div>
-      <div class="col-sm-4">
+      <div class="col-6 col-lg-3">
         <div class="card card-sm h-100">
           <div class="card-body text-center">
             <div class="text-secondary small mb-1">IPs suspectes (logs web)</div>
@@ -72,11 +72,19 @@
           </div>
         </div>
       </div>
-      <div class="col-sm-4">
+      <div class="col-6 col-lg-3">
         <div class="card card-sm h-100">
           <div class="card-body text-center">
-            <div class="text-secondary small mb-1">Hotes impactes</div>
-            <div class="h2 mb-0">{{ botHosts.length }}</div>
+            <div class="text-secondary small mb-1">Requetes NPM (total)</div>
+            <div class="h2 mb-0">{{ npmTotalRequests }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="card card-sm h-100">
+          <div class="card-body text-center">
+            <div class="text-secondary small mb-1">Trafic NPM (total)</div>
+            <div class="h2 mb-0">{{ formatBytes(npmTotalBytes) }}</div>
           </div>
         </div>
       </div>
@@ -207,6 +215,72 @@
         </table>
       </div>
     </div>
+
+    <div class="row row-cards mt-4">
+      <div class="col-lg-7">
+        <div class="card h-100">
+          <div class="card-header">
+            <h3 class="card-title">Top domaines NPM</h3>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-vcenter card-table">
+              <thead>
+                <tr>
+                  <th>Domaine</th>
+                  <th class="text-end">Hits</th>
+                  <th class="text-end">Trafic</th>
+                  <th class="text-end">4xx</th>
+                  <th class="text-end">5xx</th>
+                  <th class="text-end">Hotes</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-if="!npmTopDomains.length">
+                  <td colspan="6" class="text-center text-secondary py-4">Aucune donnee NPM disponible.</td>
+                </tr>
+                <tr v-for="item in npmTopDomains" :key="item.domain || item.domaine">
+                  <td class="font-monospace small">{{ item.domain || item.domaine || '—' }}</td>
+                  <td class="text-end">{{ item.hits ?? 0 }}</td>
+                  <td class="text-end">{{ formatBytes(item.bytes ?? item.traffic_bytes ?? item.traffic ?? 0) }}</td>
+                  <td class="text-end">{{ item.errors_4xx ?? item.status_4xx ?? item['4xx'] ?? 0 }}</td>
+                  <td class="text-end">{{ item.errors_5xx ?? item.status_5xx ?? item['5xx'] ?? 0 }}</td>
+                  <td class="text-end">{{ item.host_count ?? item.hosts ?? 0 }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-5">
+        <div class="card h-100">
+          <div class="card-header">
+            <h3 class="card-title">Hotes les plus actifs (NPM)</h3>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-vcenter card-table">
+              <thead>
+                <tr>
+                  <th>Hote</th>
+                  <th class="text-end">Requetes</th>
+                  <th class="text-end">Trafic</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-if="!npmHosts.length">
+                  <td colspan="3" class="text-center text-secondary py-4">Aucune activite NPM remontee.</td>
+                </tr>
+                <tr v-for="item in npmHosts" :key="item.host_id || item.host_name || item.host || item.name">
+                  <td>{{ item.host_name || item.host || item.name || '—' }}</td>
+                  <td class="text-end">{{ item.total_requests ?? item.requests ?? item.hits ?? 0 }}</td>
+                  <td class="text-end">{{ formatBytes(item.total_bytes ?? item.traffic_bytes ?? item.traffic ?? 0) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -228,6 +302,26 @@ const periodLabel = computed(() => periodOptions.find(p => p.hours === threatsPe
 const botTopIPs = computed(() => security.value.bot_detection?.top_suspicious_ips || [])
 const botTopPaths = computed(() => security.value.bot_detection?.top_suspicious_paths || [])
 const botHosts = computed(() => security.value.bot_detection?.hosts || [])
+const npmTopDomains = computed(() => security.value.npm_analytics?.top_domains || [])
+const npmHosts = computed(() => security.value.npm_analytics?.hosts || [])
+const npmTotalRequests = computed(() => security.value.npm_analytics?.total_requests || 0)
+const npmTotalBytes = computed(() => security.value.npm_analytics?.total_bytes || 0)
+
+function formatBytes(bytes) {
+  const value = Number(bytes) || 0
+  if (value < 1024) return `${value} B`
+
+  const units = ['KB', 'MB', 'GB', 'TB']
+  let size = value / 1024
+  let unitIndex = 0
+
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024
+    unitIndex++
+  }
+
+  return `${size.toFixed(1)} ${units[unitIndex]}`
+}
 
 async function loadSecurity() {
   threatsLoading.value = true

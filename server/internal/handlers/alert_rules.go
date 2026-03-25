@@ -183,6 +183,7 @@ func (h *AlertRulesHandler) CreateAlertRule(c *gin.Context) {
 	validMetrics := map[string]bool{
 		"cpu": true, "memory": true, "disk": true, "load": true, "heartbeat_timeout": true,
 		"disk_smart_status": true, "disk_temperature": true, "proxmox_storage_percent": true,
+		"npm_requests": true, "npm_traffic_bytes": true, "npm_5xx_errors": true,
 	}
 	if !validMetrics[req.Metric] {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Métrique invalide."})

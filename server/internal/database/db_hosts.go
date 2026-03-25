@@ -159,6 +159,45 @@ func (db *DB) GetAllHostsBotDetection() ([]models.HostBotDetection, error) {
 	return out, nil
 }
 
+// UpdateHostNPMAnalytics stores the latest npm-analytics summary JSON for a host.
+func (db *DB) UpdateHostNPMAnalytics(hostID, npmAnalyticsJSON string) error {
+	_, err := db.conn.Exec(
+		`UPDATE hosts SET npm_analytics = $1::jsonb, updated_at = NOW() WHERE id = $2`,
+		npmAnalyticsJSON, hostID)
+	return err
+}
+
+// GetAllHostsNPMAnalytics returns host metadata with cached npm-analytics JSON.
+func (db *DB) GetAllHostsNPMAnalytics() ([]models.HostNPMAnalytics, error) {
+	rows, err := db.conn.Query(
+		`SELECT id, name, npm_analytics::text
+		 FROM hosts
+		 WHERE npm_analytics IS NOT NULL`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	out := []models.HostNPMAnalytics{}
+	for rows.Next() {
+		var item models.HostNPMAnalytics
+		if err := rows.Scan(&item.HostID, &item.HostName, &item.NPMAnalyticsJSON); err != nil {
+			return nil, err
+		}
+		out = append(out, item)
+	}
+	return out, nil
+}
+
+// GetHostNPMAnalytics returns the cached npm-analytics JSON for one host as a string.
+func (db *DB) GetHostNPMAnalytics(hostID string) (string, error) {
+	var analytics string
+	err := db.conn.QueryRow(
+		`SELECT npm_analytics::text FROM hosts WHERE id = $1`, hostID).Scan(&analytics)
+	return analytics, err
+}
+
 func (db *DB) UpdateHostStatus(id, status string) error {
 	_, err := db.conn.Exec(
 		`UPDATE hosts SET status = $1, last_seen = NOW(), updated_at = NOW() WHERE id = $2`,

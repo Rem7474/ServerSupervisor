@@ -255,3 +255,44 @@ journalctl -u serversupervisor-agent -n 200 --no-pager | grep -i "bot\|detection
 # Vérifier les fichiers de logs cibles
 ls -lah /var/log/nginx/access.log /var/log/apache2/access.log /var/log/httpd/access_log 2>/dev/null
 ```
+
+---
+
+## NPM analytics ne remonte rien
+
+### Symptômes
+
+- La page **Sécurité** (`/security`) ne montre pas de stats NPM
+- `total_requests` / `total_bytes` restent à 0
+- Aucun domaine n'apparaît dans `top_domains`
+
+### Vérifications
+
+1. **Config agent**
+   - `collect_npm_analytics: true`
+   - `npm_analytics_log_paths` contient les vrais chemins de logs sur l'hôte
+   - `npm_analytics_tail_lines` et `npm_analytics_top_n` ont des valeurs cohérentes (ex: 5000 / 10)
+
+2. **Permissions de lecture**
+   - L'utilisateur systemd de l'agent doit pouvoir lire les fichiers de logs ciblés
+
+3. **Présence/format des logs**
+   - Vérifier que les globs de `npm_analytics_log_paths` matchent des fichiers existants
+   - Vérifier que les lignes sont bien au format access log (domain, status, bytes)
+
+4. **Migrations DB**
+   - La migration `012_add_npm_analytics.sql` doit être appliquée
+
+5. **Pipeline serveur**
+   - Endpoint admin de contrôle : `GET /api/v1/auth/security`
+   - Vérifier la présence du champ `npm_analytics` dans la réponse JSON
+
+### Commandes utiles
+
+```bash
+# Vérifier les options NPM analytics prises en compte par l'agent
+journalctl -u serversupervisor-agent -n 200 --no-pager | grep -i "npm\|analytics\|report"
+
+# Vérifier les fichiers de logs cibles
+ls -lah /var/log/nginx/access.log /var/log/apache2/access.log /var/log/httpd/access_log 2>/dev/null
+```

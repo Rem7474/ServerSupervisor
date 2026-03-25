@@ -476,12 +476,14 @@ func (h *AuthHandler) GetSecuritySummary(c *gin.Context) {
 	}
 
 	botDetection, _ := h.buildBotDetectionSummary()
+	npmAnalytics, _ := h.buildNPMAnalyticsSummary()
 
 	c.JSON(http.StatusOK, gin.H{
 		"stats":          stats,
 		"blocked_ips":    blockedIPs,
 		"top_failed_ips": topFailed,
 		"bot_detection":  botDetection,
+		"npm_analytics":  npmAnalytics,
 	})
 }
 
@@ -606,6 +608,120 @@ func (h *AuthHandler) buildBotDetectionSummary() (map[string]any, error) {
 	}, nil
 }
 
+func (h *AuthHandler) buildNPMAnalyticsSummary() (map[string]any, error) {
+	hostRows, err := h.db.GetAllHostsNPMAnalytics()
+	if err != nil {
+		return map[string]any{"total_requests": int64(0), "total_bytes": int64(0), "hosts": []any{}, "top_domains": []any{}}, err
+	}
+
+	type domainAgg struct {
+		Hits      int64
+		Bytes     int64
+		Errors4xx int64
+		Errors5xx int64
+		Hosts     map[string]struct{}
+	}
+
+	domainMap := map[string]*domainAgg{}
+	hosts := make([]map[string]any, 0, len(hostRows))
+	var totalRequests int64
+	var totalBytes int64
+
+	for _, row := range hostRows {
+		if strings.TrimSpace(row.NPMAnalyticsJSON) == "" {
+			continue
+		}
+
+		var data map[string]any
+		if err := json.Unmarshal([]byte(row.NPMAnalyticsJSON), &data); err != nil {
+			continue
+		}
+
+		hostRequests := toInt64(data["total_requests"])
+		hostBytes := toInt64(data["total_bytes"])
+		totalRequests += hostRequests
+		totalBytes += hostBytes
+
+		hosts = append(hosts, map[string]any{
+			"host_id":        row.HostID,
+			"host_name":      row.HostName,
+			"total_requests": hostRequests,
+			"total_bytes":    hostBytes,
+		})
+
+		if topDomains, ok := data["top_domains"].([]any); ok {
+			for _, item := range topDomains {
+				m, ok := item.(map[string]any)
+				if !ok {
+					continue
+				}
+				domain := strings.TrimSpace(toString(m["domain"]))
+				if domain == "" {
+					continue
+				}
+
+				entry := domainMap[domain]
+				if entry == nil {
+					entry = &domainAgg{Hosts: map[string]struct{}{}}
+					domainMap[domain] = entry
+				}
+
+				entry.Hits += toInt64(m["hits"])
+				entry.Bytes += toInt64(m["bytes"])
+				entry.Errors4xx += toInt64(m["errors_4xx"])
+				entry.Errors5xx += toInt64(m["errors_5xx"])
+				entry.Hosts[row.HostID] = struct{}{}
+			}
+		}
+	}
+
+	sort.Slice(hosts, func(i, j int) bool {
+		return toInt64(hosts[i]["total_requests"]) > toInt64(hosts[j]["total_requests"])
+	})
+	if len(hosts) > 10 {
+		hosts = hosts[:10]
+	}
+
+	type domainView struct {
+		Domain    string
+		Hits      int64
+		Bytes     int64
+		Errors4xx int64
+		Errors5xx int64
+		HostCount int
+	}
+	domainViews := make([]domainView, 0, len(domainMap))
+	for domain, agg := range domainMap {
+		domainViews = append(domainViews, domainView{
+			Domain:    domain,
+			Hits:      agg.Hits,
+			Bytes:     agg.Bytes,
+			Errors4xx: agg.Errors4xx,
+			Errors5xx: agg.Errors5xx,
+			HostCount: len(agg.Hosts),
+		})
+	}
+	sort.Slice(domainViews, func(i, j int) bool { return domainViews[i].Hits > domainViews[j].Hits })
+	topDomains := make([]map[string]any, 0, min(10, len(domainViews)))
+	for i := 0; i < len(domainViews) && i < 10; i++ {
+		topDomains = append(topDomains, map[string]any{
+			"domain":     domainViews[i].Domain,
+			"hits":       domainViews[i].Hits,
+			"bytes":      domainViews[i].Bytes,
+			"errors_4xx": domainViews[i].Errors4xx,
+			"errors_5xx": domainViews[i].Errors5xx,
+			"host_count": domainViews[i].HostCount,
+		})
+	}
+
+	return map[string]any{
+		"total_requests": totalRequests,
+		"total_bytes":    totalBytes,
+		"hosts":          hosts,
+		"top_domains":    topDomains,
+	}, nil
+}
+
 func toInt(v any) int {
 	switch t := v.(type) {
 	case int:
@@ -618,6 +734,33 @@ func toInt(v any) int {
 		return int(t)
 	case float64:
 		return int(t)
+	default:
+		return 0
+	}
+}
+
+func toInt64(v any) int64 {
+	switch t := v.(type) {
+	case int:
+		return int64(t)
+	case int32:
+		return int64(t)
+	case int64:
+		return t
+	case float32:
+		return int64(t)
+	case float64:
+		return int64(t)
+	case string:
+		n, err := strconv.ParseInt(strings.TrimSpace(t), 10, 64)
+		if err == nil {
+			return n
+		}
+		f, err := strconv.ParseFloat(strings.TrimSpace(t), 64)
+		if err == nil {
+			return int64(f)
+		}
+		return 0
 	default:
 		return 0
 	}
