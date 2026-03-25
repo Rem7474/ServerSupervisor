@@ -51,6 +51,9 @@
                   <span class="metric-label">{{ metric.label }}</span>
                 </button>
               </div>
+              <div class="text-secondary small mt-2">
+                Note: la température correspond à la température disque (SMART), pas à la température CPU.
+              </div>
             </div>
 
             <div v-if="step === 2">
@@ -257,7 +260,7 @@ const metricCards = [
   { value: 'memory', label: 'RAM', icon: '🧠' },
   { value: 'disk', label: 'Disque', icon: '💾' },
   { value: 'heartbeat_timeout', label: 'Heartbeat', icon: '🫀' },
-  { value: 'disk_temperature', label: 'Température', icon: '🌡' },
+  { value: 'disk_temperature', label: 'Temp. disque', icon: '🌡' },
   { value: 'proxmox_storage_percent', label: 'Proxmox', icon: '🖥' },
 ]
 
@@ -395,10 +398,10 @@ function formatDate(dateStr) {
 
 .step-chip {
   align-items: center;
-  background: #f3f6fa;
-  border: 1px solid #dbe3ec;
+  background: var(--tblr-bg-surface, #f3f6fa);
+  border: 1px solid var(--tblr-border-color, #dbe3ec);
   border-radius: 0.6rem;
-  color: #4c5b6b;
+  color: var(--tblr-body-color, #4c5b6b);
   display: flex;
   font-weight: 600;
   gap: 0.5rem;
@@ -408,19 +411,20 @@ function formatDate(dateStr) {
 }
 
 .step-chip.active {
-  background: #d9ecff;
-  border-color: #74b5ff;
-  color: #0f4c97;
+  background: rgba(45, 140, 255, 0.14);
+  border-color: #4b9bff;
+  color: #8ec2ff;
 }
 
 .step-chip.done {
-  background: #e6f7ef;
-  border-color: #7fd3ad;
-  color: #1f7a56;
+  background: rgba(61, 196, 126, 0.12);
+  border-color: #57c48b;
+  color: #63d39a;
 }
 
 .step-chip-index {
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.75);
+  color: #1f2d3d;
   border-radius: 999px;
   display: inline-flex;
   font-size: 0.85rem;
@@ -438,8 +442,8 @@ function formatDate(dateStr) {
 
 .metric-card {
   align-items: center;
-  background: #fff;
-  border: 1px solid #d9e2ee;
+  background: var(--tblr-bg-surface, #ffffff);
+  border: 1px solid var(--tblr-border-color, #d9e2ee);
   border-radius: 0.8rem;
   cursor: pointer;
   display: flex;
@@ -453,11 +457,11 @@ function formatDate(dateStr) {
 
 .metric-card:hover {
   border-color: #89b8ff;
-  box-shadow: 0 2px 10px rgba(66, 132, 245, 0.12);
+  box-shadow: 0 2px 10px rgba(66, 132, 245, 0.18);
 }
 
 .metric-card.selected {
-  background: linear-gradient(160deg, #e7f1ff 0%, #f5f9ff 100%);
+  background: linear-gradient(160deg, rgba(45, 140, 255, 0.14) 0%, rgba(45, 140, 255, 0.06) 100%);
   border-color: #4b9bff;
   box-shadow: inset 0 0 0 1px #4b9bff;
 }
@@ -468,9 +472,41 @@ function formatDate(dateStr) {
 }
 
 .metric-label {
-  color: #1f2d3d;
+  color: var(--tblr-body-color, #1f2d3d);
   font-size: 0.92rem;
   font-weight: 600;
+}
+
+[data-bs-theme='dark'] .step-chip {
+  background: #1f2a3a;
+  border-color: #2f3f57;
+  color: #c9d6ea;
+}
+
+[data-bs-theme='dark'] .step-chip.active {
+  background: rgba(33, 118, 210, 0.28);
+  border-color: #4b9bff;
+  color: #d2e6ff;
+}
+
+[data-bs-theme='dark'] .step-chip.done {
+  background: rgba(56, 142, 99, 0.24);
+  border-color: #4fb37f;
+  color: #c7f2da;
+}
+
+[data-bs-theme='dark'] .step-chip-index {
+  background: rgba(255, 255, 255, 0.16);
+  color: #d6e4fb;
+}
+
+[data-bs-theme='dark'] .metric-card {
+  background: #1f2a3a;
+  border-color: #2f3f57;
+}
+
+[data-bs-theme='dark'] .metric-card.selected {
+  background: linear-gradient(160deg, rgba(33, 118, 210, 0.34) 0%, rgba(18, 79, 150, 0.2) 100%);
 }
 
 @media (max-width: 768px) {

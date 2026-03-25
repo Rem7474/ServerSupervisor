@@ -288,6 +288,7 @@ import { formatDateLong as formatDate, formatDateTime } from '../utils/formatter
 import { useCommandStream } from '../composables/useCommandStream'
 import CommandLogPanel from '../components/CommandLogPanel.vue'
 import { moduleLabel, moduleClass } from '../utils/moduleMeta'
+import { useStatusBadge } from '../composables/useStatusBadge'
 
 const auth = useAuthStore()
 
@@ -318,6 +319,7 @@ const loginEventsLoaded = ref(false)
 const selectedCmd = ref(null)
 
 const { openCommandStream, closeStream } = useCommandStream({ token: () => auth.token })
+const { getStatusBadgeClass } = useStatusBadge()
 
 const roleBadgeClass = computed(() => {
   const map = { admin: 'bg-danger-lt text-danger', operator: 'bg-warning-lt text-warning', viewer: 'bg-secondary-lt text-secondary' }
@@ -335,6 +337,14 @@ function formatDuration(startedAt, endedAt) {
   if (diff < 60) return `${diff}s`
   const m = Math.floor(diff / 60), s = diff % 60
   return s > 0 ? `${m}m ${s}s` : `${m}m`
+}
+
+function cmdLabel(cmd) {
+  return [cmd?.action, cmd?.target].filter(Boolean).join(' ')
+}
+
+function statusClass(status) {
+  return getStatusBadgeClass(status, 'badge bg-yellow-lt text-yellow')
 }
 
 function parseUA(ua) {
