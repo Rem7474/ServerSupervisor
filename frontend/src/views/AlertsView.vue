@@ -25,6 +25,15 @@
 
     <div class="page-body">
       <div class="container-xl">
+
+        <!-- Erreur de chargement des règles -->
+        <div v-if="fetchError" class="alert alert-danger mb-3">
+          <svg xmlns="http://www.w3.org/2000/svg" class="icon alert-icon" width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+          </svg>
+          Erreur de chargement des règles : {{ fetchError }}
+        </div>
+
         <ul class="nav nav-tabs mb-4">
           <li class="nav-item">
             <a class="nav-link" :class="{ active: alertsTab === 'rules' }" href="#" @click.prevent="alertsTab = 'rules'">
@@ -97,6 +106,7 @@ const {
   rules,
   hosts,
   loading,
+  fetchError,
   showModal,
   saving,
   saveError,
@@ -118,12 +128,13 @@ const {
 let incidentsPollTimer = null
 
 onMounted(async () => {
-  if (route.query.tab === 'incidents') {
-    await switchToIncidents()
-  }
   await init()
 
-  // Fallback safety net — incidents are now event-driven via WS (alert_incident_update).
+  if (route.query.tab === 'incidents') {
+    alertsTab.value = 'incidents'
+  }
+
+  // Polling de sécurité toutes les 5 min (complément au WebSocket)
   incidentsPollTimer = setInterval(loadIncidents, 300_000)
 })
 
@@ -136,5 +147,3 @@ onUnmounted(() => {
 
 useWebSocket('/api/v1/ws/notifications', onWebSocketAlert)
 </script>
-
-

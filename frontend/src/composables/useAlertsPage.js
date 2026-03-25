@@ -25,11 +25,22 @@ export function useAlertsPage() {
   const rules = rulesStore.rules
   const hosts = hostsStore.hosts
   const loading = rulesStore.loading
+  const fetchError = rulesStore.error
 
   const activeIncidentCount = computed(() => incidents.value.filter((incident) => !incident.resolved_at).length)
 
   async function init() {
-    await Promise.all([rulesStore.fetchRules(), hostsStore.fetchHosts()])
+    // Forcer le rechargement à chaque montage de la page (cold start / F5)
+    // pour éviter qu'un TTL résiduel cache un état vide post-logout.
+    rulesStore.invalidate()
+    hostsStore.invalidate()
+
+    // Charger règles, hosts et incidents en parallèle dès le montage
+    await Promise.all([
+      rulesStore.fetchRules(),
+      hostsStore.fetchHosts(),
+      loadIncidents(),
+    ])
   }
 
   async function loadIncidents() {
@@ -48,7 +59,8 @@ export function useAlertsPage() {
 
   async function switchToIncidents() {
     alertsTab.value = 'incidents'
-    if (!incidentsLoaded.value) await loadIncidents()
+    // Toujours rafraîchir à la navigation vers l'onglet
+    await loadIncidents()
   }
 
   function startAddAlert() {
@@ -117,7 +129,7 @@ export function useAlertsPage() {
   }
 
   function onWebSocketAlert(payload) {
-    // Incident created or resolved — refresh the list
+    // Incident créé ou résolu — rafraîchir la liste
     if (payload.type === 'alert_incident_update') {
       loadIncidents()
       return
@@ -151,6 +163,7 @@ export function useAlertsPage() {
     rules,
     hosts,
     loading,
+    fetchError,
     showModal,
     saving,
     saveError,
