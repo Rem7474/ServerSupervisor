@@ -3,11 +3,14 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-playground/validator/v10"
 	"github.com/serversupervisor/server/internal/alerts"
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/database"
@@ -24,6 +27,55 @@ func NewAlertRulesHandler(db *database.DB, cfg *config.Config) *AlertRulesHandle
 		db:  db,
 		cfg: cfg,
 	}
+}
+
+// alertRuleFieldLabel maps Go struct field names to human-readable French labels.
+var alertRuleFieldLabel = map[string]string{
+	"Name":      "Nom",
+	"Metric":    "Métrique",
+	"Operator":  "Opérateur",
+	"Threshold": "Seuil",
+	"Duration":  "Durée",
+	"Enabled":   "Activé",
+	"HostID":    "Hôte",
+}
+
+// alertRuleTagMessage returns a human-readable message for a validator tag.
+func alertRuleTagMessage(field, tag string) string {
+	label, ok := alertRuleFieldLabel[field]
+	if !ok {
+		label = field
+	}
+	switch tag {
+	case "required":
+		return fmt.Sprintf("Le champ « %s » est obligatoire.", label)
+	case "min":
+		return fmt.Sprintf("Le champ « %s » est trop court.", label)
+	case "max":
+		return fmt.Sprintf("Le champ « %s » est trop long.", label)
+	case "email":
+		return fmt.Sprintf("Le champ « %s » doit être une adresse e-mail valide.", label)
+	default:
+		return fmt.Sprintf("Le champ « %s » est invalide.", label)
+	}
+}
+
+// humanizeValidationError converts a go-playground/validator error into a
+// single readable string. Falls back to the raw error for non-validation errors.
+func humanizeValidationError(err error) string {
+	var ve validator.ValidationErrors
+	if !errors.As(err, &ve) {
+		return err.Error()
+	}
+	if len(ve) == 1 {
+		return alertRuleTagMessage(ve[0].Field(), ve[0].Tag())
+	}
+	// Multiple errors: list them all.
+	msg := "Plusieurs champs sont invalides :"
+	for _, fe := range ve {
+		msg += " " + alertRuleTagMessage(fe.Field(), fe.Tag()) + ";"
+	}
+	return msg
 }
 
 // scanAlertRule scans a single alert rule row from the DB.
@@ -119,13 +171,13 @@ func (h *AlertRulesHandler) GetAlertRule(c *gin.Context) {
 func (h *AlertRulesHandler) CreateAlertRule(c *gin.Context) {
 	var req models.AlertRuleCreate
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": humanizeValidationError(err)})
 		return
 	}
 
 	validOps := map[string]bool{">": true, "<": true, ">=": true, "<=": true}
 	if !validOps[req.Operator] {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid operator"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Opérateur invalide."})
 		return
 	}
 	validMetrics := map[string]bool{
@@ -133,7 +185,7 @@ func (h *AlertRulesHandler) CreateAlertRule(c *gin.Context) {
 		"disk_smart_status": true, "disk_temperature": true, "proxmox_storage_percent": true,
 	}
 	if !validMetrics[req.Metric] {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid metric"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Métrique invalide."})
 		return
 	}
 
@@ -175,7 +227,7 @@ func (h *AlertRulesHandler) UpdateAlertRule(c *gin.Context) {
 
 	var req models.AlertRuleUpdate
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": humanizeValidationError(err)})
 		return
 	}
 
@@ -229,7 +281,7 @@ func (h *AlertRulesHandler) UpdateAlertRule(c *gin.Context) {
 	}
 
 	if len(updates) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "No fields to update"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Aucun champ à mettre à jour."})
 		return
 	}
 
@@ -249,7 +301,7 @@ func (h *AlertRulesHandler) UpdateAlertRule(c *gin.Context) {
 	}
 	rows, _ := result.RowsAffected()
 	if rows == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Alert rule not found"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Règle d'alerte introuvable."})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Alert rule updated"})
@@ -265,7 +317,7 @@ func (h *AlertRulesHandler) DeleteAlertRule(c *gin.Context) {
 	}
 	rows, _ := result.RowsAffected()
 	if rows == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Alert rule not found"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Règle d'alerte introuvable."})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Alert rule deleted"})
@@ -284,7 +336,7 @@ func (h *AlertRulesHandler) TestAlertRule(c *gin.Context) {
 		Actions   models.AlertActions `json:"actions"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": humanizeValidationError(err)})
 		return
 	}
 
