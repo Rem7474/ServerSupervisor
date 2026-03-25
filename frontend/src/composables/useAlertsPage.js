@@ -21,21 +21,18 @@ export function useAlertsPage() {
   const saveError = ref('')
   const editingRule = ref(null)
 
-  // Refs réactives du store (pas de déstructuration = garde la réactivité)
-  const rules = rulesStore.rules
-  const hosts = hostsStore.hosts
-  const loading = rulesStore.loading
-  const fetched = rulesStore.fetched
-  const fetchError = rulesStore.error
+  // computed pour garantir la réactivité lors du passage en props
+  const rules = computed(() => rulesStore.rules)
+  const hosts = computed(() => hostsStore.hosts)
+  const loading = computed(() => rulesStore.loading)
+  const fetched = computed(() => rulesStore.fetched)
+  const fetchError = computed(() => rulesStore.error)
 
   const activeIncidentCount = computed(() => incidents.value.filter((incident) => !incident.resolved_at).length)
 
   async function init() {
-    // Invalider le TTL à chaque montage pour forcer un fetch frais (F5 / cold start)
     rulesStore.invalidate()
     hostsStore.invalidate()
-
-    // Charger règles, hosts et incidents en parallèle
     await Promise.all([
       rulesStore.fetchRules(),
       hostsStore.fetchHosts(),
@@ -108,7 +105,6 @@ export function useAlertsPage() {
       variant: 'danger',
     })
     if (!confirmed) return
-
     try {
       await apiClient.deleteAlertRule(rule.id)
       await rulesStore.fetchRules(true)
@@ -132,12 +128,9 @@ export function useAlertsPage() {
       loadIncidents()
       return
     }
-
     if (payload.type !== 'new_alert' || !payload.notification) return
-
     const incoming = payload.notification
     const idx = incidents.value.findIndex((item) => item.id === incoming.id)
-
     if (idx >= 0) {
       incidents.value = [
         { ...incidents.value[idx], ...incoming },
@@ -147,7 +140,6 @@ export function useAlertsPage() {
     } else {
       incidents.value = [incoming, ...incidents.value]
     }
-
     incidentsLoaded.value = true
     loadIncidents()
   }
