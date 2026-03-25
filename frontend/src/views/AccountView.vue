@@ -99,8 +99,8 @@
                   {{ profile?.mfa_enabled ? 'Actif' : 'Inactif' }}
                 </span>
               </div>
-              <router-link to="/security" class="btn btn-outline-secondary w-100">
-                Gérer le MFA
+              <router-link to="/account/security" class="btn btn-outline-secondary w-100">
+                Gérer le MFA du compte
               </router-link>
             </div>
           </div>

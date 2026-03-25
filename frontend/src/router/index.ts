@@ -66,8 +66,14 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: '/security',
-    name: 'Security',
-    component: () => import('../views/SecurityView.vue'),
+    name: 'HostSecurity',
+    component: () => import('../views/HostSecurityView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true },
+  },
+  {
+    path: '/account/security',
+    name: 'AccountSecurity',
+    component: () => import('../views/AccountSecurityView.vue'),
     meta: { requiresAuth: true },
   },
   {

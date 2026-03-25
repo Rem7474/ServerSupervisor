@@ -5,10 +5,10 @@
         <div class="page-pretitle">
           <router-link to="/" class="text-decoration-none">Dashboard</router-link>
           <span class="text-muted mx-1">/</span>
-          <span>Sécurité</span>
+          <span>Sécurité hôtes</span>
         </div>
-        <h2 class="page-title">Sécurité</h2>
-        <div class="text-secondary">MFA et protection contre les menaces</div>
+        <h2 class="page-title">Sécurité plateforme</h2>
+        <div class="text-secondary">Menaces hôtes et sécurité du compte</div>
       </div>
     </div>
 
@@ -16,12 +16,12 @@
     <ul class="nav nav-tabs mb-4">
       <li class="nav-item">
         <a class="nav-link" :class="{ active: tab === 'mfa' }" href="#" @click.prevent="tab = 'mfa'">
-          Authentification MFA
+          Mon compte (MFA)
         </a>
       </li>
       <li class="nav-item" v-if="isAdmin">
         <a class="nav-link" :class="{ active: tab === 'threats' }" href="#" @click.prevent="switchToThreats">
-          Menaces
+          Sécurité hôtes
         </a>
       </li>
     </ul>
@@ -306,6 +306,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 
 const periodOptions = [
   { hours: 24,  label: '24h' },
@@ -317,6 +318,7 @@ import { useAuthStore } from '../stores/auth'
 
 const auth = useAuthStore()
 const isAdmin = computed(() => auth.user?.role === 'admin')
+const route = useRoute()
 
 const tab = ref('mfa')
 
@@ -451,5 +453,20 @@ async function copyBackupCodes() {
   setTimeout(() => { copiedBackup.value = false }, 1500)
 }
 
-onMounted(loadStatus)
+onMounted(async () => {
+  await loadStatus()
+
+  const requestedTab = String(route.query.tab || '').toLowerCase()
+  if (requestedTab === 'mfa') {
+    tab.value = 'mfa'
+    return
+  }
+  if (requestedTab === 'threats' && isAdmin.value) {
+    switchToThreats()
+    return
+  }
+  if (isAdmin.value) {
+    switchToThreats()
+  }
+})
 </script>

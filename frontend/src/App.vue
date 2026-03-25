@@ -68,6 +68,10 @@
                   <span class="nav-link-title">Plus</span>
                 </a>
                 <div class="dropdown-menu" :class="{ show: secondaryMenuOpen }" role="menu">
+                  <router-link v-if="auth.isAdmin" to="/security" class="dropdown-item" role="menuitem" @click="secondaryMenuOpen = false">
+                    <svg class="icon icon-sm me-2" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3l7 4v5c0 5-3.5 8.5-7 9-3.5-.5-7-4-7-9V7l7-4z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.5 12.5l2 2 3-3"/></svg>
+                    Sécurité hôtes
+                  </router-link>
                   <router-link to="/scheduled-tasks" class="dropdown-item" role="menuitem" @click="secondaryMenuOpen = false">
                     <svg class="icon icon-sm me-2" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                     Tâches planifiées
@@ -198,7 +202,7 @@ const isOnline = ref(navigator.onLine)
 function handleOnline() { isOnline.value = true }
 function handleOffline() { isOnline.value = false }
 
-const secondaryRoutes = ['/scheduled-tasks', '/network', '/settings']
+const secondaryRoutes = ['/security', '/scheduled-tasks', '/network', '/settings']
 const adminRoutes = ['/git-webhooks', '/audit', '/users']
 
 const isSecondaryActive = computed(() => secondaryRoutes.some(r => route.path.startsWith(r)))
