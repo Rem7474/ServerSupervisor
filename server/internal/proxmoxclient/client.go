@@ -242,25 +242,25 @@ func ClusterName(statuses []PVEClusterStatus) string {
 // PVETask is an element returned by GET /nodes/{node}/tasks.
 // starttime/endtime are Unix epoch seconds.
 type PVETask struct {
-	UPID       string  `json:"upid"`
-	Type       string  `json:"type"`
-	Status     string  `json:"status"`              // running | stopped
-	User       string  `json:"user"`
-	StartTime  int64   `json:"starttime"`
-	EndTime    int64   `json:"endtime,omitempty"`
-	ID         string  `json:"id,omitempty"`        // vmid or other Proxmox object
-	Node       string  `json:"node,omitempty"`
-	ExitStatus string  `json:"exitstatus,omitempty"` // OK | error msg (only when stopped)
+	UPID       string `json:"upid"`
+	Type       string `json:"type"`
+	Status     string `json:"status"` // running | stopped
+	User       string `json:"user"`
+	StartTime  int64  `json:"starttime"`
+	EndTime    int64  `json:"endtime,omitempty"`
+	ID         string `json:"id,omitempty"` // vmid or other Proxmox object
+	Node       string `json:"node,omitempty"`
+	ExitStatus string `json:"exitstatus,omitempty"` // OK | error msg (only when stopped)
 }
 
 // PVEAptPackage is an element returned by GET /nodes/{node}/apt/update.
 type PVEAptPackage struct {
-	Package    string `json:"Package"`
-	Version    string `json:"Version"`
-	OldVersion string `json:"OldVersion"`
-	Priority   string `json:"Priority"`
-	Section    string `json:"Section"`
-	Origin     string `json:"Origin"`
+	Package     string `json:"Package"`
+	Version     string `json:"Version"`
+	OldVersion  string `json:"OldVersion"`
+	Priority    string `json:"Priority"`
+	Section     string `json:"Section"`
+	Origin      string `json:"Origin"`
 	Description string `json:"Description"`
 }
 
@@ -281,9 +281,9 @@ type PVEBackupJob struct {
 	Enabled  int    `json:"enabled"` // 0 or 1
 	Schedule string `json:"schedule,omitempty"`
 	Storage  string `json:"storage,omitempty"`
-	Mode     string `json:"mode,omitempty"`     // snapshot | suspend | stop
+	Mode     string `json:"mode,omitempty"` // snapshot | suspend | stop
 	Compress string `json:"compress,omitempty"`
-	VMIDs    string `json:"vmid,omitempty"`     // comma-separated or "all"
+	VMIDs    string `json:"vmid,omitempty"` // comma-separated or "all"
 	MailTo   string `json:"mailto,omitempty"`
 }
 
@@ -362,10 +362,36 @@ type PVETaskLogLine struct {
 	T string `json:"t"` // text
 }
 
+// PVESyslogLine is one line from GET /nodes/{node}/syslog.
+// Proxmox payload shape can vary between versions, so fields are optional.
+type PVESyslogLine struct {
+	N     int    `json:"n"`
+	T     string `json:"t,omitempty"`
+	Time  int64  `json:"time,omitempty"`
+	Node  string `json:"node,omitempty"`
+	Tag   string `json:"tag,omitempty"`
+	PID   string `json:"pid,omitempty"`
+	Level string `json:"level,omitempty"`
+	Msg   string `json:"msg,omitempty"`
+}
+
 // GetNodeTaskLog returns the log lines for a given task UPID.
 func (c *Client) GetNodeTaskLog(node, upid string) ([]PVETaskLogLine, error) {
 	var lines []PVETaskLogLine
 	if err := c.get(fmt.Sprintf("/nodes/%s/tasks/%s/log", node, upid), &lines); err != nil {
+		return nil, err
+	}
+	return lines, nil
+}
+
+// GetNodeSyslog returns recent syslog lines for a node.
+// limit <= 0 defaults to 200.
+func (c *Client) GetNodeSyslog(node string, limit int) ([]PVESyslogLine, error) {
+	if limit <= 0 {
+		limit = 200
+	}
+	var lines []PVESyslogLine
+	if err := c.get(fmt.Sprintf("/nodes/%s/syslog?limit=%d", node, limit), &lines); err != nil {
 		return nil, err
 	}
 	return lines, nil
@@ -448,7 +474,7 @@ func (c *Client) GetNodeRRDData(node, timeframe string) ([]PVERRDPoint, error) {
 // PVEService is an element returned by GET /nodes/{node}/services.
 type PVEService struct {
 	Name        string `json:"name"`
-	State       string `json:"state"`       // running | stopped
+	State       string `json:"state"`        // running | stopped
 	ActiveState string `json:"active-state"` // active | inactive | failed
 	SubState    string `json:"sub-state"`
 	Description string `json:"desc"`
@@ -482,9 +508,9 @@ func (c *Client) GetVMNetworkInterfaces(node string, vmid int) ([]GuestNetworkIf
 		Prefix  int    `json:"prefix"`
 	}
 	type pveIface struct {
-		Name     string      `json:"name"`
-		MAC      string      `json:"hardware-address"`
-		IPAddrs  []pveIPAddr `json:"ip-addresses"`
+		Name    string      `json:"name"`
+		MAC     string      `json:"hardware-address"`
+		IPAddrs []pveIPAddr `json:"ip-addresses"`
 	}
 	var raw []pveIface
 	if err := c.get(fmt.Sprintf("/nodes/%s/qemu/%d/agent/network-get-interfaces", node, vmid), &raw); err != nil {

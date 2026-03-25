@@ -221,6 +221,11 @@
                 Services
               </button>
             </li>
+            <li class="nav-item">
+              <button class="nav-link" :class="{ active: tab === 'security' }" @click="tab = 'security'; loadNodeSecurityEvents()">
+                Sécurité <span class="badge bg-azure-lt text-azure ms-1">{{ securityEvents.length }}</span>
+              </button>
+            </li>
           </ul>
         </div>
 
@@ -523,6 +528,54 @@
           </div>
         </div>
 
+        <!-- Security tab -->
+        <div v-if="tab === 'security'">
+          <div class="card-header d-flex align-items-center gap-2">
+            <input
+              v-model="securitySearch"
+              type="text"
+              class="form-control form-control-sm"
+              style="max-width: 18rem"
+              placeholder="Filtre syslog (ex: auth, sshd, failed)"
+            >
+            <button class="btn btn-sm btn-outline-secondary" :disabled="securityEventsLoading" @click="loadNodeSecurityEvents">
+              <span v-if="securityEventsLoading" class="spinner-border spinner-border-sm me-1"></span>
+              Rechercher
+            </button>
+          </div>
+          <div v-if="securityEventsError" class="card-body pb-0">
+            <div class="alert alert-danger mb-0">{{ securityEventsError }}</div>
+          </div>
+          <div v-if="securityEventsLoading" class="card-body text-muted small">
+            <span class="spinner-border spinner-border-sm me-1"></span>Chargement des événements de sécurité…
+          </div>
+          <div v-else-if="securityEvents.length" class="table-responsive">
+            <table class="table table-vcenter card-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Niveau</th>
+                  <th>Tag</th>
+                  <th>Message</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(item, idx) in securityEvents" :key="item.id || `${item.time || 't'}-${idx}`">
+                  <td class="text-muted small">{{ formatSyslogTime(item) }}</td>
+                  <td>
+                    <span class="badge bg-secondary-lt text-secondary text-uppercase">{{ item.pri || item.level || '—' }}</span>
+                  </td>
+                  <td class="font-monospace small">{{ item.tag || item.ident || '—' }}</td>
+                  <td class="small">{{ item.msg || item.t || '—' }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div v-else class="card-body text-center text-muted py-4">
+            Aucun événement de sécurité trouvé pour ce filtre.
+          </div>
+        </div>
+
         <!-- Storage tab -->
         <div v-if="tab === 'storage'" class="table-responsive">
           <table class="table table-vcenter card-table">
@@ -753,6 +806,12 @@ const servicesFilter = ref('active')
 const svcActionMsg = ref('')
 const svcActionOk = ref(false)
 
+// node syslog security events
+const securityEvents = ref([])
+const securityEventsLoading = ref(false)
+const securityEventsError = ref('')
+const securitySearch = ref('auth')
+
 const vms = computed(() => node.value?.guests?.filter(g => g.guest_type === 'vm') ?? [])
 const lxcs = computed(() => node.value?.guests?.filter(g => g.guest_type === 'lxc') ?? [])
 const failedTaskCount = computed(() =>
@@ -768,7 +827,7 @@ async function load() {
   error.value = ''
   try {
     const requestedTab = String(route.query.tab || '')
-    if (requestedTab === 'vms' || requestedTab === 'lxc' || requestedTab === 'storage' || requestedTab === 'disks' || requestedTab === 'tasks' || requestedTab === 'updates' || requestedTab === 'services') {
+    if (requestedTab === 'vms' || requestedTab === 'lxc' || requestedTab === 'storage' || requestedTab === 'disks' || requestedTab === 'tasks' || requestedTab === 'updates' || requestedTab === 'services' || requestedTab === 'security') {
       tab.value = requestedTab
     }
     const res = await api.getProxmoxNode(route.params.id)
@@ -777,6 +836,9 @@ async function load() {
     // fire-and-forget: live status + RRD charts load in parallel
     loadLiveStatus()
     loadRRD('hour')
+    if (tab.value === 'security') {
+      loadNodeSecurityEvents()
+    }
   } catch (e) {
     error.value = e?.response?.data?.error || 'Erreur lors du chargement.'
   } finally {
@@ -939,6 +1001,24 @@ async function loadLiveStatus() {
   }
 }
 
+async function loadNodeSecurityEvents() {
+  if (securityEventsLoading.value) return
+  securityEventsLoading.value = true
+  securityEventsError.value = ''
+  try {
+    const res = await api.getProxmoxNodeSyslog(route.params.id, {
+      limit: 200,
+      search: securitySearch.value,
+    })
+    securityEvents.value = Array.isArray(res.data) ? res.data : []
+  } catch (e) {
+    securityEventsError.value = e?.response?.data?.error || 'Erreur lors du chargement des événements de sécurité.'
+    securityEvents.value = []
+  } finally {
+    securityEventsLoading.value = false
+  }
+}
+
 function stopPolling() {
   if (pollTimer) clearTimeout(pollTimer)
   pollTimer = null
@@ -1062,6 +1142,14 @@ function formatUptime(seconds) {
 function formatDate(iso) {
   if (!iso) return '—'
   return new Date(iso).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
+}
+
+function formatSyslogTime(item) {
+  if (!item?.time) return '—'
+  const raw = item.time
+  const ms = typeof raw === 'number' ? (raw < 1_000_000_000_000 ? raw * 1000 : raw) : Date.parse(raw)
+  if (!Number.isFinite(ms)) return '—'
+  return new Date(ms).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'medium' })
 }
 
 // wearout for SSD: 100=new, lower=more worn → invert to show wear percentage

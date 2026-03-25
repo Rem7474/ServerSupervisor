@@ -299,6 +299,7 @@ func registerProxmoxRoutes(g *gin.RouterGroup, h *handlers.ProxmoxHandler) {
 
 	// Node live data (proxied from PVE, not cached in DB)
 	g.GET("/proxmox/nodes/:id/status", h.GetNodeStatus)
+	g.GET("/proxmox/nodes/:id/syslog", h.GetNodeSyslog)
 	g.GET("/proxmox/nodes/:id/tasks/:upid/log", h.GetTaskLog)
 	g.GET("/proxmox/nodes/:id/rrd", h.GetNodeRRD)
 

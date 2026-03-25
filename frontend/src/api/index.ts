@@ -312,6 +312,8 @@ export default {
     api.get(`/v1/proxmox/nodes/${nodeId}/tasks/${encodeURIComponent(upid)}/log`),
   getProxmoxNodeRRD: (nodeId: string, timeframe?: string) =>
     api.get(`/v1/proxmox/nodes/${nodeId}/rrd`, { params: { timeframe: timeframe ?? 'hour' } }),
+  getProxmoxNodeSyslog: (nodeId: string, params?: Record<string, any>) =>
+    api.get(`/v1/proxmox/nodes/${nodeId}/syslog`, { params: params ?? {} }),
 
   // Node services
   getProxmoxNodeServices: (nodeId: string) => api.get(`/v1/proxmox/nodes/${nodeId}/services`),

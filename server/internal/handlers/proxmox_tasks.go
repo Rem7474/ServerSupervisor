@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/serversupervisor/server/internal/errors"
@@ -103,5 +104,62 @@ func (h *ProxmoxHandler) GetTaskLog(c *gin.Context) {
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 		return
 	}
+	c.JSON(http.StatusOK, lines)
+}
+
+// GetNodeSyslog proxies GET /nodes/{node}/syslog from PVE.
+// Supports ?limit= (default 200) and optional case-insensitive ?search= filtering.
+func (h *ProxmoxHandler) GetNodeSyslog(c *gin.Context) {
+	node, err := h.db.GetProxmoxNode(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if node == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "node not found"})
+		return
+	}
+
+	limit := 200
+	if rawLimit := c.Query("limit"); rawLimit != "" {
+		if parsedLimit, parseErr := strconv.Atoi(rawLimit); parseErr == nil {
+			limit = parsedLimit
+		}
+	}
+	search := strings.TrimSpace(c.Query("search"))
+
+	secret, conn, err := h.resolveSecret(node.ConnectionID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	client := proxmoxclient.New(conn.APIURL, conn.TokenID, secret, conn.InsecureSkipVerify)
+	lines, err := client.GetNodeSyslog(node.NodeName, limit)
+	if err != nil {
+		log.Printf("proxmox syslog [%s/%s]: %v", conn.Name, node.NodeName, err)
+		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+		return
+	}
+
+	if search != "" {
+		needle := strings.ToLower(search)
+		filtered := make([]proxmoxclient.PVESyslogLine, 0, len(lines))
+		for _, line := range lines {
+			haystack := strings.ToLower(strings.Join([]string{
+				line.T,
+				line.Msg,
+				line.Tag,
+				line.Level,
+				line.Node,
+				line.PID,
+			}, " "))
+			if strings.Contains(haystack, needle) {
+				filtered = append(filtered, line)
+			}
+		}
+		lines = filtered
+	}
+
 	c.JSON(http.StatusOK, lines)
 }
