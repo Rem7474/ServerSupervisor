@@ -287,6 +287,7 @@ import apiClient from '../api'
 import { formatDateLong as formatDate, formatDateTime } from '../utils/formatters'
 import { useCommandStream } from '../composables/useCommandStream'
 import CommandLogPanel from '../components/CommandLogPanel.vue'
+import { moduleLabel, moduleClass } from '../utils/moduleMeta'
 
 const auth = useAuthStore()
 
@@ -327,15 +328,6 @@ const roleLabel = computed(() => {
   const map = { admin: 'Administrateur', operator: 'Opérateur', viewer: 'Lecteur' }
   return map[profile.value?.role] || profile.value?.role || auth.role
 })
-
-const MODULE_META = {
-  apt:       { label: 'APT',        cls: 'badge bg-azure-lt text-azure' },
-  docker:    { label: 'Docker',     cls: 'badge bg-blue-lt text-blue' },
-  systemd:   { label: 'Systemd',    cls: 'badge bg-green-lt text-green' },
-  journal:   { label: 'Journal',    cls: 'badge bg-purple-lt text-purple' },
-  processes: { label: 'Processus',  cls: 'badge bg-orange-lt text-orange' },
-  custom:    { label: 'Custom',     cls: 'badge bg-teal-lt text-teal' },
-}
 
 function formatDuration(startedAt, endedAt) {
   if (!startedAt || !endedAt) return '—'
