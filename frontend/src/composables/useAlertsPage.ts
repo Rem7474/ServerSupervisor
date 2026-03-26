@@ -85,7 +85,11 @@ export function useAlertsPage(): UseAlertsPageApi {
   )
 
   async function init(): Promise<void> {
-    await Promise.all([rulesStore.fetchRules(), hostsStore.fetchHosts()])
+    await Promise.allSettled([rulesStore.fetchRules(), hostsStore.fetchHosts()])
+
+    if (!rulesStore.fetched && !rulesStore.loading) {
+      await rulesStore.fetchRules(true)
+    }
   }
 
   async function loadIncidents(): Promise<void> {

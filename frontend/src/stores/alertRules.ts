@@ -17,7 +17,10 @@ export const useAlertRulesStore = defineStore('alertRules', () => {
   const fetchedAt: Ref<number | null> = ref(null)
 
   async function fetchRules(force: boolean = false): Promise<void> {
-    if (!force && fetchedAt.value && Date.now() - fetchedAt.value < TTL_MS) return
+    if (!force && fetchedAt.value && Date.now() - fetchedAt.value < TTL_MS) {
+      fetched.value = true
+      return
+    }
     loading.value = true
     error.value = ''
     try {
