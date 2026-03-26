@@ -127,8 +127,12 @@ func (h *ProxmoxHandler) GetNodeSyslog(c *gin.Context) {
 		}
 	}
 	search := strings.TrimSpace(c.Query("search"))
-	service := strings.TrimSpace(c.Query("service"))
-	if service == "" {
+	service := ""
+	if rawService, ok := c.GetQuery("service"); ok {
+		// Explicit empty (?service=) means "all services".
+		service = strings.TrimSpace(rawService)
+	} else {
+		// Backward-compatible default when caller does not send service.
 		service = "pveproxy"
 	}
 
