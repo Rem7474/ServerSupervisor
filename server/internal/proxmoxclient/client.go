@@ -392,15 +392,72 @@ func (c *Client) GetNodeSyslog(node string, limit int, service string) ([]PVESys
 	if limit <= 0 {
 		limit = 200
 	}
-	path := fmt.Sprintf("/nodes/%s/syslog?limit=%d", node, limit)
-	if strings.TrimSpace(service) != "" {
-		path += "&service=" + url.QueryEscape(strings.TrimSpace(service))
+
+	// Proxmox syslog can be ordered oldest->newest; limit alone may return old lines.
+	// Read total first, then request the tail window via start=total-limit.
+	_, total, err := c.getNodeSyslogWindow(node, 1, 0, service)
+	if err != nil {
+		return nil, err
 	}
-	var lines []PVESyslogLine
-	if err := c.get(path, &lines); err != nil {
+
+	start := 0
+	if total > limit {
+		start = total - limit
+	}
+
+	lines, _, err := c.getNodeSyslogWindow(node, limit, start, service)
+	if err != nil {
 		return nil, err
 	}
 	return lines, nil
+}
+
+func (c *Client) getNodeSyslogWindow(node string, limit int, start int, service string) ([]PVESyslogLine, int, error) {
+	path := fmt.Sprintf("/nodes/%s/syslog?limit=%d&start=%d", node, limit, start)
+	if strings.TrimSpace(service) != "" {
+		path += "&service=" + url.QueryEscape(strings.TrimSpace(service))
+	}
+
+	url := c.baseURL + path
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, 0, fmt.Errorf("build request: %w", err)
+	}
+	req.Header.Set("Authorization", fmt.Sprintf("PVEAPIToken=%s=%s", c.tokenID, c.tokenSecret))
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, 0, fmt.Errorf("request to %s: %w", path, err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, 0, fmt.Errorf("read response from %s: %w", path, err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		snippet := string(body)
+		if len(snippet) > 300 {
+			snippet = snippet[:300]
+		}
+		return nil, 0, fmt.Errorf("API %s returned HTTP %d: %s", path, resp.StatusCode, snippet)
+	}
+
+	var envelope struct {
+		Data  []PVESyslogLine `json:"data"`
+		Total int             `json:"total"`
+	}
+	if err := json.Unmarshal(body, &envelope); err != nil {
+		return nil, 0, fmt.Errorf("parse envelope from %s: %w", path, err)
+	}
+
+	if envelope.Total < len(envelope.Data) {
+		envelope.Total = len(envelope.Data)
+	}
+
+	return envelope.Data, envelope.Total, nil
 }
 
 // TriggerNodeAptUpdate triggers an `apt-get update` on the given node via
