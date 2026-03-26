@@ -1284,7 +1284,7 @@ function formatSyslogTime(item) {
 
 function syslogLevelBadgeClass(item) {
   const raw = String(item?.parsedLevel || item?.pri || item?.level || '').toLowerCase()
-  if (raw.includes('critical') || raw.includes('fatal') || raw.includes('panic')) return 'bg-red text-white'
+  if (raw.includes('critical') || raw.includes('fatal') || raw.includes('panic')) return 'bg-danger-lt text-danger'
   if (raw.includes('error') || raw.includes('err')) return 'bg-danger-lt text-danger'
   if (raw.includes('warning') || raw.includes('warn')) return 'bg-orange-lt text-orange'
   if (raw.includes('success') || raw.includes('ok')) return 'bg-success-lt text-success'
