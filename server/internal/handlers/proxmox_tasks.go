@@ -127,6 +127,10 @@ func (h *ProxmoxHandler) GetNodeSyslog(c *gin.Context) {
 		}
 	}
 	search := strings.TrimSpace(c.Query("search"))
+	service := strings.TrimSpace(c.Query("service"))
+	if service == "" {
+		service = "pveproxy"
+	}
 
 	secret, conn, err := h.resolveSecret(node.ConnectionID)
 	if err != nil {
@@ -135,7 +139,7 @@ func (h *ProxmoxHandler) GetNodeSyslog(c *gin.Context) {
 	}
 
 	client := proxmoxclient.New(conn.APIURL, conn.TokenID, secret, conn.InsecureSkipVerify)
-	lines, err := client.GetNodeSyslog(node.NodeName, limit)
+	lines, err := client.GetNodeSyslog(node.NodeName, limit, service)
 	if err != nil {
 		log.Printf("proxmox syslog [%s/%s]: %v", conn.Name, node.NodeName, err)
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})

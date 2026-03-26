@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -386,12 +387,17 @@ func (c *Client) GetNodeTaskLog(node, upid string) ([]PVETaskLogLine, error) {
 
 // GetNodeSyslog returns recent syslog lines for a node.
 // limit <= 0 defaults to 200.
-func (c *Client) GetNodeSyslog(node string, limit int) ([]PVESyslogLine, error) {
+// service narrows logs to a service unit (e.g. pveproxy, sshd) when provided.
+func (c *Client) GetNodeSyslog(node string, limit int, service string) ([]PVESyslogLine, error) {
 	if limit <= 0 {
 		limit = 200
 	}
+	path := fmt.Sprintf("/nodes/%s/syslog?limit=%d", node, limit)
+	if strings.TrimSpace(service) != "" {
+		path += "&service=" + url.QueryEscape(strings.TrimSpace(service))
+	}
 	var lines []PVESyslogLine
-	if err := c.get(fmt.Sprintf("/nodes/%s/syslog?limit=%d", node, limit), &lines); err != nil {
+	if err := c.get(path, &lines); err != nil {
 		return nil, err
 	}
 	return lines, nil

@@ -531,6 +531,12 @@
         <!-- Security tab -->
         <div v-if="tab === 'security'">
           <div class="card-header d-flex align-items-center gap-2">
+            <select v-model="securityService" class="form-select form-select-sm" style="max-width: 11rem">
+              <option value="pveproxy">pveproxy</option>
+              <option value="sshd">sshd</option>
+              <option value="pvedaemon">pvedaemon</option>
+              <option value="">Tous les services</option>
+            </select>
             <input
               v-model="securitySearch"
               type="text"
@@ -811,6 +817,7 @@ const securityEvents = ref([])
 const securityEventsLoading = ref(false)
 const securityEventsError = ref('')
 const securitySearch = ref('auth')
+const securityService = ref('pveproxy')
 
 const vms = computed(() => node.value?.guests?.filter(g => g.guest_type === 'vm') ?? [])
 const lxcs = computed(() => node.value?.guests?.filter(g => g.guest_type === 'lxc') ?? [])
@@ -1009,6 +1016,7 @@ async function loadNodeSecurityEvents() {
     const res = await api.getProxmoxNodeSyslog(route.params.id, {
       limit: 200,
       search: securitySearch.value,
+      service: securityService.value,
     })
     securityEvents.value = Array.isArray(res.data) ? res.data : []
   } catch (e) {
