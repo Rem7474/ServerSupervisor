@@ -543,7 +543,7 @@
               type="text"
               class="form-control form-control-sm"
               style="max-width: 18rem"
-              placeholder="Filtre syslog (ex: auth, sshd, failed)"
+              placeholder="Filtre syslog (ex: failed, denied, apparmor)"
             >
             <button class="btn btn-sm btn-outline-secondary" :disabled="securityEventsLoading" @click="loadNodeSecurityEvents">
               <span v-if="securityEventsLoading" class="spinner-border spinner-border-sm me-1"></span>
