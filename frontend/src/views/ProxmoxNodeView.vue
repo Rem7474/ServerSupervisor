@@ -532,6 +532,7 @@
         <div v-if="tab === 'security'">
           <div class="card-header d-flex align-items-center gap-2">
             <select v-model="securityService" class="form-select form-select-sm" style="max-width: 11rem">
+              <option value="rotate">Rotation (3 services)</option>
               <option value="pveproxy">pveproxy</option>
               <option value="sshd">sshd</option>
               <option value="pvedaemon">pvedaemon</option>
@@ -566,13 +567,13 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="(item, idx) in securityEvents" :key="item.id || `${item.time || 't'}-${idx}`">
+                <tr v-for="(item, idx) in securityEvents" :key="item.id || `${item.parsedTimeMs || item.time || 't'}-${idx}`">
                   <td class="text-muted small">{{ formatSyslogTime(item) }}</td>
                   <td>
-                    <span class="badge bg-secondary-lt text-secondary text-uppercase">{{ item.pri || item.level || '—' }}</span>
+                    <span class="badge bg-secondary-lt text-secondary text-uppercase">{{ item.parsedLevel || item.pri || item.level || '—' }}</span>
                   </td>
-                  <td class="font-monospace small">{{ item.tag || item.ident || '—' }}</td>
-                  <td class="small">{{ item.msg || item.t || '—' }}</td>
+                  <td class="font-monospace small">{{ item.parsedTag || item.tag || item.ident || '—' }}</td>
+                  <td class="small">{{ item.parsedMsg || item.msg || item.t || '—' }}</td>
                 </tr>
               </tbody>
             </table>
@@ -816,8 +817,89 @@ const svcActionOk = ref(false)
 const securityEvents = ref([])
 const securityEventsLoading = ref(false)
 const securityEventsError = ref('')
-const securitySearch = ref('auth')
-const securityService = ref('pveproxy')
+const securitySearch = ref('')
+const securityService = ref('rotate')
+
+function mergeAndRankSyslogLines(groups, maxLines = 200) {
+  const flat = groups.flatMap(g => Array.isArray(g) ? g : []).map(normalizeSyslogEntry)
+  const uniq = new Map()
+  for (const item of flat) {
+    const key = `${item.parsedTimeMs ?? item.time ?? ''}|${item.parsedTag ?? item.tag ?? ''}|${item.parsedMsg ?? item.msg ?? item.t ?? ''}`
+    if (!uniq.has(key)) uniq.set(key, item)
+  }
+  const ranked = [...uniq.values()].sort((a, b) => {
+    const ta = Number(a?.parsedTimeMs ?? a?.time ?? 0)
+    const tb = Number(b?.parsedTimeMs ?? b?.time ?? 0)
+    if (ta !== tb) return tb - ta
+    return Number(b?.n ?? 0) - Number(a?.n ?? 0)
+  })
+  return ranked.slice(0, maxLines)
+}
+
+const SYSLOG_MONTHS = {
+  Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5,
+  Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11,
+}
+
+function guessLevel(text) {
+  const v = String(text || '').toLowerCase()
+  if (!v) return ''
+  if (v.includes('critical') || v.includes('panic') || v.includes('fatal')) return 'critical'
+  if (v.includes('error') || v.includes('failed') || v.includes('denied')) return 'error'
+  if (v.includes('warn')) return 'warning'
+  if (v.includes('info')) return 'info'
+  return ''
+}
+
+function parseHeaderDate(prefix) {
+  const m = /^([A-Z][a-z]{2})\s+(\d{1,2})\s+(\d{2}):(\d{2}):(\d{2})$/.exec(String(prefix || '').trim())
+  if (!m) return null
+  const month = SYSLOG_MONTHS[m[1]]
+  if (month == null) return null
+  const now = new Date()
+  let year = now.getFullYear()
+  let d = new Date(year, month, Number(m[2]), Number(m[3]), Number(m[4]), Number(m[5]))
+  if (d.getTime() > now.getTime() + 86_400_000) {
+    year -= 1
+    d = new Date(year, month, Number(m[2]), Number(m[3]), Number(m[4]), Number(m[5]))
+  }
+  return d
+}
+
+function normalizeSyslogEntry(item) {
+  const out = { ...(item || {}) }
+  const raw = String(out.t || '')
+  if (raw) {
+    const m = /^([A-Z][a-z]{2}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2})\s+(\S+)\s+([^\s:]+)(?:\[(\d+)\])?:\s*(.*)$/.exec(raw)
+    if (m) {
+      const parsedDate = parseHeaderDate(m[1])
+      if (parsedDate) out.parsedTimeMs = parsedDate.getTime()
+      if (!out.parsedTag) out.parsedTag = m[3]
+      const pidSuffix = m[4] ? `[${m[4]}]` : ''
+      const message = (m[5] || '').trim()
+      out.parsedMsg = message || `${m[2]} ${m[3]}${pidSuffix}`
+      out.parsedLevel = out.level || guessLevel(out.parsedMsg)
+    } else {
+      out.parsedMsg = out.msg || raw
+      out.parsedLevel = out.level || guessLevel(out.parsedMsg)
+      out.parsedTag = out.tag || out.ident || ''
+    }
+  } else {
+    out.parsedMsg = out.msg || ''
+    out.parsedLevel = out.level || guessLevel(out.parsedMsg)
+    out.parsedTag = out.tag || out.ident || ''
+  }
+
+  if (!out.parsedTimeMs && out.time) {
+    const rawTime = out.time
+    const ms = typeof rawTime === 'number'
+      ? (rawTime < 1_000_000_000_000 ? rawTime * 1000 : rawTime)
+      : Date.parse(rawTime)
+    if (Number.isFinite(ms)) out.parsedTimeMs = ms
+  }
+
+  return out
+}
 
 const vms = computed(() => node.value?.guests?.filter(g => g.guest_type === 'vm') ?? [])
 const lxcs = computed(() => node.value?.guests?.filter(g => g.guest_type === 'lxc') ?? [])
@@ -1013,12 +1095,33 @@ async function loadNodeSecurityEvents() {
   securityEventsLoading.value = true
   securityEventsError.value = ''
   try {
-    const res = await api.getProxmoxNodeSyslog(route.params.id, {
-      limit: 200,
-      search: securitySearch.value,
-      service: securityService.value,
-    })
-    securityEvents.value = Array.isArray(res.data) ? res.data : []
+    if (securityService.value === 'rotate') {
+      const services = ['pveproxy', 'sshd', 'pvedaemon']
+      const calls = services.map(service =>
+        api.getProxmoxNodeSyslog(route.params.id, {
+          limit: 120,
+          search: securitySearch.value,
+          service,
+        })
+      )
+      const results = await Promise.allSettled(calls)
+      const groups = results
+        .filter(r => r.status === 'fulfilled')
+        .map(r => Array.isArray(r.value?.data) ? r.value.data : [])
+
+      if (!groups.length) {
+        throw new Error('Aucun service syslog accessible (pveproxy, sshd, pvedaemon).')
+      }
+
+      securityEvents.value = mergeAndRankSyslogLines(groups, 200)
+    } else {
+      const res = await api.getProxmoxNodeSyslog(route.params.id, {
+        limit: 200,
+        search: securitySearch.value,
+        service: securityService.value,
+      })
+      securityEvents.value = Array.isArray(res.data) ? res.data.map(normalizeSyslogEntry) : []
+    }
   } catch (e) {
     securityEventsError.value = e?.response?.data?.error || 'Erreur lors du chargement des événements de sécurité.'
     securityEvents.value = []
@@ -1153,8 +1256,8 @@ function formatDate(iso) {
 }
 
 function formatSyslogTime(item) {
-  if (!item?.time) return '—'
-  const raw = item.time
+  const raw = item?.parsedTimeMs ?? item?.time
+  if (!raw) return '—'
   const ms = typeof raw === 'number' ? (raw < 1_000_000_000_000 ? raw * 1000 : raw) : Date.parse(raw)
   if (!Number.isFinite(ms)) return '—'
   return new Date(ms).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'medium' })
