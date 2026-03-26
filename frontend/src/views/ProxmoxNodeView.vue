@@ -570,7 +570,7 @@
                 <tr v-for="(item, idx) in securityEvents" :key="item.id || `${item.parsedTimeMs || item.time || 't'}-${idx}`">
                   <td class="text-muted small">{{ formatSyslogTime(item) }}</td>
                   <td>
-                    <span class="badge bg-secondary-lt text-secondary text-uppercase">{{ item.parsedLevel || item.pri || item.level || '—' }}</span>
+                    <span class="badge text-uppercase" :class="syslogLevelBadgeClass(item)">{{ item.parsedLevel || item.pri || item.level || '—' }}</span>
                   </td>
                   <td class="font-monospace small">{{ item.parsedTag || item.tag || item.ident || '—' }}</td>
                   <td class="small">{{ item.parsedMsg || item.msg || item.t || '—' }}</td>
@@ -844,8 +844,27 @@ const SYSLOG_MONTHS = {
 function guessLevel(text) {
   const v = String(text || '').toLowerCase()
   if (!v) return ''
+
+  if (
+    v.includes('successful auth') ||
+    v.includes('authentication success') ||
+    v.includes('authentication succeeded') ||
+    v.includes('login successful')
+  ) return 'success'
+
+  // Security-significant auth events are elevated to critical for quick triage.
+  if (
+    v.includes('authentication failure') ||
+    v.includes('failed password') ||
+    v.includes('invalid user') ||
+    v.includes('too many authentication failures') ||
+    v.includes('maximum authentication attempts exceeded') ||
+    v.includes('user root@pam msg=authentication failure')
+  ) return 'critical'
+
   if (v.includes('critical') || v.includes('panic') || v.includes('fatal')) return 'critical'
   if (v.includes('error') || v.includes('failed') || v.includes('denied')) return 'error'
+  if (v.includes('failure')) return 'error'
   if (v.includes('warn')) return 'warning'
   if (v.includes('info')) return 'info'
   return ''
@@ -1120,7 +1139,7 @@ async function loadNodeSecurityEvents() {
         search: securitySearch.value,
         service: securityService.value,
       })
-      securityEvents.value = Array.isArray(res.data) ? res.data.map(normalizeSyslogEntry) : []
+      securityEvents.value = mergeAndRankSyslogLines([Array.isArray(res.data) ? res.data : []], 200)
     }
   } catch (e) {
     securityEventsError.value = e?.response?.data?.error || 'Erreur lors du chargement des événements de sécurité.'
@@ -1261,6 +1280,16 @@ function formatSyslogTime(item) {
   const ms = typeof raw === 'number' ? (raw < 1_000_000_000_000 ? raw * 1000 : raw) : Date.parse(raw)
   if (!Number.isFinite(ms)) return '—'
   return new Date(ms).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'medium' })
+}
+
+function syslogLevelBadgeClass(item) {
+  const raw = String(item?.parsedLevel || item?.pri || item?.level || '').toLowerCase()
+  if (raw.includes('critical') || raw.includes('fatal') || raw.includes('panic')) return 'bg-red text-white'
+  if (raw.includes('error') || raw.includes('err')) return 'bg-danger-lt text-danger'
+  if (raw.includes('warning') || raw.includes('warn')) return 'bg-orange-lt text-orange'
+  if (raw.includes('success') || raw.includes('ok')) return 'bg-success-lt text-success'
+  if (raw.includes('info') || raw.includes('notice')) return 'bg-azure-lt text-azure'
+  return 'bg-secondary-lt text-secondary'
 }
 
 // wearout for SSD: 100=new, lower=more worn → invert to show wear percentage
