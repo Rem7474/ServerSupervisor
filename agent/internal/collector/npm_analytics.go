@@ -36,15 +36,16 @@ type NPMSummary struct {
 var npmAccessLogRegex = regexp.MustCompile(`^(\S+) \S+ \S+ \[[^\]]+\] "([A-Z]+) ([^\"]*?) HTTP/[^\"]*" (\d{3}) (\S+)(?: "[^\"]*" "[^\"]*")?(?: "([^\"]*)")?`)
 
 // resolveNPMLogDir détecte si un élément de logPathGlobs est un dossier.
-// Si oui, il est remplacé par dir/proxy-host-*.log.
+// Si oui, il est remplacé par dir/proxy-host-*_access.log (uniquement les access logs,
+// pas les error logs dont le format est différent).
 // Les globs et chemins de fichiers directs sont conservés tels quels.
 func resolveNPMLogDir(logPathGlobs []string) []string {
 	resolved := make([]string, 0, len(logPathGlobs))
 	for _, p := range logPathGlobs {
 		info, err := os.Stat(p)
 		if err == nil && info.IsDir() {
-			// C'est un dossier : on construit le glob NPM standard
-			resolved = append(resolved, filepath.Join(p, "proxy-host-*.log"))
+			// C'est un dossier : on cible uniquement les access logs NPM
+			resolved = append(resolved, filepath.Join(p, "proxy-host-*_access.log"))
 		} else {
 			// Glob ou fichier direct : on garde tel quel
 			resolved = append(resolved, p)
