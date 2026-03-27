@@ -290,6 +290,43 @@ func (db *DB) GetWebLogsSummary(since time.Time, hostID string, source string) (
 	}
 	traffic["top_endpoints"] = topEndpoints
 
+	proxyHostRows, err := db.conn.Query(
+		fmt.Sprintf(`SELECT COALESCE(NULLIF(domain,''), '(unknown)') AS vhost,
+		COUNT(*) AS hits,
+		COALESCE(SUM(bytes),0) AS bytes,
+		SUM(CASE WHEN status BETWEEN 400 AND 499 THEN 1 ELSE 0 END) AS errors_4xx,
+		SUM(CASE WHEN status >= 500 THEN 1 ELSE 0 END) AS errors_5xx
+		FROM web_log_requests
+		WHERE %s
+		GROUP BY vhost
+		ORDER BY hits DESC
+		LIMIT 20`, where),
+		args...,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = proxyHostRows.Close() }()
+	topProxyHosts := make([]map[string]any, 0)
+	for proxyHostRows.Next() {
+		var vhost string
+		var hits int64
+		var bytes int64
+		var errors4xx int64
+		var errors5xx int64
+		if err := proxyHostRows.Scan(&vhost, &hits, &bytes, &errors4xx, &errors5xx); err != nil {
+			return nil, err
+		}
+		topProxyHosts = append(topProxyHosts, map[string]any{
+			"vhost":      vhost,
+			"hits":       hits,
+			"bytes":      bytes,
+			"errors_4xx": errors4xx,
+			"errors_5xx": errors5xx,
+		})
+	}
+	traffic["top_proxy_hosts"] = topProxyHosts
+
 	hostTrafficRows, err := db.conn.Query(
 		fmt.Sprintf(`SELECT h.id, h.name, COUNT(*) AS hits, COALESCE(SUM(r.bytes),0) AS bytes
 		FROM web_log_requests r

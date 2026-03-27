@@ -164,13 +164,13 @@
     <div class="row row-cards mb-4">
       <div class="col-xl-6">
         <div class="card h-100">
-          <div class="card-header"><h3 class="card-title mb-0">Top hosts proxy</h3></div>
+          <div class="card-header"><h3 class="card-title mb-0">Top vhosts proxy</h3></div>
           <div class="card-body">
-            <div v-if="!topHosts.length" class="text-center text-secondary py-4">Aucune donnée hôte.</div>
+            <div v-if="!topProxyHosts.length" class="text-center text-secondary py-4">Aucune donnée vhost.</div>
             <div v-else>
-              <div v-for="h in topHosts.slice(0, 8)" :key="h.host_id" class="mb-2">
+              <div v-for="h in topProxyHosts.slice(0, 8)" :key="h.vhost || h.host_id || h.host_name" class="mb-2">
                 <div class="d-flex justify-content-between small mb-1">
-                  <span>{{ h.host_name || h.host_id }}</span>
+                  <span class="font-monospace">{{ h.vhost || h.host_name || h.host_id || '(unknown)' }}</span>
                   <span>{{ numberFormat(h.hits || 0) }}</span>
                 </div>
                 <div class="progress" style="height: 6px;">
@@ -408,6 +408,14 @@ const traffic = computed(() => summary.value.traffic || {})
 const threats = computed(() => summary.value.threats || {})
 const topDomains = computed(() => traffic.value.top_domains || [])
 const topHosts = computed(() => traffic.value.top_hosts || [])
+const topProxyHosts = computed(() => {
+  const fromApi = traffic.value.top_proxy_hosts || []
+  if (fromApi.length) return fromApi
+  return topDomains.value.map((d: AnyRecord) => ({
+    vhost: d.domain || '(unknown)',
+    hits: d.hits || 0,
+  }))
+})
 const topEndpoints = computed(() => traffic.value.top_endpoints || [])
 const topThreatIPs = computed(() => threats.value.top_ips || [])
 const statusDistribution = computed(() => traffic.value.status_distribution || { '2xx': 0, '3xx': 0, '4xx': 0, '5xx': 0 })
@@ -453,7 +461,7 @@ function statusClass(status: number): string {
 }
 
 function hostWidth(hits: number): number {
-  const max = Math.max(...(topHosts.value.map((h: AnyRecord) => Number(h.hits) || 0)), 1)
+  const max = Math.max(...(topProxyHosts.value.map((h: AnyRecord) => Number(h.hits) || 0)), 1)
   return Math.round(((Number(hits) || 0) / max) * 100)
 }
 

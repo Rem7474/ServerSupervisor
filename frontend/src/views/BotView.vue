@@ -1,5 +1,23 @@
 <template>
   <div>
+    <div class="threats-topbar mb-3">
+      <div class="d-flex align-items-center gap-2">
+        <span class="fw-semibold">Menaces web</span>
+      </div>
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <span class="small text-secondary">Période :</span>
+        <button
+          v-for="p in periodOptions"
+          :key="p.value"
+          class="btn btn-sm"
+          :class="period === p.value ? 'btn-primary' : 'btn-outline-secondary'"
+          @click="setPeriod(p.value)"
+        >
+          {{ p.label }}
+        </button>
+      </div>
+    </div>
+
     <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
       <div>
         <div class="page-pretitle">
@@ -14,14 +32,6 @@
 
     <div class="card mb-4">
       <div class="card-body d-flex flex-wrap gap-2 align-items-end">
-        <div>
-          <label class="form-label mb-1">Période</label>
-          <select v-model="period" class="form-select form-select-sm" style="min-width: 7rem;">
-            <option value="24h">24h</option>
-            <option value="168h">7j</option>
-            <option value="720h">30j</option>
-          </select>
-        </div>
         <div>
           <label class="form-label mb-1">Source</label>
           <select v-model="source" class="form-select form-select-sm" style="min-width: 9rem;">
@@ -194,7 +204,41 @@
             Chargement timeline...
           </div>
           <div v-else-if="!timeline.length" class="text-center py-4 text-secondary">Aucune requête</div>
-          <div v-else v-for="(r, idx) in timeline" :key="`${r.timestamp}-${idx}`" class="border-bottom px-3 py-2">
+          <template v-else>
+            <div class="timeline-frieze border-bottom px-3 py-3">
+              <div class="d-flex align-items-center justify-content-between mb-2 gap-2 flex-wrap">
+                <div class="small text-secondary">
+                  Frise regroupée par {{ timelineBucketLabel }}
+                </div>
+                <button class="btn btn-sm btn-outline-secondary" @click="toggleBucketFilter">
+                  {{ bucketFilterEnabled ? 'Afficher toutes les requêtes' : 'Filtrer sur la tranche sélectionnée' }}
+                </button>
+              </div>
+
+              <div class="timeline-frieze-scroll">
+                <div class="timeline-frieze-track">
+                  <div class="timeline-frieze-line"></div>
+                  <button
+                    v-for="bucket in timelineBuckets"
+                    :key="bucket.key"
+                    class="timeline-frieze-item"
+                    :class="{ active: selectedBucketKey === bucket.key }"
+                    :title="bucket.title"
+                    @click="selectBucket(bucket.key)"
+                  >
+                    <span class="timeline-frieze-dot" :style="{ width: dotSize(bucket.count), height: dotSize(bucket.count) }"></span>
+                    <span class="timeline-frieze-time">{{ bucket.label }}</span>
+                    <span class="timeline-frieze-count">{{ bucket.count }}</span>
+                  </button>
+                </div>
+              </div>
+
+              <div v-if="selectedBucket" class="small text-secondary mt-2">
+                Tranche sélectionnée: {{ selectedBucket.rangeLabel }} · {{ selectedBucket.count }} requête{{ selectedBucket.count > 1 ? 's' : '' }} · {{ selectedBucket.errorCount }} erreur{{ selectedBucket.errorCount > 1 ? 's' : '' }}
+              </div>
+            </div>
+
+            <div v-for="(r, idx) in displayedTimeline" :key="`${r.timestamp}-${idx}`" class="border-bottom px-3 py-2">
             <div class="d-flex align-items-center gap-2 mb-1">
               <span class="badge" :class="statusClass(r.status)">{{ r.status }}</span>
               <span class="badge bg-blue-lt text-blue">{{ r.method }}</span>
@@ -204,6 +248,7 @@
             <div class="font-monospace small mb-1">{{ r.domain || '(unknown)' }} {{ r.path }}</div>
             <div class="small text-secondary text-truncate">{{ r.user_agent || '-' }}</div>
           </div>
+          </template>
         </div>
       </div>
     </div>
@@ -217,6 +262,12 @@ import apiClient from '../api'
 type AnyRecord = Record<string, any>
 
 const period = ref('24h')
+const periodOptions = [
+  { value: '1h', label: '1h' },
+  { value: '24h', label: '24h' },
+  { value: '168h', label: '7j' },
+  { value: '720h', label: '30j' },
+]
 const source = ref('')
 const hostId = ref('')
 
@@ -228,12 +279,78 @@ const timelineLoading = ref(false)
 const blockLoading = ref(false)
 const selectedIP = ref('')
 const timeline = ref<AnyRecord[]>([])
+const selectedBucketKey = ref('')
+const bucketFilterEnabled = ref(true)
 
 const threats = computed(() => summary.value.threats || {})
 const topIPs = computed(() => threats.value.top_ips || [])
 const topPaths = computed(() => threats.value.top_paths || [])
 const mostTargetedHosts = computed(() => threats.value.most_targeted_hosts || [])
 const ipHostMatrix = computed(() => threats.value.ip_host_matrix || [])
+
+const timelineChrono = computed(() => {
+  return [...timeline.value].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+})
+
+const timelineBucketMs = computed(() => {
+  const n = timelineChrono.value.length
+  if (n > 220) return 60 * 60 * 1000
+  if (n > 80) return 5 * 60 * 1000
+  return 60 * 1000
+})
+
+const timelineBucketLabel = computed(() => {
+  if (timelineBucketMs.value === 60 * 60 * 1000) return 'heure'
+  if (timelineBucketMs.value === 5 * 60 * 1000) return '5 minutes'
+  return 'minute'
+})
+
+const timelineBuckets = computed(() => {
+  const buckets = new Map<string, AnyRecord>()
+  for (const r of timelineChrono.value) {
+    const ts = new Date(r.timestamp).getTime()
+    if (!Number.isFinite(ts)) continue
+    const startMs = Math.floor(ts / timelineBucketMs.value) * timelineBucketMs.value
+    const key = String(startMs)
+    const existing = buckets.get(key)
+    if (!existing) {
+      buckets.set(key, {
+        key,
+        startMs,
+        endMs: startMs + timelineBucketMs.value,
+        count: 1,
+        errorCount: Number(r.status) >= 400 ? 1 : 0,
+      })
+      continue
+    }
+    existing.count += 1
+    if (Number(r.status) >= 400) existing.errorCount += 1
+  }
+
+  return [...buckets.values()]
+    .sort((a, b) => a.startMs - b.startMs)
+    .map((b) => ({
+      ...b,
+      label: formatBucketLabel(b.startMs, timelineBucketMs.value),
+      rangeLabel: `${new Date(b.startMs).toLocaleTimeString()} → ${new Date(b.endMs).toLocaleTimeString()}`,
+      title: `${new Date(b.startMs).toLocaleString()} (${b.count} req)`
+    }))
+})
+
+const selectedBucket = computed(() => {
+  if (!selectedBucketKey.value) return null
+  return timelineBuckets.value.find((b) => b.key === selectedBucketKey.value) || null
+})
+
+const displayedTimeline = computed(() => {
+  if (!bucketFilterEnabled.value || !selectedBucket.value) return timeline.value
+  const start = selectedBucket.value.startMs
+  const end = selectedBucket.value.endMs
+  return timeline.value.filter((r) => {
+    const ts = new Date(r.timestamp).getTime()
+    return Number.isFinite(ts) && ts >= start && ts < end
+  })
+})
 
 function levelClass(level: string): string {
   switch (level) {
@@ -268,6 +385,12 @@ async function loadThreats() {
   }
 }
 
+function setPeriod(value: string) {
+  if (period.value === value) return
+  period.value = value
+  void loadThreats()
+}
+
 async function openTimeline(ip: string) {
   selectedIP.value = ip
   showTimeline.value = true
@@ -275,9 +398,12 @@ async function openTimeline(ip: string) {
   try {
     const res = await apiClient.getIPTimeline(ip, hostId.value || undefined, period.value, 500)
     timeline.value = res.data?.requests || []
+    selectedBucketKey.value = timelineBuckets.value.length ? timelineBuckets.value[timelineBuckets.value.length - 1].key : ''
+    bucketFilterEnabled.value = true
   } catch (err) {
     console.error('Failed to load IP timeline', err)
     timeline.value = []
+    selectedBucketKey.value = ''
   } finally {
     timelineLoading.value = false
   }
@@ -287,6 +413,30 @@ function closeTimeline() {
   showTimeline.value = false
   timeline.value = []
   selectedIP.value = ''
+  selectedBucketKey.value = ''
+}
+
+function selectBucket(key: string) {
+  selectedBucketKey.value = key
+  bucketFilterEnabled.value = true
+}
+
+function toggleBucketFilter() {
+  bucketFilterEnabled.value = !bucketFilterEnabled.value
+}
+
+function dotSize(count: number): string {
+  const max = Math.max(...timelineBuckets.value.map((b) => Number(b.count) || 0), 1)
+  const ratio = (Number(count) || 0) / max
+  return `${Math.round(10 + ratio * 14)}px`
+}
+
+function formatBucketLabel(startMs: number, bucketMs: number): string {
+  const d = new Date(startMs)
+  if (bucketMs >= 60 * 60 * 1000) {
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  }
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
 async function blockIP() {
@@ -303,6 +453,14 @@ onMounted(loadThreats)
 </script>
 
 <style scoped>
+.threats-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
 .timeline-drawer-backdrop {
   position: fixed;
   inset: 0;
@@ -317,5 +475,63 @@ onMounted(loadThreats)
   height: 100vh;
   border-radius: 0;
   border: 0;
+}
+
+.timeline-frieze-scroll {
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+}
+
+.timeline-frieze-track {
+  position: relative;
+  min-width: max-content;
+  display: flex;
+  gap: 1rem;
+  padding: 1.25rem 0.25rem 0.2rem;
+}
+
+.timeline-frieze-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 1.9rem;
+  height: 4px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #3a3f92 0%, #1b2a6d 100%);
+}
+
+.timeline-frieze-item {
+  position: relative;
+  z-index: 1;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  min-width: 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.timeline-frieze-dot {
+  display: inline-block;
+  border-radius: 999px;
+  background: #fff;
+  border: 4px solid #2a2f8a;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.08);
+}
+
+.timeline-frieze-item.active .timeline-frieze-dot {
+  border-color: #e24b4a;
+}
+
+.timeline-frieze-time {
+  font-size: 0.72rem;
+  color: var(--tblr-secondary);
+}
+
+.timeline-frieze-count {
+  font-size: 0.72rem;
+  font-weight: 600;
 }
 </style>
