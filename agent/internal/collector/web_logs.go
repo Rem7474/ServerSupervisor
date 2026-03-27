@@ -2,6 +2,7 @@ package collector
 
 import (
 	"bufio"
+	"compress/gzip"
 	"encoding/json"
 	"io"
 	"os"
@@ -102,6 +103,7 @@ type webLogCursorState struct {
 type webLogCursorEntry struct {
 	Offset         int64     `json:"offset"`
 	Size           int64     `json:"size"`
+	FileModUnix    int64     `json:"file_mod_unix,omitempty"`
 	BackfillOffset int64     `json:"backfill_offset,omitempty"`
 	BackfillLimit  int64     `json:"backfill_limit,omitempty"`
 	BackfillDone   bool      `json:"backfill_done,omitempty"`
@@ -172,7 +174,7 @@ func CollectWebLogs(logPathGlobs []string, tailLines int, topN int, requestLimit
 	for _, file := range files {
 		seenFiles[file] = struct{}{}
 		entry, hasEntry := cursor.Files[file]
-		lines, nextEntry, err := readIncrementalLines(file, tailLines, entry, hasEntry)
+		lines, nextEntry, err := readLinesForFile(file, tailLines, entry, hasEntry)
 		if err != nil {
 			continue
 		}
@@ -463,6 +465,24 @@ func topPaths(paths map[string]int, topN int) []NPMPathHit {
 func expandGlobs(globs []string) []string {
 	seen := map[string]struct{}{}
 	out := []string{}
+	appendMatch := func(path string) {
+		if _, ok := seen[path]; ok {
+			return
+		}
+		seen[path] = struct{}{}
+		out = append(out, path)
+	}
+
+	appendGlobMatches := func(pattern string) {
+		matches, err := filepath.Glob(pattern)
+		if err != nil {
+			return
+		}
+		for _, m := range matches {
+			appendMatch(m)
+		}
+	}
+
 	for _, pattern := range globs {
 		if pattern == "" {
 			continue
@@ -470,22 +490,70 @@ func expandGlobs(globs []string) []string {
 		matches, err := filepath.Glob(pattern)
 		if err != nil || len(matches) == 0 {
 			if _, err := os.Stat(pattern); err == nil {
-				if _, ok := seen[pattern]; !ok {
-					seen[pattern] = struct{}{}
-					out = append(out, pattern)
-				}
+				appendMatch(pattern)
+				appendGlobMatches(pattern + ".*.gz")
 			}
 			continue
 		}
 		for _, m := range matches {
-			if _, ok := seen[m]; ok {
-				continue
-			}
-			seen[m] = struct{}{}
-			out = append(out, m)
+			appendMatch(m)
 		}
+		appendGlobMatches(pattern + ".*.gz")
 	}
+	sort.Strings(out)
 	return out
+}
+
+func readLinesForFile(path string, maxLines int, prev webLogCursorEntry, hasPrev bool) ([]string, webLogCursorEntry, error) {
+	if strings.HasSuffix(strings.ToLower(path), ".gz") {
+		return readCompressedLines(path, prev, hasPrev)
+	}
+	return readIncrementalLines(path, maxLines, prev, hasPrev)
+}
+
+func readCompressedLines(path string, prev webLogCursorEntry, hasPrev bool) ([]string, webLogCursorEntry, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil, prev, err
+	}
+
+	modUnix := info.ModTime().UTC().Unix()
+	next := webLogCursorEntry{
+		Offset:       info.Size(),
+		Size:         info.Size(),
+		FileModUnix:  modUnix,
+		BackfillDone: true,
+		UpdatedAt:    time.Now().UTC(),
+	}
+
+	if hasPrev && prev.Size == info.Size() && prev.FileModUnix == modUnix {
+		return []string{}, next, nil
+	}
+
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, next, err
+	}
+	defer func() { _ = f.Close() }()
+
+	gz, err := gzip.NewReader(f)
+	if err != nil {
+		return nil, next, err
+	}
+	defer func() { _ = gz.Close() }()
+
+	lines := make([]string, 0, 4096)
+	s := bufio.NewScanner(gz)
+	buf := make([]byte, 0, 64*1024)
+	s.Buffer(buf, 4*1024*1024)
+	for s.Scan() {
+		lines = append(lines, s.Text())
+	}
+	if err := s.Err(); err != nil {
+		return nil, next, err
+	}
+
+	return lines, next, nil
 }
 
 func readLastLines(path string, n int) ([]string, error) {
@@ -521,6 +589,7 @@ func readIncrementalLines(path string, maxLines int, prev webLogCursorEntry, has
 	next := webLogCursorEntry{
 		Offset:         info.Size(),
 		Size:           info.Size(),
+		FileModUnix:    info.ModTime().UTC().Unix(),
 		BackfillOffset: prev.BackfillOffset,
 		BackfillLimit:  prev.BackfillLimit,
 		BackfillDone:   prev.BackfillDone,
