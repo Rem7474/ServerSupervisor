@@ -158,10 +158,10 @@ func (db *DB) GetWebLogsSummary(since time.Time, hostID string, source string) (
 	var errors4xx int64
 	var errors5xx int64
 	if err := db.conn.QueryRow(
-		fmt.Sprintf(`SELECT COALESCE(SUM(total_requests),0), COALESCE(SUM(total_bytes),0),
-		COALESCE(SUM(errors_4xx),0),
-		COALESCE(SUM(errors_5xx),0)
-		FROM web_log_snapshots WHERE %s`, where),
+		fmt.Sprintf(`SELECT COALESCE(COUNT(*),0), COALESCE(SUM(bytes),0),
+		COALESCE(SUM(CASE WHEN status BETWEEN 400 AND 499 THEN 1 ELSE 0 END),0),
+		COALESCE(SUM(CASE WHEN status >= 500 THEN 1 ELSE 0 END),0)
+		FROM web_log_requests WHERE %s`, where),
 		args...,
 	).Scan(&totalRequests, &totalBytes, &errors4xx, &errors5xx); err != nil {
 		return nil, err
@@ -704,9 +704,9 @@ func (db *DB) GetWebLogsKPIWindow(since time.Time, until time.Time, hostID strin
 	var totalBytes int64
 	var errors5xx int64
 	if err := db.conn.QueryRow(
-		fmt.Sprintf(`SELECT COALESCE(SUM(total_requests),0), COALESCE(SUM(total_bytes),0),
-		COALESCE(SUM(errors_5xx),0)
-		FROM web_log_snapshots
+		fmt.Sprintf(`SELECT COALESCE(COUNT(*),0), COALESCE(SUM(bytes),0),
+		COALESCE(SUM(CASE WHEN status >= 500 THEN 1 ELSE 0 END),0)
+		FROM web_log_requests
 		WHERE %s`, where),
 		args...,
 	).Scan(&totalRequests, &totalBytes, &errors5xx); err != nil {
@@ -753,14 +753,14 @@ func (db *DB) GetWebLogsTimeseries(since time.Time, hostID string, source string
 	}
 
 	query := fmt.Sprintf(`SELECT date_trunc('%s', captured_at) AS bucket_ts,
-	COALESCE(SUM(total_requests),0) AS total,
-	COALESCE(SUM(suspicious_requests),0) AS bot,
-	COALESCE(SUM(total_requests - suspicious_requests),0) AS human,
-	COALESCE(SUM(total_requests - errors_4xx - errors_5xx),0) AS status_2xx,
-	0 AS status_3xx,
-	COALESCE(SUM(errors_4xx),0) AS status_4xx,
-	COALESCE(SUM(errors_5xx),0) AS status_5xx
-	FROM web_log_snapshots
+	COUNT(*) AS total,
+	SUM(CASE WHEN suspicious = TRUE THEN 1 ELSE 0 END) AS bot,
+	SUM(CASE WHEN suspicious = FALSE THEN 1 ELSE 0 END) AS human,
+	SUM(CASE WHEN status BETWEEN 200 AND 299 THEN 1 ELSE 0 END) AS status_2xx,
+	SUM(CASE WHEN status BETWEEN 300 AND 399 THEN 1 ELSE 0 END) AS status_3xx,
+	SUM(CASE WHEN status BETWEEN 400 AND 499 THEN 1 ELSE 0 END) AS status_4xx,
+	SUM(CASE WHEN status >= 500 THEN 1 ELSE 0 END) AS status_5xx
+	FROM web_log_requests
 	WHERE %s
 	GROUP BY bucket_ts
 	ORDER BY bucket_ts ASC`, bucket, where)

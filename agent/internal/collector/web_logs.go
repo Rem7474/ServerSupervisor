@@ -527,7 +527,6 @@ func readCompressedLines(path string, prev webLogCursorEntry, hasPrev bool) ([]s
 	}
 
 	if hasPrev && prev.Size == info.Size() && prev.FileModUnix == modUnix {
-		log.Printf("Web logs collect file=%s mode=gz skip=unchanged", path)
 		return []string{}, next, nil
 	}
 
