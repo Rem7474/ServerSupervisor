@@ -229,9 +229,11 @@ func sendReport(ctx context.Context, cfg *config.Config, s *sender.Sender) {
 	}
 
 	// Collect Nginx Proxy Manager analytics from web access logs.
+	// cfg.NPMLogGlobs() résout automatiquement npm_analytics_log_dir en glob
+	// proxy-host-*.log, ou utilise npm_analytics_log_paths si log_dir est vide.
 	var npmAnalytics interface{}
 	if cfg.CollectNPMAnalytics {
-		if summary, err := collector.CollectNPMAnalytics(cfg.NPMAnalyticsLogPaths, cfg.NPMAnalyticsTailLines, cfg.NPMAnalyticsTopN); err != nil {
+		if summary, err := collector.CollectNPMAnalytics(cfg.NPMLogGlobs(), cfg.NPMAnalyticsTailLines, cfg.NPMAnalyticsTopN); err != nil {
 			log.Printf("NPM analytics collection skipped: %v", err)
 		} else {
 			npmAnalytics = summary
