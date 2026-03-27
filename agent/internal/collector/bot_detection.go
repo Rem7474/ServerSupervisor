@@ -34,7 +34,13 @@ type BotDetectionSummary struct {
 	CollectedAt         time.Time          `json:"collected_at"`
 }
 
-var accessLogRegex = regexp.MustCompile(`^(\S+) \S+ \S+ \[[^\]]+\] "([A-Z]+) ([^\"]*?) HTTP/[^\"]*" (\d{3}) \S+(?: "[^"]*" "([^"]*)")?`)
+// Format NPM custom :
+// [date] - - STATUS - METHOD SCHEME DOMAIN "PATH" [Client IP] [Length X] [Gzip -] [Sent-to X] "UA" "-"
+// Exemple :
+// [23/Mar/2026:10:41:25 +0000] - 200 200 - GET https remcorp.fr "/" [Client 79.127.182.179] [Length 16183] [Gzip -] [Sent-to 192.168.1.213] "Mozilla/5.0 ..." "-"
+var accessLogRegex = regexp.MustCompile(
+	`^\[[^\]]+\] - \S+ (\d{3}) - (\S+) \S+ \S+ "([^"]*)" \[Client ([^\]]+)\].*"([^"]*)" "-"$`,
+)
 
 var suspiciousPathNeedles = []string{
 	"/.env", "/wp-admin", "/wp-login", "/xmlrpc.php", "/cgi-bin", "/phpmyadmin", "/pma",
@@ -181,21 +187,25 @@ func readLastLines(path string, n int) ([]string, error) {
 	return ring, nil
 }
 
+// parseAccessLine parse le format de log custom de Nginx Proxy Manager :
+// [date] - STATUS_UPSTREAM STATUS - METHOD SCHEME DOMAIN "PATH" [Client IP] [Length X] [Gzip -] [Sent-to X] "UA" "-"
+// Groupes : (1) status, (2) method, (3) path+query, (4) client_ip, (5) user_agent
 func parseAccessLine(line string) (ip, method, path, ua string, ok bool) {
 	m := accessLogRegex.FindStringSubmatch(line)
 	if len(m) == 0 {
 		return "", "", "", "", false
 	}
-	ip = m[1]
+	// m[1]=status, m[2]=method, m[3]=path, m[4]=ip, m[5]=ua
 	method = strings.ToUpper(strings.TrimSpace(m[2]))
 	path = strings.TrimSpace(m[3])
-	ua = strings.ToLower(strings.TrimSpace(m[5]))
 	if q := strings.IndexByte(path, '?'); q >= 0 {
 		path = path[:q]
 	}
 	if path == "" {
 		path = "/"
 	}
+	ip = strings.TrimSpace(m[4])
+	ua = strings.ToLower(strings.TrimSpace(m[5]))
 	return ip, method, path, ua, true
 }
 

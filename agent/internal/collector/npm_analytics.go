@@ -33,7 +33,14 @@ type NPMSummary struct {
 	CollectedAt      time.Time       `json:"collected_at"`
 }
 
-var npmAccessLogRegex = regexp.MustCompile(`^(\S+) \S+ \S+ \[[^\]]+\] "([A-Z]+) ([^\"]*?) HTTP/[^\"]*" (\d{3}) (\S+)(?: "[^\"]*" "[^\"]*")?(?: "([^\"]*)")?`)
+// Format NPM custom :
+// [date] - STATUS_UPSTREAM STATUS - METHOD SCHEME DOMAIN "PATH" [Client IP] [Length BYTES] [Gzip -] [Sent-to X] "UA" "-"
+// Exemple :
+// [23/Mar/2026:10:41:25 +0000] - 200 200 - GET https remcorp.fr "/" [Client 79.127.182.179] [Length 16183] [Gzip -] [Sent-to 192.168.1.213] "Mozilla/5.0 ..." "-"
+// Groupes : (1) status, (2) method, (3) domain, (4) path+query, (5) client_ip, (6) bytes, (7) user_agent
+var npmAccessLogRegex = regexp.MustCompile(
+	`^\[[^\]]+\] - \S+ (\d{3}) - (\S+) \S+ (\S+) "([^"]*)" \[Client ([^\]]+)\] \[Length (\d+)[^\]]*\].*"([^"]*)" "-"$`,
+)
 
 // resolveNPMLogDir détecte si un élément de logPathGlobs est un dossier.
 // Si oui, il est remplacé par dir/proxy-host-*_access.log (uniquement les access logs,
@@ -44,10 +51,8 @@ func resolveNPMLogDir(logPathGlobs []string) []string {
 	for _, p := range logPathGlobs {
 		info, err := os.Stat(p)
 		if err == nil && info.IsDir() {
-			// C'est un dossier : on cible uniquement les access logs NPM
 			resolved = append(resolved, filepath.Join(p, "proxy-host-*_access.log"))
 		} else {
-			// Glob ou fichier direct : on garde tel quel
 			resolved = append(resolved, p)
 		}
 	}
@@ -62,7 +67,6 @@ func CollectNPMAnalytics(logPathGlobs []string, tailLines int, topN int) (*NPMSu
 		topN = 10
 	}
 
-	// Résolution dossier → glob avant expansion
 	logPathGlobs = resolveNPMLogDir(logPathGlobs)
 
 	files := expandGlobs(logPathGlobs)
@@ -131,28 +135,28 @@ func CollectNPMAnalytics(logPathGlobs []string, tailLines int, topN int) (*NPMSu
 	return summary, nil
 }
 
+// parseNPMAccessLine parse le format de log custom de Nginx Proxy Manager.
+// Groupes regex : (1) status, (2) method, (3) domain, (4) path+query, (5) client_ip, (6) bytes, (7) ua
 func parseNPMAccessLine(line string) (domain, path string, status int, bytes uint64, ok bool) {
 	m := npmAccessLogRegex.FindStringSubmatch(line)
 	if len(m) == 0 {
 		return "", "", 0, 0, false
 	}
 
-	status, _ = strconv.Atoi(m[4])
-	if m[5] != "-" {
-		bytes, _ = strconv.ParseUint(m[5], 10, 64)
+	status, _ = strconv.Atoi(m[1])
+	bytes, _ = strconv.ParseUint(m[6], 10, 64)
+
+	domain = strings.ToLower(strings.TrimSpace(m[3]))
+	if domain == "" || domain == "-" {
+		domain = "(unknown)"
 	}
 
-	path = strings.TrimSpace(m[3])
+	path = strings.TrimSpace(m[4])
 	if q := strings.IndexByte(path, '?'); q >= 0 {
 		path = path[:q]
 	}
 	if path == "" {
 		path = "/"
-	}
-
-	domain = strings.ToLower(strings.TrimSpace(m[6]))
-	if domain == "" || domain == "-" {
-		domain = "(unknown)"
 	}
 
 	return domain, path, status, bytes, true
