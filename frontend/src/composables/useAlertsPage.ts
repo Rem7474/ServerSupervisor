@@ -4,6 +4,7 @@ import { useDateFormatter } from './useDateFormatter'
 import { useHostsStore } from '../stores/hosts'
 import { useAlertRulesStore } from '../stores/alertRules'
 import apiClient from '../api'
+import { storeToRefs } from 'pinia'
 
 interface Host {
   id: string
@@ -74,7 +75,6 @@ export function useAlertsPage(): UseAlertsPageApi {
   const editingRule: Ref<AlertRule | null> = ref(null)
 
   // Expose store state (reactive refs shared across navigations)
-  import { storeToRefs } from 'pinia'
   const { rules, loading, fetched, error: fetchError } = storeToRefs(rulesStore)
   const { hosts } = storeToRefs(hostsStore)
 
