@@ -27,7 +27,7 @@ type Config struct {
 	BotDetectionTopN      int      `yaml:"bot_detection_top_n"`
 	CollectNPMAnalytics   bool     `yaml:"collect_npm_analytics"`
 	// NPMAnalyticsLogDir : dossier contenant les logs NPM.
-	// L'agent trouve automatiquement les fichiers proxy-host-*.log dedans.
+	// L'agent trouve automatiquement les fichiers proxy-host-*_access.log dedans.
 	// Si vide, NPMAnalyticsLogPaths (liste de globs) est utilisé à la place (rétrocompat).
 	NPMAnalyticsLogDir    string   `yaml:"npm_analytics_log_dir"`
 	NPMAnalyticsLogPaths  []string `yaml:"npm_analytics_log_paths"`
@@ -43,10 +43,12 @@ type Config struct {
 
 // NPMLogGlobs retourne la liste de globs à utiliser pour les logs NPM.
 // Priorité : npm_analytics_log_dir > npm_analytics_log_paths.
+// On cible uniquement les *_access.log — les *_error.log ont un format différent
+// et feraient échouer silencieusement le parsing.
 func (c *Config) NPMLogGlobs() []string {
 	if c.NPMAnalyticsLogDir != "" {
 		dir := strings.TrimRight(c.NPMAnalyticsLogDir, "/")
-		return []string{dir + "/proxy-host-*.log"}
+		return []string{dir + "/proxy-host-*_access.log"}
 	}
 	return c.NPMAnalyticsLogPaths
 }
@@ -202,7 +204,7 @@ bot_detection_log_paths:
   - "/var/log/nginx/access.log"
   - "/var/log/apache2/access.log"
   - "/var/log/httpd/access_log"
-  - "/data/logs/proxy-host-*.log"
+  - "/data/logs/proxy-host-*_access.log"
 
 # Number of latest log lines to inspect per file
 bot_detection_tail_lines: 5000
@@ -213,7 +215,7 @@ bot_detection_top_n: 10
 # Analyze Nginx Proxy Manager request patterns from web access logs
 collect_npm_analytics: true
 
-# Dossier contenant les logs NPM (proxy-host-*.log détectés automatiquement).
+# Dossier contenant les logs NPM (proxy-host-*_access.log détectés automatiquement).
 # Exemple : "/usr/local/bin/docker-compose/data/logs"
 # Si renseigné, npm_analytics_log_paths est ignoré.
 npm_analytics_log_dir: ""
@@ -221,7 +223,7 @@ npm_analytics_log_dir: ""
 # (Avancé) Liste explicite de globs — ignoré si npm_analytics_log_dir est défini.
 # npm_analytics_log_paths:
 #   - "/var/log/nginx/access.log"
-#   - "/data/logs/proxy-host-*.log"
+#   - "/data/logs/proxy-host-*_access.log"
 
 # Number of latest log lines to inspect per file
 npm_analytics_tail_lines: 5000

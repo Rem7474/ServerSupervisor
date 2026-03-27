@@ -71,6 +71,8 @@ func main() {
 	log.Printf("APT monitoring: %v", cfg.CollectAPT)
 	log.Printf("APT auto-update on start: %v", cfg.AptAutoUpdateOnStart)
 	log.Printf("SMART monitoring: %v", cfg.CollectSMART)
+	log.Printf("Bot detection: %v (paths: %v)", cfg.CollectBotDetection, cfg.BotDetectionLogPaths)
+	log.Printf("NPM analytics: %v (globs: %v)", cfg.CollectNPMAnalytics, cfg.NPMLogGlobs())
 
 	// Load custom tasks config (tasks.yaml)
 	tc, err := config.LoadTasksConfig()
@@ -221,21 +223,26 @@ func sendReport(ctx context.Context, cfg *config.Config, s *sender.Sender) {
 	// Detect suspicious automated scans from web access logs (nginx/apache/NPM).
 	var botDetection interface{}
 	if cfg.CollectBotDetection {
+		log.Printf("Bot detection: scanning %v", cfg.BotDetectionLogPaths)
 		if summary, err := collector.CollectBotDetection(cfg.BotDetectionLogPaths, cfg.BotDetectionTailLines, cfg.BotDetectionTopN); err != nil {
 			log.Printf("Bot detection collection skipped: %v", err)
 		} else {
+			log.Printf("Bot detection: %d files scanned, %d total requests, %d suspicious, %d unique suspicious IPs",
+				len(summary.LogFilesScanned), summary.TotalRequests, summary.SuspiciousRequests, summary.UniqueSuspiciousIPs)
 			botDetection = summary
 		}
 	}
 
 	// Collect Nginx Proxy Manager analytics from web access logs.
-	// cfg.NPMLogGlobs() résout automatiquement npm_analytics_log_dir en glob
-	// proxy-host-*.log, ou utilise npm_analytics_log_paths si log_dir est vide.
 	var npmAnalytics interface{}
 	if cfg.CollectNPMAnalytics {
-		if summary, err := collector.CollectNPMAnalytics(cfg.NPMLogGlobs(), cfg.NPMAnalyticsTailLines, cfg.NPMAnalyticsTopN); err != nil {
+		globs := cfg.NPMLogGlobs()
+		log.Printf("NPM analytics: scanning globs %v", globs)
+		if summary, err := collector.CollectNPMAnalytics(globs, cfg.NPMAnalyticsTailLines, cfg.NPMAnalyticsTopN); err != nil {
 			log.Printf("NPM analytics collection skipped: %v", err)
 		} else {
+			log.Printf("NPM analytics: %d files scanned, %d total requests, %d domains",
+				len(summary.LogFilesScanned), summary.TotalRequests, len(summary.TopDomains))
 			npmAnalytics = summary
 		}
 	}
