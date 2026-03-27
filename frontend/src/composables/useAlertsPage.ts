@@ -74,11 +74,9 @@ export function useAlertsPage(): UseAlertsPageApi {
   const editingRule: Ref<AlertRule | null> = ref(null)
 
   // Expose store state (reactive refs shared across navigations)
-  const rules = rulesStore.rules
-  const hosts = hostsStore.hosts
-  const loading = rulesStore.loading
-  const fetched = rulesStore.fetched
-  const fetchError = rulesStore.error
+  import { storeToRefs } from 'pinia'
+  const { rules, loading, fetched, error: fetchError } = storeToRefs(rulesStore)
+  const { hosts } = storeToRefs(hostsStore)
 
   const activeIncidentCount: ComputedRef<number> = computed(
     () => incidents.value.filter((incident) => !incident.resolved_at).length
