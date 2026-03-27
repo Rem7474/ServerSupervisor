@@ -18,15 +18,15 @@ type Config struct {
 	ReportInterval int `yaml:"report_interval"` // seconds
 
 	// Features
-	CollectDocker         bool     `yaml:"collect_docker"`
-	CollectAPT            bool     `yaml:"collect_apt"`
-	CollectSMART          bool     `yaml:"collect_smart"`
-	CollectWebLogs        bool     `yaml:"collect_web_logs"`
-	WebLogsLogPaths       []string `yaml:"web_logs_log_paths"`
-	WebLogsTailLines      int      `yaml:"web_logs_tail_lines"`
-	WebLogsTopN           int      `yaml:"web_logs_top_n"`
-	WebLogsRequestsLimit  int      `yaml:"web_logs_requests_limit"`
-	WebLogsCursorFile     string   `yaml:"web_logs_cursor_file"`
+	CollectDocker        bool     `yaml:"collect_docker"`
+	CollectAPT           bool     `yaml:"collect_apt"`
+	CollectSMART         bool     `yaml:"collect_smart"`
+	CollectWebLogs       bool     `yaml:"collect_web_logs"`
+	WebLogsLogPaths      []string `yaml:"web_logs_log_paths"`
+	WebLogsTailLines     int      `yaml:"web_logs_tail_lines"`
+	WebLogsTopN          int      `yaml:"web_logs_top_n"`
+	WebLogsRequestsLimit int      `yaml:"web_logs_requests_limit"`
+	WebLogsCursorFile    string   `yaml:"web_logs_cursor_file"`
 
 	// TLS
 	InsecureSkipVerify bool `yaml:"insecure_skip_verify"`

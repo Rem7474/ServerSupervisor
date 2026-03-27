@@ -73,14 +73,14 @@ type ThreatSummary struct {
 }
 
 type WebLogReport struct {
-	Source          string          `json:"source"`
-	Traffic         *TrafficSummary `json:"traffic"`
-	Threats         *ThreatSummary  `json:"threats"`
-	Requests        []WebRequest    `json:"requests"`
-	LogFilesScanned []string        `json:"log_files_scanned"`
-	TailLinesPerFile int            `json:"tail_lines_per_file"`
-	TotalRequests   int             `json:"total_requests"`
-	CollectedAt     time.Time       `json:"collected_at"`
+	Source           string          `json:"source"`
+	Traffic          *TrafficSummary `json:"traffic"`
+	Threats          *ThreatSummary  `json:"threats"`
+	Requests         []WebRequest    `json:"requests"`
+	LogFilesScanned  []string        `json:"log_files_scanned"`
+	TailLinesPerFile int             `json:"tail_lines_per_file"`
+	TotalRequests    int             `json:"total_requests"`
+	CollectedAt      time.Time       `json:"collected_at"`
 }
 
 type parsedLine struct {

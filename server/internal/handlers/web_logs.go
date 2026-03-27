@@ -53,7 +53,7 @@ func (h *AuthHandler) GetWebLogsSummary(c *gin.Context) {
 		return
 	}
 	compare := map[string]any{
-		"current": currentKPI,
+		"current":  currentKPI,
 		"previous": previousKPI,
 		"delta_percent": map[string]any{
 			"total_requests": deltaPercent(toFloat(currentKPI["total_requests"]), toFloat(previousKPI["total_requests"])),
