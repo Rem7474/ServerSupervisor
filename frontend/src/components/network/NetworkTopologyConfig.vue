@@ -185,7 +185,7 @@
                 <tr v-if="(discoveredPortsByHost[host.id] || []).length === 0">
                   <td colspan="7" class="text-center py-4">
                     <div class="text-secondary small">Aucun port detecte</div>
-                    <div class="text-muted" style="font-size:.8rem">L'agent doit etre actif et avoir collecte les donnees reseau</div>
+                    <div class="text-muted" style="font-size:.8rem">L'agent doit être actif et avoir collecté les données réseau</div>
                   </td>
                 </tr>
               </tbody>
@@ -461,3 +461,4 @@ function removeServiceRow(serviceId) {
   }
 }
 </style>
+

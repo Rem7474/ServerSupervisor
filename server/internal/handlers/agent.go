@@ -206,21 +206,13 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 		}
 	}
 
-	// Store cached bot-detection summary for this host.
-	if report.BotDetection != nil {
-		if b, err := json.Marshal(report.BotDetection); err == nil {
-			if err := h.db.UpdateHostBotDetection(hostID, string(b)); err != nil {
-				log.Printf("Warning: failed to store bot detection for host %s: %v", safeHostID, err)
-			}
+	// Store unified web logs cache + snapshot history.
+	if report.WebLogs != nil {
+		if err := h.db.UpdateHostWebLogs(hostID, report.WebLogs); err != nil {
+			log.Printf("Warning: failed to update web logs cache for host %s: %v", safeHostID, err)
 		}
-	}
-
-	// Store cached npm analytics summary for this host.
-	if report.NPMAnalytics != nil {
-		if b, err := json.Marshal(report.NPMAnalytics); err == nil {
-			if err := h.db.UpdateHostNPMAnalytics(hostID, string(b)); err != nil {
-				log.Printf("Warning: failed to store npm analytics for host %s: %v", safeHostID, err)
-			}
+		if err := h.db.InsertWebLogSnapshot(hostID, report.WebLogs); err != nil {
+			log.Printf("Warning: failed to insert web logs snapshot for host %s: %v", safeHostID, err)
 		}
 	}
 

@@ -88,6 +88,7 @@ func main() {
 	bg.Add(background.NewAlertEvalJob(db, cfg, dispatcher, notifHub))
 	bg.Add(background.NewMetricsDownsampleJob(db))
 	bg.Add(background.NewMetricsRetentionJob(db, cfg))
+	bg.Add(background.NewWebLogsRetentionJob(db, cfg))
 	bg.Start()
 	defer bg.Stop()
 

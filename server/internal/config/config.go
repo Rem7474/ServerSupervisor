@@ -59,6 +59,7 @@ type Config struct {
 	// Metrics and Audit retention
 	MetricsRetentionDays int
 	AuditRetentionDays   int
+	WebLogsRetentionDays int
 }
 
 func Load() *Config {
@@ -104,6 +105,7 @@ func Load() *Config {
 
 		MetricsRetentionDays: getIntEnv("METRICS_RETENTION_DAYS", 30),
 		AuditRetentionDays:   getIntEnv("AUDIT_RETENTION_DAYS", 90),
+		WebLogsRetentionDays: getIntEnv("WEB_LOGS_RETENTION_DAYS", 30),
 	}
 }
 
@@ -158,6 +160,11 @@ func (c *Config) OverrideFromDB(db DBSettingsLoader) {
 			c.AuditRetentionDays = i
 		}
 	}
+	if v, ok := settings["web_logs_retention_days"]; ok && v != "" {
+		if i, err := strconv.Atoi(v); err == nil {
+			c.WebLogsRetentionDays = i
+		}
+	}
 }
 
 // Validate returns a list of human-readable warnings for insecure or invalid
@@ -179,6 +186,9 @@ func (c *Config) Validate() []string {
 	}
 	if c.AuditRetentionDays <= 0 {
 		warnings = append(warnings, "AUDIT_RETENTION_DAYS must be a positive integer")
+	}
+	if c.WebLogsRetentionDays <= 0 {
+		warnings = append(warnings, "WEB_LOGS_RETENTION_DAYS must be a positive integer")
 	}
 	return warnings
 }

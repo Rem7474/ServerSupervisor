@@ -49,11 +49,11 @@
             </td>
             <td>
               <div class="fw-bold">{{ rule.name || 'Sans nom' }}</div>
-              <div v-if="rule.last_fired" class="text-muted small">Derniere alerte: {{ formatDate(rule.last_fired) }}</div>
+              <div v-if="rule.last_fired" class="text-muted small">Dernière alerte: {{ formatDate(rule.last_fired) }}</div>
             </td>
             <td>
               <span v-if="rule.host_id" class="badge bg-secondary-lt text-secondary">{{ getHostName(rule.host_id) }}</span>
-              <span v-else class="badge bg-info-lt text-info">Tous les hotes</span>
+              <span v-else class="badge bg-info-lt text-info">Tous les hôtes</span>
             </td>
             <td>
               <span class="badge" :class="getMetricBadgeClass(rule.metric)">{{ getMetricLabel(rule.metric) }}</span>
@@ -161,3 +161,4 @@ function getMetricUnit(metric) {
   return units[metric] || ''
 }
 </script>
+

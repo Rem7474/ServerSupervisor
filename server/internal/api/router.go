@@ -119,6 +119,11 @@ func registerAuthRoutes(g *gin.RouterGroup, h *handlers.AuthHandler) {
 	g.POST("/auth/mfa/verify", h.VerifyMFA)
 	g.POST("/auth/mfa/disable", h.DisableMFA)
 	g.GET("/auth/security", h.GetSecuritySummary)
+	g.GET("/security/web-logs", h.GetWebLogsSummary)
+	g.GET("/security/web-logs/timeseries", h.GetWebLogsTimeseries)
+	g.GET("/security/web-logs/live", h.GetWebLogsLive)
+	g.GET("/security/web-logs/ip/:ip", h.GetWebLogsIPTimeline)
+	g.GET("/security/web-logs/domain/:domain", h.GetWebLogsDomainDetails)
 	g.DELETE("/auth/blocked-ips/:ip", h.UnblockIP)
 }
 

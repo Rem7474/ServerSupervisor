@@ -26,7 +26,7 @@
               <th>Nom</th>
               <th>Module / Action</th>
               <th>Planification</th>
-              <th>Prochaine execution</th>
+              <th>Prochaine exécution</th>
               <th>Dernier resultat</th>
               <th>Activee</th>
               <th></th>
@@ -139,7 +139,7 @@
               <div class="mb-3">
                 <label class="form-check form-switch">
                   <input v-model="taskManualOnly" type="checkbox" class="form-check-input">
-                  <span class="form-check-label">Execution manuelle uniquement (pas de planification automatique)</span>
+                  <span class="form-check-label">Exécution manuelle uniquement (pas de planification automatique)</span>
                 </label>
               </div>
               <div v-if="!taskManualOnly" class="mb-3">
@@ -394,3 +394,4 @@ async function confirmDeleteTask(task) {
   }
 }
 </script>
+

@@ -60,7 +60,7 @@ Système de supervision d'infrastructure : monitoring de VMs, conteneurs Docker,
 - **Tâches planifiées** : création de tâches cron par hôte (apt, docker, systemd, journal, processus ou custom), déclenchement manuel immédiat, historique des exécutions
 - **Alertes** : règles d'alertes configurables avec notifications email (SMTP), ntfy, webhook ou notifications navigateur
 - **Compte → Sécurité** : gestion MFA/2FA du compte utilisateur sur `/account/security`
-- **Sécurité (admin)** : analytics sécurité hôtes sur `/security` (connexions, IPs bloquées, détection bots/scans, NPM analytics)
+- **Sécurité (admin)** : analytics sécurité hôtes sur `/security` (connexions, IPs bloquées), stats trafic web sur `/traffic`, menaces web sur `/threats`
 - **UI cohérente** : barres de recherche/filtres/tri harmonisées sur les vues principales (Docker, APT, Audit)
 - **Proxmox VE** : supervision de l'infrastructure de virtualisation via API Proxmox (sans agent sur l'hyperviseur) — nœuds, VMs QEMU, conteneurs LXC, stockage ; polling configurable par connexion
 
@@ -83,8 +83,8 @@ Système de supervision d'infrastructure : monitoring de VMs, conteneurs Docker,
 - Monitoring Docker via CLI (conteneurs, réseaux, projets compose, variables d'environnement)
 - Détection des mises à jour APT disponibles, extraction des CVEs
 - Collecte S.M.A.R.T. et métriques disques (via `smartctl`)
-- Détection d'activité bot/scanner web (parsing access logs Nginx/Apache/httpd/NPM, top IPs/paths suspects)
-- Collecte d'analytics NPM (style GoAccess) depuis les logs web : top domaines/hôtes, hits, bytes, erreurs 4xx/5xx
+- Collecte web logs unifiée (Nginx/Apache/httpd/NPM) : trafic + menaces en un seul parsing
+- Ingestion incrémentale des logs web via cursor persistant (évite de relire les mêmes lignes à chaque cycle)
 - Exécution de commandes distantes : APT, Docker/Compose, systemd, journalctl, snapshot processus
 - **Tâches custom** : exécution de scripts/binaires locaux pré-déclarés dans `tasks.yaml` (allowlist, sans shell, sans exécution de code arbitraire distant)
 - Streaming temps réel de la sortie des commandes longues (chunk par chunk)
@@ -157,22 +157,16 @@ report_interval: 30
 collect_docker: true
 collect_apt: true
 collect_smart: true
-collect_bot_detection: true
-bot_detection_log_paths:
+collect_web_logs: true
+web_logs_log_paths:
   - "/var/log/nginx/access.log"
   - "/var/log/apache2/access.log"
   - "/var/log/httpd/access_log"
-  - "/data/logs/proxy-host-*.log"
-bot_detection_tail_lines: 5000
-bot_detection_top_n: 10
-collect_npm_analytics: true
-npm_analytics_log_paths:
-  - "/var/log/nginx/access.log"
-  - "/var/log/apache2/access.log"
-  - "/var/log/httpd/access_log"
-  - "/data/logs/proxy-host-*.log"
-npm_analytics_tail_lines: 5000
-npm_analytics_top_n: 10
+  - "/data/logs/proxy-host-*_access.log"
+web_logs_tail_lines: 5000
+web_logs_top_n: 10
+web_logs_requests_limit: 200
+web_logs_cursor_file: "/var/lib/serversupervisor/web_logs_cursor.json"
 apt_auto_update_on_start: false
 insecure_skip_verify: false
 EOF

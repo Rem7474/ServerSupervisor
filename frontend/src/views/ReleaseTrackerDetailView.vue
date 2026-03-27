@@ -139,8 +139,8 @@
         <WebhookExecutionList
           :executions="executions"
           kind="tracker"
-          title="Historique des executions"
-          empty-text="Aucune execution enregistree."
+          title="Historique des exécutions"
+          empty-text="Aucune exécution enregistrée."
           :show-refresh="true"
           @refresh="loadExecutions"
         />
@@ -309,3 +309,4 @@ function channelBadge(ch) {
 
 onMounted(load)
 </script>
+

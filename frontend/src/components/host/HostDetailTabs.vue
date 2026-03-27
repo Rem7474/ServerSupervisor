@@ -73,7 +73,7 @@ const visibleTabs = computed(() => {
 
   tabs.push({
     key: 'planifiees',
-    label: 'Taches planifiees',
+    label: 'Tâches planifiées',
     badge: props.tasksCount || null,
     badgeClass: 'badge bg-secondary-lt text-secondary ms-1',
   })
@@ -81,3 +81,4 @@ const visibleTabs = computed(() => {
   return tabs
 })
 </script>
+

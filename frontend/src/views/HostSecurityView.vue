@@ -5,10 +5,10 @@
         <div class="page-pretitle">
           <router-link to="/" class="text-decoration-none">Dashboard</router-link>
           <span class="text-muted mx-1">/</span>
-          <span>Securite hotes</span>
+          <span>Sécurité hôtes</span>
         </div>
-        <h2 class="page-title">Securite infrastructure</h2>
-        <div class="text-secondary">Supervision des menaces et des activites suspectes sur les hotes</div>
+        <h2 class="page-title">Sécurité infrastructure</h2>
+        <div class="text-secondary">Supervision des menaces et des activités suspectes sur les hôtes</div>
       </div>
     </div>
 
@@ -55,41 +55,6 @@
       </div>
     </div>
 
-    <div class="row row-cards mb-4">
-      <div class="col-6 col-lg-3">
-        <div class="card card-sm h-100">
-          <div class="card-body text-center">
-            <div class="text-secondary small mb-1">Requetes suspectes (logs web)</div>
-            <div class="h2 mb-0 text-orange">{{ security.bot_detection?.total_suspicious_requests ?? 0 }}</div>
-          </div>
-        </div>
-      </div>
-      <div class="col-6 col-lg-3">
-        <div class="card card-sm h-100">
-          <div class="card-body text-center">
-            <div class="text-secondary small mb-1">IPs suspectes (logs web)</div>
-            <div class="h2 mb-0">{{ botTopIPs.length }}</div>
-          </div>
-        </div>
-      </div>
-      <div class="col-6 col-lg-3">
-        <div class="card card-sm h-100">
-          <div class="card-body text-center">
-            <div class="text-secondary small mb-1">Requetes NPM (total)</div>
-            <div class="h2 mb-0">{{ npmTotalRequests }}</div>
-          </div>
-        </div>
-      </div>
-      <div class="col-6 col-lg-3">
-        <div class="card card-sm h-100">
-          <div class="card-body text-center">
-            <div class="text-secondary small mb-1">Trafic NPM (total)</div>
-            <div class="h2 mb-0">{{ formatBytes(npmTotalBytes) }}</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <div class="row row-cards">
       <div class="col-lg-5">
         <div class="card h-100">
@@ -123,7 +88,7 @@
           </div>
           <div class="card-body p-0">
             <div v-if="!security.top_failed_ips?.length" class="text-center py-4 text-secondary small">
-              Aucun echec enregistre sur cette periode
+              Aucun échec enregistré sur cette période
             </div>
             <div v-else>
               <div v-for="item in security.top_failed_ips" :key="item.ip_address" class="px-3 py-2 border-bottom">
@@ -141,146 +106,6 @@
       </div>
     </div>
 
-    <div class="row row-cards mt-4">
-      <div class="col-lg-7">
-        <div class="card h-100">
-          <div class="card-header">
-            <h3 class="card-title">Top IPs suspectes (logs Nginx/Apache/NPM)</h3>
-          </div>
-          <div class="card-body p-0">
-            <div v-if="!botTopIPs.length" class="text-center py-4 text-secondary small">
-              Aucune activite suspecte detectee dans les logs web.
-            </div>
-            <div v-else>
-              <div v-for="item in botTopIPs" :key="item.ip" class="px-3 py-2 border-bottom">
-                <div class="d-flex align-items-center justify-content-between mb-1">
-                  <span class="font-monospace small">{{ item.ip }}</span>
-                  <span class="badge bg-orange-lt text-orange">{{ item.hits }} hits</span>
-                </div>
-                <div class="d-flex align-items-center justify-content-between text-secondary small mb-1">
-                  <span>Hosts: {{ item.host_count || 1 }}</span>
-                  <span>Paths: {{ item.unique_paths || 0 }}</span>
-                </div>
-                <div class="progress" style="height: 4px;">
-                  <div class="progress-bar bg-orange" :style="{ width: progressWidthBot(item.hits) + '%' }"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div class="col-lg-5">
-        <div class="card h-100">
-          <div class="card-header">
-            <h3 class="card-title">Top chemins scannes</h3>
-          </div>
-          <div class="card-body p-0">
-            <div v-if="!botTopPaths.length" class="text-center py-4 text-secondary small">
-              Aucun chemin suspect detecte.
-            </div>
-            <div v-else>
-              <div v-for="item in botTopPaths" :key="item.path" class="d-flex align-items-center justify-content-between px-3 py-2 border-bottom">
-                <span class="font-monospace small text-truncate me-2" style="max-width: 70%;">{{ item.path }}</span>
-                <span class="badge bg-yellow-lt text-yellow">{{ item.hits }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="card mt-4">
-      <div class="card-header">
-        <h3 class="card-title">Hotes les plus cibles (logs web)</h3>
-      </div>
-      <div class="table-responsive">
-        <table class="table table-vcenter card-table">
-          <thead>
-            <tr>
-              <th>Hote</th>
-              <th class="text-end">Requetes suspectes</th>
-              <th class="text-end">IPs suspectes</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-if="!botHosts.length">
-              <td colspan="3" class="text-center text-secondary py-4">Aucune donnee bot-detection remontee par les agents.</td>
-            </tr>
-            <tr v-for="item in botHosts" :key="item.host_id">
-              <td>{{ item.host_name || item.host_id }}</td>
-              <td class="text-end">{{ item.suspicious_requests || 0 }}</td>
-              <td class="text-end">{{ item.unique_suspicious_ips || 0 }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <div class="row row-cards mt-4">
-      <div class="col-lg-7">
-        <div class="card h-100">
-          <div class="card-header">
-            <h3 class="card-title">Top domaines NPM</h3>
-          </div>
-          <div class="table-responsive">
-            <table class="table table-vcenter card-table">
-              <thead>
-                <tr>
-                  <th>Domaine</th>
-                  <th class="text-end">Hits</th>
-                  <th class="text-end">Trafic</th>
-                  <th class="text-end">4xx</th>
-                  <th class="text-end">5xx</th>
-                  <th class="text-end">Hotes</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-if="!npmTopDomains.length">
-                  <td colspan="6" class="text-center text-secondary py-4">Aucune donnee NPM disponible.</td>
-                </tr>
-                <tr v-for="item in npmTopDomains" :key="item.domain || item.domaine">
-                  <td class="font-monospace small">{{ item.domain || item.domaine || '—' }}</td>
-                  <td class="text-end">{{ item.hits ?? 0 }}</td>
-                  <td class="text-end">{{ formatBytes(item.bytes ?? item.traffic_bytes ?? item.traffic ?? 0) }}</td>
-                  <td class="text-end">{{ item.errors_4xx ?? item.status_4xx ?? item['4xx'] ?? 0 }}</td>
-                  <td class="text-end">{{ item.errors_5xx ?? item.status_5xx ?? item['5xx'] ?? 0 }}</td>
-                  <td class="text-end">{{ item.host_count ?? item.hosts ?? 0 }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <div class="col-lg-5">
-        <div class="card h-100">
-          <div class="card-header">
-            <h3 class="card-title">Hotes les plus actifs (NPM)</h3>
-          </div>
-          <div class="table-responsive">
-            <table class="table table-vcenter card-table">
-              <thead>
-                <tr>
-                  <th>Hote</th>
-                  <th class="text-end">Requetes</th>
-                  <th class="text-end">Trafic</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-if="!npmHosts.length">
-                  <td colspan="3" class="text-center text-secondary py-4">Aucune activite NPM remontee.</td>
-                </tr>
-                <tr v-for="item in npmHosts" :key="item.host_id || item.host_name || item.host || item.name">
-                  <td>{{ item.host_name || item.host || item.name || '—' }}</td>
-                  <td class="text-end">{{ item.total_requests ?? item.requests ?? item.hits ?? 0 }}</td>
-                  <td class="text-end">{{ formatBytes(item.total_bytes ?? item.traffic_bytes ?? item.traffic ?? 0) }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -299,29 +124,6 @@ const threatsLoading = ref(false)
 const unblockingIP = ref('')
 const threatsPeriod = ref(24)
 const periodLabel = computed(() => periodOptions.find(p => p.hours === threatsPeriod.value)?.label ?? '24h')
-const botTopIPs = computed(() => security.value.bot_detection?.top_suspicious_ips || [])
-const botTopPaths = computed(() => security.value.bot_detection?.top_suspicious_paths || [])
-const botHosts = computed(() => security.value.bot_detection?.hosts || [])
-const npmTopDomains = computed(() => security.value.npm_analytics?.top_domains || [])
-const npmHosts = computed(() => security.value.npm_analytics?.hosts || [])
-const npmTotalRequests = computed(() => security.value.npm_analytics?.total_requests || 0)
-const npmTotalBytes = computed(() => security.value.npm_analytics?.total_bytes || 0)
-
-function formatBytes(bytes) {
-  const value = Number(bytes) || 0
-  if (value < 1024) return `${value} B`
-
-  const units = ['KB', 'MB', 'GB', 'TB']
-  let size = value / 1024
-  let unitIndex = 0
-
-  while (size >= 1024 && unitIndex < units.length - 1) {
-    size /= 1024
-    unitIndex++
-  }
-
-  return `${size.toFixed(1)} ${units[unitIndex]}`
-}
 
 async function loadSecurity() {
   threatsLoading.value = true
@@ -357,10 +159,6 @@ function progressWidth(failCount) {
   return max > 0 ? Math.round((failCount / max) * 100) : 0
 }
 
-function progressWidthBot(hits) {
-  const max = Math.max(...(botTopIPs.value.map(i => i.hits) || [1]))
-  return max > 0 ? Math.round((hits / max) * 100) : 0
-}
-
 onMounted(loadSecurity)
 </script>
+

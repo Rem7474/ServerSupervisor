@@ -135,7 +135,7 @@
 
             <div v-if="step === 3">
               <div class="mb-3">
-                <label class="form-label">Periode de silence (secondes)</label>
+                <label class="form-label">Période de silence (secondes)</label>
                 <input v-model.number="form.actions.cooldown" type="number" class="form-control" placeholder="3600" />
                 <small class="form-hint">Temps minimum entre deux alertes successives pour cette regle</small>
               </div>
@@ -257,14 +257,14 @@ const step = ref(1)
 
 const metricCards = [
   { value: 'cpu', label: 'CPU', icon: '⚡' },
-  { value: 'memory', label: 'RAM', icon: '🧠' },
-  { value: 'disk', label: 'Disque', icon: '💾' },
-  { value: 'heartbeat_timeout', label: 'Heartbeat', icon: '🫀' },
-  { value: 'disk_temperature', label: 'Temp. disque', icon: '🌡' },
-  { value: 'proxmox_storage_percent', label: 'Proxmox', icon: '🖥' },
-  { value: 'npm_requests', label: 'NPM requetes', icon: '🌐' },
-  { value: 'npm_traffic_bytes', label: 'NPM trafic', icon: '📦' },
-  { value: 'npm_5xx_errors', label: 'NPM 5xx', icon: '🚨' },
+  { value: 'memory', label: 'RAM', icon: 'ðŸ§ ' },
+  { value: 'disk', label: 'Disque', icon: 'ðŸ’¾' },
+  { value: 'heartbeat_timeout', label: 'Heartbeat', icon: 'ðŸ«€' },
+  { value: 'disk_temperature', label: 'Temp. disque', icon: 'ðŸŒ¡' },
+  { value: 'proxmox_storage_percent', label: 'Proxmox', icon: 'ðŸ–¥' },
+  { value: 'npm_requests', label: 'NPM requêtes', icon: 'ðŸŒ' },
+  { value: 'npm_traffic_bytes', label: 'NPM trafic', icon: 'ðŸ“¦' },
+  { value: 'npm_5xx_errors', label: 'NPM 5xx', icon: 'ðŸš¨' },
 ]
 
 const {

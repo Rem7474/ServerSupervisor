@@ -81,7 +81,7 @@
             <div class="spinner-border text-secondary" role="status"></div>
           </div>
           <Line v-else-if="chartData" :data="chartData" :options="chartOptions" class="h-100" />
-          <div v-else class="h-100 d-flex align-items-center justify-content-center text-secondary">Aucune donnee</div>
+          <div v-else class="h-100 d-flex align-items-center justify-content-center text-secondary">Aucune donnée</div>
         </div>
       </div>
     </div>
@@ -266,3 +266,4 @@ onMounted(async () => {
   await loadGuestSummary()
 })
 </script>
+

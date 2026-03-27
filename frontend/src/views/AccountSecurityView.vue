@@ -7,10 +7,10 @@
           <span class="text-muted mx-1">/</span>
           <router-link to="/account" class="text-decoration-none">Mon compte</router-link>
           <span class="text-muted mx-1">/</span>
-          <span>Securite du compte</span>
+          <span>Sécurité du compte</span>
         </div>
         <h2 class="page-title">Authentification MFA</h2>
-        <div class="text-secondary">Configuration de la securite utilisateur</div>
+        <div class="text-secondary">Configuration de la sécurité utilisateur</div>
       </div>
     </div>
 
@@ -24,7 +24,7 @@
         </div>
 
         <div v-if="!mfaEnabled">
-          <p class="text-secondary">Activez le MFA pour renforcer la securite du compte.</p>
+          <p class="text-secondary">Activez le MFA pour renforcer la sécurité du compte.</p>
           <button class="btn btn-primary" @click="startSetup" :disabled="loading">
             {{ loading ? 'Chargement...' : 'Activer MFA' }}
           </button>
@@ -167,3 +167,4 @@ async function copyBackupCodes() {
 
 onMounted(loadStatus)
 </script>
+

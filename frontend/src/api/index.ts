@@ -112,6 +112,24 @@ export default {
     api.get('/v1/auth/login-events/admin', { params: { page: page ?? 1, limit: limit ?? 50 } }),
   revokeAllSessions: (refreshToken: string) => api.post('/v1/auth/revoke-all-sessions', { refresh_token: refreshToken }),
   getSecuritySummary: (hours?: number) => api.get('/v1/auth/security', { params: { hours: hours ?? 24 } }),
+  getWebLogsSummary: (period: string = '24h', hostId?: string, source?: string) =>
+    api.get('/v1/security/web-logs', { params: { period, host_id: hostId ?? '', source: source ?? '' } }),
+  getWebLogsTimeseries: (period: string = '24h', bucket: 'hour' | 'minute' = 'hour', hostId?: string, source?: string) =>
+    api.get('/v1/security/web-logs/timeseries', {
+      params: { period, bucket, host_id: hostId ?? '', source: source ?? '' },
+    }),
+  getWebLogsLive: (hostId?: string, source?: string, limit: number = 100) =>
+    api.get('/v1/security/web-logs/live', {
+      params: { host_id: hostId ?? '', source: source ?? '', limit },
+    }),
+  getIPTimeline: (ip: string, hostId?: string, period: string = '24h', limit: number = 500) =>
+    api.get(`/v1/security/web-logs/ip/${encodeURIComponent(ip)}`, {
+      params: { host_id: hostId ?? '', period, limit },
+    }),
+  getDomainDetails: (domain: string, period: string = '24h', hostId?: string, source?: string, limit: number = 300) =>
+    api.get(`/v1/security/web-logs/domain/${encodeURIComponent(domain)}`, {
+      params: { period, host_id: hostId ?? '', source: source ?? '', limit },
+    }),
   unblockIP: (ip: string) => api.delete(`/v1/auth/blocked-ips/${ip}`),
   getMFAStatus: () => api.get('/v1/auth/mfa/status'),
   setupMFA: () => api.post('/v1/auth/mfa/setup'),
@@ -327,3 +345,4 @@ export default {
   // Node actions
   refreshProxmoxNodeApt: (nodeId: string) => api.post(`/v1/proxmox/nodes/${nodeId}/apt-refresh`),
 }
+

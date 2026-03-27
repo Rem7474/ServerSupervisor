@@ -34,7 +34,7 @@
           <div class="card card-sm">
             <div class="card-body text-center">
               <div class="h2 mb-0 text-red">{{ aptStatus.security_updates }}</div>
-              <div class="text-secondary small">Mises a jour securite</div>
+              <div class="text-secondary small">Mises à jour sécurité</div>
             </div>
           </div>
         </div>
@@ -42,7 +42,7 @@
           <div class="card card-sm">
             <div class="card-body text-center">
               <div class="fw-semibold">{{ formatDate(aptStatus.last_update) }}</div>
-              <div class="text-secondary small">Derniere mise a jour</div>
+              <div class="text-secondary small">Dernière mise à jour</div>
             </div>
           </div>
         </div>
@@ -57,7 +57,7 @@
       </div>
     </div>
   </div>
-  <div v-else class="card"><div class="card-body text-secondary">Donnees APT non disponibles pour cet hote.</div></div>
+  <div v-else class="card"><div class="card-body text-secondary">Données APT non disponibles pour cet hôte.</div></div>
 </template>
 
 <script setup>
@@ -93,3 +93,4 @@ function formatDate(date) {
   return dayjs.utc(date).local().fromNow()
 }
 </script>
+

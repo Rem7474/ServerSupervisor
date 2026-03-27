@@ -99,11 +99,11 @@ defineProps({
   },
   title: {
     type: String,
-    default: 'Historique des executions',
+    default: 'Historique des exécutions',
   },
   emptyText: {
     type: String,
-    default: 'Aucune execution enregistree.',
+    default: 'Aucune exécution enregistrée.',
   },
   showRefresh: {
     type: Boolean,

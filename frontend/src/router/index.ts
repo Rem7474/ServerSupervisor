@@ -71,6 +71,18 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, requiresAdmin: true },
   },
   {
+    path: '/traffic',
+    name: 'Traffic',
+    component: () => import('../views/TrafficView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true },
+  },
+  {
+    path: '/threats',
+    name: 'Threats',
+    component: () => import('../views/BotView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true },
+  },
+  {
     path: '/account/security',
     name: 'AccountSecurity',
     component: () => import('../views/AccountSecurityView.vue'),

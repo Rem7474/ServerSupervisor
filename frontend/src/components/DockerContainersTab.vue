@@ -196,7 +196,7 @@
     <div class="modal-dialog modal-lg modal-dialog-centered">
       <div class="modal-content">
         <div class="modal-header">
-          <h5 class="modal-title">Details Docker Compose</h5>
+          <h5 class="modal-title">Détails Docker Compose</h5>
           <button type="button" class="btn-close" @click="selectedContainer = null" aria-label="Fermer"></button>
         </div>
         <div class="modal-body">
@@ -473,3 +473,4 @@ const uniqueHosts = computed(() => {
     .sort()
 })
 </script>
+

@@ -89,14 +89,14 @@
                   </div>
                 </div>
                 <div v-if="webhook.last_execution" class="mt-2 pt-2 border-top small">
-                  <span class="text-muted">Derniere execution :</span>
+                  <span class="text-muted">Dernière exécution :</span>
                   <span class="ms-1 badge" :class="execStatusBadge(webhook.last_execution.status)">{{ webhook.last_execution.status }}</span>
                   <span class="ms-1 text-muted">{{ formatRelative(webhook.last_execution.triggered_at) }}</span>
                 </div>
                 <div v-else class="mt-2 pt-2 border-top small text-muted">Jamais declenche</div>
               </div>
               <div class="card-footer d-flex gap-2">
-                <router-link :to="`/git-webhooks/${webhook.id}`" class="btn btn-sm btn-outline-primary">Details</router-link>
+                <router-link :to="`/git-webhooks/${webhook.id}`" class="btn btn-sm btn-outline-primary">Détails</router-link>
                 <button class="btn btn-sm btn-outline-secondary" @click="openEditWebhook(webhook)">Modifier</button>
                 <button class="btn btn-sm" :class="webhook.enabled ? 'btn-outline-warning' : 'btn-outline-success'" @click="toggleWebhook(webhook)">
                   {{ webhook.enabled ? 'Desactiver' : 'Activer' }}
@@ -115,8 +115,8 @@
           class="mt-4"
           :executions="recentWebhookExecutions"
           kind="webhook"
-          title="Dernieres executions des webhooks"
-          empty-text="Aucune execution connue."
+          title="Dernières exécutions des webhooks"
+          empty-text="Aucune exécution connue."
         />
       </template>
     </div>
@@ -191,7 +191,7 @@
                 </div>
                 <div class="mt-2 pt-2 border-top small">
                   <template v-if="tracker.last_execution">
-                    <span class="text-muted">Derniere execution :</span>
+                    <span class="text-muted">Dernière exécution :</span>
                     <span class="ms-1 badge" :class="execStatusBadge(tracker.last_execution.status)">{{ tracker.last_execution.status }}</span>
                     <span class="ms-1 text-muted">{{ formatRelative(tracker.last_execution.triggered_at) }}</span>
                   </template>
@@ -206,7 +206,7 @@
                 </div>
               </div>
               <div class="card-footer d-flex gap-2">
-                <router-link :to="`/release-trackers/${tracker.id}`" class="btn btn-sm btn-outline-primary">Details</router-link>
+                <router-link :to="`/release-trackers/${tracker.id}`" class="btn btn-sm btn-outline-primary">Détails</router-link>
                 <button class="btn btn-sm btn-outline-secondary" @click="openEditTracker(tracker)">Modifier</button>
                 <button class="btn btn-sm btn-outline-info" @click="checkNow(tracker)" title="Verifier maintenant">
                   <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -230,8 +230,8 @@
           class="mt-4"
           :executions="recentTrackerExecutions"
           kind="tracker"
-          title="Dernieres executions des trackers"
-          empty-text="Aucune execution connue."
+          title="Dernières exécutions des trackers"
+          empty-text="Aucune exécution connue."
         />
       </template>
     </div>
@@ -324,3 +324,4 @@ const {
   formatRelative,
 } = useGitWebhooksPage()
 </script>
+

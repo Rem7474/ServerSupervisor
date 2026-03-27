@@ -71,8 +71,7 @@ func main() {
 	log.Printf("APT monitoring: %v", cfg.CollectAPT)
 	log.Printf("APT auto-update on start: %v", cfg.AptAutoUpdateOnStart)
 	log.Printf("SMART monitoring: %v", cfg.CollectSMART)
-	log.Printf("Bot detection: %v (paths: %v)", cfg.CollectBotDetection, cfg.BotDetectionLogPaths)
-	log.Printf("NPM analytics: %v (globs: %v)", cfg.CollectNPMAnalytics, cfg.NPMLogGlobs())
+	log.Printf("Web logs analytics: %v (paths: %v)", cfg.CollectWebLogs, cfg.WebLogGlobs())
 
 	// Load custom tasks config (tasks.yaml)
 	tc, err := config.LoadTasksConfig()
@@ -220,30 +219,22 @@ func sendReport(ctx context.Context, cfg *config.Config, s *sender.Sender) {
 		customTasksList = tasksConfig.Summaries()
 	}
 
-	// Detect suspicious automated scans from web access logs (nginx/apache/NPM).
-	var botDetection interface{}
-	if cfg.CollectBotDetection {
-		log.Printf("Bot detection: scanning %v", cfg.BotDetectionLogPaths)
-		if summary, err := collector.CollectBotDetection(cfg.BotDetectionLogPaths, cfg.BotDetectionTailLines, cfg.BotDetectionTopN); err != nil {
-			log.Printf("Bot detection collection skipped: %v", err)
+	// Collect and parse web access logs once to build both traffic and threat views.
+	var webLogs interface{}
+	if cfg.CollectWebLogs {
+		globs := cfg.WebLogGlobs()
+		log.Printf("Web logs: scanning globs %v", globs)
+		report, err := collector.CollectWebLogs(globs, cfg.WebLogsTailLines, cfg.WebLogsTopN, cfg.WebLogsRequestsLimit, cfg.WebLogsCursorFile)
+		if err != nil {
+			log.Printf("Web logs collection skipped: %v", err)
 		} else {
-			log.Printf("Bot detection: %d files scanned, %d total requests, %d suspicious, %d unique suspicious IPs",
-				len(summary.LogFilesScanned), summary.TotalRequests, summary.SuspiciousRequests, summary.UniqueSuspiciousIPs)
-			botDetection = summary
-		}
-	}
-
-	// Collect Nginx Proxy Manager analytics from web access logs.
-	var npmAnalytics interface{}
-	if cfg.CollectNPMAnalytics {
-		globs := cfg.NPMLogGlobs()
-		log.Printf("NPM analytics: scanning globs %v", globs)
-		if summary, err := collector.CollectNPMAnalytics(globs, cfg.NPMAnalyticsTailLines, cfg.NPMAnalyticsTopN); err != nil {
-			log.Printf("NPM analytics collection skipped: %v", err)
-		} else {
-			log.Printf("NPM analytics: %d files scanned, %d total requests, %d domains",
-				len(summary.LogFilesScanned), summary.TotalRequests, len(summary.TopDomains))
-			npmAnalytics = summary
+			suspicious := 0
+			if report.Threats != nil {
+				suspicious = report.Threats.SuspiciousRequests
+			}
+			log.Printf("Web logs: source=%s files=%d requests=%d suspicious=%d",
+				report.Source, len(report.LogFilesScanned), report.TotalRequests, suspicious)
+			webLogs = report
 		}
 	}
 
@@ -253,8 +244,7 @@ func sendReport(ctx context.Context, cfg *config.Config, s *sender.Sender) {
 		Metrics:         metricsPayload,
 		Docker:          dockerData,
 		AptStatus:       aptData,
-		BotDetection:    botDetection,
-		NPMAnalytics:    npmAnalytics,
+		WebLogs:         webLogs,
 		DockerNetworks:  dockerNetworks,
 		ContainerEnvs:   containerEnvs,
 		ComposeProjects: composeProjects,

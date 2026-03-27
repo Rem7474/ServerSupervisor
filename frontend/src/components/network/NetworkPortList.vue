@@ -15,7 +15,7 @@
           </div>
           <div class="col-md-6 col-lg-3">
             <select v-model="hostFilter" class="form-select">
-              <option value="">Tous les hotes</option>
+              <option value="">Tous les hôtes</option>
               <option v-for="h in hosts" :key="h.id" :value="h.id">
                 {{ h.name || h.hostname || h.id }}
               </option>
@@ -262,3 +262,4 @@ function formatBytes(bytes) {
   return `${value.toFixed(1)} ${units[idx]}`
 }
 </script>
+

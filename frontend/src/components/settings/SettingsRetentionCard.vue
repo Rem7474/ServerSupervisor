@@ -1,7 +1,7 @@
 <template>
   <div class="card h-100">
     <div class="card-header">
-      <h3 class="card-title">Retention des donnees</h3>
+      <h3 class="card-title">Rétention des données</h3>
     </div>
     <div class="card-body">
       <div class="mb-3">
@@ -57,3 +57,4 @@ defineProps({
 
 defineEmits(['save'])
 </script>
+

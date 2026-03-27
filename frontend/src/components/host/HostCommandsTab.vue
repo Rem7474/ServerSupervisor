@@ -48,7 +48,7 @@
       </button>
     </div>
   </div>
-  <div v-if="!total" class="card"><div class="card-body text-secondary">Aucune commande executee sur cet hote.</div></div>
+  <div v-if="!total" class="card"><div class="card-body text-secondary">Aucune commande exécutée sur cet hote.</div></div>
 </template>
 
 <script setup>
@@ -88,3 +88,4 @@ function statusClass(status) {
   return getStatusBadgeClass(status, 'badge bg-yellow-lt text-yellow')
 }
 </script>
+

@@ -9,7 +9,7 @@
         <div class="font-monospace">{{ settings.baseUrl || 'Non configure' }}</div>
       </div>
       <div class="mb-3 pb-3 border-bottom">
-        <div class="text-secondary small">Base de donnees</div>
+        <div class="text-secondary small">Base de données</div>
         <div class="font-monospace">{{ settings.dbHost }}:{{ settings.dbPort }}</div>
       </div>
       <div class="mb-3 pb-3 border-bottom">
@@ -34,3 +34,4 @@ defineProps({
   },
 })
 </script>
+

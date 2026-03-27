@@ -87,8 +87,8 @@
         <WebhookExecutionList
           :executions="executions"
           kind="webhook"
-          title="Historique des executions"
-          empty-text="Aucune execution enregistree."
+          title="Historique des exécutions"
+          empty-text="Aucune exécution enregistrée."
           :show-refresh="true"
           @refresh="loadExecutions"
         />
@@ -220,3 +220,4 @@ function execStatusBadge(status) {
 
 onMounted(load)
 </script>
+

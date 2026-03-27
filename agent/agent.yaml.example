@@ -12,39 +12,29 @@ collect_docker: true
 collect_apt: true
 
 # Enable SMART disk health monitoring (requires smartmontools)
-collect_smart: true
+collect_smart: false
 
-# Detect automated scans/bots from web access logs (nginx/apache/NPM)
-collect_bot_detection: true
+# Parse web access logs once for traffic and threat analytics
+collect_web_logs: false
 
 # Glob paths to parse (supports wildcards)
-bot_detection_log_paths:
+web_logs_log_paths:
 	- "/var/log/nginx/access.log"
 	- "/var/log/apache2/access.log"
 	- "/var/log/httpd/access_log"
-	- "/data/logs/proxy-host-*.log"
+	- "/data/logs/proxy-host-*_access.log"
 
 # Number of latest log lines to inspect per file
-bot_detection_tail_lines: 5000
+web_logs_tail_lines: 5000
 
-# Number of top suspicious IPs/paths returned
-bot_detection_top_n: 10
+# Number of top domains/IPs/paths returned
+web_logs_top_n: 10
 
-# Analyze Nginx Proxy Manager request patterns from web access logs
-collect_npm_analytics: true
+# Max number of raw requests attached to each report
+web_logs_requests_limit: 200
 
-# Glob paths to parse for NPM analytics (supports wildcards)
-npm_analytics_log_paths:
-	- "/var/log/nginx/access.log"
-	- "/var/log/apache2/access.log"
-	- "/var/log/httpd/access_log"
-	- "/data/logs/proxy-host-*.log"
-
-# Number of latest log lines to inspect per file
-npm_analytics_tail_lines: 5000
-
-# Number of top domains/hosts returned in analytics
-npm_analytics_top_n: 10
+# Incremental cursor state file to avoid re-reading already processed lines
+web_logs_cursor_file: "/var/lib/serversupervisor/web_logs_cursor.json"
 
 # Skip TLS verification (for self-signed certs)
 insecure_skip_verify: false
