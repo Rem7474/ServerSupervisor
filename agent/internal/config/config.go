@@ -26,6 +26,10 @@ type Config struct {
 	BotDetectionTailLines int      `yaml:"bot_detection_tail_lines"`
 	BotDetectionTopN      int      `yaml:"bot_detection_top_n"`
 	CollectNPMAnalytics   bool     `yaml:"collect_npm_analytics"`
+	// NPMAnalyticsLogDir : dossier contenant les logs NPM.
+	// L'agent trouve automatiquement les fichiers proxy-host-*.log dedans.
+	// Si vide, NPMAnalyticsLogPaths (liste de globs) est utilisé à la place (rétrocompat).
+	NPMAnalyticsLogDir    string   `yaml:"npm_analytics_log_dir"`
 	NPMAnalyticsLogPaths  []string `yaml:"npm_analytics_log_paths"`
 	NPMAnalyticsTailLines int      `yaml:"npm_analytics_tail_lines"`
 	NPMAnalyticsTopN      int      `yaml:"npm_analytics_top_n"`
@@ -35,6 +39,16 @@ type Config struct {
 
 	// APT behaviour
 	AptAutoUpdateOnStart bool `yaml:"apt_auto_update_on_start"`
+}
+
+// NPMLogGlobs retourne la liste de globs à utiliser pour les logs NPM.
+// Priorité : npm_analytics_log_dir > npm_analytics_log_paths.
+func (c *Config) NPMLogGlobs() []string {
+	if c.NPMAnalyticsLogDir != "" {
+		dir := strings.TrimRight(c.NPMAnalyticsLogDir, "/")
+		return []string{dir + "/proxy-host-*.log"}
+	}
+	return c.NPMAnalyticsLogPaths
 }
 
 func Load(path string) (*Config, error) {
@@ -122,7 +136,11 @@ func Load(path string) (*Config, error) {
 	if env := os.Getenv("SUPERVISOR_COLLECT_NPM_ANALYTICS"); env != "" {
 		cfg.CollectNPMAnalytics = env == "true" || env == "1"
 	}
-	if env := os.Getenv("SUPERVISOR_NPM_ANALYTICS_LOG_PATHS"); env != "" {
+	// Priorité env : dossier > liste de paths
+	if env := os.Getenv("SUPERVISOR_NPM_ANALYTICS_LOG_DIR"); env != "" {
+		cfg.NPMAnalyticsLogDir = strings.TrimSpace(env)
+	}
+	if env := os.Getenv("SUPERVISOR_NPM_ANALYTICS_LOG_PATHS"); env != "" && cfg.NPMAnalyticsLogDir == "" {
 		parts := []string{}
 		for _, p := range strings.Split(env, ",") {
 			p = strings.TrimSpace(p)
@@ -195,12 +213,15 @@ bot_detection_top_n: 10
 # Analyze Nginx Proxy Manager request patterns from web access logs
 collect_npm_analytics: true
 
-# Glob paths to parse for NPM analytics (supports wildcards)
-npm_analytics_log_paths:
-  - "/var/log/nginx/access.log"
-  - "/var/log/apache2/access.log"
-  - "/var/log/httpd/access_log"
-  - "/data/logs/proxy-host-*.log"
+# Dossier contenant les logs NPM (proxy-host-*.log détectés automatiquement).
+# Exemple : "/usr/local/bin/docker-compose/data/logs"
+# Si renseigné, npm_analytics_log_paths est ignoré.
+npm_analytics_log_dir: ""
+
+# (Avancé) Liste explicite de globs — ignoré si npm_analytics_log_dir est défini.
+# npm_analytics_log_paths:
+#   - "/var/log/nginx/access.log"
+#   - "/data/logs/proxy-host-*.log"
 
 # Number of latest log lines to inspect per file
 npm_analytics_tail_lines: 5000
