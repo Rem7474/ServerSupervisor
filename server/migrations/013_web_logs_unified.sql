@@ -19,7 +19,7 @@ ALTER TABLE hosts DROP COLUMN IF EXISTS npm_analytics;
 
 CREATE TABLE IF NOT EXISTS web_log_snapshots (
   id                  BIGSERIAL PRIMARY KEY,
-  host_id             UUID NOT NULL REFERENCES hosts(id) ON DELETE CASCADE,
+  host_id             VARCHAR(64) NOT NULL REFERENCES hosts(id) ON DELETE CASCADE,
   captured_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   source              TEXT NOT NULL,
   total_requests      INTEGER NOT NULL DEFAULT 0,
@@ -39,7 +39,7 @@ ON web_log_snapshots (host_id, source, captured_at DESC);
 CREATE TABLE IF NOT EXISTS web_log_requests (
   id          BIGSERIAL PRIMARY KEY,
   snapshot_id BIGINT NOT NULL REFERENCES web_log_snapshots(id) ON DELETE CASCADE,
-  host_id     UUID NOT NULL REFERENCES hosts(id) ON DELETE CASCADE,
+  host_id     VARCHAR(64) NOT NULL REFERENCES hosts(id) ON DELETE CASCADE,
   captured_at TIMESTAMPTZ NOT NULL,
   source      TEXT NOT NULL,
   ip          TEXT NOT NULL,
