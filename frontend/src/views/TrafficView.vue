@@ -162,37 +162,45 @@
     </div>
 
     <div class="row row-cards mb-4">
-      <div class="col-xl-12">
+      <div class="col-xl-8">
         <div class="card h-100">
           <div class="card-header d-flex align-items-center justify-content-between">
-            <h3 class="card-title mb-0">Pays par IP suspecte</h3>
-            <span class="small text-secondary">Géolocalisation indicative</span>
+            <h3 class="card-title mb-0">Carte mondiale des IP clientes</h3>
+            <span class="small text-secondary">Toutes les IPs observées (pas seulement suspectes)</span>
+          </div>
+          <div class="card-body">
+            <svg ref="worldMapSvg" class="world-map" role="img" aria-label="Carte mondiale du trafic par pays"></svg>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-xl-4">
+        <div class="card h-100">
+          <div class="card-header d-flex align-items-center justify-content-between">
+            <h3 class="card-title mb-0">Pays les plus actifs</h3>
+            <span class="small text-secondary">{{ numberFormat(topClientIPs.length) }} IPs</span>
           </div>
           <div class="table-responsive">
             <table class="table table-vcenter card-table">
               <thead>
                 <tr>
-                  <th>IP</th>
                   <th>Pays</th>
                   <th>Code</th>
                   <th class="text-end">Hits</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-if="!topThreatIPs.length">
-                  <td colspan="4" class="text-center text-secondary py-4">Aucune IP suspecte.</td>
+                <tr v-if="!countryDistribution.length">
+                  <td colspan="3" class="text-center text-secondary py-4">Aucune donnée pays.</td>
                 </tr>
-                <tr v-for="item in topThreatIPs.slice(0, 20)" :key="`country-${item.ip}`">
-                  <td class="font-monospace small">{{ item.ip }}</td>
+                <tr v-for="item in countryDistribution.slice(0, 20)" :key="`country-${item.country}`">
                   <td>
-                    <span class="small">
-                      {{ geoByIP[item.ip]?.loading ? 'Recherche...' : (geoByIP[item.ip]?.country || 'Inconnu') }}
-                    </span>
+                    <span class="small">{{ item.country || 'Inconnu' }}</span>
                   </td>
                   <td>
-                    <span class="badge bg-azure-lt text-azure">{{ geoByIP[item.ip]?.countryCode || '--' }}</span>
+                    <span class="badge bg-azure-lt text-azure">{{ item.country_code || '--' }}</span>
                   </td>
-                  <td class="text-end">{{ numberFormat(item.hits || 0) }}</td>
+                  <td class="text-end">{{ numberFormat(Number(item.hits) || 0) }}</td>
                 </tr>
               </tbody>
             </table>
@@ -409,6 +417,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import * as d3 from 'd3'
 import apiClient from '../api'
 
 type AnyRecord = Record<string, any>
@@ -430,7 +439,6 @@ const summary = ref<AnyRecord>({ traffic: {}, threats: {} })
 const compare = ref<AnyRecord>({ delta_percent: {} })
 const timeseries = ref<AnyRecord[]>([])
 const liveRequests = ref<AnyRecord[]>([])
-const geoByIP = ref<Record<string, { country: string; countryCode: string; loading?: boolean }>>({})
 const lastUpdatedAt = ref<Date | null>(null)
 
 const showDomainModal = ref(false)
@@ -440,10 +448,12 @@ const domainDetails = ref<AnyRecord>({})
 
 const trafficCanvas = ref<HTMLCanvasElement | null>(null)
 const statusCanvas = ref<HTMLCanvasElement | null>(null)
+const worldMapSvg = ref<SVGSVGElement | null>(null)
 let trafficChart: any = null
 let statusChart: any = null
 let refreshTimer: number | null = null
 let chartLib: any = null
+let worldMapResizeHandler: (() => void) | null = null
 
 const traffic = computed(() => summary.value.traffic || {})
 const threats = computed(() => summary.value.threats || {})
@@ -459,6 +469,11 @@ const topProxyHosts = computed(() => {
 })
 const topEndpoints = computed(() => traffic.value.top_endpoints || [])
 const topThreatIPs = computed(() => threats.value.top_ips || [])
+const topClientIPs = computed(() => traffic.value.top_client_ips || [])
+const countryDistribution = computed(() => {
+  const rows = traffic.value.country_distribution || []
+  return [...rows].sort((a: AnyRecord, b: AnyRecord) => (Number(b?.hits) || 0) - (Number(a?.hits) || 0))
+})
 const statusDistribution = computed(() => traffic.value.status_distribution || { '2xx': 0, '3xx': 0, '4xx': 0, '5xx': 0 })
 
 const lastUpdatedLabel = computed(() => {
@@ -501,47 +516,83 @@ function statusClass(status: number): string {
   return 'bg-secondary-lt text-secondary'
 }
 
-function isPrivateOrLocalIP(ip: string): boolean {
-  if (!ip) return true
-  if (ip.includes(':')) {
-    const lower = ip.toLowerCase()
-    return lower === '::1' || lower.startsWith('fc') || lower.startsWith('fd') || lower.startsWith('fe80')
-  }
-
-  const m = ip.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/)
-  if (!m) return true
-  const a = Number(m[1]); const b = Number(m[2])
-  if (a === 10 || a === 127 || a === 0) return true
-  if (a === 192 && b === 168) return true
-  if (a === 172 && b >= 16 && b <= 31) return true
-  if (a === 169 && b === 254) return true
-  if (a === 100 && b >= 64 && b <= 127) return true
-  return false
+function normalizeCountryName(name: string): string {
+  return (name || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]/g, '')
 }
 
-async function resolveIPCountry(ip: string): Promise<void> {
-  if (!ip || geoByIP.value[ip]) return
+function mapCountryKey(name: string): string {
+  const key = normalizeCountryName(name)
+  const aliases: Record<string, string> = {
+    usa: 'unitedstatesofamerica',
+    unitedstates: 'unitedstatesofamerica',
+    uk: 'unitedkingdom',
+    greatbritain: 'unitedkingdom',
+    russia: 'russianfederation',
+    southkorea: 'southkorea',
+    northkorea: 'northkorea',
+    czechia: 'czechrepublic',
+    ivorycoast: 'cotedivoire',
+    uae: 'unitedarabemirates',
+  }
+  return aliases[key] || key
+}
 
-  if (isPrivateOrLocalIP(ip)) {
-    geoByIP.value[ip] = { country: 'Local / privé', countryCode: 'LAN' }
-    return
+async function renderWorldMap() {
+  if (!worldMapSvg.value) return
+
+  const worldMod = await import('geojson-world-map/src/world.js')
+  const world = (worldMod as any).default || worldMod
+  const features = world?.features || []
+  if (!Array.isArray(features) || !features.length) return
+
+  const width = Math.max(560, worldMapSvg.value.clientWidth || 560)
+  const height = 340
+  const svg = d3.select(worldMapSvg.value)
+  svg.attr('viewBox', `0 0 ${width} ${height}`)
+
+  const countryHits = new Map<string, number>()
+  for (const row of countryDistribution.value) {
+    const key = mapCountryKey(String(row?.country || ''))
+    if (!key) continue
+    countryHits.set(key, Number(row?.hits) || 0)
   }
 
-  geoByIP.value[ip] = { country: 'Recherche...', countryCode: '--', loading: true }
-  try {
-    const res = await fetch(`https://ipwho.is/${encodeURIComponent(ip)}?fields=success,country,country_code`)
-    const data = await res.json()
-    if (!res.ok || !data?.success) {
-      geoByIP.value[ip] = { country: 'Inconnu', countryCode: '--' }
-      return
-    }
-    geoByIP.value[ip] = {
-      country: data.country || 'Inconnu',
-      countryCode: (data.country_code || '--').toUpperCase(),
-    }
-  } catch {
-    geoByIP.value[ip] = { country: 'Inconnu', countryCode: '--' }
-  }
+  const maxHits = Math.max(1, d3.max(countryDistribution.value, (d: AnyRecord) => Number(d?.hits) || 0) || 1)
+  const color = d3.scaleSequential(d3.interpolateYlOrRd).domain([0, maxHits])
+
+  const projection = d3.geoNaturalEarth1().fitSize([width, height], world as any)
+  const path = d3.geoPath(projection as any)
+
+  const root = svg.selectAll<SVGGElement, null>('g.world-root').data([null]).join('g').attr('class', 'world-root')
+
+  const countries = root
+    .selectAll<SVGPathElement, any>('path.country')
+    .data(features)
+    .join('path')
+    .attr('class', 'country')
+    .attr('d', path as any)
+    .attr('fill', (d: AnyRecord) => {
+      const key = mapCountryKey(String(d?.properties?.name || ''))
+      const hits = countryHits.get(key) || 0
+      return hits > 0 ? color(hits) : '#e9edf2'
+    })
+    .attr('stroke', '#ffffff')
+    .attr('stroke-width', 0.6)
+
+  countries
+    .selectAll('title')
+    .data((d: any) => [d])
+    .join('title')
+    .text((d: AnyRecord) => {
+      const country = String(d?.properties?.name || 'Unknown')
+      const key = mapCountryKey(country)
+      const hits = countryHits.get(key) || 0
+      return `${country}: ${numberFormat(hits)} hits`
+    })
 }
 
 function hostWidth(hits: number): number {
@@ -679,6 +730,7 @@ async function loadAll(showSpinner: boolean) {
     lastUpdatedAt.value = new Date()
     await nextTick()
     await renderCharts()
+    await renderWorldMap()
   } catch (err) {
     console.error('Failed to load traffic dashboard', err)
   } finally {
@@ -721,23 +773,24 @@ function closeDomainModal() {
 
 watch(autoRefresh, resetAutoRefresh)
 
-watch(topThreatIPs, (items) => {
-  for (const item of items.slice(0, 20)) {
-    const ip = String(item.ip || '').trim()
-    if (!ip) continue
-    void resolveIPCountry(ip)
-  }
-}, { immediate: true })
+watch(countryDistribution, () => {
+  void nextTick().then(renderWorldMap)
+})
 
 onMounted(async () => {
   await loadAll(true)
   resetAutoRefresh()
+  worldMapResizeHandler = () => {
+    void renderWorldMap()
+  }
+  window.addEventListener('resize', worldMapResizeHandler)
 })
 
 onBeforeUnmount(() => {
   if (refreshTimer) window.clearInterval(refreshTimer)
   if (trafficChart) trafficChart.destroy()
   if (statusChart) statusChart.destroy()
+  if (worldMapResizeHandler) window.removeEventListener('resize', worldMapResizeHandler)
 })
 </script>
 
@@ -788,6 +841,12 @@ onBeforeUnmount(() => {
   width: min(1200px, 96vw);
   max-height: 92vh;
   overflow: auto;
+}
+
+.world-map {
+  width: 100%;
+  height: 340px;
+  display: block;
 }
 </style>
 

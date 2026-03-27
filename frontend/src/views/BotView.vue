@@ -73,7 +73,7 @@
       <div class="col-4">
         <div class="card card-sm h-100">
           <div class="card-body text-center">
-            <div class="text-secondary small mb-1">Hôtes ciblés</div>
+            <div class="text-secondary small mb-1">Vhosts ciblés</div>
             <div class="h2 mb-0">{{ threats.targeted_hosts || 0 }}</div>
           </div>
         </div>
@@ -91,7 +91,7 @@
                   <th>IP</th>
                   <th class="text-end">Hits</th>
                   <th class="text-end">Paths</th>
-                  <th class="text-end">Hôtes</th>
+                  <th class="text-end">Vhosts</th>
                   <th>Niveau</th>
                   <th></th>
                 </tr>
@@ -136,12 +136,12 @@
     <div class="row row-cards mt-4">
       <div class="col-lg-6">
         <div class="card h-100">
-          <div class="card-header"><h3 class="card-title mb-0">Hôtes les plus ciblés</h3></div>
+          <div class="card-header"><h3 class="card-title mb-0">Vhosts les plus ciblés</h3></div>
           <div class="table-responsive">
             <table class="table table-vcenter card-table">
               <thead>
                 <tr>
-                  <th>Hôte</th>
+                  <th>Vhost</th>
                   <th class="text-end">Hits</th>
                 </tr>
               </thead>
@@ -160,13 +160,13 @@
       </div>
       <div class="col-lg-6">
         <div class="card h-100">
-          <div class="card-header"><h3 class="card-title mb-0">IP × Hôtes (scan coordonné)</h3></div>
+          <div class="card-header"><h3 class="card-title mb-0">IP × Vhosts (scan coordonné)</h3></div>
           <div class="table-responsive">
             <table class="table table-vcenter card-table">
               <thead>
                 <tr>
                   <th>IP</th>
-                  <th class="text-end">Hôtes</th>
+                  <th class="text-end">Vhosts</th>
                   <th class="text-end">Hits</th>
                 </tr>
               </thead>
@@ -206,13 +206,46 @@
           <div v-else-if="!timeline.length" class="text-center py-4 text-secondary">Aucune requête</div>
           <template v-else>
             <div class="timeline-frieze border-bottom px-3 py-3">
-              <div class="d-flex align-items-center justify-content-between mb-2 gap-2 flex-wrap">
+              <div class="timeline-controls d-flex align-items-center justify-content-between mb-2 gap-2 flex-wrap">
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                  <span class="small text-secondary">Intervalle:</span>
+                  <div class="btn-group btn-group-sm" role="group" aria-label="Intervalle timeline">
+                    <button
+                      v-for="opt in timelineIntervalOptions"
+                      :key="opt.value"
+                      class="btn"
+                      :class="selectedInterval === opt.value ? 'btn-primary' : 'btn-outline-secondary'"
+                      @click="setTimelineInterval(opt.value)"
+                    >
+                      {{ opt.label }}
+                    </button>
+                  </div>
+                </div>
                 <div class="small text-secondary">
-                  Frise regroupée par {{ timelineBucketLabel }}
+                  Regroupement: {{ timelineBucketLabel }} · {{ timelineBuckets.length }} tranches
                 </div>
                 <button class="btn btn-sm btn-outline-secondary" @click="toggleBucketFilter">
                   {{ bucketFilterEnabled ? 'Afficher toutes les requêtes' : 'Filtrer sur la tranche sélectionnée' }}
                 </button>
+              </div>
+
+              <div class="timeline-kpis mb-3">
+                <div class="timeline-kpi-chip">
+                  <span class="timeline-kpi-label">Requêtes affichées</span>
+                  <span class="timeline-kpi-value">{{ timelineStats.total }}</span>
+                </div>
+                <div class="timeline-kpi-chip">
+                  <span class="timeline-kpi-label">Erreurs</span>
+                  <span class="timeline-kpi-value text-red">{{ timelineStats.errors }}</span>
+                </div>
+                <div class="timeline-kpi-chip">
+                  <span class="timeline-kpi-label">Paths uniques</span>
+                  <span class="timeline-kpi-value">{{ timelineStats.uniquePaths }}</span>
+                </div>
+                <div class="timeline-kpi-chip">
+                  <span class="timeline-kpi-label">Vhosts touchés</span>
+                  <span class="timeline-kpi-value">{{ timelineStats.uniqueVhosts }}</span>
+                </div>
               </div>
 
               <div class="timeline-frieze-scroll">
@@ -239,15 +272,16 @@
             </div>
 
             <div v-for="(r, idx) in displayedTimeline" :key="`${r.timestamp}-${idx}`" class="border-bottom px-3 py-2">
-            <div class="d-flex align-items-center gap-2 mb-1">
-              <span class="badge" :class="statusClass(r.status)">{{ r.status }}</span>
-              <span class="badge bg-blue-lt text-blue">{{ r.method }}</span>
-              <span class="small text-secondary">{{ formatDate(r.timestamp) }}</span>
-              <span class="small text-secondary">{{ r.host_name }}</span>
+              <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
+                <span class="badge" :class="statusClass(r.status)">{{ r.status }}</span>
+                <span class="badge bg-blue-lt text-blue">{{ r.method }}</span>
+                <span class="badge bg-azure-lt text-azure">{{ r.source || 'log' }}</span>
+                <span class="small text-secondary">{{ formatDate(r.timestamp) }}</span>
+                <span class="small text-secondary">host: {{ r.host_name || r.host_id || '-' }}</span>
+              </div>
+              <div class="font-monospace small mb-1">{{ r.domain || '(unknown)' }} {{ r.path }}</div>
+              <div class="small text-secondary text-truncate">{{ r.user_agent || '-' }}</div>
             </div>
-            <div class="font-monospace small mb-1">{{ r.domain || '(unknown)' }} {{ r.path }}</div>
-            <div class="small text-secondary text-truncate">{{ r.user_agent || '-' }}</div>
-          </div>
           </template>
         </div>
       </div>
@@ -256,7 +290,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import apiClient from '../api'
 
 type AnyRecord = Record<string, any>
@@ -281,6 +315,18 @@ const selectedIP = ref('')
 const timeline = ref<AnyRecord[]>([])
 const selectedBucketKey = ref('')
 const bucketFilterEnabled = ref(true)
+const selectedInterval = ref('auto')
+
+const timelineIntervalOptions = [
+  { value: 'auto', label: 'Auto', ms: 0 },
+  { value: '10s', label: '10s', ms: 10 * 1000 },
+  { value: '30s', label: '30s', ms: 30 * 1000 },
+  { value: '1m', label: '1m', ms: 60 * 1000 },
+  { value: '5m', label: '5m', ms: 5 * 60 * 1000 },
+  { value: '10m', label: '10m', ms: 10 * 60 * 1000 },
+  { value: '30m', label: '30m', ms: 30 * 60 * 1000 },
+  { value: '1h', label: '1h', ms: 60 * 60 * 1000 },
+]
 
 const threats = computed(() => summary.value.threats || {})
 const topIPs = computed(() => threats.value.top_ips || [])
@@ -292,17 +338,34 @@ const timelineChrono = computed(() => {
   return [...timeline.value].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
 })
 
+const timelineSpanMs = computed(() => {
+  if (timelineChrono.value.length < 2) return 0
+  const first = new Date(timelineChrono.value[0]?.timestamp).getTime()
+  const last = new Date(timelineChrono.value[timelineChrono.value.length - 1]?.timestamp).getTime()
+  if (!Number.isFinite(first) || !Number.isFinite(last)) return 0
+  return Math.max(0, last - first)
+})
+
+const autoTimelineBucketMs = computed(() => {
+  const span = timelineSpanMs.value
+  if (span <= 30 * 60 * 1000) return 10 * 1000
+  if (span <= 6 * 60 * 60 * 1000) return 60 * 1000
+  if (span <= 48 * 60 * 60 * 1000) return 10 * 60 * 1000
+  if (span <= 7 * 24 * 60 * 60 * 1000) return 30 * 60 * 1000
+  return 60 * 60 * 1000
+})
+
 const timelineBucketMs = computed(() => {
-  const n = timelineChrono.value.length
-  if (n > 220) return 60 * 60 * 1000
-  if (n > 80) return 5 * 60 * 1000
-  return 60 * 1000
+  const selected = timelineIntervalOptions.find((o) => o.value === selectedInterval.value)
+  if (!selected || selected.ms <= 0) return autoTimelineBucketMs.value
+  return selected.ms
 })
 
 const timelineBucketLabel = computed(() => {
-  if (timelineBucketMs.value === 60 * 60 * 1000) return 'heure'
-  if (timelineBucketMs.value === 5 * 60 * 1000) return '5 minutes'
-  return 'minute'
+  const ms = timelineBucketMs.value
+  if (ms < 60 * 1000) return `${Math.round(ms / 1000)} secondes`
+  if (ms < 60 * 60 * 1000) return `${Math.round(ms / (60 * 1000))} minutes`
+  return `${Math.round(ms / (60 * 60 * 1000))} heure(s)`
 })
 
 const timelineBuckets = computed(() => {
@@ -332,7 +395,7 @@ const timelineBuckets = computed(() => {
     .map((b) => ({
       ...b,
       label: formatBucketLabel(b.startMs, timelineBucketMs.value),
-      rangeLabel: `${new Date(b.startMs).toLocaleTimeString()} → ${new Date(b.endMs).toLocaleTimeString()}`,
+      rangeLabel: `${new Date(b.startMs).toLocaleString()} → ${new Date(b.endMs).toLocaleString()}`,
       title: `${new Date(b.startMs).toLocaleString()} (${b.count} req)`
     }))
 })
@@ -343,13 +406,27 @@ const selectedBucket = computed(() => {
 })
 
 const displayedTimeline = computed(() => {
-  if (!bucketFilterEnabled.value || !selectedBucket.value) return timeline.value
+  const source = timelineChrono.value
+  if (!bucketFilterEnabled.value || !selectedBucket.value) return [...source].reverse()
   const start = selectedBucket.value.startMs
   const end = selectedBucket.value.endMs
-  return timeline.value.filter((r) => {
+  return source.filter((r) => {
     const ts = new Date(r.timestamp).getTime()
     return Number.isFinite(ts) && ts >= start && ts < end
-  })
+  }).reverse()
+})
+
+const timelineStats = computed(() => {
+  const rows = displayedTimeline.value
+  const errors = rows.filter((r) => Number(r.status) >= 400).length
+  const uniquePaths = new Set(rows.map((r) => String(r.path || ''))).size
+  const uniqueVhosts = new Set(rows.map((r) => String(r.domain || '(unknown)'))).size
+  return {
+    total: rows.length,
+    errors,
+    uniquePaths,
+    uniqueVhosts,
+  }
 })
 
 function levelClass(level: string): string {
@@ -425,6 +502,10 @@ function toggleBucketFilter() {
   bucketFilterEnabled.value = !bucketFilterEnabled.value
 }
 
+function setTimelineInterval(value: string) {
+  selectedInterval.value = value
+}
+
 function dotSize(count: number): string {
   const max = Math.max(...timelineBuckets.value.map((b) => Number(b.count) || 0), 1)
   const ratio = (Number(count) || 0) / max
@@ -433,11 +514,25 @@ function dotSize(count: number): string {
 
 function formatBucketLabel(startMs: number, bucketMs: number): string {
   const d = new Date(startMs)
+  if (bucketMs < 60 * 1000) {
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  }
   if (bucketMs >= 60 * 60 * 1000) {
     return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   }
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
+
+watch([timelineBuckets, timelineBucketMs], () => {
+  if (!timelineBuckets.value.length) {
+    selectedBucketKey.value = ''
+    return
+  }
+  const stillExists = timelineBuckets.value.some((b) => b.key === selectedBucketKey.value)
+  if (!stillExists) {
+    selectedBucketKey.value = timelineBuckets.value[timelineBuckets.value.length - 1].key
+  }
+})
 
 async function blockIP() {
   // Reuses existing unblock endpoint path contract inversely is not implemented server-side yet.
@@ -482,6 +577,36 @@ onMounted(loadThreats)
   padding-bottom: 0.25rem;
 }
 
+.timeline-controls .btn-group .btn {
+  min-width: 44px;
+}
+
+.timeline-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.timeline-kpi-chip {
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 0.5rem;
+  padding: 0.45rem 0.6rem;
+  background: rgba(15, 23, 42, 0.02);
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.timeline-kpi-label {
+  font-size: 0.72rem;
+  color: var(--tblr-secondary);
+}
+
+.timeline-kpi-value {
+  font-weight: 700;
+  font-size: 1rem;
+}
+
 .timeline-frieze-track {
   position: relative;
   min-width: max-content;
@@ -503,14 +628,16 @@ onMounted(loadThreats)
 .timeline-frieze-item {
   position: relative;
   z-index: 1;
-  border: 0;
-  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 0.5rem;
+  background: rgba(15, 23, 42, 0.02);
   color: inherit;
   min-width: 64px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 0.25rem;
+  padding: 0.2rem 0.25rem;
 }
 
 .timeline-frieze-dot {
@@ -525,6 +652,11 @@ onMounted(loadThreats)
   border-color: #e24b4a;
 }
 
+.timeline-frieze-item.active {
+  border-color: rgba(226, 75, 74, 0.35);
+  background: rgba(226, 75, 74, 0.08);
+}
+
 .timeline-frieze-time {
   font-size: 0.72rem;
   color: var(--tblr-secondary);
@@ -533,5 +665,17 @@ onMounted(loadThreats)
 .timeline-frieze-count {
   font-size: 0.72rem;
   font-weight: 600;
+}
+
+@media (max-width: 992px) {
+  .timeline-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .timeline-kpis {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

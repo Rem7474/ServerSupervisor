@@ -100,9 +100,12 @@ type webLogCursorState struct {
 }
 
 type webLogCursorEntry struct {
-	Offset    int64     `json:"offset"`
-	Size      int64     `json:"size"`
-	UpdatedAt time.Time `json:"updated_at"`
+	Offset         int64     `json:"offset"`
+	Size           int64     `json:"size"`
+	BackfillOffset int64     `json:"backfill_offset,omitempty"`
+	BackfillLimit  int64     `json:"backfill_limit,omitempty"`
+	BackfillDone   bool      `json:"backfill_done,omitempty"`
+	UpdatedAt      time.Time `json:"updated_at"`
 }
 
 var npmAccessLogRegex = regexp.MustCompile(
@@ -516,31 +519,166 @@ func readIncrementalLines(path string, maxLines int, prev webLogCursorEntry, has
 	}
 
 	next := webLogCursorEntry{
-		Offset:    info.Size(),
-		Size:      info.Size(),
-		UpdatedAt: time.Now().UTC(),
+		Offset:         info.Size(),
+		Size:           info.Size(),
+		BackfillOffset: prev.BackfillOffset,
+		BackfillLimit:  prev.BackfillLimit,
+		BackfillDone:   prev.BackfillDone,
+		UpdatedAt:      time.Now().UTC(),
+	}
+
+	bootstrap := func() ([]string, webLogCursorEntry, error) {
+		tailLines, tailStartOffset, err := readLastLinesWithStart(path, maxLines)
+		if err != nil {
+			return nil, next, err
+		}
+		next.Offset = info.Size()
+		next.Size = info.Size()
+		next.BackfillOffset = 0
+		next.BackfillLimit = tailStartOffset
+		next.BackfillDone = tailStartOffset <= 0
+
+		if !next.BackfillDone {
+			backfillLines, backfillOffset, done, err := readBackfillChunk(path, next.BackfillOffset, next.BackfillLimit, maxLines)
+			if err == nil {
+				tailLines = append(tailLines, backfillLines...)
+				next.BackfillOffset = backfillOffset
+				next.BackfillDone = done
+			}
+		}
+
+		return tailLines, next, nil
 	}
 
 	if !hasPrev {
-		lines, err := readLastLines(path, maxLines)
-		return lines, next, err
+		return bootstrap()
 	}
 
 	if info.Size() < prev.Offset {
 		// Log rotated or truncated: bootstrap from tail again.
-		lines, err := readLastLines(path, maxLines)
-		return lines, next, err
+		return bootstrap()
 	}
 
-	if info.Size() == prev.Offset {
-		return []string{}, next, nil
+	if next.BackfillLimit == 0 && next.BackfillOffset == 0 && !next.BackfillDone {
+		// Compatibility for legacy cursors: backfill older content up to previous live offset.
+		next.BackfillLimit = prev.Offset
+		next.BackfillDone = next.BackfillLimit <= 0
 	}
 
-	lines, err := readNewLinesFromOffset(path, prev.Offset, maxLines)
+	out := make([]string, 0, maxLines*2)
+
+	if info.Size() > prev.Offset {
+		// Always keep live tail fresh by processing new appended lines.
+		liveLines, err := readNewLinesFromOffset(path, prev.Offset, 0)
+		if err != nil {
+			return nil, next, err
+		}
+		out = append(out, liveLines...)
+	}
+
+	if !next.BackfillDone {
+		// Progressively replay old history from the beginning in fixed chunks.
+		backfillLines, backfillOffset, done, err := readBackfillChunk(path, next.BackfillOffset, next.BackfillLimit, maxLines)
+		if err == nil {
+			out = append(out, backfillLines...)
+			next.BackfillOffset = backfillOffset
+			next.BackfillDone = done
+		}
+	}
+
+	return out, next, nil
+}
+
+func readBackfillChunk(path string, startOffset int64, stopOffset int64, maxLines int) ([]string, int64, bool, error) {
+	if maxLines <= 0 {
+		maxLines = 5000
+	}
+	if startOffset >= stopOffset {
+		return []string{}, startOffset, true, nil
+	}
+
+	f, err := os.Open(path)
 	if err != nil {
-		return nil, next, err
+		return nil, startOffset, false, err
 	}
-	return lines, next, nil
+	defer func() { _ = f.Close() }()
+
+	if _, err := f.Seek(startOffset, io.SeekStart); err != nil {
+		return nil, startOffset, false, err
+	}
+
+	r := bufio.NewReader(f)
+	lines := make([]string, 0, maxLines)
+	cursor := startOffset
+	for len(lines) < maxLines && cursor < stopOffset {
+		raw, err := r.ReadString('\n')
+		if len(raw) > 0 {
+			nextCursor := cursor + int64(len(raw))
+			if nextCursor > stopOffset {
+				break
+			}
+			line := strings.TrimRight(raw, "\r\n")
+			lines = append(lines, line)
+			cursor = nextCursor
+		}
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, startOffset, false, err
+		}
+	}
+
+	done := cursor >= stopOffset
+	return lines, cursor, done, nil
+}
+
+func readLastLinesWithStart(path string, n int) ([]string, int64, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer func() { _ = f.Close() }()
+
+	type lineEntry struct {
+		start int64
+		line  string
+	}
+
+	ring := make([]lineEntry, 0, n)
+	r := bufio.NewReader(f)
+	var offset int64
+	for {
+		raw, err := r.ReadString('\n')
+		if len(raw) > 0 {
+			entry := lineEntry{start: offset, line: strings.TrimRight(raw, "\r\n")}
+			if n > 0 {
+				if len(ring) < n {
+					ring = append(ring, entry)
+				} else {
+					copy(ring, ring[1:])
+					ring[n-1] = entry
+				}
+			}
+			offset += int64(len(raw))
+		}
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, 0, err
+		}
+	}
+
+	if len(ring) == 0 {
+		return []string{}, offset, nil
+	}
+
+	lines := make([]string, 0, len(ring))
+	for _, e := range ring {
+		lines = append(lines, e.line)
+	}
+	return lines, ring[0].start, nil
 }
 
 func readNewLinesFromOffset(path string, offset int64, maxLines int) ([]string, error) {
@@ -552,6 +690,18 @@ func readNewLinesFromOffset(path string, offset int64, maxLines int) ([]string, 
 
 	if _, err := f.Seek(offset, io.SeekStart); err != nil {
 		return nil, err
+	}
+
+	if maxLines <= 0 {
+		lines := make([]string, 0, 1024)
+		s := bufio.NewScanner(f)
+		for s.Scan() {
+			lines = append(lines, s.Text())
+		}
+		if err := s.Err(); err != nil {
+			return nil, err
+		}
+		return lines, nil
 	}
 
 	ring := make([]string, 0, maxLines)

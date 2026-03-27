@@ -1,12 +1,26 @@
 package handlers
 
 import (
+	"encoding/json"
 	"net/http"
+	"net/netip"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
+)
+
+type ipCountryInfo struct {
+	Country     string
+	CountryCode string
+	UpdatedAt   time.Time
+}
+
+var (
+	ipCountryCache   = map[string]ipCountryInfo{}
+	ipCountryCacheMu sync.RWMutex
 )
 
 func (h *AuthHandler) GetWebLogsSummary(c *gin.Context) {
@@ -37,6 +51,50 @@ func (h *AuthHandler) GetWebLogsSummary(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to aggregate web logs"})
 		return
+	}
+
+	if traffic, ok := summary["traffic"].(map[string]any); ok {
+		topIPs, err := h.db.GetWebLogsTopClientIPs(since, hostID, source, 120)
+		if err == nil {
+			traffic["top_client_ips"] = topIPs
+
+			countryHits := map[string]int64{}
+			countryCodes := map[string]string{}
+			for _, row := range topIPs {
+				ip := strings.TrimSpace(anyToString(row["ip"]))
+				hits := anyToInt64(row["hits"])
+				if ip == "" || hits <= 0 {
+					continue
+				}
+				country, code := resolveCountryForIP(ip)
+				if country == "" {
+					country = "Unknown"
+				}
+				if code == "" {
+					code = "--"
+				}
+				countryHits[country] += hits
+				countryCodes[country] = code
+			}
+
+			dist := make([]map[string]any, 0, len(countryHits))
+			for country, hits := range countryHits {
+				dist = append(dist, map[string]any{
+					"country":      country,
+					"country_code": countryCodes[country],
+					"hits":         hits,
+				})
+			}
+			// Sort descending by hits.
+			for i := 0; i < len(dist); i++ {
+				for j := i + 1; j < len(dist); j++ {
+					if anyToInt64(dist[j]["hits"]) > anyToInt64(dist[i]["hits"]) {
+						dist[i], dist[j] = dist[j], dist[i]
+					}
+				}
+			}
+			traffic["country_distribution"] = dist
+		}
 	}
 
 	now := time.Now().UTC()
@@ -271,4 +329,86 @@ func deltaPercent(current float64, previous float64) any {
 		return nil
 	}
 	return ((current - previous) / previous) * 100
+}
+
+func anyToInt64(v any) int64 {
+	switch n := v.(type) {
+	case int64:
+		return n
+	case int:
+		return int64(n)
+	case float64:
+		return int64(n)
+	default:
+		return 0
+	}
+}
+
+func anyToString(v any) string {
+	if s, ok := v.(string); ok {
+		return s
+	}
+	return ""
+}
+
+func isPrivateOrLocalIP(ip string) bool {
+	addr, err := netip.ParseAddr(ip)
+	if err != nil {
+		return true
+	}
+	return addr.IsLoopback() || addr.IsPrivate() || addr.IsLinkLocalUnicast() || addr.IsUnspecified()
+}
+
+func resolveCountryForIP(ip string) (string, string) {
+	ip = strings.TrimSpace(ip)
+	if ip == "" {
+		return "Unknown", "--"
+	}
+	if isPrivateOrLocalIP(ip) {
+		return "Local / Private", "LAN"
+	}
+
+	now := time.Now().UTC()
+	ipCountryCacheMu.RLock()
+	if cached, ok := ipCountryCache[ip]; ok && now.Sub(cached.UpdatedAt) < 24*time.Hour {
+		ipCountryCacheMu.RUnlock()
+		return cached.Country, cached.CountryCode
+	}
+	ipCountryCacheMu.RUnlock()
+
+	client := &http.Client{Timeout: 2 * time.Second}
+	req, err := http.NewRequest(http.MethodGet, "https://ipwho.is/"+ip+"?fields=success,country,country_code", nil)
+	if err != nil {
+		return "Unknown", "--"
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return "Unknown", "--"
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	var payload struct {
+		Success     bool   `json:"success"`
+		Country     string `json:"country"`
+		CountryCode string `json:"country_code"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil || !payload.Success {
+		return "Unknown", "--"
+	}
+
+	country := strings.TrimSpace(payload.Country)
+	if country == "" {
+		country = "Unknown"
+	}
+	code := strings.ToUpper(strings.TrimSpace(payload.CountryCode))
+	if code == "" {
+		code = "--"
+	}
+
+	ipCountryCacheMu.Lock()
+	ipCountryCache[ip] = ipCountryInfo{Country: country, CountryCode: code, UpdatedAt: now}
+	ipCountryCacheMu.Unlock()
+
+	return country, code
 }

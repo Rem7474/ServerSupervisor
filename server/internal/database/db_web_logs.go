@@ -158,10 +158,10 @@ func (db *DB) GetWebLogsSummary(since time.Time, hostID string, source string) (
 	var errors4xx int64
 	var errors5xx int64
 	if err := db.conn.QueryRow(
-		fmt.Sprintf(`SELECT COALESCE(COUNT(*),0), COALESCE(SUM(bytes),0),
-		COALESCE(SUM(CASE WHEN status BETWEEN 400 AND 499 THEN 1 ELSE 0 END),0),
-		COALESCE(SUM(CASE WHEN status >= 500 THEN 1 ELSE 0 END),0)
-		FROM web_log_requests WHERE %s`, where),
+		fmt.Sprintf(`SELECT COALESCE(SUM(total_requests),0), COALESCE(SUM(total_bytes),0),
+		COALESCE(SUM(errors_4xx),0),
+		COALESCE(SUM(errors_5xx),0)
+		FROM web_log_snapshots WHERE %s`, where),
 		args...,
 	).Scan(&totalRequests, &totalBytes, &errors4xx, &errors5xx); err != nil {
 		return nil, err
@@ -363,7 +363,7 @@ func (db *DB) GetWebLogsSummary(since time.Time, hostID string, source string) (
 	var suspiciousIPs int64
 	var targetedHosts int64
 	if err := db.conn.QueryRow(
-		fmt.Sprintf(`SELECT COALESCE(COUNT(*),0), COALESCE(COUNT(DISTINCT ip),0), COALESCE(COUNT(DISTINCT host_id),0)
+		fmt.Sprintf(`SELECT COALESCE(COUNT(*),0), COALESCE(COUNT(DISTINCT ip),0), COALESCE(COUNT(DISTINCT COALESCE(NULLIF(domain,''), '(unknown)')),0)
 		FROM web_log_requests
 		WHERE %s AND suspicious = TRUE`, where),
 		args...,
@@ -378,7 +378,7 @@ func (db *DB) GetWebLogsSummary(since time.Time, hostID string, source string) (
 		fmt.Sprintf(`SELECT ip,
 		COUNT(*) AS hits,
 		COUNT(DISTINCT path) AS unique_paths,
-		COUNT(DISTINCT host_id) AS host_count,
+		COUNT(DISTINCT COALESCE(NULLIF(domain,''), '(unknown)')) AS host_count,
 		MIN(captured_at) AS first_seen,
 		MAX(captured_at) AS last_seen
 		FROM web_log_requests
@@ -451,11 +451,10 @@ func (db *DB) GetWebLogsSummary(since time.Time, hostID string, source string) (
 	threats["top_paths"] = topPaths
 
 	hostRows, err := db.conn.Query(
-		fmt.Sprintf(`SELECT h.id, h.name, COUNT(*) AS hits
+		fmt.Sprintf(`SELECT COALESCE(NULLIF(r.domain,''), '(unknown)') AS vhost, COUNT(*) AS hits
 		FROM web_log_requests r
-		JOIN hosts h ON h.id = r.host_id
 		WHERE %s AND r.suspicious = TRUE
-		GROUP BY h.id, h.name
+		GROUP BY vhost
 		ORDER BY hits DESC
 		LIMIT 20`, where),
 		args...,
@@ -466,21 +465,21 @@ func (db *DB) GetWebLogsSummary(since time.Time, hostID string, source string) (
 	defer func() { _ = hostRows.Close() }()
 	mostTargetedHosts := make([]map[string]any, 0)
 	for hostRows.Next() {
-		var id, name string
+		var vhost string
 		var hits int64
-		if err := hostRows.Scan(&id, &name, &hits); err != nil {
+		if err := hostRows.Scan(&vhost, &hits); err != nil {
 			return nil, err
 		}
-		mostTargetedHosts = append(mostTargetedHosts, map[string]any{"host_id": id, "host_name": name, "hits": hits})
+		mostTargetedHosts = append(mostTargetedHosts, map[string]any{"host_id": vhost, "host_name": vhost, "hits": hits})
 	}
 	threats["most_targeted_hosts"] = mostTargetedHosts
 
 	matrixRows, err := db.conn.Query(
-		fmt.Sprintf(`SELECT ip, COUNT(DISTINCT host_id) AS host_count, COUNT(*) AS hits
+		fmt.Sprintf(`SELECT ip, COUNT(DISTINCT COALESCE(NULLIF(domain,''), '(unknown)')) AS host_count, COUNT(*) AS hits
 		FROM web_log_requests
 		WHERE %s AND suspicious = TRUE
 		GROUP BY ip
-		HAVING COUNT(DISTINCT host_id) > 1
+		HAVING COUNT(DISTINCT COALESCE(NULLIF(domain,''), '(unknown)')) > 1
 		ORDER BY host_count DESC, hits DESC
 		LIMIT 30`, where),
 		args...,
@@ -705,9 +704,9 @@ func (db *DB) GetWebLogsKPIWindow(since time.Time, until time.Time, hostID strin
 	var totalBytes int64
 	var errors5xx int64
 	if err := db.conn.QueryRow(
-		fmt.Sprintf(`SELECT COALESCE(COUNT(*),0), COALESCE(SUM(bytes),0),
-		COALESCE(SUM(CASE WHEN status >= 500 THEN 1 ELSE 0 END),0)
-		FROM web_log_requests
+		fmt.Sprintf(`SELECT COALESCE(SUM(total_requests),0), COALESCE(SUM(total_bytes),0),
+		COALESCE(SUM(errors_5xx),0)
+		FROM web_log_snapshots
 		WHERE %s`, where),
 		args...,
 	).Scan(&totalRequests, &totalBytes, &errors5xx); err != nil {
@@ -754,14 +753,14 @@ func (db *DB) GetWebLogsTimeseries(since time.Time, hostID string, source string
 	}
 
 	query := fmt.Sprintf(`SELECT date_trunc('%s', captured_at) AS bucket_ts,
-	COUNT(*) AS total,
-	SUM(CASE WHEN suspicious = TRUE THEN 1 ELSE 0 END) AS bot,
-	SUM(CASE WHEN suspicious = FALSE THEN 1 ELSE 0 END) AS human,
-	SUM(CASE WHEN status BETWEEN 200 AND 299 THEN 1 ELSE 0 END) AS status_2xx,
-	SUM(CASE WHEN status BETWEEN 300 AND 399 THEN 1 ELSE 0 END) AS status_3xx,
-	SUM(CASE WHEN status BETWEEN 400 AND 499 THEN 1 ELSE 0 END) AS status_4xx,
-	SUM(CASE WHEN status >= 500 THEN 1 ELSE 0 END) AS status_5xx
-	FROM web_log_requests
+	COALESCE(SUM(total_requests),0) AS total,
+	COALESCE(SUM(suspicious_requests),0) AS bot,
+	COALESCE(SUM(total_requests - suspicious_requests),0) AS human,
+	COALESCE(SUM(total_requests - errors_4xx - errors_5xx),0) AS status_2xx,
+	0 AS status_3xx,
+	COALESCE(SUM(errors_4xx),0) AS status_4xx,
+	COALESCE(SUM(errors_5xx),0) AS status_5xx
+	FROM web_log_snapshots
 	WHERE %s
 	GROUP BY bucket_ts
 	ORDER BY bucket_ts ASC`, bucket, where)
@@ -856,6 +855,50 @@ func (db *DB) GetWebLogsLive(hostID string, source string, limit int) ([]map[str
 			"category":   category,
 			"suspicious": suspicious,
 		})
+	}
+
+	return out, nil
+}
+
+func (db *DB) GetWebLogsTopClientIPs(since time.Time, hostID string, source string, limit int) ([]map[string]any, error) {
+	if limit <= 0 || limit > 500 {
+		limit = 100
+	}
+
+	args := []any{since}
+	where := "captured_at >= $1"
+	if hostID != "" {
+		args = append(args, hostID)
+		where += fmt.Sprintf(" AND host_id = $%d", len(args))
+	}
+	if source != "" {
+		args = append(args, source)
+		where += fmt.Sprintf(" AND source = $%d", len(args))
+	}
+	args = append(args, limit)
+
+	rows, err := db.conn.Query(
+		fmt.Sprintf(`SELECT ip, COUNT(*) AS hits
+		FROM web_log_requests
+		WHERE %s
+		GROUP BY ip
+		ORDER BY hits DESC
+		LIMIT $%d`, where, len(args)),
+		args...,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	out := make([]map[string]any, 0)
+	for rows.Next() {
+		var ip string
+		var hits int64
+		if err := rows.Scan(&ip, &hits); err != nil {
+			return nil, err
+		}
+		out = append(out, map[string]any{"ip": ip, "hits": hits})
 	}
 
 	return out, nil
