@@ -162,6 +162,46 @@
     </div>
 
     <div class="row row-cards mb-4">
+      <div class="col-xl-12">
+        <div class="card h-100">
+          <div class="card-header d-flex align-items-center justify-content-between">
+            <h3 class="card-title mb-0">Pays par IP suspecte</h3>
+            <span class="small text-secondary">Géolocalisation indicative</span>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-vcenter card-table">
+              <thead>
+                <tr>
+                  <th>IP</th>
+                  <th>Pays</th>
+                  <th>Code</th>
+                  <th class="text-end">Hits</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-if="!topThreatIPs.length">
+                  <td colspan="4" class="text-center text-secondary py-4">Aucune IP suspecte.</td>
+                </tr>
+                <tr v-for="item in topThreatIPs.slice(0, 20)" :key="`country-${item.ip}`">
+                  <td class="font-monospace small">{{ item.ip }}</td>
+                  <td>
+                    <span class="small">
+                      {{ geoByIP[item.ip]?.loading ? 'Recherche...' : (geoByIP[item.ip]?.country || 'Inconnu') }}
+                    </span>
+                  </td>
+                  <td>
+                    <span class="badge bg-azure-lt text-azure">{{ geoByIP[item.ip]?.countryCode || '--' }}</span>
+                  </td>
+                  <td class="text-end">{{ numberFormat(item.hits || 0) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row row-cards mb-4">
       <div class="col-xl-6">
         <div class="card h-100">
           <div class="card-header"><h3 class="card-title mb-0">Top vhosts proxy</h3></div>
@@ -390,6 +430,7 @@ const summary = ref<AnyRecord>({ traffic: {}, threats: {} })
 const compare = ref<AnyRecord>({ delta_percent: {} })
 const timeseries = ref<AnyRecord[]>([])
 const liveRequests = ref<AnyRecord[]>([])
+const geoByIP = ref<Record<string, { country: string; countryCode: string; loading?: boolean }>>({})
 const lastUpdatedAt = ref<Date | null>(null)
 
 const showDomainModal = ref(false)
@@ -458,6 +499,49 @@ function statusClass(status: number): string {
   if (status >= 300 && status < 400) return 'bg-yellow-lt text-yellow'
   if (status >= 400) return 'bg-red-lt text-red'
   return 'bg-secondary-lt text-secondary'
+}
+
+function isPrivateOrLocalIP(ip: string): boolean {
+  if (!ip) return true
+  if (ip.includes(':')) {
+    const lower = ip.toLowerCase()
+    return lower === '::1' || lower.startsWith('fc') || lower.startsWith('fd') || lower.startsWith('fe80')
+  }
+
+  const m = ip.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/)
+  if (!m) return true
+  const a = Number(m[1]); const b = Number(m[2])
+  if (a === 10 || a === 127 || a === 0) return true
+  if (a === 192 && b === 168) return true
+  if (a === 172 && b >= 16 && b <= 31) return true
+  if (a === 169 && b === 254) return true
+  if (a === 100 && b >= 64 && b <= 127) return true
+  return false
+}
+
+async function resolveIPCountry(ip: string): Promise<void> {
+  if (!ip || geoByIP.value[ip]) return
+
+  if (isPrivateOrLocalIP(ip)) {
+    geoByIP.value[ip] = { country: 'Local / privé', countryCode: 'LAN' }
+    return
+  }
+
+  geoByIP.value[ip] = { country: 'Recherche...', countryCode: '--', loading: true }
+  try {
+    const res = await fetch(`https://ipwho.is/${encodeURIComponent(ip)}?fields=success,country,country_code`)
+    const data = await res.json()
+    if (!res.ok || !data?.success) {
+      geoByIP.value[ip] = { country: 'Inconnu', countryCode: '--' }
+      return
+    }
+    geoByIP.value[ip] = {
+      country: data.country || 'Inconnu',
+      countryCode: (data.country_code || '--').toUpperCase(),
+    }
+  } catch {
+    geoByIP.value[ip] = { country: 'Inconnu', countryCode: '--' }
+  }
 }
 
 function hostWidth(hits: number): number {
@@ -636,6 +720,14 @@ function closeDomainModal() {
 }
 
 watch(autoRefresh, resetAutoRefresh)
+
+watch(topThreatIPs, (items) => {
+  for (const item of items.slice(0, 20)) {
+    const ip = String(item.ip || '').trim()
+    if (!ip) continue
+    void resolveIPCountry(ip)
+  }
+}, { immediate: true })
 
 onMounted(async () => {
   await loadAll(true)
