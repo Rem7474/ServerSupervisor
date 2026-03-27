@@ -1,7 +1,9 @@
 package database
 
 import (
+	"crypto/md5"
 	"database/sql"
+	"encoding/hex"
 	"fmt"
 	"time"
 
@@ -92,25 +94,10 @@ func (db *DB) InsertWebLogSnapshot(hostID string, report *models.WebLogReport) e
 			ts = report.CollectedAt
 		}
 		suspicious := req.Category != ""
+		fingerprint := webLogFingerprint(hostID, report.Source, ts, req, suspicious)
 		if _, err := tx.Exec(
 			`INSERT INTO web_log_requests (snapshot_id, host_id, captured_at, source, ip, method, path, status, bytes, user_agent, domain, category, suspicious, fingerprint)
-			 VALUES (
-				$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
-				md5(CONCAT_WS('|',
-					$2::text,
-					$4::text,
-					$3::text,
-					$5,
-					$6,
-					$7,
-					$8::text,
-					$9::text,
-					COALESCE($10, ''),
-					COALESCE($11, ''),
-					COALESCE($12, ''),
-					$13::text
-				))
-			 )
+			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 			 ON CONFLICT (host_id, source, fingerprint) DO NOTHING`,
 			snapshotID,
 			hostID,
@@ -125,12 +112,32 @@ func (db *DB) InsertWebLogSnapshot(hostID string, report *models.WebLogReport) e
 			req.Domain,
 			req.Category,
 			suspicious,
+			fingerprint,
 		); err != nil {
 			return err
 		}
 	}
 
 	return tx.Commit()
+}
+
+func webLogFingerprint(hostID string, source string, capturedAt time.Time, req models.WebRequest, suspicious bool) string {
+	payload := fmt.Sprintf("%s|%s|%s|%s|%s|%s|%d|%d|%s|%s|%s|%t",
+		hostID,
+		source,
+		capturedAt.UTC().Format(time.RFC3339Nano),
+		req.IP,
+		req.Method,
+		req.Path,
+		req.Status,
+		req.Bytes,
+		req.UserAgent,
+		req.Domain,
+		req.Category,
+		suspicious,
+	)
+	digest := md5.Sum([]byte(payload))
+	return hex.EncodeToString(digest[:])
 }
 
 func (db *DB) GetWebLogsSummary(since time.Time, hostID string, source string) (map[string]any, error) {
