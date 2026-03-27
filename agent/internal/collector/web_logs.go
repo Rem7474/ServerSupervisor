@@ -228,9 +228,8 @@ func CollectWebLogs(logPathGlobs []string, tailLines int, topN int, requestLimit
 				Domain:    domain,
 				Category:  category,
 			}
-			if len(report.Requests) < requestLimit {
-				report.Requests = append(report.Requests, request)
-			}
+			// Send every parsed line of this run so progressive backfill really reaches server-side history.
+			report.Requests = append(report.Requests, request)
 
 			if category == "" {
 				continue
