@@ -72,6 +72,10 @@ func main() {
 	log.Printf("APT auto-update on start: %v", cfg.AptAutoUpdateOnStart)
 	log.Printf("SMART monitoring: %v", cfg.CollectSMART)
 	log.Printf("Web logs analytics: %v (paths: %v)", cfg.CollectWebLogs, cfg.WebLogGlobs())
+	if cfg.MaxReportBodyBytes <= 0 {
+		cfg.MaxReportBodyBytes = 3 * 1024 * 1024
+	}
+	log.Printf("Max report body size: %d bytes", cfg.MaxReportBodyBytes)
 
 	// Load custom tasks config (tasks.yaml)
 	tc, err := config.LoadTasksConfig()
@@ -253,6 +257,7 @@ func sendReport(ctx context.Context, cfg *config.Config, s *sender.Sender) {
 		CustomTasks:     customTasksList,
 		Timestamp:       time.Now(),
 	}
+	trimWebLogsForReportSize(report, cfg.MaxReportBodyBytes)
 
 	response, err := s.SendReportWithRetry(ctx, report)
 	if err != nil {
@@ -291,6 +296,52 @@ func sendReport(ctx context.Context, cfg *config.Config, s *sender.Sender) {
 			}
 		}
 	}
+}
+
+func trimWebLogsForReportSize(report *sender.Report, maxBodyBytes int) {
+	if report == nil || maxBodyBytes <= 0 {
+		return
+	}
+	web, ok := report.WebLogs.(*collector.WebLogReport)
+	if !ok || web == nil {
+		return
+	}
+
+	encoded, err := json.Marshal(report)
+	if err != nil {
+		return
+	}
+	if len(encoded) <= maxBodyBytes {
+		return
+	}
+
+	original := len(web.Requests)
+	if original == 0 {
+		return
+	}
+
+	trimmed := web.Requests
+	for len(trimmed) > 0 {
+		nextLen := len(trimmed) / 2
+		if nextLen == len(trimmed) {
+			nextLen--
+		}
+		if nextLen < 0 {
+			nextLen = 0
+		}
+		trimmed = trimmed[:nextLen]
+		web.Requests = trimmed
+
+		encoded, err = json.Marshal(report)
+		if err != nil {
+			break
+		}
+		if len(encoded) <= maxBodyBytes {
+			break
+		}
+	}
+
+	log.Printf("Web logs payload trimmed: requests %d -> %d to fit max_report_body_bytes=%d", original, len(web.Requests), maxBodyBytes)
 }
 
 // processCommands dispatches each command in its own goroutine.

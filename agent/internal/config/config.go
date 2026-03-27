@@ -15,7 +15,8 @@ type Config struct {
 	APIKey    string `yaml:"api_key"`
 
 	// Intervals
-	ReportInterval int `yaml:"report_interval"` // seconds
+	ReportInterval     int `yaml:"report_interval"` // seconds
+	MaxReportBodyBytes int `yaml:"max_report_body_bytes"`
 
 	// Features
 	CollectDocker        bool     `yaml:"collect_docker"`
@@ -42,12 +43,13 @@ func (c *Config) WebLogGlobs() []string {
 
 func Load(path string) (*Config, error) {
 	cfg := &Config{
-		ServerURL:      "http://localhost:8080",
-		ReportInterval: 30,
-		CollectDocker:  true,
-		CollectAPT:     true,
-		CollectSMART:   false,
-		CollectWebLogs: false,
+		ServerURL:          "http://localhost:8080",
+		ReportInterval:     30,
+		MaxReportBodyBytes: 3 * 1024 * 1024,
+		CollectDocker:      true,
+		CollectAPT:         true,
+		CollectSMART:       false,
+		CollectWebLogs:     false,
 		WebLogsLogPaths: []string{
 			"/var/log/nginx/access.log",
 			"/var/log/apache2/access.log",
@@ -79,6 +81,11 @@ func Load(path string) (*Config, error) {
 	if env := os.Getenv("SUPERVISOR_REPORT_INTERVAL"); env != "" {
 		if interval, err := strconv.Atoi(env); err == nil {
 			cfg.ReportInterval = interval
+		}
+	}
+	if env := os.Getenv("SUPERVISOR_MAX_REPORT_BODY_BYTES"); env != "" {
+		if n, err := strconv.Atoi(env); err == nil && n > 0 {
+			cfg.MaxReportBodyBytes = n
 		}
 	}
 	if env := os.Getenv("SUPERVISOR_COLLECT_DOCKER"); env != "" {
@@ -178,6 +185,10 @@ api_key: "your-api-key-here"
 
 # Report interval in seconds
 report_interval: 30
+
+# Max HTTP JSON report payload size sent by agent (bytes).
+# If exceeded, agent trims web_logs.requests before send.
+max_report_body_bytes: 3145728
 
 # Enable Docker container monitoring
 collect_docker: true

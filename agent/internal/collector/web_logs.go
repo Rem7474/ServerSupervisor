@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"encoding/json"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -526,6 +527,7 @@ func readCompressedLines(path string, prev webLogCursorEntry, hasPrev bool) ([]s
 	}
 
 	if hasPrev && prev.Size == info.Size() && prev.FileModUnix == modUnix {
+		log.Printf("Web logs collect file=%s mode=gz skip=unchanged", path)
 		return []string{}, next, nil
 	}
 
@@ -551,6 +553,8 @@ func readCompressedLines(path string, prev webLogCursorEntry, hasPrev bool) ([]s
 	if err := s.Err(); err != nil {
 		return nil, next, err
 	}
+
+	log.Printf("Web logs collect file=%s mode=gz decompressed_lines=%d", path, len(lines))
 
 	return lines, next, nil
 }
@@ -600,6 +604,7 @@ func readIncrementalLines(path string, maxLines int, prev webLogCursorEntry, has
 		if err != nil {
 			return nil, next, err
 		}
+		headCount := 0
 		next.Offset = info.Size()
 		next.Size = info.Size()
 		next.BackfillOffset = 0
@@ -609,11 +614,15 @@ func readIncrementalLines(path string, maxLines int, prev webLogCursorEntry, has
 		if !next.BackfillDone {
 			backfillLines, backfillOffset, done, err := readBackfillChunk(path, next.BackfillOffset, next.BackfillLimit, maxLines)
 			if err == nil {
+				headCount = len(backfillLines)
 				tailLines = append(tailLines, backfillLines...)
 				next.BackfillOffset = backfillOffset
 				next.BackfillDone = done
 			}
 		}
+
+		log.Printf("Web logs collect file=%s mode=bootstrap tail=%d head=%d live=0 total=%d backfill_done=%t",
+			path, len(tailLines)-headCount, headCount, len(tailLines), next.BackfillDone)
 
 		return tailLines, next, nil
 	}
@@ -634,6 +643,8 @@ func readIncrementalLines(path string, maxLines int, prev webLogCursorEntry, has
 	}
 
 	out := make([]string, 0, maxLines*2)
+	liveCount := 0
+	headCount := 0
 
 	if info.Size() > prev.Offset {
 		// Always keep live tail fresh by processing new appended lines.
@@ -641,6 +652,7 @@ func readIncrementalLines(path string, maxLines int, prev webLogCursorEntry, has
 		if err != nil {
 			return nil, next, err
 		}
+		liveCount = len(liveLines)
 		out = append(out, liveLines...)
 	}
 
@@ -648,11 +660,15 @@ func readIncrementalLines(path string, maxLines int, prev webLogCursorEntry, has
 		// Progressively replay old history from the beginning in fixed chunks.
 		backfillLines, backfillOffset, done, err := readBackfillChunk(path, next.BackfillOffset, next.BackfillLimit, maxLines)
 		if err == nil {
+			headCount = len(backfillLines)
 			out = append(out, backfillLines...)
 			next.BackfillOffset = backfillOffset
 			next.BackfillDone = done
 		}
 	}
+
+	log.Printf("Web logs collect file=%s mode=incremental tail=0 head=%d live=%d total=%d backfill_done=%t",
+		path, headCount, liveCount, len(out), next.BackfillDone)
 
 	return out, next, nil
 }
