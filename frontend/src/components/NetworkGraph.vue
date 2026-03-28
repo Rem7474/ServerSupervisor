@@ -4,6 +4,10 @@
     <div class="graph-legend card">
       <div class="legend-title">Légende</div>
       <div class="legend-item">
+        <span class="legend-box root-box"></span>
+        Reverse proxy
+      </div>
+      <div class="legend-item">
         <span class="legend-box host-box"></span>
         Hôte
       </div>
@@ -764,6 +768,11 @@ watch(
 .host-box {
   border: 1.5px solid rgba(148,163,184,0.4);
   background: rgba(15,23,42,0.5);
+}
+
+.root-box {
+  border: 1.5px solid #94a3b8;
+  background: rgba(15,23,42,0.78);
 }
 
 .online-dot {

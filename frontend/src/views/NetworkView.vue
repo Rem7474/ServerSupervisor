@@ -117,37 +117,6 @@
         <div>
           <h3 class="card-title mb-1">Topologie réseau</h3>
           <div class="text-secondary small">{{ hosts.length }} hôtes · {{ combinedServices.length }} services logiques · {{ totalPorts }} ports mappés</div>
-          <!-- Inline legend strip -->
-          <div class="topology-legend-strip mt-2">
-            <span class="leg-item">
-              <span class="leg-box leg-box-root"></span>
-              Reverse proxy
-            </span>
-            <span class="leg-item">
-              <span class="leg-box leg-box-host"></span>
-              Hôte
-            </span>
-            <span class="leg-item">
-              <span class="leg-dot leg-dot-service"></span>
-              Service
-            </span>
-            <span class="leg-item">
-              <span class="leg-dot leg-dot-tcp"></span>
-              Port TCP
-            </span>
-            <span class="leg-item">
-              <span class="leg-dot leg-dot-udp"></span>
-              Port UDP
-            </span>
-            <span class="leg-item">
-              <span class="leg-dash leg-dash-authelia"></span>
-              Authelia
-            </span>
-            <span class="leg-item">
-              <span class="leg-dash leg-dash-internet"></span>
-              Internet
-            </span>
-          </div>
         </div>
 
         <!-- Right: status + toolbar -->
@@ -716,76 +685,6 @@ onUnmounted(() => {
 /* De-emphasized context KPI cards */
 .kpi-context {
   opacity: 0.75;
-}
-
-/* Inline legend strip in card header */
-.topology-legend-strip {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  font-size: 11px;
-  color: #94a3b8;
-}
-
-.leg-item {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.leg-box {
-  display: inline-block;
-  width: 18px;
-  height: 10px;
-  border: 1.5px solid;
-  border-radius: 3px;
-  flex-shrink: 0;
-}
-
-.leg-box-root {
-  border-color: #94a3b8;
-  background: rgba(15, 23, 42, 0.5);
-}
-
-.leg-box-host {
-  border-color: rgba(148, 163, 184, 0.35);
-  background: rgba(15, 23, 42, 0.42);
-}
-
-.leg-dot {
-  display: inline-block;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.leg-dot-service {
-  background: #38bdf8;
-}
-
-.leg-dot-tcp {
-  background: #60a5fa;
-}
-
-.leg-dot-udp {
-  background: #fb923c;
-}
-
-.leg-dash {
-  display: inline-block;
-  width: 18px;
-  height: 0;
-  border-top: 2px dashed;
-  flex-shrink: 0;
-}
-
-.leg-dash-authelia {
-  border-color: #8b5cf6;
-}
-
-.leg-dash-internet {
-  border-color: #fb923c;
 }
 
 /* Filter bar */
