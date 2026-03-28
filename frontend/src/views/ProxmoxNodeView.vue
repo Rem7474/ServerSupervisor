@@ -12,7 +12,7 @@
           <span class="text-muted mx-1">/</span>
           <span>{{ node.node_name }}</span>
         </div>
-        <div class="d-flex align-items-center gap-3">
+        <div class="d-flex align-items-center gap-3 flex-wrap">
           <h2 class="page-title mb-0">{{ node.node_name }}</h2>
           <span v-if="node.status === 'online'" class="badge bg-success-lt text-success">En ligne</span>
           <span v-else class="badge bg-danger-lt text-danger">{{ node.status }}</span>
@@ -102,7 +102,7 @@
           </div>
 
           <!-- Live refresh timestamp + error (absolute, no added height) -->
-          <div class="position-absolute bottom-0 end-0 pb-2 pe-3 d-flex align-items-center gap-2">
+          <div class="position-absolute bottom-0 end-0 pb-2 pe-3 d-flex align-items-center gap-2 node-live-meta">
             <span v-if="liveStatusError" class="text-danger" style="font-size:0.7rem">{{ liveStatusError }}</span>
             <span v-if="liveStatus" class="text-muted" style="font-size:0.7rem">
               <span v-if="liveStatusLoading" class="spinner-border me-1" style="width:.65rem;height:.65rem;border-width:.1em"></span>
@@ -181,7 +181,7 @@
       <div class="side-main">
       <div class="card">
         <div class="card-header">
-          <ul class="nav nav-tabs card-header-tabs">
+          <ul class="nav nav-tabs card-header-tabs proxmox-node-tabs">
             <li class="nav-item">
               <button class="nav-link" :class="{ active: tab === 'vms' }" @click="tab = 'vms'; loadGuestNetworks()">
                 VMs <span class="badge bg-azure-lt text-azure ms-1">{{ vms.length }}</span>
@@ -436,7 +436,7 @@
         <!-- Updates tab -->
         <div v-if="tab === 'updates'" class="card-body">
           <!-- Apt update action bar -->
-          <div class="d-flex align-items-center gap-2 mb-3">
+          <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
             <button class="btn btn-outline-secondary" :disabled="aptRefreshing" @click="triggerAptRefresh">
               <span v-if="aptRefreshing" class="spinner-border spinner-border-sm me-1"></span>
               apt update
@@ -475,7 +475,7 @@
 
         <!-- Services tab -->
         <div v-if="tab === 'services'">
-          <div class="card-header d-flex align-items-center gap-2">
+          <div class="card-header d-flex align-items-center gap-2 flex-wrap">
             <div class="btn-group btn-group-sm">
               <button :class="servicesFilter === 'active' ? 'btn btn-primary' : 'btn btn-outline-secondary'" @click="servicesFilter = 'active'">Actifs</button>
               <button :class="servicesFilter === 'all' ? 'btn btn-primary' : 'btn btn-outline-secondary'" @click="servicesFilter = 'all'">Tous</button>
@@ -530,7 +530,7 @@
 
         <!-- Security tab -->
         <div v-if="tab === 'security'">
-          <div class="card-header d-flex align-items-center gap-2">
+          <div class="card-header d-flex align-items-center gap-2 flex-wrap">
             <select v-model="securityService" class="form-select form-select-sm" style="max-width: 11rem">
               <option value="rotate">Rotation (3 services)</option>
               <option value="pveproxy">pveproxy</option>
@@ -1359,3 +1359,33 @@ onUnmounted(() => {
   if (liveStatusTimer) clearInterval(liveStatusTimer)
 })
 </script>
+
+<style scoped>
+.proxmox-node-tabs {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+.proxmox-node-tabs .nav-item {
+  flex: 0 0 auto;
+}
+
+@media (max-width: 992px) {
+  .node-live-meta {
+    position: static !important;
+    margin-top: 0.75rem;
+    padding: 0;
+    justify-content: flex-end;
+    width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .proxmox-node-tabs .nav-link {
+    white-space: nowrap;
+    padding-inline: 0.6rem;
+  }
+}
+</style>

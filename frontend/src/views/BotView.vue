@@ -25,14 +25,14 @@
           <span class="text-muted mx-1">/</span>
           <span>Menaces web</span>
         </div>
-        <h2 class="page-title">Threats</h2>
-        <div class="text-secondary">IPs suspectes, chemins scannés, corrélation multi-hôtes et timeline détaillée</div>
+        <h2 class="page-title">Menaces web</h2>
+        <div class="text-secondary">IPs suspectes, chemins scannés, corrélation multi-hôtes et chronologie détaillée</div>
       </div>
     </div>
 
     <div class="card mb-4">
-      <div class="card-body d-flex flex-wrap gap-2 align-items-end">
-        <div>
+      <div class="card-body d-flex flex-wrap gap-2 align-items-end threats-filters">
+        <div class="threats-filter-field">
           <label class="form-label mb-1">Source</label>
           <select v-model="source" class="form-select form-select-sm" style="min-width: 9rem;">
             <option value="">Toutes</option>
@@ -42,11 +42,11 @@
             <option value="caddy">caddy</option>
           </select>
         </div>
-        <div>
-          <label class="form-label mb-1">Host ID</label>
+        <div class="threats-filter-field">
+          <label class="form-label mb-1">Hôte technique (ID)</label>
           <input v-model.trim="hostId" class="form-control form-control-sm" placeholder="(optionnel)" style="min-width: 14rem;" />
         </div>
-        <button class="btn btn-primary btn-sm" @click="loadThreats" :disabled="loading">
+        <button class="btn btn-primary btn-sm threats-refresh-btn" @click="loadThreats" :disabled="loading">
           <span v-if="loading" class="spinner-border spinner-border-sm me-1"></span>
           Rafraîchir
         </button>
@@ -54,7 +54,7 @@
     </div>
 
     <div class="row row-cards mb-4">
-      <div class="col-4">
+      <div class="col-12 col-sm-4">
         <div class="card card-sm h-100">
           <div class="card-body text-center">
             <div class="text-secondary small mb-1">Requêtes suspectes</div>
@@ -62,7 +62,7 @@
           </div>
         </div>
       </div>
-      <div class="col-4">
+      <div class="col-12 col-sm-4">
         <div class="card card-sm h-100">
           <div class="card-body text-center">
             <div class="text-secondary small mb-1">IPs suspectes</div>
@@ -70,10 +70,10 @@
           </div>
         </div>
       </div>
-      <div class="col-4">
+      <div class="col-12 col-sm-4">
         <div class="card card-sm h-100">
           <div class="card-body text-center">
-            <div class="text-secondary small mb-1">Vhosts ciblés</div>
+            <div class="text-secondary small mb-1">Domaines ciblés</div>
             <div class="h2 mb-0">{{ threats.targeted_hosts || 0 }}</div>
           </div>
         </div>
@@ -90,8 +90,8 @@
                 <tr>
                   <th>IP</th>
                   <th class="text-end">Hits</th>
-                  <th class="text-end">Paths</th>
-                  <th class="text-end">Vhosts</th>
+                  <th class="text-end">Chemins</th>
+                  <th class="text-end">Domaines</th>
                   <th>Niveau</th>
                   <th></th>
                 </tr>
@@ -120,8 +120,8 @@
         <div class="card h-100">
           <div class="card-header"><h3 class="card-title mb-0">Top chemins scannés</h3></div>
           <div class="card-body p-0">
-            <div v-if="!topPaths.length" class="text-center py-4 text-secondary small">Aucun path suspect.</div>
-            <div v-else v-for="p in topPaths" :key="`${p.path}-${p.category}`" class="d-flex justify-content-between border-bottom px-3 py-2">
+            <div v-if="!topPaths.length" class="text-center py-4 text-secondary small">Aucun chemin suspect.</div>
+            <div v-else v-for="p in topPaths" :key="`${p.path}-${p.category}`" class="d-flex justify-content-between border-bottom px-3 py-2 top-path-row">
               <div>
                 <div class="font-monospace small">{{ p.path }}</div>
                 <div class="small text-secondary">{{ p.category || 'Unknown' }}</div>
@@ -136,18 +136,18 @@
     <div class="row row-cards mt-4">
       <div class="col-lg-6">
         <div class="card h-100">
-          <div class="card-header"><h3 class="card-title mb-0">Vhosts les plus ciblés</h3></div>
+          <div class="card-header"><h3 class="card-title mb-0">Domaines les plus ciblés</h3></div>
           <div class="table-responsive">
             <table class="table table-vcenter card-table">
               <thead>
                 <tr>
-                  <th>Vhost</th>
+                  <th>Domaine cible</th>
                   <th class="text-end">Hits</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-if="!mostTargetedHosts.length">
-                  <td colspan="2" class="text-center text-secondary py-4">Aucun hôte ciblé</td>
+                  <td colspan="2" class="text-center text-secondary py-4">Aucun domaine ciblé</td>
                 </tr>
                 <tr v-for="h in mostTargetedHosts" :key="h.host_id">
                   <td>{{ h.host_name || h.host_id }}</td>
@@ -160,13 +160,13 @@
       </div>
       <div class="col-lg-6">
         <div class="card h-100">
-          <div class="card-header"><h3 class="card-title mb-0">IP × Vhosts (scan coordonné)</h3></div>
+          <div class="card-header"><h3 class="card-title mb-0">IP × Domaines (scan coordonné)</h3></div>
           <div class="table-responsive">
             <table class="table table-vcenter card-table">
               <thead>
                 <tr>
                   <th>IP</th>
-                  <th class="text-end">Vhosts</th>
+                  <th class="text-end">Domaines</th>
                   <th class="text-end">Hits</th>
                 </tr>
               </thead>
@@ -188,20 +188,20 @@
 
     <div v-if="showTimeline" class="timeline-drawer-backdrop" @click.self="closeTimeline">
       <div class="timeline-drawer card shadow-lg">
-        <div class="card-header d-flex align-items-center justify-content-between">
+        <div class="card-header d-flex align-items-center justify-content-between gap-2 flex-wrap timeline-header">
           <div>
-            <h3 class="card-title mb-0">Timeline IP: <span class="font-monospace">{{ selectedIP }}</span></h3>
+            <h3 class="card-title mb-0">Chronologie IP: <span class="font-monospace">{{ selectedIP }}</span></h3>
             <div class="text-secondary small">Chronologie des requêtes suspectes</div>
           </div>
-          <div class="d-flex gap-2">
+          <div class="d-flex gap-2 flex-wrap timeline-header-actions">
             <button class="btn btn-sm btn-outline-danger" @click="blockIP" :disabled="blockLoading">Bloquer cette IP</button>
             <button class="btn btn-sm btn-outline-secondary" @click="closeTimeline">Fermer</button>
           </div>
         </div>
-        <div class="card-body p-0" style="max-height: 70vh; overflow: auto;">
+        <div class="card-body p-0 timeline-body" style="max-height: 70vh; overflow: auto;">
           <div v-if="timelineLoading" class="text-center py-4 text-secondary">
             <span class="spinner-border spinner-border-sm me-2"></span>
-            Chargement timeline...
+            Chargement chronologie...
           </div>
           <div v-else-if="!timeline.length" class="text-center py-4 text-secondary">Aucune requête</div>
           <template v-else>
@@ -223,6 +223,9 @@
                 </div>
                 <div class="small text-secondary">
                   Regroupement: {{ timelineBucketLabel }} · {{ timelineBuckets.length }} tranches
+                  <span v-if="selectedInterval === 'auto'" class="badge bg-azure-lt text-azure ms-1">
+                    Auto cible ~{{ AUTO_BUCKET_TARGET }}
+                  </span>
                 </div>
                 <button class="btn btn-sm btn-outline-secondary" @click="toggleBucketFilter">
                   {{ bucketFilterEnabled ? 'Afficher toutes les requêtes' : 'Filtrer sur la tranche sélectionnée' }}
@@ -239,11 +242,11 @@
                   <span class="timeline-kpi-value text-red">{{ timelineStats.errors }}</span>
                 </div>
                 <div class="timeline-kpi-chip">
-                  <span class="timeline-kpi-label">Paths uniques</span>
+                  <span class="timeline-kpi-label">Chemins uniques</span>
                   <span class="timeline-kpi-value">{{ timelineStats.uniquePaths }}</span>
                 </div>
                 <div class="timeline-kpi-chip">
-                  <span class="timeline-kpi-label">Vhosts touchés</span>
+                  <span class="timeline-kpi-label">Domaines cibles uniques</span>
                   <span class="timeline-kpi-value">{{ timelineStats.uniqueVhosts }}</span>
                 </div>
               </div>
@@ -277,10 +280,10 @@
                 <span class="badge bg-blue-lt text-blue">{{ r.method }}</span>
                 <span class="badge bg-azure-lt text-azure">{{ r.source || 'log' }}</span>
                 <span class="small text-secondary">{{ formatDate(r.timestamp) }}</span>
-                <span class="small text-secondary">host: {{ r.host_name || r.host_id || '-' }}</span>
+                <span class="small text-secondary">domaine cible: {{ r.domain || '-' }}</span>
               </div>
               <div class="font-monospace small mb-1">{{ r.domain || '(unknown)' }} {{ r.path }}</div>
-              <div class="small text-secondary text-truncate">{{ r.user_agent || '-' }}</div>
+              <div class="small text-secondary text-truncate" :title="r.user_agent || '-'">{{ r.user_agent || '-' }}</div>
             </div>
           </template>
         </div>
@@ -294,6 +297,17 @@ import { computed, onMounted, ref, watch } from 'vue'
 import apiClient from '../api'
 
 type AnyRecord = Record<string, any>
+
+interface TimelineBucket {
+  key: string
+  startMs: number
+  endMs: number
+  count: number
+  errorCount: number
+  label: string
+  rangeLabel: string
+  title: string
+}
 
 const period = ref('24h')
 const periodOptions = [
@@ -328,6 +342,8 @@ const timelineIntervalOptions = [
   { value: '1h', label: '1h', ms: 60 * 60 * 1000 },
 ]
 
+const AUTO_BUCKET_TARGET = 10
+
 const threats = computed(() => summary.value.threats || {})
 const topIPs = computed(() => threats.value.top_ips || [])
 const topPaths = computed(() => threats.value.top_paths || [])
@@ -348,11 +364,39 @@ const timelineSpanMs = computed(() => {
 
 const autoTimelineBucketMs = computed(() => {
   const span = timelineSpanMs.value
-  if (span <= 30 * 60 * 1000) return 10 * 1000
-  if (span <= 6 * 60 * 60 * 1000) return 60 * 1000
-  if (span <= 48 * 60 * 60 * 1000) return 10 * 60 * 1000
-  if (span <= 7 * 24 * 60 * 60 * 1000) return 30 * 60 * 1000
-  return 60 * 60 * 1000
+  if (span <= 0) return 10 * 1000
+
+  const candidateSteps = [
+    5 * 1000,
+    10 * 1000,
+    15 * 1000,
+    30 * 1000,
+    60 * 1000,
+    2 * 60 * 1000,
+    5 * 60 * 1000,
+    10 * 60 * 1000,
+    15 * 60 * 1000,
+    30 * 60 * 1000,
+    60 * 60 * 1000,
+    2 * 60 * 60 * 1000,
+    3 * 60 * 60 * 1000,
+    6 * 60 * 60 * 1000,
+    12 * 60 * 60 * 1000,
+    24 * 60 * 60 * 1000,
+  ]
+
+  let best = candidateSteps[0]
+  let bestDiff = Number.POSITIVE_INFINITY
+  for (const step of candidateSteps) {
+    const projectedBuckets = Math.max(1, Math.ceil(span / step))
+    const diff = Math.abs(projectedBuckets - AUTO_BUCKET_TARGET)
+    if (diff < bestDiff || (diff === bestDiff && step < best)) {
+      bestDiff = diff
+      best = step
+    }
+  }
+
+  return best
 })
 
 const timelineBucketMs = computed(() => {
@@ -368,8 +412,8 @@ const timelineBucketLabel = computed(() => {
   return `${Math.round(ms / (60 * 60 * 1000))} heure(s)`
 })
 
-const timelineBuckets = computed(() => {
-  const buckets = new Map<string, AnyRecord>()
+const timelineBuckets = computed<TimelineBucket[]>(() => {
+  const buckets = new Map<string, Omit<TimelineBucket, 'label' | 'rangeLabel' | 'title'>>()
   for (const r of timelineChrono.value) {
     const ts = new Date(r.timestamp).getTime()
     if (!Number.isFinite(ts)) continue
@@ -392,11 +436,11 @@ const timelineBuckets = computed(() => {
 
   return [...buckets.values()]
     .sort((a, b) => a.startMs - b.startMs)
-    .map((b) => ({
+    .map((b): TimelineBucket => ({
       ...b,
       label: formatBucketLabel(b.startMs, timelineBucketMs.value),
       rangeLabel: `${new Date(b.startMs).toLocaleString()} → ${new Date(b.endMs).toLocaleString()}`,
-      title: `${new Date(b.startMs).toLocaleString()} (${b.count} req)`
+      title: `${new Date(b.startMs).toLocaleString()} (${b.count} req)`,
     }))
 })
 
@@ -572,9 +616,25 @@ onMounted(loadThreats)
   border: 0;
 }
 
+.timeline-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--tblr-bg-surface);
+  border-bottom: 1px solid var(--tblr-border-color);
+}
+
+.timeline-header-actions {
+  justify-content: flex-end;
+}
+
 .timeline-frieze-scroll {
   overflow-x: auto;
   padding-bottom: 0.25rem;
+}
+
+.timeline-frieze {
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.03) 0%, rgba(15, 23, 42, 0.01) 100%);
 }
 
 .timeline-controls .btn-group .btn {
@@ -638,6 +698,13 @@ onMounted(loadThreats)
   align-items: center;
   gap: 0.25rem;
   padding: 0.2rem 0.25rem;
+  transition: transform 120ms ease, border-color 120ms ease, background-color 120ms ease;
+}
+
+.timeline-frieze-item:hover {
+  border-color: rgba(58, 63, 146, 0.28);
+  background: rgba(58, 63, 146, 0.08);
+  transform: translateY(-1px);
 }
 
 .timeline-frieze-dot {
@@ -668,12 +735,61 @@ onMounted(loadThreats)
 }
 
 @media (max-width: 992px) {
+  .threats-filters {
+    align-items: stretch !important;
+  }
+
+  .threats-filter-field {
+    flex: 1 1 220px;
+  }
+
+  .threats-filter-field .form-select,
+  .threats-filter-field .form-control {
+    min-width: 0 !important;
+    width: 100%;
+  }
+
+  .threats-refresh-btn {
+    width: 100%;
+  }
+
+  .top-path-row {
+    gap: 0.5rem;
+    align-items: flex-start;
+  }
+
+  .top-path-row .font-monospace {
+    overflow-wrap: anywhere;
+  }
+
+  .timeline-drawer {
+    width: min(760px, 100vw);
+  }
+}
+
+@media (max-width: 992px) {
   .timeline-kpis {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 640px) {
+  .timeline-header-actions {
+    width: 100%;
+  }
+
+  .timeline-header-actions .btn {
+    flex: 1 1 auto;
+  }
+
+  .timeline-drawer {
+    height: 100dvh;
+  }
+
+  .timeline-body {
+    max-height: calc(100dvh - 78px) !important;
+  }
+
   .timeline-kpis {
     grid-template-columns: 1fr;
   }

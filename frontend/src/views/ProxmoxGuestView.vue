@@ -18,18 +18,18 @@
           <span :class="statusBadgeClass(guest.status)">{{ guest.status }}</span>
           <span class="badge bg-azure-lt text-azure">{{ guest.guest_type.toUpperCase() }}</span>
           <span v-if="guestLink?.host_id" class="badge bg-green-lt text-green">
-            Lie a
+            Lié à
             <router-link :to="`/hosts/${guestLink.host_id}`" class="ms-1">{{ guestLink.host_hostname || guestLink.host_name }}</router-link>
           </span>
         </div>
-        <div class="text-secondary">Noud {{ guest.node_name }} · VMID {{ guest.vmid }}</div>
+        <div class="text-secondary">Nœud {{ guest.node_name }} · VMID {{ guest.vmid }}</div>
       </div>
 
       <div class="row row-cards mb-4">
         <div class="col-6 col-lg-3">
           <div class="card card-sm h-100">
             <div class="card-body">
-              <div class="subheader">CPU alloue</div>
+              <div class="subheader">CPU alloué</div>
               <div class="h2 mt-2 mb-0">{{ guest.cpu_alloc }}</div>
             </div>
           </div>
@@ -37,7 +37,7 @@
         <div class="col-6 col-lg-3">
           <div class="card card-sm h-100">
             <div class="card-body">
-              <div class="subheader">CPU utilise</div>
+              <div class="subheader">CPU utilisé</div>
               <div class="h2 mt-2 mb-0">{{ (guest.cpu_usage * 100).toFixed(1) }}%</div>
             </div>
           </div>
@@ -63,9 +63,9 @@
       </div>
 
       <div class="card">
-        <div class="card-header d-flex align-items-center justify-content-between">
+        <div class="card-header d-flex align-items-center justify-content-between gap-2 flex-wrap">
           <h3 class="card-title mb-0">Historique CPU / RAM</h3>
-          <div class="btn-group btn-group-sm">
+          <div class="btn-group btn-group-sm guest-range-group" role="group" aria-label="Plage temporelle">
             <button
               v-for="h in [1, 6, 24, 168, 720]"
               :key="h"
@@ -266,4 +266,21 @@ onMounted(async () => {
   await loadGuestSummary()
 })
 </script>
+
+<style scoped>
+.guest-range-group {
+  flex-wrap: wrap;
+}
+
+@media (max-width: 768px) {
+  .guest-range-group {
+    width: 100%;
+  }
+
+  .guest-range-group .btn {
+    flex: 1 1 0;
+    min-width: 56px;
+  }
+}
+</style>
 

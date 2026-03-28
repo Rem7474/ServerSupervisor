@@ -1,18 +1,18 @@
 <template>
   <div class="cy-graph-container">
     <!-- Legend -->
-    <div class="graph-legend">
+    <div class="graph-legend card">
       <div class="legend-title">Légende</div>
       <div class="legend-item">
-        <span style="display:inline-block;width:20px;height:12px;border:1.5px solid rgba(148,163,184,0.4);border-radius:3px;background:rgba(15,23,42,0.5);flex-shrink:0;"></span>
+        <span class="legend-box host-box"></span>
         Hôte
       </div>
       <div class="legend-item">
-        <span class="legend-dot" style="background:#22c55e;"></span>
+        <span class="legend-dot online-dot"></span>
         En ligne
       </div>
       <div class="legend-item">
-        <span class="legend-dot" style="background:#ef4444;"></span>
+        <span class="legend-dot offline-dot"></span>
         Hors ligne
       </div>
       <div class="legend-item">
@@ -28,24 +28,24 @@
         Port UDP
       </div>
       <div v-if="hasAutheliaTargets" class="legend-item">
-        <span style="display:inline-block;width:18px;height:3px;background:#8b5cf6;border-top:2px dashed #8b5cf6;border-radius:0;flex-shrink:0;"></span>
+        <span class="legend-dash authelia-dash"></span>
         {{ autheliaLabel || 'Authelia' }}
       </div>
       <div v-if="hasInternetTargets" class="legend-item">
-        <span style="display:inline-block;width:18px;height:3px;background:#fb923c;border-top:2px dashed #fb923c;border-radius:0;flex-shrink:0;"></span>
+        <span class="legend-dash internet-dash"></span>
         {{ internetLabel || 'Internet' }}
       </div>
     </div>
 
     <!-- Controls -->
-    <div class="graph-controls">
-      <button class="graph-btn" title="Reset layout" @click="resetLayout">
+    <div class="graph-controls btn-group-vertical">
+      <button class="btn btn-sm btn-outline-secondary graph-btn" title="Réinitialiser la disposition" @click="resetLayout">
         <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
           <path d="M20 11a8.1 8.1 0 0 0-15.5-2m-.5-4v4h4"/>
           <path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4"/>
         </svg>
       </button>
-      <button class="graph-btn" title="Fit to view" @click="fitView">
+      <button class="btn btn-sm btn-outline-secondary graph-btn" title="Ajuster à l'écran" @click="fitView">
         <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
           <path d="M3 3h6M3 3v6M21 3h-6M21 3v6M3 21h6M3 21v-6M21 21h-6M21 21v-6"/>
         </svg>
@@ -753,6 +753,45 @@ watch(
   min-width: 160px;
 }
 
+.legend-box {
+  display: inline-block;
+  width: 20px;
+  height: 12px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.host-box {
+  border: 1.5px solid rgba(148,163,184,0.4);
+  background: rgba(15,23,42,0.5);
+}
+
+.online-dot {
+  background: #22c55e;
+}
+
+.offline-dot {
+  background: #ef4444;
+}
+
+.legend-dash {
+  display: inline-block;
+  width: 18px;
+  height: 3px;
+  border-radius: 0;
+  flex-shrink: 0;
+}
+
+.authelia-dash {
+  background: #8b5cf6;
+  border-top: 2px dashed #8b5cf6;
+}
+
+.internet-dash {
+  background: #fb923c;
+  border-top: 2px dashed #fb923c;
+}
+
 .legend-title {
   font-weight: 700;
   margin-bottom: 6px;
@@ -792,8 +831,8 @@ watch(
 }
 
 .graph-btn {
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   display: flex;
   align-items: center;
   justify-content: center;

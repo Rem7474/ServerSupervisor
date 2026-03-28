@@ -4,3 +4,6 @@ declare module '*.vue' {
   const component: DefineComponent<{}, {}, any>
   export default component
 }
+
+declare module 'geojson-world-map/src/world.js'
+declare module 'topojson-client'

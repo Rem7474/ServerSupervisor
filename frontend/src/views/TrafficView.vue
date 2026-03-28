@@ -3,7 +3,7 @@
     <div class="traffic-topbar mb-3">
       <div class="d-flex align-items-center gap-2">
         <span class="live-dot" :class="{ paused: !autoRefresh }"></span>
-        <span class="fw-semibold">NPM Analytics</span>
+        <span class="fw-semibold">Stats web</span>
         <span class="badge bg-green-lt text-green">{{ autoRefresh ? 'Live' : 'Pause' }}</span>
         <span class="text-secondary small">dernière MAJ {{ lastUpdatedLabel }}</span>
       </div>
@@ -21,9 +21,19 @@
       </div>
     </div>
 
+    <div class="page-header mb-4">
+      <div class="page-pretitle">
+        <router-link to="/" class="text-decoration-none">Dashboard</router-link>
+        <span class="text-muted mx-1">/</span>
+        <span>Stats web</span>
+      </div>
+      <h2 class="page-title">Stats web</h2>
+      <div class="text-secondary">Trafic HTTP, erreurs, endpoints, géographie des clients et suivi live</div>
+    </div>
+
     <div class="card mb-4">
-      <div class="card-body d-flex flex-wrap gap-2 align-items-end">
-        <div>
+      <div class="card-body d-flex flex-wrap gap-2 align-items-end traffic-filters">
+        <div class="traffic-filter-field">
           <label class="form-label mb-1">Source</label>
           <select v-model="source" class="form-select form-select-sm" style="min-width: 9rem;">
             <option value="">Toutes</option>
@@ -34,17 +44,17 @@
           </select>
         </div>
 
-        <div>
-          <label class="form-label mb-1">Host ID</label>
+        <div class="traffic-filter-field">
+          <label class="form-label mb-1">Hôte technique (ID)</label>
           <input v-model.trim="hostId" class="form-control form-control-sm" placeholder="(optionnel)" style="min-width: 14rem;" />
         </div>
 
         <div class="form-check form-switch mb-1 ms-1">
           <input id="auto-refresh" v-model="autoRefresh" class="form-check-input" type="checkbox" />
-          <label class="form-check-label small" for="auto-refresh">Auto-refresh</label>
+          <label class="form-check-label small" for="auto-refresh">Rafraîchissement auto</label>
         </div>
 
-        <button class="btn btn-primary btn-sm" @click="loadAll(true)" :disabled="loading">
+        <button class="btn btn-primary btn-sm traffic-refresh-btn" @click="loadAll(true)" :disabled="loading">
           <span v-if="loading" class="spinner-border spinner-border-sm me-1"></span>
           Rafraîchir
         </button>
@@ -94,7 +104,7 @@
       <div class="col-xl-7">
         <div class="card h-100">
           <div class="card-header d-flex justify-content-between align-items-center">
-            <h3 class="card-title mb-0">Trafic - requêtes / bucket</h3>
+            <h3 class="card-title mb-0">Trafic - requêtes par tranche</h3>
             <span class="small text-secondary">Humain vs Bot</span>
           </div>
           <div class="card-body" style="height: 260px;">
@@ -123,7 +133,7 @@
               <thead>
                 <tr>
                   <th>Méthode</th>
-                  <th>Path</th>
+                  <th>Chemin</th>
                   <th class="text-end">Req.</th>
                   <th class="text-end">Status</th>
                 </tr>
@@ -134,7 +144,7 @@
                 </tr>
                 <tr v-for="(row, idx) in topEndpoints.slice(0, 12)" :key="`${row.method}-${row.path}-${idx}`">
                   <td><span class="badge bg-blue-lt text-blue">{{ row.method }}</span></td>
-                  <td class="font-monospace small text-truncate" style="max-width: 24rem;">{{ row.path }}</td>
+                  <td class="font-monospace small text-truncate endpoint-path" :title="row.path" style="max-width: 24rem;">{{ row.path }}</td>
                   <td class="text-end">{{ numberFormat(row.hits || 0) }}</td>
                   <td class="text-end"><span class="badge" :class="statusClass(row.status)">{{ row.status }}</span></td>
                 </tr>
@@ -152,7 +162,7 @@
             <div v-else v-for="ip in topThreatIPs.slice(0, 10)" :key="ip.ip" class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom">
               <div>
                 <div class="font-monospace small">{{ ip.ip }}</div>
-                <div class="small text-secondary">{{ ip.level || 'LOW' }} · paths {{ ip.unique_paths || 0 }}</div>
+                <div class="small text-secondary">{{ ip.level || 'LOW' }} · chemins {{ ip.unique_paths || 0 }}</div>
               </div>
               <span class="badge bg-red-lt text-red">{{ numberFormat(ip.hits || 0) }}</span>
             </div>
@@ -166,7 +176,6 @@
         <div class="card h-100">
           <div class="card-header d-flex align-items-center justify-content-between">
             <h3 class="card-title mb-0">Carte mondiale des IP clientes</h3>
-            <span class="small text-secondary">Toutes les IPs observées (pas seulement suspectes)</span>
           </div>
           <div class="card-body">
             <svg ref="worldMapSvg" class="world-map" role="img" aria-label="Carte mondiale du trafic par pays"></svg>
@@ -212,9 +221,9 @@
     <div class="row row-cards mb-4">
       <div class="col-xl-6">
         <div class="card h-100">
-          <div class="card-header"><h3 class="card-title mb-0">Top vhosts proxy</h3></div>
+          <div class="card-header"><h3 class="card-title mb-0">Top domaines cibles (proxy)</h3></div>
           <div class="card-body">
-            <div v-if="!topProxyHosts.length" class="text-center text-secondary py-4">Aucune donnée vhost.</div>
+            <div v-if="!topProxyHosts.length" class="text-center text-secondary py-4">Aucune donnée domaine.</div>
             <div v-else>
               <div v-for="h in topProxyHosts.slice(0, 8)" :key="h.vhost || h.host_id || h.host_name" class="mb-2">
                 <div class="d-flex justify-content-between small mb-1">
@@ -233,8 +242,7 @@
       <div class="col-xl-6">
         <div class="card h-100">
           <div class="card-header d-flex align-items-center justify-content-between">
-            <h3 class="card-title mb-0">Top domaines</h3>
-            <span class="text-secondary small">Clique pour détails</span>
+            <h3 class="card-title mb-0">Top domaines cibles</h3>
           </div>
           <div class="table-responsive">
             <table class="table table-vcenter card-table">
@@ -278,9 +286,9 @@
             <tr>
               <th>Heure</th>
               <th>IP</th>
-              <th>Host</th>
+              <th>Domaine cible</th>
               <th>Méthode</th>
-              <th>Path</th>
+              <th>Chemin</th>
               <th>Status</th>
               <th>Bytes</th>
             </tr>
@@ -292,9 +300,9 @@
             <tr v-for="(r, idx) in liveRequests.slice(0, 16)" :key="`${r.timestamp}-${idx}`">
               <td class="small">{{ formatDate(r.timestamp) }}</td>
               <td class="font-monospace small">{{ r.ip }}</td>
-              <td class="small">{{ r.host_name || r.host_id }}</td>
+              <td class="small">{{ r.domain || r.host || r.host_name || r.host_id || '-' }}</td>
               <td><span class="badge bg-blue-lt text-blue">{{ r.method }}</span></td>
-              <td class="font-monospace small text-truncate" style="max-width: 28rem;">{{ r.path }}</td>
+              <td class="font-monospace small text-truncate live-path" :title="r.path" style="max-width: 28rem;">{{ r.path }}</td>
               <td><span class="badge" :class="statusClass(r.status)">{{ r.status }}</span></td>
               <td class="small">{{ formatBytes(r.bytes || 0) }}</td>
             </tr>
@@ -313,7 +321,7 @@
           <button class="btn btn-sm btn-outline-secondary" @click="closeDomainModal">Fermer</button>
         </div>
 
-        <div class="card-body">
+        <div class="card-body traffic-modal-body">
           <div v-if="domainLoading" class="text-center py-4 text-secondary">
             <span class="spinner-border spinner-border-sm me-2"></span>
             Chargement des détails...
@@ -350,9 +358,9 @@
             <div class="row row-cards mb-3">
               <div class="col-lg-6">
                 <div class="card h-100">
-                  <div class="card-header"><h4 class="card-title mb-0">Top paths</h4></div>
+                  <div class="card-header"><h4 class="card-title mb-0">Top chemins</h4></div>
                   <div class="card-body p-0">
-                    <div v-if="!(domainDetails.top_paths || []).length" class="text-center py-3 text-secondary small">Aucun path</div>
+                    <div v-if="!(domainDetails.top_paths || []).length" class="text-center py-3 text-secondary small">Aucun chemin</div>
                     <div v-else v-for="p in domainDetails.top_paths" :key="p.path" class="d-flex justify-content-between border-bottom px-3 py-2">
                       <span class="font-monospace small text-truncate me-2" style="max-width: 75%;">{{ p.path }}</span>
                       <span class="badge bg-azure-lt text-azure">{{ p.hits }}</span>
@@ -375,7 +383,7 @@
             </div>
 
             <div class="card">
-              <div class="card-header"><h4 class="card-title mb-0">Logs recents</h4></div>
+              <div class="card-header"><h4 class="card-title mb-0">Logs récents</h4></div>
               <div class="table-responsive" style="max-height: 360px;">
                 <table class="table table-sm table-vcenter mb-0">
                   <thead>
@@ -383,7 +391,7 @@
                       <th>Heure</th>
                       <th>IP</th>
                       <th>Méthode</th>
-                      <th>Path</th>
+                      <th>Chemin</th>
                       <th>Status</th>
                       <th>Bytes</th>
                       <th>UA</th>
@@ -397,12 +405,12 @@
                       <td class="small">{{ formatDate(r.timestamp) }}</td>
                       <td class="font-monospace small">{{ r.ip }}</td>
                       <td><span class="badge bg-blue-lt text-blue">{{ r.method }}</span></td>
-                      <td class="font-monospace small text-truncate" style="max-width: 18rem;">{{ r.path }}</td>
+                      <td class="font-monospace small text-truncate domain-path" :title="r.path" style="max-width: 18rem;">{{ r.path }}</td>
                       <td>
                         <span class="badge" :class="statusClass(r.status)">{{ r.status }}</span>
                       </td>
                       <td class="small">{{ formatBytes(r.bytes || 0) }}</td>
-                      <td class="small text-truncate" style="max-width: 20rem;">{{ r.user_agent || '-' }}</td>
+                      <td class="small text-truncate domain-ua" :title="r.user_agent || '-'" style="max-width: 20rem;">{{ r.user_agent || '-' }}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -417,7 +425,12 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import * as d3 from 'd3'
+import { max as d3Max } from 'd3-array'
+import { geoNaturalEarth1, geoPath } from 'd3-geo'
+import { scaleSequential } from 'd3-scale'
+import { interpolateYlOrRd } from 'd3-scale-chromatic'
+import { select } from 'd3-selection'
+import { feature } from 'topojson-client'
 import apiClient from '../api'
 
 type AnyRecord = Record<string, any>
@@ -458,7 +471,6 @@ let worldMapResizeHandler: (() => void) | null = null
 const traffic = computed(() => summary.value.traffic || {})
 const threats = computed(() => summary.value.threats || {})
 const topDomains = computed(() => traffic.value.top_domains || [])
-const topHosts = computed(() => traffic.value.top_hosts || [])
 const topProxyHosts = computed(() => {
   const fromApi = traffic.value.top_proxy_hosts || []
   if (fromApi.length) return fromApi
@@ -544,14 +556,15 @@ function mapCountryKey(name: string): string {
 async function renderWorldMap() {
   if (!worldMapSvg.value) return
 
-  const worldMod = await import('geojson-world-map/src/world.js')
-  const world = (worldMod as any).default || worldMod
+  const worldMod = await import('world-atlas/countries-110m.json')
+  const worldAtlas = (worldMod as any).default || worldMod
+  const world = feature(worldAtlas, worldAtlas.objects.countries) as AnyRecord
   const features = world?.features || []
   if (!Array.isArray(features) || !features.length) return
 
-  const width = Math.max(560, worldMapSvg.value.clientWidth || 560)
-  const height = 340
-  const svg = d3.select(worldMapSvg.value)
+  const width = Math.max(320, worldMapSvg.value.clientWidth || 320)
+  const height = width < 540 ? 240 : 340
+  const svg = select(worldMapSvg.value)
   svg.attr('viewBox', `0 0 ${width} ${height}`)
 
   const countryHits = new Map<string, number>()
@@ -561,11 +574,11 @@ async function renderWorldMap() {
     countryHits.set(key, Number(row?.hits) || 0)
   }
 
-  const maxHits = Math.max(1, d3.max(countryDistribution.value, (d: AnyRecord) => Number(d?.hits) || 0) || 1)
-  const color = d3.scaleSequential(d3.interpolateYlOrRd).domain([0, maxHits])
+  const maxHits = Math.max(1, d3Max(countryDistribution.value, (d: AnyRecord) => Number(d?.hits) || 0) || 1)
+  const color = scaleSequential(interpolateYlOrRd).domain([0, maxHits])
 
-  const projection = d3.geoNaturalEarth1().fitSize([width, height], world as any)
-  const path = d3.geoPath(projection as any)
+  const projection = geoNaturalEarth1().fitSize([width, height], world as any)
+  const path = geoPath(projection as any)
 
   const root = svg.selectAll<SVGGElement, null>('g.world-root').data([null]).join('g').attr('class', 'world-root')
 
@@ -847,6 +860,58 @@ onBeforeUnmount(() => {
   width: 100%;
   height: 340px;
   display: block;
+}
+
+@media (max-width: 992px) {
+  .traffic-filters {
+    align-items: stretch !important;
+  }
+
+  .traffic-filter-field {
+    flex: 1 1 220px;
+  }
+
+  .traffic-filter-field .form-select,
+  .traffic-filter-field .form-control {
+    min-width: 0 !important;
+    width: 100%;
+  }
+
+  .traffic-refresh-btn {
+    width: 100%;
+  }
+
+  .world-map {
+    height: 260px;
+  }
+}
+
+@media (max-width: 768px) {
+  .traffic-modal-backdrop {
+    padding: 0;
+  }
+
+  .traffic-modal {
+    width: 100vw;
+    max-height: 100dvh;
+    height: 100dvh;
+    border-radius: 0;
+  }
+
+  .traffic-modal-body {
+    padding: 0.75rem;
+  }
+
+  .endpoint-path,
+  .live-path,
+  .domain-path,
+  .domain-ua {
+    max-width: 12rem !important;
+  }
+
+  .world-map {
+    height: 220px;
+  }
 }
 </style>
 

@@ -129,7 +129,7 @@
 
               <div v-if="userMenuOpen" class="dropdown-menu dropdown-menu-end show user-dropdown">
                 <div class="dropdown-header">Compte</div>
-                <div class="dropdown-item text-secondary small">Role: {{ auth.role || 'inconnu' }}</div>
+                <div class="dropdown-item text-secondary small">Rôle: {{ auth.role || 'inconnu' }}</div>
                 <router-link to="/account" class="dropdown-item" @click="userMenuOpen = false">
                   Mon compte
                 </router-link>
@@ -298,8 +298,18 @@ onUnmounted(() => {
   top: 0;
 }
 
+.navbar {
+  position: relative;
+  z-index: 1030;
+  overflow: visible;
+}
+
+#navbar-menu {
+  overflow: visible;
+}
+
 .user-menu {
-  z-index: 2000;
+  z-index: 1035;
 }
 
 .nav-item.dropdown .dropdown-menu {
@@ -333,6 +343,37 @@ onUnmounted(() => {
   border-left: 1px solid rgba(255, 255, 255, 0.08);
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   transform: rotate(45deg);
+}
+
+@media (max-width: 768px) {
+  .ms-auto.d-flex.align-items-center.gap-2 {
+    width: 100%;
+    justify-content: space-between;
+    margin-top: 0.5rem;
+  }
+
+  .nav-item.dropdown .dropdown-menu,
+  .user-dropdown {
+    position: static;
+    width: 100%;
+    margin-top: 0.35rem;
+    box-shadow: none;
+    border: 1px solid var(--tblr-border-color);
+    border-radius: 0.6rem;
+  }
+
+  .user-dropdown::before {
+    display: none;
+  }
+
+  .user-menu {
+    width: 100%;
+  }
+
+  .user-menu > .btn {
+    width: 100%;
+    justify-content: flex-start;
+  }
 }
 
 </style>

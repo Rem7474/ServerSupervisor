@@ -98,12 +98,12 @@
               <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16" class="me-1">
                 <path d="M1 1a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V1zm10 0a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1V1zM1 11a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1v-4zm10 0a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-4z"/>
               </svg>
-              Cards
+              Cartes
             </label>
           </div>
           <span class="text-secondary small d-none d-sm-inline">
             <strong>Graphe</strong> : vue d'architecture logique &nbsp;•&nbsp;
-            <strong>Cards</strong> : vue détaillée par hôte / port
+            <strong>Cartes</strong> : vue détaillée par hôte / port
           </span>
         </div>
       </div>
@@ -120,31 +120,31 @@
           <!-- Inline legend strip -->
           <div class="topology-legend-strip mt-2">
             <span class="leg-item">
-              <span class="leg-box" style="border-color:#94a3b8; background:rgba(15,23,42,0.5)"></span>
+              <span class="leg-box leg-box-root"></span>
               Reverse proxy
             </span>
             <span class="leg-item">
-              <span class="leg-box" style="border-color:rgba(148,163,184,0.35); background:rgba(15,23,42,0.42)"></span>
+              <span class="leg-box leg-box-host"></span>
               Hôte
             </span>
             <span class="leg-item">
-              <span class="leg-dot" style="background:#38bdf8"></span>
+              <span class="leg-dot leg-dot-service"></span>
               Service
             </span>
             <span class="leg-item">
-              <span class="leg-dot" style="background:#60a5fa"></span>
+              <span class="leg-dot leg-dot-tcp"></span>
               Port TCP
             </span>
             <span class="leg-item">
-              <span class="leg-dot" style="background:#fb923c"></span>
+              <span class="leg-dot leg-dot-udp"></span>
               Port UDP
             </span>
             <span class="leg-item">
-              <span class="leg-dash" style="border-color:#8b5cf6"></span>
+              <span class="leg-dash leg-dash-authelia"></span>
               Authelia
             </span>
             <span class="leg-item">
-              <span class="leg-dash" style="border-color:#fb923c"></span>
+              <span class="leg-dash leg-dash-internet"></span>
               Internet
             </span>
           </div>
@@ -742,6 +742,16 @@ onUnmounted(() => {
   flex-shrink: 0;
 }
 
+.leg-box-root {
+  border-color: #94a3b8;
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.leg-box-host {
+  border-color: rgba(148, 163, 184, 0.35);
+  background: rgba(15, 23, 42, 0.42);
+}
+
 .leg-dot {
   display: inline-block;
   width: 10px;
@@ -750,12 +760,32 @@ onUnmounted(() => {
   flex-shrink: 0;
 }
 
+.leg-dot-service {
+  background: #38bdf8;
+}
+
+.leg-dot-tcp {
+  background: #60a5fa;
+}
+
+.leg-dot-udp {
+  background: #fb923c;
+}
+
 .leg-dash {
   display: inline-block;
   width: 18px;
   height: 0;
   border-top: 2px dashed;
   flex-shrink: 0;
+}
+
+.leg-dash-authelia {
+  border-color: #8b5cf6;
+}
+
+.leg-dash-internet {
+  border-color: #fb923c;
 }
 
 /* Filter bar */

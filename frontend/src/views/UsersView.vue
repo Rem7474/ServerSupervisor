@@ -8,7 +8,7 @@
           <span>Utilisateurs</span>
         </div>
         <h2 class="page-title">Utilisateurs</h2>
-        <div class="text-secondary">Gestion des roles (admin / operator / viewer)</div>
+        <div class="text-secondary">Gestion des rôles (admin / operator / viewer)</div>
       </div>
       <button class="btn btn-outline-secondary" @click="fetchUsers" :disabled="loading">Actualiser</button>
     </div>
@@ -50,7 +50,7 @@
               />
             </div>
             <div class="col-md-3">
-              <label class="form-label">Role</label>
+              <label class="form-label">Rôle</label>
               <select v-model="newUserForm.role" class="form-select" :disabled="creatingUser" name="role" autocomplete="off">
                 <option value="viewer">viewer</option>
                 <option value="operator">operator</option>
@@ -77,7 +77,7 @@
           <thead>
             <tr>
               <th>Utilisateur</th>
-              <th>Role</th>
+              <th>Rôle</th>
               <th>Création</th>
               <th style="width: 200px;"></th>
             </tr>

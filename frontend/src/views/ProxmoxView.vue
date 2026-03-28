@@ -94,14 +94,14 @@
 
     <!-- Nodes table -->
     <div v-else class="card">
-      <div class="card-header d-flex align-items-center justify-content-between">
+      <div class="card-header d-flex align-items-center justify-content-between gap-2 flex-wrap">
         <h3 class="card-title mb-0">Nœuds Proxmox</h3>
-        <div class="d-flex gap-2">
-          <select v-model="filterConnection" class="form-select form-select-sm" style="width:auto">
+        <div class="d-flex gap-2 proxmox-toolbar-controls">
+          <select v-model="filterConnection" class="form-select form-select-sm proxmox-filter-select" style="width:auto">
             <option value="">Toutes les connexions</option>
             <option v-for="inst in instances" :key="inst.id" :value="inst.id">{{ inst.name }}</option>
           </select>
-          <button class="btn btn-sm btn-outline-secondary" @click="load">
+          <button class="btn btn-sm btn-outline-secondary proxmox-refresh-btn" @click="load">
             <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.86"/>
             </svg>
@@ -133,7 +133,7 @@
             <tr v-for="node in filteredNodes" :key="node.id">
               <td>
                 <div class="fw-medium">{{ node.node_name }}</div>
-                <div class="text-muted small">{{ node.ip_address }}</div>
+                <div class="text-muted small text-break">{{ node.ip_address }}</div>
               </td>
               <td>
                 <span v-if="node.cluster_name" class="text-secondary">{{ node.cluster_name }}</span>
@@ -162,7 +162,7 @@
                   <div class="progress progress-xs flex-grow-1" style="min-width:60px">
                     <div class="progress-bar" :class="ramColor(node.mem_used, node.mem_total)" :style="`width:${memPct(node)}%`"></div>
                   </div>
-                  <span class="text-muted small">{{ formatBytes(node.mem_used) }} / {{ formatBytes(node.mem_total) }}</span>
+                  <span class="text-muted small text-nowrap">{{ formatBytes(node.mem_used) }} / {{ formatBytes(node.mem_total) }}</span>
                 </div>
               </td>
               <td>
@@ -274,3 +274,21 @@ function formatDate(iso) {
 
 onMounted(load)
 </script>
+
+<style scoped>
+@media (max-width: 768px) {
+  .proxmox-toolbar-controls {
+    width: 100%;
+  }
+
+  .proxmox-filter-select {
+    flex: 1 1 auto;
+    min-width: 0;
+    width: auto !important;
+  }
+
+  .proxmox-refresh-btn {
+    flex: 0 0 auto;
+  }
+}
+</style>
