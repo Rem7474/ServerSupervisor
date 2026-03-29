@@ -187,7 +187,7 @@
     </div>
 
     <div v-if="showTimeline" class="timeline-drawer-backdrop" @click.self="closeTimeline">
-      <div class="timeline-drawer card shadow-lg">
+      <div class="timeline-modal card shadow-lg">
         <div class="card-header d-flex align-items-center justify-content-between gap-2 flex-wrap timeline-header">
           <div>
             <h3 class="card-title mb-0">Chronologie IP: <span class="font-monospace">{{ selectedIP }}</span></h3>
@@ -198,7 +198,7 @@
             <button class="btn btn-sm btn-outline-secondary" @click="closeTimeline">Fermer</button>
           </div>
         </div>
-        <div class="card-body p-0 timeline-body" style="max-height: 70vh; overflow: auto;">
+        <div class="card-body p-0 timeline-body">
           <div v-if="timelineLoading" class="text-center py-4 text-secondary">
             <span class="spinner-border spinner-border-sm me-2"></span>
             Chargement chronologie...
@@ -228,7 +228,7 @@
                   </span>
                 </div>
                 <button class="btn btn-sm btn-outline-secondary" @click="toggleBucketFilter">
-                  {{ bucketFilterEnabled ? 'Afficher toutes les requêtes' : 'Filtrer sur la tranche sélectionnée' }}
+                  {{ bucketFilterEnabled ? 'Mode focus: tranche sélectionnée' : 'Mode global: toutes les tranches' }}
                 </button>
               </div>
 
@@ -262,7 +262,7 @@
                     :title="bucket.title"
                     @click="selectBucket(bucket.key)"
                   >
-                    <span class="timeline-frieze-dot" :style="{ width: dotSize(bucket.count), height: dotSize(bucket.count) }"></span>
+                    <span class="timeline-frieze-dot" :class="bucketToneClass(bucket)"></span>
                     <span class="timeline-frieze-time">{{ bucket.label }}</span>
                     <span class="timeline-frieze-count">{{ bucket.count }}</span>
                   </button>
@@ -274,16 +274,45 @@
               </div>
             </div>
 
-            <div v-for="(r, idx) in displayedTimeline" :key="`${r.timestamp}-${idx}`" class="border-bottom px-3 py-2">
-              <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
-                <span class="badge" :class="statusClass(r.status)">{{ r.status }}</span>
-                <span class="badge bg-blue-lt text-blue">{{ r.method }}</span>
-                <span class="badge bg-azure-lt text-azure">{{ r.source || 'log' }}</span>
-                <span class="small text-secondary">{{ formatDate(r.timestamp) }}</span>
-                <span class="small text-secondary">domaine cible: {{ r.domain || '-' }}</span>
+            <div class="timeline-groups">
+              <div v-for="group in groupedTimeline" :key="group.key" class="timeline-group border-bottom">
+                <div class="timeline-group-header px-3 py-2">
+                  <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <span class="badge bg-azure-lt text-azure">{{ group.label }}</span>
+                    <span class="small text-secondary">{{ group.rangeLabel }}</span>
+                  </div>
+                  <div class="timeline-group-kpis">
+                    <span class="badge bg-blue-lt text-blue">{{ group.count }} req</span>
+                    <span class="badge bg-red-lt text-red">{{ group.errorCount }} erreurs</span>
+                    <span class="badge bg-yellow-lt text-yellow">{{ group.uniquePaths }} chemins</span>
+                    <span class="badge bg-indigo-lt text-indigo">{{ group.uniqueVhosts }} domaines</span>
+                  </div>
+                </div>
+
+                <div class="timeline-group-events px-3 pb-3">
+                  <article
+                    v-for="(r, idx) in group.events"
+                    :key="`${group.key}-${r.timestamp}-${idx}`"
+                    class="timeline-event-card"
+                  >
+                    <div class="timeline-event-topline">
+                      <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <span class="badge" :class="statusClass(r.status)">{{ r.status }}</span>
+                        <span class="badge bg-blue-lt text-blue">{{ r.method }}</span>
+                        <span class="badge bg-azure-lt text-azure">{{ r.source || 'log' }}</span>
+                      </div>
+                      <span class="small text-secondary">{{ formatDate(r.timestamp) }}</span>
+                    </div>
+                    <div class="timeline-event-path font-monospace small">{{ r.domain || '(unknown)' }} {{ r.path }}</div>
+                    <div class="timeline-event-meta small text-secondary">
+                      <span><strong>Domaine:</strong> {{ r.domain || '-' }}</span>
+                      <span class="text-truncate" :title="r.user_agent || '-'">
+                        <strong>User-Agent:</strong> {{ r.user_agent || '-' }}
+                      </span>
+                    </div>
+                  </article>
+                </div>
               </div>
-              <div class="font-monospace small mb-1">{{ r.domain || '(unknown)' }} {{ r.path }}</div>
-              <div class="small text-secondary text-truncate" :title="r.user_agent || '-'">{{ r.user_agent || '-' }}</div>
             </div>
           </template>
         </div>
@@ -307,6 +336,17 @@ interface TimelineBucket {
   label: string
   rangeLabel: string
   title: string
+}
+
+interface TimelineGroup {
+  key: string
+  label: string
+  rangeLabel: string
+  count: number
+  errorCount: number
+  uniquePaths: number
+  uniqueVhosts: number
+  events: AnyRecord[]
 }
 
 const period = ref('24h')
@@ -449,7 +489,7 @@ const selectedBucket = computed(() => {
   return timelineBuckets.value.find((b) => b.key === selectedBucketKey.value) || null
 })
 
-const displayedTimeline = computed(() => {
+const timelineRows = computed(() => {
   const source = timelineChrono.value
   if (!bucketFilterEnabled.value || !selectedBucket.value) return [...source].reverse()
   const start = selectedBucket.value.startMs
@@ -461,7 +501,7 @@ const displayedTimeline = computed(() => {
 })
 
 const timelineStats = computed(() => {
-  const rows = displayedTimeline.value
+  const rows = timelineRows.value
   const errors = rows.filter((r) => Number(r.status) >= 400).length
   const uniquePaths = new Set(rows.map((r) => String(r.path || ''))).size
   const uniqueVhosts = new Set(rows.map((r) => String(r.domain || '(unknown)'))).size
@@ -471,6 +511,47 @@ const timelineStats = computed(() => {
     uniquePaths,
     uniqueVhosts,
   }
+})
+
+const groupedTimeline = computed<TimelineGroup[]>(() => {
+  const bucketsByKey = new Map(timelineBuckets.value.map((b) => [b.key, b]))
+  const grouped = new Map<string, AnyRecord[]>()
+
+  for (const row of timelineRows.value) {
+    const ts = new Date(row.timestamp).getTime()
+    if (!Number.isFinite(ts)) continue
+    const bucketStart = Math.floor(ts / timelineBucketMs.value) * timelineBucketMs.value
+    const key = String(bucketStart)
+    const existing = grouped.get(key)
+    if (existing) {
+      existing.push(row)
+      continue
+    }
+    grouped.set(key, [row])
+  }
+
+  return [...grouped.entries()]
+    .sort((a, b) => Number(b[0]) - Number(a[0]))
+    .map(([key, events]): TimelineGroup => {
+      const bucket = bucketsByKey.get(key)
+      const rows = [...events].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      const errorCount = rows.filter((r) => Number(r.status) >= 400).length
+      const uniquePaths = new Set(rows.map((r) => String(r.path || ''))).size
+      const uniqueVhosts = new Set(rows.map((r) => String(r.domain || '(unknown)'))).size
+      const start = Number(key)
+      const end = start + timelineBucketMs.value
+
+      return {
+        key,
+        label: bucket?.label || formatBucketLabel(start, timelineBucketMs.value),
+        rangeLabel: bucket?.rangeLabel || `${new Date(start).toLocaleString()} → ${new Date(end).toLocaleString()}`,
+        count: rows.length,
+        errorCount,
+        uniquePaths,
+        uniqueVhosts,
+        events: rows,
+      }
+    })
 })
 
 function levelClass(level: string): string {
@@ -550,10 +631,12 @@ function setTimelineInterval(value: string) {
   selectedInterval.value = value
 }
 
-function dotSize(count: number): string {
-  const max = Math.max(...timelineBuckets.value.map((b) => Number(b.count) || 0), 1)
-  const ratio = (Number(count) || 0) / max
-  return `${Math.round(10 + ratio * 14)}px`
+function bucketToneClass(bucket: TimelineBucket): string {
+  if (bucket.count <= 0) return 'is-calm'
+  const errorRate = bucket.errorCount / bucket.count
+  if (errorRate >= 0.5) return 'is-hot'
+  if (errorRate >= 0.2) return 'is-warm'
+  return 'is-calm'
 }
 
 function formatBucketLabel(startMs: number, bucketMs: number): string {
@@ -603,17 +686,20 @@ onMounted(loadThreats)
 .timeline-drawer-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.35);
+  background: rgba(15, 23, 42, 0.58);
   display: flex;
-  justify-content: flex-end;
+  justify-content: center;
+  align-items: center;
+  padding: 0.75rem;
   z-index: 1060;
 }
 
-.timeline-drawer {
-  width: min(760px, 94vw);
-  height: 100vh;
-  border-radius: 0;
-  border: 0;
+.timeline-modal {
+  width: min(1400px, 98vw);
+  height: min(96dvh, 960px);
+  border-radius: 0.75rem;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  overflow: hidden;
 }
 
 .timeline-header {
@@ -621,7 +707,7 @@ onMounted(loadThreats)
   top: 0;
   z-index: 2;
   background: var(--tblr-bg-surface);
-  border-bottom: 1px solid var(--tblr-border-color);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.28);
 }
 
 .timeline-header-actions {
@@ -633,8 +719,18 @@ onMounted(loadThreats)
   padding-bottom: 0.25rem;
 }
 
-.timeline-frieze {
+.timeline-body {
+  height: 100%;
+  overflow: auto;
   background: linear-gradient(180deg, rgba(15, 23, 42, 0.03) 0%, rgba(15, 23, 42, 0.01) 100%);
+}
+
+.timeline-frieze {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  backdrop-filter: blur(3px);
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.94) 0%, rgba(248, 250, 252, 0.8) 100%);
 }
 
 .timeline-controls .btn-group .btn {
@@ -711,8 +807,25 @@ onMounted(loadThreats)
   display: inline-block;
   border-radius: 999px;
   background: #fff;
-  border: 4px solid #2a2f8a;
+  width: 14px;
+  height: 14px;
+  border: 3px solid #2a2f8a;
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.08);
+}
+
+.timeline-frieze-dot.is-calm {
+  border-color: #1f6feb;
+  background: #eff6ff;
+}
+
+.timeline-frieze-dot.is-warm {
+  border-color: #c67c00;
+  background: #fff7e0;
+}
+
+.timeline-frieze-dot.is-hot {
+  border-color: #c2332c;
+  background: #ffe8e6;
 }
 
 .timeline-frieze-item.active .timeline-frieze-dot {
@@ -732,6 +845,64 @@ onMounted(loadThreats)
 .timeline-frieze-count {
   font-size: 0.72rem;
   font-weight: 600;
+}
+
+.timeline-groups {
+  display: flex;
+  flex-direction: column;
+}
+
+.timeline-group {
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.timeline-group-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  background: rgba(241, 245, 249, 0.65);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.timeline-group-kpis {
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.timeline-group-events {
+  display: grid;
+  gap: 0.55rem;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+}
+
+.timeline-event-card {
+  border: 1px solid rgba(148, 163, 184, 0.26);
+  border-radius: 0.6rem;
+  padding: 0.55rem 0.65rem;
+  background: #fff;
+}
+
+.timeline-event-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.35rem;
+}
+
+.timeline-event-path {
+  margin-bottom: 0.35rem;
+  overflow-wrap: anywhere;
+}
+
+.timeline-event-meta {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.25rem;
 }
 
 @media (max-width: 992px) {
@@ -762,8 +933,10 @@ onMounted(loadThreats)
     overflow-wrap: anywhere;
   }
 
-  .timeline-drawer {
-    width: min(760px, 100vw);
+  .timeline-modal {
+    width: min(1400px, 100vw);
+    height: 100dvh;
+    border-radius: 0;
   }
 }
 
@@ -782,7 +955,7 @@ onMounted(loadThreats)
     flex: 1 1 auto;
   }
 
-  .timeline-drawer {
+  .timeline-modal {
     height: 100dvh;
   }
 
@@ -791,6 +964,10 @@ onMounted(loadThreats)
   }
 
   .timeline-kpis {
+    grid-template-columns: 1fr;
+  }
+
+  .timeline-group-events {
     grid-template-columns: 1fr;
   }
 }
