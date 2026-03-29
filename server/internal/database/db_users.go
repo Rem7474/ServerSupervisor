@@ -138,6 +138,51 @@ func (db *DB) RevokeRefreshToken(tokenHash string) error {
 	return err
 }
 
+// RotateRefreshToken atomically revokes the current token and inserts a replacement.
+// Returns the owning user ID if rotation succeeds.
+func (db *DB) RotateRefreshToken(currentTokenHash, newTokenHash string, expiresAt time.Time) (int64, error) {
+	tx, err := db.conn.Begin()
+	if err != nil {
+		return 0, err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	var userID int64
+	var currentExpiresAt time.Time
+	var revokedAt sql.NullTime
+	if err = tx.QueryRow(
+		`SELECT user_id, expires_at, revoked_at FROM refresh_tokens WHERE token_hash = $1 FOR UPDATE`,
+		currentTokenHash,
+	).Scan(&userID, &currentExpiresAt, &revokedAt); err != nil {
+		return 0, err
+	}
+	if revokedAt.Valid || time.Now().After(currentExpiresAt) {
+		return 0, fmt.Errorf("refresh token expired or revoked")
+	}
+
+	if _, err = tx.Exec(
+		`UPDATE refresh_tokens SET revoked_at = NOW() WHERE token_hash = $1 AND revoked_at IS NULL`,
+		currentTokenHash,
+	); err != nil {
+		return 0, err
+	}
+
+	if _, err = tx.Exec(
+		`INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)`,
+		userID, newTokenHash, expiresAt,
+	); err != nil {
+		return 0, err
+	}
+
+	if err = tx.Commit(); err != nil {
+		return 0, err
+	}
+	return userID, nil
+}
 func (db *DB) RevokeAllOtherSessions(username, currentTokenHash string) error {
 	_, err := db.conn.Exec(
 		`UPDATE refresh_tokens SET revoked_at = NOW()

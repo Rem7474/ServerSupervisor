@@ -91,15 +91,16 @@
           <h3 class="card-title">Tendance CPU / RAM</h3>
           <div class="text-secondary small">
             <template v-if="hasProxmox">
-              <!-- Tabs source -->
-              <span
-                v-for="src in chartSources"
-                :key="src.key"
-                class="me-3 cursor-pointer"
-                :class="chartSource === src.key ? 'fw-semibold text-body' : 'text-secondary'"
-                style="cursor:pointer"
-                @click="chartSource = src.key; fetchSummary()"
-              >{{ src.label }}</span>
+              <div class="summary-source-switch" role="group" aria-label="Source des metriques du graphe">
+                <button
+                  v-for="src in chartSources"
+                  :key="src.key"
+                  type="button"
+                  :class="chartSource === src.key ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-outline-secondary'"
+                  :aria-pressed="chartSource === src.key"
+                  @click="chartSource = src.key; fetchSummary()"
+                >{{ src.label }}</button>
+              </div>
             </template>
             <template v-else>Moyenne sur tous les hôtes</template>
           </div>
@@ -115,7 +116,7 @@
           </button>
         </div>
       </div>
-      <div class="card-body" style="height: 14rem;">
+      <div class="card-body summary-chart-body">
         <div v-if="summaryLoading" class="h-100 d-flex align-items-center justify-content-center">
           <div class="spinner-border text-secondary" role="status"></div>
         </div>
@@ -129,10 +130,12 @@
       <div class="card-body">
         <div class="row g-3 align-items-center">
           <div class="col-12 col-lg">
-            <input v-model="searchQuery" type="text" class="form-control" placeholder="Rechercher un hôte..." />
+            <label class="form-label" for="dashboard-search">Recherche d'hote</label>
+            <input id="dashboard-search" v-model="searchQuery" type="text" class="form-control" placeholder="Rechercher un hôte..." />
           </div>
           <div class="col-12 col-md-4 col-lg-2">
-            <select v-model="statusFilter" class="form-select">
+            <label class="form-label" for="dashboard-status-filter">Filtre de statut</label>
+            <select id="dashboard-status-filter" v-model="statusFilter" class="form-select">
               <option value="all">Tous</option>
               <option value="online">En ligne</option>
               <option value="offline">Hors ligne</option>
@@ -140,7 +143,8 @@
             </select>
           </div>
           <div class="col-12 col-md-4 col-lg-3">
-            <select v-model="sortKey" class="form-select">
+            <label class="form-label" for="dashboard-sort-key">Tri principal</label>
+            <select id="dashboard-sort-key" v-model="sortKey" class="form-select">
               <option value="name">Trier par nom</option>
               <option value="status">Trier par statut</option>
               <option value="cpu">Trier par CPU</option>
@@ -149,7 +153,8 @@
             </select>
           </div>
           <div class="col-12 col-md-4 col-lg-2">
-            <button class="btn btn-outline-secondary w-100" @click="sortDir = sortDir === 'asc' ? 'desc' : 'asc'">
+            <label class="form-label" for="dashboard-sort-dir">Ordre</label>
+            <button id="dashboard-sort-dir" class="btn btn-outline-secondary w-100" @click="sortDir = sortDir === 'asc' ? 'desc' : 'asc'">
               {{ sortDir === 'asc' ? 'Asc' : 'Desc' }}
             </button>
           </div>
@@ -163,7 +168,7 @@
         <table class="table table-vcenter card-table">
           <thead>
             <tr>
-              <th style="width: 1%"></th>
+              <th class="host-selection-col"></th>
               <th>Nom</th>
               <th>État</th>
               <th>IP / OS</th>
@@ -177,7 +182,7 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="host in sortedHosts" :key="host.id">
+            <tr v-for="host in paginatedHosts" :key="host.id">
               <td>
                 <label class="form-check">
                   <input class="form-check-input" type="checkbox" :value="host.id" v-model="selectedHostIds" />
@@ -212,14 +217,14 @@
                 <span :class="cpuColor(effectiveMetrics(host.id).cpu)"
                       :title="effectiveMetrics(host.id).source === 'proxmox' ? 'Source : Proxmox' : ''">
                   {{ effectiveMetrics(host.id).cpu != null ? effectiveMetrics(host.id).cpu.toFixed(1) + '%' : '-' }}
-                  <span v-if="effectiveMetrics(host.id).source === 'proxmox'" class="text-orange ms-1" style="font-size:.65em" title="Métriques Proxmox">⬡</span>
+                  <span v-if="effectiveMetrics(host.id).source === 'proxmox'" class="text-orange ms-1 metric-source-badge" title="Métriques Proxmox">⬡</span>
                 </span>
               </td>
               <td>
                 <span :class="memColor(effectiveMetrics(host.id).memPct)"
                       :title="effectiveMetrics(host.id).source === 'proxmox' ? 'Source : Proxmox' : ''">
                   {{ effectiveMetrics(host.id).memPct != null ? effectiveMetrics(host.id).memPct.toFixed(1) + '%' : '-' }}
-                  <span v-if="effectiveMetrics(host.id).source === 'proxmox'" class="text-orange ms-1" style="font-size:.65em" title="Métriques Proxmox">⬡</span>
+                  <span v-if="effectiveMetrics(host.id).source === 'proxmox'" class="text-orange ms-1 metric-source-badge" title="Métriques Proxmox">⬡</span>
                 </span>
               </td>
               <td>
@@ -241,12 +246,16 @@
         </table>
       </div>
 
+      <div v-if="!loading && sortedHosts.length > 0" class="card-footer d-flex justify-content-end">
+        <PaginationNav :current-page="currentHostPage" :total-pages="totalHostPages" @select="setHostPage" />
+      </div>
+
       <div v-if="loading" class="p-3">
         <LoadingSkeleton :lines="8" variant="table" />
       </div>
 
       <div v-if="!loading && hosts.length === 0" class="text-center py-5 text-secondary">
-        <svg xmlns="http://www.w3.org/2000/svg" class="mb-3" width="48" height="48" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="opacity:.35">
+        <svg xmlns="http://www.w3.org/2000/svg" class="mb-3 empty-state-icon" width="48" height="48" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 12h2m10 0h2M12 5v2m0 10v2M7.05 7.05l1.414 1.414m7.072 7.072 1.414 1.414M7.05 16.95l1.414-1.414m7.072-7.072 1.414-1.414"/>
           <circle cx="12" cy="12" r="4" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"/>
         </svg>
@@ -257,73 +266,19 @@
     </div>
 
     <!-- ─── Versions Docker (collapsible) ───────────────────────────────────── -->
-    <div class="card">
-      <div
-        class="card-header"
-        style="cursor:pointer"
-        @click="showDockerVersions = !showDockerVersions"
-      >
-        <h3 class="card-title d-flex align-items-center gap-2">
-          Versions &amp; Mises à jour Docker
-          <span v-if="outdatedDockerImages > 0" class="badge bg-yellow-lt text-yellow">{{ outdatedDockerImages }} en retard</span>
-          <svg class="ms-auto" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-               :style="showDockerVersions ? 'transform:rotate(180deg)' : ''" style="transition:transform .2s;flex-shrink:0">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
-          </svg>
-        </h3>
-        <div class="card-options text-secondary small">Suivi via <router-link to="/git-webhooks" @click.stop>Git / Automatisation</router-link></div>
-      </div>
-      <div v-show="showDockerVersions" class="table-responsive">
-        <table class="table table-vcenter card-table">
-          <thead>
-            <tr>
-              <th>Image</th>
-              <th>Hôte</th>
-              <th>Conteneurs</th>
-              <th>En cours</th>
-              <th>Dernière version</th>
-              <th>Statut</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="v in versionComparisons" :key="v.docker_image + v.host_id">
-              <td class="fw-semibold">{{ v.docker_image }}</td>
-              <td class="text-secondary">{{ v.hostname }}</td>
-              <td>
-                <span v-if="v.container_count > 0" class="badge bg-azure-lt text-azure" :title="`${v.container_count} conteneur${v.container_count > 1 ? 's' : ''} utilisent cette image`">{{ v.container_count }}</span>
-                <span v-else class="text-secondary small">—</span>
-              </td>
-              <td><code v-if="v.running_version">{{ v.running_version }}</code><span v-else class="text-secondary small">inconnue</span></td>
-              <td>
-                <a v-if="v.release_url" :href="v.release_url" target="_blank" class="link-primary">{{ v.latest_version }}</a>
-                <span v-else>{{ v.latest_version }}</span>
-              </td>
-              <td>
-                <span v-if="v.is_up_to_date" class="badge bg-green-lt text-green">À jour</span>
-                <span v-else-if="v.running_version || v.update_confirmed" class="badge bg-yellow-lt text-yellow">Mise à jour disponible</span>
-                <span v-else class="badge bg-secondary-lt text-secondary">Version inconnue</span>
-              </td>
-            </tr>
-            <tr v-if="versionComparisons.length === 0">
-              <td colspan="6" class="text-center text-secondary py-4">
-                Aucun suivi de version configuré. Ajoutez des release trackers dans
-                <router-link to="/git-webhooks">Git / Automatisation</router-link>.
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
+    <DashboardDockerVersions :versions="versionComparisons" />
   </div>
 </template>
 
 <script setup>
-import { computed, defineAsyncComponent } from 'vue'
+import { computed, defineAsyncComponent, ref, watch } from 'vue'
 import RelativeTime from '../components/RelativeTime.vue'
 import WsStatusBar from '../components/WsStatusBar.vue'
 import ProxmoxClusterCard from '../components/ProxmoxClusterCard.vue'
 import DashboardKPIs from '../components/dashboard/DashboardKPIs.vue'
+import DashboardDockerVersions from '../components/dashboard/DashboardDockerVersions.vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
+import PaginationNav from '../components/PaginationNav.vue'
 import { formatHostStatus, hostStatusClass } from '../utils/formatHostStatus'
 import { useDashboard } from '../composables/useDashboard'
 
@@ -337,11 +292,9 @@ const Line = defineAsyncComponent(async () => {
 })
 const {
   hosts,
-  aptPending,
   versionComparisons,
   proxmoxSummary,
   hasProxmox,
-  outdatedDockerImages,
   cveSummary,
   proxmoxNodes,
   proxmoxLinks,
@@ -355,7 +308,6 @@ const {
   sortDir,
   selectedHostIds,
   aptLoading,
-  showDockerVersions,
   summaryHours,
   summaryChartData,
   summaryLoading,
@@ -396,4 +348,55 @@ function proxmoxGuestPath(hostId) {
   if (!link || !link.guest_id || link.status === 'ignored') return ''
   return `/proxmox/guests/${link.guest_id}`
 }
+
+const hostsPerPage = 15
+const currentHostPage = ref(1)
+
+const totalHostPages = computed(() => {
+  if (!sortedHosts.value.length) return 1
+  return Math.ceil(sortedHosts.value.length / hostsPerPage)
+})
+
+const paginatedHosts = computed(() => {
+  const start = (currentHostPage.value - 1) * hostsPerPage
+  return sortedHosts.value.slice(start, start + hostsPerPage)
+})
+
+function setHostPage(page) {
+  currentHostPage.value = page
+}
+
+watch([searchQuery, statusFilter, sortKey, sortDir], () => {
+  currentHostPage.value = 1
+})
+
+watch(totalHostPages, (pages) => {
+  if (currentHostPage.value > pages) {
+    currentHostPage.value = pages
+  }
+})
 </script>
+
+<style scoped>
+.summary-source-switch {
+  display: inline-flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.summary-chart-body {
+  height: 14rem;
+}
+
+.host-selection-col {
+  width: 1%;
+}
+
+.metric-source-badge {
+  font-size: 0.65em;
+}
+
+.empty-state-icon {
+  opacity: 0.35;
+}
+</style>

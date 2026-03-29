@@ -165,32 +165,22 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 		return
 	}
 
-	rec, err := h.db.GetRefreshToken(hashToken(req.RefreshToken))
-	if err != nil || rec == nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid refresh token"})
-		return
-	}
-	if rec.RevokedAt != nil || time.Now().After(rec.ExpiresAt) {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "refresh token expired"})
-		return
-	}
-
-	user, err := h.db.GetUserByID(rec.UserID)
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid refresh token"})
-		return
-	}
-
-	// Rotate refresh token
-	_ = h.db.RevokeRefreshToken(hashToken(req.RefreshToken))
 	newRefreshToken, err := generateRefreshToken()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate refresh token"})
 		return
 	}
 	refreshExpiresAt := time.Now().Add(h.cfg.RefreshTokenExpiration)
-	if err := h.db.CreateRefreshToken(user.ID, hashToken(newRefreshToken), refreshExpiresAt); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store refresh token"})
+
+	userID, err := h.db.RotateRefreshToken(hashToken(req.RefreshToken), hashToken(newRefreshToken), refreshExpiresAt)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid refresh token"})
+		return
+	}
+
+	user, err := h.db.GetUserByID(userID)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid refresh token"})
 		return
 	}
 

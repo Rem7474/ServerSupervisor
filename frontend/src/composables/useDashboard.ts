@@ -32,6 +32,91 @@ interface SummaryChartData {
   datasets: SummaryDataset[]
 }
 
+interface DashboardChartPalette {
+  legendText: string
+  tickText: string
+  grid: string
+  tooltipBackground: string
+  tooltipText: string
+  tooltipBorder: string
+  cpuBorder: string
+  cpuBackground: string
+  ramBorder: string
+  ramBackground: string
+}
+
+const FALLBACK_CHART_PALETTE: DashboardChartPalette = {
+  legendText: '#6b7280',
+  tickText: '#6b7280',
+  grid: 'rgba(107,114,128,0.15)',
+  tooltipBackground: 'rgba(17,24,39,0.90)',
+  tooltipText: '#ffffff',
+  tooltipBorder: '#4b5563',
+  cpuBorder: '#206bc4',
+  cpuBackground: 'rgba(32,107,196,0.12)',
+  ramBorder: '#2fb344',
+  ramBackground: 'rgba(47,179,68,0.12)',
+}
+
+function getRootStyles(): CSSStyleDeclaration | null {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return null
+  return window.getComputedStyle(document.documentElement)
+}
+
+function getCssVarValue(name: string, fallback: string): string {
+  const styles = getRootStyles()
+  if (!styles) return fallback
+  const value = styles.getPropertyValue(name).trim()
+  return value || fallback
+}
+
+function toRgba(color: string, alpha: number, fallback: string): string {
+  const clamped = Math.max(0, Math.min(1, alpha))
+  const hex = color.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i)
+  if (hex) {
+    const raw = hex[1]
+    const normalized = raw.length === 3 ? raw.split('').map((c) => c + c).join('') : raw
+    const int = Number.parseInt(normalized, 16)
+    const r = (int >> 16) & 255
+    const g = (int >> 8) & 255
+    const b = int & 255
+    return `rgba(${r},${g},${b},${clamped})`
+  }
+
+  const rgb = color.match(/^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/i)
+  if (rgb) {
+    return `rgba(${rgb[1]},${rgb[2]},${rgb[3]},${clamped})`
+  }
+
+  const rgba = color.match(/^rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([0-9]*\.?[0-9]+)\s*\)$/i)
+  if (rgba) {
+    return `rgba(${rgba[1]},${rgba[2]},${rgba[3]},${clamped})`
+  }
+
+  return fallback
+}
+
+function getDashboardChartPalette(): DashboardChartPalette {
+  const legendText = getCssVarValue('--tblr-secondary-color', FALLBACK_CHART_PALETTE.legendText)
+  const tickText = getCssVarValue('--tblr-secondary-color', FALLBACK_CHART_PALETTE.tickText)
+  const gridBase = getCssVarValue('--tblr-border-color', FALLBACK_CHART_PALETTE.tooltipBorder)
+  const primary = getCssVarValue('--tblr-primary', FALLBACK_CHART_PALETTE.cpuBorder)
+  const success = getCssVarValue('--tblr-success', FALLBACK_CHART_PALETTE.ramBorder)
+
+  return {
+    legendText,
+    tickText,
+    grid: toRgba(gridBase, 0.35, FALLBACK_CHART_PALETTE.grid),
+    tooltipBackground: toRgba(getCssVarValue('--tblr-body-bg', '#111827'), 0.9, FALLBACK_CHART_PALETTE.tooltipBackground),
+    tooltipText: getCssVarValue('--tblr-body-color', FALLBACK_CHART_PALETTE.tooltipText),
+    tooltipBorder: gridBase,
+    cpuBorder: primary,
+    cpuBackground: toRgba(primary, 0.12, FALLBACK_CHART_PALETTE.cpuBackground),
+    ramBorder: success,
+    ramBackground: toRgba(success, 0.12, FALLBACK_CHART_PALETTE.ramBackground),
+  }
+}
+
 export function useDashboard() {
   const dashboardStore = useDashboardStore()
   const {
@@ -155,33 +240,36 @@ export function useDashboard() {
     return list
   })
 
-  const summaryChartOptions = computed(() => ({
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: { display: true, position: 'top', labels: { color: '#6b7280', boxWidth: 12, padding: 12 } },
-      tooltip: {
-        enabled: true,
-        mode: 'index',
-        intersect: false,
-        backgroundColor: 'rgba(0,0,0,0.8)',
-        titleColor: '#fff',
-        bodyColor: '#fff',
-        borderColor: '#555',
-        borderWidth: 1,
-        padding: 10,
-        callbacks: {
-          label: (ctx: AnyRecord) => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1)}%`,
+  const summaryChartOptions = computed(() => {
+    const colors = getDashboardChartPalette()
+    return {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: true, position: 'top', labels: { color: colors.legendText, boxWidth: 12, padding: 12 } },
+        tooltip: {
+          enabled: true,
+          mode: 'index',
+          intersect: false,
+          backgroundColor: colors.tooltipBackground,
+          titleColor: colors.tooltipText,
+          bodyColor: colors.tooltipText,
+          borderColor: colors.tooltipBorder,
+          borderWidth: 1,
+          padding: 10,
+          callbacks: {
+            label: (ctx: AnyRecord) => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1)}%`,
+          },
         },
       },
-    },
-    scales: {
-      x: { display: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280', maxTicksLimit: 10 } },
-      y: { display: true, min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280' } },
-    },
-    elements: { point: { radius: 0, hitRadius: 10, hoverRadius: 5 }, line: { tension: 0.3 } },
-    interaction: { mode: 'nearest', axis: 'x', intersect: false },
-  }))
+      scales: {
+        x: { display: true, grid: { color: colors.grid }, ticks: { color: colors.tickText, maxTicksLimit: 10 } },
+        y: { display: true, min: 0, max: 100, grid: { color: colors.grid }, ticks: { color: colors.tickText } },
+      },
+      elements: { point: { radius: 0, hitRadius: 10, hoverRadius: 5 }, line: { tension: 0.3 } },
+      interaction: { mode: 'nearest', axis: 'x', intersect: false },
+    }
+  })
 
   const proxmoxAutoSwitched = ref(false)
 
@@ -215,6 +303,7 @@ export function useDashboard() {
   async function fetchSummary() {
     summaryLoading.value = true
     try {
+      const colors = getDashboardChartPalette()
       const bucketMinutes = bucketMinutesFor(summaryHours.value)
       const isProxmox = chartSource.value === 'proxmox'
       const res = isProxmox
@@ -236,15 +325,15 @@ export function useDashboard() {
           {
             label: 'CPU %',
             data: points.map((p: AnyRecord) => Number(p.cpu_avg ?? 0)),
-            borderColor: '#3b82f6',
-            backgroundColor: 'rgba(59,130,246,0.10)',
+            borderColor: colors.cpuBorder,
+            backgroundColor: colors.cpuBackground,
             fill: true,
           },
           {
             label: 'RAM %',
             data: points.map((p: AnyRecord) => Number(p.memory_avg ?? 0)),
-            borderColor: '#10b981',
-            backgroundColor: 'rgba(16,185,129,0.10)',
+            borderColor: colors.ramBorder,
+            backgroundColor: colors.ramBackground,
             fill: true,
           },
         ],

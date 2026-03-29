@@ -83,7 +83,7 @@ func (h *CommandStreamHub) BroadcastStatus(commandID, status, output string) {
 		payload["output"] = output
 	}
 	for _, conn := range conns {
-		if err := conn.WriteJSON(payload); err != nil {
+		if err := safeWriteJSON(conn, payload); err != nil {
 			_ = conn.Close()
 			h.Unregister(commandID, conn)
 		}
@@ -111,7 +111,7 @@ func (h *CommandStreamHub) runBroadcast(commandID string) {
 			"chunk":      logChunk,
 		}
 		for _, conn := range conns {
-			if err := conn.WriteJSON(payload); err != nil {
+			if err := safeWriteJSON(conn, payload); err != nil {
 				_ = conn.Close()
 				h.Unregister(commandID, conn)
 			}

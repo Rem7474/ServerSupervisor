@@ -201,6 +201,9 @@ func (h *DockerHandler) SendDockerCommand(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	if !requireHostAccess(c, h.db, req.HostID, "operator") {
+		return
+	}
 
 	// Validate working_dir to prevent path traversal on the agent
 	if !isValidWorkingDir(req.WorkingDir) {

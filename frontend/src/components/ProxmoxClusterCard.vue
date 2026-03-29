@@ -55,7 +55,7 @@
           <router-link :to="`/proxmox/nodes/${node.id}`" class="text-decoration-none">
             <div class="d-flex align-items-center gap-2 p-2 rounded hover-bg">
               <!-- Status dot -->
-              <span :class="node.status === 'online' ? 'badge bg-green' : 'badge bg-red'" style="width:8px;height:8px;padding:0;border-radius:50%;flex-shrink:0"></span>
+              <span :class="node.status === 'online' ? 'badge bg-green node-status-dot' : 'badge bg-red node-status-dot'"></span>
               <div class="flex-grow-1 min-width-0">
                 <div class="d-flex justify-content-between align-items-center mb-1">
                   <span class="fw-semibold text-body small text-truncate">{{ node.node_name }}</span>
@@ -65,7 +65,7 @@
                   </span>
                 </div>
                 <!-- CPU bar -->
-                <div class="progress mb-1" style="height:4px">
+                <div class="progress mb-1 progress-thin">
                   <div
                     class="progress-bar"
                     :class="cpuBarColor(node.cpu_usage * 100)"
@@ -73,7 +73,7 @@
                   ></div>
                 </div>
                 <!-- RAM bar -->
-                <div class="progress" style="height:4px">
+                <div class="progress progress-thin">
                   <div
                     class="progress-bar"
                     :class="ramBarColor(nodRamPct(node))"
@@ -169,5 +169,17 @@ function formatBytes(bytes) {
 }
 .min-width-0 {
   min-width: 0;
+}
+
+.node-status-dot {
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.progress-thin {
+  height: 4px;
 }
 </style>

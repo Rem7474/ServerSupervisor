@@ -40,7 +40,7 @@ func (h *NotificationHub) Broadcast(payload interface{}) {
 	h.mu.Unlock()
 
 	for _, conn := range conns {
-		if err := conn.WriteJSON(payload); err != nil {
+		if err := safeWriteJSON(conn, payload); err != nil {
 			_ = conn.Close()
 			h.Unregister(conn)
 		}

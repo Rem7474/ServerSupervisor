@@ -50,6 +50,9 @@ func (h *SystemHandler) SendJournalCommand(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid service name"})
 		return
 	}
+	if !requireHostAccess(c, h.db, req.HostID, "operator") {
+		return
+	}
 
 	result, err := h.dispatcher.Create(dispatch.Request{
 		HostID:      req.HostID,
@@ -88,6 +91,9 @@ func (h *SystemHandler) SendProcessesCommand(c *gin.Context) {
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if !requireHostAccess(c, h.db, req.HostID, "operator") {
 		return
 	}
 
@@ -134,6 +140,9 @@ func (h *SystemHandler) SendSystemdCommand(c *gin.Context) {
 
 	if req.Action != "list" && !validServiceName.MatchString(req.ServiceName) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid service name"})
+		return
+	}
+	if !requireHostAccess(c, h.db, req.HostID, "operator") {
 		return
 	}
 

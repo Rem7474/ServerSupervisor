@@ -253,6 +253,9 @@ func (h *ScheduledTaskHandler) RunScheduledTask(c *gin.Context) {
 		}
 		return
 	}
+	if !requireHostAccess(c, h.db, task.HostID, "operator") {
+		return
+	}
 
 	payload := task.Payload
 	if payload == "" {

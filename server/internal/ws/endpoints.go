@@ -58,7 +58,10 @@ func (h *WSHandler) servePollingSnapshot(c *gin.Context, enforceIPLimit bool, se
 	if err != nil {
 		return
 	}
-	defer func() { _ = conn.Close() }()
+	defer func() {
+		releaseWriteGuard(conn)
+		_ = conn.Close()
+	}()
 
 	if !h.authenticateWS(conn) {
 		return
@@ -91,7 +94,7 @@ func (h *WSHandler) servePollingSnapshot(c *gin.Context, enforceIPLimit bool, se
 				return
 			}
 		case <-pingTicker.C:
-			if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+			if err := safeWriteMessage(conn, websocket.PingMessage, nil); err != nil {
 				return
 			}
 		}
@@ -119,6 +122,7 @@ func (h *WSHandler) CommandStream(c *gin.Context) {
 	}
 	defer func() {
 		h.streamHub.Unregister(commandID, conn)
+		releaseWriteGuard(conn)
 		_ = conn.Close()
 	}()
 
@@ -129,7 +133,7 @@ func (h *WSHandler) CommandStream(c *gin.Context) {
 	h.streamHub.Register(commandID, conn)
 
 	if cmd, err := h.db.GetRemoteCommandByID(commandID); err == nil {
-		_ = conn.WriteJSON(gin.H{
+		_ = safeWriteJSON(conn, gin.H{
 			"type":       "cmd_stream_init",
 			"command_id": commandID,
 			"status":     cmd.Status,
@@ -160,6 +164,7 @@ func (h *WSHandler) NotificationStream(c *gin.Context) {
 	}
 	defer func() {
 		h.notifHub.Unregister(conn)
+		releaseWriteGuard(conn)
 		_ = conn.Close()
 	}()
 
@@ -174,7 +179,7 @@ func (h *WSHandler) NotificationStream(c *gin.Context) {
 	})
 
 	// Send auth_ok response
-	if err := conn.WriteJSON(gin.H{"type": "auth_ok"}); err != nil {
+	if err := safeWriteJSON(conn, gin.H{"type": "auth_ok"}); err != nil {
 		return
 	}
 
@@ -193,7 +198,7 @@ func (h *WSHandler) NotificationStream(c *gin.Context) {
 		case <-done:
 			return
 		case <-pingTicker.C:
-			if err := conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+			if err := safeWriteMessage(conn, websocket.PingMessage, nil); err != nil {
 				return
 			}
 		}

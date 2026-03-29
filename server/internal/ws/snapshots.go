@@ -28,7 +28,7 @@ func (h *WSHandler) sendDashboardSnapshot(conn *websocket.Conn, lastHash *string
 		proxmoxNodes = []models.ProxmoxNode{}
 	}
 
-	// Confirmed guest↔host links with live guest metrics (cpu_usage, mem_alloc, mem_usage).
+	// Confirmed guest-host links with live guest metrics (cpu_usage, mem_alloc, mem_usage).
 	// Used by the dashboard to override agent CPU/RAM when metrics_source=proxmox.
 	proxmoxLinks, _ := h.db.ListProxmoxGuestLinks("confirmed")
 	if proxmoxLinks == nil {
@@ -49,7 +49,7 @@ func (h *WSHandler) sendDashboardSnapshot(conn *websocket.Conn, lastHash *string
 	if !snapshotChanged(payload, lastHash) {
 		return nil
 	}
-	return conn.WriteJSON(payload)
+	return safeWriteJSON(conn, payload)
 }
 
 func (h *WSHandler) sendHostSnapshot(conn *websocket.Conn, hostID string, lastHash *string) error {
@@ -87,7 +87,7 @@ func (h *WSHandler) sendHostSnapshot(conn *websocket.Conn, hostID string, lastHa
 	if !snapshotChanged(payload, lastHash) {
 		return nil
 	}
-	return conn.WriteJSON(payload)
+	return safeWriteJSON(conn, payload)
 }
 
 func (h *WSHandler) sendDockerSnapshot(conn *websocket.Conn, lastHash *string) error {
@@ -115,7 +115,7 @@ func (h *WSHandler) sendDockerSnapshot(conn *websocket.Conn, lastHash *string) e
 	if !snapshotChanged(payload, lastHash) {
 		return nil
 	}
-	return conn.WriteJSON(payload)
+	return safeWriteJSON(conn, payload)
 }
 
 func (h *WSHandler) sendNetworkSnapshot(conn *websocket.Conn, lastHash *string) error {
@@ -136,7 +136,7 @@ func (h *WSHandler) sendNetworkSnapshot(conn *websocket.Conn, lastHash *string) 
 	if !snapshotChanged(payload, lastHash) {
 		return nil
 	}
-	return conn.WriteJSON(payload)
+	return safeWriteJSON(conn, payload)
 }
 
 func (h *WSHandler) sendAptSnapshot(conn *websocket.Conn, lastHash *string) error {
@@ -168,5 +168,5 @@ func (h *WSHandler) sendAptSnapshot(conn *websocket.Conn, lastHash *string) erro
 	if !snapshotChanged(payload, lastHash) {
 		return nil
 	}
-	return conn.WriteJSON(payload)
+	return safeWriteJSON(conn, payload)
 }

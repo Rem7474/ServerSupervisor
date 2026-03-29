@@ -42,6 +42,11 @@ func (h *AptHandler) SendCommand(c *gin.Context) {
 
 	var results []gin.H
 	for _, hostID := range req.HostIDs {
+		if !requireHostAccess(c, h.db, hostID, "operator") {
+			results = append(results, gin.H{"host_id": hostID, "error": "host access denied"})
+			continue
+		}
+
 		result, err := h.dispatcher.Create(dispatch.Request{
 			HostID:      hostID,
 			Module:      "apt",
