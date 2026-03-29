@@ -251,6 +251,17 @@
                 </div>
               </div>
 
+              <div class="timeline-status-breakdown mb-3">
+                <span
+                  v-for="item in timelineStatusBreakdown"
+                  :key="item.key"
+                  class="badge"
+                  :class="item.badgeClass"
+                >
+                  {{ item.label }}: {{ item.count }}
+                </span>
+              </div>
+
               <div class="timeline-frieze-scroll">
                 <div class="timeline-frieze-track">
                   <div class="timeline-frieze-line"></div>
@@ -290,27 +301,40 @@
                 </div>
 
                 <div class="timeline-group-events px-3 pb-3">
-                  <article
-                    v-for="(r, idx) in group.events"
-                    :key="`${group.key}-${r.timestamp}-${idx}`"
-                    class="timeline-event-card"
+                  <section
+                    v-for="statusGroup in group.statusGroups"
+                    :key="`${group.key}-${statusGroup.key}`"
+                    class="timeline-status-group"
                   >
-                    <div class="timeline-event-topline">
-                      <div class="d-flex align-items-center gap-2 flex-wrap">
-                        <span class="badge" :class="statusClass(r.status)">{{ r.status }}</span>
-                        <span class="badge bg-blue-lt text-blue">{{ r.method }}</span>
-                        <span class="badge bg-azure-lt text-azure">{{ r.source || 'log' }}</span>
-                      </div>
-                      <span class="small text-secondary">{{ formatDate(r.timestamp) }}</span>
+                    <div class="timeline-status-group-header">
+                      <span class="badge" :class="statusGroup.badgeClass">{{ statusGroup.label }}</span>
+                      <span class="small text-secondary">{{ statusGroup.count }} log{{ statusGroup.count > 1 ? 's' : '' }}</span>
                     </div>
-                    <div class="timeline-event-path font-monospace small">{{ r.domain || '(unknown)' }} {{ r.path }}</div>
-                    <div class="timeline-event-meta small text-secondary">
-                      <span><strong>Domaine:</strong> {{ r.domain || '-' }}</span>
-                      <span class="text-truncate" :title="r.user_agent || '-'">
-                        <strong>User-Agent:</strong> {{ r.user_agent || '-' }}
-                      </span>
+
+                    <div class="timeline-status-group-grid">
+                      <article
+                        v-for="(r, idx) in statusGroup.events"
+                        :key="`${group.key}-${statusGroup.key}-${r.timestamp}-${idx}`"
+                        class="timeline-event-card"
+                      >
+                        <div class="timeline-event-topline">
+                          <div class="d-flex align-items-center gap-2 flex-wrap">
+                            <span class="badge" :class="statusClass(r.status)">{{ r.status }}</span>
+                            <span class="badge bg-blue-lt text-blue">{{ r.method }}</span>
+                            <span class="badge bg-azure-lt text-azure">{{ r.source || 'log' }}</span>
+                          </div>
+                          <span class="small text-secondary">{{ formatDate(r.timestamp) }}</span>
+                        </div>
+                        <div class="timeline-event-path font-monospace small">{{ r.domain || '(unknown)' }} {{ r.path }}</div>
+                        <div class="timeline-event-meta small text-secondary">
+                          <span><strong>Domaine:</strong> {{ r.domain || '-' }}</span>
+                          <span class="text-truncate" :title="r.user_agent || '-'">
+                            <strong>User-Agent:</strong> {{ r.user_agent || '-' }}
+                          </span>
+                        </div>
+                      </article>
                     </div>
-                  </article>
+                  </section>
                 </div>
               </div>
             </div>
@@ -346,6 +370,14 @@ interface TimelineGroup {
   errorCount: number
   uniquePaths: number
   uniqueVhosts: number
+  statusGroups: TimelineStatusGroup[]
+}
+
+interface TimelineStatusGroup {
+  key: string
+  label: string
+  badgeClass: string
+  count: number
   events: AnyRecord[]
 }
 
@@ -513,6 +545,26 @@ const timelineStats = computed(() => {
   }
 })
 
+const timelineStatusBreakdown = computed(() => {
+  const counters = new Map<string, number>()
+  for (const row of timelineRows.value) {
+    const family = statusFamilyKey(row.status)
+    counters.set(family, (counters.get(family) || 0) + 1)
+  }
+
+  return statusFamilyOrder
+    .map((key) => {
+      const count = counters.get(key) || 0
+      return {
+        key,
+        label: statusFamilyLabel(key),
+        badgeClass: statusFamilyBadgeClass(key),
+        count,
+      }
+    })
+    .filter((item) => item.count > 0)
+})
+
 const groupedTimeline = computed<TimelineGroup[]>(() => {
   const bucketsByKey = new Map(timelineBuckets.value.map((b) => [b.key, b]))
   const grouped = new Map<string, AnyRecord[]>()
@@ -540,6 +592,30 @@ const groupedTimeline = computed<TimelineGroup[]>(() => {
       const uniqueVhosts = new Set(rows.map((r) => String(r.domain || '(unknown)'))).size
       const start = Number(key)
       const end = start + timelineBucketMs.value
+      const byStatusFamily = new Map<string, AnyRecord[]>()
+
+      for (const row of rows) {
+        const family = statusFamilyKey(row.status)
+        const existing = byStatusFamily.get(family)
+        if (existing) {
+          existing.push(row)
+          continue
+        }
+        byStatusFamily.set(family, [row])
+      }
+
+      const statusGroups: TimelineStatusGroup[] = statusFamilyOrder
+        .map((familyKey) => {
+          const familyRows = byStatusFamily.get(familyKey) || []
+          return {
+            key: familyKey,
+            label: statusFamilyLabel(familyKey),
+            badgeClass: statusFamilyBadgeClass(familyKey),
+            count: familyRows.length,
+            events: familyRows,
+          }
+        })
+        .filter((group) => group.count > 0)
 
       return {
         key,
@@ -549,10 +625,38 @@ const groupedTimeline = computed<TimelineGroup[]>(() => {
         errorCount,
         uniquePaths,
         uniqueVhosts,
-        events: rows,
+        statusGroups,
       }
     })
 })
+
+const statusFamilyOrder = ['5xx', '4xx', '3xx', '2xx', 'other']
+
+function statusFamilyKey(status: number | string): string {
+  const code = Number(status)
+  if (!Number.isFinite(code)) return 'other'
+  if (code >= 500 && code < 600) return '5xx'
+  if (code >= 400 && code < 500) return '4xx'
+  if (code >= 300 && code < 400) return '3xx'
+  if (code >= 200 && code < 300) return '2xx'
+  return 'other'
+}
+
+function statusFamilyLabel(family: string): string {
+  if (family === '5xx') return '5xx Serveur'
+  if (family === '4xx') return '4xx Client'
+  if (family === '3xx') return '3xx Redirection'
+  if (family === '2xx') return '2xx Succès'
+  return 'Autres statuts'
+}
+
+function statusFamilyBadgeClass(family: string): string {
+  if (family === '5xx') return 'bg-red-lt text-red'
+  if (family === '4xx') return 'bg-yellow-lt text-yellow'
+  if (family === '3xx') return 'bg-azure-lt text-azure'
+  if (family === '2xx') return 'bg-green-lt text-green'
+  return 'bg-secondary-lt text-secondary'
+}
 
 function levelClass(level: string): string {
   switch (level) {
@@ -564,9 +668,11 @@ function levelClass(level: string): string {
 }
 
 function statusClass(status: number): string {
+  if (status >= 500 && status < 600) return 'bg-red-lt text-red'
+  if (status >= 400 && status < 500) return 'bg-yellow-lt text-yellow'
   if (status >= 200 && status < 300) return 'bg-green-lt text-green'
-  if (status >= 300 && status < 400) return 'bg-yellow-lt text-yellow'
-  return 'bg-red-lt text-red'
+  if (status >= 300 && status < 400) return 'bg-azure-lt text-azure'
+  return 'bg-secondary-lt text-secondary'
 }
 
 function formatDate(v: string): string {
@@ -877,6 +983,34 @@ onMounted(loadThreats)
 }
 
 .timeline-group-events {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.timeline-status-breakdown {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.timeline-status-group {
+  border: 1px solid var(--tblr-border-color);
+  border-radius: 0.6rem;
+  padding: 0.5rem;
+  background: var(--tblr-bg-surface, #ffffff);
+}
+
+.timeline-status-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-bottom: 0.5rem;
+}
+
+.timeline-status-group-grid {
   display: grid;
   gap: 0.55rem;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
@@ -972,6 +1106,10 @@ onMounted(loadThreats)
   }
 
   .timeline-group-events {
+    gap: 0.6rem;
+  }
+
+  .timeline-status-group-grid {
     grid-template-columns: 1fr;
   }
 }
