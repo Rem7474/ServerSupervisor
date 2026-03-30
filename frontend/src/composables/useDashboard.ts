@@ -46,8 +46,8 @@ interface DashboardChartPalette {
 }
 
 const FALLBACK_CHART_PALETTE: DashboardChartPalette = {
-  legendText: '#6b7280',
-  tickText: '#6b7280',
+  legendText: '#1f2937',
+  tickText: '#1f2937',
   grid: 'rgba(107,114,128,0.15)',
   tooltipBackground: 'rgba(17,24,39,0.90)',
   tooltipText: '#ffffff',
@@ -68,6 +68,27 @@ function getCssVarValue(name: string, fallback: string): string {
   if (!styles) return fallback
   const value = styles.getPropertyValue(name).trim()
   return value || fallback
+}
+
+function resolveCssColorForCanvas(color: string, fallback: string): string {
+  if (!color) return fallback
+  if (typeof window === 'undefined' || typeof document === 'undefined') return fallback
+
+  const probe = document.createElement('span')
+  probe.style.color = color
+  probe.style.position = 'fixed'
+  probe.style.left = '-9999px'
+  probe.style.top = '-9999px'
+  probe.style.visibility = 'hidden'
+
+  document.body.appendChild(probe)
+  const resolved = window.getComputedStyle(probe).color.trim()
+  document.body.removeChild(probe)
+
+  if (!resolved || resolved === 'rgba(0, 0, 0, 0)' || resolved === 'transparent') {
+    return fallback
+  }
+  return resolved
 }
 
 function toRgba(color: string, alpha: number, fallback: string): string {
@@ -97,19 +118,42 @@ function toRgba(color: string, alpha: number, fallback: string): string {
 }
 
 function getDashboardChartPalette(): DashboardChartPalette {
-  const legendText = getCssVarValue('--tblr-secondary-color', FALLBACK_CHART_PALETTE.legendText)
-  const tickText = getCssVarValue('--tblr-secondary-color', FALLBACK_CHART_PALETTE.tickText)
-  const gridBase = getCssVarValue('--tblr-border-color', FALLBACK_CHART_PALETTE.tooltipBorder)
-  const primary = getCssVarValue('--tblr-primary', FALLBACK_CHART_PALETTE.cpuBorder)
-  const success = getCssVarValue('--tblr-success', FALLBACK_CHART_PALETTE.ramBorder)
+  const legendText = resolveCssColorForCanvas(
+    getCssVarValue('--tblr-body-color', FALLBACK_CHART_PALETTE.legendText),
+    FALLBACK_CHART_PALETTE.legendText,
+  )
+  const tickText = resolveCssColorForCanvas(
+    getCssVarValue('--tblr-body-color', FALLBACK_CHART_PALETTE.tickText),
+    FALLBACK_CHART_PALETTE.tickText,
+  )
+  const gridBase = resolveCssColorForCanvas(
+    getCssVarValue('--tblr-border-color', FALLBACK_CHART_PALETTE.tooltipBorder),
+    FALLBACK_CHART_PALETTE.tooltipBorder,
+  )
+  const tooltipSurfaceBase = resolveCssColorForCanvas(
+    getCssVarValue('--tblr-bg-surface', getCssVarValue('--tblr-body-bg', '#111827')),
+    '#111827',
+  )
+  const tooltipText = resolveCssColorForCanvas(
+    getCssVarValue('--tblr-body-color', FALLBACK_CHART_PALETTE.tooltipText),
+    FALLBACK_CHART_PALETTE.tooltipText,
+  )
+  const primary = resolveCssColorForCanvas(
+    getCssVarValue('--tblr-primary', FALLBACK_CHART_PALETTE.cpuBorder),
+    FALLBACK_CHART_PALETTE.cpuBorder,
+  )
+  const success = resolveCssColorForCanvas(
+    getCssVarValue('--tblr-success', FALLBACK_CHART_PALETTE.ramBorder),
+    FALLBACK_CHART_PALETTE.ramBorder,
+  )
 
   return {
     legendText,
     tickText,
     grid: toRgba(gridBase, 0.35, FALLBACK_CHART_PALETTE.grid),
-    tooltipBackground: toRgba(getCssVarValue('--tblr-body-bg', '#111827'), 0.9, FALLBACK_CHART_PALETTE.tooltipBackground),
-    tooltipText: getCssVarValue('--tblr-body-color', FALLBACK_CHART_PALETTE.tooltipText),
-    tooltipBorder: gridBase,
+    tooltipBackground: toRgba(tooltipSurfaceBase, 0.94, FALLBACK_CHART_PALETTE.tooltipBackground),
+    tooltipText,
+    tooltipBorder: resolveCssColorForCanvas(gridBase, FALLBACK_CHART_PALETTE.tooltipBorder),
     cpuBorder: primary,
     cpuBackground: toRgba(primary, 0.12, FALLBACK_CHART_PALETTE.cpuBackground),
     ramBorder: success,
