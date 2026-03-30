@@ -52,6 +52,17 @@
               <div class="text-muted small">{{ node.cpu_count }} cœurs</div>
             </div>
 
+            <!-- CPU Temp (from mapped source host) -->
+            <div class="col-6 col-sm-4 col-lg">
+              <div class="subheader mb-1">CPU TEMP</div>
+              <div class="h3 mb-1" :class="tempColor(nodeCpuTempCurrent)">
+                {{ nodeCpuTempCurrent > 0 ? `${nodeCpuTempCurrent.toFixed(1)}°C` : '—' }}
+              </div>
+              <div class="text-muted small">
+                {{ node.cpu_temp_source_host_name ? `Source: ${node.cpu_temp_source_host_name}` : 'Source non configurée' }}
+              </div>
+            </div>
+
             <!-- RAM -->
             <div class="col-6 col-sm-4 col-lg">
               <div class="subheader mb-1">RAM</div>
@@ -175,6 +186,26 @@
               <Line v-if="rrdNetChart" :data="rrdNetChart" :options="rrdNetOptions" class="h-100" />
               <div v-else class="h-100 d-flex align-items-center justify-content-center text-secondary small">{{ rrdError || 'Aucune donnée' }}</div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CPU temperature history (mapped source host) -->
+      <div class="card mb-4">
+        <div class="card-header d-flex align-items-center justify-content-between">
+          <h3 class="card-title mb-0">Historique temp. CPU (nœud)</h3>
+          <div class="btn-group btn-group-sm">
+            <button v-for="opt in tempHistoryOptions" :key="opt.hours"
+              :class="tempHistoryHours === opt.hours ? 'btn btn-primary' : 'btn btn-outline-secondary'"
+              @click="loadNodeCpuTempHistory(opt.hours)">
+              {{ opt.label }}
+            </button>
+          </div>
+        </div>
+        <div class="card-body" style="height: 12rem;">
+          <Line v-if="nodeTempChart" :data="nodeTempChart" :options="tempChartOptions" class="h-100" />
+          <div v-else class="h-100 d-flex align-items-center justify-content-center text-secondary small">
+            {{ nodeTempLoading ? 'Chargement…' : (nodeTempError || (node.cpu_temp_source_host_id ? 'Aucune donnée température disponible' : 'Configurez une source temp CPU pour ce nœud')) }}
           </div>
         </div>
       </div>
@@ -727,6 +758,17 @@ const cpuTempSourceSaving = ref(false)
 const cpuTempSourceMsg = ref('')
 const cpuTempSourceOk = ref(false)
 
+const tempHistoryOptions = [
+  { hours: 1, label: '1h' },
+  { hours: 6, label: '6h' },
+  { hours: 24, label: '24h' },
+]
+const tempHistoryHours = ref(24)
+const nodeTempLoading = ref(false)
+const nodeTempError = ref('')
+const nodeTempChart = shallowRef(null)
+const nodeCpuTempCurrent = ref(0)
+
 // apt refresh
 const aptRefreshing = ref(false)
 const aptRefreshMsg = ref('')
@@ -804,6 +846,34 @@ const rrdNetOptions = {
   scales: {
     x: { display: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280', maxTicksLimit: 8 } },
     y: { display: true, min: 0, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280', callback: (v) => formatBytesPerSec(v) } },
+  },
+  elements: { point: { radius: 0, hitRadius: 10, hoverRadius: 4 }, line: { tension: 0.3 } },
+  interaction: { mode: 'nearest', axis: 'x', intersect: false },
+}
+
+const tempChartOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: { display: false },
+    tooltip: {
+      enabled: true,
+      mode: 'index',
+      intersect: false,
+      backgroundColor: 'rgba(0,0,0,0.8)',
+      titleColor: '#fff',
+      bodyColor: '#fff',
+      borderColor: '#555',
+      borderWidth: 1,
+      padding: 8,
+      callbacks: {
+        label: (ctx) => `${ctx.parsed.y != null ? ctx.parsed.y.toFixed(1) : '—'}°C`,
+      },
+    },
+  },
+  scales: {
+    x: { display: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280', maxTicksLimit: 8 } },
+    y: { display: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280', callback: (v) => `${v}°C` } },
   },
   elements: { point: { radius: 0, hitRadius: 10, hoverRadius: 4 }, line: { tension: 0.3 } },
   interaction: { mode: 'nearest', axis: 'x', intersect: false },
@@ -967,6 +1037,7 @@ async function load() {
     node.value = res.data
     cpuTempSourceHostId.value = node.value?.cpu_temp_source_host_id || ''
     await loadCpuTempSourceCandidates()
+    await loadNodeCpuTempHistory()
     await loadGuestLinks()
     // fire-and-forget: live status + RRD charts load in parallel
     loadLiveStatus()
@@ -978,6 +1049,52 @@ async function load() {
     error.value = e?.response?.data?.error || 'Erreur lors du chargement.'
   } finally {
     loading.value = false
+  }
+}
+
+async function loadNodeCpuTempHistory(hours = tempHistoryHours.value) {
+  tempHistoryHours.value = hours
+  nodeTempLoading.value = true
+  nodeTempError.value = ''
+  nodeTempChart.value = null
+  nodeCpuTempCurrent.value = 0
+
+  try {
+    const sourceHostId = node.value?.cpu_temp_source_host_id
+    if (!sourceHostId) {
+      return
+    }
+
+    const res = await api.getMetricsHistory(sourceHostId, hours)
+    const points = (Array.isArray(res.data) ? res.data : []).filter(p => Number(p?.cpu_temperature) > 0)
+    if (!points.length) {
+      return
+    }
+
+    const labels = points.map(p => {
+      const d = new Date(p.timestamp)
+      if (hours <= 24) {
+        return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+      }
+      return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })
+    })
+    const data = points.map(p => Number(p.cpu_temperature))
+    nodeCpuTempCurrent.value = data[data.length - 1] || 0
+    nodeTempChart.value = {
+      labels,
+      datasets: [{
+        data,
+        borderColor: '#ef4444',
+        backgroundColor: 'rgba(239,68,68,0.12)',
+        fill: true,
+        tension: 0.3,
+        spanGaps: true,
+      }],
+    }
+  } catch (e) {
+    nodeTempError.value = e?.response?.data?.error || 'Erreur lors du chargement de la température CPU.'
+  } finally {
+    nodeTempLoading.value = false
   }
 }
 
@@ -1018,6 +1135,7 @@ async function saveCpuTempSource() {
       node.value.cpu_temp_source_host_name = res.data?.cpu_temp_source_host_name || ''
     }
     cpuTempSourceHostId.value = res.data?.cpu_temp_source_host_id || ''
+    await loadNodeCpuTempHistory()
     cpuTempSourceMsg.value = 'Source de température CPU mise à jour.'
     cpuTempSourceOk.value = true
   } catch (e) {
@@ -1301,6 +1419,13 @@ function cpuColor(usage) {
   if (usage > 0.85) return 'bg-danger'
   if (usage > 0.6) return 'bg-warning'
   return 'bg-success'
+}
+
+function tempColor(temp) {
+  if (!temp) return 'text-secondary'
+  if (temp >= 85) return 'text-danger'
+  if (temp >= 70) return 'text-warning'
+  return 'text-success'
 }
 
 function ramColor(used, total) {
