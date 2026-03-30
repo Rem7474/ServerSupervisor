@@ -194,21 +194,25 @@
       </div>
 
       <!-- CPU temperature history (mapped source host) -->
-      <div class="card mb-4">
-        <div class="card-header d-flex align-items-center justify-content-between">
-          <h3 class="card-title mb-0">Historique temp. CPU (nœud)</h3>
-          <div class="btn-group btn-group-sm">
-            <button v-for="opt in tempHistoryOptions" :key="opt.hours"
-              :class="tempHistoryHours === opt.hours ? 'btn btn-primary' : 'btn btn-outline-secondary'"
-              @click="loadNodeCpuTempHistory(opt.hours)">
-              {{ opt.label }}
-            </button>
-          </div>
-        </div>
-        <div class="card-body" style="height: 12rem;">
-          <Line v-if="nodeTempChart" :data="nodeTempChart" :options="tempChartOptions" class="h-100" />
-          <div v-else class="h-100 d-flex align-items-center justify-content-center text-secondary small">
-            {{ nodeTempLoading ? 'Chargement…' : (nodeTempError || (node.cpu_temp_source_host_id ? 'Aucune donnée température disponible' : 'Configurez une source temp CPU pour ce nœud')) }}
+      <div class="row row-cards mb-4">
+        <div class="col-12 col-lg-4">
+          <div class="card">
+            <div class="card-header d-flex align-items-center justify-content-between">
+              <h3 class="card-title mb-0">Historique temp. CPU (nœud)</h3>
+              <div class="btn-group btn-group-sm">
+                <button v-for="opt in tempHistoryOptions" :key="opt.hours"
+                  :class="tempHistoryHours === opt.hours ? 'btn btn-primary' : 'btn btn-outline-secondary'"
+                  @click="loadNodeCpuTempHistory(opt.hours)">
+                  {{ opt.label }}
+                </button>
+              </div>
+            </div>
+            <div class="card-body" style="height:11rem">
+              <Line v-if="nodeTempChart" :data="nodeTempChart" :options="tempChartOptions" class="h-100" />
+              <div v-else class="h-100 d-flex align-items-center justify-content-center text-secondary small">
+                {{ nodeTempLoading ? 'Chargement…' : (nodeTempError || (node.cpu_temp_source_host_id ? 'Aucune donnée température disponible' : 'Configurez une source temp CPU pour ce nœud')) }}
+              </div>
+            </div>
           </div>
         </div>
       </div>
