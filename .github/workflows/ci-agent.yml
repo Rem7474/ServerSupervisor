@@ -82,7 +82,7 @@ jobs:
         continue-on-error: true
 
       - name: Upload coverage
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         if: always()
         with:
           file: ./agent/coverage.out
