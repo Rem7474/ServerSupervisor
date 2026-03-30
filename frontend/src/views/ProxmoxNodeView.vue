@@ -16,6 +16,9 @@
           <h2 class="page-title mb-0">{{ node.node_name }}</h2>
           <span v-if="node.status === 'online'" class="badge bg-success-lt text-success">En ligne</span>
           <span v-else class="badge bg-danger-lt text-danger">{{ node.status }}</span>
+          <span v-if="nodeCpuTempCurrent > 0" class="badge" :class="tempBadgeClass(nodeCpuTempCurrent)">
+            CPU TEMP {{ nodeCpuTempCurrent.toFixed(1) }}°C
+          </span>
         </div>
         <div class="text-secondary">{{ node.cluster_name || 'Nœud standalone' }} · PVE {{ node.pve_version || 'N/A' }} · {{ node.ip_address }}</div>
       </div>
@@ -1426,6 +1429,13 @@ function tempColor(temp) {
   if (temp >= 85) return 'text-danger'
   if (temp >= 70) return 'text-warning'
   return 'text-success'
+}
+
+function tempBadgeClass(temp) {
+  if (!temp) return 'bg-secondary-lt text-secondary'
+  if (temp >= 85) return 'bg-danger-lt text-danger'
+  if (temp >= 70) return 'bg-warning-lt text-warning'
+  return 'bg-success-lt text-success'
 }
 
 function ramColor(used, total) {
