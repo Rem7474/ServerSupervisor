@@ -58,16 +58,32 @@ const FALLBACK_CHART_PALETTE: DashboardChartPalette = {
   ramBackground: 'rgba(47,179,68,0.12)',
 }
 
-function getRootStyles(): CSSStyleDeclaration | null {
+function getThemeStyles(): { body: CSSStyleDeclaration | null; root: CSSStyleDeclaration | null } | null {
   if (typeof window === 'undefined' || typeof document === 'undefined') return null
-  return window.getComputedStyle(document.documentElement)
+  return {
+    body: document.body ? window.getComputedStyle(document.body) : null,
+    root: window.getComputedStyle(document.documentElement),
+  }
 }
 
 function getCssVarValue(name: string, fallback: string): string {
-  const styles = getRootStyles()
+  const styles = getThemeStyles()
   if (!styles) return fallback
-  const value = styles.getPropertyValue(name).trim()
+  const value = styles.body?.getPropertyValue(name).trim() || styles.root?.getPropertyValue(name).trim() || ''
   return value || fallback
+}
+
+function isDarkRgbColor(color: string): boolean {
+  const rgb = color.match(/^rgb\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)$/i)
+  const rgba = color.match(/^rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([0-9]*\.?[0-9]+)\s*\)$/i)
+  const values = rgb || rgba
+  if (!values) return false
+
+  const r = Number(values[1])
+  const g = Number(values[2])
+  const b = Number(values[3])
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+  return luminance < 0.5
 }
 
 function resolveCssColorForCanvas(color: string, fallback: string): string {
@@ -118,26 +134,20 @@ function toRgba(color: string, alpha: number, fallback: string): string {
 }
 
 function getDashboardChartPalette(): DashboardChartPalette {
-  const legendText = resolveCssColorForCanvas(
-    getCssVarValue('--tblr-body-color', FALLBACK_CHART_PALETTE.legendText),
-    FALLBACK_CHART_PALETTE.legendText,
+  const pageBackground = resolveCssColorForCanvas(
+    getCssVarValue('--tblr-bg-surface', getCssVarValue('--tblr-body-bg', '#111827')),
+    '#111827',
   )
-  const tickText = resolveCssColorForCanvas(
-    getCssVarValue('--tblr-body-color', FALLBACK_CHART_PALETTE.tickText),
-    FALLBACK_CHART_PALETTE.tickText,
-  )
+  const lightText = resolveCssColorForCanvas(getCssVarValue('--tblr-light', '#f8fafc'), '#f8fafc')
+  const darkText = resolveCssColorForCanvas(getCssVarValue('--tblr-dark', '#111827'), '#111827')
+  const textOnPage = isDarkRgbColor(pageBackground) ? lightText : darkText
+  const legendText = textOnPage
+  const tickText = toRgba(textOnPage, 0.82, textOnPage)
   const gridBase = resolveCssColorForCanvas(
     getCssVarValue('--tblr-border-color', FALLBACK_CHART_PALETTE.tooltipBorder),
     FALLBACK_CHART_PALETTE.tooltipBorder,
   )
-  const tooltipSurfaceBase = resolveCssColorForCanvas(
-    getCssVarValue('--tblr-bg-surface', getCssVarValue('--tblr-body-bg', '#111827')),
-    '#111827',
-  )
-  const tooltipText = resolveCssColorForCanvas(
-    getCssVarValue('--tblr-body-color', FALLBACK_CHART_PALETTE.tooltipText),
-    FALLBACK_CHART_PALETTE.tooltipText,
-  )
+  const tooltipText = textOnPage
   const primary = resolveCssColorForCanvas(
     getCssVarValue('--tblr-primary', FALLBACK_CHART_PALETTE.cpuBorder),
     FALLBACK_CHART_PALETTE.cpuBorder,
@@ -151,7 +161,7 @@ function getDashboardChartPalette(): DashboardChartPalette {
     legendText,
     tickText,
     grid: toRgba(gridBase, 0.35, FALLBACK_CHART_PALETTE.grid),
-    tooltipBackground: toRgba(tooltipSurfaceBase, 0.94, FALLBACK_CHART_PALETTE.tooltipBackground),
+    tooltipBackground: pageBackground,
     tooltipText,
     tooltipBorder: resolveCssColorForCanvas(gridBase, FALLBACK_CHART_PALETTE.tooltipBorder),
     cpuBorder: primary,
