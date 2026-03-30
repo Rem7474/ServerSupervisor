@@ -699,23 +699,33 @@ func ExecuteComposeCommand(action, projectName, workingDir string, chunkCB func(
 	}
 
 	var fullOutput strings.Builder
-	combined := io.MultiReader(stdoutPipe, stderrPipe)
-	bufPtr := readBufPool.Get().(*[]byte)
-	buf := *bufPtr
-	defer readBufPool.Put(bufPtr)
-	for {
-		n, readErr := combined.Read(buf)
-		if n > 0 {
-			chunk := string(buf[:n])
-			fullOutput.WriteString(chunk)
-			if chunkCB != nil {
-				chunkCB(chunk)
+	var outMu sync.Mutex
+	streamPipe := func(r io.Reader) {
+		bufPtr := readBufPool.Get().(*[]byte)
+		buf := *bufPtr
+		defer readBufPool.Put(bufPtr)
+		for {
+			n, readErr := r.Read(buf)
+			if n > 0 {
+				chunk := string(buf[:n])
+				outMu.Lock()
+				fullOutput.WriteString(chunk)
+				outMu.Unlock()
+				if chunkCB != nil {
+					chunkCB(chunk)
+				}
+			}
+			if readErr != nil {
+				return
 			}
 		}
-		if readErr != nil {
-			break
-		}
 	}
+
+	var pipeWg sync.WaitGroup
+	pipeWg.Add(2)
+	go func() { defer pipeWg.Done(); streamPipe(stdoutPipe) }()
+	go func() { defer pipeWg.Done(); streamPipe(stderrPipe) }()
+	pipeWg.Wait()
 
 	cmdErr := cmd.Wait()
 	return fullOutput.String(), cmdErr

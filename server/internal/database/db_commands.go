@@ -53,10 +53,25 @@ func (db *DB) CreateRemoteCommand(hostID, module, action, target, payload, trigg
 	return &cmd, nil
 }
 
-func (db *DB) GetPendingRemoteCommands(hostID string) ([]models.PendingCommand, error) {
+// ClaimPendingRemoteCommands atomically claims all pending commands for a host
+// and marks them as running before returning them. This enforces exactly-once
+// delivery semantics across report polling cycles.
+func (db *DB) ClaimPendingRemoteCommands(hostID string) ([]models.PendingCommand, error) {
 	rows, err := db.conn.Query(
-		`SELECT id, module, action, target, payload
-		 FROM remote_commands WHERE host_id = $1 AND status = 'pending' ORDER BY created_at ASC`, hostID,
+		`WITH claimed AS (
+SELECT id
+FROM remote_commands
+WHERE host_id = $1 AND status = 'pending'
+ORDER BY created_at ASC
+FOR UPDATE SKIP LOCKED
+)
+UPDATE remote_commands rc
+SET status = 'running',
+    started_at = COALESCE(rc.started_at, NOW())
+FROM claimed
+WHERE rc.id = claimed.id
+RETURNING rc.id, rc.module, rc.action, rc.target, rc.payload`,
+		hostID,
 	)
 	if err != nil {
 		return nil, err

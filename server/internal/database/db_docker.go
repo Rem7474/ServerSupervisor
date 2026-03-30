@@ -123,16 +123,14 @@ func (db *DB) GetAllDockerContainers() ([]models.DockerContainer, error) {
 // ========== Docker Networks ==========
 
 func (db *DB) UpsertDockerNetworks(hostID string, networks []models.DockerNetwork) error {
-	if len(networks) == 0 {
-		return nil
+	if _, err := db.conn.Exec(`DELETE FROM docker_networks WHERE host_id = $1`, hostID); err != nil {
+		return err
 	}
 	for _, n := range networks {
 		containerIDsJSON, _ := json.Marshal(n.ContainerIDs)
 		_, err := db.conn.Exec(
 			`INSERT INTO docker_networks (id, host_id, network_id, name, driver, scope, container_ids, updated_at)
-			 VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
-			 ON CONFLICT(id) DO UPDATE SET
-			 container_ids = $7, updated_at = NOW()`,
+ VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
 			n.ID, hostID, n.NetworkID, n.Name, n.Driver, n.Scope, containerIDsJSON,
 		)
 		if err != nil {

@@ -14,6 +14,9 @@ collect_apt: true
 # Enable SMART disk health monitoring (requires smartmontools)
 collect_smart: false
 
+# Enable CPU temperature collection from thermal sensors
+collect_cpu_temperature: true
+
 # Parse web access logs once for traffic and threat analytics
 collect_web_logs: false
 

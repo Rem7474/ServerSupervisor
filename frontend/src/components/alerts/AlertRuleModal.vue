@@ -257,6 +257,7 @@ const step = ref(1)
 
 const metricCards = [
   { value: 'cpu', label: 'CPU', icon: '⚡' },
+  { value: 'cpu_temperature', label: 'Temp. CPU', icon: '🌡' },
   { value: 'memory', label: 'RAM', icon: 'ðŸ§ ' },
   { value: 'disk', label: 'Disque', icon: 'ðŸ’¾' },
   { value: 'heartbeat_timeout', label: 'Heartbeat', icon: 'ðŸ«€' },
@@ -375,6 +376,7 @@ function goNextStep() {
 function getMetricUnit(metric) {
   const units = {
     cpu: '%',
+    cpu_temperature: '°C',
     memory: '%',
     disk: '%',
     load: '',

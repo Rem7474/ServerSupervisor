@@ -18,6 +18,17 @@
     <div class="col-6 col-lg-3">
       <div class="card card-sm h-100">
         <div class="card-body">
+          <div class="subheader">CPU TEMP</div>
+          <div class="h2 mb-0" :class="tempColor(metrics.cpu_temperature)">
+            {{ metrics.cpu_temperature > 0 ? `${metrics.cpu_temperature.toFixed(1)}°C` : 'N/A' }}
+          </div>
+          <div class="text-secondary small">Sonde locale</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-6 col-lg-3">
+      <div class="card card-sm h-100">
+        <div class="card-body">
           <div class="subheader d-flex align-items-center gap-2">
             RAM
             <span v-if="metricsSource === 'proxmox'" class="badge bg-purple-lt text-purple" style="font-size:0.65rem">Proxmox</span>
@@ -196,6 +207,13 @@ function memColor(pct) {
   if (!pct) return 'text-secondary'
   if (pct > 90) return 'text-red'
   if (pct > 75) return 'text-yellow'
+  return 'text-green'
+}
+
+function tempColor(temp) {
+  if (!temp) return 'text-secondary'
+  if (temp >= 85) return 'text-red'
+  if (temp >= 70) return 'text-yellow'
   return 'text-green'
 }
 

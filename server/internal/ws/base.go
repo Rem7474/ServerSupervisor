@@ -113,9 +113,8 @@ func isAllowedOrigin(origin string, baseURL string, extraOrigins []string) bool 
 		return false
 	}
 
-	if strings.Contains(parsedOrigin.Host, "localhost") ||
-		strings.Contains(parsedOrigin.Host, "127.0.0.1") ||
-		strings.Contains(parsedOrigin.Host, "[::1]") {
+	hostname := strings.ToLower(parsedOrigin.Hostname())
+	if hostname == "localhost" || hostname == "127.0.0.1" || hostname == "::1" {
 		return true
 	}
 
@@ -142,9 +141,13 @@ func isAllowedOrigin(origin string, baseURL string, extraOrigins []string) bool 
 		if parsedOrigin.Host == parsedAllowed.Host && parsedOrigin.Scheme == parsedAllowed.Scheme {
 			return true
 		}
+		if parsedOrigin.Host == parsedAllowed.Host {
+			log.Printf("[WS] allowed origin with scheme mismatch: origin=%q allowed=%q", origin, allowed)
+			return true
+		}
 	}
 
-	log.Printf("[WS] rejected origin: %q (BASE_URL=%q) — set BASE_URL or ALLOWED_ORIGINS correctly", origin, baseURL)
+	log.Printf("[WS] rejected origin: %q (BASE_URL=%q) - set BASE_URL or ALLOWED_ORIGINS correctly", origin, baseURL)
 	return false
 }
 

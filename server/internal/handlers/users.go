@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"database/sql"
 	"net/http"
 	"strconv"
 
@@ -58,7 +59,7 @@ func (h *UserHandler) UpdateUserRole(c *gin.Context) {
 
 	switch req.Role {
 	case models.RoleAdmin, models.RoleOperator, models.RoleViewer:
-		// ok
+	// ok
 	default:
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid role"})
 		return
@@ -87,6 +88,15 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
 		return
 	}
+
+	if _, err := h.db.GetUserByUsername(req.Username); err == nil {
+		c.JSON(http.StatusConflict, gin.H{"error": "username already exists"})
+		return
+	} else if err != sql.ErrNoRows {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to validate username"})
+		return
+	}
+
 	if len(req.Password) < 8 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "password must be at least 8 characters"})
 		return
@@ -94,7 +104,7 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 
 	switch req.Role {
 	case models.RoleAdmin, models.RoleOperator, models.RoleViewer:
-		// ok
+	// ok
 	default:
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid role"})
 		return

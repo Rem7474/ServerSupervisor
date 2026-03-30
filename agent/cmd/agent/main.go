@@ -71,6 +71,7 @@ func main() {
 	log.Printf("APT monitoring: %v", cfg.CollectAPT)
 	log.Printf("APT auto-update on start: %v", cfg.AptAutoUpdateOnStart)
 	log.Printf("SMART monitoring: %v", cfg.CollectSMART)
+	log.Printf("CPU temperature monitoring: %v", cfg.CollectCPUTemperature)
 	log.Printf("Web logs analytics: %v (paths: %v)", cfg.CollectWebLogs, cfg.WebLogGlobs())
 	if cfg.MaxReportBodyBytes <= 0 {
 		cfg.MaxReportBodyBytes = 3 * 1024 * 1024
@@ -141,7 +142,7 @@ func sendReport(ctx context.Context, cfg *config.Config, s *sender.Sender) {
 	if skipSystemMetrics.Load() {
 		log.Printf("System metrics collection skipped (Proxmox is the designated metrics source)")
 	} else {
-		m, err := collector.CollectSystem()
+		m, err := collector.CollectSystem(cfg.CollectCPUTemperature)
 		if err != nil {
 			log.Printf("Failed to collect system metrics: %v", err)
 			return
@@ -159,9 +160,8 @@ func sendReport(ctx context.Context, cfg *config.Config, s *sender.Sender) {
 		containers, err := collector.CollectDocker()
 		if err != nil {
 			log.Printf("Docker collection skipped: %v", err)
-			dockerData = struct {
-				Containers []interface{} `json:"containers"`
-			}{Containers: []interface{}{}}
+			// Keep payload nil on collector failure so server state is not wiped.
+			dockerData = nil
 		} else {
 			dockerData = struct {
 				Containers []collector.DockerContainer `json:"containers"`

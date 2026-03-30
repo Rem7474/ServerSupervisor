@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -79,33 +80,37 @@ func ExecuteJournalctl(serviceName string, chunkCB func(string)) (string, error)
 	}
 
 	var builder strings.Builder
-	scanner := bufio.NewScanner(stdout)
-	for scanner.Scan() {
-		var entry journalEntry
-		if err := json.Unmarshal(scanner.Bytes(), &entry); err != nil {
-			// Fallback: forward raw line as-is
-			line := scanner.Text() + "\n"
-			builder.WriteString(line)
-			if chunkCB != nil {
-				chunkCB(line)
-			}
-			continue
-		}
-		line := formatJournalLine(entry) + "\n"
+	var outMu sync.Mutex
+	emit := func(line string) {
+		outMu.Lock()
 		builder.WriteString(line)
+		outMu.Unlock()
 		if chunkCB != nil {
 			chunkCB(line)
 		}
 	}
 
-	errScanner := bufio.NewScanner(stderr)
-	for errScanner.Scan() {
-		line := errScanner.Text() + "\n"
-		builder.WriteString(line)
-		if chunkCB != nil {
-			chunkCB(line)
+	var stderrWg sync.WaitGroup
+	stderrWg.Add(1)
+	go func() {
+		defer stderrWg.Done()
+		errScanner := bufio.NewScanner(stderr)
+		for errScanner.Scan() {
+			emit(errScanner.Text() + "\n")
 		}
+	}()
+
+	scanner := bufio.NewScanner(stdout)
+	for scanner.Scan() {
+		var entry journalEntry
+		if err := json.Unmarshal(scanner.Bytes(), &entry); err != nil {
+			// Fallback: forward raw line as-is
+			emit(scanner.Text() + "\n")
+			continue
+		}
+		emit(formatJournalLine(entry) + "\n")
 	}
+	stderrWg.Wait()
 
 	if err := cmd.Wait(); err != nil {
 		if ctx.Err() == context.DeadlineExceeded {

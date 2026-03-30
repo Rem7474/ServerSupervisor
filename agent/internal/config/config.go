@@ -19,15 +19,16 @@ type Config struct {
 	MaxReportBodyBytes int `yaml:"max_report_body_bytes"`
 
 	// Features
-	CollectDocker        bool     `yaml:"collect_docker"`
-	CollectAPT           bool     `yaml:"collect_apt"`
-	CollectSMART         bool     `yaml:"collect_smart"`
-	CollectWebLogs       bool     `yaml:"collect_web_logs"`
-	WebLogsLogPaths      []string `yaml:"web_logs_log_paths"`
-	WebLogsTailLines     int      `yaml:"web_logs_tail_lines"`
-	WebLogsTopN          int      `yaml:"web_logs_top_n"`
-	WebLogsRequestsLimit int      `yaml:"web_logs_requests_limit"`
-	WebLogsCursorFile    string   `yaml:"web_logs_cursor_file"`
+	CollectDocker         bool     `yaml:"collect_docker"`
+	CollectAPT            bool     `yaml:"collect_apt"`
+	CollectSMART          bool     `yaml:"collect_smart"`
+	CollectCPUTemperature bool     `yaml:"collect_cpu_temperature"`
+	CollectWebLogs        bool     `yaml:"collect_web_logs"`
+	WebLogsLogPaths       []string `yaml:"web_logs_log_paths"`
+	WebLogsTailLines      int      `yaml:"web_logs_tail_lines"`
+	WebLogsTopN           int      `yaml:"web_logs_top_n"`
+	WebLogsRequestsLimit  int      `yaml:"web_logs_requests_limit"`
+	WebLogsCursorFile     string   `yaml:"web_logs_cursor_file"`
 
 	// TLS
 	InsecureSkipVerify bool `yaml:"insecure_skip_verify"`
@@ -43,13 +44,14 @@ func (c *Config) WebLogGlobs() []string {
 
 func Load(path string) (*Config, error) {
 	cfg := &Config{
-		ServerURL:          "http://localhost:8080",
-		ReportInterval:     30,
-		MaxReportBodyBytes: 3 * 1024 * 1024,
-		CollectDocker:      true,
-		CollectAPT:         true,
-		CollectSMART:       false,
-		CollectWebLogs:     false,
+		ServerURL:             "http://localhost:8080",
+		ReportInterval:        30,
+		MaxReportBodyBytes:    3 * 1024 * 1024,
+		CollectDocker:         true,
+		CollectAPT:            true,
+		CollectSMART:          false,
+		CollectCPUTemperature: true,
+		CollectWebLogs:        false,
 		WebLogsLogPaths: []string{
 			"/var/log/nginx/access.log",
 			"/var/log/apache2/access.log",
@@ -96,6 +98,9 @@ func Load(path string) (*Config, error) {
 	}
 	if env := os.Getenv("SUPERVISOR_COLLECT_SMART"); env != "" {
 		cfg.CollectSMART = env == "true" || env == "1"
+	}
+	if env := os.Getenv("SUPERVISOR_COLLECT_CPU_TEMPERATURE"); env != "" {
+		cfg.CollectCPUTemperature = env == "true" || env == "1"
 	}
 	if env := os.Getenv("SUPERVISOR_COLLECT_WEB_LOGS"); env != "" {
 		cfg.CollectWebLogs = env == "true" || env == "1"
@@ -199,6 +204,9 @@ collect_apt: true
 # Enable SMART disk health monitoring (requires smartmontools)
 # Disable on VMs or systems without smartctl
 collect_smart: false
+
+# Enable CPU temperature collection from thermal sensors (/sys, hwmon, sensors)
+collect_cpu_temperature: true
 
 # Parse web access logs once and derive traffic + threat summaries.
 collect_web_logs: false

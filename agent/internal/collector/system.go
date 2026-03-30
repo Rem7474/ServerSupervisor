@@ -5,6 +5,9 @@ package collector
 import (
 	"fmt"
 	"os"
+	"os/exec"
+	"path/filepath"
+	"regexp"
 	"runtime"
 	"strconv"
 	"strings"
@@ -24,6 +27,7 @@ type SystemMetrics struct {
 	CPUUsagePercent   float64            `json:"cpu_usage_percent"`
 	CPUCores          int                `json:"cpu_cores"`
 	CPUModel          string             `json:"cpu_model"`
+	CPUTemperature    float64            `json:"cpu_temperature"`
 	LoadAvg1          float64            `json:"load_avg_1"`
 	LoadAvg5          float64            `json:"load_avg_5"`
 	LoadAvg15         float64            `json:"load_avg_15"`
@@ -52,8 +56,9 @@ type DiskInfo struct {
 	UsedPercent float64 `json:"used_percent"`
 }
 
-// CollectSystem gathers all system metrics using /proc and standard Linux tools
-func CollectSystem() (*SystemMetrics, error) {
+// CollectSystem gathers all system metrics using /proc and standard Linux tools.
+// CPU temperature collection can be disabled to avoid sensor probing overhead.
+func CollectSystem(collectCPUTemperature bool) (*SystemMetrics, error) {
 	m := &SystemMetrics{
 		CPUCores: runtime.NumCPU(),
 	}
@@ -62,6 +67,9 @@ func CollectSystem() (*SystemMetrics, error) {
 	m.OS = getOSName()
 	m.CPUModel = getCPUModel()
 	m.CPUUsagePercent = getCPUUsage()
+	if collectCPUTemperature {
+		m.CPUTemperature = getCPUTemperature()
+	}
 
 	loadAvg := getLoadAvg()
 	if len(loadAvg) == 3 {
@@ -227,6 +235,179 @@ func getLoadAvg() []float64 {
 		result[i], _ = strconv.ParseFloat(fields[i], 64)
 	}
 	return result
+}
+
+func getCPUTemperature() float64 {
+	if t := readCPUTemperatureFromThermalZones(); t > 0 {
+		return t
+	}
+	if t := readCPUTemperatureFromHwmon(); t > 0 {
+		return t
+	}
+	if t := readCPUTemperatureFromSensors(); t > 0 {
+		return t
+	}
+	return 0
+}
+
+func readCPUTemperatureFromThermalZones() float64 {
+	entries, err := os.ReadDir("/sys/class/thermal")
+	if err != nil {
+		return 0
+	}
+
+	best := 0.0
+	fallback := 0.0
+	for _, e := range entries {
+		if !strings.HasPrefix(e.Name(), "thermal_zone") {
+			continue
+		}
+		base := filepath.Join("/sys/class/thermal", e.Name())
+		typeName, _ := os.ReadFile(filepath.Join(base, "type"))
+		raw, ok := readTempValue(filepath.Join(base, "temp"))
+		if !ok {
+			continue
+		}
+		temp := normalizeTemp(raw)
+		if !validTemp(temp) {
+			continue
+		}
+
+		typeLower := strings.ToLower(strings.TrimSpace(string(typeName)))
+		if looksLikeCPUSensor(typeLower) {
+			if temp > best {
+				best = temp
+			}
+		} else if temp > fallback {
+			fallback = temp
+		}
+	}
+
+	if best > 0 {
+		return best
+	}
+	return fallback
+}
+
+func readCPUTemperatureFromHwmon() float64 {
+	entries, err := os.ReadDir("/sys/class/hwmon")
+	if err != nil {
+		return 0
+	}
+
+	best := 0.0
+	fallback := 0.0
+	for _, e := range entries {
+		hwmonDir := filepath.Join("/sys/class/hwmon", e.Name())
+		chipNameBytes, _ := os.ReadFile(filepath.Join(hwmonDir, "name"))
+		chipName := strings.ToLower(strings.TrimSpace(string(chipNameBytes)))
+
+		inputs, _ := filepath.Glob(filepath.Join(hwmonDir, "temp*_input"))
+		for _, input := range inputs {
+			raw, ok := readTempValue(input)
+			if !ok {
+				continue
+			}
+			temp := normalizeTemp(raw)
+			if !validTemp(temp) {
+				continue
+			}
+
+			base := strings.TrimSuffix(filepath.Base(input), "_input")
+			labelBytes, _ := os.ReadFile(filepath.Join(hwmonDir, base+"_label"))
+			label := strings.ToLower(strings.TrimSpace(string(labelBytes)))
+
+			if looksLikeCPUSensor(chipName) || looksLikeCPUSensor(label) {
+				if temp > best {
+					best = temp
+				}
+			} else if temp > fallback {
+				fallback = temp
+			}
+		}
+	}
+
+	if best > 0 {
+		return best
+	}
+	return fallback
+}
+
+var cpuTempRegex = regexp.MustCompile(`([-+]?\d+(?:\.\d+)?)\s*°C`)
+
+func readCPUTemperatureFromSensors() float64 {
+	if _, err := exec.LookPath("sensors"); err != nil {
+		return 0
+	}
+
+	out, err := exec.Command("sensors").Output()
+	if err != nil {
+		return 0
+	}
+
+	best := 0.0
+	fallback := 0.0
+	for _, line := range strings.Split(string(out), "\n") {
+		match := cpuTempRegex.FindStringSubmatch(line)
+		if len(match) < 2 {
+			continue
+		}
+		temp, err := strconv.ParseFloat(match[1], 64)
+		if err != nil || !validTemp(temp) {
+			continue
+		}
+
+		lineLower := strings.ToLower(line)
+		if looksLikeCPUSensor(lineLower) {
+			if temp > best {
+				best = temp
+			}
+		} else if temp > fallback {
+			fallback = temp
+		}
+	}
+
+	if best > 0 {
+		return best
+	}
+	return fallback
+}
+
+func looksLikeCPUSensor(s string) bool {
+	if s == "" {
+		return false
+	}
+	return strings.Contains(s, "cpu") ||
+		strings.Contains(s, "package") ||
+		strings.Contains(s, "core") ||
+		strings.Contains(s, "coretemp") ||
+		strings.Contains(s, "k10temp") ||
+		strings.Contains(s, "tctl") ||
+		strings.Contains(s, "tdie") ||
+		strings.Contains(s, "x86_pkg_temp")
+}
+
+func readTempValue(path string) (int64, bool) {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return 0, false
+	}
+	v, err := strconv.ParseInt(strings.TrimSpace(string(b)), 10, 64)
+	if err != nil {
+		return 0, false
+	}
+	return v, true
+}
+
+func normalizeTemp(raw int64) float64 {
+	if raw > 1000 {
+		return float64(raw) / 1000.0
+	}
+	return float64(raw)
+}
+
+func validTemp(t float64) bool {
+	return t >= 1 && t <= 130
 }
 
 func getMemInfo() map[string]uint64 {

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -99,30 +100,39 @@ func ExecuteSystemdCommand(serviceName, action string, chunkCB func(string)) (st
 	}
 
 	var builder strings.Builder
-
-	stdoutScanner := bufio.NewScanner(stdout)
-	for stdoutScanner.Scan() {
-		line := stdoutScanner.Text() + "\n"
+	var outMu sync.Mutex
+	emit := func(line string) {
+		outMu.Lock()
 		builder.WriteString(line)
+		outMu.Unlock()
 		if chunkCB != nil {
 			chunkCB(line)
 		}
 	}
 
-	stderrScanner := bufio.NewScanner(stderr)
-	for stderrScanner.Scan() {
-		line := stderrScanner.Text() + "\n"
-		builder.WriteString(line)
-		if chunkCB != nil {
-			chunkCB(line)
+	var streamWg sync.WaitGroup
+	streamWg.Add(2)
+	go func() {
+		defer streamWg.Done()
+		scanner := bufio.NewScanner(stdout)
+		for scanner.Scan() {
+			emit(scanner.Text() + "\n")
 		}
-	}
+	}()
+	go func() {
+		defer streamWg.Done()
+		scanner := bufio.NewScanner(stderr)
+		for scanner.Scan() {
+			emit(scanner.Text() + "\n")
+		}
+	}()
+	streamWg.Wait()
 
 	if err := cmd.Wait(); err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
 			return builder.String(), fmt.Errorf("systemctl timed out after 30s")
 		}
-		// systemctl status exits with non-zero for inactive/missing units — not an error for us.
+		// systemctl status exits with non-zero for inactive/missing units - not an error for us.
 		if action == "status" {
 			return builder.String(), nil
 		}

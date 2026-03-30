@@ -89,10 +89,12 @@ function incidentMetricLabel(metric) {
   const labels = {
     cpu: 'CPU',
     cpu_percent: 'CPU',
+    cpu_temperature: 'Temp. CPU',
     memory: 'RAM',
     ram_percent: 'RAM',
     disk: 'Disque',
     disk_percent: 'Disque',
+    disk_temperature: 'Temp. disque',
     load: 'Load avg',
     status_offline: 'Statut hote',
   }
@@ -101,7 +103,11 @@ function incidentMetricLabel(metric) {
 
 function incidentFormatValue(value, metric) {
   if (metric === 'status_offline') return value === 1 ? 'offline' : 'online'
-  const unit = ['cpu', 'cpu_percent', 'memory', 'ram_percent', 'disk', 'disk_percent'].includes(metric) ? '%' : ''
+  const unit = ['cpu', 'cpu_percent', 'memory', 'ram_percent', 'disk', 'disk_percent', 'proxmox_storage_percent'].includes(metric)
+    ? '%'
+    : ['cpu_temperature', 'disk_temperature'].includes(metric)
+      ? '°C'
+      : ''
   return `${Number(value).toFixed(2)}${unit}`
 }
 

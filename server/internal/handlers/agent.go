@@ -131,7 +131,7 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 	}
 
 	// Store docker containers
-	if report.Docker != nil && len(report.Docker.Containers) > 0 {
+	if report.Docker != nil {
 		for i := range report.Docker.Containers {
 			report.Docker.Containers[i].HostID = hostID
 		}
@@ -149,7 +149,7 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 	}
 
 	// Store Docker networks
-	if len(report.DockerNetworks) > 0 {
+	if report.DockerNetworks != nil {
 		dbNetworks := make([]models.DockerNetwork, 0, len(report.DockerNetworks))
 		for _, n := range report.DockerNetworks {
 			dbNetworks = append(dbNetworks, models.DockerNetwork{
@@ -169,7 +169,7 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 	}
 
 	// Store docker-compose projects
-	if len(report.ComposeProjects) > 0 {
+	if report.ComposeProjects != nil {
 		if err := h.db.UpsertComposeProjects(hostID, report.ComposeProjects); err != nil {
 			log.Printf("Warning: failed to store compose projects for host %s: %v", safeHostID, err)
 		}
@@ -198,7 +198,7 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 	}
 
 	// Store available custom tasks from agent's tasks.yaml
-	if len(report.CustomTasks) > 0 {
+	if report.CustomTasks != nil {
 		if b, err := json.Marshal(report.CustomTasks); err == nil {
 			if err := h.db.UpdateHostCustomTasks(hostID, string(b)); err != nil {
 				log.Printf("Warning: failed to store custom tasks for host %s: %v", safeHostID, err)
@@ -217,7 +217,7 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 	}
 
 	// Return pending commands for this host (unified remote_commands table)
-	commands, err := h.db.GetPendingRemoteCommands(hostID)
+	commands, err := h.db.ClaimPendingRemoteCommands(hostID)
 	if err != nil {
 		log.Printf("Warning: failed to get pending commands for host %s: %v", safeHostID, err)
 	}
