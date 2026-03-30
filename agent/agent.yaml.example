@@ -15,7 +15,7 @@ collect_apt: true
 collect_smart: false
 
 # Enable CPU temperature collection from thermal sensors
-collect_cpu_temperature: true
+collect_cpu_temperature: false
 
 # Parse web access logs once for traffic and threat analytics
 collect_web_logs: false

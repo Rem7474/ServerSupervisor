@@ -23,19 +23,21 @@ type ProxmoxConnection struct {
 }
 
 type ProxmoxNode struct {
-	ID           string     `json:"id"`
-	ConnectionID string     `json:"connection_id"`
-	NodeName     string     `json:"node_name"`
-	Status       string     `json:"status"`
-	CPUCount     int        `json:"cpu_count"`
-	CPUUsage     float64    `json:"cpu_usage"`
-	MemTotal     int64      `json:"mem_total"`
-	MemUsed      int64      `json:"mem_used"`
-	Uptime       int64      `json:"uptime"`
-	PVEVersion   string     `json:"pve_version"`
-	ClusterName  string     `json:"cluster_name"`
-	IPAddress    string     `json:"ip_address"`
-	LastSeenAt   time.Time  `json:"last_seen_at"`
+	ID                    string    `json:"id"`
+	ConnectionID          string    `json:"connection_id"`
+	NodeName              string    `json:"node_name"`
+	CPUTempSourceHostID   string    `json:"cpu_temp_source_host_id,omitempty"`
+	CPUTempSourceHostName string    `json:"cpu_temp_source_host_name,omitempty"`
+	Status                string    `json:"status"`
+	CPUCount              int       `json:"cpu_count"`
+	CPUUsage              float64   `json:"cpu_usage"`
+	MemTotal              int64     `json:"mem_total"`
+	MemUsed               int64     `json:"mem_used"`
+	Uptime                int64     `json:"uptime"`
+	PVEVersion            string    `json:"pve_version"`
+	ClusterName           string    `json:"cluster_name"`
+	IPAddress             string    `json:"ip_address"`
+	LastSeenAt            time.Time `json:"last_seen_at"`
 	// Pending apt updates (polled from /nodes/{node}/apt/update)
 	PendingUpdates    int        `json:"pending_updates"`
 	SecurityUpdates   int        `json:"security_updates"`
@@ -90,7 +92,7 @@ type ProxmoxTask struct {
 	NodeName     string     `json:"node_name"`
 	UPID         string     `json:"upid"`
 	TaskType     string     `json:"task_type"`
-	Status       string     `json:"status"`      // running | stopped
+	Status       string     `json:"status"` // running | stopped
 	UserName     string     `json:"user_name"`
 	StartTime    *time.Time `json:"start_time,omitempty"`
 	EndTime      *time.Time `json:"end_time,omitempty"`
@@ -107,9 +109,9 @@ type ProxmoxBackupJob struct {
 	Enabled      bool      `json:"enabled"`
 	Schedule     string    `json:"schedule"`
 	Storage      string    `json:"storage"`
-	Mode         string    `json:"mode"`     // snapshot | suspend | stop
+	Mode         string    `json:"mode"` // snapshot | suspend | stop
 	Compress     string    `json:"compress"`
-	VMIDs        string    `json:"vmids"`    // comma-separated VMIDs or "all"
+	VMIDs        string    `json:"vmids"` // comma-separated VMIDs or "all"
 	MailTo       string    `json:"mail_to"`
 	LastSeenAt   time.Time `json:"last_seen_at"`
 }
@@ -121,7 +123,7 @@ type ProxmoxBackupRun struct {
 	NodeName     string     `json:"node_name"`
 	VMID         int        `json:"vmid"`
 	TaskUPID     string     `json:"task_upid"`
-	Status       string     `json:"status"`    // OK | error | running
+	Status       string     `json:"status"` // OK | error | running
 	StartTime    *time.Time `json:"start_time,omitempty"`
 	EndTime      *time.Time `json:"end_time,omitempty"`
 	ExitStatus   string     `json:"exit_status"`
@@ -193,12 +195,12 @@ type ProxmoxGuestLink struct {
 	CreatedAt     time.Time `json:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at"`
 	// Joined display fields (populated on list/get)
-	GuestName    string  `json:"guest_name,omitempty"`
-	GuestType    string  `json:"guest_type,omitempty"`
-	NodeName     string  `json:"node_name,omitempty"`
-	VMID         int     `json:"vmid,omitempty"`
-	HostName     string  `json:"host_name,omitempty"`
-	HostHostname string  `json:"host_hostname,omitempty"`
+	GuestName    string `json:"guest_name,omitempty"`
+	GuestType    string `json:"guest_type,omitempty"`
+	NodeName     string `json:"node_name,omitempty"`
+	VMID         int    `json:"vmid,omitempty"`
+	HostName     string `json:"host_name,omitempty"`
+	HostHostname string `json:"host_hostname,omitempty"`
 	// Live metrics from the Proxmox guest (populated on list/get)
 	CPUUsage float64 `json:"cpu_usage"`
 	MemAlloc int64   `json:"mem_alloc"`

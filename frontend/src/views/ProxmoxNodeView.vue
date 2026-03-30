@@ -20,6 +20,25 @@
         <div class="text-secondary">{{ node.cluster_name || 'Nœud standalone' }} · PVE {{ node.pve_version || 'N/A' }} · {{ node.ip_address }}</div>
       </div>
 
+        <!-- CPU temperature source mapping -->
+        <div class="card mb-3">
+          <div class="card-body d-flex flex-wrap align-items-center gap-2">
+            <div class="subheader mb-0 me-2">Source temp CPU (nœud)</div>
+            <select v-model="cpuTempSourceHostId" class="form-select form-select-sm" style="max-width: 360px">
+              <option value="">Aucune (temp locale de chaque host)</option>
+              <option v-for="h in cpuTempSourceCandidates" :key="h.id" :value="h.id">
+                {{ h.hostname || h.name }} ({{ h.ip_address }})
+              </option>
+            </select>
+            <button class="btn btn-sm btn-primary" :disabled="cpuTempSourceSaving || cpuTempSourceLoading" @click="saveCpuTempSource">
+              <span v-if="cpuTempSourceSaving" class="spinner-border spinner-border-sm me-1"></span>
+              Enregistrer
+            </button>
+            <span v-if="cpuTempSourceMsg" :class="['small', cpuTempSourceOk ? 'text-success' : 'text-danger']">{{ cpuTempSourceMsg }}</span>
+            <span v-else-if="node.cpu_temp_source_host_name" class="small text-muted">Actuel: {{ node.cpu_temp_source_host_name }}</span>
+          </div>
+        </div>
+
       <!-- Compact node stats (static + live in one card) -->
       <div class="card mb-4">
         <div class="card-body position-relative">
@@ -701,6 +720,13 @@ const guestLinks = ref({})
 const linkMsg = ref('')
 const linkMsgOk = ref(false)
 
+const cpuTempSourceCandidates = ref([])
+const cpuTempSourceHostId = ref('')
+const cpuTempSourceLoading = ref(false)
+const cpuTempSourceSaving = ref(false)
+const cpuTempSourceMsg = ref('')
+const cpuTempSourceOk = ref(false)
+
 // apt refresh
 const aptRefreshing = ref(false)
 const aptRefreshMsg = ref('')
@@ -939,6 +965,8 @@ async function load() {
     }
     const res = await api.getProxmoxNode(route.params.id)
     node.value = res.data
+    cpuTempSourceHostId.value = node.value?.cpu_temp_source_host_id || ''
+    await loadCpuTempSourceCandidates()
     await loadGuestLinks()
     // fire-and-forget: live status + RRD charts load in parallel
     loadLiveStatus()
@@ -950,6 +978,54 @@ async function load() {
     error.value = e?.response?.data?.error || 'Erreur lors du chargement.'
   } finally {
     loading.value = false
+  }
+}
+
+async function loadCpuTempSourceCandidates() {
+  cpuTempSourceLoading.value = true
+  try {
+    const res = await api.getProxmoxNodeCpuTempSourceCandidates(route.params.id)
+    cpuTempSourceCandidates.value = Array.isArray(res.data) ? res.data : []
+  } catch {
+    cpuTempSourceCandidates.value = []
+  } finally {
+    cpuTempSourceLoading.value = false
+  }
+}
+
+async function refreshNodeCpuTempSource() {
+  try {
+    const res = await api.getProxmoxNode(route.params.id)
+    const n = res.data || {}
+    if (node.value) {
+      node.value.cpu_temp_source_host_id = n.cpu_temp_source_host_id || ''
+      node.value.cpu_temp_source_host_name = n.cpu_temp_source_host_name || ''
+    }
+    cpuTempSourceHostId.value = n.cpu_temp_source_host_id || ''
+  } catch {
+    // non-bloquant
+  }
+}
+
+async function saveCpuTempSource() {
+  cpuTempSourceSaving.value = true
+  cpuTempSourceMsg.value = ''
+  try {
+    const target = cpuTempSourceHostId.value || null
+    const res = await api.setProxmoxNodeCpuTempSource(route.params.id, target)
+    if (node.value) {
+      node.value.cpu_temp_source_host_id = res.data?.cpu_temp_source_host_id || ''
+      node.value.cpu_temp_source_host_name = res.data?.cpu_temp_source_host_name || ''
+    }
+    cpuTempSourceHostId.value = res.data?.cpu_temp_source_host_id || ''
+    cpuTempSourceMsg.value = 'Source de température CPU mise à jour.'
+    cpuTempSourceOk.value = true
+  } catch (e) {
+    cpuTempSourceMsg.value = e?.response?.data?.error || 'Erreur lors de la mise à jour.'
+    cpuTempSourceOk.value = false
+  } finally {
+    cpuTempSourceSaving.value = false
+    setTimeout(() => { cpuTempSourceMsg.value = '' }, 4000)
   }
 }
 
@@ -982,6 +1058,8 @@ async function confirmGuestLink(g) {
   try {
     const res = await api.updateProxmoxLink(link.id, { status: 'confirmed' })
     guestLinks.value = { ...guestLinks.value, [g.id]: res.data }
+    await loadCpuTempSourceCandidates()
+    await refreshNodeCpuTempSource()
     showMsg(`[${g.name}] Lien confirmé.`, true)
   } catch (e) {
     showMsg(e?.response?.data?.error || 'Erreur.', false)

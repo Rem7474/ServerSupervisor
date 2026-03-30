@@ -179,6 +179,11 @@ func (h *HostHandler) GetHostComplete(c *gin.Context) {
 	go func() { defer wg.Done(); diskHealth, _ = h.db.GetLatestDiskHealth(hostID) }()
 	go func() { defer wg.Done(); cmdHistory, _ = h.db.GetRecentCommandsByHost(hostID, 20) }()
 	wg.Wait()
+	if metrics != nil {
+		if temp, ok := h.db.GetEffectiveHostCPUTemperature(hostID, metrics.CPUTemperature); ok {
+			metrics.CPUTemperature = temp
+		}
+	}
 
 	if containers == nil {
 		containers = []models.DockerContainer{}
@@ -241,6 +246,11 @@ func (h *HostHandler) GetHostDashboard(c *gin.Context) {
 	}
 
 	metrics, _ := h.db.GetLatestMetrics(hostID)
+	if metrics != nil {
+		if temp, ok := h.db.GetEffectiveHostCPUTemperature(hostID, metrics.CPUTemperature); ok {
+			metrics.CPUTemperature = temp
+		}
+	}
 	containers, _ := h.db.GetDockerContainers(hostID)
 	aptStatus, _ := h.db.GetAptStatus(hostID)
 

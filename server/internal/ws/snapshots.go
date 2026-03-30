@@ -17,6 +17,14 @@ func (h *WSHandler) sendDashboardSnapshot(conn *websocket.Conn, lastHash *string
 	if hostMetrics == nil {
 		hostMetrics = map[string]*models.SystemMetrics{}
 	}
+	for hostID, m := range hostMetrics {
+		if m == nil {
+			continue
+		}
+		if temp, ok := h.db.GetEffectiveHostCPUTemperature(hostID, m.CPUTemperature); ok {
+			m.CPUTemperature = temp
+		}
+	}
 
 	comparisons, err := h.buildVersionComparisons()
 	if err != nil {
@@ -58,6 +66,11 @@ func (h *WSHandler) sendHostSnapshot(conn *websocket.Conn, hostID string, lastHa
 		return err
 	}
 	metrics, _ := h.db.GetLatestMetrics(hostID)
+	if metrics != nil {
+		if temp, ok := h.db.GetEffectiveHostCPUTemperature(hostID, metrics.CPUTemperature); ok {
+			metrics.CPUTemperature = temp
+		}
+	}
 	containers, _ := h.db.GetDockerContainers(hostID)
 	aptStatus, _ := h.db.GetAptStatus(hostID)
 	aptHistory, _ := h.db.GetAptHistoryWithAgentUpdates(hostID, 50)

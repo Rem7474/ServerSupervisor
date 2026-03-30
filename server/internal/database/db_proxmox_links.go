@@ -36,6 +36,9 @@ func (db *DB) UpsertProxmoxGuestLink(guestID, hostID, status, metricsSource stri
 	if err != nil {
 		return nil, err
 	}
+	if status == "confirmed" {
+		_ = db.setNodeCPUTempSourceIfUnset(guestID, hostID)
+	}
 	return db.GetProxmoxGuestLink(id)
 }
 
@@ -209,7 +212,14 @@ func (db *DB) UpdateProxmoxGuestLink(id string, status, metricsSource *string) (
 	if err != nil {
 		return nil, err
 	}
-	return db.GetProxmoxGuestLink(id)
+	link, err := db.GetProxmoxGuestLink(id)
+	if err != nil {
+		return nil, err
+	}
+	if link != nil && link.Status == "confirmed" {
+		_ = db.setNodeCPUTempSourceIfUnset(link.GuestID, link.HostID)
+	}
+	return link, nil
 }
 
 // DeleteProxmoxGuestLink removes a link by ID.
@@ -301,4 +311,18 @@ func scanGuestLinks(rows *sql.Rows) ([]models.ProxmoxGuestLink, error) {
 		links = []models.ProxmoxGuestLink{}
 	}
 	return links, rows.Err()
+}
+
+func (db *DB) setNodeCPUTempSourceIfUnset(guestID, hostID string) error {
+	_, err := db.conn.Exec(`
+		UPDATE proxmox_nodes n
+		SET cpu_temp_source_host_id = $2
+		FROM proxmox_guests g
+		WHERE g.id = $1
+		  AND n.connection_id = g.connection_id
+		  AND n.node_name = g.node_name
+		  AND n.cpu_temp_source_host_id IS NULL`,
+		guestID, hostID,
+	)
+	return err
 }

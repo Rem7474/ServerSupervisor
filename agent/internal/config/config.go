@@ -50,7 +50,7 @@ func Load(path string) (*Config, error) {
 		CollectDocker:         true,
 		CollectAPT:            true,
 		CollectSMART:          false,
-		CollectCPUTemperature: true,
+		CollectCPUTemperature: false,
 		CollectWebLogs:        false,
 		WebLogsLogPaths: []string{
 			"/var/log/nginx/access.log",
@@ -206,7 +206,7 @@ collect_apt: true
 collect_smart: false
 
 # Enable CPU temperature collection from thermal sensors (/sys, hwmon, sensors)
-collect_cpu_temperature: true
+collect_cpu_temperature: false
 
 # Parse web access logs once and derive traffic + threat summaries.
 collect_web_logs: false

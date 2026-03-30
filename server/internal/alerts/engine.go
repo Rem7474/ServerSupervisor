@@ -144,10 +144,11 @@ func GetMetricValue(db *database.DB, host models.Host, rule models.AlertRule) (f
 		case "cpu", "cpu_percent":
 			return metrics.CPUUsagePercent, true
 		case "cpu_temperature":
-			if metrics.CPUTemperature <= 0 {
+			temp, ok := db.GetEffectiveHostCPUTemperature(host.ID, metrics.CPUTemperature)
+			if !ok || temp <= 0 {
 				return 0, false
 			}
-			return metrics.CPUTemperature, true
+			return temp, true
 		case "memory", "ram_percent":
 			return metrics.MemoryPercent, true
 		case "disk", "disk_percent":

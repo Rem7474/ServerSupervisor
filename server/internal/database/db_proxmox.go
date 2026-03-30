@@ -232,6 +232,8 @@ func (db *DB) UpsertProxmoxNode(connectionID, nodeName, status string, cpuCount 
 // nodeSelectCols is the shared SELECT list used by list + get queries.
 const nodeSelectCols = `
 	n.id, n.connection_id, n.node_name, n.status,
+	n.cpu_temp_source_host_id,
+	MAX(COALESCE(src.hostname, src.name, '')) AS cpu_temp_source_host_name,
 	n.cpu_count, n.cpu_usage, n.mem_total, n.mem_used,
 	n.uptime, n.pve_version, n.cluster_name, n.ip_address, n.last_seen_at,
 	n.pending_updates, n.security_updates, n.last_update_check_at,
@@ -243,6 +245,7 @@ func (db *DB) ListProxmoxNodes() ([]models.ProxmoxNode, error) {
 	rows, err := db.conn.Query(`
 		SELECT ` + nodeSelectCols + `
 		FROM proxmox_nodes n
+		LEFT JOIN hosts src         ON src.id = n.cpu_temp_source_host_id
 		LEFT JOIN proxmox_guests g ON g.connection_id=n.connection_id AND g.node_name=n.node_name
 		GROUP BY n.id
 		ORDER BY n.cluster_name, n.node_name`)
@@ -258,6 +261,7 @@ func (db *DB) ListProxmoxNodesByConnection(connectionID string) ([]models.Proxmo
 	rows, err := db.conn.Query(`
 		SELECT `+nodeSelectCols+`
 		FROM proxmox_nodes n
+		LEFT JOIN hosts src         ON src.id = n.cpu_temp_source_host_id
 		LEFT JOIN proxmox_guests g ON g.connection_id=n.connection_id AND g.node_name=n.node_name
 		WHERE n.connection_id=$1
 		GROUP BY n.id
@@ -276,10 +280,12 @@ func (db *DB) GetProxmoxNode(id string) (*models.ProxmoxNode, error) {
 	err := db.conn.QueryRow(`
 		SELECT `+nodeSelectCols+`
 		FROM proxmox_nodes n
+		LEFT JOIN hosts src         ON src.id = n.cpu_temp_source_host_id
 		LEFT JOIN proxmox_guests g ON g.connection_id=n.connection_id AND g.node_name=n.node_name
 		WHERE n.id=$1
 		GROUP BY n.id`, id).Scan(
 		&n.ID, &n.ConnectionID, &n.NodeName, &n.Status,
+		&n.CPUTempSourceHostID, &n.CPUTempSourceHostName,
 		&n.CPUCount, &n.CPUUsage, &n.MemTotal, &n.MemUsed,
 		&n.Uptime, &n.PVEVersion, &n.ClusterName, &n.IPAddress, &n.LastSeenAt,
 		&n.PendingUpdates, &n.SecurityUpdates, &lastUpdateCheckAt,
@@ -334,6 +340,7 @@ func scanNodes(rows *sql.Rows) ([]models.ProxmoxNode, error) {
 		var lastUpdateCheckAt sql.NullTime
 		if err := rows.Scan(
 			&n.ID, &n.ConnectionID, &n.NodeName, &n.Status,
+			&n.CPUTempSourceHostID, &n.CPUTempSourceHostName,
 			&n.CPUCount, &n.CPUUsage, &n.MemTotal, &n.MemUsed,
 			&n.Uptime, &n.PVEVersion, &n.ClusterName, &n.IPAddress, &n.LastSeenAt,
 			&n.PendingUpdates, &n.SecurityUpdates, &lastUpdateCheckAt,
@@ -351,6 +358,87 @@ func scanNodes(rows *sql.Rows) ([]models.ProxmoxNode, error) {
 		nodes = []models.ProxmoxNode{}
 	}
 	return nodes, rows.Err()
+}
+
+// SetProxmoxNodeCPUTempSource maps a Proxmox node to a host used as CPU temperature source.
+// Pass an empty hostID to clear the mapping.
+func (db *DB) SetProxmoxNodeCPUTempSource(nodeID, hostID string) error {
+	if hostID == "" {
+		_, err := db.conn.Exec(`UPDATE proxmox_nodes SET cpu_temp_source_host_id = NULL WHERE id = $1`, nodeID)
+		return err
+	}
+	_, err := db.conn.Exec(`UPDATE proxmox_nodes SET cpu_temp_source_host_id = $2 WHERE id = $1`, nodeID, hostID)
+	return err
+}
+
+// ListProxmoxNodeCPUTempSourceCandidates returns hosts already linked to guests on this node.
+func (db *DB) ListProxmoxNodeCPUTempSourceCandidates(connectionID, nodeName string) ([]models.Host, error) {
+	rows, err := db.conn.Query(`
+		SELECT DISTINCT h.id, h.name, h.hostname, h.ip_address, h.os, h.agent_version,
+		       '' AS api_key, h.tags::text, h.status, h.last_seen, h.created_at, h.updated_at
+		FROM proxmox_guest_links l
+		JOIN proxmox_guests g ON g.id = l.guest_id
+		JOIN hosts h ON h.id = l.host_id
+		WHERE g.connection_id = $1
+		  AND g.node_name = $2
+		  AND l.status = 'confirmed'
+		ORDER BY h.name`, connectionID, nodeName)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	out := []models.Host{}
+	for rows.Next() {
+		var h models.Host
+		var tagsJSON string
+		if err := rows.Scan(&h.ID, &h.Name, &h.Hostname, &h.IPAddress, &h.OS, &h.AgentVersion, &h.APIKey, &tagsJSON, &h.Status, &h.LastSeen, &h.CreatedAt, &h.UpdatedAt); err != nil {
+			return nil, err
+		}
+		h.Tags = parseTags(tagsJSON)
+		out = append(out, h)
+	}
+	return out, rows.Err()
+}
+
+// GetEffectiveHostCPUTemperature resolves CPU temperature for a host using Proxmox node mapping when relevant.
+// Resolution order: mapped node source host temperature (fresh) -> fallbackLocal.
+func (db *DB) GetEffectiveHostCPUTemperature(hostID string, fallbackLocal float64) (float64, bool) {
+	var sourceHostID sql.NullString
+	err := db.conn.QueryRow(`
+		SELECT n.cpu_temp_source_host_id
+		FROM proxmox_guest_links l
+		JOIN proxmox_guests g ON g.id = l.guest_id
+		JOIN proxmox_nodes n ON n.connection_id = g.connection_id AND n.node_name = g.node_name
+		WHERE l.host_id = $1
+		  AND l.status = 'confirmed'
+		  AND l.metrics_source IN ('auto', 'proxmox')
+		LIMIT 1`, hostID).Scan(&sourceHostID)
+	if err != nil && err != sql.ErrNoRows {
+		if fallbackLocal > 0 {
+			return fallbackLocal, true
+		}
+		return 0, false
+	}
+
+	if sourceHostID.Valid {
+		var temp float64
+		var ts time.Time
+		err = db.conn.QueryRow(`
+			SELECT cpu_temperature, timestamp
+			FROM system_metrics
+			WHERE host_id = $1
+			ORDER BY timestamp DESC
+			LIMIT 1`, sourceHostID.String).Scan(&temp, &ts)
+		if err == nil && temp > 0 && time.Since(ts) <= 10*time.Minute {
+			return temp, true
+		}
+	}
+
+	if fallbackLocal > 0 {
+		return fallbackLocal, true
+	}
+	return 0, false
 }
 
 // ─── Guests ───────────────────────────────────────────────────────────────────
