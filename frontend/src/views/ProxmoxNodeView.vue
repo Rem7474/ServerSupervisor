@@ -531,7 +531,7 @@
         <!-- Security tab -->
         <div v-if="tab === 'security'">
           <div class="card-header d-flex align-items-center gap-2 flex-wrap">
-            <select v-model="securityService" class="form-select form-select-sm" style="max-width: 11rem">
+            <select v-model="securityService" class="form-select proxmox-security-service-select">
               <option value="rotate">Rotation (3 services)</option>
               <option value="pveproxy">pveproxy</option>
               <option value="sshd">sshd</option>
@@ -541,8 +541,7 @@
             <input
               v-model="securitySearch"
               type="text"
-              class="form-control form-control-sm"
-              style="max-width: 18rem"
+              class="form-control proxmox-security-search"
               placeholder="Filtre syslog (ex: failed, denied, apparmor)"
             >
             <button class="btn btn-sm btn-outline-secondary" :disabled="securityEventsLoading" @click="loadNodeSecurityEvents">
@@ -1372,12 +1371,26 @@ onUnmounted(() => {
   flex: 0 0 auto;
 }
 
+.proxmox-security-service-select {
+  max-width: 11rem;
+}
+
+.proxmox-security-search {
+  max-width: 18rem;
+}
+
 @media (max-width: 992px) {
   .node-live-meta {
     position: static !important;
     margin-top: 0.75rem;
     padding: 0;
     justify-content: flex-end;
+    width: 100%;
+  }
+
+  .proxmox-security-service-select,
+  .proxmox-security-search {
+    max-width: 100%;
     width: 100%;
   }
 }

@@ -1,5 +1,5 @@
 <template>
-  <div class="card ui-toolbar-card mb-3">
+  <div class="card mb-3">
     <div class="card-body">
       <div class="d-flex flex-column flex-lg-row gap-3 align-items-stretch align-items-lg-center justify-content-between">
         <div class="ui-toolbar-left d-flex flex-wrap gap-2 align-items-center">
@@ -36,11 +36,6 @@ defineEmits(['update:search'])
 </script>
 
 <style scoped>
-.ui-toolbar-card {
-  border: 1px solid #dbe3ec;
-  border-radius: 0.7rem;
-}
-
 .ui-toolbar-search {
   min-width: 260px;
 }

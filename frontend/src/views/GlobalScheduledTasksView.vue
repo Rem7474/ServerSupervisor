@@ -26,16 +26,16 @@
     <!-- Filters & Sort -->
     <div class="row g-3 mb-3 align-items-center">
       <div class="col-auto">
-        <input v-model="filterText" type="text" class="form-control form-control-sm" placeholder="Rechercher…" style="min-width:200px" />
+        <input v-model="filterText" type="text" class="form-control tasks-filter-search" placeholder="Rechercher…" />
       </div>
       <div class="col-auto">
-        <select v-model="filterHost" class="form-select form-select-sm" style="min-width:160px">
+        <select v-model="filterHost" class="form-select tasks-filter-select">
           <option value="">Tous les hôtes</option>
           <option v-for="host in hostList" :key="host" :value="host">{{ host }}</option>
         </select>
       </div>
       <div class="col-auto">
-        <select v-model="filterModule" class="form-select form-select-sm">
+        <select v-model="filterModule" class="form-select">
           <option value="">Tous les modules</option>
           <option value="apt">apt</option>
           <option value="docker">docker</option>
@@ -46,7 +46,7 @@
         </select>
       </div>
       <div class="col-auto">
-        <select v-model="filterStatus" class="form-select form-select-sm">
+        <select v-model="filterStatus" class="form-select">
           <option value="">Tous les statuts</option>
           <option value="enabled">Activées</option>
           <option value="disabled">Désactivées</option>
@@ -54,7 +54,7 @@
         </select>
       </div>
       <div class="col-auto ms-auto d-flex gap-2">
-        <select v-model="sortKey" class="form-select form-select-sm" style="min-width:160px">
+        <select v-model="sortKey" class="form-select tasks-filter-select">
           <option value="name">Nom</option>
           <option value="host_name">Hôte</option>
           <option value="module">Module</option>
@@ -483,3 +483,20 @@ async function runNow(task) {
 
 onMounted(loadTasks)
 </script>
+
+<style scoped>
+.tasks-filter-search {
+  min-width: 200px;
+}
+
+.tasks-filter-select {
+  min-width: 160px;
+}
+
+@media (max-width: 768px) {
+  .tasks-filter-search,
+  .tasks-filter-select {
+    min-width: 0;
+  }
+}
+</style>

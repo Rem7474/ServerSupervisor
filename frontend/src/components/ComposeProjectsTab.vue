@@ -1,11 +1,13 @@
 <template>
   <!-- Filters -->
-  <div class="card mb-4">
-    <div class="card-body">
+  <DataToolbar
+    searchable
+    :search="composeSearch"
+    search-placeholder="Rechercher un projet..."
+    @update:search="composeSearch = $event"
+  >
+    <template #bottom>
       <div class="row g-3">
-        <div class="col-6 col-md-6 col-lg-3">
-          <input v-model="composeSearch" type="text" class="form-control" placeholder="Rechercher un projet..." />
-        </div>
         <div class="col-6 col-md-6 col-lg-3">
           <select v-model="composeHostFilter" class="form-select">
             <option value="">Tous les hôtes</option>
@@ -20,8 +22,8 @@
           </select>
         </div>
       </div>
-    </div>
-  </div>
+    </template>
+  </DataToolbar>
 
   <div class="card">
     <div class="table-responsive">
@@ -188,6 +190,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
+import DataToolbar from './common/DataToolbar.vue'
 
 const props = defineProps({
   composeProjects: { type: Array, default: () => [] },
