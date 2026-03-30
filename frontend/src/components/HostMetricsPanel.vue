@@ -15,14 +15,14 @@
         </div>
       </div>
     </div>
-    <div class="col-6 col-lg-3">
+    <div v-if="hasCpuTemp" class="col-6 col-lg-3">
       <div class="card card-sm h-100">
         <div class="card-body">
           <div class="subheader">CPU TEMP</div>
           <div class="h2 mb-0" :class="tempColor(metrics.cpu_temperature)">
-            {{ metrics.cpu_temperature > 0 ? `${metrics.cpu_temperature.toFixed(1)}°C` : 'N/A' }}
+            {{ `${metrics.cpu_temperature.toFixed(1)}°C` }}
           </div>
-          <div class="text-secondary small">Sonde locale</div>
+          <div class="text-secondary small">{{ cpuTempSourceLabel }}</div>
         </div>
       </div>
     </div>
@@ -93,7 +93,7 @@
 </template>
 
 <script setup>
-import { ref, shallowRef, defineAsyncComponent, onMounted, watch, toRef } from 'vue'
+import { computed, ref, shallowRef, defineAsyncComponent, onMounted, watch, toRef } from 'vue'
 import apiClient from '../api'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
@@ -124,6 +124,11 @@ const chartHours = ref(24)
 const metricsHistory = ref([])
 const cpuChartData = shallowRef(null)
 const memChartData = shallowRef(null)
+
+const hasCpuTemp = computed(() => Number(props.metrics?.cpu_temperature) > 0)
+const cpuTempSourceLabel = computed(() =>
+  props.metricsSource === 'proxmox' ? 'Source : lien Proxmox' : 'Sonde locale'
+)
 
 const timeRangeOptions = [
   { hours: 1,    label: '1h' },
