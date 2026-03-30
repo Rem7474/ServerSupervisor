@@ -191,10 +191,6 @@
             </div>
           </div>
         </div>
-      </div>
-
-      <!-- CPU temperature history (mapped source host) -->
-      <div class="row row-cards mb-4">
         <div class="col-12 col-lg-4">
           <div class="card">
             <div class="card-header d-flex align-items-center justify-content-between">
