@@ -441,6 +441,20 @@ func (db *DB) GetEffectiveHostCPUTemperature(hostID string, fallbackLocal float6
 	return 0, false
 }
 
+// IsHostUsedAsProxmoxCPUTempSource returns true when the host is configured
+// as CPU temperature source for at least one Proxmox node.
+func (db *DB) IsHostUsedAsProxmoxCPUTempSource(hostID string) bool {
+	var exists bool
+	err := db.conn.QueryRow(
+		`SELECT EXISTS(SELECT 1 FROM proxmox_nodes WHERE cpu_temp_source_host_id = $1)`,
+		hostID,
+	).Scan(&exists)
+	if err != nil {
+		return false
+	}
+	return exists
+}
+
 // ─── Guests ───────────────────────────────────────────────────────────────────
 
 // UpsertProxmoxGuest inserts or updates a VM/LXC record.

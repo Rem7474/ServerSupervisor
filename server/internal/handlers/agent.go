@@ -95,6 +95,12 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 		}
 	}
 
+	// A host used as Proxmox CPU temperature source must keep sending local
+	// metrics so cpu_temperature can be resolved for all linked guests on that node.
+	if proxmoxIsMetricsSource && h.db.IsHostUsedAsProxmoxCPUTempSource(hostID) {
+		proxmoxIsMetricsSource = false
+	}
+
 	// Update host info from agent report (only if metrics are provided)
 	if report.Metrics != nil {
 		update := models.HostUpdate{
