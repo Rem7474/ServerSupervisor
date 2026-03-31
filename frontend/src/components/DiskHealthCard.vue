@@ -1,10 +1,14 @@
 <template>
-  <div v-if="loading || health.length > 0" class="card">
+  <div class="card">
     <div class="card-header">
       <h3 class="card-title">État SMART des disques</h3>
     </div>
     <div v-if="loading" class="card-body text-center py-4">
       <div class="spinner-border spinner-border-sm text-muted"></div>
+    </div>
+    <div v-else-if="health.length === 0" class="card-body text-muted small">
+      Aucune donnée SMART disponible pour cet hôte.
+      Vérifie que l'agent a `collect_smart: true`, que `smartmontools` est installé et que l'agent a accès aux disques physiques.
     </div>
     <div v-else class="card-body">
       <div class="d-flex flex-column gap-3">
