@@ -31,13 +31,16 @@
 
               <div class="mb-3">
                 <label class="form-label">Hôte cible</label>
-                <select v-model="form.host_id" class="form-select">
+                <select v-model="form.host_id" class="form-select" :disabled="!metricSupportsHostFilter">
                   <option :value="null">Tous les hôtes</option>
                   <option v-for="host in hosts" :key="host.id" :value="host.id">{{ host.name }}</option>
                 </select>
+                <small v-if="!metricSupportsHostFilter" class="form-hint">Cette metrique est globale et n'est pas liee a un hote.</small>
               </div>
 
               <div class="mb-2 fw-semibold">Choisissez une métrique à surveiller</div>
+              <div v-if="capabilitiesLoading" class="alert alert-info py-2 small mb-2">Chargement des metriques...</div>
+              <div v-else-if="capabilitiesError" class="alert alert-warning py-2 small mb-2">{{ capabilitiesError }}</div>
               <div class="metric-grid">
                 <button
                   v-for="metric in metricCards"
@@ -51,8 +54,43 @@
                   <span class="metric-label">{{ metric.label }}</span>
                 </button>
               </div>
-              <div class="text-secondary small mt-2">
-                Note: la température correspond à la température disque (SMART), pas à la température CPU.
+              <div v-if="form.metric === 'proxmox_storage_percent'" class="row g-2 mt-2">
+                <div class="col-md-4">
+                  <label class="form-label">Scope Proxmox</label>
+                  <select v-model="form.actions.proxmox_scope.scope_mode" class="form-select">
+                    <option value="global">Global</option>
+                    <option value="connection">Connexion</option>
+                    <option value="node">Noeud</option>
+                    <option value="storage">Stockage</option>
+                  </select>
+                </div>
+                <div v-if="form.actions.proxmox_scope.scope_mode === 'connection'" class="col-md-8">
+                  <label class="form-label">Connexion</label>
+                  <select v-model="form.actions.proxmox_scope.connection_id" class="form-select">
+                    <option value="">Selectionner...</option>
+                    <option v-for="opt in proxmoxConnections" :key="opt.id" :value="opt.id">{{ opt.label }}</option>
+                  </select>
+                </div>
+                <div v-if="form.actions.proxmox_scope.scope_mode === 'node'" class="col-md-8">
+                  <label class="form-label">Noeud</label>
+                  <select v-model="form.actions.proxmox_scope.node_id" class="form-select">
+                    <option value="">Selectionner...</option>
+                    <option v-for="opt in proxmoxNodes" :key="opt.id" :value="opt.id">{{ opt.label }}</option>
+                  </select>
+                </div>
+                <div v-if="form.actions.proxmox_scope.scope_mode === 'storage'" class="col-md-8">
+                  <label class="form-label">Stockage</label>
+                  <select v-model="form.actions.proxmox_scope.storage_id" class="form-select">
+                    <option value="">Selectionner...</option>
+                    <option v-for="opt in proxmoxStorages" :key="opt.id" :value="opt.id">{{ opt.label }}</option>
+                  </select>
+                </div>
+              </div>
+              <div v-if="form.metric === 'proxmox_storage_percent'" class="text-secondary small mt-2">
+                Cette métrique est globale Proxmox: elle surveille le stockage le plus rempli parmi les stockages actifs.
+              </div>
+              <div v-else-if="form.metric === 'disk_smart_status'" class="text-secondary small mt-2">
+                Utilisez typiquement un seuil > 0.5 pour déclencher quand au moins un disque est en etat SMART FAILED.
               </div>
             </div>
 
@@ -226,6 +264,7 @@ import { computed, onUnmounted, ref, watch } from 'vue'
 import apiClient from '../../api'
 import AlertRuleCommandTrigger from './AlertRuleCommandTrigger.vue'
 import { useAlertRuleForm } from '../../composables/useAlertRuleForm'
+import { getAlertMetricMeta } from '../../utils/alertMetrics'
 
 const props = defineProps({
   visible: {
@@ -239,6 +278,18 @@ const props = defineProps({
   hosts: {
     type: Array,
     default: () => [],
+  },
+  capabilities: {
+    type: Object,
+    default: null,
+  },
+  capabilitiesLoading: {
+    type: Boolean,
+    default: false,
+  },
+  capabilitiesError: {
+    type: String,
+    default: '',
   },
   saving: {
     type: Boolean,
@@ -255,19 +306,32 @@ const emit = defineEmits(['close', 'submit'])
 const browserPermission = ref(typeof Notification !== 'undefined' ? Notification.permission : 'unsupported')
 const step = ref(1)
 
-const metricCards = [
-  { value: 'cpu', label: 'CPU', icon: '⚡' },
-  { value: 'cpu_temperature', label: 'Temp. CPU', icon: '🌡' },
-  { value: 'memory', label: 'RAM', icon: 'ðŸ§ ' },
-  { value: 'disk', label: 'Disque', icon: 'ðŸ’¾' },
-  { value: 'heartbeat_timeout', label: 'Heartbeat', icon: 'ðŸ«€' },
-  { value: 'disk_temperature', label: 'Temp. disque', icon: 'ðŸŒ¡' },
-  { value: 'proxmox_storage_percent', label: 'Proxmox', icon: 'ðŸ–¥' },
-  { value: 'npm_requests', label: 'NPM requêtes', icon: 'ðŸŒ' },
-  { value: 'npm_traffic_bytes', label: 'NPM trafic', icon: 'ðŸ“¦' },
-  { value: 'npm_5xx_errors', label: 'NPM 5xx', icon: 'ðŸš¨' },
-]
+const metricCards = computed(() => {
+  const fromCapabilities = props.capabilities?.metrics
+  if (Array.isArray(fromCapabilities) && fromCapabilities.length > 0) {
+    return fromCapabilities.map((metric) => ({
+      value: metric.metric,
+      label: metric.label,
+      icon: metric.icon || getAlertMetricMeta(metric.metric).icon,
+    }))
+  }
 
+  return []
+})
+
+const proxmoxConnections = computed(() => props.capabilities?.proxmox_scope?.connections || [])
+const proxmoxNodes = computed(() => props.capabilities?.proxmox_scope?.nodes || [])
+const proxmoxStorages = computed(() => props.capabilities?.proxmox_scope?.storages || [])
+
+const metricMetaByKey = computed(() => {
+  const items = props.capabilities?.metrics || []
+  return Object.fromEntries(items.map((item) => [item.metric, item]))
+})
+
+const metricSupportsHostFilter = computed(() => {
+  const supports = metricMetaByKey.value?.[form.value.metric]?.supports_host_filter
+  return supports !== false
+})
 const {
   form,
   channelSmtp,
@@ -285,7 +349,17 @@ const testResults = ref(null)
 const hasNoDataResults = computed(() => testResults.value?.results?.some((result) => !result.has_data) || false)
 
 const canProceedStep = computed(() => {
-  if (step.value === 1) return !!form.value.metric && !!form.value.name?.trim()
+  if (step.value === 1) {
+    const hasBase = !!form.value.metric && !!form.value.name?.trim()
+    if (!hasBase) return false
+    if (form.value.metric !== 'proxmox_storage_percent') return true
+
+    const scope = form.value.actions.proxmox_scope || { scope_mode: 'global' }
+    if (scope.scope_mode === 'connection') return !!scope.connection_id
+    if (scope.scope_mode === 'node') return !!scope.node_id
+    if (scope.scope_mode === 'storage') return !!scope.storage_id
+    return true
+  }
   if (step.value === 2) return Number.isFinite(Number(form.value.threshold))
   return true
 })
@@ -318,6 +392,26 @@ watch(
 )
 
 watch(
+  () => metricSupportsHostFilter.value,
+  (supportsHost) => {
+    if (!supportsHost) {
+      form.value.host_id = null
+    }
+  }
+)
+
+watch(
+  () => form.value.actions?.proxmox_scope?.scope_mode,
+  (mode) => {
+    const scope = form.value.actions?.proxmox_scope
+    if (!scope) return
+    if (mode !== 'connection') scope.connection_id = ''
+    if (mode !== 'node') scope.node_id = ''
+    if (mode !== 'storage') scope.storage_id = ''
+  }
+)
+
+watch(
   () => props.visible,
   (visible) => {
     if (visible) {
@@ -327,6 +421,20 @@ watch(
     document.removeEventListener('keydown', onKeyDown)
   },
   { immediate: true }
+)
+
+watch(
+  () => props.capabilities?.metrics,
+  (metrics) => {
+    if (!Array.isArray(metrics) || metrics.length === 0) return
+    const current = form.value.metric
+    const exists = metrics.some((item) => item.metric === current)
+    if (!exists) {
+      form.value.metric = metrics[0].metric
+      onMetricChange()
+    }
+  },
+  { immediate: true, deep: true }
 )
 
 onUnmounted(() => {
@@ -374,21 +482,7 @@ function goNextStep() {
 }
 
 function getMetricUnit(metric) {
-  const units = {
-    cpu: '%',
-    cpu_temperature: '°C',
-    memory: '%',
-    disk: '%',
-    load: '',
-    heartbeat_timeout: 's',
-    disk_smart_status: '',
-    disk_temperature: '°C',
-    proxmox_storage_percent: '%',
-    npm_requests: 'req',
-    npm_traffic_bytes: 'B',
-    npm_5xx_errors: 'err',
-  }
-  return units[metric] || ''
+  return metricMetaByKey.value?.[metric]?.unit || getAlertMetricMeta(metric).unit
 }
 
 function formatDate(dateStr) {

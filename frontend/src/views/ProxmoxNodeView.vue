@@ -195,13 +195,7 @@
           <div class="card">
             <div class="card-header d-flex align-items-center justify-content-between">
               <h3 class="card-title mb-0">Historique temp. CPU (nœud)</h3>
-              <div class="btn-group btn-group-sm">
-                <button v-for="opt in tempHistoryOptions" :key="opt.hours"
-                  :class="tempHistoryHours === opt.hours ? 'btn btn-primary' : 'btn btn-outline-secondary'"
-                  @click="loadNodeCpuTempHistory(opt.hours)">
-                  {{ opt.label }}
-                </button>
-              </div>
+              <span class="badge bg-azure-lt text-azure">Période: {{ rrdTimeframeLabel }}</span>
             </div>
             <div class="card-body" style="height:11rem">
               <Line v-if="nodeTempChart" :data="nodeTempChart" :options="tempChartOptions" class="h-100" />
@@ -761,12 +755,6 @@ const cpuTempSourceSaving = ref(false)
 const cpuTempSourceMsg = ref('')
 const cpuTempSourceOk = ref(false)
 
-const tempHistoryOptions = [
-  { hours: 1, label: '1h' },
-  { hours: 6, label: '6h' },
-  { hours: 24, label: '24h' },
-]
-const tempHistoryHours = ref(24)
 const nodeTempLoading = ref(false)
 const nodeTempError = ref('')
 const nodeTempChart = shallowRef(null)
@@ -792,6 +780,16 @@ const rrdTimeframeOptions = [
   { value: 'month', label: '30j' },
   { value: 'year', label: '1 an' },
 ]
+const rrdTimeframeToHours = {
+  hour: 1,
+  day: 24,
+  week: 24 * 7,
+  month: 24 * 30,
+  year: 24 * 365,
+}
+const rrdTimeframeLabel = computed(() =>
+  rrdTimeframeOptions.find(opt => opt.value === rrdTimeframe.value)?.label ?? '1h'
+)
 const rrdCpuChart = shallowRef(null)
 const rrdRamChart = shallowRef(null)
 const rrdIowaitChart = shallowRef(null)
@@ -1040,7 +1038,6 @@ async function load() {
     node.value = res.data
     cpuTempSourceHostId.value = node.value?.cpu_temp_source_host_id || ''
     await loadCpuTempSourceCandidates()
-    await loadNodeCpuTempHistory()
     await loadGuestLinks()
     // fire-and-forget: live status + RRD charts load in parallel
     loadLiveStatus()
@@ -1055,8 +1052,7 @@ async function load() {
   }
 }
 
-async function loadNodeCpuTempHistory(hours = tempHistoryHours.value) {
-  tempHistoryHours.value = hours
+async function loadNodeCpuTempHistory(hours = rrdTimeframeToHours[rrdTimeframe.value] ?? 24) {
   nodeTempLoading.value = true
   nodeTempError.value = ''
   nodeTempChart.value = null
@@ -1138,7 +1134,7 @@ async function saveCpuTempSource() {
       node.value.cpu_temp_source_host_name = res.data?.cpu_temp_source_host_name || ''
     }
     cpuTempSourceHostId.value = res.data?.cpu_temp_source_host_id || ''
-    await loadNodeCpuTempHistory()
+    await loadNodeCpuTempHistory(rrdTimeframeToHours[rrdTimeframe.value] ?? 24)
     cpuTempSourceMsg.value = 'Source de température CPU mise à jour.'
     cpuTempSourceOk.value = true
   } catch (e) {
@@ -1213,6 +1209,7 @@ function showMsg(msg, ok) {
 
 async function loadRRD(timeframe = rrdTimeframe.value) {
   rrdTimeframe.value = timeframe
+  void loadNodeCpuTempHistory(rrdTimeframeToHours[timeframe] ?? 24)
   rrdLoading.value = true
   rrdError.value = ''
   try {

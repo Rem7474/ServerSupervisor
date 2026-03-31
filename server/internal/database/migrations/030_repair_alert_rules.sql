@@ -55,8 +55,9 @@ BEGIN
     -- Restore foreign key from alert_incidents
     ALTER TABLE alert_incidents
       ADD CONSTRAINT alert_incidents_rule_id_fkey
-      FOREIGN KEY (rule_id) REFERENCES alert_rules(id) ON DELETE CASCADE;
+      FOREIGN KEY (rule_id) REFERENCES alert_rules(id) ON DELETE SET NULL;
   END IF;
 END $$;
 
 CREATE INDEX IF NOT EXISTS idx_alert_rules_host ON alert_rules(host_id);
+

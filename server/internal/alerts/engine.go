@@ -52,7 +52,12 @@ func EvaluateAlerts(db *database.DB, cfg *config.Config, dispatcher *dispatch.Di
 			ruleName = fmt.Sprintf("rule#%d(%s)", rule.ID, *rule.Name)
 		}
 
-		for _, host := range hosts {
+		hostsForRule := hosts
+		if rule.Metric == "proxmox_storage_percent" {
+			hostsForRule = selectHostsForGlobalMetric(rule, hosts)
+		}
+
+		for _, host := range hostsForRule {
 			if rule.HostID != nil && *rule.HostID != host.ID {
 				continue
 			}
@@ -94,6 +99,23 @@ func EvaluateAlerts(db *database.DB, cfg *config.Config, dispatcher *dispatch.Di
 			}
 		}
 	}
+}
+
+// selectHostsForGlobalMetric returns a single host target for global metrics to avoid
+// creating duplicated incidents for every host in the inventory.
+func selectHostsForGlobalMetric(rule models.AlertRule, hosts []models.Host) []models.Host {
+	if len(hosts) == 0 {
+		return hosts
+	}
+	if rule.HostID != nil {
+		for _, host := range hosts {
+			if host.ID == *rule.HostID {
+				return []models.Host{host}
+			}
+		}
+		return []models.Host{}
+	}
+	return []models.Host{hosts[0]}
 }
 
 // GetMetricValue retrieves the current value of a metric for a host according to a rule.
@@ -189,8 +211,7 @@ func GetMetricValue(db *database.DB, host models.Host, rule models.AlertRule) (f
 		}
 		return maxTemp, true
 	case "proxmox_storage_percent":
-		// Global metric: max storage usage % across all active Proxmox storages.
-		pct := db.GetMaxProxmoxStorageUsagePercent()
+		pct := resolveProxmoxStoragePercent(db, rule)
 		return pct, true
 	case "npm_requests", "npm_traffic_bytes", "npm_5xx_errors":
 		requests, bytes, errors5xx, capturedAt, err := db.GetHostWebLogCache(host.ID)
@@ -214,6 +235,33 @@ func GetMetricValue(db *database.DB, host models.Host, rule models.AlertRule) (f
 		}
 	}
 	return 0, false
+}
+
+func resolveProxmoxStoragePercent(db *database.DB, rule models.AlertRule) float64 {
+	scope := rule.Actions.ProxmoxScope
+	if scope == nil || scope.ScopeMode == "" || scope.ScopeMode == "global" {
+		return db.GetMaxProxmoxStorageUsagePercent()
+	}
+
+	switch scope.ScopeMode {
+	case "connection":
+		if scope.ConnectionID == "" {
+			return db.GetMaxProxmoxStorageUsagePercent()
+		}
+		return db.GetMaxProxmoxStorageUsagePercentByConnection(scope.ConnectionID)
+	case "node":
+		if scope.NodeID == "" {
+			return db.GetMaxProxmoxStorageUsagePercent()
+		}
+		return db.GetMaxProxmoxStorageUsagePercentByNode(scope.NodeID)
+	case "storage":
+		if scope.StorageID == "" {
+			return db.GetMaxProxmoxStorageUsagePercent()
+		}
+		return db.GetProxmoxStorageUsagePercentByStorage(scope.StorageID)
+	default:
+		return db.GetMaxProxmoxStorageUsagePercent()
+	}
 }
 
 // MatchRule evaluates whether a rule condition is currently met for the given value.
@@ -366,7 +414,7 @@ func pushWebNotifications(db *database.DB, cfg *config.Config, rule models.Alert
 		"url":   "/alerts?tab=incidents",
 	})
 
-	subs, err := db.GetAllPushSubscriptions()
+	subs, err := db.GetPushSubscriptionsByRole("admin")
 	if err != nil || len(subs) == 0 {
 		return
 	}

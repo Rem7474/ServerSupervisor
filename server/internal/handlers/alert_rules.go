@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -23,21 +24,254 @@ type AlertRulesHandler struct {
 }
 
 func NewAlertRulesHandler(db *database.DB, cfg *config.Config) *AlertRulesHandler {
-	return &AlertRulesHandler{
-		db:  db,
-		cfg: cfg,
-	}
+	return &AlertRulesHandler{db: db, cfg: cfg}
 }
 
 // alertRuleFieldLabel maps Go struct field names to human-readable French labels.
 var alertRuleFieldLabel = map[string]string{
 	"Name":      "Nom",
-	"Metric":    "Métrique",
-	"Operator":  "Opérateur",
+	"Metric":    "Metrique",
+	"Operator":  "Operateur",
 	"Threshold": "Seuil",
-	"Duration":  "Durée",
-	"Enabled":   "Activé",
-	"HostID":    "Hôte",
+	"Duration":  "Duree",
+	"Enabled":   "Active",
+	"HostID":    "Hote",
+}
+
+var validAlertOperators = map[string]bool{">": true, "<": true, ">=": true, "<=": true}
+
+var validAlertChannels = map[string]bool{
+	"smtp":    true,
+	"ntfy":    true,
+	"browser": true,
+	"notify":  true,
+}
+
+var commandModuleActions = map[string][]string{
+	"docker":    {"logs", "restart", "start", "stop", "compose_up", "compose_down", "compose_pull", "compose_logs", "compose_restart"},
+	"journal":   {"read"},
+	"apt":       {"update", "upgrade", "full-upgrade", "autoremove"},
+	"systemd":   {"status", "start", "stop", "restart", "list"},
+	"processes": {"list"},
+	"custom":    {"run"},
+}
+
+var commandModuleRequiresTarget = map[string]bool{
+	"docker":  true,
+	"journal": true,
+	"systemd": true,
+	"custom":  true,
+}
+
+var validAlertMetrics = map[string]bool{
+	"cpu": true, "memory": true, "disk": true, "load": true, "heartbeat_timeout": true,
+	"status_offline":  true,
+	"cpu_temperature": true, "disk_smart_status": true, "disk_temperature": true, "proxmox_storage_percent": true,
+	"npm_requests": true, "npm_traffic_bytes": true, "npm_5xx_errors": true,
+}
+
+type alertMetricCapability struct {
+	Metric             string `json:"metric"`
+	Label              string `json:"label"`
+	Unit               string `json:"unit"`
+	Icon               string `json:"icon"`
+	BadgeClass         string `json:"badge_class"`
+	SupportsThreshold  bool   `json:"supports_threshold"`
+	SupportsDuration   bool   `json:"supports_duration"`
+	SupportsHostFilter bool   `json:"supports_host_filter"`
+}
+
+type alertScopeOption struct {
+	ID    string `json:"id"`
+	Label string `json:"label"`
+}
+
+type alertMetricCapabilitiesResponse struct {
+	Metrics      []alertMetricCapability `json:"metrics"`
+	ProxmoxScope struct {
+		Modes       []string           `json:"modes"`
+		Connections []alertScopeOption `json:"connections"`
+		Nodes       []alertScopeOption `json:"nodes"`
+		Storages    []alertScopeOption `json:"storages"`
+	} `json:"proxmox_scope"`
+}
+
+func validateAlertRuleMetricOperator(metric, operator string) error {
+	if !validAlertOperators[operator] {
+		return errors.New("Operateur invalide.")
+	}
+	if !validAlertMetrics[metric] {
+		return errors.New("Metrique invalide.")
+	}
+	return nil
+}
+
+func containsString(values []string, expected string) bool {
+	for _, value := range values {
+		if value == expected {
+			return true
+		}
+	}
+	return false
+}
+
+func validateAlertActions(db *database.DB, actions *models.AlertActions, metric string) error {
+	if actions == nil {
+		return nil
+	}
+	if actions.Cooldown < 0 {
+		return errors.New("La periode de silence doit etre positive ou nulle.")
+	}
+	for _, channel := range actions.Channels {
+		if !validAlertChannels[channel] {
+			return fmt.Errorf("Canal de notification invalide: %s", channel)
+		}
+	}
+
+	if actions.CommandTrigger != nil {
+		ct := actions.CommandTrigger
+		ct.Module = strings.TrimSpace(ct.Module)
+		ct.Action = strings.TrimSpace(ct.Action)
+		ct.Target = strings.TrimSpace(ct.Target)
+
+		if ct.Module == "" || ct.Action == "" {
+			return errors.New("Le declencheur de commande doit definir un module et une action.")
+		}
+		allowedActions, ok := commandModuleActions[ct.Module]
+		if !ok {
+			return fmt.Errorf("Module de commande invalide: %s", ct.Module)
+		}
+		if !containsString(allowedActions, ct.Action) {
+			return fmt.Errorf("Action invalide pour le module %s: %s", ct.Module, ct.Action)
+		}
+		if commandModuleRequiresTarget[ct.Module] && ct.Target == "" {
+			return fmt.Errorf("Le module %s requiert une cible.", ct.Module)
+		}
+		if !commandModuleRequiresTarget[ct.Module] {
+			ct.Target = ""
+		}
+	}
+
+	if metric != "proxmox_storage_percent" {
+		actions.ProxmoxScope = nil
+		return nil
+	}
+
+	if actions.ProxmoxScope == nil {
+		actions.ProxmoxScope = &models.ProxmoxMetricScope{ScopeMode: "global"}
+		return nil
+	}
+
+	scope := actions.ProxmoxScope
+	scope.ScopeMode = strings.TrimSpace(scope.ScopeMode)
+	if scope.ScopeMode == "" {
+		scope.ScopeMode = "global"
+	}
+
+	if !containsString([]string{"global", "connection", "node", "storage"}, scope.ScopeMode) {
+		return errors.New("Scope Proxmox invalide.")
+	}
+
+	if scope.ScopeMode == "connection" {
+		scope.ConnectionID = strings.TrimSpace(scope.ConnectionID)
+		if scope.ConnectionID == "" {
+			return errors.New("Le scope connexion requiert une connexion Proxmox.")
+		}
+		var exists bool
+		if err := db.QueryRow(`SELECT EXISTS(SELECT 1 FROM proxmox_connections WHERE id = $1)`, scope.ConnectionID).Scan(&exists); err != nil || !exists {
+			return errors.New("Connexion Proxmox introuvable pour ce scope.")
+		}
+	}
+
+	if scope.ScopeMode == "node" {
+		scope.NodeID = strings.TrimSpace(scope.NodeID)
+		if scope.NodeID == "" {
+			return errors.New("Le scope noeud requiert un noeud Proxmox.")
+		}
+		var exists bool
+		if err := db.QueryRow(`SELECT EXISTS(SELECT 1 FROM proxmox_nodes WHERE id = $1)`, scope.NodeID).Scan(&exists); err != nil || !exists {
+			return errors.New("Noeud Proxmox introuvable pour ce scope.")
+		}
+	}
+
+	if scope.ScopeMode == "storage" {
+		scope.StorageID = strings.TrimSpace(scope.StorageID)
+		if scope.StorageID == "" {
+			return errors.New("Le scope stockage requiert un stockage Proxmox.")
+		}
+		var exists bool
+		if err := db.QueryRow(`SELECT EXISTS(SELECT 1 FROM proxmox_storages WHERE id = $1)`, scope.StorageID).Scan(&exists); err != nil || !exists {
+			return errors.New("Stockage Proxmox introuvable pour ce scope.")
+		}
+	}
+
+	return nil
+}
+
+// GetAlertRuleCapabilities returns metric metadata and dynamic scope options.
+func (h *AlertRulesHandler) GetAlertRuleCapabilities(c *gin.Context) {
+	response := alertMetricCapabilitiesResponse{
+		Metrics: []alertMetricCapability{
+			{Metric: "cpu", Label: "CPU", Unit: "%", Icon: "\u26a1", BadgeClass: "bg-red-lt text-red", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: true},
+			{Metric: "cpu_temperature", Label: "Temp. CPU", Unit: "\u00b0C", Icon: "\U0001f321", BadgeClass: "bg-orange-lt text-orange", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: true},
+			{Metric: "memory", Label: "RAM", Unit: "%", Icon: "\U0001f9e0", BadgeClass: "bg-blue-lt text-blue", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: true},
+			{Metric: "disk", Label: "Disque", Unit: "%", Icon: "\U0001f4be", BadgeClass: "bg-yellow-lt text-yellow", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: true},
+			{Metric: "load", Label: "Load avg", Unit: "", Icon: "\U0001f4c8", BadgeClass: "bg-purple-lt text-purple", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: true},
+			{Metric: "heartbeat_timeout", Label: "Heartbeat", Unit: "s", Icon: "\U0001fac0", BadgeClass: "bg-orange-lt text-orange", SupportsThreshold: true, SupportsDuration: false, SupportsHostFilter: true},
+			{Metric: "status_offline", Label: "Hote hors ligne", Unit: "", Icon: "\U0001f50c", BadgeClass: "bg-red-lt text-red", SupportsThreshold: true, SupportsDuration: false, SupportsHostFilter: true},
+			{Metric: "disk_smart_status", Label: "SMART disque", Unit: "", Icon: "\U0001f6e1", BadgeClass: "bg-yellow-lt text-yellow", SupportsThreshold: true, SupportsDuration: false, SupportsHostFilter: true},
+			{Metric: "disk_temperature", Label: "Temp. disque", Unit: "\u00b0C", Icon: "\U0001f321", BadgeClass: "bg-orange-lt text-orange", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: true},
+			{Metric: "proxmox_storage_percent", Label: "Proxmox stockage", Unit: "%", Icon: "\U0001f5a5", BadgeClass: "bg-cyan-lt text-cyan", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: false},
+			{Metric: "npm_requests", Label: "NPM requetes", Unit: "req", Icon: "\U0001f310", BadgeClass: "bg-azure-lt text-azure", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: true},
+			{Metric: "npm_traffic_bytes", Label: "NPM trafic", Unit: "B", Icon: "\U0001f4e6", BadgeClass: "bg-azure-lt text-azure", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: true},
+			{Metric: "npm_5xx_errors", Label: "NPM erreurs 5xx", Unit: "err", Icon: "\U0001f6a8", BadgeClass: "bg-red-lt text-red", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: true},
+		},
+	}
+
+	response.ProxmoxScope.Modes = []string{"global", "connection", "node", "storage"}
+	response.ProxmoxScope.Connections = []alertScopeOption{}
+	response.ProxmoxScope.Nodes = []alertScopeOption{}
+	response.ProxmoxScope.Storages = []alertScopeOption{}
+
+	if rows, err := h.db.Query(`SELECT id, name FROM proxmox_connections ORDER BY name`); err == nil {
+		defer func() { _ = rows.Close() }()
+		for rows.Next() {
+			var id, name string
+			if scanErr := rows.Scan(&id, &name); scanErr == nil {
+				response.ProxmoxScope.Connections = append(response.ProxmoxScope.Connections, alertScopeOption{ID: id, Label: name})
+			}
+		}
+	}
+
+	if rows, err := h.db.Query(`
+		SELECT n.id, COALESCE(c.name,'?') || ' / ' || n.node_name
+		FROM proxmox_nodes n
+		LEFT JOIN proxmox_connections c ON c.id = n.connection_id
+		ORDER BY c.name, n.node_name`); err == nil {
+		defer func() { _ = rows.Close() }()
+		for rows.Next() {
+			var id, label string
+			if scanErr := rows.Scan(&id, &label); scanErr == nil {
+				response.ProxmoxScope.Nodes = append(response.ProxmoxScope.Nodes, alertScopeOption{ID: id, Label: label})
+			}
+		}
+	}
+
+	if rows, err := h.db.Query(`
+		SELECT s.id, COALESCE(c.name,'?') || ' / ' || s.node_name || ' / ' || s.storage_name
+		FROM proxmox_storages s
+		LEFT JOIN proxmox_connections c ON c.id = s.connection_id
+		ORDER BY c.name, s.node_name, s.storage_name`); err == nil {
+		defer func() { _ = rows.Close() }()
+		for rows.Next() {
+			var id, label string
+			if scanErr := rows.Scan(&id, &label); scanErr == nil {
+				response.ProxmoxScope.Storages = append(response.ProxmoxScope.Storages, alertScopeOption{ID: id, Label: label})
+			}
+		}
+	}
+
+	c.JSON(http.StatusOK, response)
 }
 
 // alertRuleTagMessage returns a human-readable message for a validator tag.
@@ -48,15 +282,15 @@ func alertRuleTagMessage(field, tag string) string {
 	}
 	switch tag {
 	case "required":
-		return fmt.Sprintf("Le champ « %s » est obligatoire.", label)
+		return fmt.Sprintf("Le champ %s est obligatoire.", label)
 	case "min":
-		return fmt.Sprintf("Le champ « %s » est trop court.", label)
+		return fmt.Sprintf("Le champ %s est trop court.", label)
 	case "max":
-		return fmt.Sprintf("Le champ « %s » est trop long.", label)
+		return fmt.Sprintf("Le champ %s est trop long.", label)
 	case "email":
-		return fmt.Sprintf("Le champ « %s » doit être une adresse e-mail valide.", label)
+		return fmt.Sprintf("Le champ %s doit etre une adresse e-mail valide.", label)
 	default:
-		return fmt.Sprintf("Le champ « %s » est invalide.", label)
+		return fmt.Sprintf("Le champ %s est invalide.", label)
 	}
 }
 
@@ -70,7 +304,6 @@ func humanizeValidationError(err error) string {
 	if len(ve) == 1 {
 		return alertRuleTagMessage(ve[0].Field(), ve[0].Tag())
 	}
-	// Multiple errors: list them all.
 	msg := "Plusieurs champs sont invalides :"
 	for _, fe := range ve {
 		msg += " " + alertRuleTagMessage(fe.Field(), fe.Tag()) + ";"
@@ -124,13 +357,13 @@ func scanAlertRule(row interface {
 }
 
 const alertRuleSelectCols = `
-	id, name, enabled, host_id, metric, operator, threshold, duration_seconds,
-	actions, last_fired, created_at, updated_at`
+id, name, enabled, host_id, metric, operator, threshold, duration_seconds,
+actions, last_fired, created_at, updated_at`
 
 // ListAlertRules returns all alert rules
 func (h *AlertRulesHandler) ListAlertRules(c *gin.Context) {
 	rows, err := h.db.Query(`SELECT` + alertRuleSelectCols + `
-		FROM alert_rules ORDER BY created_at DESC`)
+FROM alert_rules ORDER BY created_at DESC`)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -153,7 +386,7 @@ func (h *AlertRulesHandler) ListAlertRules(c *gin.Context) {
 func (h *AlertRulesHandler) GetAlertRule(c *gin.Context) {
 	id := c.Param("id")
 	row := h.db.QueryRow(`SELECT`+alertRuleSelectCols+`
-		FROM alert_rules WHERE id = $1`, id)
+FROM alert_rules WHERE id = $1`, id)
 
 	rule, err := scanAlertRule(row)
 	if err == sql.ErrNoRows {
@@ -175,18 +408,12 @@ func (h *AlertRulesHandler) CreateAlertRule(c *gin.Context) {
 		return
 	}
 
-	validOps := map[string]bool{">": true, "<": true, ">=": true, "<=": true}
-	if !validOps[req.Operator] {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Opérateur invalide."})
+	if err := validateAlertRuleMetricOperator(req.Metric, req.Operator); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	validMetrics := map[string]bool{
-		"cpu": true, "memory": true, "disk": true, "load": true, "heartbeat_timeout": true,
-		"cpu_temperature": true, "disk_smart_status": true, "disk_temperature": true, "proxmox_storage_percent": true,
-		"npm_requests": true, "npm_traffic_bytes": true, "npm_5xx_errors": true,
-	}
-	if !validMetrics[req.Metric] {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Métrique invalide."})
+	if err := validateAlertActions(h.db, &req.Actions, req.Metric); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -208,9 +435,9 @@ func (h *AlertRulesHandler) CreateAlertRule(c *gin.Context) {
 	rule.Actions = req.Actions
 
 	err := h.db.QueryRow(`
-		INSERT INTO alert_rules (name, enabled, host_id, metric, operator, threshold, duration_seconds, actions)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, CAST($8 AS JSONB))
-		RETURNING id, created_at, updated_at`,
+INSERT INTO alert_rules (name, enabled, host_id, metric, operator, threshold, duration_seconds, actions)
+VALUES ($1, $2, $3, $4, $5, $6, $7, CAST($8 AS JSONB))
+RETURNING id, created_at, updated_at`,
 		req.Name, req.Enabled, req.HostID, req.Metric, req.Operator,
 		req.Threshold, req.Duration, string(actionsJSON),
 	).Scan(&rule.ID, &rule.CreatedAt, &rule.UpdatedAt)
@@ -252,11 +479,19 @@ func (h *AlertRulesHandler) UpdateAlertRule(c *gin.Context) {
 		argCount++
 	}
 	if req.Metric != nil {
+		if !validAlertMetrics[*req.Metric] {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Metrique invalide."})
+			return
+		}
 		updates = append(updates, "metric = $"+strconv.Itoa(argCount))
 		args = append(args, *req.Metric)
 		argCount++
 	}
 	if req.Operator != nil {
+		if !validAlertOperators[*req.Operator] {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Operateur invalide."})
+			return
+		}
 		updates = append(updates, "operator = $"+strconv.Itoa(argCount))
 		args = append(args, *req.Operator)
 		argCount++
@@ -272,6 +507,23 @@ func (h *AlertRulesHandler) UpdateAlertRule(c *gin.Context) {
 		argCount++
 	}
 	if req.Actions != nil {
+		metricForValidation := req.Metric
+		if metricForValidation == nil {
+			var existingMetric string
+			if scanErr := h.db.QueryRow(`SELECT metric FROM alert_rules WHERE id = $1`, id).Scan(&existingMetric); scanErr != nil {
+				if scanErr == sql.ErrNoRows {
+					c.JSON(http.StatusNotFound, gin.H{"error": "Regle d'alerte introuvable."})
+					return
+				}
+				c.JSON(http.StatusInternalServerError, gin.H{"error": scanErr.Error()})
+				return
+			}
+			metricForValidation = &existingMetric
+		}
+		if err := validateAlertActions(h.db, req.Actions, *metricForValidation); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 		if req.Actions.Channels == nil {
 			req.Actions.Channels = []string{}
 		}
@@ -282,7 +534,7 @@ func (h *AlertRulesHandler) UpdateAlertRule(c *gin.Context) {
 	}
 
 	if len(updates) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Aucun champ à mettre à jour."})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Aucun champ a mettre a jour."})
 		return
 	}
 
@@ -302,7 +554,7 @@ func (h *AlertRulesHandler) UpdateAlertRule(c *gin.Context) {
 	}
 	rows, _ := result.RowsAffected()
 	if rows == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Règle d'alerte introuvable."})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Regle d'alerte introuvable."})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Alert rule updated"})
@@ -318,7 +570,7 @@ func (h *AlertRulesHandler) DeleteAlertRule(c *gin.Context) {
 	}
 	rows, _ := result.RowsAffected()
 	if rows == 0 {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Règle d'alerte introuvable."})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Regle d'alerte introuvable."})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Alert rule deleted"})
@@ -326,8 +578,6 @@ func (h *AlertRulesHandler) DeleteAlertRule(c *gin.Context) {
 
 // TestAlertRule evaluates a rule against current metrics without saving it.
 func (h *AlertRulesHandler) TestAlertRule(c *gin.Context) {
-	// Use a dedicated payload for test-only evaluation so draft rules can be
-	// validated without requiring fields needed only for persistence (like name).
 	var req struct {
 		HostID    *string             `json:"host_id"`
 		Metric    string              `json:"metric" binding:"required"`
@@ -338,6 +588,14 @@ func (h *AlertRulesHandler) TestAlertRule(c *gin.Context) {
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": humanizeValidationError(err)})
+		return
+	}
+	if err := validateAlertRuleMetricOperator(req.Metric, req.Operator); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := validateAlertActions(h.db, &req.Actions, req.Metric); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -369,7 +627,6 @@ func (h *AlertRulesHandler) TestAlertRule(c *gin.Context) {
 	var results []TestResult
 	anyFires := false
 
-	// For display purposes, skip staleness check so we always show the current value.
 	ruleNoStaleness := rule
 	ruleNoStaleness.DurationSeconds = 0
 
@@ -377,9 +634,7 @@ func (h *AlertRulesHandler) TestAlertRule(c *gin.Context) {
 		if rule.HostID != nil && *rule.HostID != host.ID {
 			continue
 		}
-		// Fetch current value ignoring duration-based staleness (for display).
 		value, ok := alerts.GetMetricValue(h.db, host, ruleNoStaleness)
-		// would_fire respects the original rule (including staleness).
 		_, freshOk := alerts.GetMetricValue(h.db, host, rule)
 		wouldFire := ok && freshOk && alerts.MatchRule(rule, host, value)
 		if wouldFire {
@@ -406,8 +661,8 @@ func (h *AlertRulesHandler) TestAlertRule(c *gin.Context) {
 
 // ListIncidents returns all alert incidents with pagination
 func (h *AlertRulesHandler) ListIncidents(c *gin.Context) {
-	if c.GetString("role") == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+	if c.GetString("role") != models.RoleAdmin {
+		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
 		return
 	}
 

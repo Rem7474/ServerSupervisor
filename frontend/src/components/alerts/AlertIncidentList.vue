@@ -64,6 +64,8 @@
 </template>
 
 <script setup>
+import { getAlertMetricMeta } from '../../utils/alertMetrics'
+
 const props = defineProps({
   incidents: {
     type: Array,
@@ -86,28 +88,14 @@ const props = defineProps({
 defineEmits(['refresh'])
 
 function incidentMetricLabel(metric) {
-  const labels = {
-    cpu: 'CPU',
-    cpu_percent: 'CPU',
-    cpu_temperature: 'Temp. CPU',
-    memory: 'RAM',
-    ram_percent: 'RAM',
-    disk: 'Disque',
-    disk_percent: 'Disque',
-    disk_temperature: 'Temp. disque',
-    load: 'Load avg',
-    status_offline: 'Statut hote',
-  }
-  return labels[metric] || metric || ''
+  if (!metric) return ''
+  return getAlertMetricMeta(metric).label
 }
 
 function incidentFormatValue(value, metric) {
   if (metric === 'status_offline') return value === 1 ? 'offline' : 'online'
-  const unit = ['cpu', 'cpu_percent', 'memory', 'ram_percent', 'disk', 'disk_percent', 'proxmox_storage_percent'].includes(metric)
-    ? '%'
-    : ['cpu_temperature', 'disk_temperature'].includes(metric)
-      ? '°C'
-      : ''
+  if (metric === 'disk_smart_status') return Number(value) >= 1 ? 'FAILED' : 'OK'
+  const unit = getAlertMetricMeta(metric).unit
   return `${Number(value).toFixed(2)}${unit}`
 }
 

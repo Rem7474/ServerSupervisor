@@ -214,6 +214,7 @@ export default {
   getMyHostPermissions: () => api.get('/v1/auth/host-permissions'),
 
   // Alert Rules
+  getAlertRuleCapabilities: () => api.get('/v1/alert-rules/capabilities'),
   getAlertRules: () => api.get('/v1/alert-rules'),
   createAlertRule: (payload: AlertRule) => api.post('/v1/alert-rules', payload),
   updateAlertRule: (id: number, payload: AlertRule) => api.patch(`/v1/alert-rules/${id}`, payload),

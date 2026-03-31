@@ -168,31 +168,32 @@ func (h *WSHandler) NotificationStream(c *gin.Context) {
 		_ = conn.Close()
 	}()
 
-	if !h.authenticateWS(conn) {
+	ok, role := h.authenticateWSWithRole(conn)
+	if !ok {
+		return
+	}
+	if role != "admin" {
+		_ = safeWriteJSON(conn, gin.H{"type": "auth_error", "error": "forbidden"})
 		return
 	}
 
-	// Setup read deadline and pong handler for heartbeat
 	_ = conn.SetReadDeadline(time.Now().Add(wsPongWait))
 	conn.SetPongHandler(func(string) error {
 		return conn.SetReadDeadline(time.Now().Add(wsPongWait))
 	})
 
-	// Send auth_ok response
 	if err := safeWriteJSON(conn, gin.H{"type": "auth_ok"}); err != nil {
 		return
 	}
 
 	h.notifHub.Register(conn)
 
-	// Setup ping ticker for heartbeat
 	pingTicker := time.NewTicker(wsPingInterval)
 	defer pingTicker.Stop()
 
 	done := make(chan struct{})
 	go h.readLoop(conn, done)
 
-	// Send ping messages periodically
 	for {
 		select {
 		case <-done:

@@ -29,6 +29,16 @@ interface Notification {
   notification?: any
 }
 
+interface AlertRuleCapabilities {
+  metrics: any[]
+  proxmox_scope: {
+    modes: string[]
+    connections: any[]
+    nodes: any[]
+    storages: any[]
+  }
+}
+
 interface UseAlertsPageApi {
   alertsTab: Ref<string>
   incidents: Ref<Incident[]>
@@ -44,6 +54,9 @@ interface UseAlertsPageApi {
   saving: Ref<boolean>
   saveError: Ref<string>
   editingRule: Ref<AlertRule | null>
+  capabilities: Ref<AlertRuleCapabilities | null>
+  capabilitiesLoading: Ref<boolean>
+  capabilitiesError: Ref<string>
   activeIncidentCount: ComputedRef<number>
   init: () => Promise<void>
   loadIncidents: () => Promise<void>
@@ -73,6 +86,9 @@ export function useAlertsPage(): UseAlertsPageApi {
   const saving: Ref<boolean> = ref(false)
   const saveError: Ref<string> = ref('')
   const editingRule: Ref<AlertRule | null> = ref(null)
+  const capabilities: Ref<AlertRuleCapabilities | null> = ref(null)
+  const capabilitiesLoading: Ref<boolean> = ref(false)
+  const capabilitiesError: Ref<string> = ref('')
 
   // Expose store state (reactive refs shared across navigations)
   const { rules, loading, fetched, error: fetchError } = storeToRefs(rulesStore)
@@ -83,10 +99,29 @@ export function useAlertsPage(): UseAlertsPageApi {
   )
 
   async function init(): Promise<void> {
-    await Promise.allSettled([rulesStore.fetchRules(), hostsStore.fetchHosts()])
+    capabilitiesLoading.value = true
+    capabilitiesError.value = ''
+
+    const [rulesResult, hostsResult, capabilitiesResult] = await Promise.allSettled([
+      rulesStore.fetchRules(),
+      hostsStore.fetchHosts(),
+      apiClient.getAlertRuleCapabilities(),
+    ])
+
+    if (capabilitiesResult.status === 'fulfilled') {
+      capabilities.value = capabilitiesResult.value?.data || null
+    } else {
+      capabilitiesError.value = 'Impossible de charger les capacites des metriques'
+    }
+
+    capabilitiesLoading.value = false
 
     if (!rulesStore.fetched && !rulesStore.loading) {
       await rulesStore.fetchRules(true)
+    }
+
+    if (rulesResult.status === 'rejected' || hostsResult.status === 'rejected') {
+      // Keep existing store-managed error handling behavior.
     }
   }
 
@@ -215,6 +250,9 @@ export function useAlertsPage(): UseAlertsPageApi {
     saving,
     saveError,
     editingRule,
+    capabilities,
+    capabilitiesLoading,
+    capabilitiesError,
     activeIncidentCount,
     init,
     loadIncidents,

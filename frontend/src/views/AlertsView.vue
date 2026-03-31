@@ -79,6 +79,9 @@
       :visible="showModal"
       :rule="editingRule"
       :hosts="hosts"
+      :capabilities="capabilities"
+      :capabilities-loading="capabilitiesLoading"
+      :capabilities-error="capabilitiesError"
       :saving="saving"
       :error="saveError"
       @close="closeModal"
@@ -112,6 +115,9 @@ const {
   saving,
   saveError,
   editingRule,
+  capabilities,
+  capabilitiesLoading,
+  capabilitiesError,
   activeIncidentCount,
   init,
   loadIncidents,

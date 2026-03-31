@@ -152,27 +152,39 @@ func isAllowedOrigin(origin string, baseURL string, extraOrigins []string) bool 
 }
 
 func (h *WSHandler) authenticateWS(conn *websocket.Conn) bool {
+	ok, _ := h.authenticateWSWithRole(conn)
+	return ok
+}
+
+func (h *WSHandler) authenticateWSWithRole(conn *websocket.Conn) (bool, string) {
 	_ = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 	var msg wsAuthMessage
 	if err := conn.ReadJSON(&msg); err != nil {
 		_ = conn.WriteJSON(gin.H{"type": "auth_error", "error": "missing auth"})
-		return false
+		return false, ""
 	}
 	if msg.Type != "auth" || msg.Token == "" {
 		_ = conn.WriteJSON(gin.H{"type": "auth_error", "error": "invalid auth"})
-		return false
+		return false, ""
 	}
-	if !h.validateToken(msg.Token) {
+	claims, ok := h.parseTokenClaims(msg.Token)
+	if !ok {
 		_ = conn.WriteJSON(gin.H{"type": "auth_error", "error": "unauthorized"})
-		return false
+		return false, ""
 	}
 	_ = conn.SetReadDeadline(time.Time{})
-	return true
+	role, _ := claims["role"].(string)
+	return true, role
 }
 
 func (h *WSHandler) validateToken(tokenString string) bool {
+	_, ok := h.parseTokenClaims(tokenString)
+	return ok
+}
+
+func (h *WSHandler) parseTokenClaims(tokenString string) (jwt.MapClaims, bool) {
 	if tokenString == "" {
-		return false
+		return nil, false
 	}
 
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
@@ -181,7 +193,14 @@ func (h *WSHandler) validateToken(tokenString string) bool {
 		}
 		return []byte(h.cfg.JWTSecret), nil
 	})
-	return err == nil && token.Valid
+	if err != nil || !token.Valid {
+		return nil, false
+	}
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return nil, false
+	}
+	return claims, true
 }
 
 func (h *WSHandler) readLoop(conn *websocket.Conn, done chan struct{}) {

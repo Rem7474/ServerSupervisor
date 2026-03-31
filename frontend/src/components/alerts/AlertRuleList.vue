@@ -91,6 +91,7 @@
 
 <script setup>
 import { formatDurationSecs } from '../../utils/formatters'
+import { getAlertMetricMeta } from '../../utils/alertMetrics'
 
 const props = defineProps({
   rules: {
@@ -129,36 +130,15 @@ function getHostName(hostId) {
 }
 
 function getMetricLabel(metric) {
-  const labels = {
-    cpu: 'CPU',
-    memory: 'Memoire',
-    disk: 'Disque',
-    load: 'Load',
-    heartbeat_timeout: 'Heartbeat',
-  }
-  return labels[metric] || metric
+  return getAlertMetricMeta(metric).label
 }
 
 function getMetricBadgeClass(metric) {
-  const classes = {
-    cpu: 'bg-red-lt',
-    memory: 'bg-blue-lt',
-    disk: 'bg-yellow-lt',
-    load: 'bg-purple-lt',
-    heartbeat_timeout: 'bg-orange-lt',
-  }
-  return classes[metric] || 'bg-secondary-lt'
+  return getAlertMetricMeta(metric).badgeClass
 }
 
 function getMetricUnit(metric) {
-  const units = {
-    cpu: '%',
-    memory: '%',
-    disk: '%',
-    load: '',
-    heartbeat_timeout: 's',
-  }
-  return units[metric] || ''
+  return getAlertMetricMeta(metric).unit
 }
 </script>
 

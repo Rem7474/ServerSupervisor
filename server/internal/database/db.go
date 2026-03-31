@@ -60,8 +60,8 @@ func EnsureDatabaseExists(cfg *config.Config) error {
 // DB wraps the underlying sql.DB connection and exposes domain-specific methods
 // split across db_*.go files in this package.
 type DB struct {
-	conn            *sql.DB
-	hasTimescaleDB  bool
+	conn           *sql.DB
+	hasTimescaleDB bool
 }
 
 // New opens a connection to the database, runs migrations, and returns a DB.
@@ -89,9 +89,9 @@ func New(cfg *config.Config) (*DB, error) {
 	_ = conn.QueryRow(`SELECT EXISTS(SELECT 1 FROM pg_extension WHERE extname = 'timescaledb')`).Scan(&hasTS)
 	db.hasTimescaleDB = hasTS
 	if hasTS {
-		log.Println("TimescaleDB extension detected — using time_bucket() for metric bucketing")
+		log.Println("TimescaleDB extension detected - using time_bucket() for metric bucketing")
 	} else {
-		log.Println("TimescaleDB not found — using plain PostgreSQL bucketing")
+		log.Println("TimescaleDB not found - using plain PostgreSQL bucketing")
 	}
 
 	return db, nil
@@ -119,15 +119,13 @@ func (db *DB) Exec(query string, args ...interface{}) (sql.Result, error) {
 // Applied migrations are tracked in the schema_migrations table so each file
 // runs exactly once, even across server restarts.
 func (db *DB) migrate() error {
-	// Ensure the tracking table exists.
 	if _, err := db.conn.Exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
-		filename   TEXT PRIMARY KEY,
-		applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-	)`); err != nil {
+filename   TEXT PRIMARY KEY,
+applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+)`); err != nil {
 		return fmt.Errorf("create schema_migrations: %w", err)
 	}
 
-	// Load already-applied filenames.
 	rows, err := db.conn.Query(`SELECT filename FROM schema_migrations`)
 	if err != nil {
 		return fmt.Errorf("query schema_migrations: %w", err)
@@ -143,16 +141,12 @@ func (db *DB) migrate() error {
 	}
 	rows.Close()
 
-	// Bootstrap: if schema_migrations is empty but the DB already has the core
-	// schema (hosts table exists), mark all existing migration files as applied
-	// without re-running them. This handles databases that were set up before
-	// migration versioning was introduced.
 	if len(applied) == 0 {
 		var exists bool
 		_ = db.conn.QueryRow(`SELECT EXISTS (
-			SELECT 1 FROM information_schema.tables
-			WHERE table_schema = 'public' AND table_name = 'hosts'
-		)`).Scan(&exists)
+SELECT 1 FROM information_schema.tables
+WHERE table_schema = 'public' AND table_name = 'hosts'
+)`).Scan(&exists)
 		if exists {
 			entries, err := fs.ReadDir(migrationFS, "migrations")
 			if err != nil {
@@ -181,8 +175,35 @@ func (db *DB) migrate() error {
 			continue
 		}
 		if _, ok := applied[e.Name()]; ok {
-			continue // already applied
+			continue
 		}
+
+		if e.Name() == "000_full_baseline_breaking.sql" {
+			var hostsExists bool
+			if err := db.conn.QueryRow(`SELECT EXISTS (
+SELECT 1 FROM information_schema.tables
+WHERE table_schema = 'public' AND table_name = 'hosts'
+)`).Scan(&hostsExists); err != nil {
+				return fmt.Errorf("check existing schema before baseline migration: %w", err)
+			}
+			if hostsExists {
+				if _, err := db.conn.Exec(`INSERT INTO schema_migrations (filename) VALUES ($1) ON CONFLICT DO NOTHING`, e.Name()); err != nil {
+					return fmt.Errorf("record migration %s: %w", e.Name(), err)
+				}
+				log.Printf("Migration skipped on existing schema: %s", e.Name())
+				continue
+			}
+
+			// Fresh install path: baseline migration already contains all legacy SQL.
+			// Mark legacy filenames as applied in-memory so they are skipped this run.
+			for _, legacy := range entries {
+				if !strings.HasSuffix(legacy.Name(), ".sql") || legacy.Name() == e.Name() {
+					continue
+				}
+				applied[legacy.Name()] = struct{}{}
+			}
+		}
+
 		data, err := migrationFS.ReadFile("migrations/" + e.Name())
 		if err != nil {
 			return fmt.Errorf("failed to read migration %s: %w", e.Name(), err)
@@ -208,7 +229,7 @@ func (db *DB) migrate() error {
 
 // splitSQLStatements splits a SQL file into individual statements on ";",
 // but ignores semicolons that appear inside dollar-quoted strings ($$...$$)
-// or single-quoted string literals ('...').  This is necessary for files that
+// or single-quoted string literals ('...'). This is necessary for files that
 // contain PL/pgSQL anonymous blocks (DO $$ ... END $$;).
 func splitSQLStatements(sql string) []string {
 	var statements []string
@@ -218,19 +239,14 @@ func splitSQLStatements(sql string) []string {
 
 	for i := 0; i < len(sql); i++ {
 		ch := sql[i]
-
-		// Single-quoted string literal handling.
 		if !inDollarQuote && ch == '\'' {
 			inSingleQuote = !inSingleQuote
 			cur.WriteByte(ch)
-			// Handle escaped quote '' inside a string.
 			if !inSingleQuote && i+1 < len(sql) && sql[i+1] == '\'' {
 				inSingleQuote = true
 			}
 			continue
 		}
-
-		// Dollar-quote toggle: $$ outside a single-quoted string.
 		if !inSingleQuote && ch == '$' && i+1 < len(sql) && sql[i+1] == '$' {
 			inDollarQuote = !inDollarQuote
 			cur.WriteByte(ch)
@@ -238,8 +254,6 @@ func splitSQLStatements(sql string) []string {
 			i++
 			continue
 		}
-
-		// Statement terminator — only when outside any quoting context.
 		if ch == ';' && !inDollarQuote && !inSingleQuote {
 			if stmt := strings.TrimSpace(cur.String()); stmt != "" {
 				statements = append(statements, stmt)
@@ -247,14 +261,10 @@ func splitSQLStatements(sql string) []string {
 			cur.Reset()
 			continue
 		}
-
 		cur.WriteByte(ch)
 	}
-
-	// Trailing statement without a final semicolon (e.g. last line of file).
 	if stmt := strings.TrimSpace(cur.String()); stmt != "" {
 		statements = append(statements, stmt)
 	}
-
 	return statements
 }

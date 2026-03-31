@@ -78,3 +78,27 @@ func (db *DB) GetNotificationReadAt(username string) (*time.Time, error) {
 	}
 	return &readAt, nil
 }
+
+// GetPushSubscriptionsByRole returns subscriptions for users with a specific role.
+func (db *DB) GetPushSubscriptionsByRole(role string) ([]models.PushSubscription, error) {
+	rows, err := db.conn.Query(`
+SELECT ps.id, ps.username, ps.endpoint, ps.p256dh_key, ps.auth_key, ps.user_agent, ps.created_at
+FROM push_subscriptions ps
+JOIN users u ON u.username = ps.username
+WHERE u.role = $1
+`, role)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var subs []models.PushSubscription
+	for rows.Next() {
+		var s models.PushSubscription
+		if err := rows.Scan(&s.ID, &s.Username, &s.Endpoint, &s.P256DHKey, &s.AuthKey, &s.UserAgent, &s.CreatedAt); err != nil {
+			continue
+		}
+		subs = append(subs, s)
+	}
+	return subs, nil
+}

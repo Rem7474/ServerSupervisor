@@ -639,6 +639,53 @@ func (db *DB) GetMaxProxmoxStorageUsagePercent() float64 {
 	return pct
 }
 
+// GetMaxProxmoxStorageUsagePercentByConnection returns the max used/total ratio (0-100)
+// for active storages of one Proxmox connection.
+func (db *DB) GetMaxProxmoxStorageUsagePercentByConnection(connectionID string) float64 {
+	var pct float64
+	_ = db.conn.QueryRow(`
+		SELECT COALESCE(MAX(s.used::float / NULLIF(s.total,0) * 100), 0)
+		FROM proxmox_storages s
+		WHERE s.connection_id = $1
+		  AND s.total > 0
+		  AND s.enabled = TRUE
+		  AND s.active = TRUE
+	`, connectionID).Scan(&pct)
+	return pct
+}
+
+// GetMaxProxmoxStorageUsagePercentByNode returns the max used/total ratio (0-100)
+// for active storages on one Proxmox node identified by proxmox_nodes.id.
+func (db *DB) GetMaxProxmoxStorageUsagePercentByNode(nodeID string) float64 {
+	var pct float64
+	_ = db.conn.QueryRow(`
+		SELECT COALESCE(MAX(s.used::float / NULLIF(s.total,0) * 100), 0)
+		FROM proxmox_storages s
+		JOIN proxmox_nodes n
+		  ON n.connection_id = s.connection_id AND n.node_name = s.node_name
+		WHERE n.id = $1
+		  AND s.total > 0
+		  AND s.enabled = TRUE
+		  AND s.active = TRUE
+	`, nodeID).Scan(&pct)
+	return pct
+}
+
+// GetProxmoxStorageUsagePercentByStorage returns used/total ratio (0-100)
+// for one storage identified by proxmox_storages.id.
+func (db *DB) GetProxmoxStorageUsagePercentByStorage(storageID string) float64 {
+	var pct float64
+	_ = db.conn.QueryRow(`
+		SELECT COALESCE(s.used::float / NULLIF(s.total,0) * 100, 0)
+		FROM proxmox_storages s
+		WHERE s.id = $1
+		  AND s.total > 0
+		  AND s.enabled = TRUE
+		  AND s.active = TRUE
+	`, storageID).Scan(&pct)
+	return pct
+}
+
 func scanStorages(rows *sql.Rows) ([]models.ProxmoxStorage, error) {
 	var storages []models.ProxmoxStorage
 	for rows.Next() {

@@ -38,7 +38,7 @@ database:
   - changed-files:
     - any-glob-to-any-file:
       - 'server/internal/database/**'
-      - 'server/migrations/**'
+
 
 security:
   - changed-files:

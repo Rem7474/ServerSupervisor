@@ -206,13 +206,16 @@ func registerPushRoutes(g *gin.RouterGroup, h *handlers.PushHandler) {
 }
 
 func registerAlertRoutes(g *gin.RouterGroup, rulesH *handlers.AlertRulesHandler) {
-	g.GET("/alerts/incidents", rulesH.ListIncidents)
-	g.GET("/alert-rules", rulesH.ListAlertRules)
-	g.GET("/alert-rules/:id", rulesH.GetAlertRule)
-	g.POST("/alert-rules", rulesH.CreateAlertRule)
-	g.PATCH("/alert-rules/:id", rulesH.UpdateAlertRule)
-	g.DELETE("/alert-rules/:id", rulesH.DeleteAlertRule)
-	g.POST("/alert-rules/test", rulesH.TestAlertRule)
+	admin := g.Group("")
+	admin.Use(AdminOnlyMiddleware())
+	admin.GET("/alerts/incidents", rulesH.ListIncidents)
+	admin.GET("/alert-rules/capabilities", rulesH.GetAlertRuleCapabilities)
+	admin.GET("/alert-rules", rulesH.ListAlertRules)
+	admin.GET("/alert-rules/:id", rulesH.GetAlertRule)
+	admin.POST("/alert-rules", rulesH.CreateAlertRule)
+	admin.PATCH("/alert-rules/:id", rulesH.UpdateAlertRule)
+	admin.DELETE("/alert-rules/:id", rulesH.DeleteAlertRule)
+	admin.POST("/alert-rules/test", rulesH.TestAlertRule)
 }
 
 func registerSettingsRoutes(g *gin.RouterGroup, h *handlers.SettingsHandler) {

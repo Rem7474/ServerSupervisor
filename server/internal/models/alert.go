@@ -12,6 +12,15 @@ type CommandTrigger struct {
 	Payload string `json:"payload,omitempty"` // optional JSON payload
 }
 
+// ProxmoxMetricScope defines how a Proxmox metric should be evaluated.
+// ScopeMode can be one of: global, connection, node, storage.
+type ProxmoxMetricScope struct {
+	ScopeMode    string `json:"scope_mode,omitempty"`
+	ConnectionID string `json:"connection_id,omitempty"`
+	NodeID       string `json:"node_id,omitempty"`
+	StorageID    string `json:"storage_id,omitempty"`
+}
+
 // AlertActions holds the consolidated notification configuration for an alert rule.
 // Stored as a single JSONB column in the database.
 type AlertActions struct {
@@ -20,6 +29,7 @@ type AlertActions struct {
 	NtfyTopic      string          `json:"ntfy_topic,omitempty"`      // ntfy push notification topic
 	Cooldown       int             `json:"cooldown,omitempty"`        // seconds between re-notifications (0 = no cooldown)
 	CommandTrigger *CommandTrigger `json:"command_trigger,omitempty"` // optional command to run on alert
+	ProxmoxScope   *ProxmoxMetricScope `json:"proxmox_scope,omitempty"`
 }
 
 type AlertRule struct {
@@ -39,7 +49,7 @@ type AlertRule struct {
 
 type AlertIncident struct {
 	ID          int64      `json:"id" db:"id"`
-	RuleID      int64      `json:"rule_id" db:"rule_id"`
+	RuleID      *int64     `json:"rule_id" db:"rule_id"`
 	HostID      string     `json:"host_id" db:"host_id"`
 	TriggeredAt time.Time  `json:"triggered_at" db:"triggered_at"`
 	ResolvedAt  *time.Time `json:"resolved_at" db:"resolved_at"`
