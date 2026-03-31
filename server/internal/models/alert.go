@@ -24,11 +24,11 @@ type ProxmoxMetricScope struct {
 // AlertActions holds the consolidated notification configuration for an alert rule.
 // Stored as a single JSONB column in the database.
 type AlertActions struct {
-	Channels       []string        `json:"channels"`                  // e.g. ["smtp", "ntfy", "browser"]
-	SMTPTo         string          `json:"smtp_to,omitempty"`         // SMTP recipient address(es)
-	NtfyTopic      string          `json:"ntfy_topic,omitempty"`      // ntfy push notification topic
-	Cooldown       int             `json:"cooldown,omitempty"`        // seconds between re-notifications (0 = no cooldown)
-	CommandTrigger *CommandTrigger `json:"command_trigger,omitempty"` // optional command to run on alert
+	Channels       []string            `json:"channels"`                  // e.g. ["smtp", "ntfy", "browser"]
+	SMTPTo         string              `json:"smtp_to,omitempty"`         // SMTP recipient address(es)
+	NtfyTopic      string              `json:"ntfy_topic,omitempty"`      // ntfy push notification topic
+	Cooldown       int                 `json:"cooldown,omitempty"`        // seconds between re-notifications (0 = no cooldown)
+	CommandTrigger *CommandTrigger     `json:"command_trigger,omitempty"` // optional command to run on alert
 	ProxmoxScope   *ProxmoxMetricScope `json:"proxmox_scope,omitempty"`
 }
 
