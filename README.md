@@ -125,6 +125,48 @@ Le dashboard est accessible sur `http://localhost:8080` (login: `admin` / `admin
 
 ### 3. Installer l'agent sur une VM
 
+#### Prérequis agent (packages système)
+
+L'agent est un binaire Go statique, mais certaines fonctionnalités s'appuient sur des outils système présents sur la VM/LXC.
+
+| Fonctionnalité agent | Binaire / package requis | Obligatoire |
+|---|---|---|
+| Exécution de l'agent | `ca-certificates` | Oui |
+| Monitoring Docker (`collect_docker`) + commandes Docker | `docker` / `docker-cli` | Oui si Docker activé |
+| Monitoring APT (`collect_apt`) + actions APT | `apt`, `apt-get` | Oui sur Debian/Ubuntu |
+| SMART disques (`collect_smart`) | `smartctl` (`smartmontools`) | Oui si SMART activé |
+| Température CPU (`collect_cpu_temperature`) | `/sys/class/thermal` ou `/sys/class/hwmon`, fallback `sensors` (`lm-sensors`) | Oui si température CPU activée |
+| Commandes système (services/logs) | `systemctl`, `journalctl` (systemd) | Recommandé |
+| Snapshot processus | `ps` (`procps`) | Recommandé |
+
+Exemple Debian/Ubuntu:
+
+```bash
+sudo apt update
+sudo apt install -y ca-certificates curl procps
+
+# Optionnels selon les features activées
+sudo apt install -y docker.io        # si collect_docker: true
+sudo apt install -y smartmontools    # si collect_smart: true
+sudo apt install -y lm-sensors       # si collect_cpu_temperature: true
+```
+
+Exemple RHEL/Alma/Rocky:
+
+```bash
+sudo dnf install -y ca-certificates curl procps-ng
+
+# Optionnels selon les features activées
+sudo dnf install -y docker-cli       # si collect_docker: true
+sudo dnf install -y smartmontools    # si collect_smart: true
+sudo dnf install -y lm_sensors       # si collect_cpu_temperature: true
+```
+
+Notes:
+- Pour Docker, l'utilisateur du service agent doit avoir accès au socket Docker (groupe `docker` ou équivalent).
+- Sur certains environnements virtualisés, la température CPU peut être absente même avec `lm-sensors`.
+- Si `collect_cpu_temperature` est désactivé, aucun prérequis capteur n'est nécessaire.
+
 #### Via les releases GitHub (recommandé)
 
 ```bash
