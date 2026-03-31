@@ -22,7 +22,7 @@
     "geojson-world-map": "^0.0.2",
     "pinia": "^3.0.4",
     "topojson-client": "^3.1.0",
-    "vue": "^3.5.30",
+    "vue": "^3.5.31",
     "vue-chartjs": "^5.3.0",
     "vue-router": "^5.0.4",
     "world-atlas": "^2.0.2"
