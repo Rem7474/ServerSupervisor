@@ -28,6 +28,7 @@ type SystemMetrics struct {
 	CPUCores          int                `json:"cpu_cores"`
 	CPUModel          string             `json:"cpu_model"`
 	CPUTemperature    float64            `json:"cpu_temperature"`
+	FanRPM            float64            `json:"fan_rpm"`
 	LoadAvg1          float64            `json:"load_avg_1"`
 	LoadAvg5          float64            `json:"load_avg_5"`
 	LoadAvg15         float64            `json:"load_avg_15"`
@@ -70,6 +71,7 @@ func CollectSystem(collectCPUTemperature bool) (*SystemMetrics, error) {
 	if collectCPUTemperature {
 		m.CPUTemperature = getCPUTemperature()
 	}
+	m.FanRPM = getFanRPM()
 
 	loadAvg := getLoadAvg()
 	if len(loadAvg) == 3 {
@@ -248,6 +250,77 @@ func getCPUTemperature() float64 {
 		return t
 	}
 	return 0
+}
+
+func getFanRPM() float64 {
+	if rpm := readFanRPMFromHwmon(); rpm > 0 {
+		return rpm
+	}
+	if rpm := readFanRPMFromSensors(); rpm > 0 {
+		return rpm
+	}
+	return 0
+}
+
+func readFanRPMFromHwmon() float64 {
+	// fan*_input contains instantaneous fan speed in RPM.
+	paths, err := filepath.Glob("/sys/class/hwmon/hwmon*/fan*_input")
+	if err != nil || len(paths) == 0 {
+		return 0
+	}
+
+	var sum float64
+	count := 0
+	for _, p := range paths {
+		b, err := os.ReadFile(p)
+		if err != nil {
+			continue
+		}
+		v, err := strconv.ParseFloat(strings.TrimSpace(string(b)), 64)
+		if err != nil || v <= 0 {
+			continue
+		}
+		sum += v
+		count++
+	}
+	if count == 0 {
+		return 0
+	}
+	return sum / float64(count)
+}
+
+func readFanRPMFromSensors() float64 {
+	if _, err := exec.LookPath("sensors"); err != nil {
+		return 0
+	}
+	out, err := exec.Command("sensors").Output()
+	if err != nil {
+		return 0
+	}
+
+	re := regexp.MustCompile(`(?im)fan\d+\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*RPM`)
+	matches := re.FindAllStringSubmatch(string(out), -1)
+	if len(matches) == 0 {
+		return 0
+	}
+
+	var sum float64
+	count := 0
+	for _, m := range matches {
+		if len(m) < 2 {
+			continue
+		}
+		v, err := strconv.ParseFloat(m[1], 64)
+		if err != nil || v <= 0 {
+			continue
+		}
+		sum += v
+		count++
+	}
+	if count == 0 {
+		return 0
+	}
+	return sum / float64(count)
 }
 
 func readCPUTemperatureFromThermalZones() float64 {

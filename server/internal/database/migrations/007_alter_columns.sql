@@ -1,6 +1,6 @@
 -- Column additions via ALTER TABLE (applied after all base tables are created)
 
--- hosts: add missing columns for older databases
+-- hosts: add missing columns for existing databases
 ALTER TABLE IF EXISTS hosts ADD COLUMN IF NOT EXISTS name VARCHAR(255) NOT NULL DEFAULT '';
 
 ALTER TABLE IF EXISTS hosts ADD COLUMN IF NOT EXISTS tags JSONB DEFAULT '[]'::jsonb;
@@ -78,3 +78,4 @@ ALTER TABLE IF EXISTS docker_containers ADD COLUMN IF NOT EXISTS networks JSONB 
 
 -- docker_commands: compose project working directory
 ALTER TABLE IF EXISTS docker_commands ADD COLUMN IF NOT EXISTS working_dir TEXT DEFAULT '';
+

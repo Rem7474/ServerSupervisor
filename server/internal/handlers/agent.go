@@ -101,6 +101,11 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 		proxmoxIsMetricsSource = false
 	}
 
+	// Same guard for fan RPM source hosts.
+	if proxmoxIsMetricsSource && h.db.IsHostUsedAsProxmoxFanRPMSource(hostID) {
+		proxmoxIsMetricsSource = false
+	}
+
 	// Update host info from agent report (only if metrics are provided)
 	if report.Metrics != nil {
 		update := models.HostUpdate{

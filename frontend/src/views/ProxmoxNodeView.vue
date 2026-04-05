@@ -19,6 +19,9 @@
           <span v-if="nodeCpuTempCurrent > 0" class="badge" :class="tempBadgeClass(nodeCpuTempCurrent)">
             CPU TEMP {{ nodeCpuTempCurrent.toFixed(1) }}°C
           </span>
+          <span v-if="nodeFanRPMCurrent > 0" class="badge bg-blue-lt text-blue">
+            FAN {{ nodeFanRPMCurrent.toFixed(0) }} RPM
+          </span>
         </div>
         <div class="text-secondary">{{ node.cluster_name || 'Nœud standalone' }} · PVE {{ node.pve_version || 'N/A' }} · {{ node.ip_address }}</div>
       </div>
@@ -39,6 +42,21 @@
             </button>
             <span v-if="cpuTempSourceMsg" :class="['small', cpuTempSourceOk ? 'text-success' : 'text-danger']">{{ cpuTempSourceMsg }}</span>
             <span v-else-if="node.cpu_temp_source_host_name" class="small text-muted">Actuel: {{ node.cpu_temp_source_host_name }}</span>
+          </div>
+          <div class="card-body border-top d-flex flex-wrap align-items-center gap-2">
+            <div class="subheader mb-0 me-2">Source ventilateurs (nœud)</div>
+            <select v-model="fanRPMSourceHostId" class="form-select form-select-sm" style="max-width: 360px">
+              <option value="">Aucune (RPM local de chaque host)</option>
+              <option v-for="h in fanRPMSourceCandidates" :key="h.id" :value="h.id">
+                {{ h.hostname || h.name }} ({{ h.ip_address }})
+              </option>
+            </select>
+            <button class="btn btn-sm btn-primary" :disabled="fanRPMSourceSaving || fanRPMSourceLoading" @click="saveFanRPMSource">
+              <span v-if="fanRPMSourceSaving" class="spinner-border spinner-border-sm me-1"></span>
+              Enregistrer
+            </button>
+            <span v-if="fanRPMSourceMsg" :class="['small', fanRPMSourceOk ? 'text-success' : 'text-danger']">{{ fanRPMSourceMsg }}</span>
+            <span v-else-if="node.fan_rpm_source_host_name" class="small text-muted">Actuel: {{ node.fan_rpm_source_host_name }}</span>
           </div>
         </div>
 
@@ -63,6 +81,17 @@
               </div>
               <div class="text-muted small">
                 {{ node.cpu_temp_source_host_name ? `Source: ${node.cpu_temp_source_host_name}` : 'Source non configurée' }}
+              </div>
+            </div>
+
+            <!-- Fan RPM (from mapped source host) -->
+            <div class="col-6 col-sm-4 col-lg">
+              <div class="subheader mb-1">FAN RPM</div>
+              <div class="h3 mb-1 text-blue">
+                {{ nodeFanRPMCurrent > 0 ? `${nodeFanRPMCurrent.toFixed(0)} RPM` : '—' }}
+              </div>
+              <div class="text-muted small">
+                {{ node.fan_rpm_source_host_name ? `Source: ${node.fan_rpm_source_host_name}` : 'Source non configurée' }}
               </div>
             </div>
 
@@ -201,6 +230,20 @@
               <Line v-if="nodeTempChart" :data="nodeTempChart" :options="tempChartOptions" class="h-100" />
               <div v-else class="h-100 d-flex align-items-center justify-content-center text-secondary small">
                 {{ nodeTempLoading ? 'Chargement…' : (nodeTempError || (node.cpu_temp_source_host_id ? 'Aucune donnée température disponible' : 'Configurez une source temp CPU pour ce nœud')) }}
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-12 col-lg-4">
+          <div class="card">
+            <div class="card-header d-flex align-items-center justify-content-between">
+              <h3 class="card-title mb-0">Historique RPM ventilateurs (nœud)</h3>
+              <span class="badge bg-blue-lt text-blue">Période: {{ rrdTimeframeLabel }}</span>
+            </div>
+            <div class="card-body" style="height:11rem">
+              <Line v-if="nodeFanChart" :data="nodeFanChart" :options="fanChartOptions" class="h-100" />
+              <div v-else class="h-100 d-flex align-items-center justify-content-center text-secondary small">
+                {{ nodeFanLoading ? 'Chargement…' : (nodeFanError || (node.fan_rpm_source_host_id ? 'Aucune donnée ventilateur disponible' : 'Configurez une source ventilateurs pour ce nœud')) }}
               </div>
             </div>
           </div>
@@ -755,10 +798,22 @@ const cpuTempSourceSaving = ref(false)
 const cpuTempSourceMsg = ref('')
 const cpuTempSourceOk = ref(false)
 
+const fanRPMSourceCandidates = ref([])
+const fanRPMSourceHostId = ref('')
+const fanRPMSourceLoading = ref(false)
+const fanRPMSourceSaving = ref(false)
+const fanRPMSourceMsg = ref('')
+const fanRPMSourceOk = ref(false)
+
 const nodeTempLoading = ref(false)
 const nodeTempError = ref('')
 const nodeTempChart = shallowRef(null)
 const nodeCpuTempCurrent = ref(0)
+
+const nodeFanLoading = ref(false)
+const nodeFanError = ref('')
+const nodeFanChart = shallowRef(null)
+const nodeFanRPMCurrent = ref(0)
 
 // apt refresh
 const aptRefreshing = ref(false)
@@ -875,6 +930,34 @@ const tempChartOptions = {
   scales: {
     x: { display: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280', maxTicksLimit: 8 } },
     y: { display: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280', callback: (v) => `${v}°C` } },
+  },
+  elements: { point: { radius: 0, hitRadius: 10, hoverRadius: 4 }, line: { tension: 0.3 } },
+  interaction: { mode: 'nearest', axis: 'x', intersect: false },
+}
+
+const fanChartOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: { display: false },
+    tooltip: {
+      enabled: true,
+      mode: 'index',
+      intersect: false,
+      backgroundColor: 'rgba(0,0,0,0.8)',
+      titleColor: '#fff',
+      bodyColor: '#fff',
+      borderColor: '#555',
+      borderWidth: 1,
+      padding: 8,
+      callbacks: {
+        label: (ctx) => `${ctx.parsed.y != null ? Math.round(ctx.parsed.y) : '—'} RPM`,
+      },
+    },
+  },
+  scales: {
+    x: { display: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280', maxTicksLimit: 8 } },
+    y: { display: true, min: 0, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280', callback: (v) => `${v} RPM` } },
   },
   elements: { point: { radius: 0, hitRadius: 10, hoverRadius: 4 }, line: { tension: 0.3 } },
   interaction: { mode: 'nearest', axis: 'x', intersect: false },
@@ -1037,7 +1120,9 @@ async function load() {
     const res = await api.getProxmoxNode(route.params.id)
     node.value = res.data
     cpuTempSourceHostId.value = node.value?.cpu_temp_source_host_id || ''
+    fanRPMSourceHostId.value = node.value?.fan_rpm_source_host_id || ''
     await loadCpuTempSourceCandidates()
+    await loadFanRPMSourceCandidates()
     await loadGuestLinks()
     // fire-and-forget: live status + RRD charts load in parallel
     loadLiveStatus()
@@ -1097,6 +1182,51 @@ async function loadNodeCpuTempHistory(hours = rrdTimeframeToHours[rrdTimeframe.v
   }
 }
 
+async function loadNodeFanRPMHistory(hours = rrdTimeframeToHours[rrdTimeframe.value] ?? 24) {
+  nodeFanLoading.value = true
+  nodeFanError.value = ''
+  nodeFanChart.value = null
+  nodeFanRPMCurrent.value = 0
+
+  try {
+    const sourceHostId = node.value?.fan_rpm_source_host_id
+    if (!sourceHostId) {
+      return
+    }
+
+    const res = await api.getMetricsHistory(sourceHostId, hours)
+    const points = (Array.isArray(res.data) ? res.data : []).filter(p => Number(p?.fan_rpm) > 0)
+    if (!points.length) {
+      return
+    }
+
+    const labels = points.map(p => {
+      const d = new Date(p.timestamp)
+      if (hours <= 24) {
+        return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+      }
+      return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })
+    })
+    const data = points.map(p => Number(p.fan_rpm))
+    nodeFanRPMCurrent.value = data[data.length - 1] || 0
+    nodeFanChart.value = {
+      labels,
+      datasets: [{
+        data,
+        borderColor: '#2563eb',
+        backgroundColor: 'rgba(37,99,235,0.12)',
+        fill: true,
+        tension: 0.3,
+        spanGaps: true,
+      }],
+    }
+  } catch (e) {
+    nodeFanError.value = e?.response?.data?.error || 'Erreur lors du chargement des RPM ventilateurs.'
+  } finally {
+    nodeFanLoading.value = false
+  }
+}
+
 async function loadCpuTempSourceCandidates() {
   cpuTempSourceLoading.value = true
   try {
@@ -1109,6 +1239,18 @@ async function loadCpuTempSourceCandidates() {
   }
 }
 
+async function loadFanRPMSourceCandidates() {
+  fanRPMSourceLoading.value = true
+  try {
+    const res = await api.getProxmoxNodeFanRPMSourceCandidates(route.params.id)
+    fanRPMSourceCandidates.value = Array.isArray(res.data) ? res.data : []
+  } catch {
+    fanRPMSourceCandidates.value = []
+  } finally {
+    fanRPMSourceLoading.value = false
+  }
+}
+
 async function refreshNodeCpuTempSource() {
   try {
     const res = await api.getProxmoxNode(route.params.id)
@@ -1118,6 +1260,20 @@ async function refreshNodeCpuTempSource() {
       node.value.cpu_temp_source_host_name = n.cpu_temp_source_host_name || ''
     }
     cpuTempSourceHostId.value = n.cpu_temp_source_host_id || ''
+  } catch {
+    // non-bloquant
+  }
+}
+
+async function refreshNodeFanRPMSource() {
+  try {
+    const res = await api.getProxmoxNode(route.params.id)
+    const n = res.data || {}
+    if (node.value) {
+      node.value.fan_rpm_source_host_id = n.fan_rpm_source_host_id || ''
+      node.value.fan_rpm_source_host_name = n.fan_rpm_source_host_name || ''
+    }
+    fanRPMSourceHostId.value = n.fan_rpm_source_host_id || ''
   } catch {
     // non-bloquant
   }
@@ -1143,6 +1299,29 @@ async function saveCpuTempSource() {
   } finally {
     cpuTempSourceSaving.value = false
     setTimeout(() => { cpuTempSourceMsg.value = '' }, 4000)
+  }
+}
+
+async function saveFanRPMSource() {
+  fanRPMSourceSaving.value = true
+  fanRPMSourceMsg.value = ''
+  try {
+    const target = fanRPMSourceHostId.value || null
+    const res = await api.setProxmoxNodeFanRPMSource(route.params.id, target)
+    if (node.value) {
+      node.value.fan_rpm_source_host_id = res.data?.fan_rpm_source_host_id || ''
+      node.value.fan_rpm_source_host_name = res.data?.fan_rpm_source_host_name || ''
+    }
+    fanRPMSourceHostId.value = res.data?.fan_rpm_source_host_id || ''
+    await loadNodeFanRPMHistory(rrdTimeframeToHours[rrdTimeframe.value] ?? 24)
+    fanRPMSourceMsg.value = 'Source ventilateurs mise à jour.'
+    fanRPMSourceOk.value = true
+  } catch (e) {
+    fanRPMSourceMsg.value = e?.response?.data?.error || 'Erreur lors de la mise à jour.'
+    fanRPMSourceOk.value = false
+  } finally {
+    fanRPMSourceSaving.value = false
+    setTimeout(() => { fanRPMSourceMsg.value = '' }, 4000)
   }
 }
 
@@ -1176,7 +1355,9 @@ async function confirmGuestLink(g) {
     const res = await api.updateProxmoxLink(link.id, { status: 'confirmed' })
     guestLinks.value = { ...guestLinks.value, [g.id]: res.data }
     await loadCpuTempSourceCandidates()
+    await loadFanRPMSourceCandidates()
     await refreshNodeCpuTempSource()
+    await refreshNodeFanRPMSource()
     showMsg(`[${g.name}] Lien confirmé.`, true)
   } catch (e) {
     showMsg(e?.response?.data?.error || 'Erreur.', false)
@@ -1210,6 +1391,7 @@ function showMsg(msg, ok) {
 async function loadRRD(timeframe = rrdTimeframe.value) {
   rrdTimeframe.value = timeframe
   void loadNodeCpuTempHistory(rrdTimeframeToHours[timeframe] ?? 24)
+  void loadNodeFanRPMHistory(rrdTimeframeToHours[timeframe] ?? 24)
   rrdLoading.value = true
   rrdError.value = ''
   try {

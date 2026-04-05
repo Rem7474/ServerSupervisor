@@ -1,4 +1,4 @@
--- Docker containers, apt_status, and legacy apt_commands table
+-- Docker containers, apt_status, and apt_commands table
 
 CREATE TABLE IF NOT EXISTS docker_containers (
     id VARCHAR(64) PRIMARY KEY,
@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS apt_status (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Legacy table: replaced by remote_commands in 008_remote_commands.sql
+-- Transitional table superseded by remote_commands in 008_remote_commands.sql
 CREATE TABLE IF NOT EXISTS apt_commands (
     id BIGSERIAL PRIMARY KEY,
     host_id VARCHAR(64) REFERENCES hosts(id) ON DELETE CASCADE,
@@ -58,3 +58,4 @@ CREATE TABLE IF NOT EXISTS tracked_repos (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     UNIQUE(owner, repo)
 );
+

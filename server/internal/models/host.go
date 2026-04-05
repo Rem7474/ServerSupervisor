@@ -69,6 +69,7 @@ type SystemMetrics struct {
 	CPUCores        int     `json:"cpu_cores" db:"cpu_cores"`
 	CPUModel        string  `json:"cpu_model" db:"cpu_model"`
 	CPUTemperature  float64 `json:"cpu_temperature" db:"cpu_temperature"`
+	FanRPM          float64 `json:"fan_rpm" db:"fan_rpm"`
 	LoadAvg1        float64 `json:"load_avg_1" db:"load_avg_1"`
 	LoadAvg5        float64 `json:"load_avg_5" db:"load_avg_5"`
 	LoadAvg15       float64 `json:"load_avg_15" db:"load_avg_15"`

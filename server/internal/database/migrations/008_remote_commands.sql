@@ -1,4 +1,4 @@
--- Unified remote_commands table (replaces legacy docker_commands + apt_commands)
+-- Unified remote_commands table (supersedes docker_commands + apt_commands)
 
 CREATE TABLE IF NOT EXISTS remote_commands (
     id           VARCHAR(36)  PRIMARY KEY,
@@ -21,3 +21,4 @@ CREATE INDEX IF NOT EXISTS idx_remote_commands_host_status ON remote_commands(ho
 DROP TABLE IF EXISTS docker_commands;
 
 DROP TABLE IF EXISTS apt_commands;
+

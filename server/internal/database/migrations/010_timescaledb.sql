@@ -80,7 +80,7 @@ BEGIN
 
   -- ── metrics_aggregates ───────────────────────────────────────────────────
   -- The existing UNIQUE (host_id, aggregation_type, timestamp) already includes
-  -- timestamp, so it stays compatible.  The serial PK gets the same treatment.
+  -- timestamp, so it remains valid.  The serial PK gets the same treatment.
   IF NOT EXISTS (
     SELECT 1 FROM timescaledb_information.hypertables
     WHERE hypertable_name = 'metrics_aggregates'
@@ -111,3 +111,4 @@ BEGIN
   END IF;
 
 END $$;
+

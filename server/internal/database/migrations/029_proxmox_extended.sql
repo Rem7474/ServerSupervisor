@@ -1,5 +1,5 @@
 -- Migration 029: Extended Proxmox monitoring
--- Adds tasks, backup jobs/runs, physical disks, and node update counters (read-only, PVEAuditor compatible).
+-- Adds tasks, backup jobs/runs, physical disks, and node update counters (read-only, PVEAuditor-aligned).
 
 -- ─── Task history per node ────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS proxmox_tasks (
@@ -75,3 +75,4 @@ CREATE INDEX IF NOT EXISTS idx_proxmox_disks_node ON proxmox_disks(connection_id
 ALTER TABLE proxmox_nodes ADD COLUMN IF NOT EXISTS pending_updates      INT NOT NULL DEFAULT 0;
 ALTER TABLE proxmox_nodes ADD COLUMN IF NOT EXISTS security_updates     INT NOT NULL DEFAULT 0;
 ALTER TABLE proxmox_nodes ADD COLUMN IF NOT EXISTS last_update_check_at TIMESTAMPTZ;
+

@@ -294,6 +294,9 @@ export default {
   getProxmoxNodeCpuTempSourceCandidates: (id: string) => api.get(`/v1/proxmox/nodes/${id}/cpu-temp-source/candidates`),
   setProxmoxNodeCpuTempSource: (id: string, hostId: string | null) =>
     api.put(`/v1/proxmox/nodes/${id}/cpu-temp-source`, { host_id: hostId ?? '' }),
+  getProxmoxNodeFanRPMSourceCandidates: (id: string) => api.get(`/v1/proxmox/nodes/${id}/fan-rpm-source/candidates`),
+  setProxmoxNodeFanRPMSource: (id: string, hostId: string | null) =>
+    api.put(`/v1/proxmox/nodes/${id}/fan-rpm-source`, { host_id: hostId ?? '' }),
   getProxmoxNodeMetrics: (hours?: number, bucketMinutes?: number) =>
     api.get('/v1/proxmox/nodes/metrics', { params: { hours: hours ?? 24, bucket_minutes: bucketMinutes ?? 5 } }),
   getProxmoxGuests: (params?: Record<string, any>) => api.get('/v1/proxmox/guests', { params: params ?? {} }),

@@ -95,6 +95,30 @@ func (h *ProxmoxHandler) ListNodeCPUTempSourceCandidates(c *gin.Context) {
 	c.JSON(http.StatusOK, hosts)
 }
 
+// ListNodeFanRPMSourceCandidates returns candidate hosts that can provide fan RPM for this Proxmox node.
+// Candidates are hosts already linked (confirmed) to guests on the same node.
+func (h *ProxmoxHandler) ListNodeFanRPMSourceCandidates(c *gin.Context) {
+	node, err := h.db.GetProxmoxNode(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if node == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "node not found"})
+		return
+	}
+
+	hosts, err := h.db.ListProxmoxNodeFanRPMSourceCandidates(node.ConnectionID, node.NodeName)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if hosts == nil {
+		hosts = []models.Host{}
+	}
+	c.JSON(http.StatusOK, hosts)
+}
+
 // UpdateNodeCPUTempSource sets or clears the CPU temperature source host for a Proxmox node.
 func (h *ProxmoxHandler) UpdateNodeCPUTempSource(c *gin.Context) {
 	nodeID := c.Param("id")
@@ -125,6 +149,48 @@ func (h *ProxmoxHandler) UpdateNodeCPUTempSource(c *gin.Context) {
 	}
 
 	if err := h.db.SetProxmoxNodeCPUTempSource(nodeID, req.HostID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	updated, err := h.db.GetProxmoxNode(nodeID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, updated)
+}
+
+// UpdateNodeFanRPMSource sets or clears the fan RPM source host for a Proxmox node.
+func (h *ProxmoxHandler) UpdateNodeFanRPMSource(c *gin.Context) {
+	nodeID := c.Param("id")
+	node, err := h.db.GetProxmoxNode(nodeID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if node == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "node not found"})
+		return
+	}
+
+	var req struct {
+		HostID string `json:"host_id"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if req.HostID != "" {
+		host, err := h.db.GetHost(req.HostID)
+		if err != nil || host == nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid host_id"})
+			return
+		}
+	}
+
+	if err := h.db.SetProxmoxNodeFanRPMSource(nodeID, req.HostID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

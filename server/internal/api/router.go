@@ -276,6 +276,7 @@ func registerProxmoxRoutes(g *gin.RouterGroup, h *handlers.ProxmoxHandler) {
 	g.GET("/proxmox/nodes/metrics", h.GetNodeMetricsSummary)
 	g.GET("/proxmox/nodes/:id", h.GetNode)
 	g.GET("/proxmox/nodes/:id/cpu-temp-source/candidates", h.ListNodeCPUTempSourceCandidates)
+	g.GET("/proxmox/nodes/:id/fan-rpm-source/candidates", h.ListNodeFanRPMSourceCandidates)
 	g.GET("/proxmox/guests", h.ListGuests)
 	g.GET("/proxmox/guests/:id/metrics", h.GetGuestMetricsSummary)
 	g.GET("/proxmox/guests/:id/link", h.GetLinkByGuest)
@@ -291,6 +292,7 @@ func registerProxmoxRoutes(g *gin.RouterGroup, h *handlers.ProxmoxHandler) {
 	proxmoxAdmin.POST("/proxmox/instances/:id/test", h.TestConnectionByID)
 	proxmoxAdmin.POST("/proxmox/instances/:id/poll-now", h.PollNow)
 	proxmoxAdmin.PUT("/proxmox/nodes/:id/cpu-temp-source", h.UpdateNodeCPUTempSource)
+	proxmoxAdmin.PUT("/proxmox/nodes/:id/fan-rpm-source", h.UpdateNodeFanRPMSource)
 	// Guest ↔ host link management
 	g.GET("/proxmox/links", h.ListLinks)
 	g.POST("/proxmox/links", h.CreateLink)

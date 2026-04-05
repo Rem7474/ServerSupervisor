@@ -1,5 +1,5 @@
 -- Docker networks, container envs, network topology config, compose projects,
--- and legacy docker_commands table
+-- and docker_commands table
 
 CREATE TABLE IF NOT EXISTS docker_networks (
     id VARCHAR(64) PRIMARY KEY,
@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS compose_projects (
 
 CREATE INDEX IF NOT EXISTS idx_compose_projects_host_id ON compose_projects(host_id);
 
--- Legacy table: replaced by remote_commands in 008_remote_commands.sql
+-- Transitional table superseded by remote_commands in 008_remote_commands.sql
 CREATE TABLE IF NOT EXISTS docker_commands (
     id BIGSERIAL PRIMARY KEY,
     host_id VARCHAR(64) REFERENCES hosts(id) ON DELETE CASCADE,
@@ -72,3 +72,4 @@ CREATE TABLE IF NOT EXISTS docker_commands (
 );
 
 CREATE INDEX IF NOT EXISTS idx_docker_commands_host_status ON docker_commands(host_id, status);
+

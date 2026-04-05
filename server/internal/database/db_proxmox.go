@@ -234,6 +234,8 @@ const nodeSelectCols = `
 	n.id, n.connection_id, n.node_name, n.status,
 	n.cpu_temp_source_host_id,
 	MAX(COALESCE(src.hostname, src.name, '')) AS cpu_temp_source_host_name,
+	n.fan_rpm_source_host_id,
+	MAX(COALESCE(src_fan.hostname, src_fan.name, '')) AS fan_rpm_source_host_name,
 	n.cpu_count, n.cpu_usage, n.mem_total, n.mem_used,
 	n.uptime, n.pve_version, n.cluster_name, n.ip_address, n.last_seen_at,
 	n.pending_updates, n.security_updates, n.last_update_check_at,
@@ -246,6 +248,7 @@ func (db *DB) ListProxmoxNodes() ([]models.ProxmoxNode, error) {
 		SELECT ` + nodeSelectCols + `
 		FROM proxmox_nodes n
 		LEFT JOIN hosts src         ON src.id = n.cpu_temp_source_host_id
+		LEFT JOIN hosts src_fan     ON src_fan.id = n.fan_rpm_source_host_id
 		LEFT JOIN proxmox_guests g ON g.connection_id=n.connection_id AND g.node_name=n.node_name
 		GROUP BY n.id
 		ORDER BY n.cluster_name, n.node_name`)
@@ -262,6 +265,7 @@ func (db *DB) ListProxmoxNodesByConnection(connectionID string) ([]models.Proxmo
 		SELECT `+nodeSelectCols+`
 		FROM proxmox_nodes n
 		LEFT JOIN hosts src         ON src.id = n.cpu_temp_source_host_id
+		LEFT JOIN hosts src_fan     ON src_fan.id = n.fan_rpm_source_host_id
 		LEFT JOIN proxmox_guests g ON g.connection_id=n.connection_id AND g.node_name=n.node_name
 		WHERE n.connection_id=$1
 		GROUP BY n.id
@@ -281,11 +285,13 @@ func (db *DB) GetProxmoxNode(id string) (*models.ProxmoxNode, error) {
 		SELECT `+nodeSelectCols+`
 		FROM proxmox_nodes n
 		LEFT JOIN hosts src         ON src.id = n.cpu_temp_source_host_id
+		LEFT JOIN hosts src_fan     ON src_fan.id = n.fan_rpm_source_host_id
 		LEFT JOIN proxmox_guests g ON g.connection_id=n.connection_id AND g.node_name=n.node_name
 		WHERE n.id=$1
 		GROUP BY n.id`, id).Scan(
 		&n.ID, &n.ConnectionID, &n.NodeName, &n.Status,
 		&n.CPUTempSourceHostID, &n.CPUTempSourceHostName,
+		&n.FanRPMSourceHostID, &n.FanRPMSourceHostName,
 		&n.CPUCount, &n.CPUUsage, &n.MemTotal, &n.MemUsed,
 		&n.Uptime, &n.PVEVersion, &n.ClusterName, &n.IPAddress, &n.LastSeenAt,
 		&n.PendingUpdates, &n.SecurityUpdates, &lastUpdateCheckAt,
@@ -341,6 +347,7 @@ func scanNodes(rows *sql.Rows) ([]models.ProxmoxNode, error) {
 		if err := rows.Scan(
 			&n.ID, &n.ConnectionID, &n.NodeName, &n.Status,
 			&n.CPUTempSourceHostID, &n.CPUTempSourceHostName,
+			&n.FanRPMSourceHostID, &n.FanRPMSourceHostName,
 			&n.CPUCount, &n.CPUUsage, &n.MemTotal, &n.MemUsed,
 			&n.Uptime, &n.PVEVersion, &n.ClusterName, &n.IPAddress, &n.LastSeenAt,
 			&n.PendingUpdates, &n.SecurityUpdates, &lastUpdateCheckAt,
@@ -368,6 +375,17 @@ func (db *DB) SetProxmoxNodeCPUTempSource(nodeID, hostID string) error {
 		return err
 	}
 	_, err := db.conn.Exec(`UPDATE proxmox_nodes SET cpu_temp_source_host_id = $2 WHERE id = $1`, nodeID, hostID)
+	return err
+}
+
+// SetProxmoxNodeFanRPMSource maps a Proxmox node to a host used as fan RPM source.
+// Pass an empty hostID to clear the mapping.
+func (db *DB) SetProxmoxNodeFanRPMSource(nodeID, hostID string) error {
+	if hostID == "" {
+		_, err := db.conn.Exec(`UPDATE proxmox_nodes SET fan_rpm_source_host_id = NULL WHERE id = $1`, nodeID)
+		return err
+	}
+	_, err := db.conn.Exec(`UPDATE proxmox_nodes SET fan_rpm_source_host_id = $2 WHERE id = $1`, nodeID, hostID)
 	return err
 }
 
@@ -399,6 +417,11 @@ func (db *DB) ListProxmoxNodeCPUTempSourceCandidates(connectionID, nodeName stri
 		out = append(out, h)
 	}
 	return out, rows.Err()
+}
+
+// ListProxmoxNodeFanRPMSourceCandidates returns hosts already linked to guests on this node.
+func (db *DB) ListProxmoxNodeFanRPMSourceCandidates(connectionID, nodeName string) ([]models.Host, error) {
+	return db.ListProxmoxNodeCPUTempSourceCandidates(connectionID, nodeName)
 }
 
 // GetEffectiveHostCPUTemperature resolves CPU temperature for a host using Proxmox node mapping when relevant.
@@ -441,12 +464,66 @@ func (db *DB) GetEffectiveHostCPUTemperature(hostID string, fallbackLocal float6
 	return 0, false
 }
 
+// GetEffectiveHostFanRPM resolves fan RPM for a host using Proxmox node mapping when relevant.
+// Resolution order: mapped node source host fan RPM (fresh) -> fallbackLocal.
+func (db *DB) GetEffectiveHostFanRPM(hostID string, fallbackLocal float64) (float64, bool) {
+	var sourceHostID sql.NullString
+	err := db.conn.QueryRow(`
+		SELECT n.fan_rpm_source_host_id
+		FROM proxmox_guest_links l
+		JOIN proxmox_guests g ON g.id = l.guest_id
+		JOIN proxmox_nodes n ON n.connection_id = g.connection_id AND n.node_name = g.node_name
+		WHERE l.host_id = $1
+		  AND l.status = 'confirmed'
+		  AND l.metrics_source IN ('auto', 'proxmox')
+		LIMIT 1`, hostID).Scan(&sourceHostID)
+	if err != nil && err != sql.ErrNoRows {
+		if fallbackLocal > 0 {
+			return fallbackLocal, true
+		}
+		return 0, false
+	}
+
+	if sourceHostID.Valid {
+		var rpm float64
+		var ts time.Time
+		err = db.conn.QueryRow(`
+			SELECT COALESCE(fan_rpm, 0), timestamp
+			FROM system_metrics
+			WHERE host_id = $1
+			ORDER BY timestamp DESC
+			LIMIT 1`, sourceHostID.String).Scan(&rpm, &ts)
+		if err == nil && rpm > 0 && time.Since(ts) <= 10*time.Minute {
+			return rpm, true
+		}
+	}
+
+	if fallbackLocal > 0 {
+		return fallbackLocal, true
+	}
+	return 0, false
+}
+
 // IsHostUsedAsProxmoxCPUTempSource returns true when the host is configured
 // as CPU temperature source for at least one Proxmox node.
 func (db *DB) IsHostUsedAsProxmoxCPUTempSource(hostID string) bool {
 	var exists bool
 	err := db.conn.QueryRow(
 		`SELECT EXISTS(SELECT 1 FROM proxmox_nodes WHERE cpu_temp_source_host_id = $1)`,
+		hostID,
+	).Scan(&exists)
+	if err != nil {
+		return false
+	}
+	return exists
+}
+
+// IsHostUsedAsProxmoxFanRPMSource returns true when the host is configured
+// as fan RPM source for at least one Proxmox node.
+func (db *DB) IsHostUsedAsProxmoxFanRPMSource(hostID string) bool {
+	var exists bool
+	err := db.conn.QueryRow(
+		`SELECT EXISTS(SELECT 1 FROM proxmox_nodes WHERE fan_rpm_source_host_id = $1)`,
 		hostID,
 	).Scan(&exists)
 	if err != nil {

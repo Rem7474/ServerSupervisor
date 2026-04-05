@@ -99,8 +99,6 @@ func EvaluateAlerts(db *database.DB, cfg *config.Config, dispatcher *dispatch.Di
 	}
 }
 
-// selectHostsForGlobalMetric returns a single host target for global metrics to avoid
-// creating duplicated incidents for every host in the inventory.
 // isProxmoxMetric detects if a metric belongs to the Proxmox subsystem.
 func isProxmoxMetric(metric string) bool {
 	return metric == "proxmox_storage_percent" ||
@@ -183,14 +181,7 @@ func buildAlertEvaluationTargets(rule models.AlertRule, hosts []models.Host) []m
 	}
 }
 
-// Legacy function kept for backward compatibility (redirects to new buildAlertEvaluationTargets)
-func selectHostsForGlobalMetric(rule models.AlertRule, hosts []models.Host) []models.Host {
-	return buildAlertEvaluationTargets(rule, hosts)
-}
-
 // GetMetricValue retrieves the current value of a metric for a host according to a rule.
-// Supports both legacy metric names (cpu_percent, ram_percent, disk_percent) and
-// the current short names (cpu, memory, disk) used by the frontend.
 func GetMetricValue(db *database.DB, host models.Host, rule models.AlertRule) (float64, bool) {
 	now := time.Now()
 	duration := time.Duration(rule.DurationSeconds) * time.Second
@@ -207,17 +198,17 @@ func GetMetricValue(db *database.DB, host models.Host, rule models.AlertRule) (f
 	case "heartbeat_timeout":
 		// Returns seconds since the agent last reported. Threshold is the silence duration in seconds.
 		return now.Sub(host.LastSeen).Seconds(), true
-	case "cpu", "cpu_percent", "memory", "ram_percent", "disk", "disk_percent", "load":
+	case "cpu", "memory", "disk", "load", "cpu_temperature":
 		// When a host is explicitly linked to a Proxmox guest in confirmed+auto mode,
 		// CPU/RAM alerts must use guest metrics collected from Proxmox (hypervisor view).
-		if rule.Metric == "cpu" || rule.Metric == "cpu_percent" || rule.Metric == "memory" || rule.Metric == "ram_percent" {
+		if rule.Metric == "cpu" || rule.Metric == "memory" {
 			if link, err := db.GetProxmoxGuestLinkByHost(host.ID); err == nil && link != nil && link.Status == "confirmed" && link.MetricsSource == "auto" {
 				cpuPct, memPct, ts, err := db.GetLatestProxmoxGuestMetricPercent(link.GuestID)
 				if err == nil {
 					if rule.DurationSeconds > 0 && now.Sub(ts) > duration {
 						return 0, false
 					}
-					if rule.Metric == "cpu" || rule.Metric == "cpu_percent" {
+					if rule.Metric == "cpu" {
 						return cpuPct, true
 					}
 					return memPct, true
@@ -233,7 +224,7 @@ func GetMetricValue(db *database.DB, host models.Host, rule models.AlertRule) (f
 			return 0, false
 		}
 		switch rule.Metric {
-		case "cpu", "cpu_percent":
+		case "cpu":
 			return metrics.CPUUsagePercent, true
 		case "cpu_temperature":
 			temp, ok := db.GetEffectiveHostCPUTemperature(host.ID, metrics.CPUTemperature)
@@ -241,9 +232,9 @@ func GetMetricValue(db *database.DB, host models.Host, rule models.AlertRule) (f
 				return 0, false
 			}
 			return temp, true
-		case "memory", "ram_percent":
+		case "memory":
 			return metrics.MemoryPercent, true
-		case "disk", "disk_percent":
+		case "disk":
 			maxDisk := 0.0
 			for _, d := range metrics.Disks {
 				if d.UsedPercent > maxDisk {
@@ -369,7 +360,6 @@ func resolveProxmoxNodeMemoryPercent(db *database.DB, rule models.AlertRule) flo
 }
 
 // MatchRule evaluates whether a rule condition is currently met for the given value.
-// Supports both symbol operators (">", "<", ">=", "<=") and legacy string operators ("gt", "lt").
 func MatchRule(rule models.AlertRule, host models.Host, value float64) bool {
 	if rule.Metric == "status_offline" {
 		return host.Status == "offline"
@@ -379,16 +369,14 @@ func MatchRule(rule models.AlertRule, host models.Host, value float64) bool {
 	}
 
 	switch rule.Operator {
-	case "gt", ">":
+	case ">":
 		return value > *rule.Threshold
-	case "lt", "<":
+	case "<":
 		return value < *rule.Threshold
-	case "gte", ">=":
+	case ">=":
 		return value >= *rule.Threshold
-	case "lte", "<=":
+	case "<=":
 		return value <= *rule.Threshold
-	case "eq":
-		return value == *rule.Threshold
 	default:
 		return false
 	}
@@ -522,7 +510,7 @@ func pushWebNotifications(db *database.DB, cfg *config.Config, rule models.Alert
 
 	unit := ""
 	switch rule.Metric {
-	case "cpu", "cpu_percent", "memory", "ram_percent", "disk", "disk_percent":
+	case "cpu", "memory", "disk":
 		unit = "%"
 	}
 

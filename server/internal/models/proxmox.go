@@ -28,6 +28,8 @@ type ProxmoxNode struct {
 	NodeName              string    `json:"node_name"`
 	CPUTempSourceHostID   string    `json:"cpu_temp_source_host_id,omitempty"`
 	CPUTempSourceHostName string    `json:"cpu_temp_source_host_name,omitempty"`
+	FanRPMSourceHostID    string    `json:"fan_rpm_source_host_id,omitempty"`
+	FanRPMSourceHostName  string    `json:"fan_rpm_source_host_name,omitempty"`
 	Status                string    `json:"status"`
 	CPUCount              int       `json:"cpu_count"`
 	CPUUsage              float64   `json:"cpu_usage"`

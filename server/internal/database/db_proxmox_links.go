@@ -38,6 +38,7 @@ func (db *DB) UpsertProxmoxGuestLink(guestID, hostID, status, metricsSource stri
 	}
 	if status == "confirmed" {
 		_ = db.setNodeCPUTempSourceIfUnset(guestID, hostID)
+		_ = db.setNodeFanRPMSourceIfUnset(guestID, hostID)
 	}
 	return db.GetProxmoxGuestLink(id)
 }
@@ -218,6 +219,7 @@ func (db *DB) UpdateProxmoxGuestLink(id string, status, metricsSource *string) (
 	}
 	if link != nil && link.Status == "confirmed" {
 		_ = db.setNodeCPUTempSourceIfUnset(link.GuestID, link.HostID)
+		_ = db.setNodeFanRPMSourceIfUnset(link.GuestID, link.HostID)
 	}
 	return link, nil
 }
@@ -322,6 +324,20 @@ func (db *DB) setNodeCPUTempSourceIfUnset(guestID, hostID string) error {
 		  AND n.connection_id = g.connection_id
 		  AND n.node_name = g.node_name
 		  AND n.cpu_temp_source_host_id IS NULL`,
+		guestID, hostID,
+	)
+	return err
+}
+
+func (db *DB) setNodeFanRPMSourceIfUnset(guestID, hostID string) error {
+	_, err := db.conn.Exec(`
+		UPDATE proxmox_nodes n
+		SET fan_rpm_source_host_id = $2
+		FROM proxmox_guests g
+		WHERE g.id = $1
+		  AND n.connection_id = g.connection_id
+		  AND n.node_name = g.node_name
+		  AND n.fan_rpm_source_host_id IS NULL`,
 		guestID, hostID,
 	)
 	return err

@@ -1,5 +1,5 @@
 -- BREAKING: Full database baseline consolidation
--- Fresh install: apply this baseline and mark legacy migrations as applied.
+-- Fresh install: apply this baseline and mark prior migration files as applied.
 -- Existing install: this file is skipped by migrate() when hosts table already exists.
 
 -- ===== BEGIN 001_core.sql =====
@@ -142,7 +142,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_metrics_aggregates_unique ON metrics_aggre
 -- ===== END 002_aggregates.sql =====
 
 -- ===== BEGIN 003_docker.sql =====
--- Docker containers, apt_status, and legacy apt_commands table
+-- Docker containers, apt_status, and apt_commands table
 
 CREATE TABLE IF NOT EXISTS docker_containers (
     id VARCHAR(64) PRIMARY KEY,
@@ -174,7 +174,7 @@ CREATE TABLE IF NOT EXISTS apt_status (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Legacy table: replaced by remote_commands in 008_remote_commands.sql
+-- Transitional table superseded by remote_commands in 008_remote_commands.sql
 CREATE TABLE IF NOT EXISTS apt_commands (
     id BIGSERIAL PRIMARY KEY,
     host_id VARCHAR(64) REFERENCES hosts(id) ON DELETE CASCADE,
@@ -207,7 +207,7 @@ CREATE TABLE IF NOT EXISTS tracked_repos (
 
 -- ===== BEGIN 004_topology.sql =====
 -- Docker networks, container envs, network topology config, compose projects,
--- and legacy docker_commands table
+-- and docker_commands table
 
 CREATE TABLE IF NOT EXISTS docker_networks (
     id VARCHAR(64) PRIMARY KEY,
@@ -264,7 +264,7 @@ CREATE TABLE IF NOT EXISTS compose_projects (
 
 CREATE INDEX IF NOT EXISTS idx_compose_projects_host_id ON compose_projects(host_id);
 
--- Legacy table: replaced by remote_commands in 008_remote_commands.sql
+-- Transitional table superseded by remote_commands in 008_remote_commands.sql
 CREATE TABLE IF NOT EXISTS docker_commands (
     id BIGSERIAL PRIMARY KEY,
     host_id VARCHAR(64) REFERENCES hosts(id) ON DELETE CASCADE,
@@ -353,7 +353,7 @@ CREATE TABLE IF NOT EXISTS settings (
 -- ===== BEGIN 007_alter_columns.sql =====
 -- Column additions via ALTER TABLE (applied after all base tables are created)
 
--- hosts: add missing columns for older databases
+-- hosts: add missing columns for existing databases
 ALTER TABLE IF EXISTS hosts ADD COLUMN IF NOT EXISTS name VARCHAR(255) NOT NULL DEFAULT '';
 
 ALTER TABLE IF EXISTS hosts ADD COLUMN IF NOT EXISTS tags JSONB DEFAULT '[]'::jsonb;
@@ -435,7 +435,7 @@ ALTER TABLE IF EXISTS docker_commands ADD COLUMN IF NOT EXISTS working_dir TEXT 
 -- ===== END 007_alter_columns.sql =====
 
 -- ===== BEGIN 008_remote_commands.sql =====
--- Unified remote_commands table (replaces legacy docker_commands + apt_commands)
+-- Unified remote_commands table (supersedes docker_commands + apt_commands)
 
 CREATE TABLE IF NOT EXISTS remote_commands (
     id           VARCHAR(36)  PRIMARY KEY,
@@ -571,7 +571,7 @@ BEGIN
 
   -- ── metrics_aggregates ───────────────────────────────────────────────────
   -- The existing UNIQUE (host_id, aggregation_type, timestamp) already includes
-  -- timestamp, so it stays compatible.  The serial PK gets the same treatment.
+  -- timestamp, so it remains valid.  The serial PK gets the same treatment.
   IF NOT EXISTS (
     SELECT 1 FROM timescaledb_information.hypertables
     WHERE hypertable_name = 'metrics_aggregates'
@@ -1074,7 +1074,7 @@ CREATE INDEX IF NOT EXISTS idx_proxmox_guest_links_status   ON proxmox_guest_lin
 
 -- ===== BEGIN 029_proxmox_extended.sql =====
 -- Migration 029: Extended Proxmox monitoring
--- Adds tasks, backup jobs/runs, physical disks, and node update counters (read-only, PVEAuditor compatible).
+-- Adds tasks, backup jobs/runs, physical disks, and node update counters (read-only, PVEAuditor-aligned).
 
 -- ─── Task history per node ────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS proxmox_tasks (
@@ -1308,7 +1308,7 @@ CREATE INDEX IF NOT EXISTS idx_rttd_tracker_created
 -- ===== BEGIN 036_host_permissions.sql =====
 -- Per-host access control: allows admins to restrict or grant users
 -- specific access to individual hosts. If a user has NO entries in this
--- table their global role applies to all hosts (backward-compatible).
+-- table their global role applies to all hosts.
 -- If they have ANY entries, they are restricted to only those hosts.
 CREATE TABLE IF NOT EXISTS host_permissions (
     username   TEXT NOT NULL,
@@ -1498,7 +1498,7 @@ ON proxmox_nodes(cpu_temp_source_host_id);
 
 -- ===== END 042_proxmox_cpu_temp_source.sql =====
 
--- Mark all legacy migration files as applied so they are skipped after this baseline.
+-- Mark all prior migration files as applied so they are skipped after this baseline.
 INSERT INTO schema_migrations (filename) VALUES
     ('001_core.sql'),
     ('002_aggregates.sql'),
@@ -1543,3 +1543,4 @@ INSERT INTO schema_migrations (filename) VALUES
     ('041_cpu_temperature.sql'),
     ('042_proxmox_cpu_temp_source.sql')
 ON CONFLICT DO NOTHING;
+
