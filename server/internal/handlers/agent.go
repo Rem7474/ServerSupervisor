@@ -212,6 +212,15 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 		}
 	}
 
+	// Store agent capabilities (which collectors are enabled on this host)
+	if report.Capabilities != nil {
+		if b, err := json.Marshal(report.Capabilities); err == nil {
+			if err := h.db.UpdateHostCollectors(hostID, string(b)); err != nil {
+				log.Printf("Warning: failed to store collectors for host %s: %v", safeHostID, err)
+			}
+		}
+	}
+
 	// Store unified web logs cache + snapshot history.
 	if report.WebLogs != nil {
 		if err := h.db.UpdateHostWebLogs(hostID, report.WebLogs); err != nil {

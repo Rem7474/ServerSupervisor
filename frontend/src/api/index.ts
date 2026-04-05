@@ -215,6 +215,7 @@ export default {
 
   // Alert Rules
   getAlertRuleCapabilities: () => api.get('/v1/alert-rules/capabilities'),
+  getHostAlertMetrics: (hostId: string) => api.get(`/v1/alert-rules/${hostId}/metrics`),
   getAlertRules: () => api.get('/v1/alert-rules'),
   createAlertRule: (payload: AlertRule) => api.post('/v1/alert-rules', payload),
   updateAlertRule: (id: number, payload: AlertRule) => api.patch(`/v1/alert-rules/${id}`, payload),

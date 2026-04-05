@@ -67,7 +67,7 @@ var validAlertMetrics = map[string]bool{
 	"cpu": true, "memory": true, "disk": true, "load": true, "heartbeat_timeout": true,
 	"status_offline":  true,
 	"cpu_temperature": true, "disk_smart_status": true, "disk_temperature": true, "proxmox_storage_percent": true,
-	"npm_requests": true, "npm_traffic_bytes": true, "npm_5xx_errors": true,
+	"proxmox_node_cpu_percent": true, "proxmox_node_memory_percent": true,
 }
 
 type alertMetricCapability struct {
@@ -211,21 +211,142 @@ func validateAlertActions(db *database.DB, actions *models.AlertActions, metric 
 // GetAlertRuleCapabilities returns metric metadata and dynamic scope options.
 func (h *AlertRulesHandler) GetAlertRuleCapabilities(c *gin.Context) {
 	response := alertMetricCapabilitiesResponse{
-		Metrics: []alertMetricCapability{
-			{Metric: "cpu", Label: "CPU", Unit: "%", Icon: "\u26a1", BadgeClass: "bg-red-lt text-red", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: true},
-			{Metric: "cpu_temperature", Label: "Temp. CPU", Unit: "\u00b0C", Icon: "\U0001f321", BadgeClass: "bg-orange-lt text-orange", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: true},
-			{Metric: "memory", Label: "RAM", Unit: "%", Icon: "\U0001f9e0", BadgeClass: "bg-blue-lt text-blue", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: true},
-			{Metric: "disk", Label: "Disque", Unit: "%", Icon: "\U0001f4be", BadgeClass: "bg-yellow-lt text-yellow", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: true},
-			{Metric: "load", Label: "Load avg", Unit: "", Icon: "\U0001f4c8", BadgeClass: "bg-purple-lt text-purple", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: true},
-			{Metric: "heartbeat_timeout", Label: "Heartbeat", Unit: "s", Icon: "\U0001fac0", BadgeClass: "bg-orange-lt text-orange", SupportsThreshold: true, SupportsDuration: false, SupportsHostFilter: true},
-			{Metric: "status_offline", Label: "Hote hors ligne", Unit: "", Icon: "\U0001f50c", BadgeClass: "bg-red-lt text-red", SupportsThreshold: true, SupportsDuration: false, SupportsHostFilter: true},
-			{Metric: "disk_smart_status", Label: "SMART disque", Unit: "", Icon: "\U0001f6e1", BadgeClass: "bg-yellow-lt text-yellow", SupportsThreshold: true, SupportsDuration: false, SupportsHostFilter: true},
-			{Metric: "disk_temperature", Label: "Temp. disque", Unit: "\u00b0C", Icon: "\U0001f321", BadgeClass: "bg-orange-lt text-orange", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: true},
-			{Metric: "proxmox_storage_percent", Label: "Proxmox stockage", Unit: "%", Icon: "\U0001f5a5", BadgeClass: "bg-cyan-lt text-cyan", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: false},
-			{Metric: "npm_requests", Label: "NPM requetes", Unit: "req", Icon: "\U0001f310", BadgeClass: "bg-azure-lt text-azure", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: true},
-			{Metric: "npm_traffic_bytes", Label: "NPM trafic", Unit: "B", Icon: "\U0001f4e6", BadgeClass: "bg-azure-lt text-azure", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: true},
-			{Metric: "npm_5xx_errors", Label: "NPM erreurs 5xx", Unit: "err", Icon: "\U0001f6a8", BadgeClass: "bg-red-lt text-red", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: true},
-		},
+		Metrics: allAlertMetrics(),
+	}
+
+	response.ProxmoxScope.Modes = []string{"global", "connection", "node", "storage"}
+	response.ProxmoxScope.Connections = []alertScopeOption{}
+	response.ProxmoxScope.Nodes = []alertScopeOption{}
+	response.ProxmoxScope.Storages = []alertScopeOption{}
+
+	if rows, err := h.db.Query(`SELECT id, name FROM proxmox_connections ORDER BY name`); err == nil {
+		defer func() { _ = rows.Close() }()
+		for rows.Next() {
+			var id, name string
+			if scanErr := rows.Scan(&id, &name); scanErr == nil {
+				response.ProxmoxScope.Connections = append(response.ProxmoxScope.Connections, alertScopeOption{ID: id, Label: name})
+			}
+		}
+	}
+
+	if rows, err := h.db.Query(`
+		SELECT n.id, COALESCE(c.name,'?') || ' / ' || n.node_name
+		FROM proxmox_nodes n
+		LEFT JOIN proxmox_connections c ON c.id = n.connection_id
+		ORDER BY c.name, n.node_name`); err == nil {
+		defer func() { _ = rows.Close() }()
+		for rows.Next() {
+			var id, label string
+			if scanErr := rows.Scan(&id, &label); scanErr == nil {
+				response.ProxmoxScope.Nodes = append(response.ProxmoxScope.Nodes, alertScopeOption{ID: id, Label: label})
+			}
+		}
+	}
+
+	if rows, err := h.db.Query(`
+		SELECT s.id, COALESCE(c.name,'?') || ' / ' || s.node_name || ' / ' || s.storage_name
+		FROM proxmox_storages s
+		LEFT JOIN proxmox_connections c ON c.id = s.connection_id
+		ORDER BY c.name, s.node_name, s.storage_name`); err == nil {
+		defer func() { _ = rows.Close() }()
+		for rows.Next() {
+			var id, label string
+			if scanErr := rows.Scan(&id, &label); scanErr == nil {
+				response.ProxmoxScope.Storages = append(response.ProxmoxScope.Storages, alertScopeOption{ID: id, Label: label})
+			}
+		}
+	}
+
+	c.JSON(http.StatusOK, response)
+}
+
+// allAlertMetrics returns the complete list of all available alert metrics.
+func allAlertMetrics() []alertMetricCapability {
+	return []alertMetricCapability{
+		{Metric: "cpu", Label: "CPU", Unit: "%", Icon: "\u26a1", BadgeClass: "bg-red-lt text-red", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: true},
+		{Metric: "cpu_temperature", Label: "Temp. CPU", Unit: "\u00b0C", Icon: "\U0001f321", BadgeClass: "bg-orange-lt text-orange", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: true},
+		{Metric: "memory", Label: "RAM", Unit: "%", Icon: "\U0001f9e0", BadgeClass: "bg-blue-lt text-blue", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: true},
+		{Metric: "disk", Label: "Disque", Unit: "%", Icon: "\U0001f4be", BadgeClass: "bg-yellow-lt text-yellow", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: true},
+		{Metric: "load", Label: "Load avg", Unit: "", Icon: "\U0001f4c8", BadgeClass: "bg-purple-lt text-purple", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: true},
+		{Metric: "heartbeat_timeout", Label: "Heartbeat", Unit: "s", Icon: "\U0001fac0", BadgeClass: "bg-orange-lt text-orange", SupportsThreshold: true, SupportsDuration: false, SupportsHostFilter: true},
+		{Metric: "status_offline", Label: "Hote hors ligne", Unit: "", Icon: "\U0001f50c", BadgeClass: "bg-red-lt text-red", SupportsThreshold: true, SupportsDuration: false, SupportsHostFilter: true},
+		{Metric: "disk_smart_status", Label: "SMART disque", Unit: "", Icon: "\U0001f6e1", BadgeClass: "bg-yellow-lt text-yellow", SupportsThreshold: true, SupportsDuration: false, SupportsHostFilter: true},
+		{Metric: "disk_temperature", Label: "Temp. disque", Unit: "\u00b0C", Icon: "\U0001f321", BadgeClass: "bg-orange-lt text-orange", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: true},
+		{Metric: "proxmox_storage_percent", Label: "Proxmox stockage", Unit: "%", Icon: "\U0001f5a5", BadgeClass: "bg-cyan-lt text-cyan", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: false},
+		{Metric: "proxmox_node_cpu_percent", Label: "Proxmox CPU noeud", Unit: "%", Icon: "\U0001f9e0", BadgeClass: "bg-cyan-lt text-cyan", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: false},
+		{Metric: "proxmox_node_memory_percent", Label: "Proxmox RAM noeud", Unit: "%", Icon: "\U0001f4ca", BadgeClass: "bg-cyan-lt text-cyan", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: false},
+	}
+}
+
+// filterMetricsByCollectors returns only metrics that are available on the host based on its enabled collectors.
+// Collectors map example: {"docker": true, "smart": false, "cpu_temp": true, ...}
+func filterMetricsByCollectors(allMetrics []alertMetricCapability, collectors map[string]bool) []alertMetricCapability {
+	// These metrics are always available (base system metrics)
+	alwaysAvailable := map[string]bool{
+		"cpu":               true,
+		"memory":            true,
+		"disk":              true,
+		"load":              true,
+		"heartbeat_timeout": true,
+		"status_offline":    true,
+	}
+
+	// These metrics require specific collectors
+	requiresCollector := map[string]string{
+		"cpu_temperature":            "cpu_temp",
+		"disk_smart_status":          "smart",
+		"disk_temperature":           "smart",
+		"proxmox_storage_percent":    "proxmox", // Not from collectors, but from Proxmox integration
+		"proxmox_node_cpu_percent":   "proxmox",
+		"proxmox_node_memory_percent": "proxmox",
+	}
+
+	var filtered []alertMetricCapability
+	for _, metric := range allMetrics {
+		// Always include base metrics
+		if alwaysAvailable[metric.Metric] {
+			filtered = append(filtered, metric)
+			continue
+		}
+
+		// Check if metric requires a specific collector
+		if requiredCollector, ok := requiresCollector[metric.Metric]; ok {
+			// Special case for Proxmox metrics (not in collectors, treated separately)
+			if requiredCollector == "proxmox" {
+				// Only include Proxmox metrics if we're filtering for Proxmox hosts
+				// For now, we'll include them if any Proxmox connection exists
+				// Frontend will handle visibility separately
+				continue
+			}
+
+			// Check if required collector is enabled
+			if collectors[requiredCollector] {
+				filtered = append(filtered, metric)
+			}
+		}
+	}
+
+	return filtered
+}
+
+// GetHostAlertMetrics returns alert metrics available for a specific host based on its enabled collectors.
+func (h *AlertRulesHandler) GetHostAlertMetrics(c *gin.Context) {
+	hostID := c.Param("hostId")
+	if hostID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "hostId parameter is required"})
+		return
+	}
+
+	// Fetch the host to get collectors
+	host, err := h.db.GetHost(hostID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "host not found"})
+		return
+	}
+
+	// Build response with filtered metrics
+	response := alertMetricCapabilitiesResponse{
+		Metrics: filterMetricsByCollectors(allAlertMetrics(), host.Collectors),
 	}
 
 	response.ProxmoxScope.Modes = []string{"global", "connection", "node", "storage"}
@@ -686,3 +807,5 @@ func (h *AlertRulesHandler) ListIncidents(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, incidents)
 }
+
+

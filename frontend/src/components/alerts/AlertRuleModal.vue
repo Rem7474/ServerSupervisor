@@ -41,6 +41,11 @@
               <div class="mb-2 fw-semibold">Choisissez une métrique à surveiller</div>
               <div v-if="capabilitiesLoading" class="alert alert-info py-2 small mb-2">Chargement des metriques...</div>
               <div v-else-if="capabilitiesError" class="alert alert-warning py-2 small mb-2">{{ capabilitiesError }}</div>
+              <div v-if="form.host_id && hostMetricsLoading" class="alert alert-info py-2 small mb-2">Chargement des metriques pour cet hote...</div>
+              <div v-else-if="form.host_id && hostMetricsError" class="alert alert-warning py-2 small mb-2">{{ hostMetricsError }}</div>
+              <div v-else-if="form.host_id && hostMetrics?.metrics && hostMetrics.metrics.length < (capabilities?.metrics?.length || 0)" class="alert alert-info py-2 small mb-2">
+                ℹ️ Cet hote dispose de {{ hostMetrics.metrics.length }} metrique(s): certains collecteurs peuvent ne pas etre actifs.
+              </div>
               <div class="metric-grid">
                 <button
                   v-for="metric in metricCards"
@@ -54,14 +59,14 @@
                   <span class="metric-label">{{ metric.label }}</span>
                 </button>
               </div>
-              <div v-if="form.metric === 'proxmox_storage_percent'" class="row g-2 mt-2">
+              <div v-if="isProxmoxMetric(form.metric)" class="row g-2 mt-2">
                 <div class="col-md-4">
                   <label class="form-label">Scope Proxmox</label>
                   <select v-model="form.actions.proxmox_scope.scope_mode" class="form-select">
                     <option value="global">Global</option>
                     <option value="connection">Connexion</option>
                     <option value="node">Noeud</option>
-                    <option value="storage">Stockage</option>
+                    <option v-if="metricAllowsStorageScope" value="storage">Stockage</option>
                   </select>
                 </div>
                 <div v-if="form.actions.proxmox_scope.scope_mode === 'connection'" class="col-md-8">
@@ -78,7 +83,7 @@
                     <option v-for="opt in proxmoxNodes" :key="opt.id" :value="opt.id">{{ opt.label }}</option>
                   </select>
                 </div>
-                <div v-if="form.actions.proxmox_scope.scope_mode === 'storage'" class="col-md-8">
+                <div v-if="metricAllowsStorageScope && form.actions.proxmox_scope.scope_mode === 'storage'" class="col-md-8">
                   <label class="form-label">Stockage</label>
                   <select v-model="form.actions.proxmox_scope.storage_id" class="form-select">
                     <option value="">Selectionner...</option>
@@ -264,7 +269,7 @@ import { computed, onUnmounted, ref, watch } from 'vue'
 import apiClient from '../../api'
 import AlertRuleCommandTrigger from './AlertRuleCommandTrigger.vue'
 import { useAlertRuleForm } from '../../composables/useAlertRuleForm'
-import { getAlertMetricMeta } from '../../utils/alertMetrics'
+import { ALERT_METRIC_ORDER, getAlertMetricMeta } from '../../utils/alertMetrics'
 
 const props = defineProps({
   visible: {
@@ -305,8 +310,21 @@ const emit = defineEmits(['close', 'submit'])
 
 const browserPermission = ref(typeof Notification !== 'undefined' ? Notification.permission : 'unsupported')
 const step = ref(1)
+const hostMetrics = ref(null)
+const hostMetricsLoading = ref(false)
+const hostMetricsError = ref('')
 
 const metricCards = computed(() => {
+  // If a specific host is selected, use that host's filtered metrics
+  if (form.value.host_id && hostMetrics.value?.metrics) {
+    return hostMetrics.value.metrics.map((metric) => ({
+      value: metric.metric,
+      label: metric.label,
+      icon: metric.icon || getAlertMetricMeta(metric.metric).icon,
+    }))
+  }
+
+  // Otherwise, use global capabilities (all hosts)
   const fromCapabilities = props.capabilities?.metrics
   if (Array.isArray(fromCapabilities) && fromCapabilities.length > 0) {
     return fromCapabilities.map((metric) => ({
@@ -316,7 +334,7 @@ const metricCards = computed(() => {
     }))
   }
 
-  return []
+  return ALERT_METRIC_ORDER.map((metric) => ({ value: metric, label: getAlertMetricMeta(metric).label, icon: getAlertMetricMeta(metric).icon }))
 })
 
 const proxmoxConnections = computed(() => props.capabilities?.proxmox_scope?.connections || [])
@@ -327,6 +345,9 @@ const metricMetaByKey = computed(() => {
   const items = props.capabilities?.metrics || []
   return Object.fromEntries(items.map((item) => [item.metric, item]))
 })
+
+const isProxmoxMetric = (metric) => ['proxmox_storage_percent', 'proxmox_node_cpu_percent', 'proxmox_node_memory_percent'].includes(metric)
+const metricAllowsStorageScope = computed(() => form.value.metric === 'proxmox_storage_percent')
 
 const metricSupportsHostFilter = computed(() => {
   const supports = metricMetaByKey.value?.[form.value.metric]?.supports_host_filter
@@ -352,7 +373,7 @@ const canProceedStep = computed(() => {
   if (step.value === 1) {
     const hasBase = !!form.value.metric && !!form.value.name?.trim()
     if (!hasBase) return false
-    if (form.value.metric !== 'proxmox_storage_percent') return true
+    if (!isProxmoxMetric(form.value.metric)) return true
 
     const scope = form.value.actions.proxmox_scope || { scope_mode: 'global' }
     if (scope.scope_mode === 'connection') return !!scope.connection_id
@@ -383,6 +404,32 @@ watch(
 )
 
 watch(
+  () => form.value.host_id,
+  async (hostId) => {
+    if (!hostId) {
+      // "Tous les hôtes" selected — clear host-specific metrics
+      hostMetrics.value = null
+      hostMetricsLoading.value = false
+      hostMetricsError.value = ''
+      return
+    }
+
+    // Load metrics filtered for this specific host
+    hostMetricsLoading.value = true
+    hostMetricsError.value = ''
+    try {
+      const response = await apiClient.getHostAlertMetrics(hostId)
+      hostMetrics.value = response.data
+    } catch (error) {
+      hostMetricsError.value = 'Échec du chargement des métriques pour cet hôte'
+      hostMetrics.value = null
+    } finally {
+      hostMetricsLoading.value = false
+    }
+  }
+)
+
+watch(
   () => [form.value.host_id, form.value.metric, form.value.operator, form.value.threshold, form.value.duration],
   () => {
     if (!props.visible) return
@@ -407,7 +454,7 @@ watch(
     if (!scope) return
     if (mode !== 'connection') scope.connection_id = ''
     if (mode !== 'node') scope.node_id = ''
-    if (mode !== 'storage') scope.storage_id = ''
+    if (mode !== 'storage' || !metricAllowsStorageScope.value) scope.storage_id = ''
   }
 )
 
@@ -424,17 +471,18 @@ watch(
 )
 
 watch(
-  () => props.capabilities?.metrics,
-  (metrics) => {
-    if (!Array.isArray(metrics) || metrics.length === 0) return
+  () => metricCards.value,
+  (cards) => {
+    if (!Array.isArray(cards) || cards.length === 0) return
     const current = form.value.metric
-    const exists = metrics.some((item) => item.metric === current)
-    if (!exists) {
-      form.value.metric = metrics[0].metric
+    const exists = cards.some((item) => item.value === current)
+    if (!exists && cards.length > 0) {
+      // Selected metric is no longer available for this host
+      form.value.metric = cards[0].value
       onMetricChange()
     }
   },
-  { immediate: true, deep: true }
+  { deep: true }
 )
 
 onUnmounted(() => {
@@ -621,3 +669,9 @@ function formatDate(dateStr) {
   }
 }
 </style>
+
+
+
+
+
+

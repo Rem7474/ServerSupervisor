@@ -1,5 +1,9 @@
 import { ref, Ref } from 'vue'
 
+function isProxmoxMetric(metric: string): boolean {
+  return ['proxmox_storage_percent', 'proxmox_node_cpu_percent', 'proxmox_node_memory_percent'].includes(metric)
+}
+
 interface CommandTrigger {
   module: string
   action: string
@@ -152,7 +156,7 @@ export function useAlertRuleForm(): AlertRuleFormApi {
       delete actions.command_trigger
     }
 
-    if (form.value.metric !== 'proxmox_storage_percent') {
+    if (!isProxmoxMetric(form.value.metric)) {
       delete actions.proxmox_scope
     }
 
@@ -175,3 +179,4 @@ export function useAlertRuleForm(): AlertRuleFormApi {
     buildPayload,
   }
 }
+

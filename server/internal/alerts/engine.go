@@ -52,13 +52,11 @@ func EvaluateAlerts(db *database.DB, cfg *config.Config, dispatcher *dispatch.Di
 			ruleName = fmt.Sprintf("rule#%d(%s)", rule.ID, *rule.Name)
 		}
 
-		hostsForRule := hosts
-		if rule.Metric == "proxmox_storage_percent" {
-			hostsForRule = selectHostsForGlobalMetric(rule, hosts)
-		}
+		// Build evaluation targets: real hosts for agent metrics, synthetic host for Proxmox metrics
+		hostsForRule := buildAlertEvaluationTargets(rule, hosts)
 
 		for _, host := range hostsForRule {
-			if rule.HostID != nil && *rule.HostID != host.ID {
+			if hasHostID(rule) && !isProxmoxMetric(rule.Metric) && *rule.HostID != host.ID {
 				continue
 			}
 
@@ -103,19 +101,91 @@ func EvaluateAlerts(db *database.DB, cfg *config.Config, dispatcher *dispatch.Di
 
 // selectHostsForGlobalMetric returns a single host target for global metrics to avoid
 // creating duplicated incidents for every host in the inventory.
-func selectHostsForGlobalMetric(rule models.AlertRule, hosts []models.Host) []models.Host {
-	if len(hosts) == 0 {
+// isProxmoxMetric detects if a metric belongs to the Proxmox subsystem.
+func isProxmoxMetric(metric string) bool {
+	return metric == "proxmox_storage_percent" || 
+		   metric == "proxmox_node_cpu_percent" || 
+		   metric == "proxmox_node_memory_percent"
+}
+
+// hasHostID checks if a rule explicitly filters by host ID.
+func hasHostID(rule models.AlertRule) bool {
+	return rule.HostID != nil && *rule.HostID != ""
+}
+
+// proxmoxScopeKey generates a unique identifier for a Proxmox alert incident
+// based on scope mode to avoid duplicate incidents per scope.
+func proxmoxScopeKey(scope *models.ProxmoxMetricScope) string {
+	if scope == nil || scope.ScopeMode == "" || scope.ScopeMode == "global" {
+		return "proxmox:global"
+	}
+	switch scope.ScopeMode {
+	case "connection":
+		if scope.ConnectionID != "" {
+			return fmt.Sprintf("proxmox:connection:%s", scope.ConnectionID)
+		}
+	case "node":
+		if scope.NodeID != "" {
+			return fmt.Sprintf("proxmox:node:%s", scope.NodeID)
+		}
+	case "storage":
+		if scope.StorageID != "" {
+			return fmt.Sprintf("proxmox:storage:%s", scope.StorageID)
+		}
+	}
+	return "proxmox:global"
+}
+
+// proxmoxScopeLabel formats a human-readable description of a Proxmox scope for incident messages.
+func proxmoxScopeLabel(scope *models.ProxmoxMetricScope) string {
+	if scope == nil || scope.ScopeMode == "" || scope.ScopeMode == "global" {
+		return "Proxmox global"
+	}
+	switch scope.ScopeMode {
+	case "connection":
+		return fmt.Sprintf("Proxmox connexion %s", scope.ConnectionID)
+	case "node":
+		return fmt.Sprintf("Proxmox noeud %s", scope.NodeID)
+	case "storage":
+		return fmt.Sprintf("Proxmox stockage %s", scope.StorageID)
+	}
+	return "Proxmox global"
+}
+
+// buildAlertEvaluationTargets creates the list of hosts/targets to evaluate for a rule.
+// For agent metrics, returns the provided hosts. For Proxmox metrics, returns a single
+// synthetic host record with ID from proxmoxScopeKey() to deduplicate incidents per scope.
+func buildAlertEvaluationTargets(rule models.AlertRule, hosts []models.Host) []models.Host {
+	if !isProxmoxMetric(rule.Metric) {
+		// For agent metrics, filter by HostID if set
+		if hasHostID(rule) {
+			for _, h := range hosts {
+				if h.ID == *rule.HostID {
+					return []models.Host{h}
+				}
+			}
+			return []models.Host{}
+		}
 		return hosts
 	}
-	if rule.HostID != nil {
-		for _, host := range hosts {
-			if host.ID == *rule.HostID {
-				return []models.Host{host}
-			}
-		}
-		return []models.Host{}
+	
+	// For Proxmox metrics, create a synthetic host record with scope-based ID
+	// This ensures one incident per Proxmox scope, not per agent host
+	syntheticID := proxmoxScopeKey(rule.Actions.ProxmoxScope)
+	syntheticLabel := proxmoxScopeLabel(rule.Actions.ProxmoxScope)
+	return []models.Host{
+		{
+			ID:       syntheticID,
+			Name:     syntheticLabel,
+			Status:   "online",
+			LastSeen: time.Now(),
+		},
 	}
-	return []models.Host{hosts[0]}
+}
+
+// Legacy function kept for backward compatibility (redirects to new buildAlertEvaluationTargets)
+func selectHostsForGlobalMetric(rule models.AlertRule, hosts []models.Host) []models.Host {
+	return buildAlertEvaluationTargets(rule, hosts)
 }
 
 // GetMetricValue retrieves the current value of a metric for a host according to a rule.
@@ -213,26 +283,12 @@ func GetMetricValue(db *database.DB, host models.Host, rule models.AlertRule) (f
 	case "proxmox_storage_percent":
 		pct := resolveProxmoxStoragePercent(db, rule)
 		return pct, true
-	case "npm_requests", "npm_traffic_bytes", "npm_5xx_errors":
-		requests, bytes, errors5xx, capturedAt, err := db.GetHostWebLogCache(host.ID)
-		if err != nil || capturedAt == nil {
-			return 0, false
-		}
-
-		if rule.DurationSeconds > 0 {
-			if now.Sub(*capturedAt) > duration {
-				return 0, false
-			}
-		}
-
-		switch rule.Metric {
-		case "npm_requests":
-			return float64(requests), true
-		case "npm_traffic_bytes":
-			return float64(bytes), true
-		case "npm_5xx_errors":
-			return float64(errors5xx), true
-		}
+	case "proxmox_node_cpu_percent":
+		pct := resolveProxmoxNodeCPUPercent(db, rule)
+		return pct, true
+	case "proxmox_node_memory_percent":
+		pct := resolveProxmoxNodeMemoryPercent(db, rule)
+		return pct, true
 	}
 	return 0, false
 }
@@ -261,6 +317,54 @@ func resolveProxmoxStoragePercent(db *database.DB, rule models.AlertRule) float6
 		return db.GetProxmoxStorageUsagePercentByStorage(scope.StorageID)
 	default:
 		return db.GetMaxProxmoxStorageUsagePercent()
+	}
+}
+
+// resolveProxmoxNodeCPUPercent returns the CPU usage for a Proxmox node metric
+// based on the scope defined in the rule (global, connection, or node).
+func resolveProxmoxNodeCPUPercent(db *database.DB, rule models.AlertRule) float64 {
+	scope := rule.Actions.ProxmoxScope
+	if scope == nil || scope.ScopeMode == "" || scope.ScopeMode == "global" {
+		return db.GetMaxProxmoxNodeCPUUsagePercent()
+	}
+
+	switch scope.ScopeMode {
+	case "connection":
+		if scope.ConnectionID == "" {
+			return db.GetMaxProxmoxNodeCPUUsagePercent()
+		}
+		return db.GetMaxProxmoxNodeCPUUsagePercentByConnection(scope.ConnectionID)
+	case "node":
+		if scope.NodeID == "" {
+			return db.GetMaxProxmoxNodeCPUUsagePercent()
+		}
+		return db.GetProxmoxNodeCPUUsagePercentByNode(scope.NodeID)
+	default:
+		return db.GetMaxProxmoxNodeCPUUsagePercent()
+	}
+}
+
+// resolveProxmoxNodeMemoryPercent returns the memory usage for a Proxmox node metric
+// based on the scope defined in the rule (global, connection, or node).
+func resolveProxmoxNodeMemoryPercent(db *database.DB, rule models.AlertRule) float64 {
+	scope := rule.Actions.ProxmoxScope
+	if scope == nil || scope.ScopeMode == "" || scope.ScopeMode == "global" {
+		return db.GetMaxProxmoxNodeMemoryUsagePercent()
+	}
+
+	switch scope.ScopeMode {
+	case "connection":
+		if scope.ConnectionID == "" {
+			return db.GetMaxProxmoxNodeMemoryUsagePercent()
+		}
+		return db.GetMaxProxmoxNodeMemoryUsagePercentByConnection(scope.ConnectionID)
+	case "node":
+		if scope.NodeID == "" {
+			return db.GetMaxProxmoxNodeMemoryUsagePercent()
+		}
+		return db.GetProxmoxNodeMemoryUsagePercentByNode(scope.NodeID)
+	default:
+		return db.GetMaxProxmoxNodeMemoryUsagePercent()
 	}
 }
 
@@ -300,6 +404,21 @@ func buildAlertMessage(rule models.AlertRule, host models.Host, value float64) s
 		return fmt.Sprintf("Agent silencieux sur %s depuis %ds (dernier contact : %s)",
 			host.Name, totalSecs, host.LastSeen.Local().Format("15:04:05"))
 	}
+	
+	// Format Proxmox metrics in French with scope information
+	if isProxmoxMetric(rule.Metric) {
+		metricLabel := rule.Metric
+		switch rule.Metric {
+		case "proxmox_storage_percent":
+			metricLabel = "Stockage Proxmox"
+		case "proxmox_node_cpu_percent":
+			metricLabel = "CPU noeud Proxmox"
+		case "proxmox_node_memory_percent":
+			metricLabel = "RAM noeud Proxmox"
+		}
+		return fmt.Sprintf("Alerte %s %s %.1f%% sur %s", metricLabel, rule.Operator, value, host.Name)
+	}
+	
 	return fmt.Sprintf("Alert %s %s %.2f on host %s (%s)", rule.Metric, rule.Operator, value, host.Name, host.ID)
 }
 

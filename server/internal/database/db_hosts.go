@@ -250,6 +250,15 @@ func (db *DB) UpdateHostStatusBasedOnLastSeen(maxOfflineMinutes int) error {
 	return err
 }
 
+// UpdateHostCollectors updates which collectors/metrics are available on a host.
+// collectorsJSON must be a valid JSON object (e.g. `{"docker":true,"smart":false,"cpu_temp":true}`).
+func (db *DB) UpdateHostCollectors(hostID, collectorsJSON string) error {
+	_, err := db.conn.Exec(
+		`UPDATE hosts SET collectors = $1::jsonb, updated_at = NOW() WHERE id = $2`,
+		collectorsJSON, hostID)
+	return err
+}
+
 // GetHostHealthStatus returns status and last_seen for a single host.
 func (db *DB) GetHostHealthStatus(hostID string) (status string, lastSeen time.Time, err error) {
 	err = db.conn.QueryRow(

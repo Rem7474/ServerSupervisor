@@ -242,9 +242,21 @@ func sendReport(ctx context.Context, cfg *config.Config, s *sender.Sender) {
 		}
 	}
 
+	// Build agent capabilities (which collectors are enabled)
+	capabilities := map[string]bool{
+		"docker":    cfg.CollectDocker,
+		"apt":       cfg.CollectAPT,
+		"smart":     cfg.CollectSMART,
+		"cpu_temp":  cfg.CollectCPUTemperature,
+		"web_logs":  cfg.CollectWebLogs,
+		"systemd":   true, // Always available if agent is running
+		"journal":   true, // Always available if agent is running
+	}
+
 	// Send report (with retry on transient network errors)
 	report := &sender.Report{
 		AgentVersion:    Version,
+		Capabilities:    capabilities,
 		Metrics:         metricsPayload,
 		Docker:          dockerData,
 		AptStatus:       aptData,

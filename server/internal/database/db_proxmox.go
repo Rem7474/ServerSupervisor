@@ -654,6 +654,88 @@ func (db *DB) GetMaxProxmoxStorageUsagePercentByConnection(connectionID string) 
 	return pct
 }
 
+// ─── Node CPU & Memory Metrics ────────────────────────────────────────────────
+
+// GetMaxProxmoxNodeCPUUsagePercent returns the maximum node CPU usage (0-100)
+// across all online Proxmox nodes globally.
+func (db *DB) GetMaxProxmoxNodeCPUUsagePercent() float64 {
+	var pct float64
+	_ = db.conn.QueryRow(`
+		SELECT COALESCE(MAX(n.cpu_usage * 100), 0)
+		FROM proxmox_nodes n
+		WHERE n.status = 'online'
+	`).Scan(&pct)
+	return pct
+}
+
+// GetMaxProxmoxNodeCPUUsagePercentByConnection returns the maximum node CPU usage (0-100)
+// for one Proxmox connection.
+func (db *DB) GetMaxProxmoxNodeCPUUsagePercentByConnection(connectionID string) float64 {
+	var pct float64
+	_ = db.conn.QueryRow(`
+		SELECT COALESCE(MAX(n.cpu_usage * 100), 0)
+		FROM proxmox_nodes n
+		WHERE n.connection_id = $1
+		  AND n.status = 'online'
+	`, connectionID).Scan(&pct)
+	return pct
+}
+
+// GetProxmoxNodeCPUUsagePercentByNode returns the CPU usage (0-100) for one specific node.
+func (db *DB) GetProxmoxNodeCPUUsagePercentByNode(nodeID string) float64 {
+	var pct float64
+	_ = db.conn.QueryRow(`
+		SELECT COALESCE(n.cpu_usage * 100, 0)
+		FROM proxmox_nodes n
+		WHERE n.id = $1
+		  AND n.status = 'online'
+	`, nodeID).Scan(&pct)
+	return pct
+}
+
+// GetMaxProxmoxNodeMemoryUsagePercent returns the maximum node memory usage (0-100)
+// across all online Proxmox nodes globally.
+func (db *DB) GetMaxProxmoxNodeMemoryUsagePercent() float64 {
+	var pct float64
+	_ = db.conn.QueryRow(`
+		SELECT COALESCE(MAX(CASE WHEN n.mem_total > 0
+			THEN n.mem_used::float / n.mem_total * 100
+			ELSE 0 END), 0)
+		FROM proxmox_nodes n
+		WHERE n.status = 'online'
+	`).Scan(&pct)
+	return pct
+}
+
+// GetMaxProxmoxNodeMemoryUsagePercentByConnection returns the maximum node memory usage (0-100)
+// for one Proxmox connection.
+func (db *DB) GetMaxProxmoxNodeMemoryUsagePercentByConnection(connectionID string) float64 {
+	var pct float64
+	_ = db.conn.QueryRow(`
+		SELECT COALESCE(MAX(CASE WHEN n.mem_total > 0
+			THEN n.mem_used::float / n.mem_total * 100
+			ELSE 0 END), 0)
+		FROM proxmox_nodes n
+		WHERE n.connection_id = $1
+		  AND n.status = 'online'
+	`, connectionID).Scan(&pct)
+	return pct
+}
+
+// GetProxmoxNodeMemoryUsagePercentByNode returns the memory usage (0-100) for one specific node.
+func (db *DB) GetProxmoxNodeMemoryUsagePercentByNode(nodeID string) float64 {
+	var pct float64
+	_ = db.conn.QueryRow(`
+		SELECT COALESCE(CASE WHEN n.mem_total > 0
+			THEN n.mem_used::float / n.mem_total * 100
+			ELSE 0 END, 0)
+		FROM proxmox_nodes n
+		WHERE n.id = $1
+		  AND n.status = 'online'
+	`, nodeID).Scan(&pct)
+	return pct
+}
+
 // GetMaxProxmoxStorageUsagePercentByNode returns the max used/total ratio (0-100)
 // for active storages on one Proxmox node identified by proxmox_nodes.id.
 func (db *DB) GetMaxProxmoxStorageUsagePercentByNode(nodeID string) float64 {

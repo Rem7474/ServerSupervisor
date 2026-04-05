@@ -3,7 +3,7 @@ export interface AlertMetricMeta {
   unit: string
   icon: string
   badgeClass: string
-  category: 'host' | 'proxmox' | 'web'
+  category: 'host' | 'proxmox'
 }
 
 export const ALERT_METRICS: Record<string, AlertMetricMeta> = {
@@ -77,26 +77,19 @@ export const ALERT_METRICS: Record<string, AlertMetricMeta> = {
     badgeClass: 'bg-cyan-lt text-cyan',
     category: 'proxmox',
   },
-  npm_requests: {
-    label: 'NPM requetes',
-    unit: 'req',
-    icon: '\ud83c\udf10',
-    badgeClass: 'bg-azure-lt text-azure',
-    category: 'web',
+  proxmox_node_cpu_percent: {
+    label: 'Proxmox CPU noeud',
+    unit: '%',
+    icon: '\ud83e\udde0',
+    badgeClass: 'bg-cyan-lt text-cyan',
+    category: 'proxmox',
   },
-  npm_traffic_bytes: {
-    label: 'NPM trafic',
-    unit: 'B',
-    icon: '\ud83d\udce6',
-    badgeClass: 'bg-azure-lt text-azure',
-    category: 'web',
-  },
-  npm_5xx_errors: {
-    label: 'NPM erreurs 5xx',
-    unit: 'err',
-    icon: '\ud83d\udea8',
-    badgeClass: 'bg-red-lt text-red',
-    category: 'web',
+  proxmox_node_memory_percent: {
+    label: 'Proxmox RAM noeud',
+    unit: '%',
+    icon: '\ud83d\udcca',
+    badgeClass: 'bg-cyan-lt text-cyan',
+    category: 'proxmox',
   },
 }
 
@@ -111,9 +104,8 @@ export const ALERT_METRIC_ORDER = [
   'heartbeat_timeout',
   'status_offline',
   'proxmox_storage_percent',
-  'npm_requests',
-  'npm_traffic_bytes',
-  'npm_5xx_errors',
+  'proxmox_node_cpu_percent',
+  'proxmox_node_memory_percent',
 ]
 
 export function getAlertMetricMeta(metric: string): AlertMetricMeta {
