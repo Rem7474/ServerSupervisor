@@ -103,9 +103,9 @@ func EvaluateAlerts(db *database.DB, cfg *config.Config, dispatcher *dispatch.Di
 // creating duplicated incidents for every host in the inventory.
 // isProxmoxMetric detects if a metric belongs to the Proxmox subsystem.
 func isProxmoxMetric(metric string) bool {
-	return metric == "proxmox_storage_percent" || 
-		   metric == "proxmox_node_cpu_percent" || 
-		   metric == "proxmox_node_memory_percent"
+	return metric == "proxmox_storage_percent" ||
+		metric == "proxmox_node_cpu_percent" ||
+		metric == "proxmox_node_memory_percent"
 }
 
 // hasHostID checks if a rule explicitly filters by host ID.
@@ -168,7 +168,7 @@ func buildAlertEvaluationTargets(rule models.AlertRule, hosts []models.Host) []m
 		}
 		return hosts
 	}
-	
+
 	// For Proxmox metrics, create a synthetic host record with scope-based ID
 	// This ensures one incident per Proxmox scope, not per agent host
 	syntheticID := proxmoxScopeKey(rule.Actions.ProxmoxScope)
@@ -404,7 +404,7 @@ func buildAlertMessage(rule models.AlertRule, host models.Host, value float64) s
 		return fmt.Sprintf("Agent silencieux sur %s depuis %ds (dernier contact : %s)",
 			host.Name, totalSecs, host.LastSeen.Local().Format("15:04:05"))
 	}
-	
+
 	// Format Proxmox metrics in French with scope information
 	if isProxmoxMetric(rule.Metric) {
 		metricLabel := rule.Metric
@@ -418,7 +418,7 @@ func buildAlertMessage(rule models.AlertRule, host models.Host, value float64) s
 		}
 		return fmt.Sprintf("Alerte %s %s %.1f%% sur %s", metricLabel, rule.Operator, value, host.Name)
 	}
-	
+
 	return fmt.Sprintf("Alert %s %s %.2f on host %s (%s)", rule.Metric, rule.Operator, value, host.Name, host.ID)
 }
 

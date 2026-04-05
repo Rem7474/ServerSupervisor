@@ -23,7 +23,7 @@ type Sender struct {
 type Report struct {
 	HostID          string      `json:"host_id"`
 	AgentVersion    string      `json:"agent_version"`
-	Capabilities    interface{} `json:"capabilities"`            // Agent collector status (docker, smart, cpu_temp, web_logs, etc.)
+	Capabilities    interface{} `json:"capabilities"` // Agent collector status (docker, smart, cpu_temp, web_logs, etc.)
 	Metrics         interface{} `json:"metrics"`
 	Docker          interface{} `json:"docker"`
 	AptStatus       interface{} `json:"apt_status"`

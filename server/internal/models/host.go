@@ -26,7 +26,7 @@ type Host struct {
 	CreatedAt    time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt    time.Time `json:"updated_at" db:"updated_at"`
 	// Collectors tracks which metrics sources are active on this host (docker, smart, cpu_temp, web_logs, etc.)
-	Collectors   map[string]bool `json:"collectors" db:"collectors"` // e.g., {"docker": true, "smart": false, "cpu_temp": true}
+	Collectors map[string]bool `json:"collectors" db:"collectors"` // e.g., {"docker": true, "smart": false, "cpu_temp": true}
 }
 
 type HostRegistration struct {

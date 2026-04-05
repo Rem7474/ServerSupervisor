@@ -293,11 +293,11 @@ func filterMetricsByCollectors(allMetrics []alertMetricCapability, collectors ma
 
 	// These metrics require specific collectors
 	requiresCollector := map[string]string{
-		"cpu_temperature":            "cpu_temp",
-		"disk_smart_status":          "smart",
-		"disk_temperature":           "smart",
-		"proxmox_storage_percent":    "proxmox", // Not from collectors, but from Proxmox integration
-		"proxmox_node_cpu_percent":   "proxmox",
+		"cpu_temperature":             "cpu_temp",
+		"disk_smart_status":           "smart",
+		"disk_temperature":            "smart",
+		"proxmox_storage_percent":     "proxmox", // Not from collectors, but from Proxmox integration
+		"proxmox_node_cpu_percent":    "proxmox",
 		"proxmox_node_memory_percent": "proxmox",
 	}
 
@@ -807,5 +807,3 @@ func (h *AlertRulesHandler) ListIncidents(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, incidents)
 }
-
-

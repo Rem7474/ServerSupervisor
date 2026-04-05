@@ -6,13 +6,13 @@ import "time"
 
 // AgentCapabilities tracks which collectors are active on the agent
 type AgentCapabilities struct {
-	Docker       bool `json:"docker"`        // Docker collector enabled
-	APT          bool `json:"apt"`           // APT package collector enabled
-	SMART        bool `json:"smart"`         // SMART disk health enabled
-	CPUTemp      bool `json:"cpu_temp"`      // CPU temperature collector enabled
-	WebLogs      bool `json:"web_logs"`      // Web access log parsing enabled
-	Systemd      bool `json:"systemd"`       // Systemd unit monitoring enabled
-	Journal      bool `json:"journal"`       // Journald log collection enabled
+	Docker  bool `json:"docker"`   // Docker collector enabled
+	APT     bool `json:"apt"`      // APT package collector enabled
+	SMART   bool `json:"smart"`    // SMART disk health enabled
+	CPUTemp bool `json:"cpu_temp"` // CPU temperature collector enabled
+	WebLogs bool `json:"web_logs"` // Web access log parsing enabled
+	Systemd bool `json:"systemd"`  // Systemd unit monitoring enabled
+	Journal bool `json:"journal"`  // Journald log collection enabled
 }
 
 // ========== Agent Heartbeat / Full Report ==========
