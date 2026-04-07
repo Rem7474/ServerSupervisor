@@ -210,7 +210,7 @@ func registerAlertRoutes(g *gin.RouterGroup, rulesH *handlers.AlertRulesHandler)
 	admin.Use(AdminOnlyMiddleware())
 	admin.GET("/alerts/incidents", rulesH.ListIncidents)
 	admin.GET("/alert-rules/capabilities", rulesH.GetAlertRuleCapabilities)
-	admin.GET("/alert-rules/:hostId/metrics", rulesH.GetHostAlertMetrics)
+	admin.GET("/alert-rules/:id/metrics", rulesH.GetHostAlertMetrics)
 	admin.GET("/alert-rules", rulesH.ListAlertRules)
 	admin.GET("/alert-rules/:id", rulesH.GetAlertRule)
 	admin.POST("/alert-rules", rulesH.CreateAlertRule)
@@ -339,3 +339,4 @@ func registerStaticFiles(r *gin.Engine) {
 		c.File("./frontend/dist/index.html")
 	})
 }
+

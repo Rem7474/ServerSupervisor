@@ -331,7 +331,7 @@ func filterMetricsByCollectors(allMetrics []alertMetricCapability, collectors ma
 
 // GetHostAlertMetrics returns alert metrics available for a specific host based on its enabled collectors.
 func (h *AlertRulesHandler) GetHostAlertMetrics(c *gin.Context) {
-	hostID := c.Param("hostId")
+	hostID := c.Param("id")
 	if hostID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "hostId parameter is required"})
 		return
@@ -807,3 +807,4 @@ func (h *AlertRulesHandler) ListIncidents(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, incidents)
 }
+
