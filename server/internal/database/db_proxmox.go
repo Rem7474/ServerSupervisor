@@ -232,9 +232,9 @@ func (db *DB) UpsertProxmoxNode(connectionID, nodeName, status string, cpuCount 
 // nodeSelectCols is the shared SELECT list used by list + get queries.
 const nodeSelectCols = `
 	n.id, n.connection_id, n.node_name, n.status,
-	n.cpu_temp_source_host_id,
+	COALESCE(n.cpu_temp_source_host_id, '') AS cpu_temp_source_host_id,
 	MAX(COALESCE(src.hostname, src.name, '')) AS cpu_temp_source_host_name,
-	n.fan_rpm_source_host_id,
+	COALESCE(n.fan_rpm_source_host_id, '') AS fan_rpm_source_host_id,
 	MAX(COALESCE(src_fan.hostname, src_fan.name, '')) AS fan_rpm_source_host_name,
 	n.cpu_count, n.cpu_usage, n.mem_total, n.mem_used,
 	n.uptime, n.pve_version, n.cluster_name, n.ip_address, n.last_seen_at,
@@ -867,3 +867,4 @@ func scanStorages(rows *sql.Rows) ([]models.ProxmoxStorage, error) {
 func itoa(i int) string {
 	return fmt.Sprintf("%d", i)
 }
+
