@@ -51,14 +51,17 @@
                 </div>
               </div>
 
-              <div class="mb-3">
+              <div v-if="form.source_type === 'agent'" class="mb-3">
                 <label class="form-label">Hôte cible</label>
-                <select v-model="form.host_id" class="form-select" :disabled="form.source_type === 'proxmox' || !metricSupportsHostFilter">
+                <select v-model="form.host_id" class="form-select" :disabled="!metricSupportsHostFilter">
                   <option :value="null">Tous les hôtes</option>
                   <option v-for="host in hosts" :key="host.id" :value="host.id">{{ host.name }}</option>
                 </select>
-                <small v-if="form.source_type === 'proxmox'" class="form-hint">Les alertes Proxmox ne ciblent pas un hote agent.</small>
-                <small v-else-if="!metricSupportsHostFilter" class="form-hint">Cette metrique est globale et n'est pas liee a un hote.</small>
+                <small v-if="!metricSupportsHostFilter" class="form-hint">Cette metrique est globale et n'est pas liee a un hote.</small>
+              </div>
+
+              <div v-else class="alert alert-info py-2 small mb-3">
+                Les alertes Proxmox ciblent directement le cluster, un nœud ou un stockage. Le champ hôte disparaît volontairement pour éviter l'ambiguïté.
               </div>
 
               <div class="mb-2 fw-semibold">Choisissez une métrique à surveiller</div>
@@ -113,6 +116,11 @@
                     <option v-for="opt in proxmoxStorages" :key="opt.id" :value="opt.id">{{ opt.label }}</option>
                   </select>
                 </div>
+                <div class="col-12">
+                  <small class="form-hint d-block">
+                    Connexion = toute l'instance Proxmox liée. Nœud = un hôte Proxmox précis à l'intérieur de cette connexion.
+                  </small>
+                </div>
               </div>
               <div v-if="form.metric === 'proxmox_storage_percent'" class="text-secondary small mt-2">
                 Cette métrique est globale Proxmox: elle surveille le stockage le plus rempli parmi les stockages actifs.
@@ -157,6 +165,17 @@
                 </small>
               </div>
 
+              <div v-if="form.source_type === 'proxmox'" class="alert alert-info py-2 small d-flex align-items-center justify-content-between gap-3">
+                <div>
+                  <strong>Aperçu Proxmox</strong>
+                  <div class="text-secondary">Le test ci-dessous s'actualise automatiquement avec la portée et la métrique sélectionnées.</div>
+                </div>
+                <button type="button" class="btn btn-sm btn-outline-primary" :disabled="testing" @click="testAlert">
+                  <span v-if="testing" class="spinner-border spinner-border-sm me-1"></span>
+                  Actualiser l'aperçu
+                </button>
+              </div>
+
               <div v-if="testResults" class="mt-3">
                 <div v-if="hasNoDataResults" class="alert alert-warning py-2 small mb-2">
                   <strong>Aucune donnée disponible</strong> pour un ou plusieurs hôtes.
@@ -173,7 +192,7 @@
                   <table class="table table-sm table-vcenter card-table">
                     <thead>
                       <tr>
-                        <th>Hôte</th>
+                        <th>{{ form.source_type === 'proxmox' ? 'Portée' : 'Hôte' }}</th>
                         <th>Valeur actuelle</th>
                         <th>Résultat</th>
                       </tr>
@@ -375,7 +394,7 @@ const metricMetaByKey = computed(() => {
   return Object.fromEntries(items.map((item) => [item.metric, item]))
 })
 
-const isProxmoxMetric = (metric) => ['proxmox_storage_percent', 'proxmox_node_cpu_percent', 'proxmox_node_memory_percent'].includes(metric)
+const isProxmoxMetric = (metric) => getAlertMetricMeta(metric).category === 'proxmox'
 const metricAllowsStorageScope = computed(() => form.value.metric === 'proxmox_storage_percent')
 
 const metricSupportsHostFilter = computed(() => {

@@ -71,6 +71,48 @@ func (h *ProxmoxHandler) GetNodeMetricsSummary(c *gin.Context) {
 	c.JSON(http.StatusOK, summary)
 }
 
+// GetNodeCPUTemperatureHistory returns the source host's CPU temperature history for this Proxmox node.
+func (h *ProxmoxHandler) GetNodeCPUTemperatureHistory(c *gin.Context) {
+	hours, _ := strconv.Atoi(c.DefaultQuery("hours", "24"))
+	if hours <= 0 {
+		hours = 24
+	}
+	if hours > 8760 {
+		hours = 8760
+	}
+
+	history, err := h.db.GetProxmoxNodeCPUTemperatureHistory(c.Param("id"), hours)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if history == nil {
+		history = []models.SystemMetrics{}
+	}
+	c.JSON(http.StatusOK, history)
+}
+
+// GetNodeFanRPMHistory returns the source host's fan RPM history for this Proxmox node.
+func (h *ProxmoxHandler) GetNodeFanRPMHistory(c *gin.Context) {
+	hours, _ := strconv.Atoi(c.DefaultQuery("hours", "24"))
+	if hours <= 0 {
+		hours = 24
+	}
+	if hours > 8760 {
+		hours = 8760
+	}
+
+	history, err := h.db.GetProxmoxNodeFanRPMHistory(c.Param("id"), hours)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if history == nil {
+		history = []models.SystemMetrics{}
+	}
+	c.JSON(http.StatusOK, history)
+}
+
 // ListNodeCPUTempSourceCandidates returns candidate hosts that can provide CPU temperature for this Proxmox node.
 // Candidates are hosts already linked (confirmed) to guests on the same node.
 func (h *ProxmoxHandler) ListNodeCPUTempSourceCandidates(c *gin.Context) {

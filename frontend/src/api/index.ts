@@ -299,6 +299,10 @@ export default {
   getProxmoxNodes: (connectionId?: string) =>
     api.get('/v1/proxmox/nodes', { params: connectionId ? { connection_id: connectionId } : {} }),
   getProxmoxNode: (id: string) => api.get(`/v1/proxmox/nodes/${id}`),
+  getProxmoxNodeCpuTempHistory: (id: string, hours?: number) =>
+    api.get(`/v1/proxmox/nodes/${id}/cpu-temp/history`, { params: { hours: hours ?? 24 } }),
+  getProxmoxNodeFanRPMHistory: (id: string, hours?: number) =>
+    api.get(`/v1/proxmox/nodes/${id}/fan-rpm/history`, { params: { hours: hours ?? 24 } }),
   getProxmoxNodeCpuTempSourceCandidates: (id: string) => api.get(`/v1/proxmox/nodes/${id}/cpu-temp-source/candidates`),
   setProxmoxNodeCpuTempSource: (id: string, hostId: string | null) =>
     api.put(`/v1/proxmox/nodes/${id}/cpu-temp-source`, { host_id: hostId ?? '' }),

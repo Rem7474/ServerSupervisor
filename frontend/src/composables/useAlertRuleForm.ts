@@ -1,7 +1,13 @@
 import { ref, Ref } from 'vue'
+import { getAlertMetricMeta } from '../utils/alertMetrics'
 
 function isProxmoxMetric(metric: string): boolean {
-  return ['proxmox_storage_percent', 'proxmox_node_cpu_percent', 'proxmox_node_memory_percent'].includes(metric)
+  return getAlertMetricMeta(metric).category === 'proxmox'
+}
+
+function isProxmoxCountMetric(metric: string): boolean {
+  const meta = getAlertMetricMeta(metric)
+  return meta.category === 'proxmox' && meta.unit === ''
 }
 
 interface CommandTrigger {
@@ -146,6 +152,23 @@ export function useAlertRuleForm(): AlertRuleFormApi {
       form.value.host_id = null
     } else {
       form.value.source_type = 'agent'
+    }
+
+    if (form.value.metric === 'proxmox_disk_min_wearout_percent') {
+      form.value.operator = '<'
+      if (!form.value.threshold || form.value.threshold === 80) {
+        form.value.threshold = 20
+      }
+      return
+    }
+
+    if (isProxmoxCountMetric(form.value.metric)) {
+      form.value.operator = '>'
+      if (!form.value.threshold || form.value.threshold === 80) {
+        form.value.threshold = 0.5
+      }
+      form.value.duration = 0
+      return
     }
 
     if (form.value.metric === 'status_offline' || form.value.metric === 'disk_smart_status') {

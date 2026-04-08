@@ -123,7 +123,11 @@ type AlertRuleUpdate struct {
 
 func IsProxmoxMetric(metric string) bool {
 	switch metric {
-	case "proxmox_storage_percent", "proxmox_node_cpu_percent", "proxmox_node_memory_percent":
+	case "proxmox_storage_percent", "proxmox_node_cpu_percent", "proxmox_node_memory_percent",
+		"proxmox_guest_cpu_percent", "proxmox_guest_memory_percent",
+		"proxmox_node_pending_updates", "proxmox_node_security_updates",
+		"proxmox_recent_failed_tasks_24h",
+		"proxmox_disk_failed_count", "proxmox_disk_min_wearout_percent":
 		return true
 	default:
 		return false

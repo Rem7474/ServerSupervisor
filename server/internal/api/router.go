@@ -276,6 +276,8 @@ func registerProxmoxRoutes(g *gin.RouterGroup, h *handlers.ProxmoxHandler) {
 	g.GET("/proxmox/nodes", h.ListNodes)
 	g.GET("/proxmox/nodes/metrics", h.GetNodeMetricsSummary)
 	g.GET("/proxmox/nodes/:id", h.GetNode)
+	g.GET("/proxmox/nodes/:id/cpu-temp/history", h.GetNodeCPUTemperatureHistory)
+	g.GET("/proxmox/nodes/:id/fan-rpm/history", h.GetNodeFanRPMHistory)
 	g.GET("/proxmox/nodes/:id/cpu-temp-source/candidates", h.ListNodeCPUTempSourceCandidates)
 	g.GET("/proxmox/nodes/:id/fan-rpm-source/candidates", h.ListNodeFanRPMSourceCandidates)
 	g.GET("/proxmox/guests", h.ListGuests)

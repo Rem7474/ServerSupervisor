@@ -504,6 +504,38 @@ func (db *DB) GetEffectiveHostFanRPM(hostID string, fallbackLocal float64) (floa
 	return 0, false
 }
 
+func (db *DB) GetProxmoxNodeCPUTemperatureHistory(nodeID string, hours int) ([]models.SystemMetrics, error) {
+	var sourceHostID sql.NullString
+	err := db.conn.QueryRow(`
+		SELECT n.cpu_temp_source_host_id
+		FROM proxmox_nodes n
+		WHERE n.id = $1`, nodeID).Scan(&sourceHostID)
+	if err == sql.ErrNoRows || !sourceHostID.Valid || sourceHostID.String == "" {
+		return []models.SystemMetrics{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return db.GetSystemCPUTemperatureHistoryByHost(sourceHostID.String, hours)
+}
+
+func (db *DB) GetProxmoxNodeFanRPMHistory(nodeID string, hours int) ([]models.SystemMetrics, error) {
+	var sourceHostID sql.NullString
+	err := db.conn.QueryRow(`
+		SELECT n.fan_rpm_source_host_id
+		FROM proxmox_nodes n
+		WHERE n.id = $1`, nodeID).Scan(&sourceHostID)
+	if err == sql.ErrNoRows || !sourceHostID.Valid || sourceHostID.String == "" {
+		return []models.SystemMetrics{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	return db.GetSystemFanRPMHistoryByHost(sourceHostID.String, hours)
+}
+
 // IsHostUsedAsProxmoxCPUTempSource returns true when the host is configured
 // as CPU temperature source for at least one Proxmox node.
 func (db *DB) IsHostUsedAsProxmoxCPUTempSource(hostID string) bool {

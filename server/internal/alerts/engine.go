@@ -101,9 +101,21 @@ func EvaluateAlerts(db *database.DB, cfg *config.Config, dispatcher *dispatch.Di
 
 // isProxmoxMetric detects if a metric belongs to the Proxmox subsystem.
 func isProxmoxMetric(metric string) bool {
-	return metric == "proxmox_storage_percent" ||
-		metric == "proxmox_node_cpu_percent" ||
-		metric == "proxmox_node_memory_percent"
+	switch metric {
+	case "proxmox_storage_percent",
+		"proxmox_node_cpu_percent",
+		"proxmox_node_memory_percent",
+		"proxmox_guest_cpu_percent",
+		"proxmox_guest_memory_percent",
+		"proxmox_node_pending_updates",
+		"proxmox_node_security_updates",
+		"proxmox_recent_failed_tasks_24h",
+		"proxmox_disk_failed_count",
+		"proxmox_disk_min_wearout_percent":
+		return true
+	default:
+		return false
+	}
 }
 
 // hasHostID checks if a rule explicitly filters by host ID.
@@ -284,6 +296,20 @@ func GetMetricValue(db *database.DB, host models.Host, rule models.AlertRule) (f
 	case "proxmox_node_memory_percent":
 		pct := resolveProxmoxNodeMemoryPercent(db, rule)
 		return pct, true
+	case "proxmox_guest_cpu_percent":
+		return resolveProxmoxGuestCPUPercent(db, rule), true
+	case "proxmox_guest_memory_percent":
+		return resolveProxmoxGuestMemoryPercent(db, rule), true
+	case "proxmox_node_pending_updates":
+		return resolveProxmoxNodePendingUpdates(db, rule), true
+	case "proxmox_node_security_updates":
+		return resolveProxmoxNodeSecurityUpdates(db, rule), true
+	case "proxmox_recent_failed_tasks_24h":
+		return resolveProxmoxRecentFailedTasks24h(db, rule), true
+	case "proxmox_disk_failed_count":
+		return resolveProxmoxDiskFailedCount(db, rule), true
+	case "proxmox_disk_min_wearout_percent":
+		return resolveProxmoxDiskMinWearoutPercent(db, rule), true
 	}
 	return 0, false
 }
@@ -363,6 +389,185 @@ func resolveProxmoxNodeMemoryPercent(db *database.DB, rule models.AlertRule) flo
 	}
 }
 
+func resolveProxmoxGuestCPUPercent(db *database.DB, rule models.AlertRule) float64 {
+	scope := proxmoxScopeFromRule(rule)
+	if scope == nil || scope.ScopeMode == "" || scope.ScopeMode == "global" {
+		return db.GetMaxProxmoxGuestCPUUsagePercent()
+	}
+
+	switch scope.ScopeMode {
+	case "connection":
+		if scope.ConnectionID == "" {
+			return db.GetMaxProxmoxGuestCPUUsagePercent()
+		}
+		return db.GetMaxProxmoxGuestCPUUsagePercentByConnection(scope.ConnectionID)
+	case "node":
+		if scope.NodeID == "" {
+			return db.GetMaxProxmoxGuestCPUUsagePercent()
+		}
+		return db.GetMaxProxmoxGuestCPUUsagePercentByNode(scope.NodeID)
+	default:
+		return db.GetMaxProxmoxGuestCPUUsagePercent()
+	}
+}
+
+func resolveProxmoxGuestMemoryPercent(db *database.DB, rule models.AlertRule) float64 {
+	scope := proxmoxScopeFromRule(rule)
+	if scope == nil || scope.ScopeMode == "" || scope.ScopeMode == "global" {
+		return db.GetMaxProxmoxGuestMemoryUsagePercent()
+	}
+
+	switch scope.ScopeMode {
+	case "connection":
+		if scope.ConnectionID == "" {
+			return db.GetMaxProxmoxGuestMemoryUsagePercent()
+		}
+		return db.GetMaxProxmoxGuestMemoryUsagePercentByConnection(scope.ConnectionID)
+	case "node":
+		if scope.NodeID == "" {
+			return db.GetMaxProxmoxGuestMemoryUsagePercent()
+		}
+		return db.GetMaxProxmoxGuestMemoryUsagePercentByNode(scope.NodeID)
+	default:
+		return db.GetMaxProxmoxGuestMemoryUsagePercent()
+	}
+}
+
+func resolveProxmoxNodePendingUpdates(db *database.DB, rule models.AlertRule) float64 {
+	scope := proxmoxScopeFromRule(rule)
+	if scope == nil || scope.ScopeMode == "" || scope.ScopeMode == "global" {
+		return float64(db.GetMaxProxmoxNodePendingUpdates())
+	}
+
+	switch scope.ScopeMode {
+	case "connection":
+		if scope.ConnectionID == "" {
+			return float64(db.GetMaxProxmoxNodePendingUpdates())
+		}
+		return float64(db.GetMaxProxmoxNodePendingUpdatesByConnection(scope.ConnectionID))
+	case "node":
+		if scope.NodeID == "" {
+			return float64(db.GetMaxProxmoxNodePendingUpdates())
+		}
+		return float64(db.GetMaxProxmoxNodePendingUpdatesByNode(scope.NodeID))
+	default:
+		return float64(db.GetMaxProxmoxNodePendingUpdates())
+	}
+}
+
+func resolveProxmoxNodeSecurityUpdates(db *database.DB, rule models.AlertRule) float64 {
+	scope := proxmoxScopeFromRule(rule)
+	if scope == nil || scope.ScopeMode == "" || scope.ScopeMode == "global" {
+		return float64(db.GetMaxProxmoxNodeSecurityUpdates())
+	}
+
+	switch scope.ScopeMode {
+	case "connection":
+		if scope.ConnectionID == "" {
+			return float64(db.GetMaxProxmoxNodeSecurityUpdates())
+		}
+		return float64(db.GetMaxProxmoxNodeSecurityUpdatesByConnection(scope.ConnectionID))
+	case "node":
+		if scope.NodeID == "" {
+			return float64(db.GetMaxProxmoxNodeSecurityUpdates())
+		}
+		return float64(db.GetMaxProxmoxNodeSecurityUpdatesByNode(scope.NodeID))
+	default:
+		return float64(db.GetMaxProxmoxNodeSecurityUpdates())
+	}
+}
+
+func resolveProxmoxRecentFailedTasks24h(db *database.DB, rule models.AlertRule) float64 {
+	since := time.Now().Add(-24 * time.Hour)
+	scope := proxmoxScopeFromRule(rule)
+	if scope == nil || scope.ScopeMode == "" || scope.ScopeMode == "global" {
+		count, err := db.GetRecentFailedTaskCount(since)
+		if err != nil {
+			return 0
+		}
+		return float64(count)
+	}
+
+	switch scope.ScopeMode {
+	case "connection":
+		if scope.ConnectionID == "" {
+			count, err := db.GetRecentFailedTaskCount(since)
+			if err != nil {
+				return 0
+			}
+			return float64(count)
+		}
+		count, err := db.GetRecentFailedTaskCountByConnection(scope.ConnectionID, since)
+		if err != nil {
+			return 0
+		}
+		return float64(count)
+	case "node":
+		if scope.NodeID == "" {
+			count, err := db.GetRecentFailedTaskCount(since)
+			if err != nil {
+				return 0
+			}
+			return float64(count)
+		}
+		count, err := db.GetRecentFailedTaskCountByNodeID(scope.NodeID, since)
+		if err != nil {
+			return 0
+		}
+		return float64(count)
+	default:
+		count, err := db.GetRecentFailedTaskCount(since)
+		if err != nil {
+			return 0
+		}
+		return float64(count)
+	}
+}
+
+func resolveProxmoxDiskFailedCount(db *database.DB, rule models.AlertRule) float64 {
+	scope := proxmoxScopeFromRule(rule)
+	if scope == nil || scope.ScopeMode == "" || scope.ScopeMode == "global" {
+		return float64(db.GetProxmoxDiskFailedCount())
+	}
+
+	switch scope.ScopeMode {
+	case "connection":
+		if scope.ConnectionID == "" {
+			return float64(db.GetProxmoxDiskFailedCount())
+		}
+		return float64(db.GetProxmoxDiskFailedCountByConnection(scope.ConnectionID))
+	case "node":
+		if scope.NodeID == "" {
+			return float64(db.GetProxmoxDiskFailedCount())
+		}
+		return float64(db.GetProxmoxDiskFailedCountByNodeID(scope.NodeID))
+	default:
+		return float64(db.GetProxmoxDiskFailedCount())
+	}
+}
+
+func resolveProxmoxDiskMinWearoutPercent(db *database.DB, rule models.AlertRule) float64 {
+	scope := proxmoxScopeFromRule(rule)
+	if scope == nil || scope.ScopeMode == "" || scope.ScopeMode == "global" {
+		return db.GetProxmoxDiskMinWearoutPercent()
+	}
+
+	switch scope.ScopeMode {
+	case "connection":
+		if scope.ConnectionID == "" {
+			return db.GetProxmoxDiskMinWearoutPercent()
+		}
+		return db.GetProxmoxDiskMinWearoutPercentByConnection(scope.ConnectionID)
+	case "node":
+		if scope.NodeID == "" {
+			return db.GetProxmoxDiskMinWearoutPercent()
+		}
+		return db.GetProxmoxDiskMinWearoutPercentByNodeID(scope.NodeID)
+	default:
+		return db.GetProxmoxDiskMinWearoutPercent()
+	}
+}
+
 // MatchRule evaluates whether a rule condition is currently met for the given value.
 func MatchRule(rule models.AlertRule, host models.Host, value float64) bool {
 	if rule.Metric == "status_offline" {
@@ -407,8 +612,27 @@ func buildAlertMessage(rule models.AlertRule, host models.Host, value float64) s
 			metricLabel = "CPU noeud Proxmox"
 		case "proxmox_node_memory_percent":
 			metricLabel = "RAM noeud Proxmox"
+		case "proxmox_guest_cpu_percent":
+			metricLabel = "CPU VM/LXC Proxmox"
+		case "proxmox_guest_memory_percent":
+			metricLabel = "RAM VM/LXC Proxmox"
+		case "proxmox_node_pending_updates":
+			metricLabel = "Paquets APT en attente"
+		case "proxmox_node_security_updates":
+			metricLabel = "Mises à jour sécurité APT"
+		case "proxmox_recent_failed_tasks_24h":
+			metricLabel = "Tâches Proxmox échouées (24h)"
+		case "proxmox_disk_failed_count":
+			metricLabel = "Disques physiques en échec"
+		case "proxmox_disk_min_wearout_percent":
+			metricLabel = "Usure disque min"
 		}
-		return fmt.Sprintf("Alerte %s %s %.1f%% sur %s", metricLabel, rule.Operator, value, host.Name)
+		switch rule.Metric {
+		case "proxmox_node_pending_updates", "proxmox_node_security_updates", "proxmox_recent_failed_tasks_24h", "proxmox_disk_failed_count":
+			return fmt.Sprintf("Alerte %s %s %.0f sur %s", metricLabel, rule.Operator, value, host.Name)
+		default:
+			return fmt.Sprintf("Alerte %s %s %.1f%% sur %s", metricLabel, rule.Operator, value, host.Name)
+		}
 	}
 
 	return fmt.Sprintf("Alert %s %s %.2f on host %s (%s)", rule.Metric, rule.Operator, value, host.Name, host.ID)

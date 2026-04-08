@@ -159,6 +159,142 @@ func (db *DB) GetMetricsHistory(hostID string, hours int) ([]models.SystemMetric
 	return metrics, nil
 }
 
+func (db *DB) GetSystemCPUTemperatureHistoryByHost(hostID string, hours int) ([]models.SystemMetrics, error) {
+	if hours <= 0 {
+		hours = 24
+	}
+	if hours <= 24 {
+		return db.GetMetricsHistory(hostID, hours)
+	}
+
+	bucketMinutes := 60
+	if hours > 720 {
+		bucketMinutes = 24 * 60
+	}
+
+	bucketExpr := ""
+	if db.hasTimescaleDB {
+		bucketExpr = `time_bucket($2 * '1 minute'::interval, timestamp)`
+	} else {
+		bucketExpr = `to_timestamp(floor(EXTRACT(EPOCH FROM timestamp) / ($2 * 60)) * ($2 * 60))`
+	}
+
+	query := `
+		SELECT
+			0 AS id,
+			$1 AS host_id,
+			` + bucketExpr + ` AS timestamp,
+			0 AS cpu_usage_percent,
+			0 AS cpu_cores,
+			'' AS cpu_model,
+			COALESCE(AVG(NULLIF(cpu_temperature, 0)), 0) AS cpu_temperature,
+			0 AS fan_rpm,
+			0 AS load_avg_1,
+			0 AS load_avg_5,
+			0 AS load_avg_15,
+			0 AS memory_total,
+			0 AS memory_used,
+			0 AS memory_free,
+			0 AS memory_percent,
+			0 AS swap_total,
+			0 AS swap_used,
+			0 AS network_rx_bytes,
+			0 AS network_tx_bytes,
+			0 AS uptime,
+			'' AS hostname
+		FROM system_metrics
+		WHERE host_id = $1
+		  AND timestamp > NOW() - INTERVAL '1 hour' * $3
+		GROUP BY ` + bucketExpr + `
+		ORDER BY ` + bucketExpr + ` ASC`
+
+	rows, err := db.conn.Query(query, hostID, bucketMinutes, hours)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var metrics []models.SystemMetrics
+	for rows.Next() {
+		var m models.SystemMetrics
+		if err := rows.Scan(&m.ID, &m.HostID, &m.Timestamp, &m.CPUUsagePercent, &m.CPUCores, &m.CPUModel,
+			&m.CPUTemperature, &m.FanRPM, &m.LoadAvg1, &m.LoadAvg5, &m.LoadAvg15, &m.MemoryTotal, &m.MemoryUsed, &m.MemoryFree, &m.MemoryPercent,
+			&m.SwapTotal, &m.SwapUsed, &m.NetworkRxBytes, &m.NetworkTxBytes, &m.Uptime, &m.Hostname); err != nil {
+			continue
+		}
+		metrics = append(metrics, m)
+	}
+	return metrics, rows.Err()
+}
+
+func (db *DB) GetSystemFanRPMHistoryByHost(hostID string, hours int) ([]models.SystemMetrics, error) {
+	if hours <= 0 {
+		hours = 24
+	}
+	if hours <= 24 {
+		return db.GetMetricsHistory(hostID, hours)
+	}
+
+	bucketMinutes := 60
+	if hours > 720 {
+		bucketMinutes = 24 * 60
+	}
+
+	bucketExpr := ""
+	if db.hasTimescaleDB {
+		bucketExpr = `time_bucket($2 * '1 minute'::interval, timestamp)`
+	} else {
+		bucketExpr = `to_timestamp(floor(EXTRACT(EPOCH FROM timestamp) / ($2 * 60)) * ($2 * 60))`
+	}
+
+	query := `
+		SELECT
+			0 AS id,
+			$1 AS host_id,
+			` + bucketExpr + ` AS timestamp,
+			0 AS cpu_usage_percent,
+			0 AS cpu_cores,
+			'' AS cpu_model,
+			0 AS cpu_temperature,
+			COALESCE(AVG(NULLIF(fan_rpm, 0)), 0) AS fan_rpm,
+			0 AS load_avg_1,
+			0 AS load_avg_5,
+			0 AS load_avg_15,
+			0 AS memory_total,
+			0 AS memory_used,
+			0 AS memory_free,
+			0 AS memory_percent,
+			0 AS swap_total,
+			0 AS swap_used,
+			0 AS network_rx_bytes,
+			0 AS network_tx_bytes,
+			0 AS uptime,
+			'' AS hostname
+		FROM system_metrics
+		WHERE host_id = $1
+		  AND timestamp > NOW() - INTERVAL '1 hour' * $3
+		GROUP BY ` + bucketExpr + `
+		ORDER BY ` + bucketExpr + ` ASC`
+
+	rows, err := db.conn.Query(query, hostID, bucketMinutes, hours)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var metrics []models.SystemMetrics
+	for rows.Next() {
+		var m models.SystemMetrics
+		if err := rows.Scan(&m.ID, &m.HostID, &m.Timestamp, &m.CPUUsagePercent, &m.CPUCores, &m.CPUModel,
+			&m.CPUTemperature, &m.FanRPM, &m.LoadAvg1, &m.LoadAvg5, &m.LoadAvg15, &m.MemoryTotal, &m.MemoryUsed, &m.MemoryFree, &m.MemoryPercent,
+			&m.SwapTotal, &m.SwapUsed, &m.NetworkRxBytes, &m.NetworkTxBytes, &m.Uptime, &m.Hostname); err != nil {
+			continue
+		}
+		metrics = append(metrics, m)
+	}
+	return metrics, rows.Err()
+}
+
 // GetMetricsAggregatesByType returns pre-aggregated metrics for long time ranges.
 func (db *DB) GetMetricsAggregatesByType(hostID string, hours int, aggregationType string) ([]models.SystemMetrics, error) {
 	rows, err := db.conn.Query(

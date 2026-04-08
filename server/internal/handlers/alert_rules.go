@@ -278,6 +278,13 @@ func allProxmoxAlertMetrics() []alertMetricCapability {
 		{Metric: "proxmox_storage_percent", Label: "Proxmox stockage", Unit: "%", Icon: "\U0001f5a5", BadgeClass: "bg-cyan-lt text-cyan", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: false},
 		{Metric: "proxmox_node_cpu_percent", Label: "Proxmox CPU noeud", Unit: "%", Icon: "\U0001f9e0", BadgeClass: "bg-cyan-lt text-cyan", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: false},
 		{Metric: "proxmox_node_memory_percent", Label: "Proxmox RAM noeud", Unit: "%", Icon: "\U0001f4ca", BadgeClass: "bg-cyan-lt text-cyan", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: false},
+		{Metric: "proxmox_guest_cpu_percent", Label: "CPU VM/LXC Proxmox", Unit: "%", Icon: "\U0001f9e0", BadgeClass: "bg-cyan-lt text-cyan", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: false},
+		{Metric: "proxmox_guest_memory_percent", Label: "RAM VM/LXC Proxmox", Unit: "%", Icon: "\U0001f4ca", BadgeClass: "bg-cyan-lt text-cyan", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: false},
+		{Metric: "proxmox_node_pending_updates", Label: "Paquets APT en attente", Unit: "", Icon: "\U0001f504", BadgeClass: "bg-cyan-lt text-cyan", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: false},
+		{Metric: "proxmox_node_security_updates", Label: "Mises à jour sécurité APT", Unit: "", Icon: "\U0001f512", BadgeClass: "bg-cyan-lt text-cyan", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: false},
+		{Metric: "proxmox_recent_failed_tasks_24h", Label: "Tâches Proxmox échouées (24h)", Unit: "", Icon: "\U0001f552", BadgeClass: "bg-cyan-lt text-cyan", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: false},
+		{Metric: "proxmox_disk_failed_count", Label: "Disques physiques en échec", Unit: "", Icon: "\U0001f4a5", BadgeClass: "bg-cyan-lt text-cyan", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: false},
+		{Metric: "proxmox_disk_min_wearout_percent", Label: "Usure disque min", Unit: "%", Icon: "\U0001f6e0", BadgeClass: "bg-cyan-lt text-cyan", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: false},
 	}
 }
 
