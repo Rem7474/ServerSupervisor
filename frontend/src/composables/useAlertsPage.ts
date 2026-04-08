@@ -39,6 +39,7 @@ interface AlertRuleCapabilities {
     nodes: any[]
     storages: any[]
     guests: any[]
+    disks: any[]
   }
 }
 
@@ -121,6 +122,7 @@ export function useAlertsPage(): UseAlertsPageApi {
         nodes: [],
         storages: [],
         guests: [],
+        disks: [],
       }
       capabilities.value = {
         metrics: [...agentMetrics, ...proxmoxMetrics],

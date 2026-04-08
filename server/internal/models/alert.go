@@ -24,6 +24,7 @@ type ProxmoxMetricScope struct {
 	NodeID       string `json:"node_id,omitempty"`
 	StorageID    string `json:"storage_id,omitempty"`
 	GuestID      string `json:"guest_id,omitempty"`
+	DiskID       string `json:"disk_id,omitempty"`
 }
 
 type AlertSourceType string
@@ -152,7 +153,7 @@ func (ps *ProxmoxMetricScope) Validate(metric string) error {
 		ps.ScopeMode = "global"
 	}
 
-	validModes := map[string]bool{"global": true, "connection": true, "node": true, "storage": true, "guest": true}
+	validModes := map[string]bool{"global": true, "connection": true, "node": true, "storage": true, "guest": true, "disk": true}
 	if !validModes[ps.ScopeMode] {
 		return fmt.Errorf("scope Proxmox invalide")
 	}
@@ -161,6 +162,7 @@ func (ps *ProxmoxMetricScope) Validate(metric string) error {
 	ps.NodeID = strings.TrimSpace(ps.NodeID)
 	ps.StorageID = strings.TrimSpace(ps.StorageID)
 	ps.GuestID = strings.TrimSpace(ps.GuestID)
+	ps.DiskID = strings.TrimSpace(ps.DiskID)
 
 	switch ps.ScopeMode {
 	case "connection":
@@ -190,6 +192,13 @@ func (ps *ProxmoxMetricScope) Validate(metric string) error {
 		}
 		if ps.GuestID == "" {
 			return fmt.Errorf("le scope guest requiert une VM/LXC Proxmox")
+		}
+	case "disk":
+		if metric != "proxmox_disk_failed_count" && metric != "proxmox_disk_min_wearout_percent" {
+			return fmt.Errorf("le scope disque n'est disponible que pour les metriques de disques physiques Proxmox")
+		}
+		if ps.DiskID == "" {
+			return fmt.Errorf("le scope disque requiert un disque physique Proxmox")
 		}
 	}
 

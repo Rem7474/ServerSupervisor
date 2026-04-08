@@ -91,6 +91,7 @@
                     <option v-if="!metricAllowsGuestScope" value="node">Noeud</option>
                     <option v-if="metricAllowsGuestScope" value="guest">VM/LXC</option>
                     <option v-if="metricAllowsStorageScope" value="storage">Stockage</option>
+                    <option v-if="metricAllowsDiskScope" value="disk">Disque physique</option>
                   </select>
                 </div>
                 <div v-if="!metricAllowsGuestScope && form.proxmox_scope.scope_mode === 'connection'" class="col-md-8">
@@ -119,6 +120,13 @@
                   <select v-model="form.proxmox_scope.storage_id" class="form-select">
                     <option value="">Selectionner...</option>
                     <option v-for="opt in proxmoxStorages" :key="opt.id" :value="opt.id">{{ opt.label }}</option>
+                  </select>
+                </div>
+                <div v-if="metricAllowsDiskScope && form.proxmox_scope.scope_mode === 'disk'" class="col-md-8">
+                  <label class="form-label">Disque physique</label>
+                  <select v-model="form.proxmox_scope.disk_id" class="form-select">
+                    <option value="">Selectionner...</option>
+                    <option v-for="opt in proxmoxDisks" :key="opt.id" :value="opt.id">{{ opt.label }}</option>
                   </select>
                 </div>
                 <div class="col-12">
@@ -388,6 +396,7 @@ const proxmoxConnections = computed(() => props.capabilities?.proxmox_scope?.con
 const proxmoxNodes = computed(() => props.capabilities?.proxmox_scope?.nodes || [])
 const proxmoxStorages = computed(() => props.capabilities?.proxmox_scope?.storages || [])
 const proxmoxGuests = computed(() => props.capabilities?.proxmox_scope?.guests || [])
+const proxmoxDisks = computed(() => props.capabilities?.proxmox_scope?.disks || [])
 
 const metricMetaByKey = computed(() => {
   const items = props.capabilities?.metrics || []
@@ -397,6 +406,7 @@ const metricMetaByKey = computed(() => {
 const isProxmoxMetric = (metric) => getAlertMetricMeta(metric).category === 'proxmox'
 const metricAllowsStorageScope = computed(() => form.value.metric === 'proxmox_storage_percent')
 const metricAllowsGuestScope = computed(() => form.value.metric === 'proxmox_guest_cpu_percent' || form.value.metric === 'proxmox_guest_memory_percent')
+const metricAllowsDiskScope = computed(() => form.value.metric === 'proxmox_disk_failed_count' || form.value.metric === 'proxmox_disk_min_wearout_percent')
 
 const metricSupportsHostFilter = computed(() => {
   const supports = metricMetaByKey.value?.[form.value.metric]?.supports_host_filter
@@ -429,6 +439,7 @@ const canProceedStep = computed(() => {
     if (scope.scope_mode === 'node') return !!scope.node_id
     if (scope.scope_mode === 'guest') return !!scope.guest_id
     if (scope.scope_mode === 'storage') return !!scope.storage_id
+    if (scope.scope_mode === 'disk') return !!scope.disk_id
     return true
   }
   if (step.value === 2) return Number.isFinite(Number(form.value.threshold))
@@ -492,6 +503,7 @@ watch(
     form.value.proxmox_scope?.node_id,
     form.value.proxmox_scope?.guest_id,
     form.value.proxmox_scope?.storage_id,
+    form.value.proxmox_scope?.disk_id,
   ],
   () => {
     if (!props.visible) return
@@ -529,6 +541,7 @@ watch(
     if (mode !== 'node') scope.node_id = ''
     if (mode !== 'guest' || !metricAllowsGuestScope.value) scope.guest_id = ''
     if (mode !== 'storage' || !metricAllowsStorageScope.value) scope.storage_id = ''
+    if (mode !== 'disk' || !metricAllowsDiskScope.value) scope.disk_id = ''
   }
 )
 

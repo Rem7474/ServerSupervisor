@@ -9,6 +9,10 @@ function isProxmoxGuestMetric(metric: string): boolean {
   return metric === 'proxmox_guest_cpu_percent' || metric === 'proxmox_guest_memory_percent'
 }
 
+function isProxmoxDiskMetric(metric: string): boolean {
+  return metric === 'proxmox_disk_failed_count' || metric === 'proxmox_disk_min_wearout_percent'
+}
+
 function isProxmoxCountMetric(metric: string): boolean {
   const meta = getAlertMetricMeta(metric)
   return meta.category === 'proxmox' && meta.unit === ''
@@ -34,6 +38,7 @@ interface ProxmoxScope {
   node_id: string
   storage_id: string
   guest_id: string
+  disk_id: string
 }
 
 interface AlertRuleFormData {
@@ -81,6 +86,7 @@ export function useAlertRuleForm(): AlertRuleFormApi {
       node_id: '',
       storage_id: '',
       guest_id: '',
+      disk_id: '',
     },
     operator: '>',
     threshold: 80,
@@ -122,6 +128,7 @@ export function useAlertRuleForm(): AlertRuleFormApi {
           node_id: scope.node_id || '',
           storage_id: scope.storage_id || '',
           guest_id: scope.guest_id || '',
+          disk_id: scope.disk_id || '',
         },
       operator: rule.operator,
       threshold: rule.threshold,
@@ -160,9 +167,12 @@ export function useAlertRuleForm(): AlertRuleFormApi {
 
       if (isProxmoxGuestMetric(form.value.metric)) {
         form.value.proxmox_scope.scope_mode = 'guest'
-      } else if (form.value.proxmox_scope.scope_mode === 'guest') {
+      } else if (isProxmoxDiskMetric(form.value.metric)) {
+        form.value.proxmox_scope.scope_mode = 'disk'
+      } else if (form.value.proxmox_scope.scope_mode === 'guest' || form.value.proxmox_scope.scope_mode === 'disk') {
         form.value.proxmox_scope.scope_mode = 'global'
         form.value.proxmox_scope.guest_id = ''
+        form.value.proxmox_scope.disk_id = ''
       }
     } else {
       form.value.source_type = 'agent'

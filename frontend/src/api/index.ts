@@ -84,6 +84,7 @@ interface AlertRule {
     node_id?: string
     storage_id?: string
     guest_id?: string
+    disk_id?: string
   }
   metric?: string
   operator?: string

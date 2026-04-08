@@ -105,6 +105,7 @@ type alertSplitCapabilitiesResponse struct {
 		Nodes       []alertScopeOption `json:"nodes"`
 		Storages    []alertScopeOption `json:"storages"`
 		Guests      []alertScopeOption `json:"guests"`
+		Disks       []alertScopeOption `json:"disks"`
 	} `json:"proxmox_scope"`
 }
 
@@ -199,6 +200,13 @@ func validateProxmoxScopeExists(db *database.DB, scope *models.ProxmoxMetricScop
 		}
 	}
 
+	if scope.ScopeMode == "disk" {
+		var exists bool
+		if err := db.QueryRow(`SELECT EXISTS(SELECT 1 FROM proxmox_disks WHERE id = $1)`, scope.DiskID).Scan(&exists); err != nil || !exists {
+			return errors.New("Disque physique Proxmox introuvable pour ce scope.")
+		}
+	}
+
 	return nil
 }
 
@@ -274,17 +282,38 @@ func (h *AlertRulesHandler) proxmoxScopeTestTarget(scope *models.ProxmoxMetricSc
 			return "proxmox:guest:" + scope.GuestID, "VM/LXC: " + nodeName + " / " + guestName + " (" + suffix + ")"
 		}
 		return "proxmox:guest:" + scope.GuestID, "VM/LXC: " + scope.GuestID
+	case "disk":
+		if scope.DiskID == "" {
+			return "proxmox:global", "Cluster Proxmox"
+		}
+		var connName, nodeName, devPath, model string
+		if err := h.db.QueryRow(`
+			SELECT COALESCE(c.name, ''), d.node_name, d.dev_path, d.model
+			FROM proxmox_disks d
+			LEFT JOIN proxmox_connections c ON c.id = d.connection_id
+			WHERE d.id = $1`, scope.DiskID).Scan(&connName, &nodeName, &devPath, &model); err == nil {
+			detail := devPath
+			if strings.TrimSpace(model) != "" {
+				detail = model + " (" + devPath + ")"
+			}
+			if strings.TrimSpace(connName) != "" {
+				return "proxmox:disk:" + scope.DiskID, "Disque: " + connName + " / " + nodeName + " / " + detail
+			}
+			return "proxmox:disk:" + scope.DiskID, "Disque: " + nodeName + " / " + detail
+		}
+		return "proxmox:disk:" + scope.DiskID, "Disque: " + scope.DiskID
 	default:
 		return "proxmox:global", "Cluster Proxmox"
 	}
 }
 
-func (h *AlertRulesHandler) loadProxmoxScopeOptions() (modes []string, connections, nodes, storages, guests []alertScopeOption) {
-	modes = []string{"global", "connection", "node", "storage", "guest"}
+func (h *AlertRulesHandler) loadProxmoxScopeOptions() (modes []string, connections, nodes, storages, guests, disks []alertScopeOption) {
+	modes = []string{"global", "connection", "node", "storage", "guest", "disk"}
 	connections = []alertScopeOption{}
 	nodes = []alertScopeOption{}
 	storages = []alertScopeOption{}
 	guests = []alertScopeOption{}
+	disks = []alertScopeOption{}
 
 	if rows, err := h.db.Query(`SELECT id, name FROM proxmox_connections ORDER BY name`); err == nil {
 		defer func() { _ = rows.Close() }()
@@ -339,7 +368,26 @@ func (h *AlertRulesHandler) loadProxmoxScopeOptions() (modes []string, connectio
 		}
 	}
 
-	return modes, connections, nodes, storages, guests
+	if rows, err := h.db.Query(`
+		SELECT d.id,
+		       COALESCE(c.name,'?') || ' / ' || d.node_name || ' / ' ||
+		       CASE
+		         WHEN COALESCE(NULLIF(d.model,''),'') <> '' THEN d.model || ' (' || d.dev_path || ')'
+		         ELSE d.dev_path
+		       END
+		FROM proxmox_disks d
+		LEFT JOIN proxmox_connections c ON c.id = d.connection_id
+		ORDER BY c.name, d.node_name, d.dev_path`); err == nil {
+		defer func() { _ = rows.Close() }()
+		for rows.Next() {
+			var id, label string
+			if scanErr := rows.Scan(&id, &label); scanErr == nil {
+				disks = append(disks, alertScopeOption{ID: id, Label: label})
+			}
+		}
+	}
+
+	return modes, connections, nodes, storages, guests, disks
 }
 
 func (h *AlertRulesHandler) GetAgentAlertRuleCapabilities(c *gin.Context) {
@@ -347,13 +395,14 @@ func (h *AlertRulesHandler) GetAgentAlertRuleCapabilities(c *gin.Context) {
 }
 
 func (h *AlertRulesHandler) GetProxmoxAlertRuleCapabilities(c *gin.Context) {
-	modes, connections, nodes, storages, guests := h.loadProxmoxScopeOptions()
+	modes, connections, nodes, storages, guests, disks := h.loadProxmoxScopeOptions()
 	response := alertSplitCapabilitiesResponse{AgentMetrics: []alertMetricCapability{}, ProxmoxMetrics: allProxmoxAlertMetrics()}
 	response.ProxmoxScope.Modes = modes
 	response.ProxmoxScope.Connections = connections
 	response.ProxmoxScope.Nodes = nodes
 	response.ProxmoxScope.Storages = storages
 	response.ProxmoxScope.Guests = guests
+	response.ProxmoxScope.Disks = disks
 	c.JSON(http.StatusOK, response)
 }
 

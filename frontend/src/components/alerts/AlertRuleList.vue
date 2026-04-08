@@ -153,6 +153,7 @@ function proxmoxScopeLabel(rule) {
   if (scope.scope_mode === 'node') return `Proxmox › Noeud ${scope.node_id || ''}`.trim()
   if (scope.scope_mode === 'guest') return `Proxmox › VM/LXC ${scope.guest_id || ''}`.trim()
   if (scope.scope_mode === 'storage') return `Proxmox › Stockage ${scope.storage_id || ''}`.trim()
+  if (scope.scope_mode === 'disk') return `Proxmox › Disque ${scope.disk_id || ''}`.trim()
   return 'Proxmox › Scope inconnu'
 }
 </script>

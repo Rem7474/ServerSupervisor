@@ -149,6 +149,10 @@ func proxmoxScopeKey(scope *models.ProxmoxMetricScope) string {
 		if scope.GuestID != "" {
 			return fmt.Sprintf("proxmox:guest:%s", scope.GuestID)
 		}
+	case "disk":
+		if scope.DiskID != "" {
+			return fmt.Sprintf("proxmox:disk:%s", scope.DiskID)
+		}
 	}
 	return "proxmox:global"
 }
@@ -167,6 +171,8 @@ func proxmoxScopeLabel(scope *models.ProxmoxMetricScope) string {
 		return fmt.Sprintf("Proxmox stockage %s", scope.StorageID)
 	case "guest":
 		return fmt.Sprintf("Proxmox VM/LXC %s", scope.GuestID)
+	case "disk":
+		return fmt.Sprintf("Proxmox disque %s", scope.DiskID)
 	}
 	return "Proxmox global"
 }
@@ -540,6 +546,11 @@ func resolveProxmoxDiskFailedCount(db *database.DB, rule models.AlertRule) float
 			return float64(db.GetProxmoxDiskFailedCount())
 		}
 		return float64(db.GetProxmoxDiskFailedCountByNodeID(scope.NodeID))
+	case "disk":
+		if scope.DiskID == "" {
+			return float64(db.GetProxmoxDiskFailedCount())
+		}
+		return float64(db.GetProxmoxDiskFailedCountByDiskID(scope.DiskID))
 	default:
 		return float64(db.GetProxmoxDiskFailedCount())
 	}
@@ -562,6 +573,11 @@ func resolveProxmoxDiskMinWearoutPercent(db *database.DB, rule models.AlertRule)
 			return db.GetProxmoxDiskMinWearoutPercent()
 		}
 		return db.GetProxmoxDiskMinWearoutPercentByNodeID(scope.NodeID)
+	case "disk":
+		if scope.DiskID == "" {
+			return db.GetProxmoxDiskMinWearoutPercent()
+		}
+		return db.GetProxmoxDiskWearoutPercentByDiskID(scope.DiskID)
 	default:
 		return db.GetProxmoxDiskMinWearoutPercent()
 	}

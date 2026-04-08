@@ -330,6 +330,11 @@ func (db *DB) GetProxmoxDiskFailedCountByNodeID(nodeID string) int {
 	) AND health = 'FAILED'`, []interface{}{nodeID})
 }
 
+// GetProxmoxDiskFailedCountByDiskID returns 1 when the targeted disk is FAILED, else 0.
+func (db *DB) GetProxmoxDiskFailedCountByDiskID(diskID string) int {
+	return db.queryProxmoxDiskCount(`id = $1 AND health = 'FAILED'`, []interface{}{diskID})
+}
+
 func (db *DB) queryProxmoxDiskCount(whereClause string, args []interface{}) int {
 	query := `SELECT COALESCE(COUNT(*), 0) FROM proxmox_disks WHERE ` + whereClause
 	var count int
@@ -364,6 +369,11 @@ func (db *DB) GetProxmoxDiskMinWearoutPercentByNodeID(nodeID string) float64 {
 		  AND n.connection_id = proxmox_disks.connection_id
 		  AND n.node_name = proxmox_disks.node_name
 	) AND wearout >= 0`, []interface{}{nodeID})
+}
+
+// GetProxmoxDiskWearoutPercentByDiskID returns the wearout value for one physical disk.
+func (db *DB) GetProxmoxDiskWearoutPercentByDiskID(diskID string) float64 {
+	return db.queryProxmoxDiskMinWearout(`id = $1 AND wearout >= 0`, []interface{}{diskID})
 }
 
 func (db *DB) queryProxmoxDiskMinWearout(whereClause string, args []interface{}) float64 {
