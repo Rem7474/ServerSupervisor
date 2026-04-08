@@ -899,4 +899,3 @@ func scanStorages(rows *sql.Rows) ([]models.ProxmoxStorage, error) {
 func itoa(i int) string {
 	return fmt.Sprintf("%d", i)
 }
-
