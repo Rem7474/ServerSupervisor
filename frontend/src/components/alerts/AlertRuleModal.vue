@@ -162,15 +162,9 @@
                 </small>
               </div>
 
-              <div v-if="form.source_type === 'proxmox'" class="alert alert-info py-2 small d-flex align-items-center justify-content-between gap-3">
-                <div>
-                  <strong>Aperçu Proxmox</strong>
-                  <div class="text-secondary">Le test ci-dessous s'actualise automatiquement avec la portée et la métrique sélectionnées.</div>
-                </div>
-                <button type="button" class="btn btn-sm btn-outline-primary" :disabled="testing" @click="testAlert">
-                  <span v-if="testing" class="spinner-border spinner-border-sm me-1"></span>
-                  Actualiser l'aperçu
-                </button>
+              <div v-if="form.source_type === 'proxmox'" class="alert alert-info py-2 small">
+                <strong>Aperçu Proxmox</strong>
+                <div class="text-secondary">Le test ci-dessous s'actualise automatiquement avec la portée et la métrique sélectionnées.</div>
               </div>
 
               <div v-if="testResults" class="mt-3">
@@ -475,11 +469,33 @@ watch(
 )
 
 watch(
-  () => [form.value.host_id, form.value.metric, form.value.operator, form.value.threshold, form.value.duration],
+  () => [
+    form.value.source_type,
+    form.value.host_id,
+    form.value.metric,
+    form.value.operator,
+    form.value.threshold,
+    form.value.duration,
+    form.value.proxmox_scope?.scope_mode,
+    form.value.proxmox_scope?.connection_id,
+    form.value.proxmox_scope?.node_id,
+    form.value.proxmox_scope?.storage_id,
+  ],
   () => {
     if (!props.visible) return
+    if (step.value !== 2) return
     clearTimeout(autoTestTimer)
     autoTestTimer = setTimeout(testAlert, 600)
+  }
+)
+
+watch(
+  () => step.value,
+  (currentStep) => {
+    if (!props.visible) return
+    if (currentStep !== 2) return
+    clearTimeout(autoTestTimer)
+    autoTestTimer = setTimeout(testAlert, 100)
   }
 )
 

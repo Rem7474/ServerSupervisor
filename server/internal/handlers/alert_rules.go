@@ -201,6 +201,58 @@ func normalizeRuleSourceType(source models.AlertSourceType, metric string) model
 	return source
 }
 
+func (h *AlertRulesHandler) proxmoxScopeTestTarget(scope *models.ProxmoxMetricScope) (string, string) {
+	if scope == nil || scope.ScopeMode == "" || scope.ScopeMode == "global" {
+		return "proxmox:global", "Cluster Proxmox"
+	}
+
+	switch scope.ScopeMode {
+	case "connection":
+		if scope.ConnectionID == "" {
+			return "proxmox:global", "Cluster Proxmox"
+		}
+		var connName string
+		if err := h.db.QueryRow(`SELECT name FROM proxmox_connections WHERE id = $1`, scope.ConnectionID).Scan(&connName); err == nil && strings.TrimSpace(connName) != "" {
+			return "proxmox:connection:" + scope.ConnectionID, "Connexion: " + connName
+		}
+		return "proxmox:connection:" + scope.ConnectionID, "Connexion: " + scope.ConnectionID
+	case "node":
+		if scope.NodeID == "" {
+			return "proxmox:global", "Cluster Proxmox"
+		}
+		var connName, nodeName string
+		if err := h.db.QueryRow(`
+			SELECT COALESCE(c.name, ''), n.node_name
+			FROM proxmox_nodes n
+			LEFT JOIN proxmox_connections c ON c.id = n.connection_id
+			WHERE n.id = $1`, scope.NodeID).Scan(&connName, &nodeName); err == nil {
+			if strings.TrimSpace(connName) != "" {
+				return "proxmox:node:" + scope.NodeID, "Noeud: " + connName + " / " + nodeName
+			}
+			return "proxmox:node:" + scope.NodeID, "Noeud: " + nodeName
+		}
+		return "proxmox:node:" + scope.NodeID, "Noeud: " + scope.NodeID
+	case "storage":
+		if scope.StorageID == "" {
+			return "proxmox:global", "Cluster Proxmox"
+		}
+		var connName, nodeName, storageName string
+		if err := h.db.QueryRow(`
+			SELECT COALESCE(c.name, ''), s.node_name, s.storage_name
+			FROM proxmox_storages s
+			LEFT JOIN proxmox_connections c ON c.id = s.connection_id
+			WHERE s.id = $1`, scope.StorageID).Scan(&connName, &nodeName, &storageName); err == nil {
+			if strings.TrimSpace(connName) != "" {
+				return "proxmox:storage:" + scope.StorageID, "Stockage: " + connName + " / " + nodeName + " / " + storageName
+			}
+			return "proxmox:storage:" + scope.StorageID, "Stockage: " + nodeName + " / " + storageName
+		}
+		return "proxmox:storage:" + scope.StorageID, "Stockage: " + scope.StorageID
+	default:
+		return "proxmox:global", "Cluster Proxmox"
+	}
+}
+
 func (h *AlertRulesHandler) loadProxmoxScopeOptions() (modes []string, connections, nodes, storages []alertScopeOption) {
 	modes = []string{"global", "connection", "node", "storage"}
 	connections = []alertScopeOption{}
@@ -794,12 +846,6 @@ func (h *AlertRulesHandler) TestAlertRule(c *gin.Context) {
 		}
 	}
 
-	hosts, err := h.db.GetAllHosts()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch hosts"})
-		return
-	}
-
 	type TestResult struct {
 		HostID       string  `json:"host_id"`
 		HostName     string  `json:"host_name"`
@@ -814,23 +860,47 @@ func (h *AlertRulesHandler) TestAlertRule(c *gin.Context) {
 	ruleNoStaleness := rule
 	ruleNoStaleness.DurationSeconds = 0
 
-	for _, host := range hosts {
-		if rule.HostID != nil && *rule.HostID != host.ID {
-			continue
-		}
-		value, ok := alerts.GetMetricValue(h.db, host, ruleNoStaleness)
-		_, freshOk := alerts.GetMetricValue(h.db, host, rule)
-		wouldFire := ok && freshOk && alerts.MatchRule(rule, host, value)
+	if rule.SourceType == models.AlertSourceProxmox {
+		targetID, targetLabel := h.proxmoxScopeTestTarget(rule.ProxmoxScope)
+		target := models.Host{ID: targetID, Name: targetLabel, Status: "online", LastSeen: time.Now()}
+		value, ok := alerts.GetMetricValue(h.db, target, ruleNoStaleness)
+		_, freshOk := alerts.GetMetricValue(h.db, target, rule)
+		wouldFire := ok && freshOk && alerts.MatchRule(rule, target, value)
 		if wouldFire {
 			anyFires = true
 		}
 		results = append(results, TestResult{
-			HostID:       host.ID,
-			HostName:     host.Name,
+			HostID:       target.ID,
+			HostName:     target.Name,
 			CurrentValue: value,
 			WouldFire:    wouldFire,
 			HasData:      ok,
 		})
+	} else {
+		hosts, err := h.db.GetAllHosts()
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch hosts"})
+			return
+		}
+
+		for _, host := range hosts {
+			if rule.HostID != nil && *rule.HostID != host.ID {
+				continue
+			}
+			value, ok := alerts.GetMetricValue(h.db, host, ruleNoStaleness)
+			_, freshOk := alerts.GetMetricValue(h.db, host, rule)
+			wouldFire := ok && freshOk && alerts.MatchRule(rule, host, value)
+			if wouldFire {
+				anyFires = true
+			}
+			results = append(results, TestResult{
+				HostID:       host.ID,
+				HostName:     host.Name,
+				CurrentValue: value,
+				WouldFire:    wouldFire,
+				HasData:      ok,
+			})
+		}
 	}
 
 	if results == nil {
