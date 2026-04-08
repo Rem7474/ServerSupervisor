@@ -151,6 +151,7 @@ function proxmoxScopeLabel(rule) {
   if (!scope || !scope.scope_mode || scope.scope_mode === 'global') return 'Proxmox › Cluster'
   if (scope.scope_mode === 'connection') return `Proxmox › Connexion ${scope.connection_id || ''}`.trim()
   if (scope.scope_mode === 'node') return `Proxmox › Noeud ${scope.node_id || ''}`.trim()
+  if (scope.scope_mode === 'guest') return `Proxmox › VM/LXC ${scope.guest_id || ''}`.trim()
   if (scope.scope_mode === 'storage') return `Proxmox › Stockage ${scope.storage_id || ''}`.trim()
   return 'Proxmox › Scope inconnu'
 }

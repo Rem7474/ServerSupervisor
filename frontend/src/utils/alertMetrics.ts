@@ -112,13 +112,6 @@ export const ALERT_METRICS: Record<string, AlertMetricMeta> = {
     badgeClass: 'bg-cyan-lt text-cyan',
     category: 'proxmox',
   },
-  proxmox_node_security_updates: {
-    label: 'Mises à jour sécurité APT',
-    unit: '',
-    icon: '\ud83d\udd12',
-    badgeClass: 'bg-cyan-lt text-cyan',
-    category: 'proxmox',
-  },
   proxmox_recent_failed_tasks_24h: {
     label: 'Tâches Proxmox échouées (24h)',
     unit: '',
@@ -158,7 +151,6 @@ export const ALERT_METRIC_ORDER = [
   'proxmox_guest_cpu_percent',
   'proxmox_guest_memory_percent',
   'proxmox_node_pending_updates',
-  'proxmox_node_security_updates',
   'proxmox_recent_failed_tasks_24h',
   'proxmox_disk_failed_count',
   'proxmox_disk_min_wearout_percent',

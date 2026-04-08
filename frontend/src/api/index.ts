@@ -83,6 +83,7 @@ interface AlertRule {
     connection_id?: string
     node_id?: string
     storage_id?: string
+    guest_id?: string
   }
   metric?: string
   operator?: string

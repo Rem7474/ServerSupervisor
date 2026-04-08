@@ -5,6 +5,10 @@ function isProxmoxMetric(metric: string): boolean {
   return getAlertMetricMeta(metric).category === 'proxmox'
 }
 
+function isProxmoxGuestMetric(metric: string): boolean {
+  return metric === 'proxmox_guest_cpu_percent' || metric === 'proxmox_guest_memory_percent'
+}
+
 function isProxmoxCountMetric(metric: string): boolean {
   const meta = getAlertMetricMeta(metric)
   return meta.category === 'proxmox' && meta.unit === ''
@@ -29,6 +33,7 @@ interface ProxmoxScope {
   connection_id: string
   node_id: string
   storage_id: string
+  guest_id: string
 }
 
 interface AlertRuleFormData {
@@ -75,6 +80,7 @@ export function useAlertRuleForm(): AlertRuleFormApi {
       connection_id: '',
       node_id: '',
       storage_id: '',
+      guest_id: '',
     },
     operator: '>',
     threshold: 80,
@@ -115,6 +121,7 @@ export function useAlertRuleForm(): AlertRuleFormApi {
           connection_id: scope.connection_id || '',
           node_id: scope.node_id || '',
           storage_id: scope.storage_id || '',
+          guest_id: scope.guest_id || '',
         },
       operator: rule.operator,
       threshold: rule.threshold,
@@ -150,6 +157,13 @@ export function useAlertRuleForm(): AlertRuleFormApi {
     if (isProxmoxMetric(form.value.metric)) {
       form.value.source_type = 'proxmox'
       form.value.host_id = null
+
+      if (isProxmoxGuestMetric(form.value.metric)) {
+        form.value.proxmox_scope.scope_mode = 'guest'
+      } else if (form.value.proxmox_scope.scope_mode === 'guest') {
+        form.value.proxmox_scope.scope_mode = 'global'
+        form.value.proxmox_scope.guest_id = ''
+      }
     } else {
       form.value.source_type = 'agent'
     }

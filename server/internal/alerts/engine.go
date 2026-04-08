@@ -108,7 +108,6 @@ func isProxmoxMetric(metric string) bool {
 		"proxmox_guest_cpu_percent",
 		"proxmox_guest_memory_percent",
 		"proxmox_node_pending_updates",
-		"proxmox_node_security_updates",
 		"proxmox_recent_failed_tasks_24h",
 		"proxmox_disk_failed_count",
 		"proxmox_disk_min_wearout_percent":
@@ -146,6 +145,10 @@ func proxmoxScopeKey(scope *models.ProxmoxMetricScope) string {
 		if scope.StorageID != "" {
 			return fmt.Sprintf("proxmox:storage:%s", scope.StorageID)
 		}
+	case "guest":
+		if scope.GuestID != "" {
+			return fmt.Sprintf("proxmox:guest:%s", scope.GuestID)
+		}
 	}
 	return "proxmox:global"
 }
@@ -162,6 +165,8 @@ func proxmoxScopeLabel(scope *models.ProxmoxMetricScope) string {
 		return fmt.Sprintf("Proxmox noeud %s", scope.NodeID)
 	case "storage":
 		return fmt.Sprintf("Proxmox stockage %s", scope.StorageID)
+	case "guest":
+		return fmt.Sprintf("Proxmox VM/LXC %s", scope.GuestID)
 	}
 	return "Proxmox global"
 }
@@ -302,8 +307,6 @@ func GetMetricValue(db *database.DB, host models.Host, rule models.AlertRule) (f
 		return resolveProxmoxGuestMemoryPercent(db, rule), true
 	case "proxmox_node_pending_updates":
 		return resolveProxmoxNodePendingUpdates(db, rule), true
-	case "proxmox_node_security_updates":
-		return resolveProxmoxNodeSecurityUpdates(db, rule), true
 	case "proxmox_recent_failed_tasks_24h":
 		return resolveProxmoxRecentFailedTasks24h(db, rule), true
 	case "proxmox_disk_failed_count":
@@ -406,6 +409,15 @@ func resolveProxmoxGuestCPUPercent(db *database.DB, rule models.AlertRule) float
 			return db.GetMaxProxmoxGuestCPUUsagePercent()
 		}
 		return db.GetMaxProxmoxGuestCPUUsagePercentByNode(scope.NodeID)
+	case "guest":
+		if scope.GuestID == "" {
+			return db.GetMaxProxmoxGuestCPUUsagePercent()
+		}
+		cpu, _, _, err := db.GetLatestProxmoxGuestMetricPercent(scope.GuestID)
+		if err != nil {
+			return 0
+		}
+		return cpu
 	default:
 		return db.GetMaxProxmoxGuestCPUUsagePercent()
 	}
@@ -428,6 +440,15 @@ func resolveProxmoxGuestMemoryPercent(db *database.DB, rule models.AlertRule) fl
 			return db.GetMaxProxmoxGuestMemoryUsagePercent()
 		}
 		return db.GetMaxProxmoxGuestMemoryUsagePercentByNode(scope.NodeID)
+	case "guest":
+		if scope.GuestID == "" {
+			return db.GetMaxProxmoxGuestMemoryUsagePercent()
+		}
+		_, mem, _, err := db.GetLatestProxmoxGuestMetricPercent(scope.GuestID)
+		if err != nil {
+			return 0
+		}
+		return mem
 	default:
 		return db.GetMaxProxmoxGuestMemoryUsagePercent()
 	}
@@ -452,28 +473,6 @@ func resolveProxmoxNodePendingUpdates(db *database.DB, rule models.AlertRule) fl
 		return float64(db.GetMaxProxmoxNodePendingUpdatesByNode(scope.NodeID))
 	default:
 		return float64(db.GetMaxProxmoxNodePendingUpdates())
-	}
-}
-
-func resolveProxmoxNodeSecurityUpdates(db *database.DB, rule models.AlertRule) float64 {
-	scope := proxmoxScopeFromRule(rule)
-	if scope == nil || scope.ScopeMode == "" || scope.ScopeMode == "global" {
-		return float64(db.GetMaxProxmoxNodeSecurityUpdates())
-	}
-
-	switch scope.ScopeMode {
-	case "connection":
-		if scope.ConnectionID == "" {
-			return float64(db.GetMaxProxmoxNodeSecurityUpdates())
-		}
-		return float64(db.GetMaxProxmoxNodeSecurityUpdatesByConnection(scope.ConnectionID))
-	case "node":
-		if scope.NodeID == "" {
-			return float64(db.GetMaxProxmoxNodeSecurityUpdates())
-		}
-		return float64(db.GetMaxProxmoxNodeSecurityUpdatesByNode(scope.NodeID))
-	default:
-		return float64(db.GetMaxProxmoxNodeSecurityUpdates())
 	}
 }
 
@@ -618,8 +617,6 @@ func buildAlertMessage(rule models.AlertRule, host models.Host, value float64) s
 			metricLabel = "RAM VM/LXC Proxmox"
 		case "proxmox_node_pending_updates":
 			metricLabel = "Paquets APT en attente"
-		case "proxmox_node_security_updates":
-			metricLabel = "Mises à jour sécurité APT"
 		case "proxmox_recent_failed_tasks_24h":
 			metricLabel = "Tâches Proxmox échouées (24h)"
 		case "proxmox_disk_failed_count":
@@ -628,7 +625,7 @@ func buildAlertMessage(rule models.AlertRule, host models.Host, value float64) s
 			metricLabel = "Usure disque min"
 		}
 		switch rule.Metric {
-		case "proxmox_node_pending_updates", "proxmox_node_security_updates", "proxmox_recent_failed_tasks_24h", "proxmox_disk_failed_count":
+		case "proxmox_node_pending_updates", "proxmox_recent_failed_tasks_24h", "proxmox_disk_failed_count":
 			return fmt.Sprintf("Alerte %s %s %.0f sur %s", metricLabel, rule.Operator, value, host.Name)
 		default:
 			return fmt.Sprintf("Alerte %s %s %.1f%% sur %s", metricLabel, rule.Operator, value, host.Name)

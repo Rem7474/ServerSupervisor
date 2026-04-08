@@ -251,14 +251,11 @@
       </div>
 
       <!-- Updates banner (only shown when pending updates exist) -->
-      <div v-if="node.pending_updates > 0" class="alert mb-4" :class="node.security_updates > 0 ? 'alert-danger' : 'alert-warning'">
+      <div v-if="node.pending_updates > 0" class="alert alert-warning mb-4">
         <div class="d-flex align-items-center gap-3">
           <div>
             <strong>Mises à jour disponibles sur ce nœud :</strong>
             {{ node.pending_updates }} paquet(s) en attente
-            <span v-if="node.security_updates > 0" class="ms-2 badge bg-danger">
-              dont {{ node.security_updates }} de sécurité
-            </span>
           </div>
           <div class="ms-auto text-muted small" v-if="node.last_update_check_at">
             Dernière vérification : {{ formatDate(node.last_update_check_at) }}
@@ -301,7 +298,7 @@
             <li class="nav-item">
               <button class="nav-link" :class="{ active: tab === 'updates' }" @click="tab = 'updates'">
                 Mises à jour
-                <span v-if="node.pending_updates > 0" class="badge ms-1" :class="node.security_updates > 0 ? 'bg-danger-lt text-danger' : 'bg-warning-lt text-warning'">
+                <span v-if="node.pending_updates > 0" class="badge ms-1 bg-warning-lt text-warning">
                   {{ node.pending_updates }}
                 </span>
               </button>
@@ -549,11 +546,6 @@
                 <div v-if="node.last_update_check_at" class="text-muted small">
                   Détecté le {{ formatDate(node.last_update_check_at) }}
                 </div>
-              </div>
-              <div v-if="node.security_updates > 0" class="ms-auto">
-                <span class="badge bg-danger fs-5 px-3 py-2">
-                  {{ node.security_updates }} mise(s) à jour de sécurité
-                </span>
               </div>
             </div>
             <div class="alert alert-info mb-0">

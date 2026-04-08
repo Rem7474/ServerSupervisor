@@ -23,6 +23,7 @@ type ProxmoxMetricScope struct {
 	ConnectionID string `json:"connection_id,omitempty"`
 	NodeID       string `json:"node_id,omitempty"`
 	StorageID    string `json:"storage_id,omitempty"`
+	GuestID      string `json:"guest_id,omitempty"`
 }
 
 type AlertSourceType string
@@ -125,7 +126,7 @@ func IsProxmoxMetric(metric string) bool {
 	switch metric {
 	case "proxmox_storage_percent", "proxmox_node_cpu_percent", "proxmox_node_memory_percent",
 		"proxmox_guest_cpu_percent", "proxmox_guest_memory_percent",
-		"proxmox_node_pending_updates", "proxmox_node_security_updates",
+		"proxmox_node_pending_updates",
 		"proxmox_recent_failed_tasks_24h",
 		"proxmox_disk_failed_count", "proxmox_disk_min_wearout_percent":
 		return true
@@ -151,7 +152,7 @@ func (ps *ProxmoxMetricScope) Validate(metric string) error {
 		ps.ScopeMode = "global"
 	}
 
-	validModes := map[string]bool{"global": true, "connection": true, "node": true, "storage": true}
+	validModes := map[string]bool{"global": true, "connection": true, "node": true, "storage": true, "guest": true}
 	if !validModes[ps.ScopeMode] {
 		return fmt.Errorf("scope Proxmox invalide")
 	}
@@ -159,13 +160,20 @@ func (ps *ProxmoxMetricScope) Validate(metric string) error {
 	ps.ConnectionID = strings.TrimSpace(ps.ConnectionID)
 	ps.NodeID = strings.TrimSpace(ps.NodeID)
 	ps.StorageID = strings.TrimSpace(ps.StorageID)
+	ps.GuestID = strings.TrimSpace(ps.GuestID)
 
 	switch ps.ScopeMode {
 	case "connection":
+		if metric == "proxmox_guest_cpu_percent" || metric == "proxmox_guest_memory_percent" {
+			return fmt.Errorf("les metriques VM/LXC Proxmox ne supportent pas le scope connexion")
+		}
 		if ps.ConnectionID == "" {
 			return fmt.Errorf("le scope connexion requiert une connexion Proxmox")
 		}
 	case "node":
+		if metric == "proxmox_guest_cpu_percent" || metric == "proxmox_guest_memory_percent" {
+			return fmt.Errorf("les metriques VM/LXC Proxmox ne supportent pas le scope noeud")
+		}
 		if ps.NodeID == "" {
 			return fmt.Errorf("le scope noeud requiert un noeud Proxmox")
 		}
@@ -175,6 +183,13 @@ func (ps *ProxmoxMetricScope) Validate(metric string) error {
 		}
 		if ps.StorageID == "" {
 			return fmt.Errorf("le scope stockage requiert un stockage Proxmox")
+		}
+	case "guest":
+		if metric != "proxmox_guest_cpu_percent" && metric != "proxmox_guest_memory_percent" {
+			return fmt.Errorf("le scope guest n'est disponible que pour les metriques VM/LXC Proxmox")
+		}
+		if ps.GuestID == "" {
+			return fmt.Errorf("le scope guest requiert une VM/LXC Proxmox")
 		}
 	}
 

@@ -203,14 +203,11 @@ func (s *proxmoxService) PollOne(conn database.ProxmoxConnectionFull) {
 		} else {
 			log.Printf("proxmox poller [%s/%s]: got %d pending apt package(s)", conn.Name, n.Node, len(pkgs))
 		}
-		pending, security := 0, 0
-		for _, p := range pkgs {
+		pending := 0
+		for range pkgs {
 			pending++
-			if isSecurityPackage(p.Origin, p.Section, p.Title) {
-				security++
-			}
 		}
-		if err := s.db.UpdateProxmoxNodeUpdates(conn.ID, n.Node, pending, security); err != nil {
+		if err := s.db.UpdateProxmoxNodeUpdates(conn.ID, n.Node, pending, 0); err != nil {
 			log.Printf("proxmox poller [%s/%s]: update node updates: %v", conn.Name, n.Node, err)
 		}
 	}

@@ -69,7 +69,7 @@ var validAlertMetrics = map[string]bool{
 	"cpu_temperature": true, "disk_smart_status": true, "disk_temperature": true, "proxmox_storage_percent": true,
 	"proxmox_node_cpu_percent": true, "proxmox_node_memory_percent": true,
 	"proxmox_guest_cpu_percent": true, "proxmox_guest_memory_percent": true,
-	"proxmox_node_pending_updates": true, "proxmox_node_security_updates": true,
+	"proxmox_node_pending_updates":    true,
 	"proxmox_recent_failed_tasks_24h": true,
 	"proxmox_disk_failed_count":       true, "proxmox_disk_min_wearout_percent": true,
 }
@@ -104,6 +104,7 @@ type alertSplitCapabilitiesResponse struct {
 		Connections []alertScopeOption `json:"connections"`
 		Nodes       []alertScopeOption `json:"nodes"`
 		Storages    []alertScopeOption `json:"storages"`
+		Guests      []alertScopeOption `json:"guests"`
 	} `json:"proxmox_scope"`
 }
 
@@ -191,6 +192,13 @@ func validateProxmoxScopeExists(db *database.DB, scope *models.ProxmoxMetricScop
 		}
 	}
 
+	if scope.ScopeMode == "guest" {
+		var exists bool
+		if err := db.QueryRow(`SELECT EXISTS(SELECT 1 FROM proxmox_guests WHERE id = $1)`, scope.GuestID).Scan(&exists); err != nil || !exists {
+			return errors.New("VM/LXC Proxmox introuvable pour ce scope.")
+		}
+	}
+
 	return nil
 }
 
@@ -248,16 +256,35 @@ func (h *AlertRulesHandler) proxmoxScopeTestTarget(scope *models.ProxmoxMetricSc
 			return "proxmox:storage:" + scope.StorageID, "Stockage: " + nodeName + " / " + storageName
 		}
 		return "proxmox:storage:" + scope.StorageID, "Stockage: " + scope.StorageID
+	case "guest":
+		if scope.GuestID == "" {
+			return "proxmox:global", "Cluster Proxmox"
+		}
+		var connName, nodeName, guestName, guestType string
+		var vmid int
+		if err := h.db.QueryRow(`
+			SELECT COALESCE(c.name, ''), g.node_name, g.name, g.guest_type, g.vmid
+			FROM proxmox_guests g
+			LEFT JOIN proxmox_connections c ON c.id = g.connection_id
+			WHERE g.id = $1`, scope.GuestID).Scan(&connName, &nodeName, &guestName, &guestType, &vmid); err == nil {
+			suffix := fmt.Sprintf("%s:%d", strings.ToUpper(guestType), vmid)
+			if strings.TrimSpace(connName) != "" {
+				return "proxmox:guest:" + scope.GuestID, "VM/LXC: " + connName + " / " + nodeName + " / " + guestName + " (" + suffix + ")"
+			}
+			return "proxmox:guest:" + scope.GuestID, "VM/LXC: " + nodeName + " / " + guestName + " (" + suffix + ")"
+		}
+		return "proxmox:guest:" + scope.GuestID, "VM/LXC: " + scope.GuestID
 	default:
 		return "proxmox:global", "Cluster Proxmox"
 	}
 }
 
-func (h *AlertRulesHandler) loadProxmoxScopeOptions() (modes []string, connections, nodes, storages []alertScopeOption) {
-	modes = []string{"global", "connection", "node", "storage"}
+func (h *AlertRulesHandler) loadProxmoxScopeOptions() (modes []string, connections, nodes, storages, guests []alertScopeOption) {
+	modes = []string{"global", "connection", "node", "storage", "guest"}
 	connections = []alertScopeOption{}
 	nodes = []alertScopeOption{}
 	storages = []alertScopeOption{}
+	guests = []alertScopeOption{}
 
 	if rows, err := h.db.Query(`SELECT id, name FROM proxmox_connections ORDER BY name`); err == nil {
 		defer func() { _ = rows.Close() }()
@@ -297,7 +324,22 @@ func (h *AlertRulesHandler) loadProxmoxScopeOptions() (modes []string, connectio
 		}
 	}
 
-	return modes, connections, nodes, storages
+	if rows, err := h.db.Query(`
+		SELECT g.id,
+		       COALESCE(c.name,'?') || ' / ' || g.node_name || ' / ' || COALESCE(NULLIF(g.name,''), '(sans nom)') || ' (' || UPPER(g.guest_type) || ':' || g.vmid || ')'
+		FROM proxmox_guests g
+		LEFT JOIN proxmox_connections c ON c.id = g.connection_id
+		ORDER BY c.name, g.node_name, g.guest_type, g.vmid`); err == nil {
+		defer func() { _ = rows.Close() }()
+		for rows.Next() {
+			var id, label string
+			if scanErr := rows.Scan(&id, &label); scanErr == nil {
+				guests = append(guests, alertScopeOption{ID: id, Label: label})
+			}
+		}
+	}
+
+	return modes, connections, nodes, storages, guests
 }
 
 func (h *AlertRulesHandler) GetAgentAlertRuleCapabilities(c *gin.Context) {
@@ -305,12 +347,13 @@ func (h *AlertRulesHandler) GetAgentAlertRuleCapabilities(c *gin.Context) {
 }
 
 func (h *AlertRulesHandler) GetProxmoxAlertRuleCapabilities(c *gin.Context) {
-	modes, connections, nodes, storages := h.loadProxmoxScopeOptions()
+	modes, connections, nodes, storages, guests := h.loadProxmoxScopeOptions()
 	response := alertSplitCapabilitiesResponse{AgentMetrics: []alertMetricCapability{}, ProxmoxMetrics: allProxmoxAlertMetrics()}
 	response.ProxmoxScope.Modes = modes
 	response.ProxmoxScope.Connections = connections
 	response.ProxmoxScope.Nodes = nodes
 	response.ProxmoxScope.Storages = storages
+	response.ProxmoxScope.Guests = guests
 	c.JSON(http.StatusOK, response)
 }
 
@@ -337,7 +380,6 @@ func allProxmoxAlertMetrics() []alertMetricCapability {
 		{Metric: "proxmox_guest_cpu_percent", Label: "CPU VM/LXC Proxmox", Unit: "%", Icon: "\U0001f9e0", BadgeClass: "bg-cyan-lt text-cyan", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: false},
 		{Metric: "proxmox_guest_memory_percent", Label: "RAM VM/LXC Proxmox", Unit: "%", Icon: "\U0001f4ca", BadgeClass: "bg-cyan-lt text-cyan", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: false},
 		{Metric: "proxmox_node_pending_updates", Label: "Paquets APT en attente", Unit: "", Icon: "\U0001f504", BadgeClass: "bg-cyan-lt text-cyan", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: false},
-		{Metric: "proxmox_node_security_updates", Label: "Mises à jour sécurité APT", Unit: "", Icon: "\U0001f512", BadgeClass: "bg-cyan-lt text-cyan", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: false},
 		{Metric: "proxmox_recent_failed_tasks_24h", Label: "Tâches Proxmox échouées (24h)", Unit: "", Icon: "\U0001f552", BadgeClass: "bg-cyan-lt text-cyan", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: false},
 		{Metric: "proxmox_disk_failed_count", Label: "Disques physiques en échec", Unit: "", Icon: "\U0001f4a5", BadgeClass: "bg-cyan-lt text-cyan", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: false},
 		{Metric: "proxmox_disk_min_wearout_percent", Label: "Usure disque min", Unit: "%", Icon: "\U0001f6e0", BadgeClass: "bg-cyan-lt text-cyan", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: false},

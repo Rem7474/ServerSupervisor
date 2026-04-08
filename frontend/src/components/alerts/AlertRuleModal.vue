@@ -87,23 +87,31 @@
                   <label class="form-label">Scope Proxmox</label>
                   <select v-model="form.proxmox_scope.scope_mode" class="form-select">
                     <option value="global">Global</option>
-                    <option value="connection">Connexion</option>
-                    <option value="node">Noeud</option>
+                    <option v-if="!metricAllowsGuestScope" value="connection">Connexion</option>
+                    <option v-if="!metricAllowsGuestScope" value="node">Noeud</option>
+                    <option v-if="metricAllowsGuestScope" value="guest">VM/LXC</option>
                     <option v-if="metricAllowsStorageScope" value="storage">Stockage</option>
                   </select>
                 </div>
-                <div v-if="form.proxmox_scope.scope_mode === 'connection'" class="col-md-8">
+                <div v-if="!metricAllowsGuestScope && form.proxmox_scope.scope_mode === 'connection'" class="col-md-8">
                   <label class="form-label">Connexion</label>
                   <select v-model="form.proxmox_scope.connection_id" class="form-select">
                     <option value="">Selectionner...</option>
                     <option v-for="opt in proxmoxConnections" :key="opt.id" :value="opt.id">{{ opt.label }}</option>
                   </select>
                 </div>
-                <div v-if="form.proxmox_scope.scope_mode === 'node'" class="col-md-8">
+                <div v-if="!metricAllowsGuestScope && form.proxmox_scope.scope_mode === 'node'" class="col-md-8">
                   <label class="form-label">Noeud</label>
                   <select v-model="form.proxmox_scope.node_id" class="form-select">
                     <option value="">Selectionner...</option>
                     <option v-for="opt in proxmoxNodes" :key="opt.id" :value="opt.id">{{ opt.label }}</option>
+                  </select>
+                </div>
+                <div v-if="metricAllowsGuestScope && form.proxmox_scope.scope_mode === 'guest'" class="col-md-8">
+                  <label class="form-label">VM/LXC</label>
+                  <select v-model="form.proxmox_scope.guest_id" class="form-select">
+                    <option value="">Selectionner...</option>
+                    <option v-for="opt in proxmoxGuests" :key="opt.id" :value="opt.id">{{ opt.label }}</option>
                   </select>
                 </div>
                 <div v-if="metricAllowsStorageScope && form.proxmox_scope.scope_mode === 'storage'" class="col-md-8">
@@ -379,6 +387,7 @@ const metricCards = computed(() => {
 const proxmoxConnections = computed(() => props.capabilities?.proxmox_scope?.connections || [])
 const proxmoxNodes = computed(() => props.capabilities?.proxmox_scope?.nodes || [])
 const proxmoxStorages = computed(() => props.capabilities?.proxmox_scope?.storages || [])
+const proxmoxGuests = computed(() => props.capabilities?.proxmox_scope?.guests || [])
 
 const metricMetaByKey = computed(() => {
   const items = props.capabilities?.metrics || []
@@ -387,6 +396,7 @@ const metricMetaByKey = computed(() => {
 
 const isProxmoxMetric = (metric) => getAlertMetricMeta(metric).category === 'proxmox'
 const metricAllowsStorageScope = computed(() => form.value.metric === 'proxmox_storage_percent')
+const metricAllowsGuestScope = computed(() => form.value.metric === 'proxmox_guest_cpu_percent' || form.value.metric === 'proxmox_guest_memory_percent')
 
 const metricSupportsHostFilter = computed(() => {
   const supports = metricMetaByKey.value?.[form.value.metric]?.supports_host_filter
@@ -417,6 +427,7 @@ const canProceedStep = computed(() => {
     const scope = form.value.proxmox_scope || { scope_mode: 'global' }
     if (scope.scope_mode === 'connection') return !!scope.connection_id
     if (scope.scope_mode === 'node') return !!scope.node_id
+    if (scope.scope_mode === 'guest') return !!scope.guest_id
     if (scope.scope_mode === 'storage') return !!scope.storage_id
     return true
   }
@@ -479,6 +490,7 @@ watch(
     form.value.proxmox_scope?.scope_mode,
     form.value.proxmox_scope?.connection_id,
     form.value.proxmox_scope?.node_id,
+    form.value.proxmox_scope?.guest_id,
     form.value.proxmox_scope?.storage_id,
   ],
   () => {
@@ -515,6 +527,7 @@ watch(
     if (!scope) return
     if (mode !== 'connection') scope.connection_id = ''
     if (mode !== 'node') scope.node_id = ''
+    if (mode !== 'guest' || !metricAllowsGuestScope.value) scope.guest_id = ''
     if (mode !== 'storage' || !metricAllowsStorageScope.value) scope.storage_id = ''
   }
 )
