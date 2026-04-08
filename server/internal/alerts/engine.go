@@ -105,6 +105,8 @@ func isProxmoxMetric(metric string) bool {
 	case "proxmox_storage_percent",
 		"proxmox_node_cpu_percent",
 		"proxmox_node_memory_percent",
+		"proxmox_node_cpu_temperature",
+		"proxmox_node_fan_rpm",
 		"proxmox_guest_cpu_percent",
 		"proxmox_guest_memory_percent",
 		"proxmox_node_pending_updates",
@@ -307,6 +309,10 @@ func GetMetricValue(db *database.DB, host models.Host, rule models.AlertRule) (f
 	case "proxmox_node_memory_percent":
 		pct := resolveProxmoxNodeMemoryPercent(db, rule)
 		return pct, true
+	case "proxmox_node_cpu_temperature":
+		return resolveProxmoxNodeCPUTemperature(db, rule), true
+	case "proxmox_node_fan_rpm":
+		return resolveProxmoxNodeFanRPM(db, rule), true
 	case "proxmox_guest_cpu_percent":
 		return resolveProxmoxGuestCPUPercent(db, rule), true
 	case "proxmox_guest_memory_percent":
@@ -395,6 +401,50 @@ func resolveProxmoxNodeMemoryPercent(db *database.DB, rule models.AlertRule) flo
 		return db.GetProxmoxNodeMemoryUsagePercentByNode(scope.NodeID)
 	default:
 		return db.GetMaxProxmoxNodeMemoryUsagePercent()
+	}
+}
+
+func resolveProxmoxNodeCPUTemperature(db *database.DB, rule models.AlertRule) float64 {
+	scope := proxmoxScopeFromRule(rule)
+	if scope == nil || scope.ScopeMode == "" || scope.ScopeMode == "global" {
+		return db.GetMaxProxmoxNodeCPUTemperature()
+	}
+
+	switch scope.ScopeMode {
+	case "connection":
+		if scope.ConnectionID == "" {
+			return db.GetMaxProxmoxNodeCPUTemperature()
+		}
+		return db.GetMaxProxmoxNodeCPUTemperatureByConnection(scope.ConnectionID)
+	case "node":
+		if scope.NodeID == "" {
+			return db.GetMaxProxmoxNodeCPUTemperature()
+		}
+		return db.GetProxmoxNodeCPUTemperatureByNode(scope.NodeID)
+	default:
+		return db.GetMaxProxmoxNodeCPUTemperature()
+	}
+}
+
+func resolveProxmoxNodeFanRPM(db *database.DB, rule models.AlertRule) float64 {
+	scope := proxmoxScopeFromRule(rule)
+	if scope == nil || scope.ScopeMode == "" || scope.ScopeMode == "global" {
+		return db.GetMaxProxmoxNodeFanRPM()
+	}
+
+	switch scope.ScopeMode {
+	case "connection":
+		if scope.ConnectionID == "" {
+			return db.GetMaxProxmoxNodeFanRPM()
+		}
+		return db.GetMaxProxmoxNodeFanRPMByConnection(scope.ConnectionID)
+	case "node":
+		if scope.NodeID == "" {
+			return db.GetMaxProxmoxNodeFanRPM()
+		}
+		return db.GetProxmoxNodeFanRPMByNode(scope.NodeID)
+	default:
+		return db.GetMaxProxmoxNodeFanRPM()
 	}
 }
 
@@ -627,6 +677,10 @@ func buildAlertMessage(rule models.AlertRule, host models.Host, value float64) s
 			metricLabel = "CPU noeud Proxmox"
 		case "proxmox_node_memory_percent":
 			metricLabel = "RAM noeud Proxmox"
+		case "proxmox_node_cpu_temperature":
+			metricLabel = "Temp. CPU noeud Proxmox"
+		case "proxmox_node_fan_rpm":
+			metricLabel = "RPM ventilateurs noeud Proxmox"
 		case "proxmox_guest_cpu_percent":
 			metricLabel = "CPU VM/LXC Proxmox"
 		case "proxmox_guest_memory_percent":
@@ -643,6 +697,10 @@ func buildAlertMessage(rule models.AlertRule, host models.Host, value float64) s
 		switch rule.Metric {
 		case "proxmox_node_pending_updates", "proxmox_recent_failed_tasks_24h", "proxmox_disk_failed_count":
 			return fmt.Sprintf("Alerte %s %s %.0f sur %s", metricLabel, rule.Operator, value, host.Name)
+		case "proxmox_node_cpu_temperature":
+			return fmt.Sprintf("Alerte %s %s %.1f°C sur %s", metricLabel, rule.Operator, value, host.Name)
+		case "proxmox_node_fan_rpm":
+			return fmt.Sprintf("Alerte %s %s %.0f RPM sur %s", metricLabel, rule.Operator, value, host.Name)
 		default:
 			return fmt.Sprintf("Alerte %s %s %.1f%% sur %s", metricLabel, rule.Operator, value, host.Name)
 		}

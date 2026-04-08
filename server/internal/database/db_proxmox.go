@@ -845,6 +845,64 @@ func (db *DB) GetProxmoxNodeMemoryUsagePercentByNode(nodeID string) float64 {
 	return pct
 }
 
+// GetMaxProxmoxNodeCPUTemperature returns the maximum latest CPU temperature
+// across Proxmox nodes that have a mapped source host.
+func (db *DB) GetMaxProxmoxNodeCPUTemperature() float64 {
+	return db.queryProxmoxNodeSensorMetric("cpu_temp_source_host_id", "cpu_temperature", `TRUE`, nil)
+}
+
+// GetMaxProxmoxNodeCPUTemperatureByConnection returns the maximum latest CPU
+// temperature for nodes in one Proxmox connection.
+func (db *DB) GetMaxProxmoxNodeCPUTemperatureByConnection(connectionID string) float64 {
+	return db.queryProxmoxNodeSensorMetric("cpu_temp_source_host_id", "cpu_temperature", `n.connection_id = $1`, []interface{}{connectionID})
+}
+
+// GetProxmoxNodeCPUTemperatureByNode returns the latest CPU temperature for one node.
+func (db *DB) GetProxmoxNodeCPUTemperatureByNode(nodeID string) float64 {
+	return db.queryProxmoxNodeSensorMetric("cpu_temp_source_host_id", "cpu_temperature", `n.id = $1`, []interface{}{nodeID})
+}
+
+// GetMaxProxmoxNodeFanRPM returns the maximum latest fan RPM across Proxmox nodes
+// that have a mapped source host.
+func (db *DB) GetMaxProxmoxNodeFanRPM() float64 {
+	return db.queryProxmoxNodeSensorMetric("fan_rpm_source_host_id", "fan_rpm", `TRUE`, nil)
+}
+
+// GetMaxProxmoxNodeFanRPMByConnection returns the maximum latest fan RPM for
+// nodes in one Proxmox connection.
+func (db *DB) GetMaxProxmoxNodeFanRPMByConnection(connectionID string) float64 {
+	return db.queryProxmoxNodeSensorMetric("fan_rpm_source_host_id", "fan_rpm", `n.connection_id = $1`, []interface{}{connectionID})
+}
+
+// GetProxmoxNodeFanRPMByNode returns the latest fan RPM for one node.
+func (db *DB) GetProxmoxNodeFanRPMByNode(nodeID string) float64 {
+	return db.queryProxmoxNodeSensorMetric("fan_rpm_source_host_id", "fan_rpm", `n.id = $1`, []interface{}{nodeID})
+}
+
+func (db *DB) queryProxmoxNodeSensorMetric(sourceColumn, metricColumn, whereClause string, args []interface{}) float64 {
+	query := `
+		SELECT COALESCE(MAX(latest.metric_value), 0)
+		FROM proxmox_nodes n
+		LEFT JOIN LATERAL (
+			SELECT sm.` + metricColumn + ` AS metric_value
+			FROM system_metrics sm
+			WHERE sm.host_id = n.` + sourceColumn + `
+			ORDER BY sm.timestamp DESC
+			LIMIT 1
+		) latest ON TRUE
+		WHERE ` + whereClause + `
+		  AND n.` + sourceColumn + ` IS NOT NULL
+		  AND n.status = 'online'`
+
+	var value float64
+	if len(args) == 0 {
+		_ = db.conn.QueryRow(query).Scan(&value)
+	} else {
+		_ = db.conn.QueryRow(query, args...).Scan(&value)
+	}
+	return value
+}
+
 // GetMaxProxmoxStorageUsagePercentByNode returns the max used/total ratio (0-100)
 // for active storages on one Proxmox node identified by proxmox_nodes.id.
 func (db *DB) GetMaxProxmoxStorageUsagePercentByNode(nodeID string) float64 {
