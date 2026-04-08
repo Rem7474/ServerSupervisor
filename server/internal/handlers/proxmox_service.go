@@ -206,7 +206,7 @@ func (s *proxmoxService) PollOne(conn database.ProxmoxConnectionFull) {
 		pending, security := 0, 0
 		for _, p := range pkgs {
 			pending++
-			if isSecurityPackage(p.Origin, p.Section) {
+			if isSecurityPackage(p.Origin, p.Section, p.Title) {
 				security++
 			}
 		}

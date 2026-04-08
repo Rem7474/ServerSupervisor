@@ -256,13 +256,46 @@ type PVETask struct {
 
 // PVEAptPackage is an element returned by GET /nodes/{node}/apt/update.
 type PVEAptPackage struct {
-	Package     string `json:"Package"`
-	Version     string `json:"Version"`
-	OldVersion  string `json:"OldVersion"`
-	Priority    string `json:"Priority"`
-	Section     string `json:"Section"`
-	Origin      string `json:"Origin"`
-	Description string `json:"Description"`
+	Package     string `json:"package"`
+	Title       string `json:"title"`
+	Version     string `json:"version"`
+	OldVersion  string `json:"old-version"`
+	Priority    string `json:"priority"`
+	Section     string `json:"section"`
+	Origin      string `json:"origin"`
+	Description string `json:"description"`
+}
+
+// UnmarshalJSON accepts both legacy/capitalized field names (Origin, Section, ...)
+// and lowercase/hyphenated variants (origin, section, old-version, ...).
+func (p *PVEAptPackage) UnmarshalJSON(data []byte) error {
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	pick := func(keys ...string) string {
+		for _, key := range keys {
+			if v, ok := raw[key]; ok {
+				var s string
+				if err := json.Unmarshal(v, &s); err == nil {
+					return s
+				}
+			}
+		}
+		return ""
+	}
+
+	p.Package = pick("package", "Package")
+	p.Title = pick("title", "Title")
+	p.Version = pick("version", "Version")
+	p.OldVersion = pick("old-version", "old_version", "OldVersion")
+	p.Priority = pick("priority", "Priority")
+	p.Section = pick("section", "Section")
+	p.Origin = pick("origin", "Origin")
+	p.Description = pick("description", "Description")
+
+	return nil
 }
 
 // PVEDisk is an element returned by GET /nodes/{node}/disks/list.

@@ -18,11 +18,22 @@ func parseVMID(s string) int {
 	return v
 }
 
-// isSecurityPackage returns true when the package origin or section signals a security update.
-func isSecurityPackage(origin, section string) bool {
+// isSecurityPackage returns true when apt metadata signals a security update.
+func isSecurityPackage(origin, section, title string) bool {
 	lOrigin := strings.ToLower(origin)
 	lSection := strings.ToLower(section)
-	return strings.Contains(lOrigin, "security") || strings.Contains(lSection, "security")
+	lTitle := strings.ToLower(title)
+
+	if strings.Contains(lOrigin, "security") || strings.Contains(lSection, "security") || strings.Contains(lTitle, "security") {
+		return true
+	}
+
+	// Common vendor channel markers observed in apt metadata.
+	if strings.Contains(lTitle, "debian-security") || strings.Contains(lTitle, "ubuntu-security") {
+		return true
+	}
+
+	return false
 }
 
 // resolveSecret returns the token secret and connection details for a connection ID.

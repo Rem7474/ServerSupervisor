@@ -217,32 +217,32 @@ func (db *DB) getMaxLatestProxmoxGuestMetricPercent(metricExpr string, extraClau
 
 // GetMaxProxmoxNodePendingUpdates returns the maximum pending update count across online nodes.
 func (db *DB) GetMaxProxmoxNodePendingUpdates() int {
-	return db.queryMaxProxmoxNodeInt(`status = 'online'`, nil)
+	return db.queryMaxProxmoxNodeInt(`TRUE`, nil)
 }
 
 // GetMaxProxmoxNodePendingUpdatesByConnection returns the maximum pending update count for a connection.
 func (db *DB) GetMaxProxmoxNodePendingUpdatesByConnection(connectionID string) int {
-	return db.queryMaxProxmoxNodeInt(`connection_id = $1 AND status = 'online'`, []interface{}{connectionID})
+	return db.queryMaxProxmoxNodeInt(`connection_id = $1`, []interface{}{connectionID})
 }
 
 // GetMaxProxmoxNodePendingUpdatesByNode returns the pending update count for one node.
 func (db *DB) GetMaxProxmoxNodePendingUpdatesByNode(nodeID string) int {
-	return db.queryMaxProxmoxNodeInt(`id = $1 AND status = 'online'`, []interface{}{nodeID})
+	return db.queryMaxProxmoxNodeInt(`id = $1`, []interface{}{nodeID})
 }
 
 // GetMaxProxmoxNodeSecurityUpdates returns the maximum security update count across online nodes.
 func (db *DB) GetMaxProxmoxNodeSecurityUpdates() int {
-	return db.queryMaxProxmoxNodeSecurityInt(`status = 'online'`, nil)
+	return db.queryMaxProxmoxNodeSecurityInt(`TRUE`, nil)
 }
 
 // GetMaxProxmoxNodeSecurityUpdatesByConnection returns the maximum security update count for a connection.
 func (db *DB) GetMaxProxmoxNodeSecurityUpdatesByConnection(connectionID string) int {
-	return db.queryMaxProxmoxNodeSecurityInt(`connection_id = $1 AND status = 'online'`, []interface{}{connectionID})
+	return db.queryMaxProxmoxNodeSecurityInt(`connection_id = $1`, []interface{}{connectionID})
 }
 
 // GetMaxProxmoxNodeSecurityUpdatesByNode returns the security update count for one node.
 func (db *DB) GetMaxProxmoxNodeSecurityUpdatesByNode(nodeID string) int {
-	return db.queryMaxProxmoxNodeSecurityInt(`id = $1 AND status = 'online'`, []interface{}{nodeID})
+	return db.queryMaxProxmoxNodeSecurityInt(`id = $1`, []interface{}{nodeID})
 }
 
 func (db *DB) queryMaxProxmoxNodeInt(whereClause string, args []interface{}) int {
