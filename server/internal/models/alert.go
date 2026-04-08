@@ -1,6 +1,10 @@
 package models
 
-import "time"
+import (
+	"fmt"
+	"strings"
+	"time"
+)
 
 // ========== Alerts ==========
 
@@ -21,6 +25,13 @@ type ProxmoxMetricScope struct {
 	StorageID    string `json:"storage_id,omitempty"`
 }
 
+type AlertSourceType string
+
+const (
+	AlertSourceAgent   AlertSourceType = "agent"
+	AlertSourceProxmox AlertSourceType = "proxmox"
+)
+
 // AlertActions holds the consolidated notification configuration for an alert rule.
 // Stored as a single JSONB column in the database.
 type AlertActions struct {
@@ -29,13 +40,14 @@ type AlertActions struct {
 	NtfyTopic      string              `json:"ntfy_topic,omitempty"`      // ntfy push notification topic
 	Cooldown       int                 `json:"cooldown,omitempty"`        // seconds between re-notifications (0 = no cooldown)
 	CommandTrigger *CommandTrigger     `json:"command_trigger,omitempty"` // optional command to run on alert
-	ProxmoxScope   *ProxmoxMetricScope `json:"proxmox_scope,omitempty"`
 }
 
 type AlertRule struct {
 	ID              int64        `json:"id" db:"id"`
 	Name            *string      `json:"name,omitempty" db:"name"`
+	SourceType      AlertSourceType `json:"source_type,omitempty" db:"source_type"`
 	HostID          *string      `json:"host_id" db:"host_id"`
+	ProxmoxScope    *ProxmoxMetricScope `json:"proxmox_scope,omitempty" db:"proxmox_scope"`
 	Metric          string       `json:"metric" db:"metric"`
 	Operator        string       `json:"operator" db:"operator"`
 	Threshold       *float64     `json:"threshold" db:"threshold"`
@@ -86,7 +98,9 @@ type PushSubscription struct {
 type AlertRuleCreate struct {
 	Name      string       `json:"name" binding:"required"`
 	Enabled   bool         `json:"enabled"`
+	SourceType AlertSourceType `json:"source_type"`
 	HostID    *string      `json:"host_id"`
+	ProxmoxScope *ProxmoxMetricScope `json:"proxmox_scope"`
 	Metric    string       `json:"metric" binding:"required"`
 	Operator  string       `json:"operator" binding:"required"`
 	Threshold float64      `json:"threshold" binding:"required"`
@@ -97,10 +111,101 @@ type AlertRuleCreate struct {
 type AlertRuleUpdate struct {
 	Name      *string       `json:"name"`
 	Enabled   *bool         `json:"enabled"`
+	SourceType *AlertSourceType `json:"source_type"`
 	HostID    *string       `json:"host_id"`
+	ProxmoxScope *ProxmoxMetricScope `json:"proxmox_scope"`
 	Metric    *string       `json:"metric"`
 	Operator  *string       `json:"operator"`
 	Threshold *float64      `json:"threshold"`
 	Duration  *int          `json:"duration"`
 	Actions   *AlertActions `json:"actions"`
+}
+
+func IsProxmoxMetric(metric string) bool {
+	switch metric {
+	case "proxmox_storage_percent", "proxmox_node_cpu_percent", "proxmox_node_memory_percent":
+		return true
+	default:
+		return false
+	}
+}
+
+func InferAlertSourceType(metric string) AlertSourceType {
+	if IsProxmoxMetric(metric) {
+		return AlertSourceProxmox
+	}
+	return AlertSourceAgent
+}
+
+func (ps *ProxmoxMetricScope) Validate(metric string) error {
+	if ps == nil {
+		return fmt.Errorf("le scope Proxmox est requis")
+	}
+
+	ps.ScopeMode = strings.TrimSpace(ps.ScopeMode)
+	if ps.ScopeMode == "" {
+		ps.ScopeMode = "global"
+	}
+
+	validModes := map[string]bool{"global": true, "connection": true, "node": true, "storage": true}
+	if !validModes[ps.ScopeMode] {
+		return fmt.Errorf("scope Proxmox invalide")
+	}
+
+	ps.ConnectionID = strings.TrimSpace(ps.ConnectionID)
+	ps.NodeID = strings.TrimSpace(ps.NodeID)
+	ps.StorageID = strings.TrimSpace(ps.StorageID)
+
+	switch ps.ScopeMode {
+	case "connection":
+		if ps.ConnectionID == "" {
+			return fmt.Errorf("le scope connexion requiert une connexion Proxmox")
+		}
+	case "node":
+		if ps.NodeID == "" {
+			return fmt.Errorf("le scope noeud requiert un noeud Proxmox")
+		}
+	case "storage":
+		if metric != "proxmox_storage_percent" {
+			return fmt.Errorf("le scope stockage n'est disponible que pour la metrique de stockage Proxmox")
+		}
+		if ps.StorageID == "" {
+			return fmt.Errorf("le scope stockage requiert un stockage Proxmox")
+		}
+	}
+
+	return nil
+}
+
+func (ar *AlertRule) NormalizeCompatibility() {
+	if ar.SourceType == "" {
+		ar.SourceType = InferAlertSourceType(ar.Metric)
+	}
+}
+
+func (ar *AlertRule) Validate() error {
+	ar.NormalizeCompatibility()
+
+	switch ar.SourceType {
+	case AlertSourceAgent:
+		if ar.HostID == nil || strings.TrimSpace(*ar.HostID) == "" {
+			return fmt.Errorf("une alerte agent doit cibler un hote")
+		}
+		if IsProxmoxMetric(ar.Metric) {
+			return fmt.Errorf("la metrique %s est reservee a la source Proxmox", ar.Metric)
+		}
+		ar.ProxmoxScope = nil
+	case AlertSourceProxmox:
+		if !IsProxmoxMetric(ar.Metric) {
+			return fmt.Errorf("la metrique %s est reservee a la source agent", ar.Metric)
+		}
+		ar.HostID = nil
+		if err := ar.ProxmoxScope.Validate(ar.Metric); err != nil {
+			return err
+		}
+	default:
+		return fmt.Errorf("source_type invalide")
+	}
+
+	return nil
 }

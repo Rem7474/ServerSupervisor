@@ -31,6 +31,8 @@ interface Notification {
 
 interface AlertRuleCapabilities {
   metrics: any[]
+  agent_metrics?: any[]
+  proxmox_metrics?: any[]
   proxmox_scope: {
     modes: string[]
     connections: any[]
@@ -102,14 +104,28 @@ export function useAlertsPage(): UseAlertsPageApi {
     capabilitiesLoading.value = true
     capabilitiesError.value = ''
 
-    const [rulesResult, hostsResult, capabilitiesResult] = await Promise.allSettled([
+    const [rulesResult, hostsResult, agentCapsResult, proxmoxCapsResult] = await Promise.allSettled([
       rulesStore.fetchRules(),
       hostsStore.fetchHosts(),
-      apiClient.getAlertRuleCapabilities(),
+      apiClient.getAgentAlertRuleCapabilities(),
+      apiClient.getProxmoxAlertRuleCapabilities(),
     ])
 
-    if (capabilitiesResult.status === 'fulfilled') {
-      capabilities.value = capabilitiesResult.value?.data || null
+    if (agentCapsResult.status === 'fulfilled' && proxmoxCapsResult.status === 'fulfilled') {
+      const agentMetrics = agentCapsResult.value?.data?.metrics || []
+      const proxmoxMetrics = proxmoxCapsResult.value?.data?.proxmox_metrics || []
+      const proxmoxScope = proxmoxCapsResult.value?.data?.proxmox_scope || {
+        modes: [],
+        connections: [],
+        nodes: [],
+        storages: [],
+      }
+      capabilities.value = {
+        metrics: [...agentMetrics, ...proxmoxMetrics],
+        agent_metrics: agentMetrics,
+        proxmox_metrics: proxmoxMetrics,
+        proxmox_scope: proxmoxScope,
+      }
     } else {
       capabilitiesError.value = 'Impossible de charger les capacites des metriques'
     }

@@ -86,9 +86,16 @@ type alertScopeOption struct {
 	Label string `json:"label"`
 }
 
-type alertMetricCapabilitiesResponse struct {
-	Metrics      []alertMetricCapability `json:"metrics"`
-	ProxmoxScope struct {
+type alertHostCapabilitiesResponse struct {
+	HostID   string                  `json:"host_id"`
+	HostName string                  `json:"host_name"`
+	Metrics  []alertMetricCapability `json:"metrics"`
+}
+
+type alertSplitCapabilitiesResponse struct {
+	AgentMetrics   []alertMetricCapability `json:"agent_metrics"`
+	ProxmoxMetrics []alertMetricCapability `json:"proxmox_metrics"`
+	ProxmoxScope   struct {
 		Modes       []string           `json:"modes"`
 		Connections []alertScopeOption `json:"connections"`
 		Nodes       []alertScopeOption `json:"nodes"`
@@ -115,7 +122,7 @@ func containsString(values []string, expected string) bool {
 	return false
 }
 
-func validateAlertActions(db *database.DB, actions *models.AlertActions, metric string) error {
+func validateAlertActions(actions *models.AlertActions) error {
 	if actions == nil {
 		return nil
 	}
@@ -151,32 +158,15 @@ func validateAlertActions(db *database.DB, actions *models.AlertActions, metric 
 			ct.Target = ""
 		}
 	}
+	return nil
+}
 
-	if metric != "proxmox_storage_percent" {
-		actions.ProxmoxScope = nil
-		return nil
-	}
-
-	if actions.ProxmoxScope == nil {
-		actions.ProxmoxScope = &models.ProxmoxMetricScope{ScopeMode: "global"}
-		return nil
-	}
-
-	scope := actions.ProxmoxScope
-	scope.ScopeMode = strings.TrimSpace(scope.ScopeMode)
-	if scope.ScopeMode == "" {
-		scope.ScopeMode = "global"
-	}
-
-	if !containsString([]string{"global", "connection", "node", "storage"}, scope.ScopeMode) {
-		return errors.New("Scope Proxmox invalide.")
+func validateProxmoxScopeExists(db *database.DB, scope *models.ProxmoxMetricScope) error {
+	if scope == nil {
+		return errors.New("Le scope Proxmox est requis.")
 	}
 
 	if scope.ScopeMode == "connection" {
-		scope.ConnectionID = strings.TrimSpace(scope.ConnectionID)
-		if scope.ConnectionID == "" {
-			return errors.New("Le scope connexion requiert une connexion Proxmox.")
-		}
 		var exists bool
 		if err := db.QueryRow(`SELECT EXISTS(SELECT 1 FROM proxmox_connections WHERE id = $1)`, scope.ConnectionID).Scan(&exists); err != nil || !exists {
 			return errors.New("Connexion Proxmox introuvable pour ce scope.")
@@ -184,10 +174,6 @@ func validateAlertActions(db *database.DB, actions *models.AlertActions, metric 
 	}
 
 	if scope.ScopeMode == "node" {
-		scope.NodeID = strings.TrimSpace(scope.NodeID)
-		if scope.NodeID == "" {
-			return errors.New("Le scope noeud requiert un noeud Proxmox.")
-		}
 		var exists bool
 		if err := db.QueryRow(`SELECT EXISTS(SELECT 1 FROM proxmox_nodes WHERE id = $1)`, scope.NodeID).Scan(&exists); err != nil || !exists {
 			return errors.New("Noeud Proxmox introuvable pour ce scope.")
@@ -195,10 +181,6 @@ func validateAlertActions(db *database.DB, actions *models.AlertActions, metric 
 	}
 
 	if scope.ScopeMode == "storage" {
-		scope.StorageID = strings.TrimSpace(scope.StorageID)
-		if scope.StorageID == "" {
-			return errors.New("Le scope stockage requiert un stockage Proxmox.")
-		}
 		var exists bool
 		if err := db.QueryRow(`SELECT EXISTS(SELECT 1 FROM proxmox_storages WHERE id = $1)`, scope.StorageID).Scan(&exists); err != nil || !exists {
 			return errors.New("Stockage Proxmox introuvable pour ce scope.")
@@ -208,23 +190,25 @@ func validateAlertActions(db *database.DB, actions *models.AlertActions, metric 
 	return nil
 }
 
-// GetAlertRuleCapabilities returns metric metadata and dynamic scope options.
-func (h *AlertRulesHandler) GetAlertRuleCapabilities(c *gin.Context) {
-	response := alertMetricCapabilitiesResponse{
-		Metrics: allAlertMetrics(),
+func normalizeRuleSourceType(source models.AlertSourceType, metric string) models.AlertSourceType {
+	if source == "" {
+		return models.InferAlertSourceType(metric)
 	}
+	return source
+}
 
-	response.ProxmoxScope.Modes = []string{"global", "connection", "node", "storage"}
-	response.ProxmoxScope.Connections = []alertScopeOption{}
-	response.ProxmoxScope.Nodes = []alertScopeOption{}
-	response.ProxmoxScope.Storages = []alertScopeOption{}
+func (h *AlertRulesHandler) loadProxmoxScopeOptions() (modes []string, connections, nodes, storages []alertScopeOption) {
+	modes = []string{"global", "connection", "node", "storage"}
+	connections = []alertScopeOption{}
+	nodes = []alertScopeOption{}
+	storages = []alertScopeOption{}
 
 	if rows, err := h.db.Query(`SELECT id, name FROM proxmox_connections ORDER BY name`); err == nil {
 		defer func() { _ = rows.Close() }()
 		for rows.Next() {
 			var id, name string
 			if scanErr := rows.Scan(&id, &name); scanErr == nil {
-				response.ProxmoxScope.Connections = append(response.ProxmoxScope.Connections, alertScopeOption{ID: id, Label: name})
+				connections = append(connections, alertScopeOption{ID: id, Label: name})
 			}
 		}
 	}
@@ -238,7 +222,7 @@ func (h *AlertRulesHandler) GetAlertRuleCapabilities(c *gin.Context) {
 		for rows.Next() {
 			var id, label string
 			if scanErr := rows.Scan(&id, &label); scanErr == nil {
-				response.ProxmoxScope.Nodes = append(response.ProxmoxScope.Nodes, alertScopeOption{ID: id, Label: label})
+				nodes = append(nodes, alertScopeOption{ID: id, Label: label})
 			}
 		}
 	}
@@ -252,16 +236,30 @@ func (h *AlertRulesHandler) GetAlertRuleCapabilities(c *gin.Context) {
 		for rows.Next() {
 			var id, label string
 			if scanErr := rows.Scan(&id, &label); scanErr == nil {
-				response.ProxmoxScope.Storages = append(response.ProxmoxScope.Storages, alertScopeOption{ID: id, Label: label})
+				storages = append(storages, alertScopeOption{ID: id, Label: label})
 			}
 		}
 	}
 
+	return modes, connections, nodes, storages
+}
+
+func (h *AlertRulesHandler) GetAgentAlertRuleCapabilities(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{"metrics": allAgentAlertMetrics()})
+}
+
+func (h *AlertRulesHandler) GetProxmoxAlertRuleCapabilities(c *gin.Context) {
+	modes, connections, nodes, storages := h.loadProxmoxScopeOptions()
+	response := alertSplitCapabilitiesResponse{AgentMetrics: []alertMetricCapability{}, ProxmoxMetrics: allProxmoxAlertMetrics()}
+	response.ProxmoxScope.Modes = modes
+	response.ProxmoxScope.Connections = connections
+	response.ProxmoxScope.Nodes = nodes
+	response.ProxmoxScope.Storages = storages
 	c.JSON(http.StatusOK, response)
 }
 
 // allAlertMetrics returns the complete list of all available alert metrics.
-func allAlertMetrics() []alertMetricCapability {
+func allAgentAlertMetrics() []alertMetricCapability {
 	return []alertMetricCapability{
 		{Metric: "cpu", Label: "CPU", Unit: "%", Icon: "\u26a1", BadgeClass: "bg-red-lt text-red", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: true},
 		{Metric: "cpu_temperature", Label: "Temp. CPU", Unit: "\u00b0C", Icon: "\U0001f321", BadgeClass: "bg-orange-lt text-orange", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: true},
@@ -272,6 +270,11 @@ func allAlertMetrics() []alertMetricCapability {
 		{Metric: "status_offline", Label: "Hote hors ligne", Unit: "", Icon: "\U0001f50c", BadgeClass: "bg-red-lt text-red", SupportsThreshold: true, SupportsDuration: false, SupportsHostFilter: true},
 		{Metric: "disk_smart_status", Label: "SMART disque", Unit: "", Icon: "\U0001f6e1", BadgeClass: "bg-yellow-lt text-yellow", SupportsThreshold: true, SupportsDuration: false, SupportsHostFilter: true},
 		{Metric: "disk_temperature", Label: "Temp. disque", Unit: "\u00b0C", Icon: "\U0001f321", BadgeClass: "bg-orange-lt text-orange", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: true},
+	}
+}
+
+func allProxmoxAlertMetrics() []alertMetricCapability {
+	return []alertMetricCapability{
 		{Metric: "proxmox_storage_percent", Label: "Proxmox stockage", Unit: "%", Icon: "\U0001f5a5", BadgeClass: "bg-cyan-lt text-cyan", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: false},
 		{Metric: "proxmox_node_cpu_percent", Label: "Proxmox CPU noeud", Unit: "%", Icon: "\U0001f9e0", BadgeClass: "bg-cyan-lt text-cyan", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: false},
 		{Metric: "proxmox_node_memory_percent", Label: "Proxmox RAM noeud", Unit: "%", Icon: "\U0001f4ca", BadgeClass: "bg-cyan-lt text-cyan", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: false},
@@ -293,12 +296,9 @@ func filterMetricsByCollectors(allMetrics []alertMetricCapability, collectors ma
 
 	// These metrics require specific collectors
 	requiresCollector := map[string]string{
-		"cpu_temperature":             "cpu_temp",
-		"disk_smart_status":           "smart",
-		"disk_temperature":            "smart",
-		"proxmox_storage_percent":     "proxmox", // Not from collectors, but from Proxmox integration
-		"proxmox_node_cpu_percent":    "proxmox",
-		"proxmox_node_memory_percent": "proxmox",
+		"cpu_temperature":   "cpu_temp",
+		"disk_smart_status": "smart",
+		"disk_temperature":  "smart",
 	}
 
 	var filtered []alertMetricCapability
@@ -311,14 +311,6 @@ func filterMetricsByCollectors(allMetrics []alertMetricCapability, collectors ma
 
 		// Check if metric requires a specific collector
 		if requiredCollector, ok := requiresCollector[metric.Metric]; ok {
-			// Special case for Proxmox metrics (not in collectors, treated separately)
-			if requiredCollector == "proxmox" {
-				// Only include Proxmox metrics if we're filtering for Proxmox hosts
-				// For now, we'll include them if any Proxmox connection exists
-				// Frontend will handle visibility separately
-				continue
-			}
-
 			// Check if required collector is enabled
 			if collectors[requiredCollector] {
 				filtered = append(filtered, metric)
@@ -345,51 +337,10 @@ func (h *AlertRulesHandler) GetHostAlertMetrics(c *gin.Context) {
 	}
 
 	// Build response with filtered metrics
-	response := alertMetricCapabilitiesResponse{
-		Metrics: filterMetricsByCollectors(allAlertMetrics(), host.Collectors),
-	}
-
-	response.ProxmoxScope.Modes = []string{"global", "connection", "node", "storage"}
-	response.ProxmoxScope.Connections = []alertScopeOption{}
-	response.ProxmoxScope.Nodes = []alertScopeOption{}
-	response.ProxmoxScope.Storages = []alertScopeOption{}
-
-	if rows, err := h.db.Query(`SELECT id, name FROM proxmox_connections ORDER BY name`); err == nil {
-		defer func() { _ = rows.Close() }()
-		for rows.Next() {
-			var id, name string
-			if scanErr := rows.Scan(&id, &name); scanErr == nil {
-				response.ProxmoxScope.Connections = append(response.ProxmoxScope.Connections, alertScopeOption{ID: id, Label: name})
-			}
-		}
-	}
-
-	if rows, err := h.db.Query(`
-		SELECT n.id, COALESCE(c.name,'?') || ' / ' || n.node_name
-		FROM proxmox_nodes n
-		LEFT JOIN proxmox_connections c ON c.id = n.connection_id
-		ORDER BY c.name, n.node_name`); err == nil {
-		defer func() { _ = rows.Close() }()
-		for rows.Next() {
-			var id, label string
-			if scanErr := rows.Scan(&id, &label); scanErr == nil {
-				response.ProxmoxScope.Nodes = append(response.ProxmoxScope.Nodes, alertScopeOption{ID: id, Label: label})
-			}
-		}
-	}
-
-	if rows, err := h.db.Query(`
-		SELECT s.id, COALESCE(c.name,'?') || ' / ' || s.node_name || ' / ' || s.storage_name
-		FROM proxmox_storages s
-		LEFT JOIN proxmox_connections c ON c.id = s.connection_id
-		ORDER BY c.name, s.node_name, s.storage_name`); err == nil {
-		defer func() { _ = rows.Close() }()
-		for rows.Next() {
-			var id, label string
-			if scanErr := rows.Scan(&id, &label); scanErr == nil {
-				response.ProxmoxScope.Storages = append(response.ProxmoxScope.Storages, alertScopeOption{ID: id, Label: label})
-			}
-		}
+	response := alertHostCapabilitiesResponse{
+		HostID:   host.ID,
+		HostName: host.Name,
+		Metrics:  filterMetricsByCollectors(allAgentAlertMetrics(), host.Collectors),
 	}
 
 	c.JSON(http.StatusOK, response)
@@ -433,19 +384,19 @@ func humanizeValidationError(err error) string {
 }
 
 // scanAlertRule scans a single alert rule row from the DB.
-// Expected column order: id, name, enabled, host_id, metric, operator, threshold,
-// duration_seconds, actions, last_fired, created_at, updated_at
+// Expected column order: id, name, enabled, source_type, host_id, proxmox_scope,
+// metric, operator, threshold, duration_seconds, actions, last_fired, created_at, updated_at
 func scanAlertRule(row interface {
 	Scan(dest ...interface{}) error
 }) (models.AlertRule, error) {
 	var rule models.AlertRule
-	var name, hostID sql.NullString
+	var name, hostID, sourceType sql.NullString
 	var threshold sql.NullFloat64
-	var actionsJSON []byte
+	var actionsJSON, proxmoxScopeJSON []byte
 	var lastFired, updatedAt sql.NullTime
 
 	err := row.Scan(
-		&rule.ID, &name, &rule.Enabled, &hostID, &rule.Metric,
+		&rule.ID, &name, &rule.Enabled, &sourceType, &hostID, &proxmoxScopeJSON, &rule.Metric,
 		&rule.Operator, &threshold, &rule.DurationSeconds,
 		&actionsJSON, &lastFired, &rule.CreatedAt, &updatedAt,
 	)
@@ -459,6 +410,9 @@ func scanAlertRule(row interface {
 	if hostID.Valid {
 		rule.HostID = &hostID.String
 	}
+	if sourceType.Valid {
+		rule.SourceType = models.AlertSourceType(sourceType.String)
+	}
 	if threshold.Valid {
 		rule.Threshold = &threshold.Float64
 	}
@@ -471,14 +425,18 @@ func scanAlertRule(row interface {
 	if len(actionsJSON) > 0 {
 		_ = json.Unmarshal(actionsJSON, &rule.Actions)
 	}
+	if len(proxmoxScopeJSON) > 0 {
+		_ = json.Unmarshal(proxmoxScopeJSON, &rule.ProxmoxScope)
+	}
 	if rule.Actions.Channels == nil {
 		rule.Actions.Channels = []string{}
 	}
+	rule.NormalizeCompatibility()
 	return rule, nil
 }
 
 const alertRuleSelectCols = `
-id, name, enabled, host_id, metric, operator, threshold, duration_seconds,
+id, name, enabled, source_type, host_id, proxmox_scope, metric, operator, threshold, duration_seconds,
 actions, last_fired, created_at, updated_at`
 
 // ListAlertRules returns all alert rules
@@ -529,11 +487,13 @@ func (h *AlertRulesHandler) CreateAlertRule(c *gin.Context) {
 		return
 	}
 
+	req.SourceType = normalizeRuleSourceType(req.SourceType, req.Metric)
+
 	if err := validateAlertRuleMetricOperator(req.Metric, req.Operator); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if err := validateAlertActions(h.db, &req.Actions, req.Metric); err != nil {
+	if err := validateAlertActions(&req.Actions); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -541,13 +501,14 @@ func (h *AlertRulesHandler) CreateAlertRule(c *gin.Context) {
 	if req.Actions.Channels == nil {
 		req.Actions.Channels = []string{}
 	}
-	actionsJSON, _ := json.Marshal(req.Actions)
 
 	var rule models.AlertRule
 	name := req.Name
 	rule.Name = &name
 	rule.Enabled = req.Enabled
+	rule.SourceType = req.SourceType
 	rule.HostID = req.HostID
+	rule.ProxmoxScope = req.ProxmoxScope
 	rule.Metric = req.Metric
 	rule.Operator = req.Operator
 	threshold := req.Threshold
@@ -555,11 +516,25 @@ func (h *AlertRulesHandler) CreateAlertRule(c *gin.Context) {
 	rule.DurationSeconds = req.Duration
 	rule.Actions = req.Actions
 
+	if err := rule.Validate(); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if rule.SourceType == models.AlertSourceProxmox {
+		if err := validateProxmoxScopeExists(h.db, rule.ProxmoxScope); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+	}
+
+	actionsJSON, _ := json.Marshal(rule.Actions)
+	proxmoxScopeJSON, _ := json.Marshal(rule.ProxmoxScope)
+
 	err := h.db.QueryRow(`
-INSERT INTO alert_rules (name, enabled, host_id, metric, operator, threshold, duration_seconds, actions)
-VALUES ($1, $2, $3, $4, $5, $6, $7, CAST($8 AS JSONB))
+INSERT INTO alert_rules (name, enabled, source_type, host_id, proxmox_scope, metric, operator, threshold, duration_seconds, actions)
+VALUES ($1, $2, $3, $4, CAST($5 AS JSONB), $6, $7, $8, $9, CAST($10 AS JSONB))
 RETURNING id, created_at, updated_at`,
-		req.Name, req.Enabled, req.HostID, req.Metric, req.Operator,
+		req.Name, req.Enabled, rule.SourceType, rule.HostID, string(proxmoxScopeJSON), rule.Metric, rule.Operator,
 		req.Threshold, req.Duration, string(actionsJSON),
 	).Scan(&rule.ID, &rule.CreatedAt, &rule.UpdatedAt)
 
@@ -580,75 +555,127 @@ func (h *AlertRulesHandler) UpdateAlertRule(c *gin.Context) {
 		return
 	}
 
+	row := h.db.QueryRow(`SELECT`+alertRuleSelectCols+`
+FROM alert_rules WHERE id = $1`, id)
+	existing, err := scanAlertRule(row)
+	if err == sql.ErrNoRows {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Regle d'alerte introuvable."})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	if req.SourceType != nil && *req.SourceType != existing.SourceType {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Le changement de source_type n'est pas autorise."})
+		return
+	}
+
+	next := existing
+	if req.Name != nil {
+		next.Name = req.Name
+	}
+	if req.Enabled != nil {
+		next.Enabled = *req.Enabled
+	}
+	if req.HostID != nil {
+		next.HostID = req.HostID
+	}
+	if req.Metric != nil {
+		next.Metric = *req.Metric
+	}
+	if req.Operator != nil {
+		next.Operator = *req.Operator
+	}
+	if req.Threshold != nil {
+		next.Threshold = req.Threshold
+	}
+	if req.Duration != nil {
+		next.DurationSeconds = *req.Duration
+	}
+	if req.Actions != nil {
+		next.Actions = *req.Actions
+	}
+	if req.ProxmoxScope != nil {
+		next.ProxmoxScope = req.ProxmoxScope
+	}
+
+	if err := validateAlertRuleMetricOperator(next.Metric, next.Operator); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := validateAlertActions(&next.Actions); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if err := next.Validate(); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if next.SourceType == models.AlertSourceProxmox {
+		if err := validateProxmoxScopeExists(h.db, next.ProxmoxScope); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+	}
+
+	actionsJSON, _ := json.Marshal(next.Actions)
+	proxmoxScopeJSON, _ := json.Marshal(next.ProxmoxScope)
+
 	updates := []string{}
 	args := []interface{}{}
 	argCount := 1
 
 	if req.Name != nil {
 		updates = append(updates, "name = $"+strconv.Itoa(argCount))
-		args = append(args, *req.Name)
+		args = append(args, *next.Name)
 		argCount++
 	}
 	if req.Enabled != nil {
 		updates = append(updates, "enabled = $"+strconv.Itoa(argCount))
-		args = append(args, *req.Enabled)
+		args = append(args, next.Enabled)
 		argCount++
 	}
 	if req.HostID != nil {
 		updates = append(updates, "host_id = $"+strconv.Itoa(argCount))
-		args = append(args, *req.HostID)
+		args = append(args, next.HostID)
+		argCount++
+	}
+	if req.ProxmoxScope != nil {
+		updates = append(updates, "proxmox_scope = CAST($"+strconv.Itoa(argCount)+" AS JSONB)")
+		args = append(args, string(proxmoxScopeJSON))
 		argCount++
 	}
 	if req.Metric != nil {
-		if !validAlertMetrics[*req.Metric] {
+		if !validAlertMetrics[next.Metric] {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Metrique invalide."})
 			return
 		}
 		updates = append(updates, "metric = $"+strconv.Itoa(argCount))
-		args = append(args, *req.Metric)
+		args = append(args, next.Metric)
 		argCount++
 	}
 	if req.Operator != nil {
-		if !validAlertOperators[*req.Operator] {
+		if !validAlertOperators[next.Operator] {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Operateur invalide."})
 			return
 		}
 		updates = append(updates, "operator = $"+strconv.Itoa(argCount))
-		args = append(args, *req.Operator)
+		args = append(args, next.Operator)
 		argCount++
 	}
 	if req.Threshold != nil {
 		updates = append(updates, "threshold = $"+strconv.Itoa(argCount))
-		args = append(args, *req.Threshold)
+		args = append(args, *next.Threshold)
 		argCount++
 	}
 	if req.Duration != nil {
 		updates = append(updates, "duration_seconds = $"+strconv.Itoa(argCount))
-		args = append(args, *req.Duration)
+		args = append(args, next.DurationSeconds)
 		argCount++
 	}
 	if req.Actions != nil {
-		metricForValidation := req.Metric
-		if metricForValidation == nil {
-			var existingMetric string
-			if scanErr := h.db.QueryRow(`SELECT metric FROM alert_rules WHERE id = $1`, id).Scan(&existingMetric); scanErr != nil {
-				if scanErr == sql.ErrNoRows {
-					c.JSON(http.StatusNotFound, gin.H{"error": "Regle d'alerte introuvable."})
-					return
-				}
-				c.JSON(http.StatusInternalServerError, gin.H{"error": scanErr.Error()})
-				return
-			}
-			metricForValidation = &existingMetric
-		}
-		if err := validateAlertActions(h.db, req.Actions, *metricForValidation); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-		if req.Actions.Channels == nil {
-			req.Actions.Channels = []string{}
-		}
-		actionsJSON, _ := json.Marshal(*req.Actions)
 		updates = append(updates, "actions = CAST($"+strconv.Itoa(argCount)+" AS JSONB)")
 		args = append(args, string(actionsJSON))
 		argCount++
@@ -700,7 +727,9 @@ func (h *AlertRulesHandler) DeleteAlertRule(c *gin.Context) {
 // TestAlertRule evaluates a rule against current metrics without saving it.
 func (h *AlertRulesHandler) TestAlertRule(c *gin.Context) {
 	var req struct {
+		SourceType models.AlertSourceType `json:"source_type"`
 		HostID    *string             `json:"host_id"`
+		ProxmoxScope *models.ProxmoxMetricScope `json:"proxmox_scope"`
 		Metric    string              `json:"metric" binding:"required"`
 		Operator  string              `json:"operator" binding:"required"`
 		Threshold float64             `json:"threshold" binding:"required"`
@@ -715,20 +744,36 @@ func (h *AlertRulesHandler) TestAlertRule(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if err := validateAlertActions(h.db, &req.Actions, req.Metric); err != nil {
+	if req.SourceType == "" {
+		req.SourceType = models.InferAlertSourceType(req.Metric)
+	}
+
+	if err := validateAlertActions(&req.Actions); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	threshold := req.Threshold
 	rule := models.AlertRule{
+		SourceType:      req.SourceType,
 		HostID:          req.HostID,
+		ProxmoxScope:    req.ProxmoxScope,
 		Metric:          req.Metric,
 		Operator:        req.Operator,
 		Threshold:       &threshold,
 		DurationSeconds: req.Duration,
 		Actions:         req.Actions,
 		Enabled:         true,
+	}
+	if err := rule.Validate(); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if rule.SourceType == models.AlertSourceProxmox {
+		if err := validateProxmoxScopeExists(h.db, rule.ProxmoxScope); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
 	}
 
 	hosts, err := h.db.GetAllHosts()

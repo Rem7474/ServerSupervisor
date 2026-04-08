@@ -76,7 +76,14 @@ interface AlertRule {
   id?: number
   name?: string
   enabled?: boolean
+  source_type?: 'agent' | 'proxmox'
   host_id?: string
+  proxmox_scope?: {
+    scope_mode?: string
+    connection_id?: string
+    node_id?: string
+    storage_id?: string
+  }
   metric?: string
   operator?: string
   threshold?: number
@@ -214,8 +221,9 @@ export default {
   getMyHostPermissions: () => api.get('/v1/auth/host-permissions'),
 
   // Alert Rules
-  getAlertRuleCapabilities: () => api.get('/v1/alert-rules/capabilities'),
-  getHostAlertMetrics: (hostId: string) => api.get(`/v1/alert-rules/${hostId}/metrics`),
+  getAgentAlertRuleCapabilities: () => api.get('/v1/alert-rules/capabilities/agent'),
+  getProxmoxAlertRuleCapabilities: () => api.get('/v1/alert-rules/capabilities/proxmox'),
+  getHostCapabilities: (hostId: string) => api.get(`/v1/hosts/${hostId}/capabilities`),
   getAlertRules: () => api.get('/v1/alert-rules'),
   createAlertRule: (payload: AlertRule) => api.post('/v1/alert-rules', payload),
   updateAlertRule: (id: number, payload: AlertRule) => api.patch(`/v1/alert-rules/${id}`, payload),

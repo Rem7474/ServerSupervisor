@@ -30,12 +30,35 @@
               </div>
 
               <div class="mb-3">
+                <label class="form-label required">Source des donnees</label>
+                <div class="btn-group w-100" role="group" aria-label="Source type">
+                  <button
+                    type="button"
+                    class="btn"
+                    :class="form.source_type === 'agent' ? 'btn-primary' : 'btn-outline-primary'"
+                    @click="setSourceType('agent')"
+                  >
+                    Agent
+                  </button>
+                  <button
+                    type="button"
+                    class="btn"
+                    :class="form.source_type === 'proxmox' ? 'btn-primary' : 'btn-outline-primary'"
+                    @click="setSourceType('proxmox')"
+                  >
+                    Proxmox
+                  </button>
+                </div>
+              </div>
+
+              <div class="mb-3">
                 <label class="form-label">Hôte cible</label>
-                <select v-model="form.host_id" class="form-select" :disabled="!metricSupportsHostFilter">
+                <select v-model="form.host_id" class="form-select" :disabled="form.source_type === 'proxmox' || !metricSupportsHostFilter">
                   <option :value="null">Tous les hôtes</option>
                   <option v-for="host in hosts" :key="host.id" :value="host.id">{{ host.name }}</option>
                 </select>
-                <small v-if="!metricSupportsHostFilter" class="form-hint">Cette metrique est globale et n'est pas liee a un hote.</small>
+                <small v-if="form.source_type === 'proxmox'" class="form-hint">Les alertes Proxmox ne ciblent pas un hote agent.</small>
+                <small v-else-if="!metricSupportsHostFilter" class="form-hint">Cette metrique est globale et n'est pas liee a un hote.</small>
               </div>
 
               <div class="mb-2 fw-semibold">Choisissez une métrique à surveiller</div>
@@ -62,30 +85,30 @@
               <div v-if="isProxmoxMetric(form.metric)" class="row g-2 mt-2">
                 <div class="col-md-4">
                   <label class="form-label">Scope Proxmox</label>
-                  <select v-model="form.actions.proxmox_scope.scope_mode" class="form-select">
+                  <select v-model="form.proxmox_scope.scope_mode" class="form-select">
                     <option value="global">Global</option>
                     <option value="connection">Connexion</option>
                     <option value="node">Noeud</option>
                     <option v-if="metricAllowsStorageScope" value="storage">Stockage</option>
                   </select>
                 </div>
-                <div v-if="form.actions.proxmox_scope.scope_mode === 'connection'" class="col-md-8">
+                <div v-if="form.proxmox_scope.scope_mode === 'connection'" class="col-md-8">
                   <label class="form-label">Connexion</label>
-                  <select v-model="form.actions.proxmox_scope.connection_id" class="form-select">
+                  <select v-model="form.proxmox_scope.connection_id" class="form-select">
                     <option value="">Selectionner...</option>
                     <option v-for="opt in proxmoxConnections" :key="opt.id" :value="opt.id">{{ opt.label }}</option>
                   </select>
                 </div>
-                <div v-if="form.actions.proxmox_scope.scope_mode === 'node'" class="col-md-8">
+                <div v-if="form.proxmox_scope.scope_mode === 'node'" class="col-md-8">
                   <label class="form-label">Noeud</label>
-                  <select v-model="form.actions.proxmox_scope.node_id" class="form-select">
+                  <select v-model="form.proxmox_scope.node_id" class="form-select">
                     <option value="">Selectionner...</option>
                     <option v-for="opt in proxmoxNodes" :key="opt.id" :value="opt.id">{{ opt.label }}</option>
                   </select>
                 </div>
-                <div v-if="metricAllowsStorageScope && form.actions.proxmox_scope.scope_mode === 'storage'" class="col-md-8">
+                <div v-if="metricAllowsStorageScope && form.proxmox_scope.scope_mode === 'storage'" class="col-md-8">
                   <label class="form-label">Stockage</label>
-                  <select v-model="form.actions.proxmox_scope.storage_id" class="form-select">
+                  <select v-model="form.proxmox_scope.storage_id" class="form-select">
                     <option value="">Selectionner...</option>
                     <option v-for="opt in proxmoxStorages" :key="opt.id" :value="opt.id">{{ opt.label }}</option>
                   </select>
@@ -315,8 +338,10 @@ const hostMetricsLoading = ref(false)
 const hostMetricsError = ref('')
 
 const metricCards = computed(() => {
+  const metricSource = form.value.source_type || 'agent'
+
   // If a specific host is selected, use that host's filtered metrics
-  if (form.value.host_id && hostMetrics.value?.metrics) {
+  if (metricSource === 'agent' && form.value.host_id && hostMetrics.value?.metrics) {
     return hostMetrics.value.metrics.map((metric) => ({
       value: metric.metric,
       label: metric.label,
@@ -327,14 +352,18 @@ const metricCards = computed(() => {
   // Otherwise, use global capabilities (all hosts)
   const fromCapabilities = props.capabilities?.metrics
   if (Array.isArray(fromCapabilities) && fromCapabilities.length > 0) {
-    return fromCapabilities.map((metric) => ({
+    return fromCapabilities
+      .filter((metric) => metricSource === 'proxmox' ? isProxmoxMetric(metric.metric) : !isProxmoxMetric(metric.metric))
+      .map((metric) => ({
       value: metric.metric,
       label: metric.label,
       icon: metric.icon || getAlertMetricMeta(metric.metric).icon,
-    }))
+      }))
   }
 
-  return ALERT_METRIC_ORDER.map((metric) => ({ value: metric, label: getAlertMetricMeta(metric).label, icon: getAlertMetricMeta(metric).icon }))
+  return ALERT_METRIC_ORDER
+    .filter((metric) => metricSource === 'proxmox' ? isProxmoxMetric(metric) : !isProxmoxMetric(metric))
+    .map((metric) => ({ value: metric, label: getAlertMetricMeta(metric).label, icon: getAlertMetricMeta(metric).icon }))
 })
 
 const proxmoxConnections = computed(() => props.capabilities?.proxmox_scope?.connections || [])
@@ -373,9 +402,9 @@ const canProceedStep = computed(() => {
   if (step.value === 1) {
     const hasBase = !!form.value.metric && !!form.value.name?.trim()
     if (!hasBase) return false
-    if (!isProxmoxMetric(form.value.metric)) return true
+    if (form.value.source_type === 'agent') return !!form.value.host_id
 
-    const scope = form.value.actions.proxmox_scope || { scope_mode: 'global' }
+    const scope = form.value.proxmox_scope || { scope_mode: 'global' }
     if (scope.scope_mode === 'connection') return !!scope.connection_id
     if (scope.scope_mode === 'node') return !!scope.node_id
     if (scope.scope_mode === 'storage') return !!scope.storage_id
@@ -418,7 +447,7 @@ watch(
     hostMetricsLoading.value = true
     hostMetricsError.value = ''
     try {
-      const response = await apiClient.getHostAlertMetrics(hostId)
+      const response = await apiClient.getHostCapabilities(hostId)
       hostMetrics.value = response.data
     } catch (error) {
       hostMetricsError.value = 'Échec du chargement des métriques pour cet hôte'
@@ -441,16 +470,16 @@ watch(
 watch(
   () => metricSupportsHostFilter.value,
   (supportsHost) => {
-    if (!supportsHost) {
+    if (!supportsHost || form.value.source_type === 'proxmox') {
       form.value.host_id = null
     }
   }
 )
 
 watch(
-  () => form.value.actions?.proxmox_scope?.scope_mode,
+  () => form.value.proxmox_scope?.scope_mode,
   (mode) => {
-    const scope = form.value.actions?.proxmox_scope
+    const scope = form.value.proxmox_scope
     if (!scope) return
     if (mode !== 'connection') scope.connection_id = ''
     if (mode !== 'node') scope.node_id = ''
@@ -522,6 +551,27 @@ function onKeyDown(event) {
 function selectMetric(metric) {
   form.value.metric = metric
   onMetricChange()
+}
+
+function setSourceType(sourceType) {
+  form.value.source_type = sourceType
+  if (sourceType === 'proxmox') {
+    form.value.host_id = null
+    if (!isProxmoxMetric(form.value.metric)) {
+      const first = metricCards.value[0]
+      if (first?.value) {
+        form.value.metric = first.value
+      }
+    }
+    return
+  }
+
+  if (isProxmoxMetric(form.value.metric)) {
+    const first = metricCards.value[0]
+    if (first?.value) {
+      form.value.metric = first.value
+    }
+  }
 }
 
 function goNextStep() {

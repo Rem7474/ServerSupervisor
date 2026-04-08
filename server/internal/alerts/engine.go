@@ -111,6 +111,10 @@ func hasHostID(rule models.AlertRule) bool {
 	return rule.HostID != nil && *rule.HostID != ""
 }
 
+func proxmoxScopeFromRule(rule models.AlertRule) *models.ProxmoxMetricScope {
+	return rule.ProxmoxScope
+}
+
 // proxmoxScopeKey generates a unique identifier for a Proxmox alert incident
 // based on scope mode to avoid duplicate incidents per scope.
 func proxmoxScopeKey(scope *models.ProxmoxMetricScope) string {
@@ -169,8 +173,8 @@ func buildAlertEvaluationTargets(rule models.AlertRule, hosts []models.Host) []m
 
 	// For Proxmox metrics, create a synthetic host record with scope-based ID
 	// This ensures one incident per Proxmox scope, not per agent host
-	syntheticID := proxmoxScopeKey(rule.Actions.ProxmoxScope)
-	syntheticLabel := proxmoxScopeLabel(rule.Actions.ProxmoxScope)
+	syntheticID := proxmoxScopeKey(proxmoxScopeFromRule(rule))
+	syntheticLabel := proxmoxScopeLabel(proxmoxScopeFromRule(rule))
 	return []models.Host{
 		{
 			ID:       syntheticID,
@@ -285,7 +289,7 @@ func GetMetricValue(db *database.DB, host models.Host, rule models.AlertRule) (f
 }
 
 func resolveProxmoxStoragePercent(db *database.DB, rule models.AlertRule) float64 {
-	scope := rule.Actions.ProxmoxScope
+	scope := proxmoxScopeFromRule(rule)
 	if scope == nil || scope.ScopeMode == "" || scope.ScopeMode == "global" {
 		return db.GetMaxProxmoxStorageUsagePercent()
 	}
@@ -314,7 +318,7 @@ func resolveProxmoxStoragePercent(db *database.DB, rule models.AlertRule) float6
 // resolveProxmoxNodeCPUPercent returns the CPU usage for a Proxmox node metric
 // based on the scope defined in the rule (global, connection, or node).
 func resolveProxmoxNodeCPUPercent(db *database.DB, rule models.AlertRule) float64 {
-	scope := rule.Actions.ProxmoxScope
+	scope := proxmoxScopeFromRule(rule)
 	if scope == nil || scope.ScopeMode == "" || scope.ScopeMode == "global" {
 		return db.GetMaxProxmoxNodeCPUUsagePercent()
 	}
@@ -338,7 +342,7 @@ func resolveProxmoxNodeCPUPercent(db *database.DB, rule models.AlertRule) float6
 // resolveProxmoxNodeMemoryPercent returns the memory usage for a Proxmox node metric
 // based on the scope defined in the rule (global, connection, or node).
 func resolveProxmoxNodeMemoryPercent(db *database.DB, rule models.AlertRule) float64 {
-	scope := rule.Actions.ProxmoxScope
+	scope := proxmoxScopeFromRule(rule)
 	if scope == nil || scope.ScopeMode == "" || scope.ScopeMode == "global" {
 		return db.GetMaxProxmoxNodeMemoryUsagePercent()
 	}

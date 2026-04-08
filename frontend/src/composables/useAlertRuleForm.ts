@@ -15,19 +15,22 @@ interface AlertRuleFormActions {
   smtp_to: string
   ntfy_topic: string
   cooldown: number
-  proxmox_scope?: {
-    scope_mode: string
-    connection_id: string
-    node_id: string
-    storage_id: string
-  }
   command_trigger?: CommandTrigger
+}
+
+interface ProxmoxScope {
+  scope_mode: string
+  connection_id: string
+  node_id: string
+  storage_id: string
 }
 
 interface AlertRuleFormData {
   name: string
   enabled: boolean
+  source_type: 'agent' | 'proxmox'
   host_id: string | null
+  proxmox_scope: ProxmoxScope
   metric: string
   operator: string
   threshold: number
@@ -58,8 +61,15 @@ export function useAlertRuleForm(): AlertRuleFormApi {
   const defaultForm = (): AlertRuleFormData => ({
     name: '',
     enabled: true,
+    source_type: 'agent',
     host_id: null,
     metric: 'cpu',
+    proxmox_scope: {
+      scope_mode: 'global',
+      connection_id: '',
+      node_id: '',
+      storage_id: '',
+    },
     operator: '>',
     threshold: 80,
     duration: 300,
@@ -68,12 +78,6 @@ export function useAlertRuleForm(): AlertRuleFormApi {
       smtp_to: '',
       ntfy_topic: '',
       cooldown: 3600,
-      proxmox_scope: {
-        scope_mode: 'global',
-        connection_id: '',
-        node_id: '',
-        storage_id: '',
-      },
       command_trigger: defaultCommandTrigger(),
     },
   })
@@ -91,13 +95,21 @@ export function useAlertRuleForm(): AlertRuleFormApi {
     }
 
     const actions = rule.actions || {}
+    const scope = rule.proxmox_scope || {}
     const commandTrigger = actions.command_trigger
 
     form.value = {
       name: rule.name || '',
       enabled: rule.enabled,
+        source_type: rule.source_type || (isProxmoxMetric(rule.metric) ? 'proxmox' : 'agent'),
       host_id: rule.host_id,
       metric: rule.metric,
+        proxmox_scope: {
+          scope_mode: scope.scope_mode || 'global',
+          connection_id: scope.connection_id || '',
+          node_id: scope.node_id || '',
+          storage_id: scope.storage_id || '',
+        },
       operator: rule.operator,
       threshold: rule.threshold,
       duration: rule.duration_seconds,
@@ -106,12 +118,6 @@ export function useAlertRuleForm(): AlertRuleFormApi {
         smtp_to: actions.smtp_to || '',
         ntfy_topic: actions.ntfy_topic || '',
         cooldown: actions.cooldown || 3600,
-        proxmox_scope: {
-          scope_mode: actions.proxmox_scope?.scope_mode || 'global',
-          connection_id: actions.proxmox_scope?.connection_id || '',
-          node_id: actions.proxmox_scope?.node_id || '',
-          storage_id: actions.proxmox_scope?.storage_id || '',
-        },
         command_trigger: commandTrigger
           ? { module: commandTrigger.module, action: commandTrigger.action, target: commandTrigger.target || '' }
           : defaultCommandTrigger(),
@@ -126,12 +132,20 @@ export function useAlertRuleForm(): AlertRuleFormApi {
 
   function onMetricChange(): void {
     if (form.value.metric === 'heartbeat_timeout') {
+      form.value.source_type = 'agent'
       form.value.operator = '>'
       if (!form.value.threshold || form.value.threshold === 80) {
         form.value.threshold = 300
       }
       form.value.duration = 0
       return
+    }
+
+    if (isProxmoxMetric(form.value.metric)) {
+      form.value.source_type = 'proxmox'
+      form.value.host_id = null
+    } else {
+      form.value.source_type = 'agent'
     }
 
     if (form.value.metric === 'status_offline' || form.value.metric === 'disk_smart_status') {
@@ -156,12 +170,10 @@ export function useAlertRuleForm(): AlertRuleFormApi {
       delete actions.command_trigger
     }
 
-    if (!isProxmoxMetric(form.value.metric)) {
-      delete actions.proxmox_scope
-    }
-
     return {
       ...form.value,
+      source_type: form.value.source_type,
+      proxmox_scope: isProxmoxMetric(form.value.metric) ? { ...form.value.proxmox_scope } : null,
       actions,
     }
   }

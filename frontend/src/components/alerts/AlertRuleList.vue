@@ -32,7 +32,7 @@
           <tr>
             <th>Etat</th>
             <th>Nom</th>
-            <th>Hote</th>
+            <th>Source / Hote</th>
             <th>Metrique</th>
             <th>Condition</th>
             <th>Duree</th>
@@ -52,8 +52,8 @@
               <div v-if="rule.last_fired" class="text-muted small">Dernière alerte: {{ formatDate(rule.last_fired) }}</div>
             </td>
             <td>
-              <span v-if="rule.host_id" class="badge bg-secondary-lt text-secondary">{{ getHostName(rule.host_id) }}</span>
-              <span v-else class="badge bg-info-lt text-info">Tous les hôtes</span>
+              <span v-if="ruleSourceType(rule) === 'agent'" class="badge bg-secondary-lt text-secondary">Agent › {{ getHostName(rule.host_id) || 'Tous les hotes' }}</span>
+              <span v-else class="badge bg-cyan-lt text-cyan">{{ proxmoxScopeLabel(rule) }}</span>
             </td>
             <td>
               <span class="badge" :class="getMetricBadgeClass(rule.metric)">{{ getMetricLabel(rule.metric) }}</span>
@@ -139,6 +139,20 @@ function getMetricBadgeClass(metric) {
 
 function getMetricUnit(metric) {
   return getAlertMetricMeta(metric).unit
+}
+
+function ruleSourceType(rule) {
+  if (rule?.source_type) return rule.source_type
+  return String(rule?.metric || '').startsWith('proxmox_') ? 'proxmox' : 'agent'
+}
+
+function proxmoxScopeLabel(rule) {
+  const scope = rule?.proxmox_scope
+  if (!scope || !scope.scope_mode || scope.scope_mode === 'global') return 'Proxmox › Cluster'
+  if (scope.scope_mode === 'connection') return `Proxmox › Connexion ${scope.connection_id || ''}`.trim()
+  if (scope.scope_mode === 'node') return `Proxmox › Noeud ${scope.node_id || ''}`.trim()
+  if (scope.scope_mode === 'storage') return `Proxmox › Stockage ${scope.storage_id || ''}`.trim()
+  return 'Proxmox › Scope inconnu'
 }
 </script>
 
