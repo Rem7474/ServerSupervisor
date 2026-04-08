@@ -505,35 +505,69 @@ func (db *DB) GetEffectiveHostFanRPM(hostID string, fallbackLocal float64) (floa
 }
 
 func (db *DB) GetProxmoxNodeCPUTemperatureHistory(nodeID string, hours int) ([]models.SystemMetrics, error) {
-	var sourceHostID sql.NullString
-	err := db.conn.QueryRow(`
-		SELECT n.cpu_temp_source_host_id
-		FROM proxmox_nodes n
-		WHERE n.id = $1`, nodeID).Scan(&sourceHostID)
-	if err == sql.ErrNoRows || !sourceHostID.Valid || sourceHostID.String == "" {
+	sourceHostID, err := db.resolveProxmoxNodeSourceHostID(nodeID, true)
+	if err == sql.ErrNoRows || sourceHostID == "" {
 		return []models.SystemMetrics{}, nil
 	}
 	if err != nil {
 		return nil, err
 	}
 
-	return db.GetSystemCPUTemperatureHistoryByHost(sourceHostID.String, hours)
+	return db.GetSystemCPUTemperatureHistoryByHost(sourceHostID, hours)
 }
 
 func (db *DB) GetProxmoxNodeFanRPMHistory(nodeID string, hours int) ([]models.SystemMetrics, error) {
-	var sourceHostID sql.NullString
-	err := db.conn.QueryRow(`
-		SELECT n.fan_rpm_source_host_id
-		FROM proxmox_nodes n
-		WHERE n.id = $1`, nodeID).Scan(&sourceHostID)
-	if err == sql.ErrNoRows || !sourceHostID.Valid || sourceHostID.String == "" {
+	sourceHostID, err := db.resolveProxmoxNodeSourceHostID(nodeID, false)
+	if err == sql.ErrNoRows || sourceHostID == "" {
 		return []models.SystemMetrics{}, nil
 	}
 	if err != nil {
 		return nil, err
 	}
 
-	return db.GetSystemFanRPMHistoryByHost(sourceHostID.String, hours)
+	return db.GetSystemFanRPMHistoryByHost(sourceHostID, hours)
+}
+
+// resolveProxmoxNodeSourceHostID returns an explicit source host if configured,
+// otherwise falls back to any confirmed linked host on the same Proxmox node.
+func (db *DB) resolveProxmoxNodeSourceHostID(nodeID string, cpuTemp bool) (string, error) {
+	var explicit sql.NullString
+	col := "fan_rpm_source_host_id"
+	if cpuTemp {
+		col = "cpu_temp_source_host_id"
+	}
+	err := db.conn.QueryRow(`
+		SELECT `+col+`
+		FROM proxmox_nodes
+		WHERE id = $1`, nodeID).Scan(&explicit)
+	if err != nil {
+		return "", err
+	}
+	if explicit.Valid && explicit.String != "" {
+		return explicit.String, nil
+	}
+
+	var fallback sql.NullString
+	err = db.conn.QueryRow(`
+		SELECT l.host_id
+		FROM proxmox_guest_links l
+		JOIN proxmox_guests g ON g.id = l.guest_id
+		JOIN proxmox_nodes n ON n.connection_id = g.connection_id AND n.node_name = g.node_name
+		WHERE n.id = $1
+		  AND l.status = 'confirmed'
+		  AND l.metrics_source IN ('auto', 'proxmox')
+		ORDER BY l.host_id
+		LIMIT 1`, nodeID).Scan(&fallback)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	if !fallback.Valid {
+		return "", nil
+	}
+	return fallback.String, nil
 }
 
 // IsHostUsedAsProxmoxCPUTempSource returns true when the host is configured

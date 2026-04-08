@@ -1136,11 +1136,6 @@ async function loadNodeCpuTempHistory(hours = rrdTimeframeToHours[rrdTimeframe.v
   nodeCpuTempCurrent.value = 0
 
   try {
-    const sourceHostId = node.value?.cpu_temp_source_host_id
-    if (!sourceHostId) {
-      return
-    }
-
     const res = await api.getProxmoxNodeCpuTempHistory(route.params.id, hours)
     const points = (Array.isArray(res.data) ? res.data : []).filter(p => Number(p?.cpu_temperature) > 0)
     if (!points.length) {
@@ -1181,11 +1176,6 @@ async function loadNodeFanRPMHistory(hours = rrdTimeframeToHours[rrdTimeframe.va
   nodeFanRPMCurrent.value = 0
 
   try {
-    const sourceHostId = node.value?.fan_rpm_source_host_id
-    if (!sourceHostId) {
-      return
-    }
-
     const res = await api.getProxmoxNodeFanRPMHistory(route.params.id, hours)
     const points = (Array.isArray(res.data) ? res.data : []).filter(p => Number(p?.fan_rpm) > 0)
     if (!points.length) {
