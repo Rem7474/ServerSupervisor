@@ -727,14 +727,14 @@ func (h *AlertRulesHandler) DeleteAlertRule(c *gin.Context) {
 // TestAlertRule evaluates a rule against current metrics without saving it.
 func (h *AlertRulesHandler) TestAlertRule(c *gin.Context) {
 	var req struct {
-		SourceType models.AlertSourceType `json:"source_type"`
-		HostID    *string             `json:"host_id"`
+		SourceType   models.AlertSourceType     `json:"source_type"`
+		HostID       *string                    `json:"host_id"`
 		ProxmoxScope *models.ProxmoxMetricScope `json:"proxmox_scope"`
-		Metric    string              `json:"metric" binding:"required"`
-		Operator  string              `json:"operator" binding:"required"`
-		Threshold float64             `json:"threshold" binding:"required"`
-		Duration  int                 `json:"duration"`
-		Actions   models.AlertActions `json:"actions"`
+		Metric       string                     `json:"metric" binding:"required"`
+		Operator     string                     `json:"operator" binding:"required"`
+		Threshold    float64                    `json:"threshold" binding:"required"`
+		Duration     int                        `json:"duration"`
+		Actions      models.AlertActions        `json:"actions"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": humanizeValidationError(err)})
@@ -852,4 +852,3 @@ func (h *AlertRulesHandler) ListIncidents(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, incidents)
 }
-

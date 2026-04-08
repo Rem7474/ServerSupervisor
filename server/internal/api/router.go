@@ -340,4 +340,3 @@ func registerStaticFiles(r *gin.Engine) {
 		c.File("./frontend/dist/index.html")
 	})
 }
-
