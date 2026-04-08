@@ -342,3 +342,58 @@ func (db *DB) setNodeFanRPMSourceIfUnset(guestID, hostID string) error {
 	)
 	return err
 }
+
+// BackfillProxmoxNodeSensorSources assigns missing CPU temp / fan RPM source hosts
+// from already confirmed guest links on each node.
+// This keeps legacy confirmed links compatible with node sensor widgets.
+func (db *DB) BackfillProxmoxNodeSensorSources() error {
+	if _, err := db.conn.Exec(`
+		WITH ranked AS (
+			SELECT
+				g.connection_id,
+				g.node_name,
+				l.host_id,
+				ROW_NUMBER() OVER (
+					PARTITION BY g.connection_id, g.node_name
+					ORDER BY l.updated_at DESC, l.created_at DESC
+				) AS rn
+			FROM proxmox_guest_links l
+			JOIN proxmox_guests g ON g.id = l.guest_id
+			WHERE l.status = 'confirmed'
+		)
+		UPDATE proxmox_nodes n
+		SET cpu_temp_source_host_id = r.host_id
+		FROM ranked r
+		WHERE r.rn = 1
+		  AND n.connection_id = r.connection_id
+		  AND n.node_name = r.node_name
+		  AND n.cpu_temp_source_host_id IS NULL`); err != nil {
+		return err
+	}
+
+	if _, err := db.conn.Exec(`
+		WITH ranked AS (
+			SELECT
+				g.connection_id,
+				g.node_name,
+				l.host_id,
+				ROW_NUMBER() OVER (
+					PARTITION BY g.connection_id, g.node_name
+					ORDER BY l.updated_at DESC, l.created_at DESC
+				) AS rn
+			FROM proxmox_guest_links l
+			JOIN proxmox_guests g ON g.id = l.guest_id
+			WHERE l.status = 'confirmed'
+		)
+		UPDATE proxmox_nodes n
+		SET fan_rpm_source_host_id = r.host_id
+		FROM ranked r
+		WHERE r.rn = 1
+		  AND n.connection_id = r.connection_id
+		  AND n.node_name = r.node_name
+		  AND n.fan_rpm_source_host_id IS NULL`); err != nil {
+		return err
+	}
+
+	return nil
+}

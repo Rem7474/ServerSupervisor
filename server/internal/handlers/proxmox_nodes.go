@@ -13,6 +13,8 @@ import (
 
 // ListNodes returns all nodes, optionally filtered by connection_id query param.
 func (h *ProxmoxHandler) ListNodes(c *gin.Context) {
+	_ = h.db.BackfillProxmoxNodeSensorSources()
+
 	connID := c.Query("connection_id")
 	var (
 		nodes []models.ProxmoxNode
@@ -32,6 +34,8 @@ func (h *ProxmoxHandler) ListNodes(c *gin.Context) {
 
 // GetNode returns a single node with its guests and storages.
 func (h *ProxmoxHandler) GetNode(c *gin.Context) {
+	_ = h.db.BackfillProxmoxNodeSensorSources()
+
 	node, err := h.db.GetProxmoxNode(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -73,6 +77,8 @@ func (h *ProxmoxHandler) GetNodeMetricsSummary(c *gin.Context) {
 
 // GetNodeCPUTemperatureHistory returns the source host's CPU temperature history for this Proxmox node.
 func (h *ProxmoxHandler) GetNodeCPUTemperatureHistory(c *gin.Context) {
+	_ = h.db.BackfillProxmoxNodeSensorSources()
+
 	hours, _ := strconv.Atoi(c.DefaultQuery("hours", "24"))
 	if hours <= 0 {
 		hours = 24
@@ -94,6 +100,8 @@ func (h *ProxmoxHandler) GetNodeCPUTemperatureHistory(c *gin.Context) {
 
 // GetNodeFanRPMHistory returns the source host's fan RPM history for this Proxmox node.
 func (h *ProxmoxHandler) GetNodeFanRPMHistory(c *gin.Context) {
+	_ = h.db.BackfillProxmoxNodeSensorSources()
+
 	hours, _ := strconv.Atoi(c.DefaultQuery("hours", "24"))
 	if hours <= 0 {
 		hours = 24
