@@ -68,6 +68,10 @@ var validAlertMetrics = map[string]bool{
 	"status_offline":  true,
 	"cpu_temperature": true, "disk_smart_status": true, "disk_temperature": true, "proxmox_storage_percent": true,
 	"proxmox_node_cpu_percent": true, "proxmox_node_memory_percent": true,
+	"proxmox_guest_cpu_percent": true, "proxmox_guest_memory_percent": true,
+	"proxmox_node_pending_updates": true, "proxmox_node_security_updates": true,
+	"proxmox_recent_failed_tasks_24h": true,
+	"proxmox_disk_failed_count":       true, "proxmox_disk_min_wearout_percent": true,
 }
 
 type alertMetricCapability struct {
@@ -772,7 +776,14 @@ func (h *AlertRulesHandler) TestAlertRule(c *gin.Context) {
 		Actions:         req.Actions,
 		Enabled:         true,
 	}
-	if err := rule.Validate(); err != nil {
+	// Test endpoint supports agent-wide preview when host_id is omitted.
+	validationRule := rule
+	if validationRule.SourceType == models.AlertSourceAgent && validationRule.HostID == nil {
+		placeholderHostID := "__test_all_hosts__"
+		validationRule.HostID = &placeholderHostID
+	}
+
+	if err := validationRule.Validate(); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}

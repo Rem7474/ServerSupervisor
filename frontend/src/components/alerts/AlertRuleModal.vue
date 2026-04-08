@@ -60,9 +60,6 @@
                 <small v-if="!metricSupportsHostFilter" class="form-hint">Cette metrique est globale et n'est pas liee a un hote.</small>
               </div>
 
-              <div v-else class="alert alert-info py-2 small mb-3">
-                Les alertes Proxmox ciblent directement le cluster, un nœud ou un stockage. Le champ hôte disparaît volontairement pour éviter l'ambiguïté.
-              </div>
 
               <div class="mb-2 fw-semibold">Choisissez une métrique à surveiller</div>
               <div v-if="capabilitiesLoading" class="alert alert-info py-2 small mb-2">Chargement des metriques...</div>
