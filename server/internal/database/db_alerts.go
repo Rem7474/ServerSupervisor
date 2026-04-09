@@ -147,6 +147,23 @@ func (db *DB) ResolveAlertIncident(id int64) error {
 	return err
 }
 
+// ResolveOpenAlertIncidentsByRule marks all open incidents for a rule as resolved.
+// It returns the number of incidents that were updated.
+func (db *DB) ResolveOpenAlertIncidentsByRule(ruleID int64) (int64, error) {
+	result, err := db.conn.Exec(
+		`UPDATE alert_incidents SET resolved_at = NOW() WHERE rule_id = $1 AND resolved_at IS NULL`,
+		ruleID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+	return rows, nil
+}
+
 func (db *DB) GetAlertIncidents(limit, offset int) ([]models.AlertIncident, error) {
 	rows, err := db.conn.Query(
 		`SELECT id, rule_id, host_id, triggered_at, resolved_at, value

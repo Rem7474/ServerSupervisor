@@ -196,8 +196,12 @@ export function useAlertsPage(): UseAlertsPageApi {
 
   async function toggleEnabled(rule: AlertRule): Promise<void> {
     try {
-      await apiClient.updateAlertRule(rule.id, { enabled: !rule.enabled })
+      const nextEnabled = !rule.enabled
+      await apiClient.updateAlertRule(rule.id, { enabled: nextEnabled })
       await rulesStore.fetchRules(true)
+      if (!nextEnabled && incidentsLoaded.value) {
+        await loadIncidents()
+      }
     } catch {
       // ignore
     }

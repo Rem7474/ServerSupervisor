@@ -44,6 +44,13 @@ func EvaluateAlerts(db *database.DB, cfg *config.Config, dispatcher *dispatch.Di
 
 	for _, rule := range rules {
 		if !rule.Enabled {
+			resolvedCount, err := db.ResolveOpenAlertIncidentsByRule(rule.ID)
+			if err != nil {
+				log.Printf("Alerts: failed to resolve open incidents for disabled rule#%d: %v", rule.ID, err)
+			} else if resolvedCount > 0 {
+				log.Printf("Alerts: disabled rule#%d resolved %d open incident(s)", rule.ID, resolvedCount)
+				broadcastIncidentUpdate(pusher, "resolved", rule, "")
+			}
 			continue
 		}
 

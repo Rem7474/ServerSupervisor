@@ -48,7 +48,7 @@
               <div class="text-muted small">{{ incidentMetricLabel(incident.metric) }}</div>
             </td>
             <td>
-              <router-link :to="`/hosts/${incident.host_id}`" class="text-decoration-none">{{ incident.host_name }}</router-link>
+              <router-link :to="resolveIncidentHostRoute(incident.host_id, incident.metric)" class="text-decoration-none">{{ incident.host_name }}</router-link>
             </td>
             <td><code>{{ incidentFormatValue(incident.value, incident.metric) }}</code></td>
             <td class="text-muted small">{{ formatDate(incident.triggered_at) }}</td>
@@ -65,6 +65,7 @@
 
 <script setup>
 import { getAlertMetricMeta } from '../../utils/alertMetrics'
+import { resolveIncidentHostRoute } from '../../utils/incidentRouting'
 
 const props = defineProps({
   incidents: {

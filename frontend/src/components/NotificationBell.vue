@@ -79,7 +79,7 @@
             </div>
             <div class="d-flex align-items-center justify-content-between text-secondary notification-meta">
               <router-link
-                :to="`/hosts/${item.host_id}`"
+                :to="resolveIncidentHostRoute(item.host_id, item.metric)"
                 class="text-truncate text-secondary text-decoration-none notification-host-link notification-host"
                 @click="isOpen = false"
               >
@@ -115,6 +115,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import RelativeTime from './RelativeTime.vue'
 import apiClient from '../api'
 import { useWebSocket } from '../composables/useWebSocket'
+import { resolveIncidentHostRoute } from '../utils/incidentRouting'
 
 const bellRef = ref(null)
 const isOpen = ref(false)

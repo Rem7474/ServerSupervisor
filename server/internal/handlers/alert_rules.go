@@ -862,6 +862,15 @@ FROM alert_rules WHERE id = $1`, id)
 		c.JSON(http.StatusNotFound, gin.H{"error": "Regle d'alerte introuvable."})
 		return
 	}
+	if req.Enabled != nil && !next.Enabled {
+		ruleID, parseErr := strconv.ParseInt(id, 10, 64)
+		if parseErr == nil {
+			if _, err := h.db.ResolveOpenAlertIncidentsByRule(ruleID); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Regle mise a jour, mais echec de resolution des incidents ouverts."})
+				return
+			}
+		}
+	}
 	c.JSON(http.StatusOK, gin.H{"message": "Alert rule updated"})
 }
 
