@@ -1,25 +1,49 @@
 <template>
   <div class="page">
     <!-- Skip navigation link for keyboard/screen reader users -->
-    <a href="#main-content" class="skip-link visually-hidden-focusable">Aller au contenu principal</a>
+    <a
+      href="#main-content"
+      class="skip-link visually-hidden-focusable"
+    >Aller au contenu principal</a>
 
     <!-- Sidebar + Main -->
     <div v-if="auth.isAuthenticated">
       <header class="navbar navbar-expand-md navbar-dark">
         <div class="container-xl">
-          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar-menu" aria-label="Ouvrir le menu de navigation" aria-controls="navbar-menu" aria-expanded="false">
-            <span class="navbar-toggler-icon"></span>
+          <button
+            class="navbar-toggler"
+            type="button"
+            data-bs-toggle="collapse"
+            data-bs-target="#navbar-menu"
+            aria-label="Ouvrir le menu de navigation"
+            aria-controls="navbar-menu"
+            aria-expanded="false"
+          >
+            <span class="navbar-toggler-icon" />
           </button>
-          <router-link to="/" class="navbar-brand navbar-brand-autodark">
-            <AppIcon name="brand" css-class="icon me-2" />
+          <router-link
+            to="/"
+            class="navbar-brand navbar-brand-autodark"
+          >
+            <AppIcon
+              name="brand"
+              css-class="icon me-2"
+            />
             ServerSupervisor
           </router-link>
 
-          <div class="collapse navbar-collapse" id="navbar-menu">
+          <div
+            id="navbar-menu"
+            class="collapse navbar-collapse"
+          >
             <ul class="navbar-nav">
               <!-- Éléments principaux -->
               <li class="nav-item">
-                <router-link to="/" class="nav-link" active-class="active">
+                <router-link
+                  to="/"
+                  class="nav-link"
+                  active-class="active"
+                >
                   <span class="nav-link-icon">
                     <AppIcon name="dashboard" />
                   </span>
@@ -27,7 +51,11 @@
                 </router-link>
               </li>
               <li class="nav-item">
-                <router-link to="/docker" class="nav-link" active-class="active">
+                <router-link
+                  to="/docker"
+                  class="nav-link"
+                  active-class="active"
+                >
                   <span class="nav-link-icon">
                     <AppIcon name="docker" />
                   </span>
@@ -35,7 +63,11 @@
                 </router-link>
               </li>
               <li class="nav-item">
-                <router-link to="/apt" class="nav-link" active-class="active">
+                <router-link
+                  to="/apt"
+                  class="nav-link"
+                  active-class="active"
+                >
                   <span class="nav-link-icon">
                     <AppIcon name="updates" />
                   </span>
@@ -43,7 +75,11 @@
                 </router-link>
               </li>
               <li class="nav-item">
-                <router-link to="/proxmox" class="nav-link" active-class="active">
+                <router-link
+                  to="/proxmox"
+                  class="nav-link"
+                  active-class="active"
+                >
                   <span class="nav-link-icon">
                     <AppIcon name="proxmox" />
                   </span>
@@ -51,7 +87,11 @@
                 </router-link>
               </li>
               <li class="nav-item">
-                <router-link to="/alerts" class="nav-link" active-class="active">
+                <router-link
+                  to="/alerts"
+                  class="nav-link"
+                  active-class="active"
+                >
                   <span class="nav-link-icon">
                     <AppIcon name="alerts" />
                   </span>
@@ -60,56 +100,293 @@
               </li>
 
               <!-- Dropdown "Plus" — éléments secondaires -->
-              <li class="nav-item dropdown" :class="{ active: isSecondaryActive }">
-                <a class="nav-link dropdown-toggle" href="#" role="button" @click.prevent="toggleSecondaryMenu" :aria-expanded="secondaryMenuOpen" aria-label="Plus d'options" aria-haspopup="menu">
+              <li
+                class="nav-item dropdown"
+                :class="{ active: isSecondaryActive }"
+              >
+                <button
+                  class="nav-link dropdown-toggle nav-dropdown-toggle"
+                  type="button"
+                  :aria-expanded="secondaryMenuOpen"
+                  aria-label="Plus d'options"
+                  aria-haspopup="menu"
+                  @click="toggleSecondaryMenu"
+                >
                   <span class="nav-link-icon">
                     <AppIcon name="more" />
                   </span>
                   <span class="nav-link-title">Plus</span>
-                </a>
-                <div class="dropdown-menu" :class="{ show: secondaryMenuOpen }" role="menu">
-                  <router-link v-if="auth.isAdmin" to="/threats" class="dropdown-item" role="menuitem" @click="secondaryMenuOpen = false">
-                    <svg class="icon icon-sm me-2" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3l7 4v5c0 5-3.5 8.5-7 9-3.5-.5-7-4-7-9V7l7-4z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.5 12.5l2 2 3-3"/></svg>
+                </button>
+                <div
+                  class="dropdown-menu"
+                  :class="{ show: secondaryMenuOpen }"
+                  role="menu"
+                >
+                  <router-link
+                    v-if="auth.isAdmin"
+                    to="/threats"
+                    class="dropdown-item"
+                    role="menuitem"
+                    @click="secondaryMenuOpen = false"
+                  >
+                    <svg
+                      class="icon icon-sm me-2"
+                      width="16"
+                      height="16"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    ><path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M12 3l7 4v5c0 5-3.5 8.5-7 9-3.5-.5-7-4-7-9V7l7-4z"
+                    /><path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M9.5 12.5l2 2 3-3"
+                    /></svg>
                     Menaces web
                   </router-link>
-                  <router-link v-if="auth.isAdmin" to="/traffic" class="dropdown-item" role="menuitem" @click="secondaryMenuOpen = false">
-                    <svg class="icon icon-sm me-2" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 19V5m0 14h16M8 16l3-4 3 2 4-6"/></svg>
+                  <router-link
+                    v-if="auth.isAdmin"
+                    to="/traffic"
+                    class="dropdown-item"
+                    role="menuitem"
+                    @click="secondaryMenuOpen = false"
+                  >
+                    <svg
+                      class="icon icon-sm me-2"
+                      width="16"
+                      height="16"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    ><path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M4 19V5m0 14h16M8 16l3-4 3 2 4-6"
+                    /></svg>
                     Stats web
                   </router-link>
-                  <router-link to="/scheduled-tasks" class="dropdown-item" role="menuitem" @click="secondaryMenuOpen = false">
-                    <svg class="icon icon-sm me-2" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                  <router-link
+                    to="/scheduled-tasks"
+                    class="dropdown-item"
+                    role="menuitem"
+                    @click="secondaryMenuOpen = false"
+                  >
+                    <svg
+                      class="icon icon-sm me-2"
+                      width="16"
+                      height="16"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    ><circle
+                      cx="12"
+                      cy="12"
+                      r="10"
+                    /><polyline points="12 6 12 12 16 14" /></svg>
                     Tâches planifiées
                   </router-link>
-                  <router-link to="/network" class="dropdown-item" role="menuitem" @click="secondaryMenuOpen = false">
-                    <svg class="icon icon-sm me-2" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="2.5" stroke-width="2"/><circle cx="5" cy="5" r="2" stroke-width="2"/><circle cx="19" cy="5" r="2" stroke-width="2"/><circle cx="12" cy="20" r="2" stroke-width="2"/><line x1="6.5" y1="6.5" x2="10.5" y2="10.5" stroke-width="1.8" stroke-linecap="round"/><line x1="17.5" y1="6.5" x2="13.5" y2="10.5" stroke-width="1.8" stroke-linecap="round"/><line x1="12" y1="14.5" x2="12" y2="18" stroke-width="1.8" stroke-linecap="round"/></svg>
+                  <router-link
+                    to="/network"
+                    class="dropdown-item"
+                    role="menuitem"
+                    @click="secondaryMenuOpen = false"
+                  >
+                    <svg
+                      class="icon icon-sm me-2"
+                      width="16"
+                      height="16"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    ><circle
+                      cx="12"
+                      cy="12"
+                      r="2.5"
+                      stroke-width="2"
+                    /><circle
+                      cx="5"
+                      cy="5"
+                      r="2"
+                      stroke-width="2"
+                    /><circle
+                      cx="19"
+                      cy="5"
+                      r="2"
+                      stroke-width="2"
+                    /><circle
+                      cx="12"
+                      cy="20"
+                      r="2"
+                      stroke-width="2"
+                    /><line
+                      x1="6.5"
+                      y1="6.5"
+                      x2="10.5"
+                      y2="10.5"
+                      stroke-width="1.8"
+                      stroke-linecap="round"
+                    /><line
+                      x1="17.5"
+                      y1="6.5"
+                      x2="13.5"
+                      y2="10.5"
+                      stroke-width="1.8"
+                      stroke-linecap="round"
+                    /><line
+                      x1="12"
+                      y1="14.5"
+                      x2="12"
+                      y2="18"
+                      stroke-width="1.8"
+                      stroke-linecap="round"
+                    /></svg>
                     Réseau
                   </router-link>
-                  <router-link to="/settings" class="dropdown-item" role="menuitem" @click="secondaryMenuOpen = false">
-                    <svg class="icon icon-sm me-2" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                  <router-link
+                    to="/settings"
+                    class="dropdown-item"
+                    role="menuitem"
+                    @click="secondaryMenuOpen = false"
+                  >
+                    <svg
+                      class="icon icon-sm me-2"
+                      width="16"
+                      height="16"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    ><path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                    /><path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                    /></svg>
                     Paramètres
                   </router-link>
                 </div>
               </li>
 
               <!-- Dropdown "Administration" — admin uniquement -->
-              <li v-if="auth.isAdmin" class="nav-item dropdown" :class="{ active: isAdminActive }">
-                <a class="nav-link dropdown-toggle" href="#" role="button" @click.prevent="toggleAdminMenu" :aria-expanded="adminMenuOpen" aria-label="Options administrateur" aria-haspopup="menu">
+              <li
+                v-if="auth.isAdmin"
+                class="nav-item dropdown"
+                :class="{ active: isAdminActive }"
+              >
+                <button
+                  class="nav-link dropdown-toggle nav-dropdown-toggle"
+                  type="button"
+                  :aria-expanded="adminMenuOpen"
+                  aria-label="Options administrateur"
+                  aria-haspopup="menu"
+                  @click="toggleAdminMenu"
+                >
                   <span class="nav-link-icon">
                     <AppIcon name="admin" />
                   </span>
                   <span class="nav-link-title">Admin</span>
-                </a>
-                <div class="dropdown-menu" :class="{ show: adminMenuOpen }" role="menu">
-                  <router-link to="/git-webhooks" class="dropdown-item" role="menuitem" @click="adminMenuOpen = false">
-                    <svg class="icon icon-sm me-2" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="5" r="3"/><circle cx="5" cy="19" r="3"/><circle cx="19" cy="19" r="3"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v3m0 0l-4.5 5.5M12 11l4.5 5.5"/></svg>
+                </button>
+                <div
+                  class="dropdown-menu"
+                  :class="{ show: adminMenuOpen }"
+                  role="menu"
+                >
+                  <router-link
+                    to="/git-webhooks"
+                    class="dropdown-item"
+                    role="menuitem"
+                    @click="adminMenuOpen = false"
+                  >
+                    <svg
+                      class="icon icon-sm me-2"
+                      width="16"
+                      height="16"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    ><circle
+                      cx="12"
+                      cy="5"
+                      r="3"
+                    /><circle
+                      cx="5"
+                      cy="19"
+                      r="3"
+                    /><circle
+                      cx="19"
+                      cy="19"
+                      r="3"
+                    /><path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M12 8v3m0 0l-4.5 5.5M12 11l4.5 5.5"
+                    /></svg>
                     Git / Automatisation
                   </router-link>
-                  <router-link to="/audit" class="dropdown-item" role="menuitem" @click="adminMenuOpen = false">
-                    <svg class="icon icon-sm me-2" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6M5 7h14a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V9a2 2 0 012-2z"/></svg>
+                  <router-link
+                    to="/audit"
+                    class="dropdown-item"
+                    role="menuitem"
+                    @click="adminMenuOpen = false"
+                  >
+                    <svg
+                      class="icon icon-sm me-2"
+                      width="16"
+                      height="16"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    ><path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M9 12h6m-6 4h6M5 7h14a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V9a2 2 0 012-2z"
+                    /></svg>
                     Audit
                   </router-link>
-                  <router-link to="/users" class="dropdown-item" role="menuitem" @click="adminMenuOpen = false">
-                    <svg class="icon icon-sm me-2" width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-4-4h-1"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20H4v-2a4 4 0 014-4h1"/><circle cx="9" cy="7" r="4"/><circle cx="17" cy="9" r="3"/></svg>
+                  <router-link
+                    to="/users"
+                    class="dropdown-item"
+                    role="menuitem"
+                    @click="adminMenuOpen = false"
+                  >
+                    <svg
+                      class="icon icon-sm me-2"
+                      width="16"
+                      height="16"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    ><path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M17 20h5v-2a4 4 0 00-4-4h-1"
+                    /><path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M9 20H4v-2a4 4 0 014-4h1"
+                    /><circle
+                      cx="9"
+                      cy="7"
+                      r="4"
+                    /><circle
+                      cx="17"
+                      cy="9"
+                      r="3"
+                    /></svg>
                     Utilisateurs
                   </router-link>
                 </div>
@@ -117,48 +394,90 @@
             </ul>
 
             <div class="ms-auto d-flex align-items-center gap-2">
-            <NotificationBell />
-            <div class="position-relative user-menu" ref="userMenuRef">
-              <button class="btn btn-outline-secondary d-flex align-items-center" @click="toggleUserMenu">
-                <span class="avatar avatar-sm bg-secondary-lt me-2">
-                  {{ auth.username?.slice(0, 2).toUpperCase() }}
-                </span>
-                <span class="me-2">{{ auth.username }}</span>
-                <span class="caret"></span>
-              </button>
+              <NotificationBell />
+              <div
+                ref="userMenuRef"
+                class="position-relative user-menu"
+              >
+                <button
+                  class="btn btn-outline-secondary d-flex align-items-center"
+                  @click="toggleUserMenu"
+                >
+                  <span class="avatar avatar-sm bg-secondary-lt me-2">
+                    {{ auth.username?.slice(0, 2).toUpperCase() }}
+                  </span>
+                  <span class="me-2">{{ auth.username }}</span>
+                  <span class="caret" />
+                </button>
 
-              <div v-if="userMenuOpen" class="dropdown-menu dropdown-menu-end show user-dropdown">
-                <div class="dropdown-header">Compte</div>
-                <div class="dropdown-item text-secondary small">Rôle: {{ auth.role || 'inconnu' }}</div>
-                <router-link to="/account" class="dropdown-item" @click="userMenuOpen = false">
-                  Mon compte
-                </router-link>
-                <div class="dropdown-divider"></div>
-                <button class="dropdown-item text-danger" @click="handleLogout">Déconnexion</button>
+                <div
+                  v-if="userMenuOpen"
+                  class="dropdown-menu dropdown-menu-end show user-dropdown"
+                >
+                  <div class="dropdown-header">
+                    Compte
+                  </div>
+                  <div class="dropdown-item text-secondary small">
+                    Rôle: {{ auth.role || 'inconnu' }}
+                  </div>
+                  <router-link
+                    to="/account"
+                    class="dropdown-item"
+                    @click="userMenuOpen = false"
+                  >
+                    Mon compte
+                  </router-link>
+                  <div class="dropdown-divider" />
+                  <button
+                    class="dropdown-item text-danger"
+                    @click="handleLogout"
+                  >
+                    Déconnexion
+                  </button>
+                </div>
               </div>
-            </div>
             </div><!-- end ms-auto wrapper -->
           </div>
         </div>
       </header>
 
       <!-- Offline / server-unreachable banner -->
-      <div v-if="!isOnline" class="alert alert-warning alert-dismissible mb-0 rounded-0 border-0 border-bottom" role="alert" style="position:sticky;top:0;z-index:1040;">
+      <div
+        v-if="!isOnline"
+        class="alert alert-warning alert-dismissible mb-0 rounded-0 border-0 border-bottom app-network-alert"
+        role="alert"
+      >
         <div class="container-xl d-flex align-items-center gap-2">
-          <AppIcon name="warning" :size="20" css-class="icon flex-shrink-0" />
+          <AppIcon
+            name="warning"
+            :size="20"
+            css-class="icon flex-shrink-0"
+          />
           <span>Connexion au serveur perdue — les données affichées peuvent être obsolètes.</span>
         </div>
       </div>
 
-      <div v-if="httpError" class="alert alert-danger alert-dismissible mb-0 rounded-0 border-0 border-bottom" role="alert" style="position:sticky;top:0;z-index:1039;">
+      <div
+        v-if="httpError"
+        class="alert alert-danger alert-dismissible mb-0 rounded-0 border-0 border-bottom app-http-alert"
+        role="alert"
+      >
         <div class="container-xl d-flex align-items-center justify-content-between gap-3">
           <span>{{ httpError }}</span>
-          <button type="button" class="btn-close" aria-label="Fermer" @click="httpError = ''"></button>
+          <button
+            type="button"
+            class="btn-close"
+            aria-label="Fermer"
+            @click="httpError = ''"
+          />
         </div>
       </div>
 
       <div class="page-wrapper">
-        <div id="main-content" class="page-body">
+        <div
+          id="main-content"
+          class="page-body"
+        >
           <div class="container-xl">
             <ErrorBoundary>
               <router-view />
@@ -302,6 +621,25 @@ onUnmounted(() => {
   position: relative;
   z-index: 1030;
   overflow: visible;
+}
+
+.nav-dropdown-toggle {
+  background: transparent;
+  border: 0;
+  width: 100%;
+  text-align: left;
+}
+
+.app-network-alert {
+  position: sticky;
+  top: 0;
+  z-index: 1040;
+}
+
+.app-http-alert {
+  position: sticky;
+  top: 0;
+  z-index: 1039;
 }
 
 #navbar-menu {

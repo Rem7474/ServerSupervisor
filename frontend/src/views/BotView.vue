@@ -21,12 +21,21 @@
     <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
       <div>
         <div class="page-pretitle">
-          <router-link to="/" class="text-decoration-none">Dashboard</router-link>
+          <router-link
+            to="/"
+            class="text-decoration-none"
+          >
+            Dashboard
+          </router-link>
           <span class="text-muted mx-1">/</span>
           <span>Menaces web</span>
         </div>
-        <h2 class="page-title">Menaces web</h2>
-        <div class="text-secondary">IPs suspectes, chemins scannés, corrélation multi-hôtes et chronologie détaillée</div>
+        <h2 class="page-title">
+          Menaces web
+        </h2>
+        <div class="text-secondary">
+          IPs suspectes, chemins scannés, corrélation multi-hôtes et chronologie détaillée
+        </div>
       </div>
     </div>
 
@@ -34,20 +43,46 @@
       <div class="card-body d-flex flex-wrap gap-2 align-items-end threats-filters">
         <div class="threats-filter-field">
           <label class="form-label mb-1">Source</label>
-          <select v-model="source" class="form-select form-select-sm" style="min-width: 9rem;">
-            <option value="">Toutes</option>
-            <option value="npm">npm</option>
-            <option value="nginx">nginx</option>
-            <option value="apache">apache</option>
-            <option value="caddy">caddy</option>
+          <select
+            v-model="source"
+            class="form-select form-select-sm"
+            style="min-width: 9rem;"
+          >
+            <option value="">
+              Toutes
+            </option>
+            <option value="npm">
+              npm
+            </option>
+            <option value="nginx">
+              nginx
+            </option>
+            <option value="apache">
+              apache
+            </option>
+            <option value="caddy">
+              caddy
+            </option>
           </select>
         </div>
         <div class="threats-filter-field">
           <label class="form-label mb-1">Hôte technique (ID)</label>
-          <input v-model.trim="hostId" class="form-control form-control-sm" placeholder="(optionnel)" style="min-width: 14rem;" />
+          <input
+            v-model.trim="hostId"
+            class="form-control form-control-sm"
+            placeholder="(optionnel)"
+            style="min-width: 14rem;"
+          >
         </div>
-        <button class="btn btn-primary btn-sm threats-refresh-btn" @click="loadThreats" :disabled="loading">
-          <span v-if="loading" class="spinner-border spinner-border-sm me-1"></span>
+        <button
+          class="btn btn-primary btn-sm threats-refresh-btn"
+          :disabled="loading"
+          @click="loadThreats"
+        >
+          <span
+            v-if="loading"
+            class="spinner-border spinner-border-sm me-1"
+          />
           Rafraîchir
         </button>
       </div>
@@ -57,24 +92,36 @@
       <div class="col-12 col-sm-4">
         <div class="card card-sm h-100">
           <div class="card-body text-center">
-            <div class="text-secondary small mb-1">Requêtes suspectes</div>
-            <div class="h2 mb-0 text-orange">{{ threats.suspicious_requests || 0 }}</div>
+            <div class="text-secondary small mb-1">
+              Requêtes suspectes
+            </div>
+            <div class="h2 mb-0 text-orange">
+              {{ threats.suspicious_requests || 0 }}
+            </div>
           </div>
         </div>
       </div>
       <div class="col-12 col-sm-4">
         <div class="card card-sm h-100">
           <div class="card-body text-center">
-            <div class="text-secondary small mb-1">IPs suspectes</div>
-            <div class="h2 mb-0">{{ threats.suspicious_ips || 0 }}</div>
+            <div class="text-secondary small mb-1">
+              IPs suspectes
+            </div>
+            <div class="h2 mb-0">
+              {{ threats.suspicious_ips || 0 }}
+            </div>
           </div>
         </div>
       </div>
       <div class="col-12 col-sm-4">
         <div class="card card-sm h-100">
           <div class="card-body text-center">
-            <div class="text-secondary small mb-1">Domaines ciblés</div>
-            <div class="h2 mb-0">{{ threats.targeted_hosts || 0 }}</div>
+            <div class="text-secondary small mb-1">
+              Domaines ciblés
+            </div>
+            <div class="h2 mb-0">
+              {{ threats.targeted_hosts || 0 }}
+            </div>
           </div>
         </div>
       </div>
@@ -83,31 +130,67 @@
     <div class="row row-cards">
       <div class="col-lg-7">
         <div class="card h-100">
-          <div class="card-header"><h3 class="card-title mb-0">IPs suspectes</h3></div>
+          <div class="card-header">
+            <h3 class="card-title mb-0">
+              IPs suspectes
+            </h3>
+          </div>
           <div class="table-responsive">
             <table class="table table-vcenter card-table">
               <thead>
                 <tr>
                   <th>IP</th>
-                  <th class="text-end">Hits</th>
-                  <th class="text-end">Chemins</th>
-                  <th class="text-end">Domaines</th>
+                  <th class="text-end">
+                    Hits
+                  </th>
+                  <th class="text-end">
+                    Chemins
+                  </th>
+                  <th class="text-end">
+                    Domaines
+                  </th>
                   <th>Niveau</th>
-                  <th></th>
+                  <th />
                 </tr>
               </thead>
               <tbody>
                 <tr v-if="!topIPs.length">
-                  <td colspan="6" class="text-center text-secondary py-4">Aucune IP suspecte sur la période.</td>
+                  <td
+                    colspan="6"
+                    class="text-center text-secondary py-4"
+                  >
+                    Aucune IP suspecte sur la période.
+                  </td>
                 </tr>
-                <tr v-for="ip in topIPs" :key="ip.ip">
-                  <td class="font-monospace small">{{ ip.ip }}</td>
-                  <td class="text-end">{{ ip.hits || 0 }}</td>
-                  <td class="text-end">{{ ip.unique_paths || 0 }}</td>
-                  <td class="text-end">{{ ip.host_count || 0 }}</td>
-                  <td><span class="badge" :class="levelClass(ip.level)">{{ ip.level || 'LOW' }}</span></td>
+                <tr
+                  v-for="ip in topIPs"
+                  :key="ip.ip"
+                >
+                  <td class="font-monospace small">
+                    {{ ip.ip }}
+                  </td>
                   <td class="text-end">
-                    <button class="btn btn-sm btn-outline-primary" @click="openTimeline(ip.ip)">Timeline</button>
+                    {{ ip.hits || 0 }}
+                  </td>
+                  <td class="text-end">
+                    {{ ip.unique_paths || 0 }}
+                  </td>
+                  <td class="text-end">
+                    {{ ip.host_count || 0 }}
+                  </td>
+                  <td>
+                    <span
+                      class="badge"
+                      :class="levelClass(ip.level)"
+                    >{{ ip.level || 'LOW' }}</span>
+                  </td>
+                  <td class="text-end">
+                    <button
+                      class="btn btn-sm btn-outline-primary"
+                      @click="openTimeline(ip.ip)"
+                    >
+                      Timeline
+                    </button>
                   </td>
                 </tr>
               </tbody>
@@ -118,13 +201,31 @@
 
       <div class="col-lg-5">
         <div class="card h-100">
-          <div class="card-header"><h3 class="card-title mb-0">Top chemins scannés</h3></div>
+          <div class="card-header">
+            <h3 class="card-title mb-0">
+              Top chemins scannés
+            </h3>
+          </div>
           <div class="card-body p-0">
-            <div v-if="!topPaths.length" class="text-center py-4 text-secondary small">Aucun chemin suspect.</div>
-            <div v-else v-for="p in topPaths" :key="`${p.path}-${p.category}`" class="d-flex justify-content-between border-bottom px-3 py-2 top-path-row">
+            <div
+              v-if="!topPaths.length"
+              class="text-center py-4 text-secondary small"
+            >
+              Aucun chemin suspect.
+            </div>
+            <div
+              v-for="p in topPaths"
+              v-else
+              :key="`${p.path}-${p.category}`"
+              class="d-flex justify-content-between border-bottom px-3 py-2 top-path-row"
+            >
               <div>
-                <div class="font-monospace small">{{ p.path }}</div>
-                <div class="small text-secondary">{{ p.category || 'Unknown' }}</div>
+                <div class="font-monospace small">
+                  {{ p.path }}
+                </div>
+                <div class="small text-secondary">
+                  {{ p.category || 'Unknown' }}
+                </div>
               </div>
               <span class="badge bg-yellow-lt text-yellow">{{ p.hits }}</span>
             </div>
@@ -136,22 +237,38 @@
     <div class="row row-cards mt-4">
       <div class="col-lg-6">
         <div class="card h-100">
-          <div class="card-header"><h3 class="card-title mb-0">Domaines les plus ciblés</h3></div>
+          <div class="card-header">
+            <h3 class="card-title mb-0">
+              Domaines les plus ciblés
+            </h3>
+          </div>
           <div class="table-responsive">
             <table class="table table-vcenter card-table">
               <thead>
                 <tr>
                   <th>Domaine cible</th>
-                  <th class="text-end">Hits</th>
+                  <th class="text-end">
+                    Hits
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-if="!mostTargetedHosts.length">
-                  <td colspan="2" class="text-center text-secondary py-4">Aucun domaine ciblé</td>
+                  <td
+                    colspan="2"
+                    class="text-center text-secondary py-4"
+                  >
+                    Aucun domaine ciblé
+                  </td>
                 </tr>
-                <tr v-for="h in mostTargetedHosts" :key="h.host_id">
+                <tr
+                  v-for="h in mostTargetedHosts"
+                  :key="h.host_id"
+                >
                   <td>{{ h.host_name || h.host_id }}</td>
-                  <td class="text-end">{{ h.hits || 0 }}</td>
+                  <td class="text-end">
+                    {{ h.hits || 0 }}
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -160,24 +277,46 @@
       </div>
       <div class="col-lg-6">
         <div class="card h-100">
-          <div class="card-header"><h3 class="card-title mb-0">IP × Domaines (scan coordonné)</h3></div>
+          <div class="card-header">
+            <h3 class="card-title mb-0">
+              IP × Domaines (scan coordonné)
+            </h3>
+          </div>
           <div class="table-responsive">
             <table class="table table-vcenter card-table">
               <thead>
                 <tr>
                   <th>IP</th>
-                  <th class="text-end">Domaines</th>
-                  <th class="text-end">Hits</th>
+                  <th class="text-end">
+                    Domaines
+                  </th>
+                  <th class="text-end">
+                    Hits
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-if="!ipHostMatrix.length">
-                  <td colspan="3" class="text-center text-secondary py-4">Pas de scan coordonné détecté</td>
+                  <td
+                    colspan="3"
+                    class="text-center text-secondary py-4"
+                  >
+                    Pas de scan coordonné détecté
+                  </td>
                 </tr>
-                <tr v-for="m in ipHostMatrix" :key="m.ip">
-                  <td class="font-monospace small">{{ m.ip }}</td>
-                  <td class="text-end">{{ m.host_count || 0 }}</td>
-                  <td class="text-end">{{ m.hits || 0 }}</td>
+                <tr
+                  v-for="m in ipHostMatrix"
+                  :key="m.ip"
+                >
+                  <td class="font-monospace small">
+                    {{ m.ip }}
+                  </td>
+                  <td class="text-end">
+                    {{ m.host_count || 0 }}
+                  </td>
+                  <td class="text-end">
+                    {{ m.hits || 0 }}
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -186,30 +325,61 @@
       </div>
     </div>
 
-    <div v-if="showTimeline" class="timeline-drawer-backdrop" @click.self="closeTimeline">
+    <div
+      v-if="showTimeline"
+      class="timeline-drawer-backdrop"
+      @click.self="closeTimeline"
+    >
       <div class="timeline-modal card shadow-lg">
         <div class="card-header d-flex align-items-center justify-content-between gap-2 flex-wrap timeline-header">
           <div>
-            <h3 class="card-title mb-0">Chronologie IP: <span class="font-monospace">{{ selectedIP }}</span></h3>
-            <div class="text-secondary small">Chronologie des requêtes suspectes</div>
+            <h3 class="card-title mb-0">
+              Chronologie IP: <span class="font-monospace">{{ selectedIP }}</span>
+            </h3>
+            <div class="text-secondary small">
+              Chronologie des requêtes suspectes
+            </div>
           </div>
           <div class="d-flex gap-2 flex-wrap timeline-header-actions">
-            <button class="btn btn-sm btn-outline-danger" @click="blockIP" :disabled="blockLoading">Bloquer cette IP</button>
-            <button class="btn btn-sm btn-outline-secondary" @click="closeTimeline">Fermer</button>
+            <button
+              class="btn btn-sm btn-outline-danger"
+              :disabled="blockLoading"
+              @click="blockIP"
+            >
+              Bloquer cette IP
+            </button>
+            <button
+              class="btn btn-sm btn-outline-secondary"
+              @click="closeTimeline"
+            >
+              Fermer
+            </button>
           </div>
         </div>
         <div class="card-body p-0 timeline-body">
-          <div v-if="timelineLoading" class="text-center py-4 text-secondary">
-            <span class="spinner-border spinner-border-sm me-2"></span>
+          <div
+            v-if="timelineLoading"
+            class="text-center py-4 text-secondary"
+          >
+            <span class="spinner-border spinner-border-sm me-2" />
             Chargement chronologie...
           </div>
-          <div v-else-if="!timeline.length" class="text-center py-4 text-secondary">Aucune requête</div>
+          <div
+            v-else-if="!timeline.length"
+            class="text-center py-4 text-secondary"
+          >
+            Aucune requête
+          </div>
           <template v-else>
             <div class="timeline-frieze border-bottom px-3 py-3">
               <div class="timeline-controls d-flex align-items-center justify-content-between mb-2 gap-2 flex-wrap">
                 <div class="d-flex align-items-center gap-2 flex-wrap">
                   <span class="small text-secondary">Intervalle:</span>
-                  <div class="btn-group btn-group-sm" role="group" aria-label="Intervalle timeline">
+                  <div
+                    class="btn-group btn-group-sm"
+                    role="group"
+                    aria-label="Intervalle timeline"
+                  >
                     <button
                       v-for="opt in timelineIntervalOptions"
                       :key="opt.value"
@@ -223,11 +393,17 @@
                 </div>
                 <div class="small text-secondary">
                   Regroupement: {{ timelineBucketLabel }} · {{ timelineBuckets.length }} tranches
-                  <span v-if="selectedInterval === 'auto'" class="badge bg-azure-lt text-azure ms-1">
+                  <span
+                    v-if="selectedInterval === 'auto'"
+                    class="badge bg-azure-lt text-azure ms-1"
+                  >
                     Auto cible ~{{ AUTO_BUCKET_TARGET }}
                   </span>
                 </div>
-                <button class="btn btn-sm btn-outline-secondary" @click="toggleBucketFilter">
+                <button
+                  class="btn btn-sm btn-outline-secondary"
+                  @click="toggleBucketFilter"
+                >
                   {{ bucketFilterEnabled ? 'Mode focus: tranche sélectionnée' : 'Mode global: toutes les tranches' }}
                 </button>
               </div>
@@ -264,7 +440,7 @@
 
               <div class="timeline-frieze-scroll">
                 <div class="timeline-frieze-track">
-                  <div class="timeline-frieze-line"></div>
+                  <div class="timeline-frieze-line" />
                   <button
                     v-for="bucket in timelineBuckets"
                     :key="bucket.key"
@@ -273,20 +449,30 @@
                     :title="bucket.title"
                     @click="selectBucket(bucket.key)"
                   >
-                    <span class="timeline-frieze-dot" :class="bucketToneClass(bucket)"></span>
+                    <span
+                      class="timeline-frieze-dot"
+                      :class="bucketToneClass(bucket)"
+                    />
                     <span class="timeline-frieze-time">{{ bucket.label }}</span>
                     <span class="timeline-frieze-count">{{ bucket.count }}</span>
                   </button>
                 </div>
               </div>
 
-              <div v-if="selectedBucket" class="small text-secondary mt-2">
+              <div
+                v-if="selectedBucket"
+                class="small text-secondary mt-2"
+              >
                 Tranche sélectionnée: {{ selectedBucket.rangeLabel }} · {{ selectedBucket.count }} requête{{ selectedBucket.count > 1 ? 's' : '' }} · {{ selectedBucket.errorCount }} erreur{{ selectedBucket.errorCount > 1 ? 's' : '' }}
               </div>
             </div>
 
             <div class="timeline-groups">
-              <div v-for="group in groupedTimeline" :key="group.key" class="timeline-group border-bottom">
+              <div
+                v-for="group in groupedTimeline"
+                :key="group.key"
+                class="timeline-group border-bottom"
+              >
                 <div class="timeline-group-header px-3 py-2">
                   <div class="d-flex align-items-center gap-2 flex-wrap">
                     <span class="badge bg-azure-lt text-azure">{{ group.label }}</span>
@@ -307,7 +493,10 @@
                     class="timeline-status-group"
                   >
                     <div class="timeline-status-group-header">
-                      <span class="badge" :class="statusGroup.badgeClass">{{ statusGroup.label }}</span>
+                      <span
+                        class="badge"
+                        :class="statusGroup.badgeClass"
+                      >{{ statusGroup.label }}</span>
                       <span class="small text-secondary">{{ statusGroup.count }} log{{ statusGroup.count > 1 ? 's' : '' }}</span>
                     </div>
 
@@ -319,16 +508,24 @@
                       >
                         <div class="timeline-event-topline">
                           <div class="d-flex align-items-center gap-2 flex-wrap">
-                            <span class="badge" :class="statusClass(r.status)">{{ r.status }}</span>
+                            <span
+                              class="badge"
+                              :class="statusClass(r.status)"
+                            >{{ r.status }}</span>
                             <span class="badge bg-blue-lt text-blue">{{ r.method }}</span>
                             <span class="badge bg-azure-lt text-azure">{{ r.source || 'log' }}</span>
                           </div>
                           <span class="small text-secondary">{{ formatDate(r.timestamp) }}</span>
                         </div>
-                        <div class="timeline-event-path font-monospace small">{{ r.domain || '(unknown)' }} {{ r.path }}</div>
+                        <div class="timeline-event-path font-monospace small">
+                          {{ r.domain || '(unknown)' }} {{ r.path }}
+                        </div>
                         <div class="timeline-event-meta small text-secondary">
                           <span><strong>Domaine:</strong> {{ r.domain || '-' }}</span>
-                          <span class="text-truncate" :title="r.user_agent || '-'">
+                          <span
+                            class="text-truncate"
+                            :title="r.user_agent || '-'"
+                          >
                             <strong>User-Agent:</strong> {{ r.user_agent || '-' }}
                           </span>
                         </div>

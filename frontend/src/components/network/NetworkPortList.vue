@@ -4,26 +4,53 @@
       <div class="card-body">
         <div class="row g-3">
           <div class="col-md-6 col-lg-3">
-            <input v-model="search" type="text" class="form-control" placeholder="Rechercher un port, conteneur, image...">
+            <input
+              v-model="search"
+              type="text"
+              class="form-control"
+              placeholder="Rechercher un port, conteneur, image..."
+            >
           </div>
           <div class="col-md-6 col-lg-3">
-            <select v-model="protocolFilter" class="form-select">
-              <option value="">Tous les protocoles</option>
-              <option value="tcp">TCP</option>
-              <option value="udp">UDP</option>
+            <select
+              v-model="protocolFilter"
+              class="form-select"
+            >
+              <option value="">
+                Tous les protocoles
+              </option>
+              <option value="tcp">
+                TCP
+              </option>
+              <option value="udp">
+                UDP
+              </option>
             </select>
           </div>
           <div class="col-md-6 col-lg-3">
-            <select v-model="hostFilter" class="form-select">
-              <option value="">Tous les hôtes</option>
-              <option v-for="h in hosts" :key="h.id" :value="h.id">
+            <select
+              v-model="hostFilter"
+              class="form-select"
+            >
+              <option value="">
+                Tous les hôtes
+              </option>
+              <option
+                v-for="h in hosts"
+                :key="h.id"
+                :value="h.id"
+              >
                 {{ h.name || h.hostname || h.id }}
               </option>
             </select>
           </div>
           <div class="col-md-6 col-lg-3">
             <label class="form-check form-switch">
-              <input v-model="onlyPublished" class="form-check-input" type="checkbox">
+              <input
+                v-model="onlyPublished"
+                class="form-check-input"
+                type="checkbox"
+              >
               <span class="form-check-label">Ports publies seulement</span>
             </label>
           </div>
@@ -48,27 +75,55 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-for="row in portRows" :key="row.key">
+            <tr
+              v-for="row in portRows"
+              :key="row.key"
+            >
               <td>
-                <router-link :to="`/hosts/${row.host_id}`" class="text-decoration-none">
+                <router-link
+                  :to="`/hosts/${row.host_id}`"
+                  class="text-decoration-none"
+                >
                   {{ row.host_name || row.host_id }}
                 </router-link>
               </td>
-              <td class="fw-semibold">{{ row.container_name }}</td>
+              <td class="fw-semibold">
+                {{ row.container_name }}
+              </td>
               <td>
                 <div>{{ row.image }}</div>
-                <div class="text-secondary small"><code>{{ row.image_tag || '-' }}</code></div>
+                <div class="text-secondary small">
+                  <code>{{ row.image_tag || '-' }}</code>
+                </div>
               </td>
-              <td class="fw-semibold">{{ row.host_port || '-' }}</td>
-              <td class="text-secondary">{{ row.container_port || '-' }}</td>
-              <td class="text-secondary text-uppercase">{{ row.protocol || '-' }}</td>
-              <td class="text-secondary small font-monospace">
-                <span v-if="row.ipv4" class="badge bg-blue-lt text-blue">{{ row.ipv4 }}</span>
-                <span v-else class="text-muted">-</span>
+              <td class="fw-semibold">
+                {{ row.host_port || '-' }}
+              </td>
+              <td class="text-secondary">
+                {{ row.container_port || '-' }}
+              </td>
+              <td class="text-secondary text-uppercase">
+                {{ row.protocol || '-' }}
               </td>
               <td class="text-secondary small font-monospace">
-                <span v-if="row.ipv6" class="badge bg-purple-lt text-purple">{{ row.ipv6 }}</span>
-                <span v-else class="text-muted">-</span>
+                <span
+                  v-if="row.ipv4"
+                  class="badge bg-blue-lt text-blue"
+                >{{ row.ipv4 }}</span>
+                <span
+                  v-else
+                  class="text-muted"
+                >-</span>
+              </td>
+              <td class="text-secondary small font-monospace">
+                <span
+                  v-if="row.ipv6"
+                  class="badge bg-purple-lt text-purple"
+                >{{ row.ipv6 }}</span>
+                <span
+                  v-else
+                  class="text-muted"
+                >-</span>
               </td>
               <td>
                 <span :class="row.state === 'running' ? 'badge bg-green-lt text-green' : 'badge bg-secondary-lt text-secondary'">
@@ -79,14 +134,19 @@
           </tbody>
         </table>
       </div>
-      <div v-if="portRows.length === 0" class="text-center text-secondary py-4">
+      <div
+        v-if="portRows.length === 0"
+        class="text-center text-secondary py-4"
+      >
         Aucun port visible
       </div>
     </div>
 
     <div class="card">
       <div class="card-header">
-        <h3 class="card-title">Trafic par hote</h3>
+        <h3 class="card-title">
+          Trafic par hote
+        </h3>
         <div class="card-options">
           <span class="badge bg-azure-lt text-azure ms-1">
             {{ hosts.length }} hote{{ hosts.length > 1 ? 's' : '' }}
@@ -99,21 +159,37 @@
             <tr>
               <th>Hote</th>
               <th>IP</th>
-              <th class="text-end">↓ Rx</th>
-              <th class="text-end">↑ Tx</th>
+              <th class="text-end">
+                ↓ Rx
+              </th>
+              <th class="text-end">
+                ↑ Tx
+              </th>
               <th>Statut</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="h in hosts" :key="h.id">
+            <tr
+              v-for="h in hosts"
+              :key="h.id"
+            >
               <td>
-                <router-link :to="`/hosts/${h.id}`" class="fw-semibold text-decoration-none">
+                <router-link
+                  :to="`/hosts/${h.id}`"
+                  class="fw-semibold text-decoration-none"
+                >
                   {{ h.name || h.hostname || h.id }}
                 </router-link>
               </td>
-              <td class="text-secondary">{{ h.ip_address }}</td>
-              <td class="text-end font-monospace small text-info">{{ formatBytes(h.network_rx_bytes || 0) }}</td>
-              <td class="text-end font-monospace small text-warning">{{ formatBytes(h.network_tx_bytes || 0) }}</td>
+              <td class="text-secondary">
+                {{ h.ip_address }}
+              </td>
+              <td class="text-end font-monospace small text-info">
+                {{ formatBytes(h.network_rx_bytes || 0) }}
+              </td>
+              <td class="text-end font-monospace small text-warning">
+                {{ formatBytes(h.network_tx_bytes || 0) }}
+              </td>
               <td>
                 <span :class="h.status === 'online' ? 'badge bg-green-lt text-green' : h.status === 'warning' ? 'badge bg-yellow-lt text-yellow' : 'badge bg-red-lt text-red'">
                   {{ h.status || 'unknown' }}
@@ -123,14 +199,22 @@
           </tbody>
         </table>
       </div>
-      <div v-if="hosts.length === 0" class="text-center text-secondary py-4">
+      <div
+        v-if="hosts.length === 0"
+        class="text-center text-secondary py-4"
+      >
         Aucun hote trouve
       </div>
     </div>
 
-    <div v-if="containersWithNetStats.length" class="card mt-4">
+    <div
+      v-if="containersWithNetStats.length"
+      class="card mt-4"
+    >
       <div class="card-header">
-        <h3 class="card-title">Trafic reseau par conteneur</h3>
+        <h3 class="card-title">
+          Trafic reseau par conteneur
+        </h3>
         <div class="card-options">
           <span class="badge bg-azure-lt text-azure ms-1">
             {{ containersWithNetStats.length }} conteneur{{ containersWithNetStats.length > 1 ? 's' : '' }}
@@ -143,18 +227,37 @@
             <tr>
               <th>Conteneur</th>
               <th>Hote</th>
-              <th class="text-end">↓ Rx</th>
-              <th class="text-end">↑ Tx</th>
-              <th class="text-end">Total</th>
+              <th class="text-end">
+                ↓ Rx
+              </th>
+              <th class="text-end">
+                ↑ Tx
+              </th>
+              <th class="text-end">
+                Total
+              </th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="c in containersWithNetStats" :key="c.id">
-              <td class="fw-semibold">{{ c.name }}</td>
-              <td class="text-secondary">{{ c.hostname }}</td>
-              <td class="text-end font-monospace small text-info">{{ formatBytes(c.net_rx_bytes) }}</td>
-              <td class="text-end font-monospace small text-warning">{{ formatBytes(c.net_tx_bytes) }}</td>
-              <td class="text-end font-monospace small fw-semibold">{{ formatBytes(c.net_rx_bytes + c.net_tx_bytes) }}</td>
+            <tr
+              v-for="c in containersWithNetStats"
+              :key="c.id"
+            >
+              <td class="fw-semibold">
+                {{ c.name }}
+              </td>
+              <td class="text-secondary">
+                {{ c.hostname }}
+              </td>
+              <td class="text-end font-monospace small text-info">
+                {{ formatBytes(c.net_rx_bytes) }}
+              </td>
+              <td class="text-end font-monospace small text-warning">
+                {{ formatBytes(c.net_tx_bytes) }}
+              </td>
+              <td class="text-end font-monospace small fw-semibold">
+                {{ formatBytes(c.net_rx_bytes + c.net_tx_bytes) }}
+              </td>
             </tr>
           </tbody>
         </table>

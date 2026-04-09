@@ -1,7 +1,12 @@
 <template>
-  <div v-if="canRun" class="card mt-4">
+  <div
+    v-if="canRun"
+    class="card mt-4"
+  >
     <div class="card-header d-flex align-items-center justify-content-between">
-      <h3 class="card-title">Processus</h3>
+      <h3 class="card-title">
+        Processus
+      </h3>
       <div class="d-flex align-items-center gap-2">
         <input
           v-model="processFilter"
@@ -9,37 +14,94 @@
           class="form-control form-control-sm"
           placeholder="Filtrer..."
           style="width: 160px;"
-        />
-        <button class="btn btn-sm btn-outline-secondary" @click="loadProcesses" :disabled="loading">
-          <span v-if="loading" class="spinner-border spinner-border-sm me-1"></span>
+        >
+        <button
+          class="btn btn-sm btn-outline-secondary"
+          :disabled="loading"
+          @click="loadProcesses"
+        >
+          <span
+            v-if="loading"
+            class="spinner-border spinner-border-sm me-1"
+          />
           {{ loading ? 'Chargement...' : (processes.length ? 'Actualiser' : 'Charger') }}
         </button>
       </div>
     </div>
-    <div v-if="error" class="card-body pb-0">
-      <div class="alert alert-danger mb-0">{{ error }}</div>
+    <div
+      v-if="error"
+      class="card-body pb-0"
+    >
+      <div class="alert alert-danger mb-0">
+        {{ error }}
+      </div>
     </div>
-    <div v-if="!processes.length && !loading && !error" class="card-body">
-      <div class="text-secondary small">Cliquez sur "Charger" pour afficher les processus actifs de cet hôte.</div>
+    <div
+      v-if="!processes.length && !loading && !error"
+      class="card-body"
+    >
+      <div class="text-secondary small">
+        Cliquez sur "Charger" pour afficher les processus actifs de cet hôte.
+      </div>
     </div>
-    <div v-if="filteredProcesses.length" class="table-responsive">
-      <table class="table table-vcenter table-hover card-table mb-0" style="font-size: 0.82rem;">
+    <div
+      v-if="filteredProcesses.length"
+      class="table-responsive"
+    >
+      <table
+        class="table table-vcenter table-hover card-table mb-0"
+        style="font-size: 0.82rem;"
+      >
         <thead>
           <tr>
-            <th class="cursor-pointer" @click="sortBy('pid')">PID <span class="text-secondary">{{ sortIcon('pid') }}</span></th>
-            <th class="cursor-pointer" @click="sortBy('name')">Nom <span class="text-secondary">{{ sortIcon('name') }}</span></th>
+            <th
+              class="cursor-pointer"
+              @click="sortBy('pid')"
+            >
+              PID <span class="text-secondary">{{ sortIcon('pid') }}</span>
+            </th>
+            <th
+              class="cursor-pointer"
+              @click="sortBy('name')"
+            >
+              Nom <span class="text-secondary">{{ sortIcon('name') }}</span>
+            </th>
             <th>Utilisateur</th>
-            <th class="cursor-pointer" @click="sortBy('cpu_pct')">CPU% <span class="text-secondary">{{ sortIcon('cpu_pct') }}</span></th>
-            <th class="cursor-pointer" @click="sortBy('mem_pct')">MEM% <span class="text-secondary">{{ sortIcon('mem_pct') }}</span></th>
-            <th class="cursor-pointer" @click="sortBy('mem_rss_kb')">RSS (KB) <span class="text-secondary">{{ sortIcon('mem_rss_kb') }}</span></th>
+            <th
+              class="cursor-pointer"
+              @click="sortBy('cpu_pct')"
+            >
+              CPU% <span class="text-secondary">{{ sortIcon('cpu_pct') }}</span>
+            </th>
+            <th
+              class="cursor-pointer"
+              @click="sortBy('mem_pct')"
+            >
+              MEM% <span class="text-secondary">{{ sortIcon('mem_pct') }}</span>
+            </th>
+            <th
+              class="cursor-pointer"
+              @click="sortBy('mem_rss_kb')"
+            >
+              RSS (KB) <span class="text-secondary">{{ sortIcon('mem_rss_kb') }}</span>
+            </th>
             <th>État</th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="proc in filteredProcesses" :key="proc.pid">
-            <td class="text-secondary font-monospace">{{ proc.pid }}</td>
-            <td class="fw-semibold font-monospace">{{ proc.name }}</td>
-            <td class="text-secondary">{{ proc.user }}</td>
+          <tr
+            v-for="proc in filteredProcesses"
+            :key="proc.pid"
+          >
+            <td class="text-secondary font-monospace">
+              {{ proc.pid }}
+            </td>
+            <td class="fw-semibold font-monospace">
+              {{ proc.name }}
+            </td>
+            <td class="text-secondary">
+              {{ proc.user }}
+            </td>
             <td>
               <span :class="proc.cpu_pct > 50 ? 'text-danger fw-bold' : proc.cpu_pct > 10 ? 'text-warning' : ''">
                 {{ proc.cpu_pct.toFixed(1) }}%
@@ -50,9 +112,14 @@
                 {{ proc.mem_pct.toFixed(1) }}%
               </span>
             </td>
-            <td class="text-secondary">{{ proc.mem_rss_kb.toLocaleString() }}</td>
+            <td class="text-secondary">
+              {{ proc.mem_rss_kb.toLocaleString() }}
+            </td>
             <td>
-              <span class="badge" :class="proc.state.startsWith('S') || proc.state.startsWith('I') ? 'bg-secondary-lt text-secondary' : proc.state.startsWith('R') ? 'bg-success-lt text-success' : proc.state.startsWith('Z') ? 'bg-danger-lt text-danger' : 'bg-yellow-lt text-yellow'">
+              <span
+                class="badge"
+                :class="proc.state.startsWith('S') || proc.state.startsWith('I') ? 'bg-secondary-lt text-secondary' : proc.state.startsWith('R') ? 'bg-success-lt text-success' : proc.state.startsWith('Z') ? 'bg-danger-lt text-danger' : 'bg-yellow-lt text-yellow'"
+              >
                 {{ proc.state }}
               </span>
             </td>
@@ -60,7 +127,10 @@
         </tbody>
       </table>
     </div>
-    <div v-if="processes.length" class="card-footer text-secondary small">
+    <div
+      v-if="processes.length"
+      class="card-footer text-secondary small"
+    >
       {{ filteredProcesses.length }} / {{ processes.length }} processus
     </div>
   </div>

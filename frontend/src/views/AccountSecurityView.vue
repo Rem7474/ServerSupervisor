@@ -3,83 +3,182 @@
     <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
       <div>
         <div class="page-pretitle">
-          <router-link to="/" class="text-decoration-none">Dashboard</router-link>
+          <router-link
+            to="/"
+            class="text-decoration-none"
+          >
+            Dashboard
+          </router-link>
           <span class="text-muted mx-1">/</span>
-          <router-link to="/account" class="text-decoration-none">Mon compte</router-link>
+          <router-link
+            to="/account"
+            class="text-decoration-none"
+          >
+            Mon compte
+          </router-link>
           <span class="text-muted mx-1">/</span>
           <span>Sécurité du compte</span>
         </div>
-        <h2 class="page-title">Authentification MFA</h2>
-        <div class="text-secondary">Configuration de la sécurité utilisateur</div>
+        <h2 class="page-title">
+          Authentification MFA
+        </h2>
+        <div class="text-secondary">
+          Configuration de la sécurité utilisateur
+        </div>
       </div>
     </div>
 
-    <div class="card" style="max-width: 640px;">
+    <div
+      class="card"
+      style="max-width: 640px;"
+    >
       <div class="card-body">
         <div class="d-flex align-items-center justify-content-between mb-3">
-          <div class="fw-semibold">Authentification multi-facteur</div>
+          <div class="fw-semibold">
+            Authentification multi-facteur
+          </div>
           <span :class="mfaEnabled ? 'badge bg-green-lt text-green' : 'badge bg-orange-lt text-orange'">
             {{ mfaEnabled ? 'Active' : 'Desactive' }}
           </span>
         </div>
 
         <div v-if="!mfaEnabled">
-          <p class="text-secondary">Activez le MFA pour renforcer la sécurité du compte.</p>
-          <button class="btn btn-primary" @click="startSetup" :disabled="loading">
+          <p class="text-secondary">
+            Activez le MFA pour renforcer la sécurité du compte.
+          </p>
+          <button
+            class="btn btn-primary"
+            :disabled="loading"
+            @click="startSetup"
+          >
             {{ loading ? 'Chargement...' : 'Activer MFA' }}
           </button>
         </div>
 
         <div v-else>
-          <p class="text-secondary">Le MFA est actif. Vous pouvez le desactiver si besoin.</p>
-          <button class="btn btn-outline-danger" @click="showDisable = true">Desactiver le MFA</button>
+          <p class="text-secondary">
+            Le MFA est actif. Vous pouvez le desactiver si besoin.
+          </p>
+          <button
+            class="btn btn-outline-danger"
+            @click="showDisable = true"
+          >
+            Desactiver le MFA
+          </button>
         </div>
 
-        <div v-if="setupVisible" class="mt-4">
+        <div
+          v-if="setupVisible"
+          class="mt-4"
+        >
           <div class="border rounded p-3">
-            <div class="fw-semibold mb-2">Configuration MFA</div>
-            <div class="text-secondary small mb-3">Scannez le QR code avec votre application d'authentification.</div>
+            <div class="fw-semibold mb-2">
+              Configuration MFA
+            </div>
+            <div class="text-secondary small mb-3">
+              Scannez le QR code avec votre application d'authentification.
+            </div>
             <div class="d-flex flex-column flex-md-row gap-3 align-items-center">
-              <img :src="setup.qr_code" alt="QR Code" class="border rounded" style="width: 160px; height: 160px;" />
+              <img
+                :src="setup.qr_code"
+                alt="QR Code"
+                class="border rounded"
+                style="width: 160px; height: 160px;"
+              >
               <div class="flex-fill">
-                <div class="text-secondary small mb-1">Cle secrete</div>
-                <div class="bg-dark text-light rounded p-2 mb-3"><code>{{ setup.secret }}</code></div>
+                <div class="text-secondary small mb-1">
+                  Cle secrete
+                </div>
+                <div class="bg-dark text-light rounded p-2 mb-3">
+                  <code>{{ setup.secret }}</code>
+                </div>
                 <div class="mb-3">
                   <label class="form-label">Code TOTP</label>
-                  <input v-model="verifyCode" type="text" class="form-control" placeholder="123456" inputmode="numeric" maxlength="6" />
+                  <input
+                    v-model="verifyCode"
+                    type="text"
+                    class="form-control"
+                    placeholder="123456"
+                    inputmode="numeric"
+                    maxlength="6"
+                  >
                 </div>
-                <button class="btn btn-success" @click="verifySetup" :disabled="loading || !verifyCode">
+                <button
+                  class="btn btn-success"
+                  :disabled="loading || !verifyCode"
+                  @click="verifySetup"
+                >
                   {{ loading ? 'Verification...' : 'Verifier et activer' }}
                 </button>
               </div>
             </div>
 
-            <div v-if="setup.backup_codes?.length" class="mt-4">
-              <div class="text-secondary small mb-1">Codes de secours</div>
+            <div
+              v-if="setup.backup_codes?.length"
+              class="mt-4"
+            >
+              <div class="text-secondary small mb-1">
+                Codes de secours
+              </div>
               <pre class="bg-dark text-light rounded p-2 small">{{ setup.backup_codes.join('\n') }}</pre>
-              <button class="btn btn-outline-light btn-sm" @click="copyBackupCodes">
+              <button
+                class="btn btn-outline-light btn-sm"
+                @click="copyBackupCodes"
+              >
                 {{ copiedBackup ? 'Copie' : 'Copier les codes' }}
               </button>
             </div>
           </div>
         </div>
 
-        <div v-if="showDisable" class="mt-4">
+        <div
+          v-if="showDisable"
+          class="mt-4"
+        >
           <div class="border rounded p-3">
-            <div class="fw-semibold mb-2">Desactiver le MFA</div>
+            <div class="fw-semibold mb-2">
+              Desactiver le MFA
+            </div>
             <div class="mb-3">
               <label class="form-label">Mot de passe</label>
-              <input v-model="disablePassword" type="password" class="form-control" placeholder="••••••••" />
+              <input
+                v-model="disablePassword"
+                type="password"
+                class="form-control"
+                placeholder="••••••••"
+              >
             </div>
-            <button class="btn btn-danger" @click="disableMFA" :disabled="loading || !disablePassword">
+            <button
+              class="btn btn-danger"
+              :disabled="loading || !disablePassword"
+              @click="disableMFA"
+            >
               {{ loading ? 'Desactivation...' : 'Confirmer la desactivation' }}
             </button>
-            <button class="btn btn-outline-secondary ms-2" @click="showDisable = false" :disabled="loading">Annuler</button>
+            <button
+              class="btn btn-outline-secondary ms-2"
+              :disabled="loading"
+              @click="showDisable = false"
+            >
+              Annuler
+            </button>
           </div>
         </div>
 
-        <div v-if="error" class="alert alert-danger mt-3" role="alert">{{ error }}</div>
-        <div v-if="success" class="alert alert-success mt-3" role="alert">{{ success }}</div>
+        <div
+          v-if="error"
+          class="alert alert-danger mt-3"
+          role="alert"
+        >
+          {{ error }}
+        </div>
+        <div
+          v-if="success"
+          class="alert alert-success mt-3"
+          role="alert"
+        >
+          {{ success }}
+        </div>
       </div>
     </div>
   </div>

@@ -2,7 +2,10 @@
   <div>
     <div class="traffic-topbar mb-3">
       <div class="d-flex align-items-center gap-2">
-        <span class="live-dot" :class="{ paused: !autoRefresh }"></span>
+        <span
+          class="live-dot"
+          :class="{ paused: !autoRefresh }"
+        />
         <span class="fw-semibold">Stats web</span>
         <span class="badge bg-green-lt text-green">{{ autoRefresh ? 'Live' : 'Pause' }}</span>
         <span class="text-secondary small">dernière MAJ {{ lastUpdatedLabel }}</span>
@@ -23,39 +26,82 @@
 
     <div class="page-header mb-4">
       <div class="page-pretitle">
-        <router-link to="/" class="text-decoration-none">Dashboard</router-link>
+        <router-link
+          to="/"
+          class="text-decoration-none"
+        >
+          Dashboard
+        </router-link>
         <span class="text-muted mx-1">/</span>
         <span>Stats web</span>
       </div>
-      <h2 class="page-title">Stats web</h2>
-      <div class="text-secondary">Trafic HTTP, erreurs, endpoints, géographie des clients et suivi live</div>
+      <h2 class="page-title">
+        Stats web
+      </h2>
+      <div class="text-secondary">
+        Trafic HTTP, erreurs, endpoints, géographie des clients et suivi live
+      </div>
     </div>
 
     <div class="card mb-4">
       <div class="card-body d-flex flex-wrap gap-2 align-items-end traffic-filters">
         <div class="traffic-filter-field">
           <label class="form-label mb-1">Source</label>
-          <select v-model="source" class="form-select form-select-sm" style="min-width: 9rem;">
-            <option value="">Toutes</option>
-            <option value="npm">npm</option>
-            <option value="nginx">nginx</option>
-            <option value="apache">apache</option>
-            <option value="caddy">caddy</option>
+          <select
+            v-model="source"
+            class="form-select form-select-sm"
+            style="min-width: 9rem;"
+          >
+            <option value="">
+              Toutes
+            </option>
+            <option value="npm">
+              npm
+            </option>
+            <option value="nginx">
+              nginx
+            </option>
+            <option value="apache">
+              apache
+            </option>
+            <option value="caddy">
+              caddy
+            </option>
           </select>
         </div>
 
         <div class="traffic-filter-field">
           <label class="form-label mb-1">Hôte technique (ID)</label>
-          <input v-model.trim="hostId" class="form-control form-control-sm" placeholder="(optionnel)" style="min-width: 14rem;" />
+          <input
+            v-model.trim="hostId"
+            class="form-control form-control-sm"
+            placeholder="(optionnel)"
+            style="min-width: 14rem;"
+          >
         </div>
 
         <div class="form-check form-switch mb-1 ms-1">
-          <input id="auto-refresh" v-model="autoRefresh" class="form-check-input" type="checkbox" />
-          <label class="form-check-label small" for="auto-refresh">Rafraîchissement auto</label>
+          <input
+            id="auto-refresh"
+            v-model="autoRefresh"
+            class="form-check-input"
+            type="checkbox"
+          >
+          <label
+            class="form-check-label small"
+            for="auto-refresh"
+          >Rafraîchissement auto</label>
         </div>
 
-        <button class="btn btn-primary btn-sm traffic-refresh-btn" @click="loadAll(true)" :disabled="loading">
-          <span v-if="loading" class="spinner-border spinner-border-sm me-1"></span>
+        <button
+          class="btn btn-primary btn-sm traffic-refresh-btn"
+          :disabled="loading"
+          @click="loadAll(true)"
+        >
+          <span
+            v-if="loading"
+            class="spinner-border spinner-border-sm me-1"
+          />
           Rafraîchir
         </button>
       </div>
@@ -65,36 +111,72 @@
       <div class="col-6 col-lg-3">
         <div class="card card-sm h-100">
           <div class="card-body text-center">
-            <div class="text-secondary small mb-1">Requêtes totales</div>
-            <div class="h2 mb-0">{{ numberFormat(traffic.total_requests || 0) }}</div>
-            <div class="small mt-1" :class="deltaClass('total_requests')">{{ deltaLabel('total_requests') }}</div>
+            <div class="text-secondary small mb-1">
+              Requêtes totales
+            </div>
+            <div class="h2 mb-0">
+              {{ numberFormat(traffic.total_requests || 0) }}
+            </div>
+            <div
+              class="small mt-1"
+              :class="deltaClass('total_requests')"
+            >
+              {{ deltaLabel('total_requests') }}
+            </div>
           </div>
         </div>
       </div>
       <div class="col-6 col-lg-3">
         <div class="card card-sm h-100">
           <div class="card-body text-center">
-            <div class="text-secondary small mb-1">Bande passante</div>
-            <div class="h2 mb-0">{{ formatBytes(traffic.total_bytes || 0) }}</div>
-            <div class="small mt-1" :class="deltaClass('total_bytes')">{{ deltaLabel('total_bytes') }}</div>
+            <div class="text-secondary small mb-1">
+              Bande passante
+            </div>
+            <div class="h2 mb-0">
+              {{ formatBytes(traffic.total_bytes || 0) }}
+            </div>
+            <div
+              class="small mt-1"
+              :class="deltaClass('total_bytes')"
+            >
+              {{ deltaLabel('total_bytes') }}
+            </div>
           </div>
         </div>
       </div>
       <div class="col-6 col-lg-3">
         <div class="card card-sm h-100">
           <div class="card-body text-center">
-            <div class="text-secondary small mb-1">Taux 5xx</div>
-            <div class="h2 mb-0 text-red">{{ percent(traffic.ratio_5xx) }}</div>
-            <div class="small mt-1" :class="deltaClass('ratio_5xx')">{{ deltaLabel('ratio_5xx') }}</div>
+            <div class="text-secondary small mb-1">
+              Taux 5xx
+            </div>
+            <div class="h2 mb-0 text-red">
+              {{ percent(traffic.ratio_5xx) }}
+            </div>
+            <div
+              class="small mt-1"
+              :class="deltaClass('ratio_5xx')"
+            >
+              {{ deltaLabel('ratio_5xx') }}
+            </div>
           </div>
         </div>
       </div>
       <div class="col-6 col-lg-3">
         <div class="card card-sm h-100">
           <div class="card-body text-center">
-            <div class="text-secondary small mb-1">IPs suspectes</div>
-            <div class="h2 mb-0">{{ numberFormat(threats.suspicious_ips || 0) }}</div>
-            <div class="small mt-1" :class="deltaClass('suspicious_ips')">{{ deltaLabel('suspicious_ips') }}</div>
+            <div class="text-secondary small mb-1">
+              IPs suspectes
+            </div>
+            <div class="h2 mb-0">
+              {{ numberFormat(threats.suspicious_ips || 0) }}
+            </div>
+            <div
+              class="small mt-1"
+              :class="deltaClass('suspicious_ips')"
+            >
+              {{ deltaLabel('suspicious_ips') }}
+            </div>
           </div>
         </div>
       </div>
@@ -104,21 +186,31 @@
       <div class="col-xl-7">
         <div class="card h-100">
           <div class="card-header d-flex justify-content-between align-items-center">
-            <h3 class="card-title mb-0">Trafic - requêtes par tranche</h3>
+            <h3 class="card-title mb-0">
+              Trafic - requêtes par tranche
+            </h3>
             <span class="small text-secondary">Humain vs Bot</span>
           </div>
-          <div class="card-body" style="height: 260px;">
-            <canvas ref="trafficCanvas"></canvas>
+          <div
+            class="card-body"
+            style="height: 260px;"
+          >
+            <canvas ref="trafficCanvas" />
           </div>
         </div>
       </div>
       <div class="col-xl-5">
         <div class="card h-100">
           <div class="card-header">
-            <h3 class="card-title mb-0">Distribution HTTP</h3>
+            <h3 class="card-title mb-0">
+              Distribution HTTP
+            </h3>
           </div>
-          <div class="card-body" style="height: 260px;">
-            <canvas ref="statusCanvas"></canvas>
+          <div
+            class="card-body"
+            style="height: 260px;"
+          >
+            <canvas ref="statusCanvas" />
           </div>
         </div>
       </div>
@@ -127,26 +219,55 @@
     <div class="row row-cards mb-4">
       <div class="col-xl-7">
         <div class="card h-100">
-          <div class="card-header"><h3 class="card-title mb-0">Top endpoints</h3></div>
+          <div class="card-header">
+            <h3 class="card-title mb-0">
+              Top endpoints
+            </h3>
+          </div>
           <div class="table-responsive">
             <table class="table table-vcenter card-table">
               <thead>
                 <tr>
                   <th>Méthode</th>
                   <th>Chemin</th>
-                  <th class="text-end">Req.</th>
-                  <th class="text-end">Status</th>
+                  <th class="text-end">
+                    Req.
+                  </th>
+                  <th class="text-end">
+                    Status
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-if="!topEndpoints.length">
-                  <td colspan="4" class="text-center text-secondary py-4">Aucun endpoint sur la période.</td>
+                  <td
+                    colspan="4"
+                    class="text-center text-secondary py-4"
+                  >
+                    Aucun endpoint sur la période.
+                  </td>
                 </tr>
-                <tr v-for="(row, idx) in topEndpoints.slice(0, 12)" :key="`${row.method}-${row.path}-${idx}`">
+                <tr
+                  v-for="(row, idx) in topEndpoints.slice(0, 12)"
+                  :key="`${row.method}-${row.path}-${idx}`"
+                >
                   <td><span class="badge bg-blue-lt text-blue">{{ row.method }}</span></td>
-                  <td class="font-monospace small text-truncate endpoint-path" :title="row.path" style="max-width: 24rem;">{{ row.path }}</td>
-                  <td class="text-end">{{ numberFormat(row.hits || 0) }}</td>
-                  <td class="text-end"><span class="badge" :class="statusClass(row.status)">{{ row.status }}</span></td>
+                  <td
+                    class="font-monospace small text-truncate endpoint-path"
+                    :title="row.path"
+                    style="max-width: 24rem;"
+                  >
+                    {{ row.path }}
+                  </td>
+                  <td class="text-end">
+                    {{ numberFormat(row.hits || 0) }}
+                  </td>
+                  <td class="text-end">
+                    <span
+                      class="badge"
+                      :class="statusClass(row.status)"
+                    >{{ row.status }}</span>
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -156,13 +277,31 @@
 
       <div class="col-xl-5">
         <div class="card h-100">
-          <div class="card-header"><h3 class="card-title mb-0">Top IPs suspectes</h3></div>
+          <div class="card-header">
+            <h3 class="card-title mb-0">
+              Top IPs suspectes
+            </h3>
+          </div>
           <div class="card-body p-0">
-            <div v-if="!topThreatIPs.length" class="text-center text-secondary py-4">Aucune IP suspecte.</div>
-            <div v-else v-for="ip in topThreatIPs.slice(0, 10)" :key="ip.ip" class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom">
+            <div
+              v-if="!topThreatIPs.length"
+              class="text-center text-secondary py-4"
+            >
+              Aucune IP suspecte.
+            </div>
+            <div
+              v-for="ip in topThreatIPs.slice(0, 10)"
+              v-else
+              :key="ip.ip"
+              class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom"
+            >
               <div>
-                <div class="font-monospace small">{{ ip.ip }}</div>
-                <div class="small text-secondary">{{ ip.level || 'LOW' }} · chemins {{ ip.unique_paths || 0 }}</div>
+                <div class="font-monospace small">
+                  {{ ip.ip }}
+                </div>
+                <div class="small text-secondary">
+                  {{ ip.level || 'LOW' }} · chemins {{ ip.unique_paths || 0 }}
+                </div>
               </div>
               <span class="badge bg-red-lt text-red">{{ numberFormat(ip.hits || 0) }}</span>
             </div>
@@ -175,10 +314,17 @@
       <div class="col-xl-8">
         <div class="card h-100">
           <div class="card-header d-flex align-items-center justify-content-between">
-            <h3 class="card-title mb-0">Carte mondiale des IP clientes</h3>
+            <h3 class="card-title mb-0">
+              Carte mondiale des IP clientes
+            </h3>
           </div>
           <div class="card-body">
-            <svg ref="worldMapSvg" class="world-map" role="img" aria-label="Carte mondiale du trafic par pays"></svg>
+            <svg
+              ref="worldMapSvg"
+              class="world-map"
+              role="img"
+              aria-label="Carte mondiale du trafic par pays"
+            />
           </div>
         </div>
       </div>
@@ -186,7 +332,9 @@
       <div class="col-xl-4">
         <div class="card h-100">
           <div class="card-header d-flex align-items-center justify-content-between">
-            <h3 class="card-title mb-0">Pays les plus actifs</h3>
+            <h3 class="card-title mb-0">
+              Pays les plus actifs
+            </h3>
             <span class="small text-secondary">{{ numberFormat(topClientIPs.length) }} IPs</span>
           </div>
           <div class="table-responsive">
@@ -195,21 +343,33 @@
                 <tr>
                   <th>Pays</th>
                   <th>Code</th>
-                  <th class="text-end">Hits</th>
+                  <th class="text-end">
+                    Hits
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-if="!countryDistribution.length">
-                  <td colspan="3" class="text-center text-secondary py-4">Aucune donnée pays.</td>
+                  <td
+                    colspan="3"
+                    class="text-center text-secondary py-4"
+                  >
+                    Aucune donnée pays.
+                  </td>
                 </tr>
-                <tr v-for="item in countryDistribution.slice(0, 20)" :key="`country-${item.country}`">
+                <tr
+                  v-for="item in countryDistribution.slice(0, 20)"
+                  :key="`country-${item.country}`"
+                >
                   <td>
                     <span class="small">{{ item.country || 'Inconnu' }}</span>
                   </td>
                   <td>
                     <span class="badge bg-azure-lt text-azure">{{ item.country_code || '--' }}</span>
                   </td>
-                  <td class="text-end">{{ numberFormat(Number(item.hits) || 0) }}</td>
+                  <td class="text-end">
+                    {{ numberFormat(Number(item.hits) || 0) }}
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -221,17 +381,36 @@
     <div class="row row-cards mb-4">
       <div class="col-xl-6">
         <div class="card h-100">
-          <div class="card-header"><h3 class="card-title mb-0">Top domaines cibles (proxy)</h3></div>
+          <div class="card-header">
+            <h3 class="card-title mb-0">
+              Top domaines cibles (proxy)
+            </h3>
+          </div>
           <div class="card-body">
-            <div v-if="!topProxyHosts.length" class="text-center text-secondary py-4">Aucune donnée domaine.</div>
+            <div
+              v-if="!topProxyHosts.length"
+              class="text-center text-secondary py-4"
+            >
+              Aucune donnée domaine.
+            </div>
             <div v-else>
-              <div v-for="h in topProxyHosts.slice(0, 8)" :key="h.vhost || h.host_id || h.host_name" class="mb-2">
+              <div
+                v-for="h in topProxyHosts.slice(0, 8)"
+                :key="h.vhost || h.host_id || h.host_name"
+                class="mb-2"
+              >
                 <div class="d-flex justify-content-between small mb-1">
                   <span class="font-monospace">{{ h.vhost || h.host_name || h.host_id || '(unknown)' }}</span>
                   <span>{{ numberFormat(h.hits || 0) }}</span>
                 </div>
-                <div class="progress" style="height: 6px;">
-                  <div class="progress-bar bg-blue" :style="{ width: hostWidth(h.hits) + '%' }"></div>
+                <div
+                  class="progress"
+                  style="height: 6px;"
+                >
+                  <div
+                    class="progress-bar bg-blue"
+                    :style="{ width: hostWidth(h.hits) + '%' }"
+                  />
                 </div>
               </div>
             </div>
@@ -242,30 +421,59 @@
       <div class="col-xl-6">
         <div class="card h-100">
           <div class="card-header d-flex align-items-center justify-content-between">
-            <h3 class="card-title mb-0">Top domaines cibles</h3>
+            <h3 class="card-title mb-0">
+              Top domaines cibles
+            </h3>
           </div>
           <div class="table-responsive">
             <table class="table table-vcenter card-table">
               <thead>
                 <tr>
                   <th>Domaine</th>
-                  <th class="text-end">Hits</th>
-                  <th class="text-end">4xx</th>
-                  <th class="text-end">5xx</th>
-                  <th></th>
+                  <th class="text-end">
+                    Hits
+                  </th>
+                  <th class="text-end">
+                    4xx
+                  </th>
+                  <th class="text-end">
+                    5xx
+                  </th>
+                  <th />
                 </tr>
               </thead>
               <tbody>
                 <tr v-if="!topDomains.length">
-                  <td colspan="5" class="text-center text-secondary py-4">Aucune donnée de trafic.</td>
+                  <td
+                    colspan="5"
+                    class="text-center text-secondary py-4"
+                  >
+                    Aucune donnée de trafic.
+                  </td>
                 </tr>
-                <tr v-for="item in topDomains.slice(0, 10)" :key="item.domain">
-                  <td class="font-monospace small">{{ item.domain || '(unknown)' }}</td>
-                  <td class="text-end">{{ numberFormat(item.hits || 0) }}</td>
-                  <td class="text-end text-yellow">{{ numberFormat(item.errors_4xx || 0) }}</td>
-                  <td class="text-end text-red">{{ numberFormat(item.errors_5xx || 0) }}</td>
+                <tr
+                  v-for="item in topDomains.slice(0, 10)"
+                  :key="item.domain"
+                >
+                  <td class="font-monospace small">
+                    {{ item.domain || '(unknown)' }}
+                  </td>
                   <td class="text-end">
-                    <button class="btn btn-sm btn-outline-primary" @click="openDomain(item.domain)">Détails</button>
+                    {{ numberFormat(item.hits || 0) }}
+                  </td>
+                  <td class="text-end text-yellow">
+                    {{ numberFormat(item.errors_4xx || 0) }}
+                  </td>
+                  <td class="text-end text-red">
+                    {{ numberFormat(item.errors_5xx || 0) }}
+                  </td>
+                  <td class="text-end">
+                    <button
+                      class="btn btn-sm btn-outline-primary"
+                      @click="openDomain(item.domain)"
+                    >
+                      Détails
+                    </button>
                   </td>
                 </tr>
               </tbody>
@@ -277,7 +485,9 @@
 
     <div class="card">
       <div class="card-header d-flex align-items-center justify-content-between">
-        <h3 class="card-title mb-0">Flux temps réel - dernières requêtes</h3>
+        <h3 class="card-title mb-0">
+          Flux temps réel - dernières requêtes
+        </h3>
         <span class="small text-secondary">auto-refresh {{ autoRefresh ? 'ON' : 'OFF' }}</span>
       </div>
       <div class="table-responsive">
@@ -295,35 +505,78 @@
           </thead>
           <tbody>
             <tr v-if="!liveRequests.length">
-              <td colspan="7" class="text-center text-secondary py-4">Aucune requête récente.</td>
+              <td
+                colspan="7"
+                class="text-center text-secondary py-4"
+              >
+                Aucune requête récente.
+              </td>
             </tr>
-            <tr v-for="(r, idx) in liveRequests.slice(0, 16)" :key="`${r.timestamp}-${idx}`">
-              <td class="small">{{ formatDate(r.timestamp) }}</td>
-              <td class="font-monospace small">{{ r.ip }}</td>
-              <td class="small">{{ r.domain || r.host || r.host_name || r.host_id || '-' }}</td>
+            <tr
+              v-for="(r, idx) in liveRequests.slice(0, 16)"
+              :key="`${r.timestamp}-${idx}`"
+            >
+              <td class="small">
+                {{ formatDate(r.timestamp) }}
+              </td>
+              <td class="font-monospace small">
+                {{ r.ip }}
+              </td>
+              <td class="small">
+                {{ r.domain || r.host || r.host_name || r.host_id || '-' }}
+              </td>
               <td><span class="badge bg-blue-lt text-blue">{{ r.method }}</span></td>
-              <td class="font-monospace small text-truncate live-path" :title="r.path" style="max-width: 28rem;">{{ r.path }}</td>
-              <td><span class="badge" :class="statusClass(r.status)">{{ r.status }}</span></td>
-              <td class="small">{{ formatBytes(r.bytes || 0) }}</td>
+              <td
+                class="font-monospace small text-truncate live-path"
+                :title="r.path"
+                style="max-width: 28rem;"
+              >
+                {{ r.path }}
+              </td>
+              <td>
+                <span
+                  class="badge"
+                  :class="statusClass(r.status)"
+                >{{ r.status }}</span>
+              </td>
+              <td class="small">
+                {{ formatBytes(r.bytes || 0) }}
+              </td>
             </tr>
           </tbody>
         </table>
       </div>
     </div>
 
-    <div v-if="showDomainModal" class="traffic-modal-backdrop" @click.self="closeDomainModal">
+    <div
+      v-if="showDomainModal"
+      class="traffic-modal-backdrop"
+      @click.self="closeDomainModal"
+    >
       <div class="traffic-modal card shadow-lg">
         <div class="card-header d-flex align-items-center justify-content-between">
           <div>
-            <h3 class="card-title mb-0">Détails domaine: <span class="font-monospace">{{ selectedDomain }}</span></h3>
-            <div class="text-secondary small">Fenêtre de logs détaillée sur {{ period }}</div>
+            <h3 class="card-title mb-0">
+              Détails domaine: <span class="font-monospace">{{ selectedDomain }}</span>
+            </h3>
+            <div class="text-secondary small">
+              Fenêtre de logs détaillée sur {{ period }}
+            </div>
           </div>
-          <button class="btn btn-sm btn-outline-secondary" @click="closeDomainModal">Fermer</button>
+          <button
+            class="btn btn-sm btn-outline-secondary"
+            @click="closeDomainModal"
+          >
+            Fermer
+          </button>
         </div>
 
         <div class="card-body traffic-modal-body">
-          <div v-if="domainLoading" class="text-center py-4 text-secondary">
-            <span class="spinner-border spinner-border-sm me-2"></span>
+          <div
+            v-if="domainLoading"
+            class="text-center py-4 text-secondary"
+          >
+            <span class="spinner-border spinner-border-sm me-2" />
             Chargement des détails...
           </div>
 
@@ -331,26 +584,42 @@
             <div class="row row-cards mb-3">
               <div class="col-6 col-lg-3">
                 <div class="border rounded p-2 text-center">
-                  <div class="text-secondary small">Hits</div>
-                  <div class="h3 mb-0">{{ domainDetails.hits || 0 }}</div>
+                  <div class="text-secondary small">
+                    Hits
+                  </div>
+                  <div class="h3 mb-0">
+                    {{ domainDetails.hits || 0 }}
+                  </div>
                 </div>
               </div>
               <div class="col-6 col-lg-3">
                 <div class="border rounded p-2 text-center">
-                  <div class="text-secondary small">Bytes</div>
-                  <div class="h3 mb-0">{{ formatBytes(domainDetails.bytes || 0) }}</div>
+                  <div class="text-secondary small">
+                    Bytes
+                  </div>
+                  <div class="h3 mb-0">
+                    {{ formatBytes(domainDetails.bytes || 0) }}
+                  </div>
                 </div>
               </div>
               <div class="col-6 col-lg-3">
                 <div class="border rounded p-2 text-center">
-                  <div class="text-secondary small">4xx</div>
-                  <div class="h3 mb-0 text-yellow">{{ domainDetails.status_4xx || 0 }}</div>
+                  <div class="text-secondary small">
+                    4xx
+                  </div>
+                  <div class="h3 mb-0 text-yellow">
+                    {{ domainDetails.status_4xx || 0 }}
+                  </div>
                 </div>
               </div>
               <div class="col-6 col-lg-3">
                 <div class="border rounded p-2 text-center">
-                  <div class="text-secondary small">5xx</div>
-                  <div class="h3 mb-0 text-red">{{ domainDetails.status_5xx || 0 }}</div>
+                  <div class="text-secondary small">
+                    5xx
+                  </div>
+                  <div class="h3 mb-0 text-red">
+                    {{ domainDetails.status_5xx || 0 }}
+                  </div>
                 </div>
               </div>
             </div>
@@ -358,11 +627,28 @@
             <div class="row row-cards mb-3">
               <div class="col-lg-6">
                 <div class="card h-100">
-                  <div class="card-header"><h4 class="card-title mb-0">Top chemins</h4></div>
+                  <div class="card-header">
+                    <h4 class="card-title mb-0">
+                      Top chemins
+                    </h4>
+                  </div>
                   <div class="card-body p-0">
-                    <div v-if="!(domainDetails.top_paths || []).length" class="text-center py-3 text-secondary small">Aucun chemin</div>
-                    <div v-else v-for="p in domainDetails.top_paths" :key="p.path" class="d-flex justify-content-between border-bottom px-3 py-2">
-                      <span class="font-monospace small text-truncate me-2" style="max-width: 75%;">{{ p.path }}</span>
+                    <div
+                      v-if="!(domainDetails.top_paths || []).length"
+                      class="text-center py-3 text-secondary small"
+                    >
+                      Aucun chemin
+                    </div>
+                    <div
+                      v-for="p in domainDetails.top_paths"
+                      v-else
+                      :key="p.path"
+                      class="d-flex justify-content-between border-bottom px-3 py-2"
+                    >
+                      <span
+                        class="font-monospace small text-truncate me-2"
+                        style="max-width: 75%;"
+                      >{{ p.path }}</span>
                       <span class="badge bg-azure-lt text-azure">{{ p.hits }}</span>
                     </div>
                   </div>
@@ -370,10 +656,24 @@
               </div>
               <div class="col-lg-6">
                 <div class="card h-100">
-                  <div class="card-header"><h4 class="card-title mb-0">Top IPs clientes</h4></div>
+                  <div class="card-header">
+                    <h4 class="card-title mb-0">
+                      Top IPs clientes
+                    </h4>
+                  </div>
                   <div class="card-body p-0">
-                    <div v-if="!(domainDetails.top_clients || []).length" class="text-center py-3 text-secondary small">Aucune IP</div>
-                    <div v-else v-for="ip in domainDetails.top_clients" :key="ip.ip" class="d-flex justify-content-between border-bottom px-3 py-2">
+                    <div
+                      v-if="!(domainDetails.top_clients || []).length"
+                      class="text-center py-3 text-secondary small"
+                    >
+                      Aucune IP
+                    </div>
+                    <div
+                      v-for="ip in domainDetails.top_clients"
+                      v-else
+                      :key="ip.ip"
+                      class="d-flex justify-content-between border-bottom px-3 py-2"
+                    >
                       <span class="font-monospace small">{{ ip.ip }}</span>
                       <span class="badge bg-purple-lt text-purple">{{ ip.hits }}</span>
                     </div>
@@ -383,8 +683,15 @@
             </div>
 
             <div class="card">
-              <div class="card-header"><h4 class="card-title mb-0">Logs récents</h4></div>
-              <div class="table-responsive" style="max-height: 360px;">
+              <div class="card-header">
+                <h4 class="card-title mb-0">
+                  Logs récents
+                </h4>
+              </div>
+              <div
+                class="table-responsive"
+                style="max-height: 360px;"
+              >
                 <table class="table table-sm table-vcenter mb-0">
                   <thead>
                     <tr>
@@ -399,18 +706,47 @@
                   </thead>
                   <tbody>
                     <tr v-if="!(domainDetails.requests || []).length">
-                      <td colspan="7" class="text-center text-secondary py-3">Aucune requête disponible</td>
-                    </tr>
-                    <tr v-for="(r, idx) in domainDetails.requests || []" :key="`${r.timestamp}-${idx}`">
-                      <td class="small">{{ formatDate(r.timestamp) }}</td>
-                      <td class="font-monospace small">{{ r.ip }}</td>
-                      <td><span class="badge bg-blue-lt text-blue">{{ r.method }}</span></td>
-                      <td class="font-monospace small text-truncate domain-path" :title="r.path" style="max-width: 18rem;">{{ r.path }}</td>
-                      <td>
-                        <span class="badge" :class="statusClass(r.status)">{{ r.status }}</span>
+                      <td
+                        colspan="7"
+                        class="text-center text-secondary py-3"
+                      >
+                        Aucune requête disponible
                       </td>
-                      <td class="small">{{ formatBytes(r.bytes || 0) }}</td>
-                      <td class="small text-truncate domain-ua" :title="r.user_agent || '-'" style="max-width: 20rem;">{{ r.user_agent || '-' }}</td>
+                    </tr>
+                    <tr
+                      v-for="(r, idx) in domainDetails.requests || []"
+                      :key="`${r.timestamp}-${idx}`"
+                    >
+                      <td class="small">
+                        {{ formatDate(r.timestamp) }}
+                      </td>
+                      <td class="font-monospace small">
+                        {{ r.ip }}
+                      </td>
+                      <td><span class="badge bg-blue-lt text-blue">{{ r.method }}</span></td>
+                      <td
+                        class="font-monospace small text-truncate domain-path"
+                        :title="r.path"
+                        style="max-width: 18rem;"
+                      >
+                        {{ r.path }}
+                      </td>
+                      <td>
+                        <span
+                          class="badge"
+                          :class="statusClass(r.status)"
+                        >{{ r.status }}</span>
+                      </td>
+                      <td class="small">
+                        {{ formatBytes(r.bytes || 0) }}
+                      </td>
+                      <td
+                        class="small text-truncate domain-ua"
+                        :title="r.user_agent || '-'"
+                        style="max-width: 20rem;"
+                      >
+                        {{ r.user_agent || '-' }}
+                      </td>
                     </tr>
                   </tbody>
                 </table>

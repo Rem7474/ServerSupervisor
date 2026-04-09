@@ -1,31 +1,60 @@
 <template>
-  <div v-if="canRun" class="card mt-4">
+  <div
+    v-if="canRun"
+    class="card mt-4"
+  >
     <div class="card-header d-flex align-items-center justify-content-between">
-      <h3 class="card-title">Services système (systemd)</h3>
+      <h3 class="card-title">
+        Services système (systemd)
+      </h3>
       <div class="d-flex align-items-center gap-2">
         <div class="btn-group btn-group-sm">
           <button
             :class="filter === 'active' ? 'btn btn-primary' : 'btn btn-outline-secondary'"
             @click="filter = 'active'"
-          >Actifs</button>
+          >
+            Actifs
+          </button>
           <button
             :class="filter === 'all' ? 'btn btn-primary' : 'btn btn-outline-secondary'"
             @click="filter = 'all'"
-          >Tous</button>
+          >
+            Tous
+          </button>
         </div>
-        <button class="btn btn-sm btn-outline-secondary" @click="loadServices" :disabled="loading">
-          <span v-if="loading" class="spinner-border spinner-border-sm me-1"></span>
+        <button
+          class="btn btn-sm btn-outline-secondary"
+          :disabled="loading"
+          @click="loadServices"
+        >
+          <span
+            v-if="loading"
+            class="spinner-border spinner-border-sm me-1"
+          />
           {{ loading ? 'Chargement...' : 'Charger les services' }}
         </button>
       </div>
     </div>
-    <div v-if="error" class="card-body pb-0">
-      <div class="alert alert-danger mb-0">{{ error }}</div>
+    <div
+      v-if="error"
+      class="card-body pb-0"
+    >
+      <div class="alert alert-danger mb-0">
+        {{ error }}
+      </div>
     </div>
-    <div v-if="!services.length && !loading && !error" class="card-body">
-      <div class="text-secondary small">Cliquez sur "Charger les services" pour afficher les services systemd de cet hôte.</div>
+    <div
+      v-if="!services.length && !loading && !error"
+      class="card-body"
+    >
+      <div class="text-secondary small">
+        Cliquez sur "Charger les services" pour afficher les services systemd de cet hôte.
+      </div>
     </div>
-    <div v-if="filteredServices.length" class="table-responsive">
+    <div
+      v-if="filteredServices.length"
+      class="table-responsive"
+    >
       <table class="table table-vcenter table-hover card-table mb-0">
         <thead>
           <tr>
@@ -37,13 +66,24 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="svc in filteredServices" :key="svc.name">
-            <td class="font-monospace small">{{ svc.name }}</td>
+          <tr
+            v-for="svc in filteredServices"
+            :key="svc.name"
+          >
+            <td class="font-monospace small">
+              {{ svc.name }}
+            </td>
             <td>
               <span :class="stateClass(svc.active_state)">{{ svc.active_state }}</span>
             </td>
-            <td class="text-secondary small">{{ svc.sub_state }}</td>
-            <td class="text-secondary small text-truncate" style="max-width: 250px;" :title="svc.description">
+            <td class="text-secondary small">
+              {{ svc.sub_state }}
+            </td>
+            <td
+              class="text-secondary small text-truncate"
+              style="max-width: 250px;"
+              :title="svc.description"
+            >
               {{ svc.description || '—' }}
             </td>
             <td class="text-nowrap">
@@ -51,25 +91,33 @@
                 <button
                   v-if="svc.active_state !== 'active'"
                   class="btn btn-outline-success"
-                  @click="runAction(svc.name, 'start')"
                   title="Démarrer"
-                >Start</button>
+                  @click="runAction(svc.name, 'start')"
+                >
+                  Start
+                </button>
                 <button
                   v-if="svc.active_state === 'active'"
                   class="btn btn-outline-danger"
-                  @click="runAction(svc.name, 'stop')"
                   title="Arrêter"
-                >Stop</button>
+                  @click="runAction(svc.name, 'stop')"
+                >
+                  Stop
+                </button>
                 <button
                   class="btn btn-outline-secondary"
-                  @click="runAction(svc.name, 'restart')"
                   title="Redémarrer"
-                >Restart</button>
+                  @click="runAction(svc.name, 'restart')"
+                >
+                  Restart
+                </button>
                 <button
                   class="btn btn-outline-secondary"
-                  @click="runAction(svc.name, 'status')"
                   title="Statut"
-                >Status</button>
+                  @click="runAction(svc.name, 'status')"
+                >
+                  Status
+                </button>
               </div>
             </td>
           </tr>

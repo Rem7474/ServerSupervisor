@@ -3,114 +3,269 @@
     <div class="page-header mb-3">
       <div>
         <div class="page-pretitle">
-          <router-link to="/git-webhooks?tab=trackers" class="text-decoration-none">Suivi de versions</router-link>
+          <router-link
+            to="/git-webhooks?tab=trackers"
+            class="text-decoration-none"
+          >
+            Suivi de versions
+          </router-link>
           <span class="text-muted mx-1">/</span>
           <span>{{ tracker?.name || id }}</span>
         </div>
         <h2 class="page-title d-flex align-items-center gap-2">
           {{ tracker?.name }}
           <template v-if="tracker">
-            <span v-if="tracker.tracker_type === 'docker'" class="badge bg-cyan-lt text-cyan">docker</span>
-            <span v-else class="badge" :class="providerBadge(tracker.provider)">{{ tracker.provider }}</span>
+            <span
+              v-if="tracker.tracker_type === 'docker'"
+              class="badge bg-cyan-lt text-cyan"
+            >docker</span>
+            <span
+              v-else
+              class="badge"
+              :class="providerBadge(tracker.provider)"
+            >{{ tracker.provider }}</span>
           </template>
-          <span v-if="tracker && !tracker.enabled" class="badge bg-secondary">Désactivé</span>
+          <span
+            v-if="tracker && !tracker.enabled"
+            class="badge bg-secondary"
+          >Désactivé</span>
         </h2>
       </div>
     </div>
 
-    <div v-if="error" class="alert alert-danger mb-3">{{ error }}</div>
-
-    <div v-if="loading" class="text-center py-5">
-      <div class="spinner-border text-primary" role="status"></div>
+    <div
+      v-if="error"
+      class="alert alert-danger mb-3"
+    >
+      {{ error }}
     </div>
 
-    <div v-else-if="tracker" class="row g-3">
+    <div
+      v-if="loading"
+      class="text-center py-5"
+    >
+      <div
+        class="spinner-border text-primary"
+        role="status"
+      />
+    </div>
+
+    <div
+      v-else-if="tracker"
+      class="row g-3"
+    >
       <!-- Left column: config -->
       <div class="col-lg-5">
         <div class="card">
           <div class="card-header d-flex align-items-center justify-content-between">
-            <h3 class="card-title">Configuration</h3>
+            <h3 class="card-title">
+              Configuration
+            </h3>
             <div class="d-flex gap-2">
-              <button class="btn btn-sm btn-ghost-secondary" @click="triggerCheck" :disabled="checking">
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="me-1">
-                  <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/>
+              <button
+                class="btn btn-sm btn-ghost-secondary"
+                :disabled="checking"
+                @click="triggerCheck"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="14"
+                  height="14"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  class="me-1"
+                >
+                  <polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10" />
                 </svg>
                 {{ checking ? 'Vérification...' : 'Vérifier maintenant' }}
               </button>
-              <button class="btn btn-sm btn-primary" @click="runManually" :disabled="running">
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="me-1">
-                  <polygon points="5 3 19 12 5 21 5 3"/>
+              <button
+                class="btn btn-sm btn-primary"
+                :disabled="running"
+                @click="runManually"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="14"
+                  height="14"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  class="me-1"
+                >
+                  <polygon points="5 3 19 12 5 21 5 3" />
                 </svg>
                 {{ running ? 'Déclenchement...' : 'Exécuter' }}
               </button>
-              <button class="btn btn-sm btn-ghost-secondary" @click="openEdit">Modifier</button>
+              <button
+                class="btn btn-sm btn-ghost-secondary"
+                @click="openEdit"
+              >
+                Modifier
+              </button>
             </div>
           </div>
           <div class="card-body">
             <dl class="row mb-0 small">
-              <dt class="col-5 text-muted">Type</dt>
+              <dt class="col-5 text-muted">
+                Type
+              </dt>
               <dd class="col-7">
-                <span v-if="tracker.tracker_type === 'docker'" class="badge bg-cyan-lt text-cyan">Image Docker</span>
-                <span v-else class="badge bg-blue-lt text-blue">Release Git</span>
+                <span
+                  v-if="tracker.tracker_type === 'docker'"
+                  class="badge bg-cyan-lt text-cyan"
+                >Image Docker</span>
+                <span
+                  v-else
+                  class="badge bg-blue-lt text-blue"
+                >Release Git</span>
               </dd>
 
               <!-- Git-specific -->
               <template v-if="tracker.tracker_type !== 'docker'">
-                <dt class="col-5 text-muted">Provider</dt>
-                <dd class="col-7">{{ tracker.provider }}</dd>
-                <dt class="col-5 text-muted">Dépôt</dt>
+                <dt class="col-5 text-muted">
+                  Provider
+                </dt>
                 <dd class="col-7">
-                  <a :href="repoURL" target="_blank" class="link-primary">
+                  {{ tracker.provider }}
+                </dd>
+                <dt class="col-5 text-muted">
+                  Dépôt
+                </dt>
+                <dd class="col-7">
+                  <a
+                    :href="repoURL"
+                    target="_blank"
+                    class="link-primary"
+                  >
                     {{ tracker.repo_owner }}/{{ tracker.repo_name }}
                   </a>
                 </dd>
-                <dt class="col-5 text-muted">Dernière release</dt>
+                <dt class="col-5 text-muted">
+                  Dernière release
+                </dt>
                 <dd class="col-7">
-                  <span v-if="tracker.last_release_tag" class="badge bg-green-lt text-green">{{ tracker.last_release_tag }}</span>
-                  <span v-else class="text-muted">En attente...</span>
+                  <span
+                    v-if="tracker.last_release_tag"
+                    class="badge bg-green-lt text-green"
+                  >{{ tracker.last_release_tag }}</span>
+                  <span
+                    v-else
+                    class="text-muted"
+                  >En attente...</span>
                 </dd>
               </template>
 
               <!-- Docker-specific -->
               <template v-else>
-                <dt class="col-5 text-muted">Image</dt>
-                <dd class="col-7"><code>{{ tracker.docker_image }}</code></dd>
-                <dt class="col-5 text-muted">Tag surveillé</dt>
-                <dd class="col-7"><code>{{ tracker.docker_tag || 'latest' }}</code></dd>
+                <dt class="col-5 text-muted">
+                  Image
+                </dt>
+                <dd class="col-7">
+                  <code>{{ tracker.docker_image }}</code>
+                </dd>
+                <dt class="col-5 text-muted">
+                  Tag surveillé
+                </dt>
+                <dd class="col-7">
+                  <code>{{ tracker.docker_tag || 'latest' }}</code>
+                </dd>
                 <template v-if="tracker.latest_image_digest">
-                  <dt class="col-5 text-muted">Dernier digest</dt>
+                  <dt class="col-5 text-muted">
+                    Dernier digest
+                  </dt>
                   <dd class="col-7">
-                    <code class="small text-muted" :title="tracker.latest_image_digest">
+                    <code
+                      class="small text-muted"
+                      :title="tracker.latest_image_digest"
+                    >
                       {{ tracker.latest_image_digest.slice(0, 19) }}…
                     </code>
                   </dd>
                 </template>
-                <dt class="col-5 text-muted">Dernier check</dt>
+                <dt class="col-5 text-muted">
+                  Dernier check
+                </dt>
                 <dd class="col-7">
                   <span v-if="tracker.last_checked_at"><RelativeTime :date="tracker.last_checked_at" /></span>
-                  <span v-else class="text-muted">Jamais</span>
+                  <span
+                    v-else
+                    class="text-muted"
+                  >Jamais</span>
                 </dd>
               </template>
 
               <!-- Common fields -->
-              <dt class="col-5 text-muted">VM cible</dt>
-              <dd class="col-7">{{ tracker.host_name || tracker.host_id }}</dd>
-              <dt class="col-5 text-muted">Tâche</dt>
-              <dd class="col-7"><code>{{ tracker.custom_task_id }}</code></dd>
-              <dt v-if="tracker.tracker_type !== 'docker' && tracker.last_checked_at" class="col-5 text-muted">Dernier check</dt>
-              <dd v-if="tracker.tracker_type !== 'docker' && tracker.last_checked_at" class="col-7"><RelativeTime :date="tracker.last_checked_at" /></dd>
-              <template v-if="tracker.last_error">
-                <dt class="col-5 text-muted">Erreur</dt>
-                <dd class="col-7 text-danger small">{{ tracker.last_error }}</dd>
-              </template>
-              <dt v-if="tracker.last_triggered_at" class="col-5 text-muted">Dernier déclench.</dt>
-              <dd v-if="tracker.last_triggered_at" class="col-7"><RelativeTime :date="tracker.last_triggered_at" /></dd>
-              <dt v-if="tracker.notify_channels?.length" class="col-5 text-muted">Notifications</dt>
-              <dd v-if="tracker.notify_channels?.length" class="col-7">
-                <span v-for="ch in tracker.notify_channels" :key="ch" class="badge me-1" :class="channelBadge(ch)">{{ ch }}</span>
+              <dt class="col-5 text-muted">
+                VM cible
+              </dt>
+              <dd class="col-7">
+                {{ tracker.host_name || tracker.host_id }}
               </dd>
-              <dt class="col-5 text-muted">Créé le</dt>
-              <dd class="col-7">{{ formatDateTime(tracker.created_at) }}</dd>
+              <dt class="col-5 text-muted">
+                Tâche
+              </dt>
+              <dd class="col-7">
+                <code>{{ tracker.custom_task_id }}</code>
+              </dd>
+              <dt
+                v-if="tracker.tracker_type !== 'docker' && tracker.last_checked_at"
+                class="col-5 text-muted"
+              >
+                Dernier check
+              </dt>
+              <dd
+                v-if="tracker.tracker_type !== 'docker' && tracker.last_checked_at"
+                class="col-7"
+              >
+                <RelativeTime :date="tracker.last_checked_at" />
+              </dd>
+              <template v-if="tracker.last_error">
+                <dt class="col-5 text-muted">
+                  Erreur
+                </dt>
+                <dd class="col-7 text-danger small">
+                  {{ tracker.last_error }}
+                </dd>
+              </template>
+              <dt
+                v-if="tracker.last_triggered_at"
+                class="col-5 text-muted"
+              >
+                Dernier déclench.
+              </dt>
+              <dd
+                v-if="tracker.last_triggered_at"
+                class="col-7"
+              >
+                <RelativeTime :date="tracker.last_triggered_at" />
+              </dd>
+              <dt
+                v-if="tracker.notify_channels?.length"
+                class="col-5 text-muted"
+              >
+                Notifications
+              </dt>
+              <dd
+                v-if="tracker.notify_channels?.length"
+                class="col-7"
+              >
+                <span
+                  v-for="ch in tracker.notify_channels"
+                  :key="ch"
+                  class="badge me-1"
+                  :class="channelBadge(ch)"
+                >{{ ch }}</span>
+              </dd>
+              <dt class="col-5 text-muted">
+                Créé le
+              </dt>
+              <dd class="col-7">
+                {{ formatDateTime(tracker.created_at) }}
+              </dd>
             </dl>
           </div>
         </div>
@@ -118,15 +273,22 @@
         <!-- Env vars card -->
         <div class="card mt-3">
           <div class="card-header">
-            <h3 class="card-title">Variables disponibles dans le script</h3>
+            <h3 class="card-title">
+              Variables disponibles dans le script
+            </h3>
           </div>
           <div class="card-body p-0">
             <div class="table-responsive">
               <table class="table table-sm table-vcenter mb-0">
                 <tbody>
-                  <tr v-for="v in envVars" :key="v.name">
+                  <tr
+                    v-for="v in envVars"
+                    :key="v.name"
+                  >
                     <td><code class="small">{{ v.name }}</code></td>
-                    <td class="text-muted small">{{ v.desc }}</td>
+                    <td class="text-muted small">
+                      {{ v.desc }}
+                    </td>
                   </tr>
                 </tbody>
               </table>

@@ -1,13 +1,20 @@
 <template>
   <ul class="nav nav-tabs mb-4">
-    <li v-for="tab in tabs" :key="tab.key" class="nav-item">
+    <li
+      v-for="tab in tabs"
+      :key="tab.key"
+      class="nav-item"
+    >
       <button
         class="nav-link"
         :class="{ active: modelValue === tab.key }"
         @click="$emit('update:modelValue', tab.key)"
       >
         {{ tab.label }}
-        <span v-if="tab.badge" class="badge bg-azure-lt text-azure ms-1">{{ tab.badge }}</span>
+        <span
+          v-if="tab.badge"
+          class="badge bg-azure-lt text-azure ms-1"
+        >{{ tab.badge }}</span>
       </button>
     </li>
   </ul>

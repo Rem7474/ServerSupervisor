@@ -3,11 +3,21 @@
     <div class="network-config-row">
       <div class="network-config-item">
         <label class="form-label">Reverse proxy</label>
-        <input v-model="rootNodeName" type="text" class="form-control form-control-sm" placeholder="Ex: Nginx Proxy Manager">
+        <input
+          v-model="rootNodeName"
+          type="text"
+          class="form-control form-control-sm"
+          placeholder="Ex: Nginx Proxy Manager"
+        >
       </div>
       <div class="network-config-item">
         <label class="form-label">IP du proxy</label>
-        <input v-model="rootNodeIp" type="text" class="form-control form-control-sm" placeholder="Ex: 192.168.1.10">
+        <input
+          v-model="rootNodeIp"
+          type="text"
+          class="form-control form-control-sm"
+          placeholder="Ex: 192.168.1.10"
+        >
       </div>
     </div>
 
@@ -21,7 +31,10 @@
             et cochez "Proxy".
           </div>
         </div>
-        <button class="btn btn-outline-light btn-sm ms-2" @click="addServiceRow">
+        <button
+          class="btn btn-outline-light btn-sm ms-2"
+          @click="addServiceRow"
+        >
           + Ajouter
         </button>
       </div>
@@ -38,37 +51,114 @@
               <th>Authelia</th>
               <th>Internet</th>
               <th>Port ext.</th>
-              <th></th>
+              <th />
             </tr>
           </thead>
           <tbody>
-            <tr v-for="service in networkServices" :key="service.id">
-              <td><input v-model="service.name" class="form-control form-control-sm" placeholder="Ex: Vaultwarden"></td>
-              <td><input v-model="service.domain" class="form-control form-control-sm" placeholder="vault.example.com"></td>
-              <td><input v-model="service.path" class="form-control form-control-sm" placeholder="/"></td>
-              <td><input v-model.number="service.internalPort" type="number" class="form-control form-control-sm" placeholder="3000"></td>
+            <tr
+              v-for="service in networkServices"
+              :key="service.id"
+            >
               <td>
-                <select v-model="service.hostId" class="form-select form-select-sm">
-                  <option value="">Choisir...</option>
-                  <option v-for="h in hosts" :key="h.id" :value="h.id">
+                <input
+                  v-model="service.name"
+                  class="form-control form-control-sm"
+                  placeholder="Ex: Vaultwarden"
+                >
+              </td>
+              <td>
+                <input
+                  v-model="service.domain"
+                  class="form-control form-control-sm"
+                  placeholder="vault.example.com"
+                >
+              </td>
+              <td>
+                <input
+                  v-model="service.path"
+                  class="form-control form-control-sm"
+                  placeholder="/"
+                >
+              </td>
+              <td>
+                <input
+                  v-model.number="service.internalPort"
+                  type="number"
+                  class="form-control form-control-sm"
+                  placeholder="3000"
+                >
+              </td>
+              <td>
+                <select
+                  v-model="service.hostId"
+                  class="form-select form-select-sm"
+                >
+                  <option value="">
+                    Choisir...
+                  </option>
+                  <option
+                    v-for="h in hosts"
+                    :key="h.id"
+                    :value="h.id"
+                  >
                     {{ h.name || h.hostname || h.ip_address || h.id }}
                   </option>
                 </select>
               </td>
-              <td><label class="form-check form-switch"><input v-model="service.linkToProxy" class="form-check-input" type="checkbox"></label></td>
-              <td><label class="form-check form-switch"><input v-model="service.linkToAuthelia" class="form-check-input" type="checkbox"></label></td>
-              <td><label class="form-check form-switch"><input v-model="service.exposedToInternet" class="form-check-input" type="checkbox"></label></td>
               <td>
-                <input v-model.number="service.externalPort" type="number" class="form-control form-control-sm" placeholder="443" :disabled="!service.exposedToInternet" style="width: 70px;">
+                <label class="form-check form-switch"><input
+                  v-model="service.linkToProxy"
+                  class="form-check-input"
+                  type="checkbox"
+                ></label>
+              </td>
+              <td>
+                <label class="form-check form-switch"><input
+                  v-model="service.linkToAuthelia"
+                  class="form-check-input"
+                  type="checkbox"
+                ></label>
+              </td>
+              <td>
+                <label class="form-check form-switch"><input
+                  v-model="service.exposedToInternet"
+                  class="form-check-input"
+                  type="checkbox"
+                ></label>
+              </td>
+              <td>
+                <input
+                  v-model.number="service.externalPort"
+                  type="number"
+                  class="form-control form-control-sm"
+                  placeholder="443"
+                  :disabled="!service.exposedToInternet"
+                  style="width: 70px;"
+                >
               </td>
               <td class="text-end">
-                <button class="btn btn-sm btn-outline-danger" @click="removeServiceRow(service.id)">Supprimer</button>
+                <button
+                  class="btn btn-sm btn-outline-danger"
+                  @click="removeServiceRow(service.id)"
+                >
+                  Supprimer
+                </button>
               </td>
             </tr>
             <tr v-if="networkServices.length === 0">
-              <td colspan="10" class="text-center py-4">
-                <div class="text-secondary small">Aucun service configure</div>
-                <div class="text-muted" style="font-size:.8rem">Ajoutez un service pour le faire apparaitre dans la topologie reseau</div>
+              <td
+                colspan="10"
+                class="text-center py-4"
+              >
+                <div class="text-secondary small">
+                  Aucun service configure
+                </div>
+                <div
+                  class="text-muted"
+                  style="font-size:.8rem"
+                >
+                  Ajoutez un service pour le faire apparaitre dans la topologie reseau
+                </div>
               </td>
             </tr>
           </tbody>
@@ -80,12 +170,26 @@
       <label class="form-label">Noeud Authelia (optionnel)</label>
       <div class="network-config-row">
         <div>
-          <input v-model="autheliaLabel" type="text" class="form-control form-control-sm" placeholder="Ex: Authelia">
-          <div class="text-secondary small mt-1">Label affiche dans le graphe</div>
+          <input
+            v-model="autheliaLabel"
+            type="text"
+            class="form-control form-control-sm"
+            placeholder="Ex: Authelia"
+          >
+          <div class="text-secondary small mt-1">
+            Label affiche dans le graphe
+          </div>
         </div>
         <div>
-          <input v-model="autheliaIp" type="text" class="form-control form-control-sm" placeholder="Ex: 192.168.1.11">
-          <div class="text-secondary small mt-1">IP / domaine Authelia</div>
+          <input
+            v-model="autheliaIp"
+            type="text"
+            class="form-control form-control-sm"
+            placeholder="Ex: 192.168.1.11"
+          >
+          <div class="text-secondary small mt-1">
+            IP / domaine Authelia
+          </div>
         </div>
       </div>
     </div>
@@ -94,12 +198,26 @@
       <label class="form-label">Noeud Internet / Routeur (optionnel)</label>
       <div class="network-config-row">
         <div>
-          <input v-model="internetLabel" type="text" class="form-control form-control-sm" placeholder="Ex: Internet">
-          <div class="text-secondary small mt-1">Label affiche dans le graphe</div>
+          <input
+            v-model="internetLabel"
+            type="text"
+            class="form-control form-control-sm"
+            placeholder="Ex: Internet"
+          >
+          <div class="text-secondary small mt-1">
+            Label affiche dans le graphe
+          </div>
         </div>
         <div>
-          <input v-model="internetIp" type="text" class="form-control form-control-sm" placeholder="Ex: 1.2.3.4">
-          <div class="text-secondary small mt-1">IP publique / domaine</div>
+          <input
+            v-model="internetIp"
+            type="text"
+            class="form-control form-control-sm"
+            placeholder="Ex: 1.2.3.4"
+          >
+          <div class="text-secondary small mt-1">
+            IP publique / domaine
+          </div>
         </div>
       </div>
     </div>
@@ -107,18 +225,37 @@
     <div class="network-config-item mt-4">
       <div class="d-flex align-items-center justify-content-between mb-2">
         <label class="form-label mb-0">Ports decouverts par host</label>
-        <div class="text-secondary small">Nommer, masquer, lier au proxy</div>
+        <div class="text-secondary small">
+          Nommer, masquer, lier au proxy
+        </div>
       </div>
       <div class="network-discovered">
-        <div v-for="host in hosts" :key="host.id" class="network-host-block">
+        <div
+          v-for="host in hosts"
+          :key="host.id"
+          class="network-host-block"
+        >
           <div class="network-host-header">
-            <div class="fw-semibold">{{ host.name || host.hostname || host.ip_address || host.id }}</div>
-            <div class="text-secondary small">{{ host.ip_address || 'IP inconnue' }}</div>
+            <div class="fw-semibold">
+              {{ host.name || host.hostname || host.ip_address || host.id }}
+            </div>
+            <div class="text-secondary small">
+              {{ host.ip_address || 'IP inconnue' }}
+            </div>
             <div class="d-flex gap-2 mt-1">
               <span class="badge bg-blue-lt text-blue text-xs">{{ countEnabled(host.id) }} / {{ (discoveredPortsByHost[host.id] || []).length }} ports affiches</span>
-              <span v-if="countProxyLinked(host.id) > 0" class="badge bg-cyan-lt text-cyan text-xs">{{ countProxyLinked(host.id) }} proxy</span>
-              <span v-if="countAutheliaLinked(host.id) > 0" class="badge bg-purple-lt text-purple text-xs">{{ countAutheliaLinked(host.id) }} Authelia</span>
-              <span v-if="countInternetExposed(host.id) > 0" class="badge bg-orange-lt text-orange text-xs">{{ countInternetExposed(host.id) }} Internet</span>
+              <span
+                v-if="countProxyLinked(host.id) > 0"
+                class="badge bg-cyan-lt text-cyan text-xs"
+              >{{ countProxyLinked(host.id) }} proxy</span>
+              <span
+                v-if="countAutheliaLinked(host.id) > 0"
+                class="badge bg-purple-lt text-purple text-xs"
+              >{{ countAutheliaLinked(host.id) }} Authelia</span>
+              <span
+                v-if="countInternetExposed(host.id) > 0"
+                class="badge bg-orange-lt text-orange text-xs"
+              >{{ countInternetExposed(host.id) }} Internet</span>
             </div>
           </div>
           <div class="table-responsive network-config-table">
@@ -135,57 +272,151 @@
                   <th>Authelia</th>
                   <th>Internet</th>
                   <th>Port ext.</th>
-                  <th></th>
+                  <th />
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="port in discoveredPortsByHost[host.id] || []" :key="port.key" :class="portRowClass(host.id, port.port)">
+                <tr
+                  v-for="port in discoveredPortsByHost[host.id] || []"
+                  :key="port.key"
+                  :class="portRowClass(host.id, port.port)"
+                >
                   <td class="fw-semibold">
                     {{ port.port }}
-                    <span v-if="port.internal" class="badge bg-secondary-lt text-secondary ms-1" title="Port interne Docker uniquement, non expose sur l'hote">interne</span>
-                    <div v-if="port.containers?.length" class="text-secondary fw-normal" style="font-size:.75rem;line-height:1.3">{{ port.containers.join(', ') }}</div>
+                    <span
+                      v-if="port.internal"
+                      class="badge bg-secondary-lt text-secondary ms-1"
+                      title="Port interne Docker uniquement, non expose sur l'hote"
+                    >interne</span>
+                    <div
+                      v-if="port.containers?.length"
+                      class="text-secondary fw-normal"
+                      style="font-size:.75rem;line-height:1.3"
+                    >
+                      {{ port.containers.join(', ') }}
+                    </div>
                   </td>
-                  <td class="text-secondary text-uppercase">{{ port.protocol }}</td>
-                  <td><input v-model="getPortSetting(host.id, port.port).name" class="form-control form-control-sm" placeholder="Ex: Vaultwarden"></td>
-                  <td><input v-model="getPortSetting(host.id, port.port).domain" class="form-control form-control-sm" placeholder="vault.example.com"></td>
-                  <td><input v-model="getPortSetting(host.id, port.port).path" class="form-control form-control-sm" placeholder="/"></td>
+                  <td class="text-secondary text-uppercase">
+                    {{ port.protocol }}
+                  </td>
+                  <td>
+                    <input
+                      v-model="getPortSetting(host.id, port.port).name"
+                      class="form-control form-control-sm"
+                      placeholder="Ex: Vaultwarden"
+                    >
+                  </td>
+                  <td>
+                    <input
+                      v-model="getPortSetting(host.id, port.port).domain"
+                      class="form-control form-control-sm"
+                      placeholder="vault.example.com"
+                    >
+                  </td>
+                  <td>
+                    <input
+                      v-model="getPortSetting(host.id, port.port).path"
+                      class="form-control form-control-sm"
+                      placeholder="/"
+                    >
+                  </td>
                   <td>
                     <label class="form-check">
-                      <input :id="`port-enabled-${host.id}-${port.port}`" v-model="getPortSetting(host.id, port.port).enabled" class="form-check-input" type="checkbox" @change="onEnabledChange(host.id, port.port, $event)">
+                      <input
+                        :id="`port-enabled-${host.id}-${port.port}`"
+                        v-model="getPortSetting(host.id, port.port).enabled"
+                        class="form-check-input"
+                        type="checkbox"
+                        @change="onEnabledChange(host.id, port.port, $event)"
+                      >
                     </label>
                   </td>
                   <td>
-                    <label class="form-check form-switch" :title="getPortProxyTooltip(host.id, port.port)">
-                      <input v-model="getPortSetting(host.id, port.port).linkToProxy" class="form-check-input" type="checkbox" :disabled="!getPortSetting(host.id, port.port).enabled">
+                    <label
+                      class="form-check form-switch"
+                      :title="getPortProxyTooltip(host.id, port.port)"
+                    >
+                      <input
+                        v-model="getPortSetting(host.id, port.port).linkToProxy"
+                        class="form-check-input"
+                        type="checkbox"
+                        :disabled="!getPortSetting(host.id, port.port).enabled"
+                      >
                     </label>
                   </td>
                   <td>
                     <label class="form-check form-switch">
-                      <input v-model="getPortSetting(host.id, port.port).linkToAuthelia" class="form-check-input" type="checkbox" :disabled="!getPortSetting(host.id, port.port).enabled">
+                      <input
+                        v-model="getPortSetting(host.id, port.port).linkToAuthelia"
+                        class="form-check-input"
+                        type="checkbox"
+                        :disabled="!getPortSetting(host.id, port.port).enabled"
+                      >
                     </label>
                   </td>
                   <td>
                     <label class="form-check form-switch">
-                      <input v-model="getPortSetting(host.id, port.port).exposedToInternet" class="form-check-input" type="checkbox" :disabled="!getPortSetting(host.id, port.port).enabled">
+                      <input
+                        v-model="getPortSetting(host.id, port.port).exposedToInternet"
+                        class="form-check-input"
+                        type="checkbox"
+                        :disabled="!getPortSetting(host.id, port.port).enabled"
+                      >
                     </label>
                   </td>
                   <td>
-                    <input v-model.number="getPortSetting(host.id, port.port).externalPort" type="number" class="form-control form-control-sm" placeholder="443" :disabled="!getPortSetting(host.id, port.port).exposedToInternet" style="width: 70px;">
+                    <input
+                      v-model.number="getPortSetting(host.id, port.port).externalPort"
+                      type="number"
+                      class="form-control form-control-sm"
+                      placeholder="443"
+                      :disabled="!getPortSetting(host.id, port.port).exposedToInternet"
+                      style="width: 70px;"
+                    >
                   </td>
                   <td class="text-end">
-                    <button v-if="isPortModified(host.id, port.port)" class="btn btn-sm btn-ghost-secondary" title="Reinitialiser ce port" aria-label="Reinitialiser ce port" @click="resetPortSetting(host.id, port.port)">
-                      <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none">
-                        <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                        <path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4"/>
-                        <path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4"/>
+                    <button
+                      v-if="isPortModified(host.id, port.port)"
+                      class="btn btn-sm btn-ghost-secondary"
+                      title="Reinitialiser ce port"
+                      aria-label="Reinitialiser ce port"
+                      @click="resetPortSetting(host.id, port.port)"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        class="icon icon-sm"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        stroke-width="2"
+                        stroke="currentColor"
+                        fill="none"
+                      >
+                        <path
+                          stroke="none"
+                          d="M0 0h24v24H0z"
+                          fill="none"
+                        />
+                        <path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4" />
+                        <path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4" />
                       </svg>
                     </button>
                   </td>
                 </tr>
                 <tr v-if="(discoveredPortsByHost[host.id] || []).length === 0">
-                  <td colspan="7" class="text-center py-4">
-                    <div class="text-secondary small">Aucun port detecte</div>
-                    <div class="text-muted" style="font-size:.8rem">L'agent doit être actif et avoir collecté les données réseau</div>
+                  <td
+                    colspan="7"
+                    class="text-center py-4"
+                  >
+                    <div class="text-secondary small">
+                      Aucun port detecte
+                    </div>
+                    <div
+                      class="text-muted"
+                      style="font-size:.8rem"
+                    >
+                      L'agent doit être actif et avoir collecté les données réseau
+                    </div>
                   </td>
                 </tr>
               </tbody>

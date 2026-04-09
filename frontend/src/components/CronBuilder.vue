@@ -3,10 +3,20 @@
     <div class="d-flex align-items-center justify-content-between mb-2">
       <label class="form-label mb-0">Expression cron</label>
       <div class="btn-group btn-group-sm">
-        <button type="button" class="btn" :class="expertMode ? 'btn-outline-secondary' : 'btn-secondary'" @click="expertMode = false">
+        <button
+          type="button"
+          class="btn"
+          :class="expertMode ? 'btn-outline-secondary' : 'btn-secondary'"
+          @click="expertMode = false"
+        >
           Visuel
         </button>
-        <button type="button" class="btn" :class="expertMode ? 'btn-secondary' : 'btn-outline-secondary'" @click="expertMode = true">
+        <button
+          type="button"
+          class="btn"
+          :class="expertMode ? 'btn-secondary' : 'btn-outline-secondary'"
+          @click="expertMode = true"
+        >
           Expert
         </button>
       </div>
@@ -20,8 +30,10 @@
         class="form-control font-monospace"
         placeholder="0 3 * * 1"
         @input="$emit('update:modelValue', $event.target.value)"
-      />
-      <div class="form-hint">Format : minute heure jour-du-mois mois jour-de-la-semaine</div>
+      >
+      <div class="form-hint">
+        Format : minute heure jour-du-mois mois jour-de-la-semaine
+      </div>
     </div>
 
     <!-- Visual builder -->
@@ -43,26 +55,46 @@
       </div>
 
       <!-- Days of week (hebdomadaire / personnalisé) -->
-      <div v-if="frequency === 'weekly' || frequency === 'custom'" class="mb-2">
+      <div
+        v-if="frequency === 'weekly' || frequency === 'custom'"
+        class="mb-2"
+      >
         <label class="form-label text-secondary small mb-1">Jours</label>
         <div class="d-flex flex-wrap gap-2">
-          <label v-for="d in daysOfWeek" :key="d.value" class="form-check form-check-inline mb-0">
+          <label
+            v-for="d in daysOfWeek"
+            :key="d.value"
+            class="form-check form-check-inline mb-0"
+          >
             <input
               type="checkbox"
               class="form-check-input"
               :checked="selectedDays.includes(d.value)"
               @change="toggleDay(d.value)"
-            />
+            >
             <span class="form-check-label">{{ d.label }}</span>
           </label>
         </div>
       </div>
 
       <!-- Day of month (mensuel) -->
-      <div v-if="frequency === 'monthly'" class="mb-2">
+      <div
+        v-if="frequency === 'monthly'"
+        class="mb-2"
+      >
         <label class="form-label text-secondary small mb-1">Jour du mois</label>
-        <select v-model="dayOfMonth" class="form-select form-select-sm w-auto" @change="buildCron">
-          <option v-for="d in 28" :key="d" :value="d">{{ d }}</option>
+        <select
+          v-model="dayOfMonth"
+          class="form-select form-select-sm w-auto"
+          @change="buildCron"
+        >
+          <option
+            v-for="d in 28"
+            :key="d"
+            :value="d"
+          >
+            {{ d }}
+          </option>
         </select>
       </div>
 
@@ -70,22 +102,58 @@
       <div class="d-flex gap-3 mb-2">
         <div>
           <label class="form-label text-secondary small mb-1">Heure</label>
-          <select v-model="hour" class="form-select form-select-sm" @change="buildCron">
-            <option v-for="h in 24" :key="h - 1" :value="h - 1">{{ String(h - 1).padStart(2, '0') }}</option>
+          <select
+            v-model="hour"
+            class="form-select form-select-sm"
+            @change="buildCron"
+          >
+            <option
+              v-for="h in 24"
+              :key="h - 1"
+              :value="h - 1"
+            >
+              {{ String(h - 1).padStart(2, '0') }}
+            </option>
           </select>
         </div>
         <div>
           <label class="form-label text-secondary small mb-1">Minute</label>
-          <select v-model="minute" class="form-select form-select-sm" @change="buildCron">
-            <option v-for="m in minuteOptions" :key="m" :value="m">{{ String(m).padStart(2, '0') }}</option>
+          <select
+            v-model="minute"
+            class="form-select form-select-sm"
+            @change="buildCron"
+          >
+            <option
+              v-for="m in minuteOptions"
+              :key="m"
+              :value="m"
+            >
+              {{ String(m).padStart(2, '0') }}
+            </option>
           </select>
         </div>
       </div>
 
       <!-- Preview -->
-      <div v-if="preview" class="form-hint text-primary">
-        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="me-1">
-          <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+      <div
+        v-if="preview"
+        class="form-hint text-primary"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          class="me-1"
+        >
+          <circle
+            cx="12"
+            cy="12"
+            r="10"
+          /><polyline points="12 6 12 12 16 14" />
         </svg>
         {{ preview }}
         <code class="ms-2 text-muted small">{{ modelValue }}</code>

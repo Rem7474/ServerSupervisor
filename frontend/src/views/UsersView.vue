@@ -3,23 +3,43 @@
     <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
       <div>
         <div class="page-pretitle">
-          <router-link to="/" class="text-decoration-none">Dashboard</router-link>
+          <router-link
+            to="/"
+            class="text-decoration-none"
+          >
+            Dashboard
+          </router-link>
           <span class="text-muted mx-1">/</span>
           <span>Utilisateurs</span>
         </div>
-        <h2 class="page-title">Utilisateurs</h2>
-        <div class="text-secondary">Gestion des rôles (admin / operator / viewer)</div>
+        <h2 class="page-title">
+          Utilisateurs
+        </h2>
+        <div class="text-secondary">
+          Gestion des rôles (admin / operator / viewer)
+        </div>
       </div>
-      <button class="btn btn-outline-secondary" @click="fetchUsers" :disabled="loading">Actualiser</button>
+      <button
+        class="btn btn-outline-secondary"
+        :disabled="loading"
+        @click="fetchUsers"
+      >
+        Actualiser
+      </button>
     </div>
 
     <!-- Create User Form -->
     <div class="card mb-4">
       <div class="card-header">
-        <h3 class="card-title">Ajouter un utilisateur</h3>
+        <h3 class="card-title">
+          Ajouter un utilisateur
+        </h3>
       </div>
       <div class="card-body">
-        <form @submit.prevent="createUser" autocomplete="off">
+        <form
+          autocomplete="off"
+          @submit.prevent="createUser"
+        >
           <div class="row g-3">
             <div class="col-md-4">
               <label class="form-label">Nom d'utilisateur</label>
@@ -34,7 +54,7 @@
                 spellcheck="false"
                 required
                 :disabled="creatingUser"
-              />
+              >
             </div>
             <div class="col-md-4">
               <label class="form-label">Mot de passe</label>
@@ -47,24 +67,43 @@
                 autocomplete="new-password"
                 required
                 :disabled="creatingUser"
-              />
+              >
             </div>
             <div class="col-md-3">
               <label class="form-label">Rôle</label>
-              <select v-model="newUserForm.role" class="form-select" :disabled="creatingUser" name="role" autocomplete="off">
-                <option value="viewer">viewer</option>
-                <option value="operator">operator</option>
-                <option value="admin">admin</option>
+              <select
+                v-model="newUserForm.role"
+                class="form-select"
+                :disabled="creatingUser"
+                name="role"
+                autocomplete="off"
+              >
+                <option value="viewer">
+                  viewer
+                </option>
+                <option value="operator">
+                  operator
+                </option>
+                <option value="admin">
+                  admin
+                </option>
               </select>
             </div>
             <div class="col-md-1 d-flex align-items-end">
-              <button type="submit" class="btn btn-primary w-100" :disabled="creatingUser">
+              <button
+                type="submit"
+                class="btn btn-primary w-100"
+                :disabled="creatingUser"
+              >
                 {{ creatingUser ? 'Création...' : 'Ajouter' }}
               </button>
             </div>
           </div>
         </form>
-        <div v-if="createMessage" :class="['alert mt-3 mb-0', createSuccess ? 'alert-success' : 'alert-danger']">
+        <div
+          v-if="createMessage"
+          :class="['alert mt-3 mb-0', createSuccess ? 'alert-success' : 'alert-danger']"
+        >
           {{ createMessage }}
         </div>
       </div>
@@ -79,42 +118,61 @@
               <th>Utilisateur</th>
               <th>Rôle</th>
               <th>Création</th>
-              <th style="width: 200px;"></th>
+              <th style="width: 200px;" />
             </tr>
           </thead>
           <tbody>
-            <tr v-for="user in users" :key="user.id">
+            <tr
+              v-for="user in users"
+              :key="user.id"
+            >
               <td class="fw-semibold">
                 {{ user.username }}
-                <span v-if="user.username === auth.username" class="badge bg-blue-lt text-blue ms-2">Vous</span>
+                <span
+                  v-if="user.username === auth.username"
+                  class="badge bg-blue-lt text-blue ms-2"
+                >Vous</span>
               </td>
               <td>
                 <select 
                   v-model="user.role" 
                   class="form-select form-select-sm" 
                   :disabled="saving || user.username === auth.username"
-                  @change="saveRole(user)"
                   :title="user.username === auth.username ? 'Impossible de modifier votre propre rôle' : ''"
+                  @change="saveRole(user)"
                 >
-                  <option value="viewer">viewer</option>
-                  <option value="operator">operator</option>
-                  <option value="admin">admin</option>
+                  <option value="viewer">
+                    viewer
+                  </option>
+                  <option value="operator">
+                    operator
+                  </option>
+                  <option value="admin">
+                    admin
+                  </option>
                 </select>
               </td>
-              <td class="text-secondary small">{{ formatDate(user.created_at) }}</td>
+              <td class="text-secondary small">
+                {{ formatDate(user.created_at) }}
+              </td>
               <td class="text-end">
                 <button 
                   class="btn btn-sm btn-danger"
-                  @click="deleteUser(user)"
                   :disabled="saving || user.username === auth.username || (isLastAdmin(user.id) && user.role === 'admin')"
                   :title="getDeleteButtonTitle(user)"
+                  @click="deleteUser(user)"
                 >
                   Supprimer
                 </button>
               </td>
             </tr>
             <tr v-if="!users.length && !loading">
-              <td colspan="4" class="text-center text-secondary py-4">Aucun utilisateur</td>
+              <td
+                colspan="4"
+                class="text-center text-secondary py-4"
+              >
+                Aucun utilisateur
+              </td>
             </tr>
           </tbody>
         </table>

@@ -1,57 +1,115 @@
 <template>
   <div class="card mb-4">
     <div class="card-header d-flex align-items-center justify-content-between">
-      <h3 class="card-title mb-0">Proxmox VE</h3>
-      <button v-if="authIsAdmin && !showForm" class="btn btn-sm btn-primary" @click="openAddForm">
+      <h3 class="card-title mb-0">
+        Proxmox VE
+      </h3>
+      <button
+        v-if="authIsAdmin && !showForm"
+        class="btn btn-sm btn-primary"
+        @click="openAddForm"
+      >
         + Ajouter une connexion
       </button>
     </div>
 
     <!-- Add / Edit form -->
-    <div v-if="showForm && authIsAdmin" class="card-body border-bottom">
+    <div
+      v-if="showForm && authIsAdmin"
+      class="card-body border-bottom"
+    >
       <div class="row g-3">
         <div class="col-md-6">
           <label class="form-label">Nom *</label>
-          <input v-model="form.name" type="text" class="form-control" placeholder="Mon cluster PVE" />
+          <input
+            v-model="form.name"
+            type="text"
+            class="form-control"
+            placeholder="Mon cluster PVE"
+          >
         </div>
         <div class="col-md-6">
           <label class="form-label">URL API *</label>
-          <input v-model="form.api_url" type="text" class="form-control" placeholder="https://pve.example.com:8006/api2/json" />
+          <input
+            v-model="form.api_url"
+            type="text"
+            class="form-control"
+            placeholder="https://pve.example.com:8006/api2/json"
+          >
         </div>
         <div class="col-md-6">
           <label class="form-label">Token ID *</label>
-          <input v-model="form.token_id" type="text" class="form-control" placeholder="root@pam!supervision" />
+          <input
+            v-model="form.token_id"
+            type="text"
+            class="form-control"
+            placeholder="root@pam!supervision"
+          >
         </div>
         <div class="col-md-6">
           <label class="form-label">Token secret {{ editingId ? '(vide = inchangé)' : '*' }}</label>
-          <input v-model="form.token_secret" type="password" class="form-control" autocomplete="new-password" />
+          <input
+            v-model="form.token_secret"
+            type="password"
+            class="form-control"
+            autocomplete="new-password"
+          >
         </div>
         <div class="col-md-4">
           <label class="form-label">Intervalle de collecte (s)</label>
-          <input v-model.number="form.poll_interval_sec" type="number" class="form-control" min="10" />
+          <input
+            v-model.number="form.poll_interval_sec"
+            type="number"
+            class="form-control"
+            min="10"
+          >
         </div>
         <div class="col-md-4 d-flex align-items-end gap-3">
           <label class="form-check form-switch mb-0">
-            <input v-model="form.insecure_skip_verify" class="form-check-input" type="checkbox" />
+            <input
+              v-model="form.insecure_skip_verify"
+              class="form-check-input"
+              type="checkbox"
+            >
             <span class="form-check-label">Ignorer TLS (self-signed)</span>
           </label>
         </div>
         <div class="col-md-4 d-flex align-items-end gap-3">
           <label class="form-check form-switch mb-0">
-            <input v-model="form.enabled" class="form-check-input" type="checkbox" />
+            <input
+              v-model="form.enabled"
+              class="form-check-input"
+              type="checkbox"
+            >
             <span class="form-check-label">Activé</span>
           </label>
         </div>
       </div>
       <div class="mt-3 d-flex align-items-center gap-2">
-        <button class="btn btn-primary" :disabled="saving" @click="save">
+        <button
+          class="btn btn-primary"
+          :disabled="saving"
+          @click="save"
+        >
           {{ saving ? 'Enregistrement...' : (editingId ? 'Mettre à jour' : 'Créer') }}
         </button>
-        <button class="btn btn-outline-secondary" @click="cancelForm">Annuler</button>
-        <button class="btn btn-outline-info ms-2" :disabled="testing" @click="testForm">
+        <button
+          class="btn btn-outline-secondary"
+          @click="cancelForm"
+        >
+          Annuler
+        </button>
+        <button
+          class="btn btn-outline-info ms-2"
+          :disabled="testing"
+          @click="testForm"
+        >
           {{ testing ? 'Test...' : 'Tester la connexion' }}
         </button>
-        <span v-if="formMsg" :class="['ms-auto small', formOk ? 'text-success' : 'text-danger']">{{ formMsg }}</span>
+        <span
+          v-if="formMsg"
+          :class="['ms-auto small', formOk ? 'text-success' : 'text-danger']"
+        >{{ formMsg }}</span>
       </div>
     </div>
 
@@ -67,53 +125,125 @@
             <th>Guests</th>
             <th>Statut</th>
             <th>Dernier contact</th>
-            <th v-if="authIsAdmin"></th>
+            <th v-if="authIsAdmin" />
           </tr>
         </thead>
         <tbody>
           <tr v-if="instances.length === 0">
-            <td colspan="8" class="text-center text-muted py-4">
+            <td
+              colspan="8"
+              class="text-center text-muted py-4"
+            >
               Aucune connexion Proxmox configurée.
             </td>
           </tr>
-          <tr v-for="inst in instances" :key="inst.id">
-            <td class="fw-medium">{{ inst.name }}</td>
-            <td class="text-muted small">{{ inst.api_url }}</td>
-            <td class="text-muted small">{{ inst.token_id }}</td>
+          <tr
+            v-for="inst in instances"
+            :key="inst.id"
+          >
+            <td class="fw-medium">
+              {{ inst.name }}
+            </td>
+            <td class="text-muted small">
+              {{ inst.api_url }}
+            </td>
+            <td class="text-muted small">
+              {{ inst.token_id }}
+            </td>
             <td>{{ inst.node_count }}</td>
             <td>{{ inst.guest_count }}</td>
             <td>
-              <span v-if="!inst.enabled" class="badge bg-secondary-lt text-secondary">Désactivé</span>
-              <span v-else-if="inst.last_error" class="badge bg-danger-lt text-danger" :title="inst.last_error">Erreur</span>
-              <span v-else-if="inst.last_success_at" class="badge bg-success-lt text-success">OK</span>
-              <span v-else class="badge bg-warning-lt text-warning">En attente</span>
+              <span
+                v-if="!inst.enabled"
+                class="badge bg-secondary-lt text-secondary"
+              >Désactivé</span>
+              <span
+                v-else-if="inst.last_error"
+                class="badge bg-danger-lt text-danger"
+                :title="inst.last_error"
+              >Erreur</span>
+              <span
+                v-else-if="inst.last_success_at"
+                class="badge bg-success-lt text-success"
+              >OK</span>
+              <span
+                v-else
+                class="badge bg-warning-lt text-warning"
+              >En attente</span>
             </td>
             <td class="text-muted small">
               <span v-if="inst.last_success_at">{{ formatDate(inst.last_success_at) }}</span>
               <span v-else>—</span>
             </td>
-            <td v-if="authIsAdmin" class="text-end">
+            <td
+              v-if="authIsAdmin"
+              class="text-end"
+            >
               <div class="d-flex gap-1 justify-content-end">
-                <button class="btn btn-sm btn-outline-secondary" @click="openEditForm(inst)" title="Modifier">
-                  <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
-                    <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                <button
+                  class="btn btn-sm btn-outline-secondary"
+                  title="Modifier"
+                  @click="openEditForm(inst)"
+                >
+                  <svg
+                    class="icon icon-sm"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
+                    <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
                   </svg>
                 </button>
-                <button class="btn btn-sm btn-outline-info" @click="testById(inst)" title="Tester">
-                  <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="10"/><polyline points="12 8 12 12 14 14"/>
+                <button
+                  class="btn btn-sm btn-outline-info"
+                  title="Tester"
+                  @click="testById(inst)"
+                >
+                  <svg
+                    class="icon icon-sm"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <circle
+                      cx="12"
+                      cy="12"
+                      r="10"
+                    /><polyline points="12 8 12 12 14 14" />
                   </svg>
                 </button>
-                <button class="btn btn-sm btn-outline-primary" @click="pollNow(inst)" title="Collecter maintenant">
-                  <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.86"/>
+                <button
+                  class="btn btn-sm btn-outline-primary"
+                  title="Collecter maintenant"
+                  @click="pollNow(inst)"
+                >
+                  <svg
+                    class="icon icon-sm"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 .49-3.86" />
                   </svg>
                 </button>
-                <button class="btn btn-sm btn-outline-danger" @click="remove(inst)" title="Supprimer">
-                  <svg class="icon icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
-                    <path d="M10 11v6M14 11v6M9 6V4h6v2"/>
+                <button
+                  class="btn btn-sm btn-outline-danger"
+                  title="Supprimer"
+                  @click="remove(inst)"
+                >
+                  <svg
+                    class="icon icon-sm"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                  >
+                    <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
+                    <path d="M10 11v6M14 11v6M9 6V4h6v2" />
                   </svg>
                 </button>
               </div>
@@ -123,7 +253,10 @@
       </table>
     </div>
 
-    <div v-if="listMsg" class="card-footer">
+    <div
+      v-if="listMsg"
+      class="card-footer"
+    >
       <span :class="['small', listOk ? 'text-success' : 'text-danger']">{{ listMsg }}</span>
     </div>
   </div>

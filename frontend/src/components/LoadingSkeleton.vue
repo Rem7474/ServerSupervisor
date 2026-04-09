@@ -1,6 +1,14 @@
 <template>
-  <div class="loading-skeleton" :class="`loading-skeleton-${variant}`" aria-hidden="true">
-    <div v-for="n in lines" :key="n" class="loading-skeleton-line"></div>
+  <div
+    class="loading-skeleton"
+    :class="`loading-skeleton-${variant}`"
+    aria-hidden="true"
+  >
+    <div
+      v-for="n in lines"
+      :key="n"
+      class="loading-skeleton-line"
+    />
   </div>
 </template>
 

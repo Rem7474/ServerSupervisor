@@ -11,14 +11,17 @@
               class="form-control ui-toolbar-search"
               :placeholder="searchPlaceholder"
               @input="$emit('update:search', $event.target.value)"
-            />
+            >
           </slot>
         </div>
         <div class="ui-toolbar-right d-flex flex-wrap gap-2 align-items-center justify-content-lg-end">
           <slot name="right" />
         </div>
       </div>
-      <div v-if="$slots.bottom" class="mt-3">
+      <div
+        v-if="$slots.bottom"
+        class="mt-3"
+      >
         <slot name="bottom" />
       </div>
     </div>

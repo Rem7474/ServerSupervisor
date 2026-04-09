@@ -34,11 +34,14 @@
                 v{{ appVersion }}
               </a>
             </li>
-            <li v-if="wsStatus" class="list-inline-item">
+            <li
+              v-if="wsStatus"
+              class="list-inline-item"
+            >
               <span
                 class="status-dot me-1"
                 :class="wsDotClass"
-              ></span>
+              />
               <span class="text-secondary">{{ wsStatusLabel }}</span>
             </li>
           </ul>
@@ -47,7 +50,12 @@
           <p class="mb-0">
             <span class="text-muted">
               Copyright &copy; {{ year }}
-              <a href="https://github.com/Rem7474" target="_blank" rel="noopener noreferrer" class="link-secondary">ServerSupervisor</a>.
+              <a
+                href="https://github.com/Rem7474"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="link-secondary"
+              >ServerSupervisor</a>.
               Tous droits réservés.
             </span>
           </p>

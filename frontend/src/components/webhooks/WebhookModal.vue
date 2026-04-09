@@ -1,47 +1,99 @@
 <template>
-  <div v-if="visible" class="modal modal-blur show d-block" style="background:rgba(0,0,0,.5)">
+  <div
+    v-if="visible"
+    class="modal modal-blur show d-block"
+    style="background:rgba(0,0,0,.5)"
+  >
     <div class="modal-dialog modal-lg">
       <div class="modal-content">
         <div class="modal-header">
-          <h5 class="modal-title">{{ title }}</h5>
-          <button type="button" class="btn-close" @click="close"></button>
+          <h5 class="modal-title">
+            {{ title }}
+          </h5>
+          <button
+            type="button"
+            class="btn-close"
+            @click="close"
+          />
         </div>
         <div class="modal-body">
-          <div v-if="errorMessage" class="alert alert-danger">{{ errorMessage }}</div>
+          <div
+            v-if="errorMessage"
+            class="alert alert-danger"
+          >
+            {{ errorMessage }}
+          </div>
 
           <div class="row g-3">
             <div class="col-12">
               <label class="form-label required">Nom</label>
-              <input v-model="form.name" type="text" class="form-control" :placeholder="mode === 'webhook' ? 'ex: Deploy mon-app' : 'ex: Mise a jour Home Assistant'" />
+              <input
+                v-model="form.name"
+                type="text"
+                class="form-control"
+                :placeholder="mode === 'webhook' ? 'ex: Deploy mon-app' : 'ex: Mise a jour Home Assistant'"
+              >
             </div>
 
             <!-- ===== WEBHOOK FIELDS ===== -->
             <template v-if="mode === 'webhook'">
               <div class="col-md-6">
                 <label class="form-label required">Provider</label>
-                <select class="form-select" v-model="form.provider">
-                  <option value="github">GitHub</option>
-                  <option value="gitlab">GitLab</option>
-                  <option value="gitea">Gitea</option>
-                  <option value="forgejo">Forgejo</option>
-                  <option value="custom">Custom</option>
+                <select
+                  v-model="form.provider"
+                  class="form-select"
+                >
+                  <option value="github">
+                    GitHub
+                  </option>
+                  <option value="gitlab">
+                    GitLab
+                  </option>
+                  <option value="gitea">
+                    Gitea
+                  </option>
+                  <option value="forgejo">
+                    Forgejo
+                  </option>
+                  <option value="custom">
+                    Custom
+                  </option>
                 </select>
               </div>
               <div class="col-md-6">
                 <label class="form-label">Evenement</label>
-                <select class="form-select" v-model="form.event_filter">
-                  <option value="push">push</option>
-                  <option value="tag">tag / create</option>
-                  <option value="release">release</option>
+                <select
+                  v-model="form.event_filter"
+                  class="form-select"
+                >
+                  <option value="push">
+                    push
+                  </option>
+                  <option value="tag">
+                    tag / create
+                  </option>
+                  <option value="release">
+                    release
+                  </option>
                 </select>
               </div>
               <div class="col-md-6">
                 <label class="form-label">Filtre repo <span class="text-muted">(optionnel)</span></label>
-                <input type="text" class="form-control" v-model="form.repo_filter" placeholder="ex: monorg/mon-app" />
+                <input
+                  v-model="form.repo_filter"
+                  type="text"
+                  class="form-control"
+                  placeholder="ex: monorg/mon-app"
+                >
               </div>
               <div class="col-md-6">
                 <label class="form-label">Filtre branche <span class="text-muted">(optionnel)</span></label>
-                <input type="text" class="form-control" v-model="form.branch_filter" placeholder="ex: main" />
+                <input
+                  v-model="form.branch_filter"
+                  type="text"
+                  class="form-control"
+                  placeholder="ex: main"
+                >
               </div>
             </template>
 
@@ -52,8 +104,16 @@
                 <label class="form-label required">Type de suivi</label>
                 <div class="row g-2">
                   <div class="col-6">
-                    <label class="form-check form-check-inline w-100 p-3 border rounded cursor-pointer" :class="form.tracker_type === 'git' ? 'border-primary bg-primary-lt' : 'border-muted'">
-                      <input class="form-check-input" type="radio" v-model="form.tracker_type" value="git" />
+                    <label
+                      class="form-check form-check-inline w-100 p-3 border rounded cursor-pointer"
+                      :class="form.tracker_type === 'git' ? 'border-primary bg-primary-lt' : 'border-muted'"
+                    >
+                      <input
+                        v-model="form.tracker_type"
+                        class="form-check-input"
+                        type="radio"
+                        value="git"
+                      >
                       <span class="ms-2">
                         <span class="fw-semibold d-block">Release Git</span>
                         <span class="text-muted small">Surveille les nouvelles releases/tags sur GitHub, GitLab ou Gitea</span>
@@ -61,8 +121,16 @@
                     </label>
                   </div>
                   <div class="col-6">
-                    <label class="form-check form-check-inline w-100 p-3 border rounded cursor-pointer" :class="form.tracker_type === 'docker' ? 'border-primary bg-primary-lt' : 'border-muted'">
-                      <input class="form-check-input" type="radio" v-model="form.tracker_type" value="docker" />
+                    <label
+                      class="form-check form-check-inline w-100 p-3 border rounded cursor-pointer"
+                      :class="form.tracker_type === 'docker' ? 'border-primary bg-primary-lt' : 'border-muted'"
+                    >
+                      <input
+                        v-model="form.tracker_type"
+                        class="form-check-input"
+                        type="radio"
+                        value="docker"
+                      >
                       <span class="ms-2">
                         <span class="fw-semibold d-block">Image Docker</span>
                         <span class="text-muted small">Detecte quand une nouvelle image est poussee sur le registre</span>
@@ -76,19 +144,38 @@
               <template v-if="form.tracker_type === 'git'">
                 <div class="col-md-4">
                   <label class="form-label required">Provider</label>
-                  <select class="form-select" v-model="form.provider">
-                    <option value="github">GitHub</option>
-                    <option value="gitlab">GitLab</option>
-                    <option value="gitea">Gitea (Codeberg)</option>
+                  <select
+                    v-model="form.provider"
+                    class="form-select"
+                  >
+                    <option value="github">
+                      GitHub
+                    </option>
+                    <option value="gitlab">
+                      GitLab
+                    </option>
+                    <option value="gitea">
+                      Gitea (Codeberg)
+                    </option>
                   </select>
                 </div>
                 <div class="col-md-4">
                   <label class="form-label required">Owner / Org</label>
-                  <input type="text" class="form-control" v-model="form.repo_owner" placeholder="ex: home-assistant" />
+                  <input
+                    v-model="form.repo_owner"
+                    type="text"
+                    class="form-control"
+                    placeholder="ex: home-assistant"
+                  >
                 </div>
                 <div class="col-md-4">
                   <label class="form-label required">Depot</label>
-                  <input type="text" class="form-control" v-model="form.repo_name" placeholder="ex: core" />
+                  <input
+                    v-model="form.repo_name"
+                    type="text"
+                    class="form-control"
+                    placeholder="ex: core"
+                  >
                 </div>
               </template>
 
@@ -96,43 +183,106 @@
               <template v-else>
                 <div class="col-md-8">
                   <label class="form-label required">Image Docker</label>
-                  <input type="text" class="form-control" v-model="form.docker_image" placeholder="ex: homeassistant/home-assistant, nginx, ghcr.io/user/app" />
-                  <div class="form-hint">Nom de l'image sans le tag (registre Docker Hub par defaut).</div>
+                  <input
+                    v-model="form.docker_image"
+                    type="text"
+                    class="form-control"
+                    placeholder="ex: homeassistant/home-assistant, nginx, ghcr.io/user/app"
+                  >
+                  <div class="form-hint">
+                    Nom de l'image sans le tag (registre Docker Hub par defaut).
+                  </div>
                 </div>
                 <div class="col-md-4">
                   <label class="form-label required">Tag surveille</label>
-                  <input type="text" class="form-control" v-model="form.docker_tag" placeholder="latest" />
-                  <div class="form-hint">Tag de l'image a surveiller.</div>
+                  <input
+                    v-model="form.docker_tag"
+                    type="text"
+                    class="form-control"
+                    placeholder="latest"
+                  >
+                  <div class="form-hint">
+                    Tag de l'image a surveiller.
+                  </div>
                 </div>
               </template>
             </template>
 
             <!-- VM + Task -->
             <!-- Docker trackers: optional dispatch toggle -->
-            <div v-if="mode === 'tracker' && form.tracker_type === 'docker'" class="col-12">
+            <div
+              v-if="mode === 'tracker' && form.tracker_type === 'docker'"
+              class="col-12"
+            >
               <label class="form-check form-switch">
-                <input class="form-check-input" type="checkbox" v-model="form.dispatch_task" />
+                <input
+                  v-model="form.dispatch_task"
+                  class="form-check-input"
+                  type="checkbox"
+                >
                 <span class="form-check-label fw-medium">Declencher une tache lors d'une mise a jour</span>
               </label>
-              <div class="form-hint text-muted">Si desactive, le tracker surveille uniquement et enregistre la version sans executer de script.</div>
+              <div class="form-hint text-muted">
+                Si desactive, le tracker surveille uniquement et enregistre la version sans executer de script.
+              </div>
             </div>
 
             <template v-if="mode === 'webhook' || form.tracker_type === 'git' || form.dispatch_task">
               <div class="col-md-6">
-                <label class="form-label" :class="(mode === 'webhook' || form.tracker_type === 'git') ? 'required' : ''">VM cible</label>
-                <select class="form-select" v-model="form.host_id">
-                  <option value="">-- Selectionner un hote --</option>
-                  <option v-for="host in hosts" :key="host.id" :value="host.id">{{ host.name }}</option>
+                <label
+                  class="form-label"
+                  :class="(mode === 'webhook' || form.tracker_type === 'git') ? 'required' : ''"
+                >VM cible</label>
+                <select
+                  v-model="form.host_id"
+                  class="form-select"
+                >
+                  <option value="">
+                    -- Selectionner un hote --
+                  </option>
+                  <option
+                    v-for="host in hosts"
+                    :key="host.id"
+                    :value="host.id"
+                  >
+                    {{ host.name }}
+                  </option>
                 </select>
               </div>
               <div class="col-md-6">
-                <label class="form-label" :class="(mode === 'webhook' || form.tracker_type === 'git') ? 'required' : ''">Tache (tasks.yaml)</label>
-                <select v-if="customTasks.length" class="form-select" v-model="form.custom_task_id">
-                  <option value="" disabled>-- Selectionner une tache --</option>
-                  <option v-for="task in customTasks" :key="task.id" :value="task.id">{{ task.name }} ({{ task.id }})</option>
+                <label
+                  class="form-label"
+                  :class="(mode === 'webhook' || form.tracker_type === 'git') ? 'required' : ''"
+                >Tache (tasks.yaml)</label>
+                <select
+                  v-if="customTasks.length"
+                  v-model="form.custom_task_id"
+                  class="form-select"
+                >
+                  <option
+                    value=""
+                    disabled
+                  >
+                    -- Selectionner une tache --
+                  </option>
+                  <option
+                    v-for="task in customTasks"
+                    :key="task.id"
+                    :value="task.id"
+                  >
+                    {{ task.name }} ({{ task.id }})
+                  </option>
                 </select>
-                <input v-else type="text" class="form-control" v-model="form.custom_task_id" :placeholder="mode === 'webhook' ? 'ex: deploy-mon-app' : 'ex: update-home-assistant'" />
-                <div class="form-hint">Correspond a l'<code>id</code> dans <code>tasks.yaml</code> de l'agent.</div>
+                <input
+                  v-else
+                  v-model="form.custom_task_id"
+                  type="text"
+                  class="form-control"
+                  :placeholder="mode === 'webhook' ? 'ex: deploy-mon-app' : 'ex: update-home-assistant'"
+                >
+                <div class="form-hint">
+                  Correspond a l'<code>id</code> dans <code>tasks.yaml</code> de l'agent.
+                </div>
               </div>
             </template>
 
@@ -140,22 +290,52 @@
             <div class="col-12">
               <label class="form-label">Notifications</label>
               <div class="d-flex flex-wrap gap-3 mt-1">
-                <label v-if="mode === 'webhook'" class="form-check">
-                  <input class="form-check-input" type="checkbox" v-model="form.notify_on_success" />
+                <label
+                  v-if="mode === 'webhook'"
+                  class="form-check"
+                >
+                  <input
+                    v-model="form.notify_on_success"
+                    class="form-check-input"
+                    type="checkbox"
+                  >
                   <span class="form-check-label">En cas de succes</span>
                 </label>
-                <label v-if="mode === 'webhook'" class="form-check">
-                  <input class="form-check-input" type="checkbox" v-model="form.notify_on_failure" />
+                <label
+                  v-if="mode === 'webhook'"
+                  class="form-check"
+                >
+                  <input
+                    v-model="form.notify_on_failure"
+                    class="form-check-input"
+                    type="checkbox"
+                  >
                   <span class="form-check-label">En cas d'echec</span>
                 </label>
-                <label v-if="mode === 'tracker'" class="form-check">
-                  <input class="form-check-input" type="checkbox" v-model="form.notify_on_release" />
+                <label
+                  v-if="mode === 'tracker'"
+                  class="form-check"
+                >
+                  <input
+                    v-model="form.notify_on_release"
+                    class="form-check-input"
+                    type="checkbox"
+                  >
                   <span class="form-check-label">Notifier a chaque mise a jour detectee</span>
                 </label>
               </div>
               <div class="d-flex flex-wrap gap-3 mt-2">
-                <label v-for="channel in ['smtp', 'ntfy', 'browser']" :key="channel" class="form-check">
-                  <input class="form-check-input" type="checkbox" :value="channel" v-model="form.notify_channels" />
+                <label
+                  v-for="channel in ['smtp', 'ntfy', 'browser']"
+                  :key="channel"
+                  class="form-check"
+                >
+                  <input
+                    v-model="form.notify_channels"
+                    class="form-check-input"
+                    type="checkbox"
+                    :value="channel"
+                  >
                   <span class="form-check-label">{{ channel }}</span>
                 </label>
               </div>
@@ -163,21 +343,37 @@
 
             <div class="col-12">
               <label class="form-check form-switch">
-                <input class="form-check-input" type="checkbox" v-model="form.enabled" />
+                <input
+                  v-model="form.enabled"
+                  class="form-check-input"
+                  type="checkbox"
+                >
                 <span class="form-check-label">Active</span>
               </label>
             </div>
           </div>
 
           <!-- Env vars table for trackers -->
-          <div v-if="mode === 'tracker'" class="mt-3 pt-3 border-top">
-            <div class="text-muted small mb-2">Variables injectees dans votre script :</div>
+          <div
+            v-if="mode === 'tracker'"
+            class="mt-3 pt-3 border-top"
+          >
+            <div class="text-muted small mb-2">
+              Variables injectees dans votre script :
+            </div>
             <div class="table-responsive">
               <table class="table table-sm mb-0">
                 <tbody>
-                  <tr v-for="variable in currentEnvVars" :key="variable.name">
-                    <td class="py-1"><code class="small">{{ variable.name }}</code></td>
-                    <td class="py-1 text-muted small">{{ variable.desc }}</td>
+                  <tr
+                    v-for="variable in currentEnvVars"
+                    :key="variable.name"
+                  >
+                    <td class="py-1">
+                      <code class="small">{{ variable.name }}</code>
+                    </td>
+                    <td class="py-1 text-muted small">
+                      {{ variable.desc }}
+                    </td>
                   </tr>
                 </tbody>
               </table>
@@ -185,8 +381,17 @@
           </div>
         </div>
         <div class="modal-footer">
-          <button class="btn btn-secondary" @click="close">Annuler</button>
-          <button class="btn btn-primary" @click="submit" :disabled="saving">
+          <button
+            class="btn btn-secondary"
+            @click="close"
+          >
+            Annuler
+          </button>
+          <button
+            class="btn btn-primary"
+            :disabled="saving"
+            @click="submit"
+          >
             {{ saving ? 'Enregistrement...' : submitLabel }}
           </button>
         </div>

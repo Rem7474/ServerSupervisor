@@ -7,8 +7,14 @@
     stroke="currentColor"
     viewBox="0 0 24 24"
   >
-    <template v-for="(el, idx) in resolved.elements" :key="`${name}-${idx}`">
-      <component :is="el.tag" v-bind="el.attrs" />
+    <template
+      v-for="(el, idx) in resolved.elements"
+      :key="`${name}-${idx}`"
+    >
+      <component
+        :is="el.tag"
+        v-bind="el.attrs"
+      />
     </template>
   </svg>
 </template>

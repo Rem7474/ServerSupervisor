@@ -1,11 +1,25 @@
 <template>
   <div>
-    <div v-if="hasError" class="alert alert-danger d-flex justify-content-between align-items-start gap-3" role="alert">
+    <div
+      v-if="hasError"
+      class="alert alert-danger d-flex justify-content-between align-items-start gap-3"
+      role="alert"
+    >
       <div>
-        <div class="fw-semibold">Une erreur inattendue est survenue dans l'interface.</div>
-        <div class="small opacity-75">{{ errorMessage }}</div>
+        <div class="fw-semibold">
+          Une erreur inattendue est survenue dans l'interface.
+        </div>
+        <div class="small opacity-75">
+          {{ errorMessage }}
+        </div>
       </div>
-      <button type="button" class="btn btn-sm btn-danger" @click="resetBoundary">Réessayer</button>
+      <button
+        type="button"
+        class="btn btn-sm btn-danger"
+        @click="resetBoundary"
+      >
+        Réessayer
+      </button>
     </div>
     <slot v-else />
   </div>

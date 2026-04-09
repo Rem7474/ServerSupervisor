@@ -45,7 +45,7 @@ export const ALERT_METRICS: Record<string, AlertMetricMeta> = {
   heartbeat_timeout: {
     label: 'Heartbeat',
     unit: 's',
-    icon: '\ud83e\dec0',
+    icon: '\ud83e\udec0',
     badgeClass: 'bg-orange-lt text-orange',
     category: 'host',
   },

@@ -1,8 +1,17 @@
 <template>
-  <div v-if="cves.length > 0" class="my-2">
-    <div v-if="showMaxSeverity" class="d-flex align-items-center mb-2">
+  <div
+    v-if="cves.length > 0"
+    class="my-2"
+  >
+    <div
+      v-if="showMaxSeverity"
+      class="d-flex align-items-center mb-2"
+    >
       <span class="fw-semibold me-2">Criticité max:</span>
-      <span :class="maxSeverityClass" class="badge">
+      <span
+        :class="maxSeverityClass"
+        class="badge"
+      >
         {{ maxSeverity }}
       </span>
       <span class="text-secondary small ms-2">({{ cves.length }} CVE{{ cves.length > 1 ? 's' : '' }})</span>
@@ -12,15 +21,22 @@
       {{ packageGroups.length }} paquet{{ packageGroups.length > 1 ? 's' : '' }} avec CVE
     </div>
     
-    <div v-if="!collapsed || alwaysExpanded" class="cve-groups">
+    <div
+      v-if="!collapsed || alwaysExpanded"
+      class="cve-groups"
+    >
       <div
         v-for="group in displayedPackageGroups"
         :key="group.packageName"
         class="cve-group-row"
       >
         <div class="cve-group-package">
-          <div class="fw-semibold">{{ group.packageName }}</div>
-          <div class="text-secondary small">{{ group.cves.length }} CVE{{ group.cves.length > 1 ? 's' : '' }}</div>
+          <div class="fw-semibold">
+            {{ group.packageName }}
+          </div>
+          <div class="text-secondary small">
+            {{ group.cves.length }} CVE{{ group.cves.length > 1 ? 's' : '' }}
+          </div>
         </div>
         <div class="cve-group-items">
           <div
@@ -28,17 +44,26 @@
             :key="`${group.packageName}-${cve.id}-${index}`"
             class="d-flex align-items-center gap-2"
           >
-            <CVEBadge :cve="cve" :showIcon="true" />
-            <span :class="severityClass(cve.severity)" class="badge">{{ normalizeSeverity(cve.severity) }}</span>
-            <span v-if="cve.cvss_score" class="text-secondary small">CVSS {{ cve.cvss_score.toFixed(1) }}</span>
+            <CVEBadge
+              :cve="cve"
+              :show-icon="true"
+            />
+            <span
+              :class="severityClass(cve.severity)"
+              class="badge"
+            >{{ normalizeSeverity(cve.severity) }}</span>
+            <span
+              v-if="cve.cvss_score"
+              class="text-secondary small"
+            >CVSS {{ cve.cvss_score.toFixed(1) }}</span>
           </div>
         </div>
       </div>
 
       <button
         v-if="packageGroups.length > limit && !showAll"
-        @click="showAll = true"
         class="btn btn-sm btn-link p-0 mt-2"
+        @click="showAll = true"
       >
         +{{ packageGroups.length - limit }} paquet{{ packageGroups.length - limit > 1 ? 's' : '' }}...
       </button>
@@ -46,13 +71,16 @@
     
     <button 
       v-if="!alwaysExpanded"
-      @click="collapsed = !collapsed"
       class="btn btn-sm btn-link p-0 mt-1"
+      @click="collapsed = !collapsed"
     >
       {{ collapsed ? `Afficher ${cves.length} CVE${cves.length > 1 ? 's' : ''}` : 'Masquer' }}
     </button>
   </div>
-  <div v-else class="text-secondary small">
+  <div
+    v-else
+    class="text-secondary small"
+  >
     Aucune CVE détectée
   </div>
 </template>

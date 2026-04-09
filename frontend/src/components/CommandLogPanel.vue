@@ -1,13 +1,29 @@
 <template>
   <!-- Side panel -->
-  <div v-show="show" :class="wrapperClass">
+  <div
+    v-show="show"
+    :class="wrapperClass"
+  >
     <div class="card d-flex flex-column h-100">
       <div class="card-header d-flex align-items-center justify-content-between">
         <h3 class="card-title">
-          <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler me-1" width="24" height="24"
-            viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"
-            stroke-linecap="round" stroke-linejoin="round">
-            <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="icon icon-tabler me-1"
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            stroke-width="2"
+            stroke="currentColor"
+            fill="none"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path
+              stroke="none"
+              d="M0 0h24v24H0z"
+              fill="none"
+            />
             <path d="M8 9l3 3l-3 3" />
             <path d="M13 15l3 0" />
             <path d="M3 4m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z" />
@@ -22,17 +38,45 @@
             :disabled="!command"
             @click="copy"
           >
-            <svg v-if="!copied" xmlns="http://www.w3.org/2000/svg" class="icon" width="18" height="18"
-              viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"
-              stroke-linecap="round" stroke-linejoin="round">
-              <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+            <svg
+              v-if="!copied"
+              xmlns="http://www.w3.org/2000/svg"
+              class="icon"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              stroke-width="2"
+              stroke="currentColor"
+              fill="none"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path
+                stroke="none"
+                d="M0 0h24v24H0z"
+                fill="none"
+              />
               <path d="M8 8m0 2a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2z" />
               <path d="M16 8v-2a2 2 0 0 0 -2 -2h-8a2 2 0 0 0 -2 2v8a2 2 0 0 0 2 2h2" />
             </svg>
-            <svg v-else xmlns="http://www.w3.org/2000/svg" class="icon text-success" width="18" height="18"
-              viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"
-              stroke-linecap="round" stroke-linejoin="round">
-              <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+            <svg
+              v-else
+              xmlns="http://www.w3.org/2000/svg"
+              class="icon text-success"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              stroke-width="2"
+              stroke="currentColor"
+              fill="none"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path
+                stroke="none"
+                d="M0 0h24v24H0z"
+                fill="none"
+              />
               <path d="M5 12l5 5l10 -10" />
             </svg>
           </button>
@@ -43,10 +87,23 @@
             :disabled="!command"
             @click="download"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="18" height="18"
-              viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"
-              stroke-linecap="round" stroke-linejoin="round">
-              <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="icon"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              stroke-width="2"
+              stroke="currentColor"
+              fill="none"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path
+                stroke="none"
+                d="M0 0h24v24H0z"
+                fill="none"
+              />
               <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2" />
               <path d="M7 11l5 5l5 -5" />
               <path d="M12 4l0 12" />
@@ -60,10 +117,23 @@
             :disabled="!command"
             @click="$emit('clear')"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="18" height="18"
-              viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"
-              stroke-linecap="round" stroke-linejoin="round">
-              <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="icon"
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              stroke-width="2"
+              stroke="currentColor"
+              fill="none"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path
+                stroke="none"
+                d="M0 0h24v24H0z"
+                fill="none"
+              />
               <path d="M4 7h16" /><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12" />
               <path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3" />
             </svg>
@@ -74,10 +144,23 @@
             title="Fermer"
             @click="$emit('close')"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24"
-              viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"
-              stroke-linecap="round" stroke-linejoin="round">
-              <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="icon"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              stroke-width="2"
+              stroke="currentColor"
+              fill="none"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path
+                stroke="none"
+                d="M0 0h24v24H0z"
+                fill="none"
+              />
               <path d="M18 6l-12 12" />
               <path d="M6 6l12 12" />
             </svg>
@@ -92,25 +175,51 @@
           class="d-flex align-items-center justify-content-center flex-fill text-secondary console-empty"
         >
           <div class="text-center p-4">
-            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler mb-2 opacity-50" width="48" height="48"
-              viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" fill="none"
-              stroke-linecap="round" stroke-linejoin="round">
-              <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="icon icon-tabler mb-2 opacity-50"
+              width="48"
+              height="48"
+              viewBox="0 0 24 24"
+              stroke-width="1.5"
+              stroke="currentColor"
+              fill="none"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path
+                stroke="none"
+                d="M0 0h24v24H0z"
+                fill="none"
+              />
               <path d="M8 9l3 3l-3 3" />
               <path d="M13 15l3 0" />
               <path d="M3 4m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z" />
             </svg>
-            <div class="opacity-75">{{ emptyText }}</div>
-            <div class="small mt-1 opacity-50">Cliquez sur "Logs" pour afficher la sortie d'une commande</div>
+            <div class="opacity-75">
+              {{ emptyText }}
+            </div>
+            <div class="small mt-1 opacity-50">
+              Cliquez sur "Logs" pour afficher la sortie d'une commande
+            </div>
           </div>
         </div>
 
         <!-- Active viewer -->
-        <div v-else class="d-flex flex-column h-100">
+        <div
+          v-else
+          class="d-flex flex-column h-100"
+        >
           <div class="console-header px-3 pt-3 pb-2">
             <div class="d-flex align-items-start justify-content-between mb-2">
-              <div class="flex-fill" style="min-width: 0;">
-                <div class="fw-semibold text-light" style="font-size: 0.95rem;">
+              <div
+                class="flex-fill"
+                style="min-width: 0;"
+              >
+                <div
+                  class="fw-semibold text-light"
+                  style="font-size: 0.95rem;"
+                >
                   {{ command.host_name || command.host_id }}
                 </div>
                 <div class="d-flex align-items-center gap-2 mt-1 flex-wrap">
@@ -120,14 +229,17 @@
                   </code>
                 </div>
               </div>
-              <span :class="statusClass(command.status)" class="ms-2">{{ command.status }}</span>
+              <span
+                :class="statusClass(command.status)"
+                class="ms-2"
+              >{{ command.status }}</span>
             </div>
           </div>
           <pre
             ref="outputEl"
             class="console-output mb-0 flex-fill"
             v-html="colorizedOutput || '<span style=\'opacity:0.5\'>Aucune sortie disponible.</span>'"
-          ></pre>
+          />
         </div>
       </div>
     </div>
@@ -139,10 +251,23 @@
     class="btn btn-primary console-fab"
     @click="$emit('open')"
   >
-    <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24"
-      viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"
-      stroke-linecap="round" stroke-linejoin="round">
-      <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      class="icon me-1"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      stroke-width="2"
+      stroke="currentColor"
+      fill="none"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
+      <path
+        stroke="none"
+        d="M0 0h24v24H0z"
+        fill="none"
+      />
       <path d="M8 9l3 3l-3 3" />
       <path d="M13 15l3 0" />
       <path d="M3 4m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z" />

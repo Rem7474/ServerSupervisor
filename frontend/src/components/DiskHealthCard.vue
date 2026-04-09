@@ -1,16 +1,27 @@
 <template>
   <div class="card">
     <div class="card-header">
-      <h3 class="card-title">État SMART des disques</h3>
+      <h3 class="card-title">
+        État SMART des disques
+      </h3>
     </div>
-    <div v-if="loading" class="card-body text-center py-4">
-      <div class="spinner-border spinner-border-sm text-muted"></div>
+    <div
+      v-if="loading"
+      class="card-body text-center py-4"
+    >
+      <div class="spinner-border spinner-border-sm text-muted" />
     </div>
-    <div v-else-if="health.length === 0" class="card-body text-muted small">
+    <div
+      v-else-if="health.length === 0"
+      class="card-body text-muted small"
+    >
       Aucune donnée SMART disponible pour cet hôte.
       Vérifie que l'agent a `collect_smart: true`, que `smartmontools` est installé et que l'agent a accès aux disques physiques.
     </div>
-    <div v-else class="card-body">
+    <div
+      v-else
+      class="card-body"
+    >
       <div class="d-flex flex-column gap-3">
         <div 
           v-for="disk in health" 
@@ -20,41 +31,81 @@
         >
           <div class="d-flex align-items-start justify-content-between">
             <div>
-              <div class="fw-bold">{{ disk.device }}</div>
+              <div class="fw-bold">
+                {{ disk.device }}
+              </div>
               <div class="text-muted small">
                 {{ disk.model }}
-                <span v-if="disk.serial_number" class="ms-2">{{ disk.serial_number }}</span>
+                <span
+                  v-if="disk.serial_number"
+                  class="ms-2"
+                >{{ disk.serial_number }}</span>
               </div>
             </div>
-            <span :class="getStatusBadgeClass(disk.smart_status)" class="badge">
+            <span
+              :class="getStatusBadgeClass(disk.smart_status)"
+              class="badge"
+            >
               {{ disk.smart_status }}
             </span>
           </div>
 
           <div class="row mt-3 text-sm">
             <div class="col-6">
-              <div class="text-muted" style="font-size: 0.8rem">Température</div>
+              <div
+                class="text-muted"
+                style="font-size: 0.8rem"
+              >
+                Température
+              </div>
               <div class="fw-bold">
                 <span v-if="disk.temperature > 0">{{ disk.temperature }}°C</span>
-                <span v-else class="text-muted">N/A</span>
+                <span
+                  v-else
+                  class="text-muted"
+                >N/A</span>
               </div>
             </div>
             <div class="col-6">
-              <div class="text-muted" style="font-size: 0.8rem">Heures d'utilisation</div>
+              <div
+                class="text-muted"
+                style="font-size: 0.8rem"
+              >
+                Heures d'utilisation
+              </div>
               <div class="fw-bold">
                 <span v-if="disk.power_on_hours > 0">{{ disk.power_on_hours.toLocaleString() }}h</span>
-                <span v-else class="text-muted">N/A</span>
+                <span
+                  v-else
+                  class="text-muted"
+                >N/A</span>
               </div>
             </div>
             <div class="col-6 mt-2">
-              <div class="text-muted" style="font-size: 0.8rem">Secteurs réalloués</div>
-              <div class="fw-bold" :class="{ 'text-danger': disk.realloc_sectors > 10 }">
+              <div
+                class="text-muted"
+                style="font-size: 0.8rem"
+              >
+                Secteurs réalloués
+              </div>
+              <div
+                class="fw-bold"
+                :class="{ 'text-danger': disk.realloc_sectors > 10 }"
+              >
                 {{ disk.realloc_sectors }}
               </div>
             </div>
             <div class="col-6 mt-2">
-              <div class="text-muted" style="font-size: 0.8rem">Secteurs en attente</div>
-              <div class="fw-bold" :class="{ 'text-danger': disk.pending_sectors > 0 }">
+              <div
+                class="text-muted"
+                style="font-size: 0.8rem"
+              >
+                Secteurs en attente
+              </div>
+              <div
+                class="fw-bold"
+                :class="{ 'text-danger': disk.pending_sectors > 0 }"
+              >
                 {{ disk.pending_sectors }}
               </div>
             </div>

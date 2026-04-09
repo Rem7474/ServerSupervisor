@@ -2,31 +2,57 @@
   <aside class="network-node-detail">
     <!-- Mobile header -->
     <div class="detail-mobile-header d-flex d-lg-none align-items-center gap-2 px-3 py-2 border-bottom">
-      <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
-        <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
-        <path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533L8.93 6.588zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/>
+      <svg
+        width="14"
+        height="14"
+        fill="currentColor"
+        viewBox="0 0 16 16"
+      >
+        <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z" />
+        <path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533L8.93 6.588zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0z" />
       </svg>
       <span class="text-secondary small fw-semibold">Détails du nœud sélectionné</span>
     </div>
 
     <div class="detail-scroll">
-      <div v-if="!selectedNode" class="detail-empty">
-        <svg width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.2" viewBox="0 0 24 24" class="mb-3">
-          <circle cx="12" cy="12" r="3"/><path d="M12 3v2m0 14v2M3 12h2m14 0h2m-3.22-6.78-1.42 1.42M6.64 17.36l-1.42 1.42m0-12.78 1.42 1.42m10.72 10.72 1.42 1.42"/>
+      <div
+        v-if="!selectedNode"
+        class="detail-empty"
+      >
+        <svg
+          width="36"
+          height="36"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.2"
+          viewBox="0 0 24 24"
+          class="mb-3"
+        >
+          <circle
+            cx="12"
+            cy="12"
+            r="3"
+          /><path d="M12 3v2m0 14v2M3 12h2m14 0h2m-3.22-6.78-1.42 1.42M6.64 17.36l-1.42 1.42m0-12.78 1.42 1.42m10.72 10.72 1.42 1.42" />
         </svg>
-        <div class="text-secondary small">Cliquez sur un nœud du graphe<br>pour afficher ses détails.</div>
+        <div class="text-secondary small">
+          Cliquez sur un nœud du graphe<br>pour afficher ses détails.
+        </div>
       </div>
 
       <template v-else>
-
         <!-- ─── Identification ─────────────────────────────────── -->
         <section class="detail-section">
-          <div class="detail-section-title">Identification</div>
+          <div class="detail-section-title">
+            Identification
+          </div>
           <div class="detail-kv">
             <span class="detail-key">Nom</span>
             <span class="detail-val fw-semibold">{{ selectedNode.label || '-' }}</span>
           </div>
-          <div v-if="selectedNode.sublabel && selectedNode.type !== 'service'" class="detail-kv">
+          <div
+            v-if="selectedNode.sublabel && selectedNode.type !== 'service'"
+            class="detail-kv"
+          >
             <span class="detail-key">Adresse</span>
             <span class="detail-val text-secondary">{{ selectedNode.sublabel }}</span>
           </div>
@@ -37,8 +63,13 @@
         </section>
 
         <!-- ─── Rôle réseau (host) ─────────────────────────────── -->
-        <section v-if="selectedNode.type === 'host'" class="detail-section">
-          <div class="detail-section-title">Rôle réseau</div>
+        <section
+          v-if="selectedNode.type === 'host'"
+          class="detail-section"
+        >
+          <div class="detail-section-title">
+            Rôle réseau
+          </div>
           <div class="detail-kv">
             <span class="detail-key">Statut</span>
             <span :class="statusBadgeClass">{{ hostData?.status || 'unknown' }}</span>
@@ -54,30 +85,69 @@
         </section>
 
         <!-- ─── Ports & services exposés (host) ───────────────── -->
-        <section v-if="selectedNode.type === 'host'" class="detail-section">
-          <div class="detail-section-title">Ports & services exposés</div>
+        <section
+          v-if="selectedNode.type === 'host'"
+          class="detail-section"
+        >
+          <div class="detail-section-title">
+            Ports & services exposés
+          </div>
 
           <!-- Logical services -->
-          <div v-for="svc in hostServices" :key="svc.id" class="port-entry port-entry-service">
+          <div
+            v-for="svc in hostServices"
+            :key="svc.id"
+            class="port-entry port-entry-service"
+          >
             <div class="port-entry-head">
               <span class="fw-semibold">{{ svc.name }}</span>
               <div class="port-badges">
                 <span class="badge bg-cyan-lt text-cyan">service</span>
-                <span v-if="svc.linkToProxy" class="badge bg-blue-lt text-blue" title="Via reverse proxy">proxy</span>
-                <span v-if="svc.linkToAuthelia" class="badge bg-purple-lt text-purple" title="Protégé par Authelia">auth</span>
-                <span v-if="svc.exposedToInternet" class="badge bg-orange-lt text-orange" title="Exposé à Internet">inet</span>
+                <span
+                  v-if="svc.linkToProxy"
+                  class="badge bg-blue-lt text-blue"
+                  title="Via reverse proxy"
+                >proxy</span>
+                <span
+                  v-if="svc.linkToAuthelia"
+                  class="badge bg-purple-lt text-purple"
+                  title="Protégé par Authelia"
+                >auth</span>
+                <span
+                  v-if="svc.exposedToInternet"
+                  class="badge bg-orange-lt text-orange"
+                  title="Exposé à Internet"
+                >inet</span>
               </div>
             </div>
             <div class="port-entry-sub text-secondary">
               Port {{ svc.internalPort }}
               <template v-if="svc.domain">
                 •
-                <a :href="`https://${svc.domain}${svc.path || '/'}`" target="_blank" rel="noopener" class="text-blue">{{ svc.domain }}{{ svc.path || '/' }}</a>
+                <a
+                  :href="`https://${svc.domain}${svc.path || '/'}`"
+                  target="_blank"
+                  rel="noopener"
+                  class="text-blue"
+                >{{ svc.domain }}{{ svc.path || '/' }}</a>
               </template>
             </div>
-            <div v-if="svc.domain" class="port-entry-actions">
-              <a :href="`https://${svc.domain}${svc.path || '/'}`" target="_blank" rel="noopener" class="btn btn-xs btn-outline-primary">Ouvrir</a>
-              <button class="btn btn-xs btn-outline-secondary" @click="copyUrl(`https://${svc.domain}${svc.path || '/'}`)">Copier l'URL</button>
+            <div
+              v-if="svc.domain"
+              class="port-entry-actions"
+            >
+              <a
+                :href="`https://${svc.domain}${svc.path || '/'}`"
+                target="_blank"
+                rel="noopener"
+                class="btn btn-xs btn-outline-primary"
+              >Ouvrir</a>
+              <button
+                class="btn btn-xs btn-outline-secondary"
+                @click="copyUrl(`https://${svc.domain}${svc.path || '/'}`)"
+              >
+                Copier l'URL
+              </button>
             </div>
           </div>
 
@@ -89,54 +159,99 @@
             :class="{ 'port-entry-disabled': !p.enabled }"
           >
             <div class="port-entry-head">
-              <span class="fw-medium" :class="{ 'text-secondary': !p.enabled }">
+              <span
+                class="fw-medium"
+                :class="{ 'text-secondary': !p.enabled }"
+              >
                 {{ p.name || p.port + '/' + p.protocol.toUpperCase() }}
               </span>
               <div class="port-badges">
-                <span v-if="!p.enabled" class="badge bg-secondary-lt text-secondary">désactivé</span>
+                <span
+                  v-if="!p.enabled"
+                  class="badge bg-secondary-lt text-secondary"
+                >désactivé</span>
                 <template v-else>
-                  <span v-if="p.isProxyLinked" class="badge bg-blue-lt text-blue">proxy</span>
-                  <span v-if="p.isAutheliaLinked" class="badge bg-purple-lt text-purple">auth</span>
-                  <span v-if="p.isInternetExposed" class="badge bg-orange-lt text-orange">inet</span>
+                  <span
+                    v-if="p.isProxyLinked"
+                    class="badge bg-blue-lt text-blue"
+                  >proxy</span>
+                  <span
+                    v-if="p.isAutheliaLinked"
+                    class="badge bg-purple-lt text-purple"
+                  >auth</span>
+                  <span
+                    v-if="p.isInternetExposed"
+                    class="badge bg-orange-lt text-orange"
+                  >inet</span>
                 </template>
               </div>
             </div>
             <div class="port-entry-sub text-secondary">
               {{ p.port }}/{{ p.protocol.toUpperCase() }}
-              <template v-if="p.containers?.length"> • {{ p.containers.join(', ') }}</template>
+              <template v-if="p.containers?.length">
+                • {{ p.containers.join(', ') }}
+              </template>
             </div>
           </div>
 
-          <div v-if="hostServices.length === 0 && allHostPorts.length === 0" class="text-secondary small py-2">
+          <div
+            v-if="hostServices.length === 0 && allHostPorts.length === 0"
+            class="text-secondary small py-2"
+          >
             Aucun port exposé détecté.
           </div>
         </section>
 
         <!-- ─── Service node details ───────────────────────────── -->
-        <section v-if="selectedNode.type === 'service'" class="detail-section">
-          <div class="detail-section-title">Ports & services</div>
+        <section
+          v-if="selectedNode.type === 'service'"
+          class="detail-section"
+        >
+          <div class="detail-section-title">
+            Ports & services
+          </div>
           <div class="detail-kv">
             <span class="detail-key">Port interne</span>
             <span class="detail-val fw-semibold">{{ selectedNode.internalPort || '-' }}</span>
           </div>
-          <div v-if="selectedNode.externalPort" class="detail-kv">
+          <div
+            v-if="selectedNode.externalPort"
+            class="detail-kv"
+          >
             <span class="detail-key">Port externe</span>
             <span class="detail-val">{{ selectedNode.externalPort }}</span>
           </div>
-          <div v-if="serviceUrl" class="detail-kv">
+          <div
+            v-if="serviceUrl"
+            class="detail-kv"
+          >
             <span class="detail-key">URL</span>
-            <a :href="serviceUrl" target="_blank" rel="noopener" class="detail-val small text-blue" style="word-break:break-all">{{ serviceUrl }}</a>
+            <a
+              :href="serviceUrl"
+              target="_blank"
+              rel="noopener"
+              class="detail-val small text-blue"
+              style="word-break:break-all"
+            >{{ serviceUrl }}</a>
           </div>
         </section>
 
         <!-- ─── Port node details ──────────────────────────────── -->
-        <section v-if="selectedNode.type === 'port'" class="detail-section">
-          <div class="detail-section-title">Port</div>
+        <section
+          v-if="selectedNode.type === 'port'"
+          class="detail-section"
+        >
+          <div class="detail-section-title">
+            Port
+          </div>
           <div class="detail-kv">
             <span class="detail-key">Numéro</span>
             <span class="detail-val fw-semibold">{{ selectedNode.portNumber }}/{{ (selectedNode.protocol || '').toUpperCase() }}</span>
           </div>
-          <div v-if="selectedNode.containers?.length" class="detail-kv">
+          <div
+            v-if="selectedNode.containers?.length"
+            class="detail-kv"
+          >
             <span class="detail-key">Conteneurs</span>
             <span class="detail-val small">{{ selectedNode.containers.join(', ') }}</span>
           </div>
@@ -147,23 +262,43 @@
           v-if="['service', 'port'].includes(selectedNode.type)"
           class="detail-section"
         >
-          <div class="detail-section-title">Intégration</div>
+          <div class="detail-section-title">
+            Intégration
+          </div>
           <div class="detail-kv">
             <span class="detail-key">Reverse proxy</span>
-            <span v-if="selectedNode.isProxyLinked" class="badge bg-blue-lt text-blue">Oui</span>
-            <span v-else class="text-secondary small">Non</span>
+            <span
+              v-if="selectedNode.isProxyLinked"
+              class="badge bg-blue-lt text-blue"
+            >Oui</span>
+            <span
+              v-else
+              class="text-secondary small"
+            >Non</span>
           </div>
           <div class="detail-kv">
             <span class="detail-key">Authelia</span>
-            <span v-if="selectedNode.isAutheliaLinked" class="badge bg-purple-lt text-purple">Oui</span>
-            <span v-else class="text-secondary small">Non</span>
+            <span
+              v-if="selectedNode.isAutheliaLinked"
+              class="badge bg-purple-lt text-purple"
+            >Oui</span>
+            <span
+              v-else
+              class="text-secondary small"
+            >Non</span>
           </div>
           <div class="detail-kv">
             <span class="detail-key">Internet</span>
-            <span v-if="selectedNode.isInternetExposed" class="badge bg-orange-lt text-orange">
+            <span
+              v-if="selectedNode.isInternetExposed"
+              class="badge bg-orange-lt text-orange"
+            >
               Exposé{{ selectedNode.externalPort ? ' (port ' + selectedNode.externalPort + ')' : '' }}
             </span>
-            <span v-else class="text-secondary small">Non exposé</span>
+            <span
+              v-else
+              class="text-secondary small"
+            >Non exposé</span>
           </div>
         </section>
 
@@ -174,8 +309,14 @@
             :to="`/hosts/${selectedNode.hostId}`"
             class="btn btn-sm btn-outline-primary w-100"
           >
-            <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16" class="me-1">
-              <path d="M6.5 14.5v-3.505c0-.245.25-.495.5-.495h2c.25 0 .5.25.5.5v3.5a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 .5-.5v-7a.5.5 0 0 0-.146-.354L13 5.793V2.5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1.293L8.354 1.146a.5.5 0 0 0-.708 0l-6 6A.5.5 0 0 0 1.5 7.5v7a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 .5-.5z"/>
+            <svg
+              width="14"
+              height="14"
+              fill="currentColor"
+              viewBox="0 0 16 16"
+              class="me-1"
+            >
+              <path d="M6.5 14.5v-3.505c0-.245.25-.495.5-.495h2c.25 0 .5.25.5.5v3.5a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 .5-.5v-7a.5.5 0 0 0-.146-.354L13 5.793V2.5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1.293L8.354 1.146a.5.5 0 0 0-.708 0l-6 6A.5.5 0 0 0 1.5 7.5v7a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 .5-.5z" />
             </svg>
             Ouvrir l'hôte
           </router-link>
@@ -189,15 +330,22 @@
           </router-link>
 
           <template v-if="selectedNode.type === 'service' && serviceUrl">
-            <a :href="serviceUrl" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary w-100">
+            <a
+              :href="serviceUrl"
+              target="_blank"
+              rel="noopener"
+              class="btn btn-sm btn-outline-primary w-100"
+            >
               Ouvrir dans le navigateur
             </a>
-            <button class="btn btn-sm btn-outline-secondary w-100" @click="copyUrl(serviceUrl)">
+            <button
+              class="btn btn-sm btn-outline-secondary w-100"
+              @click="copyUrl(serviceUrl)"
+            >
               Copier l'URL
             </button>
           </template>
         </section>
-
       </template>
     </div>
   </aside>

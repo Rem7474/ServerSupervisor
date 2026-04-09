@@ -4,14 +4,28 @@
       <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
         <div>
           <div class="page-pretitle">
-            <router-link to="/" class="text-decoration-none">Dashboard</router-link>
+            <router-link
+              to="/"
+              class="text-decoration-none"
+            >
+              Dashboard
+            </router-link>
             <span class="text-muted mx-1">/</span>
             <span>Ajouter un hôte</span>
           </div>
-          <h2 class="page-title">Ajouter un hôte</h2>
-          <div class="text-secondary">Enregistrer un nouvel hôte</div>
+          <h2 class="page-title">
+            Ajouter un hôte
+          </h2>
+          <div class="text-secondary">
+            Enregistrer un nouvel hôte
+          </div>
         </div>
-        <router-link to="/" class="btn btn-outline-secondary">Retour au dashboard</router-link>
+        <router-link
+          to="/"
+          class="btn btn-outline-secondary"
+        >
+          Retour au dashboard
+        </router-link>
       </div>
     </div>
 
@@ -19,9 +33,15 @@
       <div class="col-12 col-md-8 col-lg-6">
         <div class="card">
           <div class="card-body">
-            <form v-if="!result" @submit.prevent="handleSubmit">
+            <form
+              v-if="!result"
+              @submit.prevent="handleSubmit"
+            >
               <div class="mb-3">
-                <label class="form-label" for="host-name">Nom (alias personnel)</label>
+                <label
+                  class="form-label"
+                  for="host-name"
+                >Nom (alias personnel)</label>
                 <input
                   id="host-name"
                   v-model="form.name"
@@ -30,11 +50,19 @@
                   required
                   placeholder="Ex: Prod Web Server"
                   @blur="touched.name = true"
-                />
-                <div v-if="touched.name && !form.name.trim()" class="invalid-feedback">Ce champ est requis</div>
+                >
+                <div
+                  v-if="touched.name && !form.name.trim()"
+                  class="invalid-feedback"
+                >
+                  Ce champ est requis
+                </div>
               </div>
               <div class="mb-3">
-                <label class="form-label" for="host-ip">Adresse IP</label>
+                <label
+                  class="form-label"
+                  for="host-ip"
+                >Adresse IP</label>
                 <input
                   id="host-ip"
                   v-model="form.ip_address"
@@ -43,11 +71,20 @@
                   required
                   placeholder="192.168.1.100"
                   @blur="touched.ip_address = true"
-                />
-                <div v-if="ipFeedback" class="invalid-feedback">{{ ipFeedback }}</div>
+                >
+                <div
+                  v-if="ipFeedback"
+                  class="invalid-feedback"
+                >
+                  {{ ipFeedback }}
+                </div>
               </div>
 
-              <div v-if="error" class="alert alert-danger" role="alert">
+              <div
+                v-if="error"
+                class="alert alert-danger"
+                role="alert"
+              >
                 {{ error }}
               </div>
 
@@ -55,34 +92,64 @@
                 OS et Hostname seront recuperes automatiquement lors de la premiere connexion de l'agent.
               </div>
 
-              <button type="submit" class="btn btn-primary w-100" :disabled="loading">
+              <button
+                type="submit"
+                class="btn btn-primary w-100"
+                :disabled="loading"
+              >
                 {{ loading ? 'Enregistrement...' : 'Enregistrer l\'hôte' }}
               </button>
             </form>
 
-            <div v-else class="host-success" role="alert">
+            <div
+              v-else
+              class="host-success"
+              role="alert"
+            >
               <div class="host-success-header">
                 <div>
-                  <div class="fw-semibold">Hôte enregistré avec succès</div>
-                  <div class="text-secondary small">La cle ne sera plus affichee. Copiez-la maintenant.</div>
+                  <div class="fw-semibold">
+                    Hôte enregistré avec succès
+                  </div>
+                  <div class="text-secondary small">
+                    La cle ne sera plus affichee. Copiez-la maintenant.
+                  </div>
                 </div>
-                <button type="button" class="btn btn-success" @click="finishAdd">Termine</button>
+                <button
+                  type="button"
+                  class="btn btn-success"
+                  @click="finishAdd"
+                >
+                  Termine
+                </button>
               </div>
 
               <div class="host-success-grid">
                 <div class="host-success-card">
-                  <div class="text-secondary small mb-2">Cle API agent</div>
+                  <div class="text-secondary small mb-2">
+                    Cle API agent
+                  </div>
                   <div class="host-success-key">
                     <code>{{ result.api_key }}</code>
-                    <button type="button" class="btn btn-outline-light btn-sm" @click="copyApiKey">
+                    <button
+                      type="button"
+                      class="btn btn-outline-light btn-sm"
+                      @click="copyApiKey"
+                    >
                       {{ copiedApiKey ? 'Copie' : 'Copier' }}
                     </button>
                   </div>
                 </div>
                 <div class="host-success-card">
                   <div class="d-flex align-items-center justify-content-between mb-2">
-                    <div class="text-secondary small">Configuration agent</div>
-                    <button type="button" class="btn btn-outline-light btn-sm" @click="copyAgentConfig">
+                    <div class="text-secondary small">
+                      Configuration agent
+                    </div>
+                    <button
+                      type="button"
+                      class="btn btn-outline-light btn-sm"
+                      @click="copyAgentConfig"
+                    >
                       {{ copiedConfig ? 'Copie' : 'Copier la config' }}
                     </button>
                   </div>

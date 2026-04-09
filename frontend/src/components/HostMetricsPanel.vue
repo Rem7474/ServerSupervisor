@@ -1,28 +1,50 @@
 <template>
   <!-- Metric cards -->
-  <div v-if="metrics" class="row row-cards mb-4 g-3">
+  <div
+    v-if="metrics"
+    class="row row-cards mb-4 g-3"
+  >
     <div class="col-6 col-lg-3">
       <div class="card card-sm h-100">
         <div class="card-body">
           <div class="subheader d-flex align-items-center gap-2">
             CPU ({{ metrics.cpu_cores }} CORES)
-            <span v-if="metricsSource === 'proxmox'" class="badge bg-purple-lt text-purple" style="font-size:0.65rem">Proxmox</span>
+            <span
+              v-if="metricsSource === 'proxmox'"
+              class="badge bg-purple-lt text-purple"
+              style="font-size:0.65rem"
+            >Proxmox</span>
           </div>
-          <div class="h2 mb-0" :class="cpuColor(metrics.cpu_usage_percent)">
+          <div
+            class="h2 mb-0"
+            :class="cpuColor(metrics.cpu_usage_percent)"
+          >
             {{ metrics.cpu_usage_percent?.toFixed(1) }}%
           </div>
-          <div class="text-secondary small">{{ metricsSource === 'proxmox' ? 'Source : hyperviseur' : metrics.cpu_model }}</div>
+          <div class="text-secondary small">
+            {{ metricsSource === 'proxmox' ? 'Source : hyperviseur' : metrics.cpu_model }}
+          </div>
         </div>
       </div>
     </div>
-    <div v-if="hasCpuTemp" class="col-6 col-lg-3">
+    <div
+      v-if="hasCpuTemp"
+      class="col-6 col-lg-3"
+    >
       <div class="card card-sm h-100">
         <div class="card-body">
-          <div class="subheader">CPU TEMP</div>
-          <div class="h2 mb-0" :class="tempColor(metrics.cpu_temperature)">
+          <div class="subheader">
+            CPU TEMP
+          </div>
+          <div
+            class="h2 mb-0"
+            :class="tempColor(metrics.cpu_temperature)"
+          >
             {{ `${metrics.cpu_temperature.toFixed(1)}°C` }}
           </div>
-          <div class="text-secondary small">{{ cpuTempSourceLabel }}</div>
+          <div class="text-secondary small">
+            {{ cpuTempSourceLabel }}
+          </div>
         </div>
       </div>
     </div>
@@ -31,29 +53,48 @@
         <div class="card-body">
           <div class="subheader d-flex align-items-center gap-2">
             RAM
-            <span v-if="metricsSource === 'proxmox'" class="badge bg-purple-lt text-purple" style="font-size:0.65rem">Proxmox</span>
+            <span
+              v-if="metricsSource === 'proxmox'"
+              class="badge bg-purple-lt text-purple"
+              style="font-size:0.65rem"
+            >Proxmox</span>
           </div>
-          <div class="h2 mb-0" :class="memColor(metrics.memory_percent)">
+          <div
+            class="h2 mb-0"
+            :class="memColor(metrics.memory_percent)"
+          >
             {{ metrics.memory_percent?.toFixed(1) }}%
           </div>
-          <div class="text-secondary small">{{ formatBytes(metrics.memory_used) }} / {{ formatBytes(metrics.memory_total) }}</div>
+          <div class="text-secondary small">
+            {{ formatBytes(metrics.memory_used) }} / {{ formatBytes(metrics.memory_total) }}
+          </div>
         </div>
       </div>
     </div>
     <div class="col-6 col-lg-3">
       <div class="card card-sm h-100">
         <div class="card-body">
-          <div class="subheader">UPTIME</div>
-          <div class="h2 mb-0 text-primary">{{ formatUptime(metrics.uptime) }}</div>
+          <div class="subheader">
+            UPTIME
+          </div>
+          <div class="h2 mb-0 text-primary">
+            {{ formatUptime(metrics.uptime) }}
+          </div>
         </div>
       </div>
     </div>
     <div class="col-6 col-lg-3">
       <div class="card card-sm h-100">
         <div class="card-body">
-          <div class="subheader">LOAD AVG</div>
-          <div class="h2 mb-0">{{ metrics.load_avg_1?.toFixed(2) }}</div>
-          <div class="text-secondary small">{{ metrics.load_avg_5?.toFixed(2) }} / {{ metrics.load_avg_15?.toFixed(2) }}</div>
+          <div class="subheader">
+            LOAD AVG
+          </div>
+          <div class="h2 mb-0">
+            {{ metrics.load_avg_1?.toFixed(2) }}
+          </div>
+          <div class="text-secondary small">
+            {{ metrics.load_avg_5?.toFixed(2) }} / {{ metrics.load_avg_15?.toFixed(2) }}
+          </div>
         </div>
       </div>
     </div>
@@ -64,28 +105,62 @@
     <div class="col-lg-6">
       <div class="card">
         <div class="card-header d-flex align-items-center justify-content-between">
-          <h3 class="card-title">CPU</h3>
+          <h3 class="card-title">
+            CPU
+          </h3>
           <div class="btn-group btn-group-sm">
-            <button v-for="opt in timeRangeOptions" :key="opt.hours" @click="loadHistory(opt.hours)"
-              :class="chartHours === opt.hours ? 'btn btn-primary' : 'btn btn-outline-secondary'">
+            <button
+              v-for="opt in timeRangeOptions"
+              :key="opt.hours"
+              :class="chartHours === opt.hours ? 'btn btn-primary' : 'btn btn-outline-secondary'"
+              @click="loadHistory(opt.hours)"
+            >
               {{ opt.label }}
             </button>
           </div>
         </div>
-        <div class="card-body" style="height: 12rem;">
-          <Line v-if="cpuChartData" :data="cpuChartData" :options="chartOptions" class="h-100" />
-          <div v-else class="h-100 d-flex align-items-center justify-content-center text-secondary">Aucune donnée</div>
+        <div
+          class="card-body"
+          style="height: 12rem;"
+        >
+          <Line
+            v-if="cpuChartData"
+            :data="cpuChartData"
+            :options="chartOptions"
+            class="h-100"
+          />
+          <div
+            v-else
+            class="h-100 d-flex align-items-center justify-content-center text-secondary"
+          >
+            Aucune donnée
+          </div>
         </div>
       </div>
     </div>
     <div class="col-lg-6">
       <div class="card">
         <div class="card-header">
-          <h3 class="card-title">Mémoire</h3>
+          <h3 class="card-title">
+            Mémoire
+          </h3>
         </div>
-        <div class="card-body" style="height: 12rem;">
-          <Line v-if="memChartData" :data="memChartData" :options="memChartOptions" class="h-100" />
-          <div v-else class="h-100 d-flex align-items-center justify-content-center text-secondary">Aucune donnée</div>
+        <div
+          class="card-body"
+          style="height: 12rem;"
+        >
+          <Line
+            v-if="memChartData"
+            :data="memChartData"
+            :options="memChartOptions"
+            class="h-100"
+          />
+          <div
+            v-else
+            class="h-100 d-flex align-items-center justify-content-center text-secondary"
+          >
+            Aucune donnée
+          </div>
         </div>
       </div>
     </div>

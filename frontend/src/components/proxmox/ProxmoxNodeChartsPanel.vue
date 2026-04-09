@@ -3,44 +3,121 @@
     <div class="col-12 col-lg-4">
       <div class="card">
         <div class="card-header d-flex align-items-center justify-content-between">
-          <h3 class="card-title mb-0">CPU</h3>
-          <div v-if="!loading" class="btn-group btn-group-sm">
-            <button v-for="opt in timeframeOptions" :key="opt.value"
+          <h3 class="card-title mb-0">
+            CPU
+          </h3>
+          <div
+            v-if="!loading"
+            class="btn-group btn-group-sm"
+          >
+            <button
+              v-for="opt in timeframeOptions"
+              :key="opt.value"
               :class="timeframe === opt.value ? 'btn btn-primary' : 'btn btn-outline-secondary'"
-              @click="changeTimeframe(opt.value)">{{ opt.label }}</button>
+              @click="changeTimeframe(opt.value)"
+            >
+              {{ opt.label }}
+            </button>
           </div>
-          <span v-else class="spinner-border spinner-border-sm text-muted"></span>
+          <span
+            v-else
+            class="spinner-border spinner-border-sm text-muted"
+          />
         </div>
-        <div class="card-body" style="height:11rem">
-          <Line v-if="cpuChart" :data="cpuChart" :options="pctOptions" class="h-100" />
-          <div v-else class="h-100 d-flex align-items-center justify-content-center text-secondary small">{{ error || 'Aucune donnée' }}</div>
-        </div>
-      </div>
-    </div>
-    <div class="col-12 col-lg-4">
-      <div class="card">
-        <div class="card-header"><h3 class="card-title mb-0">RAM</h3></div>
-        <div class="card-body" style="height:11rem">
-          <Line v-if="ramChart" :data="ramChart" :options="ramOptions" class="h-100" />
-          <div v-else class="h-100 d-flex align-items-center justify-content-center text-secondary small">{{ error || 'Aucune donnée' }}</div>
-        </div>
-      </div>
-    </div>
-    <div class="col-12 col-lg-4">
-      <div class="card">
-        <div class="card-header"><h3 class="card-title mb-0">IO Wait</h3></div>
-        <div class="card-body" style="height:11rem">
-          <Line v-if="iowaitChart" :data="iowaitChart" :options="pctOptions" class="h-100" />
-          <div v-else class="h-100 d-flex align-items-center justify-content-center text-secondary small">{{ error || 'Aucune donnée' }}</div>
+        <div
+          class="card-body"
+          style="height:11rem"
+        >
+          <Line
+            v-if="cpuChart"
+            :data="cpuChart"
+            :options="pctOptions"
+            class="h-100"
+          />
+          <div
+            v-else
+            class="h-100 d-flex align-items-center justify-content-center text-secondary small"
+          >
+            {{ error || 'Aucune donnée' }}
+          </div>
         </div>
       </div>
     </div>
     <div class="col-12 col-lg-4">
       <div class="card">
-        <div class="card-header"><h3 class="card-title mb-0">Réseau</h3></div>
-        <div class="card-body" style="height:11rem">
-          <Line v-if="netChart" :data="netChart" :options="netOptions" class="h-100" />
-          <div v-else class="h-100 d-flex align-items-center justify-content-center text-secondary small">{{ error || 'Aucune donnée' }}</div>
+        <div class="card-header">
+          <h3 class="card-title mb-0">
+            RAM
+          </h3>
+        </div>
+        <div
+          class="card-body"
+          style="height:11rem"
+        >
+          <Line
+            v-if="ramChart"
+            :data="ramChart"
+            :options="ramOptions"
+            class="h-100"
+          />
+          <div
+            v-else
+            class="h-100 d-flex align-items-center justify-content-center text-secondary small"
+          >
+            {{ error || 'Aucune donnée' }}
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-12 col-lg-4">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title mb-0">
+            IO Wait
+          </h3>
+        </div>
+        <div
+          class="card-body"
+          style="height:11rem"
+        >
+          <Line
+            v-if="iowaitChart"
+            :data="iowaitChart"
+            :options="pctOptions"
+            class="h-100"
+          />
+          <div
+            v-else
+            class="h-100 d-flex align-items-center justify-content-center text-secondary small"
+          >
+            {{ error || 'Aucune donnée' }}
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-12 col-lg-4">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title mb-0">
+            Réseau
+          </h3>
+        </div>
+        <div
+          class="card-body"
+          style="height:11rem"
+        >
+          <Line
+            v-if="netChart"
+            :data="netChart"
+            :options="netOptions"
+            class="h-100"
+          />
+          <div
+            v-else
+            class="h-100 d-flex align-items-center justify-content-center text-secondary small"
+          >
+            {{ error || 'Aucune donnée' }}
+          </div>
         </div>
       </div>
     </div>

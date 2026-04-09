@@ -3,33 +3,79 @@
     <div class="container container-tight py-4">
       <div class="text-center mb-4">
         <span class="h1">ServerSupervisor</span>
-        <div class="text-secondary">Connexion au dashboard</div>
+        <div class="text-secondary">
+          Connexion au dashboard
+        </div>
       </div>
 
-      <form class="card card-md" @submit.prevent="handleLogin">
+      <form
+        class="card card-md"
+        @submit.prevent="handleLogin"
+      >
         <div class="card-body">
-          <h2 class="card-title text-center mb-4">Se connecter</h2>
+          <h2 class="card-title text-center mb-4">
+            Se connecter
+          </h2>
           <div class="mb-3">
             <label class="form-label">Utilisateur</label>
-            <input v-model="username" type="text" class="form-control" placeholder="admin" name="username" autocomplete="username" required :disabled="loading || needsMFA" />
+            <input
+              v-model="username"
+              type="text"
+              class="form-control"
+              placeholder="admin"
+              name="username"
+              autocomplete="username"
+              required
+              :disabled="loading || needsMFA"
+            >
           </div>
           <div class="mb-3">
             <label class="form-label">Mot de passe</label>
-            <input v-model="password" type="password" class="form-control" placeholder="••••••••" name="password" autocomplete="current-password" required :disabled="loading || needsMFA" />
+            <input
+              v-model="password"
+              type="password"
+              class="form-control"
+              placeholder="••••••••"
+              name="password"
+              autocomplete="current-password"
+              required
+              :disabled="loading || needsMFA"
+            >
           </div>
 
-          <div v-if="needsMFA" class="mb-3">
+          <div
+            v-if="needsMFA"
+            class="mb-3"
+          >
             <label class="form-label">Code TOTP</label>
-            <input v-model="totpCode" type="text" class="form-control" placeholder="123456" inputmode="numeric" maxlength="6" required />
-            <div class="text-secondary small mt-1">Entrez le code de votre application d'authentification.</div>
+            <input
+              v-model="totpCode"
+              type="text"
+              class="form-control"
+              placeholder="123456"
+              inputmode="numeric"
+              maxlength="6"
+              required
+            >
+            <div class="text-secondary small mt-1">
+              Entrez le code de votre application d'authentification.
+            </div>
           </div>
 
-          <div v-if="error" class="alert alert-danger" role="alert">
+          <div
+            v-if="error"
+            class="alert alert-danger"
+            role="alert"
+          >
             {{ error }}
           </div>
 
           <div class="form-footer">
-            <button type="submit" class="btn btn-primary w-100" :disabled="loading">
+            <button
+              type="submit"
+              class="btn btn-primary w-100"
+              :disabled="loading"
+            >
               {{ loading ? 'Connexion...' : (needsMFA ? 'Verifier le code' : 'Se connecter') }}
             </button>
           </div>

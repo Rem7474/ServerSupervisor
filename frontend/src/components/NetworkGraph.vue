@@ -2,67 +2,110 @@
   <div class="cy-graph-container">
     <!-- Legend -->
     <div class="graph-legend card">
-      <div class="legend-title">Légende</div>
+      <div class="legend-title">
+        Légende
+      </div>
       <div class="legend-item">
-        <span class="legend-box root-box"></span>
+        <span class="legend-box root-box" />
         Reverse proxy
       </div>
       <div class="legend-item">
-        <span class="legend-box host-box"></span>
+        <span class="legend-box host-box" />
         Hôte
       </div>
       <div class="legend-item">
-        <span class="legend-dot online-dot"></span>
+        <span class="legend-dot online-dot" />
         En ligne
       </div>
       <div class="legend-item">
-        <span class="legend-dot offline-dot"></span>
+        <span class="legend-dot offline-dot" />
         Hors ligne
       </div>
       <div class="legend-item">
-        <span class="legend-dot service-node"></span>
+        <span class="legend-dot service-node" />
         Service proxy
       </div>
       <div class="legend-item">
-        <span class="legend-dot port-tcp"></span>
+        <span class="legend-dot port-tcp" />
         Port TCP
       </div>
       <div class="legend-item">
-        <span class="legend-dot port-udp"></span>
+        <span class="legend-dot port-udp" />
         Port UDP
       </div>
-      <div v-if="hasAutheliaTargets" class="legend-item">
-        <span class="legend-dash authelia-dash"></span>
+      <div
+        v-if="hasAutheliaTargets"
+        class="legend-item"
+      >
+        <span class="legend-dash authelia-dash" />
         {{ autheliaLabel || 'Authelia' }}
       </div>
-      <div v-if="hasInternetTargets" class="legend-item">
-        <span class="legend-dash internet-dash"></span>
+      <div
+        v-if="hasInternetTargets"
+        class="legend-item"
+      >
+        <span class="legend-dash internet-dash" />
         {{ internetLabel || 'Internet' }}
       </div>
     </div>
 
     <!-- Controls -->
     <div class="graph-controls btn-group-vertical">
-      <button class="btn btn-sm btn-outline-secondary graph-btn" title="Réinitialiser la disposition" @click="resetLayout">
-        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-          <path d="M20 11a8.1 8.1 0 0 0-15.5-2m-.5-4v4h4"/>
-          <path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4"/>
+      <button
+        class="btn btn-sm btn-outline-secondary graph-btn"
+        title="Réinitialiser la disposition"
+        @click="resetLayout"
+      >
+        <svg
+          width="14"
+          height="14"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          viewBox="0 0 24 24"
+        >
+          <path d="M20 11a8.1 8.1 0 0 0-15.5-2m-.5-4v4h4" />
+          <path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4" />
         </svg>
       </button>
-      <button class="btn btn-sm btn-outline-secondary graph-btn" title="Ajuster à l'écran" @click="fitView">
-        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-          <path d="M3 3h6M3 3v6M21 3h-6M21 3v6M3 21h6M3 21v-6M21 21h-6M21 21v-6"/>
+      <button
+        class="btn btn-sm btn-outline-secondary graph-btn"
+        title="Ajuster à l'écran"
+        @click="fitView"
+      >
+        <svg
+          width="14"
+          height="14"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          viewBox="0 0 24 24"
+        >
+          <path d="M3 3h6M3 3v6M21 3h-6M21 3v6M3 21h6M3 21v-6M21 21h-6M21 21v-6" />
         </svg>
       </button>
     </div>
 
-    <div v-if="!hasData" class="graph-empty">
-      <div class="empty-title">Aucune topologie disponible</div>
-      <div class="empty-subtitle">Les hôtes actifs apparaîtront ici dès que les données remontent.</div>
+    <div
+      v-if="!hasData"
+      class="graph-empty"
+    >
+      <div class="empty-title">
+        Aucune topologie disponible
+      </div>
+      <div class="empty-subtitle">
+        Les hôtes actifs apparaîtront ici dès que les données remontent.
+      </div>
     </div>
 
-    <div ref="tooltipRef" class="cy-tooltip"></div>
-    <div ref="cyContainer" class="cy-canvas"></div>
+    <div
+      ref="tooltipRef"
+      class="cy-tooltip"
+    />
+    <div
+      ref="cyContainer"
+      class="cy-canvas"
+    />
   </div>
 </template>
 

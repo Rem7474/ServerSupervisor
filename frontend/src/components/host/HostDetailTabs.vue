@@ -1,9 +1,21 @@
 <template>
   <ul class="nav nav-tabs mb-3">
-    <li v-for="tab in visibleTabs" :key="tab.key" class="nav-item">
-      <a class="nav-link" :class="{ active: modelValue === tab.key }" href="#" @click.prevent="$emit('update:modelValue', tab.key)">
+    <li
+      v-for="tab in visibleTabs"
+      :key="tab.key"
+      class="nav-item"
+    >
+      <a
+        class="nav-link"
+        :class="{ active: modelValue === tab.key }"
+        href="#"
+        @click.prevent="$emit('update:modelValue', tab.key)"
+      >
         {{ tab.label }}
-        <span v-if="tab.badge" :class="tab.badgeClass">{{ tab.badge }}</span>
+        <span
+          v-if="tab.badge"
+          :class="tab.badgeClass"
+        >{{ tab.badge }}</span>
       </a>
     </li>
   </ul>

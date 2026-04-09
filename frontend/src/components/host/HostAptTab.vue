@@ -1,63 +1,118 @@
 <template>
-  <div v-if="aptStatus" class="card">
+  <div
+    v-if="aptStatus"
+    class="card"
+  >
     <div class="card-header d-flex align-items-center justify-content-between">
-      <h3 class="card-title">APT - Mises a jour systeme</h3>
-      <div class="btn-group btn-group-sm" v-if="canRunApt">
-        <button @click="$emit('run-apt-command', 'update')" class="btn btn-outline-secondary" :disabled="!!aptCmdLoading">
-          <span v-if="aptCmdLoading === 'update'" class="spinner-border spinner-border-sm me-1"></span>
+      <h3 class="card-title">
+        APT - Mises a jour systeme
+      </h3>
+      <div
+        v-if="canRunApt"
+        class="btn-group btn-group-sm"
+      >
+        <button
+          class="btn btn-outline-secondary"
+          :disabled="!!aptCmdLoading"
+          @click="$emit('run-apt-command', 'update')"
+        >
+          <span
+            v-if="aptCmdLoading === 'update'"
+            class="spinner-border spinner-border-sm me-1"
+          />
           apt update
         </button>
-        <button @click="$emit('run-apt-command', 'upgrade')" class="btn btn-primary" :disabled="!!aptCmdLoading">
-          <span v-if="aptCmdLoading === 'upgrade'" class="spinner-border spinner-border-sm me-1"></span>
+        <button
+          class="btn btn-primary"
+          :disabled="!!aptCmdLoading"
+          @click="$emit('run-apt-command', 'upgrade')"
+        >
+          <span
+            v-if="aptCmdLoading === 'upgrade'"
+            class="spinner-border spinner-border-sm me-1"
+          />
           apt upgrade
         </button>
-        <button @click="$emit('run-apt-command', 'dist-upgrade')" class="btn btn-outline-danger" :disabled="!!aptCmdLoading">
-          <span v-if="aptCmdLoading === 'dist-upgrade'" class="spinner-border spinner-border-sm me-1"></span>
+        <button
+          class="btn btn-outline-danger"
+          :disabled="!!aptCmdLoading"
+          @click="$emit('run-apt-command', 'dist-upgrade')"
+        >
+          <span
+            v-if="aptCmdLoading === 'dist-upgrade'"
+            class="spinner-border spinner-border-sm me-1"
+          />
           apt dist-upgrade
         </button>
       </div>
-      <span v-else class="text-secondary small">Mode lecture seule</span>
+      <span
+        v-else
+        class="text-secondary small"
+      >Mode lecture seule</span>
     </div>
     <div class="card-body">
       <div class="row row-cards">
         <div class="col-md-4">
           <div class="card card-sm">
             <div class="card-body text-center">
-              <div class="h2 mb-0" :class="aptStatus.pending_packages > 0 ? 'text-yellow' : 'text-green'">
+              <div
+                class="h2 mb-0"
+                :class="aptStatus.pending_packages > 0 ? 'text-yellow' : 'text-green'"
+              >
                 {{ aptStatus.pending_packages }}
               </div>
-              <div class="text-secondary small">Paquets en attente</div>
+              <div class="text-secondary small">
+                Paquets en attente
+              </div>
             </div>
           </div>
         </div>
         <div class="col-md-4">
           <div class="card card-sm">
             <div class="card-body text-center">
-              <div class="h2 mb-0 text-red">{{ aptStatus.security_updates }}</div>
-              <div class="text-secondary small">Mises à jour sécurité</div>
+              <div class="h2 mb-0 text-red">
+                {{ aptStatus.security_updates }}
+              </div>
+              <div class="text-secondary small">
+                Mises à jour sécurité
+              </div>
             </div>
           </div>
         </div>
         <div class="col-md-4">
           <div class="card card-sm">
             <div class="card-body text-center">
-              <div class="fw-semibold">{{ formatDate(aptStatus.last_update) }}</div>
-              <div class="text-secondary small">Dernière mise à jour</div>
+              <div class="fw-semibold">
+                {{ formatDate(aptStatus.last_update) }}
+              </div>
+              <div class="text-secondary small">
+                Dernière mise à jour
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      <div v-if="aptStatus.cve_list" class="mt-3">
+      <div
+        v-if="aptStatus.cve_list"
+        class="mt-3"
+      >
         <CVEList
-          :cveList="aptStatus.cve_list"
-          :showMaxSeverity="true"
-          :alwaysExpanded="true"
+          :cve-list="aptStatus.cve_list"
+          :show-max-severity="true"
+          :always-expanded="true"
         />
       </div>
     </div>
   </div>
-  <div v-else class="card"><div class="card-body text-secondary">Données APT non disponibles pour cet hôte.</div></div>
+  <div
+    v-else
+    class="card"
+  >
+    <div class="card-body text-secondary">
+      Données APT non disponibles pour cet hôte.
+    </div>
+  </div>
 </template>
 
 <script setup>

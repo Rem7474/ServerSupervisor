@@ -2,7 +2,9 @@
   <div>
     <div class="card mb-4">
       <div class="card-header">
-        <h3 class="card-title">Logs systeme (journalctl)</h3>
+        <h3 class="card-title">
+          Logs systeme (journalctl)
+        </h3>
       </div>
       <div class="card-body">
         <div class="d-flex gap-2">
@@ -11,26 +13,42 @@
             type="text"
             class="form-control"
             placeholder="Nom du service (ex: nginx, ssh, docker)"
-            @keyup.enter="loadJournalLogs"
             style="max-width: 320px;"
+            @keyup.enter="loadJournalLogs"
           >
           <button
             class="btn btn-primary"
-            @click="loadJournalLogs"
             :disabled="!journalService.trim() || journalLoading"
+            @click="loadJournalLogs"
           >
-            <span v-if="journalLoading" class="spinner-border spinner-border-sm me-1"></span>
+            <span
+              v-if="journalLoading"
+              class="spinner-border spinner-border-sm me-1"
+            />
             {{ journalLoading ? 'Chargement...' : 'Charger les logs' }}
           </button>
         </div>
-        <div v-if="journalError" class="alert alert-danger mt-3 mb-0">{{ journalError }}</div>
-        <div v-if="journalCmdId" class="text-secondary small mt-2">
+        <div
+          v-if="journalError"
+          class="alert alert-danger mt-3 mb-0"
+        >
+          {{ journalError }}
+        </div>
+        <div
+          v-if="journalCmdId"
+          class="text-secondary small mt-2"
+        >
           Stream -> commande #{{ journalCmdId }} - les logs apparaissent dans la Console Live ->
         </div>
       </div>
     </div>
 
-    <HostSystemdPanel :hostId="hostId" :can-run="canRunApt" @open-console="$emit('open-command', $event)" @history-changed="$emit('history-changed')" />
+    <HostSystemdPanel
+      :host-id="hostId"
+      :can-run="canRunApt"
+      @open-console="$emit('open-command', $event)"
+      @history-changed="$emit('history-changed')"
+    />
   </div>
 </template>
 

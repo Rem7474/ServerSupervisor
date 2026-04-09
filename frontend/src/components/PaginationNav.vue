@@ -1,7 +1,17 @@
 <template>
-  <ul v-if="totalPages > 1" class="pagination pagination-sm mb-0">
-    <li class="page-item" :class="{ disabled: currentPage <= 1 }">
-      <a class="page-link" href="#" @click.prevent="emitSelect(currentPage - 1)">‹</a>
+  <ul
+    v-if="totalPages > 1"
+    class="pagination pagination-sm mb-0"
+  >
+    <li
+      class="page-item"
+      :class="{ disabled: currentPage <= 1 }"
+    >
+      <a
+        class="page-link"
+        href="#"
+        @click.prevent="emitSelect(currentPage - 1)"
+      >‹</a>
     </li>
     <li
       v-for="item in visibleItems"
@@ -9,11 +19,26 @@
       class="page-item"
       :class="{ active: item.type === 'page' && item.value === currentPage, disabled: item.type === 'ellipsis' }"
     >
-      <span v-if="item.type === 'ellipsis'" class="page-link">…</span>
-      <a v-else class="page-link" href="#" @click.prevent="emitSelect(item.value)">{{ item.value }}</a>
+      <span
+        v-if="item.type === 'ellipsis'"
+        class="page-link"
+      >…</span>
+      <a
+        v-else
+        class="page-link"
+        href="#"
+        @click.prevent="emitSelect(item.value)"
+      >{{ item.value }}</a>
     </li>
-    <li class="page-item" :class="{ disabled: currentPage >= totalPages }">
-      <a class="page-link" href="#" @click.prevent="emitSelect(currentPage + 1)">›</a>
+    <li
+      class="page-item"
+      :class="{ disabled: currentPage >= totalPages }"
+    >
+      <a
+        class="page-link"
+        href="#"
+        @click.prevent="emitSelect(currentPage + 1)"
+      >›</a>
     </li>
   </ul>
 </template>

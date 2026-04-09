@@ -5,16 +5,39 @@
         <div class="row g-2 align-items-center">
           <div class="col">
             <div class="page-pretitle">
-              <router-link to="/" class="text-decoration-none">Dashboard</router-link>
+              <router-link
+                to="/"
+                class="text-decoration-none"
+              >
+                Dashboard
+              </router-link>
               <span class="text-muted mx-1">/</span>
               <span>Alertes</span>
             </div>
-            <h2 class="page-title">Alertes</h2>
+            <h2 class="page-title">
+              Alertes
+            </h2>
           </div>
           <div class="col-auto ms-auto d-flex gap-2">
-            <button v-if="alertsTab === 'rules'" @click="startAddAlert" class="btn btn-primary">
-              <svg class="icon me-1" width="24" height="24" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+            <button
+              v-if="alertsTab === 'rules'"
+              class="btn btn-primary"
+              @click="startAddAlert"
+            >
+              <svg
+                class="icon me-1"
+                width="24"
+                height="24"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M12 4v16m8-8H4"
+                />
               </svg>
               Nouvelle alerte
             </button>
@@ -25,25 +48,53 @@
 
     <div class="page-body">
       <div class="container-xl">
-
-        <div v-if="fetchError" class="alert alert-danger mb-3">
-          <svg xmlns="http://www.w3.org/2000/svg" class="icon alert-icon" width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+        <div
+          v-if="fetchError"
+          class="alert alert-danger mb-3"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="icon alert-icon"
+            width="24"
+            height="24"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
+            />
           </svg>
           Erreur de chargement des règles : {{ fetchError }}
         </div>
 
         <ul class="nav nav-tabs mb-4">
           <li class="nav-item">
-            <a class="nav-link" :class="{ active: alertsTab === 'rules' }" href="#" @click.prevent="alertsTab = 'rules'">
+            <a
+              class="nav-link"
+              :class="{ active: alertsTab === 'rules' }"
+              href="#"
+              @click.prevent="alertsTab = 'rules'"
+            >
               Regles
               <span class="badge bg-azure-lt text-azure ms-1">{{ rules.length }}</span>
             </a>
           </li>
           <li class="nav-item">
-            <a class="nav-link" :class="{ active: alertsTab === 'incidents' }" href="#" @click.prevent="switchToIncidents">
+            <a
+              class="nav-link"
+              :class="{ active: alertsTab === 'incidents' }"
+              href="#"
+              @click.prevent="switchToIncidents"
+            >
               Incidents
-              <span v-if="activeIncidentCount > 0" class="badge bg-red-lt text-red ms-1">{{ activeIncidentCount }}</span>
+              <span
+                v-if="activeIncidentCount > 0"
+                class="badge bg-red-lt text-red ms-1"
+              >{{ activeIncidentCount }}</span>
             </a>
           </li>
         </ul>

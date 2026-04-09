@@ -1,7 +1,9 @@
 <template>
   <div class="card mt-0">
     <div class="card-header">
-      <h3 class="card-title">Historique de commandes</h3>
+      <h3 class="card-title">
+        Historique de commandes
+      </h3>
       <div class="card-options">
         <span class="badge bg-secondary-lt text-secondary">{{ showFullHistory ? total : displayedCommands.length }}</span>
       </div>
@@ -15,12 +17,17 @@
             <th>Commande</th>
             <th>Statut</th>
             <th>Utilisateur</th>
-            <th></th>
+            <th />
           </tr>
         </thead>
         <tbody>
-          <tr v-for="cmd in displayedCommands" :key="cmd.id">
-            <td class="text-secondary small">{{ formatDate(cmd.created_at) }}</td>
+          <tr
+            v-for="cmd in displayedCommands"
+            :key="cmd.id"
+          >
+            <td class="text-secondary small">
+              {{ formatDate(cmd.created_at) }}
+            </td>
             <td>
               <span :class="cmdModuleClass(cmd.module)">{{ cmdModuleLabel(cmd.module) }}</span>
             </td>
@@ -28,27 +35,55 @@
               <code class="small">{{ cmdLabel(cmd) }}</code>
             </td>
             <td><span :class="statusClass(cmd.status)">{{ cmd.status }}</span></td>
-            <td class="text-secondary small">{{ cmd.triggered_by || '-' }}</td>
+            <td class="text-secondary small">
+              {{ cmd.triggered_by || '-' }}
+            </td>
             <td>
               <button
-                @click="$emit('watch-command', cmd)"
                 class="btn btn-sm btn-ghost-secondary"
                 title="Voir les logs"
+                @click="$emit('watch-command', cmd)"
               >
-                <svg class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" xmlns="http://www.w3.org/2000/svg"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 6l16 0" /><path d="M4 12l16 0" /><path d="M4 18l12 0" /></svg>
+                <svg
+                  class="icon icon-sm"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  stroke-width="2"
+                  stroke="currentColor"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                ><path
+                  stroke="none"
+                  d="M0 0h24v24H0z"
+                  fill="none"
+                /><path d="M4 6l16 0" /><path d="M4 12l16 0" /><path d="M4 18l12 0" /></svg>
               </button>
             </td>
           </tr>
         </tbody>
       </table>
     </div>
-    <div v-if="total > 5 && !showFullHistory" class="card-footer text-center">
-      <button @click="showFullHistory = true" class="btn btn-outline-secondary btn-sm">
+    <div
+      v-if="total > 5 && !showFullHistory"
+      class="card-footer text-center"
+    >
+      <button
+        class="btn btn-outline-secondary btn-sm"
+        @click="showFullHistory = true"
+      >
         Afficher tout ({{ total - 5 }} autres)
       </button>
     </div>
   </div>
-  <div v-if="!total" class="card"><div class="card-body text-secondary">Aucune commande exécutée sur cet hote.</div></div>
+  <div
+    v-if="!total"
+    class="card"
+  >
+    <div class="card-body text-secondary">
+      Aucune commande exécutée sur cet hote.
+    </div>
+  </div>
 </template>
 
 <script setup>

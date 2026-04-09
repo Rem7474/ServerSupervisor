@@ -3,14 +3,39 @@
     <div class="card-header d-flex align-items-center justify-content-between">
       <div class="d-flex align-items-center gap-2">
         <!-- Proxmox logo-style icon -->
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-             stroke-linecap="round" stroke-linejoin="round" class="text-orange">
-          <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
+        <svg
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          class="text-orange"
+        >
+          <rect
+            x="2"
+            y="3"
+            width="20"
+            height="14"
+            rx="2"
+          /><path d="M8 21h8M12 17v4" />
         </svg>
-        <h3 class="card-title mb-0">Cluster Proxmox</h3>
-        <span v-if="clusterName" class="text-secondary small">— {{ clusterName }}</span>
+        <h3 class="card-title mb-0">
+          Cluster Proxmox
+        </h3>
+        <span
+          v-if="clusterName"
+          class="text-secondary small"
+        >— {{ clusterName }}</span>
       </div>
-      <router-link to="/proxmox" class="btn btn-sm btn-outline-secondary">Détails</router-link>
+      <router-link
+        to="/proxmox"
+        class="btn btn-sm btn-outline-secondary"
+      >
+        Détails
+      </router-link>
     </div>
 
     <div class="card-body">
@@ -18,44 +43,85 @@
       <div class="row g-3 mb-4">
         <div class="col-6 col-md-3">
           <div class="d-flex flex-column">
-            <div class="subheader">Nœuds</div>
+            <div class="subheader">
+              Nœuds
+            </div>
             <div class="d-flex align-items-baseline gap-1">
-              <span class="h2 mb-0" :class="nodesDown > 0 ? 'text-red' : 'text-green'">{{ onlineNodes }}</span>
+              <span
+                class="h2 mb-0"
+                :class="nodesDown > 0 ? 'text-red' : 'text-green'"
+              >{{ onlineNodes }}</span>
               <span class="text-secondary small">/ {{ nodes.length }}</span>
             </div>
-            <div v-if="nodesDown > 0" class="text-red small">{{ nodesDown }} hors ligne</div>
+            <div
+              v-if="nodesDown > 0"
+              class="text-red small"
+            >
+              {{ nodesDown }} hors ligne
+            </div>
           </div>
         </div>
         <div class="col-6 col-md-3">
           <div class="d-flex flex-column">
-            <div class="subheader">VMs / LXC</div>
-            <div class="h2 mb-0">{{ totalVMs + totalLXC }}</div>
-            <div class="text-secondary small">{{ totalVMs }} VM · {{ totalLXC }} LXC</div>
+            <div class="subheader">
+              VMs / LXC
+            </div>
+            <div class="h2 mb-0">
+              {{ totalVMs + totalLXC }}
+            </div>
+            <div class="text-secondary small">
+              {{ totalVMs }} VM · {{ totalLXC }} LXC
+            </div>
           </div>
         </div>
         <div class="col-6 col-md-3">
           <div class="d-flex flex-column">
-            <div class="subheader">CPU cluster</div>
-            <div class="h2 mb-0" :class="clusterCpuColor">{{ clusterCpuPct.toFixed(1) }}%</div>
-            <div class="text-secondary small">{{ totalCpus }} cœurs</div>
+            <div class="subheader">
+              CPU cluster
+            </div>
+            <div
+              class="h2 mb-0"
+              :class="clusterCpuColor"
+            >
+              {{ clusterCpuPct.toFixed(1) }}%
+            </div>
+            <div class="text-secondary small">
+              {{ totalCpus }} cœurs
+            </div>
           </div>
         </div>
         <div class="col-6 col-md-3">
           <div class="d-flex flex-column">
-            <div class="subheader">RAM cluster</div>
-            <div class="h2 mb-0" :class="clusterRamColor">{{ clusterRamPct.toFixed(1) }}%</div>
-            <div class="text-secondary small">{{ formatBytes(totalMemUsed) }} / {{ formatBytes(totalMemTotal) }}</div>
+            <div class="subheader">
+              RAM cluster
+            </div>
+            <div
+              class="h2 mb-0"
+              :class="clusterRamColor"
+            >
+              {{ clusterRamPct.toFixed(1) }}%
+            </div>
+            <div class="text-secondary small">
+              {{ formatBytes(totalMemUsed) }} / {{ formatBytes(totalMemTotal) }}
+            </div>
           </div>
         </div>
       </div>
 
       <!-- Per-node bars -->
       <div class="row g-2">
-        <div v-for="node in nodes" :key="node.id" class="col-12 col-md-6 col-xl-4">
-          <router-link :to="`/proxmox/nodes/${node.id}`" class="text-decoration-none">
+        <div
+          v-for="node in nodes"
+          :key="node.id"
+          class="col-12 col-md-6 col-xl-4"
+        >
+          <router-link
+            :to="`/proxmox/nodes/${node.id}`"
+            class="text-decoration-none"
+          >
             <div class="d-flex align-items-center gap-2 p-2 rounded hover-bg">
               <!-- Status dot -->
-              <span :class="node.status === 'online' ? 'badge bg-green node-status-dot' : 'badge bg-red node-status-dot'"></span>
+              <span :class="node.status === 'online' ? 'badge bg-green node-status-dot' : 'badge bg-red node-status-dot'" />
               <div class="flex-grow-1 min-width-0">
                 <div class="d-flex justify-content-between align-items-center mb-1">
                   <span class="fw-semibold text-body small text-truncate">{{ node.node_name }}</span>
@@ -70,7 +136,7 @@
                     class="progress-bar"
                     :class="cpuBarColor(node.cpu_usage * 100)"
                     :style="{ width: Math.min(node.cpu_usage * 100, 100) + '%' }"
-                  ></div>
+                  />
                 </div>
                 <!-- RAM bar -->
                 <div class="progress progress-thin">
@@ -78,7 +144,7 @@
                     class="progress-bar"
                     :class="ramBarColor(nodRamPct(node))"
                     :style="{ width: Math.min(nodRamPct(node), 100) + '%' }"
-                  ></div>
+                  />
                 </div>
               </div>
             </div>

@@ -2,38 +2,86 @@
   <div>
     <div class="page-header mb-4">
       <div class="page-pretitle">
-        <router-link to="/" class="text-decoration-none">Dashboard</router-link>
+        <router-link
+          to="/"
+          class="text-decoration-none"
+        >
+          Dashboard
+        </router-link>
         <span class="text-muted mx-1">/</span>
         <span>Paramètres</span>
       </div>
-      <h2 class="page-title">Paramètres</h2>
+      <h2 class="page-title">
+        Paramètres
+      </h2>
     </div>
 
     <ul class="nav nav-tabs mb-4">
       <li class="nav-item">
-        <a class="nav-link" :class="{ active: tab === 'general' }" href="#" @click.prevent="tab = 'general'">Général</a>
+        <button
+          type="button"
+          class="nav-link"
+          :class="{ active: tab === 'general' }"
+          @click="tab = 'general'"
+        >
+          Général
+        </button>
       </li>
       <li class="nav-item">
-        <a class="nav-link" :class="{ active: tab === 'notifications' }" href="#" @click.prevent="tab = 'notifications'">Notifications</a>
+        <button
+          type="button"
+          class="nav-link"
+          :class="{ active: tab === 'notifications' }"
+          @click="tab = 'notifications'"
+        >
+          Notifications
+        </button>
       </li>
       <li class="nav-item">
-        <a class="nav-link" :class="{ active: tab === 'integrations' }" href="#" @click.prevent="tab = 'integrations'">Intégrations</a>
+        <button
+          type="button"
+          class="nav-link"
+          :class="{ active: tab === 'integrations' }"
+          @click="tab = 'integrations'"
+        >
+          Intégrations
+        </button>
       </li>
       <li class="nav-item">
-        <a class="nav-link" :class="{ active: tab === 'retention' }" href="#" @click.prevent="tab = 'retention'">Rétention</a>
+        <button
+          type="button"
+          class="nav-link"
+          :class="{ active: tab === 'retention' }"
+          @click="tab = 'retention'"
+        >
+          Rétention
+        </button>
       </li>
       <li class="nav-item">
-        <a class="nav-link" :class="{ active: tab === 'maintenance' }" href="#" @click.prevent="tab = 'maintenance'">Maintenance</a>
+        <button
+          type="button"
+          class="nav-link"
+          :class="{ active: tab === 'maintenance' }"
+          @click="tab = 'maintenance'"
+        >
+          Maintenance
+        </button>
       </li>
     </ul>
 
     <!-- Général -->
-    <div v-show="tab === 'general'" class="row row-cards">
+    <div
+      v-show="tab === 'general'"
+      class="row row-cards"
+    >
       <div class="col-lg-6">
         <SettingsSystemInfoCard :settings="settings" />
       </div>
       <div class="col-lg-6">
-        <SettingsDatabaseCard :db-status="dbStatus" :format-number="formatNumber" />
+        <SettingsDatabaseCard
+          :db-status="dbStatus"
+          :format-number="formatNumber"
+        />
       </div>
     </div>
 

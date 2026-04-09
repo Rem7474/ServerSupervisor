@@ -3,34 +3,68 @@
     <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
       <div>
         <div class="page-pretitle">
-          <router-link to="/" class="text-decoration-none">Dashboard</router-link>
+          <router-link
+            to="/"
+            class="text-decoration-none"
+          >
+            Dashboard
+          </router-link>
           <span class="text-muted mx-1">/</span>
           <span>Audit</span>
         </div>
-        <h2 class="page-title">Audit</h2>
-        <div class="text-secondary">Historique des actions, connexions et commandes</div>
+        <h2 class="page-title">
+          Audit
+        </h2>
+        <div class="text-secondary">
+          Historique des actions, connexions et commandes
+        </div>
       </div>
       <div class="d-flex align-items-center gap-2">
-        <button class="btn btn-outline-secondary" @click="refresh" :disabled="connexionsLoading || cmdsLoading">Actualiser</button>
+        <button
+          class="btn btn-outline-secondary"
+          :disabled="connexionsLoading || cmdsLoading"
+          @click="refresh"
+        >
+          Actualiser
+        </button>
       </div>
     </div>
 
     <!-- Tab navigation -->
     <ul class="nav nav-tabs mb-4">
-      <li v-if="canViewCommands" class="nav-item">
-        <a class="nav-link" :class="{ active: activeTab === 'commandes' }" href="#" @click.prevent="switchToCommandes">
+      <li
+        v-if="canViewCommands"
+        class="nav-item"
+      >
+        <a
+          class="nav-link"
+          :class="{ active: activeTab === 'commandes' }"
+          href="#"
+          @click.prevent="switchToCommandes"
+        >
           Commandes
         </a>
       </li>
-      <li v-if="auth.role === 'admin'" class="nav-item">
-        <a class="nav-link" :class="{ active: activeTab === 'connexions' }" href="#" @click.prevent="switchToConnexions">
+      <li
+        v-if="auth.role === 'admin'"
+        class="nav-item"
+      >
+        <a
+          class="nav-link"
+          :class="{ active: activeTab === 'connexions' }"
+          href="#"
+          @click.prevent="switchToConnexions"
+        >
           Connexions
         </a>
       </li>
     </ul>
 
     <!-- ── Commandes tab ────────────────────────────────────────────────────── -->
-    <div v-show="activeTab === 'commandes'" class="side-layout">
+    <div
+      v-show="activeTab === 'commandes'"
+      class="side-layout"
+    >
       <!-- Left: table -->
       <div class="side-main">
         <DataToolbar
@@ -42,29 +76,70 @@
           <template #bottom>
             <div class="row g-2">
               <div class="col-12 col-md-4">
-                <select v-model="cmdHostFilter" class="form-select form-select-sm">
-                  <option value="">Tous les hôtes</option>
-                  <option v-for="h in cmdHosts" :key="h" :value="h">{{ h }}</option>
+                <select
+                  v-model="cmdHostFilter"
+                  class="form-select form-select-sm"
+                >
+                  <option value="">
+                    Tous les hôtes
+                  </option>
+                  <option
+                    v-for="h in cmdHosts"
+                    :key="h"
+                    :value="h"
+                  >
+                    {{ h }}
+                  </option>
                 </select>
               </div>
               <div class="col-6 col-md-4">
-                <select v-model="cmdStatusFilter" class="form-select form-select-sm">
-                  <option value="">Tous les états</option>
-                  <option value="pending">pending</option>
-                  <option value="running">running</option>
-                  <option value="completed">completed</option>
-                  <option value="failed">failed</option>
+                <select
+                  v-model="cmdStatusFilter"
+                  class="form-select form-select-sm"
+                >
+                  <option value="">
+                    Tous les états
+                  </option>
+                  <option value="pending">
+                    pending
+                  </option>
+                  <option value="running">
+                    running
+                  </option>
+                  <option value="completed">
+                    completed
+                  </option>
+                  <option value="failed">
+                    failed
+                  </option>
                 </select>
               </div>
               <div class="col-6 col-md-4">
-                <select v-model="cmdModuleFilter" class="form-select form-select-sm">
-                  <option value="">Tous les modules</option>
-                  <option value="apt">APT</option>
-                  <option value="docker">Docker</option>
-                  <option value="systemd">Systemd</option>
-                  <option value="journal">Journal</option>
-                  <option value="processes">Processus</option>
-                  <option value="custom">Custom</option>
+                <select
+                  v-model="cmdModuleFilter"
+                  class="form-select form-select-sm"
+                >
+                  <option value="">
+                    Tous les modules
+                  </option>
+                  <option value="apt">
+                    APT
+                  </option>
+                  <option value="docker">
+                    Docker
+                  </option>
+                  <option value="systemd">
+                    Systemd
+                  </option>
+                  <option value="journal">
+                    Journal
+                  </option>
+                  <option value="processes">
+                    Processus
+                  </option>
+                  <option value="custom">
+                    Custom
+                  </option>
                 </select>
               </div>
             </div>
@@ -76,31 +151,88 @@
             <table class="table table-vcenter card-table">
               <thead>
                 <tr>
-                  <th><SortableHeader label="Date" :active="cmdSortBy === 'created_at'" :direction="cmdSortDir" @toggle="toggleCmdSort('created_at')" /></th>
-                  <th><SortableHeader label="Hôte" :active="cmdSortBy === 'host_name'" :direction="cmdSortDir" @toggle="toggleCmdSort('host_name')" /></th>
-                  <th><SortableHeader label="Type" :active="cmdSortBy === 'module'" :direction="cmdSortDir" @toggle="toggleCmdSort('module')" /></th>
-                  <th><SortableHeader label="Commande" :active="cmdSortBy === 'command'" :direction="cmdSortDir" @toggle="toggleCmdSort('command')" /></th>
-                  <th><SortableHeader label="Utilisateur" :active="cmdSortBy === 'triggered_by'" :direction="cmdSortDir" @toggle="toggleCmdSort('triggered_by')" /></th>
-                  <th><SortableHeader label="Statut" :active="cmdSortBy === 'status'" :direction="cmdSortDir" @toggle="toggleCmdSort('status')" /></th>
+                  <th>
+                    <SortableHeader
+                      label="Date"
+                      :active="cmdSortBy === 'created_at'"
+                      :direction="cmdSortDir"
+                      @toggle="toggleCmdSort('created_at')"
+                    />
+                  </th>
+                  <th>
+                    <SortableHeader
+                      label="Hôte"
+                      :active="cmdSortBy === 'host_name'"
+                      :direction="cmdSortDir"
+                      @toggle="toggleCmdSort('host_name')"
+                    />
+                  </th>
+                  <th>
+                    <SortableHeader
+                      label="Type"
+                      :active="cmdSortBy === 'module'"
+                      :direction="cmdSortDir"
+                      @toggle="toggleCmdSort('module')"
+                    />
+                  </th>
+                  <th>
+                    <SortableHeader
+                      label="Commande"
+                      :active="cmdSortBy === 'command'"
+                      :direction="cmdSortDir"
+                      @toggle="toggleCmdSort('command')"
+                    />
+                  </th>
+                  <th>
+                    <SortableHeader
+                      label="Utilisateur"
+                      :active="cmdSortBy === 'triggered_by'"
+                      :direction="cmdSortDir"
+                      @toggle="toggleCmdSort('triggered_by')"
+                    />
+                  </th>
+                  <th>
+                    <SortableHeader
+                      label="Statut"
+                      :active="cmdSortBy === 'status'"
+                      :direction="cmdSortDir"
+                      @toggle="toggleCmdSort('status')"
+                    />
+                  </th>
                   <th>Durée</th>
-                  <th></th>
+                  <th />
                 </tr>
               </thead>
               <tbody>
                 <tr v-if="cmdsLoading">
-                  <td colspan="8" class="text-center text-secondary py-3">Chargement...</td>
+                  <td
+                    colspan="8"
+                    class="text-center text-secondary py-3"
+                  >
+                    Chargement...
+                  </td>
                 </tr>
                 <tr v-else-if="!displayedCmds.length">
-                  <td colspan="8" class="text-center text-secondary py-4">Aucune commande enregistrée</td>
+                  <td
+                    colspan="8"
+                    class="text-center text-secondary py-4"
+                  >
+                    Aucune commande enregistrée
+                  </td>
                 </tr>
                 <tr
                   v-for="cmd in displayedCmds"
                   :key="cmd.id"
                   :class="{ 'table-active': selectedCmd?.id === cmd.id }"
                 >
-                  <td class="text-secondary small">{{ formatDate(cmd.created_at) }}</td>
+                  <td class="text-secondary small">
+                    {{ formatDate(cmd.created_at) }}
+                  </td>
                   <td>
-                    <router-link :to="`/hosts/${cmd.host_id}`" class="text-decoration-none fw-semibold">
+                    <router-link
+                      :to="`/hosts/${cmd.host_id}`"
+                      class="text-decoration-none fw-semibold"
+                    >
                       {{ cmd.host_name || cmd.host_id }}
                     </router-link>
                   </td>
@@ -110,19 +242,36 @@
                   <td>
                     <code class="small">{{ cmdLabel(cmd) }}</code>
                   </td>
-                  <td class="text-secondary small">{{ cmd.triggered_by || '—' }}</td>
+                  <td class="text-secondary small">
+                    {{ cmd.triggered_by || '—' }}
+                  </td>
                   <td>
                     <span :class="statusClass(cmd.status)">{{ cmd.status }}</span>
                   </td>
-                  <td class="text-secondary small">{{ formatDuration(cmd.started_at, cmd.ended_at) }}</td>
+                  <td class="text-secondary small">
+                    {{ formatDuration(cmd.started_at, cmd.ended_at) }}
+                  </td>
                   <td>
                     <button
                       class="btn btn-sm btn-ghost-secondary"
-                      @click="openLogViewer(cmd)"
                       :disabled="!cmd.output && cmd.status === 'pending'"
                       title="Voir les logs"
+                      @click="openLogViewer(cmd)"
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 6l16 0" /><path d="M4 12l16 0" /><path d="M4 18l12 0" /></svg>
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        class="icon icon-sm"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        stroke-width="2"
+                        stroke="currentColor"
+                        fill="none"
+                      ><path
+                        stroke="none"
+                        d="M0 0h24v24H0z"
+                        fill="none"
+                      /><path d="M4 6l16 0" /><path d="M4 12l16 0" /><path d="M4 18l12 0" /></svg>
                     </button>
                   </td>
                 </tr>
@@ -160,24 +309,36 @@
         <div class="col-sm-4">
           <div class="card card-sm h-100">
             <div class="card-body text-center">
-              <div class="text-secondary small mb-1">Connexions (24h)</div>
-              <div class="h2 mb-0">{{ security.stats?.total ?? '—' }}</div>
+              <div class="text-secondary small mb-1">
+                Connexions (24h)
+              </div>
+              <div class="h2 mb-0">
+                {{ security.stats?.total ?? '—' }}
+              </div>
             </div>
           </div>
         </div>
         <div class="col-sm-4">
           <div class="card card-sm h-100">
             <div class="card-body text-center">
-              <div class="text-secondary small mb-1">Échecs (24h)</div>
-              <div class="h2 mb-0 text-danger">{{ security.stats?.failures ?? '—' }}</div>
+              <div class="text-secondary small mb-1">
+                Échecs (24h)
+              </div>
+              <div class="h2 mb-0 text-danger">
+                {{ security.stats?.failures ?? '—' }}
+              </div>
             </div>
           </div>
         </div>
         <div class="col-sm-4">
           <div class="card card-sm h-100">
             <div class="card-body text-center">
-              <div class="text-secondary small mb-1">IPs uniques (24h)</div>
-              <div class="h2 mb-0 text-azure">{{ security.stats?.unique_ips ?? '—' }}</div>
+              <div class="text-secondary small mb-1">
+                IPs uniques (24h)
+              </div>
+              <div class="h2 mb-0 text-azure">
+                {{ security.stats?.unique_ips ?? '—' }}
+              </div>
             </div>
           </div>
         </div>
@@ -186,23 +347,35 @@
       <!-- Top failed IPs -->
       <div class="card mb-4">
         <div class="card-header">
-          <h3 class="card-title">Top IPs — échecs de connexion (24h)</h3>
+          <h3 class="card-title">
+            Top IPs — échecs de connexion (24h)
+          </h3>
         </div>
         <div class="card-body p-0">
-          <div v-if="!security.top_failed_ips?.length" class="text-center py-4 text-secondary small">
+          <div
+            v-if="!security.top_failed_ips?.length"
+            class="text-center py-4 text-secondary small"
+          >
             Aucun échec enregistré sur cette période
           </div>
           <div v-else>
-            <div v-for="item in security.top_failed_ips" :key="item.ip_address" class="px-3 py-2 border-bottom">
+            <div
+              v-for="item in security.top_failed_ips"
+              :key="item.ip_address"
+              class="px-3 py-2 border-bottom"
+            >
               <div class="d-flex align-items-center justify-content-between mb-1">
                 <span class="font-monospace small">{{ item.ip_address }}</span>
                 <span class="badge bg-red-lt text-red">{{ item.fail_count }} échecs</span>
               </div>
-              <div class="progress" style="height: 4px;">
+              <div
+                class="progress"
+                style="height: 4px;"
+              >
                 <div
                   class="progress-bar bg-danger"
                   :style="{ width: progressWidth(item.fail_count) + '%' }"
-                ></div>
+                />
               </div>
             </div>
           </div>
@@ -212,7 +385,9 @@
       <!-- All login events -->
       <div class="card">
         <div class="card-header">
-          <h3 class="card-title">Toutes les connexions</h3>
+          <h3 class="card-title">
+            Toutes les connexions
+          </h3>
         </div>
         <div class="table-responsive">
           <table class="table table-vcenter card-table">
@@ -228,19 +403,45 @@
             </thead>
             <tbody>
               <tr v-if="connexionsLoading">
-                <td colspan="6" class="text-center text-secondary py-3">Chargement...</td>
+                <td
+                  colspan="6"
+                  class="text-center text-secondary py-3"
+                >
+                  Chargement...
+                </td>
               </tr>
               <tr v-else-if="!connexions.length">
-                <td colspan="6" class="text-center text-secondary py-4">Aucune connexion enregistrée</td>
+                <td
+                  colspan="6"
+                  class="text-center text-secondary py-4"
+                >
+                  Aucune connexion enregistrée
+                </td>
               </tr>
-              <tr v-for="ev in connexions" :key="ev.id">
-                <td class="text-secondary small">{{ formatDate(ev.created_at) }}</td>
-                <td class="fw-semibold">{{ ev.username }}</td>
-                <td class="text-secondary small font-monospace">{{ ev.ip_address }}</td>
-                <td class="text-secondary small">{{ parseUA(ev.user_agent).browser }}</td>
-                <td class="text-secondary small">{{ parseUA(ev.user_agent).os }}</td>
+              <tr
+                v-for="ev in connexions"
+                :key="ev.id"
+              >
+                <td class="text-secondary small">
+                  {{ formatDate(ev.created_at) }}
+                </td>
+                <td class="fw-semibold">
+                  {{ ev.username }}
+                </td>
+                <td class="text-secondary small font-monospace">
+                  {{ ev.ip_address }}
+                </td>
+                <td class="text-secondary small">
+                  {{ parseUA(ev.user_agent).browser }}
+                </td>
+                <td class="text-secondary small">
+                  {{ parseUA(ev.user_agent).os }}
+                </td>
                 <td>
-                  <span class="badge" :class="ev.success ? 'bg-green-lt text-green' : 'bg-red-lt text-red'">
+                  <span
+                    class="badge"
+                    :class="ev.success ? 'bg-green-lt text-green' : 'bg-red-lt text-red'"
+                  >
                     {{ ev.success ? 'Succès' : 'Échec' }}
                   </span>
                 </td>
@@ -249,7 +450,9 @@
           </table>
         </div>
         <div class="card-footer d-flex align-items-center justify-content-between">
-          <div class="text-secondary small">Page {{ connexionsPage }} / {{ totalConnexionsPages }}</div>
+          <div class="text-secondary small">
+            Page {{ connexionsPage }} / {{ totalConnexionsPages }}
+          </div>
           <PaginationNav
             :current-page="connexionsPage"
             :total-pages="totalConnexionsPages"

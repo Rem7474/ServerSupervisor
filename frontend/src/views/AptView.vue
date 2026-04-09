@@ -2,15 +2,29 @@
   <div>
     <div class="page-header mb-3">
       <div class="page-pretitle">
-        <router-link to="/" class="text-decoration-none">Dashboard</router-link>
+        <router-link
+          to="/"
+          class="text-decoration-none"
+        >
+          Dashboard
+        </router-link>
         <span class="text-muted mx-1">/</span>
         <span>APT</span>
       </div>
-      <h2 class="page-title">APT — Mises à jour système</h2>
-      <div class="text-secondary">Gérer les mises à jour APT sur tous les hôtes</div>
+      <h2 class="page-title">
+        APT — Mises à jour système
+      </h2>
+      <div class="text-secondary">
+        Gérer les mises à jour APT sur tous les hôtes
+      </div>
     </div>
 
-    <WsStatusBar :status="wsStatus" :error="wsError" :retry-count="retryCount" @reconnect="reconnect" />
+    <WsStatusBar
+      :status="wsStatus"
+      :error="wsError"
+      :retry-count="retryCount"
+      @reconnect="reconnect"
+    />
 
     <!-- Onglets -->
     <SubNavigation
@@ -27,7 +41,12 @@
       <div class="side-main">
         <!-- === Vue Hôtes === -->
         <template v-if="activeTab === 'hosts'">
-          <DataToolbar searchable :search="hostSearch" search-placeholder="Rechercher un hôte..." @update:search="hostSearch = $event">
+          <DataToolbar
+            searchable
+            :search="hostSearch"
+            search-placeholder="Rechercher un hôte..."
+            @update:search="hostSearch = $event"
+          >
             <template #right>
               <div class="btn-group">
                 <button
@@ -36,129 +55,284 @@
                   class="btn btn-sm"
                   :class="hostQuickFilter === f.value ? 'btn-primary' : 'btn-outline-secondary'"
                   @click="hostQuickFilter = f.value"
-                >{{ f.label }}</button>
+                >
+                  {{ f.label }}
+                </button>
               </div>
-              <select v-model="hostSortKey" class="form-select form-select-sm" style="width: auto;">
-                <option value="name">Trier par nom</option>
-                <option value="pending">Trier par paquets en attente</option>
-                <option value="security">Trier par mises à jour sécurité</option>
-                <option value="cve">Trier par CVE</option>
+              <select
+                v-model="hostSortKey"
+                class="form-select form-select-sm"
+                style="width: auto;"
+              >
+                <option value="name">
+                  Trier par nom
+                </option>
+                <option value="pending">
+                  Trier par paquets en attente
+                </option>
+                <option value="security">
+                  Trier par mises à jour sécurité
+                </option>
+                <option value="cve">
+                  Trier par CVE
+                </option>
               </select>
-              <button class="btn btn-sm btn-outline-secondary" @click="hostSortDir = hostSortDir === 'asc' ? 'desc' : 'asc'" :title="hostSortDir === 'asc' ? 'Croissant' : 'Décroissant'">
-                <svg v-if="hostSortDir === 'asc'" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 8l4-4 4 4M7 4v16M13 16l4 4 4-4M17 20V4"/></svg>
-                <svg v-else xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 16l4 4 4-4M7 20V4M13 8l4-4 4 4M17 4v16"/></svg>
+              <button
+                class="btn btn-sm btn-outline-secondary"
+                :title="hostSortDir === 'asc' ? 'Croissant' : 'Décroissant'"
+                @click="hostSortDir = hostSortDir === 'asc' ? 'desc' : 'asc'"
+              >
+                <svg
+                  v-if="hostSortDir === 'asc'"
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                ><path d="M3 8l4-4 4 4M7 4v16M13 16l4 4 4-4M17 20V4" /></svg>
+                <svg
+                  v-else
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                ><path d="M3 16l4 4 4-4M7 20V4M13 8l4-4 4 4M17 4v16" /></svg>
               </button>
             </template>
             <template #bottom>
               <div class="d-flex flex-wrap align-items-center gap-3">
                 <label class="form-check">
-                  <input type="checkbox" class="form-check-input" v-model="selectAll" @change="toggleSelectAll" />
+                  <input
+                    v-model="selectAll"
+                    type="checkbox"
+                    class="form-check-input"
+                    @change="toggleSelectAll"
+                  >
                   <span class="form-check-label">Sélectionner tous les hôtes</span>
                 </label>
                 <div class="ms-auto d-flex flex-wrap gap-2">
                   <template v-if="canRunApt">
-                    <button @click="bulkAptCmd('update')" class="btn btn-outline-secondary" :disabled="selectedHosts.length === 0 || !!aptBulkLoading">
-                      <span v-if="aptBulkLoading === 'update'" class="spinner-border spinner-border-sm me-1" role="status"></span>
+                    <button
+                      class="btn btn-outline-secondary"
+                      :disabled="selectedHosts.length === 0 || !!aptBulkLoading"
+                      @click="bulkAptCmd('update')"
+                    >
+                      <span
+                        v-if="aptBulkLoading === 'update'"
+                        class="spinner-border spinner-border-sm me-1"
+                        role="status"
+                      />
                       apt update ({{ selectedHosts.length }})
                     </button>
-                    <button @click="bulkAptCmd('upgrade')" class="btn btn-primary" :disabled="selectedHosts.length === 0 || !!aptBulkLoading">
-                      <span v-if="aptBulkLoading === 'upgrade'" class="spinner-border spinner-border-sm me-1" role="status"></span>
+                    <button
+                      class="btn btn-primary"
+                      :disabled="selectedHosts.length === 0 || !!aptBulkLoading"
+                      @click="bulkAptCmd('upgrade')"
+                    >
+                      <span
+                        v-if="aptBulkLoading === 'upgrade'"
+                        class="spinner-border spinner-border-sm me-1"
+                        role="status"
+                      />
                       apt upgrade ({{ selectedHosts.length }})
                     </button>
-                    <button @click="bulkAptCmd('dist-upgrade')" class="btn btn-outline-danger" :disabled="selectedHosts.length === 0 || !!aptBulkLoading">
-                      <span v-if="aptBulkLoading === 'dist-upgrade'" class="spinner-border spinner-border-sm me-1" role="status"></span>
+                    <button
+                      class="btn btn-outline-danger"
+                      :disabled="selectedHosts.length === 0 || !!aptBulkLoading"
+                      @click="bulkAptCmd('dist-upgrade')"
+                    >
+                      <span
+                        v-if="aptBulkLoading === 'dist-upgrade'"
+                        class="spinner-border spinner-border-sm me-1"
+                        role="status"
+                      />
                       apt dist-upgrade ({{ selectedHosts.length }})
                     </button>
                   </template>
-                  <div v-else class="text-secondary small">Mode lecture seule</div>
+                  <div
+                    v-else
+                    class="text-secondary small"
+                  >
+                    Mode lecture seule
+                  </div>
                 </div>
               </div>
             </template>
           </DataToolbar>
 
           <div class="row row-cards">
-            <div v-if="filteredHosts.length === 0" class="col-12">
+            <div
+              v-if="filteredHosts.length === 0"
+              class="col-12"
+            >
               <div class="card">
-                <div class="card-body text-center text-secondary py-4">Aucun hôte ne correspond aux filtres.</div>
+                <div class="card-body text-center text-secondary py-4">
+                  Aucun hôte ne correspond aux filtres.
+                </div>
               </div>
             </div>
-            <div v-for="host in filteredHosts" :key="host.id" class="col-12">
+            <div
+              v-for="host in filteredHosts"
+              :key="host.id"
+              class="col-12"
+            >
               <div class="card">
                 <div class="card-body">
                   <div class="d-flex align-items-center gap-3 mb-3">
                     <label class="form-check">
-                      <input type="checkbox" class="form-check-input" :value="host.id" v-model="selectedHosts" />
-                      <span class="form-check-label"></span>
+                      <input
+                        v-model="selectedHosts"
+                        type="checkbox"
+                        class="form-check-input"
+                        :value="host.id"
+                      >
+                      <span class="form-check-label" />
                     </label>
                     <div class="flex-fill">
-                      <div class="fw-semibold">{{ host.hostname || host.name }}</div>
-                      <div class="text-secondary small">{{ host.ip_address }}</div>
+                      <div class="fw-semibold">
+                        {{ host.hostname || host.name }}
+                      </div>
+                      <div class="text-secondary small">
+                        {{ host.ip_address }}
+                      </div>
                     </div>
                     <span :class="host.status === 'online' ? 'badge bg-green-lt text-green' : 'badge bg-red-lt text-red'">
                       {{ host.status === 'online' ? 'En ligne' : 'Hors ligne' }}
                     </span>
-                    <button v-if="canRunApt" class="btn btn-sm btn-outline-secondary" @click="openScheduleModal(host)" title="Planifier une commande APT">
-                      <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm me-1" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                    <button
+                      v-if="canRunApt"
+                      class="btn btn-sm btn-outline-secondary"
+                      title="Planifier une commande APT"
+                      @click="openScheduleModal(host)"
+                    >
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        class="icon icon-sm me-1"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      >
+                        <rect
+                          x="3"
+                          y="4"
+                          width="18"
+                          height="18"
+                          rx="2"
+                          ry="2"
+                        /><line
+                          x1="16"
+                          y1="2"
+                          x2="16"
+                          y2="6"
+                        /><line
+                          x1="8"
+                          y1="2"
+                          x2="8"
+                          y2="6"
+                        /><line
+                          x1="3"
+                          y1="10"
+                          x2="21"
+                          y2="10"
+                        />
                       </svg>
                       Planifier
                     </button>
                   </div>
 
-                  <div v-if="aptStatuses[host.id]" class="row row-cards mb-3">
+                  <div
+                    v-if="aptStatuses[host.id]"
+                    class="row row-cards mb-3"
+                  >
                     <div class="col-sm-6 col-md-3">
                       <div class="card card-sm h-100">
                         <div class="card-body text-center">
-                          <div class="h2 mb-0" :class="aptStatuses[host.id].pending_packages > 0 ? 'text-yellow' : 'text-green'">
+                          <div
+                            class="h2 mb-0"
+                            :class="aptStatuses[host.id].pending_packages > 0 ? 'text-yellow' : 'text-green'"
+                          >
                             {{ aptStatuses[host.id].pending_packages }}
                           </div>
-                          <div class="text-secondary small">En attente</div>
+                          <div class="text-secondary small">
+                            En attente
+                          </div>
                         </div>
                       </div>
                     </div>
                     <div class="col-sm-6 col-md-3">
                       <div class="card card-sm h-100">
                         <div class="card-body text-center">
-                          <div class="h2 mb-0 text-red">{{ aptStatuses[host.id].security_updates }}</div>
-                          <div class="text-secondary small">Sécurité</div>
+                          <div class="h2 mb-0 text-red">
+                            {{ aptStatuses[host.id].security_updates }}
+                          </div>
+                          <div class="text-secondary small">
+                            Sécurité
+                          </div>
                         </div>
                       </div>
                     </div>
                     <div class="col-sm-6 col-md-3">
                       <div class="card card-sm h-100">
                         <div class="card-body text-center">
-                          <div class="fw-semibold">{{ formatDate(aptStatuses[host.id].last_update) }}</div>
-                          <div class="text-secondary small">Dernier update</div>
+                          <div class="fw-semibold">
+                            {{ formatDate(aptStatuses[host.id].last_update) }}
+                          </div>
+                          <div class="text-secondary small">
+                            Dernier update
+                          </div>
                         </div>
                       </div>
                     </div>
                     <div class="col-sm-6 col-md-3">
                       <div class="card card-sm h-100">
                         <div class="card-body text-center">
-                          <div class="fw-semibold">{{ formatDate(aptStatuses[host.id].last_upgrade) }}</div>
-                          <div class="text-secondary small">Dernière mise à jour</div>
+                          <div class="fw-semibold">
+                            {{ formatDate(aptStatuses[host.id].last_upgrade) }}
+                          </div>
+                          <div class="text-secondary small">
+                            Dernière mise à jour
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
 
                   <!-- CVE Information -->
-                  <div v-if="aptStatuses[host.id]?.cve_list" class="mb-3">
+                  <div
+                    v-if="aptStatuses[host.id]?.cve_list"
+                    class="mb-3"
+                  >
                     <CVEList
-                      :cveList="aptStatuses[host.id].cve_list"
-                      :showMaxSeverity="true"
-                      :alwaysExpanded="false"
+                      :cve-list="aptStatuses[host.id].cve_list"
+                      :show-max-severity="true"
+                      :always-expanded="false"
                       :limit="5"
                     />
                   </div>
 
                   <!-- Package List -->
-                  <div v-if="getPackages(aptStatuses[host.id]).length > 0" class="mb-3">
+                  <div
+                    v-if="getPackages(aptStatuses[host.id]).length > 0"
+                    class="mb-3"
+                  >
                     <div class="d-flex align-items-center mb-2">
                       <span class="fw-semibold me-2">Paquets en attente :</span>
                       <span class="badge bg-yellow-lt text-yellow">{{ getPackages(aptStatuses[host.id]).length }}</span>
                     </div>
-                    <div v-if="packagesExpanded[host.id]" class="d-flex flex-wrap gap-1 mb-1">
+                    <div
+                      v-if="packagesExpanded[host.id]"
+                      class="d-flex flex-wrap gap-1 mb-1"
+                    >
                       <span
                         v-for="pkg in (packagesShowAll[host.id] ? getPackages(aptStatuses[host.id]) : getPackages(aptStatuses[host.id]).slice(0, 12))"
                         :key="pkg"
@@ -167,13 +341,15 @@
                       >{{ pkg }}</span>
                       <button
                         v-if="getPackages(aptStatuses[host.id]).length > 12 && !packagesShowAll[host.id]"
-                        @click="packagesShowAll[host.id] = true"
                         class="btn btn-sm btn-link p-0 ms-1"
-                      >+{{ getPackages(aptStatuses[host.id]).length - 12 }} plus...</button>
+                        @click="packagesShowAll[host.id] = true"
+                      >
+                        +{{ getPackages(aptStatuses[host.id]).length - 12 }} plus...
+                      </button>
                     </div>
                     <button
-                      @click="packagesExpanded[host.id] = !packagesExpanded[host.id]"
                       class="btn btn-sm btn-link p-0"
+                      @click="packagesExpanded[host.id] = !packagesExpanded[host.id]"
                     >
                       {{ packagesExpanded[host.id]
                         ? 'Masquer'
@@ -182,18 +358,47 @@
                   </div>
 
                   <div v-if="aptHistories[host.id]?.length">
-                    <button @click="toggleHistory(host.id)" class="btn btn-link p-0">
+                    <button
+                      class="btn btn-link p-0"
+                      @click="toggleHistory(host.id)"
+                    >
                       {{ expandedHistories[host.id] ? 'Masquer' : 'Voir' }} l'historique ({{ aptHistories[host.id].length }})
                     </button>
-                    <div v-if="expandedHistories[host.id]" class="mt-3">
-                      <div v-for="cmd in aptHistories[host.id]" :key="cmd.id" class="border rounded p-3 mb-2">
+                    <div
+                      v-if="expandedHistories[host.id]"
+                      class="mt-3"
+                    >
+                      <div
+                        v-for="cmd in aptHistories[host.id]"
+                        :key="cmd.id"
+                        class="border rounded p-3 mb-2"
+                      >
                         <div class="d-flex align-items-center justify-content-between">
-                          <div class="fw-semibold">apt {{ cmd.action }}</div>
+                          <div class="fw-semibold">
+                            apt {{ cmd.action }}
+                          </div>
                           <div class="d-flex align-items-center gap-2">
                             <span :class="statusClass(cmd.status)">{{ cmd.status }}</span>
                             <span class="text-secondary small">{{ formatDuration(cmd.started_at, cmd.ended_at) }}</span>
-                            <button @click="watchCommand(cmd, host)" class="btn btn-sm btn-ghost-secondary" title="Voir les logs">
-                              <svg class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" xmlns="http://www.w3.org/2000/svg"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 6l16 0" /><path d="M4 12l16 0" /><path d="M4 18l12 0" /></svg>
+                            <button
+                              class="btn btn-sm btn-ghost-secondary"
+                              title="Voir les logs"
+                              @click="watchCommand(cmd, host)"
+                            >
+                              <svg
+                                class="icon icon-sm"
+                                width="16"
+                                height="16"
+                                viewBox="0 0 24 24"
+                                stroke-width="2"
+                                stroke="currentColor"
+                                fill="none"
+                                xmlns="http://www.w3.org/2000/svg"
+                              ><path
+                                stroke="none"
+                                d="M0 0h24v24H0z"
+                                fill="none"
+                              /><path d="M4 6l16 0" /><path d="M4 12l16 0" /><path d="M4 18l12 0" /></svg>
                             </button>
                           </div>
                         </div>
@@ -211,14 +416,30 @@
         </template>
 
         <!-- === Vue Historique global === -->
-        <div v-else class="card">
+        <div
+          v-else
+          class="card"
+        >
           <div class="card-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
-            <h3 class="card-title mb-0">Historique des mises à jour</h3>
+            <h3 class="card-title mb-0">
+              Historique des mises à jour
+            </h3>
             <div class="d-flex flex-wrap gap-2">
               <!-- Filtre hôte -->
-              <select v-model="historyHostFilter" class="form-select form-select-sm" style="min-width: 160px;" @change="resetHistoryPage">
-                <option value="all">Tous les hôtes</option>
-                <option v-for="host in hosts" :key="host.id" :value="host.id">
+              <select
+                v-model="historyHostFilter"
+                class="form-select form-select-sm"
+                style="min-width: 160px;"
+                @change="resetHistoryPage"
+              >
+                <option value="all">
+                  Tous les hôtes
+                </option>
+                <option
+                  v-for="host in hosts"
+                  :key="host.id"
+                  :value="host.id"
+                >
                   {{ host.hostname || host.name }}
                 </option>
               </select>
@@ -246,26 +467,42 @@
                   <th>Utilisateur</th>
                   <th>Statut</th>
                   <th>Durée</th>
-                  <th></th>
+                  <th />
                 </tr>
               </thead>
               <tbody>
                 <tr v-if="filteredHistory.length === 0">
-                  <td colspan="7" class="text-center text-secondary py-4">Aucun historique pour cette période</td>
+                  <td
+                    colspan="7"
+                    class="text-center text-secondary py-4"
+                  >
+                    Aucun historique pour cette période
+                  </td>
                 </tr>
-                <tr v-for="cmd in pagedHistory" :key="cmd.id">
-                  <td class="text-secondary small">{{ formatDateExact(cmd.created_at) }}</td>
+                <tr
+                  v-for="cmd in pagedHistory"
+                  :key="cmd.id"
+                >
+                  <td class="text-secondary small">
+                    {{ formatDateExact(cmd.created_at) }}
+                  </td>
                   <td>
-                    <div class="fw-semibold">{{ cmd.hostName }}</div>
+                    <div class="fw-semibold">
+                      {{ cmd.hostName }}
+                    </div>
                   </td>
                   <td><code>apt {{ cmd.action }}</code></td>
-                  <td class="text-secondary">{{ cmd.triggered_by || '—' }}</td>
+                  <td class="text-secondary">
+                    {{ cmd.triggered_by || '—' }}
+                  </td>
                   <td><span :class="statusClass(cmd.status)">{{ cmd.status }}</span></td>
-                  <td class="text-secondary small">{{ formatDuration(cmd.started_at, cmd.ended_at) }}</td>
+                  <td class="text-secondary small">
+                    {{ formatDuration(cmd.started_at, cmd.ended_at) }}
+                  </td>
                   <td>
                     <button
-                      @click="watchCommand(cmd, { hostname: cmd.hostName, id: cmd.hostId })"
                       class="btn btn-sm btn-outline-primary"
+                      @click="watchCommand(cmd, { hostname: cmd.hostName, id: cmd.hostId })"
                     >
                       Logs
                     </button>
@@ -274,7 +511,10 @@
               </tbody>
             </table>
           </div>
-          <div v-if="historyTotalPages > 1" class="card-footer d-flex align-items-center justify-content-between">
+          <div
+            v-if="historyTotalPages > 1"
+            class="card-footer d-flex align-items-center justify-content-between"
+          >
             <div class="text-secondary small">
               {{ filteredHistory.length }} entrée{{ filteredHistory.length > 1 ? 's' : '' }} —
               page {{ historyPage }} / {{ historyTotalPages }}
@@ -300,48 +540,111 @@
     </div>
 
     <!-- Schedule APT modal -->
-    <div v-if="scheduleModal.open" class="modal modal-blur show d-block" tabindex="-1" style="background:rgba(0,0,0,.5);z-index:1050" @click.self="scheduleModal.open = false">
+    <div
+      v-if="scheduleModal.open"
+      class="modal modal-blur show d-block"
+      tabindex="-1"
+      style="background:rgba(0,0,0,.5);z-index:1050"
+      @click.self="scheduleModal.open = false"
+    >
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
           <div class="modal-header">
             <div>
-              <h5 class="modal-title">Planifier une commande APT</h5>
-              <div class="text-muted small mt-1">{{ scheduleModal.hostname }}</div>
+              <h5 class="modal-title">
+                Planifier une commande APT
+              </h5>
+              <div class="text-muted small mt-1">
+                {{ scheduleModal.hostname }}
+              </div>
             </div>
-            <button type="button" class="btn-close" @click="scheduleModal.open = false"></button>
+            <button
+              type="button"
+              class="btn-close"
+              @click="scheduleModal.open = false"
+            />
           </div>
           <div class="modal-body">
             <div class="mb-3">
               <label class="form-label">Nom de la tâche</label>
-              <input v-model="scheduleModal.name" type="text" class="form-control" placeholder="ex: apt upgrade hebdo" />
+              <input
+                v-model="scheduleModal.name"
+                type="text"
+                class="form-control"
+                placeholder="ex: apt upgrade hebdo"
+              >
             </div>
             <div class="mb-3">
               <label class="form-label">Commande</label>
-              <select v-model="scheduleModal.action" class="form-select">
-                <option value="update">apt update</option>
-                <option value="upgrade">apt upgrade</option>
-                <option value="dist-upgrade">apt dist-upgrade</option>
+              <select
+                v-model="scheduleModal.action"
+                class="form-select"
+              >
+                <option value="update">
+                  apt update
+                </option>
+                <option value="upgrade">
+                  apt upgrade
+                </option>
+                <option value="dist-upgrade">
+                  apt dist-upgrade
+                </option>
               </select>
             </div>
             <div class="mb-3">
               <label class="form-check form-switch">
-                <input v-model="scheduleModal.manualOnly" type="checkbox" class="form-check-input" />
+                <input
+                  v-model="scheduleModal.manualOnly"
+                  type="checkbox"
+                  class="form-check-input"
+                >
                 <span class="form-check-label">Exécution manuelle uniquement (pas de planification automatique)</span>
               </label>
             </div>
-            <div v-if="!scheduleModal.manualOnly" class="mb-3">
+            <div
+              v-if="!scheduleModal.manualOnly"
+              class="mb-3"
+            >
               <CronBuilder v-model="scheduleModal.cron_expression" />
             </div>
-            <div v-if="!scheduleModal.manualOnly" class="form-check form-switch mb-2">
-              <input v-model="scheduleModal.enabled" type="checkbox" class="form-check-input" id="schedEnabled" />
-              <label class="form-check-label" for="schedEnabled">Activée</label>
+            <div
+              v-if="!scheduleModal.manualOnly"
+              class="form-check form-switch mb-2"
+            >
+              <input
+                id="schedEnabled"
+                v-model="scheduleModal.enabled"
+                type="checkbox"
+                class="form-check-input"
+              >
+              <label
+                class="form-check-label"
+                for="schedEnabled"
+              >Activée</label>
             </div>
-            <div v-if="scheduleModal.error" class="alert alert-danger py-2">{{ scheduleModal.error }}</div>
+            <div
+              v-if="scheduleModal.error"
+              class="alert alert-danger py-2"
+            >
+              {{ scheduleModal.error }}
+            </div>
           </div>
           <div class="modal-footer">
-            <button class="btn btn-secondary" @click="scheduleModal.open = false">Annuler</button>
-            <button class="btn btn-primary" :disabled="scheduleModal.saving" @click="saveSchedule">
-              <span v-if="scheduleModal.saving" class="spinner-border spinner-border-sm me-1"></span>
+            <button
+              class="btn btn-secondary"
+              @click="scheduleModal.open = false"
+            >
+              Annuler
+            </button>
+            <button
+              class="btn btn-primary"
+              :disabled="scheduleModal.saving"
+              @click="saveSchedule"
+            >
+              <span
+                v-if="scheduleModal.saving"
+                class="spinner-border spinner-border-sm me-1"
+              />
               Créer la tâche
             </button>
           </div>
@@ -349,14 +652,31 @@
       </div>
     </div>
 
-    <div v-if="bulkActionFeedback" class="position-fixed bottom-0 end-0 p-3" style="z-index: 1100;">
-      <div class="toast show align-items-center border-0" :class="bulkActionFeedback.variantClass">
+    <div
+      v-if="bulkActionFeedback"
+      class="position-fixed bottom-0 end-0 p-3"
+      style="z-index: 1100;"
+    >
+      <div
+        class="toast show align-items-center border-0"
+        :class="bulkActionFeedback.variantClass"
+      >
         <div class="d-flex">
           <div class="toast-body">
             <strong>apt {{ bulkActionFeedback.command }}</strong> {{ bulkActionFeedback.message }}
-            <div v-if="bulkActionFeedback.details" class="small mt-1">{{ bulkActionFeedback.details }}</div>
+            <div
+              v-if="bulkActionFeedback.details"
+              class="small mt-1"
+            >
+              {{ bulkActionFeedback.details }}
+            </div>
           </div>
-          <button type="button" class="btn-close me-2 m-auto" :class="bulkActionFeedback.closeClass" @click="bulkActionFeedback = null"></button>
+          <button
+            type="button"
+            class="btn-close me-2 m-auto"
+            :class="bulkActionFeedback.closeClass"
+            @click="bulkActionFeedback = null"
+          />
         </div>
       </div>
     </div>

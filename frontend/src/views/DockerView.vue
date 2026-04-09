@@ -2,31 +2,64 @@
   <div>
     <div class="page-header mb-4">
       <div class="page-pretitle">
-        <router-link to="/" class="text-decoration-none">Dashboard</router-link>
+        <router-link
+          to="/"
+          class="text-decoration-none"
+        >
+          Dashboard
+        </router-link>
         <span class="text-muted mx-1">/</span>
         <span>Docker</span>
       </div>
-      <h2 class="page-title">Docker</h2>
-      <div class="text-secondary">Vue globale de tous les conteneurs sur l'infrastructure</div>
+      <h2 class="page-title">
+        Docker
+      </h2>
+      <div class="text-secondary">
+        Vue globale de tous les conteneurs sur l'infrastructure
+      </div>
     </div>
 
-    <WsStatusBar :status="wsStatus" :error="wsError" :retry-count="retryCount" @reconnect="reconnect" />
+    <WsStatusBar
+      :status="wsStatus"
+      :error="wsError"
+      :retry-count="retryCount"
+      @reconnect="reconnect"
+    />
 
-    <div v-if="actionError" class="alert alert-danger alert-dismissible mb-3" role="alert">
+    <div
+      v-if="actionError"
+      class="alert alert-danger alert-dismissible mb-3"
+      role="alert"
+    >
       {{ actionError }}
-      <button type="button" class="btn-close" @click="actionError = ''" aria-label="Fermer le message d'erreur"></button>
+      <button
+        type="button"
+        class="btn-close"
+        aria-label="Fermer le message d'erreur"
+        @click="actionError = ''"
+      />
     </div>
 
     <!-- Tabs -->
     <ul class="nav nav-tabs mb-4">
       <li class="nav-item">
-        <a class="nav-link" :class="{ active: activeTab === 'containers' }" href="#" @click.prevent="activeTab = 'containers'">
+        <a
+          class="nav-link"
+          :class="{ active: activeTab === 'containers' }"
+          href="#"
+          @click.prevent="activeTab = 'containers'"
+        >
           Conteneurs
           <span class="badge bg-azure-lt text-azure ms-1">{{ containers.length }}</span>
         </a>
       </li>
       <li class="nav-item">
-        <a class="nav-link" :class="{ active: activeTab === 'compose' }" href="#" @click.prevent="activeTab = 'compose'">
+        <a
+          class="nav-link"
+          :class="{ active: activeTab === 'compose' }"
+          href="#"
+          @click.prevent="activeTab = 'compose'"
+        >
           Projets Compose
           <span class="badge bg-azure-lt text-azure ms-1">{{ composeProjects.length }}</span>
         </a>

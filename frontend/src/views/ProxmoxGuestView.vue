@@ -1,62 +1,117 @@
 <template>
   <div>
-    <div v-if="loading" class="text-center py-5 text-muted">Chargement...</div>
-    <div v-else-if="error" class="alert alert-danger">{{ error }}</div>
+    <div
+      v-if="loading"
+      class="text-center py-5 text-muted"
+    >
+      Chargement...
+    </div>
+    <div
+      v-else-if="error"
+      class="alert alert-danger"
+    >
+      {{ error }}
+    </div>
     <div v-else-if="guest">
       <div class="page-header mb-4">
         <div class="page-pretitle">
-          <router-link to="/" class="text-decoration-none">Dashboard</router-link>
+          <router-link
+            to="/"
+            class="text-decoration-none"
+          >
+            Dashboard
+          </router-link>
           <span class="text-muted mx-1">/</span>
-          <router-link to="/proxmox" class="text-decoration-none">Proxmox VE</router-link>
+          <router-link
+            to="/proxmox"
+            class="text-decoration-none"
+          >
+            Proxmox VE
+          </router-link>
           <span class="text-muted mx-1">/</span>
-          <router-link :to="`/proxmox/nodes/${guestNodeId}`" class="text-decoration-none">{{ guest.node_name }}</router-link>
+          <router-link
+            :to="`/proxmox/nodes/${guestNodeId}`"
+            class="text-decoration-none"
+          >
+            {{ guest.node_name }}
+          </router-link>
           <span class="text-muted mx-1">/</span>
           <span>{{ guest.guest_type.toUpperCase() }} {{ guest.vmid }}</span>
         </div>
         <div class="d-flex align-items-center gap-3 flex-wrap">
-          <h2 class="page-title mb-0">{{ guest.name || `${guest.guest_type.toUpperCase()} ${guest.vmid}` }}</h2>
+          <h2 class="page-title mb-0">
+            {{ guest.name || `${guest.guest_type.toUpperCase()} ${guest.vmid}` }}
+          </h2>
           <span :class="statusBadgeClass(guest.status)">{{ guest.status }}</span>
           <span class="badge bg-azure-lt text-azure">{{ guest.guest_type.toUpperCase() }}</span>
-          <span v-if="guestLink?.host_id" class="badge bg-green-lt text-green">
+          <span
+            v-if="guestLink?.host_id"
+            class="badge bg-green-lt text-green"
+          >
             Lié à
-            <router-link :to="`/hosts/${guestLink.host_id}`" class="ms-1">{{ guestLink.host_hostname || guestLink.host_name }}</router-link>
+            <router-link
+              :to="`/hosts/${guestLink.host_id}`"
+              class="ms-1"
+            >{{ guestLink.host_hostname || guestLink.host_name }}</router-link>
           </span>
         </div>
-        <div class="text-secondary">Nœud {{ guest.node_name }} · VMID {{ guest.vmid }}</div>
+        <div class="text-secondary">
+          Nœud {{ guest.node_name }} · VMID {{ guest.vmid }}
+        </div>
       </div>
 
       <div class="row row-cards mb-4">
         <div class="col-6 col-lg-3">
           <div class="card card-sm h-100">
             <div class="card-body">
-              <div class="subheader">CPU alloué</div>
-              <div class="h2 mt-2 mb-0">{{ guest.cpu_alloc }}</div>
+              <div class="subheader">
+                CPU alloué
+              </div>
+              <div class="h2 mt-2 mb-0">
+                {{ guest.cpu_alloc }}
+              </div>
             </div>
           </div>
         </div>
         <div class="col-6 col-lg-3">
           <div class="card card-sm h-100">
             <div class="card-body">
-              <div class="subheader">CPU utilisé</div>
-              <div class="h2 mt-2 mb-0">{{ (guest.cpu_usage * 100).toFixed(1) }}%</div>
+              <div class="subheader">
+                CPU utilisé
+              </div>
+              <div class="h2 mt-2 mb-0">
+                {{ (guest.cpu_usage * 100).toFixed(1) }}%
+              </div>
             </div>
           </div>
         </div>
         <div class="col-6 col-lg-3">
           <div class="card card-sm h-100">
             <div class="card-body">
-              <div class="subheader">RAM</div>
-              <div class="h2 mt-2 mb-0">{{ formatBytes(guest.mem_usage) }}</div>
-              <div class="text-secondary small">/ {{ formatBytes(guest.mem_alloc) }}</div>
+              <div class="subheader">
+                RAM
+              </div>
+              <div class="h2 mt-2 mb-0">
+                {{ formatBytes(guest.mem_usage) }}
+              </div>
+              <div class="text-secondary small">
+                / {{ formatBytes(guest.mem_alloc) }}
+              </div>
             </div>
           </div>
         </div>
         <div class="col-6 col-lg-3">
           <div class="card card-sm h-100">
             <div class="card-body">
-              <div class="subheader">Disque</div>
-              <div class="h2 mt-2 mb-0">{{ formatBytes(guest.disk_alloc) }}</div>
-              <div class="text-secondary small">Uptime {{ formatUptime(guest.uptime) }}</div>
+              <div class="subheader">
+                Disque
+              </div>
+              <div class="h2 mt-2 mb-0">
+                {{ formatBytes(guest.disk_alloc) }}
+              </div>
+              <div class="text-secondary small">
+                Uptime {{ formatUptime(guest.uptime) }}
+              </div>
             </div>
           </div>
         </div>
@@ -64,8 +119,14 @@
 
       <div class="card">
         <div class="card-header d-flex align-items-center justify-content-between gap-2 flex-wrap">
-          <h3 class="card-title mb-0">Historique CPU / RAM</h3>
-          <div class="btn-group btn-group-sm guest-range-group" role="group" aria-label="Plage temporelle">
+          <h3 class="card-title mb-0">
+            Historique CPU / RAM
+          </h3>
+          <div
+            class="btn-group btn-group-sm guest-range-group"
+            role="group"
+            aria-label="Plage temporelle"
+          >
             <button
               v-for="h in [1, 6, 24, 168, 720]"
               :key="h"
@@ -76,12 +137,31 @@
             </button>
           </div>
         </div>
-        <div class="card-body" style="height: 14rem;">
-          <div v-if="summaryLoading" class="h-100 d-flex align-items-center justify-content-center">
-            <div class="spinner-border text-secondary" role="status"></div>
+        <div
+          class="card-body"
+          style="height: 14rem;"
+        >
+          <div
+            v-if="summaryLoading"
+            class="h-100 d-flex align-items-center justify-content-center"
+          >
+            <div
+              class="spinner-border text-secondary"
+              role="status"
+            />
           </div>
-          <Line v-else-if="chartData" :data="chartData" :options="chartOptions" class="h-100" />
-          <div v-else class="h-100 d-flex align-items-center justify-content-center text-secondary">Aucune donnée</div>
+          <Line
+            v-else-if="chartData"
+            :data="chartData"
+            :options="chartOptions"
+            class="h-100"
+          />
+          <div
+            v-else
+            class="h-100 d-flex align-items-center justify-content-center text-secondary"
+          >
+            Aucune donnée
+          </div>
         </div>
       </div>
     </div>

@@ -3,15 +3,29 @@
     <!-- Page Header -->
     <div class="page-header mb-4">
       <div class="page-pretitle">
-        <router-link to="/" class="text-decoration-none">Dashboard</router-link>
+        <router-link
+          to="/"
+          class="text-decoration-none"
+        >
+          Dashboard
+        </router-link>
         <span class="text-muted mx-1">/</span>
         <span>Architecture réseau</span>
       </div>
-      <h2 class="page-title">Architecture réseau logique</h2>
-      <div class="text-secondary">Relations entre services, reverse proxy, Authelia et exposition Internet</div>
+      <h2 class="page-title">
+        Architecture réseau logique
+      </h2>
+      <div class="text-secondary">
+        Relations entre services, reverse proxy, Authelia et exposition Internet
+      </div>
     </div>
 
-    <WsStatusBar :status="wsStatus" :error="wsError" :retry-count="retryCount" @reconnect="reconnect" />
+    <WsStatusBar
+      :status="wsStatus"
+      :error="wsError"
+      :retry-count="retryCount"
+      @reconnect="reconnect"
+    />
 
     <!-- KPI Cards -->
     <div class="row row-cards mb-4">
@@ -19,18 +33,30 @@
       <div class="col-sm-6 col-lg-3">
         <div class="card card-sm h-100 kpi-context">
           <div class="card-body">
-            <div class="subheader text-secondary">Hôtes</div>
-            <div class="h2 mb-0 text-secondary">{{ hosts.length }}</div>
-            <div class="text-muted small">{{ hostsOnline }} en ligne</div>
+            <div class="subheader text-secondary">
+              Hôtes
+            </div>
+            <div class="h2 mb-0 text-secondary">
+              {{ hosts.length }}
+            </div>
+            <div class="text-muted small">
+              {{ hostsOnline }} en ligne
+            </div>
           </div>
         </div>
       </div>
       <div class="col-sm-6 col-lg-3">
         <div class="card card-sm h-100 kpi-context">
           <div class="card-body">
-            <div class="subheader text-secondary">Conteneurs</div>
-            <div class="h2 mb-0 text-secondary">{{ containers.length }}</div>
-            <div class="text-muted small">{{ containersRunning }} actifs</div>
+            <div class="subheader text-secondary">
+              Conteneurs
+            </div>
+            <div class="h2 mb-0 text-secondary">
+              {{ containers.length }}
+            </div>
+            <div class="text-muted small">
+              {{ containersRunning }} actifs
+            </div>
           </div>
         </div>
       </div>
@@ -38,9 +64,15 @@
       <div class="col-sm-6 col-lg-3">
         <div class="card card-sm h-100">
           <div class="card-body">
-            <div class="subheader">Ports visibles</div>
-            <div class="h1 mb-0">{{ totalPorts }}</div>
-            <div class="text-secondary small">{{ combinedServices.length }} services logiques</div>
+            <div class="subheader">
+              Ports visibles
+            </div>
+            <div class="h1 mb-0">
+              {{ totalPorts }}
+            </div>
+            <div class="text-secondary small">
+              {{ combinedServices.length }} services logiques
+            </div>
           </div>
         </div>
       </div>
@@ -54,13 +86,20 @@
                 style="cursor:help; color:#64748b;"
                 title="Delta calculé entre les deux dernières mises à jour WebSocket. Les deltas négatifs (reset de compteur après redémarrage agent) sont ignorés."
               >
-                <svg width="12" height="12" fill="currentColor" viewBox="0 0 16 16">
-                  <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
-                  <path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533L8.93 6.588zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/>
+                <svg
+                  width="12"
+                  height="12"
+                  fill="currentColor"
+                  viewBox="0 0 16 16"
+                >
+                  <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z" />
+                  <path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533L8.93 6.588zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0z" />
                 </svg>
               </span>
             </div>
-            <div class="h1 mb-0">{{ trafficDelta.intervalSec > 0 ? formatBytes(trafficDelta.rx + trafficDelta.tx) : '—' }}</div>
+            <div class="h1 mb-0">
+              {{ trafficDelta.intervalSec > 0 ? formatBytes(trafficDelta.rx + trafficDelta.tx) : '—' }}
+            </div>
             <div class="text-secondary small">
               <span v-if="trafficDelta.intervalSec > 0">
                 sur {{ trafficDelta.intervalSec }}s · ↓ {{ formatBytes(trafficDelta.rx) }} / ↑ {{ formatBytes(trafficDelta.tx) }}
@@ -76,27 +115,54 @@
     <div class="card mb-4">
       <div class="card-body py-2">
         <div class="d-flex align-items-center gap-3 flex-wrap">
-          <div class="btn-group" role="group">
-            <input type="radio" class="btn-check" id="viewGraph" value="graph" v-model="viewMode" />
+          <div
+            class="btn-group"
+            role="group"
+          >
+            <input
+              id="viewGraph"
+              v-model="viewMode"
+              type="radio"
+              class="btn-check"
+              value="graph"
+            >
             <label
               class="btn btn-sm"
               :class="viewMode === 'graph' ? 'btn-primary' : 'btn-outline-secondary'"
               for="viewGraph"
             >
-              <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16" class="me-1">
-                <path d="M0 2a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V2zm2.5 7a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-1zm2-4a.5.5 0 0 0-.5.5v5a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-5a.5.5 0 0 0-.5-.5h-1zm2-2a.5.5 0 0 0-.5.5v8a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5V3.5a.5.5 0 0 0-.5-.5h-1zm2-1a.5.5 0 0 0-.5.5v9a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5V2.5a.5.5 0 0 0-.5-.5h-1z"/>
+              <svg
+                width="14"
+                height="14"
+                fill="currentColor"
+                viewBox="0 0 16 16"
+                class="me-1"
+              >
+                <path d="M0 2a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V2zm2.5 7a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-1zm2-4a.5.5 0 0 0-.5.5v5a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-5a.5.5 0 0 0-.5-.5h-1zm2-2a.5.5 0 0 0-.5.5v8a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5V3.5a.5.5 0 0 0-.5-.5h-1zm2-1a.5.5 0 0 0-.5.5v9a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5V2.5a.5.5 0 0 0-.5-.5h-1z" />
               </svg>
               Graphe
             </label>
 
-            <input type="radio" class="btn-check" id="viewCards" value="cards" v-model="viewMode" />
+            <input
+              id="viewCards"
+              v-model="viewMode"
+              type="radio"
+              class="btn-check"
+              value="cards"
+            >
             <label
               class="btn btn-sm"
               :class="viewMode === 'cards' ? 'btn-primary' : 'btn-outline-secondary'"
               for="viewCards"
             >
-              <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16" class="me-1">
-                <path d="M1 1a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V1zm10 0a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1V1zM1 11a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1v-4zm10 0a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-4z"/>
+              <svg
+                width="14"
+                height="14"
+                fill="currentColor"
+                viewBox="0 0 16 16"
+                class="me-1"
+              >
+                <path d="M1 1a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V1zm10 0a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1V1zM1 11a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1v-4zm10 0a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-4z" />
               </svg>
               Cartes
             </label>
@@ -110,45 +176,106 @@
     </div>
 
     <!-- ══════════════════ GRAPH VIEW ══════════════════ -->
-    <div v-if="viewMode === 'graph'" class="card mb-4 network-topology-card">
-
+    <div
+      v-if="viewMode === 'graph'"
+      class="card mb-4 network-topology-card"
+    >
       <!-- Card header -->
       <div class="card-header d-flex align-items-start justify-content-between flex-wrap gap-2">
         <div>
-          <h3 class="card-title mb-1">Topologie réseau</h3>
-          <div class="text-secondary small">{{ hosts.length }} hôtes · {{ combinedServices.length }} services logiques · {{ totalPorts }} ports mappés</div>
+          <h3 class="card-title mb-1">
+            Topologie réseau
+          </h3>
+          <div class="text-secondary small">
+            {{ hosts.length }} hôtes · {{ combinedServices.length }} services logiques · {{ totalPorts }} ports mappés
+          </div>
         </div>
 
         <!-- Right: status + toolbar -->
         <div class="d-flex align-items-center gap-2 flex-wrap">
-          <div v-if="saveStatus !== 'idle'" class="d-flex align-items-center gap-2">
-            <span v-if="saveStatus === 'saving'" class="spinner-border spinner-border-sm text-secondary"></span>
-            <span v-else-if="saveStatus === 'saved'" class="text-success small">✓ Enregistré</span>
-            <span v-else-if="saveStatus === 'error'" class="text-danger small">✗ Erreur</span>
+          <div
+            v-if="saveStatus !== 'idle'"
+            class="d-flex align-items-center gap-2"
+          >
+            <span
+              v-if="saveStatus === 'saving'"
+              class="spinner-border spinner-border-sm text-secondary"
+            />
+            <span
+              v-else-if="saveStatus === 'saved'"
+              class="text-success small"
+            >✓ Enregistré</span>
+            <span
+              v-else-if="saveStatus === 'error'"
+              class="text-danger small"
+            >✗ Erreur</span>
           </div>
           <!-- Zoom / layout toolbar (visible in topology tab only) -->
-          <div v-if="networkTab === 'topology'" class="btn-group btn-group-sm">
-            <button class="btn btn-outline-secondary" title="Zoom +" @click="networkGraphRef?.zoomIn()">
-              <svg width="12" height="12" fill="currentColor" viewBox="0 0 16 16">
-                <path d="M6.5 1a5.5 5.5 0 1 0 0 11A5.5 5.5 0 0 0 6.5 1zm-4.5 5.5a4.5 4.5 0 1 1 9 0 4.5 4.5 0 0 1-9 0z"/>
-                <path d="M6.5 3.5a.5.5 0 0 1 .5.5V6h2a.5.5 0 0 1 0 1H7v2a.5.5 0 0 1-1 0V7H4a.5.5 0 0 1 0-1h2V4a.5.5 0 0 1 .5-.5zm5.35 4.85a.5.5 0 0 1 .707 0l3.5 3.5a.5.5 0 0 1-.707.707l-3.5-3.5a.5.5 0 0 1 0-.707z"/>
+          <div
+            v-if="networkTab === 'topology'"
+            class="btn-group btn-group-sm"
+          >
+            <button
+              class="btn btn-outline-secondary"
+              title="Zoom +"
+              @click="networkGraphRef?.zoomIn()"
+            >
+              <svg
+                width="12"
+                height="12"
+                fill="currentColor"
+                viewBox="0 0 16 16"
+              >
+                <path d="M6.5 1a5.5 5.5 0 1 0 0 11A5.5 5.5 0 0 0 6.5 1zm-4.5 5.5a4.5 4.5 0 1 1 9 0 4.5 4.5 0 0 1-9 0z" />
+                <path d="M6.5 3.5a.5.5 0 0 1 .5.5V6h2a.5.5 0 0 1 0 1H7v2a.5.5 0 0 1-1 0V7H4a.5.5 0 0 1 0-1h2V4a.5.5 0 0 1 .5-.5zm5.35 4.85a.5.5 0 0 1 .707 0l3.5 3.5a.5.5 0 0 1-.707.707l-3.5-3.5a.5.5 0 0 1 0-.707z" />
               </svg>
             </button>
-            <button class="btn btn-outline-secondary" title="Zoom −" @click="networkGraphRef?.zoomOut()">
-              <svg width="12" height="12" fill="currentColor" viewBox="0 0 16 16">
-                <path d="M6.5 1a5.5 5.5 0 1 0 0 11A5.5 5.5 0 0 0 6.5 1zm-4.5 5.5a4.5 4.5 0 1 1 9 0 4.5 4.5 0 0 1-9 0z"/>
-                <path d="M4 6.5a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 0 1h-4a.5.5 0 0 1-.5-.5zm5.35 1.85a.5.5 0 0 1 .707 0l3.5 3.5a.5.5 0 0 1-.707.707l-3.5-3.5a.5.5 0 0 1 0-.707z"/>
+            <button
+              class="btn btn-outline-secondary"
+              title="Zoom −"
+              @click="networkGraphRef?.zoomOut()"
+            >
+              <svg
+                width="12"
+                height="12"
+                fill="currentColor"
+                viewBox="0 0 16 16"
+              >
+                <path d="M6.5 1a5.5 5.5 0 1 0 0 11A5.5 5.5 0 0 0 6.5 1zm-4.5 5.5a4.5 4.5 0 1 1 9 0 4.5 4.5 0 0 1-9 0z" />
+                <path d="M4 6.5a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 0 1h-4a.5.5 0 0 1-.5-.5zm5.35 1.85a.5.5 0 0 1 .707 0l3.5 3.5a.5.5 0 0 1-.707.707l-3.5-3.5a.5.5 0 0 1 0-.707z" />
               </svg>
             </button>
-            <button class="btn btn-outline-secondary" title="Ajuster à l'écran" @click="networkGraphRef?.fitView()">
-              <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path d="M3 3h6M3 3v6M21 3h-6M21 3v6M3 21h6M3 21v-6M21 21h-6M21 21v-6"/>
+            <button
+              class="btn btn-outline-secondary"
+              title="Ajuster à l'écran"
+              @click="networkGraphRef?.fitView()"
+            >
+              <svg
+                width="12"
+                height="12"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+              >
+                <path d="M3 3h6M3 3v6M21 3h-6M21 3v6M3 21h6M3 21v-6M21 21h-6M21 21v-6" />
               </svg>
             </button>
-            <button class="btn btn-outline-secondary" title="Réinitialiser la disposition" @click="handleResetLayout">
-              <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path d="M20 11a8.1 8.1 0 0 0-15.5-2m-.5-4v4h4"/>
-                <path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4"/>
+            <button
+              class="btn btn-outline-secondary"
+              title="Réinitialiser la disposition"
+              @click="handleResetLayout"
+            >
+              <svg
+                width="12"
+                height="12"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+              >
+                <path d="M20 11a8.1 8.1 0 0 0-15.5-2m-.5-4v4h4" />
+                <path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4" />
               </svg>
             </button>
           </div>
@@ -158,17 +285,37 @@
       <!-- Tabs -->
       <ul class="nav nav-tabs px-3 mb-0">
         <li class="nav-item">
-          <button class="nav-link" :class="{ active: networkTab === 'topology' }" @click="networkTab = 'topology'">
-            <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16" class="me-1">
-              <path d="M1 4.5A1.5 1.5 0 0 1 2.5 3h11A1.5 1.5 0 0 1 15 4.5v7a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 1 11.5v-7zm13 0a.5.5 0 0 0-.5-.5h-11a.5.5 0 0 0-.5.5v7a.5.5 0 0 0 .5.5h11a.5.5 0 0 0 .5-.5v-7zm-6 3.5a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 0 1h-2a.5.5 0 0 1-.5-.5zm-4 0a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 0 1h-2a.5.5 0 0 1-.5-.5z"/>
+          <button
+            class="nav-link"
+            :class="{ active: networkTab === 'topology' }"
+            @click="networkTab = 'topology'"
+          >
+            <svg
+              width="14"
+              height="14"
+              fill="currentColor"
+              viewBox="0 0 16 16"
+              class="me-1"
+            >
+              <path d="M1 4.5A1.5 1.5 0 0 1 2.5 3h11A1.5 1.5 0 0 1 15 4.5v7a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 1 11.5v-7zm13 0a.5.5 0 0 0-.5-.5h-11a.5.5 0 0 0-.5.5v7a.5.5 0 0 0 .5.5h11a.5.5 0 0 0 .5-.5v-7zm-6 3.5a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 0 1h-2a.5.5 0 0 1-.5-.5zm-4 0a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 0 1h-2a.5.5 0 0 1-.5-.5z" />
             </svg>
             Topologie
           </button>
         </li>
         <li class="nav-item">
-          <button class="nav-link" :class="{ active: networkTab === 'config' }" @click="networkTab = 'config'">
-            <svg width="14" height="14" fill="currentColor" viewBox="0 0 16 16" class="me-1">
-              <path d="M9.405 1.05c-.413-1.4-2.397-1.4-2.81 0l-.1.34a1.464 1.464 0 0 1-2.105.872l-.31-.17c-1.283-.698-2.686.264-2.17 1.655l.119.355a1.464 1.464 0 0 1-1.738 1.738l-.355-.119c-1.39-.516-2.353 1.102-1.656 2.17l.17.31a1.464 1.464 0 0 1-.872 2.105l-.34.1c-1.4.413-1.4 2.397 0 2.81l.34.1a1.464 1.464 0 0 1 .872 2.105l-.17.31c-.697 1.283.264 2.686 1.655 2.17l.355-.119a1.464 1.464 0 0 1 1.738 1.738l-.119.355c-.516 1.39 1.102 2.353 2.17 1.656l.31-.17a1.464 1.464 0 0 1 2.105.872l.1.34c.413 1.4 2.397 1.4 2.81 0l.1-.34a1.464 1.464 0 0 1 2.105-.872l.31.17c1.283.697 2.686-.264 2.17-1.655l-.119-.355a1.464 1.464 0 0 1 1.738-1.738l.355.119c1.39.516 2.353-1.102 1.656-2.17l-.17-.31a1.464 1.464 0 0 1 .872-2.105l.34-.1c1.4-.413 1.4-2.397 0-2.81l-.34-.1a1.464 1.464 0 0 1-.872-2.105l.17-.31c.697-1.283-.264-2.686-1.655-2.17l-.355.119a1.464 1.464 0 0 1-1.738-1.738l.119-.355c.516-1.39-1.102-2.353-2.17-1.656l-.31.17a1.464 1.464 0 0 1-2.105-.872l-.1-.34zM8 10.93a2.929 2.929 0 1 1 0-5.86 2.929 2.929 0 0 1 0 5.858z"/>
+          <button
+            class="nav-link"
+            :class="{ active: networkTab === 'config' }"
+            @click="networkTab = 'config'"
+          >
+            <svg
+              width="14"
+              height="14"
+              fill="currentColor"
+              viewBox="0 0 16 16"
+              class="me-1"
+            >
+              <path d="M9.405 1.05c-.413-1.4-2.397-1.4-2.81 0l-.1.34a1.464 1.464 0 0 1-2.105.872l-.31-.17c-1.283-.698-2.686.264-2.17 1.655l.119.355a1.464 1.464 0 0 1-1.738 1.738l-.355-.119c-1.39-.516-2.353 1.102-1.656 2.17l.17.31a1.464 1.464 0 0 1-.872 2.105l-.34.1c-1.4.413-1.4 2.397 0 2.81l.34.1a1.464 1.464 0 0 1 .872 2.105l-.17.31c-.697 1.283.264 2.686 1.655 2.17l.355-.119a1.464 1.464 0 0 1 1.738 1.738l-.119.355c-.516 1.39 1.102 2.353 2.17 1.656l.31-.17a1.464 1.464 0 0 1 2.105.872l.1.34c.413 1.4 2.397 1.4 2.81 0l.1-.34a1.464 1.464 0 0 1 2.105-.872l.31.17c1.283.697 2.686-.264 2.17-1.655l-.119-.355a1.464 1.464 0 0 1 1.738-1.738l.355.119c1.39.516 2.353-1.102 1.656-2.17l-.17-.31a1.464 1.464 0 0 1 .872-2.105l.34-.1c1.4-.413 1.4-2.397 0-2.81l-.34-.1a1.464 1.464 0 0 1-.872-2.105l.17-.31c.697-1.283-.264-2.686-1.655-2.17l-.355.119a1.464 1.464 0 0 1-1.738-1.738l.119-.355c.516-1.39-1.102-2.353-2.17-1.656l-.31.17a1.464 1.464 0 0 1-2.105-.872l-.1-.34zM8 10.93a2.929 2.929 0 1 1 0-5.86 2.929 2.929 0 0 1 0 5.858z" />
             </svg>
             Configuration
           </button>
@@ -196,40 +343,72 @@
           <!-- Filters bar -->
           <div class="graph-filters d-flex align-items-center gap-4 px-3 py-2 border-bottom flex-wrap">
             <label class="form-check form-switch mb-0 d-flex align-items-center gap-2">
-              <input type="checkbox" class="form-check-input" v-model="filterInternetOnly" />
+              <input
+                v-model="filterInternetOnly"
+                type="checkbox"
+                class="form-check-input"
+              >
               <span class="form-check-label small">Internet uniquement</span>
             </label>
             <label class="form-check form-switch mb-0 d-flex align-items-center gap-2">
               <input
+                v-model="filterHideInternal"
                 type="checkbox"
                 class="form-check-input"
-                v-model="filterHideInternal"
                 :disabled="filterInternetOnly"
-              />
-              <span class="form-check-label small" :class="{ 'text-muted': filterInternetOnly }">
+              >
+              <span
+                class="form-check-label small"
+                :class="{ 'text-muted': filterInternetOnly }"
+              >
                 Masquer les ports internes
               </span>
             </label>
-            <span v-if="filterInternetOnly || filterHideInternal" class="badge bg-blue-lt text-blue small">
+            <span
+              v-if="filterInternetOnly || filterHideInternal"
+              class="badge bg-blue-lt text-blue small"
+            >
               Filtre actif
             </span>
           </div>
 
           <!-- Graph + detail panel layout -->
           <div class="network-topology-graph-layout">
-            <div ref="graphSurfaceRef" class="network-graph-surface" :style="{ height: graphHeight }">
+            <div
+              ref="graphSurfaceRef"
+              class="network-graph-surface"
+              :style="{ height: graphHeight }"
+            >
               <!-- Loading state -->
-              <div v-if="!topologyConfigLoaded" class="graph-loading">
-                <span class="spinner-border spinner-border-sm me-2"></span>
+              <div
+                v-if="!topologyConfigLoaded"
+                class="graph-loading"
+              >
+                <span class="spinner-border spinner-border-sm me-2" />
                 Chargement de la topologie…
               </div>
               <!-- Empty state -->
-              <div v-else-if="hosts.length === 0" class="graph-empty-state">
-                <svg width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.2" viewBox="0 0 24 24" class="mb-3">
-                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+              <div
+                v-else-if="hosts.length === 0"
+                class="graph-empty-state"
+              >
+                <svg
+                  width="40"
+                  height="40"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.2"
+                  viewBox="0 0 24 24"
+                  class="mb-3"
+                >
+                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
                 </svg>
-                <div class="fw-semibold mb-1">Aucun nœud réseau détecté</div>
-                <div class="text-secondary small">Ajoute des hôtes ou configure ta topologie pour voir le diagramme.</div>
+                <div class="fw-semibold mb-1">
+                  Aucun nœud réseau détecté
+                </div>
+                <div class="text-secondary small">
+                  Ajoute des hôtes ou configure ta topologie pour voir le diagramme.
+                </div>
               </div>
               <!-- Graph -->
               <NetworkGraph
@@ -251,7 +430,11 @@
             </div>
 
             <!-- Draggable splitter -->
-            <div class="graph-splitter" @mousedown="onSplitterMouseDown" title="Redimensionner"></div>
+            <div
+              class="graph-splitter"
+              title="Redimensionner"
+              @mousedown="onSplitterMouseDown"
+            />
 
             <!-- Detail panel -->
             <NetworkNodeDetail
@@ -269,7 +452,11 @@
     </div>
 
     <!-- ══════════════════ CARDS VIEW ══════════════════ -->
-    <NetworkPortList v-if="viewMode === 'cards'" :hosts="hosts" :containers="containers" />
+    <NetworkPortList
+      v-if="viewMode === 'cards'"
+      :hosts="hosts"
+      :containers="containers"
+    />
   </div>
 </template>
 

@@ -1,5 +1,9 @@
 <template>
-  <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none ui-sortable-header" @click="$emit('toggle')">
+  <button
+    type="button"
+    class="btn btn-link btn-sm p-0 text-decoration-none ui-sortable-header"
+    @click="$emit('toggle')"
+  >
     {{ label }} {{ indicator }}
   </button>
 </template>
