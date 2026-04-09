@@ -29,7 +29,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@types/chart.js": "^2.9.41",
+    "@types/chart.js": "^4.0.1",
     "@types/cytoscape": "^3.21.9",
     "@types/d3": "^7.4.3",
     "@types/node": "^25.5.2",
