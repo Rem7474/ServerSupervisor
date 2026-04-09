@@ -14,8 +14,12 @@
           class="form-control"
           min="1"
           max="365"
+          aria-describedby="metrics-retention-hint"
         >
-        <div class="form-hint">
+        <div
+          id="metrics-retention-hint"
+          class="form-hint"
+        >
           Metriques brutes et agregats plus anciens que ce seuil sont supprimes
         </div>
       </div>
@@ -27,8 +31,12 @@
           class="form-control"
           min="1"
           max="3650"
+          aria-describedby="audit-retention-hint"
         >
-        <div class="form-hint">
+        <div
+          id="audit-retention-hint"
+          class="form-hint"
+        >
           Entrees d'audit plus anciennes que ce seuil sont supprimees
         </div>
       </div>

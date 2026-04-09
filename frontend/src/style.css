@@ -35,8 +35,21 @@ html {
   .side-panel {
     width: 100%;
     min-width: 0;
-    height: 60vh;
-    position: static;
+    position: static !important;
+    height: auto !important;
+    max-height: none;
+    overflow: visible !important;
+  }
+
+  .side-panel-scrollable {
+    overflow-y: auto;
+    max-height: 400px;
+  }
+}
+
+@media (max-width: 767px) {
+  .side-panel {
+    max-height: 50vh;
   }
 }
 
@@ -45,6 +58,15 @@ body {
   margin: 0;
   padding: 0;
   overflow-x: hidden;
+}
+
+:root {
+  --z-index-toast: 1090;
+  --z-index-popover: 1070;
+  --z-index-tooltip: 1080;
+  --z-index-modal-backdrop: 1040;
+  --z-index-modal: 1050;
+  --z-index-sticky: 20;
 }
 
 .table td code,
@@ -60,7 +82,196 @@ body {
  * bg-secondary (solid gray) becomes invisible on dark card backgrounds.
  * Force it to use the -lt (light) style: translucent bg + legible text. */
 [data-bs-theme="dark"] .badge.bg-secondary,
-[data-bs-theme="dark"] .badge.bg-dark {
+[data-bs-theme="dark"] .badge.bg-dark,
+[data-bs-theme="dark"] .badge.bg-gray,
+[data-bs-theme="dark"] .badge.bg-gray-900,
+[data-bs-theme="dark"] .badge:not([class*="bg-"]) {
   background-color: rgba(110, 117, 130, 0.18) !important;
   color: #9aa0ac !important;
+}
+
+/* Focus-visible outline — keyboard navigation pour tous les modes */
+*:focus-visible {
+  outline: 2px solid var(--tblr-focus-color, #4c6ef5);
+  outline-offset: 2px;
+}
+
+button:focus-visible {
+  box-shadow: 0 0 0 3px rgba(76, 110, 245, 0.2);
+}
+
+[data-bs-theme="dark"] button:focus-visible {
+  outline-color: #7b9df8;
+  box-shadow: 0 0 0 3px rgba(123, 157, 248, 0.3);
+}
+
+/* ── Avatar utilities ── */
+.avatar-64 {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.avatar-48 {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.avatar-32 {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ── Terminal utilities ── */
+.terminal-bg {
+  background-color: var(--tblr-surface-color, #f5f7fb);
+  color: var(--tblr-body-color, #212529);
+  border-radius: 0.25rem;
+  font-family: 'Courier New', monospace;
+}
+
+[data-bs-theme="dark"] .terminal-bg {
+  background-color: #0f172a;
+  color: #e2e8f0;
+}
+
+.terminal-sm {
+  font-size: 0.75rem;
+}
+
+/* ── Progress utilities ── */
+.progress-thin {
+  height: 4px;
+}
+
+.progress-xs {
+  height: 2px;
+}
+
+/* ── Min-width utilities ── */
+.min-w-200 {
+  min-width: 200px;
+}
+
+.min-w-250 {
+  min-width: 250px;
+}
+
+.min-w-300 {
+  min-width: 300px;
+}
+
+/* ── Flex utilities ── */
+.flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── Typography utilities ── */
+.text-xs {
+  font-size: 0.75rem;
+}
+
+.text-sm {
+  font-size: 0.875rem;
+}
+
+/* ── Form validation ── */
+.is-invalid {
+  border-color: #e74c3c !important;
+}
+
+.invalid-feedback {
+  display: block;
+  color: #e74c3c;
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+}
+
+/* ── Avatar with initials ── */
+.avatar-initials-container {
+  width: 64px;
+  height: 64px;
+  background-color: var(--tblr-azure-lt);
+  color: var(--tblr-azure);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+  font-size: 1.6rem;
+  flex-shrink: 0;
+}
+
+.toast,
+.z-toast {
+  z-index: var(--z-index-toast);
+}
+
+.tooltip {
+  z-index: var(--z-index-tooltip);
+}
+
+.dropdown-menu {
+  z-index: var(--z-index-popover);
+}
+
+.modal-backdrop,
+.z-modal-overlay {
+  background: rgba(0, 0, 0, 0.5);
+  z-index: var(--z-index-modal-backdrop);
+}
+
+.modal,
+.z-modal {
+  z-index: var(--z-index-modal);
+}
+
+.sticky-top,
+.sticky-bottom {
+  z-index: var(--z-index-sticky);
+}
+
+/* ── Responsive icons ── */
+.icon-xs {
+  width: 12px;
+  height: 12px;
+}
+
+.icon-sm {
+  width: 16px;
+  height: 16px;
+}
+
+.icon-md {
+  width: 24px;
+  height: 24px;
+}
+
+.icon-lg {
+  width: 32px;
+  height: 32px;
+}
+
+.icon-xl {
+  width: 48px;
+  height: 48px;
+}
+
+@media (max-width: 576px) {
+  .icon-responsive-lg {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+/* ── Min-width utilities ── */
+.min-w-160 {
+  min-width: 160px;
 }

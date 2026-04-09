@@ -228,6 +228,12 @@
                     {{ cmdLabel(command) }}
                   </code>
                 </div>
+                <div
+                  v-if="command.created_at"
+                  class="text-secondary small mt-1"
+                >
+                  Exécutée {{ formatRelativeTime(command.created_at, '—', true) }}
+                </div>
               </div>
               <span
                 :class="statusClass(command.status)"
@@ -280,6 +286,7 @@ import { computed, nextTick, ref, watch } from 'vue'
 import { copyConsoleOutput, downloadConsoleOutput } from '../utils/consoleOutput'
 import { moduleLabel, moduleClass } from '../utils/moduleMeta'
 import { useStatusBadge } from '../composables/useStatusBadge'
+import { useDateFormatter } from '../composables/useDateFormatter'
 
 const props = defineProps({
   /** The command record: { host_name?, host_id?, module, action, target?, status, output? } */
@@ -312,6 +319,7 @@ const props = defineProps({
 const emit = defineEmits(['close', 'open', 'clear'])
 
 const { getStatusBadgeClass } = useStatusBadge()
+const { formatRelativeTime } = useDateFormatter()
 
 const outputEl = ref(null)
 const copied = ref(false)

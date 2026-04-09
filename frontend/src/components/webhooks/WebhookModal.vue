@@ -1,8 +1,11 @@
 <template>
   <div
     v-if="visible"
+    ref="modalRef"
     class="modal modal-blur show d-block"
     style="background:rgba(0,0,0,.5)"
+    role="dialog"
+    aria-modal="true"
   >
     <div class="modal-dialog modal-lg">
       <div class="modal-content">
@@ -188,8 +191,12 @@
                     type="text"
                     class="form-control"
                     placeholder="ex: homeassistant/home-assistant, nginx, ghcr.io/user/app"
+                    aria-describedby="docker-image-hint"
                   >
-                  <div class="form-hint">
+                  <div
+                    id="docker-image-hint"
+                    class="form-hint"
+                  >
                     Nom de l'image sans le tag (registre Docker Hub par defaut).
                   </div>
                 </div>
@@ -200,8 +207,12 @@
                     type="text"
                     class="form-control"
                     placeholder="latest"
+                    aria-describedby="docker-tag-hint"
                   >
-                  <div class="form-hint">
+                  <div
+                    id="docker-tag-hint"
+                    class="form-hint"
+                  >
                     Tag de l'image a surveiller.
                   </div>
                 </div>
@@ -222,7 +233,10 @@
                 >
                 <span class="form-check-label fw-medium">Declencher une tache lors d'une mise a jour</span>
               </label>
-              <div class="form-hint text-muted">
+              <div
+                id="dispatch-task-hint"
+                class="form-hint text-muted"
+              >
                 Si desactive, le tracker surveille uniquement et enregistre la version sans executer de script.
               </div>
             </div>
@@ -279,8 +293,12 @@
                   type="text"
                   class="form-control"
                   :placeholder="mode === 'webhook' ? 'ex: deploy-mon-app' : 'ex: update-home-assistant'"
+                  aria-describedby="task-id-hint"
                 >
-                <div class="form-hint">
+                <div
+                  id="task-id-hint"
+                  class="form-hint"
+                >
                   Correspond a l'<code>id</code> dans <code>tasks.yaml</code> de l'agent.
                 </div>
               </div>
@@ -403,6 +421,7 @@
 <script setup>
 import { computed, onUnmounted, ref, watch } from 'vue'
 import api from '../../api'
+import { useModalFocusTrap } from '../../composables/useModalFocusTrap'
 
 const props = defineProps({
   visible: {
@@ -441,6 +460,9 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['close', 'submit'])
+
+const modalRef = ref(null)
+useModalFocusTrap(modalRef)
 
 const customTasks = ref([])
 const validationError = ref('')

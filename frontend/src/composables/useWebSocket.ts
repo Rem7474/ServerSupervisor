@@ -1,7 +1,12 @@
 import { ref, onMounted, onUnmounted, Ref } from 'vue'
+import mitt from 'mitt'
 import { useAuthStore } from '../stores/auth'
 
 type WebSocketStatus = 'connecting' | 'connected' | 'reconnecting' | 'error' | 'disconnected'
+
+type WsEvents = {
+  reconnected: { timestamp: number }
+}
 
 interface UseWebSocketOptions {
   debounceMs?: number
@@ -15,10 +20,14 @@ interface UseWebSocketApi {
   wsStatus: Ref<WebSocketStatus>
   wsError: Ref<string>
   retryCount: Ref<number>
+  dataStaleAlert: Ref<boolean>
   reconnect: () => void
   disconnect: () => void
   send: (message: unknown, options?: SendOptions) => boolean
+  wsEvents: typeof wsEvents
 }
+
+export const wsEvents = mitt<WsEvents>()
 
 /**
  * WebSocket status values:
@@ -39,10 +48,12 @@ export function useWebSocket<TPayload = unknown>(
   const wsStatus: Ref<WebSocketStatus> = ref('connecting')
   const wsError: Ref<string> = ref('')
   const retryCount: Ref<number> = ref(0)
+  const dataStaleAlert: Ref<boolean> = ref(false)
 
   let ws: WebSocket | null = null
   let retryTimer: ReturnType<typeof setTimeout> | null = null
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
+  let staleAlertTimer: ReturnType<typeof setTimeout> | null = null
   let manualClose = false
 
   // Exponential backoff: 2s, 4s, 8s, capped at 30s
@@ -66,7 +77,16 @@ export function useWebSocket<TPayload = unknown>(
     ws = new WebSocket(url)
 
     ws.onopen = () => {
+      const wasReconnecting = retryCount.value > 0 || wsStatus.value === 'reconnecting'
       ws!.send(JSON.stringify({ type: 'auth', token: auth.token }))
+      if (wasReconnecting) {
+        dataStaleAlert.value = true
+        wsEvents.emit('reconnected', { timestamp: Date.now() })
+        if (staleAlertTimer) clearTimeout(staleAlertTimer)
+        staleAlertTimer = setTimeout(() => {
+          dataStaleAlert.value = false
+        }, 3000)
+      }
       // Status moves to 'connected' only after the first valid message
     }
 
@@ -144,10 +164,12 @@ export function useWebSocket<TPayload = unknown>(
     manualClose = true
     if (retryTimer) clearTimeout(retryTimer)
     if (debounceTimer) clearTimeout(debounceTimer)
+    if (staleAlertTimer) clearTimeout(staleAlertTimer)
     if (ws) {
       ws.close()
       ws = null
     }
+    dataStaleAlert.value = false
     wsStatus.value = 'disconnected'
   }
 
@@ -164,5 +186,5 @@ export function useWebSocket<TPayload = unknown>(
   onMounted(connect)
   onUnmounted(disconnect)
 
-  return { wsStatus, wsError, retryCount, reconnect: connect, disconnect, send }
+  return { wsStatus, wsError, retryCount, dataStaleAlert, reconnect: connect, disconnect, send, wsEvents }
 }

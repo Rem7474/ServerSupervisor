@@ -67,6 +67,94 @@
     >
       <!-- Left: table -->
       <div class="side-main">
+        <div class="card mb-3">
+          <div class="card-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-2">
+            <div>
+              <h3 class="card-title mb-0">
+                Audit Trail
+              </h3>
+              <div class="text-secondary small">
+                {{ commandLogs.length }} commande{{ commandLogs.length > 1 ? 's' : '' }} tracée{{ commandLogs.length > 1 ? 's' : '' }}
+              </div>
+            </div>
+            <div
+              class="btn-group btn-group-sm"
+              role="group"
+            >
+              <button
+                v-for="type in ['all', 'command', 'alert', 'config']"
+                :key="type"
+                class="btn"
+                :class="filterType === type ? 'btn-primary' : 'btn-outline-primary'"
+                @click="filterType = type"
+              >
+                {{ type === 'all' ? 'Tous' : type === 'command' ? 'Commandes' : type === 'alert' ? 'Alertes' : 'Config' }}
+              </button>
+            </div>
+          </div>
+          <div class="card-body p-0">
+            <div
+              v-if="auditLogsLoading"
+              class="p-3"
+            >
+              <LoadingSkeleton
+                variant="list"
+                :lines="4"
+              />
+            </div>
+            <div
+              v-else-if="!filteredLogs.length"
+              class="text-center text-secondary py-4"
+            >
+              Aucun événement d'audit correspondant
+            </div>
+            <div
+              v-else
+              class="timeline timeline-sm px-3 py-3"
+            >
+              <div
+                v-for="log in filteredLogs"
+                :key="log.id"
+                class="timeline-item"
+              >
+                <div
+                  class="timeline-point"
+                  :class="log.type === 'command' ? 'bg-primary' : log.type === 'alert' ? 'bg-warning' : 'bg-secondary'"
+                />
+                <div class="timeline-content">
+                  <div class="d-flex flex-column flex-md-row justify-content-between gap-2">
+                    <div>
+                      <div class="fw-semibold">
+                        {{ log.title || log.action || log.type }}
+                      </div>
+                      <div class="text-secondary small">
+                        {{ log.description || log.message || '—' }}
+                      </div>
+                      <code
+                        v-if="log.type === 'command' && (log.command || log.action)"
+                        class="text-xs d-inline-block mt-1"
+                      >
+                        {{ log.command || log.action }}
+                      </code>
+                    </div>
+                    <div class="text-md-end">
+                      <span
+                        class="badge"
+                        :class="auditStatusClass(log.status)"
+                      >
+                        {{ log.status || log.type }}
+                      </span>
+                      <div class="text-secondary small mt-1">
+                        {{ formatRelativeTime(log.timestamp || log.created_at) }}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <DataToolbar
           searchable
           :search="cmdSearch"
@@ -469,22 +557,33 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import apiClient from '../api'
+import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import { useDateFormatter } from '../composables/useDateFormatter'
 import { useStatusBadge } from '../composables/useStatusBadge'
 import { useCommandStream } from '../composables/useCommandStream'
+import { useAuditLogs } from '../composables/useAuditLogs'
 import PaginationNav from '../components/PaginationNav.vue'
 import CommandLogPanel from '../components/CommandLogPanel.vue'
 import DataToolbar from '../components/common/DataToolbar.vue'
 import SortableHeader from '../components/common/SortableHeader.vue'
 
-const { formatLocaleDateTime: formatDate } = useDateFormatter()
+const { formatLocaleDateTime: formatDate, formatRelativeTime } = useDateFormatter()
 const { getStatusBadgeClass } = useStatusBadge()
+const { auditLogs, isLoading: auditLogsLoading } = useAuditLogs()
 
 const route = useRoute()
 const auth = useAuthStore()
 const canViewCommands = computed(() => auth.role === 'admin' || auth.role === 'operator')
 
 const activeTab = ref('commandes')
+const filterType = ref('all')
+
+const filteredLogs = computed(() => {
+  if (filterType.value === 'all') return auditLogs.value
+  return auditLogs.value.filter((log) => log.type === filterType.value)
+})
+
+const commandLogs = computed(() => auditLogs.value.filter((log) => log.type === 'command'))
 
 // ── Commands history ─────────────────────────────────────────────────────────
 const cmds = ref([])
@@ -620,6 +719,14 @@ function formatDuration(startedAt, endedAt) {
 // ── Status / UA helpers ───────────────────────────────────────────────────────
 function statusClass(status) {
   return getStatusBadgeClass(status, 'badge bg-yellow-lt text-yellow')
+}
+
+function auditStatusClass(status) {
+  const normalized = String(status || '').toLowerCase()
+  if (normalized === 'completed' || normalized === 'success') return 'bg-green-lt text-green'
+  if (normalized === 'failed' || normalized === 'error') return 'bg-red-lt text-red'
+  if (normalized === 'running' || normalized === 'pending') return 'bg-yellow-lt text-yellow'
+  return 'bg-secondary-lt text-secondary'
 }
 
 function parseUA(ua) {

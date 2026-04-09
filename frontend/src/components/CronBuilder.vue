@@ -29,9 +29,13 @@
         type="text"
         class="form-control font-monospace"
         placeholder="0 3 * * 1"
+        aria-describedby="cron-format-hint"
         @input="$emit('update:modelValue', $event.target.value)"
       >
-      <div class="form-hint">
+      <div
+        id="cron-format-hint"
+        class="form-hint"
+      >
         Format : minute heure jour-du-mois mois jour-de-la-semaine
       </div>
     </div>

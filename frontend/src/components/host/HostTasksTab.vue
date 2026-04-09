@@ -318,8 +318,12 @@
                       type="text"
                       class="form-control"
                       placeholder="cleanup_logs"
+                      aria-describedby="task-yaml-hint"
                     >
-                    <div class="form-hint">
+                    <div
+                      id="task-yaml-hint"
+                      class="form-hint"
+                    >
                       Aucune tache detectee dans <code>tasks.yaml</code> - saisissez l'ID manuellement.
                     </div>
                   </template>

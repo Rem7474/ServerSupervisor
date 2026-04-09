@@ -63,11 +63,15 @@
             :value="modelValue.target"
             class="form-control form-control-sm"
             :placeholder="commandTargetPlaceholder"
+            aria-describedby="command-target-hint"
             @input="onTargetChange($event.target.value)"
           >
         </div>
       </div>
-      <small class="form-hint mt-1">La commande sera creee automatiquement sur l'hote concerne des le declenchement de l'alerte.</small>
+      <small
+        id="command-target-hint"
+        class="form-hint mt-1"
+      >La commande sera creee automatiquement sur l'hote concerne des le declenchement de l'alerte.</small>
     </div>
   </div>
 </template>

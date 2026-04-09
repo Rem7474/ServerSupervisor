@@ -9,7 +9,10 @@
       v-if="loading"
       class="card-body text-center py-4"
     >
-      <div class="spinner-border spinner-border-sm text-muted" />
+      <LoadingSkeleton
+        variant="card"
+        :lines="3"
+      />
     </div>
     <div
       v-else-if="health.length === 0"
@@ -119,6 +122,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import apiClient from '../api'
+import LoadingSkeleton from './LoadingSkeleton.vue'
 
 const props = defineProps({
   hostId: { type: String, required: true },

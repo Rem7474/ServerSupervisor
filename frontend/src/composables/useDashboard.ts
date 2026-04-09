@@ -1,11 +1,13 @@
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { storeToRefs } from 'pinia'
 import apiClient from '../api'
 import { useAuthStore } from '../stores/auth'
 import { useDashboardStore } from '../stores/dashboard'
-import { useWebSocket } from './useWebSocket'
+import { useWebSocket, wsEvents } from './useWebSocket'
 import { useConfirmDialog } from './useConfirmDialog'
+import { confirmBulkAction } from '../utils/bulkActionHelpers'
 import { translateError } from '../utils/translateError'
+import { formatRelativeTime } from './useDateFormatter'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import utc from 'dayjs/plugin/utc'
@@ -234,6 +236,8 @@ export function useDashboard() {
 
   const latestAgentVersion = ref('')
   const cveSummary = ref<AnyRecord | null>(null)
+  const cveLastUpdated = ref<Date | null>(null)
+  const cveTimestampText = computed(() => formatRelativeTime(cveLastUpdated.value, 'Jamais mis à jour', true))
   const proxmoxNodes = ref<AnyRecord[]>([])
   const proxmoxLinks = ref<DashboardProxmoxLinkRecord[]>([])
 
@@ -377,7 +381,7 @@ export function useDashboard() {
 
   const proxmoxAutoSwitched = ref(false)
 
-  const { wsStatus, wsError, retryCount, reconnect } = useWebSocket<DashboardWebSocketPayload>('/api/v1/ws/dashboard', (payload) => {
+  const { wsStatus, wsError, retryCount, dataStaleAlert, reconnect } = useWebSocket<DashboardWebSocketPayload>('/api/v1/ws/dashboard', (payload) => {
     if (payload.type !== 'dashboard') return
     dashboardStore.setHosts(payload.hosts || [])
     hostMetrics.value = payload.host_metrics || {}
@@ -396,6 +400,26 @@ export function useDashboard() {
       fetchSummary()
     }
   }, { debounceMs: 200 })
+
+  let cveRefreshTimer: ReturnType<typeof setInterval> | null = null
+
+  async function refreshCveSummary() {
+    try {
+      const response = await apiClient.getAptCVESummary()
+      cveSummary.value = response.data || null
+      cveLastUpdated.value = new Date()
+    } catch {
+      // Keep last known CVE summary on error.
+    }
+  }
+
+  async function refreshDashboardOnReconnect() {
+    await Promise.allSettled([
+      fetchSummary(),
+      fetchProxmoxSummary(),
+      refreshCveSummary(),
+    ])
+  }
 
   function bucketMinutesFor(hours: number) {
     if (hours <= 6) return 1
@@ -469,11 +493,13 @@ export function useDashboard() {
       .filter((h: DashboardHostRecord) => selectedHostIds.value.includes(h.id))
       .map((h: DashboardHostRecord) => h.hostname || h.name)
       .join(', ')
-    const confirmed = await dialog.confirm({
-      title: `apt ${command}`,
-      message: `Exécuter sur ${selectedHostIds.value.length} hôte(s) :\n${hostnames}`,
-      variant: 'warning',
-    })
+    const confirmed = await confirmBulkAction(
+      `apt ${command}`,
+      selectedHostIds.value.length,
+      hostnames
+        ? `Exécuter sur ${selectedHostIds.value.length} hôte${selectedHostIds.value.length > 1 ? 's' : ''} :\n${hostnames}\n\nCela peut affecter la stabilité de plusieurs serveurs.`
+        : 'Cette action peut affecter la stabilité de plusieurs serveurs.'
+    )
     if (!confirmed) return
     aptLoading.value = command
     try {
@@ -537,12 +563,15 @@ export function useDashboard() {
         latestAgentVersion.value = r.data?.settings?.latestAgentVersion || ''
       })
       .catch(() => {})
-    apiClient
-      .getAptCVESummary()
-      .then((r) => {
-        cveSummary.value = r.data
-      })
-      .catch(() => {})
+
+    refreshCveSummary()
+    cveRefreshTimer = setInterval(refreshCveSummary, 5 * 60 * 1000)
+    wsEvents.on('reconnected', refreshDashboardOnReconnect)
+  })
+
+  onUnmounted(() => {
+    if (cveRefreshTimer) clearInterval(cveRefreshTimer)
+    wsEvents.off('reconnected', refreshDashboardOnReconnect)
   })
 
   return {
@@ -554,6 +583,8 @@ export function useDashboard() {
     outdatedDockerImages,
     latestAgentVersion,
     cveSummary,
+    cveLastUpdated,
+    cveTimestampText,
     proxmoxNodes,
     proxmoxLinks,
     hostMetrics,
@@ -577,12 +608,14 @@ export function useDashboard() {
     wsStatus,
     wsError,
     retryCount,
+    dataStaleAlert,
     reconnect,
     effectiveMetrics,
     filteredHosts,
     sortedHosts,
     summaryChartOptions,
     fetchSummary,
+    refreshCveSummary,
     changeSummaryRange,
     selectAllFiltered,
     clearSelection,

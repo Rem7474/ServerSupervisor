@@ -8,7 +8,12 @@
         Processus
       </h3>
       <div class="d-flex align-items-center gap-2">
+        <label
+          for="process-filter"
+          class="visually-hidden"
+        >Filtrer processus</label>
         <input
+          id="process-filter"
           v-model="processFilter"
           type="text"
           class="form-control form-control-sm"
@@ -27,6 +32,15 @@
           {{ loading ? 'Chargement...' : (processes.length ? 'Actualiser' : 'Charger') }}
         </button>
       </div>
+    </div>
+    <div
+      v-if="loading"
+      class="card-body"
+    >
+      <LoadingSkeleton
+        variant="list"
+        :lines="3"
+      />
     </div>
     <div
       v-if="error"
@@ -141,6 +155,7 @@ import { ref, computed } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import apiClient, { getApiErrorMessage } from '../api'
 import { useCommandStream } from '../composables/useCommandStream'
+import LoadingSkeleton from './LoadingSkeleton.vue'
 
 const props = defineProps({
   hostId: { type: String, required: true },

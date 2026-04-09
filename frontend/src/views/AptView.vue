@@ -23,7 +23,9 @@
       :status="wsStatus"
       :error="wsError"
       :retry-count="retryCount"
+      :data-stale-alert="dataStaleAlert"
       @reconnect="reconnect"
+      @dismiss-stale-alert="dataStaleAlert = false"
     />
 
     <!-- Onglets -->
@@ -130,7 +132,7 @@
                       apt update ({{ selectedHosts.length }})
                     </button>
                     <button
-                      class="btn btn-primary"
+                      :class="selectedHosts.length > 5 ? 'btn btn-danger' : 'btn btn-primary'"
                       :disabled="selectedHosts.length === 0 || !!aptBulkLoading"
                       @click="bulkAptCmd('upgrade')"
                     >
@@ -140,9 +142,13 @@
                         role="status"
                       />
                       apt upgrade ({{ selectedHosts.length }})
+                      <span
+                        v-if="selectedHosts.length > 5"
+                        class="badge bg-danger-lt text-danger ms-2"
+                      >DANGER</span>
                     </button>
                     <button
-                      class="btn btn-outline-danger"
+                      :class="selectedHosts.length > 5 ? 'btn btn-danger' : 'btn btn-outline-danger'"
                       :disabled="selectedHosts.length === 0 || !!aptBulkLoading"
                       @click="bulkAptCmd('dist-upgrade')"
                     >
@@ -152,6 +158,10 @@
                         role="status"
                       />
                       apt dist-upgrade ({{ selectedHosts.length }})
+                      <span
+                        v-if="selectedHosts.length > 5"
+                        class="badge bg-danger-lt text-danger ms-2"
+                      >DANGER</span>
                     </button>
                   </template>
                   <div
@@ -690,6 +700,7 @@ import apiClient, { getApiErrorMessage } from '../api'
 import { useAuthStore } from '../stores/auth'
 import { useWebSocket } from '../composables/useWebSocket'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
+import { confirmBulkAction } from '../utils/bulkActionHelpers'
 import { useDateFormatter } from '../composables/useDateFormatter'
 import { usePagination } from '../composables/usePagination'
 import { useStatusBadge } from '../composables/useStatusBadge'
@@ -1018,14 +1029,13 @@ function connectStreamWebSocket(commandId) {
 async function bulkAptCmd(command) {
   const hostnames = hosts.value.filter(h => selectedHosts.value.includes(h.id)).map(h => h.hostname).join(', ')
 
-  const isDangerous = command === 'dist-upgrade'
-  const confirmed = await dialog.confirm({
-    title: `apt ${command}`,
-    message: isDangerous
-      ? `⚠️ apt dist-upgrade peut supprimer des paquets existants.\nExécuter sur : ${hostnames} ?`
-      : `Exécuter sur : ${hostnames} ?`,
-    variant: isDangerous ? 'danger' : 'warning'
-  })
+  const confirmed = await confirmBulkAction(
+    `apt ${command}`,
+    selectedHosts.value.length,
+    command === 'dist-upgrade'
+      ? `⚠️ apt dist-upgrade peut supprimer des paquets existants.\nExécuter sur : ${hostnames || 'les hôtes sélectionnés'} ?`
+      : `Exécuter sur : ${hostnames || 'les hôtes sélectionnés'} ?`
+  )
 
   if (!confirmed) return
 
@@ -1105,7 +1115,7 @@ function statusClass(status) {
   return getStatusBadgeClass(status, 'badge bg-yellow-lt text-yellow')
 }
 
-const { wsStatus, wsError, retryCount, reconnect } = useWebSocket('/api/v1/ws/apt', (payload) => {
+const { wsStatus, wsError, retryCount, dataStaleAlert, reconnect } = useWebSocket('/api/v1/ws/apt', (payload) => {
   if (payload.type !== 'apt') return
   hosts.value = payload.hosts || []
   aptStatuses.value = payload.apt_statuses || {}

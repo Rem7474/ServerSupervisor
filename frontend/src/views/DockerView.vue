@@ -23,7 +23,9 @@
       :status="wsStatus"
       :error="wsError"
       :retry-count="retryCount"
+      :data-stale-alert="dataStaleAlert"
       @reconnect="reconnect"
+      @dismiss-stale-alert="dataStaleAlert = false"
     />
 
     <div
@@ -215,7 +217,7 @@ function closeDockerConsole() {
   showDockerConsole.value = false
 }
 
-const { wsStatus, wsError, retryCount, reconnect } = useWebSocket('/api/v1/ws/docker', (payload) => {
+const { wsStatus, wsError, retryCount, dataStaleAlert, reconnect } = useWebSocket('/api/v1/ws/docker', (payload) => {
   if (payload.type !== 'docker') return
   containers.value = payload.containers || []
   composeProjects.value = payload.compose_projects || []

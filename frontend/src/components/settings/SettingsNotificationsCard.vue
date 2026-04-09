@@ -13,7 +13,15 @@
           type="text"
           class="form-control"
           placeholder="https://ntfy.sh/mon-topic"
+          aria-describedby="ntfy-hint"
         >
+        <div
+          id="ntfy-hint"
+          class="form-hint"
+          style="display:none;"
+        >
+          URL ntfy.sh pour les notifications
+        </div>
       </div>
       <div class="mb-0">
         <label class="form-label">GitHub Token</label>
@@ -24,6 +32,7 @@
             class="form-control"
             placeholder="ghp_..."
             autocomplete="new-password"
+            aria-describedby="github-token-hint"
           >
           <button
             class="btn btn-outline-secondary"
@@ -33,7 +42,10 @@
             {{ showGitHubToken ? 'Masquer' : 'Afficher' }}
           </button>
         </div>
-        <div class="form-hint">
+        <div
+          id="github-token-hint"
+          class="form-hint"
+        >
           Pour le suivi des releases GitHub
         </div>
       </div>

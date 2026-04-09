@@ -1,9 +1,12 @@
 <template>
   <div v-if="visible">
     <div
+      ref="modalRef"
       class="modal modal-blur fade show"
       style="display: block"
       tabindex="-1"
+      role="dialog"
+      aria-modal="true"
     >
       <div class="modal-dialog modal-lg modal-dialog-centered">
         <div class="modal-content">
@@ -102,6 +105,7 @@
                 </select>
                 <small
                   v-if="!metricSupportsHostFilter"
+                  :id="`host-filter-hint-${rule?.id || 'new'}`"
                   class="form-hint"
                 >Cette metrique est globale et n'est pas liee a un hote.</small>
               </div>
@@ -304,7 +308,10 @@
                   </select>
                 </div>
                 <div class="col-12">
-                  <small class="form-hint d-block">
+                  <small
+                    :id="`proxmox-scope-hint-${rule?.id || 'new'}`"
+                    class="form-hint d-block"
+                  >
                     Connexion = toute l'instance Proxmox liée. Nœud = un hôte Proxmox précis à l'intérieur de cette connexion.
                   </small>
                 </div>
@@ -356,9 +363,11 @@
                     :step="form.metric === 'heartbeat_timeout' ? 60 : 0.1"
                     class="form-control"
                     :placeholder="form.metric === 'heartbeat_timeout' ? '300' : '80'"
+                    :aria-describedby="form.metric === 'heartbeat_timeout' ? `heartbeat-hint-${rule?.id || 'new'}` : undefined"
                   >
                   <small
                     v-if="form.metric === 'heartbeat_timeout'"
+                    :id="`heartbeat-hint-${rule?.id || 'new'}`"
                     class="form-hint"
                   >
                     Durée en secondes sans rapport avant alerte.
@@ -376,10 +385,15 @@
                   type="number"
                   class="form-control"
                   placeholder="300"
+                  :aria-describedby="`duration-hint-${rule?.id || 'new'}`"
                 >
-                <small class="form-hint">Le seuil doit être dépassé pendant cette durée avant de déclencher l'alerte.</small>
+                <small
+                  :id="`duration-hint-${rule?.id || 'new'}`"
+                  class="form-hint"
+                >Le seuil doit être dépassé pendant cette durée avant de déclencher l'alerte.</small>
                 <small
                   v-if="form.duration > 0"
+                  :id="`duration-warn-${rule?.id || 'new'}`"
                   class="form-hint text-warning d-block mt-1"
                 >
                   Si l'agent reporte toutes les 60s, une durée inférieure peut empêcher le déclenchement.
@@ -477,8 +491,12 @@
                   type="number"
                   class="form-control"
                   placeholder="3600"
+                  :aria-describedby="`cooldown-hint-${rule?.id || 'new'}`"
                 >
-                <small class="form-hint">Temps minimum entre deux alertes successives pour cette regle</small>
+                <small
+                  :id="`cooldown-hint-${rule?.id || 'new'}`"
+                  class="form-hint"
+                >Temps minimum entre deux alertes successives pour cette regle</small>
               </div>
 
               <div class="mb-3">
@@ -550,8 +568,12 @@
                   type="text"
                   class="form-control"
                   placeholder="admin@example.com, ops@example.com"
+                  aria-describedby="smtp-hint"
                 >
-                <small class="form-hint">Séparez plusieurs emails par des virgules</small>
+                <small
+                  id="smtp-hint"
+                  class="form-hint"
+                >Séparez plusieurs emails par des virgules</small>
               </div>
 
               <div
@@ -676,6 +698,7 @@ import { computed, onUnmounted, ref, watch } from 'vue'
 import apiClient from '../../api'
 import AlertRuleCommandTrigger from './AlertRuleCommandTrigger.vue'
 import { useAlertRuleForm } from '../../composables/useAlertRuleForm'
+import { useModalFocusTrap } from '../../composables/useModalFocusTrap'
 import { ALERT_METRIC_ORDER, getAlertMetricMeta } from '../../utils/alertMetrics'
 
 const props = defineProps({
@@ -714,6 +737,9 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['close', 'submit'])
+
+const modalRef = ref<HTMLElement | null>(null)
+useModalFocusTrap(modalRef)
 
 const browserPermission = ref(typeof Notification !== 'undefined' ? Notification.permission : 'unsupported')
 const step = ref(1)

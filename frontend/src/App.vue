@@ -37,6 +37,20 @@
             class="collapse navbar-collapse"
           >
             <ul class="navbar-nav">
+              <!-- Badge hôtes hors ligne -->
+              <li class="nav-item">
+                <span
+                  v-if="hostsDownCount > 0"
+                  class="badge bg-red-lt text-red ms-2 py-2"
+                  style="line-height: 1.5"
+                >
+                  <AppIcon
+                    name="alert"
+                    css-class="icon icon-sm me-1"
+                  />
+                  {{ hostsDownCount }} HORS LIGNE
+                </span>
+              </li>
               <!-- Éléments principaux -->
               <li class="nav-item">
                 <router-link
@@ -499,6 +513,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useAuthStore } from './stores/auth'
+import { useHostsStore } from './stores/hosts'
 import { useRouter, useRoute } from 'vue-router'
 import ConfirmDialog from './components/ConfirmDialog.vue'
 import NotificationBell from './components/NotificationBell.vue'
@@ -508,6 +523,7 @@ import ErrorBoundary from './components/ErrorBoundary.vue'
 import { subscribeHttpErrors } from './utils/httpErrorBus'
 
 const auth = useAuthStore()
+const hostsStore = useHostsStore()
 const router = useRouter()
 const route = useRoute()
 const userMenuOpen = ref(false)
@@ -516,6 +532,13 @@ const secondaryMenuOpen = ref(false)
 const adminMenuOpen = ref(false)
 const httpError = ref('')
 let unsubscribeHttpErrors = () => {}
+
+// Computed property: compter les hôtes hors ligne
+const hostsDownCount = computed(() => {
+  return hostsStore.hosts.filter(
+    h => h.status === 'down' || h.status === 'offline'
+  ).length
+})
 
 // Offline detection — tracks browser connectivity via navigator.onLine events.
 // A "false" value means the browser has no network; the server may still be

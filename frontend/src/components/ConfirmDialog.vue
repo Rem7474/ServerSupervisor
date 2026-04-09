@@ -1,16 +1,19 @@
 <template>
   <div
     v-if="dialog.isOpen.value"
+    ref="modalRef"
     class="modal modal-blur fade show"
     style="display: block;"
     tabindex="-1"
+    role="dialog"
+    aria-modal="true"
   >
     <div class="modal-dialog modal-sm modal-dialog-centered">
       <div class="modal-content">
-        <div :class="['modal-status', dialog.variant.value === 'danger' ? 'bg-danger' : 'bg-warning']" />
+        <div :class="['modal-status', dialog.destructive.value || dialog.variant.value === 'danger' ? 'bg-danger' : 'bg-warning']" />
         <div class="modal-body text-center py-4">
           <svg
-            v-if="dialog.variant.value === 'danger'"
+            v-if="dialog.destructive.value || dialog.variant.value === 'danger'"
             class="icon mb-2 text-danger icon-lg"
             width="24"
             height="24"
@@ -83,14 +86,14 @@
               class="btn link-secondary w-100"
               @click="handleCancel"
             >
-              Annuler
+              {{ dialog.cancelLabel.value }}
             </button>
             <button
               :disabled="!!dialog.requiredText.value && typedText !== dialog.requiredText.value"
-              :class="['btn', 'w-100', dialog.variant.value === 'danger' ? 'btn-danger' : 'btn-warning']"
+              :class="['btn', 'w-100', dialog.destructive.value || dialog.variant.value === 'danger' ? 'btn-danger' : 'btn-warning']"
               @click="tryConfirm"
             >
-              Confirmer
+              {{ dialog.okLabel.value }}
             </button>
           </div>
         </div>
@@ -106,10 +109,14 @@
 <script setup>
 import { ref, watch, nextTick } from 'vue'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
+import { useModalFocusTrap } from '../composables/useModalFocusTrap'
 
 const dialog = useConfirmDialog()
 const typedText = ref('')
 const inputRef = ref(null)
+const modalRef = ref(null)
+
+useModalFocusTrap(modalRef)
 
 watch(dialog.isOpen, (val) => {
   if (val) {

@@ -456,9 +456,11 @@
                 type="text"
                 class="form-control font-monospace"
                 placeholder="ex: 0 3 * * *"
+                aria-describedby="cron-description"
               >
               <div
                 v-if="editForm.cron_expression && describeCron(editForm.cron_expression)"
+                id="cron-description"
                 class="form-hint"
               >
                 {{ describeCron(editForm.cron_expression) }}

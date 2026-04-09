@@ -45,7 +45,7 @@
               apt update ({{ selectedCount }})
             </button>
             <button
-              class="btn btn-primary btn-sm"
+              :class="selectedCount > 5 ? 'btn btn-danger btn-sm' : 'btn btn-primary btn-sm'"
               :disabled="selectedCount === 0 || aptLoading !== ''"
               @click="sendBulkApt('upgrade')"
             >
@@ -55,6 +55,10 @@
                 role="status"
               />
               apt upgrade ({{ selectedCount }})
+              <span
+                v-if="selectedCount > 5"
+                class="badge bg-danger-lt text-danger ms-2"
+              >DANGER</span>
             </button>
           </div>
         </template>
@@ -92,7 +96,9 @@
       :status="wsStatus"
       :error="wsError"
       :retry-count="retryCount"
+      :data-stale-alert="dataStaleAlert"
       @reconnect="reconnect"
+      @dismiss-stale-alert="dataStaleAlert = false"
     />
 
     <!-- ─── Bannières d'alerte ───────────────────────────────────────────────── -->
@@ -102,7 +108,7 @@
     >
       <svg
         xmlns="http://www.w3.org/2000/svg"
-        class="icon icon-lg flex-shrink-0"
+        class="icon icon-lg icon-responsive-lg flex-shrink-0"
         width="24"
         height="24"
         viewBox="0 0 24 24"
@@ -157,7 +163,7 @@
     >
       <svg
         xmlns="http://www.w3.org/2000/svg"
-        class="icon icon-lg flex-shrink-0"
+        class="icon icon-lg icon-responsive-lg flex-shrink-0"
         width="24"
         height="24"
         viewBox="0 0 24 24"
@@ -197,6 +203,51 @@
       >
         Voir Proxmox
       </router-link>
+    </div>
+
+    <div
+      v-if="cveSummary"
+      class="card mb-3"
+    >
+      <div class="card-body">
+        <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+          <div>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+              <h3 class="card-title mb-0">
+                Résumé CVE
+              </h3>
+              <span
+                v-if="cveSummary.hosts_with_critical > 0"
+                class="badge bg-red-lt text-red"
+              >Critique</span>
+              <span
+                v-if="cveSummary.hosts_with_high > 0"
+                class="badge bg-orange-lt text-orange"
+              >High</span>
+            </div>
+            <div class="text-secondary small mt-1">
+              Mis à jour {{ cveTimestampText }}
+            </div>
+            <div class="small mt-2">
+              <span class="me-3">
+                <span class="badge bg-red-lt text-red me-1">CRITICAL</span>
+                {{ cveSummary.critical_count }} CVE sur {{ cveSummary.hosts_with_critical }} hôte{{ cveSummary.hosts_with_critical > 1 ? 's' : '' }}
+              </span>
+              <span>
+                <span class="badge bg-orange-lt text-orange me-1">HIGH</span>
+                {{ cveSummary.high_count }} CVE sur {{ cveSummary.hosts_with_high }} hôte{{ cveSummary.hosts_with_high > 1 ? 's' : '' }}
+              </span>
+            </div>
+          </div>
+          <button
+            type="button"
+            class="btn btn-outline-primary btn-sm"
+            @click="refreshCveSummary"
+          >
+            Actualiser maintenant
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- ─── KPIs ─────────────────────────────────────────────────────────────── -->
@@ -617,11 +668,13 @@ const {
   wsStatus,
   wsError,
   retryCount,
+  dataStaleAlert,
   reconnect,
   effectiveMetrics,
   sortedHosts,
   summaryChartOptions,
   fetchSummary,
+  refreshCveSummary,
   changeSummaryRange,
   selectAllFiltered,
   clearSelection,

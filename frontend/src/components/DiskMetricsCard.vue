@@ -9,7 +9,10 @@
       v-if="loading"
       class="card-body text-center py-4"
     >
-      <div class="spinner-border spinner-border-sm text-muted" />
+      <LoadingSkeleton
+        variant="card"
+        :lines="3"
+      />
     </div>
     <div
       v-else-if="metrics.length === 0"
@@ -17,7 +20,7 @@
     >
       <svg
         xmlns="http://www.w3.org/2000/svg"
-        class="mb-2"
+        class="mb-2 icon icon-md icon-responsive-lg"
         width="36"
         height="36"
         fill="none"
@@ -118,6 +121,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import apiClient from '../api'
+import LoadingSkeleton from './LoadingSkeleton.vue'
 
 const props = defineProps({
   hostId: { type: String, required: true },
