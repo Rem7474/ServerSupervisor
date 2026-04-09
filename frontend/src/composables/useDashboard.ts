@@ -15,9 +15,59 @@ dayjs.extend(relativeTime)
 dayjs.extend(utc)
 dayjs.locale('fr')
 
-type AnyRecord = Record<string, any>
+type AnyRecord = Record<string, unknown>
 type SortDirection = 'asc' | 'desc'
 type HostStatus = 'online' | 'warning' | 'offline'
+
+interface DashboardHostRecord {
+  id: string
+  status?: string
+  name?: string
+  hostname?: string
+  ip_address?: string
+  os?: string
+  last_seen?: string | number | Date | null
+}
+
+interface DashboardMetricPoint {
+  timestamp?: string | number | Date
+  cpu_avg?: number | string | null
+  memory_avg?: number | string | null
+}
+
+interface DashboardAgentMetric {
+  cpu_usage_percent?: number | null
+  memory_percent?: number | null
+}
+
+interface DashboardProxmoxLinkRecord {
+  host_id: string
+  metrics_source?: 'proxmox' | 'auto' | string
+  cpu_usage?: number | null
+  mem_alloc?: number
+  mem_usage?: number
+}
+
+interface DashboardWebSocketPayload {
+  type?: string
+  hosts?: DashboardHostRecord[]
+  host_metrics?: Record<string, DashboardAgentMetric>
+  version_comparisons?: Array<{
+    is_up_to_date?: boolean
+    running_version?: string
+    update_confirmed?: boolean
+  }>
+  apt_pending?: number
+  apt_pending_hosts?: Record<string, number>
+  disk_usage?: Record<string, number>
+  proxmox_nodes?: AnyRecord[]
+  proxmox_links?: DashboardProxmoxLinkRecord[]
+}
+
+interface TooltipContext {
+  dataset: { label?: string }
+  parsed: { y: number }
+}
 
 interface SummaryDataset {
   label: string
@@ -185,9 +235,9 @@ export function useDashboard() {
   const latestAgentVersion = ref('')
   const cveSummary = ref<AnyRecord | null>(null)
   const proxmoxNodes = ref<AnyRecord[]>([])
-  const proxmoxLinks = ref<AnyRecord[]>([])
+  const proxmoxLinks = ref<DashboardProxmoxLinkRecord[]>([])
 
-  const hostMetrics = ref<Record<string, AnyRecord>>({})
+  const hostMetrics = ref<Record<string, DashboardAgentMetric>>({})
   const aptPendingHosts = ref<Record<string, number>>({})
   const diskUsage = ref<Record<string, number>>({})
   const loading = ref(true)
@@ -219,7 +269,7 @@ export function useDashboard() {
   const canRunApt = computed(() => auth.role === 'admin' || auth.role === 'operator')
 
   const proxmoxLinkByHostId = computed(() => {
-    const m: Record<string, AnyRecord> = {}
+    const m: Record<string, DashboardProxmoxLinkRecord> = {}
     for (const link of proxmoxLinks.value) {
       m[link.host_id] = link
     }
@@ -248,7 +298,7 @@ export function useDashboard() {
 
   const filteredHosts = computed(() => {
     const query = searchQuery.value.trim().toLowerCase()
-    return hosts.value.filter((host: AnyRecord) => {
+    return hosts.value.filter((host: DashboardHostRecord) => {
       if (statusFilter.value !== 'all' && host.status !== statusFilter.value) return false
       if (!query) return true
       return [host.name, host.hostname, host.ip_address, host.os]
@@ -264,7 +314,7 @@ export function useDashboard() {
     const direction = sortDir.value === 'asc' ? 1 : -1
     const statusOrder: Record<HostStatus, number> = { online: 0, warning: 1, offline: 2 }
 
-    list.sort((a: AnyRecord, b: AnyRecord) => {
+    list.sort((a: DashboardHostRecord, b: DashboardHostRecord) => {
       let aVal, bVal
       switch (sortKey.value) {
         case 'status':
@@ -312,7 +362,7 @@ export function useDashboard() {
           borderWidth: 1,
           padding: 10,
           callbacks: {
-            label: (ctx: AnyRecord) => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1)}%`,
+            label: (ctx: TooltipContext) => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1)}%`,
           },
         },
       },
@@ -327,7 +377,7 @@ export function useDashboard() {
 
   const proxmoxAutoSwitched = ref(false)
 
-  const { wsStatus, wsError, retryCount, reconnect } = useWebSocket('/api/v1/ws/dashboard', (payload: AnyRecord) => {
+  const { wsStatus, wsError, retryCount, reconnect } = useWebSocket<DashboardWebSocketPayload>('/api/v1/ws/dashboard', (payload) => {
     if (payload.type !== 'dashboard') return
     dashboardStore.setHosts(payload.hosts || [])
     hostMetrics.value = payload.host_metrics || {}
@@ -337,7 +387,7 @@ export function useDashboard() {
     diskUsage.value = payload.disk_usage || {}
     proxmoxNodes.value = payload.proxmox_nodes || []
     proxmoxLinks.value = payload.proxmox_links || []
-    selectedHostIds.value = selectedHostIds.value.filter((id) => hosts.value.some((h: AnyRecord) => h.id === id))
+    selectedHostIds.value = selectedHostIds.value.filter((id) => hosts.value.some((h: DashboardHostRecord) => h.id === id))
     loading.value = false
 
     if (!proxmoxAutoSwitched.value && proxmoxNodes.value.length > 0) {
@@ -364,13 +414,13 @@ export function useDashboard() {
         ? await apiClient.getProxmoxNodeMetrics(summaryHours.value, bucketMinutes)
         : await apiClient.getMetricsSummary(summaryHours.value, bucketMinutes)
 
-      const points: AnyRecord[] = Array.isArray(res.data) ? res.data : []
+      const points: DashboardMetricPoint[] = Array.isArray(res.data) ? res.data : []
       if (!points.length) {
         summaryChartData.value = null
         return
       }
 
-      const labels = points.map((p: AnyRecord) =>
+      const labels = points.map((p: DashboardMetricPoint) =>
         summaryHours.value >= 24 ? dayjs(p.timestamp).format('DD/MM HH:mm') : dayjs(p.timestamp).format('HH:mm')
       )
       summaryChartData.value = {
@@ -378,14 +428,14 @@ export function useDashboard() {
         datasets: [
           {
             label: 'CPU %',
-            data: points.map((p: AnyRecord) => Number(p.cpu_avg ?? 0)),
+            data: points.map((p: DashboardMetricPoint) => Number(p.cpu_avg ?? 0)),
             borderColor: colors.cpuBorder,
             backgroundColor: colors.cpuBackground,
             fill: true,
           },
           {
             label: 'RAM %',
-            data: points.map((p: AnyRecord) => Number(p.memory_avg ?? 0)),
+            data: points.map((p: DashboardMetricPoint) => Number(p.memory_avg ?? 0)),
             borderColor: colors.ramBorder,
             backgroundColor: colors.ramBackground,
             fill: true,
@@ -405,7 +455,7 @@ export function useDashboard() {
   }
 
   function selectAllFiltered() {
-    const ids = sortedHosts.value.map((h: AnyRecord) => h.id)
+    const ids = sortedHosts.value.map((h: DashboardHostRecord) => h.id)
     selectedHostIds.value = Array.from(new Set([...selectedHostIds.value, ...ids]))
   }
 
@@ -416,8 +466,8 @@ export function useDashboard() {
   async function sendBulkApt(command: string) {
     if (!selectedHostIds.value.length || aptLoading.value) return
     const hostnames = hosts.value
-      .filter((h: AnyRecord) => selectedHostIds.value.includes(h.id))
-      .map((h: AnyRecord) => h.hostname || h.name)
+      .filter((h: DashboardHostRecord) => selectedHostIds.value.includes(h.id))
+      .map((h: DashboardHostRecord) => h.hostname || h.name)
       .join(', ')
     const confirmed = await dialog.confirm({
       title: `apt ${command}`,
@@ -428,7 +478,7 @@ export function useDashboard() {
     aptLoading.value = command
     try {
       await apiClient.sendAptCommand(selectedHostIds.value, command)
-    } catch (e: any) {
+    } catch (e: unknown) {
       await dialog.confirm({ title: 'Erreur', message: translateError(e), variant: 'danger' })
     } finally {
       aptLoading.value = ''

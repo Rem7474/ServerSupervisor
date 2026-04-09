@@ -54,6 +54,29 @@ interface AlertRuleFormData {
   actions: AlertRuleFormActions
 }
 
+interface AlertRuleInput {
+  name?: string
+  enabled?: boolean
+  source_type?: 'agent' | 'proxmox'
+  host_id?: string | null
+  metric?: string
+  proxmox_scope?: Partial<ProxmoxScope>
+  operator?: string
+  threshold?: number
+  duration_seconds?: number
+  actions?: {
+    channels?: string[]
+    smtp_to?: string
+    ntfy_topic?: string
+    cooldown?: number
+    command_trigger?: Partial<CommandTrigger>
+  }
+}
+
+interface AlertRulePayload extends Omit<AlertRuleFormData, 'proxmox_scope'> {
+  proxmox_scope: ProxmoxScope | null
+}
+
 interface AlertRuleFormApi {
   form: Ref<AlertRuleFormData>
   channelSmtp: Ref<boolean>
@@ -62,9 +85,9 @@ interface AlertRuleFormApi {
   commandTriggerEnabled: Ref<boolean>
   defaultCommandTrigger: () => CommandTrigger
   defaultForm: () => AlertRuleFormData
-  hydrateFormFromRule: (rule: any) => void
+  hydrateFormFromRule: (rule: AlertRuleInput | null) => void
   onMetricChange: () => void
-  buildPayload: () => any
+  buildPayload: () => AlertRulePayload
 }
 
 export function useAlertRuleForm(): AlertRuleFormApi {
@@ -102,7 +125,7 @@ export function useAlertRuleForm(): AlertRuleFormApi {
 
   const form: Ref<AlertRuleFormData> = ref(defaultForm())
 
-  function hydrateFormFromRule(rule: any): void {
+  function hydrateFormFromRule(rule: AlertRuleInput | null): void {
     if (!rule) {
       form.value = defaultForm()
       channelSmtp.value = false
@@ -202,13 +225,13 @@ export function useAlertRuleForm(): AlertRuleFormApi {
     }
   }
 
-  function buildPayload(): any {
+  function buildPayload(): AlertRulePayload {
     const channels: string[] = []
     if (channelSmtp.value) channels.push('smtp')
     if (channelNtfy.value) channels.push('ntfy')
     if (channelBrowser.value) channels.push('browser')
 
-    const actions: any = {
+    const actions: AlertRuleFormActions = {
       ...form.value.actions,
       channels,
     }

@@ -2,10 +2,18 @@ import { getCurrentInstance, onUnmounted } from 'vue'
 
 type TokenSource = string | { value: string } | (() => string)
 
+interface CommandStreamPayload {
+  type?: string
+  status?: string
+  output?: string
+  chunk?: string
+  [key: string]: unknown
+}
+
 interface CommandStreamOptions {
-  onInit?: (payload: any) => void
-  onChunk?: (payload: any) => void
-  onStatus?: (payload: any) => void
+  onInit?: (payload: CommandStreamPayload) => void
+  onChunk?: (payload: CommandStreamPayload) => void
+  onStatus?: (payload: CommandStreamPayload) => void
   onClose?: () => void
   onError?: (error: Error) => void
   closeOnTerminalStatus?: boolean
@@ -14,9 +22,9 @@ interface CommandStreamOptions {
 
 interface CollectCommandOutputOptions {
   timeoutMs?: number
-  onInit?: (payload: any, output: string) => void
-  onChunk?: (payload: any, output: string) => void
-  onStatus?: (payload: any, output: string) => void
+  onInit?: (payload: CommandStreamPayload, output: string) => void
+  onChunk?: (payload: CommandStreamPayload, output: string) => void
+  onStatus?: (payload: CommandStreamPayload, output: string) => void
 }
 
 interface UseCommandStreamApi {
@@ -88,15 +96,17 @@ export function useCommandStream({ token }: { token: TokenSource }): UseCommandS
     ws.onmessage = (event: MessageEvent): void => {
       if (activeStream !== ws) return
       try {
-        const payload = JSON.parse(event.data)
+        const parsed = JSON.parse(event.data) as unknown
+        if (typeof parsed !== 'object' || parsed === null) return
+        const payload = parsed as CommandStreamPayload
         if (payload.type === 'cmd_stream_init') {
           onInit?.(payload)
-          scheduleTerminalClose(payload.status)
+          scheduleTerminalClose(payload.status || '')
         } else if (payload.type === 'cmd_stream') {
           onChunk?.(payload)
         } else if (payload.type === 'cmd_status_update') {
           onStatus?.(payload)
-          scheduleTerminalClose(payload.status)
+          scheduleTerminalClose(payload.status || '')
         }
       } catch {
         // Ignore malformed payloads
@@ -149,17 +159,17 @@ export function useCommandStream({ token }: { token: TokenSource }): UseCommandS
       }
 
       openCommandStream(commandId, {
-        onInit: (payload: any) => {
+        onInit: (payload: CommandStreamPayload) => {
           output = payload.output || ''
           onInit?.(payload, output)
           if (payload.status === 'completed') finishResolve(output)
           else if (payload.status === 'failed') finishReject(new Error(output || 'Command failed'))
         },
-        onChunk: (payload: any) => {
+        onChunk: (payload: CommandStreamPayload) => {
           output += payload.chunk || ''
           onChunk?.(payload, output)
         },
-        onStatus: (payload: any) => {
+        onStatus: (payload: CommandStreamPayload) => {
           if (typeof payload.output === 'string') output = payload.output
           onStatus?.(payload, output)
           if (payload.status === 'completed') finishResolve(output)

@@ -6,15 +6,15 @@ import { ref, watch, Ref } from 'vue'
  * @param defaultValue - value to use if the key does not exist
  * @returns A reactive ref bound to localStorage
  */
-export function useLocalStorage<T = any>(key: string, defaultValue: T): Ref<T> {
+export function useLocalStorage<T = unknown>(key: string, defaultValue: T): Ref<T> {
   const stored = localStorage.getItem(key)
-  let initial: any = defaultValue
+  let initial: T = defaultValue
   if (stored !== null) {
     try {
-      initial = JSON.parse(stored)
+      initial = JSON.parse(stored) as T
     } catch {
       // Legacy value stored without JSON.stringify — use as-is and re-persist in correct format
-      initial = stored
+      initial = stored as unknown as T
     }
   }
 

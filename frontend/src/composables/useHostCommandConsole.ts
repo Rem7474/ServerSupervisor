@@ -15,7 +15,11 @@ interface NormalizedHostCommand {
 }
 
 interface RawCommand {
-  [key: string]: any
+  [key: string]: unknown
+}
+
+function toText(value: unknown, fallback = ''): string {
+  return typeof value === 'string' ? value : value == null ? fallback : String(value)
 }
 
 interface UseHostCommandConsoleApi {
@@ -37,19 +41,19 @@ export function useHostCommandConsole(): UseHostCommandConsoleApi {
   function normalizeCommand(command: RawCommand | null | undefined): NormalizedHostCommand | null {
     if (!command) return null
 
-    const host_name = command.host_name || ''
+    const host_name = toText(command.host_name)
 
     if (command.commandId) {
       return {
         id: command.commandId,
         host_name,
-        module: command.module || 'custom',
-        action: command.action || command.command || '',
-        target: command.target || '',
-        prefix: command.prefix || '',
-        command: command.command || '',
-        status: command.status || 'running',
-        output: command.output || '',
+        module: toText(command.module, 'custom'),
+        action: toText(command.action, toText(command.command)),
+        target: toText(command.target),
+        prefix: toText(command.prefix),
+        command: toText(command.command),
+        status: toText(command.status, 'running'),
+        output: toText(command.output),
       }
     }
 
@@ -57,38 +61,38 @@ export function useHostCommandConsole(): UseHostCommandConsoleApi {
       return {
         id: command.id,
         host_name,
-        module: command.module || 'custom',
-        action: command.action || command.command || '',
-        target: command.target || '',
-        prefix: command.prefix || '',
-        command: command.command || '',
-        status: command.status || 'pending',
-        output: command.output || '',
+        module: toText(command.module, 'custom'),
+        action: toText(command.action, toText(command.command)),
+        target: toText(command.target),
+        prefix: toText(command.prefix),
+        command: toText(command.command),
+        status: toText(command.status, 'pending'),
+        output: toText(command.output),
       }
     }
 
     let displayCommand: string
     let prefix = ''
-    const module = command.module || 'apt'
+    const module = toText(command.module, 'apt')
     if (module === 'apt') {
       prefix = 'apt '
-      displayCommand = command.action || command.command
+      displayCommand = toText(command.action, toText(command.command))
     } else if (module === 'journal') {
-      displayCommand = `journalctl -u ${command.target || command.container_name}`
+      displayCommand = `journalctl -u ${toText(command.target, toText(command.container_name))}`
     } else {
-      displayCommand = `${command.action || ''} ${command.target || command.container_name || ''}`.trim()
+      displayCommand = `${toText(command.action)} ${toText(command.target, toText(command.container_name))}`.trim()
     }
 
     return {
       id: command.id,
       host_name,
       module,
-      action: command.action || '',
-      target: command.target || command.container_name || '',
+      action: toText(command.action),
+      target: toText(command.target, toText(command.container_name)),
       prefix,
       command: displayCommand,
-      status: command.status || 'pending',
-      output: command.output || '',
+      status: toText(command.status, 'pending'),
+      output: toText(command.output),
     }
   }
 

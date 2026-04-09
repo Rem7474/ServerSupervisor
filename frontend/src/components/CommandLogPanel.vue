@@ -238,8 +238,7 @@
           <pre
             ref="outputEl"
             class="console-output mb-0 flex-fill"
-            v-html="colorizedOutput || '<span style=\'opacity:0.5\'>Aucune sortie disponible.</span>'"
-          />
+          >{{ outputText }}</pre>
         </div>
       </div>
     </div>
@@ -278,7 +277,7 @@
 
 <script setup>
 import { computed, nextTick, ref, watch } from 'vue'
-import { colorizeConsoleOutput, copyConsoleOutput, downloadConsoleOutput } from '../utils/consoleOutput'
+import { copyConsoleOutput, downloadConsoleOutput } from '../utils/consoleOutput'
 import { moduleLabel, moduleClass } from '../utils/moduleMeta'
 import { useStatusBadge } from '../composables/useStatusBadge'
 
@@ -325,10 +324,10 @@ function statusClass(status) {
   return getStatusBadgeClass(status, 'badge bg-yellow-lt text-yellow')
 }
 
-const colorizedOutput = computed(() => colorizeConsoleOutput(props.command?.output || ''))
+const outputText = computed(() => props.command?.output || 'Aucune sortie disponible.')
 
 // Scroll to bottom whenever output changes
-watch(colorizedOutput, () => {
+watch(outputText, () => {
   nextTick(() => {
     if (outputEl.value) outputEl.value.scrollTop = outputEl.value.scrollHeight
   })

@@ -1,13 +1,13 @@
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import apiClient from '../api'
+import apiClient, { getApiErrorMessage } from '../api'
 import { useHostCommandConsole } from './useHostCommandConsole'
 import { useCommandStream } from './useCommandStream'
 import { useConfirmDialog } from './useConfirmDialog'
 import { useWebSocket } from './useWebSocket'
 import { useAuthStore } from '../stores/auth'
 
-type AnyRecord = Record<string, any>
+type AnyRecord = Record<string, unknown>
 
 export function useHostDetail() {
   const route = useRoute()
@@ -162,10 +162,10 @@ export function useHostDetail() {
           openCommand({ id: cmd.command_id, module: 'apt', action: command, status: 'pending', output: '' })
         }
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       await dialog.confirm({
         title: 'Erreur',
-        message: e.response?.data?.error || e.message,
+        message: getApiErrorMessage(e),
         variant: 'danger',
       })
     } finally {
@@ -217,10 +217,10 @@ export function useHostDetail() {
     try {
       await apiClient.deleteHost(hostId)
       router.push('/')
-    } catch (e: any) {
+    } catch (e: unknown) {
       await dialog.confirm({
         title: 'Erreur',
-        message: e.response?.data?.error || e.message,
+        message: getApiErrorMessage(e),
         variant: 'danger',
       })
     }
@@ -368,8 +368,8 @@ export function useHostDetail() {
       await apiClient.setHostPermission(hostId, newPermUsername.value, newPermLevel.value)
       addPermModal.value = false
       await loadHostPerms()
-    } catch (e: any) {
-      permError.value = e?.response?.data?.error || "Erreur lors de l'enregistrement"
+    } catch (e: unknown) {
+      permError.value = getApiErrorMessage(e, "Erreur lors de l'enregistrement")
     } finally {
       permSaving.value = false
     }

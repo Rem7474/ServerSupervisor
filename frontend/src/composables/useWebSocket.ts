@@ -28,7 +28,7 @@ interface UseWebSocketApi {
  *   'error'        — blocked (403 origin, 401 auth) — no auto-retry
  *   'disconnected' — manually closed
  */
-export function useWebSocket<TPayload = any>(
+export function useWebSocket<TPayload = unknown>(
   path: string,
   onMessage: (payload: TPayload) => void,
   options: UseWebSocketOptions = {}

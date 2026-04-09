@@ -19,7 +19,7 @@
       stroke="currentColor"
       fill="none"
       stroke-linecap="round"
-stroke-linejoin="round"
+      stroke-linejoin="round"
     >
       <path
         stroke="none"

@@ -1,15 +1,26 @@
 import { computed, onMounted, ref, Ref, ComputedRef } from 'vue'
 import { useRoute } from 'vue-router'
-import api from '../api'
+import api, { getApiErrorMessage } from '../api'
 import { useConfirmDialog } from './useConfirmDialog'
+
+interface ExecutionPayload {
+  triggered_at?: string
+  repo_name?: string
+  branch?: string
+  tag_name?: string
+  release_name?: string
+  [key: string]: unknown
+}
 
 interface GitWebhook {
   id: string
   name: string
   enabled: boolean
   secret?: string
-  last_execution?: any
-  [key: string]: any
+  repo_filter?: string
+  branch_filter?: string
+  last_execution?: ExecutionPayload
+  [key: string]: unknown
 }
 
 interface ReleaseTracker {
@@ -20,21 +31,27 @@ interface ReleaseTracker {
   repo_owner: string
   repo_name: string
   last_release_tag?: string
-  last_execution?: any
-  [key: string]: any
+  last_execution?: ExecutionPayload
+  [key: string]: unknown
 }
 
 interface Host {
   id: string
-  [key: string]: any
+  [key: string]: unknown
 }
 
-interface RecentExecution {
+interface RecentExecution extends ExecutionPayload {
   triggered_at: string
   sourceId: string
   sourceName: string
-  [key: string]: any
 }
+
+interface CreatedWebhook {
+  id?: string
+  secret?: string
+}
+
+type FormPayload = Record<string, unknown>
 
 interface UseGitWebhooksPageApi {
   activeTab: Ref<string>
@@ -59,14 +76,14 @@ interface UseGitWebhooksPageApi {
   openCreateWebhook: () => void
   openEditWebhook: (webhook: GitWebhook) => void
   closeWebhookModal: () => void
-  saveWebhook: (payload: any) => Promise<void>
+  saveWebhook: (payload: FormPayload) => Promise<void>
   toggleWebhook: (webhook: GitWebhook) => Promise<void>
   confirmDeleteWebhook: (webhook: GitWebhook) => Promise<void>
   closeSecretModal: () => void
   openCreateTracker: () => void
   openEditTracker: (tracker: ReleaseTracker) => void
   closeTrackerModal: () => void
-  saveTracker: (payload: any) => Promise<void>
+  saveTracker: (payload: FormPayload) => Promise<void>
   toggleTracker: (tracker: ReleaseTracker) => Promise<void>
   checkNow: (tracker: ReleaseTracker) => Promise<void>
   confirmDeleteTracker: (tracker: ReleaseTracker) => Promise<void>
@@ -102,27 +119,46 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
   const recentWebhookExecutions: ComputedRef<RecentExecution[]> = computed(() =>
     webhooks.value
       .filter((webhook) => webhook.last_execution)
-      .map((webhook) => ({
-        ...webhook.last_execution,
-        sourceId: webhook.id,
-        sourceName: webhook.name,
-        repo_name: webhook.last_execution.repo_name || webhook.repo_filter || webhook.name,
-        branch: webhook.last_execution.branch || webhook.branch_filter || '',
-      }))
+      .map((webhook) => {
+        const execution = webhook.last_execution as ExecutionPayload
+        return {
+          ...execution,
+          triggered_at: execution.triggered_at || new Date(0).toISOString(),
+          sourceId: webhook.id,
+          sourceName: webhook.name,
+          repo_name: execution.repo_name || webhook.repo_filter || webhook.name,
+          branch: execution.branch || webhook.branch_filter || '',
+        }
+      })
       .sort((left, right) => new Date(right.triggered_at).getTime() - new Date(left.triggered_at).getTime())
   )
 
   const recentTrackerExecutions: ComputedRef<RecentExecution[]> = computed(() =>
     trackers.value
       .filter((tracker) => tracker.last_execution)
-      .map((tracker) => ({
-        ...tracker.last_execution,
-        sourceId: tracker.id,
-        tag_name: tracker.last_execution.tag_name || tracker.last_release_tag,
-        release_name: tracker.last_execution.release_name || tracker.name,
-      }))
+      .map((tracker) => {
+        const execution = tracker.last_execution as ExecutionPayload
+        return {
+          ...execution,
+          triggered_at: execution.triggered_at || new Date(0).toISOString(),
+          sourceId: tracker.id,
+          sourceName: tracker.name,
+          tag_name: execution.tag_name || tracker.last_release_tag,
+          release_name: execution.release_name || tracker.name,
+        }
+      })
       .sort((left, right) => new Date(right.triggered_at).getTime() - new Date(left.triggered_at).getTime())
   )
+
+  function parseCreatedWebhook(response: unknown): CreatedWebhook {
+    if (typeof response !== 'object' || response === null) return {}
+    const data = (response as { data?: { webhook?: CreatedWebhook } }).data
+    return data?.webhook ?? {}
+  }
+
+  function readError(err: unknown, fallback: string): string {
+    return getApiErrorMessage(err, fallback)
+  }
 
   onMounted(async () => {
     if (route.query.tab === 'trackers') {
@@ -145,8 +181,8 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
       error.value = ''
       const response = await api.getGitWebhooks()
       webhooks.value = response.data.webhooks || []
-    } catch (err: any) {
-      error.value = err.response?.data?.error || 'Erreur lors du chargement des webhooks'
+    } catch (err: unknown) {
+      error.value = readError(err, 'Erreur lors du chargement des webhooks')
     } finally {
       loadingWebhooks.value = false
     }
@@ -158,8 +194,8 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
       error.value = ''
       const response = await api.getReleaseTrackers()
       trackers.value = response.data.trackers || []
-    } catch (err: any) {
-      error.value = err.response?.data?.error || 'Erreur lors du chargement des trackers'
+    } catch (err: unknown) {
+      error.value = readError(err, 'Erreur lors du chargement des trackers')
     } finally {
       loadingTrackers.value = false
     }
@@ -192,24 +228,24 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
     modalError.value = ''
   }
 
-  async function saveWebhook(payload: any): Promise<void> {
+  async function saveWebhook(payload: FormPayload): Promise<void> {
     saving.value = true
     modalError.value = ''
     try {
       if (editingWebhook.value) {
         await api.updateGitWebhook(editingWebhook.value.id, payload)
       } else {
-        const response: any = await api.createGitWebhook(payload)
-        const created = response.data.webhook
+        const response = await api.createGitWebhook(payload)
+        const created = parseCreatedWebhook(response)
         if (created?.secret) {
-          newWebhookId.value = created.id
+          newWebhookId.value = created.id || ''
           newWebhookSecret.value = created.secret
         }
       }
       closeWebhookModal()
       await loadWebhooks()
-    } catch (err: any) {
-      modalError.value = err.response?.data?.error || 'Erreur'
+    } catch (err: unknown) {
+      modalError.value = readError(err, 'Erreur')
     } finally {
       saving.value = false
     }
@@ -219,8 +255,8 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
     try {
       await api.updateGitWebhook(webhook.id, { ...webhook, enabled: !webhook.enabled })
       await loadWebhooks()
-    } catch (err: any) {
-      error.value = err.response?.data?.error || 'Erreur'
+    } catch (err: unknown) {
+      error.value = readError(err, 'Erreur')
     }
   }
 
@@ -234,8 +270,8 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
     try {
       await api.deleteGitWebhook(webhook.id)
       await loadWebhooks()
-    } catch (err: any) {
-      error.value = err.response?.data?.error || 'Erreur lors de la suppression'
+    } catch (err: unknown) {
+      error.value = readError(err, 'Erreur lors de la suppression')
     }
   }
 
@@ -266,7 +302,7 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
     prefillDockerTag.value = ''
   }
 
-  async function saveTracker(payload: any): Promise<void> {
+  async function saveTracker(payload: FormPayload): Promise<void> {
     saving.value = true
     modalError.value = ''
     try {
@@ -277,8 +313,8 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
       }
       closeTrackerModal()
       await loadTrackers()
-    } catch (err: any) {
-      modalError.value = err.response?.data?.error || 'Erreur'
+    } catch (err: unknown) {
+      modalError.value = readError(err, 'Erreur')
     } finally {
       saving.value = false
     }
@@ -288,8 +324,8 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
     try {
       await api.updateReleaseTracker(tracker.id, { ...tracker, enabled: !tracker.enabled })
       await loadTrackers()
-    } catch (err: any) {
-      error.value = err.response?.data?.error || 'Erreur'
+    } catch (err: unknown) {
+      error.value = readError(err, 'Erreur')
     }
   }
 
@@ -297,8 +333,8 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
     try {
       await api.checkReleaseTrackerNow(tracker.id)
       setTimeout(() => loadTrackers(), 2000)
-    } catch (err: any) {
-      error.value = err.response?.data?.error || 'Erreur'
+    } catch (err: unknown) {
+      error.value = readError(err, 'Erreur')
     }
   }
 
@@ -312,8 +348,8 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
     try {
       await api.deleteReleaseTracker(tracker.id)
       await loadTrackers()
-    } catch (err: any) {
-      error.value = err.response?.data?.error || 'Erreur lors de la suppression'
+    } catch (err: unknown) {
+      error.value = readError(err, 'Erreur lors de la suppression')
     }
   }
 

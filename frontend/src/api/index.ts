@@ -1,6 +1,23 @@
-import axios, { AxiosInstance, AxiosError } from 'axios'
+import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios'
 import { useAuthStore } from '../stores/auth'
 import { emitHttpError } from '../utils/httpErrorBus'
+
+type JsonObject = Record<string, unknown>
+
+type ApiErrorLike = {
+  response?: {
+    data?: {
+      error?: unknown
+      message?: unknown
+    }
+  }
+  message?: unknown
+  name?: unknown
+}
+
+function asApiErrorLike(error: unknown): ApiErrorLike {
+  return typeof error === 'object' && error !== null ? (error as ApiErrorLike) : {}
+}
 
 const api: AxiosInstance = axios.create({
   baseURL: '/api',
@@ -14,10 +31,8 @@ export function getApiErrorMessage(
   error: unknown,
   fallback: string = 'Une erreur est survenue'
 ): string {
-  const message =
-    (error as any)?.response?.data?.error ||
-    (error as any)?.response?.data?.message ||
-    (error as any)?.message
+  const parsed = asApiErrorLike(error)
+  const message = parsed.response?.data?.error || parsed.response?.data?.message || parsed.message
 
   return message ? String(message) : fallback
 }
@@ -26,12 +41,13 @@ export function getApiErrorMessage(
  * Add JWT token and standard headers to every request.
  * X-Requested-With is a defense-in-depth measure to prevent CSRF attacks.
  */
-api.interceptors.request.use((config: any) => {
+api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const auth = useAuthStore()
+  const headers = config.headers as Record<string, string>
   if (auth.token) {
-    config.headers.Authorization = `Bearer ${auth.token}`
+    headers.Authorization = `Bearer ${auth.token}`
   }
-  config.headers['X-Requested-With'] = 'XMLHttpRequest'
+  headers['X-Requested-With'] = 'XMLHttpRequest'
   return config
 })
 
@@ -65,10 +81,11 @@ api.interceptors.response.use(
  * Check if an axios error was caused by intentional cancellation.
  */
 export function isApiAbort(error: unknown): boolean {
+  const parsed = asApiErrorLike(error)
   return (
     axios.isCancel(error) ||
-    (error as any)?.name === 'CanceledError' ||
-    (error as any)?.name === 'AbortError'
+    parsed.name === 'CanceledError' ||
+    parsed.name === 'AbortError'
   )
 }
 
@@ -95,7 +112,7 @@ interface AlertRule {
     smtp_to?: string
     ntfy_topic?: string
     cooldown?: number
-    command_trigger?: any
+    command_trigger?: unknown
   }
 }
 
@@ -151,8 +168,8 @@ export default {
   getHost: (id: string) => api.get(`/v1/hosts/${id}`),
   getHostComplete: (id: string) => api.get(`/v1/hosts/${id}/complete`),
   getHostDashboard: (id: string) => api.get(`/v1/hosts/${id}/dashboard`),
-  registerHost: (data: Record<string, any>) => api.post('/v1/hosts', data),
-  updateHost: (id: string, data: Record<string, any>) => api.patch(`/v1/hosts/${id}`, data),
+  registerHost: (data: JsonObject) => api.post('/v1/hosts', data),
+  updateHost: (id: string, data: JsonObject) => api.patch(`/v1/hosts/${id}`, data),
   deleteHost: (id: string) => api.delete(`/v1/hosts/${id}`),
   rotateHostKey: (id: string) => api.post(`/v1/hosts/${id}/rotate-key`),
 
@@ -193,7 +210,7 @@ export default {
   getNetworkSnapshot: () => api.get('/v1/network'),
   getTopologySnapshot: () => api.get('/v1/network/topology'),
   getTopologyConfig: () => api.get('/v1/network/config'),
-  saveTopologyConfig: (config: Record<string, any>) => api.put('/v1/network/config', config),
+  saveTopologyConfig: (config: JsonObject) => api.put('/v1/network/config', config),
 
   // Audit
   getAuditLogs: (page?: number, limit?: number) =>
@@ -244,9 +261,9 @@ export default {
   // Scheduled Tasks
   getAllScheduledTasks: () => api.get('/v1/scheduled-tasks'),
   getScheduledTasks: (hostId: string) => api.get(`/v1/hosts/${hostId}/scheduled-tasks`),
-  createScheduledTask: (hostId: string, payload: Record<string, any>) =>
+  createScheduledTask: (hostId: string, payload: JsonObject) =>
     api.post(`/v1/hosts/${hostId}/scheduled-tasks`, payload),
-  updateScheduledTask: (id: string, payload: Record<string, any>) =>
+  updateScheduledTask: (id: string, payload: JsonObject) =>
     api.put(`/v1/scheduled-tasks/${id}`, payload),
   deleteScheduledTask: (id: string) => api.delete(`/v1/scheduled-tasks/${id}`),
   runScheduledTask: (id: string) => api.post(`/v1/scheduled-tasks/${id}/run`),
@@ -257,8 +274,8 @@ export default {
   // Release Trackers
   getReleaseTrackers: () => api.get('/v1/release-trackers'),
   getReleaseTracker: (id: string) => api.get(`/v1/release-trackers/${id}`),
-  createReleaseTracker: (payload: Record<string, any>) => api.post('/v1/release-trackers', payload),
-  updateReleaseTracker: (id: string, payload: Record<string, any>) =>
+  createReleaseTracker: (payload: JsonObject) => api.post('/v1/release-trackers', payload),
+  updateReleaseTracker: (id: string, payload: JsonObject) =>
     api.put(`/v1/release-trackers/${id}`, payload),
   deleteReleaseTracker: (id: string) => api.delete(`/v1/release-trackers/${id}`),
   checkReleaseTrackerNow: (id: string) => api.post(`/v1/release-trackers/${id}/check-now`),
@@ -269,8 +286,8 @@ export default {
   // Git Webhooks
   getGitWebhooks: () => api.get('/v1/webhooks/git'),
   getGitWebhook: (id: string) => api.get(`/v1/webhooks/git/${id}`),
-  createGitWebhook: (payload: Record<string, any>) => api.post('/v1/webhooks/git', payload),
-  updateGitWebhook: (id: string, payload: Record<string, any>) =>
+  createGitWebhook: (payload: JsonObject) => api.post('/v1/webhooks/git', payload),
+  updateGitWebhook: (id: string, payload: JsonObject) =>
     api.put(`/v1/webhooks/git/${id}`, payload),
   deleteGitWebhook: (id: string) => api.delete(`/v1/webhooks/git/${id}`),
   regenerateWebhookSecret: (id: string) => api.post(`/v1/webhooks/git/${id}/regenerate-secret`),
@@ -279,7 +296,7 @@ export default {
 
   // Settings
   getSettings: () => api.get('/v1/settings'),
-  updateSettings: (payload: Record<string, any>) => api.put('/v1/settings', payload),
+  updateSettings: (payload: JsonObject) => api.put('/v1/settings', payload),
   testSmtp: () => api.post('/v1/settings/test-smtp'),
   testNtfy: () => api.post('/v1/settings/test-ntfy'),
   cleanupMetrics: () => api.post('/v1/settings/cleanup-metrics'),
@@ -313,7 +330,7 @@ export default {
     api.put(`/v1/proxmox/nodes/${id}/fan-rpm-source`, { host_id: hostId ?? '' }),
   getProxmoxNodeMetrics: (hours?: number, bucketMinutes?: number) =>
     api.get('/v1/proxmox/nodes/metrics', { params: { hours: hours ?? 24, bucket_minutes: bucketMinutes ?? 5 } }),
-  getProxmoxGuests: (params?: Record<string, any>) => api.get('/v1/proxmox/guests', { params: params ?? {} }),
+  getProxmoxGuests: (params?: JsonObject) => api.get('/v1/proxmox/guests', { params: params ?? {} }),
   getProxmoxGuestMetrics: (guestId: string, hours?: number, bucketMinutes?: number) =>
     api.get(`/v1/proxmox/guests/${guestId}/metrics`, { params: { hours: hours ?? 24, bucket_minutes: bucketMinutes ?? 5 } }),
   getProxmoxGuestLink: (guestId: string) => api.get(`/v1/proxmox/guests/${guestId}/link`),
@@ -322,8 +339,8 @@ export default {
   getProxmoxLinks: (status?: string) =>
     api.get('/v1/proxmox/links', { params: status ? { status } : {} }),
   getProxmoxLink: (id: string) => api.get(`/v1/proxmox/links/${id}`),
-  createProxmoxLink: (payload: Record<string, any>) => api.post('/v1/proxmox/links', payload),
-  updateProxmoxLink: (id: string, payload: Record<string, any>) =>
+  createProxmoxLink: (payload: JsonObject) => api.post('/v1/proxmox/links', payload),
+  updateProxmoxLink: (id: string, payload: JsonObject) =>
     api.put(`/v1/proxmox/links/${id}`, payload),
   deleteProxmoxLink: (id: string) => api.delete(`/v1/proxmox/links/${id}`),
 
@@ -332,7 +349,7 @@ export default {
   getHostProxmoxCandidates: (hostId: string) => api.get(`/v1/hosts/${hostId}/proxmox-candidates`),
 
   // Extended: tasks
-  getProxmoxTasks: (params?: Record<string, any>) =>
+  getProxmoxTasks: (params?: JsonObject) =>
     api.get('/v1/proxmox/tasks', { params: params ?? {} }),
   getProxmoxNodeTasks: (nodeId: string, limit?: number) =>
     api.get(`/v1/proxmox/nodes/${nodeId}/tasks`, { params: { limit: limit ?? 50 } }),
@@ -352,7 +369,7 @@ export default {
     api.get(`/v1/proxmox/nodes/${nodeId}/tasks/${encodeURIComponent(upid)}/log`),
   getProxmoxNodeRRD: (nodeId: string, timeframe?: string) =>
     api.get(`/v1/proxmox/nodes/${nodeId}/rrd`, { params: { timeframe: timeframe ?? 'hour' } }),
-  getProxmoxNodeSyslog: (nodeId: string, params?: Record<string, any>) =>
+  getProxmoxNodeSyslog: (nodeId: string, params?: JsonObject) =>
     api.get(`/v1/proxmox/nodes/${nodeId}/syslog`, { params: params ?? {} }),
 
   // Node services

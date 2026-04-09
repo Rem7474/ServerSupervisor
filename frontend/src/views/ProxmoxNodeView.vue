@@ -77,11 +77,11 @@
               Aucune (temp locale de chaque host)
             </option>
             <option
-              v-for="h in cpuTempSourceCandidates"
-              :key="h.id"
-              :value="h.id"
+              v-for="candidate in cpuTempSourceCandidates"
+              :key="candidate.id"
+              :value="candidate.id"
             >
-              {{ h.hostname || h.name }} ({{ h.ip_address }})
+              {{ candidate.hostname || candidate.name }} ({{ candidate.ip_address }})
             </option>
           </select>
           <button
@@ -116,11 +116,11 @@
               Aucune (RPM local de chaque host)
             </option>
             <option
-              v-for="h in fanRPMSourceCandidates"
-              :key="h.id"
-              :value="h.id"
+              v-for="candidate in fanRPMSourceCandidates"
+              :key="candidate.id"
+              :value="candidate.id"
             >
-              {{ h.hostname || h.name }} ({{ h.ip_address }})
+              {{ candidate.hostname || candidate.name }} ({{ candidate.ip_address }})
             </option>
           </select>
           <button

@@ -6,7 +6,7 @@ const TTL_MS = 60_000 // 1 minute
 
 interface Host {
   id: string
-  [key: string]: any
+  [key: string]: unknown
 }
 
 export const useHostsStore = defineStore('hosts', () => {

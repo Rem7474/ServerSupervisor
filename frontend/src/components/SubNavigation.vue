@@ -22,7 +22,10 @@
 
 <script setup>
 defineProps({
-  modelValue: String,
+  modelValue: {
+    type: String,
+    required: true,
+  },
   tabs: {
     type: Array,
     required: true

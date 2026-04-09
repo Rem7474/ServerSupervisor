@@ -1,6 +1,6 @@
 module github.com/serversupervisor/server
 
-go 1.25.8
+go 1.25.9
 
 require (
 	github.com/SherClockHolmes/webpush-go v1.4.0

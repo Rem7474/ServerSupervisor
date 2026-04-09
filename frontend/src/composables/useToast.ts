@@ -1,12 +1,12 @@
 import { onUnmounted, ref, Ref } from 'vue'
 
-interface UseToastApi<T = any> {
+interface UseToastApi<T = unknown> {
   value: Ref<T | null>
   showToast: (nextValue: T, durationMs?: number) => void
   clearToast: () => void
 }
 
-export function useToast<T = any>(initialValue: T | null = null): UseToastApi<T> {
+export function useToast<T = unknown>(initialValue: T | null = null): UseToastApi<T> {
   const value: Ref<T | null> = ref(initialValue) as Ref<T | null>
   let timeoutId: ReturnType<typeof setTimeout> | null = null
 

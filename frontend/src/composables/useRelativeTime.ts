@@ -19,7 +19,7 @@ export function useRelativeTime(dateInput: RelativeDateInput, updateInterval: nu
   const resolveDate = (): string | Date | null | undefined => {
     if (typeof dateInput === 'function') return dateInput()
     return dateInput && typeof dateInput === 'object' && 'value' in dateInput
-      ? (dateInput as any).value
+      ? dateInput.value
       : dateInput
   }
 

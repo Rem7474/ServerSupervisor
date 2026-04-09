@@ -3,45 +3,47 @@ import { useConfirmDialog } from './useConfirmDialog'
 import { useDateFormatter } from './useDateFormatter'
 import { useHostsStore } from '../stores/hosts'
 import { useAlertRulesStore } from '../stores/alertRules'
-import apiClient from '../api'
+import apiClient, { getApiErrorMessage } from '../api'
 import { storeToRefs } from 'pinia'
 
 interface Host {
   id: string
-  [key: string]: any
+  [key: string]: unknown
 }
 
 interface AlertRule {
   id: number
   name: string
   enabled: boolean
-  [key: string]: any
+  [key: string]: unknown
 }
 
 interface Incident {
   id: string
   resolved_at?: string | null
-  [key: string]: any
+  [key: string]: unknown
 }
 
 interface Notification {
   type: string
-  notification?: any
+  notification?: Incident
 }
 
 interface AlertRuleCapabilities {
-  metrics: any[]
-  agent_metrics?: any[]
-  proxmox_metrics?: any[]
+  metrics: unknown[]
+  agent_metrics?: unknown[]
+  proxmox_metrics?: unknown[]
   proxmox_scope: {
     modes: string[]
-    connections: any[]
-    nodes: any[]
-    storages: any[]
-    guests: any[]
-    disks: any[]
+    connections: unknown[]
+    nodes: unknown[]
+    storages: unknown[]
+    guests: unknown[]
+    disks: unknown[]
   }
 }
+
+type AlertRulePayload = Record<string, unknown>
 
 interface UseAlertsPageApi {
   alertsTab: Ref<string>
@@ -67,7 +69,7 @@ interface UseAlertsPageApi {
   switchToIncidents: () => Promise<void>
   startAddAlert: () => void
   startEditAlert: (rule: AlertRule) => void
-  saveAlert: (payload: any) => Promise<void>
+  saveAlert: (payload: AlertRulePayload) => Promise<void>
   toggleEnabled: (rule: AlertRule) => Promise<void>
   deleteAlert: (rule: AlertRule) => Promise<void>
   closeModal: () => void
@@ -176,7 +178,7 @@ export function useAlertsPage(): UseAlertsPageApi {
     showModal.value = true
   }
 
-  async function saveAlert(payload: any): Promise<void> {
+  async function saveAlert(payload: AlertRulePayload): Promise<void> {
     saveError.value = ''
     saving.value = true
     try {
@@ -187,8 +189,8 @@ export function useAlertsPage(): UseAlertsPageApi {
       }
       await rulesStore.fetchRules(true)
       closeModal()
-    } catch (err: any) {
-      saveError.value = 'Erreur : ' + (err.response?.data?.error || err.message)
+    } catch (err: unknown) {
+      saveError.value = `Erreur : ${getApiErrorMessage(err)}`
     } finally {
       saving.value = false
     }
@@ -218,8 +220,8 @@ export function useAlertsPage(): UseAlertsPageApi {
     try {
       await apiClient.deleteAlertRule(rule.id)
       await rulesStore.fetchRules(true)
-    } catch (err: any) {
-      saveError.value = 'Erreur lors de la suppression : ' + (err.response?.data?.error || err.message)
+    } catch (err: unknown) {
+      saveError.value = `Erreur lors de la suppression : ${getApiErrorMessage(err)}`
     }
   }
 
@@ -265,11 +267,11 @@ export function useAlertsPage(): UseAlertsPageApi {
     incidentsLoading,
     incidentsError,
     incidentsLoaded,
-    rules: rules as any,
-    hosts: hosts as any,
-    loading: loading as any,
-    fetched: fetched as any,
-    fetchError: fetchError as any,
+    rules: rules as Ref<AlertRule[]>,
+    hosts: hosts as Ref<Host[]>,
+    loading: loading as Ref<boolean>,
+    fetched: fetched as Ref<boolean>,
+    fetchError: fetchError as Ref<string>,
     showModal,
     saving,
     saveError,

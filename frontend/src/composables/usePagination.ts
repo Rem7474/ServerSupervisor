@@ -30,7 +30,7 @@ export function usePagination<T>({ items, pageSize = 10, initialPage = 1 }: Pagi
 
   const sourceItems: ComputedRef<T[]> = computed(() => {
     if (!items) return []
-    return isRef(items) ? (items as any).value : items
+    return isRef(items) ? items.value : items
   })
 
   const totalItems: ComputedRef<number> = computed(() => sourceItems.value.length)
@@ -79,8 +79,8 @@ interface RemotePaginationOptions {
 }
 
 export function useRemotePagination({ currentPage, totalPages }: RemotePaginationOptions): RemotePaginationApi {
-  const safeCurrentPage = isRef(currentPage) ? currentPage : (currentPage as { value: number })
-  const safeTotalPages = isRef(totalPages) ? totalPages : (totalPages as { value: number })
+  const safeCurrentPage = currentPage
+  const safeTotalPages = totalPages
 
   function nextPage(): void {
     if (safeCurrentPage.value < safeTotalPages.value) safeCurrentPage.value += 1
