@@ -578,9 +578,20 @@ func (h *AuthHandler) RevokeAllSessions(c *gin.Context) {
 	var req struct {
 		RefreshToken string `json:"refresh_token"`
 	}
-	_ = c.ShouldBindJSON(&req)
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+	if strings.TrimSpace(req.RefreshToken) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "refresh_token is required"})
+		return
+	}
 	currentHash := hashToken(req.RefreshToken)
-	_ = h.db.RevokeAllOtherSessions(username, currentHash)
+	if err := h.db.RevokeAllOtherSessions(username, currentHash); err != nil {
+		log.Printf("Failed to revoke sessions for user %s: %v", username, err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to revoke sessions"})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
 

@@ -58,24 +58,8 @@ func (h *AuthHandler) GetWebLogsSummary(c *gin.Context) {
 		if err == nil {
 			traffic["top_client_ips"] = topIPs
 
-			countryHits := map[string]int64{}
-			countryCodes := map[string]string{}
-			for _, row := range topIPs {
-				ip := strings.TrimSpace(anyToString(row["ip"]))
-				hits := anyToInt64(row["hits"])
-				if ip == "" || hits <= 0 {
-					continue
-				}
-				country, code := resolveCountryForIP(ip)
-				if country == "" {
-					country = "Unknown"
-				}
-				if code == "" {
-					code = "--"
-				}
-				countryHits[country] += hits
-				countryCodes[country] = code
-			}
+			// Resolve IP geolocation with bounded concurrency to avoid blocking on slow external API.
+			countryHits, countryCodes := resolveIPsWithContext(topIPs)
 
 			dist := make([]map[string]any, 0, len(countryHits))
 			for country, hits := range countryHits {
@@ -357,6 +341,53 @@ func isPrivateOrLocalIP(ip string) bool {
 		return true
 	}
 	return addr.IsLoopback() || addr.IsPrivate() || addr.IsLinkLocalUnicast() || addr.IsUnspecified()
+}
+
+// resolveIPsWithContext resolves IPs to countries with bounded concurrency (4 workers).
+// Returns aggregated country hits and codes without blocking the request on slow external API calls.
+func resolveIPsWithContext(topIPs []map[string]any) (map[string]int64, map[string]string) {
+	countryHits := make(map[string]int64)
+	countryCodes := make(map[string]string)
+	var mu sync.Mutex
+
+	const concurrency = 4
+	jobs := make(chan map[string]any, concurrency)
+	var wg sync.WaitGroup
+
+	// Launch workers
+	for w := 0; w < concurrency; w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for row := range jobs {
+				ip := strings.TrimSpace(anyToString(row["ip"]))
+				hits := anyToInt64(row["hits"])
+				if ip == "" || hits <= 0 {
+					continue
+				}
+				country, code := resolveCountryForIP(ip)
+				if country == "" {
+					country = "Unknown"
+				}
+				if code == "" {
+					code = "--"
+				}
+				mu.Lock()
+				countryHits[country] += hits
+				countryCodes[country] = code
+				mu.Unlock()
+			}
+		}()
+	}
+
+	// Send jobs
+	for _, row := range topIPs {
+		jobs <- row
+	}
+	close(jobs)
+	wg.Wait()
+
+	return countryHits, countryCodes
 }
 
 func resolveCountryForIP(ip string) (string, string) {

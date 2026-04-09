@@ -10,23 +10,28 @@ import (
 	"github.com/serversupervisor/server/internal/models"
 )
 
-// generateWebhookSecret creates a random 32-byte hex secret.
-func generateWebhookSecret() string {
+// generateWebhookSecret creates a random 32-byte hex secret or returns an error.
+func generateWebhookSecret() (string, error) {
 	b := make([]byte, 32)
-	_, _ = rand.Read(b)
-	return hex.EncodeToString(b)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b), nil
 }
 
 // ========== Git Webhooks ==========
 
 func (db *DB) CreateGitWebhook(w models.GitWebhook) (*models.GitWebhook, error) {
-	secret := generateWebhookSecret()
+	secret, err := generateWebhookSecret()
+	if err != nil {
+		return nil, err
+	}
 	channels := w.NotifyChannels
 	if channels == nil {
 		channels = []string{}
 	}
 	var result models.GitWebhook
-	err := db.conn.QueryRow(
+	err = db.conn.QueryRow(
 		`INSERT INTO git_webhooks
 		 (name, secret, provider, repo_filter, branch_filter, event_filter,
 		  host_id, custom_task_id, notify_channels, notify_on_success, notify_on_failure, enabled)
@@ -185,8 +190,11 @@ func (db *DB) DeleteGitWebhook(id string) error {
 }
 
 func (db *DB) RegenerateWebhookSecret(id string) (string, error) {
-	secret := generateWebhookSecret()
-	_, err := db.conn.Exec(`UPDATE git_webhooks SET secret=$1 WHERE id=$2`, secret, id)
+	secret, err := generateWebhookSecret()
+	if err != nil {
+		return "", err
+	}
+	_, err = db.conn.Exec(`UPDATE git_webhooks SET secret=$1 WHERE id=$2`, secret, id)
 	if err != nil {
 		return "", err
 	}

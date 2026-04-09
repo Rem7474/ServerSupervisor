@@ -350,17 +350,21 @@ func (db *DB) CleanupStalledCommands(timeoutMinutes int) error {
 	if count > 0 {
 		log.Printf("Cleaned up %d stalled remote commands", count)
 		if len(auditIDs) > 0 {
-			_, _ = db.conn.Exec(`
+			if _, err := db.conn.Exec(`
 				UPDATE audit_logs SET status = 'failed',
 				    details = 'Command timed out - agent may have crashed or restarted'
 				WHERE id = ANY($1)`,
-				pq.Array(auditIDs))
+				pq.Array(auditIDs)); err != nil {
+				log.Printf("Warning: failed to update %d audit logs during cleanup: %v", len(auditIDs), err)
+			}
 		}
 		if len(taskIDs) > 0 {
-			_, _ = db.conn.Exec(`
+			if _, err := db.conn.Exec(`
 				UPDATE scheduled_tasks SET last_run_status = 'failed', last_run_at = NOW()
 				WHERE id = ANY($1)`,
-				pq.Array(taskIDs))
+				pq.Array(taskIDs)); err != nil {
+				log.Printf("Warning: failed to update %d scheduled tasks during cleanup: %v", len(taskIDs), err)
+			}
 		}
 	}
 	return nil
@@ -407,17 +411,21 @@ func (db *DB) CleanupHostStalledCommands(hostID string, timeoutMinutes int) erro
 		safeHostID = strings.ReplaceAll(safeHostID, "\r", "")
 		log.Printf("Cleaned up %d stalled commands for host %s", count, safeHostID)
 		if len(auditIDs) > 0 {
-			_, _ = db.conn.Exec(`
+			if _, err := db.conn.Exec(`
 				UPDATE audit_logs SET status = 'failed',
 				    details = 'Command timed out - agent may have crashed or restarted'
 				WHERE id = ANY($1)`,
-				pq.Array(auditIDs))
+				pq.Array(auditIDs)); err != nil {
+				log.Printf("Warning: failed to update %d audit logs for host %s during cleanup: %v", len(auditIDs), safeHostID, err)
+			}
 		}
 		if len(taskIDs) > 0 {
-			_, _ = db.conn.Exec(`
+			if _, err := db.conn.Exec(`
 				UPDATE scheduled_tasks SET last_run_status = 'failed', last_run_at = NOW()
 				WHERE id = ANY($1)`,
-				pq.Array(taskIDs))
+				pq.Array(taskIDs)); err != nil {
+				log.Printf("Warning: failed to update %d scheduled tasks for host %s during cleanup: %v", len(taskIDs), safeHostID, err)
+			}
 		}
 	}
 	return nil
