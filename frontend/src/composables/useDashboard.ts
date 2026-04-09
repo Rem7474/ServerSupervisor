@@ -289,7 +289,9 @@ export function useDashboard() {
       const useProxmox = src === 'proxmox' || (src === 'auto' && link.cpu_usage != null)
       if (useProxmox) {
         const cpu = link.cpu_usage != null ? link.cpu_usage * 100 : null
-        const memPct = link.mem_alloc > 0 ? (link.mem_usage / link.mem_alloc) * 100 : null
+        const memAlloc = typeof link.mem_alloc === 'number' ? link.mem_alloc : 0
+        const memUsage = typeof link.mem_usage === 'number' ? link.mem_usage : 0
+        const memPct = memAlloc > 0 ? (memUsage / memAlloc) * 100 : null
         return { cpu, memPct, source: 'proxmox' }
       }
     }

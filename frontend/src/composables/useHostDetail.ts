@@ -9,6 +9,27 @@ import { useAuthStore } from '../stores/auth'
 
 type AnyRecord = Record<string, unknown>
 
+function asString(value: unknown, fallback = ''): string {
+  return typeof value === 'string' ? value : value == null ? fallback : String(value)
+}
+
+function asNumber(value: unknown, fallback = 0): number {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value)
+    if (Number.isFinite(parsed)) return parsed
+  }
+  return fallback
+}
+
+function asRecord(value: unknown): AnyRecord | null {
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as AnyRecord) : null
+}
+
+function asRecordArray(value: unknown): AnyRecord[] {
+  return Array.isArray(value) ? (value as AnyRecord[]) : []
+}
+
 export function useHostDetail() {
   const route = useRoute()
   const router = useRouter()
@@ -39,16 +60,17 @@ export function useHostDetail() {
   const effectiveMetrics = computed(() => {
     const m = metrics.value
     const link = proxmoxLink.value
-    if (!m || !link || link.status !== 'confirmed') return m
+    if (!m || !link || asString(link.status) !== 'confirmed') return m
 
-    const src = link.metrics_source ?? 'auto'
-    const useProxmox = src === 'proxmox' || (src === 'auto' && (link.mem_alloc ?? 0) > 0)
+    const src = asString(link.metrics_source, 'auto')
+    const memAlloc = asNumber(link.mem_alloc, 0)
+    const useProxmox = src === 'proxmox' || (src === 'auto' && memAlloc > 0)
 
     if (!useProxmox) return m
 
-    const cpuPct = (link.cpu_usage ?? 0) * 100
-    const memUsed = link.mem_usage ?? 0
-    const memTotal = link.mem_alloc ?? 0
+    const cpuPct = asNumber(link.cpu_usage, 0) * 100
+    const memUsed = asNumber(link.mem_usage, 0)
+    const memTotal = memAlloc
     return {
       ...m,
       cpu_usage_percent: cpuPct,
@@ -60,10 +82,10 @@ export function useHostDetail() {
 
   const effectiveMetricsSource = computed(() => {
     const link = proxmoxLink.value
-    if (!link || link.status !== 'confirmed') return 'agent'
-    const src = link.metrics_source ?? 'auto'
+    if (!link || asString(link.status) !== 'confirmed') return 'agent'
+    const src = asString(link.metrics_source, 'auto')
     if (src === 'proxmox') return 'proxmox'
-    if (src === 'auto' && (link.mem_alloc ?? 0) > 0) return 'proxmox'
+    if (src === 'auto' && asNumber(link.mem_alloc, 0) > 0) return 'proxmox'
     return 'agent'
   })
   const showLinkForm = ref(false)
@@ -84,19 +106,20 @@ export function useHostDetail() {
       onInit: (p: AnyRecord) => {
         const current = liveCommand.value
         if (!current) return
-        updateCommand({ ...current, status: p.status, output: p.output || '' })
+        updateCommand({ ...current, status: asString(p.status, current.status), output: asString(p.output) })
         nextTick(() => {})
       },
       onChunk: (p: AnyRecord) => {
         const current = liveCommand.value
         if (!current) return
-        updateCommand({ ...current, output: (current.output || '') + (p.chunk || '') })
+        updateCommand({ ...current, output: (current.output || '') + asString(p.chunk) })
       },
       onStatus: (p: AnyRecord) => {
         const current = liveCommand.value
         if (!current) return
-        updateCommand({ ...current, status: p.status })
-        if (p.status === 'completed' || p.status === 'failed') {
+        const nextStatus = asString(p.status, current.status)
+        updateCommand({ ...current, status: nextStatus })
+        if (nextStatus === 'completed' || nextStatus === 'failed') {
           loadCmdHistoryRefresh()
         }
       },
@@ -132,13 +155,13 @@ export function useHostDetail() {
     `/api/v1/ws/hosts/${hostId}`,
     (payload: AnyRecord) => {
       if (payload.type !== 'host_detail') return
-      host.value = payload.host
-      metrics.value = payload.metrics
-      containers.value = payload.containers || []
-      versionComparisons.value = payload.version_comparisons || []
-      aptStatus.value = payload.apt_status
+      host.value = asRecord(payload.host)
+      metrics.value = asRecord(payload.metrics)
+      containers.value = asRecordArray(payload.containers)
+      versionComparisons.value = asRecordArray(payload.version_comparisons)
+      aptStatus.value = asRecord(payload.apt_status)
       if ('proxmox_link' in payload) {
-        proxmoxLink.value = payload.proxmox_link
+        proxmoxLink.value = asRecord(payload.proxmox_link)
       }
     },
     { debounceMs: 200 }
@@ -205,11 +228,12 @@ export function useHostDetail() {
   }
 
   async function deleteHost() {
+    const requiredText = asString(host.value?.hostname) || asString(host.value?.name) || undefined
     const confirmed = await dialog.confirm({
       title: "Supprimer l'hôte",
       message: 'Cette action est irréversible. Toutes les données associées seront supprimées.',
       variant: 'danger',
-      requiredText: host.value?.hostname || host.value?.name,
+      requiredText,
     })
 
     if (!confirmed) return
@@ -229,8 +253,8 @@ export function useHostDetail() {
   async function loadProxmoxLink() {
     try {
       const res = await apiClient.getHostProxmoxLink(hostId)
-      proxmoxLink.value = res.data
-      if (!res.data) {
+      proxmoxLink.value = asRecord(res.data)
+      if (!proxmoxLink.value) {
         const cands = await apiClient.getHostProxmoxCandidates(hostId).catch(() => ({ data: [] }))
         showLinkButton.value = (cands.data?.length ?? 0) > 0
       }
@@ -242,10 +266,12 @@ export function useHostDetail() {
 
   async function confirmLink() {
     if (!proxmoxLink.value) return
+    const linkId = asString(proxmoxLink.value.id)
+    if (!linkId) return
     linkSaving.value = true
     try {
-      const res = await apiClient.updateProxmoxLink(proxmoxLink.value.id, { status: 'confirmed' })
-      proxmoxLink.value = res.data
+      const res = await apiClient.updateProxmoxLink(linkId, { status: 'confirmed' })
+      proxmoxLink.value = asRecord(res.data)
     } finally {
       linkSaving.value = false
     }
@@ -253,9 +279,11 @@ export function useHostDetail() {
 
   async function ignoreLink() {
     if (!proxmoxLink.value) return
+    const linkId = asString(proxmoxLink.value.id)
+    if (!linkId) return
     linkSaving.value = true
     try {
-      await apiClient.updateProxmoxLink(proxmoxLink.value.id, { status: 'ignored' })
+      await apiClient.updateProxmoxLink(linkId, { status: 'ignored' })
       proxmoxLink.value = null
       showLinkButton.value = true
     } finally {
@@ -265,10 +293,12 @@ export function useHostDetail() {
 
   async function changeMetricsSource(source: 'agent' | 'proxmox' | 'auto') {
     if (!proxmoxLink.value) return
+    const linkId = asString(proxmoxLink.value.id)
+    if (!linkId) return
     linkSaving.value = true
     try {
-      const res = await apiClient.updateProxmoxLink(proxmoxLink.value.id, { metrics_source: source })
-      proxmoxLink.value = res.data
+      const res = await apiClient.updateProxmoxLink(linkId, { metrics_source: source })
+      proxmoxLink.value = asRecord(res.data)
     } finally {
       linkSaving.value = false
     }
@@ -276,9 +306,11 @@ export function useHostDetail() {
 
   async function deleteLink() {
     if (!proxmoxLink.value) return
+    const linkId = asString(proxmoxLink.value.id)
+    if (!linkId) return
     linkSaving.value = true
     try {
-      await apiClient.deleteProxmoxLink(proxmoxLink.value.id)
+      await apiClient.deleteProxmoxLink(linkId)
       proxmoxLink.value = null
       showLinkButton.value = true
     } finally {

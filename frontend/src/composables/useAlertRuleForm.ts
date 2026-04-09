@@ -138,31 +138,36 @@ export function useAlertRuleForm(): AlertRuleFormApi {
     const actions = rule.actions || {}
     const scope = rule.proxmox_scope || {}
     const commandTrigger = actions.command_trigger
+    const metric = rule.metric ?? 'cpu'
 
     form.value = {
       name: rule.name || '',
-      enabled: rule.enabled,
-        source_type: rule.source_type || (isProxmoxMetric(rule.metric) ? 'proxmox' : 'agent'),
-      host_id: rule.host_id,
-      metric: rule.metric,
-        proxmox_scope: {
-          scope_mode: scope.scope_mode || 'global',
-          connection_id: scope.connection_id || '',
-          node_id: scope.node_id || '',
-          storage_id: scope.storage_id || '',
-          guest_id: scope.guest_id || '',
-          disk_id: scope.disk_id || '',
-        },
-      operator: rule.operator,
-      threshold: rule.threshold,
-      duration: rule.duration_seconds,
+      enabled: rule.enabled ?? true,
+      source_type: rule.source_type || (isProxmoxMetric(metric) ? 'proxmox' : 'agent'),
+      host_id: rule.host_id ?? null,
+      metric,
+      proxmox_scope: {
+        scope_mode: scope.scope_mode || 'global',
+        connection_id: scope.connection_id || '',
+        node_id: scope.node_id || '',
+        storage_id: scope.storage_id || '',
+        guest_id: scope.guest_id || '',
+        disk_id: scope.disk_id || '',
+      },
+      operator: rule.operator ?? '>',
+      threshold: rule.threshold ?? 80,
+      duration: rule.duration_seconds ?? 300,
       actions: {
         channels: actions.channels || [],
         smtp_to: actions.smtp_to || '',
         ntfy_topic: actions.ntfy_topic || '',
-        cooldown: actions.cooldown || 3600,
+        cooldown: actions.cooldown ?? 3600,
         command_trigger: commandTrigger
-          ? { module: commandTrigger.module, action: commandTrigger.action, target: commandTrigger.target || '' }
+          ? {
+              module: commandTrigger.module ?? 'processes',
+              action: commandTrigger.action ?? 'list',
+              target: commandTrigger.target || '',
+            }
           : defaultCommandTrigger(),
       },
     }

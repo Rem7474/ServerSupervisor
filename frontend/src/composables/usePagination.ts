@@ -30,7 +30,9 @@ export function usePagination<T>({ items, pageSize = 10, initialPage = 1 }: Pagi
 
   const sourceItems: ComputedRef<T[]> = computed(() => {
     if (!items) return []
-    return isRef(items) ? items.value : items
+    if (Array.isArray(items)) return items
+    if (isRef(items)) return items.value
+    return Array.isArray(items.value) ? items.value : []
   })
 
   const totalItems: ComputedRef<number> = computed(() => sourceItems.value.length)

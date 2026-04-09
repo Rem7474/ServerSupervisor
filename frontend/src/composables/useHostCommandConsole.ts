@@ -22,6 +22,11 @@ function toText(value: unknown, fallback = ''): string {
   return typeof value === 'string' ? value : value == null ? fallback : String(value)
 }
 
+function toCommandId(value: unknown, fallback = 'tmp-command'): string | number {
+  if (typeof value === 'string' || typeof value === 'number') return value
+  return fallback
+}
+
 interface UseHostCommandConsoleApi {
   liveCommand: Ref<NormalizedHostCommand | null>
   showConsole: Ref<boolean>
@@ -45,7 +50,7 @@ export function useHostCommandConsole(): UseHostCommandConsoleApi {
 
     if (command.commandId) {
       return {
-        id: command.commandId,
+        id: toCommandId(command.commandId),
         host_name,
         module: toText(command.module, 'custom'),
         action: toText(command.action, toText(command.command)),
@@ -59,7 +64,7 @@ export function useHostCommandConsole(): UseHostCommandConsoleApi {
 
     if (command.command && Object.prototype.hasOwnProperty.call(command, 'prefix')) {
       return {
-        id: command.id,
+        id: toCommandId(command.id),
         host_name,
         module: toText(command.module, 'custom'),
         action: toText(command.action, toText(command.command)),
@@ -84,7 +89,7 @@ export function useHostCommandConsole(): UseHostCommandConsoleApi {
     }
 
     return {
-      id: command.id,
+      id: toCommandId(command.id),
       host_name,
       module,
       action: toText(command.action),

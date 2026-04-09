@@ -18,7 +18,7 @@ export function useLocalStorage<T = unknown>(key: string, defaultValue: T): Ref<
     }
   }
 
-  const value: Ref<T> = ref(initial)
+  const value = ref(initial) as Ref<T>
 
   watch(value, (newVal: T) => {
     if (newVal === null || newVal === undefined) {
