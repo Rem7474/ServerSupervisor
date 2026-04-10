@@ -105,7 +105,10 @@ interface AlertRule {
   }
   metric?: string
   operator?: string
-  threshold?: number
+  threshold_warn?: number
+  threshold_crit?: number
+  threshold_clear_warn?: number
+  threshold_clear_crit?: number
   duration?: number
   actions?: {
     channels?: string[]

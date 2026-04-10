@@ -14,10 +14,10 @@ func (db *DB) CreateAlertRule(rule *models.AlertRule) error {
 	actionsJSON, _ := json.Marshal(rule.Actions)
 	proxmoxScopeJSON, _ := json.Marshal(rule.ProxmoxScope)
 	return db.conn.QueryRow(
-		`INSERT INTO alert_rules (source_type, host_id, proxmox_scope, metric, operator, threshold, duration_seconds, actions, enabled)
- VALUES ($1,$2,CAST($3 AS JSONB),$4,$5,$6,$7,CAST($8 AS JSONB),$9)
+		`INSERT INTO alert_rules (source_type, host_id, proxmox_scope, metric, operator, threshold_warn, threshold_crit, threshold_clear_warn, threshold_clear_crit, duration_seconds, actions, enabled)
+ VALUES ($1,$2,CAST($3 AS JSONB),$4,$5,$6,$7,$8,$9,$10,CAST($11 AS JSONB),$12)
  RETURNING id`,
-		rule.SourceType, rule.HostID, string(proxmoxScopeJSON), rule.Metric, rule.Operator, rule.Threshold, rule.DurationSeconds, string(actionsJSON), rule.Enabled,
+		rule.SourceType, rule.HostID, string(proxmoxScopeJSON), rule.Metric, rule.Operator, rule.ThresholdWarn, rule.ThresholdCrit, rule.ThresholdClearWarn, rule.ThresholdClearCrit, rule.DurationSeconds, string(actionsJSON), rule.Enabled,
 	).Scan(&rule.ID)
 }
 
@@ -32,13 +32,16 @@ host_id = $2,
 proxmox_scope = CAST($3 AS JSONB),
 metric = $4,
 operator = $5,
-threshold = $6,
-duration_seconds = $7,
-actions = CAST($8 AS JSONB),
-enabled = $9,
+threshold_warn = $6,
+threshold_crit = $7,
+threshold_clear_warn = $8,
+threshold_clear_crit = $9,
+duration_seconds = $10,
+actions = CAST($11 AS JSONB),
+enabled = $12,
 updated_at = NOW()
- WHERE id = $10`,
-		rule.SourceType, rule.HostID, string(proxmoxScopeJSON), rule.Metric, rule.Operator, rule.Threshold, rule.DurationSeconds, string(actionsJSON), rule.Enabled, rule.ID,
+ WHERE id = $13`,
+		rule.SourceType, rule.HostID, string(proxmoxScopeJSON), rule.Metric, rule.Operator, rule.ThresholdWarn, rule.ThresholdCrit, rule.ThresholdClearWarn, rule.ThresholdClearCrit, rule.DurationSeconds, string(actionsJSON), rule.Enabled, rule.ID,
 	)
 	return err
 }
@@ -50,7 +53,8 @@ func (db *DB) DeleteAlertRule(id int64) error {
 
 func (db *DB) GetAlertRules() ([]models.AlertRule, error) {
 	rows, err := db.conn.Query(
-		`SELECT id, name, source_type, host_id, proxmox_scope, metric, operator, threshold, duration_seconds,
+		`SELECT id, name, source_type, host_id, proxmox_scope, metric, operator, threshold_warn, threshold_crit, 
+        threshold_clear_warn, threshold_clear_crit, duration_seconds,
         actions, last_fired, enabled, created_at, updated_at
  FROM alert_rules ORDER BY created_at DESC`,
 	)
@@ -63,12 +67,13 @@ func (db *DB) GetAlertRules() ([]models.AlertRule, error) {
 	for rows.Next() {
 		var r models.AlertRule
 		var name, hostID, sourceType sql.NullString
-		var threshold sql.NullFloat64
+		var thresholdWarn, thresholdCrit, thresholdClearWarn, thresholdClearCrit sql.NullFloat64
 		var actionsJSON, proxmoxScopeJSON []byte
 		var lastFired, updatedAt sql.NullTime
 
 		if err := rows.Scan(
-			&r.ID, &name, &sourceType, &hostID, &proxmoxScopeJSON, &r.Metric, &r.Operator, &threshold, &r.DurationSeconds,
+			&r.ID, &name, &sourceType, &hostID, &proxmoxScopeJSON, &r.Metric, &r.Operator, &thresholdWarn, &thresholdCrit,
+			&thresholdClearWarn, &thresholdClearCrit, &r.DurationSeconds,
 			&actionsJSON, &lastFired, &r.Enabled, &r.CreatedAt, &updatedAt,
 		); err != nil {
 			continue
@@ -83,8 +88,17 @@ func (db *DB) GetAlertRules() ([]models.AlertRule, error) {
 		if sourceType.Valid {
 			r.SourceType = models.AlertSourceType(sourceType.String)
 		}
-		if threshold.Valid {
-			r.Threshold = &threshold.Float64
+		if thresholdWarn.Valid {
+			r.ThresholdWarn = &thresholdWarn.Float64
+		}
+		if thresholdCrit.Valid {
+			r.ThresholdCrit = &thresholdCrit.Float64
+		}
+		if thresholdClearWarn.Valid {
+			r.ThresholdClearWarn = &thresholdClearWarn.Float64
+		}
+		if thresholdClearCrit.Valid {
+			r.ThresholdClearCrit = &thresholdClearCrit.Float64
 		}
 		if lastFired.Valid {
 			r.LastFired = &lastFired.Time
@@ -130,11 +144,14 @@ func (db *DB) GetOpenAlertIncident(ruleID int64, hostID string) (*models.AlertIn
 }
 
 // CreateAlertIncident inserts a new alert incident and returns its generated ID.
-func (db *DB) CreateAlertIncident(ruleID int64, hostID string, value float64) (int64, error) {
+func (db *DB) CreateAlertIncident(ruleID int64, hostID string, value float64, severity string) (int64, error) {
 	var id int64
+	if severity == "" {
+		severity = "crit"
+	}
 	err := db.conn.QueryRow(
-		`INSERT INTO alert_incidents (rule_id, host_id, value) VALUES ($1, $2, $3) RETURNING id`,
-		ruleID, hostID, value,
+		`INSERT INTO alert_incidents (rule_id, host_id, value, severity) VALUES ($1, $2, $3, $4) RETURNING id`,
+		ruleID, hostID, value, severity,
 	).Scan(&id)
 	return id, err
 }

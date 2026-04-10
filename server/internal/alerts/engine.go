@@ -72,35 +72,47 @@ func EvaluateAlerts(db *database.DB, cfg *config.Config, dispatcher *dispatch.Di
 				continue
 			}
 
-			matched := MatchRule(rule, host, value)
+			// Determine current severity based on rule and value
+			currentSeveration := DetermineSeverity(rule, host, value)
+			
+			// Get any open incident (regardless of severity)
 			inc, err := db.GetOpenAlertIncident(rule.ID, host.ID)
 			if err != nil && err != sql.ErrNoRows {
 				log.Printf("Alerts: failed to check incidents: %v", err)
 				continue
 			}
 
-			if matched {
+			if currentSeveration != SeverityNone {
+				// Alert is triggered at current severity level
 				if err == sql.ErrNoRows || inc == nil {
-					incID, err := db.CreateAlertIncident(rule.ID, host.ID, value)
+					// No existing incident - create new one with current severity
+					incID, err := db.CreateAlertIncident(rule.ID, host.ID, value, string(currentSeveration))
 					if err != nil {
 						log.Printf("Alerts: failed to create incident: %v", err)
 						continue
 					}
-					log.Printf("Alerts: FIRED %s host=%s value=%.2f → incident#%d created", ruleName, host.Name, value, incID)
-					details := fmt.Sprintf(`{"rule_id":%d,"metric":"%s","operator":"%s","value":%.4f}`, rule.ID, rule.Metric, rule.Operator, value)
+					log.Printf("Alerts: FIRED %s host=%s value=%.2f severity=%s → incident#%d created", ruleName, host.Name, value, currentSeveration, incID)
+					details := fmt.Sprintf(`{"rule_id":%d,"metric":"%s","operator":"%s","value":%.4f,"severity":"%s"}`, rule.ID, rule.Metric, rule.Operator, value, currentSeveration)
 					_, _ = db.CreateAuditLog("alert-engine", "alert_fired", host.ID, "", details, "success")
 					sendAlertNotifications(n, cfg, rule, host, value)
 					triggerAlertCommand(dispatcher, rule, host)
 					pushBrowserNotification(pusher, rule, host, value, incID)
 					go pushWebNotifications(db, cfg, rule, host, value)
 					broadcastIncidentUpdate(pusher, "fired", rule, host.ID)
+				} else if AlertSeverity(inc.Severity) != currentSeveration {
+					// Severity changed - update incident
+					// For now, keep the incident and just log the change
+					log.Printf("Alerts: UPGRADED %s host=%s value=%.2f severity %s→%s incident#%d", ruleName, host.Name, value, inc.Severity, currentSeveration, inc.ID)
 				}
 			} else if inc != nil {
-				_ = db.ResolveAlertIncident(inc.ID)
-				log.Printf("Alerts: %s host=%s — resolved incident#%d", ruleName, host.Name, inc.ID)
-				details := fmt.Sprintf(`{"rule_id":%d,"incident_id":%d}`, rule.ID, inc.ID)
-				_, _ = db.CreateAuditLog("alert-engine", "alert_resolved", host.ID, "", details, "success")
-				broadcastIncidentUpdate(pusher, "resolved", rule, host.ID)
+				// No alert triggered - resolve if one exists
+				if ShouldResolveAlertSeverity(rule, host, value, AlertSeverity(inc.Severity)) {
+					_ = db.ResolveAlertIncident(inc.ID)
+					log.Printf("Alerts: %s host=%s severity=%s — resolved incident#%d", ruleName, host.Name, inc.Severity, inc.ID)
+					details := fmt.Sprintf(`{"rule_id":%d,"incident_id":%d,"severity":"%s"}`, rule.ID, inc.ID, inc.Severity)
+					_, _ = db.CreateAuditLog("alert-engine", "alert_resolved", host.ID, "", details, "success")
+					broadcastIncidentUpdate(pusher, "resolved", rule, host.ID)
+				}
 			}
 		}
 	}
@@ -641,23 +653,107 @@ func resolveProxmoxDiskMinWearoutPercent(db *database.DB, rule models.AlertRule)
 }
 
 // MatchRule evaluates whether a rule condition is currently met for the given value.
-func MatchRule(rule models.AlertRule, host models.Host, value float64) bool {
+// AlertSeverity represents the severity level of an alert
+type AlertSeverity string
+
+const (
+	SeverityNone AlertSeverity = ""
+	SeverityWarn AlertSeverity = "warn"
+	SeverityCrit AlertSeverity = "crit"
+)
+
+// DetermineSeverity returns the highest severity level (crit > warn > none) triggered by the rule
+func DetermineSeverity(rule models.AlertRule, host models.Host, value float64) AlertSeverity {
 	if rule.Metric == "status_offline" {
-		return host.Status == "offline"
-	}
-	if rule.Threshold == nil {
-		return false
+		if host.Status == "offline" {
+			return SeverityCrit
+		}
+		return SeverityNone
 	}
 
-	switch rule.Operator {
+	if rule.ThresholdCrit == nil && rule.ThresholdWarn == nil {
+		return SeverityNone
+	}
+
+	// Check critical threshold first
+	if rule.ThresholdCrit != nil && matchThreshold(rule.Operator, value, *rule.ThresholdCrit) {
+		return SeverityCrit
+	}
+
+	// Check warning threshold
+	if rule.ThresholdWarn != nil && matchThreshold(rule.Operator, value, *rule.ThresholdWarn) {
+		return SeverityWarn
+	}
+
+	return SeverityNone
+}
+
+// matchThreshold is a helper that checks if value matches operator condition against threshold
+func matchThreshold(operator string, value float64, threshold float64) bool {
+	switch operator {
 	case ">":
-		return value > *rule.Threshold
+		return value > threshold
 	case "<":
-		return value < *rule.Threshold
+		return value < threshold
 	case ">=":
-		return value >= *rule.Threshold
+		return value >= threshold
 	case "<=":
-		return value <= *rule.Threshold
+		return value <= threshold
+	default:
+		return false
+	}
+}
+
+// MatchRule maintains backward compatibility - returns true if any severity is triggered
+func MatchRule(rule models.AlertRule, host models.Host, value float64) bool {
+	return DetermineSeverity(rule, host, value) != SeverityNone
+}
+
+// ShouldActivateAlert determines if an alert should be activated (incident created).
+func ShouldActivateAlert(rule models.AlertRule, host models.Host, value float64) bool {
+	return DetermineSeverity(rule, host, value) != SeverityNone
+}
+
+// ShouldResolveAlertSeverity determines if an open alert with given severity should be resolved.
+// Uses hysteresis thresholds if available, otherwise uses lower severity as clearance condition.
+func ShouldResolveAlertSeverity(rule models.AlertRule, host models.Host, value float64, currentSeverity AlertSeverity) bool {
+	if rule.Metric == "status_offline" {
+		return host.Status != "offline"
+	}
+
+	// Determine what severity level would be active at the current value
+	activeSeverity := DetermineSeverity(rule, host, value)
+
+	if currentSeverity == SeverityCrit {
+		// For critical incidents:
+		// If threshold_clear_crit is set, resolve when value crosses it
+		if rule.ThresholdClearCrit != nil {
+			return resolvesHysteresis(rule.Operator, value, *rule.ThresholdClearCrit)
+		}
+		// Otherwise resolve if we drop to warn or below
+		return activeSeverity != SeverityCrit
+	}
+
+	if currentSeverity == SeverityWarn {
+		// For warning incidents:
+		// If threshold_clear_warn is set, resolve when value crosses it
+		if rule.ThresholdClearWarn != nil {
+			return resolvesHysteresis(rule.Operator, value, *rule.ThresholdClearWarn)
+		}
+		// Otherwise resolve if no severity is active
+		return activeSeverity == SeverityNone
+	}
+
+	return false
+}
+
+// resolvesHysteresis checks if value has crossed the clear threshold based on operator
+func resolvesHysteresis(operator string, value float64, clearThreshold float64) bool {
+	switch operator {
+	case ">", ">=":
+		return value <= clearThreshold
+	case "<", "<=":
+		return value >= clearThreshold
 	default:
 		return false
 	}
@@ -721,14 +817,15 @@ func sendAlertNotifications(n notify.Notifier, cfg *config.Config, rule models.A
 	payload := map[string]interface{}{
 		"title":        "ServerSupervisor Alert",
 		"message":      msg,
-		"rule_id":      rule.ID,
-		"host_id":      host.ID,
-		"host_name":    host.Name,
-		"metric":       rule.Metric,
-		"operator":     rule.Operator,
-		"threshold":    rule.Threshold,
-		"value":        value,
-		"triggered_at": time.Now().UTC(),
+		"rule_id":           rule.ID,
+		"host_id":           host.ID,
+		"host_name":         host.Name,
+		"metric":            rule.Metric,
+		"operator":          rule.Operator,
+		"threshold_warn":    rule.ThresholdWarn,
+		"threshold_crit":    rule.ThresholdCrit,
+		"value":             value,
+		"triggered_at":      time.Now().UTC(),
 	}
 
 	for _, channel := range rule.Actions.Channels {
@@ -810,8 +907,10 @@ func pushWebNotifications(db *database.DB, cfg *config.Config, rule models.Alert
 	ruleName := ""
 	if rule.Name != nil {
 		ruleName = *rule.Name
-	} else if rule.Threshold != nil {
-		ruleName = fmt.Sprintf("%s %s %.2f", rule.Metric, rule.Operator, *rule.Threshold)
+	} else if rule.ThresholdCrit != nil {
+		ruleName = fmt.Sprintf("%s %s %.2f (crit)", rule.Metric, rule.Operator, *rule.ThresholdCrit)
+	} else if rule.ThresholdWarn != nil {
+		ruleName = fmt.Sprintf("%s %s %.2f (warn)", rule.Metric, rule.Operator, *rule.ThresholdWarn)
 	}
 
 	unit := ""
@@ -884,8 +983,10 @@ func pushBrowserNotification(pusher NotificationPusher, rule models.AlertRule, h
 	ruleName := ""
 	if rule.Name != nil {
 		ruleName = *rule.Name
-	} else if rule.Threshold != nil {
-		ruleName = fmt.Sprintf("%s %s %.2f", rule.Metric, rule.Operator, *rule.Threshold)
+	} else if rule.ThresholdCrit != nil {
+		ruleName = fmt.Sprintf("%s %s %.2f (crit)", rule.Metric, rule.Operator, *rule.ThresholdCrit)
+	} else if rule.ThresholdWarn != nil {
+		ruleName = fmt.Sprintf("%s %s %.2f (warn)", rule.Metric, rule.Operator, *rule.ThresholdWarn)
 	}
 
 	pusher.Broadcast(map[string]interface{}{

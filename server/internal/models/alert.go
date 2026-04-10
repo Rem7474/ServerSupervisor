@@ -45,26 +45,30 @@ type AlertActions struct {
 }
 
 type AlertRule struct {
-	ID              int64               `json:"id" db:"id"`
-	Name            *string             `json:"name,omitempty" db:"name"`
-	SourceType      AlertSourceType     `json:"source_type,omitempty" db:"source_type"`
-	HostID          *string             `json:"host_id" db:"host_id"`
-	ProxmoxScope    *ProxmoxMetricScope `json:"proxmox_scope,omitempty" db:"proxmox_scope"`
-	Metric          string              `json:"metric" db:"metric"`
-	Operator        string              `json:"operator" db:"operator"`
-	Threshold       *float64            `json:"threshold" db:"threshold"`
-	DurationSeconds int                 `json:"duration_seconds" db:"duration_seconds"`
-	Actions         AlertActions        `json:"actions" db:"-"` // stored as JSONB in DB
-	LastFired       *time.Time          `json:"last_fired,omitempty" db:"last_fired"`
-	Enabled         bool                `json:"enabled" db:"enabled"`
-	CreatedAt       time.Time           `json:"created_at" db:"created_at"`
-	UpdatedAt       *time.Time          `json:"updated_at,omitempty" db:"updated_at"`
+	ID                int64               `json:"id" db:"id"`
+	Name              *string             `json:"name,omitempty" db:"name"`
+	SourceType        AlertSourceType     `json:"source_type,omitempty" db:"source_type"`
+	HostID            *string             `json:"host_id" db:"host_id"`
+	ProxmoxScope      *ProxmoxMetricScope `json:"proxmox_scope,omitempty" db:"proxmox_scope"`
+	Metric            string              `json:"metric" db:"metric"`
+	Operator          string              `json:"operator" db:"operator"`
+	ThresholdWarn     *float64            `json:"threshold_warn" db:"threshold_warn"`
+	ThresholdCrit     *float64            `json:"threshold_crit" db:"threshold_crit"`
+	ThresholdClearWarn *float64           `json:"threshold_clear_warn,omitempty" db:"threshold_clear_warn"` // hysteresis for warn
+	ThresholdClearCrit *float64           `json:"threshold_clear_crit,omitempty" db:"threshold_clear_crit"` // hysteresis for crit
+	DurationSeconds   int                 `json:"duration_seconds" db:"duration_seconds"`
+	Actions           AlertActions        `json:"actions" db:"-"` // stored as JSONB in DB
+	LastFired         *time.Time          `json:"last_fired,omitempty" db:"last_fired"`
+	Enabled           bool                `json:"enabled" db:"enabled"`
+	CreatedAt         time.Time           `json:"created_at" db:"created_at"`
+	UpdatedAt         *time.Time          `json:"updated_at,omitempty" db:"updated_at"`
 }
 
 type AlertIncident struct {
 	ID          int64      `json:"id" db:"id"`
 	RuleID      *int64     `json:"rule_id" db:"rule_id"`
 	HostID      string     `json:"host_id" db:"host_id"`
+	Severity    string     `json:"severity" db:"severity"` // "warn" or "crit"
 	TriggeredAt time.Time  `json:"triggered_at" db:"triggered_at"`
 	ResolvedAt  *time.Time `json:"resolved_at" db:"resolved_at"`
 	Value       float64    `json:"value" db:"value"`
@@ -98,29 +102,35 @@ type PushSubscription struct {
 // ========== Alert Rules - Create/Update Helpers ==========
 
 type AlertRuleCreate struct {
-	Name         string              `json:"name" binding:"required"`
-	Enabled      bool                `json:"enabled"`
-	SourceType   AlertSourceType     `json:"source_type"`
-	HostID       *string             `json:"host_id"`
-	ProxmoxScope *ProxmoxMetricScope `json:"proxmox_scope"`
-	Metric       string              `json:"metric" binding:"required"`
-	Operator     string              `json:"operator" binding:"required"`
-	Threshold    float64             `json:"threshold" binding:"required"`
-	Duration     int                 `json:"duration"`
-	Actions      AlertActions        `json:"actions"`
+	Name              string              `json:"name" binding:"required"`
+	Enabled           bool                `json:"enabled"`
+	SourceType        AlertSourceType     `json:"source_type"`
+	HostID            *string             `json:"host_id"`
+	ProxmoxScope      *ProxmoxMetricScope `json:"proxmox_scope"`
+	Metric            string              `json:"metric" binding:"required"`
+	Operator          string              `json:"operator" binding:"required"`
+	ThresholdWarn     float64             `json:"threshold_warn" binding:"required"`
+	ThresholdCrit     float64             `json:"threshold_crit" binding:"required"`
+	ThresholdClearWarn *float64           `json:"threshold_clear_warn"`
+	ThresholdClearCrit *float64           `json:"threshold_clear_crit"`
+	Duration          int                 `json:"duration"`
+	Actions           AlertActions        `json:"actions"`
 }
 
 type AlertRuleUpdate struct {
-	Name         *string             `json:"name"`
-	Enabled      *bool               `json:"enabled"`
-	SourceType   *AlertSourceType    `json:"source_type"`
-	HostID       *string             `json:"host_id"`
-	ProxmoxScope *ProxmoxMetricScope `json:"proxmox_scope"`
-	Metric       *string             `json:"metric"`
-	Operator     *string             `json:"operator"`
-	Threshold    *float64            `json:"threshold"`
-	Duration     *int                `json:"duration"`
-	Actions      *AlertActions       `json:"actions"`
+	Name               *string             `json:"name"`
+	Enabled            *bool               `json:"enabled"`
+	SourceType         *AlertSourceType    `json:"source_type"`
+	HostID             *string             `json:"host_id"`
+	ProxmoxScope       *ProxmoxMetricScope `json:"proxmox_scope"`
+	Metric             *string             `json:"metric"`
+	Operator           *string             `json:"operator"`
+	ThresholdWarn      *float64            `json:"threshold_warn"`
+	ThresholdCrit      *float64            `json:"threshold_crit"`
+	ThresholdClearWarn *float64            `json:"threshold_clear_warn"`
+	ThresholdClearCrit *float64            `json:"threshold_clear_crit"`
+	Duration           *int                `json:"duration"`
+	Actions            *AlertActions       `json:"actions"`
 }
 
 func IsProxmoxMetric(metric string) bool {

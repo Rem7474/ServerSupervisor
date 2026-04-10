@@ -542,19 +542,20 @@ func humanizeValidationError(err error) string {
 
 // scanAlertRule scans a single alert rule row from the DB.
 // Expected column order: id, name, enabled, source_type, host_id, proxmox_scope,
-// metric, operator, threshold, duration_seconds, actions, last_fired, created_at, updated_at
+// metric, operator, threshold_warn, threshold_crit, threshold_clear_warn, threshold_clear_crit, 
+// duration_seconds, actions, last_fired, created_at, updated_at
 func scanAlertRule(row interface {
 	Scan(dest ...interface{}) error
 }) (models.AlertRule, error) {
 	var rule models.AlertRule
 	var name, hostID, sourceType sql.NullString
-	var threshold sql.NullFloat64
+	var thresholdWarn, thresholdCrit, thresholdClearWarn, thresholdClearCrit sql.NullFloat64
 	var actionsJSON, proxmoxScopeJSON []byte
 	var lastFired, updatedAt sql.NullTime
 
 	err := row.Scan(
 		&rule.ID, &name, &rule.Enabled, &sourceType, &hostID, &proxmoxScopeJSON, &rule.Metric,
-		&rule.Operator, &threshold, &rule.DurationSeconds,
+		&rule.Operator, &thresholdWarn, &thresholdCrit, &thresholdClearWarn, &thresholdClearCrit, &rule.DurationSeconds,
 		&actionsJSON, &lastFired, &rule.CreatedAt, &updatedAt,
 	)
 	if err != nil {
@@ -570,8 +571,17 @@ func scanAlertRule(row interface {
 	if sourceType.Valid {
 		rule.SourceType = models.AlertSourceType(sourceType.String)
 	}
-	if threshold.Valid {
-		rule.Threshold = &threshold.Float64
+	if thresholdWarn.Valid {
+		rule.ThresholdWarn = &thresholdWarn.Float64
+	}
+	if thresholdCrit.Valid {
+		rule.ThresholdCrit = &thresholdCrit.Float64
+	}
+	if thresholdClearWarn.Valid {
+		rule.ThresholdClearWarn = &thresholdClearWarn.Float64
+	}
+	if thresholdClearCrit.Valid {
+		rule.ThresholdClearCrit = &thresholdClearCrit.Float64
 	}
 	if lastFired.Valid {
 		rule.LastFired = &lastFired.Time
@@ -593,8 +603,8 @@ func scanAlertRule(row interface {
 }
 
 const alertRuleSelectCols = `
-id, name, enabled, source_type, host_id, proxmox_scope, metric, operator, threshold, duration_seconds,
-actions, last_fired, created_at, updated_at`
+id, name, enabled, source_type, host_id, proxmox_scope, metric, operator, threshold_warn, threshold_crit,
+threshold_clear_warn, threshold_clear_crit, duration_seconds, actions, last_fired, created_at, updated_at`
 
 // ListAlertRules returns all alert rules
 func (h *AlertRulesHandler) ListAlertRules(c *gin.Context) {
@@ -668,8 +678,10 @@ func (h *AlertRulesHandler) CreateAlertRule(c *gin.Context) {
 	rule.ProxmoxScope = req.ProxmoxScope
 	rule.Metric = req.Metric
 	rule.Operator = req.Operator
-	threshold := req.Threshold
-	rule.Threshold = &threshold
+	rule.ThresholdWarn = &req.ThresholdWarn
+	rule.ThresholdCrit = &req.ThresholdCrit
+	rule.ThresholdClearWarn = req.ThresholdClearWarn
+	rule.ThresholdClearCrit = req.ThresholdClearCrit
 	rule.DurationSeconds = req.Duration
 	rule.Actions = req.Actions
 
@@ -688,11 +700,11 @@ func (h *AlertRulesHandler) CreateAlertRule(c *gin.Context) {
 	proxmoxScopeJSON, _ := json.Marshal(rule.ProxmoxScope)
 
 	err := h.db.QueryRow(`
-INSERT INTO alert_rules (name, enabled, source_type, host_id, proxmox_scope, metric, operator, threshold, duration_seconds, actions)
-VALUES ($1, $2, $3, $4, CAST($5 AS JSONB), $6, $7, $8, $9, CAST($10 AS JSONB))
+INSERT INTO alert_rules (name, enabled, source_type, host_id, proxmox_scope, metric, operator, threshold_warn, threshold_crit, threshold_clear_warn, threshold_clear_crit, duration_seconds, actions)
+VALUES ($1, $2, $3, $4, CAST($5 AS JSONB), $6, $7, $8, $9, $10, $11, $12, CAST($13 AS JSONB))
 RETURNING id, created_at, updated_at`,
 		req.Name, req.Enabled, rule.SourceType, rule.HostID, string(proxmoxScopeJSON), rule.Metric, rule.Operator,
-		req.Threshold, req.Duration, string(actionsJSON),
+		req.ThresholdWarn, req.ThresholdCrit, req.ThresholdClearWarn, req.ThresholdClearCrit, req.Duration, string(actionsJSON),
 	).Scan(&rule.ID, &rule.CreatedAt, &rule.UpdatedAt)
 
 	if err != nil {
@@ -745,8 +757,17 @@ FROM alert_rules WHERE id = $1`, id)
 	if req.Operator != nil {
 		next.Operator = *req.Operator
 	}
-	if req.Threshold != nil {
-		next.Threshold = req.Threshold
+	if req.ThresholdWarn != nil {
+		next.ThresholdWarn = req.ThresholdWarn
+	}
+	if req.ThresholdCrit != nil {
+		next.ThresholdCrit = req.ThresholdCrit
+	}
+	if req.ThresholdClearWarn != nil {
+		next.ThresholdClearWarn = req.ThresholdClearWarn
+	}
+	if req.ThresholdClearCrit != nil {
+		next.ThresholdClearCrit = req.ThresholdClearCrit
 	}
 	if req.Duration != nil {
 		next.DurationSeconds = *req.Duration
@@ -822,9 +843,24 @@ FROM alert_rules WHERE id = $1`, id)
 		args = append(args, next.Operator)
 		argCount++
 	}
-	if req.Threshold != nil {
-		updates = append(updates, "threshold = $"+strconv.Itoa(argCount))
-		args = append(args, *next.Threshold)
+	if req.ThresholdWarn != nil {
+		updates = append(updates, "threshold_warn = $"+strconv.Itoa(argCount))
+		args = append(args, *next.ThresholdWarn)
+		argCount++
+	}
+	if req.ThresholdCrit != nil {
+		updates = append(updates, "threshold_crit = $"+strconv.Itoa(argCount))
+		args = append(args, *next.ThresholdCrit)
+		argCount++
+	}
+	if req.ThresholdClearWarn != nil {
+		updates = append(updates, "threshold_clear_warn = $"+strconv.Itoa(argCount))
+		args = append(args, *next.ThresholdClearWarn)
+		argCount++
+	}
+	if req.ThresholdClearCrit != nil {
+		updates = append(updates, "threshold_clear_crit = $"+strconv.Itoa(argCount))
+		args = append(args, *next.ThresholdClearCrit)
 		argCount++
 	}
 	if req.Duration != nil {
@@ -893,14 +929,17 @@ func (h *AlertRulesHandler) DeleteAlertRule(c *gin.Context) {
 // TestAlertRule evaluates a rule against current metrics without saving it.
 func (h *AlertRulesHandler) TestAlertRule(c *gin.Context) {
 	var req struct {
-		SourceType   models.AlertSourceType     `json:"source_type"`
-		HostID       *string                    `json:"host_id"`
-		ProxmoxScope *models.ProxmoxMetricScope `json:"proxmox_scope"`
-		Metric       string                     `json:"metric" binding:"required"`
-		Operator     string                     `json:"operator" binding:"required"`
-		Threshold    float64                    `json:"threshold" binding:"required"`
-		Duration     int                        `json:"duration"`
-		Actions      models.AlertActions        `json:"actions"`
+		SourceType         models.AlertSourceType     `json:"source_type"`
+		HostID             *string                    `json:"host_id"`
+		ProxmoxScope       *models.ProxmoxMetricScope `json:"proxmox_scope"`
+		Metric             string                     `json:"metric" binding:"required"`
+		Operator           string                     `json:"operator" binding:"required"`
+		ThresholdWarn      float64                    `json:"threshold_warn" binding:"required"`
+		ThresholdCrit      float64                    `json:"threshold_crit" binding:"required"`
+		ThresholdClearWarn *float64                   `json:"threshold_clear_warn"`
+		ThresholdClearCrit *float64                   `json:"threshold_clear_crit"`
+		Duration           int                        `json:"duration"`
+		Actions            models.AlertActions        `json:"actions"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": humanizeValidationError(err)})
@@ -919,17 +958,19 @@ func (h *AlertRulesHandler) TestAlertRule(c *gin.Context) {
 		return
 	}
 
-	threshold := req.Threshold
 	rule := models.AlertRule{
-		SourceType:      req.SourceType,
-		HostID:          req.HostID,
-		ProxmoxScope:    req.ProxmoxScope,
-		Metric:          req.Metric,
-		Operator:        req.Operator,
-		Threshold:       &threshold,
-		DurationSeconds: req.Duration,
-		Actions:         req.Actions,
-		Enabled:         true,
+		SourceType:         req.SourceType,
+		HostID:             req.HostID,
+		ProxmoxScope:       req.ProxmoxScope,
+		Metric:             req.Metric,
+		Operator:           req.Operator,
+		ThresholdWarn:      &req.ThresholdWarn,
+		ThresholdCrit:      &req.ThresholdCrit,
+		ThresholdClearWarn: req.ThresholdClearWarn,
+		ThresholdClearCrit: req.ThresholdClearCrit,
+		DurationSeconds:    req.Duration,
+		Actions:            req.Actions,
+		Enabled:            true,
 	}
 	// Test endpoint supports agent-wide preview when host_id is omitted.
 	validationRule := rule

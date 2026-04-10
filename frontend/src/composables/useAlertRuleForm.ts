@@ -49,7 +49,10 @@ interface AlertRuleFormData {
   proxmox_scope: ProxmoxScope
   metric: string
   operator: string
-  threshold: number
+  threshold_warn: number
+  threshold_crit: number
+  threshold_clear_warn?: number
+  threshold_clear_crit?: number
   duration: number
   actions: AlertRuleFormActions
 }
@@ -62,7 +65,10 @@ interface AlertRuleInput {
   metric?: string
   proxmox_scope?: Partial<ProxmoxScope>
   operator?: string
-  threshold?: number
+  threshold_warn?: number
+  threshold_crit?: number
+  threshold_clear_warn?: number
+  threshold_clear_crit?: number
   duration_seconds?: number
   actions?: {
     channels?: string[]
@@ -112,7 +118,10 @@ export function useAlertRuleForm(): AlertRuleFormApi {
       disk_id: '',
     },
     operator: '>',
-    threshold: 80,
+    threshold_warn: 70,
+    threshold_crit: 85,
+    threshold_clear_warn: undefined,
+    threshold_clear_crit: undefined,
     duration: 300,
     actions: {
       channels: [],
@@ -155,7 +164,10 @@ export function useAlertRuleForm(): AlertRuleFormApi {
         disk_id: scope.disk_id || '',
       },
       operator: rule.operator ?? '>',
-      threshold: rule.threshold ?? 80,
+      threshold_warn: rule.threshold_warn ?? 70,
+      threshold_crit: rule.threshold_crit ?? 85,
+      threshold_clear_warn: rule.threshold_clear_warn,
+      threshold_clear_crit: rule.threshold_clear_crit,
       duration: rule.duration_seconds ?? 300,
       actions: {
         channels: actions.channels || [],
@@ -182,8 +194,9 @@ export function useAlertRuleForm(): AlertRuleFormApi {
     if (form.value.metric === 'heartbeat_timeout') {
       form.value.source_type = 'agent'
       form.value.operator = '>'
-      if (!form.value.threshold || form.value.threshold === 80) {
-        form.value.threshold = 300
+      if (!form.value.threshold_crit || form.value.threshold_crit === 85) {
+        form.value.threshold_warn = 240
+        form.value.threshold_crit = 300
       }
       form.value.duration = 0
       return
@@ -208,16 +221,18 @@ export function useAlertRuleForm(): AlertRuleFormApi {
 
     if (form.value.metric === 'proxmox_disk_min_wearout_percent') {
       form.value.operator = '<'
-      if (!form.value.threshold || form.value.threshold === 80) {
-        form.value.threshold = 20
+      if (!form.value.threshold_crit || form.value.threshold_crit === 85) {
+        form.value.threshold_warn = 25
+        form.value.threshold_crit = 20
       }
       return
     }
 
     if (isProxmoxCountMetric(form.value.metric)) {
       form.value.operator = '>'
-      if (!form.value.threshold || form.value.threshold === 80) {
-        form.value.threshold = 0.5
+      if (!form.value.threshold_crit || form.value.threshold_crit === 85) {
+        form.value.threshold_warn = 0.3
+        form.value.threshold_crit = 0.5
       }
       form.value.duration = 0
       return
@@ -225,7 +240,8 @@ export function useAlertRuleForm(): AlertRuleFormApi {
 
     if (form.value.metric === 'status_offline' || form.value.metric === 'disk_smart_status') {
       form.value.operator = '>'
-      form.value.threshold = 0.5
+      form.value.threshold_warn = 0.5
+      form.value.threshold_crit = 0.5
       form.value.duration = 0
     }
   }

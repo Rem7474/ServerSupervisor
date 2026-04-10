@@ -355,22 +355,88 @@
                     </option>
                   </select>
                 </div>
-                <div :class="form.metric !== 'heartbeat_timeout' ? 'col-md-6 mb-3' : 'col-md-12 mb-3'">
-                  <label class="form-label required">{{ form.metric === 'heartbeat_timeout' ? 'Silence maximum (secondes)' : 'Seuil' }}</label>
+              </div>
+
+              <div v-if="form.metric !== 'heartbeat_timeout'" class="row">
+                <div class="col-md-6 mb-3">
+                  <label class="form-label required">Seuil d'avertissement (warn)</label>
                   <input
-                    v-model.number="form.threshold"
+                    v-model.number="form.threshold_warn"
                     type="number"
-                    :step="form.metric === 'heartbeat_timeout' ? 60 : 0.1"
+                    step="0.1"
                     class="form-control"
-                    :placeholder="form.metric === 'heartbeat_timeout' ? '300' : '80'"
-                    :aria-describedby="form.metric === 'heartbeat_timeout' ? `heartbeat-hint-${rule?.id || 'new'}` : undefined"
+                    placeholder="70"
+                  >
+                  <small class="form-hint">Déclenche une alerte de niveau avertissement.</small>
+                </div>
+                <div class="col-md-6 mb-3">
+                  <label class="form-label required">Seuil critique (crit)</label>
+                  <input
+                    v-model.number="form.threshold_crit"
+                    type="number"
+                    step="0.1"
+                    class="form-control"
+                    placeholder="85"
+                  >
+                  <small class="form-hint">Déclenche une alerte de niveau critique.</small>
+                </div>
+              </div>
+
+              <div v-if="form.metric === 'heartbeat_timeout'" class="row">
+                <div class="col-md-12 mb-3">
+                  <label class="form-label required">Silence maximum (secondes)</label>
+                  <input
+                    v-model.number="form.threshold_crit"
+                    type="number"
+                    step="60"
+                    class="form-control"
+                    placeholder="300"
+                    :aria-describedby="`heartbeat-hint-${rule?.id || 'new'}`"
                   >
                   <small
-                    v-if="form.metric === 'heartbeat_timeout'"
                     :id="`heartbeat-hint-${rule?.id || 'new'}`"
                     class="form-hint"
                   >
                     Durée en secondes sans rapport avant alerte.
+                  </small>
+                </div>
+              </div>
+
+              <div
+                v-if="form.metric !== 'heartbeat_timeout'"
+                class="row">
+                <div class="col-md-6 mb-3">
+                  <label class="form-label">Désactivation warn (hystérésis)</label>
+                  <input
+                    v-model.number="form.threshold_clear_warn"
+                    type="number"
+                    step="0.1"
+                    class="form-control"
+                    placeholder="(Laisser vide pour auto)"
+                    :aria-describedby="`threshold-clear-warn-hint-${rule?.id || 'new'}`"
+                  >
+                  <small
+                    :id="`threshold-clear-warn-hint-${rule?.id || 'new'}`"
+                    class="form-hint"
+                  >
+                    Seuil pour résoudre l'alerte warn. Évite le fluttering.
+                  </small>
+                </div>
+                <div class="col-md-6 mb-3">
+                  <label class="form-label">Désactivation crit (hystérésis)</label>
+                  <input
+                    v-model.number="form.threshold_clear_crit"
+                    type="number"
+                    step="0.1"
+                    class="form-control"
+                    placeholder="(Laisser vide pour auto)"
+                    :aria-describedby="`threshold-clear-crit-hint-${rule?.id || 'new'}`"
+                  >
+                  <small
+                    :id="`threshold-clear-crit-hint-${rule?.id || 'new'}`"
+                    class="form-hint"
+                  >
+                    Seuil pour résoudre l'alerte crit. Évite le fluttering.
                   </small>
                 </div>
               </div>
@@ -397,6 +463,29 @@
                   class="form-hint text-warning d-block mt-1"
                 >
                   Si l'agent reporte toutes les 60s, une durée inférieure peut empêcher le déclenchement.
+                </small>
+              </div>
+
+              <div
+                v-if="form.metric !== 'heartbeat_timeout'"
+                class="mb-3"
+              >
+                <label class="form-label">Seuil de désactivation (hystérésis)</label>
+                <input
+                  v-model.number="form.threshold_clear"
+                  type="number"
+                  :step="0.1"
+                  class="form-control"
+                  placeholder="(Laisser vide pour utiliser l'inverse du seuil d'activation)"
+                  :aria-describedby="`threshold-clear-hint-${rule?.id || 'new'}`"
+                >
+                <small
+                  :id="`threshold-clear-hint-${rule?.id || 'new'}`"
+                  class="form-hint"
+                >
+                  Seuil pour désactiver l'alerte. Évite le fluttering si l'alerte oscille autour du seuil d'activation.
+                  <br>
+                  <strong>Exemple:</strong> Seuil 80°C, Désactivation 70°C. L'alerte se déclenche à 80°C mais ne se désactive qu'à 70°C.
                 </small>
               </div>
 
