@@ -542,7 +542,7 @@ func humanizeValidationError(err error) string {
 
 // scanAlertRule scans a single alert rule row from the DB.
 // Expected column order: id, name, enabled, source_type, host_id, proxmox_scope,
-// metric, operator, threshold_warn, threshold_crit, threshold_clear_warn, threshold_clear_crit, 
+// metric, operator, threshold_warn, threshold_crit, threshold_clear_warn, threshold_clear_crit,
 // duration_seconds, actions, last_fired, created_at, updated_at
 func scanAlertRule(row interface {
 	Scan(dest ...interface{}) error

@@ -74,7 +74,7 @@ func EvaluateAlerts(db *database.DB, cfg *config.Config, dispatcher *dispatch.Di
 
 			// Determine current severity based on rule and value
 			currentSeveration := DetermineSeverity(rule, host, value)
-			
+
 			// Get any open incident (regardless of severity)
 			inc, err := db.GetOpenAlertIncident(rule.ID, host.ID)
 			if err != nil && err != sql.ErrNoRows {
@@ -815,17 +815,17 @@ func buildAlertMessage(rule models.AlertRule, host models.Host, value float64) s
 func sendAlertNotifications(n notify.Notifier, cfg *config.Config, rule models.AlertRule, host models.Host, value float64) {
 	msg := buildAlertMessage(rule, host, value)
 	payload := map[string]interface{}{
-		"title":        "ServerSupervisor Alert",
-		"message":      msg,
-		"rule_id":           rule.ID,
-		"host_id":           host.ID,
-		"host_name":         host.Name,
-		"metric":            rule.Metric,
-		"operator":          rule.Operator,
-		"threshold_warn":    rule.ThresholdWarn,
-		"threshold_crit":    rule.ThresholdCrit,
-		"value":             value,
-		"triggered_at":      time.Now().UTC(),
+		"title":          "ServerSupervisor Alert",
+		"message":        msg,
+		"rule_id":        rule.ID,
+		"host_id":        host.ID,
+		"host_name":      host.Name,
+		"metric":         rule.Metric,
+		"operator":       rule.Operator,
+		"threshold_warn": rule.ThresholdWarn,
+		"threshold_crit": rule.ThresholdCrit,
+		"value":          value,
+		"triggered_at":   time.Now().UTC(),
 	}
 
 	for _, channel := range rule.Actions.Channels {
