@@ -467,29 +467,6 @@
               </div>
 
               <div
-                v-if="form.metric !== 'heartbeat_timeout'"
-                class="mb-3"
-              >
-                <label class="form-label">Seuil de désactivation (hystérésis)</label>
-                <input
-                  v-model.number="form.threshold_clear"
-                  type="number"
-                  :step="0.1"
-                  class="form-control"
-                  placeholder="(Laisser vide pour utiliser l'inverse du seuil d'activation)"
-                  :aria-describedby="`threshold-clear-hint-${rule?.id || 'new'}`"
-                >
-                <small
-                  :id="`threshold-clear-hint-${rule?.id || 'new'}`"
-                  class="form-hint"
-                >
-                  Seuil pour désactiver l'alerte. Évite le fluttering si l'alerte oscille autour du seuil d'activation.
-                  <br>
-                  <strong>Exemple:</strong> Seuil 80°C, Désactivation 70°C. L'alerte se déclenche à 80°C mais ne se désactive qu'à 70°C.
-                </small>
-              </div>
-
-              <div
                 v-if="form.source_type === 'proxmox'"
                 class="alert alert-info py-2 small"
               >
@@ -915,7 +892,13 @@ const canProceedStep = computed(() => {
     if (scope.scope_mode === 'disk') return !!scope.disk_id
     return true
   }
-  if (step.value === 2) return Number.isFinite(Number(form.value.threshold))
+  if (step.value === 2) {
+    if (form.value.metric === 'heartbeat_timeout') {
+      return Number.isFinite(Number(form.value.threshold_crit))
+    }
+
+    return Number.isFinite(Number(form.value.threshold_warn)) && Number.isFinite(Number(form.value.threshold_crit))
+  }
   return true
 })
 
@@ -969,7 +952,10 @@ watch(
     form.value.host_id,
     form.value.metric,
     form.value.operator,
-    form.value.threshold,
+    form.value.threshold_warn,
+    form.value.threshold_crit,
+    form.value.threshold_clear_warn,
+    form.value.threshold_clear_crit,
     form.value.duration,
     form.value.proxmox_scope?.scope_mode,
     form.value.proxmox_scope?.connection_id,
