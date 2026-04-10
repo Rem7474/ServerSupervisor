@@ -137,7 +137,15 @@
                 :class="getMetricBadgeClass(rule.metric)"
               >{{ getMetricLabel(rule.metric) }}</span>
             </td>
-            <td><code>{{ rule.operator }} {{ rule.threshold }}{{ getMetricUnit(rule.metric) }}</code></td>
+            <td>
+              <div v-if="rule.metric === 'heartbeat_timeout'" style="line-height: 1.4;">
+                <code>{{ rule.operator }} {{ rule.threshold_crit }}s</code>
+              </div>
+              <div v-else style="line-height: 1.4;">
+                <div><code>{{ rule.operator }} {{ rule.threshold_warn }}{{ getMetricUnit(rule.metric) }} (warn)</code></div>
+                <div><code>{{ rule.operator }} {{ rule.threshold_crit }}{{ getMetricUnit(rule.metric) }} (crit)</code></div>
+              </div>
+            </td>
             <td>{{ formatDurationSecs(rule.duration_seconds) }}</td>
             <td>
               <span
