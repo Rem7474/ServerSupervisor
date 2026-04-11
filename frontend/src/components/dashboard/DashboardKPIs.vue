@@ -52,7 +52,6 @@
               <span v-if="(cveSummary.critical_count || 0) > 0 || (cveSummary.hosts_with_critical || 0) > 0">·</span>
               <span class="badge bg-orange-lt text-orange">HIGH {{ cveSummary.high_count || 0 }}</span>
             </span>
-            <span class="opacity-75">· {{ cveTimestampText || 'jamais' }}</span>
           </div>
         </div>
       </div>
