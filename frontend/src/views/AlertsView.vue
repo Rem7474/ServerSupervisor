@@ -189,7 +189,7 @@ onMounted(async () => {
   await init()
 
   if (route.query.tab === 'incidents') {
-    alertsTab.value = 'incidents'
+    await switchToIncidents()
   }
 
   incidentsPollTimer = setInterval(loadIncidents, 300_000)

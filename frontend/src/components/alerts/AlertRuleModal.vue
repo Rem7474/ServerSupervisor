@@ -458,22 +458,12 @@
                   class="form-hint"
                 >Le seuil doit être dépassé pendant cette durée avant de déclencher l'alerte.</small>
                 <small
-                  v-if="form.duration > 0"
+                  v-if="Number.isFinite(Number(form.duration)) && form.duration > 0 && form.duration < 60"
                   :id="`duration-warn-${rule?.id || 'new'}`"
                   class="form-hint text-warning d-block mt-1"
                 >
                   Si l'agent reporte toutes les 60s, une durée inférieure peut empêcher le déclenchement.
                 </small>
-              </div>
-
-              <div
-                v-if="form.source_type === 'proxmox'"
-                class="alert alert-info py-2 small"
-              >
-                <strong>Aperçu Proxmox</strong>
-                <div class="text-secondary">
-                  Le test ci-dessous s'actualise automatiquement avec la portée et la métrique sélectionnées.
-                </div>
               </div>
 
               <div
@@ -550,6 +540,24 @@
             </div>
 
             <div v-if="step === 3">
+              <div
+                v-if="testResults"
+                class="alert py-2 small mb-3"
+                :class="testResults.any_fires ? 'alert-warning' : 'alert-success'"
+              >
+                <strong>Dernier test:</strong>
+                {{ testResults.any_fires ? ' la règle déclencherait une alerte.' : ' la règle ne déclencherait pas d\'alerte.' }}
+                <span class="text-secondary ms-1">({{ formatDate(testResults.evaluated_at) }})</span>
+              </div>
+
+              <div
+                v-if="testError"
+                class="alert alert-danger py-2 small mb-3"
+                role="alert"
+              >
+                {{ testError }}
+              </div>
+
               <div class="mb-3">
                 <label class="form-label">Période de silence (secondes)</label>
                 <input
@@ -875,6 +883,7 @@ const {
 
 const testing = ref(false)
 const testResults = ref(null)
+const testError = ref('')
 
 const hasNoDataResults = computed(() => testResults.value?.results?.some((result) => !result.has_data) || false)
 
@@ -882,7 +891,8 @@ const canProceedStep = computed(() => {
   if (step.value === 1) {
     const hasBase = !!form.value.metric && !!form.value.name?.trim()
     if (!hasBase) return false
-    if (form.value.source_type === 'agent') return !!form.value.host_id
+    // "Tous les hôtes" is a valid selection for agent-based rules.
+    if (form.value.source_type === 'agent') return true
 
     const scope = form.value.proxmox_scope || { scope_mode: 'global' }
     if (scope.scope_mode === 'connection') return !!scope.connection_id
@@ -910,10 +920,12 @@ watch(
     if (!props.visible) {
       clearTimeout(autoTestTimer)
       testResults.value = null
+      testError.value = ''
       step.value = 1
       return
     }
     testResults.value = null
+    testError.value = ''
     hydrateFormFromRule(props.rule)
     step.value = 1
   },
@@ -1047,11 +1059,13 @@ async function testAlert() {
   if (!props.visible) return
   testing.value = true
   testResults.value = null
+  testError.value = ''
   try {
     const response = await apiClient.testAlertRule(buildPayload())
     testResults.value = response.data
-  } catch {
+  } catch (err) {
     testResults.value = null
+    testError.value = err?.response?.data?.error || 'Échec du test de la règle.'
   } finally {
     testing.value = false
   }
