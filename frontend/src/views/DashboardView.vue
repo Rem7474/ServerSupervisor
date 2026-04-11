@@ -318,46 +318,6 @@
               </option>
             </select>
           </div>
-          <div class="col-12 col-md-4 col-lg-3">
-            <label
-              class="form-label"
-              for="dashboard-sort-key"
-            >Tri principal</label>
-            <select
-              id="dashboard-sort-key"
-              v-model="sortKey"
-              class="form-select"
-            >
-              <option value="name">
-                Trier par nom
-              </option>
-              <option value="status">
-                Trier par statut
-              </option>
-              <option value="cpu">
-                Trier par CPU
-              </option>
-              <option value="apt">
-                Trier par APT en attente
-              </option>
-              <option value="last_seen">
-                Trier par dernière activité
-              </option>
-            </select>
-          </div>
-          <div class="col-12 col-md-4 col-lg-2">
-            <label
-              class="form-label"
-              for="dashboard-sort-dir"
-            >Ordre</label>
-            <button
-              id="dashboard-sort-dir"
-              class="btn btn-outline-secondary w-100"
-              @click="sortDir = sortDir === 'asc' ? 'desc' : 'asc'"
-            >
-              {{ sortDir === 'asc' ? 'Asc' : 'Desc' }}
-            </button>
-          </div>
         </div>
       </div>
     </div>
@@ -369,20 +329,86 @@
           <thead>
             <tr>
               <th class="host-selection-col" />
-              <th>Nom</th>
-              <th>État</th>
-              <th>IP / OS</th>
+              <th>
+                <SortableHeader
+                  label="Nom"
+                  :active="sortKey === 'name'"
+                  :direction="sortDir"
+                  @toggle="toggleSort('name')"
+                />
+              </th>
+              <th>
+                <SortableHeader
+                  label="État"
+                  :active="sortKey === 'status'"
+                  :direction="sortDir"
+                  @toggle="toggleSort('status')"
+                />
+              </th>
+              <th>
+                <SortableHeader
+                  label="IP / OS"
+                  :active="sortKey === 'ip_os'"
+                  :direction="sortDir"
+                  @toggle="toggleSort('ip_os')"
+                />
+              </th>
               <th title="Version de l'agent">
-                Agent
+                <SortableHeader
+                  label="Agent"
+                  :active="sortKey === 'agent'"
+                  :direction="sortDir"
+                  @toggle="toggleSort('agent')"
+                />
               </th>
-              <th>CPU</th>
-              <th>RAM</th>
-              <th>Disque</th>
+              <th>
+                <SortableHeader
+                  label="CPU"
+                  :active="sortKey === 'cpu'"
+                  :direction="sortDir"
+                  @toggle="toggleSort('cpu')"
+                />
+              </th>
+              <th>
+                <SortableHeader
+                  label="RAM"
+                  :active="sortKey === 'ram'"
+                  :direction="sortDir"
+                  @toggle="toggleSort('ram')"
+                />
+              </th>
+              <th>
+                <SortableHeader
+                  label="Disque"
+                  :active="sortKey === 'disk'"
+                  :direction="sortDir"
+                  @toggle="toggleSort('disk')"
+                />
+              </th>
               <th title="Paquets APT en attente">
-                APT
+                <SortableHeader
+                  label="APT"
+                  :active="sortKey === 'apt'"
+                  :direction="sortDir"
+                  @toggle="toggleSort('apt')"
+                />
               </th>
-              <th>Uptime</th>
-              <th>Dernière activité</th>
+              <th>
+                <SortableHeader
+                  label="Uptime"
+                  :active="sortKey === 'uptime'"
+                  :direction="sortDir"
+                  @toggle="toggleSort('uptime')"
+                />
+              </th>
+              <th>
+                <SortableHeader
+                  label="Dernière activité"
+                  :active="sortKey === 'last_seen'"
+                  :direction="sortDir"
+                  @toggle="toggleSort('last_seen')"
+                />
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -580,6 +606,7 @@ import DashboardKPIs from '../components/dashboard/DashboardKPIs.vue'
 import DashboardDockerVersions from '../components/dashboard/DashboardDockerVersions.vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import PaginationNav from '../components/PaginationNav.vue'
+import SortableHeader from '../components/common/SortableHeader.vue'
 import { formatHostStatus, hostStatusClass } from '../utils/formatHostStatus'
 import { useDashboard } from '../composables/useDashboard'
 
@@ -666,6 +693,16 @@ const paginatedHosts = computed(() => {
 
 function setHostPage(page) {
   currentHostPage.value = page
+}
+
+function toggleSort(key) {
+  if (sortKey.value === key) {
+    sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
+    return
+  }
+
+  sortKey.value = key
+  sortDir.value = 'asc'
 }
 
 watch([searchQuery, statusFilter, sortKey, sortDir], () => {

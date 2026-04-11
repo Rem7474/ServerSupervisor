@@ -28,6 +28,7 @@ interface DashboardHostRecord {
   hostname?: string
   ip_address?: string
   os?: string
+  agent_version?: string
   last_seen?: string | number | Date | null
 }
 
@@ -327,13 +328,33 @@ export function useDashboard() {
           aVal = statusOrder[(a.status as HostStatus)] ?? 99
           bVal = statusOrder[(b.status as HostStatus)] ?? 99
           break
+        case 'ip_os':
+          aVal = `${a.ip_address || ''} ${a.os || ''}`.trim().toLowerCase()
+          bVal = `${b.ip_address || ''} ${b.os || ''}`.trim().toLowerCase()
+          break
+        case 'agent':
+          aVal = String(a.agent_version || '').toLowerCase()
+          bVal = String(b.agent_version || '').toLowerCase()
+          break
         case 'cpu':
           aVal = effectiveMetrics(a.id).cpu ?? -1
           bVal = effectiveMetrics(b.id).cpu ?? -1
           break
+        case 'ram':
+          aVal = effectiveMetrics(a.id).memPct ?? -1
+          bVal = effectiveMetrics(b.id).memPct ?? -1
+          break
+        case 'disk':
+          aVal = diskUsage.value[a.id] ?? -1
+          bVal = diskUsage.value[b.id] ?? -1
+          break
         case 'apt':
           aVal = aptPendingHosts.value[a.id] ?? 0
           bVal = aptPendingHosts.value[b.id] ?? 0
+          break
+        case 'uptime':
+          aVal = hostMetrics.value[a.id]?.uptime ?? -1
+          bVal = hostMetrics.value[b.id]?.uptime ?? -1
           break
         case 'last_seen':
           aVal = a.last_seen ? new Date(a.last_seen).getTime() : 0
