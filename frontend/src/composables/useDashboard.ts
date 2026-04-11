@@ -41,6 +41,10 @@ interface DashboardMetricPoint {
 interface DashboardAgentMetric {
   cpu_usage_percent?: number | null
   memory_percent?: number | null
+  cpu_temperature?: number | null
+  fan_rpm?: number | null
+  uptime?: number | null
+  hostname?: string | null
 }
 
 interface DashboardProxmoxLinkRecord {
