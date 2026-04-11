@@ -40,13 +40,17 @@
             <span v-if="outdatedVersions === 0">Tout est à jour</span>
           </div>
           <div
-            v-if="cveSummary && (cveSummary.hosts_with_critical || 0) > 0"
+            v-if="cveSummary && ((cveSummary.critical_count || 0) > 0 || (cveSummary.hosts_with_critical || 0) > 0 || (cveSummary.high_count || 0) > 0 || (cveSummary.hosts_with_high || 0) > 0)"
             class="small mt-1 text-secondary d-flex flex-wrap align-items-center gap-1"
           >
-            <span class="badge bg-red-lt text-red">CRIT {{ cveSummary.critical_count || 0 }}</span>
-            <span>{{ cveSummary.hosts_with_critical || 0 }} hôte{{ (cveSummary.hosts_with_critical || 0) > 1 ? 's' : '' }}</span>
-            <span v-if="(cveSummary.hosts_with_high || 0) > 0">
-              · <span class="badge bg-orange-lt text-orange">HIGH {{ cveSummary.high_count || 0 }}</span>
+            <span
+              v-if="(cveSummary.critical_count || 0) > 0 || (cveSummary.hosts_with_critical || 0) > 0"
+              class="badge bg-red-lt text-red"
+            >CRIT {{ cveSummary.critical_count || 0 }}</span>
+            <span v-if="(cveSummary.hosts_with_critical || 0) > 0">{{ cveSummary.hosts_with_critical || 0 }} hôte{{ (cveSummary.hosts_with_critical || 0) > 1 ? 's' : '' }}</span>
+            <span v-if="(cveSummary.high_count || 0) > 0 || (cveSummary.hosts_with_high || 0) > 0">
+              <span v-if="(cveSummary.critical_count || 0) > 0 || (cveSummary.hosts_with_critical || 0) > 0">·</span>
+              <span class="badge bg-orange-lt text-orange">HIGH {{ cveSummary.high_count || 0 }}</span>
             </span>
             <span class="opacity-75">· {{ cveTimestampText || 'jamais' }}</span>
           </div>

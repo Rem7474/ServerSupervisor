@@ -104,6 +104,53 @@
     <!-- ─── Bannières d'alerte ───────────────────────────────────────────────── -->
 
     <div
+      v-if="cveSummary && ((cveSummary.critical_count || 0) > 0 || (cveSummary.hosts_with_critical || 0) > 0)"
+      class="alert alert-danger mb-3 d-flex align-items-center gap-3"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        class="icon icon-lg icon-responsive-lg flex-shrink-0"
+        width="24"
+        height="24"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+      >
+        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+        <line
+          x1="12"
+          y1="9"
+          x2="12"
+          y2="13"
+        /><line
+          x1="12"
+          y1="17"
+          x2="12.01"
+          y2="17"
+        />
+      </svg>
+      <div class="flex-grow-1">
+        <div class="fw-semibold">
+          Vulnérabilités critiques détectées
+        </div>
+        <div class="text-secondary small">
+          <span class="badge bg-red-lt text-red me-1">CRITICAL</span>
+          {{ cveSummary.critical_count || 0 }} CVE
+          <span v-if="(cveSummary.hosts_with_critical || 0) > 0"> sur {{ cveSummary.hosts_with_critical || 0 }} hôte{{ (cveSummary.hosts_with_critical || 0) > 1 ? 's' : '' }}</span>
+        </div>
+      </div>
+      <router-link
+        to="/apt"
+        class="btn btn-sm btn-danger"
+      >
+        Voir les mises à jour
+      </router-link>
+    </div>
+
+    <div
       v-if="proxmoxSummary && (proxmoxSummary.nodes_down > 0 || proxmoxSummary.recent_failed_tasks > 0 || proxmoxSummary.storage_near_full > 0 || proxmoxSummary.storage_offline > 0)"
       class="alert alert-warning mb-3 d-flex align-items-center gap-3"
     >
