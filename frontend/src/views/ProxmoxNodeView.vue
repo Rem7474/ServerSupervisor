@@ -63,21 +63,21 @@
         </div>
       </div>
 
-      <!-- CPU temperature source mapping -->
+      <!-- Shared sensor source mapping (CPU temp + fan RPM) -->
       <div class="card mb-3">
         <div class="card-body d-flex flex-wrap align-items-center gap-2">
           <div class="subheader mb-0 me-2">
-            Source temp CPU (nœud)
+            Source capteurs nœud (CPU + ventilateurs)
           </div>
           <select
-            v-model="cpuTempSourceHostId"
+            v-model="sensorSourceHostId"
             class="form-select form-select-sm proxmox-source-select"
           >
             <option value="">
-              Aucune (temp locale de chaque host)
+              Aucune (capteurs locaux du nœud)
             </option>
             <option
-              v-for="candidate in cpuTempSourceCandidates"
+              v-for="candidate in sensorSourceCandidates"
               :key="candidate.id"
               :value="candidate.id"
             >
@@ -86,62 +86,23 @@
           </select>
           <button
             class="btn btn-sm btn-primary"
-            :disabled="cpuTempSourceSaving || cpuTempSourceLoading"
-            @click="saveCpuTempSource"
+            :disabled="sensorSourceSaving || sensorSourceLoading"
+            @click="saveSensorSource"
           >
             <span
-              v-if="cpuTempSourceSaving"
+              v-if="sensorSourceSaving"
               class="spinner-border spinner-border-sm me-1"
             />
             Enregistrer
           </button>
           <span
-            v-if="cpuTempSourceMsg"
-            :class="['small', cpuTempSourceOk ? 'text-success' : 'text-danger']"
-          >{{ cpuTempSourceMsg }}</span>
+            v-if="sensorSourceMsg"
+            :class="['small', sensorSourceOk ? 'text-success' : 'text-danger']"
+          >{{ sensorSourceMsg }}</span>
           <span
-            v-else-if="node.cpu_temp_source_host_name"
+            v-else-if="sensorSourceHostName"
             class="small text-muted"
-          >Actuel: {{ node.cpu_temp_source_host_name }}</span>
-        </div>
-        <div class="card-body border-top d-flex flex-wrap align-items-center gap-2">
-          <div class="subheader mb-0 me-2">
-            Source ventilateurs (nœud)
-          </div>
-          <select
-            v-model="fanRPMSourceHostId"
-            class="form-select form-select-sm proxmox-source-select"
-          >
-            <option value="">
-              Aucune (RPM local de chaque host)
-            </option>
-            <option
-              v-for="candidate in fanRPMSourceCandidates"
-              :key="candidate.id"
-              :value="candidate.id"
-            >
-              {{ candidate.hostname || candidate.name }} ({{ candidate.ip_address }})
-            </option>
-          </select>
-          <button
-            class="btn btn-sm btn-primary"
-            :disabled="fanRPMSourceSaving || fanRPMSourceLoading"
-            @click="saveFanRPMSource"
-          >
-            <span
-              v-if="fanRPMSourceSaving"
-              class="spinner-border spinner-border-sm me-1"
-            />
-            Enregistrer
-          </button>
-          <span
-            v-if="fanRPMSourceMsg"
-            :class="['small', fanRPMSourceOk ? 'text-success' : 'text-danger']"
-          >{{ fanRPMSourceMsg }}</span>
-          <span
-            v-else-if="node.fan_rpm_source_host_name"
-            class="small text-muted"
-          >Actuel: {{ node.fan_rpm_source_host_name }}</span>
+          >Actuel: {{ sensorSourceHostName }}</span>
         </div>
       </div>
 
@@ -181,7 +142,7 @@
                 {{ nodeCpuTempCurrent > 0 ? `${nodeCpuTempCurrent.toFixed(1)}°C` : '—' }}
               </div>
               <div class="text-muted small">
-                {{ node.cpu_temp_source_host_name ? `Source: ${node.cpu_temp_source_host_name}` : 'Source non configurée' }}
+                {{ sensorSourceHostName ? `Source: ${sensorSourceHostName}` : 'Source non configurée' }}
               </div>
             </div>
 
@@ -194,7 +155,7 @@
                 {{ nodeFanRPMCurrent > 0 ? `${nodeFanRPMCurrent.toFixed(0)} RPM` : '—' }}
               </div>
               <div class="text-muted small">
-                {{ node.fan_rpm_source_host_name ? `Source: ${node.fan_rpm_source_host_name}` : 'Source non configurée' }}
+                {{ sensorSourceHostName ? `Source: ${sensorSourceHostName}` : 'Source non configurée' }}
               </div>
             </div>
 
@@ -464,7 +425,7 @@
                 v-else
                 class="h-100 d-flex align-items-center justify-content-center text-secondary small"
               >
-                {{ nodeTempLoading ? 'Chargement…' : (nodeTempError || (node.cpu_temp_source_host_id ? 'Aucune donnée température disponible' : 'Configurez une source temp CPU pour ce nœud')) }}
+                {{ nodeTempLoading ? 'Chargement…' : (nodeTempError || (sensorSourceHostId ? 'Aucune donnée température disponible' : 'Configurez une source capteurs pour ce nœud')) }}
               </div>
             </div>
           </div>
@@ -488,7 +449,7 @@
                 v-else
                 class="h-100 d-flex align-items-center justify-content-center text-secondary small"
               >
-                {{ nodeFanLoading ? 'Chargement…' : (nodeFanError || (node.fan_rpm_source_host_id ? 'Aucune donnée ventilateur disponible' : 'Configurez une source ventilateurs pour ce nœud')) }}
+                {{ nodeFanLoading ? 'Chargement…' : (nodeFanError || (sensorSourceHostId ? 'Aucune donnée ventilateur disponible' : 'Configurez une source capteurs pour ce nœud')) }}
               </div>
             </div>
           </div>
@@ -1414,19 +1375,15 @@ const guestLinks = ref({})
 const linkMsg = ref('')
 const linkMsgOk = ref(false)
 
-const cpuTempSourceCandidates = ref([])
-const cpuTempSourceHostId = ref('')
-const cpuTempSourceLoading = ref(false)
-const cpuTempSourceSaving = ref(false)
-const cpuTempSourceMsg = ref('')
-const cpuTempSourceOk = ref(false)
-
-const fanRPMSourceCandidates = ref([])
-const fanRPMSourceHostId = ref('')
-const fanRPMSourceLoading = ref(false)
-const fanRPMSourceSaving = ref(false)
-const fanRPMSourceMsg = ref('')
-const fanRPMSourceOk = ref(false)
+const sensorSourceCandidates = ref([])
+const sensorSourceHostId = ref('')
+const sensorSourceLoading = ref(false)
+const sensorSourceSaving = ref(false)
+const sensorSourceMsg = ref('')
+const sensorSourceOk = ref(false)
+const sensorSourceHostName = computed(() =>
+  node.value?.cpu_temp_source_host_name || node.value?.fan_rpm_source_host_name || ''
+)
 
 const nodeTempLoading = ref(false)
 const nodeTempError = ref('')
@@ -1742,10 +1699,8 @@ async function load() {
     }
     const res = await api.getProxmoxNode(route.params.id)
     node.value = res.data
-    cpuTempSourceHostId.value = node.value?.cpu_temp_source_host_id || ''
-    fanRPMSourceHostId.value = node.value?.fan_rpm_source_host_id || ''
-    await loadCpuTempSourceCandidates()
-    await loadFanRPMSourceCandidates()
+    sensorSourceHostId.value = node.value?.cpu_temp_source_host_id || node.value?.fan_rpm_source_host_id || ''
+    await loadSensorSourceCandidates()
     await loadGuestLinks()
     // fire-and-forget: live status + RRD charts load in parallel
     loadLiveStatus()
@@ -1767,7 +1722,7 @@ async function loadNodeCpuTempHistory(hours = rrdTimeframeToHours[rrdTimeframe.v
   nodeCpuTempCurrent.value = 0
 
   try {
-    const sourceHostId = node.value?.cpu_temp_source_host_id
+    const sourceHostId = sensorSourceHostId.value || node.value?.cpu_temp_source_host_id || node.value?.fan_rpm_source_host_id
     if (!sourceHostId) {
       return
     }
@@ -1812,7 +1767,7 @@ async function loadNodeFanRPMHistory(hours = rrdTimeframeToHours[rrdTimeframe.va
   nodeFanRPMCurrent.value = 0
 
   try {
-    const sourceHostId = node.value?.fan_rpm_source_host_id
+    const sourceHostId = sensorSourceHostId.value || node.value?.fan_rpm_source_host_id || node.value?.cpu_temp_source_host_id
     if (!sourceHostId) {
       return
     }
@@ -1850,101 +1805,58 @@ async function loadNodeFanRPMHistory(hours = rrdTimeframeToHours[rrdTimeframe.va
   }
 }
 
-async function loadCpuTempSourceCandidates() {
-  cpuTempSourceLoading.value = true
+async function loadSensorSourceCandidates() {
+  sensorSourceLoading.value = true
   try {
-    const res = await api.getProxmoxNodeCpuTempSourceCandidates(route.params.id)
-    cpuTempSourceCandidates.value = Array.isArray(res.data) ? res.data : []
+    const res = await api.getProxmoxNodeSensorSourceCandidates(route.params.id)
+    sensorSourceCandidates.value = Array.isArray(res.data) ? res.data : []
   } catch {
-    cpuTempSourceCandidates.value = []
+    sensorSourceCandidates.value = []
   } finally {
-    cpuTempSourceLoading.value = false
+    sensorSourceLoading.value = false
   }
 }
 
-async function loadFanRPMSourceCandidates() {
-  fanRPMSourceLoading.value = true
-  try {
-    const res = await api.getProxmoxNodeFanRPMSourceCandidates(route.params.id)
-    fanRPMSourceCandidates.value = Array.isArray(res.data) ? res.data : []
-  } catch {
-    fanRPMSourceCandidates.value = []
-  } finally {
-    fanRPMSourceLoading.value = false
-  }
-}
-
-async function refreshNodeCpuTempSource() {
+async function refreshNodeSensorSource() {
   try {
     const res = await api.getProxmoxNode(route.params.id)
     const n = res.data || {}
     if (node.value) {
       node.value.cpu_temp_source_host_id = n.cpu_temp_source_host_id || ''
       node.value.cpu_temp_source_host_name = n.cpu_temp_source_host_name || ''
-    }
-    cpuTempSourceHostId.value = n.cpu_temp_source_host_id || ''
-  } catch {
-    // non-bloquant
-  }
-}
-
-async function refreshNodeFanRPMSource() {
-  try {
-    const res = await api.getProxmoxNode(route.params.id)
-    const n = res.data || {}
-    if (node.value) {
       node.value.fan_rpm_source_host_id = n.fan_rpm_source_host_id || ''
       node.value.fan_rpm_source_host_name = n.fan_rpm_source_host_name || ''
     }
-    fanRPMSourceHostId.value = n.fan_rpm_source_host_id || ''
+    sensorSourceHostId.value = n.cpu_temp_source_host_id || n.fan_rpm_source_host_id || ''
   } catch {
     // non-bloquant
   }
 }
 
-async function saveCpuTempSource() {
-  cpuTempSourceSaving.value = true
-  cpuTempSourceMsg.value = ''
+async function saveSensorSource() {
+  sensorSourceSaving.value = true
+  sensorSourceMsg.value = ''
   try {
-    const target = cpuTempSourceHostId.value || null
-    const res = await api.setProxmoxNodeCpuTempSource(route.params.id, target)
+    const target = sensorSourceHostId.value || null
+    const res = await api.setProxmoxNodeSensorSource(route.params.id, target)
     if (node.value) {
       node.value.cpu_temp_source_host_id = res.data?.cpu_temp_source_host_id || ''
       node.value.cpu_temp_source_host_name = res.data?.cpu_temp_source_host_name || ''
-    }
-    cpuTempSourceHostId.value = res.data?.cpu_temp_source_host_id || ''
-    await loadNodeCpuTempHistory(rrdTimeframeToHours[rrdTimeframe.value] ?? 24)
-    cpuTempSourceMsg.value = 'Source de température CPU mise à jour.'
-    cpuTempSourceOk.value = true
-  } catch (e) {
-    cpuTempSourceMsg.value = e?.response?.data?.error || 'Erreur lors de la mise à jour.'
-    cpuTempSourceOk.value = false
-  } finally {
-    cpuTempSourceSaving.value = false
-    setTimeout(() => { cpuTempSourceMsg.value = '' }, 4000)
-  }
-}
-
-async function saveFanRPMSource() {
-  fanRPMSourceSaving.value = true
-  fanRPMSourceMsg.value = ''
-  try {
-    const target = fanRPMSourceHostId.value || null
-    const res = await api.setProxmoxNodeFanRPMSource(route.params.id, target)
-    if (node.value) {
       node.value.fan_rpm_source_host_id = res.data?.fan_rpm_source_host_id || ''
       node.value.fan_rpm_source_host_name = res.data?.fan_rpm_source_host_name || ''
     }
-    fanRPMSourceHostId.value = res.data?.fan_rpm_source_host_id || ''
+    sensorSourceHostId.value = res.data?.cpu_temp_source_host_id || res.data?.fan_rpm_source_host_id || ''
+    await loadSensorSourceCandidates()
+    await loadNodeCpuTempHistory(rrdTimeframeToHours[rrdTimeframe.value] ?? 24)
     await loadNodeFanRPMHistory(rrdTimeframeToHours[rrdTimeframe.value] ?? 24)
-    fanRPMSourceMsg.value = 'Source ventilateurs mise à jour.'
-    fanRPMSourceOk.value = true
+    sensorSourceMsg.value = 'Source capteurs mise à jour (CPU + ventilateurs).'
+    sensorSourceOk.value = true
   } catch (e) {
-    fanRPMSourceMsg.value = e?.response?.data?.error || 'Erreur lors de la mise à jour.'
-    fanRPMSourceOk.value = false
+    sensorSourceMsg.value = e?.response?.data?.error || 'Erreur lors de la mise à jour.'
+    sensorSourceOk.value = false
   } finally {
-    fanRPMSourceSaving.value = false
-    setTimeout(() => { fanRPMSourceMsg.value = '' }, 4000)
+    sensorSourceSaving.value = false
+    setTimeout(() => { sensorSourceMsg.value = '' }, 4000)
   }
 }
 
@@ -1977,10 +1889,8 @@ async function confirmGuestLink(g) {
   try {
     const res = await api.updateProxmoxLink(link.id, { status: 'confirmed' })
     guestLinks.value = { ...guestLinks.value, [g.id]: res.data }
-    await loadCpuTempSourceCandidates()
-    await loadFanRPMSourceCandidates()
-    await refreshNodeCpuTempSource()
-    await refreshNodeFanRPMSource()
+    await loadSensorSourceCandidates()
+    await refreshNodeSensorSource()
     showMsg(`[${g.name}] Lien confirmé.`, true)
   } catch (e) {
     showMsg(e?.response?.data?.error || 'Erreur.', false)

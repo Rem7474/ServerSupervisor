@@ -367,25 +367,23 @@ func scanNodes(rows *sql.Rows) ([]models.ProxmoxNode, error) {
 	return nodes, rows.Err()
 }
 
-// SetProxmoxNodeCPUTempSource maps a Proxmox node to a host used as CPU temperature source.
-// Pass an empty hostID to clear the mapping.
-func (db *DB) SetProxmoxNodeCPUTempSource(nodeID, hostID string) error {
+// SetProxmoxNodeSensorSource maps both CPU temperature and fan RPM sources to the same host.
+// Pass an empty hostID to clear both mappings.
+func (db *DB) SetProxmoxNodeSensorSource(nodeID, hostID string) error {
 	if hostID == "" {
-		_, err := db.conn.Exec(`UPDATE proxmox_nodes SET cpu_temp_source_host_id = NULL WHERE id = $1`, nodeID)
+		_, err := db.conn.Exec(`
+			UPDATE proxmox_nodes
+			SET cpu_temp_source_host_id = NULL,
+			    fan_rpm_source_host_id = NULL
+			WHERE id = $1`, nodeID)
 		return err
 	}
-	_, err := db.conn.Exec(`UPDATE proxmox_nodes SET cpu_temp_source_host_id = $2 WHERE id = $1`, nodeID, hostID)
-	return err
-}
 
-// SetProxmoxNodeFanRPMSource maps a Proxmox node to a host used as fan RPM source.
-// Pass an empty hostID to clear the mapping.
-func (db *DB) SetProxmoxNodeFanRPMSource(nodeID, hostID string) error {
-	if hostID == "" {
-		_, err := db.conn.Exec(`UPDATE proxmox_nodes SET fan_rpm_source_host_id = NULL WHERE id = $1`, nodeID)
-		return err
-	}
-	_, err := db.conn.Exec(`UPDATE proxmox_nodes SET fan_rpm_source_host_id = $2 WHERE id = $1`, nodeID, hostID)
+	_, err := db.conn.Exec(`
+		UPDATE proxmox_nodes
+		SET cpu_temp_source_host_id = $2,
+		    fan_rpm_source_host_id = $2
+		WHERE id = $1`, nodeID, hostID)
 	return err
 }
 
@@ -417,11 +415,6 @@ func (db *DB) ListProxmoxNodeCPUTempSourceCandidates(connectionID, nodeName stri
 		out = append(out, h)
 	}
 	return out, rows.Err()
-}
-
-// ListProxmoxNodeFanRPMSourceCandidates returns hosts already linked to guests on this node.
-func (db *DB) ListProxmoxNodeFanRPMSourceCandidates(connectionID, nodeName string) ([]models.Host, error) {
-	return db.ListProxmoxNodeCPUTempSourceCandidates(connectionID, nodeName)
 }
 
 // GetEffectiveHostCPUTemperature resolves CPU temperature for a host using Proxmox node mapping when relevant.
