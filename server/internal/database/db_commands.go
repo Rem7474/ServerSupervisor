@@ -276,7 +276,7 @@ func (db *DB) GetRecentNotifications(limit int) ([]models.NotificationItem, erro
 		`SELECT ai.id, ai.rule_id, ai.host_id,
 		        COALESCE(h.name, ai.host_id) AS host_name,
 		        COALESCE(ar.name,
-		            ar.metric || ' ' || ar.operator || ' ' || CAST(COALESCE(ar.threshold, 0) AS TEXT),
+		            ar.metric || ' ' || ar.operator || ' ' || CAST(COALESCE(ar.threshold_crit, ar.threshold_warn, 0) AS TEXT),
 		            'Règle supprimée') AS rule_name,
 		        COALESCE(ar.metric, '') AS metric,
 		        ai.value, ai.triggered_at, ai.resolved_at,
