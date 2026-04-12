@@ -326,6 +326,10 @@ function syncNotificationsIfVisible() {
   fetchNotifications()
 }
 
+function onAppResume() {
+  syncNotificationsIfVisible()
+}
+
 function onClickOutside(e) {
   if (bellRef.value && !bellRef.value.contains(e.target)) {
     isOpen.value = false
@@ -346,15 +350,13 @@ onMounted(async () => {
   fetchNotifications()
   pollTimer = setInterval(fetchNotifications, 30_000)
   document.addEventListener('click', onClickOutside)
-  document.addEventListener('visibilitychange', syncNotificationsIfVisible)
-  window.addEventListener('focus', syncNotificationsIfVisible)
+  window.addEventListener('ss:app-resume', onAppResume)
 })
 
 onUnmounted(() => {
   clearInterval(pollTimer)
   document.removeEventListener('click', onClickOutside)
-  document.removeEventListener('visibilitychange', syncNotificationsIfVisible)
-  window.removeEventListener('focus', syncNotificationsIfVisible)
+  window.removeEventListener('ss:app-resume', onAppResume)
 })
 </script>
 

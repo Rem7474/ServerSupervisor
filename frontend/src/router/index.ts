@@ -160,6 +160,36 @@ const router = createRouter({
   routes,
 })
 
+const CHUNK_RETRY_FLAG = 'ss:chunk-retry-once'
+
+async function purgeChunkRelatedCaches(): Promise<void> {
+  if ('serviceWorker' in navigator) {
+    const registrations = await navigator.serviceWorker.getRegistrations()
+    registrations.forEach((registration) => {
+      registration.active?.postMessage({ type: 'CLEAR_CACHE' })
+    })
+    await Promise.all(registrations.map((registration) => registration.update().catch(() => undefined)))
+  }
+
+  if ('caches' in window) {
+    const cacheNames = await caches.keys()
+    const targetNames = cacheNames.filter((name) => /serversupervisor-(static|runtime)/i.test(name))
+    await Promise.all(targetNames.map((name) => caches.delete(name)))
+  }
+}
+
+function emitChunkFatalError(error: unknown): void {
+  const reason = error instanceof Error ? error.message : 'Erreur de chargement de module'
+  window.dispatchEvent(
+    new CustomEvent('ss:fatal-error', {
+      detail: {
+        title: 'Mise a jour detectee, chargement impossible',
+        message: `Le chargement des modules a echoue apres une tentative automatique. ${reason}`,
+      },
+    })
+  )
+}
+
 router.beforeEach(
   (to: RouteLocationNormalized, _from: RouteLocationNormalized, next: NavigationGuardNext) => {
     const auth = useAuthStore()
@@ -180,6 +210,10 @@ router.beforeEach(
   }
 )
 
+router.afterEach(() => {
+  sessionStorage.removeItem(CHUNK_RETRY_FLAG)
+})
+
 // Recover from chunk load failures (network hiccup during lazy route import).
 // The browser caches the old chunk references after a deployment; a hard
 // reload fetches the new manifest and resolves the mismatch.
@@ -189,9 +223,20 @@ router.onError((error: unknown) => {
     (error instanceof Error && error.name === 'ChunkLoadError') ||
     /loading chunk/i.test(message) ||
     /failed to fetch dynamically imported module/i.test(message)
-  if (isChunkError) {
-    window.location.reload()
+  if (!isChunkError) {
+    return
   }
+
+  const hasRetried = sessionStorage.getItem(CHUNK_RETRY_FLAG) === '1'
+  if (!hasRetried) {
+    sessionStorage.setItem(CHUNK_RETRY_FLAG, '1')
+    void purgeChunkRelatedCaches().finally(() => {
+      window.location.reload()
+    })
+    return
+  }
+
+  emitChunkFatalError(error)
 })
 
 export default router

@@ -1,5 +1,9 @@
-const CACHE_NAME = 'serversupervisor-v1'
-const RUNTIME_CACHE = 'serversupervisor-runtime'
+const SW_VERSION = '2026-04-12-v1'
+const STATIC_CACHE_PREFIX = 'serversupervisor-static'
+const RUNTIME_CACHE_PREFIX = 'serversupervisor-runtime'
+const CACHE_NAME = `${STATIC_CACHE_PREFIX}-${SW_VERSION}`
+const RUNTIME_CACHE = `${RUNTIME_CACHE_PREFIX}-${SW_VERSION}`
+const CACHE_PREFIXES = [STATIC_CACHE_PREFIX, RUNTIME_CACHE_PREFIX]
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -27,7 +31,8 @@ self.addEventListener('activate', (event) => {
       .then((cacheNames) => {
         return Promise.all(
           cacheNames.map((cacheName) => {
-            if (cacheName !== CACHE_NAME && cacheName !== RUNTIME_CACHE) {
+            const isServerSupervisorCache = CACHE_PREFIXES.some((prefix) => cacheName.startsWith(prefix))
+            if (isServerSupervisorCache && cacheName !== CACHE_NAME && cacheName !== RUNTIME_CACHE) {
               console.log('[ServiceWorker] Deleting old cache:', cacheName)
               return caches.delete(cacheName)
             }
@@ -49,6 +54,39 @@ self.addEventListener('fetch', (event) => {
 
   // Skip external APIs and websockets
   if (url.origin !== self.location.origin || url.protocol === 'ws:' || url.protocol === 'wss:') {
+    return
+  }
+
+  // HTML navigations: network-first to avoid stale app shell after tab resume/deploy.
+  if (event.request.mode === 'navigate' || event.request.destination === 'document') {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          if (response && response.status === 200) {
+            const clone = response.clone()
+            caches.open(CACHE_NAME).then((cache) => cache.put('/index.html', clone))
+          }
+          return response
+        })
+        .catch(async () => {
+          const cachedPage = await caches.match(event.request)
+          if (cachedPage) {
+            return cachedPage
+          }
+          const cachedShell = await caches.match('/index.html')
+          if (cachedShell) {
+            return cachedShell
+          }
+          return new Response(
+            'Offline - application shell unavailable',
+            {
+              status: 503,
+              statusText: 'Service Unavailable',
+              headers: { 'Content-Type': 'text/plain' },
+            }
+          )
+        })
+    )
     return
   }
 
@@ -196,7 +234,9 @@ self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'CLEAR_CACHE') {
     caches.keys().then((cacheNames) => {
       return Promise.all(
-        cacheNames.map((cacheName) => caches.delete(cacheName))
+        cacheNames
+          .filter((cacheName) => CACHE_PREFIXES.some((prefix) => cacheName.startsWith(prefix)))
+          .map((cacheName) => caches.delete(cacheName))
       )
     })
   }

@@ -55,6 +55,7 @@ export function useWebSocket<TPayload = unknown>(
   let debounceTimer: ReturnType<typeof setTimeout> | null = null
   let staleAlertTimer: ReturnType<typeof setTimeout> | null = null
   let manualClose = false
+  let lastResumeReconnectAt = 0
 
   // Exponential backoff: 2s, 4s, 8s, capped at 30s
   function retryDelay(): number {
@@ -183,8 +184,27 @@ export function useWebSocket<TPayload = unknown>(
     }
   }
 
-  onMounted(connect)
-  onUnmounted(disconnect)
+  function handleAppResume(): void {
+    const now = Date.now()
+    if (now - lastResumeReconnectAt < 1500) return
+    lastResumeReconnectAt = now
+
+    const state = ws?.readyState
+    const isClosedOrMissing = !ws || state === WebSocket.CLOSED
+    const isRecoverableState = wsStatus.value === 'reconnecting' || wsStatus.value === 'error'
+    if (isClosedOrMissing || isRecoverableState) {
+      connect()
+    }
+  }
+
+  onMounted(() => {
+    connect()
+    window.addEventListener('ss:app-resume', handleAppResume as EventListener)
+  })
+  onUnmounted(() => {
+    window.removeEventListener('ss:app-resume', handleAppResume as EventListener)
+    disconnect()
+  })
 
   return { wsStatus, wsError, retryCount, dataStaleAlert, reconnect: connect, disconnect, send, wsEvents }
 }

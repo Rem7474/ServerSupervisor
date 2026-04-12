@@ -41,8 +41,7 @@
               <li class="nav-item">
                 <span
                   v-if="hostsDownCount > 0"
-                  class="badge bg-red-lt text-red ms-2 py-2"
-                  style="line-height: 1.5"
+                  class="badge bg-red-lt text-red ms-2 py-2 hosts-down-badge"
                 >
                   <AppIcon
                     name="alert"
@@ -532,6 +531,7 @@ const secondaryMenuOpen = ref(false)
 const adminMenuOpen = ref(false)
 const httpError = ref('')
 let unsubscribeHttpErrors = () => {}
+let resumeDebounceTimer = null
 
 // Computed property: compter les hôtes hors ligne
 const hostsDownCount = computed(() => {
@@ -547,6 +547,27 @@ const hostsDownCount = computed(() => {
 const isOnline = ref(navigator.onLine)
 function handleOnline() { isOnline.value = true }
 function handleOffline() { isOnline.value = false }
+
+function notifyAppResume() {
+  if (resumeDebounceTimer) {
+    clearTimeout(resumeDebounceTimer)
+  }
+  resumeDebounceTimer = setTimeout(() => {
+    window.dispatchEvent(new CustomEvent('ss:app-resume', { detail: { at: Date.now() } }))
+  }, 600)
+}
+
+function handleVisibilityResume() {
+  if (document.visibilityState === 'visible') {
+    notifyAppResume()
+  }
+}
+
+function handlePageShow(event) {
+  if (event.persisted || document.visibilityState === 'visible') {
+    notifyAppResume()
+  }
+}
 
 const secondaryRoutes = ['/threats', '/traffic', '/security', '/scheduled-tasks', '/network', '/settings']
 const adminRoutes = ['/git-webhooks', '/audit', '/users']
@@ -599,6 +620,9 @@ onMounted(() => {
   })
   window.addEventListener('online', handleOnline)
   window.addEventListener('offline', handleOffline)
+  document.addEventListener('visibilitychange', handleVisibilityResume)
+  window.addEventListener('pageshow', handlePageShow)
+  window.addEventListener('focus', notifyAppResume)
   document.addEventListener('click', handleOutsideClick, true)
   // Auto-close all menus after navigation
   router.afterEach(() => {
@@ -618,7 +642,13 @@ onUnmounted(() => {
   unsubscribeHttpErrors()
   window.removeEventListener('online', handleOnline)
   window.removeEventListener('offline', handleOffline)
+  document.removeEventListener('visibilitychange', handleVisibilityResume)
+  window.removeEventListener('pageshow', handlePageShow)
+  window.removeEventListener('focus', notifyAppResume)
   document.removeEventListener('click', handleOutsideClick, true)
+  if (resumeDebounceTimer) {
+    clearTimeout(resumeDebounceTimer)
+  }
 })
 </script>
 
@@ -651,6 +681,10 @@ onUnmounted(() => {
   border: 0;
   width: 100%;
   text-align: left;
+}
+
+.hosts-down-badge {
+  line-height: 1.5;
 }
 
 .app-network-alert {
