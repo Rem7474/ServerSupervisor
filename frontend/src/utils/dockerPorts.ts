@@ -5,6 +5,12 @@ export interface DockerPortMapping {
   ip: string
 }
 
+export interface DockerPortBadgeGroup {
+  key: string
+  mapping: DockerPortMapping
+  hasGlobalIPv6: boolean
+}
+
 function toStringValue(value: unknown): string {
   if (value === undefined || value === null) {
     return ''
@@ -99,6 +105,24 @@ function parseToken(token: string): DockerPortMapping {
   }
 }
 
+function normalizeIp(value: string): string {
+  return value.trim().toLowerCase()
+}
+
+function isGlobalIp(value: string): boolean {
+  const normalized = normalizeIp(value)
+  return normalized === '' || normalized === '0.0.0.0' || normalized === '::' || normalized === ':::'
+}
+
+function isGlobalIPv6(value: string): boolean {
+  const normalized = normalizeIp(value)
+  return normalized === '::' || normalized === ':::'
+}
+
+function portDisplayGroupKey(mapping: DockerPortMapping): string {
+  return `${mapping.internalPort || 'none'}|${mapping.hostPort || 'none'}|${mapping.proto || 'na'}`
+}
+
 export function normalizeDockerPorts(raw: unknown): DockerPortMapping[] {
   if (!raw) {
     return []
@@ -155,6 +179,56 @@ export function normalizeDockerPorts(raw: unknown): DockerPortMapping[] {
 
 export function formatInternalPort(mapping: DockerPortMapping): string {
   return mapping.proto ? `${mapping.internalPort}/${mapping.proto}` : mapping.internalPort
+}
+
+export function groupGlobalDockerPorts(ports: DockerPortMapping[]): DockerPortBadgeGroup[] {
+  const groupedPorts: DockerPortBadgeGroup[] = []
+  const groupedIndices = new Map<string, number>()
+
+  for (const mapping of ports) {
+    if (!mapping.hostPort) {
+      const key = portDisplayGroupKey(mapping)
+      if (groupedIndices.has(key)) {
+        continue
+      }
+
+      groupedIndices.set(key, groupedPorts.length)
+      groupedPorts.push({
+        key,
+        mapping,
+        hasGlobalIPv6: false,
+      })
+      continue
+    }
+
+    if (!isGlobalIp(mapping.ip)) {
+      groupedPorts.push({
+        key: portMappingKey(mapping),
+        mapping,
+        hasGlobalIPv6: false,
+      })
+      continue
+    }
+
+    const key = portDisplayGroupKey(mapping)
+    const existingIndex = groupedIndices.get(key)
+
+    if (existingIndex === undefined) {
+      groupedIndices.set(key, groupedPorts.length)
+      groupedPorts.push({
+        key,
+        mapping,
+        hasGlobalIPv6: isGlobalIPv6(mapping.ip),
+      })
+      continue
+    }
+
+    if (isGlobalIPv6(mapping.ip)) {
+      groupedPorts[existingIndex].hasGlobalIPv6 = true
+    }
+  }
+
+  return groupedPorts
 }
 
 export function formatExposedPort(mapping: DockerPortMapping): string {

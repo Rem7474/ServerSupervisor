@@ -2,10 +2,16 @@
   <div class="d-flex flex-wrap align-items-center gap-1 port-badges">
     <template v-if="visiblePorts.length">
       <span
-        v-for="mapping in visiblePorts"
-        :key="portMappingKey(mapping)"
-        :class="badgeClass"
-      >{{ formatLabel(mapping) }}</span>
+        v-for="entry in visiblePorts"
+        :key="entry.key"
+        class="d-inline-flex align-items-center flex-wrap gap-1 port-badge-group"
+      >
+        <span :class="badgeClass">{{ formatLabel(entry.mapping) }}</span>
+        <span
+          v-if="entry.hasGlobalIPv6"
+          class="badge bg-secondary-lt text-secondary port-badge-global-v6"
+        >IPv6 globale</span>
+      </span>
     </template>
     <span
       v-else
@@ -19,7 +25,8 @@ import { computed } from 'vue'
 import {
   formatExposedPort,
   formatInternalPort,
-  portMappingKey,
+  groupGlobalDockerPorts,
+  type DockerPortBadgeGroup,
   type DockerPortMapping,
 } from '../../utils/dockerPorts'
 
@@ -30,12 +37,14 @@ const props = withDefaults(defineProps<{
   ports: () => [],
 })
 
-const visiblePorts = computed(() => {
+const visiblePorts = computed<DockerPortBadgeGroup[]>(() => {
+  const grouped = groupGlobalDockerPorts(props.ports)
+
   if (props.kind === 'internal') {
-    return props.ports.filter((mapping) => Boolean(mapping.internalPort))
+    return grouped.filter((entry) => Boolean(entry.mapping.internalPort))
   }
 
-  return props.ports.filter((mapping) => Boolean(mapping.hostPort))
+  return grouped.filter((entry) => Boolean(entry.mapping.hostPort))
 })
 
 const badgeClass = computed(() => {
@@ -56,8 +65,18 @@ function formatLabel(mapping: DockerPortMapping): string {
   white-space: nowrap;
 }
 
+.port-badge-global-v6 {
+  font-size: 0.625rem;
+  line-height: 1.1;
+  padding: 0.15rem 0.35rem;
+}
+
 @media (max-width: 576px) {
   .port-badges {
+    gap: 0.25rem !important;
+  }
+
+  .port-badge-group {
     gap: 0.25rem !important;
   }
 
