@@ -78,25 +78,8 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-/* Unified online/offline status badge with animated dot */
-.status-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-}
-
-.status-badge::before {
-  content: '';
-  width: 0.45rem;
-  height: 0.45rem;
-  border-radius: 50%;
-  background-color: currentColor;
-  box-shadow: 0 0 0 0 currentColor;
-  opacity: 0.9;
-  flex: 0 0 auto;
-}
-
-.status-badge.status-dot-animated::before {
+/* Unified online/offline status animation on Tabler status dots */
+.status-dot.status-dot-animated {
   animation: status-dot-pulse 1.6s ease-in-out infinite;
 }
 
@@ -118,7 +101,7 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .status-badge.status-dot-animated::before {
+  .status-dot.status-dot-animated {
     animation: none;
   }
 }

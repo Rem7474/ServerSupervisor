@@ -211,8 +211,9 @@
                         {{ host.ip_address }}
                       </div>
                     </div>
-                    <span :class="host.status === 'online' ? 'badge bg-green-lt text-green status-badge status-dot-animated' : 'badge bg-red-lt text-red status-badge status-dot-animated'">
-                      {{ host.status === 'online' ? 'En ligne' : 'Hors ligne' }}
+                    <span :class="host.status === 'online' ? 'status status-lime' : 'status status-red'">
+                      <span class="status-dot status-dot-animated" />
+                      <span :data-translation-id="host.status === 'online' ? 'online' : 'offline'">{{ host.status === 'online' ? 'En ligne' : 'Hors ligne' }}</span>
                     </span>
                     <button
                       v-if="canRunApt"

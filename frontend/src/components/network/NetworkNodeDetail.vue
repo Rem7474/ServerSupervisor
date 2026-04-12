@@ -72,7 +72,10 @@
           </div>
           <div class="detail-kv">
             <span class="detail-key">Statut</span>
-            <span :class="statusBadgeClass">{{ hostData?.status || 'unknown' }}</span>
+            <span :class="statusBadgeClass">
+              <span class="status-dot status-dot-animated" />
+              <span :data-translation-id="(hostData?.status || props.selectedNode?.status) === 'online' ? 'online' : (hostData?.status || props.selectedNode?.status) === 'offline' ? 'offline' : 'unknown'">{{ hostData?.status || 'unknown' }}</span>
+            </span>
           </div>
           <div class="detail-kv">
             <span class="detail-key">Trafic cumul.</span>
@@ -442,10 +445,10 @@ const typeTagClass = computed(() => {
 
 const statusBadgeClass = computed(() => {
   const status = hostData.value?.status || props.selectedNode?.status
-  if (status === 'online') return 'badge bg-green-lt text-green status-badge status-dot-animated'
-  if (status === 'warning') return 'badge bg-yellow-lt text-yellow status-badge status-dot-animated'
-  if (status === 'offline') return 'badge bg-red-lt text-red status-badge status-dot-animated'
-  return 'badge bg-secondary-lt text-secondary status-badge'
+  if (status === 'online') return 'status status-lime'
+  if (status === 'warning') return 'status status-yellow'
+  if (status === 'offline') return 'status status-red'
+  return 'status status-secondary'
 })
 
 function formatBytes(bytes) {

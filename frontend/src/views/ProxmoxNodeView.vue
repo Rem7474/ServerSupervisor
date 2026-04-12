@@ -38,12 +38,18 @@
           </h2>
           <span
             v-if="node.status === 'online'"
-            class="badge bg-success-lt text-success status-badge status-dot-animated"
-          >En ligne</span>
+            class="status status-lime"
+          >
+            <span class="status-dot status-dot-animated" />
+            <span data-translation-id="online">En ligne</span>
+          </span>
           <span
             v-else
-            class="badge bg-danger-lt text-danger status-badge status-dot-animated"
-          >{{ node.status }}</span>
+            class="status status-red"
+          >
+            <span class="status-dot status-dot-animated" />
+            <span data-translation-id="offline">Hors ligne</span>
+          </span>
           <span
             v-if="nodeCpuTempCurrent > 0"
             class="badge"

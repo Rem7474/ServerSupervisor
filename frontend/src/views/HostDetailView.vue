@@ -64,7 +64,10 @@
           <span
             v-if="host"
             :class="hostStatusClass(host.status)"
-          >{{ formatHostStatus(host.status) }}</span>
+          >
+            <span class="status-dot status-dot-animated" />
+            <span :data-translation-id="host.status === 'online' ? 'online' : host.status === 'offline' ? 'offline' : 'unknown'">{{ formatHostStatus(host.status) }}</span>
+          </span>
           <span
             v-if="host?.agent_version"
             :class="isAgentUpToDate(host.agent_version) ? 'badge bg-green-lt text-green' : 'badge bg-yellow-lt text-yellow'"

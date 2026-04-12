@@ -450,7 +450,10 @@
                 </div>
               </td>
               <td>
-                <span :class="hostStatusClass(host.status)">{{ formatHostStatus(host.status) }}</span>
+                <span :class="hostStatusClass(host.status)">
+                  <span class="status-dot status-dot-animated" />
+                  <span :data-translation-id="host.status === 'online' ? 'online' : host.status === 'offline' ? 'offline' : 'unknown'">{{ formatHostStatus(host.status) }}</span>
+                </span>
               </td>
               <td>
                 <div class="text-body">
