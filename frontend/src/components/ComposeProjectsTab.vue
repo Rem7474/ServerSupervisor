@@ -85,6 +85,34 @@
               >
                 {{ getComposeUpdates(p).length }} MAJ
               </span>
+              <div
+                v-if="getComposeUpdates(p).length > 0"
+                class="d-flex flex-wrap gap-1 mt-1"
+              >
+                <template
+                  v-for="vc in getComposeUpdates(p)"
+                  :key="vc.tracker_id || `${p.id}:${vc.docker_image}`"
+                >
+                  <router-link
+                    v-if="vc.tracker_id"
+                    :to="`/release-trackers/${vc.tracker_id}`"
+                    class="btn btn-sm btn-outline-secondary"
+                    title="Voir le suivi"
+                  >
+                    {{ vc.docker_image }}
+                  </router-link>
+                  <button
+                    v-if="vc.tracker_id"
+                    type="button"
+                    class="btn btn-sm btn-primary"
+                    :disabled="isTrackerRunDisabled(vc)"
+                    :title="trackerRunTooltip(vc)"
+                    @click="runTracker(vc, p)"
+                  >
+                    {{ trackerRunLoading[vc.tracker_id] ? '...' : 'Run' }}
+                  </button>
+                </template>
+              </div>
             </td>
             <td>
               <div class="d-flex flex-wrap gap-1">
@@ -258,6 +286,13 @@
     >
       Aucun projet Compose trouvé
     </div>
+    <div
+      v-if="trackerFeedback"
+      class="alert alert-info m-3 mt-0 py-2"
+      role="status"
+    >
+      {{ trackerFeedback }}
+    </div>
   </div>
 
   <!-- Modal projet compose (raw config) -->
@@ -371,6 +406,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
+import apiClient from '../api'
 import DataToolbar from './common/DataToolbar.vue'
 
 const props = defineProps({
@@ -388,6 +424,8 @@ const composeHostFilter = ref('')
 const composeStateFilter = ref('')
 const selectedProject = ref(null)
 const copied = ref(false)
+const trackerRunLoading = ref({})
+const trackerFeedback = ref('')
 
 const composeProjectStatus = computed(() => {
   const statusMap = {}
@@ -419,11 +457,16 @@ function getComposeUpdates(project) {
     c => c.labels?.['com.docker.compose.project'] === project.name && c.host_id === project.host_id
   )
   const updates = []
+  const seen = new Set()
   for (const c of projectContainers) {
     const vc = vcByImage.value[`${c.host_id}|${c.image}`] ||
                vcByImage.value[`${c.host_id}|${c.image}:${c.image_tag}`]
     if (vc && !vc.is_up_to_date && (vc.running_version || vc.update_confirmed)) {
-      updates.push(vc)
+      const key = vc.tracker_id || `${vc.host_id}|${vc.docker_image}`
+      if (!seen.has(key)) {
+        seen.add(key)
+        updates.push(vc)
+      }
     }
   }
   return updates
@@ -458,5 +501,42 @@ async function copyConfig(text) {
   await navigator.clipboard.writeText(text)
   copied.value = true
   setTimeout(() => { copied.value = false }, 2000)
+}
+
+function canRunTracker(vc) {
+  return props.canRunDocker && !!vc?.tracker_id
+}
+
+function hasManualTrackerData(vc) {
+  return !!(vc?.latest_version && String(vc.latest_version).trim())
+}
+
+function isTrackerRunDisabled(vc) {
+  if (!canRunTracker(vc)) return true
+  if (!hasManualTrackerData(vc)) return true
+  return !!trackerRunLoading.value[vc.tracker_id]
+}
+
+function trackerRunTooltip(vc) {
+  if (!props.canRunDocker) return 'Action réservée admin/opérateur'
+  if (!hasManualTrackerData(vc)) return 'Attendez la première vérification automatique'
+  return 'Déclencher la tâche du tracker maintenant'
+}
+
+async function runTracker(vc, project) {
+  if (isTrackerRunDisabled(vc)) return
+  const id = vc.tracker_id
+  trackerRunLoading.value = { ...trackerRunLoading.value, [id]: true }
+  trackerFeedback.value = ''
+  try {
+    await apiClient.runReleaseTracker(id)
+    trackerFeedback.value = `Déclenchement lancé pour ${project?.name || vc?.docker_image || 'le tracker'}.`
+  } catch (e) {
+    trackerFeedback.value = e.response?.data?.error || 'Échec du déclenchement manuel.'
+  } finally {
+    const next = { ...trackerRunLoading.value }
+    delete next[id]
+    trackerRunLoading.value = next
+  }
 }
 </script>

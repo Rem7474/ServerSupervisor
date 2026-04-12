@@ -77,6 +77,13 @@
     v-if="sortedContainers.length > 0"
     class="card"
   >
+    <div
+      v-if="trackerFeedback"
+      class="alert alert-info m-3 mb-0 py-2"
+      role="status"
+    >
+      {{ trackerFeedback }}
+    </div>
     <div class="table-responsive">
       <table class="table table-vcenter card-table">
         <thead>
@@ -343,6 +350,56 @@
                     cy="10"
                     r="7"
                   /><path d="M21 21l-6 -6" /></svg>
+                </button>
+                <button
+                  v-if="containerVersion(c)?.tracker_id"
+                  class="btn btn-sm btn-ghost-secondary"
+                  title="Voir le suivi de version"
+                  aria-label="Voir le suivi de version"
+                  @click="openTracker(containerVersion(c).tracker_id)"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    class="icon icon-sm"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    stroke-width="2"
+                    stroke="currentColor"
+                    fill="none"
+                  ><path
+                    stroke="none"
+                    d="M0 0h24v24H0z"
+                    fill="none"
+                  /><path d="M12 5l7 7l-7 7" /><path d="M5 12h14" /></svg>
+                </button>
+                <button
+                  v-if="containerVersion(c)?.tracker_id"
+                  :disabled="isTrackerRunDisabled(containerVersion(c))"
+                  class="btn btn-sm btn-ghost-primary"
+                  :title="trackerRunTooltip(containerVersion(c))"
+                  aria-label="Déclencher le tracker"
+                  @click="runTracker(containerVersion(c), c)"
+                >
+                  <span
+                    v-if="trackerRunLoading[containerVersion(c).tracker_id]"
+                    class="spinner-border spinner-border-sm"
+                  />
+                  <svg
+                    v-else
+                    xmlns="http://www.w3.org/2000/svg"
+                    class="icon icon-sm"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    stroke-width="2"
+                    stroke="currentColor"
+                    fill="none"
+                  ><path
+                    stroke="none"
+                    d="M0 0h24v24H0z"
+                    fill="none"
+                  /><path d="M7 4v16l13 -8z" /></svg>
                 </button>
                 <button
                   class="btn btn-sm btn-ghost-secondary"
@@ -709,6 +766,7 @@
 <script setup>
 import { ref, computed, watch, toRef } from 'vue'
 import { useRouter } from 'vue-router'
+import apiClient from '../api'
 import DataToolbar from './common/DataToolbar.vue'
 import SortableHeader from './common/SortableHeader.vue'
 import DockerPortBadges from './common/DockerPortBadges.vue'
@@ -763,6 +821,8 @@ const sortDir = ref('asc')
 const inspectTarget = ref(null)
 const inspectTab = ref('env')
 const selectedContainer = ref(null)
+const trackerRunLoading = ref({})
+const trackerFeedback = ref('')
 
 function toggleSort(key) {
   if (sortBy.value === key) {
@@ -806,6 +866,48 @@ function formatBytes(bytes) {
   const sizes = ['B', 'KiB', 'MiB', 'GiB', 'TiB']
   const i = Math.floor(Math.log(bytes) / Math.log(k))
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
+}
+
+function openTracker(trackerId) {
+  if (!trackerId) return
+  router.push(`/release-trackers/${trackerId}`)
+}
+
+function canRunTracker(vc) {
+  return props.canRunDocker && !!vc?.tracker_id
+}
+
+function hasManualTrackerData(vc) {
+  return !!(vc?.latest_version && String(vc.latest_version).trim())
+}
+
+function isTrackerRunDisabled(vc) {
+  if (!canRunTracker(vc)) return true
+  if (!hasManualTrackerData(vc)) return true
+  return !!trackerRunLoading.value[vc.tracker_id]
+}
+
+function trackerRunTooltip(vc) {
+  if (!props.canRunDocker) return 'Action réservée admin/opérateur'
+  if (!hasManualTrackerData(vc)) return 'Attendez la première vérification automatique'
+  return 'Déclencher la tâche du tracker maintenant'
+}
+
+async function runTracker(vc, container) {
+  if (isTrackerRunDisabled(vc)) return
+  const id = vc.tracker_id
+  trackerRunLoading.value = { ...trackerRunLoading.value, [id]: true }
+  trackerFeedback.value = ''
+  try {
+    await apiClient.runReleaseTracker(id)
+    trackerFeedback.value = `Déclenchement lancé pour ${container?.image || 'le tracker'}.`
+  } catch (e) {
+    trackerFeedback.value = e.response?.data?.error || 'Échec du déclenchement manuel.'
+  } finally {
+    const next = { ...trackerRunLoading.value }
+    delete next[id]
+    trackerRunLoading.value = next
+  }
 }
 
 const filteredContainers = computed(() => {
