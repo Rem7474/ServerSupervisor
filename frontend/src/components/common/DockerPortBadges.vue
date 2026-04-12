@@ -7,11 +7,11 @@
         class="d-inline-flex align-items-center flex-wrap gap-1 port-badge-group"
       >
         <span :class="badgeClass">{{ formatLabel(entry.mapping) }}</span>
-        <span
-          v-if="entry.hasGlobalIPv6"
-          class="badge bg-secondary-lt text-secondary port-badge-global-v6"
-        >IPv6 globale</span>
       </span>
+      <span
+        v-if="showGlobalIPv6Badge"
+        class="badge bg-secondary-lt text-secondary port-badge-global-v6"
+      >IPv6</span>
     </template>
     <span
       v-else
@@ -51,6 +51,14 @@ const badgeClass = computed(() => {
   return props.kind === 'internal'
     ? 'badge bg-azure-lt text-azure'
     : 'badge bg-green-lt text-green'
+})
+
+const showGlobalIPv6Badge = computed(() => {
+  if (props.kind !== 'exposed') {
+    return false
+  }
+
+  return visiblePorts.value.some((entry) => entry.hasGlobalIPv6)
 })
 
 function formatLabel(mapping: DockerPortMapping): string {
