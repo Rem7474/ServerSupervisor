@@ -439,8 +439,24 @@
                     >Maj</span>
                     <span>{{ formatDateOnly(tracker.last_checked_at || tracker.last_triggered_at || tracker.last_execution?.triggered_at) }}</span>
                   </div>
+                  <div class="d-flex gap-2 mb-1">
+                    <span
+                      class="text-muted"
+                      style="min-width:60px"
+                    >Cooldown</span>
+                    <span>{{ tracker.cooldown_hours ? `${tracker.cooldown_hours}h` : 'Aucun' }}</span>
+                  </div>
                 </div>
                 <div class="mt-2 pt-2 border-top small">
+                  <div
+                    v-if="isCooldownActive(tracker)"
+                    class="mb-2"
+                  >
+                    <span
+                      class="badge bg-yellow-lt text-yellow"
+                      :title="`Déploiement prévu: ${cooldownEtaLabel(tracker)}`"
+                    >Cooldown actif · reste {{ cooldownRemainingLabel(tracker) }}</span>
+                  </div>
                   <template v-if="tracker.last_execution">
                     <span class="text-muted">Dernière exécution :</span>
                     <span
@@ -638,6 +654,9 @@ const {
   execStatusBadge,
   formatRelative,
   formatDateOnly,
+  isCooldownActive,
+  cooldownRemainingLabel,
+  cooldownEtaLabel,
 } = useGitWebhooksPage()
 </script>
 

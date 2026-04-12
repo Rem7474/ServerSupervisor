@@ -93,6 +93,7 @@ func (h *ReleaseTrackerHandler) checkOne(t models.ReleaseTracker) {
 func (h *ReleaseTrackerHandler) checkOneGit(t models.ReleaseTracker) {
 	providerClient := gitprovider.NewClient(t.Provider, h.cfg.GitHubToken)
 	tag, releaseURL, releaseName, err := providerClient.FetchLatestRelease(t.RepoOwner, t.RepoName)
+	cooldown := time.Duration(t.CooldownHours) * time.Hour
 	if err != nil {
 		log.Printf("Git tracker %s (%s/%s): fetch error: %v", t.Name, t.RepoOwner, t.RepoName, err)
 		_ = h.db.UpdateReleaseTrackerError(t.ID, err.Error())
@@ -114,10 +115,22 @@ func (h *ReleaseTrackerHandler) checkOneGit(t models.ReleaseTracker) {
 	// No change
 	if tag == t.LastReleaseTag {
 		_ = h.db.UpdateReleaseTrackerLastSeen(t.ID, "", false)
+		if cooldown > 0 && t.LastReleaseDetectedAt != nil && (t.LastTriggeredAt == nil || t.LastTriggeredAt.Before(*t.LastReleaseDetectedAt)) {
+			if time.Since(*t.LastReleaseDetectedAt) >= cooldown {
+				log.Printf("Git tracker %s: cooldown elapsed (%dh) for %s → dispatching", t.Name, t.CooldownHours, tag)
+				h.dispatchGitRelease(t, tag, releaseURL, releaseName)
+			}
+		}
 		return
 	}
 
 	// New release detected
+	_ = h.db.UpdateReleaseTrackerDetected(t.ID, tag)
+	if cooldown > 0 {
+		log.Printf("Git tracker %s: new release %s detected (cooldown=%dh) — deployment delayed", t.Name, tag, t.CooldownHours)
+		return
+	}
+
 	log.Printf("Git tracker %s: new release %s (was %s) → dispatching task %s on host %s",
 		t.Name, tag, t.LastReleaseTag, t.CustomTaskID, t.HostID)
 
@@ -136,6 +149,7 @@ func (h *ReleaseTrackerHandler) checkOneDocker(t models.ReleaseTracker) {
 	}
 
 	providerClient := gitprovider.NewClient("github", h.cfg.GitHubToken)
+	cooldown := time.Duration(t.CooldownHours) * time.Hour
 	digest, err := providerClient.FetchDockerManifestDigest(t.DockerImage, tag)
 	if err != nil {
 		log.Printf("Docker tracker %s (%s:%s): fetch error: %v", t.Name, t.DockerImage, tag, err)
@@ -163,9 +177,7 @@ func (h *ReleaseTrackerHandler) checkOneDocker(t models.ReleaseTracker) {
 		log.Printf("Docker tracker %s: initial digest recorded for %s:%s", t.Name, t.DockerImage, tag)
 		_ = h.db.UpdateReleaseTrackerDigest(t.ID, digest)
 		_ = h.db.UpdateReleaseTrackerLastSeen(t.ID, resolvedVersion, false)
-		if resolvedVersion != tag {
-			_ = h.db.StoreTrackerTagDigest(t.ID, resolvedVersion, digest)
-		}
+		_ = h.db.StoreTrackerTagDigest(t.ID, resolvedVersion, digest)
 		return
 	}
 
@@ -178,20 +190,31 @@ func (h *ReleaseTrackerHandler) checkOneDocker(t models.ReleaseTracker) {
 		} else {
 			_ = h.db.UpdateReleaseTrackerLastSeen(t.ID, "", false)
 		}
+
+		if cooldown > 0 && t.CustomTaskID != "" && t.HostID != "" && t.LastReleaseDetectedAt != nil && (t.LastTriggeredAt == nil || t.LastTriggeredAt.Before(*t.LastReleaseDetectedAt)) {
+			if time.Since(*t.LastReleaseDetectedAt) >= cooldown {
+				log.Printf("Docker tracker %s: cooldown elapsed (%dh) for %s:%s → dispatching", t.Name, t.CooldownHours, t.DockerImage, tag)
+				h.dispatchDockerUpdate(t, tag, resolvedVersion, digest, digest)
+			}
+		}
 		return
 	}
 
 	// New image detected
 	oldDigest := t.LatestImageDigest
 	_ = h.db.UpdateReleaseTrackerDigest(t.ID, digest)
-	if resolvedVersion != tag {
-		_ = h.db.StoreTrackerTagDigest(t.ID, resolvedVersion, digest)
-	}
+	_ = h.db.StoreTrackerTagDigest(t.ID, resolvedVersion, digest)
+	_ = h.db.UpdateReleaseTrackerDetected(t.ID, resolvedVersion)
 
 	// Monitor-only mode: no task configured, just record the new version.
 	if t.CustomTaskID == "" || t.HostID == "" {
 		log.Printf("Docker tracker %s: new digest for %s:%s (monitor-only, no task dispatched)", t.Name, t.DockerImage, tag)
 		_ = h.db.UpdateReleaseTrackerLastSeen(t.ID, resolvedVersion, false)
+		return
+	}
+
+	if cooldown > 0 {
+		log.Printf("Docker tracker %s: new digest for %s:%s detected (cooldown=%dh) — deployment delayed", t.Name, t.DockerImage, tag, t.CooldownHours)
 		return
 	}
 
@@ -254,7 +277,7 @@ func (h *ReleaseTrackerHandler) dispatchGitRelease(t models.ReleaseTracker, tag,
 	}
 
 	_ = h.db.UpdateReleaseTrackerExecutionCommandID(exec.ID, result.Command.ID)
-	_ = h.db.UpdateReleaseTrackerLastSeen(t.ID, tag, true)
+	_ = h.db.MarkReleaseTrackerTriggered(t.ID)
 }
 
 func (h *ReleaseTrackerHandler) dispatchDockerUpdate(t models.ReleaseTracker, tag, resolvedVersion, oldDigest, newDigest string) {
@@ -312,7 +335,7 @@ func (h *ReleaseTrackerHandler) dispatchDockerUpdate(t models.ReleaseTracker, ta
 	}
 
 	_ = h.db.UpdateReleaseTrackerExecutionCommandID(exec.ID, result.Command.ID)
-	_ = h.db.UpdateReleaseTrackerLastSeen(t.ID, resolvedVersion, true)
+	_ = h.db.MarkReleaseTrackerTriggered(t.ID)
 }
 
 // NotifyComplete is called by the agent handler when a command completes.
@@ -432,6 +455,10 @@ func (h *ReleaseTrackerHandler) Create(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "name is required"})
 		return
 	}
+	if req.CooldownHours < 0 || req.CooldownHours > 168 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "cooldown_hours must be between 0 and 168"})
+		return
+	}
 
 	if req.TrackerType == "git" {
 		// Git trackers always need a host+task to dispatch to.
@@ -517,6 +544,10 @@ func (h *ReleaseTrackerHandler) Update(c *gin.Context) {
 	}
 	if req.Name == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "name is required"})
+		return
+	}
+	if req.CooldownHours < 0 || req.CooldownHours > 168 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "cooldown_hours must be between 0 and 168"})
 		return
 	}
 	if req.TrackerType == "git" {

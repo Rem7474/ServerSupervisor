@@ -108,16 +108,16 @@
                 <div class="row g-2">
                   <div class="col-6">
                     <label
-                      class="form-check form-check-inline w-100 p-3 border rounded cursor-pointer"
-                      :class="form.tracker_type === 'git' ? 'border-primary bg-primary-lt' : 'border-muted'"
+                      class="tracker-type-card"
+                      :class="form.tracker_type === 'git' ? 'tracker-type-card--active' : 'tracker-type-card--idle'"
                     >
                       <input
                         v-model="form.tracker_type"
-                        class="form-check-input"
+                        class="tracker-type-input"
                         type="radio"
                         value="git"
                       >
-                      <span class="ms-2">
+                      <span>
                         <span class="fw-semibold d-block">Release Git</span>
                         <span class="text-muted small">Surveille les nouvelles releases/tags sur GitHub, GitLab ou Gitea</span>
                       </span>
@@ -125,16 +125,16 @@
                   </div>
                   <div class="col-6">
                     <label
-                      class="form-check form-check-inline w-100 p-3 border rounded cursor-pointer"
-                      :class="form.tracker_type === 'docker' ? 'border-primary bg-primary-lt' : 'border-muted'"
+                      class="tracker-type-card"
+                      :class="form.tracker_type === 'docker' ? 'tracker-type-card--active' : 'tracker-type-card--idle'"
                     >
                       <input
                         v-model="form.tracker_type"
-                        class="form-check-input"
+                        class="tracker-type-input"
                         type="radio"
                         value="docker"
                       >
-                      <span class="ms-2">
+                      <span>
                         <span class="fw-semibold d-block">Image Docker</span>
                         <span class="text-muted small">Detecte quand une nouvelle image est poussee sur le registre</span>
                       </span>
@@ -217,6 +217,21 @@
                   </div>
                 </div>
               </template>
+
+              <div class="col-md-4">
+                <label class="form-label">Cooldown (heures)</label>
+                <input
+                  v-model.number="form.cooldown_hours"
+                  type="number"
+                  min="0"
+                  max="168"
+                  class="form-control"
+                  placeholder="0"
+                >
+                <div class="form-hint">
+                  Delai avant declenchement apres detection d'une nouvelle version (0 = immediat).
+                </div>
+              </div>
             </template>
 
             <!-- VM + Task -->
@@ -512,6 +527,7 @@ const defaultTrackerForm = () => ({
   docker_tag: props.prefillDockerTag || 'latest',
   host_id: '',
   custom_task_id: '',
+  cooldown_hours: 0,
   dispatch_task: false,
   notify_channels: [],
   notify_on_release: true,
@@ -579,6 +595,7 @@ function hydrateForm() {
           docker_tag: props.item.docker_tag || 'latest',
           host_id: props.item.host_id || '',
           custom_task_id: props.item.custom_task_id || '',
+          cooldown_hours: Number.isFinite(props.item.cooldown_hours) ? props.item.cooldown_hours : 0,
           dispatch_task: !!(props.item.host_id && props.item.custom_task_id),
           notify_channels: [...(props.item.notify_channels || [])],
           notify_on_release: props.item.notify_on_release,
@@ -621,6 +638,9 @@ async function loadCustomTasks(hostId) {
 function validate() {
   if (props.mode === 'tracker') {
     if (!form.value.name) return 'Le nom est obligatoire.'
+    if ((form.value.cooldown_hours ?? 0) < 0 || (form.value.cooldown_hours ?? 0) > 168) {
+      return 'Le cooldown doit etre compris entre 0 et 168 heures.'
+    }
     if (form.value.tracker_type === 'git') {
       if (!form.value.repo_owner || !form.value.repo_name) {
         return 'Owner et depot sont obligatoires pour un tracker Git.'
@@ -667,3 +687,33 @@ function onKeyDown(event) {
   if (event.key === 'Escape' && props.visible) close()
 }
 </script>
+
+<style scoped>
+.tracker-type-card {
+  display: block;
+  width: 100%;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--tblr-border-color);
+  cursor: pointer;
+  transition: border-color 0.18s ease, background-color 0.18s ease;
+}
+
+.tracker-type-card--active {
+  border-color: var(--tblr-primary);
+  background: var(--tblr-primary-lt);
+}
+
+.tracker-type-card--idle {
+  border-color: var(--tblr-border-color);
+  background: transparent;
+}
+
+.tracker-type-input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+</style>

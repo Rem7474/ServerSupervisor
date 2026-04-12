@@ -29,6 +29,11 @@
             v-if="tracker && !tracker.enabled"
             class="badge bg-secondary"
           >Désactivé</span>
+          <span
+            v-if="tracker && cooldownActive"
+            class="badge bg-yellow-lt text-yellow"
+            :title="`Déploiement prévu: ${cooldownEtaText}`"
+          >Cooldown actif · reste {{ cooldownRemainingText }}</span>
         </h2>
       </div>
     </div>
@@ -277,6 +282,20 @@
               <dd class="col-7">
                 {{ formatDateTime(tracker.created_at) }}
               </dd>
+              <dt class="col-5 text-muted">
+                Cooldown
+              </dt>
+              <dd class="col-7">
+                {{ tracker.cooldown_hours ? `${tracker.cooldown_hours}h` : 'Aucun (immédiat)' }}
+              </dd>
+              <template v-if="cooldownActive">
+                <dt class="col-5 text-muted">
+                  Déploiement prévu
+                </dt>
+                <dd class="col-7">
+                  {{ cooldownEtaText }}
+                </dd>
+              </template>
             </dl>
           </div>
         </div>
@@ -434,6 +453,8 @@ const historyLoading = ref(false)
 const checking = ref(false)
 const running = ref(false)
 const selectedCmd = ref(null)
+const nowTick = ref(Date.now())
+let cooldownTimer = null
 
 const showModal = ref(false)
 const saving = ref(false)
@@ -476,6 +497,50 @@ const runDisabledReason = computed(() => {
     return 'Mode surveillance seule: configurez une VM cible et une tâche pour autoriser l\'exécution manuelle.'
   }
   return ''
+})
+
+const cooldownRemainingMs = computed(() => {
+  const t = tracker.value
+  if (!t) return 0
+  const hours = Number(t.cooldown_hours || 0)
+  if (!hours || hours <= 0 || !t.last_release_detected_at) return 0
+
+  const detectedAt = new Date(t.last_release_detected_at).getTime()
+  if (!Number.isFinite(detectedAt)) return 0
+
+  if (t.last_triggered_at) {
+    const triggeredAt = new Date(t.last_triggered_at).getTime()
+    if (Number.isFinite(triggeredAt) && triggeredAt >= detectedAt) return 0
+  }
+
+  const endsAt = detectedAt + (hours * 60 * 60 * 1000)
+  return Math.max(0, endsAt - nowTick.value)
+})
+
+const cooldownActive = computed(() => cooldownRemainingMs.value > 0)
+
+const cooldownRemainingText = computed(() => {
+  const ms = cooldownRemainingMs.value
+  if (ms <= 0) return '0m'
+  const totalMinutes = Math.ceil(ms / 60000)
+  const days = Math.floor(totalMinutes / (24 * 60))
+  const hours = Math.floor((totalMinutes % (24 * 60)) / 60)
+  const minutes = totalMinutes % 60
+  if (days > 0) return `${days}j ${hours}h`
+  if (hours > 0) return `${hours}h ${minutes}m`
+  return `${minutes}m`
+})
+
+const cooldownEtaText = computed(() => {
+  const t = tracker.value
+  if (!t) return '-'
+  const hours = Number(t.cooldown_hours || 0)
+  if (!hours || hours <= 0 || !t.last_release_detected_at) return '-'
+
+  const detectedAt = new Date(t.last_release_detected_at).getTime()
+  if (!Number.isFinite(detectedAt)) return '-'
+
+  return formatDateTime(new Date(detectedAt + (hours * 60 * 60 * 1000)).toISOString())
 })
 
 const repoURL = computed(() => {
@@ -653,8 +718,17 @@ function channelBadge(ch) {
   return map[ch] || 'bg-secondary-lt text-secondary'
 }
 
-onMounted(load)
+onMounted(() => {
+  load()
+  cooldownTimer = window.setInterval(() => {
+    nowTick.value = Date.now()
+  }, 60000)
+})
 onUnmounted(() => {
+  if (cooldownTimer !== null) {
+    window.clearInterval(cooldownTimer)
+    cooldownTimer = null
+  }
   closeStream()
 })
 </script>

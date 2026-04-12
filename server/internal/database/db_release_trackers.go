@@ -27,16 +27,17 @@ func (db *DB) CreateReleaseTracker(t models.ReleaseTracker) (*models.ReleaseTrac
 	err := db.conn.QueryRow(
 		`INSERT INTO release_trackers
 		 (name, tracker_type, provider, repo_owner, repo_name, docker_image, docker_tag, host_id, custom_task_id,
-		  notify_channels, notify_on_release, enabled)
-		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+		  notify_channels, notify_on_release, enabled, cooldown_hours)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
 		 RETURNING id, name, tracker_type, provider, repo_owner, repo_name, docker_image, docker_tag,
-		           host_id, custom_task_id, last_release_tag, last_checked_at, last_triggered_at,
+		           host_id, custom_task_id, last_release_tag, cooldown_hours, last_release_detected_at, last_checked_at, last_triggered_at,
 		           notify_channels, notify_on_release, enabled, created_at`,
 		t.Name, t.TrackerType, t.Provider, t.RepoOwner, t.RepoName, t.DockerImage, t.DockerTag,
-		hostID, t.CustomTaskID, pq.Array(channels), t.NotifyOnRelease, t.Enabled,
+		hostID, t.CustomTaskID, pq.Array(channels), t.NotifyOnRelease, t.Enabled, t.CooldownHours,
 	).Scan(
 		&result.ID, &result.Name, &result.TrackerType, &result.Provider, &result.RepoOwner, &result.RepoName,
 		&result.DockerImage, &result.DockerTag, &scannedHostID, &result.CustomTaskID, &result.LastReleaseTag,
+		&result.CooldownHours, &result.LastReleaseDetectedAt,
 		&result.LastCheckedAt, &result.LastTriggeredAt,
 		pq.Array(&result.NotifyChannels), &result.NotifyOnRelease,
 		&result.Enabled, &result.CreatedAt,
@@ -55,7 +56,7 @@ func (db *DB) ListReleaseTrackers() ([]models.ReleaseTracker, error) {
 	rows, err := db.conn.Query(
 		`SELECT t.id, t.name, t.tracker_type, t.provider, t.repo_owner, t.repo_name,
 		        t.docker_image, t.docker_tag,
-		        t.host_id, t.custom_task_id, t.last_release_tag, t.latest_image_digest,
+		        t.host_id, t.custom_task_id, t.last_release_tag, t.latest_image_digest, t.cooldown_hours, t.last_release_detected_at,
 		        t.last_checked_at, t.last_triggered_at, t.last_error,
 		        t.notify_channels, t.notify_on_release, t.enabled, t.created_at,
 		        COALESCE(h.name, '') AS host_name,
@@ -85,7 +86,7 @@ func (db *DB) ListReleaseTrackers() ([]models.ReleaseTracker, error) {
 		if err := rows.Scan(
 			&t.ID, &t.Name, &t.TrackerType, &t.Provider, &t.RepoOwner, &t.RepoName,
 			&t.DockerImage, &t.DockerTag,
-			&hostID, &t.CustomTaskID, &t.LastReleaseTag, &t.LatestImageDigest,
+			&hostID, &t.CustomTaskID, &t.LastReleaseTag, &t.LatestImageDigest, &t.CooldownHours, &t.LastReleaseDetectedAt,
 			&t.LastCheckedAt, &t.LastTriggeredAt, &t.LastError,
 			pq.Array(&t.NotifyChannels), &t.NotifyOnRelease, &t.Enabled, &t.CreatedAt,
 			&t.HostName,
@@ -123,7 +124,7 @@ func (db *DB) GetReleaseTrackerByID(id string) (*models.ReleaseTracker, error) {
 	err := db.conn.QueryRow(
 		`SELECT t.id, t.name, t.tracker_type, t.provider, t.repo_owner, t.repo_name,
 		        t.docker_image, t.docker_tag,
-		        t.host_id, t.custom_task_id, t.last_release_tag, t.latest_image_digest,
+		        t.host_id, t.custom_task_id, t.last_release_tag, t.latest_image_digest, t.cooldown_hours, t.last_release_detected_at,
 		        t.last_checked_at, t.last_triggered_at, t.last_error,
 		        t.notify_channels, t.notify_on_release, t.enabled, t.created_at,
 		        COALESCE(h.name, '') AS host_name
@@ -133,7 +134,7 @@ func (db *DB) GetReleaseTrackerByID(id string) (*models.ReleaseTracker, error) {
 	).Scan(
 		&t.ID, &t.Name, &t.TrackerType, &t.Provider, &t.RepoOwner, &t.RepoName,
 		&t.DockerImage, &t.DockerTag,
-		&hostID, &t.CustomTaskID, &t.LastReleaseTag, &t.LatestImageDigest,
+		&hostID, &t.CustomTaskID, &t.LastReleaseTag, &t.LatestImageDigest, &t.CooldownHours, &t.LastReleaseDetectedAt,
 		&t.LastCheckedAt, &t.LastTriggeredAt, &t.LastError,
 		pq.Array(&t.NotifyChannels), &t.NotifyOnRelease, &t.Enabled, &t.CreatedAt,
 		&t.HostName,
@@ -165,12 +166,12 @@ func (db *DB) UpdateReleaseTracker(id string, t models.ReleaseTracker) error {
 		   name=$1, tracker_type=$2, provider=$3, repo_owner=$4, repo_name=$5,
 		   docker_image=$6, docker_tag=$7,
 		   host_id=$8, custom_task_id=$9,
-		   notify_channels=$10, notify_on_release=$11, enabled=$12
-		 WHERE id=$13`,
+		   notify_channels=$10, notify_on_release=$11, enabled=$12, cooldown_hours=$13
+		 WHERE id=$14`,
 		t.Name, t.TrackerType, t.Provider, t.RepoOwner, t.RepoName,
 		t.DockerImage, t.DockerTag,
 		hostID, t.CustomTaskID,
-		pq.Array(channels), t.NotifyOnRelease, t.Enabled,
+		pq.Array(channels), t.NotifyOnRelease, t.Enabled, t.CooldownHours,
 		id,
 	)
 	return err
@@ -186,7 +187,7 @@ func (db *DB) GetEnabledReleaseTrackers() ([]models.ReleaseTracker, error) {
 	rows, err := db.conn.Query(
 		`SELECT id, name, tracker_type, provider, repo_owner, repo_name,
 		        docker_image, docker_tag, host_id, custom_task_id,
-		        last_release_tag, latest_image_digest, notify_channels, notify_on_release
+		        last_release_tag, latest_image_digest, cooldown_hours, last_release_detected_at, last_triggered_at, notify_channels, notify_on_release
 		 FROM release_trackers WHERE enabled = TRUE ORDER BY id`)
 	if err != nil {
 		return nil, err
@@ -200,7 +201,7 @@ func (db *DB) GetEnabledReleaseTrackers() ([]models.ReleaseTracker, error) {
 		if err := rows.Scan(
 			&t.ID, &t.Name, &t.TrackerType, &t.Provider, &t.RepoOwner, &t.RepoName,
 			&t.DockerImage, &t.DockerTag, &hostID, &t.CustomTaskID,
-			&t.LastReleaseTag, &t.LatestImageDigest,
+			&t.LastReleaseTag, &t.LatestImageDigest, &t.CooldownHours, &t.LastReleaseDetectedAt, &t.LastTriggeredAt,
 			pq.Array(&t.NotifyChannels), &t.NotifyOnRelease,
 		); err != nil {
 			return nil, err
@@ -235,6 +236,36 @@ func (db *DB) UpdateReleaseTrackerLastSeen(id, newTag string, triggered bool) er
 	return err
 }
 
+// UpdateReleaseTrackerDetected updates the last known release tag and records
+// when this release was first detected, without marking it as triggered.
+func (db *DB) UpdateReleaseTrackerDetected(id, newTag string) error {
+	now := time.Now()
+	_, err := db.conn.Exec(
+		`UPDATE release_trackers
+		 SET last_release_tag=$1,
+		     last_release_detected_at=$2,
+		     last_checked_at=$2,
+		     last_error=''
+		 WHERE id=$3`,
+		newTag, now, id,
+	)
+	return err
+}
+
+// MarkReleaseTrackerTriggered marks a tracker as triggered now and clears errors.
+func (db *DB) MarkReleaseTrackerTriggered(id string) error {
+	now := time.Now()
+	_, err := db.conn.Exec(
+		`UPDATE release_trackers
+		 SET last_triggered_at=$1,
+		     last_checked_at=$1,
+		     last_error=''
+		 WHERE id=$2`,
+		now, id,
+	)
+	return err
+}
+
 // UpdateReleaseTrackerDigest stores the manifest digest of the latest release image.
 func (db *DB) UpdateReleaseTrackerDigest(id, digest string) error {
 	_, err := db.conn.Exec(
@@ -248,7 +279,9 @@ func (db *DB) StoreTrackerTagDigest(trackerID, tag, digest string) error {
 	_, err := db.conn.Exec(
 		`INSERT INTO release_tracker_tag_digests (tracker_id, tag, digest)
 		 VALUES ($1, $2, $3)
-		 ON CONFLICT (tracker_id, tag) DO UPDATE SET digest = EXCLUDED.digest`,
+		 ON CONFLICT (tracker_id, tag, digest) DO UPDATE SET
+		   digest = EXCLUDED.digest,
+		   created_at = NOW()`,
 		trackerID, tag, digest)
 	return err
 }

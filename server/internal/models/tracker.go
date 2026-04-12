@@ -17,6 +17,8 @@ type ReleaseTracker struct {
 	CustomTaskID      string                   `json:"custom_task_id"`
 	LastReleaseTag    string                   `json:"last_release_tag"`
 	LatestImageDigest string                   `json:"latest_image_digest,omitempty"` // manifest sha256 for docker trackers
+	CooldownHours     int                      `json:"cooldown_hours"`
+	LastReleaseDetectedAt *time.Time           `json:"last_release_detected_at,omitempty"`
 	LastCheckedAt     *time.Time               `json:"last_checked_at,omitempty"`
 	LastTriggeredAt   *time.Time               `json:"last_triggered_at,omitempty"`
 	LastError         string                   `json:"last_error,omitempty"`

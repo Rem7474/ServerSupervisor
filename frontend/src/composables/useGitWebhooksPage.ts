@@ -1,4 +1,4 @@
-import { computed, onMounted, ref, Ref, ComputedRef } from 'vue'
+import { computed, onMounted, onUnmounted, ref, Ref, ComputedRef } from 'vue'
 import { useRoute } from 'vue-router'
 import api, { getApiErrorMessage } from '../api'
 import { useConfirmDialog } from './useConfirmDialog'
@@ -27,6 +27,9 @@ interface ReleaseTracker {
   id: string
   name: string
   enabled: boolean
+  cooldown_hours?: number
+  last_release_detected_at?: string
+  last_triggered_at?: string
   provider: string
   repo_owner: string
   repo_name: string
@@ -92,6 +95,9 @@ interface UseGitWebhooksPageApi {
   execStatusBadge: (status: string) => string
   formatRelative: (dateStr: string) => string
   formatDateOnly: (dateStr?: string) => string
+  isCooldownActive: (tracker: ReleaseTracker) => boolean
+  cooldownRemainingLabel: (tracker: ReleaseTracker) => string
+  cooldownEtaLabel: (tracker: ReleaseTracker) => string
 }
 
 export function useGitWebhooksPage(): UseGitWebhooksPageApi {
@@ -116,6 +122,8 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
 
   const prefillDockerImage: Ref<string> = ref('')
   const prefillDockerTag: Ref<string> = ref('')
+  const nowTick: Ref<number> = ref(Date.now())
+  let cooldownTimer: number | null = null
 
   const recentWebhookExecutions: ComputedRef<RecentExecution[]> = computed(() =>
     webhooks.value
@@ -162,6 +170,10 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
   }
 
   onMounted(async () => {
+    cooldownTimer = window.setInterval(() => {
+      nowTick.value = Date.now()
+    }, 60000)
+
     if (route.query.tab === 'trackers') {
       activeTab.value = 'trackers'
     }
@@ -174,6 +186,13 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
       return
     }
     await Promise.all([loadWebhooks(), loadTrackers(), loadHosts()])
+  })
+
+  onUnmounted(() => {
+    if (cooldownTimer !== null) {
+      window.clearInterval(cooldownTimer)
+      cooldownTimer = null
+    }
   })
 
   async function loadWebhooks(): Promise<void> {
@@ -397,6 +416,47 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
     return new Date(dateStr).toLocaleDateString('fr-FR')
   }
 
+  function cooldownRemainingMs(tracker: ReleaseTracker): number {
+    const hours = Number(tracker.cooldown_hours || 0)
+    if (!hours || hours <= 0 || !tracker.last_release_detected_at) return 0
+
+    const detectedAt = new Date(tracker.last_release_detected_at).getTime()
+    if (!Number.isFinite(detectedAt)) return 0
+
+    if (tracker.last_triggered_at) {
+      const triggeredAt = new Date(tracker.last_triggered_at).getTime()
+      if (Number.isFinite(triggeredAt) && triggeredAt >= detectedAt) return 0
+    }
+
+    const endsAt = detectedAt + (hours * 60 * 60 * 1000)
+    return Math.max(0, endsAt - nowTick.value)
+  }
+
+  function isCooldownActive(tracker: ReleaseTracker): boolean {
+    return cooldownRemainingMs(tracker) > 0
+  }
+
+  function cooldownRemainingLabel(tracker: ReleaseTracker): string {
+    const ms = cooldownRemainingMs(tracker)
+    if (ms <= 0) return '0m'
+    const totalMinutes = Math.ceil(ms / 60000)
+    const days = Math.floor(totalMinutes / (24 * 60))
+    const hours = Math.floor((totalMinutes % (24 * 60)) / 60)
+    const minutes = totalMinutes % 60
+    if (days > 0) return `${days}j ${hours}h`
+    if (hours > 0) return `${hours}h ${minutes}m`
+    return `${minutes}m`
+  }
+
+  function cooldownEtaLabel(tracker: ReleaseTracker): string {
+    const hours = Number(tracker.cooldown_hours || 0)
+    if (!hours || hours <= 0 || !tracker.last_release_detected_at) return '-'
+    const detectedAt = new Date(tracker.last_release_detected_at).getTime()
+    if (!Number.isFinite(detectedAt)) return '-'
+    const eta = new Date(detectedAt + (hours * 60 * 60 * 1000))
+    return eta.toLocaleString('fr-FR')
+  }
+
   return {
     activeTab,
     hosts,
@@ -436,5 +496,8 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
     execStatusBadge,
     formatRelative,
     formatDateOnly,
+    isCooldownActive,
+    cooldownRemainingLabel,
+    cooldownEtaLabel,
   }
 }
