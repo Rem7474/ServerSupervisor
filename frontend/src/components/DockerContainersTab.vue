@@ -114,7 +114,8 @@
                 @toggle="toggleSort('state')"
               />
             </th>
-            <th>Ports</th>
+            <th>Port interne</th>
+            <th>Port hôte exposé</th>
             <th>Réseau (Rx / Tx)</th>
             <th />
           </tr>
@@ -176,8 +177,17 @@
             <td>
               <span :class="stateClass(c.state)">{{ c.state }}</span>
             </td>
-            <td class="d-none d-sm-table-cell text-secondary small font-monospace">
-              {{ formatContainerPorts(c.ports) }}
+            <td class="small">
+              <DockerPortBadges
+                :ports="normalizedPortsForContainer(c)"
+                kind="internal"
+              />
+            </td>
+            <td class="small">
+              <DockerPortBadges
+                :ports="normalizedPortsForContainer(c)"
+                kind="exposed"
+              />
             </td>
             <td class="text-secondary small font-monospace">
               <template v-if="c.state === 'running' && (c.net_rx_bytes > 0 || c.net_tx_bytes > 0)">
@@ -697,10 +707,12 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, toRef } from 'vue'
 import { useRouter } from 'vue-router'
 import DataToolbar from './common/DataToolbar.vue'
 import SortableHeader from './common/SortableHeader.vue'
+import DockerPortBadges from './common/DockerPortBadges.vue'
+import { useDockerContainerPorts } from '../composables/useDockerContainerPorts'
 
 const router = useRouter()
 
@@ -710,6 +722,8 @@ const props = defineProps({
   canRunDocker: { type: Boolean, default: false },
   actionLoading: { type: Object, default: () => ({}) },
 })
+
+const { normalizedPortsForContainer } = useDockerContainerPorts(toRef(props, 'containers'))
 
 // Map host_id+image → comparison for quick lookup
 const versionMap = computed(() => {
@@ -794,14 +808,6 @@ function formatBytes(bytes) {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
 }
 
-function formatContainerPorts(raw) {
-  if (!raw) return '-'
-  const hostPorts = new Set()
-  const matches = raw.matchAll(/(\d+\.\d+\.\d+\.\d+|:::?):(\d+)->/g)
-  for (const m of matches) hostPorts.add(m[2])
-  return hostPorts.size > 0 ? [...hostPorts].join(', ') : raw.split(',').slice(0, 2).join(', ')
-}
-
 const filteredContainers = computed(() => {
   return props.containers.filter(c => {
     const matchSearch = !search.value ||
@@ -844,4 +850,5 @@ const uniqueHosts = computed(() => {
     .sort()
 })
 </script>
+
 

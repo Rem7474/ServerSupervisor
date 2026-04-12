@@ -14,7 +14,8 @@
             <th>Tag</th>
             <th>Etat</th>
             <th>Status</th>
-            <th>Ports</th>
+            <th>Port interne</th>
+            <th>Port hote expose</th>
           </tr>
         </thead>
         <tbody>
@@ -55,13 +56,22 @@
             <td class="text-secondary small">
               {{ c.status }}
             </td>
-            <td class="text-secondary small font-monospace">
-              {{ c.ports || '-' }}
+            <td>
+              <DockerPortBadges
+                :ports="normalizedPortsForContainer(c)"
+                kind="internal"
+              />
+            </td>
+            <td>
+              <DockerPortBadges
+                :ports="normalizedPortsForContainer(c)"
+                kind="exposed"
+              />
             </td>
           </tr>
           <tr v-if="!containers.length">
             <td
-              colspan="6"
+              colspan="7"
               class="text-center text-secondary py-4"
             >
               Aucun conteneur Docker actif sur cet hote.
@@ -74,7 +84,9 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, toRef } from 'vue'
+import DockerPortBadges from '../common/DockerPortBadges.vue'
+import { useDockerContainerPorts } from '../../composables/useDockerContainerPorts'
 
 const props = defineProps({
   containers: {
@@ -87,6 +99,8 @@ const props = defineProps({
   },
 })
 
+const { normalizedPortsForContainer } = useDockerContainerPorts(toRef(props, 'containers'))
+
 const versionMap = computed(() => {
   const map = {}
   for (const vc of props.versionComparisons) {
@@ -98,4 +112,5 @@ const versionMap = computed(() => {
 function containerVersion(container) {
   return versionMap.value[container.image] || versionMap.value[`${container.image}:${container.image_tag}`] || null
 }
+
 </script>
