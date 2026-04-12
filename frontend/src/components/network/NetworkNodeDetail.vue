@@ -442,10 +442,10 @@ const typeTagClass = computed(() => {
 
 const statusBadgeClass = computed(() => {
   const status = hostData.value?.status || props.selectedNode?.status
-  if (status === 'online') return 'badge bg-green-lt text-green'
-  if (status === 'warning') return 'badge bg-yellow-lt text-yellow'
-  if (status === 'offline') return 'badge bg-red-lt text-red'
-  return 'badge bg-secondary-lt text-secondary'
+  if (status === 'online') return 'badge bg-green-lt text-green status-badge status-dot-animated'
+  if (status === 'warning') return 'badge bg-yellow-lt text-yellow status-badge status-dot-animated'
+  if (status === 'offline') return 'badge bg-red-lt text-red status-badge status-dot-animated'
+  return 'badge bg-secondary-lt text-secondary status-badge'
 })
 
 function formatBytes(bytes) {

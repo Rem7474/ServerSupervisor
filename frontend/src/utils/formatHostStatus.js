@@ -19,9 +19,9 @@ export function formatHostStatus(status) {
  */
 export function hostStatusClass(status) {
   switch (status) {
-    case 'online':  return 'badge bg-green-lt text-green'
-    case 'warning': return 'badge bg-yellow-lt text-yellow'
-    case 'offline': return 'badge bg-red-lt text-red'
-    default:        return 'badge bg-secondary-lt text-secondary'
+    case 'online':  return 'badge bg-green-lt text-green status-badge status-dot-animated'
+    case 'warning': return 'badge bg-yellow-lt text-yellow status-badge status-dot-animated'
+    case 'offline': return 'badge bg-red-lt text-red status-badge status-dot-animated'
+    default:        return 'badge bg-secondary-lt text-secondary status-badge'
   }
 }

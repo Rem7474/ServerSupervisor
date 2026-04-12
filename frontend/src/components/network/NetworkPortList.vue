@@ -191,7 +191,7 @@
                 {{ formatBytes(h.network_tx_bytes || 0) }}
               </td>
               <td>
-                <span :class="h.status === 'online' ? 'badge bg-green-lt text-green' : h.status === 'warning' ? 'badge bg-yellow-lt text-yellow' : 'badge bg-red-lt text-red'">
+                <span :class="h.status === 'online' ? 'badge bg-green-lt text-green status-badge status-dot-animated' : h.status === 'warning' ? 'badge bg-yellow-lt text-yellow status-badge status-dot-animated' : 'badge bg-red-lt text-red status-badge status-dot-animated'">
                   {{ h.status || 'unknown' }}
                 </span>
               </td>

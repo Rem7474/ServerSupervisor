@@ -302,11 +302,11 @@
               <td>
                 <span
                   v-if="node.status === 'online'"
-                  class="badge bg-success-lt text-success"
+                  class="badge bg-success-lt text-success status-badge status-dot-animated"
                 >En ligne</span>
                 <span
                   v-else
-                  class="badge bg-danger-lt text-danger"
+                  class="badge bg-danger-lt text-danger status-badge status-dot-animated"
                 >{{ node.status }}</span>
               </td>
               <td class="text-muted small">

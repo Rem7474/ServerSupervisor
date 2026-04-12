@@ -83,7 +83,8 @@
               </button>
               <button
                 class="btn btn-sm btn-primary"
-                :disabled="running"
+                :disabled="running || !canRunManually"
+                :title="runDisabledReason"
                 @click="runManually"
               >
                 <svg
@@ -199,18 +200,28 @@
               </template>
 
               <!-- Common fields -->
-              <dt class="col-5 text-muted">
-                VM cible
-              </dt>
-              <dd class="col-7">
-                {{ tracker.host_name || tracker.host_id }}
-              </dd>
-              <dt class="col-5 text-muted">
-                Tâche
-              </dt>
-              <dd class="col-7">
-                <code>{{ tracker.custom_task_id }}</code>
-              </dd>
+              <template v-if="tracker.host_id && tracker.custom_task_id">
+                <dt class="col-5 text-muted">
+                  VM cible
+                </dt>
+                <dd class="col-7">
+                  {{ tracker.host_name || tracker.host_id }}
+                </dd>
+                <dt class="col-5 text-muted">
+                  Tâche
+                </dt>
+                <dd class="col-7">
+                  <code>{{ tracker.custom_task_id }}</code>
+                </dd>
+              </template>
+              <template v-else-if="tracker.tracker_type === 'docker'">
+                <dt class="col-5 text-muted">
+                  Mode
+                </dt>
+                <dd class="col-7">
+                  <span class="badge bg-blue-lt text-blue">Surveillance seule</span>
+                </dd>
+              </template>
               <dt
                 v-if="tracker.tracker_type !== 'docker' && tracker.last_checked_at"
                 class="col-5 text-muted"
@@ -366,6 +377,23 @@ const envVars = computed(() =>
   tracker.value?.tracker_type === 'docker' ? dockerEnvVars : gitEnvVars
 )
 
+const canRunManually = computed(() => {
+  if (!tracker.value) return false
+  // Docker tracker can be in monitor-only mode (no host/task dispatch configured).
+  if (tracker.value.tracker_type === 'docker' && (!tracker.value.host_id || !tracker.value.custom_task_id)) {
+    return false
+  }
+  return true
+})
+
+const runDisabledReason = computed(() => {
+  if (!tracker.value) return ''
+  if (tracker.value.tracker_type === 'docker' && (!tracker.value.host_id || !tracker.value.custom_task_id)) {
+    return 'Mode surveillance seule: configurez une VM cible et une tâche pour autoriser l\'exécution manuelle.'
+  }
+  return ''
+})
+
 const repoURL = computed(() => {
   if (!tracker.value || tracker.value.tracker_type === 'docker') return '#'
   switch (tracker.value.provider) {
@@ -398,6 +426,10 @@ async function loadExecutions() {
 }
 
 async function runManually() {
+  if (!canRunManually.value) {
+    error.value = runDisabledReason.value || 'Exécution manuelle non disponible dans ce mode.'
+    return
+  }
   running.value = true
   try {
     await api.runReleaseTracker(id)

@@ -655,6 +655,10 @@ const displayedCmds = computed(() => {
   return arr
 })
 
+const hasActiveCommands = computed(() =>
+  cmds.value.some((c) => c.status === 'pending' || c.status === 'running')
+)
+
 function toggleCmdSort(key) {
   if (cmdSortBy.value === key) {
     cmdSortDir.value = cmdSortDir.value === 'asc' ? 'desc' : 'asc'
@@ -679,6 +683,8 @@ const connexionsTotal = ref(0)
 const connexionsLoading = ref(false)
 const connexionsLoaded = ref(false)
 const security = ref({ stats: null, top_failed_ips: [] })
+const lastCmdFetchAt = ref(0)
+const lastConnFetchAt = ref(0)
 
 const totalConnexionsPages = computed(() =>
   Math.max(1, Math.ceil(connexionsTotal.value / connexionsLimit))
@@ -770,31 +776,44 @@ function closeLogViewer() {
 }
 
 function connectStream(commandId) {
+  const syncCmdInList = (patch) => {
+    const idx = cmds.value.findIndex((c) => c.id === commandId)
+    if (idx === -1) return
+    const next = [...cmds.value]
+    next[idx] = { ...next[idx], ...patch }
+    cmds.value = next
+  }
+
   openCommandStream(commandId, {
     onInit(p) {
       if (selectedCmd.value) { selectedCmd.value.status = p.status; selectedCmd.value.output = p.output || '' }
+      syncCmdInList({ status: p.status, output: p.output || '' })
     },
     onChunk(p) {
       if (selectedCmd.value) selectedCmd.value.output = (selectedCmd.value.output || '') + p.chunk
     },
     onStatus(p) {
       if (selectedCmd.value) { selectedCmd.value.status = p.status; if (p.output) selectedCmd.value.output = p.output }
+      syncCmdInList({ status: p.status, ...(p.output ? { output: p.output } : {}) })
     },
   })
 }
 
 // ── Data fetching ─────────────────────────────────────────────────────────────
 async function fetchCmds() {
+  if (cmdsLoading.value) return
   cmdsLoading.value = true
   try {
     const res = await apiClient.getCommandsHistory(cmdsPage.value, cmdsLimit)
     cmds.value = res.data?.commands || []
     cmdsTotal.value = res.data?.total || 0
     cmdsLoaded.value = true
+    lastCmdFetchAt.value = Date.now()
   } catch { cmds.value = [] } finally { cmdsLoading.value = false }
 }
 
 async function fetchConnexions() {
+  if (connexionsLoading.value) return
   connexionsLoading.value = true
   try {
     const [evRes, secRes] = await Promise.allSettled([
@@ -816,6 +835,7 @@ async function fetchConnexions() {
     } else {
       security.value = { stats: null, top_failed_ips: [] }
     }
+    lastConnFetchAt.value = Date.now()
   } finally { connexionsLoading.value = false }
 }
 
@@ -866,11 +886,18 @@ onMounted(async () => {
 onMounted(() => {
   auditPollTimer = setInterval(() => {
     if (activeTab.value === 'commandes') {
-      fetchCmds()
+      const now = Date.now()
+      const refreshMs = hasActiveCommands.value ? 5000 : 30000
+      if (now - lastCmdFetchAt.value >= refreshMs) {
+        fetchCmds()
+      }
     } else if (auth.role === 'admin') {
-      fetchConnexions()
+      const now = Date.now()
+      if (now - lastConnFetchAt.value >= 30000) {
+        fetchConnexions()
+      }
     }
-  }, 30_000)
+  }, 5000)
 })
 
 onUnmounted(() => {
