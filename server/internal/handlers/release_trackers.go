@@ -482,10 +482,12 @@ func (h *ReleaseTrackerHandler) Get(c *gin.Context) {
 	id := c.Param("id")
 	t, err := h.db.GetReleaseTrackerByID(id)
 	if err == sql.ErrNoRows {
+		log.Printf("Release tracker history: tracker not found (id=%s)", id)
 		c.JSON(http.StatusNotFound, gin.H{"error": "tracker not found"})
 		return
 	}
 	if err != nil {
+		log.Printf("Release tracker history: failed to load tracker (id=%s): %v", id, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get tracker"})
 		return
 	}
@@ -666,6 +668,7 @@ func (h *ReleaseTrackerHandler) GetVersionHistory(c *gin.Context) {
 	if t.TrackerType == "docker" {
 		history, err = h.db.ListTrackerTagDigests(id, limit)
 		if err != nil {
+			log.Printf("Release tracker history: docker history load error (tracker=%s id=%s image=%s tag=%s limit=%d): %v", t.Name, t.ID, t.DockerImage, t.DockerTag, limit, err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load docker version history"})
 			return
 		}
@@ -673,6 +676,7 @@ func (h *ReleaseTrackerHandler) GetVersionHistory(c *gin.Context) {
 		providerClient := gitprovider.NewClient(t.Provider, h.cfg.GitHubToken)
 		releases, ferr := providerClient.FetchReleaseHistory(t.RepoOwner, t.RepoName, limit)
 		if ferr != nil {
+			log.Printf("Release tracker history: provider call failed (tracker=%s id=%s provider=%s repo=%s/%s limit=%d): %v", t.Name, t.ID, t.Provider, t.RepoOwner, t.RepoName, limit, ferr)
 			c.JSON(http.StatusBadGateway, gin.H{"error": ferr.Error()})
 			return
 		}
