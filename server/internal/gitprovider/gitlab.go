@@ -41,6 +41,69 @@ func (c *gitLabClient) FetchLatestRelease(owner, repo string) (string, string, s
 	return tag.TagName, tag.HTMLURL, tag.Name, nil
 }
 
+// FetchReleaseHistory returns recent GitLab releases with fallback to tags.
+func (c *gitLabClient) FetchReleaseHistory(owner, repo string, limit int) ([]Release, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 50 {
+		limit = 50
+	}
+
+	projectID := fmt.Sprintf("%s%%2F%s", owner, repo)
+	url := fmt.Sprintf("https://gitlab.com/api/v4/projects/%s/releases?per_page=%d", projectID, limit)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", "ServerSupervisor/1.0")
+	if c.authToken != "" {
+		req.Header.Set("PRIVATE-TOKEN", c.authToken)
+	}
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return c.fetchGitLabTagHistory(owner, repo, limit)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("GitLab API returned status %d", resp.StatusCode)
+	}
+
+	var releases []struct {
+		TagName     string    `json:"tag_name"`
+		Name        string    `json:"name"`
+		PublishedAt time.Time `json:"published_at"`
+		WebURL      string    `json:"web_url"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&releases); err != nil {
+		return nil, err
+	}
+	if len(releases) == 0 {
+		return c.fetchGitLabTagHistory(owner, repo, limit)
+	}
+
+	out := make([]Release, 0, len(releases))
+	for _, r := range releases {
+		publishedAt := r.PublishedAt
+		if publishedAt.IsZero() {
+			publishedAt = time.Now().UTC()
+		}
+		out = append(out, Release{
+			TagName:     r.TagName,
+			Name:        r.Name,
+			PublishedAt: publishedAt,
+			HTMLURL:     r.WebURL,
+		})
+	}
+	return out, nil
+}
+
 // FetchDockerManifestDigest returns the SHA256 digest from Docker registries
 func (c *gitLabClient) FetchDockerManifestDigest(imageName, tag string) (string, error) {
 	return fetchDockerManifestDigest(c.client, imageName, tag)
@@ -142,4 +205,46 @@ func (c *gitLabClient) fetchGitLabTag(owner, repo string) (*models.GitHubRelease
 		TagName: tags[0].Name,
 		HTMLURL: tags[0].WebURL,
 	}, nil
+}
+
+func (c *gitLabClient) fetchGitLabTagHistory(owner, repo string, limit int) ([]Release, error) {
+	projectID := fmt.Sprintf("%s%%2F%s", owner, repo)
+	url := fmt.Sprintf("https://gitlab.com/api/v4/projects/%s/repository/tags?per_page=%d", projectID, limit)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", "ServerSupervisor/1.0")
+	if c.authToken != "" {
+		req.Header.Set("PRIVATE-TOKEN", c.authToken)
+	}
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("GitLab API returned status %d", resp.StatusCode)
+	}
+
+	var tags []struct {
+		Name   string `json:"name"`
+		WebURL string `json:"web_url"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&tags); err != nil {
+		return nil, err
+	}
+
+	out := make([]Release, 0, len(tags))
+	for _, t := range tags {
+		out = append(out, Release{
+			TagName:     t.Name,
+			Name:        t.Name,
+			HTMLURL:     t.WebURL,
+		})
+	}
+	return out, nil
 }

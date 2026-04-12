@@ -432,6 +432,13 @@
                     >Derniere</span>
                     <span class="badge bg-green-lt text-green">{{ tracker.last_release_tag }}</span>
                   </div>
+                  <div class="d-flex gap-2 mb-1">
+                    <span
+                      class="text-muted"
+                      style="min-width:60px"
+                    >Maj</span>
+                    <span>{{ formatDateOnly(tracker.last_checked_at || tracker.last_triggered_at || tracker.last_execution?.triggered_at) }}</span>
+                  </div>
                 </div>
                 <div class="mt-2 pt-2 border-top small">
                   <template v-if="tracker.last_execution">
@@ -630,6 +637,7 @@ const {
   providerBadge,
   execStatusBadge,
   formatRelative,
+  formatDateOnly,
 } = useGitWebhooksPage()
 </script>
 

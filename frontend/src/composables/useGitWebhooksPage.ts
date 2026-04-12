@@ -91,6 +91,7 @@ interface UseGitWebhooksPageApi {
   providerBadge: (provider: string) => string
   execStatusBadge: (status: string) => string
   formatRelative: (dateStr: string) => string
+  formatDateOnly: (dateStr?: string) => string
 }
 
 export function useGitWebhooksPage(): UseGitWebhooksPageApi {
@@ -391,6 +392,11 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
     return new Date(dateStr).toLocaleString('fr-FR')
   }
 
+  function formatDateOnly(dateStr?: string): string {
+    if (!dateStr) return '-'
+    return new Date(dateStr).toLocaleDateString('fr-FR')
+  }
+
   return {
     activeTab,
     hosts,
@@ -429,5 +435,6 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
     providerBadge,
     execStatusBadge,
     formatRelative,
+    formatDateOnly,
   }
 }

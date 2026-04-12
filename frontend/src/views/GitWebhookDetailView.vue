@@ -178,8 +178,20 @@
           title="Historique des exécutions"
           empty-text="Aucune exécution enregistrée."
           :show-refresh="true"
+          logs-mode="inline"
           @refresh="loadExecutions"
+          @open-logs="openExecutionLogs"
         />
+
+        <div class="mt-3">
+          <CommandLogPanel
+            :command="selectedCmd"
+            :show="true"
+            title="Console live"
+            empty-text="Sélectionnez 'Logs' dans l'historique des exécutions"
+            @close="clearExecutionLogs"
+          />
+        </div>
       </div>
     </div>
 
@@ -197,16 +209,20 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
+import { useAuthStore } from '../stores/auth'
 import api from '../api'
 import { formatDateTime } from '../utils/formatters'
 import RelativeTime from '../components/RelativeTime.vue'
 import WebhookUrlCard from '../components/WebhookUrlCard.vue'
 import WebhookExecutionList from '../components/webhooks/WebhookExecutionList.vue'
 import WebhookModal from '../components/webhooks/WebhookModal.vue'
+import CommandLogPanel from '../components/CommandLogPanel.vue'
+import { useCommandStream } from '../composables/useCommandStream'
 
 const route = useRoute()
+const auth = useAuthStore()
 const id = route.params.id
 
 const webhook = ref(null)
@@ -215,11 +231,13 @@ const hosts = ref([])
 const loading = ref(false)
 const error = ref('')
 const revealedSecret = ref('')
+const selectedCmd = ref(null)
 
 // Edit modal
 const showModal = ref(false)
 const saving = ref(false)
 const modalError = ref('')
+const { openCommandStream, closeStream } = useCommandStream({ token: () => auth.token })
 
 const envVars = [
   { name: 'SS_REPO_NAME', desc: 'Nom complet du dépôt (ex: monorg/mon-app)' },
@@ -251,6 +269,60 @@ async function loadExecutions() {
     const res = await api.getWebhookExecutions(id)
     executions.value = res.data.executions || []
   } catch { /* ignore */ }
+}
+
+function clearExecutionLogs() {
+  closeStream()
+  selectedCmd.value = null
+}
+
+function connectExecutionStream(commandId) {
+  openCommandStream(commandId, {
+    onInit(payload) {
+      if (!selectedCmd.value || selectedCmd.value.id !== commandId) return
+      selectedCmd.value = {
+        ...selectedCmd.value,
+        status: payload.status || selectedCmd.value.status,
+        output: payload.output ?? selectedCmd.value.output,
+      }
+    },
+    onChunk(payload) {
+      if (!selectedCmd.value || selectedCmd.value.id !== commandId) return
+      selectedCmd.value = {
+        ...selectedCmd.value,
+        output: (selectedCmd.value.output || '') + (payload.chunk || ''),
+      }
+    },
+    onStatus(payload) {
+      if (!selectedCmd.value || selectedCmd.value.id !== commandId) return
+      selectedCmd.value = {
+        ...selectedCmd.value,
+        status: payload.status || selectedCmd.value.status,
+        output: payload.output ?? selectedCmd.value.output,
+      }
+
+      const idx = executions.value.findIndex((e) => e.command_id === commandId)
+      if (idx !== -1) {
+        const next = [...executions.value]
+        next[idx] = { ...next[idx], status: payload.status || next[idx].status }
+        executions.value = next
+      }
+    },
+  })
+}
+
+async function openExecutionLogs(commandId) {
+  closeStream()
+  try {
+    const res = await api.getCommandStatus(commandId)
+    const cmd = res.data
+    selectedCmd.value = cmd
+    if (cmd?.status === 'pending' || cmd?.status === 'running') {
+      connectExecutionStream(commandId)
+    }
+  } catch {
+    error.value = 'Impossible de charger les logs de la commande.'
+  }
 }
 
 function openEdit() {
@@ -307,5 +379,8 @@ function execStatusBadge(status) {
 }
 
 onMounted(load)
+onUnmounted(() => {
+  closeStream()
+})
 </script>
 

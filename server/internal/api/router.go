@@ -268,6 +268,7 @@ func registerReleaseTrackerRoutes(g *gin.RouterGroup, h *handlers.ReleaseTracker
 	g.POST("/release-trackers/:id/check-now", h.TriggerCheck)
 	g.POST("/release-trackers/:id/run", h.Run)
 	g.GET("/release-trackers/:id/executions", h.GetExecutions)
+	g.GET("/release-trackers/:id/version-history", h.GetVersionHistory)
 }
 
 func registerProxmoxRoutes(g *gin.RouterGroup, h *handlers.ProxmoxHandler) {

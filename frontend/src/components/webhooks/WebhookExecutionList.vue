@@ -96,8 +96,37 @@
                 >{{ execution.status }}</span>
               </td>
               <td>
+                <button
+                  v-if="execution.command_id && logsMode === 'inline'"
+                  class="btn btn-sm btn-ghost-secondary"
+                  title="Voir les logs"
+                  @click="$emit('open-logs', execution.command_id)"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="14"
+                    height="14"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" />
+                    <line
+                      x1="16"
+                      y1="13"
+                      x2="8"
+                      y2="13"
+                    /><line
+                      x1="16"
+                      y1="17"
+                      x2="8"
+                      y2="17"
+                    />
+                  </svg>
+                </button>
                 <router-link
-                  v-if="execution.command_id"
+                  v-else-if="execution.command_id"
                   :to="`/audit?command=${execution.command_id}`"
                   class="btn btn-sm btn-ghost-secondary"
                   title="Voir les logs"
@@ -169,8 +198,37 @@
                 >{{ execution.status }}</span>
               </td>
               <td>
+                <button
+                  v-if="execution.command_id && logsMode === 'inline'"
+                  class="btn btn-sm btn-ghost-secondary"
+                  title="Voir les logs"
+                  @click="$emit('open-logs', execution.command_id)"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="14"
+                    height="14"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" />
+                    <line
+                      x1="16"
+                      y1="13"
+                      x2="8"
+                      y2="13"
+                    /><line
+                      x1="16"
+                      y1="17"
+                      x2="8"
+                      y2="17"
+                    /><polyline points="10 9 9 9 8 9" />
+                  </svg>
+                </button>
                 <router-link
-                  v-if="execution.command_id"
+                  v-else-if="execution.command_id"
                   :to="`/audit?command=${execution.command_id}`"
                   class="btn btn-sm btn-ghost-secondary"
                   title="Voir les logs"
@@ -239,9 +297,13 @@ defineProps({
     type: Boolean,
     default: false,
   },
+  logsMode: {
+    type: String,
+    default: 'link',
+  },
 })
 
-defineEmits(['refresh'])
+defineEmits(['refresh', 'open-logs'])
 
 function execStatusBadge(status) {
   const map = {

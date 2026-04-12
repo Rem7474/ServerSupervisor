@@ -13,6 +13,10 @@ type Client interface {
 	// Returns (tag, releaseURL, releaseName, error)
 	FetchLatestRelease(owner, repo string) (string, string, string, error)
 
+	// FetchReleaseHistory returns recent releases/tags for the given repository.
+	// The list is ordered from newest to oldest.
+	FetchReleaseHistory(owner, repo string, limit int) ([]Release, error)
+
 	// FetchDockerManifestDigest returns the SHA256 digest of a Docker image manifest for tag.
 	FetchDockerManifestDigest(imageName, tag string) (string, error)
 

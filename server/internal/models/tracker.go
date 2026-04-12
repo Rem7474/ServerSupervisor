@@ -40,6 +40,13 @@ type ReleaseTrackerExecution struct {
 	CompletedAt *time.Time `json:"completed_at,omitempty"`
 }
 
+type ReleaseVersionHistoryItem struct {
+	Version     string     `json:"version"`
+	Name        string     `json:"name,omitempty"`
+	ReleaseURL  string     `json:"release_url,omitempty"`
+	PublishedAt *time.Time `json:"published_at,omitempty"`
+}
+
 // ========== GitHub Release Info (used by gitprovider) ==========
 
 type GitHubRelease struct {

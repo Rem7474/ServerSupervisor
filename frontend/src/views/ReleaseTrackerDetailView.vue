@@ -309,14 +309,89 @@
       </div>
 
       <div class="col-lg-7">
+        <div class="card mb-3">
+          <div class="card-header d-flex align-items-center justify-content-between">
+            <h3 class="card-title mb-0">
+              Historique des versions
+            </h3>
+            <small class="text-muted">Publication / détection</small>
+          </div>
+          <div class="card-body p-0">
+            <div
+              v-if="historyLoading"
+              class="p-3 text-center text-muted"
+            >
+              Chargement...
+            </div>
+            <div
+              v-else-if="!versionHistory.length"
+              class="p-3 text-muted"
+            >
+              Aucune version disponible.
+            </div>
+            <div
+              v-else
+              class="table-responsive"
+            >
+              <table class="table table-sm table-vcenter mb-0">
+                <thead>
+                  <tr>
+                    <th>Version</th>
+                    <th>Détails</th>
+                    <th class="text-end">
+                      Date de publication
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    v-for="entry in versionHistory"
+                    :key="`${entry.version}-${entry.published_at || 'n/a'}`"
+                  >
+                    <td>
+                      <span class="badge bg-green-lt text-green">{{ entry.version }}</span>
+                    </td>
+                    <td>
+                      <a
+                        v-if="entry.release_url"
+                        :href="entry.release_url"
+                        target="_blank"
+                        class="link-primary"
+                      >
+                        {{ entry.name || entry.release_url }}
+                      </a>
+                      <span v-else>{{ entry.name || '-' }}</span>
+                    </td>
+                    <td class="text-end text-muted">
+                      {{ entry.published_at ? formatDateTime(entry.published_at) : 'N/A' }}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
         <WebhookExecutionList
           :executions="executions"
           kind="tracker"
           title="Historique des exécutions"
           empty-text="Aucune exécution enregistrée."
           :show-refresh="true"
+          logs-mode="inline"
           @refresh="loadExecutions"
+          @open-logs="openExecutionLogs"
         />
+
+        <div class="mt-3">
+          <CommandLogPanel
+            :command="selectedCmd"
+            :show="true"
+            title="Console live"
+            empty-text="Sélectionnez 'Logs' dans l'historique des exécutions"
+            @close="clearExecutionLogs"
+          />
+        </div>
       </div>
     </div>
 
@@ -334,28 +409,37 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
+import { useAuthStore } from '../stores/auth'
 import api from '../api'
 import { formatDateTime } from '../utils/formatters'
 import RelativeTime from '../components/RelativeTime.vue'
 import WebhookExecutionList from '../components/webhooks/WebhookExecutionList.vue'
 import WebhookModal from '../components/webhooks/WebhookModal.vue'
+import CommandLogPanel from '../components/CommandLogPanel.vue'
+import { useCommandStream } from '../composables/useCommandStream'
 
 const route = useRoute()
+const auth = useAuthStore()
 const id = route.params.id
 
 const tracker = ref(null)
 const executions = ref([])
+const versionHistory = ref([])
 const hosts = ref([])
 const loading = ref(false)
 const error = ref('')
+const historyLoading = ref(false)
 const checking = ref(false)
 const running = ref(false)
+const selectedCmd = ref(null)
 
 const showModal = ref(false)
 const saving = ref(false)
 const modalError = ref('')
+
+const { openCommandStream, closeStream } = useCommandStream({ token: () => auth.token })
 
 const gitEnvVars = [
   { name: 'SS_REPO_NAME',    desc: 'owner/repo (ex: home-assistant/core)' },
@@ -416,6 +500,20 @@ async function load() {
   } finally {
     loading.value = false
   }
+
+  await loadVersionHistory()
+}
+
+async function loadVersionHistory() {
+  historyLoading.value = true
+  try {
+    const res = await api.getReleaseTrackerVersionHistory(id)
+    versionHistory.value = res.data.history || []
+  } catch {
+    versionHistory.value = []
+  } finally {
+    historyLoading.value = false
+  }
 }
 
 async function loadExecutions() {
@@ -423,6 +521,60 @@ async function loadExecutions() {
     const res = await api.getReleaseTrackerExecutions(id)
     executions.value = res.data.executions || []
   } catch { /* ignore */ }
+}
+
+function clearExecutionLogs() {
+  closeStream()
+  selectedCmd.value = null
+}
+
+function connectExecutionStream(commandId) {
+  openCommandStream(commandId, {
+    onInit(payload) {
+      if (!selectedCmd.value || selectedCmd.value.id !== commandId) return
+      selectedCmd.value = {
+        ...selectedCmd.value,
+        status: payload.status || selectedCmd.value.status,
+        output: payload.output ?? selectedCmd.value.output,
+      }
+    },
+    onChunk(payload) {
+      if (!selectedCmd.value || selectedCmd.value.id !== commandId) return
+      selectedCmd.value = {
+        ...selectedCmd.value,
+        output: (selectedCmd.value.output || '') + (payload.chunk || ''),
+      }
+    },
+    onStatus(payload) {
+      if (!selectedCmd.value || selectedCmd.value.id !== commandId) return
+      selectedCmd.value = {
+        ...selectedCmd.value,
+        status: payload.status || selectedCmd.value.status,
+        output: payload.output ?? selectedCmd.value.output,
+      }
+
+      const idx = executions.value.findIndex((e) => e.command_id === commandId)
+      if (idx !== -1) {
+        const next = [...executions.value]
+        next[idx] = { ...next[idx], status: payload.status || next[idx].status }
+        executions.value = next
+      }
+    },
+  })
+}
+
+async function openExecutionLogs(commandId) {
+  closeStream()
+  try {
+    const res = await api.getCommandStatus(commandId)
+    const cmd = res.data
+    selectedCmd.value = cmd
+    if (cmd?.status === 'pending' || cmd?.status === 'running') {
+      connectExecutionStream(commandId)
+    }
+  } catch {
+    error.value = 'Impossible de charger les logs de la commande.'
+  }
 }
 
 async function runManually() {
@@ -502,5 +654,8 @@ function channelBadge(ch) {
 }
 
 onMounted(load)
+onUnmounted(() => {
+  closeStream()
+})
 </script>
 

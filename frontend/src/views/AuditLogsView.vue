@@ -805,11 +805,58 @@ async function fetchCmds() {
   cmdsLoading.value = true
   try {
     const res = await apiClient.getCommandsHistory(cmdsPage.value, cmdsLimit)
-    cmds.value = res.data?.commands || []
+    const nextCmds = res.data?.commands || []
+    cmds.value = nextCmds
+    await reconcileCommandStatuses(nextCmds)
     cmdsTotal.value = res.data?.total || 0
     cmdsLoaded.value = true
     lastCmdFetchAt.value = Date.now()
   } catch { cmds.value = [] } finally { cmdsLoading.value = false }
+}
+
+async function reconcileCommandStatuses(list) {
+  const ids = []
+  for (const c of list) {
+    if (c.status === 'pending' || c.status === 'running') {
+      ids.push(c.id)
+    }
+  }
+  if (selectedCmd.value?.id && !ids.includes(selectedCmd.value.id)) {
+    ids.push(selectedCmd.value.id)
+  }
+  if (!ids.length) return
+
+  const snapshots = await Promise.allSettled(ids.map((id) => apiClient.getCommandStatus(id)))
+  if (!snapshots.length) return
+
+  const patchById = {}
+  snapshots.forEach((result, idx) => {
+    if (result.status !== 'fulfilled') return
+    const cmd = result.value?.data
+    if (!cmd?.id) return
+    patchById[ids[idx]] = cmd
+  })
+
+  if (!Object.keys(patchById).length) return
+
+  cmds.value = list.map((c) => {
+    const snap = patchById[c.id]
+    if (!snap) return c
+    return {
+      ...c,
+      status: snap.status || c.status,
+      output: snap.output ?? c.output,
+      started_at: snap.started_at || c.started_at,
+      ended_at: snap.ended_at || c.ended_at,
+    }
+  })
+
+  if (selectedCmd.value?.id && patchById[selectedCmd.value.id]) {
+    selectedCmd.value = {
+      ...selectedCmd.value,
+      ...patchById[selectedCmd.value.id],
+    }
+  }
 }
 
 async function fetchConnexions() {

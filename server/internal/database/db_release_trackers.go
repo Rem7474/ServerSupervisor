@@ -273,6 +273,39 @@ func (db *DB) GetAllTrackerTagDigests() (map[string]string, error) {
 	return m, nil
 }
 
+func (db *DB) ListTrackerTagDigests(trackerID string, limit int) ([]models.ReleaseVersionHistoryItem, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	rows, err := db.conn.Query(
+		`SELECT tag, created_at
+		 FROM release_tracker_tag_digests
+		 WHERE tracker_id=$1
+		 ORDER BY created_at DESC
+		 LIMIT $2`,
+		trackerID, limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	out := make([]models.ReleaseVersionHistoryItem, 0)
+	for rows.Next() {
+		var tag string
+		var createdAt time.Time
+		if err := rows.Scan(&tag, &createdAt); err != nil {
+			return nil, err
+		}
+		created := createdAt
+		out = append(out, models.ReleaseVersionHistoryItem{
+			Version:     tag,
+			PublishedAt: &created,
+		})
+	}
+	return out, rows.Err()
+}
+
 // CleanupTrackerTagDigests removes old digest entries, keeping only the most recent
 // keepPerTracker rows per tracker. This prevents unbounded growth of the table.
 // Returns the total number of deleted rows.

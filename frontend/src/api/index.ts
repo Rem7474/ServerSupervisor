@@ -285,6 +285,8 @@ export default {
   runReleaseTracker: (id: string) => api.post(`/v1/release-trackers/${id}/run`),
   getReleaseTrackerExecutions: (id: string, limit?: number) =>
     api.get(`/v1/release-trackers/${id}/executions`, { params: { limit: limit ?? 50 } }),
+  getReleaseTrackerVersionHistory: (id: string, limit?: number) =>
+    api.get(`/v1/release-trackers/${id}/version-history`, { params: { limit: limit ?? 20 } }),
 
   // Git Webhooks
   getGitWebhooks: () => api.get('/v1/webhooks/git'),

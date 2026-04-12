@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -636,4 +637,61 @@ func (h *ReleaseTrackerHandler) GetExecutions(c *gin.Context) {
 		execs = []models.ReleaseTrackerExecution{}
 	}
 	c.JSON(http.StatusOK, gin.H{"executions": execs})
+}
+
+func (h *ReleaseTrackerHandler) GetVersionHistory(c *gin.Context) {
+	id := c.Param("id")
+
+	limit := 20
+	if raw := c.Query("limit"); raw != "" {
+		if n, err := strconv.Atoi(raw); err == nil && n > 0 {
+			if n > 50 {
+				n = 50
+			}
+			limit = n
+		}
+	}
+
+	t, err := h.db.GetReleaseTrackerByID(id)
+	if err == sql.ErrNoRows {
+		c.JSON(http.StatusNotFound, gin.H{"error": "tracker not found"})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get tracker"})
+		return
+	}
+
+	history := make([]models.ReleaseVersionHistoryItem, 0)
+	if t.TrackerType == "docker" {
+		history, err = h.db.ListTrackerTagDigests(id, limit)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load docker version history"})
+			return
+		}
+	} else {
+		providerClient := gitprovider.NewClient(t.Provider, h.cfg.GitHubToken)
+		releases, ferr := providerClient.FetchReleaseHistory(t.RepoOwner, t.RepoName, limit)
+		if ferr != nil {
+			c.JSON(http.StatusBadGateway, gin.H{"error": ferr.Error()})
+			return
+		}
+		for _, r := range releases {
+			item := models.ReleaseVersionHistoryItem{
+				Version:    r.TagName,
+				Name:       r.Name,
+				ReleaseURL: r.HTMLURL,
+			}
+			if !r.PublishedAt.IsZero() {
+				published := r.PublishedAt
+				item.PublishedAt = &published
+			}
+			history = append(history, item)
+		}
+	}
+
+	if history == nil {
+		history = []models.ReleaseVersionHistoryItem{}
+	}
+	c.JSON(http.StatusOK, gin.H{"history": history})
 }
