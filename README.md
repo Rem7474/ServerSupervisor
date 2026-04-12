@@ -169,11 +169,19 @@ Notes:
 
 #### Via les releases GitHub (recommandé)
 
+> Le binaire release et le binaire compilé manuellement utilisent exactement la même configuration `agent.yaml` et les mêmes flags (`--init`, `--server-url`, `--api-key`, `--config`, `--init-force`).
+
 ```bash
 # Remplacer ARCH par : amd64, arm64, armv7, armv6
 curl -L https://github.com/<org>/serversupervisor/releases/latest/download/agent-linux-ARCH.gz | \
   gunzip > /usr/local/bin/serversupervisor-agent
 chmod +x /usr/local/bin/serversupervisor-agent
+
+# Initialiser la config (idem pour binaire compilé localement)
+sudo /usr/local/bin/serversupervisor-agent --init \
+  --config /etc/serversupervisor/agent.yaml \
+  --server-url http://your-server:8080 \
+  --api-key your-key
 ```
 
 #### Via le script d'installation
@@ -190,28 +198,15 @@ cd agent
 GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o serversupervisor-agent ./cmd/agent
 scp serversupervisor-agent user@vm:/usr/local/bin/
 
-# Sur la VM : créer la config
-sudo mkdir -p /etc/serversupervisor
-sudo tee /etc/serversupervisor/agent.yaml <<EOF
-server_url: "http://your-server:8080"
-api_key: "la-clé-api-copiée"
-report_interval: 30
-collect_docker: true
-collect_apt: true
-collect_smart: true
-collect_web_logs: true
-web_logs_log_paths:
-  - "/var/log/nginx/access.log"
-  - "/var/log/apache2/access.log"
-  - "/var/log/httpd/access_log"
-  - "/data/logs/proxy-host-*_access.log"
-web_logs_tail_lines: 5000
-web_logs_top_n: 10
-web_logs_requests_limit: 200
-web_logs_cursor_file: "/var/lib/serversupervisor/web_logs_cursor.json"
-apt_auto_update_on_start: false
-insecure_skip_verify: false
-EOF
+# Sur la VM : générer la config (écrit le fichier en 0600)
+sudo /usr/local/bin/serversupervisor-agent --init \
+  --config /etc/serversupervisor/agent.yaml \
+  --server-url http://your-server:8080 \
+  --api-key la-cle-api-copiee
+
+# Si le fichier existe déjà et doit être écrasé
+# sudo /usr/local/bin/serversupervisor-agent --init --init-force \
+#   --config /etc/serversupervisor/agent.yaml --server-url ... --api-key ...
 
 # Installer le service systemd
 sudo tee /etc/systemd/system/serversupervisor-agent.service <<EOF
@@ -345,31 +340,45 @@ sudo journalctl -u serversupervisor-agent -f
 
 ### Configuration agent (`agent.yaml`)
 
-Générer une config par défaut :
+Cette configuration est identique quel que soit le mode d'installation de l'agent (release GitHub, build manuel, ou script d'installation).
+
+Initialiser une config (écriture fichier) :
 ```bash
-serversupervisor-agent --init
+serversupervisor-agent --init \
+  --config /etc/serversupervisor/agent.yaml \
+  --server-url http://your-server:8080 \
+  --api-key your-key
 ```
+
+Comportement de `--init` :
+- Écrit la config sur le chemin passé via `--config` (défaut: `/etc/serversupervisor/agent.yaml`)
+- Refuse d'écraser un fichier existant sauf avec `--init-force`
+- Crée automatiquement le dossier parent si nécessaire
+- Écrit le fichier avec permissions `0600`
+- Mode compatibilité stdout: `--config -`
 
 | Champ | Description | Défaut | Variable d'env |
 |---|---|---|---|
 | `server_url` | URL du serveur | `http://localhost:8080` | `SUPERVISOR_SERVER_URL` |
 | `api_key` | Clé API de l'hôte **(requis)** | — | `SUPERVISOR_API_KEY` |
 | `report_interval` | Intervalle d'envoi en secondes | `30` | `SUPERVISOR_REPORT_INTERVAL` |
+| `max_report_body_bytes` | Taille max du payload JSON envoyé (bytes) | `3145728` | `SUPERVISOR_MAX_REPORT_BODY_BYTES` |
 | `collect_docker` | Activer le monitoring Docker | `true` | `SUPERVISOR_COLLECT_DOCKER` |
 | `collect_apt` | Activer le monitoring APT | `true` | `SUPERVISOR_COLLECT_APT` |
-| `collect_smart` | Activer la collecte S.M.A.R.T. | `true` | `SUPERVISOR_COLLECT_SMART` |
-| `collect_bot_detection` | Activer la détection bot/scanner depuis les logs web | `true` | `SUPERVISOR_COLLECT_BOT_DETECTION` |
-| `bot_detection_log_paths` | Liste de paths/globs de logs access à parser | voir exemple | `SUPERVISOR_BOT_DETECTION_LOG_PATHS` |
-| `bot_detection_tail_lines` | Nombre de lignes lues (par fichier) | `5000` | `SUPERVISOR_BOT_DETECTION_TAIL_LINES` |
-| `bot_detection_top_n` | Nombre max d'IP/paths retournés | `10` | `SUPERVISOR_BOT_DETECTION_TOP_N` |
-| `collect_npm_analytics` | Activer la collecte analytics NPM depuis les logs web | `true` | `SUPERVISOR_COLLECT_NPM_ANALYTICS` |
-| `npm_analytics_log_paths` | Liste de paths/globs de logs access à parser pour NPM analytics | voir exemple | `SUPERVISOR_NPM_ANALYTICS_LOG_PATHS` |
-| `npm_analytics_tail_lines` | Nombre de lignes lues (par fichier) pour NPM analytics | `5000` | `SUPERVISOR_NPM_ANALYTICS_TAIL_LINES` |
-| `npm_analytics_top_n` | Nombre max de domaines retournés dans les analytics | `10` | `SUPERVISOR_NPM_ANALYTICS_TOP_N` |
+| `collect_smart` | Activer la collecte S.M.A.R.T. | `false` | `SUPERVISOR_COLLECT_SMART` |
+| `collect_cpu_temperature` | Activer la collecte de température CPU | `false` | `SUPERVISOR_COLLECT_CPU_TEMPERATURE` |
+| `collect_web_logs` | Activer l'analyse unifiée des logs web | `false` | `SUPERVISOR_COLLECT_WEB_LOGS` |
+| `web_logs_log_paths` | Liste de paths/globs de logs access à parser | voir exemple | `SUPERVISOR_WEB_LOGS_LOG_PATHS` |
+| `web_logs_tail_lines` | Nombre de lignes lues (par fichier) | `5000` | `SUPERVISOR_WEB_LOGS_TAIL_LINES` |
+| `web_logs_top_n` | Nombre max d'IP/domaines/paths retournés | `10` | `SUPERVISOR_WEB_LOGS_TOP_N` |
+| `web_logs_requests_limit` | Nombre max de requêtes brutes envoyées | `200` | `SUPERVISOR_WEB_LOGS_REQUESTS_LIMIT` |
+| `web_logs_cursor_file` | Fichier de cursor incrémental web logs | `/var/lib/serversupervisor/web_logs_cursor.json` | `SUPERVISOR_WEB_LOGS_CURSOR_FILE` |
 | `apt_auto_update_on_start` | Lancer `apt update` au démarrage de l'agent | `false` | `SUPERVISOR_APT_AUTO_UPDATE_ON_START` |
 | `insecure_skip_verify` | Ignorer les erreurs TLS (certificats auto-signés) | `false` | `SUPERVISOR_INSECURE_SKIP_VERIFY` |
 
 > Toutes les options sont également configurables via variables d'environnement (préfixe `SUPERVISOR_`), utile pour les déploiements Docker/Kubernetes.
+>
+> Compatibilité: les anciennes variables `SUPERVISOR_COLLECT_BOT_DETECTION`, `SUPERVISOR_COLLECT_NPM_ANALYTICS` et leurs variantes `*_LOG_PATHS`, `*_TAIL_LINES`, `*_TOP_N` restent supportées comme alias hérités.
 
 ### Bot detection (logs web)
 

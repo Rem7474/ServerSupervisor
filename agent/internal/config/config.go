@@ -43,26 +43,7 @@ func (c *Config) WebLogGlobs() []string {
 }
 
 func Load(path string) (*Config, error) {
-	cfg := &Config{
-		ServerURL:             "http://localhost:8080",
-		ReportInterval:        30,
-		MaxReportBodyBytes:    3 * 1024 * 1024,
-		CollectDocker:         true,
-		CollectAPT:            true,
-		CollectSMART:          false,
-		CollectCPUTemperature: false,
-		CollectWebLogs:        false,
-		WebLogsLogPaths: []string{
-			"/var/log/nginx/access.log",
-			"/var/log/apache2/access.log",
-			"/var/log/httpd/access_log",
-			"/data/logs/proxy-host-*_access.log",
-		},
-		WebLogsTailLines:     5000,
-		WebLogsTopN:          10,
-		WebLogsRequestsLimit: 200,
-		WebLogsCursorFile:    "/var/lib/serversupervisor/web_logs_cursor.json",
-	}
+	cfg := defaultConfig()
 
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -183,8 +164,35 @@ func Load(path string) (*Config, error) {
 	return cfg, nil
 }
 
+func defaultConfig() *Config {
+	return &Config{
+		ServerURL:             "http://localhost:8080",
+		ReportInterval:        30,
+		MaxReportBodyBytes:    3 * 1024 * 1024,
+		CollectDocker:         true,
+		CollectAPT:            true,
+		CollectSMART:          false,
+		CollectCPUTemperature: false,
+		CollectWebLogs:        false,
+		WebLogsLogPaths: []string{
+			"/var/log/nginx/access.log",
+			"/var/log/apache2/access.log",
+			"/var/log/httpd/access_log",
+			"/data/logs/proxy-host-*_access.log",
+		},
+		WebLogsTailLines:     5000,
+		WebLogsTopN:          10,
+		WebLogsRequestsLimit: 200,
+		WebLogsCursorFile:    "/var/lib/serversupervisor/web_logs_cursor.json",
+	}
+}
+
 func DefaultConfigFile() string {
-	return `# ServerSupervisor Agent Configuration
+	return DefaultConfigFileWithOverrides("", "")
+}
+
+func DefaultConfigFileWithOverrides(serverURL, apiKey string) string {
+	raw := `# ServerSupervisor Agent Configuration
 server_url: "http://your-server:8080"
 api_key: "your-api-key-here"
 
@@ -236,6 +244,15 @@ insecure_skip_verify: false
 # Automatically run apt update at agent startup (opt-in, default false)
 apt_auto_update_on_start: false
 `
+
+	if strings.TrimSpace(serverURL) != "" {
+		raw = strings.Replace(raw, "server_url: \"http://your-server:8080\"", fmt.Sprintf("server_url: %q", serverURL), 1)
+	}
+	if strings.TrimSpace(apiKey) != "" {
+		raw = strings.Replace(raw, "api_key: \"your-api-key-here\"", fmt.Sprintf("api_key: %q", apiKey), 1)
+	}
+
+	return raw
 }
 
 func splitCSV(raw string) []string {

@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -49,12 +50,40 @@ func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
 	configPath := flag.String("config", "/etc/serversupervisor/agent.yaml", "Path to config file")
-	initConfig := flag.Bool("init", false, "Generate a default config file")
+	initConfig := flag.Bool("init", false, "Generate and write a default config file")
+	initForce := flag.Bool("init-force", false, "Allow overwriting existing config file when used with --init")
+	initServerURL := flag.String("server-url", "", "Server URL override used with --init")
+	initAPIKey := flag.String("api-key", "", "API key override used with --init")
 	flag.Parse()
 
-	// Generate default config
+	// Generate/write default config
 	if *initConfig {
-		fmt.Print(config.DefaultConfigFile())
+		content := config.DefaultConfigFileWithOverrides(*initServerURL, *initAPIKey)
+
+		// Compatibility mode: print config to stdout only.
+		if *configPath == "-" {
+			fmt.Print(content)
+			return
+		}
+
+		if _, err := os.Stat(*configPath); err == nil && !*initForce {
+			log.Fatalf("Config file already exists at %s (use --init-force to overwrite)", *configPath)
+		} else if err != nil && !os.IsNotExist(err) {
+			log.Fatalf("Unable to check config file %s: %v", *configPath, err)
+		}
+
+		parentDir := filepath.Dir(*configPath)
+		if parentDir != "." && parentDir != "" {
+			if err := os.MkdirAll(parentDir, 0o700); err != nil {
+				log.Fatalf("Failed to create config directory %s: %v", parentDir, err)
+			}
+		}
+
+		if err := os.WriteFile(*configPath, []byte(content), 0o600); err != nil {
+			log.Fatalf("Failed to write config file %s: %v", *configPath, err)
+		}
+
+		log.Printf("Default config written to %s", *configPath)
 		return
 	}
 
