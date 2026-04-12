@@ -241,9 +241,9 @@ func (c *gitLabClient) fetchGitLabTagHistory(owner, repo string, limit int) ([]R
 	out := make([]Release, 0, len(tags))
 	for _, t := range tags {
 		out = append(out, Release{
-			TagName:     t.Name,
-			Name:        t.Name,
-			HTMLURL:     t.WebURL,
+			TagName: t.Name,
+			Name:    t.Name,
+			HTMLURL: t.WebURL,
 		})
 	}
 	return out, nil

@@ -222,9 +222,9 @@ func (c *gitHubClient) fetchGitHubTagHistory(owner, repo string, limit int) ([]R
 	out := make([]Release, 0, len(tags))
 	for _, t := range tags {
 		out = append(out, Release{
-			TagName:     t.Name,
-			Name:        t.Name,
-			HTMLURL:     fmt.Sprintf("https://github.com/%s/%s/releases/tag/%s", owner, repo, t.Name),
+			TagName: t.Name,
+			Name:    t.Name,
+			HTMLURL: fmt.Sprintf("https://github.com/%s/%s/releases/tag/%s", owner, repo, t.Name),
 		})
 	}
 	return out, nil
