@@ -72,6 +72,7 @@ type TrackedRepoCreate struct {
 // ========== Version Comparison ==========
 
 type VersionComparison struct {
+	TrackerID       string `json:"tracker_id"`
 	DockerImage     string `json:"docker_image"`
 	RunningVersion  string `json:"running_version"`
 	LatestVersion   string `json:"latest_version"`

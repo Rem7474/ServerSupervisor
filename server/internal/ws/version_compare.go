@@ -91,6 +91,7 @@ func (h *WSHandler) buildVersionComparisons() ([]models.VersionComparison, error
 
 		if matchCount > 0 {
 			comparisons = append(comparisons, models.VersionComparison{
+				TrackerID:       tracker.ID,
 				DockerImage:     tracker.DockerImage,
 				RunningVersion:  aggRunningVersion,
 				LatestVersion:   tracker.LastReleaseTag,
@@ -105,6 +106,7 @@ func (h *WSHandler) buildVersionComparisons() ([]models.VersionComparison, error
 			})
 		} else {
 			comparisons = append(comparisons, models.VersionComparison{
+				TrackerID:     tracker.ID,
 				DockerImage:   tracker.DockerImage,
 				LatestVersion: tracker.LastReleaseTag,
 				IsUpToDate:    false,

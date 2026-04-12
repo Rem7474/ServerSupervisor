@@ -56,6 +56,7 @@
             <th>En cours</th>
             <th>Dernière version</th>
             <th>Statut</th>
+            <th class="text-end">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -110,10 +111,32 @@
                 class="badge bg-secondary-lt text-secondary"
               >Version inconnue</span>
             </td>
+            <td class="text-end">
+              <div class="btn-list justify-content-end">
+                <router-link
+                  v-if="v.tracker_id"
+                  :to="`/release-trackers/${v.tracker_id}`"
+                  class="btn btn-sm btn-outline-secondary"
+                  title="Ouvrir le suivi de version"
+                >
+                  Voir suivi
+                </router-link>
+                <button
+                  v-if="v.tracker_id"
+                  type="button"
+                  class="btn btn-sm btn-primary"
+                  :disabled="isRunDisabled(v)"
+                  :title="runTooltip(v)"
+                  @click="runTracker(v)"
+                >
+                  {{ runningIds[v.tracker_id] ? 'Déclenchement...' : 'Déclencher' }}
+                </button>
+              </div>
+            </td>
           </tr>
           <tr v-if="versions.length === 0">
             <td
-              colspan="6"
+              colspan="7"
               class="text-center text-secondary py-4"
             >
               Aucun suivi de version configuré. Ajoutez des release trackers dans
@@ -124,26 +147,74 @@
           </tr>
         </tbody>
       </table>
+      <div
+        v-if="feedback"
+        class="alert alert-info m-3 mb-0 py-2"
+        role="status"
+      >
+        {{ feedback }}
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
 import { defineProps, ref, computed } from 'vue'
+import apiClient from '../../api'
+import { useAuthStore } from '../../stores/auth'
 
 const props = defineProps({
   versions: { type: Array, default: () => [] },
 })
 
+const auth = useAuthStore()
 const isOpen = ref(false)
 const panelId = 'dashboard-docker-versions-panel'
+const runningIds = ref({})
+const feedback = ref('')
 
 const outdatedCount = computed(() =>
   props.versions.filter(v => !v.is_up_to_date && (v.running_version || v.update_confirmed)).length
 )
 
+const canRunTracker = computed(() => auth.role === 'admin' || auth.role === 'operator')
+
 function toggle() {
   isOpen.value = !isOpen.value
+}
+
+function hasManualData(v) {
+  return !!(v.latest_version && String(v.latest_version).trim())
+}
+
+function isRunDisabled(v) {
+  if (!canRunTracker.value) return true
+  if (!v?.tracker_id) return true
+  if (!hasManualData(v)) return true
+  return !!runningIds.value[v.tracker_id]
+}
+
+function runTooltip(v) {
+  if (!canRunTracker.value) return 'Action réservée admin/opérateur'
+  if (!hasManualData(v)) return 'Attendez la première vérification automatique'
+  return 'Déclencher la tâche du tracker maintenant'
+}
+
+async function runTracker(v) {
+  if (isRunDisabled(v)) return
+  const id = v.tracker_id
+  runningIds.value = { ...runningIds.value, [id]: true }
+  feedback.value = ''
+  try {
+    await apiClient.runReleaseTracker(id)
+    feedback.value = `Déclenchement lancé pour ${v.docker_image}.`
+  } catch (e) {
+    feedback.value = e.response?.data?.error || 'Échec du déclenchement manuel.'
+  } finally {
+    const next = { ...runningIds.value }
+    delete next[id]
+    runningIds.value = next
+  }
 }
 </script>
 

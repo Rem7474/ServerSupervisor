@@ -60,6 +60,7 @@ interface DashboardWebSocketPayload {
   hosts?: DashboardHostRecord[]
   host_metrics?: Record<string, DashboardAgentMetric>
   version_comparisons?: Array<{
+    tracker_id?: string
     is_up_to_date?: boolean
     running_version?: string
     update_confirmed?: boolean
