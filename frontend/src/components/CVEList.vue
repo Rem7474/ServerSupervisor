@@ -39,9 +39,7 @@
           </div>
         </div>
         <div class="cve-group-items">
-          <div
-            class="d-flex align-items-center gap-2"
-          >
+          <div class="cve-group-meta">
             <CVEBadge
               :cve="group"
               :show-icon="true"
@@ -55,13 +53,15 @@
               class="text-secondary small"
             >CVSS {{ group.cvss_score.toFixed(1) }}</span>
           </div>
-          <div class="text-secondary small">
-            <span class="me-1">Paquets:</span>
-            <span
-              v-for="pkg in group.packages"
-              :key="`${group.id}-${pkg}`"
-              class="badge bg-secondary-lt text-secondary me-1 mb-1"
-            >{{ pkg }}</span>
+          <div class="cve-group-packages text-secondary small">
+            <span>Paquets:</span>
+            <div class="cve-package-chips">
+              <span
+                v-for="pkg in group.packages"
+                :key="`${group.id}-${pkg}`"
+                class="badge bg-secondary-lt text-secondary"
+              >{{ pkg }}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -250,6 +250,7 @@ function severityClass(severity) {
 .cve-group-row {
   display: grid;
   grid-template-columns: minmax(140px, 220px) 1fr;
+  align-items: stretch;
   border: 1px solid var(--tblr-border-color, #e6e7e9);
   border-radius: 0.5rem;
   overflow: hidden;
@@ -259,11 +260,36 @@ function severityClass(severity) {
   background: var(--tblr-bg-surface-secondary, #f8fafc);
   padding: 0.625rem 0.75rem;
   border-right: 1px solid var(--tblr-border-color, #e6e7e9);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .cve-group-items {
   padding: 0.625rem 0.75rem;
-  display: grid;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.35rem;
+}
+
+.cve-group-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.cve-group-packages {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.cve-package-chips {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
   gap: 0.35rem;
 }
 
