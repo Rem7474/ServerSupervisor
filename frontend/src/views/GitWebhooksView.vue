@@ -413,7 +413,7 @@
                       <code class="small text-truncate">{{ tracker.custom_task_id }}</code>
                     </div>
                   </template>
-                  <template v-else-if="tracker.tracker_type === 'docker'">
+                  <template v-else-if="!tracker.host_id || !tracker.custom_task_id">
                     <div class="d-flex gap-2 mb-1">
                       <span
                         class="text-muted"

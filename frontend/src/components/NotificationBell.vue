@@ -239,6 +239,20 @@ function showBrowserNotification(item) {
   }
 }
 
+function showExecutionBrowserNotification(title, body, tag) {
+  try {
+    const n = new Notification(title, {
+      body,
+      icon: '/favicon.ico',
+      tag,
+      requireInteraction: false,
+    })
+    n.onclick = () => { window.focus(); n.close() }
+  } catch {
+    // API not supported or permission revoked mid-session
+  }
+}
+
 // Convert URL-safe base64 to Uint8Array for PushManager.subscribe()
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
@@ -271,22 +285,62 @@ async function setupPushNotifications() {
   }
 }
 
-// WebSocket push — receives new_alert events in real time from the alert engine
+// WebSocket push — receives real-time browser notifications from backend
 useWebSocket('/api/v1/ws/notifications', (payload) => {
-  if (payload.type !== 'new_alert' || !payload.notification) return
-  const item = payload.notification
+  if (!payload?.type || !payload.notification) return
 
-  // Show in-app notification immediately (WS push is always new)
-  if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-    showBrowserNotification(item)
+  if (payload.type === 'new_alert') {
+    const item = payload.notification
+
+    // Show in-app notification immediately (WS push is always new)
+    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+      showBrowserNotification(item)
+    }
+
+    // Mark as seen so the polling cycle doesn't re-trigger the browser notification
+    if (seenIdSet !== null) seenIdSet.add(item.id)
+
+    // Prepend to the in-app list (max 30)
+    if (!notifications.value.some(n => n.id === item.id)) {
+      notifications.value = [item, ...notifications.value].slice(0, 30)
+    }
+    return
   }
 
-  // Mark as seen so the polling cycle doesn't re-trigger the browser notification
-  if (seenIdSet !== null) seenIdSet.add(item.id)
+  if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+    if (payload.type === 'release_tracker_detected') {
+      const n = payload.notification
+      const trackerTypeLabel = n.tracker_type === 'docker' ? 'Docker' : 'Git'
+      const versionLabel = n.version ? ` (${n.version})` : ''
+      showExecutionBrowserNotification(
+        `${trackerTypeLabel} tracker : ${n.tracker_name}${versionLabel}`,
+        `Nouvelle version détectée${n.version ? ` : ${n.version}` : ''}${n.release_name ? ` - ${n.release_name}` : ''}`,
+        `tracker-detected-${n.tracker_id}-${n.version || 'unknown'}`,
+      )
+      return
+    }
 
-  // Prepend to the in-app list (max 30)
-  if (!notifications.value.some(n => n.id === item.id)) {
-    notifications.value = [item, ...notifications.value].slice(0, 30)
+    if (payload.type === 'release_tracker_execution') {
+      const n = payload.notification
+      const statusLabel = n.status === 'success' ? 'reussie' : 'echouee'
+      const typeLabel = n.tracker_type === 'docker' ? 'Docker' : 'Git'
+      showExecutionBrowserNotification(
+        `${typeLabel} tracker : ${n.tracker_name}`,
+        `Execution ${statusLabel}`,
+        `tracker-exec-${n.tracker_id}-${n.status}`,
+      )
+      return
+    }
+
+    if (payload.type === 'webhook_execution') {
+      const n = payload.notification
+      const statusLabel = n.status === 'success' ? 'reussie' : 'echouee'
+      showExecutionBrowserNotification(
+        `Webhook : ${n.webhook_name}`,
+        `Execution ${statusLabel}`,
+        `webhook-exec-${n.webhook_id}-${n.status}`,
+      )
+    }
   }
 })
 

@@ -219,7 +219,7 @@
                   <code>{{ tracker.custom_task_id }}</code>
                 </dd>
               </template>
-              <template v-else-if="tracker.tracker_type === 'docker'">
+              <template v-else-if="!tracker.host_id || !tracker.custom_task_id">
                 <dt class="col-5 text-muted">
                   Mode
                 </dt>
@@ -405,10 +405,11 @@
         <div class="mt-3">
           <CommandLogPanel
             :command="selectedCmd"
-            :show="true"
+            :show="showConsole"
             title="Console live"
             empty-text="Sélectionnez 'Logs' dans l'historique des exécutions"
             @close="clearExecutionLogs"
+            @open="showConsole = true"
           />
         </div>
       </div>
@@ -453,6 +454,7 @@ const historyLoading = ref(false)
 const checking = ref(false)
 const running = ref(false)
 const selectedCmd = ref(null)
+const showConsole = ref(false)
 const nowTick = ref(Date.now())
 let cooldownTimer = null
 
@@ -484,8 +486,8 @@ const envVars = computed(() =>
 
 const canRunManually = computed(() => {
   if (!tracker.value) return false
-  // Docker tracker can be in monitor-only mode (no host/task dispatch configured).
-  if (tracker.value.tracker_type === 'docker' && (!tracker.value.host_id || !tracker.value.custom_task_id)) {
+  // Any tracker can be in monitor-only mode (no host/task dispatch configured).
+  if (!tracker.value.host_id || !tracker.value.custom_task_id) {
     return false
   }
   return true
@@ -493,7 +495,7 @@ const canRunManually = computed(() => {
 
 const runDisabledReason = computed(() => {
   if (!tracker.value) return ''
-  if (tracker.value.tracker_type === 'docker' && (!tracker.value.host_id || !tracker.value.custom_task_id)) {
+  if (!tracker.value.host_id || !tracker.value.custom_task_id) {
     return 'Mode surveillance seule: configurez une VM cible et une tâche pour autoriser l\'exécution manuelle.'
   }
   return ''
@@ -591,6 +593,7 @@ async function loadExecutions() {
 function clearExecutionLogs() {
   closeStream()
   selectedCmd.value = null
+  showConsole.value = false
 }
 
 function connectExecutionStream(commandId) {
@@ -634,6 +637,7 @@ async function openExecutionLogs(commandId) {
     const res = await api.getCommandStatus(commandId)
     const cmd = res.data
     selectedCmd.value = cmd
+    showConsole.value = true
     if (cmd?.status === 'pending' || cmd?.status === 'running') {
       connectExecutionStream(commandId)
     }

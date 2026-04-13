@@ -115,7 +115,7 @@ func (h *ReleaseTrackerHandler) checkOneGit(t models.ReleaseTracker) {
 	// No change
 	if tag == t.LastReleaseTag {
 		_ = h.db.UpdateReleaseTrackerLastSeen(t.ID, "", false)
-		if cooldown > 0 && t.LastReleaseDetectedAt != nil && (t.LastTriggeredAt == nil || t.LastTriggeredAt.Before(*t.LastReleaseDetectedAt)) {
+		if cooldown > 0 && t.HostID != "" && t.CustomTaskID != "" && t.LastReleaseDetectedAt != nil && (t.LastTriggeredAt == nil || t.LastTriggeredAt.Before(*t.LastReleaseDetectedAt)) {
 			if time.Since(*t.LastReleaseDetectedAt) >= cooldown {
 				log.Printf("Git tracker %s: cooldown elapsed (%dh) for %s → dispatching", t.Name, t.CooldownHours, tag)
 				h.dispatchGitRelease(t, tag, releaseURL, releaseName)
@@ -126,6 +126,11 @@ func (h *ReleaseTrackerHandler) checkOneGit(t models.ReleaseTracker) {
 
 	// New release detected
 	_ = h.db.UpdateReleaseTrackerDetected(t.ID, tag)
+	h.notifyReleaseTrackerDetected(t, tag, releaseURL, releaseName)
+	if t.HostID == "" || t.CustomTaskID == "" {
+		log.Printf("Git tracker %s: new release %s detected (monitor-only, no task dispatched)", t.Name, tag)
+		return
+	}
 	if cooldown > 0 {
 		log.Printf("Git tracker %s: new release %s detected (cooldown=%dh) — deployment delayed", t.Name, tag, t.CooldownHours)
 		return
@@ -205,6 +210,7 @@ func (h *ReleaseTrackerHandler) checkOneDocker(t models.ReleaseTracker) {
 	_ = h.db.UpdateReleaseTrackerDigest(t.ID, digest)
 	_ = h.db.StoreTrackerTagDigest(t.ID, resolvedVersion, digest)
 	_ = h.db.UpdateReleaseTrackerDetected(t.ID, resolvedVersion)
+	h.notifyReleaseTrackerDetected(t, resolvedVersion, "", t.DockerImage+":"+tag)
 
 	// Monitor-only mode: no task configured, just record the new version.
 	if t.CustomTaskID == "" || t.HostID == "" {
@@ -338,6 +344,43 @@ func (h *ReleaseTrackerHandler) dispatchDockerUpdate(t models.ReleaseTracker, ta
 	_ = h.db.MarkReleaseTrackerTriggered(t.ID)
 }
 
+func (h *ReleaseTrackerHandler) notifyReleaseTrackerDetected(t models.ReleaseTracker, version, releaseURL, releaseName string) {
+	if h.notifHub == nil || len(t.NotifyChannels) == 0 {
+		return
+	}
+
+	hasBrowser := false
+	for _, ch := range t.NotifyChannels {
+		if ch == "browser" {
+			hasBrowser = true
+			break
+		}
+	}
+	if !hasBrowser {
+		return
+	}
+
+	label := "Git"
+	if t.TrackerType == "docker" {
+		label = "Docker"
+	}
+
+	h.notifHub.Broadcast(map[string]interface{}{
+		"type": "release_tracker_detected",
+		"notification": map[string]interface{}{
+			"tracker_id":   t.ID,
+			"tracker_name": t.Name,
+			"tracker_type": t.TrackerType,
+			"version":      version,
+			"release_url":  releaseURL,
+			"release_name": releaseName,
+			"status":       "detected",
+			"label":        label,
+			"triggered_at": time.Now().UTC(),
+		},
+	})
+}
+
 // NotifyComplete is called by the agent handler when a command completes.
 func (h *ReleaseTrackerHandler) NotifyComplete(commandID, status string) {
 	trackerID, notifyOnRelease, channels, err := h.db.UpdateReleaseTrackerExecutionByCommandID(commandID, status)
@@ -394,21 +437,6 @@ func (h *ReleaseTrackerHandler) NotifyComplete(commandID, status string) {
 			if err := notifier.SendNtfy(h.cfg, ntfyURL, subject, msg); err != nil {
 				log.Printf("Release tracker notify ntfy: %v", err)
 			}
-
-		case "browser":
-			if h.notifHub == nil {
-				continue
-			}
-			h.notifHub.Broadcast(map[string]interface{}{
-				"type": "release_tracker_execution",
-				"notification": map[string]interface{}{
-					"tracker_id":   trackerID,
-					"tracker_name": tracker.Name,
-					"tracker_type": tracker.TrackerType,
-					"status":       status,
-					"triggered_at": time.Now().UTC(),
-				},
-			})
 		}
 	}
 }
@@ -461,9 +489,10 @@ func (h *ReleaseTrackerHandler) Create(c *gin.Context) {
 	}
 
 	if req.TrackerType == "git" {
-		// Git trackers always need a host+task to dispatch to.
-		if req.HostID == "" || req.CustomTaskID == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "host_id and custom_task_id are required for git trackers"})
+		// Git trackers can run in monitor-only mode (no host/task),
+		// but host/task must be provided together when dispatch is enabled.
+		if (req.HostID == "") != (req.CustomTaskID == "") {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "host_id and custom_task_id must be provided together for git trackers"})
 			return
 		}
 		if req.RepoOwner == "" || req.RepoName == "" {
@@ -551,8 +580,8 @@ func (h *ReleaseTrackerHandler) Update(c *gin.Context) {
 		return
 	}
 	if req.TrackerType == "git" {
-		if req.HostID == "" || req.CustomTaskID == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "host_id and custom_task_id are required for git trackers"})
+		if (req.HostID == "") != (req.CustomTaskID == "") {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "host_id and custom_task_id must be provided together for git trackers"})
 			return
 		}
 		if req.RepoOwner == "" || req.RepoName == "" {
@@ -650,6 +679,10 @@ func (h *ReleaseTrackerHandler) Run(c *gin.Context) {
 		}
 		go h.dispatchDockerUpdate(*t, tag, t.LastReleaseTag, t.LatestImageDigest, t.LatestImageDigest)
 	} else {
+		if t.HostID == "" || t.CustomTaskID == "" {
+			c.JSON(http.StatusConflict, gin.H{"error": "tracker en mode surveillance seule — configurez une VM cible et une tâche pour déclencher manuellement"})
+			return
+		}
 		if t.LastReleaseTag == "" {
 			c.JSON(http.StatusConflict, gin.H{"error": "aucune release initiale enregistrée — attendez le prochain cycle de polling avant de déclencher manuellement"})
 			return

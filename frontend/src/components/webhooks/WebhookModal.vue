@@ -235,9 +235,9 @@
             </template>
 
             <!-- VM + Task -->
-            <!-- Docker trackers: optional dispatch toggle -->
+            <!-- Trackers: optional dispatch toggle -->
             <div
-              v-if="mode === 'tracker' && form.tracker_type === 'docker'"
+              v-if="mode === 'tracker'"
               class="col-12"
             >
               <label class="form-check form-switch">
@@ -256,11 +256,11 @@
               </div>
             </div>
 
-            <template v-if="mode === 'webhook' || form.tracker_type === 'git' || form.dispatch_task">
+            <template v-if="mode === 'webhook' || (mode === 'tracker' && form.dispatch_task)">
               <div class="col-md-6">
                 <label
                   class="form-label"
-                  :class="(mode === 'webhook' || form.tracker_type === 'git') ? 'required' : ''"
+                  :class="(mode === 'webhook' || (mode === 'tracker' && form.dispatch_task)) ? 'required' : ''"
                 >VM cible</label>
                 <select
                   v-model="form.host_id"
@@ -281,7 +281,7 @@
               <div class="col-md-6">
                 <label
                   class="form-label"
-                  :class="(mode === 'webhook' || form.tracker_type === 'git') ? 'required' : ''"
+                  :class="(mode === 'webhook' || (mode === 'tracker' && form.dispatch_task)) ? 'required' : ''"
                 >Tache (tasks.yaml)</label>
                 <select
                   v-if="customTasks.length"
@@ -528,7 +528,7 @@ const defaultTrackerForm = () => ({
   host_id: '',
   custom_task_id: '',
   cooldown_hours: 0,
-  dispatch_task: false,
+  dispatch_task: props.prefillDockerImage ? false : true,
   notify_channels: [],
   notify_on_release: true,
   enabled: true,
@@ -645,8 +645,8 @@ function validate() {
       if (!form.value.repo_owner || !form.value.repo_name) {
         return 'Owner et depot sont obligatoires pour un tracker Git.'
       }
-      if (!form.value.host_id || !form.value.custom_task_id) {
-        return 'VM cible et ID de tache sont obligatoires pour un tracker Git.'
+      if (form.value.dispatch_task && (!form.value.host_id || !form.value.custom_task_id)) {
+        return 'VM cible et ID de tache sont obligatoires si le declenchement de tache est active.'
       }
     } else {
       if (!form.value.docker_image) {
@@ -669,8 +669,8 @@ function submit() {
   validationError.value = validate()
   if (validationError.value) return
   const payload = { ...form.value }
-  // For Docker trackers in monitor-only mode, clear host/task before sending
-  if (props.mode === 'tracker' && payload.tracker_type === 'docker' && !payload.dispatch_task) {
+  // For monitor-only trackers, clear host/task before sending
+  if (props.mode === 'tracker' && !payload.dispatch_task) {
     payload.host_id = ''
     payload.custom_task_id = ''
   }
