@@ -71,7 +71,7 @@
         class="btn btn-sm btn-link p-0 mt-2"
         @click="showAll = true"
       >
-        +{{ cveGroups.length - limit }} CVE...
+        Afficher plus
       </button>
     </div>
     
@@ -111,10 +111,14 @@ const props = defineProps({
   limit: {
     type: Number,
     default: 5
+  },
+  initiallyCollapsed: {
+    type: Boolean,
+    default: null
   }
 })
 
-const collapsed = ref(!props.alwaysExpanded)
+const collapsed = ref(props.initiallyCollapsed ?? !props.alwaysExpanded)
 const showAll = ref(false)
 
 const cves = computed(() => {

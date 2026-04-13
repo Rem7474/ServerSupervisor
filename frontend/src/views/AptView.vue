@@ -120,7 +120,7 @@
                 <div class="ms-auto d-flex flex-wrap gap-2">
                   <template v-if="canRunApt">
                     <button
-                      class="btn btn-outline-secondary"
+                      class="btn btn-outline-secondary btn-sm"
                       :disabled="selectedHosts.length === 0 || !!aptBulkLoading"
                       @click="bulkAptCmd('update')"
                     >
@@ -132,7 +132,7 @@
                       apt update ({{ selectedHosts.length }})
                     </button>
                     <button
-                      :class="selectedHosts.length > 5 ? 'btn btn-danger' : 'btn btn-primary'"
+                      class="btn btn-primary btn-sm"
                       :disabled="selectedHosts.length === 0 || !!aptBulkLoading"
                       @click="bulkAptCmd('upgrade')"
                     >
@@ -142,13 +142,9 @@
                         role="status"
                       />
                       apt upgrade ({{ selectedHosts.length }})
-                      <span
-                        v-if="selectedHosts.length > 5"
-                        class="badge bg-danger-lt text-danger ms-2"
-                      >DANGER</span>
                     </button>
                     <button
-                      :class="selectedHosts.length > 5 ? 'btn btn-danger' : 'btn btn-outline-danger'"
+                      class="btn btn-outline-danger btn-sm"
                       :disabled="selectedHosts.length === 0 || !!aptBulkLoading"
                       @click="bulkAptCmd('dist-upgrade')"
                     >
@@ -158,10 +154,6 @@
                         role="status"
                       />
                       apt dist-upgrade ({{ selectedHosts.length }})
-                      <span
-                        v-if="selectedHosts.length > 5"
-                        class="badge bg-danger-lt text-danger ms-2"
-                      >DANGER</span>
                     </button>
                   </template>
                   <div
@@ -182,7 +174,17 @@
             >
               <div class="card">
                 <div class="card-body text-center text-secondary py-4">
-                  Aucun hôte ne correspond aux filtres.
+                  <template v-if="wsStatus === 'connecting' || wsStatus === 'reconnecting'">
+                    <span
+                      class="spinner-border spinner-border-sm me-2"
+                      role="status"
+                      aria-hidden="true"
+                    />
+                    Chargement des hôtes...
+                  </template>
+                  <template v-else>
+                    Aucun hôte ne correspond aux filtres.
+                  </template>
                 </div>
               </div>
             </div>
@@ -204,9 +206,12 @@
                       <span class="form-check-label" />
                     </label>
                     <div class="flex-fill">
-                      <div class="fw-semibold">
-                        {{ host.hostname || host.name }}
-                      </div>
+                      <router-link
+                        :to="`/hosts/${host.id}`"
+                        class="fw-semibold text-reset text-decoration-none"
+                      >
+                        {{ host.name || host.hostname }}
+                      </router-link>
                       <div class="text-secondary small">
                         {{ host.ip_address }}
                       </div>
@@ -328,10 +333,11 @@
                         CVE prioritaires
                       </div>
                       <CVEList
-                        :cve-list="getTopCvesByCriticality(aptStatuses[host.id])"
+                        :cve-list="aptStatuses[host.id].cve_list"
                         :show-max-severity="true"
                         :always-expanded="false"
-                        :limit="5"
+                        :initially-collapsed="false"
+                        :limit="3"
                       />
                     </div>
                   </div>
@@ -396,7 +402,7 @@
                             <span v-if="cmd.triggered_by">• {{ cmd.triggered_by }}</span>
                           </span>
                           <button
-                            class="btn btn-sm btn-ghost-secondary ms-auto flex-shrink-0"
+                            class="btn btn-outline-secondary btn-sm ms-auto flex-shrink-0"
                             title="Voir les logs"
                             @click="watchCommand(cmd, host)"
                           >
@@ -414,6 +420,7 @@
                               d="M0 0h24v24H0z"
                               fill="none"
                             /><path d="M4 6l16 0" /><path d="M4 12l16 0" /><path d="M4 18l12 0" /></svg>
+                            <span class="ms-1">Logs</span>
                           </button>
                         </div>
                       </div>
@@ -460,7 +467,7 @@
                   :key="host.id"
                   :value="host.id"
                 >
-                  {{ host.hostname || host.name }}
+                  {{ host.name || host.hostname }}
                 </option>
               </select>
               <!-- Filtre période -->
@@ -507,9 +514,12 @@
                     {{ formatDateExact(cmd.created_at) }}
                   </td>
                   <td>
-                    <div class="fw-semibold">
+                    <router-link
+                      :to="`/hosts/${cmd.hostId}`"
+                      class="fw-semibold text-reset text-decoration-none"
+                    >
                       {{ cmd.hostName }}
-                    </div>
+                    </router-link>
                   </td>
                   <td><code>apt {{ cmd.action }}</code></td>
                   <td class="text-secondary">
@@ -521,9 +531,23 @@
                   </td>
                   <td>
                     <button
-                      class="btn btn-sm btn-outline-primary"
+                      class="btn btn-outline-secondary btn-sm"
                       @click="watchCommand(cmd, { hostname: cmd.hostName, id: cmd.hostId })"
                     >
+                      <svg
+                        class="icon icon-sm me-1"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        stroke-width="2"
+                        stroke="currentColor"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                      ><path
+                        stroke="none"
+                        d="M0 0h24v24H0z"
+                        fill="none"
+                      /><path d="M4 6l16 0" /><path d="M4 12l16 0" /><path d="M4 18l12 0" /></svg>
                       Logs
                     </button>
                   </td>
@@ -808,16 +832,6 @@ const hostFilterOptions = [
 ]
 
 const HOST_HISTORY_PREVIEW_COUNT = 3
-const TOP_CVE_PREVIEW_COUNT = 5
-
-const severityRank = {
-  CRITICAL: 5,
-  HIGH: 4,
-  MEDIUM: 3,
-  LOW: 2,
-  NEGLIGIBLE: 1,
-  UNKNOWN: 0,
-}
 
 const filteredHosts = computed(() => {
   let list = [...hosts.value]
@@ -877,7 +891,7 @@ const periodOptions = [
 const allHistory = computed(() => {
   return Object.entries(aptHistories.value).flatMap(([hostId, cmds]) => {
     const host = hosts.value.find(h => h.id === hostId)
-    const hostName = host?.hostname || host?.name || hostId
+    const hostName = host?.name || host?.hostname || hostId
     return (cmds || []).map(cmd => ({ ...cmd, hostId, hostName }))
   }).sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
 })
@@ -942,28 +956,6 @@ function hasMoreHostHistory(hostId) {
   return history.length > HOST_HISTORY_PREVIEW_COUNT
 }
 
-function getTopCvesByCriticality(aptStatus) {
-  if (!aptStatus?.cve_list) return []
-  try {
-    const parsed = typeof aptStatus.cve_list === 'string'
-      ? JSON.parse(aptStatus.cve_list)
-      : aptStatus.cve_list
-    const list = Array.isArray(parsed) ? parsed : []
-    return [...list]
-      .sort((a, b) => {
-        const rankA = severityRank[String(a?.severity || '').toUpperCase()] ?? 0
-        const rankB = severityRank[String(b?.severity || '').toUpperCase()] ?? 0
-        if (rankA !== rankB) return rankB - rankA
-        const scoreA = Number(a?.cvss_score || 0)
-        const scoreB = Number(b?.cvss_score || 0)
-        return scoreB - scoreA
-      })
-      .slice(0, TOP_CVE_PREVIEW_COUNT)
-  } catch {
-    return []
-  }
-}
-
 function getPackages(aptStatus) {
   if (!aptStatus?.package_list) return []
   try {
@@ -981,7 +973,7 @@ function watchCommand(cmd, host) {
   liveCommand.value = {
     id: cmd.id,
     hostId: host?.id || cmd.hostId || cmd.host_id || null,
-    host_name: host?.hostname || host?.name || '—',
+    host_name: host?.name || host?.hostname || '—',
     module: 'apt',
     action: cmd.action || cmd.command || '—',
     target: '',
@@ -1082,7 +1074,10 @@ function connectStreamWebSocket(commandId) {
 }
 
 async function bulkAptCmd(command) {
-  const hostnames = hosts.value.filter(h => selectedHosts.value.includes(h.id)).map(h => h.hostname).join(', ')
+  const hostnames = hosts.value
+    .filter(h => selectedHosts.value.includes(h.id))
+    .map(h => h.name || h.hostname)
+    .join(', ')
 
   const confirmed = await confirmBulkAction(
     `apt ${command}`,
@@ -1098,7 +1093,7 @@ async function bulkAptCmd(command) {
   try {
     const response = await apiClient.sendAptCommand(selectedHosts.value, command)
     const commandResults = Array.isArray(response.data?.commands) ? response.data.commands : []
-    const hostNameById = new Map(hosts.value.map(host => [host.id, host.hostname || host.name || host.id]))
+    const hostNameById = new Map(hosts.value.map(host => [host.id, host.name || host.hostname || host.id]))
     const launchedCommands = commandResults.filter(item => item.command_id)
     const failedCommands = commandResults.filter(item => item.error)
     const createdAt = new Date().toISOString()
