@@ -4,7 +4,7 @@ go 1.25.9
 
 require (
 	github.com/fsouza/go-dockerclient v1.13.1
-	golang.org/x/sys v0.42.0
+	golang.org/x/sys v0.43.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
