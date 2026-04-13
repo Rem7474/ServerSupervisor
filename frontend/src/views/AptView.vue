@@ -195,7 +195,7 @@
             >
               <div class="card">
                 <div class="card-body">
-                  <div class="d-flex align-items-center gap-3 mb-3">
+                  <div class="d-flex align-items-center gap-3">
                     <label class="form-check">
                       <input
                         v-model="selectedHosts"
