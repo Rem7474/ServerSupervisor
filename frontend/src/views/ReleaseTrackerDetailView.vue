@@ -390,10 +390,10 @@
             </div>
             <div
               v-if="versionHistory.length > VERSION_HISTORY_PREVIEW_LIMIT"
-              class="p-2 border-top"
+              class="p-2 border-top text-center"
             >
               <button
-                class="btn btn-sm btn-link p-0"
+                class="btn btn-outline-secondary btn-sm"
                 @click="showAllVersionHistory = !showAllVersionHistory"
               >
                 {{ showAllVersionHistory

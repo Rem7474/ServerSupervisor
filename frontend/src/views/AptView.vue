@@ -323,12 +323,17 @@
                     v-if="aptStatuses[host.id]?.cve_list"
                     class="mb-3"
                   >
-                    <CVEList
-                      :cve-list="getTopCvesByCriticality(aptStatuses[host.id])"
-                      :show-max-severity="true"
-                      :always-expanded="false"
-                      :limit="5"
-                    />
+                    <div class="border rounded px-3 py-2 bg-body-tertiary">
+                      <div class="text-secondary small mb-1 fw-semibold">
+                        CVE prioritaires
+                      </div>
+                      <CVEList
+                        :cve-list="getTopCvesByCriticality(aptStatuses[host.id])"
+                        :show-max-severity="true"
+                        :always-expanded="false"
+                        :limit="5"
+                      />
+                    </div>
                   </div>
 
                   <!-- Package List -->
@@ -368,11 +373,15 @@
                     </button>
                   </div>
 
-                  <div v-if="aptHistories[host.id]?.length">
-                    <div class="text-secondary small mb-2">
-                      Historique récent ({{ aptHistories[host.id].length }})
-                    </div>
-                    <div class="mt-1">
+                  <div
+                    v-if="aptHistories[host.id]?.length"
+                    class="mt-3"
+                  >
+                    <div class="border rounded px-3 py-2 bg-body-tertiary">
+                      <div class="text-secondary small mb-2 fw-semibold">
+                        Historique récent ({{ aptHistories[host.id].length }})
+                      </div>
+                      <div class="mt-1">
                       <div
                         v-for="cmd in displayedHostHistory(host.id)"
                         :key="cmd.id"
@@ -412,16 +421,17 @@
                           <span v-if="cmd.triggered_by">• par {{ cmd.triggered_by }}</span>
                         </div>
                       </div>
+                      </div>
+                      <button
+                        v-if="hasMoreHostHistory(host.id)"
+                        class="btn btn-outline-secondary btn-sm"
+                        @click="toggleHistory(host.id)"
+                      >
+                        {{ expandedHistories[host.id]
+                          ? 'Afficher moins'
+                          : `Afficher plus (${aptHistories[host.id].length - HOST_HISTORY_PREVIEW_COUNT})` }}
+                      </button>
                     </div>
-                    <button
-                      v-if="hasMoreHostHistory(host.id)"
-                      class="btn btn-sm btn-link p-0"
-                      @click="toggleHistory(host.id)"
-                    >
-                      {{ expandedHistories[host.id]
-                        ? 'Afficher moins'
-                        : `Afficher plus (${aptHistories[host.id].length - HOST_HISTORY_PREVIEW_COUNT})` }}
-                    </button>
                   </div>
                 </div>
               </div>
