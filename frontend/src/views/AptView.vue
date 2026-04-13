@@ -387,38 +387,34 @@
                         :key="cmd.id"
                         class="border rounded p-2 mb-2"
                       >
-                        <div class="d-flex align-items-center justify-content-between gap-2">
-                          <div class="small fw-semibold">
-                            apt {{ cmd.action }}
-                          </div>
-                          <div class="d-flex align-items-center gap-2">
-                            <span :class="statusClass(cmd.status)">{{ cmd.status }}</span>
-                            <span class="text-secondary small">{{ formatDuration(cmd.started_at, cmd.ended_at) }}</span>
-                            <button
-                              class="btn btn-sm btn-ghost-secondary"
-                              title="Voir les logs"
-                              @click="watchCommand(cmd, host)"
-                            >
-                              <svg
-                                class="icon icon-sm"
-                                width="16"
-                                height="16"
-                                viewBox="0 0 24 24"
-                                stroke-width="2"
-                                stroke="currentColor"
-                                fill="none"
-                                xmlns="http://www.w3.org/2000/svg"
-                              ><path
-                                stroke="none"
-                                d="M0 0h24v24H0z"
-                                fill="none"
-                              /><path d="M4 6l16 0" /><path d="M4 12l16 0" /><path d="M4 18l12 0" /></svg>
-                            </button>
-                          </div>
-                        </div>
-                        <div class="text-secondary small mt-1">
-                          {{ formatDate(cmd.created_at) }}
-                          <span v-if="cmd.triggered_by">• par {{ cmd.triggered_by }}</span>
+                        <div class="d-flex align-items-center gap-2 flex-nowrap small">
+                          <span class="fw-semibold text-truncate">apt {{ cmd.action }}</span>
+                          <span :class="statusClass(cmd.status)" class="flex-shrink-0">{{ cmd.status }}</span>
+                          <span class="text-secondary flex-shrink-0">{{ formatDuration(cmd.started_at, cmd.ended_at) }}</span>
+                          <span class="text-secondary text-truncate">
+                            {{ formatDate(cmd.created_at) }}
+                            <span v-if="cmd.triggered_by">• {{ cmd.triggered_by }}</span>
+                          </span>
+                          <button
+                            class="btn btn-sm btn-ghost-secondary ms-auto flex-shrink-0"
+                            title="Voir les logs"
+                            @click="watchCommand(cmd, host)"
+                          >
+                            <svg
+                              class="icon icon-sm"
+                              width="16"
+                              height="16"
+                              viewBox="0 0 24 24"
+                              stroke-width="2"
+                              stroke="currentColor"
+                              fill="none"
+                              xmlns="http://www.w3.org/2000/svg"
+                            ><path
+                              stroke="none"
+                              d="M0 0h24v24H0z"
+                              fill="none"
+                            /><path d="M4 6l16 0" /><path d="M4 12l16 0" /><path d="M4 18l12 0" /></svg>
+                          </button>
                         </div>
                       </div>
                       </div>

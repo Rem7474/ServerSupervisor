@@ -18,7 +18,7 @@
     </div>
 
     <div class="text-secondary small mb-2">
-      {{ packageGroups.length }} paquet{{ packageGroups.length > 1 ? 's' : '' }} avec CVE
+      {{ cveGroups.length }} CVE • {{ impactedPackageCount }} paquet{{ impactedPackageCount > 1 ? 's' : '' }} impacté{{ impactedPackageCount > 1 ? 's' : '' }}
     </div>
     
     <div
@@ -26,46 +26,52 @@
       class="cve-groups"
     >
       <div
-        v-for="group in displayedPackageGroups"
-        :key="group.packageName"
+        v-for="group in displayedCveGroups"
+        :key="group.id"
         class="cve-group-row"
       >
         <div class="cve-group-package">
           <div class="fw-semibold">
-            {{ group.packageName }}
+            {{ group.id }}
           </div>
           <div class="text-secondary small">
-            {{ group.cves.length }} CVE{{ group.cves.length > 1 ? 's' : '' }}
+            {{ group.packages.length }} paquet{{ group.packages.length > 1 ? 's' : '' }} impacté{{ group.packages.length > 1 ? 's' : '' }}
           </div>
         </div>
         <div class="cve-group-items">
           <div
-            v-for="(cve, index) in group.cves"
-            :key="`${group.packageName}-${cve.id}-${index}`"
             class="d-flex align-items-center gap-2"
           >
             <CVEBadge
-              :cve="cve"
+              :cve="group"
               :show-icon="true"
             />
             <span
-              :class="severityClass(cve.severity)"
+              :class="severityClass(group.severity)"
               class="badge"
-            >{{ normalizeSeverity(cve.severity) }}</span>
+            >{{ normalizeSeverity(group.severity) }}</span>
             <span
-              v-if="cve.cvss_score"
+              v-if="group.cvss_score"
               class="text-secondary small"
-            >CVSS {{ cve.cvss_score.toFixed(1) }}</span>
+            >CVSS {{ group.cvss_score.toFixed(1) }}</span>
+          </div>
+          <div class="text-secondary small">
+            <span class="me-1">Paquets:</span>
+            <span
+              v-for="pkg in group.packages"
+              :key="`${group.id}-${pkg}`"
+              class="badge bg-secondary-lt text-secondary me-1 mb-1"
+            >{{ pkg }}</span>
           </div>
         </div>
       </div>
 
       <button
-        v-if="packageGroups.length > limit && !showAll"
+        v-if="cveGroups.length > limit && !showAll"
         class="btn btn-sm btn-link p-0 mt-2"
         @click="showAll = true"
       >
-        +{{ packageGroups.length - limit }} paquet{{ packageGroups.length - limit > 1 ? 's' : '' }}...
+        +{{ cveGroups.length - limit }} CVE...
       </button>
     </div>
     
@@ -126,30 +132,6 @@ const cves = computed(() => {
   }
 })
 
-const packageGroups = computed(() => {
-  const grouped = new Map()
-
-  for (const cve of cves.value) {
-    const packageName = String(cve?.package || '').trim() || 'Paquet non specifie'
-    if (!grouped.has(packageName)) {
-      grouped.set(packageName, [])
-    }
-    grouped.get(packageName).push(cve)
-  }
-
-  return Array.from(grouped.entries()).map(([packageName, groupedCves]) => ({
-    packageName,
-    cves: groupedCves,
-  }))
-})
-
-const displayedPackageGroups = computed(() => {
-  if (showAll.value || props.alwaysExpanded) {
-    return packageGroups.value
-  }
-  return packageGroups.value.slice(0, props.limit)
-})
-
 const severityOrder = {
   'CRITICAL': 5,
   'HIGH': 4,
@@ -158,6 +140,66 @@ const severityOrder = {
   'NEGLIGIBLE': 1,
   'UNKNOWN': 0
 }
+
+const cveGroups = computed(() => {
+  const grouped = new Map()
+
+  for (const cve of cves.value) {
+    const cveId = String(cve?.id || '').trim() || 'CVE-UNKNOWN'
+    const packageName = String(cve?.package || '').trim() || 'Paquet non specifie'
+    if (!grouped.has(cveId)) {
+      grouped.set(cveId, {
+        id: cveId,
+        severity: cve?.severity || 'UNKNOWN',
+        cvss_score: Number(cve?.cvss_score || 0),
+        packages: new Set(),
+      })
+    }
+    const entry = grouped.get(cveId)
+    entry.packages.add(packageName)
+
+    const currentRank = severityOrder[String(entry.severity || '').toUpperCase()] || 0
+    const nextRank = severityOrder[String(cve?.severity || '').toUpperCase()] || 0
+    if (nextRank > currentRank) {
+      entry.severity = cve?.severity || entry.severity
+    }
+
+    const nextScore = Number(cve?.cvss_score || 0)
+    if (nextScore > Number(entry.cvss_score || 0)) {
+      entry.cvss_score = nextScore
+    }
+  }
+
+  return Array.from(grouped.values())
+    .map((group) => ({
+      ...group,
+      packages: Array.from(group.packages).sort((a, b) => a.localeCompare(b)),
+    }))
+    .sort((a, b) => {
+      const rankA = severityOrder[String(a.severity || '').toUpperCase()] || 0
+      const rankB = severityOrder[String(b.severity || '').toUpperCase()] || 0
+      if (rankA !== rankB) return rankB - rankA
+      const scoreA = Number(a.cvss_score || 0)
+      const scoreB = Number(b.cvss_score || 0)
+      if (scoreA !== scoreB) return scoreB - scoreA
+      return String(a.id).localeCompare(String(b.id))
+    })
+})
+
+const displayedCveGroups = computed(() => {
+  if (showAll.value || props.alwaysExpanded) {
+    return cveGroups.value
+  }
+  return cveGroups.value.slice(0, props.limit)
+})
+
+const impactedPackageCount = computed(() => {
+  const uniquePackages = new Set()
+  for (const group of cveGroups.value) {
+    for (const pkg of group.packages) uniquePackages.add(pkg)
+  }
+  return uniquePackages.size
+})
 
 const maxSeverity = computed(() => {
   if (cves.value.length === 0) return 'NONE'
