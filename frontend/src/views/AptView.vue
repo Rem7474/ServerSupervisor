@@ -206,12 +206,20 @@
                       <span class="form-check-label" />
                     </label>
                     <div class="flex-fill">
-                      <router-link
-                        :to="`/hosts/${host.id}`"
-                        class="fw-semibold text-reset text-decoration-none"
-                      >
-                        {{ host.name || host.hostname }}
-                      </router-link>
+                      <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <router-link
+                          :to="`/hosts/${host.id}`"
+                          class="fw-semibold text-reset text-decoration-none"
+                        >
+                          {{ host.name || host.hostname }}
+                        </router-link>
+                        <span
+                          v-if="host.name && host.hostname && host.name !== host.hostname"
+                          class="text-secondary small"
+                        >
+                          {{ host.hostname }}
+                        </span>
+                      </div>
                       <div class="text-secondary small">
                         {{ host.ip_address }}
                       </div>
@@ -220,112 +228,84 @@
                       <span class="status-dot status-dot-animated" />
                       <span :data-translation-id="host.status === 'online' ? 'online' : 'offline'">{{ host.status === 'online' ? 'En ligne' : 'Hors ligne' }}</span>
                     </span>
-                    <button
-                      v-if="canRunApt"
-                      class="btn btn-sm btn-outline-secondary"
-                      title="Planifier une commande APT"
-                      @click="openScheduleModal(host)"
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        class="icon icon-sm me-1"
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
+                    <div class="d-flex align-items-center gap-2">
+                      <button
+                        class="btn btn-sm btn-outline-secondary"
+                        @click="toggleHostDetails(host.id)"
                       >
-                        <rect
-                          x="3"
-                          y="4"
-                          width="18"
-                          height="18"
-                          rx="2"
-                          ry="2"
-                        /><line
-                          x1="16"
-                          y1="2"
-                          x2="16"
-                          y2="6"
-                        /><line
-                          x1="8"
-                          y1="2"
-                          x2="8"
-                          y2="6"
-                        /><line
-                          x1="3"
-                          y1="10"
-                          x2="21"
-                          y2="10"
-                        />
-                      </svg>
-                      Planifier
-                    </button>
+                        {{ isHostDetailsExpanded(host.id) ? 'Réduire' : 'Détails' }}
+                      </button>
+                      <button
+                        v-if="canRunApt"
+                        class="btn btn-sm btn-outline-secondary"
+                        title="Planifier une commande APT"
+                        @click="openScheduleModal(host)"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          class="icon icon-sm me-1"
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        >
+                          <rect
+                            x="3"
+                            y="4"
+                            width="18"
+                            height="18"
+                            rx="2"
+                            ry="2"
+                          /><line
+                            x1="16"
+                            y1="2"
+                            x2="16"
+                            y2="6"
+                          /><line
+                            x1="8"
+                            y1="2"
+                            x2="8"
+                            y2="6"
+                          /><line
+                            x1="3"
+                            y1="10"
+                            x2="21"
+                            y2="10"
+                          />
+                        </svg>
+                        Planifier
+                      </button>
+                    </div>
                   </div>
 
                   <div
                     v-if="aptStatuses[host.id]"
-                    class="row row-cards mb-3"
+                    class="d-flex flex-wrap gap-2 mb-3"
                   >
-                    <div class="col-sm-6 col-md-3">
-                      <div class="card card-sm h-100">
-                        <div class="card-body text-center">
-                          <div
-                            class="h2 mb-0"
-                            :class="aptStatuses[host.id].pending_packages > 0 ? 'text-yellow' : 'text-green'"
-                          >
-                            {{ aptStatuses[host.id].pending_packages }}
-                          </div>
-                          <div class="text-secondary small">
-                            En attente
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="col-sm-6 col-md-3">
-                      <div class="card card-sm h-100">
-                        <div class="card-body text-center">
-                          <div class="h2 mb-0 text-red">
-                            {{ aptStatuses[host.id].security_updates }}
-                          </div>
-                          <div class="text-secondary small">
-                            Sécurité
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="col-sm-6 col-md-3">
-                      <div class="card card-sm h-100">
-                        <div class="card-body text-center">
-                          <div class="fw-semibold">
-                            {{ formatDate(aptStatuses[host.id].last_update) }}
-                          </div>
-                          <div class="text-secondary small">
-                            Dernier update
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <div class="col-sm-6 col-md-3">
-                      <div class="card card-sm h-100">
-                        <div class="card-body text-center">
-                          <div class="fw-semibold">
-                            {{ formatDate(aptStatuses[host.id].last_upgrade) }}
-                          </div>
-                          <div class="text-secondary small">
-                            Dernière mise à jour
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                    <span
+                      class="badge"
+                      :class="aptStatuses[host.id].pending_packages > 0 ? 'bg-yellow-lt text-yellow' : 'bg-green-lt text-green'"
+                    >
+                      {{ aptStatuses[host.id].pending_packages }} en attente
+                    </span>
+                    <span class="badge bg-red-lt text-red">
+                      {{ aptStatuses[host.id].security_updates }} sécurité
+                    </span>
+                    <span class="badge bg-secondary-lt text-secondary">
+                      update: {{ formatDate(aptStatuses[host.id].last_update) }}
+                    </span>
+                    <span class="badge bg-secondary-lt text-secondary">
+                      upgrade: {{ formatDate(aptStatuses[host.id].last_upgrade) }}
+                    </span>
                   </div>
 
                   <!-- CVE Information -->
                   <div
-                    v-if="aptStatuses[host.id]?.cve_list"
+                    v-if="isHostDetailsExpanded(host.id) && aptStatuses[host.id]?.cve_list"
                     class="mb-3"
                   >
                     <div class="border rounded px-3 py-2 bg-body-tertiary">
@@ -344,7 +324,7 @@
 
                   <!-- Package List -->
                   <div
-                    v-if="getPackages(aptStatuses[host.id]).length > 0"
+                    v-if="isHostDetailsExpanded(host.id) && getPackages(aptStatuses[host.id]).length > 0"
                     class="mb-3"
                   >
                     <div class="d-flex align-items-center mb-2">
@@ -380,7 +360,7 @@
                   </div>
 
                   <div
-                    v-if="aptHistories[host.id]?.length"
+                    v-if="isHostDetailsExpanded(host.id) && aptHistories[host.id]?.length"
                     class="mt-3"
                   >
                     <div class="border rounded px-3 py-2 bg-body-tertiary">
@@ -760,6 +740,7 @@ const selectAll = ref(false)
 const aptStatuses = ref({})
 const aptHistories = ref({})
 const expandedHistories = ref({})
+const expandedHostDetails = ref({})
 const packagesExpanded = ref({})
 const packagesShowAll = ref({})
 const auth = useAuthStore()
@@ -776,10 +757,14 @@ const scheduleModal = ref({
 })
 
 function openScheduleModal(host) {
+  const hostLabel = host.name && host.hostname && host.name !== host.hostname
+    ? `${host.name} (${host.hostname})`
+    : (host.name || host.hostname)
+
   scheduleModal.value = {
     open: true,
     hostId: host.id,
-    hostname: host.hostname || host.name,
+    hostname: hostLabel,
     name: '',
     action: 'update',
     cron_expression: '0 3 * * 0',
@@ -839,7 +824,11 @@ const filteredHosts = computed(() => {
   // Search by name
   const q = hostSearch.value.trim().toLowerCase()
   if (q) {
-    list = list.filter(h => (h.hostname || h.name || '').toLowerCase().includes(q) || (h.ip_address || '').includes(q))
+    list = list.filter((h) => {
+      const primary = (h.name || h.hostname || '').toLowerCase()
+      const secondary = (h.hostname || '').toLowerCase()
+      return primary.includes(q) || secondary.includes(q) || (h.ip_address || '').includes(q)
+    })
   }
 
   // Quick filter
@@ -865,8 +854,8 @@ const filteredHosts = computed(() => {
       va = (aptStatuses.value[a.id]?.cve_list || []).length
       vb = (aptStatuses.value[b.id]?.cve_list || []).length
     } else {
-      va = (a.hostname || a.name || '').toLowerCase()
-      vb = (b.hostname || b.name || '').toLowerCase()
+      va = (a.name || a.hostname || '').toLowerCase()
+      vb = (b.name || b.hostname || '').toLowerCase()
     }
     if (va < vb) return hostSortDir.value === 'asc' ? -1 : 1
     if (va > vb) return hostSortDir.value === 'asc' ? 1 : -1
@@ -943,6 +932,14 @@ function toggleSelectAll() {
 
 function toggleHistory(hostId) {
   expandedHistories.value[hostId] = !expandedHistories.value[hostId]
+}
+
+function isHostDetailsExpanded(hostId) {
+  return !!expandedHostDetails.value[hostId]
+}
+
+function toggleHostDetails(hostId) {
+  expandedHostDetails.value[hostId] = !expandedHostDetails.value[hostId]
 }
 
 function displayedHostHistory(hostId) {

@@ -15,7 +15,13 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
+)
+
+const (
+	aptCommandIdleTimeout     = 10 * time.Minute
+	aptIdleTimeoutCheckPeriod = 5 * time.Second
 )
 
 type CVEInfo struct {
@@ -129,36 +135,21 @@ func ExecuteAptCommand(command string) (string, error) {
 // ExecuteAptCommandWithStreaming runs an apt command with real-time output streaming
 // streamCallback is called for each chunk of output (can be nil)
 func ExecuteAptCommandWithStreaming(command string, streamCallback func(chunk string)) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	defer cancel()
-
 	var cmd *exec.Cmd
 	switch command {
 	case "update":
-		cmd = exec.CommandContext(ctx, "apt", "update")
+		cmd = exec.Command("apt", "update")
 	case "upgrade":
-		cmd = exec.CommandContext(ctx, "apt", "upgrade", "-y", "-qq")
+		cmd = exec.Command("apt", "upgrade", "-y", "-qq")
 	case "dist-upgrade":
-		cmd = exec.CommandContext(ctx, "apt", "dist-upgrade", "-y", "-qq")
+		cmd = exec.Command("apt", "dist-upgrade", "-y", "-qq")
 	default:
 		return "", fmt.Errorf("unknown apt command: %s", command)
 	}
 
 	log.Printf("Executing: apt %s -y", command)
 
-	// If streaming callback provided, capture output in real-time
-	if streamCallback != nil {
-		output, err := runCommandWithStreaming(cmd, streamCallback)
-		if err != nil {
-			return output, fmt.Errorf("apt %s failed: %w\nOutput: %s", command, err, output)
-		}
-		log.Printf("apt %s completed successfully", command)
-		return output, nil
-	}
-
-	// Fallback to simple execution
-	out, err := cmd.CombinedOutput()
-	output := string(out)
+	output, err := runCommandWithStreaming(cmd, streamCallback, aptCommandIdleTimeout)
 
 	if err != nil {
 		return output, fmt.Errorf("apt %s failed: %w\nOutput: %s", command, err, output)
@@ -169,7 +160,7 @@ func ExecuteAptCommandWithStreaming(command string, streamCallback func(chunk st
 }
 
 // runCommandWithStreaming executes a command and streams output via callback
-func runCommandWithStreaming(cmd *exec.Cmd, streamCallback func(chunk string)) (string, error) {
+func runCommandWithStreaming(cmd *exec.Cmd, streamCallback func(chunk string), idleTimeout time.Duration) (string, error) {
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return "", err
@@ -185,8 +176,13 @@ func runCommandWithStreaming(cmd *exec.Cmd, streamCallback func(chunk string)) (
 
 	var fullOutput strings.Builder
 	var mu sync.Mutex
+	var lastChunkUnixNano atomic.Int64
+	var timedOut atomic.Bool
+
+	lastChunkUnixNano.Store(time.Now().UnixNano())
 
 	handleChunk := func(chunk string) {
+		lastChunkUnixNano.Store(time.Now().UnixNano())
 		mu.Lock()
 		fullOutput.WriteString(chunk)
 		mu.Unlock()
@@ -195,8 +191,33 @@ func runCommandWithStreaming(cmd *exec.Cmd, streamCallback func(chunk string)) (
 		}
 	}
 
-	// Read stdout and stderr concurrently - each goroutine has its own buffer
-	done := make(chan error, 2)
+	// Kill the process only when no output chunk has been produced for idleTimeout.
+	monitorDone := make(chan struct{})
+	go func() {
+		ticker := time.NewTicker(aptIdleTimeoutCheckPeriod)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-monitorDone:
+				return
+			case <-ticker.C:
+				last := time.Unix(0, lastChunkUnixNano.Load())
+				if time.Since(last) <= idleTimeout {
+					continue
+				}
+				if timedOut.CompareAndSwap(false, true) {
+					timeoutMsg := fmt.Sprintf("\nERROR: apt command timed out after %s without log output", idleTimeout)
+					handleChunk(timeoutMsg)
+					if cmd.Process != nil {
+						_ = cmd.Process.Kill()
+					}
+				}
+			}
+		}
+	}()
+
+	// Read stdout and stderr concurrently - each goroutine has its own buffer.
+	done := make(chan struct{}, 2)
 
 	go func() {
 		buf := make([]byte, 4096) // Local buffer for this goroutine
@@ -206,7 +227,7 @@ func runCommandWithStreaming(cmd *exec.Cmd, streamCallback func(chunk string)) (
 				handleChunk(string(buf[:n]))
 			}
 			if err != nil {
-				done <- nil
+				done <- struct{}{}
 				return
 			}
 		}
@@ -220,7 +241,7 @@ func runCommandWithStreaming(cmd *exec.Cmd, streamCallback func(chunk string)) (
 				handleChunk(string(buf[:n]))
 			}
 			if err != nil {
-				done <- nil
+				done <- struct{}{}
 				return
 			}
 		}
@@ -229,8 +250,12 @@ func runCommandWithStreaming(cmd *exec.Cmd, streamCallback func(chunk string)) (
 	// Wait for both streams to finish
 	<-done
 	<-done
+	close(monitorDone)
 
 	err = cmd.Wait()
+	if timedOut.Load() {
+		return fullOutput.String(), fmt.Errorf("timeout after %s without log output", idleTimeout)
+	}
 	return fullOutput.String(), err
 }
 
