@@ -24,6 +24,24 @@ const api: AxiosInstance = axios.create({
   timeout: 30000,
 })
 
+let redirectingToLogin = false
+
+function hardRedirectToLogin(): void {
+  if (redirectingToLogin) return
+  redirectingToLogin = true
+
+  const now = Date.now()
+  const target = `/login?reauth=${now}`
+
+  if (window.location.pathname === '/login') {
+    window.location.replace(target)
+    setTimeout(() => window.location.reload(), 50)
+    return
+  }
+
+  window.location.replace(target)
+}
+
 /**
  * Normalize API/Network error objects into a user-facing message.
  */
@@ -65,7 +83,7 @@ api.interceptors.response.use(
     if (status === 401) {
       const auth = useAuthStore()
       auth.logout()
-      window.location.href = '/login'
+      hardRedirectToLogin()
     } else if (status === 403) {
       emitHttpError(403, "Vous n'avez pas les droits nécessaires pour cette action")
     } else if (status && status >= 500) {
