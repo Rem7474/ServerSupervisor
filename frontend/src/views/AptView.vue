@@ -286,21 +286,37 @@
                     v-if="aptStatuses[host.id]"
                     class="d-flex flex-wrap gap-2 mb-3"
                   >
-                    <span
-                      class="badge"
-                      :class="aptStatuses[host.id].pending_packages > 0 ? 'bg-yellow-lt text-yellow' : 'bg-green-lt text-green'"
-                    >
-                      {{ aptStatuses[host.id].pending_packages }} en attente
-                    </span>
-                    <span class="badge bg-red-lt text-red">
-                      {{ aptStatuses[host.id].security_updates }} sécurité
-                    </span>
-                    <span class="badge bg-secondary-lt text-secondary">
-                      update: {{ formatDate(aptStatuses[host.id].last_update) }}
-                    </span>
-                    <span class="badge bg-secondary-lt text-secondary">
-                      upgrade: {{ formatDate(aptStatuses[host.id].last_upgrade) }}
-                    </span>
+                    <template v-if="isHostUpToDate(host.id)">
+                      <span class="badge bg-green-lt text-green">
+                        À jour
+                      </span>
+                      <span class="text-secondary small">
+                        Aucune mise à jour en attente
+                      </span>
+                      <span class="badge bg-secondary-lt text-secondary">
+                        vérifié: {{ formatDate(aptStatuses[host.id].last_update) }}
+                      </span>
+                    </template>
+                    <template v-else>
+                      <span
+                        class="badge"
+                        :class="aptStatuses[host.id].pending_packages > 0 ? 'bg-yellow-lt text-yellow' : 'bg-green-lt text-green'"
+                      >
+                        {{ aptStatuses[host.id].pending_packages }} en attente
+                      </span>
+                      <span
+                        class="badge"
+                        :class="aptStatuses[host.id].security_updates > 0 ? 'bg-red-lt text-red' : 'bg-secondary-lt text-secondary'"
+                      >
+                        {{ aptStatuses[host.id].security_updates }} sécurité
+                      </span>
+                      <span class="badge bg-secondary-lt text-secondary">
+                        update: {{ formatDate(aptStatuses[host.id].last_update) }}
+                      </span>
+                      <span class="badge bg-secondary-lt text-secondary">
+                        upgrade: {{ formatDate(aptStatuses[host.id].last_upgrade) }}
+                      </span>
+                    </template>
                   </div>
 
                   <!-- CVE Information -->
@@ -951,6 +967,14 @@ function displayedHostHistory(hostId) {
 function hasMoreHostHistory(hostId) {
   const history = Array.isArray(aptHistories.value[hostId]) ? aptHistories.value[hostId] : []
   return history.length > HOST_HISTORY_PREVIEW_COUNT
+}
+
+function isHostUpToDate(hostId) {
+  const status = aptStatuses.value[hostId]
+  if (!status) return false
+  const pending = Number(status.pending_packages || 0)
+  const security = Number(status.security_updates || 0)
+  return pending === 0 && security === 0
 }
 
 function getPackages(aptStatus) {
