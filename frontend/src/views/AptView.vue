@@ -324,7 +324,7 @@
                     class="mb-3"
                   >
                     <CVEList
-                      :cve-list="aptStatuses[host.id].cve_list"
+                      :cve-list="getTopCvesByCriticality(aptStatuses[host.id])"
                       :show-max-severity="true"
                       :always-expanded="false"
                       :limit="5"
@@ -369,23 +369,17 @@
                   </div>
 
                   <div v-if="aptHistories[host.id]?.length">
-                    <button
-                      class="btn btn-link p-0"
-                      @click="toggleHistory(host.id)"
-                    >
-                      {{ expandedHistories[host.id] ? 'Masquer' : 'Voir' }} l'historique ({{ aptHistories[host.id].length }})
-                    </button>
-                    <div
-                      v-if="expandedHistories[host.id]"
-                      class="mt-3"
-                    >
+                    <div class="text-secondary small mb-2">
+                      Historique récent ({{ aptHistories[host.id].length }})
+                    </div>
+                    <div class="mt-1">
                       <div
-                        v-for="cmd in aptHistories[host.id]"
+                        v-for="cmd in displayedHostHistory(host.id)"
                         :key="cmd.id"
-                        class="border rounded p-3 mb-2"
+                        class="border rounded p-2 mb-2"
                       >
-                        <div class="d-flex align-items-center justify-content-between">
-                          <div class="fw-semibold">
+                        <div class="d-flex align-items-center justify-content-between gap-2">
+                          <div class="small fw-semibold">
                             apt {{ cmd.action }}
                           </div>
                           <div class="d-flex align-items-center gap-2">
@@ -419,6 +413,15 @@
                         </div>
                       </div>
                     </div>
+                    <button
+                      v-if="hasMoreHostHistory(host.id)"
+                      class="btn btn-sm btn-link p-0"
+                      @click="toggleHistory(host.id)"
+                    >
+                      {{ expandedHistories[host.id]
+                        ? 'Afficher moins'
+                        : `Afficher plus (${aptHistories[host.id].length - HOST_HISTORY_PREVIEW_COUNT})` }}
+                    </button>
                   </div>
                 </div>
               </div>
@@ -798,6 +801,18 @@ const hostFilterOptions = [
   { value: 'security', label: 'Sécu > 0' },
 ]
 
+const HOST_HISTORY_PREVIEW_COUNT = 3
+const TOP_CVE_PREVIEW_COUNT = 5
+
+const severityRank = {
+  CRITICAL: 5,
+  HIGH: 4,
+  MEDIUM: 3,
+  LOW: 2,
+  NEGLIGIBLE: 1,
+  UNKNOWN: 0,
+}
+
 const filteredHosts = computed(() => {
   let list = [...hosts.value]
 
@@ -908,6 +923,39 @@ function toggleSelectAll() {
 
 function toggleHistory(hostId) {
   expandedHistories.value[hostId] = !expandedHistories.value[hostId]
+}
+
+function displayedHostHistory(hostId) {
+  const history = Array.isArray(aptHistories.value[hostId]) ? aptHistories.value[hostId] : []
+  if (expandedHistories.value[hostId]) return history
+  return history.slice(0, HOST_HISTORY_PREVIEW_COUNT)
+}
+
+function hasMoreHostHistory(hostId) {
+  const history = Array.isArray(aptHistories.value[hostId]) ? aptHistories.value[hostId] : []
+  return history.length > HOST_HISTORY_PREVIEW_COUNT
+}
+
+function getTopCvesByCriticality(aptStatus) {
+  if (!aptStatus?.cve_list) return []
+  try {
+    const parsed = typeof aptStatus.cve_list === 'string'
+      ? JSON.parse(aptStatus.cve_list)
+      : aptStatus.cve_list
+    const list = Array.isArray(parsed) ? parsed : []
+    return [...list]
+      .sort((a, b) => {
+        const rankA = severityRank[String(a?.severity || '').toUpperCase()] ?? 0
+        const rankB = severityRank[String(b?.severity || '').toUpperCase()] ?? 0
+        if (rankA !== rankB) return rankB - rankA
+        const scoreA = Number(a?.cvss_score || 0)
+        const scoreB = Number(b?.cvss_score || 0)
+        return scoreB - scoreA
+      })
+      .slice(0, TOP_CVE_PREVIEW_COUNT)
+  } catch {
+    return []
+  }
 }
 
 function getPackages(aptStatus) {

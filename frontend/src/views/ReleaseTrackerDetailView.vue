@@ -364,7 +364,7 @@
                 </thead>
                 <tbody>
                   <tr
-                    v-for="entry in versionHistory"
+                    v-for="entry in visibleVersionHistory"
                     :key="`${entry.version}-${entry.published_at || 'n/a'}`"
                   >
                     <td>
@@ -387,6 +387,19 @@
                   </tr>
                 </tbody>
               </table>
+            </div>
+            <div
+              v-if="versionHistory.length > VERSION_HISTORY_PREVIEW_LIMIT"
+              class="p-2 border-top"
+            >
+              <button
+                class="btn btn-sm btn-link p-0"
+                @click="showAllVersionHistory = !showAllVersionHistory"
+              >
+                {{ showAllVersionHistory
+                  ? 'Afficher moins'
+                  : `Afficher plus (${versionHistory.length - VERSION_HISTORY_PREVIEW_LIMIT})` }}
+              </button>
             </div>
           </div>
         </div>
@@ -447,6 +460,7 @@ const id = route.params.id
 const tracker = ref(null)
 const executions = ref([])
 const versionHistory = ref([])
+const showAllVersionHistory = ref(false)
 const hosts = ref([])
 const loading = ref(false)
 const error = ref('')
@@ -463,6 +477,13 @@ const saving = ref(false)
 const modalError = ref('')
 
 const { openCommandStream, closeStream } = useCommandStream({ token: () => auth.token })
+
+const VERSION_HISTORY_PREVIEW_LIMIT = 5
+
+const visibleVersionHistory = computed(() => {
+  if (showAllVersionHistory.value) return versionHistory.value
+  return versionHistory.value.slice(0, VERSION_HISTORY_PREVIEW_LIMIT)
+})
 
 const gitEnvVars = [
   { name: 'SS_REPO_NAME',    desc: 'owner/repo (ex: home-assistant/core)' },
@@ -576,8 +597,10 @@ async function loadVersionHistory() {
   try {
     const res = await api.getReleaseTrackerVersionHistory(id)
     versionHistory.value = res.data.history || []
+    showAllVersionHistory.value = false
   } catch {
     versionHistory.value = []
+    showAllVersionHistory.value = false
   } finally {
     historyLoading.value = false
   }
