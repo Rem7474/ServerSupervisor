@@ -9,6 +9,9 @@ interface ExecutionPayload {
   branch?: string
   tag_name?: string
   release_name?: string
+  command_id?: string
+  host_name?: string
+  host_id?: string
   [key: string]: unknown
 }
 
@@ -124,6 +127,7 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
   const prefillDockerTag: Ref<string> = ref('')
   const nowTick: Ref<number> = ref(Date.now())
   let cooldownTimer: number | null = null
+  let runningRefreshTimer: number | null = null
 
   const recentWebhookExecutions: ComputedRef<RecentExecution[]> = computed(() =>
     webhooks.value
@@ -154,6 +158,9 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
           sourceName: tracker.name,
           tag_name: execution.tag_name || tracker.last_release_tag,
           release_name: execution.release_name || tracker.name,
+          command_id: execution.command_id,
+          host_name: (tracker as unknown as Record<string, string>).host_name || (tracker as unknown as Record<string, string>).host_id || '',
+          host_id: (tracker as unknown as Record<string, string>).host_id || '',
         }
       })
       .sort((left, right) => new Date(right.triggered_at).getTime() - new Date(left.triggered_at).getTime())
@@ -182,10 +189,12 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
       prefillDockerTag.value = String(route.query.docker_tag || 'latest')
       activeTab.value = 'trackers'
       await Promise.all([loadWebhooks(), loadTrackers(), loadHosts()])
+      ensureRunningRefresh()
       openCreateTracker()
       return
     }
     await Promise.all([loadWebhooks(), loadTrackers(), loadHosts()])
+    ensureRunningRefresh()
   })
 
   onUnmounted(() => {
@@ -193,7 +202,37 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
       window.clearInterval(cooldownTimer)
       cooldownTimer = null
     }
+    stopRunningRefresh()
   })
+
+  function hasRunningTrackerExecution(): boolean {
+    return trackers.value.some((tracker) => {
+      const status = (tracker.last_execution as ExecutionPayload | undefined)?.status
+      return status === 'pending' || status === 'running'
+    })
+  }
+
+  function stopRunningRefresh(): void {
+    if (runningRefreshTimer !== null) {
+      window.clearInterval(runningRefreshTimer)
+      runningRefreshTimer = null
+    }
+  }
+
+  function ensureRunningRefresh(): void {
+    if (!hasRunningTrackerExecution()) {
+      stopRunningRefresh()
+      return
+    }
+    if (runningRefreshTimer !== null) return
+    runningRefreshTimer = window.setInterval(async () => {
+      if (!hasRunningTrackerExecution()) {
+        stopRunningRefresh()
+        return
+      }
+      await loadTrackers()
+    }, 5000)
+  }
 
   async function loadWebhooks(): Promise<void> {
     loadingWebhooks.value = true
@@ -214,6 +253,7 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
       error.value = ''
       const response = await api.getReleaseTrackers()
       trackers.value = response.data.trackers || []
+      ensureRunningRefresh()
     } catch (err: unknown) {
       error.value = readError(err, 'Erreur lors du chargement des trackers')
     } finally {

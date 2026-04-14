@@ -382,6 +382,7 @@ function download() {
   padding: 1rem;
   margin: 0;
   overflow: auto;
+  max-height: 60vh;
   font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
   font-size: 0.813rem;
   line-height: 1.5;

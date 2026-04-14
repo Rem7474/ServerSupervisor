@@ -60,12 +60,12 @@ func (db *DB) ListReleaseTrackers() ([]models.ReleaseTracker, error) {
 		        t.last_checked_at, t.last_triggered_at, t.last_error,
 		        t.notify_channels, t.notify_on_release, t.enabled, t.created_at,
 		        COALESCE(h.name, '') AS host_name,
-		        le.id, le.tag_name, le.release_url, le.release_name,
+		        le.id, le.command_id, le.tag_name, le.release_url, le.release_name,
 		        le.status, le.triggered_at, le.completed_at
 		 FROM release_trackers t
 		 LEFT JOIN hosts h ON h.id = t.host_id
 		 LEFT JOIN LATERAL (
-		   SELECT id, tag_name, release_url, release_name, status, triggered_at, completed_at
+		   SELECT id, command_id, tag_name, release_url, release_name, status, triggered_at, completed_at
 		   FROM release_tracker_executions
 		   WHERE tracker_id = t.id
 		   ORDER BY triggered_at DESC LIMIT 1
@@ -90,7 +90,7 @@ func (db *DB) ListReleaseTrackers() ([]models.ReleaseTracker, error) {
 			&t.LastCheckedAt, &t.LastTriggeredAt, &t.LastError,
 			pq.Array(&t.NotifyChannels), &t.NotifyOnRelease, &t.Enabled, &t.CreatedAt,
 			&t.HostName,
-			&leID, &leTag, &leURL, &leName, &leStatus, &leTriggered, &leCompleted,
+			&leID, &leCommandID, &leTag, &leURL, &leName, &leStatus, &leTriggered, &leCompleted,
 		); err != nil {
 			return nil, err
 		}
@@ -107,6 +107,9 @@ func (db *DB) ListReleaseTrackers() ([]models.ReleaseTracker, error) {
 				ReleaseName: leName.String,
 				Status:      leStatus.String,
 				TriggeredAt: leTriggered.Time,
+			}
+			if leCommandID.Valid {
+				exec.CommandID = &leCommandID.String
 			}
 			if leCompleted.Valid {
 				exec.CompletedAt = &leCompleted.Time

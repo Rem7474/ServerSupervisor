@@ -127,15 +127,29 @@ func normalizeDigest(d string) string {
 }
 
 func isVersionUpToDate(runningTag, runningDigest, latestTag, latestDigest string) bool {
+	// Digest equality is the strongest signal when both are known.
+	nd := normalizeDigest(runningDigest)
+	ld := normalizeDigest(latestDigest)
+	if nd != "" && ld != "" && nd == ld {
+		return true
+	}
+
 	// When both tags are explicit (non-"latest") versions, tag equality wins.
 	// Digest may legitimately differ across architectures or registry re-pushes.
 	if runningTag != "latest" && latestTag != "latest" {
-		return normalizeVersion(runningTag) == normalizeVersion(latestTag)
+		r := normalizeVersion(runningTag)
+		l := normalizeVersion(latestTag)
+		if r == l {
+			return true
+		}
+		// Support channel-like tags such as "v5" while running explicit patch versions like "v5.13.2".
+		if l != "" && strings.HasPrefix(r, l+".") {
+			return true
+		}
+		return false
 	}
 
 	// For "latest" tags, rely on digest comparison when available.
-	nd := normalizeDigest(runningDigest)
-	ld := normalizeDigest(latestDigest)
 	if nd != "" && ld != "" {
 		return nd == ld
 	}

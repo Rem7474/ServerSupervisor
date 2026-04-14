@@ -382,6 +382,20 @@
                       >Image</span>
                       <code class="text-truncate">{{ tracker.docker_image }}:{{ tracker.docker_tag || 'latest' }}</code>
                     </div>
+                    <div
+                      v-if="tracker.repo_owner && tracker.repo_name"
+                      class="d-flex gap-2 mb-1"
+                    >
+                      <span
+                        class="text-muted"
+                        style="min-width:60px"
+                      >Repo</span>
+                      <a
+                        :href="repoURL(tracker)"
+                        target="_blank"
+                        class="link-primary text-truncate"
+                      >{{ tracker.repo_owner }}/{{ tracker.repo_name }}</a>
+                    </div>
                   </template>
                   <!-- Git tracker info -->
                   <template v-else>
@@ -546,7 +560,20 @@
           kind="tracker"
           title="Dernières exécutions des trackers"
           empty-text="Aucune exécution connue."
+          logs-mode="inline"
+          @open-logs="openTrackerLogs"
         />
+
+        <div class="mt-3">
+          <CommandLogPanel
+            :command="selectedTrackerCmd"
+            :show="showTrackerConsole"
+            title="Console live"
+            empty-text="Sélectionnez 'Logs' dans les dernières exécutions"
+            @close="closeTrackerLogs"
+            @open="showTrackerConsole = true"
+          />
+        </div>
       </template>
     </div>
 
@@ -615,6 +642,11 @@ import { useGitWebhooksPage } from '../composables/useGitWebhooksPage'
 import WebhookUrlCard from '../components/WebhookUrlCard.vue'
 import WebhookExecutionList from '../components/webhooks/WebhookExecutionList.vue'
 import WebhookModal from '../components/webhooks/WebhookModal.vue'
+import CommandLogPanel from '../components/CommandLogPanel.vue'
+import { ref } from 'vue'
+import api from '../api'
+import { useAuthStore } from '../stores/auth'
+import { useCommandStream } from '../composables/useCommandStream'
 const {
   activeTab,
   hosts,
@@ -658,5 +690,58 @@ const {
   cooldownRemainingLabel,
   cooldownEtaLabel,
 } = useGitWebhooksPage()
+
+const auth = useAuthStore()
+const { openCommandStream, closeStream } = useCommandStream({ token: () => auth.token })
+const selectedTrackerCmd = ref(null)
+const showTrackerConsole = ref(false)
+
+function closeTrackerLogs() {
+  closeStream()
+  selectedTrackerCmd.value = null
+  showTrackerConsole.value = false
+}
+
+function connectTrackerStream(commandId) {
+  openCommandStream(commandId, {
+    onInit(payload) {
+      if (!selectedTrackerCmd.value || selectedTrackerCmd.value.id !== commandId) return
+      selectedTrackerCmd.value = {
+        ...selectedTrackerCmd.value,
+        status: payload.status || selectedTrackerCmd.value.status,
+        output: payload.output ?? selectedTrackerCmd.value.output,
+      }
+    },
+    onChunk(payload) {
+      if (!selectedTrackerCmd.value || selectedTrackerCmd.value.id !== commandId) return
+      selectedTrackerCmd.value = {
+        ...selectedTrackerCmd.value,
+        output: (selectedTrackerCmd.value.output || '') + (payload.chunk || ''),
+      }
+    },
+    onStatus(payload) {
+      if (!selectedTrackerCmd.value || selectedTrackerCmd.value.id !== commandId) return
+      selectedTrackerCmd.value = {
+        ...selectedTrackerCmd.value,
+        status: payload.status || selectedTrackerCmd.value.status,
+        output: payload.output ?? selectedTrackerCmd.value.output,
+      }
+    },
+  })
+}
+
+async function openTrackerLogs(commandId) {
+  closeStream()
+  try {
+    const res = await api.getCommandStatus(commandId)
+    selectedTrackerCmd.value = res.data
+    showTrackerConsole.value = true
+    if (res.data?.status === 'pending' || res.data?.status === 'running') {
+      connectTrackerStream(commandId)
+    }
+  } catch {
+    // Keep page usable even if command history entry vanished.
+  }
+}
 </script>
 

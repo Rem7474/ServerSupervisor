@@ -48,6 +48,7 @@
           <tr v-if="kind === 'tracker'">
             <th>Date</th>
             <th>Release</th>
+            <th>Hôte</th>
             <th>Statut</th>
             <th>Logs</th>
           </tr>
@@ -88,6 +89,9 @@
                 >
                   {{ execution.release_name }}
                 </div>
+              </td>
+              <td class="small text-muted">
+                {{ execution.host_name || execution.host_id || '—' }}
               </td>
               <td>
                 <span

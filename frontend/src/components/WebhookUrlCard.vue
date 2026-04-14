@@ -179,8 +179,7 @@
       >
         <strong>Configuration {{ providerLabel }}:</strong>
         <div
-          class="mt-1 font-monospace"
-          style="background:#f1f3f4;border-radius:4px;padding:8px;font-size:0.8rem;"
+          class="mt-1 font-monospace provider-setup-box"
         >
           <template v-if="provider === 'gitlab'">
             Header: <strong>X-Gitlab-Token</strong> = &lt;secret&gt;
@@ -271,3 +270,13 @@ async function doRegenerate() {
   }
 }
 </script>
+
+<style scoped>
+.provider-setup-box {
+  background: var(--tblr-bg-surface-secondary);
+  border-radius: 4px;
+  padding: 8px;
+  font-size: 0.8rem;
+  border: 1px solid var(--tblr-border-color);
+}
+</style>

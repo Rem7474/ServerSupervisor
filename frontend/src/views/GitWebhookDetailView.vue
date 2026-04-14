@@ -186,10 +186,11 @@
         <div class="mt-3">
           <CommandLogPanel
             :command="selectedCmd"
-            :show="true"
+            :show="showConsole"
             title="Console live"
             empty-text="Sélectionnez 'Logs' dans l'historique des exécutions"
             @close="clearExecutionLogs"
+            @open="showConsole = true"
           />
         </div>
       </div>
@@ -232,6 +233,7 @@ const loading = ref(false)
 const error = ref('')
 const revealedSecret = ref('')
 const selectedCmd = ref(null)
+const showConsole = ref(false)
 
 // Edit modal
 const showModal = ref(false)
@@ -274,6 +276,7 @@ async function loadExecutions() {
 function clearExecutionLogs() {
   closeStream()
   selectedCmd.value = null
+  showConsole.value = false
 }
 
 function connectExecutionStream(commandId) {
@@ -317,6 +320,7 @@ async function openExecutionLogs(commandId) {
     const res = await api.getCommandStatus(commandId)
     const cmd = res.data
     selectedCmd.value = cmd
+    showConsole.value = true
     if (cmd?.status === 'pending' || cmd?.status === 'running') {
       connectExecutionStream(commandId)
     }

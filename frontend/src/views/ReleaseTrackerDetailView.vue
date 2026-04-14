@@ -202,6 +202,28 @@
                     class="text-muted"
                   >Jamais</span>
                 </dd>
+
+                <template v-if="tracker.repo_owner && tracker.repo_name">
+                  <dt class="col-5 text-muted">
+                    Repo lié
+                  </dt>
+                  <dd class="col-7">
+                    <a
+                      :href="repoURL"
+                      target="_blank"
+                      class="link-primary"
+                    >
+                      {{ tracker.repo_owner }}/{{ tracker.repo_name }}
+                    </a>
+                    <div class="small mt-1">
+                      <a
+                        :href="releaseNotesURL"
+                        target="_blank"
+                        class="link-secondary"
+                      >Voir les release notes</a>
+                    </div>
+                  </dd>
+                </template>
               </template>
 
               <!-- Common fields -->
@@ -567,11 +589,23 @@ const cooldownEtaText = computed(() => {
 })
 
 const repoURL = computed(() => {
-  if (!tracker.value || tracker.value.tracker_type === 'docker') return '#'
+  if (!tracker.value || !tracker.value.repo_owner || !tracker.value.repo_name) return '#'
   switch (tracker.value.provider) {
     case 'gitlab': return `https://gitlab.com/${tracker.value.repo_owner}/${tracker.value.repo_name}`
     case 'gitea':  return `https://codeberg.org/${tracker.value.repo_owner}/${tracker.value.repo_name}`
     default:       return `https://github.com/${tracker.value.repo_owner}/${tracker.value.repo_name}`
+  }
+})
+
+const releaseNotesURL = computed(() => {
+  if (!tracker.value || !tracker.value.repo_owner || !tracker.value.repo_name) return '#'
+  switch (tracker.value.provider) {
+    case 'gitlab': return `https://gitlab.com/${tracker.value.repo_owner}/${tracker.value.repo_name}/-/releases`
+    case 'gitea':
+    case 'forgejo':
+      return `https://codeberg.org/${tracker.value.repo_owner}/${tracker.value.repo_name}/releases`
+    default:
+      return `https://github.com/${tracker.value.repo_owner}/${tracker.value.repo_name}/releases`
   }
 })
 

@@ -216,22 +216,53 @@
                     Tag de l'image a surveiller.
                   </div>
                 </div>
+
+                <div class="col-12">
+                  <div class="border rounded p-2">
+                    <div class="fw-medium mb-2">
+                      Repo Git lie (optionnel, pour les release notes)
+                    </div>
+                    <div class="row g-2">
+                      <div class="col-md-4">
+                        <label class="form-label">Provider</label>
+                        <select
+                          v-model="form.provider"
+                          class="form-select"
+                        >
+                          <option value="github">
+                            GitHub
+                          </option>
+                          <option value="gitlab">
+                            GitLab
+                          </option>
+                          <option value="gitea">
+                            Gitea (Codeberg)
+                          </option>
+                        </select>
+                      </div>
+                      <div class="col-md-4">
+                        <label class="form-label">Owner / Org</label>
+                        <input
+                          v-model="form.repo_owner"
+                          type="text"
+                          class="form-control"
+                          placeholder="ex: home-assistant"
+                        >
+                      </div>
+                      <div class="col-md-4">
+                        <label class="form-label">Depot</label>
+                        <input
+                          v-model="form.repo_name"
+                          type="text"
+                          class="form-control"
+                          placeholder="ex: core"
+                        >
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </template>
 
-              <div class="col-md-4">
-                <label class="form-label">Cooldown (heures)</label>
-                <input
-                  v-model.number="form.cooldown_hours"
-                  type="number"
-                  min="0"
-                  max="168"
-                  class="form-control"
-                  placeholder="0"
-                >
-                <div class="form-hint">
-                  Delai avant declenchement apres detection d'une nouvelle version (0 = immediat).
-                </div>
-              </div>
             </template>
 
             <!-- VM + Task -->
@@ -253,6 +284,24 @@
                 class="form-hint text-muted"
               >
                 Si desactive, le tracker surveille uniquement et enregistre la version sans executer de script.
+              </div>
+            </div>
+
+            <div
+              v-if="mode === 'tracker'"
+              class="col-md-4"
+            >
+              <label class="form-label">Cooldown (heures)</label>
+              <input
+                v-model.number="form.cooldown_hours"
+                type="number"
+                min="0"
+                max="168"
+                class="form-control"
+                placeholder="0"
+              >
+              <div class="form-hint">
+                Delai avant declenchement apres detection d'une nouvelle version (0 = immediat).
               </div>
             </div>
 
@@ -353,6 +402,7 @@
                     v-model="form.notify_on_release"
                     class="form-check-input"
                     type="checkbox"
+                    :disabled="!form.notify_channels.length"
                   >
                   <span class="form-check-label">Notifier a chaque mise a jour detectee</span>
                 </label>
@@ -372,16 +422,22 @@
                   <span class="form-check-label">{{ channel }}</span>
                 </label>
               </div>
+              <div
+                v-if="mode === 'tracker'"
+                class="form-hint mt-2"
+              >
+                Activez au moins un canal pour pouvoir notifier les nouvelles versions.
+              </div>
             </div>
 
-            <div class="col-12">
-              <label class="form-check form-switch">
+            <div class="col-12 border-top pt-3">
+              <label class="form-check form-switch mb-0">
                 <input
                   v-model="form.enabled"
                   class="form-check-input"
                   type="checkbox"
                 >
-                <span class="form-check-label">Active</span>
+                <span class="form-check-label fw-medium">Activer ce {{ mode === 'tracker' ? 'tracker' : 'webhook' }}</span>
               </label>
             </div>
           </div>
@@ -567,6 +623,17 @@ watch(
 )
 
 watch(
+  () => form.value.notify_channels,
+  (channels) => {
+    if (props.mode !== 'tracker') return
+    if (!Array.isArray(channels) || channels.length === 0) {
+      form.value.notify_on_release = false
+    }
+  },
+  { deep: true }
+)
+
+watch(
   () => props.visible,
   (visible) => {
     if (visible) {
@@ -652,6 +719,9 @@ function validate() {
       if (!form.value.docker_image) {
         return "L'image Docker est obligatoire pour un tracker Docker."
       }
+      if ((form.value.repo_owner && !form.value.repo_name) || (!form.value.repo_owner && form.value.repo_name)) {
+        return 'Pour le repo Git lie, renseignez owner et depot ensemble (ou laissez les deux vides).'
+      }
       if (form.value.dispatch_task && (!form.value.host_id || !form.value.custom_task_id)) {
         return 'VM cible et ID de tache sont obligatoires si le declenchement de tache est active.'
       }
@@ -669,6 +739,9 @@ function submit() {
   validationError.value = validate()
   if (validationError.value) return
   const payload = { ...form.value }
+  if (props.mode === 'tracker' && (!Array.isArray(payload.notify_channels) || payload.notify_channels.length === 0)) {
+    payload.notify_on_release = false
+  }
   // For monitor-only trackers, clear host/task before sending
   if (props.mode === 'tracker' && !payload.dispatch_task) {
     payload.host_id = ''
