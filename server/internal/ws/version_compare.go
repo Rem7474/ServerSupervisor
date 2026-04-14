@@ -51,13 +51,13 @@ func (h *WSHandler) buildVersionComparisons() ([]models.VersionComparison, error
 			nd := normalizeDigest(container.ImageDigest)
 			ld := normalizeDigest(tracker.LatestImageDigest)
 
-			// Resolve display version first — OCI labels may carry an explicit version
-			// even when the image is tagged "latest".
+			// Resolve display version with digest priority: digest can reveal an exact
+			// deployed release (e.g. v5.13.2) even if runtime tag stays broad (e.g. v5).
 			runningVersion := resolveContainerVersion(container.ImageTag, container.Labels)
-			if runningVersion == "latest" && nd != "" {
+			if nd != "" {
 				if nd == ld {
 					runningVersion = tracker.LastReleaseTag
-				} else if historicTag, ok := digestTagMap[tracker.ID+"|"+nd]; ok {
+				} else if historicTag, ok := digestTagMap[tracker.ID+"|"+nd]; ok && historicTag != "" {
 					runningVersion = historicTag
 				}
 			}

@@ -558,7 +558,10 @@
                 {{ testError }}
               </div>
 
-              <div class="mb-3">
+              <div
+                v-if="commandTriggerEnabled"
+                class="mb-3"
+              >
                 <label class="form-label">Période de silence (secondes)</label>
                 <input
                   v-model.number="form.actions.cooldown"
