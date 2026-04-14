@@ -304,12 +304,14 @@
               <dd class="col-7">
                 {{ formatDateTime(tracker.created_at) }}
               </dd>
-              <dt class="col-5 text-muted">
-                Cooldown
-              </dt>
-              <dd class="col-7">
-                {{ tracker.cooldown_hours ? `${tracker.cooldown_hours}h` : 'Aucun (immédiat)' }}
-              </dd>
+              <template v-if="Number(tracker.cooldown_hours || 0) > 0">
+                <dt class="col-5 text-muted">
+                  Cooldown
+                </dt>
+                <dd class="col-7">
+                  {{ `${tracker.cooldown_hours}h` }}
+                </dd>
+              </template>
               <template v-if="cooldownActive">
                 <dt class="col-5 text-muted">
                   Déploiement prévu

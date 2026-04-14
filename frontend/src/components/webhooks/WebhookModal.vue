@@ -288,7 +288,7 @@
             </div>
 
             <div
-              v-if="mode === 'tracker'"
+              v-if="mode === 'tracker' && form.dispatch_task"
               class="col-md-4"
             >
               <label class="form-label">Cooldown (heures)</label>

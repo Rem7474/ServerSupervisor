@@ -453,12 +453,15 @@
                     >Maj</span>
                     <span>{{ formatDateOnly(tracker.last_checked_at || tracker.last_triggered_at || tracker.last_execution?.triggered_at) }}</span>
                   </div>
-                  <div class="d-flex gap-2 mb-1">
+                  <div
+                    v-if="Number(tracker.cooldown_hours || 0) > 0"
+                    class="d-flex gap-2 mb-1"
+                  >
                     <span
                       class="text-muted"
                       style="min-width:60px"
                     >Cooldown</span>
-                    <span>{{ tracker.cooldown_hours ? `${tracker.cooldown_hours}h` : 'Aucun' }}</span>
+                    <span>{{ `${tracker.cooldown_hours}h` }}</span>
                   </div>
                 </div>
                 <div class="mt-2 pt-2 border-top small">
