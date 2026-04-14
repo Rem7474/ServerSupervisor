@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -158,7 +159,11 @@ func (h *ReleaseTrackerHandler) checkOneDocker(t models.ReleaseTracker) {
 	digest, err := providerClient.FetchDockerManifestDigest(t.DockerImage, tag)
 	if err != nil {
 		log.Printf("Docker tracker %s (%s:%s): fetch error: %v", t.Name, t.DockerImage, tag, err)
-		_ = h.db.UpdateReleaseTrackerError(t.ID, err.Error())
+		errMsg := err.Error()
+		if tag == "latest" && strings.Contains(strings.ToLower(errMsg), "status 404") {
+			errMsg = "tag latest introuvable pour cette image; utilisez un tag versionne (ex: v4, v4.4, v4.4.1)"
+		}
+		_ = h.db.UpdateReleaseTrackerError(t.ID, errMsg)
 		return
 	}
 	if digest == "" {
@@ -166,14 +171,17 @@ func (h *ReleaseTrackerHandler) checkOneDocker(t models.ReleaseTracker) {
 		return
 	}
 
-	// For "latest" tags, attempt to resolve the actual version from the registry.
+	// For mutable tags ("latest", major/minor channels like "v4"/"v4.4"),
+	// resolve the exact version from the digest when possible.
 	// Docker Hub: uses hub.docker.com API (tags + digest in one call).
 	// Others: enumerates semver-looking tags and HEADs each manifest.
 	resolvedVersion := tag
-	if tag == "latest" {
+	if shouldResolveDockerTag(tag) {
 		if v := providerClient.FetchDockerVersionForDigest(t.DockerImage, digest); v != "" {
 			resolvedVersion = v
-			log.Printf("Docker tracker %s: resolved 'latest' → %s", t.Name, v)
+			if v != tag {
+				log.Printf("Docker tracker %s: resolved mutable tag %q to %q", t.Name, tag, v)
+			}
 		}
 	}
 
@@ -227,6 +235,30 @@ func (h *ReleaseTrackerHandler) checkOneDocker(t models.ReleaseTracker) {
 	log.Printf("Docker tracker %s: new digest for %s:%s → dispatching task %s on host %s",
 		t.Name, t.DockerImage, tag, t.CustomTaskID, t.HostID)
 	h.dispatchDockerUpdate(t, tag, resolvedVersion, oldDigest, digest)
+}
+
+func shouldResolveDockerTag(tag string) bool {
+	t := strings.TrimSpace(strings.ToLower(tag))
+	if t == "" || t == "latest" {
+		return true
+	}
+
+	t = strings.TrimPrefix(t, "v")
+	parts := strings.Split(t, ".")
+	if len(parts) != 1 && len(parts) != 2 {
+		return false
+	}
+	for _, p := range parts {
+		if p == "" {
+			return false
+		}
+		for _, ch := range p {
+			if ch < '0' || ch > '9' {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 func (h *ReleaseTrackerHandler) dispatchGitRelease(t models.ReleaseTracker, tag, releaseURL, releaseName string) {

@@ -549,7 +549,7 @@ const gitEnvVars = [
 const dockerEnvVars = [
   { name: 'SS_IMAGE_NAME',    desc: 'image:tag surveille (ex: nginx:latest)' },
   { name: 'SS_IMAGE_TAG',     desc: 'Tag surveille (ex: latest)' },
-  { name: 'SS_IMAGE_VERSION', desc: 'Version resolue si tag=latest (ex: 1.27.3) ou identique a SS_IMAGE_TAG' },
+  { name: 'SS_IMAGE_VERSION', desc: 'Version exacte resolue a partir du digest (ex: 4.4.1), ou identique a SS_IMAGE_TAG si non resolue' },
   { name: 'SS_OLD_DIGEST',    desc: 'Digest manifest SHA256 precedent' },
   { name: 'SS_NEW_DIGEST',    desc: 'Nouveau digest manifest SHA256' },
   { name: 'SS_TRACKER_NAME',  desc: 'Nom du tracker dans ServerSupervisor' },
