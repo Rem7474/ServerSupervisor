@@ -81,6 +81,7 @@ func (db *DB) ListReleaseTrackers() ([]models.ReleaseTracker, error) {
 		var t models.ReleaseTracker
 		var hostID sql.NullString
 		var leID, leTag, leURL, leName, leStatus sql.NullString
+		var leCommandID sql.NullString
 		var leTriggered sql.NullTime
 		var leCompleted sql.NullTime
 		if err := rows.Scan(

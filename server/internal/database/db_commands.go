@@ -279,6 +279,7 @@ func (db *DB) GetRecentNotifications(limit int) ([]models.NotificationItem, erro
 		            ar.metric || ' ' || ar.operator || ' ' || CAST(COALESCE(ar.threshold_crit, ar.threshold_warn, 0) AS TEXT),
 		            'Règle supprimée') AS rule_name,
 		        COALESCE(ar.metric, '') AS metric,
+		        COALESCE(ai.severity, '') AS severity,
 		        ai.value, ai.triggered_at, ai.resolved_at,
 		        COALESCE(ar.actions->'channels' @> '["browser"]'::jsonb, FALSE) AS browser_notify
 		 FROM alert_incidents ai
@@ -297,7 +298,7 @@ func (db *DB) GetRecentNotifications(limit int) ([]models.NotificationItem, erro
 		var ruleID sql.NullInt64
 		if err := rows.Scan(
 			&item.ID, &ruleID, &item.HostID,
-			&item.HostName, &item.RuleName, &item.Metric,
+			&item.HostName, &item.RuleName, &item.Metric, &item.Severity,
 			&item.Value, &item.TriggeredAt, &item.ResolvedAt,
 			&item.BrowserNotify,
 		); err != nil {
@@ -306,9 +307,242 @@ func (db *DB) GetRecentNotifications(limit int) ([]models.NotificationItem, erro
 		if ruleID.Valid {
 			item.RuleID = &ruleID.Int64
 		}
+		db.enrichNotificationSource(&item)
 		items = append(items, item)
 	}
 	return items, nil
+}
+
+func (db *DB) enrichNotificationSource(item *models.NotificationItem) {
+	if item == nil {
+		return
+	}
+	item.SourceType = "agent"
+	item.SourceLabel = item.HostName
+
+	if !strings.HasPrefix(item.HostID, "proxmox:") {
+		return
+	}
+
+	item.SourceType = "proxmox"
+	parts := strings.SplitN(item.HostID, ":", 3)
+	if len(parts) < 2 {
+		item.SourceLabel = "Proxmox"
+		return
+	}
+
+	scope := parts[1]
+	rawID := ""
+	if len(parts) == 3 {
+		rawID = parts[2]
+	}
+
+	switch scope {
+	case "node":
+		if label := db.resolveProxmoxNodeLabel(rawID); label != "" {
+			item.SourceLabel = label
+			return
+		}
+	case "guest":
+		if label := db.resolveProxmoxGuestLabel(rawID); label != "" {
+			item.SourceLabel = label
+			return
+		}
+	case "storage":
+		if label := db.resolveProxmoxStorageLabel(rawID); label != "" {
+			item.SourceLabel = label
+			return
+		}
+	case "disk":
+		if label := db.resolveProxmoxDiskLabel(rawID); label != "" {
+			item.SourceLabel = label
+			return
+		}
+	case "connection":
+		if label := db.resolveProxmoxConnectionLabel(rawID); label != "" {
+			item.SourceLabel = label
+			return
+		}
+	case "global":
+		if label := db.resolveProxmoxGlobalLikelySource(item.Metric); label != "" {
+			item.SourceLabel = label + " (source actuelle)"
+			return
+		}
+	}
+
+	if item.HostName == "" {
+		item.SourceLabel = "Proxmox"
+	} else {
+		item.SourceLabel = item.HostName
+	}
+}
+
+func (db *DB) resolveProxmoxConnectionLabel(connectionID string) string {
+	if connectionID == "" {
+		return "Proxmox cluster"
+	}
+	var name string
+	if err := db.conn.QueryRow(`SELECT name FROM proxmox_connections WHERE id = $1`, connectionID).Scan(&name); err != nil {
+		return "Connexion " + connectionID
+	}
+	return "Connexion " + name
+}
+
+func (db *DB) resolveProxmoxNodeLabel(nodeID string) string {
+	if nodeID == "" {
+		return "Noeud Proxmox"
+	}
+	var connName, nodeName string
+	err := db.conn.QueryRow(`
+		SELECT COALESCE(c.name, ''), n.node_name
+		FROM proxmox_nodes n
+		LEFT JOIN proxmox_connections c ON c.id = n.connection_id
+		WHERE n.id = $1`, nodeID).Scan(&connName, &nodeName)
+	if err != nil {
+		return "Noeud " + nodeID
+	}
+	if strings.TrimSpace(connName) != "" {
+		return "Noeud " + connName + " / " + nodeName
+	}
+	return "Noeud " + nodeName
+}
+
+func (db *DB) resolveProxmoxGuestLabel(guestID string) string {
+	if guestID == "" {
+		return "VM/LXC Proxmox"
+	}
+	var connName, nodeName, guestName, guestType string
+	var vmid int
+	err := db.conn.QueryRow(`
+		SELECT COALESCE(c.name, ''), g.node_name, COALESCE(NULLIF(g.name,''), '(sans nom)'), g.guest_type, g.vmid
+		FROM proxmox_guests g
+		LEFT JOIN proxmox_connections c ON c.id = g.connection_id
+		WHERE g.id = $1`, guestID).Scan(&connName, &nodeName, &guestName, &guestType, &vmid)
+	if err != nil {
+		return "VM/LXC " + guestID
+	}
+	base := fmt.Sprintf("VM/LXC %s (%s:%d)", guestName, strings.ToUpper(guestType), vmid)
+	if strings.TrimSpace(connName) != "" {
+		return base + " sur " + connName + " / " + nodeName
+	}
+	return base + " sur " + nodeName
+}
+
+func (db *DB) resolveProxmoxStorageLabel(storageID string) string {
+	if storageID == "" {
+		return "Stockage Proxmox"
+	}
+	var connName, nodeName, storageName string
+	err := db.conn.QueryRow(`
+		SELECT COALESCE(c.name, ''), s.node_name, s.storage_name
+		FROM proxmox_storages s
+		LEFT JOIN proxmox_connections c ON c.id = s.connection_id
+		WHERE s.id = $1`, storageID).Scan(&connName, &nodeName, &storageName)
+	if err != nil {
+		return "Stockage " + storageID
+	}
+	if strings.TrimSpace(connName) != "" {
+		return "Stockage " + connName + " / " + nodeName + " / " + storageName
+	}
+	return "Stockage " + nodeName + " / " + storageName
+}
+
+func (db *DB) resolveProxmoxDiskLabel(diskID string) string {
+	if diskID == "" {
+		return "Disque Proxmox"
+	}
+	var connName, nodeName, devPath, model string
+	err := db.conn.QueryRow(`
+		SELECT COALESCE(c.name, ''), d.node_name, d.dev_path, COALESCE(d.model, '')
+		FROM proxmox_disks d
+		LEFT JOIN proxmox_connections c ON c.id = d.connection_id
+		WHERE d.id = $1`, diskID).Scan(&connName, &nodeName, &devPath, &model)
+	if err != nil {
+		return "Disque " + diskID
+	}
+	detail := devPath
+	if strings.TrimSpace(model) != "" {
+		detail = model + " (" + devPath + ")"
+	}
+	if strings.TrimSpace(connName) != "" {
+		return "Disque " + connName + " / " + nodeName + " / " + detail
+	}
+	return "Disque " + nodeName + " / " + detail
+}
+
+func (db *DB) resolveProxmoxGlobalLikelySource(metric string) string {
+	switch metric {
+	case "proxmox_node_cpu_percent", "proxmox_node_memory_percent", "proxmox_node_cpu_temperature", "proxmox_node_fan_rpm", "proxmox_node_pending_updates", "proxmox_recent_failed_tasks_24h":
+		var nodeID string
+		if err := db.conn.QueryRow(`
+			SELECT n.id
+			FROM proxmox_nodes n
+			LEFT JOIN LATERAL (
+				SELECT COUNT(*) AS failed_tasks
+				FROM proxmox_tasks t
+				WHERE t.connection_id = n.connection_id
+				  AND t.node_name = n.node_name
+				  AND t.status='stopped'
+				  AND t.exit_status != ''
+				  AND t.exit_status != 'OK'
+				  AND t.start_time >= NOW() - INTERVAL '24 hours'
+			) ft ON TRUE
+			ORDER BY CASE
+				WHEN $1 = 'proxmox_node_memory_percent' THEN CASE WHEN n.mem_total > 0 THEN n.mem_used::float / n.mem_total ELSE 0 END
+				WHEN $1 = 'proxmox_node_pending_updates' THEN n.pending_updates::float
+				WHEN $1 = 'proxmox_recent_failed_tasks_24h' THEN COALESCE(ft.failed_tasks, 0)::float
+				ELSE n.cpu_usage
+			END DESC,
+			n.last_seen_at DESC
+			LIMIT 1`, metric).Scan(&nodeID); err == nil && nodeID != "" {
+			return db.resolveProxmoxNodeLabel(nodeID)
+		}
+		return "Cluster Proxmox"
+	case "proxmox_guest_cpu_percent", "proxmox_guest_memory_percent":
+		var guestID string
+		if err := db.conn.QueryRow(`
+			SELECT g.id
+			FROM proxmox_guests g
+			LEFT JOIN LATERAL (
+				SELECT gm.cpu_usage,
+				       CASE WHEN gm.mem_total > 0 THEN gm.mem_used::float / gm.mem_total ELSE 0 END AS mem_ratio
+				FROM proxmox_guest_metrics gm
+				WHERE gm.guest_id = g.id
+				ORDER BY gm.timestamp DESC
+				LIMIT 1
+			) m ON TRUE
+			ORDER BY CASE WHEN $1 = 'proxmox_guest_memory_percent' THEN COALESCE(m.mem_ratio, 0) ELSE COALESCE(m.cpu_usage, 0) END DESC,
+			         g.last_seen_at DESC
+			LIMIT 1`, metric).Scan(&guestID); err == nil && guestID != "" {
+			return db.resolveProxmoxGuestLabel(guestID)
+		}
+		return "Cluster Proxmox"
+	case "proxmox_storage_percent":
+		var storageID string
+		if err := db.conn.QueryRow(`
+			SELECT id
+			FROM proxmox_storages
+			WHERE total > 0 AND enabled = TRUE AND active = TRUE
+			ORDER BY (used::float / NULLIF(total, 0)) DESC, last_seen_at DESC
+			LIMIT 1`).Scan(&storageID); err == nil && storageID != "" {
+			return db.resolveProxmoxStorageLabel(storageID)
+		}
+		return "Cluster Proxmox"
+	case "proxmox_disk_failed_count", "proxmox_disk_min_wearout_percent":
+		var diskID string
+		if err := db.conn.QueryRow(`
+			SELECT id
+			FROM proxmox_disks
+			WHERE wearout >= 0
+			ORDER BY CASE WHEN $1 = 'proxmox_disk_failed_count' THEN CASE WHEN health = 'FAILED' THEN 1 ELSE 0 END ELSE (100 - wearout) END DESC,
+			         last_seen_at DESC
+			LIMIT 1`, metric).Scan(&diskID); err == nil && diskID != "" {
+			return db.resolveProxmoxDiskLabel(diskID)
+		}
+		return "Cluster Proxmox"
+	default:
+		return "Cluster Proxmox"
+	}
 }
 
 // CleanupStalledCommands marks old pending/running commands as failed and closes linked audit logs

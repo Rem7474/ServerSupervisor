@@ -79,8 +79,11 @@ type NotificationItem struct {
 	RuleID        *int64     `json:"rule_id"`
 	HostID        string     `json:"host_id"`
 	HostName      string     `json:"host_name"`
+	SourceType    string     `json:"source_type,omitempty"`
+	SourceLabel   string     `json:"source_label,omitempty"`
 	RuleName      string     `json:"rule_name"`
 	Metric        string     `json:"metric"`
+	Severity      string     `json:"severity,omitempty"`
 	Value         float64    `json:"value"`
 	TriggeredAt   time.Time  `json:"triggered_at"`
 	ResolvedAt    *time.Time `json:"resolved_at"`

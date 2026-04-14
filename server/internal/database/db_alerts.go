@@ -164,6 +164,23 @@ func (db *DB) ResolveAlertIncident(id int64) error {
 	return err
 }
 
+// UpdateAlertIncidentContext refreshes the host/value/severity of an open incident.
+// This keeps the active incident aligned with the latest evaluation state.
+func (db *DB) UpdateAlertIncidentContext(id int64, hostID string, value float64, severity string) error {
+	if severity == "" {
+		severity = "crit"
+	}
+	_, err := db.conn.Exec(
+		`UPDATE alert_incidents
+		 SET host_id = $2,
+		     value = $3,
+		     severity = $4
+		 WHERE id = $1 AND resolved_at IS NULL`,
+		id, hostID, value, severity,
+	)
+	return err
+}
+
 // ResolveOpenAlertIncidentsByRule marks all open incidents for a rule as resolved.
 // It returns the number of incidents that were updated.
 func (db *DB) ResolveOpenAlertIncidentsByRule(ruleID int64) (int64, error) {

@@ -99,10 +99,18 @@ func EvaluateAlerts(db *database.DB, cfg *config.Config, dispatcher *dispatch.Di
 					pushBrowserNotification(pusher, rule, host, value, incID)
 					go pushWebNotifications(db, cfg, rule, host, value)
 					broadcastIncidentUpdate(pusher, "fired", rule, host.ID)
-				} else if AlertSeverity(inc.Severity) != currentSeveration {
-					// Severity changed - update incident
-					// For now, keep the incident and just log the change
-					log.Printf("Alerts: UPGRADED %s host=%s value=%.2f severity %s→%s incident#%d", ruleName, host.Name, value, inc.Severity, currentSeveration, inc.ID)
+				} else {
+					// Keep incident context fresh so UI and resolution logic use current severity/value.
+					severityChanged := AlertSeverity(inc.Severity) != currentSeveration
+					valueChanged := inc.Value != value
+					hostChanged := inc.HostID != host.ID
+					if severityChanged || valueChanged || hostChanged {
+						if err := db.UpdateAlertIncidentContext(inc.ID, host.ID, value, string(currentSeveration)); err != nil {
+							log.Printf("Alerts: failed to update incident context for incident#%d: %v", inc.ID, err)
+						} else if severityChanged {
+							log.Printf("Alerts: UPDATED %s host=%s value=%.2f severity %s→%s incident#%d", ruleName, host.Name, value, inc.Severity, currentSeveration, inc.ID)
+						}
+					}
 				}
 			} else if inc != nil {
 				// No alert triggered - resolve if one exists

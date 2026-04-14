@@ -144,6 +144,16 @@
               <div v-else style="line-height: 1.4;">
                 <div><code>{{ rule.operator }} {{ rule.threshold_warn }}{{ getMetricUnit(rule.metric) }} (warn)</code></div>
                 <div><code>{{ rule.operator }} {{ rule.threshold_crit }}{{ getMetricUnit(rule.metric) }} (crit)</code></div>
+                <div class="text-muted small mt-1">
+                  clear warn:
+                  <code v-if="rule.threshold_clear_warn != null">{{ formatClearThreshold(rule, rule.threshold_clear_warn) }}</code>
+                  <span v-else>{{ autoHysteresisHint(rule, 'warn') }}</span>
+                </div>
+                <div class="text-muted small">
+                  clear crit:
+                  <code v-if="rule.threshold_clear_crit != null">{{ formatClearThreshold(rule, rule.threshold_clear_crit) }}</code>
+                  <span v-else>{{ autoHysteresisHint(rule, 'crit') }}</span>
+                </div>
               </div>
             </td>
             <td>{{ formatDurationSecs(rule.duration_seconds) }}</td>
@@ -267,6 +277,17 @@ function getMetricBadgeClass(metric) {
 
 function getMetricUnit(metric) {
   return getAlertMetricMeta(metric).unit
+}
+
+function formatClearThreshold(rule, value) {
+  return `${rule.operator} ${value}${getMetricUnit(rule.metric)}`
+}
+
+function autoHysteresisHint(rule, level) {
+  if (level === 'crit') {
+    return 'auto: resolution quand la condition crit n\'est plus vraie'
+  }
+  return 'auto: resolution quand aucune condition n\'est vraie'
 }
 
 function ruleSourceType(rule) {

@@ -96,6 +96,12 @@ interface AlertRuleFormApi {
   buildPayload: () => AlertRulePayload
 }
 
+function normalizeOptionalNumber(value: unknown): number | undefined {
+  if (value === null || value === undefined || value === '') return undefined
+  const n = Number(value)
+  return Number.isFinite(n) ? n : undefined
+}
+
 export function useAlertRuleForm(): AlertRuleFormApi {
   const channelSmtp: Ref<boolean> = ref(false)
   const channelNtfy: Ref<boolean> = ref(false)
@@ -261,8 +267,13 @@ export function useAlertRuleForm(): AlertRuleFormApi {
       delete actions.command_trigger
     }
 
+    const thresholdClearWarn = normalizeOptionalNumber(form.value.threshold_clear_warn)
+    const thresholdClearCrit = normalizeOptionalNumber(form.value.threshold_clear_crit)
+
     return {
       ...form.value,
+      threshold_clear_warn: thresholdClearWarn,
+      threshold_clear_crit: thresholdClearCrit,
       source_type: form.value.source_type,
       proxmox_scope: isProxmoxMetric(form.value.metric) ? { ...form.value.proxmox_scope } : null,
       actions,

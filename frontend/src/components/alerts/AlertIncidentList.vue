@@ -85,8 +85,9 @@
             <th style="width: 90px;">
               Etat
             </th>
+            <th>Severite</th>
             <th>Regle</th>
-            <th>Hote</th>
+            <th>Source</th>
             <th>Valeur</th>
             <th>Declenche</th>
             <th>Resolu</th>
@@ -108,6 +109,20 @@
               >Actif</span>
             </td>
             <td>
+              <span
+                v-if="(incident.severity || '').toLowerCase() === 'crit'"
+                class="badge bg-red-lt text-red"
+              >Critique</span>
+              <span
+                v-else-if="(incident.severity || '').toLowerCase() === 'warn'"
+                class="badge bg-yellow-lt text-yellow"
+              >Avertissement</span>
+              <span
+                v-else
+                class="badge bg-secondary-lt text-secondary"
+              >-</span>
+            </td>
+            <td>
               <div
                 class="fw-semibold text-truncate"
                 style="max-width: 220px;"
@@ -124,8 +139,16 @@
                 :to="resolveIncidentHostRoute(incident.host_id, incident.metric)"
                 class="text-decoration-none"
               >
-                {{ incident.host_name }}
+                {{ incident.host_name || 'Source inconnue' }}
               </router-link>
+              <div
+                v-if="incident.source_label && incident.source_label !== incident.host_name"
+                class="text-muted small text-truncate"
+                :title="incident.source_label"
+                style="max-width: 260px;"
+              >
+                {{ incident.source_label }}
+              </div>
             </td>
             <td><code>{{ incidentFormatValue(incident.value, incident.metric) }}</code></td>
             <td class="text-muted small">
