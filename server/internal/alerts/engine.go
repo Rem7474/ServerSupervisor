@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	webpush "github.com/SherClockHolmes/webpush-go"
@@ -59,10 +60,14 @@ func EvaluateAlerts(db *database.DB, cfg *config.Config, dispatcher *dispatch.Di
 			ruleName = fmt.Sprintf("rule#%d(%s)", rule.ID, *rule.Name)
 		}
 
-		// Build evaluation targets: real hosts for agent metrics, synthetic host for Proxmox metrics
-		hostsForRule := buildAlertEvaluationTargets(rule, hosts)
+		// Build evaluation targets:
+		// - agent metrics: real hosts
+		// - Proxmox metrics: synthetic targets (scope-based or per-entity for global rules)
+		hostsForRule := buildAlertEvaluationTargets(db, rule, hosts)
+		evaluatedTargets := make(map[string]struct{}, len(hostsForRule))
 
 		for _, host := range hostsForRule {
+			evaluatedTargets[host.ID] = struct{}{}
 			if hasHostID(rule) && !isProxmoxMetric(rule.Metric) && *rule.HostID != host.ID {
 				continue
 			}
@@ -123,7 +128,19 @@ func EvaluateAlerts(db *database.DB, cfg *config.Config, dispatcher *dispatch.Di
 				}
 			}
 		}
+
+		if isProxmoxGlobalScope(rule) {
+			resolveStaleGlobalProxmoxIncidents(db, rule, evaluatedTargets)
+		}
 	}
+}
+
+func isProxmoxGlobalScope(rule models.AlertRule) bool {
+	if !isProxmoxMetric(rule.Metric) {
+		return false
+	}
+	scope := proxmoxScopeFromRule(rule)
+	return scope == nil || scope.ScopeMode == "" || scope.ScopeMode == "global"
 }
 
 // isProxmoxMetric detects if a metric belongs to the Proxmox subsystem.
@@ -209,7 +226,7 @@ func proxmoxScopeLabel(scope *models.ProxmoxMetricScope) string {
 // buildAlertEvaluationTargets creates the list of hosts/targets to evaluate for a rule.
 // For agent metrics, returns the provided hosts. For Proxmox metrics, returns a single
 // synthetic host record with ID from proxmoxScopeKey() to deduplicate incidents per scope.
-func buildAlertEvaluationTargets(rule models.AlertRule, hosts []models.Host) []models.Host {
+func buildAlertEvaluationTargets(db *database.DB, rule models.AlertRule, hosts []models.Host) []models.Host {
 	if !isProxmoxMetric(rule.Metric) {
 		// For agent metrics, filter by HostID if set
 		if hasHostID(rule) {
@@ -221,6 +238,12 @@ func buildAlertEvaluationTargets(rule models.AlertRule, hosts []models.Host) []m
 			return []models.Host{}
 		}
 		return hosts
+	}
+
+	if isProxmoxGlobalScope(rule) {
+		if targets := buildGlobalProxmoxEntityTargets(db, rule); len(targets) > 0 {
+			return targets
+		}
 	}
 
 	// For Proxmox metrics, create a synthetic host record with scope-based ID
@@ -237,8 +260,151 @@ func buildAlertEvaluationTargets(rule models.AlertRule, hosts []models.Host) []m
 	}
 }
 
+func buildGlobalProxmoxEntityTargets(db *database.DB, rule models.AlertRule) []models.Host {
+	switch rule.Metric {
+	case "proxmox_node_cpu_percent", "proxmox_node_memory_percent", "proxmox_node_cpu_temperature", "proxmox_node_fan_rpm", "proxmox_node_pending_updates", "proxmox_recent_failed_tasks_24h":
+		nodes, err := db.ListProxmoxNodes()
+		if err != nil {
+			return nil
+		}
+		targets := make([]models.Host, 0, len(nodes))
+		for _, n := range nodes {
+			targets = append(targets, models.Host{
+				ID:       "proxmox:node:" + n.ID,
+				Name:     fmt.Sprintf("Proxmox noeud %s", n.NodeName),
+				Status:   "online",
+				LastSeen: time.Now(),
+			})
+		}
+		return targets
+	case "proxmox_guest_cpu_percent", "proxmox_guest_memory_percent":
+		guests, err := db.ListProxmoxGuests("", "", "")
+		if err != nil {
+			return nil
+		}
+		targets := make([]models.Host, 0, len(guests))
+		for _, g := range guests {
+			name := g.Name
+			if strings.TrimSpace(name) == "" {
+				name = fmt.Sprintf("VM/LXC %d", g.VMID)
+			}
+			targets = append(targets, models.Host{
+				ID:       "proxmox:guest:" + g.ID,
+				Name:     fmt.Sprintf("Proxmox VM/LXC %s", name),
+				Status:   "online",
+				LastSeen: time.Now(),
+			})
+		}
+		return targets
+	case "proxmox_storage_percent":
+		nodes, err := db.ListProxmoxNodes()
+		if err != nil {
+			return nil
+		}
+		targets := make([]models.Host, 0)
+		for _, n := range nodes {
+			storages, err := db.ListProxmoxStoragesByNode(n.ConnectionID, n.NodeName)
+			if err != nil {
+				continue
+			}
+			for _, s := range storages {
+				targets = append(targets, models.Host{
+					ID:       "proxmox:storage:" + s.ID,
+					Name:     fmt.Sprintf("Proxmox stockage %s", s.StorageName),
+					Status:   "online",
+					LastSeen: time.Now(),
+				})
+			}
+		}
+		return targets
+	case "proxmox_disk_failed_count", "proxmox_disk_min_wearout_percent":
+		nodes, err := db.ListProxmoxNodes()
+		if err != nil {
+			return nil
+		}
+		targets := make([]models.Host, 0)
+		for _, n := range nodes {
+			disks, err := db.ListProxmoxDisksByNode(n.ConnectionID, n.NodeName)
+			if err != nil {
+				continue
+			}
+			for _, d := range disks {
+				targets = append(targets, models.Host{
+					ID:       "proxmox:disk:" + d.ID,
+					Name:     fmt.Sprintf("Proxmox disque %s", d.DevPath),
+					Status:   "online",
+					LastSeen: time.Now(),
+				})
+			}
+		}
+		return targets
+	default:
+		return nil
+	}
+}
+
+func proxmoxScopedRuleForSyntheticTarget(rule models.AlertRule, targetID string) (models.AlertRule, bool) {
+	if !isProxmoxGlobalScope(rule) {
+		return rule, false
+	}
+
+	parts := strings.SplitN(targetID, ":", 3)
+	if len(parts) != 3 || parts[0] != "proxmox" || parts[2] == "" {
+		return rule, false
+	}
+
+	scoped := rule
+	scope := &models.ProxmoxMetricScope{}
+	entityType := parts[1]
+	entityID := parts[2]
+
+	switch entityType {
+	case "node":
+		scope.ScopeMode = "node"
+		scope.NodeID = entityID
+	case "guest":
+		scope.ScopeMode = "guest"
+		scope.GuestID = entityID
+	case "storage":
+		scope.ScopeMode = "storage"
+		scope.StorageID = entityID
+	case "disk":
+		scope.ScopeMode = "disk"
+		scope.DiskID = entityID
+	default:
+		return rule, false
+	}
+
+	scoped.ProxmoxScope = scope
+	return scoped, true
+}
+
+func resolveStaleGlobalProxmoxIncidents(db *database.DB, rule models.AlertRule, evaluatedTargets map[string]struct{}) {
+	openIncidents, err := db.ListOpenAlertIncidentsByRule(rule.ID)
+	if err != nil {
+		log.Printf("Alerts: failed to list open incidents for stale cleanup rule#%d: %v", rule.ID, err)
+		return
+	}
+
+	for _, inc := range openIncidents {
+		if !strings.HasPrefix(inc.HostID, "proxmox:") {
+			continue
+		}
+		if _, ok := evaluatedTargets[inc.HostID]; ok {
+			continue
+		}
+		if err := db.ResolveAlertIncident(inc.ID); err != nil {
+			log.Printf("Alerts: failed to resolve stale incident#%d for rule#%d: %v", inc.ID, rule.ID, err)
+		}
+	}
+}
+
 // GetMetricValue retrieves the current value of a metric for a host according to a rule.
 func GetMetricValue(db *database.DB, host models.Host, rule models.AlertRule) (float64, bool) {
+	if scopedRule, ok := proxmoxScopedRuleForSyntheticTarget(rule, host.ID); ok {
+		rule = scopedRule
+	}
+
 	now := time.Now()
 	duration := time.Duration(rule.DurationSeconds) * time.Second
 

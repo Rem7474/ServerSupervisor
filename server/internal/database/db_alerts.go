@@ -128,12 +128,12 @@ func (db *DB) GetOpenAlertIncident(ruleID int64, hostID string) (*models.AlertIn
 	var inc models.AlertIncident
 	var nullableRuleID sql.NullInt64
 	err := db.conn.QueryRow(
-		`SELECT id, rule_id, host_id, triggered_at, resolved_at, value
+		`SELECT id, rule_id, host_id, severity, triggered_at, resolved_at, value
  FROM alert_incidents
  WHERE rule_id = $1 AND host_id = $2 AND resolved_at IS NULL
  ORDER BY triggered_at DESC LIMIT 1`,
 		ruleID, hostID,
-	).Scan(&inc.ID, &nullableRuleID, &inc.HostID, &inc.TriggeredAt, &inc.ResolvedAt, &inc.Value)
+	).Scan(&inc.ID, &nullableRuleID, &inc.HostID, &inc.Severity, &inc.TriggeredAt, &inc.ResolvedAt, &inc.Value)
 	if err != nil {
 		return nil, err
 	}
@@ -141,6 +141,35 @@ func (db *DB) GetOpenAlertIncident(ruleID int64, hostID string) (*models.AlertIn
 		inc.RuleID = &nullableRuleID.Int64
 	}
 	return &inc, nil
+}
+
+// ListOpenAlertIncidentsByRule returns all unresolved incidents for a rule.
+func (db *DB) ListOpenAlertIncidentsByRule(ruleID int64) ([]models.AlertIncident, error) {
+	rows, err := db.conn.Query(
+		`SELECT id, rule_id, host_id, severity, triggered_at, resolved_at, value
+		 FROM alert_incidents
+		 WHERE rule_id = $1 AND resolved_at IS NULL
+		 ORDER BY triggered_at DESC`,
+		ruleID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	incidents := make([]models.AlertIncident, 0)
+	for rows.Next() {
+		var inc models.AlertIncident
+		var nullableRuleID sql.NullInt64
+		if err := rows.Scan(&inc.ID, &nullableRuleID, &inc.HostID, &inc.Severity, &inc.TriggeredAt, &inc.ResolvedAt, &inc.Value); err != nil {
+			continue
+		}
+		if nullableRuleID.Valid {
+			inc.RuleID = &nullableRuleID.Int64
+		}
+		incidents = append(incidents, inc)
+	}
+	return incidents, rows.Err()
 }
 
 // CreateAlertIncident inserts a new alert incident and returns its generated ID.
@@ -200,7 +229,7 @@ func (db *DB) ResolveOpenAlertIncidentsByRule(ruleID int64) (int64, error) {
 
 func (db *DB) GetAlertIncidents(limit, offset int) ([]models.AlertIncident, error) {
 	rows, err := db.conn.Query(
-		`SELECT id, rule_id, host_id, triggered_at, resolved_at, value
+		`SELECT id, rule_id, host_id, severity, triggered_at, resolved_at, value
  FROM alert_incidents ORDER BY triggered_at DESC LIMIT $1 OFFSET $2`,
 		limit, offset,
 	)
@@ -213,7 +242,7 @@ func (db *DB) GetAlertIncidents(limit, offset int) ([]models.AlertIncident, erro
 	for rows.Next() {
 		var inc models.AlertIncident
 		var nullableRuleID sql.NullInt64
-		if err := rows.Scan(&inc.ID, &nullableRuleID, &inc.HostID, &inc.TriggeredAt, &inc.ResolvedAt, &inc.Value); err != nil {
+		if err := rows.Scan(&inc.ID, &nullableRuleID, &inc.HostID, &inc.Severity, &inc.TriggeredAt, &inc.ResolvedAt, &inc.Value); err != nil {
 			continue
 		}
 		if nullableRuleID.Valid {
