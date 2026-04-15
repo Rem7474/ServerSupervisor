@@ -12,6 +12,7 @@
             <th>Nom</th>
             <th>Image</th>
             <th>Tag</th>
+            <th>Version réelle</th>
             <th>Etat</th>
             <th>Status</th>
             <th>Port interne</th>
@@ -34,19 +35,34 @@
               <template v-if="containerVersion(c)">
                 <br>
                 <span
-                  v-if="containerVersion(c).is_up_to_date"
+                  v-if="containerVersion(c).tracker_id && containerVersion(c).custom_task_id && containerVersion(c).is_up_to_date"
                   class="badge bg-green-lt text-green mt-1"
                 >A jour</span>
                 <span
-                  v-else-if="!containerVersion(c).running_version"
-                  class="badge bg-secondary-lt text-secondary mt-1"
-                >Version inconnue</span>
-                <span
-                  v-else
+                  v-else-if="containerVersion(c).tracker_id && containerVersion(c).custom_task_id && !containerVersion(c).is_up_to_date && containerVersion(c).running_version"
                   class="badge bg-yellow-lt text-yellow mt-1"
                   :title="`Derniere : ${containerVersion(c).latest_version}`"
                 >MAJ dispo</span>
+                <span
+                  v-else-if="containerVersion(c).tracker_id && !containerVersion(c).custom_task_id"
+                  class="badge bg-secondary-lt text-secondary mt-1"
+                  title="Tracker est configuré mais aucune task n'a été associée"
+                >Surveillance seule</span>
+                <span
+                  v-else-if="!containerVersion(c).tracker_id"
+                  class="badge bg-secondary-lt text-secondary mt-1"
+                >Pas de tracker</span>
+                <span
+                  v-else
+                  class="badge bg-secondary-lt text-secondary mt-1"
+                >Version inconnue</span>
               </template>
+            </td>
+            <td>
+              <code v-if="containerVersion(c)?.running_version">
+                {{ c.image_tag }} → <strong>{{ containerVersion(c).running_version }}</strong>
+              </code>
+              <code v-else>{{ c.image_tag }}</code>
             </td>
             <td>
               <span :class="c.state === 'running' ? 'badge bg-green-lt text-green' : 'badge bg-secondary-lt text-secondary'">
@@ -71,7 +87,7 @@
           </tr>
           <tr v-if="!containers.length">
             <td
-              colspan="7"
+              colspan="8"
               class="text-center text-secondary py-4"
             >
               Aucun conteneur Docker actif sur cet hote.

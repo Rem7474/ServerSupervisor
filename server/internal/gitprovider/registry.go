@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 )
 
@@ -196,7 +197,7 @@ func looksLikeVersion(tag string) bool {
 		return false
 	}
 	switch tag {
-	case "latest", "stable", "edge", "nightly", "dev", "main", "master", "beta", "alpha", "rc":
+	case "latest", "stable", "edge", "nightly", "dev", "main", "master", "beta", "alpha", "rc", "dev-latest":
 		return false
 	}
 	t := tag
@@ -206,35 +207,45 @@ func looksLikeVersion(tag string) bool {
 	if len(t) == 0 || t[0] < '0' || t[0] > '9' {
 		return false
 	}
-	return strings.Contains(t, ".")
+	// Accept "5", "5.4", "5.4.1" (no need for explicit dot)
+	// Validate all chars are digits, dots, dashes, or plus signs
+	for _, c := range t {
+		if (c < '0' || c > '9') && c != '.' && c != '-' && c != '+' {
+			return false
+		}
+	}
+	return true
 }
 
 // getRegistryToken fetches an anonymous pull token for the given registry and image.
 func getRegistryToken(client *http.Client, registry, image string) (string, error) {
-	var authURL string
 	switch registry {
 	case "registry-1.docker.io":
-		authURL = fmt.Sprintf("https://auth.docker.io/token?service=registry.docker.io&scope=repository:%s:pull", image)
+		authURL := fmt.Sprintf("https://auth.docker.io/token?service=registry.docker.io&scope=repository:%s:pull", image)
+		req, _ := http.NewRequest("GET", authURL, nil)
+		req.Header.Set("User-Agent", "ServerSupervisor/1.0")
+		resp, err := client.Do(req)
+		if err != nil {
+			return "", err
+		}
+		defer func() { _ = resp.Body.Close() }()
+		var result struct {
+			Token string `json:"token"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+			return "", err
+		}
+		return result.Token, nil
 	case "ghcr.io":
-		authURL = fmt.Sprintf("https://ghcr.io/token?scope=repository:%s:pull&service=ghcr.io", image)
+		// GHCR public: no auth required
+		// GHCR private: requires GitHub token via Authorization header
+		if ghtoken := os.Getenv("GITHUB_TOKEN"); ghtoken != "" {
+			return ghtoken, nil
+		}
+		// Fallback: attempt without token (succeeds for public images)
+		return "", nil
 	default:
 		// For unknown registries, attempt unauthenticated access
 		return "", nil
 	}
-
-	req, _ := http.NewRequest("GET", authURL, nil)
-	req.Header.Set("User-Agent", "ServerSupervisor/1.0")
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	var result struct {
-		Token string `json:"token"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", err
-	}
-	return result.Token, nil
 }

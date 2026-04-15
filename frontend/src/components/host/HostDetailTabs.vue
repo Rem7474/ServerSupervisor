@@ -84,6 +84,11 @@ const visibleTabs = computed(() => {
   }
 
   tabs.push({
+    key: 'securite',
+    label: 'Sécurité',
+  })
+
+  tabs.push({
     key: 'planifiees',
     label: 'Tâches planifiées',
     badge: props.tasksCount || null,

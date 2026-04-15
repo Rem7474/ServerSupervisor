@@ -44,16 +44,15 @@
           </h2>
           <span :class="statusBadgeClass(guest.status)">{{ guest.status }}</span>
           <span class="badge bg-azure-lt text-azure">{{ guest.guest_type.toUpperCase() }}</span>
-          <span
-            v-if="guestLink?.host_id"
-            class="badge bg-green-lt text-green"
-          >
-            Lié à
+          <template v-if="guestLink?.host_id">
+            <MetricsSourceBadge source="proxmox" />
             <router-link
               :to="`/hosts/${guestLink.host_id}`"
               class="ms-1"
-            >{{ guestLink.host_hostname || guestLink.host_name }}</router-link>
-          </span>
+            >
+              {{ guestLink.host_hostname || guestLink.host_name }}
+            </router-link>
+          </template>
         </div>
         <div class="text-secondary">
           Nœud {{ guest.node_name }} · VMID {{ guest.vmid }}
@@ -173,6 +172,7 @@ import { computed, defineAsyncComponent, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import dayjs from 'dayjs'
 import api from '../api'
+import MetricsSourceBadge from '../components/common/MetricsSourceBadge.vue'
 
 interface ProxmoxGuest {
   id: string

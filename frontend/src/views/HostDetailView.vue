@@ -64,16 +64,18 @@
           <span
             v-if="host"
             :class="hostStatusClass(host.status)"
+            :aria-label="`Statut de l'hôte : ${formatHostStatus(host.status)}`"
           >
             <span class="status-dot status-dot-animated" />
             <span :data-translation-id="host.status === 'online' ? 'online' : host.status === 'offline' ? 'offline' : 'unknown'">{{ formatHostStatus(host.status) }}</span>
           </span>
           <span
             v-if="host?.agent_version"
-            :class="isAgentUpToDate(host.agent_version) ? 'badge bg-green-lt text-green' : 'badge bg-yellow-lt text-yellow'"
-            :title="isAgentUpToDate(host.agent_version) ? 'Agent à jour' : 'Mise à jour disponible'"
+            :class="isAgentUpToDate(host.agent_version) ? 'badge bg-green-lt text-green d-inline-flex align-items-center gap-1' : 'badge bg-yellow-lt text-yellow d-inline-flex align-items-center gap-1'"
+            :aria-label="isAgentUpToDate(host.agent_version) ? `Agent version ${host.agent_version}, à jour` : `Agent version ${host.agent_version}, mise à jour disponible`"
           >
-            Agent v{{ host.agent_version }}
+            <span>{{ isAgentUpToDate(host.agent_version) ? '✓' : '⚠' }}</span>
+            <span>{{ isAgentUpToDate(host.agent_version) ? 'À jour' : 'MAJ dispo' }}</span>
           </span>
         </div>
       </div>
@@ -360,6 +362,111 @@
             @history-changed="loadCmdHistoryRefresh"
           />
         </div>
+
+        <!-- Security tab: Per-host permissions (admin only) -->
+        <div v-show="activeTab === 'securite'">
+          <div
+            v-if="auth.isAdmin"
+            class="card"
+          >
+            <div class="card-header d-flex align-items-center justify-content-between">
+              <h3 class="card-title mb-0 d-flex align-items-center gap-2">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  class="icon icon-sm text-warning"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <rect
+                    x="3"
+                    y="11"
+                    width="18"
+                    height="11"
+                    rx="2"
+                    ry="2"
+                  /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+                Permissions par hôte
+              </h3>
+              <span class="badge badge-sm bg-danger text-white">Admin only</span>
+            </div>
+            <div class="card-body p-0">
+              <div
+                v-if="permLoading"
+                class="text-center py-3"
+              >
+                <span class="spinner-border spinner-border-sm" />
+              </div>
+              <div
+                v-else-if="!hostPerms.length"
+                class="text-center py-3 text-muted small"
+              >
+                Aucune restriction — tous les utilisateurs accèdent à cet hôte selon leur rôle global.
+              </div>
+              <table
+                v-else
+                class="table table-vcenter mb-0"
+              >
+                <thead>
+                  <tr>
+                    <th>Utilisateur</th>
+                    <th>Niveau</th>
+                    <th />
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    v-for="p in hostPerms"
+                    :key="p.username"
+                  >
+                    <td>{{ p.username }}</td>
+                    <td>
+                      <span :class="p.level === 'operator' ? 'badge bg-blue-lt' : 'badge bg-secondary-lt'">
+                        {{ p.level }}
+                      </span>
+                    </td>
+                    <td class="text-end">
+                      <button
+                        class="btn btn-sm btn-ghost-danger"
+                        title="Révoquer"
+                        @click="revokePermission(p.username)"
+                      >
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          class="icon icon-sm"
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        >
+                          <path d="M18 6l-12 12" /><path d="M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="card-footer d-flex justify-content-end">
+              <button
+                class="btn btn-sm btn-outline-primary"
+                @click="openAddPermission"
+              >
+                + Ajouter
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <CommandLogPanel
@@ -375,96 +482,15 @@
       />
     </div>
 
-    <!-- Per-host permissions (admin only) -->
-    <div
-      v-if="auth.isAdmin"
-      class="card mt-4"
-    >
-      <div class="card-header d-flex align-items-center justify-content-between">
-        <h3 class="card-title mb-0">
-          Permissions par hôte
-        </h3>
-        <button
-          class="btn btn-sm btn-outline-primary"
-          @click="openAddPermission"
-        >
-          + Ajouter
-        </button>
-      </div>
-      <div class="card-body p-0">
-        <div
-          v-if="permLoading"
-          class="text-center py-3"
-        >
-          <span class="spinner-border spinner-border-sm" />
-        </div>
-        <div
-          v-else-if="!hostPerms.length"
-          class="text-center py-3 text-muted small"
-        >
-          Aucune restriction — tous les utilisateurs accèdent à cet hôte selon leur rôle global.
-        </div>
-        <table
-          v-else
-          class="table table-vcenter mb-0"
-        >
-          <thead>
-            <tr>
-              <th>Utilisateur</th>
-              <th>Niveau</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="p in hostPerms"
-              :key="p.username"
-            >
-              <td>{{ p.username }}</td>
-              <td>
-                <span :class="p.level === 'operator' ? 'badge bg-blue-lt' : 'badge bg-secondary-lt'">
-                  {{ p.level }}
-                </span>
-              </td>
-              <td class="text-end">
-                <button
-                  class="btn btn-sm btn-ghost-danger"
-                  title="Révoquer"
-                  @click="revokePermission(p.username)"
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    class="icon icon-sm"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <path d="M18 6l-12 12" /><path d="M6 6l12 12" />
-                  </svg>
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
     <!-- Add permission modal -->
     <div
       v-if="addPermModal"
-      class="modal modal-blur show d-block"
+      class="modal modal-blur show d-block modal-permissions-overlay"
       tabindex="-1"
-      style="background:rgba(0,0,0,.5);z-index:1050"
       @click.self="addPermModal = false"
     >
       <div
-        class="modal-dialog modal-dialog-centered"
-        style="max-width:380px"
+        class="modal-dialog modal-dialog-centered modal-permissions-dialog"
       >
         <div class="modal-content">
           <div class="modal-header">
@@ -559,6 +585,7 @@ import HostSystemTab from '../components/host/HostSystemTab.vue'
 import HostTasksTab from '../components/host/HostTasksTab.vue'
 import CommandLogPanel from '../components/CommandLogPanel.vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
+import MetricsSourceBadge from '../components/common/MetricsSourceBadge.vue'
 import { formatHostStatus, hostStatusClass } from '../utils/formatHostStatus'
 
 const {

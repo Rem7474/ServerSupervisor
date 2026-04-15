@@ -262,7 +262,6 @@
                   </div>
                 </div>
               </template>
-
             </template>
 
             <!-- VM + Task -->

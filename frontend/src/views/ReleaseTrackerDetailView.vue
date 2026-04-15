@@ -59,6 +59,51 @@
       v-else-if="tracker"
       class="row g-3"
     >
+      <!-- Latest release info card -->
+      <div
+        v-if="tracker?.last_release_tag"
+        class="col-lg-12"
+      >
+        <div class="card bg-info-lt border-info">
+          <div class="card-body">
+            <h4 class="card-title">
+              Dernière version détectée
+            </h4>
+            <dl class="row mb-0 small">
+              <dt class="col-sm-3 text-muted">
+                Version
+              </dt>
+              <dd class="col-sm-9">
+                <code class="fs-6">{{ tracker.last_release_tag }}</code>
+              </dd>
+              <template v-if="tracker.docker_image">
+                <dt class="col-sm-3 text-muted">
+                  Image &amp; tag
+                </dt>
+                <dd class="col-sm-9">
+                  <code>{{ tracker.docker_image }}:{{ tracker.last_release_tag }}</code>
+                </dd>
+              </template>
+              <template v-if="tracker.release_url">
+                <dt class="col-sm-3 text-muted">
+                  Release
+                </dt>
+                <dd class="col-sm-9">
+                  <a
+                    :href="tracker.release_url"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="link-primary"
+                  >
+                    → Voir sur GitHub
+                  </a>
+                </dd>
+              </template>
+            </dl>
+          </div>
+        </div>
+      </div>
+
       <!-- Left column: config -->
       <div class="col-lg-5">
         <div class="card">
@@ -322,6 +367,28 @@
               </template>
             </dl>
           </div>
+        </div>
+
+        <!-- Alert: No task configured -->
+        <div
+          v-if="tracker && !tracker.custom_task_id && tracker.host_id"
+          class="alert alert-warning mt-3 mb-3"
+        >
+          <h4 class="alert-title">
+            Aucune tâche configurée
+          </h4>
+          <p class="mb-2">
+            Cette image Docker est surveillée, mais aucune tâche de déploiement n'a été configurée.
+          </p>
+          <p class="mb-2 small text-muted">
+            Créer une tâche pour automatiser les mises à jour lorsqu'une nouvelle version est détectée.
+          </p>
+          <router-link
+            :to="`/hosts/${tracker.host_id}`"
+            class="btn btn-sm btn-warning"
+          >
+            Créer une tâche
+          </router-link>
         </div>
 
         <!-- Env vars card -->

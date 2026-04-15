@@ -299,6 +299,22 @@ button:focus-visible {
   }
 }
 
+/* ── Modal permissions styling ── */
+.modal-permissions-overlay {
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1050;
+}
+
+.modal-permissions-dialog {
+  max-width: 380px;
+}
+
+@media (max-width: 576px) {
+  .modal-permissions-dialog {
+    max-width: 100%;
+  }
+}
+
 /* ── Min-width utilities ── */
 .min-w-160 {
   min-width: 160px;

@@ -56,7 +56,10 @@
             <th>En cours</th>
             <th>Dernière version</th>
             <th>Statut</th>
-            <th class="text-end">Actions</th>
+            <th>Task</th>
+            <th class="text-end">
+              Actions
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -111,6 +114,23 @@
                 class="badge bg-secondary-lt text-secondary"
               >Version inconnue</span>
             </td>
+            <td>
+              <span
+                v-if="v.custom_task_id"
+                class="badge bg-green-lt text-green"
+                title="Task de déploiement configurée"
+              >✅ Déploiement</span>
+              <span
+                v-else-if="v.tracker_id"
+                class="badge bg-yellow-lt text-yellow"
+                title="Surveillance active mais aucune task configurée"
+              >⏸️ Surveillance</span>
+              <span
+                v-else
+                class="badge bg-secondary-lt text-secondary"
+                title="Aucun tracker configuré"
+              >❌ Non suivi</span>
+            </td>
             <td class="text-end">
               <div class="btn-list justify-content-end">
                 <router-link
@@ -136,7 +156,7 @@
           </tr>
           <tr v-if="versions.length === 0">
             <td
-              colspan="7"
+              colspan="8"
               class="text-center text-secondary py-4"
             >
               Aucun suivi de version configuré. Ajoutez des release trackers dans

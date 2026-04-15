@@ -357,7 +357,10 @@
                 </div>
               </div>
 
-              <div v-if="form.metric !== 'heartbeat_timeout'" class="row">
+              <div
+                v-if="form.metric !== 'heartbeat_timeout'"
+                class="row"
+              >
                 <div class="col-md-6 mb-3">
                   <label class="form-label required">Seuil d'avertissement (warn)</label>
                   <input
@@ -382,7 +385,10 @@
                 </div>
               </div>
 
-              <div v-if="form.metric === 'heartbeat_timeout'" class="row">
+              <div
+                v-if="form.metric === 'heartbeat_timeout'"
+                class="row"
+              >
                 <div class="col-md-12 mb-3">
                   <label class="form-label required">Silence maximum (secondes)</label>
                   <input
@@ -404,7 +410,8 @@
 
               <div
                 v-if="form.metric !== 'heartbeat_timeout'"
-                class="row">
+                class="row"
+              >
                 <div class="col-md-6 mb-3">
                   <label class="form-label">Désactivation warn (hystérésis)</label>
                   <input

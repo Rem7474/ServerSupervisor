@@ -79,6 +79,7 @@ type VersionComparison struct {
 	IsUpToDate      bool   `json:"is_up_to_date"`
 	UpdateConfirmed bool   `json:"update_confirmed"` // true when digest comparison confirms an update (even if running version is unknown)
 	ContainerCount  int    `json:"container_count"`  // number of containers using this image on the host
+	CustomTaskID    string `json:"custom_task_id"`   // empty if monitoring-only (no auto-deployment task)
 	RepoOwner       string `json:"repo_owner"`
 	RepoName        string `json:"repo_name"`
 	ReleaseURL      string `json:"release_url"`
