@@ -9,11 +9,10 @@
         <div class="card-body">
           <div class="subheader d-flex align-items-center gap-2">
             CPU ({{ metrics.cpu_cores }} CORES)
-            <span
+            <MetricsSourceBadge
               v-if="metricsSource === 'proxmox'"
-              class="badge bg-purple-lt text-purple"
-              style="font-size:0.65rem"
-            >Proxmox</span>
+              source="proxmox"
+            />
           </div>
           <div
             class="h2 mb-0"
@@ -22,7 +21,7 @@
             {{ metrics.cpu_usage_percent?.toFixed(1) }}%
           </div>
           <div class="text-secondary small">
-            {{ metricsSource === 'proxmox' ? 'Source : hyperviseur' : metrics.cpu_model }}
+            {{ metricsSource === 'proxmox' ? 'Source : Proxmox' : metrics.cpu_model }}
           </div>
         </div>
       </div>
@@ -33,8 +32,12 @@
     >
       <div class="card card-sm h-100">
         <div class="card-body">
-          <div class="subheader">
+          <div class="subheader d-flex align-items-center gap-2">
             CPU TEMP
+            <MetricsSourceBadge
+              v-if="metricsSource === 'proxmox'"
+              source="proxmox"
+            />
           </div>
           <div
             class="h2 mb-0"
@@ -53,11 +56,10 @@
         <div class="card-body">
           <div class="subheader d-flex align-items-center gap-2">
             RAM
-            <span
+            <MetricsSourceBadge
               v-if="metricsSource === 'proxmox'"
-              class="badge bg-purple-lt text-purple"
-              style="font-size:0.65rem"
-            >Proxmox</span>
+              source="proxmox"
+            />
           </div>
           <div
             class="h2 mb-0"
@@ -170,6 +172,7 @@
 <script setup>
 import { computed, ref, shallowRef, defineAsyncComponent, onMounted, watch, toRef } from 'vue'
 import apiClient from '../api'
+import MetricsSourceBadge from './common/MetricsSourceBadge.vue'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import utc from 'dayjs/plugin/utc'
@@ -202,7 +205,7 @@ const memChartData = shallowRef(null)
 
 const hasCpuTemp = computed(() => Number(props.metrics?.cpu_temperature) > 0)
 const cpuTempSourceLabel = computed(() =>
-  props.metricsSource === 'proxmox' ? 'Source : lien Proxmox' : 'Sonde locale'
+  props.metricsSource === 'proxmox' ? 'Source : Proxmox' : 'Source : Agent'
 )
 
 const timeRangeOptions = [

@@ -4,17 +4,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
+	"strconv"
 	"strings"
 )
 
 // fetchDockerManifestDigest queries the Docker registry for the manifest digest
 // of imageRef:tag (e.g. "nginx:v1.25.3" or "ghcr.io/org/app:v2.0.0").
 // Returns the digest without "sha256:" prefix, e.g. "f88cbb90...".
-func fetchDockerManifestDigest(client *http.Client, imageRef, tag string) (string, error) {
+func fetchDockerManifestDigest(client *http.Client, imageRef, tag, authToken string) (string, error) {
 	registry, image := parseDockerRegistry(imageRef)
 
-	token, err := getRegistryToken(client, registry, image)
+	token, err := getRegistryToken(client, registry, image, authToken)
 	if err != nil {
 		return "", fmt.Errorf("auth: %w", err)
 	}
@@ -75,7 +75,7 @@ func parseDockerRegistry(imageRef string) (registry, image string) {
 // For Docker Hub, it uses the hub.docker.com API (tags with digest in one call).
 // For other registries, it enumerates tags and HEADs each semver-looking tag.
 // Returns "" if resolution fails.
-func fetchDockerVersionForDigest(client *http.Client, imageRef, targetDigest string) string {
+func fetchDockerVersionForDigest(client *http.Client, imageRef, targetDigest, authToken string) string {
 	if targetDigest == "" {
 		return ""
 	}
@@ -87,7 +87,7 @@ func fetchDockerVersionForDigest(client *http.Client, imageRef, targetDigest str
 			return v
 		}
 	}
-	return registryVersionForDigest(client, registry, image, normTarget)
+	return registryVersionForDigest(client, registry, image, normTarget, authToken)
 }
 
 // dockerHubVersionForDigest queries hub.docker.com to find a versioned tag for a digest.
@@ -114,21 +114,22 @@ func dockerHubVersionForDigest(client *http.Client, image, normDigest string) st
 		return ""
 	}
 
+	matches := make([]string, 0)
 	for _, t := range result.Results {
 		if !looksLikeVersion(t.Name) {
 			continue
 		}
 		if strings.TrimPrefix(t.Digest, "sha256:") == normDigest {
-			return t.Name
+			matches = append(matches, t.Name)
 		}
 	}
-	return ""
+	return pickCanonicalVersionTag(matches)
 }
 
 // registryVersionForDigest uses the v2 tags/list API + HEAD manifest per tag
 // to find a versioned tag matching normDigest. Checks up to 30 semver-looking tags.
-func registryVersionForDigest(client *http.Client, registry, image, normDigest string) string {
-	token, err := getRegistryToken(client, registry, image)
+func registryVersionForDigest(client *http.Client, registry, image, normDigest, authToken string) string {
+	token, err := getRegistryToken(client, registry, image, authToken)
 	if err != nil {
 		return ""
 	}
@@ -163,6 +164,7 @@ func registryVersionForDigest(client *http.Client, registry, image, normDigest s
 	}, ", ")
 
 	checked := 0
+	matches := make([]string, 0)
 	for _, tag := range result.Tags {
 		if !looksLikeVersion(tag) || checked >= 30 {
 			continue
@@ -184,10 +186,10 @@ func registryVersionForDigest(client *http.Client, registry, image, normDigest s
 		}
 		d := strings.TrimPrefix(hresp.Header.Get("Docker-Content-Digest"), "sha256:")
 		if d == normDigest {
-			return tag
+			matches = append(matches, tag)
 		}
 	}
-	return ""
+	return pickCanonicalVersionTag(matches)
 }
 
 // looksLikeVersion returns true for tags that appear to be version numbers (e.g. "1.25.3", "v2.0.1").
@@ -217,8 +219,109 @@ func looksLikeVersion(tag string) bool {
 	return true
 }
 
+// pickCanonicalVersionTag chooses a stable canonical version when multiple tags
+// point to the same digest (for example: v5, v5.13, v5.13.2).
+func pickCanonicalVersionTag(tags []string) string {
+	if len(tags) == 0 {
+		return ""
+	}
+	best := tags[0]
+	for i := 1; i < len(tags); i++ {
+		if compareVersionTags(tags[i], best) > 0 {
+			best = tags[i]
+		}
+	}
+	return best
+}
+
+// compareVersionTags returns:
+//  1 if a is preferred over b
+//  0 if equivalent
+// -1 if b is preferred over a
+func compareVersionTags(a, b string) int {
+	ap, aok := parseVersionParts(a)
+	bp, bok := parseVersionParts(b)
+
+	if aok && !bok {
+		return 1
+	}
+	if !aok && bok {
+		return -1
+	}
+	if aok && bok {
+		maxLen := len(ap)
+		if len(bp) > maxLen {
+			maxLen = len(bp)
+		}
+		for i := 0; i < maxLen; i++ {
+			av := -1
+			bv := -1
+			if i < len(ap) {
+				av = ap[i]
+			}
+			if i < len(bp) {
+				bv = bp[i]
+			}
+			if av != bv {
+				if av > bv {
+					return 1
+				}
+				return -1
+			}
+		}
+		return 0
+	}
+
+	// Fallback for non-parseable tags: deterministic lexical order.
+	if a > b {
+		return 1
+	}
+	if a < b {
+		return -1
+	}
+	return 0
+}
+
+func parseVersionParts(tag string) ([]int, bool) {
+	t := strings.TrimSpace(strings.ToLower(tag))
+	t = strings.TrimPrefix(t, "v")
+	if t == "" {
+		return nil, false
+	}
+
+	raw := strings.Split(t, ".")
+	parts := make([]int, 0, len(raw))
+	for _, seg := range raw {
+		if seg == "" {
+			return nil, false
+		}
+		n := leadingDigits(seg)
+		if n == "" {
+			return nil, false
+		}
+		v, err := strconv.Atoi(n)
+		if err != nil {
+			return nil, false
+		}
+		parts = append(parts, v)
+	}
+	return parts, true
+}
+
+func leadingDigits(s string) string {
+	for i, r := range s {
+		if r < '0' || r > '9' {
+			if i == 0 {
+				return ""
+			}
+			return s[:i]
+		}
+	}
+	return s
+}
+
 // getRegistryToken fetches an anonymous pull token for the given registry and image.
-func getRegistryToken(client *http.Client, registry, image string) (string, error) {
+func getRegistryToken(client *http.Client, registry, image, authToken string) (string, error) {
 	switch registry {
 	case "registry-1.docker.io":
 		authURL := fmt.Sprintf("https://auth.docker.io/token?service=registry.docker.io&scope=repository:%s:pull", image)
@@ -237,10 +340,10 @@ func getRegistryToken(client *http.Client, registry, image string) (string, erro
 		}
 		return result.Token, nil
 	case "ghcr.io":
-		// GHCR public: no auth required
-		// GHCR private: requires GitHub token via Authorization header
-		if ghtoken := os.Getenv("GITHUB_TOKEN"); ghtoken != "" {
-			return ghtoken, nil
+		// GHCR public: no auth required.
+		// GHCR private: use runtime auth token from provider config.
+		if authToken != "" {
+			return authToken, nil
 		}
 		// Fallback: attempt without token (succeeds for public images)
 		return "", nil

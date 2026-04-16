@@ -533,7 +533,6 @@ curl http://localhost:8080/api/v1/hosts \
 | `GET` | `/api/v1/hosts/:id/containers` | Conteneurs d'un hôte | Authentifié |
 | `GET` | `/api/v1/docker/containers` | Tous les conteneurs | Authentifié |
 | `GET` | `/api/v1/docker/compose` | Tous les projets Compose | Authentifié |
-| `GET` | `/api/v1/docker/versions` | Comparaison versions | Authentifié |
 | `POST` | `/api/v1/docker/command` | Envoyer une commande Docker/Compose | Operator+ |
 | `GET` | `/api/v1/network` | Snapshot réseau | Authentifié |
 | `GET` | `/api/v1/network/topology` | Topologie réseau | Authentifié |

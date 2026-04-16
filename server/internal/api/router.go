@@ -168,7 +168,6 @@ func registerDockerRoutes(g *gin.RouterGroup, dockerH *handlers.DockerHandler, s
 	g.GET("/hosts/:id/commands/history", agentH.GetHostCommandHistory)
 	g.GET("/docker/containers", dockerH.ListAllContainers)
 	g.GET("/docker/compose", dockerH.ListComposeProjects)
-	g.GET("/docker/versions", dockerH.CompareVersions)
 	g.POST("/docker/command", dockerH.SendDockerCommand)
 	g.POST("/system/journalctl", systemH.SendJournalCommand)
 	g.POST("/system/service", systemH.SendSystemdCommand)

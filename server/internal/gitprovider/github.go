@@ -102,12 +102,12 @@ func (c *gitHubClient) FetchReleaseHistory(owner, repo string, limit int) ([]Rel
 
 // FetchDockerManifestDigest returns the SHA256 digest from Docker Hub/registries
 func (c *gitHubClient) FetchDockerManifestDigest(imageName, tag string) (string, error) {
-	return fetchDockerManifestDigest(c.client, imageName, tag)
+	return fetchDockerManifestDigest(c.client, imageName, tag, c.authToken)
 }
 
 // FetchDockerVersionForDigest finds a versioned tag matching the given digest.
 func (c *gitHubClient) FetchDockerVersionForDigest(imageName, digest string) string {
-	return fetchDockerVersionForDigest(c.client, imageName, digest)
+	return fetchDockerVersionForDigest(c.client, imageName, digest, c.authToken)
 }
 
 func (c *gitHubClient) fetchGitHubRelease(owner, repo string) (*models.GitHubRelease, error) {

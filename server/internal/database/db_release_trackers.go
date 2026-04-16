@@ -2,6 +2,8 @@ package database
 
 import (
 	"database/sql"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/lib/pq"
@@ -305,9 +307,97 @@ func (db *DB) GetAllTrackerTagDigests() (map[string]string, error) {
 		if err := rows.Scan(&trackerID, &tag, &digest); err != nil {
 			continue
 		}
-		m[trackerID+"|"+digest] = tag
+		key := trackerID + "|" + digest
+		if cur, ok := m[key]; ok {
+			if compareVersionTagsForDB(tag, cur) > 0 {
+				m[key] = tag
+			}
+			continue
+		}
+		m[key] = tag
 	}
 	return m, nil
+}
+
+func compareVersionTagsForDB(a, b string) int {
+	ap, aok := parseVersionPartsForDB(a)
+	bp, bok := parseVersionPartsForDB(b)
+
+	if aok && !bok {
+		return 1
+	}
+	if !aok && bok {
+		return -1
+	}
+	if aok && bok {
+		maxLen := len(ap)
+		if len(bp) > maxLen {
+			maxLen = len(bp)
+		}
+		for i := 0; i < maxLen; i++ {
+			av := -1
+			bv := -1
+			if i < len(ap) {
+				av = ap[i]
+			}
+			if i < len(bp) {
+				bv = bp[i]
+			}
+			if av != bv {
+				if av > bv {
+					return 1
+				}
+				return -1
+			}
+		}
+		return 0
+	}
+
+	if a > b {
+		return 1
+	}
+	if a < b {
+		return -1
+	}
+	return 0
+}
+
+func parseVersionPartsForDB(tag string) ([]int, bool) {
+	t := strings.TrimSpace(strings.ToLower(tag))
+	t = strings.TrimPrefix(t, "v")
+	if t == "" {
+		return nil, false
+	}
+
+	raw := strings.Split(t, ".")
+	parts := make([]int, 0, len(raw))
+	for _, seg := range raw {
+		if seg == "" {
+			return nil, false
+		}
+		n := leadingDigitsForDB(seg)
+		if n == "" {
+			return nil, false
+		}
+		v, err := strconv.Atoi(n)
+		if err != nil {
+			return nil, false
+		}
+		parts = append(parts, v)
+	}
+	return parts, true
+}
+
+func leadingDigitsForDB(s string) string {
+	for i, r := range s {
+		if r < '0' || r > '9' {
+			if i == 0 {
+				return ""
+			}
+			return s[:i]
+		}
+	}
+	return s
 }
 
 func (db *DB) ListTrackerTagDigests(trackerID string, limit int) ([]models.ReleaseVersionHistoryItem, error) {
