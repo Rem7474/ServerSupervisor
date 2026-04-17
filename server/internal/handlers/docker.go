@@ -87,54 +87,6 @@ func (h *DockerHandler) ListAllContainers(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"containers": containers, "total": total, "limit": limit, "offset": offset})
 }
 
-// CompareVersions compares running docker images with tracked GitHub releases
-func (h *DockerHandler) CompareVersions(c *gin.Context) {
-	repos, err := h.db.GetTrackedRepos()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch tracked repos"})
-		return
-	}
-
-	containers, err := h.db.GetAllDockerContainers()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch containers"})
-		return
-	}
-
-	hosts, err := h.db.GetAllHosts()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch hosts"})
-		return
-	}
-	hostMap := make(map[string]string)
-	for _, h := range hosts {
-		hostMap[h.ID] = h.Hostname
-	}
-
-	var comparisons []models.VersionComparison
-	for _, repo := range repos {
-		if repo.DockerImage == "" {
-			continue
-		}
-		for _, container := range containers {
-			if container.Image == repo.DockerImage || container.Image+":"+container.ImageTag == repo.DockerImage {
-				comparisons = append(comparisons, models.VersionComparison{
-					DockerImage:    container.Image,
-					RunningVersion: container.ImageTag,
-					LatestVersion:  repo.LatestVersion,
-					IsUpToDate:     NormalizeVersion(container.ImageTag) == NormalizeVersion(repo.LatestVersion),
-					RepoOwner:      repo.Owner,
-					RepoName:       repo.Repo,
-					ReleaseURL:     repo.ReleaseURL,
-					HostID:         container.HostID,
-					Hostname:       hostMap[container.HostID],
-				})
-			}
-		}
-	}
-	c.JSON(http.StatusOK, comparisons)
-}
-
 // TrackedRepos management
 
 func (h *DockerHandler) ListTrackedRepos(c *gin.Context) {
@@ -248,10 +200,3 @@ func (h *DockerHandler) ListComposeProjects(c *gin.Context) {
 	c.JSON(http.StatusOK, projects)
 }
 
-// NormalizeVersion strips leading 'v' from version strings for comparison.
-func NormalizeVersion(v string) string {
-	if len(v) > 0 && v[0] == 'v' {
-		return v[1:]
-	}
-	return v
-}

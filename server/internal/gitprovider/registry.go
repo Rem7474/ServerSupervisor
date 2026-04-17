@@ -235,8 +235,10 @@ func pickCanonicalVersionTag(tags []string) string {
 }
 
 // compareVersionTags returns:
-//  1 if a is preferred over b
-//  0 if equivalent
+//
+//	1 if a is preferred over b
+//	0 if equivalent
+//
 // -1 if b is preferred over a
 func compareVersionTags(a, b string) int {
 	ap, aok := parseVersionParts(a)
