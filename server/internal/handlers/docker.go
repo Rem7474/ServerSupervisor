@@ -199,4 +199,3 @@ func (h *DockerHandler) ListComposeProjects(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, projects)
 }
-
