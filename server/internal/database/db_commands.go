@@ -314,7 +314,7 @@ func (db *DB) GetRecentNotifications(limit int) ([]models.NotificationItem, erro
 				'release_tracker'::text AS metric,
 				''::text AS severity,
 				COALESCE(rte.status, '') AS status,
-				COALESCE(rt.id, '') AS tracker_id,
+				COALESCE(rt.id::text, '') AS tracker_id,
 				COALESCE(rt.tracker_type, '') AS tracker_type,
 				COALESCE(rte.release_url, '') AS release_url,
 				COALESCE(rte.release_name, '') AS release_name,
