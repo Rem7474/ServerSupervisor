@@ -261,8 +261,8 @@ export function useHostDetail() {
 
     const version = asString(latestAgentVersion.value)
     const confirmed = await dialog.confirm({
-      title: 'Mettre à jour l\'agent',
-      message: `Déployer la version ${version} sur ${host.value?.hostname || host.value?.name || hostId} ? L\'agent sera redémarré pendant l\'opération.`,
+      title: "Mettre à jour l'agent",
+      message: `Déployer la version ${version} sur ${host.value?.hostname || host.value?.name || hostId} ? L'agent sera redémarré pendant l'opération.`,
       variant: 'warning',
     })
 
