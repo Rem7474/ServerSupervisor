@@ -26,7 +26,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 
 	// Instantiate handlers
 	authH := handlers.NewAuthHandler(db, cfg)
-	hostH := handlers.NewHostHandler(db, cfg)
+	hostH := handlers.NewHostHandler(db, cfg, dispatcher)
 	wsH := ws.NewWSHandler(db, cfg, notifHub)
 	agentH := handlers.NewAgentHandler(db, cfg, wsH.GetStreamHub())
 	aptH := handlers.NewAptHandler(db, cfg, dispatcher)
@@ -150,6 +150,7 @@ func registerHostRoutes(g *gin.RouterGroup, h *handlers.HostHandler, agentH *han
 	hostOperator.PATCH("", h.UpdateHost)
 	hostOperator.DELETE("", h.DeleteHost)
 	hostOperator.POST("/rotate-key", h.RotateAPIKey)
+	hostOperator.POST("/agent/update", h.TriggerAgentUpdate)
 }
 
 func registerHostPermissionRoutes(g *gin.RouterGroup, h *handlers.HostPermissionHandler) {

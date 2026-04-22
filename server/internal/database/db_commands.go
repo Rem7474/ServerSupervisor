@@ -273,19 +273,63 @@ func (db *DB) CountAllRemoteCommands() (int64, error) {
 // for WebSocket browser notification delivery.
 func (db *DB) GetRecentNotifications(limit int) ([]models.NotificationItem, error) {
 	rows, err := db.conn.Query(
-		`SELECT ai.id, ai.rule_id, ai.host_id,
-		        COALESCE(h.name, ai.host_id) AS host_name,
-		        COALESCE(ar.name,
-		            ar.metric || ' ' || ar.operator || ' ' || CAST(COALESCE(ar.threshold_crit, ar.threshold_warn, 0) AS TEXT),
-		            'Règle supprimée') AS rule_name,
-		        COALESCE(ar.metric, '') AS metric,
-		        COALESCE(ai.severity, '') AS severity,
-		        ai.value, ai.triggered_at, ai.resolved_at,
-		        COALESCE(ar.actions->'channels' @> '["browser"]'::jsonb, FALSE) AS browser_notify
-		 FROM alert_incidents ai
-		 LEFT JOIN alert_rules ar ON ai.rule_id = ar.id
-		 LEFT JOIN hosts h ON ai.host_id = h.id
-		 ORDER BY ai.triggered_at DESC LIMIT $1`, limit,
+		`SELECT * FROM (
+			SELECT
+				'alert:' || ai.id::text AS id,
+				'alert_incident'::text AS type,
+				ai.rule_id,
+				ai.host_id,
+				COALESCE(h.name, ai.host_id) AS host_name,
+				COALESCE(ar.name,
+					ar.metric || ' ' || ar.operator || ' ' || CAST(COALESCE(ar.threshold_crit, ar.threshold_warn, 0) AS TEXT),
+					'Règle supprimée') AS rule_name,
+				COALESCE(ar.metric, '') AS metric,
+				COALESCE(ai.severity, '') AS severity,
+				''::text AS status,
+				''::text AS tracker_id,
+				''::text AS tracker_type,
+				''::text AS release_url,
+				''::text AS release_name,
+				''::text AS version,
+				ai.value,
+				ai.triggered_at,
+				ai.resolved_at,
+				COALESCE(ar.actions->'channels' @> '["browser"]'::jsonb, FALSE) AS browser_notify
+			FROM alert_incidents ai
+			LEFT JOIN alert_rules ar ON ai.rule_id = ar.id
+			LEFT JOIN hosts h ON ai.host_id = h.id
+
+			UNION ALL
+
+			SELECT
+				'tracker:' || rte.id::text AS id,
+				CASE
+					WHEN rte.status IN ('pending', 'running') THEN 'release_tracker_detected'
+					ELSE 'release_tracker_execution'
+				END AS type,
+				NULL::bigint AS rule_id,
+				COALESCE(rt.host_id, '') AS host_id,
+				COALESCE(h.name, rt.host_id, 'Source inconnue') AS host_name,
+				COALESCE(rt.name, 'Release tracker') AS rule_name,
+				'release_tracker'::text AS metric,
+				''::text AS severity,
+				COALESCE(rte.status, '') AS status,
+				COALESCE(rt.id, '') AS tracker_id,
+				COALESCE(rt.tracker_type, '') AS tracker_type,
+				COALESCE(rte.release_url, '') AS release_url,
+				COALESCE(rte.release_name, '') AS release_name,
+				COALESCE(NULLIF(rte.tag_name, ''), '') AS version,
+				0::double precision AS value,
+				rte.triggered_at,
+				rte.completed_at AS resolved_at,
+				TRUE AS browser_notify
+			FROM release_tracker_executions rte
+			JOIN release_trackers rt ON rte.tracker_id = rt.id
+			LEFT JOIN hosts h ON rt.host_id = h.id
+			WHERE rt.notify_channels @> ARRAY['browser']::text[]
+		) AS unified
+		ORDER BY unified.triggered_at DESC
+		LIMIT $1`, limit,
 	)
 	if err != nil {
 		return nil, err
@@ -297,8 +341,10 @@ func (db *DB) GetRecentNotifications(limit int) ([]models.NotificationItem, erro
 		var item models.NotificationItem
 		var ruleID sql.NullInt64
 		if err := rows.Scan(
-			&item.ID, &ruleID, &item.HostID,
+			&item.ID, &item.Type, &ruleID, &item.HostID,
 			&item.HostName, &item.RuleName, &item.Metric, &item.Severity,
+			&item.Status, &item.TrackerID, &item.TrackerType,
+			&item.ReleaseURL, &item.ReleaseName, &item.Version,
 			&item.Value, &item.TriggeredAt, &item.ResolvedAt,
 			&item.BrowserNotify,
 		); err != nil {
@@ -315,6 +361,18 @@ func (db *DB) GetRecentNotifications(limit int) ([]models.NotificationItem, erro
 
 func (db *DB) enrichNotificationSource(item *models.NotificationItem) {
 	if item == nil {
+		return
+	}
+	if item.Type == "" {
+		item.Type = "alert_incident"
+	}
+	if strings.HasPrefix(item.Type, "release_tracker") {
+		item.SourceType = "release_tracker"
+		if item.TrackerType == "docker" {
+			item.SourceLabel = "Docker tracker"
+		} else {
+			item.SourceLabel = "Git tracker"
+		}
 		return
 	}
 	item.SourceType = "agent"

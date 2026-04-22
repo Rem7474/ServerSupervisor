@@ -20,6 +20,19 @@ interface AlertRule {
 
 interface Incident {
   id: string
+  type?: string
+  status?: string
+  tracker_id?: string
+  tracker_type?: string
+  release_url?: string
+  release_name?: string
+  version?: string
+  host_id?: string
+  host_name?: string
+  rule_name?: string
+  metric?: string
+  value?: number
+  triggered_at?: string
   resolved_at?: string | null
   [key: string]: unknown
 }
@@ -101,7 +114,10 @@ export function useAlertsPage(): UseAlertsPageApi {
   const { hosts } = storeToRefs(hostsStore)
 
   const activeIncidentCount: ComputedRef<number> = computed(
-    () => incidents.value.filter((incident) => !incident.resolved_at).length
+    () =>
+      incidents.value.filter(
+        (incident) => (incident.type === 'alert_incident' || !incident.type) && !incident.resolved_at
+      ).length
   )
 
   async function init(): Promise<void> {
@@ -155,7 +171,7 @@ export function useAlertsPage(): UseAlertsPageApi {
       incidents.value = response.data?.notifications || []
       incidentsLoaded.value = true
     } catch {
-      incidentsError.value = 'Impossible de charger les incidents'
+      incidentsError.value = "Impossible de charger l'historique des notifications"
     } finally {
       incidentsLoading.value = false
     }
@@ -237,7 +253,11 @@ export function useAlertsPage(): UseAlertsPageApi {
 
   function onWebSocketAlert(payload: Notification): void {
     // Incident created or resolved — refresh the list
-    if (payload.type === 'alert_incident_update') {
+    if (
+      payload.type === 'alert_incident_update' ||
+      payload.type === 'release_tracker_detected' ||
+      payload.type === 'release_tracker_execution'
+    ) {
       loadIncidents()
       return
     }

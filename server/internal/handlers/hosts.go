@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"net"
 	"net/http"
 	"sync"
@@ -9,16 +10,18 @@ import (
 	"github.com/google/uuid"
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/database"
+	"github.com/serversupervisor/server/internal/dispatch"
 	"github.com/serversupervisor/server/internal/models"
 )
 
 type HostHandler struct {
-	db  *database.DB
-	cfg *config.Config
+	db         *database.DB
+	cfg        *config.Config
+	dispatcher *dispatch.Dispatcher
 }
 
-func NewHostHandler(db *database.DB, cfg *config.Config) *HostHandler {
-	return &HostHandler{db: db, cfg: cfg}
+func NewHostHandler(db *database.DB, cfg *config.Config, dispatcher *dispatch.Dispatcher) *HostHandler {
+	return &HostHandler{db: db, cfg: cfg, dispatcher: dispatcher}
 }
 
 // generateAPIKey creates a new API key pair for a host.
@@ -133,6 +136,71 @@ func (h *HostHandler) UpdateHost(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, updated)
+}
+
+// TriggerAgentUpdate queues an agent self-update command for the host.
+func (h *HostHandler) TriggerAgentUpdate(c *gin.Context) {
+	if c.GetString("role") != models.RoleAdmin && c.GetString("role") != models.RoleOperator {
+		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+		return
+	}
+
+	hostID := c.Param("id")
+	host, err := h.db.GetHost(hostID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "host not found"})
+		return
+	}
+
+	if host.AgentVersion != "" && host.AgentVersion == LatestAgentVersion {
+		c.JSON(http.StatusConflict, gin.H{"error": "agent is already up to date"})
+		return
+	}
+
+	if cmds, err := h.db.GetRemoteCommandsByHostAndModule(hostID, "agent", 20); err == nil {
+		for _, cmd := range cmds {
+			if cmd.Action == "update" && (cmd.Status == "pending" || cmd.Status == "running") {
+				c.JSON(http.StatusConflict, gin.H{"error": "an agent update is already in progress for this host"})
+				return
+			}
+		}
+	}
+
+	payload, err := json.Marshal(gin.H{"version": LatestAgentVersion})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to build update payload"})
+		return
+	}
+
+	username := c.GetString("username")
+	if username == "" {
+		username = "system"
+	}
+
+	result, err := h.dispatcher.Create(dispatch.Request{
+		HostID:      hostID,
+		Module:      "agent",
+		Action:      "update",
+		Payload:     string(payload),
+		TriggeredBy: username,
+		Audit: &dispatch.AuditLogRequest{
+			Username:  username,
+			Action:    "agent_update",
+			HostID:    hostID,
+			IPAddress: c.ClientIP(),
+			Details:   "agent update to v" + LatestAgentVersion,
+		},
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to queue agent update"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"command_id":     result.Command.ID,
+		"status":         "pending",
+		"target_version": LatestAgentVersion,
+	})
 }
 
 // DeleteHost removes a host

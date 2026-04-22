@@ -2,14 +2,14 @@
   <div class="card">
     <div class="card-header d-flex align-items-center justify-content-between">
       <h3 class="card-title">
-        Incidents recents
+        Historique de notifications
       </h3>
       <div class="d-flex align-items-center gap-2">
         <span
           v-if="activeIncidentCount > 0"
           class="badge bg-red-lt text-red"
         >{{ activeIncidentCount }} actif{{ activeIncidentCount > 1 ? 's' : '' }}</span>
-        <span class="text-secondary small">{{ incidents.length }} incident{{ incidents.length !== 1 ? 's' : '' }}</span>
+        <span class="text-secondary small">{{ incidents.length }} notification{{ incidents.length !== 1 ? 's' : '' }}</span>
         <button
           class="btn btn-sm btn-ghost-secondary"
           @click="$emit('refresh')"
@@ -70,9 +70,9 @@
           d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
         />
       </svg>
-      <div>Aucun incident enregistre</div>
+      <div>Aucune notification enregistree</div>
       <div class="text-muted small mt-1">
-        Les incidents apparaitront ici lorsqu'une regle d'alerte se declenchera
+        Les alertes et notifications release tracker apparaitront ici
       </div>
     </div>
     <div
@@ -85,12 +85,12 @@
             <th style="width: 90px;">
               Etat
             </th>
-            <th>Severite</th>
-            <th>Regle</th>
+            <th>Type</th>
+            <th>Element</th>
             <th>Source</th>
-            <th>Valeur</th>
+            <th>Details</th>
             <th>Declenche</th>
-            <th>Resolu</th>
+            <th>Termine</th>
           </tr>
         </thead>
         <tbody>
@@ -100,9 +100,9 @@
           >
             <td>
               <span
-                v-if="incident.resolved_at"
+                v-if="isCompleted(incident)"
                 class="badge bg-green-lt text-green"
-              >Resolu</span>
+              >Termine</span>
               <span
                 v-else
                 class="badge bg-red-lt text-red"
@@ -110,13 +110,21 @@
             </td>
             <td>
               <span
-                v-if="(incident.severity || '').toLowerCase() === 'crit'"
+                v-if="incident.type === 'release_tracker_detected'"
+                class="badge bg-blue-lt text-blue"
+              >Release tracker</span>
+              <span
+                v-else-if="incident.type === 'release_tracker_execution'"
+                class="badge bg-indigo-lt text-indigo"
+              >Execution tracker</span>
+              <span
+                v-else-if="(incident.severity || '').toLowerCase() === 'crit'"
                 class="badge bg-red-lt text-red"
-              >Critique</span>
+              >Alerte critique</span>
               <span
                 v-else-if="(incident.severity || '').toLowerCase() === 'warn'"
                 class="badge bg-yellow-lt text-yellow"
-              >Avertissement</span>
+              >Alerte avertissement</span>
               <span
                 v-else
                 class="badge bg-secondary-lt text-secondary"
@@ -128,19 +136,24 @@
                 style="max-width: 220px;"
                 :title="incident.rule_name"
               >
-                {{ incident.rule_name }}
+                {{ incident.rule_name || defaultNotificationTitle(incident) }}
               </div>
-              <div class="text-muted small">
+              <div
+                v-if="incident.metric"
+                class="text-muted small"
+              >
                 {{ incidentMetricLabel(incident.metric) }}
               </div>
             </td>
             <td>
               <router-link
-                :to="resolveIncidentHostRoute(incident.host_id, incident.metric)"
+                v-if="notificationRoute(incident)"
+                :to="notificationRoute(incident)"
                 class="text-decoration-none"
               >
                 {{ incident.host_name || 'Source inconnue' }}
               </router-link>
+              <span v-else>{{ incident.host_name || 'Source inconnue' }}</span>
               <div
                 v-if="incident.source_label && incident.source_label !== incident.host_name"
                 class="text-muted small text-truncate"
@@ -150,7 +163,19 @@
                 {{ incident.source_label }}
               </div>
             </td>
-            <td><code>{{ incidentFormatValue(incident.value, incident.metric) }}</code></td>
+            <td>
+              <template v-if="incident.type === 'release_tracker_detected' || incident.type === 'release_tracker_execution'">
+                <div>
+                  Version : <code>{{ incident.version || '-' }}</code>
+                </div>
+                <div class="text-muted small">
+                  {{ trackerStatusLabel(incident.status) }}
+                </div>
+              </template>
+              <template v-else>
+                <code>{{ incidentFormatValue(incident.value, incident.metric) }}</code>
+              </template>
+            </td>
             <td class="text-muted small">
               {{ formatDate(incident.triggered_at) }}
             </td>
@@ -195,10 +220,40 @@ defineEmits(['refresh'])
 
 function incidentMetricLabel(metric) {
   if (!metric) return ''
+  if (metric === 'release_tracker') return 'Suivi de version'
   return getAlertMetricMeta(metric).label
 }
 
+function defaultNotificationTitle(incident) {
+  if (incident?.type === 'release_tracker_detected') return 'Nouvelle release detectee'
+  if (incident?.type === 'release_tracker_execution') return 'Execution release tracker'
+  return 'Alerte'
+}
+
+function notificationRoute(incident) {
+  if (incident?.type === 'release_tracker_detected' || incident?.type === 'release_tracker_execution') {
+    if (incident?.tracker_id) return `/release-trackers/${encodeURIComponent(incident.tracker_id)}`
+    return '/git-webhooks?tab=trackers'
+  }
+  return resolveIncidentHostRoute(incident?.host_id, incident?.metric)
+}
+
+function trackerStatusLabel(status) {
+  if (status === 'pending' || status === 'running') return 'Detection en cours'
+  if (status === 'completed' || status === 'success') return 'Execution reussie'
+  if (status === 'failed' || status === 'error') return 'Execution echouee'
+  return status || 'Etat inconnu'
+}
+
+function isCompleted(incident) {
+  if (incident?.type === 'release_tracker_detected' || incident?.type === 'release_tracker_execution') {
+    return !!incident?.resolved_at || ['completed', 'success', 'failed', 'error'].includes((incident?.status || '').toLowerCase())
+  }
+  return !!incident?.resolved_at
+}
+
 function incidentFormatValue(value, metric) {
+  if (metric === 'release_tracker') return '-'
   if (metric === 'status_offline') return value === 1 ? 'offline' : 'online'
   if (metric === 'disk_smart_status') return Number(value) >= 1 ? 'FAILED' : 'OK'
   const unit = getAlertMetricMeta(metric).unit

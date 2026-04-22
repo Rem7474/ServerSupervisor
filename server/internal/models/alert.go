@@ -75,7 +75,8 @@ type AlertIncident struct {
 }
 
 type NotificationItem struct {
-	ID            int64      `json:"id"`
+	ID            string     `json:"id"`
+	Type          string     `json:"type"`
 	RuleID        *int64     `json:"rule_id"`
 	HostID        string     `json:"host_id"`
 	HostName      string     `json:"host_name"`
@@ -84,6 +85,12 @@ type NotificationItem struct {
 	RuleName      string     `json:"rule_name"`
 	Metric        string     `json:"metric"`
 	Severity      string     `json:"severity,omitempty"`
+	Status        string     `json:"status,omitempty"`
+	TrackerID     string     `json:"tracker_id,omitempty"`
+	TrackerType   string     `json:"tracker_type,omitempty"`
+	ReleaseURL    string     `json:"release_url,omitempty"`
+	ReleaseName   string     `json:"release_name,omitempty"`
+	Version       string     `json:"version,omitempty"`
 	Value         float64    `json:"value"`
 	TriggeredAt   time.Time  `json:"triggered_at"`
 	ResolvedAt    *time.Time `json:"resolved_at"`

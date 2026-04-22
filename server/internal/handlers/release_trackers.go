@@ -469,6 +469,21 @@ func (h *ReleaseTrackerHandler) NotifyComplete(commandID, status string) {
 			if err := notifier.SendNtfy(h.cfg, ntfyURL, subject, msg); err != nil {
 				log.Printf("Release tracker notify ntfy: %v", err)
 			}
+
+		case "browser":
+			if h.notifHub == nil {
+				continue
+			}
+			h.notifHub.Broadcast(map[string]interface{}{
+				"type": "release_tracker_execution",
+				"notification": map[string]interface{}{
+					"tracker_id":   tracker.ID,
+					"tracker_name": tracker.Name,
+					"tracker_type": tracker.TrackerType,
+					"status":       status,
+					"triggered_at": time.Now().UTC(),
+				},
+			})
 		}
 	}
 }

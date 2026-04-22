@@ -111,12 +111,12 @@
                 class="fw-semibold text-truncate small notification-rule"
                 :title="item.rule_name"
               >
-                {{ item.rule_name }}
+                {{ notificationTitle(item) }}
               </div>
               <span
-                v-if="item.resolved_at"
+                v-if="notificationResolved(item)"
                 class="badge bg-success-lt text-success flex-shrink-0 notification-state-badge"
-              >Résolu</span>
+              >Termine</span>
               <span
                 v-else
                 class="badge bg-red-lt text-red flex-shrink-0 notification-state-badge"
@@ -124,7 +124,7 @@
             </div>
             <div class="d-flex align-items-center justify-content-between text-secondary notification-meta">
               <router-link
-                :to="resolveIncidentHostRoute(item.host_id, item.metric)"
+                :to="notificationRoute(item)"
                 class="text-truncate text-secondary text-decoration-none notification-host-link notification-host"
                 @click="isOpen = false"
               >
@@ -149,7 +149,17 @@
                 <RelativeTime :date="item.triggered_at" />
               </span>
             </div>
-            <div class="text-secondary mt-1 notification-value-row">
+            <div
+              v-if="item.type === 'release_tracker_detected' || item.type === 'release_tracker_execution'"
+              class="text-secondary mt-1 notification-value-row"
+            >
+              Version : <code class="notification-value">{{ item.version || '-' }}</code>
+              <span class="ms-1">{{ trackerStatusLabel(item.status) }}</span>
+            </div>
+            <div
+              v-else
+              class="text-secondary mt-1 notification-value-row"
+            >
               Valeur : <code class="notification-value">{{ item.value?.toFixed(2) }}</code>
               <span class="ms-1">{{ metricUnit(item.metric) }}</span>
             </div>
@@ -164,7 +174,7 @@
           class="text-secondary small"
           @click="isOpen = false"
         >
-          Voir l'historique des incidents →
+          Voir l'historique des notifications →
         </router-link>
       </div>
     </div>
@@ -208,6 +218,35 @@ function metricUnit(metric) {
   return ''
 }
 
+function trackerStatusLabel(status) {
+  if (status === 'pending' || status === 'running') return 'Detection en cours'
+  if (status === 'completed' || status === 'success') return 'Execution reussie'
+  if (status === 'failed' || status === 'error') return 'Execution echouee'
+  return status || 'Etat inconnu'
+}
+
+function notificationResolved(item) {
+  if (item?.type === 'release_tracker_detected' || item?.type === 'release_tracker_execution') {
+    return !!item?.resolved_at || ['completed', 'success', 'failed', 'error'].includes((item?.status || '').toLowerCase())
+  }
+  return !!item?.resolved_at
+}
+
+function notificationTitle(item) {
+  if (!item) return 'Notification'
+  if (item.type === 'release_tracker_detected') return item.rule_name || 'Nouvelle release detectee'
+  if (item.type === 'release_tracker_execution') return item.rule_name || 'Execution release tracker'
+  return item.rule_name || 'Alerte'
+}
+
+function notificationRoute(item) {
+  if (item?.type === 'release_tracker_detected' || item?.type === 'release_tracker_execution') {
+    if (item?.tracker_id) return `/release-trackers/${encodeURIComponent(item.tracker_id)}`
+    return '/git-webhooks?tab=trackers'
+  }
+  return resolveIncidentHostRoute(item?.host_id, item?.metric)
+}
+
 function toggleOpen() {
   isOpen.value = !isOpen.value
   if (isOpen.value) {
@@ -226,6 +265,18 @@ async function markAllRead() {
 }
 
 function showBrowserNotification(item) {
+  if (item?.type === 'release_tracker_detected' || item?.type === 'release_tracker_execution') {
+    const trackerTypeLabel = item.tracker_type === 'docker' ? 'Docker' : 'Git'
+    showExecutionBrowserNotification(
+      `${trackerTypeLabel} tracker : ${notificationTitle(item)}`,
+      item.type === 'release_tracker_detected'
+        ? `Nouvelle version detectee${item.version ? ` : ${item.version}` : ''}`
+        : `Execution ${trackerStatusLabel(item.status).toLowerCase()}`,
+      `tracker-history-${item.id}`,
+    )
+    return
+  }
+
   try {
     const n = new Notification(`Alerte : ${item.rule_name}`, {
       body: `${item.host_name} — Valeur : ${item.value?.toFixed(2)}${metricUnit(item.metric)}`,
@@ -317,29 +368,32 @@ useWebSocket('/api/v1/ws/notifications', (payload) => {
         `Nouvelle version détectée${n.version ? ` : ${n.version}` : ''}${n.release_name ? ` - ${n.release_name}` : ''}`,
         `tracker-detected-${n.tracker_id}-${n.version || 'unknown'}`,
       )
+      fetchNotifications()
       return
     }
 
     if (payload.type === 'release_tracker_execution') {
       const n = payload.notification
-      const statusLabel = n.status === 'success' ? 'reussie' : 'echouee'
+      const statusLabel = n.status === 'completed' || n.status === 'success' ? 'reussie' : 'echouee'
       const typeLabel = n.tracker_type === 'docker' ? 'Docker' : 'Git'
       showExecutionBrowserNotification(
         `${typeLabel} tracker : ${n.tracker_name}`,
         `Execution ${statusLabel}`,
         `tracker-exec-${n.tracker_id}-${n.status}`,
       )
+      fetchNotifications()
       return
     }
 
     if (payload.type === 'webhook_execution') {
       const n = payload.notification
-      const statusLabel = n.status === 'success' ? 'reussie' : 'echouee'
+      const statusLabel = n.status === 'completed' || n.status === 'success' ? 'reussie' : 'echouee'
       showExecutionBrowserNotification(
         `Webhook : ${n.webhook_name}`,
         `Execution ${statusLabel}`,
         `webhook-exec-${n.webhook_id}-${n.status}`,
       )
+      fetchNotifications()
     }
   }
 })

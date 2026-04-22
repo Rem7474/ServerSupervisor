@@ -12,10 +12,10 @@
                 Dashboard
               </router-link>
               <span class="text-muted mx-1">/</span>
-              <span>Alertes</span>
+              <span>{{ alertsTab === 'incidents' ? 'Historique de notifications' : 'Alertes' }}</span>
             </div>
             <h2 class="page-title">
-              Alertes
+              {{ alertsTab === 'incidents' ? 'Historique de notifications' : 'Alertes' }}
             </h2>
           </div>
           <div class="col-auto ms-auto d-flex gap-2">
@@ -90,7 +90,7 @@
               href="#"
               @click.prevent="switchToIncidents"
             >
-              Incidents
+              Historique notifications
               <span
                 v-if="activeIncidentCount > 0"
                 class="badge bg-red-lt text-red ms-1"

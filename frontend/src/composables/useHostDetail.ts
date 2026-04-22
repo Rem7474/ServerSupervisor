@@ -43,6 +43,7 @@ export function useHostDetail() {
   const isEditing = ref(false)
   const tasksCount = ref(0)
   const aptCmdLoading = ref('')
+  const agentUpdateLoading = ref(false)
 
   const host = ref<AnyRecord | null>(null)
   const metrics = ref<AnyRecord | null>(null)
@@ -201,6 +202,11 @@ export function useHostDetail() {
     return version === latestAgentVersion.value
   }
 
+  const canUpdateAgent = computed(() => {
+    const version = asString(host.value?.agent_version)
+    return auth.canManage && !!version && !!latestAgentVersion.value && !isAgentUpToDate(version)
+  })
+
   async function loadComplete() {
     try {
       const res = await apiClient.getHostComplete(hostId)
@@ -247,6 +253,42 @@ export function useHostDetail() {
         message: getApiErrorMessage(e),
         variant: 'danger',
       })
+    }
+  }
+
+  async function sendAgentUpdate() {
+    if (!canUpdateAgent.value) return
+
+    const version = asString(latestAgentVersion.value)
+    const confirmed = await dialog.confirm({
+      title: 'Mettre à jour l\'agent',
+      message: `Déployer la version ${version} sur ${host.value?.hostname || host.value?.name || hostId} ? L\'agent sera redémarré pendant l\'opération.`,
+      variant: 'warning',
+    })
+
+    if (!confirmed) return
+
+    agentUpdateLoading.value = true
+    try {
+      const response = await apiClient.updateHostAgent(hostId)
+      const commandId = response.data?.command_id
+      if (commandId) {
+        openCommand({
+          id: commandId,
+          module: 'agent',
+          action: 'update',
+          status: 'pending',
+          output: '',
+        })
+      }
+    } catch (e: unknown) {
+      await dialog.confirm({
+        title: 'Erreur',
+        message: getApiErrorMessage(e),
+        variant: 'danger',
+      })
+    } finally {
+      agentUpdateLoading.value = false
     }
   }
 
@@ -430,6 +472,7 @@ export function useHostDetail() {
     isEditing,
     tasksCount,
     aptCmdLoading,
+    agentUpdateLoading,
     host,
     containers,
     versionComparisons,
@@ -454,7 +497,9 @@ export function useHostDetail() {
     reconnect,
     openCommand,
     sendAptCmd,
+    sendAgentUpdate,
     isAgentUpToDate,
+    canUpdateAgent,
     deleteHost,
     loadCmdHistoryRefresh,
     confirmLink,

@@ -193,6 +193,7 @@ export default {
   updateHost: (id: string, data: JsonObject) => api.patch(`/v1/hosts/${id}`, data),
   deleteHost: (id: string) => api.delete(`/v1/hosts/${id}`),
   rotateHostKey: (id: string) => api.post(`/v1/hosts/${id}/rotate-key`),
+  updateHostAgent: (id: string) => api.post(`/v1/hosts/${id}/agent/update`),
 
   // Disk
   getDiskMetrics: (hostId: string) => api.get(`/v1/hosts/${hostId}/disk/metrics`),

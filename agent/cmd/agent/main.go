@@ -32,6 +32,9 @@ var Version = "dev"
 // Capacity 10 lets up to 10 pending batches queue up before we start dropping.
 var commandQueue = make(chan []sender.PendingCommand, 10)
 
+// agentConfigPath stores the active configuration path for helper commands.
+var agentConfigPath = "/etc/serversupervisor/agent.yaml"
+
 // aptMu serialises APT operations — dpkg cannot run concurrently.
 var aptMu sync.Mutex
 
@@ -54,7 +57,25 @@ func main() {
 	initForce := flag.Bool("init-force", false, "Allow overwriting existing config file when used with --init")
 	initServerURL := flag.String("server-url", "", "Server URL override used with --init")
 	initAPIKey := flag.String("api-key", "", "API key override used with --init")
+	showVersion := flag.Bool("version", false, "Print the agent version and exit")
+	internalUpdate := flag.Bool("internal-update", false, "Run the detached self-update helper and exit")
+	updateCommandID := flag.String("update-command-id", "", "Command ID for internal update helper")
+	updateVersion := flag.String("update-version", "", "Target version for internal update helper")
 	flag.Parse()
+	agentConfigPath = *configPath
+
+	if *showVersion {
+		fmt.Println(Version)
+		return
+	}
+
+	if *internalUpdate {
+		if err := runInternalUpdate(*configPath, *updateCommandID, *updateVersion); err != nil {
+			log.Printf("Internal update failed: %v", err)
+			os.Exit(1)
+		}
+		return
+	}
 
 	// Generate/write default config
 	if *initConfig {
@@ -530,6 +551,38 @@ func executeCommand(s *sender.Sender, cmd sender.PendingCommand) {
 			AptStatus: aptStatus,
 		}); err != nil {
 			log.Printf("Failed to report command result: %v", err)
+		}
+
+	case "agent":
+		if cmd.Action != "update" {
+			if err := s.ReportCommandResult(ctx, &sender.CommandResult{
+				CommandID: cmd.ID,
+				Status:    "failed",
+				Output:    fmt.Sprintf("unsupported agent action: %s", cmd.Action),
+			}); err != nil {
+				log.Printf("Failed to report unsupported agent action: %v", err)
+			}
+			return
+		}
+
+		if err := s.ReportCommandResult(ctx, &sender.CommandResult{
+			CommandID: cmd.ID,
+			Status:    "running",
+			Output:    "Launching detached update helper...",
+		}); err != nil {
+			log.Printf("Failed to report agent update running status: %v", err)
+		}
+
+		if err := startDetachedAgentUpdate(s, cmd, agentConfigPath); err != nil {
+			output := fmt.Sprintf("ERROR: %v", err)
+			if reportErr := s.ReportCommandResult(ctx, &sender.CommandResult{
+				CommandID: cmd.ID,
+				Status:    "failed",
+				Output:    output,
+			}); reportErr != nil {
+				log.Printf("Failed to report agent update launch failure: %v", reportErr)
+			}
+			return
 		}
 
 	case "systemd":

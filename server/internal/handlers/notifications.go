@@ -17,7 +17,8 @@ func NewNotificationsHandler(db *database.DB) *NotificationsHandler {
 	return &NotificationsHandler{db: db}
 }
 
-// GetNotifications returns the 30 most recent alert incidents enriched with rule and host names.
+// GetNotifications returns the most recent browser notification history entries
+// (alerts and release trackers) enriched with display metadata.
 // It also includes the caller's server-side read_at timestamp for cross-device unread-count sync.
 func (h *NotificationsHandler) GetNotifications(c *gin.Context) {
 	if c.GetString("role") != models.RoleAdmin {

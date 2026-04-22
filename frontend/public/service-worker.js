@@ -1,4 +1,4 @@
-const SW_VERSION = '2026-04-12-v1'
+const SW_VERSION = '2026-04-22-v1'
 const STATIC_CACHE_PREFIX = 'serversupervisor-static'
 const RUNTIME_CACHE_PREFIX = 'serversupervisor-runtime'
 const CACHE_NAME = `${STATIC_CACHE_PREFIX}-${SW_VERSION}`
@@ -183,7 +183,7 @@ self.addEventListener('push', (event) => {
   }
   const title = data.title || 'ServerSupervisor'
   const options = {
-    body: data.body || 'Nouvelle alerte détectée',
+    body: data.body || 'Nouvelle notification disponible',
     icon: '/favicon.ico',
     badge: '/favicon.ico',
     tag: data.tag || 'ss-alert',
