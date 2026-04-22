@@ -401,7 +401,7 @@
                   @toggle="toggleSort('uptime')"
                 />
               </th>
-              <th>
+              <th class="last-activity-col">
                 <SortableHeader
                   label="Dernière activité"
                   :active="sortKey === 'last_seen'"
@@ -517,7 +517,9 @@
                 >—</span>
               </td>
               <td>{{ hostMetrics[host.id] ? formatUptime(hostMetrics[host.id].uptime) : '-' }}</td>
-              <td><RelativeTime :date="host.last_seen" /></td>
+              <td class="last-activity-col">
+                <RelativeTime :date="host.last_seen" />
+              </td>
             </tr>
             <tr v-if="!loading && hosts.length > 0 && sortedHosts.length === 0">
               <td
@@ -737,5 +739,10 @@ watch(totalHostPages, (pages) => {
 
 .empty-state-icon {
   opacity: 0.35;
+}
+
+.last-activity-col {
+  min-width: 13rem;
+  white-space: nowrap;
 }
 </style>
