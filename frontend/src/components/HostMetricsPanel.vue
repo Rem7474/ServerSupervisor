@@ -21,7 +21,7 @@
             {{ metrics.cpu_usage_percent?.toFixed(1) }}%
           </div>
           <div class="text-secondary small">
-            {{ metricsSource === 'proxmox' ? 'Source : Proxmox' : metrics.cpu_model }}
+            {{ metricsSource === 'proxmox' ? 'proxmox' : metrics.cpu_model }}
           </div>
         </div>
       </div>
@@ -205,7 +205,7 @@ const memChartData = shallowRef(null)
 
 const hasCpuTemp = computed(() => Number(props.metrics?.cpu_temperature) > 0)
 const cpuTempSourceLabel = computed(() =>
-  props.metricsSource === 'proxmox' ? 'Source : Proxmox' : 'Source : Agent'
+  props.metricsSource === 'proxmox' ? 'proxmox' : 'Source : Agent'
 )
 
 const timeRangeOptions = [

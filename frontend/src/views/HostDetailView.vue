@@ -125,7 +125,7 @@
       <div class="card-body py-2 px-3 d-flex flex-wrap align-items-center gap-3">
         <!-- Guest info -->
         <div class="d-flex align-items-center gap-2">
-          <span class="badge bg-purple-lt text-purple">Proxmox</span>
+          <span class="badge bg-orange-lt text-orange">Proxmox</span>
           <span class="fw-medium">{{ proxmoxLink.guest_name || `VMID ${proxmoxLink.vmid}` }}</span>
           <span class="text-muted small">({{ proxmoxLink.guest_type?.toUpperCase() }} · {{ proxmoxLink.node_name }})</span>
         </div>
@@ -219,7 +219,7 @@
       class="d-flex align-items-center gap-2 mb-3"
     >
       <button
-        class="btn btn-sm btn-outline-purple"
+        class="btn btn-sm btn-outline-orange"
         @click="openLinkForm"
       >
         <svg

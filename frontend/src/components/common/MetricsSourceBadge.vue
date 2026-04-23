@@ -22,7 +22,7 @@ const props = defineProps({
 const badgeText = computed(() => {
   switch (props.source) {
     case 'proxmox':
-      return 'Source : Proxmox'
+      return 'proxmox'
     case 'agent':
       return 'Source : Agent'
     case 'auto':
@@ -35,7 +35,7 @@ const badgeText = computed(() => {
 const badgeClass = computed(() => {
   switch (props.source) {
     case 'proxmox':
-      return 'badge bg-purple-lt text-purple'
+      return 'badge bg-orange-lt text-orange'
     case 'agent':
       return 'badge bg-cyan-lt text-cyan'
     case 'auto':

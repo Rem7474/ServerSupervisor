@@ -353,14 +353,6 @@
                   @toggle="toggleSort('ip_os')"
                 />
               </th>
-              <th title="Version de l'agent">
-                <SortableHeader
-                  label="Agent"
-                  :active="sortKey === 'agent'"
-                  :direction="sortDir"
-                  @toggle="toggleSort('agent')"
-                />
-              </th>
               <th>
                 <SortableHeader
                   label="CPU"
@@ -445,7 +437,7 @@
                     :to="proxmoxGuestPath(host.id)"
                     class="badge bg-orange-lt text-orange text-decoration-none"
                   >
-                    Stats VM/LXC Proxmox
+                    Stats Proxmox
                   </router-link>
                 </div>
               </td>
@@ -465,20 +457,8 @@
               </td>
               <td>
                 <span
-                  v-if="host.agent_version"
-                  :class="isAgentUpToDate(host.agent_version) ? 'badge bg-green-lt text-green' : 'badge bg-yellow-lt text-yellow'"
-                >
-                  v{{ host.agent_version }}
-                </span>
-                <span
-                  v-else
-                  class="text-secondary small"
-                >-</span>
-              </td>
-              <td>
-                <span
                   :class="cpuColor(effectiveMetrics(host.id).cpu)"
-                  :title="effectiveMetrics(host.id).source === 'proxmox' ? 'Source : Proxmox' : ''"
+                  :title="effectiveMetrics(host.id).source === 'proxmox' ? 'proxmox' : ''"
                 >
                   {{ effectiveMetrics(host.id).cpu != null ? effectiveMetrics(host.id).cpu.toFixed(1) + '%' : '-' }}
                 </span>
@@ -491,7 +471,7 @@
               <td>
                 <span
                   :class="memColor(effectiveMetrics(host.id).memPct)"
-                  :title="effectiveMetrics(host.id).source === 'proxmox' ? 'Source : Proxmox' : ''"
+                  :title="effectiveMetrics(host.id).source === 'proxmox' ? 'proxmox' : ''"
                 >
                   {{ effectiveMetrics(host.id).memPct != null ? effectiveMetrics(host.id).memPct.toFixed(1) + '%' : '-' }}
                 </span>
@@ -523,7 +503,7 @@
             </tr>
             <tr v-if="!loading && hosts.length > 0 && sortedHosts.length === 0">
               <td
-                colspan="11"
+                colspan="10"
                 class="text-center text-secondary py-4"
               >
                 Aucun hôte ne correspond à votre recherche.
