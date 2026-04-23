@@ -441,7 +441,7 @@
                   </router-link>
                 </div>
               </td>
-              <td>
+              <td style="min-width: 110px">
                 <span :class="hostStatusClass(host.status)">
                   <span class="status-dot status-dot-animated" />
                   <span :data-translation-id="host.status === 'online' ? 'online' : host.status === 'offline' ? 'offline' : 'unknown'">{{ formatHostStatus(host.status) }}</span>

@@ -20,8 +20,11 @@
           >
             {{ metrics.cpu_usage_percent?.toFixed(1) }}%
           </div>
-          <div class="text-secondary small">
-            {{ metricsSource === 'proxmox' ? 'proxmox' : metrics.cpu_model }}
+          <div
+            v-if="metricsSource !== 'proxmox'"
+            class="text-secondary small"
+          >
+            {{ metrics.cpu_model }}
           </div>
         </div>
       </div>
@@ -45,7 +48,10 @@
           >
             {{ `${metrics.cpu_temperature.toFixed(1)}°C` }}
           </div>
-          <div class="text-secondary small">
+          <div
+            v-if="metricsSource !== 'proxmox'"
+            class="text-secondary small"
+          >
             {{ cpuTempSourceLabel }}
           </div>
         </div>
