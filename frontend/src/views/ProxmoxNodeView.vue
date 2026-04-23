@@ -874,22 +874,10 @@
                       </td>
                       <td>
                         <span
-                          v-if="t.status === 'running'"
-                          class="badge bg-blue-lt text-blue"
-                        >En cours</span>
-                        <span
-                          v-else-if="t.exit_status === 'OK'"
-                          class="badge bg-success-lt text-success"
-                        >OK</span>
-                        <span
-                          v-else-if="t.exit_status"
-                          class="badge bg-danger-lt text-danger"
-                          :title="t.exit_status"
-                        >Erreur</span>
-                        <span
-                          v-else
-                          class="badge bg-secondary-lt text-secondary"
-                        >{{ t.status }}</span>
+                          class="badge task-status-badge"
+                          :class="taskStatusBadgeClass(t)"
+                          :title="taskStatusLabel(t)"
+                        >{{ taskStatusLabel(t) }}</span>
                       </td>
                       <td>
                         <button
@@ -2403,6 +2391,20 @@ function taskDuration(t) {
   return `${h}h ${m % 60}m`
 }
 
+function taskStatusLabel(t) {
+  if (t.status === 'running') return 'En cours'
+  if (t.exit_status === 'OK' || t.status === 'OK') return 'OK'
+  if (t.exit_status) return String(t.exit_status)
+  return String(t.status || '—')
+}
+
+function taskStatusBadgeClass(t) {
+  if (t.status === 'running') return 'bg-blue-lt text-blue'
+  if (t.exit_status === 'OK' || t.status === 'OK') return 'bg-success-lt text-success'
+  if (t.exit_status) return 'bg-danger-lt text-danger'
+  return 'bg-secondary-lt text-secondary'
+}
+
 onMounted(() => {
   load()
   liveStatusTimer = setInterval(loadLiveStatus, 60_000)
@@ -2461,6 +2463,15 @@ onUnmounted(() => {
 
 .proxmox-security-search {
   max-width: 18rem;
+}
+
+.task-status-badge {
+  max-width: 11rem;
+  display: inline-block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
 }
 
 @media (max-width: 992px) {
