@@ -462,11 +462,6 @@
                 >
                   {{ effectiveMetrics(host.id).cpu != null ? effectiveMetrics(host.id).cpu.toFixed(1) + '%' : '-' }}
                 </span>
-                <MetricsSourceBadge
-                  v-if="effectiveMetrics(host.id).source === 'proxmox'"
-                  :source="effectiveMetrics(host.id).source"
-                  class="ms-2"
-                />
               </td>
               <td>
                 <span
@@ -475,11 +470,6 @@
                 >
                   {{ effectiveMetrics(host.id).memPct != null ? effectiveMetrics(host.id).memPct.toFixed(1) + '%' : '-' }}
                 </span>
-                <MetricsSourceBadge
-                  v-if="effectiveMetrics(host.id).source === 'proxmox'"
-                  :source="effectiveMetrics(host.id).source"
-                  class="ms-2"
-                />
               </td>
               <td>
                 <span :class="diskColor(diskUsage[host.id])">

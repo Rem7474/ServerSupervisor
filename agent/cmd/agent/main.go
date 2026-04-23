@@ -186,11 +186,21 @@ func main() {
 func sendReport(ctx context.Context, cfg *config.Config, s *sender.Sender) {
 	// When the server designates Proxmox as the metrics source for this host,
 	// skip CPU/RAM/load collection entirely — Proxmox polling already covers it.
+	// However, always collect and send uptime (+ basic host info) so the server can
+	// track uptime changes (e.g., on agent restart).
 	// Use interface{} so the JSON field is truly null (not a typed nil interface).
 	var metricsPayload interface{}
 	var collectedMetrics *collector.SystemMetrics
 	if skipSystemMetrics.Load() {
 		log.Printf("System metrics collection skipped (Proxmox is the designated metrics source)")
+		// Collect minimal metrics (uptime only) to track uptime changes on agent restart
+		m, err := collector.CollectMinimalMetrics()
+		if err != nil {
+			log.Printf("Failed to collect minimal metrics: %v", err)
+			return
+		}
+		collectedMetrics = m
+		metricsPayload = m
 	} else {
 		m, err := collector.CollectSystem(cfg.CollectCPUTemperature)
 		if err != nil {
@@ -327,11 +337,11 @@ func sendReport(ctx context.Context, cfg *config.Config, s *sender.Sender) {
 		return
 	}
 
-	if collectedMetrics != nil {
+	if skipSystemMetrics.Load() {
+		log.Printf("Report sent successfully (uptime: %ds — Proxmox source)", collectedMetrics.Uptime)
+	} else {
 		log.Printf("Report sent successfully (CPU: %.1f%%, RAM: %.1f%%, Disks: %d)",
 			collectedMetrics.CPUUsagePercent, collectedMetrics.MemoryPercent, len(collectedMetrics.Disks))
-	} else {
-		log.Printf("Report sent successfully (system metrics skipped — Proxmox source)")
 	}
 
 	// Update the skip flag for the next cycle based on server directive.

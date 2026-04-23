@@ -605,6 +605,17 @@ func getUptime() uint64 {
 	return uint64(val)
 }
 
+// CollectMinimalMetrics gathers only essential metrics (uptime + host info).
+// Used when Proxmox is the designated metrics source to track uptime changes
+// (e.g., on agent restart).
+func CollectMinimalMetrics() (*SystemMetrics, error) {
+	m := &SystemMetrics{}
+	m.Hostname, _ = os.Hostname()
+	m.OS = getOSName()
+	m.Uptime = getUptime()
+	return m, nil
+}
+
 func FormatBytes(b uint64) string {
 	const unit = 1024
 	if b < unit {
