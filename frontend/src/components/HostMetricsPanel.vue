@@ -26,17 +26,14 @@
           >
             {{ metrics.cpu_model }}
           </div>
-          <!-- CPU Temperature (if available) -->
           <div
             v-if="hasCpuTemp"
-            class="mt-2 pt-2 border-top"
+            class="mt-2 pt-2 border-top d-flex align-items-center gap-2"
           >
-            <div class="text-muted small">Temp:</div>
-            <div
-              :class="['text-sm fw-semibold', tempColor(metrics.cpu_temperature)]"
-            >
+            <span class="text-muted small">Temp:</span>
+            <span :class="['text-sm fw-semibold', tempColor(metrics.cpu_temperature)]">
               {{ `${metrics.cpu_temperature.toFixed(1)}°C` }}
-            </div>
+            </span>
           </div>
         </div>
       </div>
@@ -215,13 +212,22 @@ const chartOptions = {
       backgroundColor: 'rgba(0,0,0,0.8)', titleColor: '#fff', bodyColor: '#fff',
       borderColor: '#555', borderWidth: 1, padding: 10, displayColors: false,
       callbacks: {
-        title: (items) => items[0]?.label || '',
+        title: (items) => formatChartTime(items[0]?.parsed?.x),
         label: (ctx) => `${ctx.parsed.y.toFixed(1)}%`,
       },
     },
   },
   scales: {
-    x: { display: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280', maxTicksLimit: 10 } },
+    x: {
+      type: 'linear',
+      display: true,
+      grid: { color: 'rgba(255,255,255,0.05)' },
+      ticks: {
+        color: '#6b7280',
+        maxTicksLimit: 10,
+        callback: (value) => formatChartTime(Number(value)),
+      },
+    },
     y: { display: true, min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280' } },
   },
   elements: { point: { radius: 0, hitRadius: 10, hoverRadius: 5 }, line: { tension: 0.3 } },
@@ -287,6 +293,22 @@ function tempColor(temp) {
   return 'text-green'
 }
 
+function formatChartTime(timestamp) {
+  if (!timestamp) return ''
+  const date = dayjs(timestamp)
+  if (!date.isValid()) return ''
+  if (chartHours.value <= 24) return date.format('HH:mm')
+  if (chartHours.value <= 720) return date.format('DD/MM HH:mm')
+  return date.format('DD/MM')
+}
+
+function toChartPoint(metric, field) {
+  const timestamp = dayjs(metric.timestamp).valueOf()
+  const value = metric[field]
+  if (!Number.isFinite(timestamp) || value == null) return null
+  return { x: timestamp, y: value }
+}
+
 async function loadHistory(hours) {
   chartHours.value = hours
   try {
@@ -318,19 +340,31 @@ async function loadHistory(hours) {
 }
 
 function buildCharts() {
-  const labels = metricsHistory.value.map(m => {
-    const date = dayjs(m.timestamp)
-    if (chartHours.value <= 24) return date.format('HH:mm')
-    if (chartHours.value <= 720) return date.format('DD/MM HH:mm')
-    return date.format('DD/MM')
-  })
+  const cpuPoints = metricsHistory.value
+    .map(m => toChartPoint(m, 'cpu_usage_percent'))
+    .filter(Boolean)
+  const memPoints = metricsHistory.value
+    .map(m => toChartPoint(m, 'memory_percent'))
+    .filter(Boolean)
   cpuChartData.value = {
-    labels,
-    datasets: [{ data: metricsHistory.value.map(m => m.cpu_usage_percent), borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.1)', fill: true, tension: 0.3 }],
+    datasets: [{
+      data: cpuPoints,
+      borderColor: '#3b82f6',
+      backgroundColor: 'rgba(59,130,246,0.1)',
+      fill: true,
+      tension: 0.3,
+      spanGaps: false,
+    }],
   }
   memChartData.value = {
-    labels,
-    datasets: [{ data: metricsHistory.value.map(m => m.memory_percent), borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.1)', fill: true, tension: 0.3 }],
+    datasets: [{
+      data: memPoints,
+      borderColor: '#10b981',
+      backgroundColor: 'rgba(16,185,129,0.1)',
+      fill: true,
+      tension: 0.3,
+      spanGaps: false,
+    }],
   }
 }
 

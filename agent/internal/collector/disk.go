@@ -8,17 +8,6 @@ import (
 	"strings"
 )
 
-// pseudoFS lists filesystem types that carry no real storage and must be
-// excluded from disk reporting. Mirrors the list in system.go.
-var pseudoFS = map[string]bool{
-	"proc": true, "sysfs": true, "devtmpfs": true, "devpts": true,
-	"tmpfs": true, "cgroup": true, "cgroup2": true, "securityfs": true,
-	"pstore": true, "debugfs": true, "tracefs": true, "bpf": true,
-	"overlay": true, "squashfs": true, "fusectl": true, "mqueue": true,
-	"hugetlbfs": true, "nsfs": true, "ramfs": true, "autofs": true,
-	"binfmt_misc": true, "configfs": true, "efivarfs": true,
-}
-
 // shouldSkipFilesystem returns true if the filesystem should be excluded from disk metrics.
 func shouldSkipFilesystem(fsType, device, mountPoint string) bool {
 	// Check by filesystem type
@@ -143,7 +132,7 @@ func parseDfSpace(output string) map[string]DiskMetrics {
 		}
 
 		// Skip pseudo-filesystems and system mounts
-		if shouldSkipFilesystem(fsType, filesystem, mountPoint) {
+		if shouldSkipFilesystem(filesystem, filesystem, mountPoint) {
 			continue
 		}
 
@@ -192,7 +181,7 @@ func parseDfHuman(output string) []DiskMetrics {
 		}
 
 		// Skip pseudo-filesystems and system mounts
-		if shouldSkipFilesystem(fields[2], fields[0], mountPoint) {
+		if shouldSkipFilesystem(fields[0], fields[0], mountPoint) {
 			continue
 		}
 

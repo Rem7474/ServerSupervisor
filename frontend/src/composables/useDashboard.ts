@@ -74,19 +74,19 @@ interface DashboardWebSocketPayload {
 
 interface TooltipContext {
   dataset: { label?: string }
-  parsed: { y: number }
+  parsed: { x?: number; y: number }
 }
 
 interface SummaryDataset {
   label: string
-  data: number[]
+  data: Array<{ x: number; y: number }>
   borderColor: string
   backgroundColor: string
   fill: boolean
+  spanGaps?: boolean
 }
 
 interface SummaryChartData {
-  labels: string[]
   datasets: SummaryDataset[]
 }
 
@@ -394,12 +394,22 @@ export function useDashboard() {
           borderWidth: 1,
           padding: 10,
           callbacks: {
+            title: (items: Array<{ parsed?: { x?: number } }>) => formatSummaryChartTime(items[0]?.parsed?.x),
             label: (ctx: TooltipContext) => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1)}%`,
           },
         },
       },
       scales: {
-        x: { display: true, grid: { color: colors.grid }, ticks: { color: colors.tickText, maxTicksLimit: 10 } },
+        x: {
+          type: 'linear',
+          display: true,
+          grid: { color: colors.grid },
+          ticks: {
+            color: colors.tickText,
+            maxTicksLimit: 10,
+            callback: (value: string | number) => formatSummaryChartTime(Number(value)),
+          },
+        },
         y: { display: true, min: 0, max: 100, grid: { color: colors.grid }, ticks: { color: colors.tickText } },
       },
       elements: { point: { radius: 0, hitRadius: 10, hoverRadius: 5 }, line: { tension: 0.3 } },
@@ -456,6 +466,22 @@ export function useDashboard() {
     return 60
   }
 
+  function formatSummaryChartTime(timestamp?: number) {
+    if (!timestamp) return ''
+    const date = dayjs(timestamp)
+    if (!date.isValid()) return ''
+    if (summaryHours.value < 24) return date.format('HH:mm')
+    if (summaryHours.value < 720) return date.format('DD/MM HH:mm')
+    return date.format('DD/MM')
+  }
+
+  function toSummaryPoint(point: DashboardMetricPoint, key: 'cpu_avg' | 'memory_avg') {
+    const timestamp = dayjs(point.timestamp).valueOf()
+    const value = Number(point[key] ?? 0)
+    if (!Number.isFinite(timestamp)) return null
+    return { x: timestamp, y: value }
+  }
+
   async function fetchSummary() {
     summaryLoading.value = true
     try {
@@ -472,25 +498,23 @@ export function useDashboard() {
         return
       }
 
-      const labels = points.map((p: DashboardMetricPoint) =>
-        summaryHours.value >= 24 ? dayjs(p.timestamp).format('DD/MM HH:mm') : dayjs(p.timestamp).format('HH:mm')
-      )
       summaryChartData.value = {
-        labels,
         datasets: [
           {
             label: 'CPU %',
-            data: points.map((p: DashboardMetricPoint) => Number(p.cpu_avg ?? 0)),
+            data: points.map((p: DashboardMetricPoint) => toSummaryPoint(p, 'cpu_avg')).filter(Boolean) as Array<{ x: number; y: number }>,
             borderColor: colors.cpuBorder,
             backgroundColor: colors.cpuBackground,
             fill: true,
+            spanGaps: false,
           },
           {
             label: 'RAM %',
-            data: points.map((p: DashboardMetricPoint) => Number(p.memory_avg ?? 0)),
+            data: points.map((p: DashboardMetricPoint) => toSummaryPoint(p, 'memory_avg')).filter(Boolean) as Array<{ x: number; y: number }>,
             borderColor: colors.ramBorder,
             backgroundColor: colors.ramBackground,
             fill: true,
+            spanGaps: false,
           },
         ],
       }
