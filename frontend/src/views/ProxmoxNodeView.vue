@@ -416,9 +416,8 @@
           <div class="card">
             <div class="card-header d-flex align-items-center justify-content-between">
               <h3 class="card-title mb-0">
-                Historique temp. CPU (nœud)
+                Température CPU
               </h3>
-              <span class="badge bg-azure-lt text-azure">Période: {{ rrdTimeframeLabel }}</span>
             </div>
             <div class="card-body proxmox-chart-body">
               <Line
@@ -440,9 +439,8 @@
           <div class="card">
             <div class="card-header d-flex align-items-center justify-content-between">
               <h3 class="card-title mb-0">
-                Historique RPM ventilateurs (nœud)
+                RPM Ventilateurs
               </h3>
-              <span class="badge bg-blue-lt text-blue">Période: {{ rrdTimeframeLabel }}</span>
             </div>
             <div class="card-body proxmox-chart-body">
               <Line
