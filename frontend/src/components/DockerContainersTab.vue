@@ -151,7 +151,10 @@
                 <div class="text-primary fw-semibold">
                   {{ getComposeInfo(c).project }}
                 </div>
-                <div class="text-secondary">
+                <div
+                  v-if="!isComposeServiceRedundant(c)"
+                  class="text-secondary"
+                >
                   {{ getComposeInfo(c).service }}
                 </div>
               </div>
@@ -841,6 +844,16 @@ function getComposeInfo(container) {
     workingDir: container.labels['com.docker.compose.project.working_dir'] || '',
     configFiles: container.labels['com.docker.compose.project.config_files'] || '',
   }
+}
+
+function normalizeComposeName(value) {
+  return String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+}
+
+function isComposeServiceRedundant(container) {
+  const info = getComposeInfo(container)
+  if (!info.project || !info.service) return true
+  return normalizeComposeName(info.project) === normalizeComposeName(info.service)
 }
 
 function isComposeContainer(container) {
