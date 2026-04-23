@@ -241,7 +241,7 @@ const memChartOptions = {
     tooltip: {
       ...chartOptions.plugins.tooltip,
       callbacks: {
-        title: (items) => items[0]?.label || '',
+        title: (items) => formatChartTime(items[0]?.parsed?.x),
         label: (ctx) => {
           const pct = ctx.parsed.y.toFixed(1)
           const m = metricsHistory.value[ctx.dataIndex]
