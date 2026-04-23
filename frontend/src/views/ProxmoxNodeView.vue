@@ -50,19 +50,6 @@
             <span class="status-dot status-dot-animated" />
             <span data-translation-id="offline">Hors ligne</span>
           </span>
-          <span
-            v-if="nodeCpuTempCurrent > 0"
-            class="badge"
-            :class="tempBadgeClass(nodeCpuTempCurrent)"
-          >
-            CPU TEMP {{ nodeCpuTempCurrent.toFixed(1) }}°C
-          </span>
-          <span
-            v-if="nodeFanRPMCurrent > 0"
-            class="badge bg-blue-lt text-blue"
-          >
-            FAN {{ nodeFanRPMCurrent.toFixed(0) }} RPM
-          </span>
         </div>
         <div class="text-secondary">
           {{ node.cluster_name || 'Nœud standalone' }} · PVE {{ node.pve_version || 'N/A' }} · {{ node.ip_address }}
@@ -148,7 +135,7 @@
                 {{ nodeCpuTempCurrent > 0 ? `${nodeCpuTempCurrent.toFixed(1)}°C` : '—' }}
               </div>
               <div class="text-muted small">
-                {{ sensorSourceHostName ? `Source: ${sensorSourceHostName}` : 'Source non configurée' }}
+                <span v-if="!sensorSourceHostName">Source non configurée</span>
               </div>
             </div>
 
@@ -161,7 +148,7 @@
                 {{ nodeFanRPMCurrent > 0 ? `${nodeFanRPMCurrent.toFixed(0)} RPM` : '—' }}
               </div>
               <div class="text-muted small">
-                {{ sensorSourceHostName ? `Source: ${sensorSourceHostName}` : 'Source non configurée' }}
+                <span v-if="!sensorSourceHostName">Source non configurée</span>
               </div>
             </div>
 
@@ -578,22 +565,22 @@
               <table class="table table-vcenter card-table">
                 <thead>
                   <tr>
-                    <th>VMID</th>
-                    <th>Nom</th>
-                    <th>Statut</th>
-                    <th>IP</th>
-                    <th>CPU alloué</th>
-                    <th>CPU utilisé</th>
-                    <th>RAM allouée</th>
-                    <th>RAM utilisée</th>
-                    <th>Disque</th>
-                    <th>Uptime</th>
-                    <th>Tags</th>
-                    <th>Hôte lié</th>
+                    <th><SortableHeader label="VMID" :active="vmSortKey === 'vmid'" :direction="vmSortDir" @toggle="toggleVmSort('vmid')" /></th>
+                    <th><SortableHeader label="Nom" :active="vmSortKey === 'name'" :direction="vmSortDir" @toggle="toggleVmSort('name')" /></th>
+                    <th><SortableHeader label="Statut" :active="vmSortKey === 'status'" :direction="vmSortDir" @toggle="toggleVmSort('status')" /></th>
+                    <th><SortableHeader label="IP" :active="vmSortKey === 'ip'" :direction="vmSortDir" @toggle="toggleVmSort('ip')" /></th>
+                    <th><SortableHeader label="CPU alloué" :active="vmSortKey === 'cpu_alloc'" :direction="vmSortDir" @toggle="toggleVmSort('cpu_alloc')" /></th>
+                    <th><SortableHeader label="CPU utilisé" :active="vmSortKey === 'cpu_used'" :direction="vmSortDir" @toggle="toggleVmSort('cpu_used')" /></th>
+                    <th><SortableHeader label="RAM allouée" :active="vmSortKey === 'mem_alloc'" :direction="vmSortDir" @toggle="toggleVmSort('mem_alloc')" /></th>
+                    <th><SortableHeader label="RAM utilisée" :active="vmSortKey === 'mem_used'" :direction="vmSortDir" @toggle="toggleVmSort('mem_used')" /></th>
+                    <th><SortableHeader label="Disque" :active="vmSortKey === 'disk_alloc'" :direction="vmSortDir" @toggle="toggleVmSort('disk_alloc')" /></th>
+                    <th><SortableHeader label="Uptime" :active="vmSortKey === 'uptime'" :direction="vmSortDir" @toggle="toggleVmSort('uptime')" /></th>
+                    <th><SortableHeader label="Tags" :active="vmSortKey === 'tags'" :direction="vmSortDir" @toggle="toggleVmSort('tags')" /></th>
+                    <th><SortableHeader label="Hôte lié" :active="vmSortKey === 'linked_host'" :direction="vmSortDir" @toggle="toggleVmSort('linked_host')" /></th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-if="vms.length === 0">
+                  <tr v-if="sortedVms.length === 0">
                     <td
                       colspan="12"
                       class="text-center text-muted py-4"
@@ -602,7 +589,7 @@
                     </td>
                   </tr>
                   <tr
-                    v-for="g in vms"
+                    v-for="g in sortedVms"
                     :key="g.id"
                   >
                     <td class="text-muted">
@@ -676,21 +663,21 @@
               <table class="table table-vcenter card-table">
                 <thead>
                   <tr>
-                    <th>CT ID</th>
-                    <th>Nom</th>
-                    <th>Statut</th>
-                    <th>IP</th>
-                    <th>CPU alloué</th>
-                    <th>CPU utilisé</th>
-                    <th>RAM allouée</th>
-                    <th>RAM utilisée</th>
-                    <th>Disque</th>
-                    <th>Uptime</th>
-                    <th>Hôte lié</th>
+                    <th><SortableHeader label="CT ID" :active="lxcSortKey === 'vmid'" :direction="lxcSortDir" @toggle="toggleLxcSort('vmid')" /></th>
+                    <th><SortableHeader label="Nom" :active="lxcSortKey === 'name'" :direction="lxcSortDir" @toggle="toggleLxcSort('name')" /></th>
+                    <th><SortableHeader label="Statut" :active="lxcSortKey === 'status'" :direction="lxcSortDir" @toggle="toggleLxcSort('status')" /></th>
+                    <th><SortableHeader label="IP" :active="lxcSortKey === 'ip'" :direction="lxcSortDir" @toggle="toggleLxcSort('ip')" /></th>
+                    <th><SortableHeader label="CPU alloué" :active="lxcSortKey === 'cpu_alloc'" :direction="lxcSortDir" @toggle="toggleLxcSort('cpu_alloc')" /></th>
+                    <th><SortableHeader label="CPU utilisé" :active="lxcSortKey === 'cpu_used'" :direction="lxcSortDir" @toggle="toggleLxcSort('cpu_used')" /></th>
+                    <th><SortableHeader label="RAM allouée" :active="lxcSortKey === 'mem_alloc'" :direction="lxcSortDir" @toggle="toggleLxcSort('mem_alloc')" /></th>
+                    <th><SortableHeader label="RAM utilisée" :active="lxcSortKey === 'mem_used'" :direction="lxcSortDir" @toggle="toggleLxcSort('mem_used')" /></th>
+                    <th><SortableHeader label="Disque" :active="lxcSortKey === 'disk_alloc'" :direction="lxcSortDir" @toggle="toggleLxcSort('disk_alloc')" /></th>
+                    <th><SortableHeader label="Uptime" :active="lxcSortKey === 'uptime'" :direction="lxcSortDir" @toggle="toggleLxcSort('uptime')" /></th>
+                    <th><SortableHeader label="Hôte lié" :active="lxcSortKey === 'linked_host'" :direction="lxcSortDir" @toggle="toggleLxcSort('linked_host')" /></th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-if="lxcs.length === 0">
+                  <tr v-if="sortedLxcs.length === 0">
                     <td
                       colspan="11"
                       class="text-center text-muted py-4"
@@ -699,7 +686,7 @@
                     </td>
                   </tr>
                   <tr
-                    v-for="g in lxcs"
+                    v-for="g in sortedLxcs"
                     :key="g.id"
                   >
                     <td class="text-muted">
@@ -772,16 +759,16 @@
               <table class="table table-vcenter card-table">
                 <thead>
                   <tr>
-                    <th>Périphérique</th>
-                    <th>Modèle</th>
-                    <th>Type</th>
-                    <th>Taille</th>
-                    <th>Santé SMART</th>
-                    <th>Usure SSD</th>
+                    <th><SortableHeader label="Périphérique" :active="diskSortKey === 'dev_path'" :direction="diskSortDir" @toggle="toggleDiskSort('dev_path')" /></th>
+                    <th><SortableHeader label="Modèle" :active="diskSortKey === 'model'" :direction="diskSortDir" @toggle="toggleDiskSort('model')" /></th>
+                    <th><SortableHeader label="Type" :active="diskSortKey === 'disk_type'" :direction="diskSortDir" @toggle="toggleDiskSort('disk_type')" /></th>
+                    <th><SortableHeader label="Taille" :active="diskSortKey === 'size_bytes'" :direction="diskSortDir" @toggle="toggleDiskSort('size_bytes')" /></th>
+                    <th><SortableHeader label="Santé SMART" :active="diskSortKey === 'health'" :direction="diskSortDir" @toggle="toggleDiskSort('health')" /></th>
+                    <th><SortableHeader label="Usure SSD" :active="diskSortKey === 'wearout'" :direction="diskSortDir" @toggle="toggleDiskSort('wearout')" /></th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-if="!node.disks?.length">
+                  <tr v-if="!sortedDisks.length">
                     <td
                       colspan="6"
                       class="text-center text-muted py-4"
@@ -790,7 +777,7 @@
                     </td>
                   </tr>
                   <tr
-                    v-for="d in node.disks"
+                    v-for="d in sortedDisks"
                     :key="d.id"
                   >
                     <td class="fw-medium font-monospace">
@@ -846,12 +833,12 @@
                 <table class="table table-vcenter card-table">
                   <thead>
                     <tr>
-                      <th>Type</th>
-                      <th>Objet</th>
-                      <th>Utilisateur</th>
-                      <th>Début</th>
-                      <th>Durée</th>
-                      <th>Statut</th>
+                      <th><SortableHeader label="Type" :active="taskSortKey === 'task_type'" :direction="taskSortDir" @toggle="toggleTaskSort('task_type')" /></th>
+                      <th><SortableHeader label="Objet" :active="taskSortKey === 'object_id'" :direction="taskSortDir" @toggle="toggleTaskSort('object_id')" /></th>
+                      <th><SortableHeader label="Utilisateur" :active="taskSortKey === 'user_name'" :direction="taskSortDir" @toggle="toggleTaskSort('user_name')" /></th>
+                      <th><SortableHeader label="Début" :active="taskSortKey === 'start_time'" :direction="taskSortDir" @toggle="toggleTaskSort('start_time')" /></th>
+                      <th><SortableHeader label="Durée" :active="taskSortKey === 'duration'" :direction="taskSortDir" @toggle="toggleTaskSort('duration')" /></th>
+                      <th><SortableHeader label="Statut" :active="taskSortKey === 'status'" :direction="taskSortDir" @toggle="toggleTaskSort('status')" /></th>
                       <th />
                     </tr>
                   </thead>
@@ -867,7 +854,7 @@
                       </tr>
                     </template>
                     <tr
-                      v-for="t in node.tasks"
+                      v-for="t in sortedTasks"
                       v-else
                       :key="t.id"
                       :class="activeUpid === t.upid ? 'table-active' : ''"
@@ -1325,6 +1312,7 @@
 import { ref, computed, shallowRef, onMounted, onUnmounted, defineAsyncComponent, defineComponent, h } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import CommandLogPanel from '../components/CommandLogPanel.vue'
+import SortableHeader from '../components/common/SortableHeader.vue'
 import api from '../api'
 
 const Line = defineAsyncComponent(async () => {
@@ -1373,6 +1361,15 @@ const node = ref(null)
 const loading = ref(true)
 const error = ref('')
 const tab = ref('vms')
+
+const vmSortKey = ref('vmid')
+const vmSortDir = ref('asc')
+const lxcSortKey = ref('vmid')
+const lxcSortDir = ref('asc')
+const diskSortKey = ref('dev_path')
+const diskSortDir = ref('asc')
+const taskSortKey = ref('start_time')
+const taskSortDir = ref('desc')
 
 // guest_id → link object (loaded after node data)
 const guestLinks = ref({})
@@ -1683,8 +1680,136 @@ function normalizeSyslogEntry(item) {
   return out
 }
 
+function toggleSort(sortKeyRef, sortDirRef, key) {
+  if (sortKeyRef.value === key) {
+    sortDirRef.value = sortDirRef.value === 'asc' ? 'desc' : 'asc'
+    return
+  }
+  sortKeyRef.value = key
+  sortDirRef.value = 'asc'
+}
+
+function compareValues(a, b, direction = 'asc') {
+  const dir = direction === 'asc' ? 1 : -1
+  if (a == null && b == null) return 0
+  if (a == null) return 1 * dir
+  if (b == null) return -1 * dir
+
+  if (typeof a === 'string' || typeof b === 'string') {
+    return String(a).localeCompare(String(b), 'fr', { sensitivity: 'base' }) * dir
+  }
+
+  if (a < b) return -1 * dir
+  if (a > b) return 1 * dir
+  return 0
+}
+
+function guestPrimaryIp(guest) {
+  const ifaces = guestNetworks.value?.[guest.vmid]
+  if (!Array.isArray(ifaces)) return ''
+  for (const iface of ifaces) {
+    const ips = Array.isArray(iface?.ips) ? iface.ips : []
+    const first = ips.find(ip => typeof ip === 'string' && !ip.startsWith('fe80'))
+    if (first) return first.split('/')[0]
+  }
+  return ''
+}
+
+function linkedHostLabel(guest) {
+  const link = linkForGuest(guest)
+  if (!link) return ''
+  return link.host_hostname || link.host_name || ''
+}
+
+function taskDurationSeconds(task) {
+  if (!task?.start_time) return null
+  const startMs = new Date(task.start_time).getTime()
+  if (!Number.isFinite(startMs)) return null
+  const endMs = task.end_time
+    ? new Date(task.end_time).getTime()
+    : (task.status === 'running' ? Date.now() : null)
+  if (!Number.isFinite(endMs)) return null
+  return Math.max(0, Math.floor((endMs - startMs) / 1000))
+}
+
 const vms = computed(() => node.value?.guests?.filter(g => g.guest_type === 'vm') ?? [])
 const lxcs = computed(() => node.value?.guests?.filter(g => g.guest_type === 'lxc') ?? [])
+const sortedVms = computed(() => {
+  const list = [...vms.value]
+  list.sort((a, b) => {
+    switch (vmSortKey.value) {
+      case 'vmid': return compareValues(a.vmid, b.vmid, vmSortDir.value)
+      case 'name': return compareValues(a.name || '', b.name || '', vmSortDir.value)
+      case 'status': return compareValues(a.status || '', b.status || '', vmSortDir.value)
+      case 'ip': return compareValues(guestPrimaryIp(a), guestPrimaryIp(b), vmSortDir.value)
+      case 'cpu_alloc': return compareValues(a.cpu_alloc, b.cpu_alloc, vmSortDir.value)
+      case 'cpu_used': return compareValues(a.cpu_usage, b.cpu_usage, vmSortDir.value)
+      case 'mem_alloc': return compareValues(a.mem_alloc, b.mem_alloc, vmSortDir.value)
+      case 'mem_used': return compareValues(a.mem_usage, b.mem_usage, vmSortDir.value)
+      case 'disk_alloc': return compareValues(a.disk_alloc, b.disk_alloc, vmSortDir.value)
+      case 'uptime': return compareValues(a.status === 'running' ? a.uptime : -1, b.status === 'running' ? b.uptime : -1, vmSortDir.value)
+      case 'tags': return compareValues(a.tags || '', b.tags || '', vmSortDir.value)
+      case 'linked_host': return compareValues(linkedHostLabel(a), linkedHostLabel(b), vmSortDir.value)
+      default: return 0
+    }
+  })
+  return list
+})
+
+const sortedLxcs = computed(() => {
+  const list = [...lxcs.value]
+  list.sort((a, b) => {
+    switch (lxcSortKey.value) {
+      case 'vmid': return compareValues(a.vmid, b.vmid, lxcSortDir.value)
+      case 'name': return compareValues(a.name || '', b.name || '', lxcSortDir.value)
+      case 'status': return compareValues(a.status || '', b.status || '', lxcSortDir.value)
+      case 'ip': return compareValues(guestPrimaryIp(a), guestPrimaryIp(b), lxcSortDir.value)
+      case 'cpu_alloc': return compareValues(a.cpu_alloc, b.cpu_alloc, lxcSortDir.value)
+      case 'cpu_used': return compareValues(a.cpu_usage, b.cpu_usage, lxcSortDir.value)
+      case 'mem_alloc': return compareValues(a.mem_alloc, b.mem_alloc, lxcSortDir.value)
+      case 'mem_used': return compareValues(a.mem_usage, b.mem_usage, lxcSortDir.value)
+      case 'disk_alloc': return compareValues(a.disk_alloc, b.disk_alloc, lxcSortDir.value)
+      case 'uptime': return compareValues(a.status === 'running' ? a.uptime : -1, b.status === 'running' ? b.uptime : -1, lxcSortDir.value)
+      case 'linked_host': return compareValues(linkedHostLabel(a), linkedHostLabel(b), lxcSortDir.value)
+      default: return 0
+    }
+  })
+  return list
+})
+
+const sortedDisks = computed(() => {
+  const list = [...(node.value?.disks ?? [])]
+  list.sort((a, b) => compareValues(a?.[diskSortKey.value], b?.[diskSortKey.value], diskSortDir.value))
+  return list
+})
+
+const sortedTasks = computed(() => {
+  const list = [...(node.value?.tasks ?? [])]
+  list.sort((a, b) => {
+    if (taskSortKey.value === 'duration') {
+      return compareValues(taskDurationSeconds(a), taskDurationSeconds(b), taskSortDir.value)
+    }
+    return compareValues(a?.[taskSortKey.value], b?.[taskSortKey.value], taskSortDir.value)
+  })
+  return list
+})
+
+function toggleVmSort(key) {
+  toggleSort(vmSortKey, vmSortDir, key)
+}
+
+function toggleLxcSort(key) {
+  toggleSort(lxcSortKey, lxcSortDir, key)
+}
+
+function toggleDiskSort(key) {
+  toggleSort(diskSortKey, diskSortDir, key)
+}
+
+function toggleTaskSort(key) {
+  toggleSort(taskSortKey, taskSortDir, key)
+}
+
 const failedTaskCount = computed(() =>
   (node.value?.tasks ?? []).filter(t => t.status === 'stopped' && t.exit_status && t.exit_status !== 'OK').length
 )

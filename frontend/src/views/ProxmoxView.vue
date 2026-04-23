@@ -204,19 +204,19 @@
         <table class="table table-vcenter card-table">
           <thead>
             <tr>
-              <th>Nœud</th>
-              <th>Instance / Cluster</th>
-              <th>VMs</th>
-              <th>LXC</th>
-              <th>CPU</th>
-              <th>RAM</th>
-              <th>Statut</th>
-              <th>Dernier contact</th>
+              <th><SortableHeader label="Nœud" :active="nodeSortKey === 'node_name'" :direction="nodeSortDir" @toggle="toggleNodeSort('node_name')" /></th>
+              <th><SortableHeader label="Instance / Cluster" :active="nodeSortKey === 'cluster_name'" :direction="nodeSortDir" @toggle="toggleNodeSort('cluster_name')" /></th>
+              <th><SortableHeader label="VMs" :active="nodeSortKey === 'vm_count'" :direction="nodeSortDir" @toggle="toggleNodeSort('vm_count')" /></th>
+              <th><SortableHeader label="LXC" :active="nodeSortKey === 'lxc_count'" :direction="nodeSortDir" @toggle="toggleNodeSort('lxc_count')" /></th>
+              <th><SortableHeader label="CPU" :active="nodeSortKey === 'cpu_usage'" :direction="nodeSortDir" @toggle="toggleNodeSort('cpu_usage')" /></th>
+              <th><SortableHeader label="RAM" :active="nodeSortKey === 'mem_used'" :direction="nodeSortDir" @toggle="toggleNodeSort('mem_used')" /></th>
+              <th><SortableHeader label="Statut" :active="nodeSortKey === 'status'" :direction="nodeSortDir" @toggle="toggleNodeSort('status')" /></th>
+              <th><SortableHeader label="Dernier contact" :active="nodeSortKey === 'last_seen_at'" :direction="nodeSortDir" @toggle="toggleNodeSort('last_seen_at')" /></th>
               <th />
             </tr>
           </thead>
           <tbody>
-            <tr v-if="filteredNodes.length === 0">
+            <tr v-if="sortedNodes.length === 0">
               <td
                 colspan="9"
                 class="text-center text-muted py-4"
@@ -232,7 +232,7 @@
               </td>
             </tr>
             <tr
-              v-for="node in filteredNodes"
+              v-for="node in sortedNodes"
               :key="node.id"
             >
               <td>
@@ -337,6 +337,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
+import SortableHeader from '../components/common/SortableHeader.vue'
 import api from '../api'
 
 const auth = useAuthStore()
@@ -347,12 +348,52 @@ const instances = ref([])
 const filterConnection = ref('')
 const loading = ref(true)
 const error = ref('')
+const nodeSortKey = ref('node_name')
+const nodeSortDir = ref('asc')
 
 const filteredNodes = computed(() =>
   filterConnection.value
     ? nodes.value.filter(n => n.connection_id === filterConnection.value)
     : nodes.value
 )
+
+const sortedNodes = computed(() => {
+  const list = [...filteredNodes.value]
+  const dir = nodeSortDir.value === 'asc' ? 1 : -1
+  list.sort((a, b) => {
+    let aVal
+    let bVal
+    switch (nodeSortKey.value) {
+      case 'node_name':
+      case 'cluster_name':
+      case 'status':
+        aVal = String(a[nodeSortKey.value] || '').toLowerCase()
+        bVal = String(b[nodeSortKey.value] || '').toLowerCase()
+        break
+      case 'last_seen_at':
+        aVal = a.last_seen_at ? new Date(a.last_seen_at).getTime() : 0
+        bVal = b.last_seen_at ? new Date(b.last_seen_at).getTime() : 0
+        break
+      default:
+        aVal = Number(a[nodeSortKey.value] || 0)
+        bVal = Number(b[nodeSortKey.value] || 0)
+        break
+    }
+    if (aVal < bVal) return -1 * dir
+    if (aVal > bVal) return 1 * dir
+    return 0
+  })
+  return list
+})
+
+function toggleNodeSort(key) {
+  if (nodeSortKey.value === key) {
+    nodeSortDir.value = nodeSortDir.value === 'asc' ? 'desc' : 'asc'
+    return
+  }
+  nodeSortKey.value = key
+  nodeSortDir.value = 'asc'
+}
 
 const hasHealthAlerts = computed(() =>
   (summary.value.nodes_down ?? 0) > 0 ||
