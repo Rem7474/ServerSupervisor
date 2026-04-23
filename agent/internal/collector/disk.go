@@ -8,6 +8,38 @@ import (
 	"strings"
 )
 
+// pseudoFS lists filesystem types that carry no real storage and must be
+// excluded from disk reporting. Mirrors the list in system.go.
+var pseudoFS = map[string]bool{
+	"proc": true, "sysfs": true, "devtmpfs": true, "devpts": true,
+	"tmpfs": true, "cgroup": true, "cgroup2": true, "securityfs": true,
+	"pstore": true, "debugfs": true, "tracefs": true, "bpf": true,
+	"overlay": true, "squashfs": true, "fusectl": true, "mqueue": true,
+	"hugetlbfs": true, "nsfs": true, "ramfs": true, "autofs": true,
+	"binfmt_misc": true, "configfs": true, "efivarfs": true,
+}
+
+// shouldSkipFilesystem returns true if the filesystem should be excluded from disk metrics.
+func shouldSkipFilesystem(fsType, device, mountPoint string) bool {
+	// Check by filesystem type
+	if pseudoFS[fsType] {
+		return true
+	}
+	// Check by device name patterns
+	if strings.HasPrefix(device, "devtmpfs") || strings.HasPrefix(device, "tmpfs") ||
+		strings.HasPrefix(device, "squashfs") || strings.HasPrefix(device, "overlay") ||
+		strings.HasPrefix(device, "devfs") {
+		return true
+	}
+	// Check by mount point patterns (virtual/system filesystems)
+	if strings.HasPrefix(mountPoint, "/dev") || strings.HasPrefix(mountPoint, "/sys") ||
+		strings.HasPrefix(mountPoint, "/proc") || strings.HasPrefix(mountPoint, "/run") ||
+		strings.HasPrefix(mountPoint, "/boot") && strings.HasSuffix(mountPoint, "efi") {
+		return true
+	}
+	return false
+}
+
 // DiskMetrics contient les informations détaillées sur l'utilisation du disque
 type DiskMetrics struct {
 	MountPoint    string  `json:"mount_point"`
@@ -110,10 +142,8 @@ func parseDfSpace(output string) map[string]DiskMetrics {
 			mountPoint = strings.Join(fields[5:], " ")
 		}
 
-		// Skip pseudo-filesystems
-		if strings.HasPrefix(filesystem, "tmpfs") || strings.HasPrefix(filesystem, "devtmpfs") ||
-			strings.HasPrefix(filesystem, "squashfs") || strings.HasPrefix(filesystem, "overlay") ||
-			strings.HasPrefix(filesystem, "devfs") {
+		// Skip pseudo-filesystems and system mounts
+		if shouldSkipFilesystem(fsType, filesystem, mountPoint) {
 			continue
 		}
 
@@ -161,8 +191,8 @@ func parseDfHuman(output string) []DiskMetrics {
 			mountPoint = strings.Join(fields[5:], " ")
 		}
 
-		// Skip pseudo-filesystems
-		if strings.HasPrefix(fields[0], "tmpfs") || strings.HasPrefix(fields[0], "devtmpfs") {
+		// Skip pseudo-filesystems and system mounts
+		if shouldSkipFilesystem(fields[2], fields[0], mountPoint) {
 			continue
 		}
 

@@ -26,33 +26,17 @@
           >
             {{ metrics.cpu_model }}
           </div>
-        </div>
-      </div>
-    </div>
-    <div
-      v-if="hasCpuTemp"
-      class="col-6 col-lg-3"
-    >
-      <div class="card card-sm h-100">
-        <div class="card-body">
-          <div class="subheader d-flex align-items-center gap-2">
-            CPU TEMP
-            <MetricsSourceBadge
-              v-if="metricsSource === 'proxmox'"
-              source="proxmox"
-            />
-          </div>
+          <!-- CPU Temperature (if available) -->
           <div
-            class="h2 mb-0"
-            :class="tempColor(metrics.cpu_temperature)"
+            v-if="hasCpuTemp"
+            class="mt-2 pt-2 border-top"
           >
-            {{ `${metrics.cpu_temperature.toFixed(1)}°C` }}
-          </div>
-          <div
-            v-if="metricsSource !== 'proxmox'"
-            class="text-secondary small"
-          >
-            {{ cpuTempSourceLabel }}
+            <div class="text-muted small">Temp:</div>
+            <div
+              :class="['text-sm fw-semibold', tempColor(metrics.cpu_temperature)]"
+            >
+              {{ `${metrics.cpu_temperature.toFixed(1)}°C` }}
+            </div>
           </div>
         </div>
       </div>
@@ -210,9 +194,6 @@ const cpuChartData = shallowRef(null)
 const memChartData = shallowRef(null)
 
 const hasCpuTemp = computed(() => Number(props.metrics?.cpu_temperature) > 0)
-const cpuTempSourceLabel = computed(() =>
-  props.metricsSource === 'proxmox' ? 'proxmox' : 'Source : Agent'
-)
 
 const timeRangeOptions = [
   { hours: 1,    label: '1h' },
