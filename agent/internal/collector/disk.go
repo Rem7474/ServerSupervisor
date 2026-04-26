@@ -8,22 +8,14 @@ import (
 	"strings"
 )
 
-// pseudoFS maps pseudo-filesystem types that should be skipped
+// pseudoFS lists filesystem types that carry no real storage and must be excluded.
 var pseudoFS = map[string]bool{
-	"sysfs":      true,
-	"proc":       true,
-	"tmpfs":      true,
-	"devtmpfs":   true,
-	"devfs":      true,
-	"iso9660":    true,
-	"squashfs":   true,
-	"vfat":       true,
-	"fuse.gvfs":  true,
-	"cgroup":     true,
-	"pstore":     true,
-	"tracefs":    true,
-	"debugfs":    true,
-	"securityfs": true,
+	"proc": true, "sysfs": true, "devtmpfs": true, "devpts": true,
+	"tmpfs": true, "cgroup": true, "cgroup2": true, "securityfs": true,
+	"pstore": true, "debugfs": true, "tracefs": true, "bpf": true,
+	"overlay": true, "squashfs": true, "fusectl": true, "mqueue": true,
+	"hugetlbfs": true, "nsfs": true, "ramfs": true, "autofs": true,
+	"binfmt_misc": true, "configfs": true, "efivarfs": true,
 }
 
 // shouldSkipFilesystem returns true if the filesystem should be excluded from disk metrics.
