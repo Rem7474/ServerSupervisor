@@ -503,17 +503,6 @@ func getMemInfo() map[string]uint64 {
 	return result
 }
 
-// pseudoFS lists filesystem types that carry no real storage and must be
-// excluded from disk reporting.
-var pseudoFS = map[string]bool{
-	"proc": true, "sysfs": true, "devtmpfs": true, "devpts": true,
-	"tmpfs": true, "cgroup": true, "cgroup2": true, "securityfs": true,
-	"pstore": true, "debugfs": true, "tracefs": true, "bpf": true,
-	"overlay": true, "squashfs": true, "fusectl": true, "mqueue": true,
-	"hugetlbfs": true, "nsfs": true, "ramfs": true, "autofs": true,
-	"binfmt_misc": true, "configfs": true, "efivarfs": true,
-}
-
 func getDiskUsage() []DiskInfo {
 	data, err := os.ReadFile("/proc/mounts")
 	if err != nil {
