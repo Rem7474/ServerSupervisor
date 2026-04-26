@@ -48,3 +48,8 @@ type DiskInfo struct {
 func CollectSystem(_ bool) (*SystemMetrics, error) {
 	return nil, fmt.Errorf("system collector is only supported on linux")
 }
+
+// CollectMinimalMetrics is Linux-only in production; this stub exists for non-Linux local builds.
+func CollectMinimalMetrics() (*SystemMetrics, error) {
+	return nil, fmt.Errorf("system collector is only supported on linux")
+}

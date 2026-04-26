@@ -8,6 +8,24 @@ import (
 	"strings"
 )
 
+// pseudoFS maps pseudo-filesystem types that should be skipped
+var pseudoFS = map[string]bool{
+	"sysfs":      true,
+	"proc":       true,
+	"tmpfs":      true,
+	"devtmpfs":   true,
+	"devfs":      true,
+	"iso9660":    true,
+	"squashfs":   true,
+	"vfat":       true,
+	"fuse.gvfs":  true,
+	"cgroup":     true,
+	"pstore":     true,
+	"tracefs":    true,
+	"debugfs":    true,
+	"securityfs": true,
+}
+
 // shouldSkipFilesystem returns true if the filesystem should be excluded from disk metrics.
 func shouldSkipFilesystem(fsType, device, mountPoint string) bool {
 	// Check by filesystem type

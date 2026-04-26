@@ -49,6 +49,9 @@ var cmdSem = make(chan struct{}, 4)
 // tasksConfig holds custom tasks loaded from the local YAML file at startup.
 var tasksConfig *config.TasksConfig
 
+// verboseMode enables detailed logging for debugging (set via -verbose flag)
+var verboseMode bool
+
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
@@ -61,7 +64,9 @@ func main() {
 	internalUpdate := flag.Bool("internal-update", false, "Run the detached self-update helper and exit")
 	updateCommandID := flag.String("update-command-id", "", "Command ID for internal update helper")
 	updateVersion := flag.String("update-version", "", "Target version for internal update helper")
+	verbose := flag.Bool("verbose", false, "Enable verbose/debug logging output")
 	flag.Parse()
+	verboseMode = *verbose
 	agentConfigPath = *configPath
 
 	if *showVersion {
@@ -288,7 +293,7 @@ func sendReport(ctx context.Context, cfg *config.Config, s *sender.Sender) {
 	if cfg.CollectWebLogs {
 		globs := cfg.WebLogGlobs()
 		log.Printf("Web logs: scanning globs %v", globs)
-		report, err := collector.CollectWebLogs(globs, cfg.WebLogsTailLines, cfg.WebLogsTopN, cfg.WebLogsRequestsLimit, cfg.WebLogsCursorFile)
+		report, err := collector.CollectWebLogs(globs, cfg.WebLogsTailLines, cfg.WebLogsTopN, cfg.WebLogsRequestsLimit, cfg.WebLogsCursorFile, verboseMode)
 		if err != nil {
 			log.Printf("Web logs collection skipped: %v", err)
 		} else {

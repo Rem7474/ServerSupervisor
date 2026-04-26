@@ -129,7 +129,7 @@ var suspiciousUANeedles = []string{
 	"masscan", "nmap", "zgrab", "sqlmap", "nikto", "dirbuster", "gobuster", "wpscan", "acunetix", "nessus",
 }
 
-func CollectWebLogs(logPathGlobs []string, tailLines int, topN int, requestLimit int, cursorFile string) (*WebLogReport, error) {
+func CollectWebLogs(logPathGlobs []string, tailLines int, topN int, requestLimit int, cursorFile string, verbose bool) (*WebLogReport, error) {
 	if tailLines <= 0 {
 		tailLines = 5000
 	}
@@ -175,7 +175,7 @@ func CollectWebLogs(logPathGlobs []string, tailLines int, topN int, requestLimit
 	for _, file := range files {
 		seenFiles[file] = struct{}{}
 		entry, hasEntry := cursor.Files[file]
-		lines, nextEntry, err := readLinesForFile(file, tailLines, entry, hasEntry)
+		lines, nextEntry, err := readLinesForFile(file, tailLines, entry, hasEntry, verbose)
 		if err != nil {
 			continue
 		}
@@ -504,14 +504,14 @@ func expandGlobs(globs []string) []string {
 	return out
 }
 
-func readLinesForFile(path string, maxLines int, prev webLogCursorEntry, hasPrev bool) ([]string, webLogCursorEntry, error) {
+func readLinesForFile(path string, maxLines int, prev webLogCursorEntry, hasPrev bool, verbose bool) ([]string, webLogCursorEntry, error) {
 	if strings.HasSuffix(strings.ToLower(path), ".gz") {
-		return readCompressedLines(path, prev, hasPrev)
+		return readCompressedLines(path, prev, hasPrev, verbose)
 	}
-	return readIncrementalLines(path, maxLines, prev, hasPrev)
+	return readIncrementalLines(path, maxLines, prev, hasPrev, verbose)
 }
 
-func readCompressedLines(path string, prev webLogCursorEntry, hasPrev bool) ([]string, webLogCursorEntry, error) {
+func readCompressedLines(path string, prev webLogCursorEntry, hasPrev bool, verbose bool) ([]string, webLogCursorEntry, error) {
 	info, err := os.Stat(path)
 	if err != nil {
 		return nil, prev, err
@@ -553,7 +553,9 @@ func readCompressedLines(path string, prev webLogCursorEntry, hasPrev bool) ([]s
 		return nil, next, err
 	}
 
-	log.Printf("Web logs collect file=%s mode=gz decompressed_lines=%d", path, len(lines))
+	if verbose && len(lines) > 0 {
+		log.Printf("Web logs collect file=%s mode=gz decompressed_lines=%d", path, len(lines))
+	}
 
 	return lines, next, nil
 }
@@ -582,7 +584,7 @@ func readLastLines(path string, n int) ([]string, error) {
 	return ring, nil
 }
 
-func readIncrementalLines(path string, maxLines int, prev webLogCursorEntry, hasPrev bool) ([]string, webLogCursorEntry, error) {
+func readIncrementalLines(path string, maxLines int, prev webLogCursorEntry, hasPrev bool, verbose bool) ([]string, webLogCursorEntry, error) {
 	info, err := os.Stat(path)
 	if err != nil {
 		return nil, prev, err
@@ -620,8 +622,10 @@ func readIncrementalLines(path string, maxLines int, prev webLogCursorEntry, has
 			}
 		}
 
-		log.Printf("Web logs collect file=%s mode=bootstrap tail=%d head=%d live=0 total=%d backfill_done=%t",
-			path, len(tailLines)-headCount, headCount, len(tailLines), next.BackfillDone)
+		if verbose && (len(tailLines) > 0 || headCount > 0) {
+			log.Printf("Web logs collect file=%s mode=bootstrap tail=%d head=%d live=0 total=%d backfill_done=%t",
+				path, len(tailLines)-headCount, headCount, len(tailLines), next.BackfillDone)
+		}
 
 		return tailLines, next, nil
 	}
@@ -641,7 +645,7 @@ func readIncrementalLines(path string, maxLines int, prev webLogCursorEntry, has
 		next.BackfillDone = next.BackfillLimit <= 0
 	}
 
-	out := make([]string, 0, maxLines*2)
+	var out []string
 	liveCount := 0
 	headCount := 0
 
@@ -666,8 +670,10 @@ func readIncrementalLines(path string, maxLines int, prev webLogCursorEntry, has
 		}
 	}
 
-	log.Printf("Web logs collect file=%s mode=incremental tail=0 head=%d live=%d total=%d backfill_done=%t",
-		path, headCount, liveCount, len(out), next.BackfillDone)
+	if verbose && len(out) > 0 {
+		log.Printf("Web logs collect file=%s mode=incremental tail=0 head=%d live=%d total=%d backfill_done=%t",
+			path, headCount, liveCount, len(out), next.BackfillDone)
+	}
 
 	return out, next, nil
 }

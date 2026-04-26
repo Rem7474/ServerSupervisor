@@ -50,19 +50,19 @@ func CollectAPT(extractCVE bool) (*AptStatus, error) {
 
 	status := &AptStatus{}
 
-	// Check if apt is available
-	if _, err := exec.LookPath("apt"); err != nil {
-		return nil, fmt.Errorf("apt not found in PATH")
+	// Check if apt-get is available
+	if _, err := exec.LookPath("apt-get"); err != nil {
+		return nil, fmt.Errorf("apt-get not found in PATH")
 	}
 
 	// Get last update time from apt history log
 	status.LastUpdate = getLastAptAction("Start-Date", "/var/log/apt/history.log")
 	status.LastUpgrade = getLastAptUpgrade()
 
-	// List upgradable packages
-	out, err := exec.CommandContext(ctx, "apt", "list", "--upgradable").Output()
+	// List upgradable packages using dry-run simulation
+	out, err := exec.CommandContext(ctx, "apt-get", "upgrade", "--simulate").Output()
 	if err != nil {
-		log.Printf("apt list --upgradable failed: %v", err)
+		log.Printf("apt-get upgrade --simulate failed: %v", err)
 		return status, nil
 	}
 
@@ -72,23 +72,27 @@ func CollectAPT(extractCVE bool) (*AptStatus, error) {
 	var cveInfos []CVEInfo
 
 	for _, line := range lines {
-		if line == "" || strings.HasPrefix(line, "Listing") {
+		// Only process lines starting with "Inst " (package installation lines)
+		if !strings.HasPrefix(line, "Inst ") {
 			continue
 		}
-		// Format: package/suite version arch [upgradable from: version]
-		parts := strings.SplitN(line, "/", 2)
-		if len(parts) >= 1 {
-			packageName := parts[0]
-			packages = append(packages, packageName)
 
-			// Check if it's a security update
-			if strings.Contains(line, "-security") {
-				secCount++
-				// Extract CVEs for security packages only if requested
-				if extractCVE {
-					cves := extractCVEsForPackage(packageName)
-					cveInfos = append(cveInfos, cves...)
-				}
+		// Format: "Inst package_name [current_version] (new_version ...)"
+		// Extract package name (second token)
+		fields := strings.Fields(line)
+		if len(fields) < 2 {
+			continue
+		}
+		packageName := fields[1]
+		packages = append(packages, packageName)
+
+		// Check if it's a security update by looking at policy
+		if isSecurityUpdate(packageName) {
+			secCount++
+			// Extract CVEs for security packages only if requested
+			if extractCVE {
+				cves := extractCVEsForPackage(packageName)
+				cveInfos = append(cveInfos, cves...)
 			}
 		}
 	}
@@ -132,30 +136,33 @@ func ExecuteAptCommand(command string) (string, error) {
 	return ExecuteAptCommandWithStreaming(command, nil)
 }
 
-// ExecuteAptCommandWithStreaming runs an apt command with real-time output streaming
+// ExecuteAptCommandWithStreaming runs an apt-get command with real-time output streaming
 // streamCallback is called for each chunk of output (can be nil)
 func ExecuteAptCommandWithStreaming(command string, streamCallback func(chunk string)) (string, error) {
 	var cmd *exec.Cmd
 	switch command {
 	case "update":
-		cmd = exec.Command("apt", "update")
+		cmd = exec.Command("apt-get", "update")
 	case "upgrade":
-		cmd = exec.Command("apt", "upgrade", "-y", "-qq")
+		cmd = exec.Command("apt-get", "upgrade", "-y", "-qq", "-o", "Dpkg::Options::=--force-confold")
 	case "dist-upgrade":
-		cmd = exec.Command("apt", "dist-upgrade", "-y", "-qq")
+		cmd = exec.Command("apt-get", "dist-upgrade", "-y", "-qq", "-o", "Dpkg::Options::=--force-confold")
 	default:
 		return "", fmt.Errorf("unknown apt command: %s", command)
 	}
 
-	log.Printf("Executing: apt %s -y", command)
+	// Set non-interactive environment for unattended operation
+	cmd.Env = append(os.Environ(), "DEBIAN_FRONTEND=noninteractive")
+
+	log.Printf("Executing: apt-get %s -y", command)
 
 	output, err := runCommandWithStreaming(cmd, streamCallback, aptCommandIdleTimeout)
 
 	if err != nil {
-		return output, fmt.Errorf("apt %s failed: %w\nOutput: %s", command, err, output)
+		return output, fmt.Errorf("apt-get %s failed: %w\nOutput: %s", command, err, output)
 	}
 
-	log.Printf("apt %s completed successfully", command)
+	log.Printf("apt-get %s completed successfully", command)
 	return output, nil
 }
 
@@ -295,6 +302,22 @@ func getLastAptUpgrade() time.Time {
 	}
 	// Preserve local timezone for UI relative time display
 	return time.Unix(epoch, 0).In(time.Local)
+}
+
+// isSecurityUpdate checks if a package upgrade comes from security repositories
+func isSecurityUpdate(packageName string) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	out, err := exec.CommandContext(ctx, "apt-cache", "policy", packageName).Output()
+	if err != nil {
+		return false
+	}
+
+	policy := string(out)
+	// Check if any upgrade source contains "security"
+	return strings.Contains(strings.ToLower(policy), "security.ubuntu.com") ||
+		strings.Contains(strings.ToLower(policy), "-security")
 }
 
 // ─── Ubuntu CVE API ───────────────────────────────────────────────────────────
