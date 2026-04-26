@@ -447,7 +447,7 @@ func doUbuntuCVERequest(url string) (*ubuntuCVEResponse, []byte, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, nil, errCVENotFound

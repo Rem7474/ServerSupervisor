@@ -560,30 +560,6 @@ func readCompressedLines(path string, prev webLogCursorEntry, hasPrev bool, verb
 	return lines, next, nil
 }
 
-func readLastLines(path string, n int) ([]string, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = f.Close() }()
-
-	ring := make([]string, 0, n)
-	s := bufio.NewScanner(f)
-	for s.Scan() {
-		line := s.Text()
-		if len(ring) < n {
-			ring = append(ring, line)
-			continue
-		}
-		copy(ring, ring[1:])
-		ring[n-1] = line
-	}
-	if err := s.Err(); err != nil {
-		return nil, err
-	}
-	return ring, nil
-}
-
 func readIncrementalLines(path string, maxLines int, prev webLogCursorEntry, hasPrev bool, verbose bool) ([]string, webLogCursorEntry, error) {
 	info, err := os.Stat(path)
 	if err != nil {

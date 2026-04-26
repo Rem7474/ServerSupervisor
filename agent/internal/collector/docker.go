@@ -115,7 +115,7 @@ func CollectDocker() ([]DockerContainer, error) {
 
 	var containers []DockerContainer
 	for _, ac := range apiContainers {
-		container, err := client.InspectContainerWithContext(ac.ID, ctx)
+		container, err := client.InspectContainerWithOptions(docker.InspectContainerOptions{ID: ac.ID, Context: ctx})
 		if err != nil {
 			log.Printf("Failed to inspect container %s: %v", ac.ID[:12], err)
 			continue
@@ -397,7 +397,7 @@ func CollectContainerEnvVars(containerNames []string) ([]ContainerEnv, error) {
 
 	var result []ContainerEnv
 	for _, name := range containerNames {
-		container, err := client.InspectContainer(name)
+		container, err := client.InspectContainerWithOptions(docker.InspectContainerOptions{ID: name})
 		if err != nil {
 			continue
 		}
