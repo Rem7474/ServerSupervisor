@@ -23,7 +23,7 @@ import (
 const (
 	agentUpdateServiceName = "serversupervisor-agent"
 	agentUpdateBinaryPath  = "/usr/local/bin/serversupervisor-agent"
-	agentReleaseRepo       = "serversupervisor/server"
+	agentReleaseRepo       = "Rem7474/ServerSupervisor"
 )
 
 type agentUpdatePayload struct {
