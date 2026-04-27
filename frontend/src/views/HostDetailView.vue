@@ -98,6 +98,8 @@
           >
             <span>{{ isAgentUpToDate(host.agent_version) ? '✓' : '⚠' }}</span>
             <span>{{ isAgentUpToDate(host.agent_version) ? 'À jour' : 'MAJ dispo' }}</span>
+            <span class="text-muted">·</span>
+            <span class="font-monospace">v{{ host.agent_version }}</span>
           </span>
         </div>
       </div>
