@@ -11,9 +11,9 @@ import (
 )
 
 const (
-	defaultLatestAgentVersion = "1.3.0"
-	agentReleaseOwner         = "serversupervisor"
-	agentReleaseRepo          = "server"
+	defaultLatestAgentVersion = "7.6.5"
+	agentReleaseOwner         = "Rem7474"
+	agentReleaseRepo          = "ServerSupervisor"
 	agentReleaseCacheDuration = 10 * time.Minute
 )
 
