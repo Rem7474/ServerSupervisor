@@ -157,6 +157,15 @@ func ExecuteAptCommandWithStreaming(command string, streamCallback func(chunk st
 	log.Printf("Executing: apt-get %s -y", command)
 
 	output, err := runCommandWithStreaming(cmd, streamCallback, aptCommandIdleTimeout)
+	if err != nil && isDpkgInterruptedError(output, err) {
+		log.Printf("apt-get %s reported interrupted dpkg state, running dpkg --configure -a before retrying", command)
+		repairOutput, repairErr := runDpkgConfigureAll(streamCallback)
+		if repairErr != nil {
+			return output, fmt.Errorf("apt-get %s failed: %w\nOutput: %s\nRecovery dpkg --configure -a failed: %v\nRecovery output: %s", command, err, output, repairErr, repairOutput)
+		}
+
+		output, err = runCommandWithStreaming(cmd, streamCallback, aptCommandIdleTimeout)
+	}
 
 	if err != nil {
 		return output, fmt.Errorf("apt-get %s failed: %w\nOutput: %s", command, err, output)
@@ -164,6 +173,21 @@ func ExecuteAptCommandWithStreaming(command string, streamCallback func(chunk st
 
 	log.Printf("apt-get %s completed successfully", command)
 	return output, nil
+}
+
+func isDpkgInterruptedError(output string, err error) bool {
+	if err == nil {
+		return false
+	}
+	combined := strings.ToLower(output + "\n" + err.Error())
+	return strings.Contains(combined, "dpkg was interrupted") || strings.Contains(combined, "run 'dpkg --configure -a'")
+}
+
+func runDpkgConfigureAll(streamCallback func(chunk string)) (string, error) {
+	cmd := exec.Command("dpkg", "--configure", "-a")
+	cmd.Env = append(os.Environ(), "DEBIAN_FRONTEND=noninteractive")
+	log.Printf("Executing: dpkg --configure -a")
+	return runCommandWithStreaming(cmd, streamCallback, aptCommandIdleTimeout)
 }
 
 // runCommandWithStreaming executes a command and streams output via callback
