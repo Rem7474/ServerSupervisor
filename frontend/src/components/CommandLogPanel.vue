@@ -411,13 +411,14 @@ function download() {
   padding: 1rem;
   margin: 0;
   overflow: auto;
-  max-height: 60vh;
   font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
   font-size: 0.813rem;
   line-height: 1.5;
   border-radius: 0 0 0.5rem 0.5rem;
   white-space: pre;
   word-break: normal;
+  /* flex-fill handles the height — no max-height cap needed */
+  min-height: 0;
 }
 
 .console-fab {
