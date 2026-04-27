@@ -7,7 +7,7 @@
             Git / Automatisation
           </h2>
           <div class="text-muted">
-            Webhooks entrants et suivi de releases pour declencher des scripts sur vos VMs.
+            Webhooks entrants et suivi de releases pour déclencher des scripts sur vos VMs.
           </div>
         </div>
         <button
@@ -159,7 +159,7 @@
             Aucun webhook configure.
           </p>
           <p class="text-muted small">
-            Recevez des evenements depuis GitHub, GitLab, Gitea ou Forgejo pour declencher des scripts sur vos VMs.
+            Recevez des événements depuis GitHub, GitLab, Gitea ou Forgejo pour déclencher des scripts sur vos VMs.
           </p>
           <button
             class="btn btn-sm btn-primary"
@@ -242,7 +242,7 @@
                   v-else
                   class="mt-2 pt-2 border-top small text-muted"
                 >
-                  Jamais declenche
+                  Jamais déclenché
                 </div>
               </div>
               <div class="card-footer d-flex gap-2">
@@ -328,7 +328,7 @@
             Aucun tracker configure.
           </p>
           <p class="text-muted small">
-            Surveillez les releases Git ou les images Docker et declenchez automatiquement un script sur une VM lors d'une mise a jour.
+            Surveillez les releases Git ou les images Docker et déclenchez automatiquement un script sur une VM lors d'une mise à jour.
           </p>
           <button
             class="btn btn-sm btn-primary"

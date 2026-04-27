@@ -57,7 +57,7 @@
               </div>
 
               <div class="mb-3">
-                <label class="form-label required">Source des donnees</label>
+                <label class="form-label required">Source des données</label>
                 <div
                   class="btn-group w-100"
                   role="group"
@@ -107,7 +107,7 @@
                   v-if="!metricSupportsHostFilter"
                   :id="`host-filter-hint-${rule?.id || 'new'}`"
                   class="form-hint"
-                >Cette metrique est globale et n'est pas liee a un hote.</small>
+                >Cette métrique est globale et n'est pas liée à un hôte.</small>
               </div>
 
 
@@ -118,7 +118,7 @@
                 v-if="capabilitiesLoading"
                 class="alert alert-info py-2 small mb-2"
               >
-                Chargement des metriques...
+                Chargement des métriques...
               </div>
               <div
                 v-else-if="capabilitiesError"
@@ -130,7 +130,7 @@
                 v-if="form.host_id && hostMetricsLoading"
                 class="alert alert-info py-2 small mb-2"
               >
-                Chargement des metriques pour cet hote...
+                Chargement des métriques pour cet hôte...
               </div>
               <div
                 v-else-if="form.host_id && hostMetricsError"
@@ -142,7 +142,7 @@
                 v-else-if="form.host_id && hostMetrics?.metrics && hostMetrics.metrics.length < (capabilities?.metrics?.length || 0)"
                 class="alert alert-info py-2 small mb-2"
               >
-                ℹ️ Cet hote dispose de {{ hostMetrics.metrics.length }} metrique(s): certains collecteurs peuvent ne pas etre actifs.
+                ℹ️ Cet hôte dispose de {{ hostMetrics.metrics.length }} métrique(s) — certains collecteurs peuvent ne pas être actifs.
               </div>
               <div class="metric-grid">
                 <button
@@ -180,7 +180,7 @@
                       v-if="!metricAllowsGuestScope"
                       value="node"
                     >
-                      Noeud
+                      Nœud
                     </option>
                     <option
                       v-if="metricAllowsGuestScope"
@@ -212,7 +212,7 @@
                     class="form-select"
                   >
                     <option value="">
-                      Selectionner...
+                      Sélectionner...
                     </option>
                     <option
                       v-for="opt in proxmoxConnections"
@@ -227,13 +227,13 @@
                   v-if="!metricAllowsGuestScope && form.proxmox_scope.scope_mode === 'node'"
                   class="col-md-8"
                 >
-                  <label class="form-label">Noeud</label>
+                  <label class="form-label">Nœud</label>
                   <select
                     v-model="form.proxmox_scope.node_id"
                     class="form-select"
                   >
                     <option value="">
-                      Selectionner...
+                      Sélectionner...
                     </option>
                     <option
                       v-for="opt in proxmoxNodes"
@@ -254,7 +254,7 @@
                     class="form-select"
                   >
                     <option value="">
-                      Selectionner...
+                      Sélectionner...
                     </option>
                     <option
                       v-for="opt in proxmoxGuests"
@@ -275,7 +275,7 @@
                     class="form-select"
                   >
                     <option value="">
-                      Selectionner...
+                      Sélectionner...
                     </option>
                     <option
                       v-for="opt in proxmoxStorages"
@@ -296,7 +296,7 @@
                     class="form-select"
                   >
                     <option value="">
-                      Selectionner...
+                      Sélectionner...
                     </option>
                     <option
                       v-for="opt in proxmoxDisks"
@@ -326,7 +326,7 @@
                 v-else-if="form.metric === 'disk_smart_status'"
                 class="text-secondary small mt-2"
               >
-                Utilisez typiquement un seuil > 0.5 pour déclencher quand au moins un disque est en etat SMART FAILED.
+                Utilisez typiquement un seuil > 0.5 pour déclencher quand au moins un disque est en état SMART FAILED.
               </div>
             </div>
 
@@ -489,7 +489,7 @@
                     <span
                       v-if="testResults.any_fires"
                       class="badge bg-danger-lt text-danger ms-2"
-                    >Declencherait une alerte</span>
+                    >Déclencherait une alerte</span>
                     <span
                       v-else
                       class="badge bg-success-lt text-success ms-2"
@@ -552,7 +552,7 @@
                 class="alert py-2 small mb-3"
                 :class="testResults.any_fires ? 'alert-warning' : 'alert-success'"
               >
-                <strong>Dernier test:</strong>
+                <strong>Dernier test :</strong>
                 {{ testResults.any_fires ? ' la règle déclencherait une alerte.' : ' la règle ne déclencherait pas d\'alerte.' }}
                 <span class="text-secondary ms-1">({{ formatDate(testResults.evaluated_at) }})</span>
               </div>
@@ -580,7 +580,7 @@
                 <small
                   :id="`cooldown-hint-${rule?.id || 'new'}`"
                   class="form-hint"
-                >Temps minimum entre deux alertes successives pour cette regle</small>
+                >Temps minimum entre deux alertes successives pour cette règle</small>
               </div>
 
               <div class="mb-3">

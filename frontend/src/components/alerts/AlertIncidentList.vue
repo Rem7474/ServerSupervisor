@@ -83,13 +83,13 @@
         <thead>
           <tr>
             <th style="width: 90px;">
-              Etat
+              État
             </th>
             <th>Type</th>
-            <th>Element</th>
+            <th>Élément</th>
             <th>Source</th>
-            <th>Details</th>
-            <th>Declenche</th>
+            <th>Détails</th>
+            <th>Déclenché</th>
             <th>Termine</th>
           </tr>
         </thead>
@@ -239,10 +239,10 @@ function notificationRoute(incident) {
 }
 
 function trackerStatusLabel(status) {
-  if (status === 'pending' || status === 'running') return 'Detection en cours'
-  if (status === 'completed' || status === 'success') return 'Execution reussie'
-  if (status === 'failed' || status === 'error') return 'Execution echouee'
-  return status || 'Etat inconnu'
+  if (status === 'pending' || status === 'running') return 'Détection en cours'
+  if (status === 'completed' || status === 'success') return 'Exécution réussie'
+  if (status === 'failed' || status === 'error') return 'Exécution échouée'
+  return status || 'État inconnu'
 }
 
 function isCompleted(incident) {

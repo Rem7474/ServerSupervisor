@@ -55,7 +55,7 @@ defineEmits(['update:modelValue'])
 
 const visibleTabs = computed(() => {
   const tabs = [
-    { key: 'metrics', label: 'Metriques' },
+    { key: 'metrics', label: 'Métriques' },
     {
       key: 'docker',
       label: 'Docker',

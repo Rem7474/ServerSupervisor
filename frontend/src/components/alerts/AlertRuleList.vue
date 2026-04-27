@@ -1,30 +1,9 @@
 <template>
   <div class="card">
-    <div class="card-header d-flex align-items-center justify-content-between">
+    <div class="card-header">
       <h3 class="card-title">
-        Regles actives
+        Règles actives
       </h3>
-      <button
-        class="btn btn-primary btn-sm"
-        @click="$emit('add')"
-      >
-        <svg
-          class="icon me-1"
-          width="16"
-          height="16"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M12 4v16m8-8H4"
-          />
-        </svg>
-        Nouvelle alerte
-      </button>
     </div>
 
     <div
@@ -50,30 +29,14 @@
 
     <div
       v-else-if="rules.length === 0"
-      class="card-body text-center py-5 text-muted"
+      class="card-body"
     >
-      <svg
-        class="icon icon-lg mb-3 text-muted"
-        width="48"
-        height="48"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-width="2"
-          d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-        />
-      </svg>
-      <div>Aucune regle d'alerte configuree</div>
-      <button
-        class="btn btn-primary mt-3"
-        @click="$emit('add')"
-      >
-        Creer ma premiere alerte
-      </button>
+      <EmptyState
+        title="Aucune règle d'alerte configurée"
+        subtitle="Créez votre première règle pour commencer à surveiller votre infrastructure."
+        cta-label="Créer ma première alerte"
+        @cta="$emit('add')"
+      />
     </div>
 
     <div
@@ -83,12 +46,12 @@
       <table class="table table-vcenter card-table">
         <thead>
           <tr>
-            <th>Etat</th>
+            <th>État</th>
             <th>Nom</th>
-            <th>Source / Hote</th>
-            <th>Metrique</th>
+            <th>Source / Hôte</th>
+            <th>Métrique</th>
             <th>Condition</th>
-            <th>Duree</th>
+            <th>Durée</th>
             <th>Canaux</th>
             <th class="w-1">
               Actions
@@ -125,7 +88,7 @@
               <span
                 v-if="ruleSourceType(rule) === 'agent'"
                 class="badge bg-secondary-lt text-secondary"
-              >Agent › {{ getHostName(rule.host_id) || 'Tous les hotes' }}</span>
+              >Agent › {{ getHostName(rule.host_id) || 'Tous les hôtes' }}</span>
               <span
                 v-else
                 class="badge bg-cyan-lt text-cyan"
@@ -140,13 +103,13 @@
             <td>
               <div
                 v-if="rule.metric === 'heartbeat_timeout'"
-                style="line-height: 1.4;"
+                class="condition-cell"
               >
                 <code>{{ rule.operator }} {{ rule.threshold_crit }}s</code>
               </div>
               <div
                 v-else
-                style="line-height: 1.4;"
+                class="condition-cell"
               >
                 <div><code>{{ rule.operator }} {{ rule.threshold_warn }}{{ getMetricUnit(rule.metric) }} (warn)</code></div>
                 <div><code>{{ rule.operator }} {{ rule.threshold_crit }}{{ getMetricUnit(rule.metric) }} (crit)</code></div>
@@ -168,9 +131,9 @@
                 v-for="channel in rule.actions?.channels"
                 :key="channel"
                 class="badge me-1"
-                :class="channel === 'browser' ? 'bg-green-lt text-green' : 'bg-azure-lt text-azure'"
+                :class="channelBadgeClass(channel)"
               >
-                {{ channel === 'browser' ? 'Navigateur' : channel }}
+                {{ channelLabel(channel) }}
               </span>
               <span
                 v-if="rule.actions?.command_trigger"
@@ -234,8 +197,25 @@
 </template>
 
 <script setup>
+import EmptyState from '../EmptyState.vue'
 import { formatDurationSecs } from '../../utils/formatters'
 import { getAlertMetricMeta } from '../../utils/alertMetrics'
+
+const CHANNEL_LABELS = { browser: 'Navigateur', smtp: 'Email', ntfy: 'Ntfy', notify: 'Système' }
+const CHANNEL_BADGE_CLASSES = {
+  browser: 'bg-green-lt text-green',
+  smtp: 'bg-azure-lt text-azure',
+  ntfy: 'bg-azure-lt text-azure',
+  notify: 'bg-purple-lt text-purple',
+}
+
+function channelLabel(channel) {
+  return CHANNEL_LABELS[channel] || channel
+}
+
+function channelBadgeClass(channel) {
+  return CHANNEL_BADGE_CLASSES[channel] || 'bg-azure-lt text-azure'
+}
 
 const props = defineProps({
   rules: {
@@ -291,9 +271,9 @@ function formatClearThreshold(rule, value) {
 
 function autoHysteresisHint(rule, level) {
   if (level === 'crit') {
-    return 'auto: resolution quand la condition crit n\'est plus vraie'
+    return 'auto : résolution quand la condition crit n\'est plus vraie'
   }
-  return 'auto: resolution quand aucune condition n\'est vraie'
+  return 'auto : résolution quand aucune condition n\'est vraie'
 }
 
 function ruleSourceType(rule) {
@@ -305,7 +285,7 @@ function proxmoxScopeLabel(rule) {
   const scope = rule?.proxmox_scope
   if (!scope || !scope.scope_mode || scope.scope_mode === 'global') return 'Proxmox › Cluster'
   if (scope.scope_mode === 'connection') return `Proxmox › Connexion ${scope.connection_id || ''}`.trim()
-  if (scope.scope_mode === 'node') return `Proxmox › Noeud ${scope.node_id || ''}`.trim()
+  if (scope.scope_mode === 'node') return `Proxmox › Nœud ${scope.node_id || ''}`.trim()
   if (scope.scope_mode === 'guest') return `Proxmox › VM/LXC ${scope.guest_id || ''}`.trim()
   if (scope.scope_mode === 'storage') return `Proxmox › Stockage ${scope.storage_id || ''}`.trim()
   if (scope.scope_mode === 'disk') return `Proxmox › Disque ${scope.disk_id || ''}`.trim()
@@ -313,3 +293,8 @@ function proxmoxScopeLabel(rule) {
 }
 </script>
 
+<style scoped>
+.condition-cell {
+  line-height: 1.4;
+}
+</style>

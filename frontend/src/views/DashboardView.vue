@@ -107,31 +107,11 @@
       v-if="cveSummary && ((cveSummary.critical_count || 0) > 0 || (cveSummary.hosts_with_critical || 0) > 0)"
       class="alert alert-danger mb-3 d-flex align-items-center gap-3"
     >
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        class="icon icon-lg icon-responsive-lg flex-shrink-0"
-        width="24"
-        height="24"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      >
-        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-        <line
-          x1="12"
-          y1="9"
-          x2="12"
-          y2="13"
-        /><line
-          x1="12"
-          y1="17"
-          x2="12.01"
-          y2="17"
-        />
-      </svg>
+      <AppIcon
+        name="warning"
+        :size="24"
+        css-class="icon icon-lg icon-responsive-lg flex-shrink-0"
+      />
       <div class="flex-grow-1">
         <div class="fw-semibold">
           Vulnérabilités critiques détectées
@@ -154,31 +134,11 @@
       v-if="proxmoxSummary && (proxmoxSummary.nodes_down > 0 || proxmoxSummary.recent_failed_tasks > 0 || proxmoxSummary.storage_near_full > 0 || proxmoxSummary.storage_offline > 0)"
       class="alert alert-warning mb-3 d-flex align-items-center gap-3"
     >
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        class="icon icon-lg icon-responsive-lg flex-shrink-0"
-        width="24"
-        height="24"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      >
-        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-        <line
-          x1="12"
-          y1="9"
-          x2="12"
-          y2="13"
-        /><line
-          x1="12"
-          y1="17"
-          x2="12.01"
-          y2="17"
-        />
-      </svg>
+      <AppIcon
+        name="warning"
+        :size="24"
+        css-class="icon icon-lg icon-responsive-lg flex-shrink-0"
+      />
       <div class="flex-grow-1">
         <div class="fw-semibold">
           Alertes Proxmox
@@ -222,7 +182,7 @@
               <div
                 class="summary-source-switch"
                 role="group"
-                aria-label="Source des metriques du graphe"
+                aria-label="Source des métriques du graphe"
               >
                 <button
                   v-for="src in chartSources"
@@ -285,7 +245,7 @@
             <label
               class="form-label"
               for="dashboard-search"
-            >Recherche d'hote</label>
+            >Recherche d'hôte</label>
             <input
               id="dashboard-search"
               v-model="searchQuery"
@@ -441,10 +401,10 @@
                   </router-link>
                 </div>
               </td>
-              <td style="min-width: 110px">
+              <td class="status-col">
                 <span :class="hostStatusClass(host.status)">
-                  <span class="status-dot status-dot-animated" />
-                  <span :data-translation-id="host.status === 'online' ? 'online' : host.status === 'offline' ? 'offline' : 'unknown'">{{ formatHostStatus(host.status) }}</span>
+                  <span :class="['status-dot', host.status === 'online' ? 'status-dot-animated' : '']" />
+                  {{ formatHostStatus(host.status) }}
                 </span>
               </td>
               <td>
@@ -526,44 +486,14 @@
 
       <div
         v-if="!loading && hosts.length === 0"
-        class="text-center py-5 text-secondary"
+        class="py-3"
       >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          class="mb-3 empty-state-icon"
-          width="48"
-          height="48"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="1.5"
-            d="M5 12h2m10 0h2M12 5v2m0 10v2M7.05 7.05l1.414 1.414m7.072 7.072 1.414 1.414M7.05 16.95l1.414-1.414m7.072-7.072 1.414-1.414"
-          />
-          <circle
-            cx="12"
-            cy="12"
-            r="4"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="1.5"
-          />
-        </svg>
-        <div class="fw-medium">
-          Aucun hôte enregistré
-        </div>
-        <div class="small mt-1 mb-3 opacity-75">
-          Ajoutez votre premier hôte pour commencer à surveiller votre infrastructure
-        </div>
-        <router-link
-          to="/hosts/new"
-          class="btn btn-primary btn-sm"
-        >
-          Ajouter un hôte
-        </router-link>
+        <EmptyState
+          title="Aucun hôte enregistré"
+          subtitle="Ajoutez votre premier hôte pour commencer à surveiller votre infrastructure."
+          cta-label="Ajouter un hôte"
+          cta-to="/hosts/new"
+        />
       </div>
     </div>
 
@@ -582,7 +512,8 @@ import DashboardDockerVersions from '../components/dashboard/DashboardDockerVers
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import PaginationNav from '../components/PaginationNav.vue'
 import SortableHeader from '../components/common/SortableHeader.vue'
-import MetricsSourceBadge from '../components/common/MetricsSourceBadge.vue'
+import EmptyState from '../components/EmptyState.vue'
+import AppIcon from '../components/AppIcon.vue'
 import { formatHostStatus, hostStatusClass } from '../utils/formatHostStatus'
 import { useDashboard } from '../composables/useDashboard'
 
@@ -714,5 +645,9 @@ watch(totalHostPages, (pages) => {
 .last-activity-col {
   min-width: 13rem;
   white-space: nowrap;
+}
+
+.status-col {
+  min-width: 110px;
 }
 </style>

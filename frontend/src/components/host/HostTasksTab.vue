@@ -174,7 +174,7 @@
                       v-if="taskRunningId === task.id"
                       class="spinner-border spinner-border-sm"
                     />
-                    <span v-else>Executer</span>
+                    <span v-else>Exécuter</span>
                   </button>
                   <button
                     v-if="canRunApt"
@@ -302,7 +302,7 @@
                       value=""
                       disabled
                     >
-                      -- Selectionner une tache --
+                      -- Sélectionner une tâche --
                     </option>
                     <option
                       v-for="t in customTaskOptions"
@@ -403,7 +403,7 @@
       <div class="toast show align-items-center text-bg-success border-0">
         <div class="d-flex">
           <div class="toast-body">
-            <strong>{{ taskRunResult.name }}</strong> declenchee - commande <code>{{ taskRunResult.id }}</code>
+            <strong>{{ taskRunResult.name }}</strong> déclenchée — commande <code>{{ taskRunResult.id }}</code>
           </div>
           <button
             type="button"

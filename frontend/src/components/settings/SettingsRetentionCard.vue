@@ -7,7 +7,7 @@
     </div>
     <div class="card-body">
       <div class="mb-3">
-        <label class="form-label">Metriques (jours)</label>
+        <label class="form-label">Métriques (jours)</label>
         <input
           v-model.number="form.metricsRetentionDays"
           type="number"
@@ -20,7 +20,7 @@
           id="metrics-retention-hint"
           class="form-hint"
         >
-          Metriques brutes et agregats plus anciens que ce seuil sont supprimes
+          Métriques brutes et agrégats plus anciens que ce seuil sont supprimés
         </div>
       </div>
       <div class="mb-0">
@@ -37,7 +37,7 @@
           id="audit-retention-hint"
           class="form-hint"
         >
-          Entrees d'audit plus anciennes que ce seuil sont supprimees
+          Entrées d'audit plus anciennes que ce seuil sont supprimées
         </div>
       </div>
     </div>

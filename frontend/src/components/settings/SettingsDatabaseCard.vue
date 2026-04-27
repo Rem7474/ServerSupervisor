@@ -18,11 +18,11 @@
         <div class="text-secondary small">
           Logs audit
         </div>
-        <div>{{ formatNumber(dbStatus.auditLogCount) }} entrees</div>
+        <div>{{ formatNumber(dbStatus.auditLogCount) }} entrées</div>
       </div>
       <div class="mb-3 pb-3 border-bottom">
         <div class="text-secondary small">
-          Metriques stockees
+          Métriques stockées
         </div>
         <div>{{ formatNumber(dbStatus.metricsCount) }} points</div>
       </div>

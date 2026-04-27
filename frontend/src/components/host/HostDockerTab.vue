@@ -13,10 +13,10 @@
             <th>Image</th>
             <th>Tag</th>
             <th>Version réelle</th>
-            <th>Etat</th>
+            <th>État</th>
             <th>Status</th>
             <th>Port interne</th>
-            <th>Port hote expose</th>
+            <th>Port hôte exposé</th>
           </tr>
         </thead>
         <tbody>
@@ -41,7 +41,7 @@
                 <span
                   v-else-if="containerVersion(c).tracker_id && containerVersion(c).custom_task_id && !containerVersion(c).is_up_to_date && containerVersion(c).running_version"
                   class="badge bg-yellow-lt text-yellow mt-1"
-                  :title="`Derniere : ${containerVersion(c).latest_version}`"
+                  :title="`Dernière : ${containerVersion(c).latest_version}`"
                 >MAJ dispo</span>
                 <span
                   v-else-if="containerVersion(c).tracker_id && !containerVersion(c).custom_task_id"
@@ -66,7 +66,7 @@
             </td>
             <td>
               <span :class="c.state === 'running' ? 'badge bg-green-lt text-green' : 'badge bg-secondary-lt text-secondary'">
-                {{ { running: 'En cours', exited: 'Arrete', paused: 'En pause', created: 'Cree', restarting: 'Redemarrage', dead: 'Mort' }[c.state] || c.state }}
+                {{ { running: 'En cours', exited: 'Arrêté', paused: 'En pause', created: 'Créé', restarting: 'Redémarrage', dead: 'Mort' }[c.state] || c.state }}
               </span>
             </td>
             <td class="text-secondary small">
@@ -90,7 +90,7 @@
               colspan="8"
               class="text-center text-secondary py-4"
             >
-              Aucun conteneur Docker actif sur cet hote.
+              Aucun conteneur Docker actif sur cet hôte.
             </td>
           </tr>
         </tbody>

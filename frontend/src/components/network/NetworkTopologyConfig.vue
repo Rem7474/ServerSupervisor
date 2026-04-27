@@ -167,7 +167,7 @@
     </div>
 
     <div class="network-config-item mt-3">
-      <label class="form-label">Noeud Authelia (optionnel)</label>
+      <label class="form-label">Nœud Authelia (optionnel)</label>
       <div class="network-config-row">
         <div>
           <input
@@ -177,7 +177,7 @@
             placeholder="Ex: Authelia"
           >
           <div class="text-secondary small mt-1">
-            Label affiche dans le graphe
+            Label affiché dans le graphe
           </div>
         </div>
         <div>
@@ -195,7 +195,7 @@
     </div>
 
     <div class="network-config-item mt-3">
-      <label class="form-label">Noeud Internet / Routeur (optionnel)</label>
+      <label class="form-label">Nœud Internet / Routeur (optionnel)</label>
       <div class="network-config-row">
         <div>
           <input
@@ -205,7 +205,7 @@
             placeholder="Ex: Internet"
           >
           <div class="text-secondary small mt-1">
-            Label affiche dans le graphe
+            Label affiché dans le graphe
           </div>
         </div>
         <div>
@@ -286,7 +286,7 @@
                     <span
                       v-if="port.internal"
                       class="badge bg-secondary-lt text-secondary ms-1"
-                      title="Port interne Docker uniquement, non expose sur l'hote"
+                      title="Port interne Docker uniquement, non exposé sur l'hôte"
                     >interne</span>
                     <div
                       v-if="port.containers?.length"

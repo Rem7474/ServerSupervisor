@@ -7,7 +7,7 @@
         type="checkbox"
         @change="$emit('update:enabled', $event.target.checked)"
       >
-      <span class="form-check-label fw-medium">Declencher une commande a l'alerte</span>
+      <span class="form-check-label fw-medium">Déclencher une commande à l'alerte</span>
     </label>
 
     <div
@@ -71,7 +71,7 @@
       <small
         id="command-target-hint"
         class="form-hint mt-1"
-      >La commande sera creee automatiquement sur l'hote concerne des le declenchement de l'alerte.</small>
+      >La commande sera créée automatiquement sur l'hôte concerné dès le déclenchement de l'alerte.</small>
     </div>
   </div>
 </template>

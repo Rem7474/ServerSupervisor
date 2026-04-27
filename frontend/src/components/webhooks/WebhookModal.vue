@@ -276,13 +276,13 @@
                   class="form-check-input"
                   type="checkbox"
                 >
-                <span class="form-check-label fw-medium">Declencher une tache lors d'une mise a jour</span>
+                <span class="form-check-label fw-medium">Déclencher une tâche lors d'une mise à jour</span>
               </label>
               <div
                 id="dispatch-task-hint"
                 class="form-hint text-muted"
               >
-                Si desactive, le tracker surveille uniquement et enregistre la version sans executer de script.
+                Si désactivé, le tracker surveille uniquement et enregistre la version sans exécuter de script.
               </div>
             </div>
 
@@ -300,7 +300,7 @@
                 placeholder="0"
               >
               <div class="form-hint">
-                Delai avant declenchement apres detection d'une nouvelle version (0 = immediat).
+                Délai avant déclenchement après détection d'une nouvelle version (0 = immédiat).
               </div>
             </div>
 
@@ -315,7 +315,7 @@
                   class="form-select"
                 >
                   <option value="">
-                    -- Selectionner un hote --
+                    -- Sélectionner un hôte --
                   </option>
                   <option
                     v-for="host in hosts"
@@ -340,7 +340,7 @@
                     value=""
                     disabled
                   >
-                    -- Selectionner une tache --
+                    -- Sélectionner une tâche --
                   </option>
                   <option
                     v-for="task in customTasks"
@@ -712,7 +712,7 @@ function validate() {
         return 'Owner et depot sont obligatoires pour un tracker Git.'
       }
       if (form.value.dispatch_task && (!form.value.host_id || !form.value.custom_task_id)) {
-        return 'VM cible et ID de tache sont obligatoires si le declenchement de tache est active.'
+        return 'VM cible et ID de tâche sont obligatoires si le déclenchement de tâche est activé.'
       }
     } else {
       if (!form.value.docker_image) {
@@ -722,7 +722,7 @@ function validate() {
         return 'Pour le repo Git lie, renseignez owner et depot ensemble (ou laissez les deux vides).'
       }
       if (form.value.dispatch_task && (!form.value.host_id || !form.value.custom_task_id)) {
-        return 'VM cible et ID de tache sont obligatoires si le declenchement de tache est active.'
+        return 'VM cible et ID de tâche sont obligatoires si le déclenchement de tâche est activé.'
       }
     }
     return ''

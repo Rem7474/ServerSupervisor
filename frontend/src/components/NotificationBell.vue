@@ -219,10 +219,10 @@ function metricUnit(metric) {
 }
 
 function trackerStatusLabel(status) {
-  if (status === 'pending' || status === 'running') return 'Detection en cours'
-  if (status === 'completed' || status === 'success') return 'Execution reussie'
-  if (status === 'failed' || status === 'error') return 'Execution echouee'
-  return status || 'Etat inconnu'
+  if (status === 'pending' || status === 'running') return 'Détection en cours'
+  if (status === 'completed' || status === 'success') return 'Exécution réussie'
+  if (status === 'failed' || status === 'error') return 'Exécution échouée'
+  return status || 'État inconnu'
 }
 
 function notificationResolved(item) {
@@ -374,11 +374,11 @@ useWebSocket('/api/v1/ws/notifications', (payload) => {
 
     if (payload.type === 'release_tracker_execution') {
       const n = payload.notification
-      const statusLabel = n.status === 'completed' || n.status === 'success' ? 'reussie' : 'echouee'
+      const statusLabel = n.status === 'completed' || n.status === 'success' ? 'réussie' : 'échouée'
       const typeLabel = n.tracker_type === 'docker' ? 'Docker' : 'Git'
       showExecutionBrowserNotification(
         `${typeLabel} tracker : ${n.tracker_name}`,
-        `Execution ${statusLabel}`,
+        `Exécution ${statusLabel}`,
         `tracker-exec-${n.tracker_id}-${n.status}`,
       )
       fetchNotifications()
@@ -387,10 +387,10 @@ useWebSocket('/api/v1/ws/notifications', (payload) => {
 
     if (payload.type === 'webhook_execution') {
       const n = payload.notification
-      const statusLabel = n.status === 'completed' || n.status === 'success' ? 'reussie' : 'echouee'
+      const statusLabel = n.status === 'completed' || n.status === 'success' ? 'réussie' : 'échouée'
       showExecutionBrowserNotification(
         `Webhook : ${n.webhook_name}`,
-        `Execution ${statusLabel}`,
+        `Exécution ${statusLabel}`,
         `webhook-exec-${n.webhook_id}-${n.status}`,
       )
       fetchNotifications()

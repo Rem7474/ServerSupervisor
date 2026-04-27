@@ -81,7 +81,7 @@
     class="card"
   >
     <div class="card-body text-secondary">
-      Aucune commande exécutée sur cet hote.
+      Aucune commande exécutée sur cet hôte.
     </div>
   </div>
 </template>

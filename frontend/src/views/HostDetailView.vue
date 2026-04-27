@@ -88,8 +88,8 @@
             :class="hostStatusClass(host.status)"
             :aria-label="`Statut de l'hôte : ${formatHostStatus(host.status)}`"
           >
-            <span class="status-dot status-dot-animated" />
-            <span :data-translation-id="host.status === 'online' ? 'online' : host.status === 'offline' ? 'offline' : 'unknown'">{{ formatHostStatus(host.status) }}</span>
+            <span :class="['status-dot', host.status === 'online' ? 'status-dot-animated' : '']" />
+            {{ formatHostStatus(host.status) }}
           </span>
           <span
             v-if="host?.agent_version"
@@ -265,8 +265,7 @@
         >
           <select
             v-model="selectedCandidate"
-            class="form-select form-select-sm"
-            style="max-width:320px"
+            class="form-select form-select-sm candidate-select"
           >
             <option value="">
               -- Choisir un guest --
@@ -512,6 +511,7 @@
       class="modal modal-blur show d-block modal-permissions-overlay"
       tabindex="-1"
       @click.self="addPermModal = false"
+      @keydown.escape.stop="addPermModal = false"
     >
       <div
         class="modal-dialog modal-dialog-centered modal-permissions-dialog"
@@ -683,5 +683,9 @@ const {
   :deep(.side-panel) {
     width: 100%;
   }
+}
+
+.candidate-select {
+  max-width: 320px;
 }
 </style>

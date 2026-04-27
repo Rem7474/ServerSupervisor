@@ -63,15 +63,15 @@
         <table class="table table-vcenter card-table">
           <thead>
             <tr>
-              <th>Hote</th>
+              <th>Hôte</th>
               <th>Conteneur</th>
               <th>Image</th>
-              <th>Port hote</th>
+              <th>Port hôte</th>
               <th>Port conteneur</th>
               <th>Proto</th>
               <th>IPv4</th>
               <th>IPv6</th>
-              <th>Etat</th>
+              <th>État</th>
             </tr>
           </thead>
           <tbody>
@@ -127,7 +127,7 @@
               </td>
               <td>
                 <span :class="row.state === 'running' ? 'badge bg-green-lt text-green' : 'badge bg-secondary-lt text-secondary'">
-                  {{ { running: 'En cours', exited: 'Arrete', paused: 'En pause', created: 'Cree', restarting: 'Redemarrage', dead: 'Mort' }[row.state] || row.state || 'inconnu' }}
+                  {{ { running: 'En cours', exited: 'Arrêté', paused: 'En pause', created: 'Créé', restarting: 'Redémarrage', dead: 'Mort' }[row.state] || row.state || 'inconnu' }}
                 </span>
               </td>
             </tr>
@@ -145,11 +145,11 @@
     <div class="card">
       <div class="card-header">
         <h3 class="card-title">
-          Trafic par hote
+          Trafic par hôte
         </h3>
         <div class="card-options">
           <span class="badge bg-azure-lt text-azure ms-1">
-            {{ hosts.length }} hote{{ hosts.length > 1 ? 's' : '' }}
+            {{ hosts.length }} hôte{{ hosts.length > 1 ? 's' : '' }}
           </span>
         </div>
       </div>
@@ -204,7 +204,7 @@
         v-if="hosts.length === 0"
         class="text-center text-secondary py-4"
       >
-        Aucun hote trouve
+        Aucun hôte trouvé
       </div>
     </div>
 

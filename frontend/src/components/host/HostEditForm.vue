@@ -79,7 +79,7 @@
                   API Key agent
                 </div>
                 <div class="text-secondary small">
-                  Regenerer la cle pour un hote existant.
+                  Régénérer la clé pour un hôte existant.
                 </div>
               </div>
               <button

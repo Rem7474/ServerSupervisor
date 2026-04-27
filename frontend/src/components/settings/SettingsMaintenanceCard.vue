@@ -9,10 +9,10 @@
       <div class="row g-3">
         <div class="col-md-6">
           <h4 class="text-sm mb-2">
-            Nettoyage des metriques
+            Nettoyage des métriques
           </h4>
           <p class="text-secondary small mb-3">
-            Supprime les metriques brutes + agregats plus anciens que {{ settings.metricsRetentionDays }} jours
+            Supprime les métriques brutes + agrégats plus anciens que {{ settings.metricsRetentionDays }} jours
           </p>
           <button
             class="btn btn-warning btn-sm"
@@ -34,7 +34,7 @@
             Nettoyage des logs audit
           </h4>
           <p class="text-secondary small mb-3">
-            Supprime les entrees audit plus anciennes que {{ settings.auditRetentionDays }} jours
+            Supprime les entrées audit plus anciennes que {{ settings.auditRetentionDays }} jours
           </p>
           <button
             class="btn btn-warning btn-sm"
@@ -86,7 +86,7 @@
             /><path d="M12 9m-6 0a6 6 0 1 0 12 0a6 6 0 1 0 -12 0" /><path d="M12 7v5" /><path d="M12 13v.01" /></svg>
             <h3>Confirmer le nettoyage</h3>
             <div class="text-secondary mb-3">
-              Les metriques plus anciennes que {{ settings.metricsRetentionDays }} jours seront supprimees definitivement.
+              Les métriques plus anciennes que {{ settings.metricsRetentionDays }} jours seront supprimées définitivement.
             </div>
           </div>
           <div class="modal-footer">
@@ -144,7 +144,7 @@
             /><path d="M12 9m-6 0a6 6 0 1 0 12 0a6 6 0 1 0 -12 0" /><path d="M12 7v5" /><path d="M12 13v.01" /></svg>
             <h3>Confirmer le nettoyage</h3>
             <div class="text-secondary mb-3">
-              Les entrees audit plus anciennes que {{ settings.auditRetentionDays }} jours seront supprimees. Cette action est irreversible.
+              Les entrées audit plus anciennes que {{ settings.auditRetentionDays }} jours seront supprimées. Cette action est irréversible.
             </div>
           </div>
           <div class="modal-footer">

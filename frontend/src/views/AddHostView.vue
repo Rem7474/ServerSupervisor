@@ -89,7 +89,7 @@
               </div>
 
               <div class="text-secondary small mb-3">
-                OS et Hostname seront recuperes automatiquement lors de la premiere connexion de l'agent.
+                OS et Hostname seront récupérés automatiquement lors de la première connexion de l'agent.
               </div>
 
               <button
