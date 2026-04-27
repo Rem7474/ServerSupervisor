@@ -107,14 +107,15 @@ func (db *DB) GetLatestMetricsAll() (map[string]*models.SystemMetrics, error) {
 }
 
 // GetRootDiskPercentAll returns the used_percent of the root ("/") mount point for
-// each host, based on the most recent system_metrics row. Hosts with no disk_info
-// row for "/" are omitted from the map.
+// each host, based on the most recent disk_metrics row. Uses disk_metrics (not
+// disk_info) so the value is always current even when Proxmox is the metrics source
+// and InsertMetrics is skipped. Hosts with no disk_metrics row for "/" are omitted.
 func (db *DB) GetRootDiskPercentAll() map[string]float64 {
 	rows, err := db.conn.Query(
-		`SELECT DISTINCT ON (sm.host_id) sm.host_id, di.used_percent
-		 FROM system_metrics sm
-		 JOIN disk_info di ON di.metrics_id = sm.id AND di.mount_point = '/'
-		 ORDER BY sm.host_id, sm.timestamp DESC`,
+		`SELECT DISTINCT ON (host_id) host_id, used_percent
+		 FROM disk_metrics
+		 WHERE mount_point = '/'
+		 ORDER BY host_id, timestamp DESC`,
 	)
 	if err != nil {
 		return map[string]float64{}

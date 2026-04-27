@@ -208,7 +208,7 @@
         <!-- Active viewer -->
         <div
           v-else
-          class="d-flex flex-column h-100"
+          class="d-flex flex-column flex-fill console-viewer"
         >
           <div class="console-header px-3 pt-3 pb-2">
             <div class="d-flex align-items-start justify-content-between mb-2">
@@ -385,6 +385,10 @@ function download() {
 
 <style scoped>
 .console-body {
+  min-height: 0;
+}
+
+.console-viewer {
   min-height: 0;
 }
 
