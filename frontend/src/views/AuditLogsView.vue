@@ -65,140 +65,35 @@
       v-show="activeTab === 'commandes'"
       class="side-layout"
     >
-      <!-- Left: table -->
       <div class="side-main">
-        <div class="card mb-3">
-          <div class="card-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-2">
-            <div>
-              <h3 class="card-title mb-0">
-                Audit Trail
-              </h3>
-              <div class="text-secondary small">
-                {{ commandLogs.length }} commande{{ commandLogs.length > 1 ? 's' : '' }} tracée{{ commandLogs.length > 1 ? 's' : '' }}
-              </div>
-            </div>
-            <div
-              class="btn-group btn-group-sm"
-              role="group"
-            >
-              <button
-                v-for="type in ['all', 'command', 'alert', 'config']"
-                :key="type"
-                class="btn"
-                :class="filterType === type ? 'btn-primary' : 'btn-outline-primary'"
-                @click="filterType = type"
-              >
-                {{ type === 'all' ? 'Tous' : type === 'command' ? 'Commandes' : type === 'alert' ? 'Alertes' : 'Config' }}
-              </button>
-            </div>
-          </div>
-          <div class="card-body p-0">
-            <div
-              v-if="auditLogsLoading"
-              class="p-3"
-            >
-              <LoadingSkeleton
-                variant="list"
-                :lines="4"
-              />
-            </div>
-            <div
-              v-else-if="!filteredLogs.length"
-              class="text-center text-secondary py-4"
-            >
-              Aucun événement d'audit correspondant
-            </div>
-            <div
-              v-else
-              class="timeline timeline-sm px-3 py-3"
-            >
-              <div
-                v-for="log in filteredLogs"
-                :key="log.id"
-                class="timeline-item"
-              >
-                <div
-                  class="timeline-point"
-                  :class="log.type === 'command' ? 'bg-primary' : log.type === 'alert' ? 'bg-warning' : 'bg-secondary'"
-                />
-                <div class="timeline-content">
-                  <div class="d-flex flex-column flex-md-row justify-content-between gap-2">
-                    <div>
-                      <div class="fw-semibold">
-                        {{ log.title || log.action || log.type }}
-                      </div>
-                      <div class="text-secondary small">
-                        {{ log.description || log.message || '—' }}
-                      </div>
-                      <code
-                        v-if="log.type === 'command' && (log.command || log.action)"
-                        class="text-xs d-inline-block mt-1"
-                      >
-                        {{ log.command || log.action }}
-                      </code>
-                    </div>
-                    <div class="text-md-end">
-                      <span
-                        class="badge"
-                        :class="auditStatusClass(log.status)"
-                      >
-                        {{ log.status || log.type }}
-                      </span>
-                      <div class="text-secondary small mt-1">
-                        {{ formatRelativeTime(log.timestamp || log.created_at) }}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
         <DataToolbar
           searchable
           :search="cmdSearch"
-          search-placeholder="Rechercher une commande..."
-          @update:search="cmdSearch = $event"
+          search-placeholder="Rechercher hôte, commande, utilisateur..."
+          @update:search="onSearchUpdate"
         >
           <template #bottom>
             <div class="row g-2">
-              <div class="col-12 col-md-4">
-                <select
-                  v-model="cmdHostFilter"
-                  class="form-select form-select-sm"
-                >
-                  <option value="">
-                    Tous les hôtes
-                  </option>
-                  <option
-                    v-for="h in cmdHosts"
-                    :key="h"
-                    :value="h"
-                  >
-                    {{ h }}
-                  </option>
-                </select>
-              </div>
               <div class="col-6 col-md-4">
                 <select
                   v-model="cmdStatusFilter"
                   class="form-select form-select-sm"
+                  @change="onFilterChange"
                 >
                   <option value="">
                     Tous les états
                   </option>
                   <option value="pending">
-                    pending
+                    En attente
                   </option>
                   <option value="running">
-                    running
+                    En cours
                   </option>
                   <option value="completed">
-                    completed
+                    Terminé
                   </option>
                   <option value="failed">
-                    failed
+                    Échoué
                   </option>
                 </select>
               </div>
@@ -206,6 +101,7 @@
                 <select
                   v-model="cmdModuleFilter"
                   class="form-select form-select-sm"
+                  @change="onFilterChange"
                 >
                   <option value="">
                     Tous les modules
@@ -300,7 +196,7 @@
                     Chargement...
                   </td>
                 </tr>
-                <tr v-else-if="!displayedCmds.length">
+                <tr v-else-if="!sortedCmds.length">
                   <td
                     colspan="8"
                     class="text-center text-secondary py-4"
@@ -309,7 +205,7 @@
                   </td>
                 </tr>
                 <tr
-                  v-for="cmd in displayedCmds"
+                  v-for="cmd in sortedCmds"
                   :key="cmd.id"
                   :class="{ 'table-active': selectedCmd?.id === cmd.id }"
                 >
@@ -334,7 +230,7 @@
                     {{ cmd.triggered_by || '—' }}
                   </td>
                   <td>
-                    <span :class="statusClass(cmd.status)">{{ cmd.status }}</span>
+                    <span :class="statusClass(cmd.status)">{{ statusLabel(cmd.status) }}</span>
                   </td>
                   <td class="text-secondary small">
                     {{ formatDuration(cmd.started_at, cmd.ended_at) }}
@@ -553,15 +449,13 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import apiClient from '../api'
-import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import { useDateFormatter } from '../composables/useDateFormatter'
 import { useStatusBadge } from '../composables/useStatusBadge'
 import { useCommandStream } from '../composables/useCommandStream'
-import { useAuditLogs } from '../composables/useAuditLogs'
 import PaginationNav from '../components/PaginationNav.vue'
 import CommandLogPanel from '../components/CommandLogPanel.vue'
 import DataToolbar from '../components/common/DataToolbar.vue'
@@ -569,21 +463,12 @@ import SortableHeader from '../components/common/SortableHeader.vue'
 
 const { formatLocaleDateTime: formatDate, formatRelativeTime } = useDateFormatter()
 const { getStatusBadgeClass } = useStatusBadge()
-const { auditLogs, isLoading: auditLogsLoading } = useAuditLogs()
 
 const route = useRoute()
 const auth = useAuthStore()
 const canViewCommands = computed(() => auth.role === 'admin' || auth.role === 'operator')
 
 const activeTab = ref('commandes')
-const filterType = ref('all')
-
-const filteredLogs = computed(() => {
-  if (filterType.value === 'all') return auditLogs.value
-  return auditLogs.value.filter((log) => log.type === filterType.value)
-})
-
-const commandLogs = computed(() => auditLogs.value.filter((log) => log.type === 'command'))
 
 // ── Commands history ─────────────────────────────────────────────────────────
 const cmds = ref([])
@@ -595,63 +480,26 @@ const cmdsLoaded = ref(false)
 
 const totalCmdsPages = computed(() => Math.max(1, Math.ceil(cmdsTotal.value / cmdsLimit)))
 const cmdSearch = ref('')
-const cmdHostFilter = ref('')
 const cmdStatusFilter = ref('')
 const cmdModuleFilter = ref('')
 const cmdSortBy = ref('created_at')
 const cmdSortDir = ref('desc')
 
-const cmdHosts = computed(() => {
-  const seen = new Set()
-  return cmds.value
-    .map((c) => c.host_name || c.host_id || '')
-    .filter((h) => {
-      if (!h || seen.has(h)) return false
-      seen.add(h)
-      return true
-    })
-    .sort((a, b) => a.localeCompare(b))
-})
-
-const displayedCmds = computed(() => {
-  const q = cmdSearch.value.trim().toLowerCase()
-  const arr = cmds.value.filter((c) => {
-    const hostName = (c.host_name || c.host_id || '').toLowerCase()
-    const cmdText = cmdLabel(c).toLowerCase()
-    const user = (c.triggered_by || '').toLowerCase()
-
-    const matchSearch = !q || hostName.includes(q) || cmdText.includes(q) || user.includes(q)
-    const matchHost = !cmdHostFilter.value || (c.host_name || c.host_id || '') === cmdHostFilter.value
-    const matchStatus = !cmdStatusFilter.value || c.status === cmdStatusFilter.value
-    const matchModule = !cmdModuleFilter.value || c.module === cmdModuleFilter.value
-    return matchSearch && matchHost && matchStatus && matchModule
-  })
-
+// Client-side sort only (server already returns filtered+paginated, just re-sort current page)
+const sortedCmds = computed(() => {
+  const arr = [...cmds.value]
   const dir = cmdSortDir.value === 'asc' ? 1 : -1
   arr.sort((a, b) => {
     const key = cmdSortBy.value
-    let av
-    let bv
-
     if (key === 'created_at') {
-      av = new Date(a.created_at || 0).getTime()
-      bv = new Date(b.created_at || 0).getTime()
-      if (av < bv) return -1 * dir
-      if (av > bv) return 1 * dir
-      return 0
+      const av = new Date(a.created_at || 0).getTime()
+      const bv = new Date(b.created_at || 0).getTime()
+      return (av < bv ? -1 : av > bv ? 1 : 0) * dir
     }
-
-    if (key === 'command') {
-      av = cmdLabel(a)
-      bv = cmdLabel(b)
-    } else {
-      av = a[key] || ''
-      bv = b[key] || ''
-    }
-
+    const av = key === 'command' ? cmdLabel(a) : (a[key] || '')
+    const bv = key === 'command' ? cmdLabel(b) : (b[key] || '')
     return String(av).toLowerCase().localeCompare(String(bv).toLowerCase()) * dir
   })
-
   return arr
 })
 
@@ -666,6 +514,21 @@ function toggleCmdSort(key) {
   }
   cmdSortBy.value = key
   cmdSortDir.value = key === 'created_at' ? 'desc' : 'asc'
+}
+
+let searchDebounceTimer = null
+function onSearchUpdate(val) {
+  cmdSearch.value = val
+  clearTimeout(searchDebounceTimer)
+  searchDebounceTimer = setTimeout(() => {
+    cmdsPage.value = 1
+    fetchCmds()
+  }, 350)
+}
+
+function onFilterChange() {
+  cmdsPage.value = 1
+  fetchCmds()
 }
 
 // Log viewer
@@ -700,12 +563,23 @@ const MODULE_META = {
   custom:    { label: 'Custom',     cls: 'badge bg-teal-lt text-teal' },
 }
 
+const STATUS_LABELS = {
+  pending:   'En attente',
+  running:   'En cours',
+  completed: 'Terminé',
+  failed:    'Échoué',
+}
+
 function moduleLabel(module) {
   return MODULE_META[module]?.label ?? module
 }
 
 function moduleClass(module) {
   return MODULE_META[module]?.cls ?? 'badge bg-secondary-lt text-secondary'
+}
+
+function statusLabel(status) {
+  return STATUS_LABELS[status] ?? status
 }
 
 function cmdLabel(cmd) {
@@ -725,14 +599,6 @@ function formatDuration(startedAt, endedAt) {
 // ── Status / UA helpers ───────────────────────────────────────────────────────
 function statusClass(status) {
   return getStatusBadgeClass(status, 'badge bg-yellow-lt text-yellow')
-}
-
-function auditStatusClass(status) {
-  const normalized = String(status || '').toLowerCase()
-  if (normalized === 'completed' || normalized === 'success') return 'bg-green-lt text-green'
-  if (normalized === 'failed' || normalized === 'error') return 'bg-red-lt text-red'
-  if (normalized === 'running' || normalized === 'pending') return 'bg-yellow-lt text-yellow'
-  return 'bg-secondary-lt text-secondary'
 }
 
 function parseUA(ua) {
@@ -804,7 +670,12 @@ async function fetchCmds() {
   if (cmdsLoading.value) return
   cmdsLoading.value = true
   try {
-    const res = await apiClient.getCommandsHistory(cmdsPage.value, cmdsLimit)
+    const filters = {
+      search: cmdSearch.value.trim() || undefined,
+      module: cmdModuleFilter.value || undefined,
+      status: cmdStatusFilter.value || undefined,
+    }
+    const res = await apiClient.getCommandsHistory(cmdsPage.value, cmdsLimit, filters)
     const nextCmds = res.data?.commands || []
     cmds.value = nextCmds
     await reconcileCommandStatuses(nextCmds)
@@ -948,6 +819,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  clearTimeout(searchDebounceTimer)
   if (auditPollTimer) {
     clearInterval(auditPollTimer)
     auditPollTimer = null

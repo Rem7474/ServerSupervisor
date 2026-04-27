@@ -204,7 +204,78 @@ type RemoteCommandWithHost struct {
 }
 
 // GetAllRemoteCommands returns paginated remote commands for all hosts, joined with host name.
-func (db *DB) GetAllRemoteCommands(limit, offset int) ([]RemoteCommandWithHost, error) {
+// CommandFilter holds optional server-side filter criteria for GetAllRemoteCommands.
+type CommandFilter struct {
+	Search string // matches host_name, action, target, triggered_by
+	Module string
+	Status string
+}
+
+// buildCommandFilterWhere builds a WHERE+ORDER+LIMIT clause and its args slice.
+// The first two positional args are always LIMIT ($N-1) and OFFSET ($N).
+func buildCommandFilterWhere(f CommandFilter, limit, offset int) (string, []any) {
+	var conds []string
+	var args []any
+
+	if f.Module != "" {
+		args = append(args, f.Module)
+		conds = append(conds, fmt.Sprintf("rc.module = $%d", len(args)))
+	}
+	if f.Status != "" {
+		args = append(args, f.Status)
+		conds = append(conds, fmt.Sprintf("rc.status = $%d", len(args)))
+	}
+	if f.Search != "" {
+		pat := "%" + strings.ToLower(f.Search) + "%"
+		args = append(args, pat)
+		n := len(args)
+		conds = append(conds, fmt.Sprintf(
+			"(LOWER(COALESCE(h.name, rc.host_id)) ILIKE $%d OR LOWER(rc.action) ILIKE $%d OR LOWER(rc.target) ILIKE $%d OR LOWER(rc.triggered_by) ILIKE $%d)",
+			n, n, n, n,
+		))
+	}
+
+	clause := ""
+	if len(conds) > 0 {
+		clause = "WHERE " + strings.Join(conds, " AND ") + " "
+	}
+
+	args = append(args, limit, offset)
+	clause += fmt.Sprintf("ORDER BY rc.created_at DESC LIMIT $%d OFFSET $%d", len(args)-1, len(args))
+	return clause, args
+}
+
+// buildCommandCountWhere builds a WHERE clause (no LIMIT/OFFSET) and args for COUNT queries.
+func buildCommandCountWhere(f CommandFilter) (string, []any) {
+	var conds []string
+	var args []any
+
+	if f.Module != "" {
+		args = append(args, f.Module)
+		conds = append(conds, fmt.Sprintf("rc.module = $%d", len(args)))
+	}
+	if f.Status != "" {
+		args = append(args, f.Status)
+		conds = append(conds, fmt.Sprintf("rc.status = $%d", len(args)))
+	}
+	if f.Search != "" {
+		pat := "%" + strings.ToLower(f.Search) + "%"
+		args = append(args, pat)
+		n := len(args)
+		conds = append(conds, fmt.Sprintf(
+			"(LOWER(COALESCE(h.name, rc.host_id)) ILIKE $%d OR LOWER(rc.action) ILIKE $%d OR LOWER(rc.target) ILIKE $%d OR LOWER(rc.triggered_by) ILIKE $%d)",
+			n, n, n, n,
+		))
+	}
+
+	if len(conds) == 0 {
+		return "", args
+	}
+	return "WHERE " + strings.Join(conds, " AND "), args
+}
+
+func (db *DB) GetAllRemoteCommands(limit, offset int, f CommandFilter) ([]RemoteCommandWithHost, error) {
+	where, args := buildCommandFilterWhere(f, limit, offset)
 	rows, err := db.conn.Query(`
 		SELECT rc.id, rc.host_id, rc.module, rc.action, rc.target, rc.payload,
 		       rc.status, rc.output, rc.triggered_by, rc.audit_log_id,
@@ -212,9 +283,8 @@ func (db *DB) GetAllRemoteCommands(limit, offset int) ([]RemoteCommandWithHost, 
 		       COALESCE(h.name, rc.host_id) AS host_name
 		FROM remote_commands rc
 		LEFT JOIN hosts h ON h.id = rc.host_id
-		ORDER BY rc.created_at DESC
-		LIMIT $1 OFFSET $2`,
-		limit, offset,
+		`+where,
+		args...,
 	)
 	if err != nil {
 		return nil, err
@@ -262,10 +332,15 @@ func (db *DB) CreateCompletedRemoteCommand(hostID, module, action, target, outpu
 	return err
 }
 
-// CountAllRemoteCommands returns the total number of remote commands.
-func (db *DB) CountAllRemoteCommands() (int64, error) {
+// CountAllRemoteCommands returns the total number of remote commands matching the filter.
+func (db *DB) CountAllRemoteCommands(f CommandFilter) (int64, error) {
+	where, args := buildCommandCountWhere(f)
+	q := `SELECT COUNT(*) FROM remote_commands rc LEFT JOIN hosts h ON h.id = rc.host_id`
+	if where != "" {
+		q += " " + where
+	}
 	var count int64
-	err := db.conn.QueryRow(`SELECT COUNT(*) FROM remote_commands`).Scan(&count)
+	err := db.conn.QueryRow(q, args...).Scan(&count)
 	return count, err
 }
 

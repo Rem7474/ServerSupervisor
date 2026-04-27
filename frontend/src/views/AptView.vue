@@ -63,8 +63,7 @@
               </div>
               <select
                 v-model="hostSortKey"
-                class="form-select form-select-sm"
-                style="width: auto;"
+                class="form-select form-select-sm sort-select"
               >
                 <option value="name">
                   Trier par nom
@@ -225,8 +224,8 @@
                       </div>
                     </div>
                     <span :class="host.status === 'online' ? 'status status-lime' : 'status status-red'">
-                      <span class="status-dot status-dot-animated" />
-                      <span :data-translation-id="host.status === 'online' ? 'online' : 'offline'">{{ host.status === 'online' ? 'En ligne' : 'Hors ligne' }}</span>
+                      <span :class="['status-dot', host.status === 'online' ? 'status-dot-animated' : '']" />
+                      <span>{{ host.status === 'online' ? 'En ligne' : 'Hors ligne' }}</span>
                     </span>
                     <div class="d-flex align-items-center gap-2">
                       <button
@@ -311,10 +310,10 @@
                         {{ aptStatuses[host.id].security_updates }} sécurité
                       </span>
                       <span class="badge bg-secondary-lt text-secondary">
-                        update: {{ formatDate(aptStatuses[host.id].last_update) }}
+                        Màj: {{ formatDate(aptStatuses[host.id].last_update) }}
                       </span>
                       <span class="badge bg-secondary-lt text-secondary">
-                        upgrade: {{ formatDate(aptStatuses[host.id].last_upgrade) }}
+                        Upgrade: {{ formatDate(aptStatuses[host.id].last_upgrade) }}
                       </span>
                     </template>
                   </div>
@@ -354,8 +353,7 @@
                       <span
                         v-for="pkg in (packagesShowAll[host.id] ? getPackages(aptStatuses[host.id]) : getPackages(aptStatuses[host.id]).slice(0, 12))"
                         :key="pkg"
-                        class="badge bg-blue-lt text-blue"
-                        style="font-family: monospace; font-size: 0.72rem;"
+                        class="badge bg-blue-lt text-blue apt-pkg-badge"
                       >{{ pkg }}</span>
                       <button
                         v-if="getPackages(aptStatuses[host.id]).length > 12 && !packagesShowAll[host.id]"
@@ -394,7 +392,7 @@
                             <span
                               :class="statusClass(cmd.status)"
                               class="flex-shrink-0"
-                            >{{ cmd.status }}</span>
+                            >{{ statusLabel(cmd.status) }}</span>
                             <span class="text-secondary flex-shrink-0">{{ formatDuration(cmd.started_at, cmd.ended_at) }}</span>
                             <span class="text-secondary text-truncate">
                               {{ formatDate(cmd.created_at) }}
@@ -454,8 +452,7 @@
               <!-- Filtre hôte -->
               <select
                 v-model="historyHostFilter"
-                class="form-select form-select-sm"
-                style="min-width: 160px;"
+                class="form-select form-select-sm history-host-select"
                 @change="resetHistoryPage"
               >
                 <option value="all">
@@ -524,7 +521,7 @@
                   <td class="text-secondary">
                     {{ cmd.triggered_by || '—' }}
                   </td>
-                  <td><span :class="statusClass(cmd.status)">{{ cmd.status }}</span></td>
+                  <td><span :class="statusClass(cmd.status)">{{ statusLabel(cmd.status) }}</span></td>
                   <td class="text-secondary small">
                     {{ formatDuration(cmd.started_at, cmd.ended_at) }}
                   </td>
@@ -585,9 +582,8 @@
     <!-- Schedule APT modal -->
     <div
       v-if="scheduleModal.open"
-      class="modal modal-blur show d-block"
+      class="modal modal-blur show d-block modal-overlay"
       tabindex="-1"
-      style="background:rgba(0,0,0,.5);z-index:1050"
       @click.self="scheduleModal.open = false"
     >
       <div class="modal-dialog modal-dialog-centered">
@@ -697,8 +693,7 @@
 
     <div
       v-if="bulkActionFeedback"
-      class="position-fixed bottom-0 end-0 p-3"
-      style="z-index: 1100;"
+      class="position-fixed bottom-0 end-0 p-3 toast-overlay"
     >
       <div
         class="toast show align-items-center border-0"
@@ -1185,6 +1180,17 @@ function formatDuration(startedAt, endedAt) {
   return seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`
 }
 
+const STATUS_LABELS = {
+  pending:   'En attente',
+  running:   'En cours',
+  completed: 'Terminé',
+  failed:    'Échoué',
+}
+
+function statusLabel(status) {
+  return STATUS_LABELS[status] ?? status
+}
+
 function statusClass(status) {
   return getStatusBadgeClass(status, 'badge bg-yellow-lt text-yellow')
 }
@@ -1200,3 +1206,11 @@ onUnmounted(() => {
   closeStreamSocket()
 })
 </script>
+
+<style scoped>
+.sort-select { width: auto; }
+.history-host-select { min-width: 160px; }
+.apt-pkg-badge { font-family: monospace; font-size: 0.72rem; }
+.modal-overlay { background: rgba(0,0,0,.5); z-index: 1050; }
+.toast-overlay { z-index: 1100; }
+</style>

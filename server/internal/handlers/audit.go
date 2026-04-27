@@ -135,12 +135,18 @@ func (h *AuditHandler) GetCommandsHistory(c *gin.Context) {
 	}
 	offset := (page - 1) * limit
 
-	cmds, err := h.db.GetAllRemoteCommands(limit, offset)
+	f := database.CommandFilter{
+		Search: c.Query("search"),
+		Module: c.Query("module"),
+		Status: c.Query("status"),
+	}
+
+	cmds, err := h.db.GetAllRemoteCommands(limit, offset, f)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch commands history"})
 		return
 	}
-	total, _ := h.db.CountAllRemoteCommands()
+	total, _ := h.db.CountAllRemoteCommands(f)
 	if cmds == nil {
 		cmds = []database.RemoteCommandWithHost{}
 	}
