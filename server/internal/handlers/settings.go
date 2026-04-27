@@ -15,10 +15,6 @@ import (
 	"github.com/serversupervisor/server/internal/database"
 )
 
-// LatestAgentVersion is the current agent release version.
-// Update this constant when cutting a new agent release.
-const LatestAgentVersion = "1.3.0"
-
 type SettingsHandler struct {
 	db  *database.DB
 	cfg *config.Config
@@ -31,6 +27,7 @@ func NewSettingsHandler(db *database.DB, cfg *config.Config) *SettingsHandler {
 // GetSettings returns system configuration and database status
 func (h *SettingsHandler) GetSettings(c *gin.Context) {
 	dbStatus := h.getDatabaseStatus()
+	latestAgentVersion := resolveLatestAgentVersion(h.cfg)
 
 	response := gin.H{
 		"settings": gin.H{
@@ -50,7 +47,7 @@ func (h *SettingsHandler) GetSettings(c *gin.Context) {
 			"smtpTls":              h.cfg.SMTPTLS,
 			"ntfyUrl":              h.cfg.NotifyURL,
 			"githubToken":          h.cfg.GitHubToken,
-			"latestAgentVersion":   LatestAgentVersion,
+			"latestAgentVersion":   latestAgentVersion,
 		},
 		"dbStatus": dbStatus,
 	}

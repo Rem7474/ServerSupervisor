@@ -152,7 +152,9 @@ func (h *HostHandler) TriggerAgentUpdate(c *gin.Context) {
 		return
 	}
 
-	if host.AgentVersion != "" && host.AgentVersion == LatestAgentVersion {
+	latestAgentVersion := resolveLatestAgentVersion(h.cfg)
+
+	if host.AgentVersion != "" && host.AgentVersion == latestAgentVersion {
 		c.JSON(http.StatusConflict, gin.H{"error": "agent is already up to date"})
 		return
 	}
@@ -166,7 +168,7 @@ func (h *HostHandler) TriggerAgentUpdate(c *gin.Context) {
 		}
 	}
 
-	payload, err := json.Marshal(gin.H{"version": LatestAgentVersion})
+	payload, err := json.Marshal(gin.H{"version": latestAgentVersion})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to build update payload"})
 		return
@@ -188,7 +190,7 @@ func (h *HostHandler) TriggerAgentUpdate(c *gin.Context) {
 			Action:    "agent_update",
 			HostID:    hostID,
 			IPAddress: c.ClientIP(),
-			Details:   "agent update to v" + LatestAgentVersion,
+			Details:   "agent update to v" + latestAgentVersion,
 		},
 	})
 	if err != nil {
@@ -199,7 +201,7 @@ func (h *HostHandler) TriggerAgentUpdate(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"command_id":     result.Command.ID,
 		"status":         "pending",
-		"target_version": LatestAgentVersion,
+		"target_version": latestAgentVersion,
 	})
 }
 
@@ -274,7 +276,7 @@ func (h *HostHandler) GetHostComplete(c *gin.Context) {
 		"disk_metrics":         diskMetrics,
 		"disk_health":          diskHealth,
 		"command_history":      cmdHistory,
-		"latest_agent_version": LatestAgentVersion,
+		"latest_agent_version": resolveLatestAgentVersion(h.cfg),
 	})
 }
 
