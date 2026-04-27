@@ -332,7 +332,36 @@ function statusClass(status) {
   return getStatusBadgeClass(status, 'badge bg-yellow-lt text-yellow')
 }
 
-const outputText = computed(() => props.command?.output || 'Aucune sortie disponible.')
+function processCarriageReturns(text) {
+  const lines = []
+  let currentLine = ''
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i]
+    if (ch === '\r') {
+      if (i + 1 < text.length && text[i + 1] === '\n') {
+        lines.push(currentLine)
+        currentLine = ''
+        i++
+      } else {
+        // carriage return alone: go back to start of current line (overwrite)
+        currentLine = ''
+      }
+    } else if (ch === '\n') {
+      lines.push(currentLine)
+      currentLine = ''
+    } else {
+      currentLine += ch
+    }
+  }
+  if (currentLine) lines.push(currentLine)
+  return lines.join('\n')
+}
+
+const outputText = computed(() => {
+  const raw = props.command?.output
+  if (!raw) return 'Aucune sortie disponible.'
+  return processCarriageReturns(raw)
+})
 
 // Scroll to bottom whenever output changes
 watch(outputText, () => {

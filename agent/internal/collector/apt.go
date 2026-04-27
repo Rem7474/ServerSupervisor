@@ -136,39 +136,49 @@ func ExecuteAptCommand(command string) (string, error) {
 	return ExecuteAptCommandWithStreaming(command, nil)
 }
 
-// ExecuteAptCommandWithStreaming runs an apt-get command with real-time output streaming
-// streamCallback is called for each chunk of output (can be nil)
-func ExecuteAptCommandWithStreaming(command string, streamCallback func(chunk string)) (string, error) {
+func newAptGetCmd(command string) (*exec.Cmd, error) {
 	var cmd *exec.Cmd
 	switch command {
 	case "update":
 		cmd = exec.Command("apt-get", "update")
 	case "upgrade":
-		cmd = exec.Command("apt-get", "upgrade", "-y", "-qq", "-o", "Dpkg::Options::=--force-confold")
+		cmd = exec.Command("apt-get", "upgrade", "-y", "-q", "-o", "Dpkg::Options::=--force-confold")
 	case "dist-upgrade":
-		cmd = exec.Command("apt-get", "dist-upgrade", "-y", "-qq", "-o", "Dpkg::Options::=--force-confold")
+		cmd = exec.Command("apt-get", "dist-upgrade", "-y", "-q", "-o", "Dpkg::Options::=--force-confold")
 	default:
-		return "", fmt.Errorf("unknown apt command: %s", command)
+		return nil, fmt.Errorf("unknown apt command: %s", command)
 	}
-
-	// Set non-interactive environment for unattended operation
 	cmd.Env = append(os.Environ(), "DEBIAN_FRONTEND=noninteractive")
+	return cmd, nil
+}
+
+// ExecuteAptCommandWithStreaming runs an apt-get command with real-time output streaming
+// streamCallback is called for each chunk of output (can be nil)
+func ExecuteAptCommandWithStreaming(command string, streamCallback func(chunk string)) (string, error) {
+	cmd, err := newAptGetCmd(command)
+	if err != nil {
+		return "", err
+	}
 
 	log.Printf("Executing: apt-get %s -y", command)
 
-	output, err := runCommandWithStreaming(cmd, streamCallback, aptCommandIdleTimeout)
-	if err != nil && isDpkgInterruptedError(output, err) {
+	output, runErr := runCommandWithStreaming(cmd, streamCallback, aptCommandIdleTimeout)
+	if runErr != nil && isDpkgInterruptedError(output, runErr) {
 		log.Printf("apt-get %s reported interrupted dpkg state, running dpkg --configure -a before retrying", command)
 		repairOutput, repairErr := runDpkgConfigureAll(streamCallback)
 		if repairErr != nil {
-			return output, fmt.Errorf("apt-get %s failed: %w\nOutput: %s\nRecovery dpkg --configure -a failed: %v\nRecovery output: %s", command, err, output, repairErr, repairOutput)
+			return output, fmt.Errorf("apt-get %s failed: %w\nOutput: %s\nRecovery dpkg --configure -a failed: %v\nRecovery output: %s", command, runErr, output, repairErr, repairOutput)
 		}
-
-		output, err = runCommandWithStreaming(cmd, streamCallback, aptCommandIdleTimeout)
+		// Rebuild the command: *exec.Cmd cannot be reused after Start()/Wait()
+		cmd, err = newAptGetCmd(command)
+		if err != nil {
+			return output, fmt.Errorf("apt-get %s retry setup failed: %w", command, err)
+		}
+		output, runErr = runCommandWithStreaming(cmd, streamCallback, aptCommandIdleTimeout)
 	}
 
-	if err != nil {
-		return output, fmt.Errorf("apt-get %s failed: %w\nOutput: %s", command, err, output)
+	if runErr != nil {
+		return output, fmt.Errorf("apt-get %s failed: %w\nOutput: %s", command, runErr, output)
 	}
 
 	log.Printf("apt-get %s completed successfully", command)
