@@ -124,7 +124,6 @@ func main() {
 	log.Printf("Report interval: %ds", cfg.ReportInterval)
 	log.Printf("Docker monitoring: %v", cfg.CollectDocker)
 	log.Printf("APT monitoring: %v", cfg.CollectAPT)
-	log.Printf("APT auto-update on start: %v", cfg.AptAutoUpdateOnStart)
 	log.Printf("SMART monitoring: %v", cfg.CollectSMART)
 	log.Printf("CPU temperature monitoring: %v", cfg.CollectCPUTemperature)
 	log.Printf("Web logs analytics: %v (paths: %v)", cfg.CollectWebLogs, cfg.WebLogGlobs())
@@ -164,11 +163,6 @@ func main() {
 
 	// Run first report immediately
 	sendReport(ctx, cfg, s)
-
-	// Perform initial APT status collection with CVE extraction (only once at startup)
-	if cfg.CollectAPT {
-		go initialAptCollection(ctx, cfg, s)
-	}
 
 	// Start periodic reporting
 	ticker := time.NewTicker(time.Duration(cfg.ReportInterval) * time.Second)
@@ -819,79 +813,3 @@ func executeCustomTask(ctx context.Context, s *sender.Sender, cmd sender.Pending
 	}
 }
 
-// initialAptCollection performs a full APT status check with CVE extraction at startup
-func initialAptCollection(ctx context.Context, cfg *config.Config, s *sender.Sender) {
-	// Wait a bit to avoid overwhelming the system at startup; exit early on shutdown.
-	select {
-	case <-time.After(5 * time.Second):
-	case <-ctx.Done():
-		return
-	}
-
-	var aptUpdateOutput string
-	var aptUpdateErr error
-
-	if cfg.AptAutoUpdateOnStart {
-		log.Println("Performing initial APT update (apt_auto_update_on_start=true)...")
-		aptUpdateOutput, aptUpdateErr = executeAptUpdate()
-		status := "completed"
-		if aptUpdateErr != nil {
-			status = "failed"
-			log.Printf("Warning: Initial apt update failed: %v", aptUpdateErr)
-		} else {
-			log.Println("Initial apt update completed successfully")
-		}
-		// Log the command immediately — independently of the APT status report below.
-		logAptAction(ctx, s, "update", status, aptUpdateOutput)
-	}
-
-	log.Println("Performing APT status collection with CVE extraction...")
-	apt, err := collector.CollectAPT(true) // true = extract CVE
-	if err != nil {
-		log.Printf("Initial APT collection failed: %v", err)
-		return
-	}
-
-	log.Printf("Initial APT status: %d packages, %d security updates",
-		apt.PendingPackages, apt.SecurityUpdates)
-
-	// Send updated APT status to server (best-effort)
-	report := &sender.Report{
-		AgentVersion: Version,
-		Metrics:      nil, // Skip metrics in this report
-		Docker:       nil, // Skip docker in this report
-		AptStatus:    apt,
-		Timestamp:    time.Now(),
-	}
-
-	if _, err := s.SendReportWithRetry(ctx, report); err != nil {
-		log.Printf("Failed to send initial APT status: %v", err)
-	} else {
-		log.Println("Initial APT status with CVE sent successfully")
-	}
-}
-
-// executeAptUpdate runs apt update command, logs real output and returns it
-func executeAptUpdate() (string, error) {
-	cmd := exec.Command("apt", "update")
-	output, err := cmd.CombinedOutput()
-	outputStr := string(output)
-	if len(output) > 0 {
-		log.Printf("[apt update]\n%s", outputStr)
-	}
-	if err != nil {
-		return outputStr, fmt.Errorf("apt update failed: %w", err)
-	}
-	return outputStr, nil
-}
-
-// logAptAction sends an audit log entry for APT actions to the server.
-// module="apt" tells the server to also create a remote_command record so the
-// action appears in the unified commands history (Audit → Commandes tab).
-func logAptAction(ctx context.Context, s *sender.Sender, action, status, message string) {
-	log.Printf("APT Action: %s [%s] - %s", action, status, message)
-
-	if err := s.SendAuditLog(ctx, "apt", action, status, message); err != nil {
-		log.Printf("Warning: Failed to send audit log: %v", err)
-	}
-}
