@@ -13,11 +13,10 @@
           <button
             class="navbar-toggler"
             type="button"
-            data-bs-toggle="collapse"
-            data-bs-target="#navbar-menu"
             aria-label="Ouvrir le menu de navigation"
             aria-controls="navbar-menu"
-            aria-expanded="false"
+            :aria-expanded="navbarOpen"
+            @click="navbarOpen = !navbarOpen"
           >
             <span class="navbar-toggler-icon" />
           </button>
@@ -34,7 +33,7 @@
 
           <div
             id="navbar-menu"
-            class="collapse navbar-collapse"
+            :class="['collapse navbar-collapse', { show: navbarOpen }]"
           >
             <ul class="navbar-nav">
               <!-- Badge hôtes hors ligne -->
@@ -526,6 +525,7 @@ const auth = useAuthStore()
 const hostsStore = useHostsStore()
 const router = useRouter()
 const route = useRoute()
+const navbarOpen = ref(false)
 const userMenuOpen = ref(false)
 const userMenuRef = ref(null)
 const secondaryMenuOpen = ref(false)
@@ -641,15 +641,10 @@ onMounted(() => {
   document.addEventListener('click', handleOutsideClick, true)
   // Auto-close all menus after navigation
   router.afterEach(() => {
+    navbarOpen.value = false
     secondaryMenuOpen.value = false
     adminMenuOpen.value = false
     userMenuOpen.value = false
-    const el = document.getElementById('navbar-menu')
-    if (el?.classList.contains('show')) {
-      el.classList.remove('show')
-      const toggler = document.querySelector('.navbar-toggler[data-bs-target="#navbar-menu"]')
-      if (toggler) toggler.setAttribute('aria-expanded', 'false')
-    }
   })
 })
 
