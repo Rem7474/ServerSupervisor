@@ -23,13 +23,12 @@ type crowdSecAPIDecision struct {
 	ID        int    `json:"id"`
 	CreatedAt string `json:"created_at"`
 	UpdatedAt string `json:"updated_at"`
-	Value     string `json:"value"`    // IP address
-	Type      string `json:"type"`     // "ip", "range", etc.
-	Scope     string `json:"scope"`    // "Ip", "Range", etc.
-	Origin    string `json:"origin"`   // "crowdsec", "cscli", etc.
-	Until     string `json:"until"`    // Expiration time in RFC3339 format
-	Reason    string `json:"reason"`   // Scenario/reason, e.g., "attack:web/cvi"
-	Duration  string `json:"duration"` // e.g., "72h", "-1s" (permanent)
+	Value    string `json:"value"`    // IP address or range
+	Type     string `json:"type"`     // remediation type: "ban", "captcha", etc.
+	Scope    string `json:"scope"`    // "Ip", "Range", "Country", etc.
+	Origin   string `json:"origin"`   // "crowdsec", "cscli", etc.
+	Scenario string `json:"scenario"` // scenario name, e.g., "crowdsecurity/http-bad-user-agent"
+	Duration string `json:"duration"` // remaining duration, e.g., "3h45m23s"
 }
 
 // CollectCrowdSecDecisions queries the CrowdSec Local API and returns a map of IP -> decision.
@@ -86,38 +85,24 @@ func CollectCrowdSecDecisions(connectionString, apiKey string, verbose bool) (ma
 	// Convert to our format
 	now := time.Now()
 	for _, d := range decisions {
-		// Only process "ip" type decisions that are currently active
-		if d.Type != "ip" || d.Scope == "" || d.Value == "" {
+		// Only process IP-scope decisions with a value
+		if (d.Scope != "Ip" && d.Scope != "Range") || d.Value == "" {
 			continue
 		}
 
-		// Parse expiration time (CrowdSec provides RFC3339)
+		// CrowdSec returns remaining duration (e.g. "3h45m23s"), compute absolute expiry
 		blockedUntil := time.Time{}
-		if d.Until != "" {
-			if ut, err := time.Parse(time.RFC3339, d.Until); err == nil {
-				blockedUntil = ut
+		if d.Duration != "" {
+			if dur, err := time.ParseDuration(d.Duration); err == nil && dur > 0 {
+				blockedUntil = now.Add(dur)
 			}
-		}
-
-		// Parse creation time to get blocked_at
-		blockedAt := time.Time{}
-		if d.CreatedAt != "" {
-			if ct, err := time.Parse(time.RFC3339, d.CreatedAt); err == nil {
-				blockedAt = ct
-			}
-		}
-
-		// Determine if still active (has not expired yet)
-		isActive := blockedUntil.IsZero() || blockedUntil.After(now)
-		if !isActive {
-			continue
 		}
 
 		result[d.Value] = CrowdSecDecision{
 			IP:           d.Value,
 			Blocked:      true,
-			Reason:       d.Reason,
-			BlockedAt:    blockedAt,
+			Reason:       d.Scenario,
+			BlockedAt:    time.Time{},
 			BlockedUntil: blockedUntil,
 		}
 	}
