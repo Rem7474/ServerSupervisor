@@ -26,7 +26,8 @@ type Report struct {
 	Capabilities    interface{} `json:"capabilities"` // Agent collector status (docker, smart, cpu_temp, web_logs, etc.)
 	Metrics         interface{} `json:"metrics"`
 	Docker          interface{} `json:"docker"`
-	AptStatus       interface{} `json:"apt_status"`
+	AptStatus            interface{} `json:"apt_status"`
+	UnattendedUpgrades   interface{} `json:"unattended_upgrades,omitempty"`
 	WebLogs         interface{} `json:"web_logs,omitempty"`
 	DockerNetworks  interface{} `json:"docker_networks,omitempty"`  // Network topology data
 	ContainerEnvs   interface{} `json:"container_envs,omitempty"`   // Container environment variables

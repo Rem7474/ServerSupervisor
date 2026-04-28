@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"encoding/json"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/serversupervisor/server/internal/config"
@@ -91,4 +93,171 @@ func (h *AptHandler) GetAptStatus(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, status)
+}
+
+// ========== Unattended-Upgrades handlers ==========
+
+// GetUUStatus returns the unattended-upgrades status for a host.
+func (h *AptHandler) GetUUStatus(c *gin.Context) {
+	hostID := c.Param("id")
+	s, err := h.db.GetUUStatus(hostID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, s)
+}
+
+// GetUURuns returns the upgrade run history for a host.
+func (h *AptHandler) GetUURuns(c *gin.Context) {
+	hostID := c.Param("id")
+	limit := 20
+	if v := c.Query("limit"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			limit = n
+		}
+	}
+	runs, err := h.db.GetUURuns(hostID, limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if runs == nil {
+		runs = []models.UURun{}
+	}
+	c.JSON(http.StatusOK, runs)
+}
+
+// ConfigureUU applies a configuration update and/or enable/disable to unattended-upgrades.
+// Dispatches configure_uu and optionally toggle_uu commands to the agent.
+func (h *AptHandler) ConfigureUU(c *gin.Context) {
+	hostID := c.Param("id")
+	if !requireHostAccess(c, h.db, hostID, "operator") {
+		return
+	}
+
+	var req models.UnattendedUpgradesConfigureRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	username := c.GetString("username")
+	if username == "" {
+		username = "unknown"
+	}
+
+	cfgPayload, err := json.Marshal(req.Config)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to encode config"})
+		return
+	}
+
+	var commandIDs []string
+
+	// Dispatch configure_uu
+	r, err := h.dispatcher.Create(dispatch.Request{
+		HostID:      hostID,
+		Module:      "apt",
+		Action:      "configure_uu",
+		Payload:     string(cfgPayload),
+		TriggeredBy: username,
+		Audit: &dispatch.AuditLogRequest{
+			Username:  username,
+			Action:    "uu_configure",
+			HostID:    hostID,
+			IPAddress: c.ClientIP(),
+			Details:   "configure unattended-upgrades",
+		},
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	commandIDs = append(commandIDs, r.Command.ID)
+
+	// Dispatch toggle_uu to enable or disable the service
+	target := "disable"
+	if req.Enabled {
+		target = "enable"
+	}
+	r2, err := h.dispatcher.Create(dispatch.Request{
+		HostID:      hostID,
+		Module:      "apt",
+		Action:      "toggle_uu",
+		Target:      target,
+		Payload:     "{}",
+		TriggeredBy: username,
+	})
+	if err == nil {
+		commandIDs = append(commandIDs, r2.Command.ID)
+	}
+
+	c.JSON(http.StatusOK, gin.H{"command_ids": commandIDs, "status": "pending"})
+}
+
+// InstallUU dispatches an apt-get install unattended-upgrades command to the agent.
+func (h *AptHandler) InstallUU(c *gin.Context) {
+	hostID := c.Param("id")
+	if !requireHostAccess(c, h.db, hostID, "operator") {
+		return
+	}
+
+	username := c.GetString("username")
+	if username == "" {
+		username = "unknown"
+	}
+
+	r, err := h.dispatcher.Create(dispatch.Request{
+		HostID:      hostID,
+		Module:      "apt",
+		Action:      "install_uu",
+		Payload:     "{}",
+		TriggeredBy: username,
+		Audit: &dispatch.AuditLogRequest{
+			Username:  username,
+			Action:    "uu_install",
+			HostID:    hostID,
+			IPAddress: c.ClientIP(),
+			Details:   "install unattended-upgrades",
+		},
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"command_id": r.Command.ID, "status": "pending"})
+}
+
+// RunUUNow dispatches a manual unattended-upgrade run to the agent.
+func (h *AptHandler) RunUUNow(c *gin.Context) {
+	hostID := c.Param("id")
+	if !requireHostAccess(c, h.db, hostID, "operator") {
+		return
+	}
+
+	username := c.GetString("username")
+	if username == "" {
+		username = "unknown"
+	}
+
+	r, err := h.dispatcher.Create(dispatch.Request{
+		HostID:      hostID,
+		Module:      "apt",
+		Action:      "run_uu",
+		Payload:     "{}",
+		TriggeredBy: username,
+		Audit: &dispatch.AuditLogRequest{
+			Username:  username,
+			Action:    "uu_run",
+			HostID:    hostID,
+			IPAddress: c.ClientIP(),
+			Details:   "manual unattended-upgrade run",
+		},
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"command_id": r.Command.ID, "status": "pending"})
 }

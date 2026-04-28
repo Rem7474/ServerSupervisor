@@ -5,7 +5,7 @@
   >
     <div class="card-header d-flex align-items-center justify-content-between">
       <h3 class="card-title">
-        APT - Mises a jour systeme
+        APT - Mises à jour système
       </h3>
       <div
         v-if="canRunApt"
@@ -113,6 +113,220 @@
       Données APT non disponibles pour cet hôte.
     </div>
   </div>
+
+  <!-- Unattended-upgrades card -->
+  <div class="card mt-3">
+    <div class="card-header d-flex align-items-center justify-content-between">
+      <h3 class="card-title mb-0">
+        Mises à jour automatiques
+      </h3>
+      <div
+        v-if="uuStatus"
+        class="d-flex align-items-center gap-2"
+      >
+        <span
+          v-if="!uuStatus.installed"
+          class="badge bg-secondary"
+        >Non installé</span>
+        <template v-else>
+          <span
+            class="badge"
+            :class="uuStatus.enabled ? 'bg-green' : 'bg-secondary'"
+          >{{ uuStatus.enabled ? 'Activé' : 'Désactivé' }}</span>
+          <span
+            v-if="uuStatus.reboot_required"
+            class="badge bg-orange"
+          >Redémarrage requis</span>
+        </template>
+      </div>
+    </div>
+    <div class="card-body">
+      <!-- Not installed -->
+      <div
+        v-if="uuStatus && !uuStatus.installed"
+        class="d-flex align-items-center gap-3"
+      >
+        <span class="text-secondary">unattended-upgrades n'est pas installé sur cet hôte.</span>
+        <button
+          v-if="canRunApt"
+          class="btn btn-sm btn-primary"
+          :disabled="uuLoading"
+          @click="$emit('uu-install')"
+        >
+          <span
+            v-if="uuLoading === 'install'"
+            class="spinner-border spinner-border-sm me-1"
+          />
+          Installer
+        </button>
+      </div>
+
+      <!-- Installed -->
+      <div v-else-if="uuStatus && uuStatus.installed">
+        <!-- Last run info -->
+        <div
+          v-if="uuStatus.last_run_at"
+          class="mb-3 text-secondary small"
+        >
+          Dernière exécution : <strong>{{ formatDate(uuStatus.last_run_at) }}</strong>
+          — {{ uuStatus.last_run_packages }} paquet(s) installé(s)
+        </div>
+        <div
+          v-else
+          class="mb-3 text-secondary small"
+        >
+          Aucune exécution enregistrée.
+        </div>
+
+        <!-- Config form -->
+        <div
+          v-if="canRunApt && uuForm"
+          class="row g-3 mb-3"
+        >
+          <!-- Enable toggle -->
+          <div class="col-12">
+            <label class="form-check form-switch">
+              <input
+                v-model="uuForm.enabled"
+                class="form-check-input"
+                type="checkbox"
+              >
+              <span class="form-check-label fw-semibold">Activé</span>
+            </label>
+          </div>
+          <!-- Config options (only meaningful when enabled) -->
+          <div class="col-md-6">
+            <label class="form-check">
+              <input
+                v-model="uuForm.config.security_only"
+                class="form-check-input"
+                type="checkbox"
+              >
+              <span class="form-check-label">Sécurité uniquement</span>
+            </label>
+          </div>
+          <div class="col-md-6">
+            <label class="form-check">
+              <input
+                v-model="uuForm.config.remove_unused"
+                class="form-check-input"
+                type="checkbox"
+              >
+              <span class="form-check-label">Supprimer les dépendances inutilisées</span>
+            </label>
+          </div>
+          <div class="col-md-6">
+            <label class="form-check">
+              <input
+                v-model="uuForm.config.auto_reboot"
+                class="form-check-input"
+                type="checkbox"
+              >
+              <span class="form-check-label">Redémarrage automatique</span>
+            </label>
+          </div>
+          <div
+            v-if="uuForm.config.auto_reboot"
+            class="col-md-6"
+          >
+            <label class="form-label small mb-1">Heure de redémarrage</label>
+            <input
+              v-model="uuForm.config.auto_reboot_time"
+              type="time"
+              class="form-control form-control-sm"
+              style="max-width:120px"
+            >
+          </div>
+          <!-- Actions -->
+          <div class="col-12 d-flex gap-2">
+            <button
+              class="btn btn-sm btn-primary"
+              :disabled="uuLoading === 'configure'"
+              @click="$emit('uu-configure', uuForm)"
+            >
+              <span
+                v-if="uuLoading === 'configure'"
+                class="spinner-border spinner-border-sm me-1"
+              />
+              Enregistrer
+            </button>
+            <button
+              class="btn btn-sm btn-outline-secondary"
+              :disabled="!!uuLoading"
+              @click="$emit('uu-run-now')"
+            >
+              <span
+                v-if="uuLoading === 'run'"
+                class="spinner-border spinner-border-sm me-1"
+              />
+              Lancer maintenant
+            </button>
+          </div>
+        </div>
+
+        <!-- Run history -->
+        <div v-if="uuRuns && uuRuns.length > 0">
+          <div class="fw-semibold small mb-2">
+            Historique des upgrades automatiques
+          </div>
+          <div class="table-responsive">
+            <table class="table table-sm table-vcenter">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Paquets</th>
+                  <th>Statut</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="run in uuRuns"
+                  :key="run.run_at"
+                >
+                  <td class="text-nowrap small">
+                    {{ formatDate(run.run_at) }}
+                  </td>
+                  <td class="small">
+                    <span
+                      v-if="run.packages && run.packages.length"
+                      :title="run.packages.join(', ')"
+                    >
+                      {{ run.packages.slice(0, 3).join(', ') }}
+                      <span v-if="run.packages.length > 3">… (+{{ run.packages.length - 3 }})</span>
+                    </span>
+                    <span
+                      v-else
+                      class="text-secondary"
+                    >Aucun</span>
+                  </td>
+                  <td>
+                    <span
+                      class="badge"
+                      :class="run.had_error ? 'bg-red' : 'bg-green'"
+                    >{{ run.had_error ? 'Erreur' : 'OK' }}</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div
+          v-else-if="uuRuns"
+          class="text-secondary small"
+        >
+          Aucun upgrade automatique enregistré.
+        </div>
+      </div>
+
+      <!-- No data yet -->
+      <div
+        v-else
+        class="text-secondary small"
+      >
+        En attente des données de l'agent…
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup>
@@ -122,7 +336,7 @@ import utc from 'dayjs/plugin/utc'
 import 'dayjs/locale/fr'
 import CVEList from '../CVEList.vue'
 
-defineEmits(['run-apt-command'])
+defineEmits(['run-apt-command', 'uu-install', 'uu-configure', 'uu-run-now'])
 
 const props = defineProps({
   aptStatus: {
@@ -134,6 +348,22 @@ const props = defineProps({
     default: false,
   },
   aptCmdLoading: {
+    type: String,
+    default: '',
+  },
+  uuStatus: {
+    type: Object,
+    default: null,
+  },
+  uuRuns: {
+    type: Array,
+    default: null,
+  },
+  uuForm: {
+    type: Object,
+    default: null,
+  },
+  uuLoading: {
     type: String,
     default: '',
   },

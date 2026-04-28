@@ -14,6 +14,7 @@ import (
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/models"
+	"github.com/serversupervisor/server/internal/notify"
 	"github.com/serversupervisor/server/internal/ws"
 )
 
@@ -22,19 +23,26 @@ type CommandCompletionListener interface {
 	HandleCommandCompletion(commandID, status string)
 }
 
+// NotificationPusher broadcasts real-time events to connected frontend clients.
+type NotificationPusher interface {
+	Broadcast(payload interface{})
+}
+
 type AgentHandler struct {
 	db                  *database.DB
 	cfg                 *config.Config
 	streamHub           *ws.CommandStreamHub
+	notifPusher         NotificationPusher
 	completionListeners []CommandCompletionListener
 	completionMu        sync.RWMutex
 }
 
-func NewAgentHandler(db *database.DB, cfg *config.Config, streamHub *ws.CommandStreamHub) *AgentHandler {
+func NewAgentHandler(db *database.DB, cfg *config.Config, streamHub *ws.CommandStreamHub, notifPusher NotificationPusher) *AgentHandler {
 	return &AgentHandler{
-		db:        db,
-		cfg:       cfg,
-		streamHub: streamHub,
+		db:          db,
+		cfg:         cfg,
+		streamHub:   streamHub,
+		notifPusher: notifPusher,
 	}
 }
 
@@ -160,6 +168,28 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 		report.AptStatus.HostID = hostID
 		if err := h.db.UpsertAptStatus(report.AptStatus); err != nil {
 			log.Printf("Warning: failed to store apt status for host %s: %v", safeHostID, err)
+		}
+	}
+
+	// Store unattended-upgrades status and notify on new upgrade runs
+	if report.UnattendedUpgrades != nil {
+		if err := h.db.UpsertUUStatus(hostID, *report.UnattendedUpgrades); err != nil {
+			log.Printf("Warning: failed to store UU status for host %s: %v", safeHostID, err)
+		}
+		for _, run := range report.UnattendedUpgrades.NewRuns {
+			isNew, err := h.db.InsertUURunIfNew(hostID, run)
+			if err != nil {
+				log.Printf("Warning: failed to insert UU run for host %s: %v", safeHostID, err)
+				continue
+			}
+			if isNew && len(run.Packages) > 0 {
+				_ = h.db.UpdateUULastRun(hostID, run.RunAt, len(run.Packages))
+				hostname := hostID
+				if host, err := h.db.GetHost(hostID); err == nil && host != nil {
+					hostname = host.Hostname
+				}
+				h.pushUUNotification(hostname, hostID, run)
+			}
 		}
 	}
 
@@ -546,4 +576,41 @@ func stringPtrIfNotEmpty(value string) *string {
 		return nil
 	}
 	return &value
+}
+
+// pushUUNotification sends a browser + ntfy notification when unattended-upgrades installs packages.
+func (h *AgentHandler) pushUUNotification(hostname, hostID string, run models.UURun) {
+	pkgCount := len(run.Packages)
+	title := fmt.Sprintf("Mises à jour auto — %s", hostname)
+	msg := fmt.Sprintf("%d paquet(s) installé(s) : %s", pkgCount, strings.Join(run.Packages, ", "))
+	if len(msg) > 200 {
+		msg = msg[:197] + "..."
+	}
+
+	// Browser / WebSocket notification
+	if h.notifPusher != nil {
+		h.notifPusher.Broadcast(map[string]interface{}{
+			"type": "unattended_upgrade",
+			"notification": map[string]interface{}{
+				"id":             fmt.Sprintf("uu:%s:%d", hostID, run.RunAt.UnixNano()),
+				"type":           "unattended_upgrade",
+				"host_id":        hostID,
+				"host_name":      hostname,
+				"packages":       run.Packages,
+				"pkg_count":      pkgCount,
+				"run_at":         run.RunAt,
+				"browser_notify": true,
+				"title":          title,
+				"message":        msg,
+			},
+		})
+	}
+
+	// ntfy notification
+	if h.cfg.NotifyURL != "" {
+		n := notify.New()
+		if err := n.SendNtfy(h.cfg, h.cfg.NotifyURL, title, msg); err != nil {
+			log.Printf("UU ntfy notification failed for host %s: %v", hostID, err)
+		}
+	}
 }

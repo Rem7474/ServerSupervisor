@@ -55,6 +55,11 @@ export function useHostDetail() {
   const diskHealth = ref<AnyRecord | null>(null)
   const latestAgentVersion = ref('')
 
+  const uuStatus = ref<AnyRecord | null>(null)
+  const uuRuns = ref<AnyRecord[] | null>(null)
+  const uuLoading = ref('')
+  const uuForm = ref<AnyRecord | null>(null)
+
   const proxmoxLink = ref<AnyRecord | null>(null)
   const linkSaving = ref(false)
 
@@ -221,6 +226,74 @@ export function useHostDetail() {
       if (d.latest_agent_version) latestAgentVersion.value = d.latest_agent_version
     } catch {
       // Non-critical — WS will populate live data
+    }
+  }
+
+  async function loadUUData() {
+    try {
+      const [statusRes, runsRes] = await Promise.all([
+        apiClient.getUUStatus(hostId),
+        apiClient.getUURuns(hostId),
+      ])
+      uuStatus.value = statusRes.data || null
+      uuRuns.value = runsRes.data || []
+      // Initialise the editable form from server state
+      if (uuStatus.value) {
+        const cfg = (uuStatus.value.config ?? {}) as Record<string, unknown>
+        uuForm.value = {
+          enabled: uuStatus.value.enabled ?? false,
+          config: {
+            security_only: cfg.security_only ?? true,
+            auto_reboot: cfg.auto_reboot ?? false,
+            auto_reboot_time: cfg.auto_reboot_time ?? '02:00',
+            remove_unused: cfg.remove_unused ?? false,
+          },
+        }
+      }
+    } catch {
+      // non-critical
+    }
+  }
+
+  async function handleUUInstall() {
+    uuLoading.value = 'install'
+    try {
+      const res = await apiClient.installUU(hostId)
+      const commandId = res.data?.command_id
+      if (commandId) {
+        openCommand({ id: commandId, module: 'apt', action: 'install_uu', status: 'pending', output: '' })
+      }
+    } catch (e: unknown) {
+      await dialog.confirm({ title: 'Erreur', message: getApiErrorMessage(e), variant: 'danger' })
+    } finally {
+      uuLoading.value = ''
+    }
+  }
+
+  async function handleUUConfigure(form: AnyRecord) {
+    uuLoading.value = 'configure'
+    try {
+      await apiClient.updateUU(hostId, form as { enabled: boolean; config: object })
+      await loadUUData()
+    } catch (e: unknown) {
+      await dialog.confirm({ title: 'Erreur', message: getApiErrorMessage(e), variant: 'danger' })
+    } finally {
+      uuLoading.value = ''
+    }
+  }
+
+  async function handleUURunNow() {
+    uuLoading.value = 'run'
+    try {
+      const res = await apiClient.runUUNow(hostId)
+      const commandId = res.data?.command_id
+      if (commandId) {
+        openCommand({ id: commandId, module: 'apt', action: 'run_uu', status: 'pending', output: '' })
+      }
+    } catch (e: unknown) {
+      await dialog.confirm({ title: 'Erreur', message: getApiErrorMessage(e), variant: 'danger' })
+    } finally {
+      uuLoading.value = ''
     }
   }
 
@@ -462,6 +535,7 @@ export function useHostDetail() {
     loadComplete()
     loadProxmoxLink()
     loadHostPerms()
+    loadUUData()
   })
 
   return {
@@ -522,5 +596,12 @@ export function useHostDetail() {
     openAddPermission,
     savePermission,
     revokePermission,
+    uuStatus,
+    uuRuns,
+    uuForm,
+    uuLoading,
+    handleUUInstall,
+    handleUUConfigure,
+    handleUURunNow,
   }
 }

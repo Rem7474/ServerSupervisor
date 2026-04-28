@@ -1,6 +1,8 @@
 package database
 
 import (
+	"database/sql"
+	"encoding/json"
 	"time"
 
 	"github.com/serversupervisor/server/internal/models"
@@ -159,6 +161,116 @@ func (db *DB) UpdateTrackedRepo(id int64, version, url string, date time.Time) e
 		version, url, date, id,
 	)
 	return err
+}
+
+// ========== Unattended-Upgrades ==========
+
+func (db *DB) UpsertUUStatus(hostID string, s models.UnattendedUpgradesStatus) error {
+	cfgJSON, err := json.Marshal(s.Config)
+	if err != nil {
+		cfgJSON = []byte("{}")
+	}
+	_, err = db.conn.Exec(`
+		INSERT INTO unattended_upgrades_status
+			(host_id, installed, enabled, reboot_required, config, updated_at)
+		VALUES ($1, $2, $3, $4, $5, NOW())
+		ON CONFLICT (host_id) DO UPDATE SET
+			installed       = EXCLUDED.installed,
+			enabled         = EXCLUDED.enabled,
+			reboot_required = EXCLUDED.reboot_required,
+			config          = EXCLUDED.config,
+			updated_at      = NOW()`,
+		hostID, s.Installed, s.Enabled, s.RebootRequired, string(cfgJSON),
+	)
+	return err
+}
+
+// UpdateUULastRun bumps the last_run_at / last_run_packages counters after a new run is stored.
+func (db *DB) UpdateUULastRun(hostID string, runAt time.Time, pkgCount int) error {
+	_, err := db.conn.Exec(`
+		INSERT INTO unattended_upgrades_status (host_id, last_run_at, last_run_packages, updated_at)
+		VALUES ($1, $2, $3, NOW())
+		ON CONFLICT (host_id) DO UPDATE SET
+			last_run_at       = EXCLUDED.last_run_at,
+			last_run_packages = EXCLUDED.last_run_packages,
+			updated_at        = NOW()`,
+		hostID, runAt, pkgCount,
+	)
+	return err
+}
+
+// InsertUURunIfNew inserts a run record and returns true if it was actually new.
+func (db *DB) InsertUURunIfNew(hostID string, run models.UURun) (bool, error) {
+	pkgsJSON, err := json.Marshal(run.Packages)
+	if err != nil {
+		pkgsJSON = []byte("[]")
+	}
+	var id int64
+	err = db.conn.QueryRow(`
+		INSERT INTO unattended_upgrades_runs (host_id, run_at, packages, had_error, log_snippet)
+		VALUES ($1, $2, $3, $4, $5)
+		ON CONFLICT (host_id, run_at) DO NOTHING
+		RETURNING id`,
+		hostID, run.RunAt, string(pkgsJSON), run.HadError, run.LogSnippet,
+	).Scan(&id)
+	if err == sql.ErrNoRows {
+		return false, nil // already existed
+	}
+	return err == nil, err
+}
+
+func (db *DB) GetUUStatus(hostID string) (*models.UnattendedUpgradesDB, error) {
+	row := db.conn.QueryRow(`
+		SELECT installed, enabled, reboot_required, last_run_at, last_run_packages, config
+		FROM unattended_upgrades_status WHERE host_id = $1`, hostID)
+
+	var s models.UnattendedUpgradesDB
+	var cfgRaw []byte
+	var lastRunAt sql.NullTime
+	if err := row.Scan(&s.Installed, &s.Enabled, &s.RebootRequired, &lastRunAt, &s.LastRunPackages, &cfgRaw); err != nil {
+		if err == sql.ErrNoRows {
+			return &models.UnattendedUpgradesDB{}, nil
+		}
+		return nil, err
+	}
+	if lastRunAt.Valid {
+		t := lastRunAt.Time
+		s.LastRunAt = &t
+	}
+	if len(cfgRaw) > 0 {
+		_ = json.Unmarshal(cfgRaw, &s.Config)
+	}
+	return &s, nil
+}
+
+func (db *DB) GetUURuns(hostID string, limit int) ([]models.UURun, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	rows, err := db.conn.Query(`
+		SELECT run_at, packages, had_error, COALESCE(log_snippet, '')
+		FROM unattended_upgrades_runs
+		WHERE host_id = $1
+		ORDER BY run_at DESC LIMIT $2`, hostID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var runs []models.UURun
+	for rows.Next() {
+		var r models.UURun
+		var pkgsRaw []byte
+		if err := rows.Scan(&r.RunAt, &pkgsRaw, &r.HadError, &r.LogSnippet); err != nil {
+			continue
+		}
+		_ = json.Unmarshal(pkgsRaw, &r.Packages)
+		if r.Packages == nil {
+			r.Packages = []string{}
+		}
+		runs = append(runs, r)
+	}
+	return runs, nil
 }
 
 func (db *DB) DeleteTrackedRepo(id int64) error {

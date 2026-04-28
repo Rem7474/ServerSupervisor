@@ -37,7 +37,6 @@ type Config struct {
 
 	// TLS
 	InsecureSkipVerify bool `yaml:"insecure_skip_verify"`
-
 }
 
 // WebLogGlobs returns configured web access log globs.
@@ -189,13 +188,13 @@ func defaultConfig() *Config {
 			"/var/log/httpd/access_log",
 			"/data/logs/proxy-host-*_access.log",
 		},
-		WebLogsTailLines:             5000,
-		WebLogsTopN:                  10,
-		WebLogsRequestsLimit:         200,
-		WebLogsCursorFile:            "/var/lib/serversupervisor/web_logs_cursor.json",
-		CollectCrowdSecCorrelation:   false,
-		CrowdSecConnectionString:     "http://localhost:8080",
-		CrowdSecAPIKey:               "",
+		WebLogsTailLines:           5000,
+		WebLogsTopN:                10,
+		WebLogsRequestsLimit:       200,
+		WebLogsCursorFile:          "/var/lib/serversupervisor/web_logs_cursor.json",
+		CollectCrowdSecCorrelation: false,
+		CrowdSecConnectionString:   "http://localhost:8080",
+		CrowdSecAPIKey:             "",
 	}
 }
 

@@ -29,7 +29,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	authH := handlers.NewAuthHandler(db, cfg)
 	hostH := handlers.NewHostHandler(db, cfg, dispatcher)
 	wsH := ws.NewWSHandler(db, cfg, notifHub)
-	agentH := handlers.NewAgentHandler(db, cfg, wsH.GetStreamHub())
+	agentH := handlers.NewAgentHandler(db, cfg, wsH.GetStreamHub(), notifHub)
 	aptH := handlers.NewAptHandler(db, cfg, dispatcher)
 	dockerH := handlers.NewDockerHandler(db, cfg, dispatcher, wsH.GetStreamHub())
 	systemH := handlers.NewSystemHandler(db, cfg, dispatcher, wsH.GetStreamHub())
@@ -188,6 +188,13 @@ func registerAPTRoutes(g *gin.RouterGroup, h *handlers.AptHandler) {
 	g.GET("/hosts/:id/apt", h.GetAptStatus)
 	g.GET("/apt/summary", h.GetCVESummary)
 	g.POST("/apt/command", h.SendCommand)
+
+	// Unattended-upgrades
+	g.GET("/hosts/:id/apt/unattended-upgrades", h.GetUUStatus)
+	g.PUT("/hosts/:id/apt/unattended-upgrades", h.ConfigureUU)
+	g.POST("/hosts/:id/apt/unattended-upgrades/install", h.InstallUU)
+	g.POST("/hosts/:id/apt/unattended-upgrades/run-now", h.RunUUNow)
+	g.GET("/hosts/:id/apt/unattended-upgrades/runs", h.GetUURuns)
 }
 
 func registerAuditRoutes(g *gin.RouterGroup, h *handlers.AuditHandler) {

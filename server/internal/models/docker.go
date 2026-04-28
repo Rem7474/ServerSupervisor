@@ -144,3 +144,46 @@ type AptCommandRequest struct {
 	HostIDs []string `json:"host_ids" binding:"required"`
 	Command string   `json:"command" binding:"required,oneof=update upgrade dist-upgrade"`
 }
+
+// ========== Unattended-Upgrades ==========
+
+type UUConfig struct {
+	SecurityOnly   bool   `json:"security_only"`
+	AutoReboot     bool   `json:"auto_reboot"`
+	AutoRebootTime string `json:"auto_reboot_time"` // e.g. "02:00"
+	RemoveUnused   bool   `json:"remove_unused"`
+}
+
+type UURun struct {
+	RunAt      time.Time `json:"run_at"`
+	Packages   []string  `json:"packages"`
+	HadError   bool      `json:"had_error"`
+	LogSnippet string    `json:"log_snippet,omitempty"`
+}
+
+// UnattendedUpgradesStatus is the state of unattended-upgrades on a host,
+// reported by the agent on every cycle.
+type UnattendedUpgradesStatus struct {
+	Installed      bool     `json:"installed"`
+	Enabled        bool     `json:"enabled"`
+	RebootRequired bool     `json:"reboot_required"`
+	Config         UUConfig `json:"config"`
+	// NewRuns contains only runs discovered since the last agent report.
+	NewRuns []UURun `json:"new_runs"`
+}
+
+// UnattendedUpgradesDB is the persisted view returned by API endpoints.
+type UnattendedUpgradesDB struct {
+	Installed      bool      `json:"installed"`
+	Enabled        bool      `json:"enabled"`
+	RebootRequired bool      `json:"reboot_required"`
+	LastRunAt      *time.Time `json:"last_run_at"`
+	LastRunPackages int      `json:"last_run_packages"`
+	Config         UUConfig  `json:"config"`
+}
+
+// UnattendedUpgradesConfigureRequest is the body for PUT /hosts/:id/apt/unattended-upgrades.
+type UnattendedUpgradesConfigureRequest struct {
+	Enabled bool     `json:"enabled"`
+	Config  UUConfig `json:"config"`
+}

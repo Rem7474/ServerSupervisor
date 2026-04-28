@@ -345,7 +345,14 @@
             :apt-status="aptStatus"
             :can-run-apt="canRunApt"
             :apt-cmd-loading="aptCmdLoading"
+            :uu-status="uuStatus"
+            :uu-runs="uuRuns"
+            :uu-form="uuForm"
+            :uu-loading="uuLoading"
             @run-apt-command="sendAptCmd"
+            @uu-install="handleUUInstall"
+            @uu-configure="handleUUConfigure"
+            @uu-run-now="handleUURunNow"
           />
         </div>
 
@@ -670,6 +677,13 @@ const {
   openAddPermission,
   savePermission,
   revokePermission,
+  uuStatus,
+  uuRuns,
+  uuForm,
+  uuLoading,
+  handleUUInstall,
+  handleUUConfigure,
+  handleUURunNow,
 } = useHostDetail()
 </script>
 

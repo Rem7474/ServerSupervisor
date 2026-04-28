@@ -1,6 +1,7 @@
 package collector
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -695,4 +696,293 @@ func extractCVEsFromPolicy(packageName string) []CVEInfo {
 	}
 
 	return cves
+}
+
+// ========== Unattended-Upgrades ==========
+
+const uuLogPath = "/var/log/unattended-upgrades/unattended-upgrades.log"
+const uuAutoUpgradesConf = "/etc/apt/apt.conf.d/20auto-upgrades"
+const uuMainConf = "/etc/apt/apt.conf.d/50unattended-upgrades"
+const uuRebootRequired = "/var/run/reboot-required"
+
+// uuLogCursor tracks the byte offset in the UU log file.
+// -1 means "not yet initialised": on the first call we seek to EOF so we
+// don't flood the server with historical upgrade runs from before the agent started.
+var uuLogCursor int64 = -1
+var uuLogMu sync.Mutex
+
+type UUConfig struct {
+	SecurityOnly   bool   `json:"security_only"`
+	AutoReboot     bool   `json:"auto_reboot"`
+	AutoRebootTime string `json:"auto_reboot_time"`
+	RemoveUnused   bool   `json:"remove_unused"`
+}
+
+type UURun struct {
+	RunAt      time.Time `json:"run_at"`
+	Packages   []string  `json:"packages"`
+	HadError   bool      `json:"had_error"`
+	LogSnippet string    `json:"log_snippet,omitempty"`
+}
+
+type UnattendedUpgradesStatus struct {
+	Installed      bool     `json:"installed"`
+	Enabled        bool     `json:"enabled"`
+	RebootRequired bool     `json:"reboot_required"`
+	Config         UUConfig `json:"config"`
+	NewRuns        []UURun  `json:"new_runs"`
+}
+
+// CollectUnattendedUpgrades collects the current status of unattended-upgrades.
+// NewRuns contains only upgrade runs discovered since the previous call (cursor-based).
+func CollectUnattendedUpgrades() *UnattendedUpgradesStatus {
+	status := &UnattendedUpgradesStatus{}
+
+	// Is the package installed?
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, "dpkg", "-s", "unattended-upgrades").Output()
+	if err != nil || !strings.Contains(string(out), "Status: install ok installed") {
+		return status // not installed — all fields remain false/zero
+	}
+	status.Installed = true
+
+	// Is the systemd service enabled?
+	ctx2, cancel2 := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel2()
+	enOut, _ := exec.CommandContext(ctx2, "systemctl", "is-enabled", "unattended-upgrades").Output()
+	status.Enabled = strings.TrimSpace(string(enOut)) == "enabled"
+
+	// Reboot required?
+	if _, statErr := os.Stat(uuRebootRequired); statErr == nil {
+		status.RebootRequired = true
+	}
+
+	// Read configuration
+	status.Config = readUUConfig()
+
+	// Read new log entries since last cursor position
+	status.NewRuns = readNewUURuns()
+
+	return status
+}
+
+// readUUConfig parses the apt config files to extract essential settings.
+func readUUConfig() UUConfig {
+	cfg := UUConfig{
+		SecurityOnly:   true, // default: security only
+		AutoRebootTime: "02:00",
+	}
+
+	data, err := os.ReadFile(uuMainConf)
+	if err != nil {
+		return cfg
+	}
+
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "//") || strings.HasPrefix(line, "#") || line == "" {
+			continue
+		}
+		if strings.Contains(line, `"${distro_id}:${distro_codename}"`) ||
+			strings.Contains(line, `"${distro_id}:${distro_codename}-updates"`) {
+			cfg.SecurityOnly = false
+		}
+		if strings.Contains(line, `Unattended-Upgrade::Automatic-Reboot "true"`) {
+			cfg.AutoReboot = true
+		}
+		if strings.Contains(line, "Unattended-Upgrade::Automatic-Reboot-Time") {
+			parts := strings.SplitN(line, `"`, 3)
+			if len(parts) >= 3 {
+				cfg.AutoRebootTime = parts[1]
+			}
+		}
+		if strings.Contains(line, `Unattended-Upgrade::Remove-Unused-Dependencies "true"`) ||
+			strings.Contains(line, `Unattended-Upgrade::Remove-Unused-Kernel-Packages "true"`) {
+			cfg.RemoveUnused = true
+		}
+	}
+	return cfg
+}
+
+// readNewUURuns reads the UU log file from the cursor position and returns newly completed runs.
+func readNewUURuns() []UURun {
+	uuLogMu.Lock()
+	defer uuLogMu.Unlock()
+
+	f, err := os.Open(uuLogPath)
+	if err != nil {
+		return nil
+	}
+	defer func() { _ = f.Close() }()
+
+	info, err := f.Stat()
+	if err != nil {
+		return nil
+	}
+	fileSize := info.Size()
+
+	// First call: initialise cursor to EOF to skip historical entries.
+	if uuLogCursor == -1 {
+		uuLogCursor = fileSize
+		return nil
+	}
+
+	// File was rotated (smaller than cursor) — reset to beginning.
+	if fileSize < uuLogCursor {
+		uuLogCursor = 0
+	}
+
+	if fileSize == uuLogCursor {
+		return nil
+	}
+
+	if _, err := f.Seek(uuLogCursor, io.SeekStart); err != nil {
+		return nil
+	}
+
+	scanner := bufio.NewScanner(f)
+	var runs []UURun
+	var current *UURun
+	var snippetLines []string
+
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		if strings.Contains(line, "INFO Starting unattended upgrades script") {
+			ts := parseUUTimestamp(line)
+			current = &UURun{RunAt: ts}
+			snippetLines = []string{line}
+			continue
+		}
+		if current == nil {
+			continue
+		}
+
+		snippetLines = append(snippetLines, line)
+		if len(snippetLines) > 30 {
+			snippetLines = snippetLines[1:]
+		}
+
+		if strings.Contains(line, "INFO Packages that will be upgraded:") {
+			idx := strings.Index(line, "Packages that will be upgraded:")
+			pkgStr := strings.TrimSpace(line[idx+len("Packages that will be upgraded:"):])
+			if pkgStr != "" {
+				current.Packages = strings.Fields(pkgStr)
+			}
+		}
+		if strings.Contains(line, "ERROR") {
+			current.HadError = true
+		}
+		if strings.Contains(line, "All upgrades installed") ||
+			strings.Contains(line, "No packages found that can be upgraded") ||
+			strings.Contains(line, "Packages that are not upgraded") {
+			if len(snippetLines) > 0 {
+				current.LogSnippet = strings.Join(snippetLines, "\n")
+			}
+			runs = append(runs, *current)
+			current = nil
+			snippetLines = nil
+		}
+	}
+
+	// Update cursor to current file position
+	if pos, err := f.Seek(0, io.SeekCurrent); err == nil {
+		uuLogCursor = pos
+	}
+
+	return runs
+}
+
+// parseUUTimestamp extracts the timestamp from a UU log line.
+// Format: "2006-01-02 15:04:05,000 INFO ..."
+func parseUUTimestamp(line string) time.Time {
+	if len(line) < 19 {
+		return time.Now()
+	}
+	t, err := time.ParseInLocation("2006-01-02 15:04:05", line[:19], time.Local)
+	if err != nil {
+		return time.Now()
+	}
+	return t
+}
+
+// writeUUConfig writes the two unattended-upgrades config files based on the given UUConfig.
+func writeUUConfig(cfg UUConfig) error {
+	autoUpgrades := `APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Download-Upgradeable-Packages "1";
+APT::Periodic::AutocleanInterval "7";
+APT::Periodic::Unattended-Upgrade "1";
+`
+	if err := os.WriteFile(uuAutoUpgradesConf, []byte(autoUpgrades), 0644); err != nil {
+		return fmt.Errorf("writing %s: %w", uuAutoUpgradesConf, err)
+	}
+
+	var b strings.Builder
+	b.WriteString(`Unattended-Upgrade::Allowed-Origins {
+	"${distro_id}:${distro_codename}-security";
+`)
+	if !cfg.SecurityOnly {
+		b.WriteString(`	"${distro_id}:${distro_codename}";
+	"${distro_id}:${distro_codename}-updates";
+`)
+	}
+	b.WriteString("};\n\n")
+
+	autoReboot := "false"
+	if cfg.AutoReboot {
+		autoReboot = "true"
+	}
+	b.WriteString(fmt.Sprintf("Unattended-Upgrade::Automatic-Reboot \"%s\";\n", autoReboot))
+
+	rebootTime := cfg.AutoRebootTime
+	if rebootTime == "" {
+		rebootTime = "02:00"
+	}
+	b.WriteString(fmt.Sprintf("Unattended-Upgrade::Automatic-Reboot-Time \"%s\";\n", rebootTime))
+
+	removeUnused := "false"
+	if cfg.RemoveUnused {
+		removeUnused = "true"
+	}
+	b.WriteString(fmt.Sprintf("Unattended-Upgrade::Remove-Unused-Dependencies \"%s\";\n", removeUnused))
+	b.WriteString(fmt.Sprintf("Unattended-Upgrade::Remove-Unused-Kernel-Packages \"%s\";\n", removeUnused))
+
+	if err := os.WriteFile(uuMainConf, []byte(b.String()), 0644); err != nil {
+		return fmt.Errorf("writing %s: %w", uuMainConf, err)
+	}
+	return nil
+}
+
+// ToggleUnattendedUpgrades enables or disables the unattended-upgrades systemd service.
+func ToggleUnattendedUpgrades(enable bool) (string, error) {
+	action := "disable"
+	if enable {
+		action = "enable"
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, "systemctl", action, "--now", "unattended-upgrades").CombinedOutput()
+	return string(out), err
+}
+
+// ConfigureUnattendedUpgrades writes config files for unattended-upgrades.
+func ConfigureUnattendedUpgrades(cfg UUConfig) error {
+	return writeUUConfig(cfg)
+}
+
+// RunUnattendedUpgrades triggers a manual unattended-upgrade run with streaming output.
+func RunUnattendedUpgrades(streamCallback func(string)) (string, error) {
+	cmd := exec.Command("unattended-upgrade", "--verbose")
+	cmd.Env = append(os.Environ(), "DEBIAN_FRONTEND=noninteractive")
+	log.Printf("Executing: unattended-upgrade --verbose")
+	return runCommandWithStreaming(cmd, streamCallback, aptCommandIdleTimeout)
+}
+
+// InstallUnattendedUpgrades installs the unattended-upgrades package if not present.
+func InstallUnattendedUpgrades(streamCallback func(string)) (string, error) {
+	cmd := exec.Command("apt-get", "install", "-y", "-q", "unattended-upgrades")
+	cmd.Env = append(os.Environ(), "DEBIAN_FRONTEND=noninteractive")
+	log.Printf("Executing: apt-get install -y unattended-upgrades")
+	return runCommandWithStreaming(cmd, streamCallback, aptCommandIdleTimeout)
 }

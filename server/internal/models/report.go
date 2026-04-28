@@ -24,7 +24,8 @@ type AgentReport struct {
 	Capabilities    *AgentCapabilities  `json:"capabilities,omitempty"` // Which collectors are enabled on this agent
 	Metrics         *SystemMetrics      `json:"metrics,omitempty"`
 	Docker          *DockerReport       `json:"docker,omitempty"`
-	AptStatus       *AptStatus          `json:"apt_status,omitempty"`
+	AptStatus            *AptStatus                `json:"apt_status,omitempty"`
+	UnattendedUpgrades   *UnattendedUpgradesStatus `json:"unattended_upgrades,omitempty"`
 	WebLogs         *WebLogReport       `json:"web_logs,omitempty"`
 	DockerNetworks  []DockerNetwork     `json:"docker_networks,omitempty"`
 	ContainerEnvs   []ContainerEnv      `json:"container_envs,omitempty"`
