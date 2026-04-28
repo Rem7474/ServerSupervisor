@@ -62,7 +62,7 @@ function renderFatalFallback(detail: FatalDetail): void {
                 <div class="flex-fill">
                   <h3 class="alert-title mb-1">${title}</h3>
                   <div class="text-secondary mb-3">${message}</div>
-                  <button type="button" class="btn btn-danger" id="fatal-reload-btn">Recharger l application</button>
+                  <button type="button" class="btn btn-danger" id="fatal-reload-btn">Recharger l'application</button>
                 </div>
               </div>
             </div>
@@ -90,14 +90,14 @@ renderBootPlaceholder()
 
 window.addEventListener('error', (event: ErrorEvent) => {
   renderFatalFallback({
-    title: 'Erreur JavaScript non geree',
+    title: 'Erreur JavaScript non gérée',
     message: toErrorMessage(event.error ?? event.message),
   })
 })
 
 window.addEventListener('unhandledrejection', (event: PromiseRejectionEvent) => {
   renderFatalFallback({
-    title: 'Erreur asynchrone non geree',
+    title: 'Erreur asynchrone non gérée',
     message: toErrorMessage(event.reason),
   })
 })
