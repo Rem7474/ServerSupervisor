@@ -157,24 +157,33 @@ func (h *WSHandler) authenticateWS(conn *websocket.Conn) bool {
 }
 
 func (h *WSHandler) authenticateWSWithRole(conn *websocket.Conn) (bool, string) {
+	claims, ok := h.authenticateWSClaims(conn)
+	if !ok {
+		return false, ""
+	}
+	role, _ := claims["role"].(string)
+	return true, role
+}
+
+// authenticateWSClaims reads the auth handshake message and returns the full JWT claims.
+func (h *WSHandler) authenticateWSClaims(conn *websocket.Conn) (jwt.MapClaims, bool) {
 	_ = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 	var msg wsAuthMessage
 	if err := conn.ReadJSON(&msg); err != nil {
 		_ = conn.WriteJSON(gin.H{"type": "auth_error", "error": "missing auth"})
-		return false, ""
+		return nil, false
 	}
 	if msg.Type != "auth" || msg.Token == "" {
 		_ = conn.WriteJSON(gin.H{"type": "auth_error", "error": "invalid auth"})
-		return false, ""
+		return nil, false
 	}
 	claims, ok := h.parseTokenClaims(msg.Token)
 	if !ok {
 		_ = conn.WriteJSON(gin.H{"type": "auth_error", "error": "unauthorized"})
-		return false, ""
+		return nil, false
 	}
 	_ = conn.SetReadDeadline(time.Time{})
-	role, _ := claims["role"].(string)
-	return true, role
+	return claims, true
 }
 
 func (h *WSHandler) validateToken(tokenString string) bool {

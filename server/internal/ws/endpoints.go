@@ -126,21 +126,37 @@ func (h *WSHandler) CommandStream(c *gin.Context) {
 		_ = conn.Close()
 	}()
 
-	if !h.authenticateWS(conn) {
+	claims, ok := h.authenticateWSClaims(conn)
+	if !ok {
 		return
+	}
+
+	// Fetch the command to verify existence and, for non-admins, host ownership.
+	cmd, err := h.db.GetRemoteCommandByID(commandID)
+	if err != nil {
+		_ = safeWriteJSON(conn, gin.H{"type": "error", "error": "command not found"})
+		return
+	}
+
+	role, _ := claims["role"].(string)
+	if role != "admin" {
+		username, _ := claims["sub"].(string)
+		restricted, level, accessErr := h.db.GetHostAccess(username, cmd.HostID)
+		if accessErr != nil || (restricted && level == "") {
+			_ = safeWriteJSON(conn, gin.H{"type": "auth_error", "error": "access denied"})
+			return
+		}
 	}
 
 	h.streamHub.Register(commandID, conn)
 
-	if cmd, err := h.db.GetRemoteCommandByID(commandID); err == nil {
-		_ = safeWriteJSON(conn, gin.H{
-			"type":       "cmd_stream_init",
-			"command_id": commandID,
-			"status":     cmd.Status,
-			"command":    cmd.Action,
-			"output":     cmd.Output,
-		})
-	}
+	_ = safeWriteJSON(conn, gin.H{
+		"type":       "cmd_stream_init",
+		"command_id": commandID,
+		"status":     cmd.Status,
+		"command":    cmd.Action,
+		"output":     cmd.Output,
+	})
 
 	done := make(chan struct{})
 	go h.readLoop(conn, done)

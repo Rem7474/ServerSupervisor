@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -26,6 +27,7 @@ type AgentHandler struct {
 	cfg                 *config.Config
 	streamHub           *ws.CommandStreamHub
 	completionListeners []CommandCompletionListener
+	completionMu        sync.RWMutex
 }
 
 func NewAgentHandler(db *database.DB, cfg *config.Config, streamHub *ws.CommandStreamHub) *AgentHandler {
@@ -40,6 +42,8 @@ func (h *AgentHandler) AddCompletionListener(listener CommandCompletionListener)
 	if listener == nil {
 		return
 	}
+	h.completionMu.Lock()
+	defer h.completionMu.Unlock()
 	h.completionListeners = append(h.completionListeners, listener)
 }
 
@@ -301,7 +305,11 @@ func (h *AgentHandler) ReportCommandResult(c *gin.Context) {
 
 	// Notify any registered listeners about terminal command states.
 	if result.Status == "completed" || result.Status == "failed" {
-		for _, listener := range h.completionListeners {
+		h.completionMu.RLock()
+		listeners := make([]CommandCompletionListener, len(h.completionListeners))
+		copy(listeners, h.completionListeners)
+		h.completionMu.RUnlock()
+		for _, listener := range listeners {
 			go listener.HandleCommandCompletion(result.CommandID, result.Status)
 		}
 	}

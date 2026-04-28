@@ -12,7 +12,8 @@ import (
 
 // SetupRouter wires all handlers and registers route groups.
 // The caller is responsible for starting long-running poller services after this function returns.
-func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationHub, sched *scheduler.TaskScheduler, dispatcher *dispatch.Dispatcher) (*gin.Engine, *handlers.ReleaseTrackerHandler, *handlers.ProxmoxHandler) {
+// The returned cleanup func must be called on shutdown to stop background goroutines (rate limiters).
+func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationHub, sched *scheduler.TaskScheduler, dispatcher *dispatch.Dispatcher) (*gin.Engine, *handlers.ReleaseTrackerHandler, *handlers.ProxmoxHandler, func()) {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
 	r.Use(gin.Recovery())
@@ -72,7 +73,11 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 
 	registerStaticFiles(r)
 
-	return r, releaseTrackerH, proxmoxH
+	cleanup := func() {
+		ipRateLimiter.Stop()
+		agentRateLimiter.Stop()
+	}
+	return r, releaseTrackerH, proxmoxH, cleanup
 }
 
 func registerPublicRoutes(r *gin.Engine, h *handlers.AuthHandler, db *database.DB) {

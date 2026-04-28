@@ -24,6 +24,7 @@ type IPRateLimiter struct {
 	rps      rate.Limit
 	burst    int
 	trusted  []*net.IPNet
+	done     chan struct{}
 }
 
 func NewIPRateLimiter(rps int, burst int, trustedProxyCIDRs []string) *IPRateLimiter {
@@ -33,18 +34,30 @@ func NewIPRateLimiter(rps int, burst int, trustedProxyCIDRs []string) *IPRateLim
 		rps:      rate.Limit(rps),
 		burst:    burst,
 		trusted:  parseTrustedProxies(trustedProxyCIDRs),
+		done:     make(chan struct{}),
 	}
 
-	// Cleanup goroutine: remove unused limiters every 10 minutes
+	// Cleanup goroutine: remove unused limiters every 10 minutes.
+	// Exits cleanly when Stop() is called.
 	go func() {
 		ticker := time.NewTicker(10 * time.Minute)
 		defer ticker.Stop()
-		for range ticker.C {
-			rl.cleanup()
+		for {
+			select {
+			case <-ticker.C:
+				rl.cleanup()
+			case <-rl.done:
+				return
+			}
 		}
 	}()
 
 	return rl
+}
+
+// Stop terminates the background cleanup goroutine.
+func (rl *IPRateLimiter) Stop() {
+	close(rl.done)
 }
 
 func (rl *IPRateLimiter) getClientIP(c *gin.Context) string {
@@ -155,6 +168,7 @@ func RateLimiterMiddleware(rl *IPRateLimiter) gin.HandlerFunc {
 		clientIP := rl.getClientIP(c)
 
 		if !rl.Allow(clientIP) {
+			log.Printf("[rate-limit] blocked %s %s from %s", c.Request.Method, c.Request.URL.Path, clientIP)
 			c.JSON(429, gin.H{"error": "rate limit exceeded"})
 			c.Abort()
 			return

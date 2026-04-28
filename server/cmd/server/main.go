@@ -26,7 +26,7 @@ func main() {
 
 	// Load config
 	cfg := config.Load()
-	log.Printf("Database Config: host=%s port=%s user=%s dbname=%s", cfg.DBHost, cfg.DBPort, cfg.DBUser, cfg.DBName)
+	log.Printf("Database Config: host=%s port=%s dbname=%s", cfg.DBHost, cfg.DBPort, cfg.DBName)
 
 	// ⚠️  Validate configuration — log all warnings before connecting to the database
 	for _, w := range cfg.Validate() {
@@ -93,7 +93,8 @@ func main() {
 	defer bg.Stop()
 
 	// Setup router
-	router, releaseTrackerH, proxmoxH := api.SetupRouter(db, cfg, notifHub, sched, dispatcher)
+	router, releaseTrackerH, proxmoxH, cleanupRouter := api.SetupRouter(db, cfg, notifHub, sched, dispatcher)
+	defer cleanupRouter()
 	releaseTrackerH.StartPoller()
 	defer releaseTrackerH.StopPoller()
 	proxmoxH.StartPoller()

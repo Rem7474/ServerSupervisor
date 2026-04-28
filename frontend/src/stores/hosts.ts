@@ -21,8 +21,8 @@ export const useHostsStore = defineStore('hosts', () => {
       const res = await apiClient.getHosts()
       hosts.value = res.data || []
       fetchedAt.value = Date.now()
-    } catch {
-      // Keep stale data on error
+    } catch (err) {
+      console.error('[hosts] failed to fetch hosts, keeping stale data:', err)
     } finally {
       loading.value = false
     }

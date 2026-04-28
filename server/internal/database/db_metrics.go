@@ -2,6 +2,7 @@ package database
 
 import (
 	"database/sql"
+	"log"
 
 	"github.com/serversupervisor/server/internal/models"
 )
@@ -56,6 +57,7 @@ func (db *DB) GetLatestMetrics(hostID string) (*models.SystemMetrics, error) {
 		 FROM disk_info WHERE metrics_id = $1`, m.ID,
 	)
 	if err != nil {
+		log.Printf("Warning: failed to fetch disk_info for metrics %d (host %s): %v", m.ID, m.HostID, err)
 		return &m, nil
 	}
 	defer func() { _ = rows.Close() }()
