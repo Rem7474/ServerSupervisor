@@ -154,13 +154,13 @@ import AlertRuleList from '../components/alerts/AlertRuleList.vue'
 import AlertRuleModal from '../components/alerts/AlertRuleModal.vue'
 import AppIcon from '../components/AppIcon.vue'
 import { useAlertsPage } from '../composables/useAlertsPage'
+import { useWebSocket } from '../composables/useWebSocket'
 
 const TAB_TITLES = {
   rules: 'Alertes',
   releases: 'Suivi de versions',
   incidents: 'Historique de notifications',
 }
-import { useWebSocket } from '../composables/useWebSocket'
 
 const route = useRoute()
 const {
@@ -169,6 +169,9 @@ const {
   incidentsLoading,
   incidentsError,
   incidentsLoaded,
+  trackers,
+  trackersLoading,
+  trackersError,
   rules,
   hosts,
   loading,
@@ -185,6 +188,7 @@ const {
   init,
   loadIncidents,
   switchToIncidents,
+  switchToTrackers,
   startAddAlert,
   startEditAlert,
   saveAlert,
