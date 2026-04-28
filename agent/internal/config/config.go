@@ -251,6 +251,13 @@ web_logs_cursor_file: "/var/lib/serversupervisor/web_logs_cursor.json"
 
 # Skip TLS verification (for self-signed certs)
 insecure_skip_verify: false
+
+# CrowdSec integration: correlate web logs with active CrowdSec decisions.
+# Requires collect_web_logs: true. The agent queries the CrowdSec Local API
+# and marks blocked IPs in the web threats dashboard.
+collect_crowdsec_correlation: false
+crowdsec_connection_string: "http://localhost:8080"
+crowdsec_api_key: ""
 `
 
 	if strings.TrimSpace(serverURL) != "" {

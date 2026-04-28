@@ -336,7 +336,7 @@ func CollectWebLogs(logPathGlobs []string, tailLines int, topN int, requestLimit
 	// Correlate with CrowdSec decisions if enabled
 	if crowdSecEnabled {
 		crowdSecDecisions, err := CollectCrowdSecDecisions(crowdSecConnectionString, crowdSecAPIKey, verbose)
-		if err != nil && verbose {
+		if err != nil {
 			log.Printf("[web_logs] CrowdSec correlation error (non-fatal): %v", err)
 		}
 
@@ -352,6 +352,7 @@ func CollectWebLogs(logPathGlobs []string, tailLines int, topN int, requestLimit
 		}
 
 		// Enrich top suspicious IPs with CrowdSec data
+		blockedCount := 0
 		for i := range report.Threats.TopSuspiciousIPs {
 			if decision, ok := crowdSecDecisions[report.Threats.TopSuspiciousIPs[i].IP]; ok {
 				report.Threats.TopSuspiciousIPs[i].Blocked = decision.Blocked
@@ -359,12 +360,11 @@ func CollectWebLogs(logPathGlobs []string, tailLines int, topN int, requestLimit
 				report.Threats.TopSuspiciousIPs[i].BlockedReason = decision.Reason
 				report.Threats.TopSuspiciousIPs[i].BlockedAt = &decision.BlockedAt
 				report.Threats.TopSuspiciousIPs[i].BlockedUntil = &decision.BlockedUntil
+				blockedCount++
 			}
 		}
 
-		if verbose && len(crowdSecDecisions) > 0 {
-			log.Printf("[web_logs] enriched threats with CrowdSec data: %d IPs marked as blocked", len(crowdSecDecisions))
-		}
+		log.Printf("[web_logs] CrowdSec: %d active decisions, enriched %d suspicious IPs", len(crowdSecDecisions), blockedCount)
 	}
 
 	return report, nil

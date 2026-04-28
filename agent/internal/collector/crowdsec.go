@@ -51,9 +51,7 @@ func CollectCrowdSecDecisions(connectionString, apiKey string, verbose bool) (ma
 	// Create HTTP request
 	req, err := http.NewRequest("GET", apiURL, nil)
 	if err != nil {
-		if verbose {
-			log.Printf("[crowdsec] failed to create request: %v", err)
-		}
+		log.Printf("[crowdsec] failed to create request: %v", err)
 		return result, nil // Graceful degradation
 	}
 
@@ -66,28 +64,22 @@ func CollectCrowdSecDecisions(connectionString, apiKey string, verbose bool) (ma
 	client := &http.Client{Timeout: 5 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
-		if verbose {
-			log.Printf("[crowdsec] failed to query CrowdSec API: %v", err)
-		}
+		log.Printf("[crowdsec] failed to query CrowdSec API: %v", err)
 		return result, nil // Graceful degradation
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	// Check for HTTP errors
 	if resp.StatusCode != http.StatusOK {
-		if verbose {
-			body, _ := io.ReadAll(resp.Body)
-			log.Printf("[crowdsec] API returned status %d: %s", resp.StatusCode, string(body))
-		}
+		body, _ := io.ReadAll(resp.Body)
+		log.Printf("[crowdsec] API returned status %d: %s", resp.StatusCode, string(body))
 		return result, nil // Graceful degradation
 	}
 
 	// Parse response
 	var decisions []crowdSecAPIDecision
 	if err := json.NewDecoder(resp.Body).Decode(&decisions); err != nil {
-		if verbose {
-			log.Printf("[crowdsec] failed to decode response: %v", err)
-		}
+		log.Printf("[crowdsec] failed to decode response: %v", err)
 		return result, nil // Graceful degradation
 	}
 
@@ -130,9 +122,7 @@ func CollectCrowdSecDecisions(connectionString, apiKey string, verbose bool) (ma
 		}
 	}
 
-	if verbose {
-		log.Printf("[crowdsec] collected %d active IP decisions", len(result))
-	}
+	log.Printf("[crowdsec] collected %d active IP decisions", len(result))
 
 	return result, nil
 }
