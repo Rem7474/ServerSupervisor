@@ -53,10 +53,18 @@ func (db *DB) DeleteAlertRule(id int64) error {
 
 func (db *DB) GetAlertRules() ([]models.AlertRule, error) {
 	rows, err := db.conn.Query(
-		`SELECT id, name, source_type, host_id, proxmox_scope, metric, operator, threshold_warn, threshold_crit, 
-        threshold_clear_warn, threshold_clear_crit, duration_seconds,
-        actions, last_fired, enabled, created_at, updated_at
- FROM alert_rules ORDER BY created_at DESC`,
+		`SELECT ar.id, ar.name, ar.source_type, ar.host_id, ar.proxmox_scope, ar.metric, ar.operator,
+        ar.threshold_warn, ar.threshold_crit, ar.threshold_clear_warn, ar.threshold_clear_crit,
+        ar.duration_seconds, ar.actions, ar.last_fired, ar.enabled, ar.created_at, ar.updated_at,
+        COALESCE(ic.active_count, 0)
+ FROM alert_rules ar
+ LEFT JOIN (
+   SELECT rule_id, COUNT(*) AS active_count
+   FROM alert_incidents
+   WHERE resolved_at IS NULL
+   GROUP BY rule_id
+ ) ic ON ic.rule_id = ar.id
+ ORDER BY ar.created_at DESC`,
 	)
 	if err != nil {
 		return nil, err
@@ -75,6 +83,7 @@ func (db *DB) GetAlertRules() ([]models.AlertRule, error) {
 			&r.ID, &name, &sourceType, &hostID, &proxmoxScopeJSON, &r.Metric, &r.Operator, &thresholdWarn, &thresholdCrit,
 			&thresholdClearWarn, &thresholdClearCrit, &r.DurationSeconds,
 			&actionsJSON, &lastFired, &r.Enabled, &r.CreatedAt, &updatedAt,
+			&r.ActiveIncidentCount,
 		); err != nil {
 			continue
 		}

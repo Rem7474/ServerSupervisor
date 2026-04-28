@@ -74,8 +74,13 @@
               </label>
             </td>
             <td>
-              <div class="fw-bold">
-                {{ rule.name || 'Sans nom' }}
+              <div class="d-flex align-items-center gap-2">
+                <span class="fw-bold">{{ rule.name || 'Sans nom' }}</span>
+                <span
+                  v-if="rule.active_incident_count > 0"
+                  class="badge bg-red-lt text-red"
+                  :title="`${rule.active_incident_count} incident${rule.active_incident_count > 1 ? 's' : ''} actif${rule.active_incident_count > 1 ? 's' : ''}`"
+                >{{ rule.active_incident_count }} actif{{ rule.active_incident_count > 1 ? 's' : '' }}</span>
               </div>
               <div
                 v-if="rule.last_fired"

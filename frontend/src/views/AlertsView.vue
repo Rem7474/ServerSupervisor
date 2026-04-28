@@ -11,10 +11,10 @@
               Dashboard
             </router-link>
             <span class="text-muted mx-1">/</span>
-            <span>{{ alertsTab === 'incidents' ? 'Historique de notifications' : 'Alertes' }}</span>
+            <span>{{ TAB_TITLES[alertsTab] || 'Alertes' }}</span>
           </div>
           <h2 class="page-title">
-            {{ alertsTab === 'incidents' ? 'Historique de notifications' : 'Alertes' }}
+            {{ TAB_TITLES[alertsTab] || 'Alertes' }}
           </h2>
         </div>
         <div class="col-auto ms-auto d-flex gap-2">
@@ -70,6 +70,20 @@
       <li class="nav-item">
         <a
           class="nav-link"
+          :class="{ active: alertsTab === 'releases' }"
+          href="#"
+          @click.prevent="switchToTrackers"
+        >
+          Suivi de versions
+          <span
+            v-if="trackers.length > 0"
+            class="badge bg-azure-lt text-azure ms-1"
+          >{{ trackers.length }}</span>
+        </a>
+      </li>
+      <li class="nav-item">
+        <a
+          class="nav-link"
           :class="{ active: alertsTab === 'incidents' }"
           href="#"
           @click.prevent="switchToIncidents"
@@ -95,6 +109,14 @@
         @edit="startEditAlert"
         @toggle="toggleEnabled"
         @delete="deleteAlert"
+      />
+    </div>
+
+    <div v-show="alertsTab === 'releases'">
+      <AlertReleaseSummary
+        :trackers="trackers"
+        :loading="trackersLoading"
+        :error="trackersError"
       />
     </div>
 
@@ -127,10 +149,17 @@
 import { onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import AlertIncidentList from '../components/alerts/AlertIncidentList.vue'
+import AlertReleaseSummary from '../components/alerts/AlertReleaseSummary.vue'
 import AlertRuleList from '../components/alerts/AlertRuleList.vue'
 import AlertRuleModal from '../components/alerts/AlertRuleModal.vue'
 import AppIcon from '../components/AppIcon.vue'
 import { useAlertsPage } from '../composables/useAlertsPage'
+
+const TAB_TITLES = {
+  rules: 'Alertes',
+  releases: 'Suivi de versions',
+  incidents: 'Historique de notifications',
+}
 import { useWebSocket } from '../composables/useWebSocket'
 
 const route = useRoute()

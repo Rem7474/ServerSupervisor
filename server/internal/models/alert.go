@@ -59,9 +59,10 @@ type AlertRule struct {
 	DurationSeconds    int                 `json:"duration_seconds" db:"duration_seconds"`
 	Actions            AlertActions        `json:"actions" db:"-"` // stored as JSONB in DB
 	LastFired          *time.Time          `json:"last_fired,omitempty" db:"last_fired"`
-	Enabled            bool                `json:"enabled" db:"enabled"`
-	CreatedAt          time.Time           `json:"created_at" db:"created_at"`
-	UpdatedAt          *time.Time          `json:"updated_at,omitempty" db:"updated_at"`
+	Enabled              bool                `json:"enabled" db:"enabled"`
+	CreatedAt            time.Time           `json:"created_at" db:"created_at"`
+	UpdatedAt            *time.Time          `json:"updated_at,omitempty" db:"updated_at"`
+	ActiveIncidentCount  int                 `json:"active_incident_count" db:"-"`
 }
 
 type AlertIncident struct {

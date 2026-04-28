@@ -58,12 +58,35 @@ interface AlertRuleCapabilities {
 
 type AlertRulePayload = Record<string, unknown>
 
+interface ReleaseTracker {
+  id: string
+  name: string
+  tracker_type: string
+  host_id?: string
+  host_name?: string
+  last_release_tag?: string
+  last_release_detected_at?: string
+  last_checked_at?: string
+  last_triggered_at?: string
+  last_error?: string
+  enabled: boolean
+  last_execution?: {
+    status: string
+    tag_name: string
+    triggered_at: string
+  }
+  [key: string]: unknown
+}
+
 interface UseAlertsPageApi {
   alertsTab: Ref<string>
   incidents: Ref<Incident[]>
   incidentsLoading: Ref<boolean>
   incidentsError: Ref<string>
   incidentsLoaded: Ref<boolean>
+  trackers: Ref<ReleaseTracker[]>
+  trackersLoading: Ref<boolean>
+  trackersError: Ref<string>
   rules: Ref<AlertRule[]>
   hosts: Ref<Host[]>
   loading: Ref<boolean>
@@ -79,7 +102,9 @@ interface UseAlertsPageApi {
   activeIncidentCount: ComputedRef<number>
   init: () => Promise<void>
   loadIncidents: () => Promise<void>
+  loadTrackers: () => Promise<void>
   switchToIncidents: () => Promise<void>
+  switchToTrackers: () => Promise<void>
   startAddAlert: () => void
   startEditAlert: (rule: AlertRule) => void
   saveAlert: (payload: AlertRulePayload) => Promise<void>
@@ -101,6 +126,10 @@ export function useAlertsPage(): UseAlertsPageApi {
   const incidentsLoading: Ref<boolean> = ref(false)
   const incidentsError: Ref<string> = ref('')
   const incidentsLoaded: Ref<boolean> = ref(false)
+  const trackers: Ref<ReleaseTracker[]> = ref([])
+  const trackersLoading: Ref<boolean> = ref(false)
+  const trackersError: Ref<string> = ref('')
+  const trackersLoaded: Ref<boolean> = ref(false)
   const showModal: Ref<boolean> = ref(false)
   const saving: Ref<boolean> = ref(false)
   const saveError: Ref<string> = ref('')
@@ -177,9 +206,28 @@ export function useAlertsPage(): UseAlertsPageApi {
     }
   }
 
+  async function loadTrackers(): Promise<void> {
+    trackersLoading.value = true
+    trackersError.value = ''
+    try {
+      const response = await apiClient.getReleaseTrackers()
+      trackers.value = response.data?.trackers || response.data || []
+      trackersLoaded.value = true
+    } catch {
+      trackersError.value = 'Impossible de charger les trackers de versions'
+    } finally {
+      trackersLoading.value = false
+    }
+  }
+
   async function switchToIncidents(): Promise<void> {
     alertsTab.value = 'incidents'
     if (!incidentsLoaded.value) await loadIncidents()
+  }
+
+  async function switchToTrackers(): Promise<void> {
+    alertsTab.value = 'releases'
+    if (!trackersLoaded.value) await loadTrackers()
   }
 
   function startAddAlert(): void {
@@ -253,12 +301,16 @@ export function useAlertsPage(): UseAlertsPageApi {
 
   function onWebSocketAlert(payload: Notification): void {
     // Incident created or resolved — refresh the list
+    if (payload.type === 'alert_incident_update') {
+      loadIncidents()
+      return
+    }
     if (
-      payload.type === 'alert_incident_update' ||
       payload.type === 'release_tracker_detected' ||
       payload.type === 'release_tracker_execution'
     ) {
       loadIncidents()
+      if (trackersLoaded.value) loadTrackers()
       return
     }
 
@@ -287,6 +339,9 @@ export function useAlertsPage(): UseAlertsPageApi {
     incidentsLoading,
     incidentsError,
     incidentsLoaded,
+    trackers,
+    trackersLoading,
+    trackersError,
     rules: rules as Ref<AlertRule[]>,
     hosts: hosts as Ref<Host[]>,
     loading: loading as Ref<boolean>,
@@ -302,7 +357,9 @@ export function useAlertsPage(): UseAlertsPageApi {
     activeIncidentCount,
     init,
     loadIncidents,
+    loadTrackers,
     switchToIncidents,
+    switchToTrackers,
     startAddAlert,
     startEditAlert,
     saveAlert,
