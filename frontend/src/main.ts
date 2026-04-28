@@ -95,7 +95,34 @@ window.addEventListener('error', (event: ErrorEvent) => {
   })
 })
 
+// Errors expected during reconnect/wake: network failures, aborted fetches, WS close races.
+// These must NOT destroy the app — just log them.
+function isBenignRejection(reason: unknown): boolean {
+  const msg = reason instanceof Error
+    ? reason.message.toLowerCase()
+    : typeof reason === 'string' ? reason.toLowerCase() : ''
+  if (!msg) return false
+  return (
+    msg.includes('aborted') ||
+    msg.includes('abort') ||
+    msg.includes('failed to fetch') ||
+    msg.includes('load failed') ||
+    msg.includes('networkerror') ||
+    msg.includes('network error') ||
+    msg.includes('the internet connection appears to be offline') ||
+    msg.includes('websocket') ||
+    // axios cancel
+    (reason instanceof Error && reason.name === 'CanceledError') ||
+    (reason instanceof Error && reason.name === 'AbortError')
+  )
+}
+
 window.addEventListener('unhandledrejection', (event: PromiseRejectionEvent) => {
+  if (isBenignRejection(event.reason)) {
+    console.warn('[PWA] Unhandled rejection (réseau/veille, ignoré):', event.reason)
+    event.preventDefault()
+    return
+  }
   renderFatalFallback({
     title: 'Erreur asynchrone non gérée',
     message: toErrorMessage(event.reason),
@@ -129,9 +156,14 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
         console.error('[PWA] Service worker registration failed:', error)
       })
 
+    // Guard against double-reload (controllerchange can fire multiple times during SW swap)
+    let reloadPending = false
     navigator.serviceWorker.addEventListener('controllerchange', () => {
-      console.log('[PWA] New version of app is available, reloading...')
-      window.location.reload()
+      if (reloadPending) return
+      reloadPending = true
+      console.log('[PWA] Nouvelle version disponible, rechargement dans 300ms...')
+      // Small delay so the new SW finishes activating before the page reloads
+      setTimeout(() => window.location.reload(), 300)
     })
   })
 }

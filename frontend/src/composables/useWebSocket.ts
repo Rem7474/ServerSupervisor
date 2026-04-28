@@ -66,6 +66,9 @@ export function useWebSocket<TPayload = unknown>(
     if (!auth.token) return
     manualClose = false
 
+    // Cancel any pending retry timer so handleAppResume can't trigger a double-connect
+    if (retryTimer) { clearTimeout(retryTimer); retryTimer = null }
+
     // Close any existing socket before opening a new one (prevents double-instance on reconnect)
     if (ws && ws.readyState !== WebSocket.CLOSED) {
       ws.onclose = null

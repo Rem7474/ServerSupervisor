@@ -1,4 +1,4 @@
-const SW_VERSION = '2026-04-22-v1'
+const SW_VERSION = '2026-04-28-v1'
 const STATIC_CACHE_PREFIX = 'serversupervisor-static'
 const RUNTIME_CACHE_PREFIX = 'serversupervisor-runtime'
 const CACHE_NAME = `${STATIC_CACHE_PREFIX}-${SW_VERSION}`
@@ -219,10 +219,8 @@ self.addEventListener('notificationclick', (event) => {
 // Background sync for failed requests (optional future feature)
 self.addEventListener('sync', (event) => {
   if (event.tag === 'sync-api-requests') {
-    event.waitUntil(
-      // Retry failed API requests when connection restores
-      console.log('[ServiceWorker] Background sync triggered')
-    )
+    console.log('[ServiceWorker] Background sync triggered')
+    event.waitUntil(Promise.resolve())
   }
 })
 
@@ -232,12 +230,13 @@ self.addEventListener('message', (event) => {
     self.skipWaiting()
   }
   if (event.data && event.data.type === 'CLEAR_CACHE') {
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
+    const cleared = caches.keys().then((cacheNames) =>
+      Promise.all(
         cacheNames
           .filter((cacheName) => CACHE_PREFIXES.some((prefix) => cacheName.startsWith(prefix)))
           .map((cacheName) => caches.delete(cacheName))
       )
-    })
+    ).catch((err) => console.error('[ServiceWorker] CLEAR_CACHE failed:', err))
+    if (event.waitUntil) event.waitUntil(cleared)
   }
 })
