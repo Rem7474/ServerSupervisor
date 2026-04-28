@@ -96,8 +96,8 @@ func (db *DB) InsertWebLogSnapshot(hostID string, report *models.WebLogReport) e
 		suspicious := req.Category != ""
 		fingerprint := webLogFingerprint(hostID, report.Source, ts, req, suspicious)
 		if _, err := tx.Exec(
-			`INSERT INTO web_log_requests (snapshot_id, host_id, captured_at, source, ip, method, path, status, bytes, user_agent, domain, category, suspicious, fingerprint)
-			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+			`INSERT INTO web_log_requests (snapshot_id, host_id, captured_at, source, ip, method, path, status, bytes, user_agent, domain, category, suspicious, fingerprint, blocked, blocked_source, blocked_reason, blocked_at, blocked_until)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
 			 ON CONFLICT (host_id, source, fingerprint) DO NOTHING`,
 			snapshotID,
 			hostID,
@@ -113,6 +113,11 @@ func (db *DB) InsertWebLogSnapshot(hostID string, report *models.WebLogReport) e
 			req.Category,
 			suspicious,
 			fingerprint,
+			req.Blocked,
+			req.BlockedSource,
+			req.BlockedReason,
+			req.BlockedAt,
+			req.BlockedUntil,
 		); err != nil {
 			return err
 		}
@@ -196,6 +201,25 @@ func (db *DB) GetWebLogsSummary(since time.Time, hostID string, source string) (
 		"3xx": status3xx,
 		"4xx": errors4xx,
 		"5xx": errors5xx,
+	}
+
+	// Blocked requests statistics
+	var blockedRequests int64
+	var blockedIPs int64
+	if err := db.conn.QueryRow(
+		fmt.Sprintf(`SELECT 
+		COALESCE(COUNT(*),0),
+		COALESCE(COUNT(DISTINCT ip),0)
+		FROM web_log_requests WHERE %s AND blocked = TRUE`, where),
+		args...,
+	).Scan(&blockedRequests, &blockedIPs); err == nil {
+		traffic["blocked_requests"] = blockedRequests
+		traffic["blocked_ips"] = blockedIPs
+		if totalRequests > 0 {
+			traffic["blocked_ratio"] = float64(blockedRequests) / float64(totalRequests)
+		} else {
+			traffic["blocked_ratio"] = float64(0)
+		}
 	}
 
 	rows, err := db.conn.Query(
@@ -380,7 +404,12 @@ func (db *DB) GetWebLogsSummary(since time.Time, hostID string, source string) (
 		COUNT(DISTINCT path) AS unique_paths,
 		COUNT(DISTINCT COALESCE(NULLIF(domain,''), '(unknown)')) AS host_count,
 		MIN(captured_at) AS first_seen,
-		MAX(captured_at) AS last_seen
+		MAX(captured_at) AS last_seen,
+		MAX(CASE WHEN blocked = TRUE THEN blocked_source END) AS blocked_source,
+		MAX(CASE WHEN blocked = TRUE THEN blocked_reason END) AS blocked_reason,
+		MAX(CASE WHEN blocked = TRUE THEN blocked_at END) AS blocked_at,
+		MAX(CASE WHEN blocked = TRUE THEN blocked_until END) AS blocked_until,
+		MAX(CASE WHEN blocked = TRUE THEN 1 ELSE 0 END) AS is_blocked
 		FROM web_log_requests
 		WHERE %s AND suspicious = TRUE
 		GROUP BY ip
@@ -400,7 +429,12 @@ func (db *DB) GetWebLogsSummary(since time.Time, hostID string, source string) (
 		var hostCount int64
 		var firstSeen time.Time
 		var lastSeen time.Time
-		if err := ipRows.Scan(&ip, &hits, &uniquePaths, &hostCount, &firstSeen, &lastSeen); err != nil {
+		var blockedSource sql.NullString
+		var blockedReason sql.NullString
+		var blockedAt sql.NullTime
+		var blockedUntil sql.NullTime
+		var isBlocked int
+		if err := ipRows.Scan(&ip, &hits, &uniquePaths, &hostCount, &firstSeen, &lastSeen, &blockedSource, &blockedReason, &blockedAt, &blockedUntil, &isBlocked); err != nil {
 			return nil, err
 		}
 		score := hits * uniquePaths
@@ -413,7 +447,7 @@ func (db *DB) GetWebLogsSummary(since time.Time, hostID string, source string) (
 		case score >= 80:
 			level = "MEDIUM"
 		}
-		topIPs = append(topIPs, map[string]any{
+		ipData := map[string]any{
 			"ip":           ip,
 			"hits":         hits,
 			"unique_paths": uniquePaths,
@@ -422,7 +456,24 @@ func (db *DB) GetWebLogsSummary(since time.Time, hostID string, source string) (
 			"last_seen":    lastSeen,
 			"threat_score": score,
 			"level":        level,
-		})
+		}
+		// Add blocking info if IP is blocked
+		if isBlocked == 1 {
+			ipData["blocked"] = true
+			if blockedSource.Valid {
+				ipData["blocked_source"] = blockedSource.String
+			}
+			if blockedReason.Valid {
+				ipData["blocked_reason"] = blockedReason.String
+			}
+			if blockedAt.Valid {
+				ipData["blocked_at"] = blockedAt.Time
+			}
+			if blockedUntil.Valid {
+				ipData["blocked_until"] = blockedUntil.Time
+			}
+		}
+		topIPs = append(topIPs, ipData)
 	}
 	threats["top_ips"] = topIPs
 
@@ -519,7 +570,7 @@ func (db *DB) GetIPTimeline(ip string, since time.Time, hostID string, limit int
 	args = append(args, limit)
 
 	rows, err := db.conn.Query(
-		fmt.Sprintf(`SELECT r.captured_at, r.host_id, h.name, r.source, r.ip, r.method, r.path, r.status, r.bytes, COALESCE(r.user_agent,''), COALESCE(r.domain,''), COALESCE(r.category,'')
+		fmt.Sprintf(`SELECT r.captured_at, r.host_id, h.name, r.source, r.ip, r.method, r.path, r.status, r.bytes, COALESCE(r.user_agent,''), COALESCE(r.domain,''), COALESCE(r.category,''), r.blocked, COALESCE(r.blocked_source,''), COALESCE(r.blocked_reason,''), r.blocked_at, r.blocked_until
 		FROM web_log_requests r
 		JOIN hosts h ON h.id = r.host_id
 		WHERE %s
@@ -535,7 +586,7 @@ func (db *DB) GetIPTimeline(ip string, since time.Time, hostID string, limit int
 	out := make([]models.WebLogIPTimelineRow, 0)
 	for rows.Next() {
 		var row models.WebLogIPTimelineRow
-		if err := rows.Scan(&row.Timestamp, &row.HostID, &row.HostName, &row.Source, &row.IP, &row.Method, &row.Path, &row.Status, &row.Bytes, &row.UserAgent, &row.Domain, &row.Category); err != nil {
+		if err := rows.Scan(&row.Timestamp, &row.HostID, &row.HostName, &row.Source, &row.IP, &row.Method, &row.Path, &row.Status, &row.Bytes, &row.UserAgent, &row.Domain, &row.Category, &row.Blocked, &row.BlockedSource, &row.BlockedReason, &row.BlockedAt, &row.BlockedUntil); err != nil {
 			return nil, err
 		}
 		out = append(out, row)
@@ -608,7 +659,12 @@ func (db *DB) GetDomainDetails(domain string, since time.Time, hostID string, so
 	out["top_paths"] = paths
 
 	ipRows, err := db.conn.Query(
-		fmt.Sprintf(`SELECT ip, COUNT(*) AS hits
+		fmt.Sprintf(`SELECT ip, COUNT(*) AS hits,
+		MAX(CASE WHEN blocked = TRUE THEN blocked_source END) AS blocked_source,
+		MAX(CASE WHEN blocked = TRUE THEN blocked_reason END) AS blocked_reason,
+		MAX(CASE WHEN blocked = TRUE THEN blocked_at END) AS blocked_at,
+		MAX(CASE WHEN blocked = TRUE THEN blocked_until END) AS blocked_until,
+		MAX(CASE WHEN blocked = TRUE THEN 1 ELSE 0 END) AS is_blocked
 		FROM web_log_requests
 		WHERE %s
 		GROUP BY ip
@@ -624,16 +680,37 @@ func (db *DB) GetDomainDetails(domain string, since time.Time, hostID string, so
 	for ipRows.Next() {
 		var ip string
 		var hits int64
-		if err := ipRows.Scan(&ip, &hits); err != nil {
+		var blockedSource sql.NullString
+		var blockedReason sql.NullString
+		var blockedAt sql.NullTime
+		var blockedUntil sql.NullTime
+		var isBlocked int
+		if err := ipRows.Scan(&ip, &hits, &blockedSource, &blockedReason, &blockedAt, &blockedUntil, &isBlocked); err != nil {
 			return nil, err
 		}
-		ipClients = append(ipClients, map[string]any{"ip": ip, "hits": hits})
+		clientData := map[string]any{"ip": ip, "hits": hits}
+		if isBlocked == 1 {
+			clientData["blocked"] = true
+			if blockedSource.Valid {
+				clientData["blocked_source"] = blockedSource.String
+			}
+			if blockedReason.Valid {
+				clientData["blocked_reason"] = blockedReason.String
+			}
+			if blockedAt.Valid {
+				clientData["blocked_at"] = blockedAt.Time
+			}
+			if blockedUntil.Valid {
+				clientData["blocked_until"] = blockedUntil.Time
+			}
+		}
+		ipClients = append(ipClients, clientData)
 	}
 	out["top_clients"] = ipClients
 
 	args = append(args, limit)
 	reqRows, err := db.conn.Query(
-		fmt.Sprintf(`SELECT captured_at, host_id, source, ip, method, path, status, bytes, COALESCE(user_agent,''), COALESCE(category,'')
+		fmt.Sprintf(`SELECT captured_at, host_id, source, ip, method, path, status, bytes, COALESCE(user_agent,''), COALESCE(category,''), blocked, COALESCE(blocked_source,''), COALESCE(blocked_reason,''), blocked_at, blocked_until
 		FROM web_log_requests
 		WHERE %s
 		ORDER BY captured_at DESC
@@ -650,10 +727,13 @@ func (db *DB) GetDomainDetails(domain string, since time.Time, hostID string, so
 		var rowHostID, rowSource, ip, method, path, userAgent, category string
 		var status int
 		var bytes int64
-		if err := reqRows.Scan(&capturedAt, &rowHostID, &rowSource, &ip, &method, &path, &status, &bytes, &userAgent, &category); err != nil {
+		var blocked bool
+		var blockedSource, blockedReason string
+		var blockedAt, blockedUntil sql.NullTime
+		if err := reqRows.Scan(&capturedAt, &rowHostID, &rowSource, &ip, &method, &path, &status, &bytes, &userAgent, &category, &blocked, &blockedSource, &blockedReason, &blockedAt, &blockedUntil); err != nil {
 			return nil, err
 		}
-		requests = append(requests, map[string]any{
+		reqData := map[string]any{
 			"timestamp":  capturedAt,
 			"host_id":    rowHostID,
 			"source":     rowSource,
@@ -664,7 +744,23 @@ func (db *DB) GetDomainDetails(domain string, since time.Time, hostID string, so
 			"bytes":      bytes,
 			"user_agent": userAgent,
 			"category":   category,
-		})
+		}
+		if blocked {
+			reqData["blocked"] = true
+			if blockedSource != "" {
+				reqData["blocked_source"] = blockedSource
+			}
+			if blockedReason != "" {
+				reqData["blocked_reason"] = blockedReason
+			}
+			if blockedAt.Valid {
+				reqData["blocked_at"] = blockedAt.Time
+			}
+			if blockedUntil.Valid {
+				reqData["blocked_until"] = blockedUntil.Time
+			}
+		}
+		requests = append(requests, reqData)
 	}
 	out["requests"] = requests
 

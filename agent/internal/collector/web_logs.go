@@ -16,15 +16,20 @@ import (
 )
 
 type WebRequest struct {
-	Timestamp string `json:"timestamp"`
-	IP        string `json:"ip"`
-	Method    string `json:"method"`
-	Path      string `json:"path"`
-	Status    int    `json:"status"`
-	Bytes     int64  `json:"bytes"`
-	UserAgent string `json:"user_agent"`
-	Domain    string `json:"domain"`
-	Category  string `json:"category,omitempty"`
+	Timestamp     string     `json:"timestamp"`
+	IP            string     `json:"ip"`
+	Method        string     `json:"method"`
+	Path          string     `json:"path"`
+	Status        int        `json:"status"`
+	Bytes         int64      `json:"bytes"`
+	UserAgent     string     `json:"user_agent"`
+	Domain        string     `json:"domain"`
+	Category      string     `json:"category,omitempty"`
+	Blocked       bool       `json:"blocked,omitempty"`
+	BlockedSource string     `json:"blocked_source,omitempty"`
+	BlockedReason string     `json:"blocked_reason,omitempty"`
+	BlockedAt     *time.Time `json:"blocked_at,omitempty"`
+	BlockedUntil  *time.Time `json:"blocked_until,omitempty"`
 }
 
 type NPMPathHit struct {
@@ -51,14 +56,19 @@ type TrafficSummary struct {
 }
 
 type BotDetectionIP struct {
-	IP          string       `json:"ip"`
-	Hits        int          `json:"hits"`
-	UniquePaths int          `json:"unique_paths"`
-	FirstSeen   string       `json:"first_seen"`
-	LastSeen    string       `json:"last_seen"`
-	Category    string       `json:"category"`
-	UserAgents  []string     `json:"user_agents"`
-	Requests    []WebRequest `json:"requests"`
+	IP            string       `json:"ip"`
+	Hits          int          `json:"hits"`
+	UniquePaths   int          `json:"unique_paths"`
+	FirstSeen     string       `json:"first_seen"`
+	LastSeen      string       `json:"last_seen"`
+	Category      string       `json:"category"`
+	UserAgents    []string     `json:"user_agents"`
+	Requests      []WebRequest `json:"requests"`
+	Blocked       bool         `json:"blocked,omitempty"`
+	BlockedSource string       `json:"blocked_source,omitempty"`
+	BlockedReason string       `json:"blocked_reason,omitempty"`
+	BlockedAt     *time.Time   `json:"blocked_at,omitempty"`
+	BlockedUntil  *time.Time   `json:"blocked_until,omitempty"`
 }
 
 type BotDetectionPath struct {
@@ -129,7 +139,7 @@ var suspiciousUANeedles = []string{
 	"masscan", "nmap", "zgrab", "sqlmap", "nikto", "dirbuster", "gobuster", "wpscan", "acunetix", "nessus",
 }
 
-func CollectWebLogs(logPathGlobs []string, tailLines int, topN int, requestLimit int, cursorFile string, verbose bool) (*WebLogReport, error) {
+func CollectWebLogs(logPathGlobs []string, tailLines int, topN int, requestLimit int, cursorFile string, verbose bool, crowdSecConnectionString string, crowdSecAPIKey string, crowdSecEnabled bool) (*WebLogReport, error) {
 	if tailLines <= 0 {
 		tailLines = 5000
 	}
@@ -322,6 +332,40 @@ func CollectWebLogs(logPathGlobs []string, tailLines int, topN int, requestLimit
 		}
 	}
 	saveWebLogCursor(cursorFile, cursor)
+
+	// Correlate with CrowdSec decisions if enabled
+	if crowdSecEnabled {
+		crowdSecDecisions, err := CollectCrowdSecDecisions(crowdSecConnectionString, crowdSecAPIKey, verbose)
+		if err != nil && verbose {
+			log.Printf("[web_logs] CrowdSec correlation error (non-fatal): %v", err)
+		}
+
+		// Enrich individual requests with CrowdSec data
+		for i := range report.Requests {
+			if decision, ok := crowdSecDecisions[report.Requests[i].IP]; ok {
+				report.Requests[i].Blocked = decision.Blocked
+				report.Requests[i].BlockedSource = "crowdsec"
+				report.Requests[i].BlockedReason = decision.Reason
+				report.Requests[i].BlockedAt = &decision.BlockedAt
+				report.Requests[i].BlockedUntil = &decision.BlockedUntil
+			}
+		}
+
+		// Enrich top suspicious IPs with CrowdSec data
+		for i := range report.Threats.TopSuspiciousIPs {
+			if decision, ok := crowdSecDecisions[report.Threats.TopSuspiciousIPs[i].IP]; ok {
+				report.Threats.TopSuspiciousIPs[i].Blocked = decision.Blocked
+				report.Threats.TopSuspiciousIPs[i].BlockedSource = "crowdsec"
+				report.Threats.TopSuspiciousIPs[i].BlockedReason = decision.Reason
+				report.Threats.TopSuspiciousIPs[i].BlockedAt = &decision.BlockedAt
+				report.Threats.TopSuspiciousIPs[i].BlockedUntil = &decision.BlockedUntil
+			}
+		}
+
+		if verbose && len(crowdSecDecisions) > 0 {
+			log.Printf("[web_logs] enriched threats with CrowdSec data: %d IPs marked as blocked", len(crowdSecDecisions))
+		}
+	}
 
 	return report, nil
 }

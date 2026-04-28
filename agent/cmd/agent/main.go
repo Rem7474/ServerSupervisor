@@ -262,6 +262,12 @@ func sendReport(ctx context.Context, cfg *config.Config, s *sender.Sender) {
 	// 2. After manual apt update/upgrade commands (with CVE)
 	var aptData interface{} = nil
 
+	// Always collect UU status (cheap: reads config files + log cursor)
+	var uuData interface{}
+	if cfg.CollectAPT {
+		uuData = collector.CollectUnattendedUpgrades()
+	}
+
 	// Collect disk metrics and health
 	diskMetrics, err := collector.CollectDiskMetrics()
 	if err != nil {
@@ -287,7 +293,7 @@ func sendReport(ctx context.Context, cfg *config.Config, s *sender.Sender) {
 	if cfg.CollectWebLogs {
 		globs := cfg.WebLogGlobs()
 		log.Printf("Web logs: scanning globs %v", globs)
-		report, err := collector.CollectWebLogs(globs, cfg.WebLogsTailLines, cfg.WebLogsTopN, cfg.WebLogsRequestsLimit, cfg.WebLogsCursorFile, verboseMode)
+		report, err := collector.CollectWebLogs(globs, cfg.WebLogsTailLines, cfg.WebLogsTopN, cfg.WebLogsRequestsLimit, cfg.WebLogsCursorFile, verboseMode, cfg.CrowdSecConnectionString, cfg.CrowdSecAPIKey, cfg.CollectCrowdSecCorrelation)
 		if err != nil {
 			log.Printf("Web logs collection skipped: %v", err)
 		} else {
@@ -314,19 +320,20 @@ func sendReport(ctx context.Context, cfg *config.Config, s *sender.Sender) {
 
 	// Send report (with retry on transient network errors)
 	report := &sender.Report{
-		AgentVersion:    Version,
-		Capabilities:    capabilities,
-		Metrics:         metricsPayload,
-		Docker:          dockerData,
-		AptStatus:       aptData,
-		WebLogs:         webLogs,
-		DockerNetworks:  dockerNetworks,
-		ContainerEnvs:   containerEnvs,
-		ComposeProjects: composeProjects,
-		DiskMetrics:     diskMetrics,
-		DiskHealth:      diskHealth,
-		CustomTasks:     customTasksList,
-		Timestamp:       time.Now(),
+		AgentVersion:       Version,
+		Capabilities:       capabilities,
+		Metrics:            metricsPayload,
+		Docker:             dockerData,
+		AptStatus:          aptData,
+		UnattendedUpgrades: uuData,
+		WebLogs:            webLogs,
+		DockerNetworks:     dockerNetworks,
+		ContainerEnvs:      containerEnvs,
+		ComposeProjects:    composeProjects,
+		DiskMetrics:        diskMetrics,
+		DiskHealth:         diskHealth,
+		CustomTasks:        customTasksList,
+		Timestamp:          time.Now(),
 	}
 	trimWebLogsForReportSize(report, cfg.MaxReportBodyBytes)
 
@@ -521,6 +528,70 @@ func executeCommand(s *sender.Sender, cmd sender.PendingCommand) {
 		}
 
 	case "apt":
+		stream := func(chunk string) {
+			if streamErr := s.StreamCommandChunk(ctx, cmd.ID, chunk); streamErr != nil {
+				log.Printf("Failed to stream apt chunk: %v", streamErr)
+			}
+		}
+
+		// Unattended-upgrades management actions — handled before standard apt-get commands.
+		switch cmd.Action {
+		case "install_uu":
+			_ = s.ReportCommandResult(ctx, &sender.CommandResult{CommandID: cmd.ID, Status: "running"})
+			output, err := collector.InstallUnattendedUpgrades(stream)
+			status := "completed"
+			if err != nil {
+				status = "failed"
+				output = fmt.Sprintf("ERROR: %v\n%s", err, output)
+			}
+			_ = s.ReportCommandResult(ctx, &sender.CommandResult{CommandID: cmd.ID, Status: status, Output: output})
+			return
+
+		case "toggle_uu":
+			enable := cmd.Target == "enable"
+			_ = s.ReportCommandResult(ctx, &sender.CommandResult{CommandID: cmd.ID, Status: "running"})
+			output, err := collector.ToggleUnattendedUpgrades(enable)
+			status := "completed"
+			if err != nil {
+				status = "failed"
+				output = fmt.Sprintf("ERROR: %v\n%s", err, output)
+			}
+			_ = s.ReportCommandResult(ctx, &sender.CommandResult{CommandID: cmd.ID, Status: status, Output: output})
+			return
+
+		case "configure_uu":
+			_ = s.ReportCommandResult(ctx, &sender.CommandResult{CommandID: cmd.ID, Status: "running"})
+			var cfg collector.UUConfig
+			if jsonErr := json.Unmarshal([]byte(cmd.Payload), &cfg); jsonErr != nil {
+				_ = s.ReportCommandResult(ctx, &sender.CommandResult{
+					CommandID: cmd.ID, Status: "failed",
+					Output: fmt.Sprintf("invalid payload: %v", jsonErr),
+				})
+				return
+			}
+			err := collector.ConfigureUnattendedUpgrades(cfg)
+			status := "completed"
+			output := "Configuration applied."
+			if err != nil {
+				status = "failed"
+				output = fmt.Sprintf("ERROR: %v", err)
+			}
+			_ = s.ReportCommandResult(ctx, &sender.CommandResult{CommandID: cmd.ID, Status: status, Output: output})
+			return
+
+		case "run_uu":
+			_ = s.ReportCommandResult(ctx, &sender.CommandResult{CommandID: cmd.ID, Status: "running"})
+			output, err := collector.RunUnattendedUpgrades(stream)
+			status := "completed"
+			if err != nil {
+				status = "failed"
+				output = fmt.Sprintf("ERROR: %v\n%s", err, output)
+			}
+			_ = s.ReportCommandResult(ctx, &sender.CommandResult{CommandID: cmd.ID, Status: status, Output: output})
+			return
+		}
+
+		// Standard apt-get commands: update / upgrade / dist-upgrade
 		if err := s.ReportCommandResult(ctx, &sender.CommandResult{
 			CommandID: cmd.ID,
 			Status:    "running",
@@ -528,11 +599,7 @@ func executeCommand(s *sender.Sender, cmd sender.PendingCommand) {
 			log.Printf("Failed to report running status: %v", err)
 		}
 
-		output, err := collector.ExecuteAptCommandWithStreaming(cmd.Action, func(chunk string) {
-			if streamErr := s.StreamCommandChunk(ctx, cmd.ID, chunk); streamErr != nil {
-				log.Printf("Failed to stream apt chunk: %v", streamErr)
-			}
-		})
+		output, err := collector.ExecuteAptCommandWithStreaming(cmd.Action, stream)
 		status := "completed"
 		if err != nil {
 			status = "failed"
@@ -812,4 +879,3 @@ func executeCustomTask(ctx context.Context, s *sender.Sender, cmd sender.Pending
 		log.Printf("Failed to report custom task result: %v", err)
 	}
 }
-

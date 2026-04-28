@@ -30,6 +30,11 @@ type Config struct {
 	WebLogsRequestsLimit  int      `yaml:"web_logs_requests_limit"`
 	WebLogsCursorFile     string   `yaml:"web_logs_cursor_file"`
 
+	// CrowdSec correlation
+	CollectCrowdSecCorrelation bool   `yaml:"collect_crowdsec_correlation"`
+	CrowdSecConnectionString   string `yaml:"crowdsec_connection_string"`
+	CrowdSecAPIKey             string `yaml:"crowdsec_api_key"`
+
 	// TLS
 	InsecureSkipVerify bool `yaml:"insecure_skip_verify"`
 
@@ -151,6 +156,15 @@ func Load(path string) (*Config, error) {
 	if env := os.Getenv("SUPERVISOR_INSECURE_SKIP_VERIFY"); env != "" {
 		cfg.InsecureSkipVerify = env == "true" || env == "1"
 	}
+	if env := os.Getenv("SUPERVISOR_COLLECT_CROWDSEC_CORRELATION"); env != "" {
+		cfg.CollectCrowdSecCorrelation = env == "true" || env == "1"
+	}
+	if env := os.Getenv("SUPERVISOR_CROWDSEC_CONNECTION_STRING"); env != "" {
+		cfg.CrowdSecConnectionString = strings.TrimSpace(env)
+	}
+	if env := os.Getenv("SUPERVISOR_CROWDSEC_API_KEY"); env != "" {
+		cfg.CrowdSecAPIKey = strings.TrimSpace(env)
+	}
 
 	if cfg.APIKey == "" {
 		return nil, fmt.Errorf("api_key is required (set in config or SUPERVISOR_API_KEY env var)")
@@ -175,10 +189,13 @@ func defaultConfig() *Config {
 			"/var/log/httpd/access_log",
 			"/data/logs/proxy-host-*_access.log",
 		},
-		WebLogsTailLines:     5000,
-		WebLogsTopN:          10,
-		WebLogsRequestsLimit: 200,
-		WebLogsCursorFile:    "/var/lib/serversupervisor/web_logs_cursor.json",
+		WebLogsTailLines:             5000,
+		WebLogsTopN:                  10,
+		WebLogsRequestsLimit:         200,
+		WebLogsCursorFile:            "/var/lib/serversupervisor/web_logs_cursor.json",
+		CollectCrowdSecCorrelation:   false,
+		CrowdSecConnectionString:     "http://localhost:8080",
+		CrowdSecAPIKey:               "",
 	}
 }
 

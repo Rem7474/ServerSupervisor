@@ -89,7 +89,7 @@
     </div>
 
     <div class="row row-cards mb-4">
-      <div class="col-12 col-sm-4">
+      <div class="col-12 col-sm-3">
         <div class="card card-sm h-100">
           <div class="card-body text-center">
             <div class="text-secondary small mb-1">
@@ -101,7 +101,7 @@
           </div>
         </div>
       </div>
-      <div class="col-12 col-sm-4">
+      <div class="col-12 col-sm-3">
         <div class="card card-sm h-100">
           <div class="card-body text-center">
             <div class="text-secondary small mb-1">
@@ -113,7 +113,7 @@
           </div>
         </div>
       </div>
-      <div class="col-12 col-sm-4">
+      <div class="col-12 col-sm-3">
         <div class="card card-sm h-100">
           <div class="card-body text-center">
             <div class="text-secondary small mb-1">
@@ -121,6 +121,18 @@
             </div>
             <div class="h2 mb-0">
               {{ threats.targeted_hosts || 0 }}
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-sm-3">
+        <div class="card card-sm h-100">
+          <div class="card-body text-center">
+            <div class="text-secondary small mb-1">
+              IPs bloquées
+            </div>
+            <div class="h2 mb-0 text-success">
+              {{ threats.blocked_ips || 0 }}
             </div>
           </div>
         </div>
@@ -150,13 +162,14 @@
                     Domaines
                   </th>
                   <th>Niveau</th>
+                  <th>Blocage</th>
                   <th />
                 </tr>
               </thead>
               <tbody>
                 <tr v-if="!topIPs.length">
                   <td
-                    colspan="6"
+                    colspan="7"
                     class="text-center text-secondary py-4"
                   >
                     Aucune IP suspecte sur la période.
@@ -183,6 +196,21 @@
                       class="badge"
                       :class="levelClass(ip.level)"
                     >{{ ip.level || 'LOW' }}</span>
+                  </td>
+                  <td>
+                    <span
+                      v-if="ip.blocked"
+                      class="badge bg-success"
+                      :title="formatBlockedUntil(ip.blocked_until)"
+                    >
+                      ✓ Bloquée
+                    </span>
+                    <span
+                      v-else
+                      class="text-secondary small"
+                    >
+                      —
+                    </span>
                   </td>
                   <td class="text-end">
                     <button
@@ -862,6 +890,20 @@ function levelClass(level: string): string {
     case 'MEDIUM': return 'bg-yellow-lt text-yellow'
     default: return 'bg-azure-lt text-azure'
   }
+}
+
+function formatBlockedUntil(blockedUntil?: string): string {
+  if (!blockedUntil) return 'Bloquée'
+  const d = new Date(blockedUntil)
+  if (Number.isNaN(d.getTime())) return 'Bloquée'
+  const now = new Date()
+  if (d <= now) return 'Bloquée (permanent)'
+  const diff = d.getTime() - now.getTime()
+  const hours = Math.floor(diff / 3600000)
+  const days = Math.floor(hours / 24)
+  if (days > 0) return `Bloquée jusqu'à ${d.toLocaleDateString()}`
+  if (hours > 0) return `Bloquée ${hours}h`
+  return 'Bloquée (moins d\'une heure)'
 }
 
 function statusClass(status: number): string {

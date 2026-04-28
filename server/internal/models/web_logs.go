@@ -3,15 +3,20 @@ package models
 import "time"
 
 type WebRequest struct {
-	Timestamp string `json:"timestamp"`
-	IP        string `json:"ip"`
-	Method    string `json:"method"`
-	Path      string `json:"path"`
-	Status    int    `json:"status"`
-	Bytes     int64  `json:"bytes"`
-	UserAgent string `json:"user_agent"`
-	Domain    string `json:"domain"`
-	Category  string `json:"category,omitempty"`
+	Timestamp     string     `json:"timestamp"`
+	IP            string     `json:"ip"`
+	Method        string     `json:"method"`
+	Path          string     `json:"path"`
+	Status        int        `json:"status"`
+	Bytes         int64      `json:"bytes"`
+	UserAgent     string     `json:"user_agent"`
+	Domain        string     `json:"domain"`
+	Category      string     `json:"category,omitempty"`
+	Blocked       bool       `json:"blocked,omitempty"`
+	BlockedSource string     `json:"blocked_source,omitempty"`
+	BlockedReason string     `json:"blocked_reason,omitempty"`
+	BlockedAt     *time.Time `json:"blocked_at,omitempty"`
+	BlockedUntil  *time.Time `json:"blocked_until,omitempty"`
 }
 
 type NPMPathHit struct {
@@ -38,14 +43,19 @@ type TrafficSummary struct {
 }
 
 type BotDetectionIP struct {
-	IP          string       `json:"ip"`
-	Hits        int          `json:"hits"`
-	UniquePaths int          `json:"unique_paths"`
-	FirstSeen   string       `json:"first_seen"`
-	LastSeen    string       `json:"last_seen"`
-	Category    string       `json:"category"`
-	UserAgents  []string     `json:"user_agents"`
-	Requests    []WebRequest `json:"requests"`
+	IP            string       `json:"ip"`
+	Hits          int          `json:"hits"`
+	UniquePaths   int          `json:"unique_paths"`
+	FirstSeen     string       `json:"first_seen"`
+	LastSeen      string       `json:"last_seen"`
+	Category      string       `json:"category"`
+	UserAgents    []string     `json:"user_agents"`
+	Requests      []WebRequest `json:"requests"`
+	Blocked       bool         `json:"blocked,omitempty"`
+	BlockedSource string       `json:"blocked_source,omitempty"`
+	BlockedReason string       `json:"blocked_reason,omitempty"`
+	BlockedAt     *time.Time   `json:"blocked_at,omitempty"`
+	BlockedUntil  *time.Time   `json:"blocked_until,omitempty"`
 }
 
 type BotDetectionPath struct {
@@ -73,16 +83,21 @@ type WebLogReport struct {
 }
 
 type WebLogIPTimelineRow struct {
-	Timestamp time.Time `json:"timestamp"`
-	HostID    string    `json:"host_id"`
-	HostName  string    `json:"host_name"`
-	Source    string    `json:"source"`
-	IP        string    `json:"ip"`
-	Method    string    `json:"method"`
-	Path      string    `json:"path"`
-	Status    int       `json:"status"`
-	Bytes     int64     `json:"bytes"`
-	UserAgent string    `json:"user_agent"`
-	Domain    string    `json:"domain"`
-	Category  string    `json:"category"`
+	Timestamp     time.Time  `json:"timestamp"`
+	HostID        string     `json:"host_id"`
+	HostName      string     `json:"host_name"`
+	Source        string     `json:"source"`
+	IP            string     `json:"ip"`
+	Method        string     `json:"method"`
+	Path          string     `json:"path"`
+	Status        int        `json:"status"`
+	Bytes         int64      `json:"bytes"`
+	UserAgent     string     `json:"user_agent"`
+	Domain        string     `json:"domain"`
+	Category      string     `json:"category"`
+	Blocked       bool       `json:"blocked,omitempty"`
+	BlockedSource string     `json:"blocked_source,omitempty"`
+	BlockedReason string     `json:"blocked_reason,omitempty"`
+	BlockedAt     *time.Time `json:"blocked_at,omitempty"`
+	BlockedUntil  *time.Time `json:"blocked_until,omitempty"`
 }

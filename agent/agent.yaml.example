@@ -39,5 +39,16 @@ web_logs_requests_limit: 200
 # Incremental cursor state file to avoid re-reading already processed lines
 web_logs_cursor_file: "/var/lib/serversupervisor/web_logs_cursor.json"
 
+# CrowdSec integration: correlate web logs with active CrowdSec decisions to identify blocked IPs
+collect_crowdsec_correlation: false
+
+# CrowdSec Local API connection string
+# Examples: "http://localhost:8080" (HTTP), "/var/run/crowdsec/api.sock" (socket), "https://localhost:8080" (HTTPS)
+crowdsec_connection_string: "http://localhost:8080"
+
+# CrowdSec API key for authentication (if required by your setup)
+# Leave empty if CrowdSec Local API is unauthenticated or accessible via socket
+crowdsec_api_key: ""
+
 # Skip TLS verification (for self-signed certs)
 insecure_skip_verify: false
