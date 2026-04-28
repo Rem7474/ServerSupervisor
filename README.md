@@ -125,6 +125,23 @@ Le dashboard est accessible sur `http://localhost:8080` (login: `admin` / `admin
 
 ### 3. Installer l'agent sur une VM
 
+#### Installation en une commande (recommandé)
+
+Après avoir enregistré un hôte dans le dashboard, copiez la commande affichée (URL serveur et clé API déjà injectées) :
+
+```bash
+curl -sSL https://raw.githubusercontent.com/Rem7474/ServerSupervisor/main/agent/install.sh | sudo bash -s -- --server-url http://your-server:8080 --api-key your-api-key
+```
+
+Le script détecte l'architecture (`amd64` / `arm64` / `arm`), télécharge le binaire depuis les releases GitHub, génère `/etc/serversupervisor/agent.yaml` (permissions 0600) et active le service systemd immédiatement.
+
+Options supplémentaires :
+```
+--interval <sec>   Intervalle de rapport (défaut: 30)
+--no-docker        Désactiver le monitoring Docker
+--no-apt           Désactiver le monitoring APT
+```
+
 #### Prérequis agent (packages système)
 
 L'agent est un binaire Go statique, mais certaines fonctionnalités s'appuient sur des outils système présents sur la VM/LXC.
@@ -167,27 +184,18 @@ Notes:
 - Sur certains environnements virtualisés, la température CPU peut être absente même avec `lm-sensors`.
 - Si `collect_cpu_temperature` est désactivé, aucun prérequis capteur n'est nécessaire.
 
-#### Via les releases GitHub (recommandé)
-
-> Le binaire release et le binaire compilé manuellement utilisent exactement la même configuration `agent.yaml` et les mêmes flags (`--init`, `--server-url`, `--api-key`, `--config`, `--init-force`).
+#### Via les releases GitHub (manuel)
 
 ```bash
-# Remplacer ARCH par : amd64, arm64, armv7, armv6
-curl -L https://github.com/<org>/serversupervisor/releases/latest/download/agent-linux-ARCH.gz | \
-  gunzip > /usr/local/bin/serversupervisor-agent
+# Remplacer ARCH par : amd64, arm64, arm
+curl -fsSL https://github.com/Rem7474/ServerSupervisor/releases/latest/download/serversupervisor-agent-linux-ARCH \
+  -o /usr/local/bin/serversupervisor-agent
 chmod +x /usr/local/bin/serversupervisor-agent
 
-# Initialiser la config (idem pour binaire compilé localement)
 sudo /usr/local/bin/serversupervisor-agent --init \
   --config /etc/serversupervisor/agent.yaml \
   --server-url http://your-server:8080 \
   --api-key your-key
-```
-
-#### Via le script d'installation
-
-```bash
-sudo bash agent/install.sh --server-url http://your-server:8080 --api-key your-key
 ```
 
 #### Manuellement

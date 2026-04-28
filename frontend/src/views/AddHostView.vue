@@ -112,7 +112,7 @@
                     Hôte enregistré avec succès
                   </div>
                   <div class="text-secondary small">
-                    La cle ne sera plus affichee. Copiez-la maintenant.
+                    La clé ne sera plus affichée. Copiez-la maintenant.
                   </div>
                 </div>
                 <button
@@ -120,14 +120,30 @@
                   class="btn btn-success"
                   @click="finishAdd"
                 >
-                  Termine
+                  Terminé
                 </button>
+              </div>
+
+              <div class="host-success-card mb-3">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                  <div class="text-secondary small">
+                    Installation en une commande
+                  </div>
+                  <button
+                    type="button"
+                    class="btn btn-outline-light btn-sm"
+                    @click="copyInstallCmd"
+                  >
+                    {{ copiedInstall ? 'Copié' : 'Copier' }}
+                  </button>
+                </div>
+                <pre class="host-success-config host-success-install">{{ installCmd }}</pre>
               </div>
 
               <div class="host-success-grid">
                 <div class="host-success-card">
                   <div class="text-secondary small mb-2">
-                    Cle API agent
+                    Clé API agent
                   </div>
                   <div class="host-success-key">
                     <code>{{ result.api_key }}</code>
@@ -136,21 +152,21 @@
                       class="btn btn-outline-light btn-sm"
                       @click="copyApiKey"
                     >
-                      {{ copiedApiKey ? 'Copie' : 'Copier' }}
+                      {{ copiedApiKey ? 'Copié' : 'Copier' }}
                     </button>
                   </div>
                 </div>
                 <div class="host-success-card">
                   <div class="d-flex align-items-center justify-content-between mb-2">
                     <div class="text-secondary small">
-                      Configuration agent
+                      Configuration agent (YAML)
                     </div>
                     <button
                       type="button"
                       class="btn btn-outline-light btn-sm"
                       @click="copyAgentConfig"
                     >
-                      {{ copiedConfig ? 'Copie' : 'Copier la config' }}
+                      {{ copiedConfig ? 'Copié' : 'Copier' }}
                     </button>
                   </div>
                   <pre class="host-success-config">{{ agentConfig }}</pre>
@@ -169,10 +185,13 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import apiClient from '../api'
 
-const serverHostname =
-  typeof window !== 'undefined' && window.location?.hostname
-    ? window.location.hostname
-    : 'localhost'
+const serverUrl =
+  typeof window !== 'undefined' && window.location?.origin
+    ? window.location.origin
+    : 'http://localhost:8080'
+
+const INSTALL_SCRIPT_URL =
+  'https://raw.githubusercontent.com/Rem7474/ServerSupervisor/main/agent/install.sh'
 
 const form = ref({ name: '', ip_address: '' })
 const error = ref('')
@@ -182,7 +201,7 @@ const touched = ref({ name: false, ip_address: false })
 const IP_RE = /^(\d{1,3}\.){3}\d{1,3}$/
 const isValidIp = computed(() => {
   const v = form.value.ip_address.trim()
-  if (!v) return null // not validated yet
+  if (!v) return null
   if (!IP_RE.test(v)) return false
   return v.split('.').every(n => Number(n) <= 255)
 })
@@ -193,11 +212,17 @@ const ipFeedback = computed(() => {
 const result = ref(null)
 const copiedApiKey = ref(false)
 const copiedConfig = ref(false)
+const copiedInstall = ref(false)
 const router = useRouter()
+
+const installCmd = computed(() => {
+  if (!result.value) return ''
+  return `curl -sSL ${INSTALL_SCRIPT_URL} | sudo bash -s -- --server-url ${serverUrl} --api-key "${result.value.api_key}"`
+})
 
 const agentConfig = computed(() => {
   if (!result.value) return ''
-  return `server_url: "http://${serverHostname}:8080"\napi_key: "${result.value.api_key}"\nreport_interval: 30\ncollect_docker: true\ncollect_apt: true`
+  return `server_url: "${serverUrl}"\napi_key: "${result.value.api_key}"\nreport_interval: 30\ncollect_docker: true\ncollect_apt: true`
 })
 
 async function handleSubmit() {
@@ -220,18 +245,21 @@ async function copyApiKey() {
   if (!result.value?.api_key) return
   await navigator.clipboard.writeText(result.value.api_key)
   copiedApiKey.value = true
-  setTimeout(() => {
-    copiedApiKey.value = false
-  }, 1500)
+  setTimeout(() => { copiedApiKey.value = false }, 1500)
 }
 
 async function copyAgentConfig() {
   if (!agentConfig.value) return
   await navigator.clipboard.writeText(agentConfig.value)
   copiedConfig.value = true
-  setTimeout(() => {
-    copiedConfig.value = false
-  }, 1500)
+  setTimeout(() => { copiedConfig.value = false }, 1500)
+}
+
+async function copyInstallCmd() {
+  if (!installCmd.value) return
+  await navigator.clipboard.writeText(installCmd.value)
+  copiedInstall.value = true
+  setTimeout(() => { copiedInstall.value = false }, 1500)
 }
 
 function finishAdd() {
@@ -296,6 +324,13 @@ function finishAdd() {
   padding: 10px;
   margin: 0;
   font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.host-success-install {
+  border-left: 3px solid rgba(56, 189, 248, 0.6);
+  color: #7dd3fc;
 }
 
 @media (max-width: 991px) {
