@@ -200,18 +200,23 @@ self.addEventListener('push', (event) => {
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
   const targetUrl = (event.notification.data && event.notification.data.url) || '/alerts?tab=incidents'
+  const absoluteTarget = new URL(targetUrl, self.location.origin).href
   event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      // Focus first open tab if available
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      // Prefer a tab already showing the exact target URL
       for (const client of clientList) {
-        if (client.url.includes(self.location.origin) && 'focus' in client) {
+        if (client.url === absoluteTarget && 'focus' in client) {
           return client.focus()
         }
       }
-      // No open tab — open the target URL in a new window
-      if (clients.openWindow) {
-        return clients.openWindow(targetUrl)
+      // Fall back to any open app tab and navigate it to the target
+      for (const client of clientList) {
+        if (client.url.startsWith(self.location.origin) && 'navigate' in client) {
+          return client.focus().then(() => client.navigate(absoluteTarget))
+        }
       }
+      // No open tab — open a new window
+      return self.clients.openWindow(absoluteTarget)
     })
   )
 })

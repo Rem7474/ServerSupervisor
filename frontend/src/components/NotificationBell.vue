@@ -312,6 +312,23 @@ function urlBase64ToUint8Array(base64String) {
   return Uint8Array.from(rawData, (c) => c.charCodeAt(0))
 }
 
+// Remove the server-side push subscription for this browser.
+// Called on logout and when notification permission is revoked.
+async function cleanupPushSubscription() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
+  try {
+    const reg = await navigator.serviceWorker.ready
+    const sub = await reg.pushManager.getSubscription()
+    if (sub) {
+      await apiClient.unsubscribePush(sub.endpoint).catch(() => {})
+      await sub.unsubscribe()
+    }
+    localStorage.removeItem('ss_vapid_public_key')
+  } catch {
+    // Non-critical
+  }
+}
+
 // Register a Web Push subscription so the backend can push alerts to this device
 // even when the app is closed (required for mobile PWA).
 async function setupPushNotifications() {
@@ -319,21 +336,55 @@ async function setupPushNotifications() {
   if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return
   try {
     const reg = await navigator.serviceWorker.ready
+
+    // Fetch VAPID public key first so we can detect key rotation before reusing an existing sub
+    const { data } = await apiClient.getPushVapidPublicKey()
+    if (!data?.public_key) return
+
     let sub = await reg.pushManager.getSubscription()
+
+    // Force re-subscribe if VAPID key was rotated or subscription expired
+    if (sub) {
+      const cachedKey = localStorage.getItem('ss_vapid_public_key')
+      const expired = sub.expirationTime != null && Date.now() > sub.expirationTime
+      const keyRotated = cachedKey != null && cachedKey !== data.public_key
+      if (expired || keyRotated) {
+        await sub.unsubscribe()
+        sub = null
+      }
+    }
+
     if (!sub) {
-      const { data } = await apiClient.getPushVapidPublicKey()
-      if (!data?.public_key) return
       sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(data.public_key),
       })
     }
-    // Always sync the current subscription to the server (covers new login / key rotation)
+
+    // Cache current key for next rotation check
+    localStorage.setItem('ss_vapid_public_key', data.public_key)
+
+    // Always sync subscription to server (covers new login / key rotation)
     await apiClient.subscribePush(sub.toJSON())
   } catch (err) {
     // Non-critical: push not supported or user declined — desktop Notification API still works
     console.debug('[Push] subscription setup failed:', err)
   }
+}
+
+// Watch for the user revoking notification permission from browser settings
+// while the app is open (e.g. site settings panel).
+function watchPermissionChange() {
+  if (!navigator.permissions) return
+  navigator.permissions.query({ name: 'notifications' }).then((status) => {
+    status.onchange = () => {
+      if (status.state === 'denied') {
+        cleanupPushSubscription()
+      } else if (status.state === 'granted') {
+        setupPushNotifications()
+      }
+    }
+  }).catch(() => {})
 }
 
 // WebSocket push — receives real-time browser notifications from backend
@@ -455,6 +506,7 @@ onMounted(async () => {
     // Already granted (e.g. page reload) — ensure subscription is registered with server
     await setupPushNotifications()
   }
+  watchPermissionChange()
   fetchNotifications()
   pollTimer = setInterval(fetchNotifications, 30_000)
   document.addEventListener('click', onClickOutside)

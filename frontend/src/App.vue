@@ -520,6 +520,7 @@ import AppFooter from './components/AppFooter.vue'
 import AppIcon from './components/AppIcon.vue'
 import ErrorBoundary from './components/ErrorBoundary.vue'
 import { subscribeHttpErrors } from './utils/httpErrorBus'
+import apiClient from './api'
 
 const auth = useAuthStore()
 const hostsStore = useHostsStore()
@@ -575,8 +576,22 @@ const adminRoutes = ['/git-webhooks', '/audit', '/users']
 const isSecondaryActive = computed(() => secondaryRoutes.some(r => route.path.startsWith(r)))
 const isAdminActive = computed(() => adminRoutes.some(r => route.path.startsWith(r)))
 
-function handleLogout() {
+async function handleLogout() {
   userMenuOpen.value = false
+  // Remove push subscription before clearing auth token so the DELETE /push/subscribe call succeeds
+  if ('serviceWorker' in navigator && 'PushManager' in window) {
+    try {
+      const reg = await navigator.serviceWorker.ready
+      const sub = await reg.pushManager.getSubscription()
+      if (sub) {
+        await apiClient.unsubscribePush(sub.endpoint).catch(() => {})
+        await sub.unsubscribe()
+      }
+    } catch {
+      // Non-critical
+    }
+  }
+  localStorage.removeItem('ss_vapid_public_key')
   auth.logout()
   router.push('/login')
 }

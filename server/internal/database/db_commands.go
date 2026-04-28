@@ -472,42 +472,40 @@ func (db *DB) enrichNotificationSource(item *models.NotificationItem) {
 
 	switch scope {
 	case "node":
-		if label := db.resolveProxmoxNodeLabel(rawID); label != "" {
-			item.SourceLabel = label
-			return
-		}
+		name, ctx := db.resolveProxmoxNodeInfo(rawID)
+		item.HostName = name
+		item.SourceLabel = ctx
+		return
 	case "guest":
-		if label := db.resolveProxmoxGuestLabel(rawID); label != "" {
-			item.SourceLabel = label
-			return
-		}
+		name, ctx := db.resolveProxmoxGuestInfo(rawID)
+		item.HostName = name
+		item.SourceLabel = ctx
+		return
 	case "storage":
-		if label := db.resolveProxmoxStorageLabel(rawID); label != "" {
-			item.SourceLabel = label
-			return
-		}
+		name, ctx := db.resolveProxmoxStorageInfo(rawID)
+		item.HostName = name
+		item.SourceLabel = ctx
+		return
 	case "disk":
-		if label := db.resolveProxmoxDiskLabel(rawID); label != "" {
-			item.SourceLabel = label
-			return
-		}
+		name, ctx := db.resolveProxmoxDiskInfo(rawID)
+		item.HostName = name
+		item.SourceLabel = ctx
+		return
 	case "connection":
-		if label := db.resolveProxmoxConnectionLabel(rawID); label != "" {
-			item.SourceLabel = label
-			return
-		}
+		label := db.resolveProxmoxConnectionLabel(rawID)
+		item.HostName = label
+		item.SourceLabel = "Proxmox"
+		return
 	case "global":
 		if label := db.resolveProxmoxGlobalLikelySource(item.Metric); label != "" {
+			item.HostName = label
 			item.SourceLabel = label + " (source actuelle)"
-			return
 		}
+		return
 	}
 
-	if item.HostName == "" {
-		item.SourceLabel = "Proxmox"
-	} else {
-		item.SourceLabel = item.HostName
-	}
+	item.HostName = "Proxmox"
+	item.SourceLabel = "Proxmox"
 }
 
 func (db *DB) resolveProxmoxConnectionLabel(connectionID string) string {
@@ -601,6 +599,99 @@ func (db *DB) resolveProxmoxDiskLabel(diskID string) string {
 		return "Disque " + connName + " / " + nodeName + " / " + detail
 	}
 	return "Disque " + nodeName + " / " + detail
+}
+
+func (db *DB) resolveProxmoxNodeInfo(nodeID string) (name, context string) {
+	if nodeID == "" {
+		return "Noeud Proxmox", "Proxmox"
+	}
+	var connName, nodeName string
+	err := db.conn.QueryRow(`
+		SELECT COALESCE(c.name, ''), n.node_name
+		FROM proxmox_nodes n
+		LEFT JOIN proxmox_connections c ON c.id = n.connection_id
+		WHERE n.id = $1`, nodeID).Scan(&connName, &nodeName)
+	if err != nil {
+		return "Noeud " + nodeID, "Proxmox"
+	}
+	name = nodeName
+	if strings.TrimSpace(connName) != "" {
+		context = "Noeud Proxmox sur " + connName
+	} else {
+		context = "Noeud Proxmox"
+	}
+	return
+}
+
+func (db *DB) resolveProxmoxGuestInfo(guestID string) (name, context string) {
+	if guestID == "" {
+		return "VM/LXC Proxmox", "Proxmox"
+	}
+	var connName, nodeName, guestName, guestType string
+	var vmid int
+	err := db.conn.QueryRow(`
+		SELECT COALESCE(c.name, ''), g.node_name, COALESCE(NULLIF(g.name, ''), '(sans nom)'), g.guest_type, g.vmid
+		FROM proxmox_guests g
+		LEFT JOIN proxmox_connections c ON c.id = g.connection_id
+		WHERE g.id = $1`, guestID).Scan(&connName, &nodeName, &guestName, &guestType, &vmid)
+	if err != nil {
+		return "VM/LXC " + guestID, "Proxmox"
+	}
+	name = fmt.Sprintf("%s (%s:%d)", guestName, strings.ToUpper(guestType), vmid)
+	if strings.TrimSpace(connName) != "" {
+		context = "Proxmox VM/LXC sur " + connName + " / " + nodeName
+	} else {
+		context = "Proxmox VM/LXC sur " + nodeName
+	}
+	return
+}
+
+func (db *DB) resolveProxmoxStorageInfo(storageID string) (name, context string) {
+	if storageID == "" {
+		return "Stockage Proxmox", "Proxmox"
+	}
+	var connName, nodeName, storageName string
+	err := db.conn.QueryRow(`
+		SELECT COALESCE(c.name, ''), s.node_name, s.storage_name
+		FROM proxmox_storages s
+		LEFT JOIN proxmox_connections c ON c.id = s.connection_id
+		WHERE s.id = $1`, storageID).Scan(&connName, &nodeName, &storageName)
+	if err != nil {
+		return "Stockage " + storageID, "Proxmox"
+	}
+	name = storageName
+	if strings.TrimSpace(connName) != "" {
+		context = "Stockage Proxmox sur " + connName + " / " + nodeName
+	} else {
+		context = "Stockage Proxmox sur " + nodeName
+	}
+	return
+}
+
+func (db *DB) resolveProxmoxDiskInfo(diskID string) (name, context string) {
+	if diskID == "" {
+		return "Disque Proxmox", "Proxmox"
+	}
+	var connName, nodeName, devPath, model string
+	err := db.conn.QueryRow(`
+		SELECT COALESCE(c.name, ''), d.node_name, d.dev_path, COALESCE(d.model, '')
+		FROM proxmox_disks d
+		LEFT JOIN proxmox_connections c ON c.id = d.connection_id
+		WHERE d.id = $1`, diskID).Scan(&connName, &nodeName, &devPath, &model)
+	if err != nil {
+		return "Disque " + diskID, "Proxmox"
+	}
+	if strings.TrimSpace(model) != "" {
+		name = model + " (" + devPath + ")"
+	} else {
+		name = devPath
+	}
+	if strings.TrimSpace(connName) != "" {
+		context = "Disque Proxmox sur " + connName + " / " + nodeName
+	} else {
+		context = "Disque Proxmox sur " + nodeName
+	}
+	return
 }
 
 func (db *DB) resolveProxmoxGlobalLikelySource(metric string) string {

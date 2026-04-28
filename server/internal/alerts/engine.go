@@ -1166,7 +1166,8 @@ func pushBrowserNotification(pusher NotificationPusher, rule models.AlertRule, h
 	pusher.Broadcast(map[string]interface{}{
 		"type": "new_alert",
 		"notification": map[string]interface{}{
-			"id":             incID,
+			"id":             fmt.Sprintf("alert:%d", incID),
+			"type":           "alert_incident",
 			"rule_id":        rule.ID,
 			"host_id":        host.ID,
 			"host_name":      host.Name,
