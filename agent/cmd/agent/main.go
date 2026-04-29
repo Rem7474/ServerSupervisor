@@ -292,7 +292,7 @@ func sendReport(ctx context.Context, cfg *config.Config, s *sender.Sender) {
 	if cfg.CollectWebLogs {
 		globs := cfg.WebLogGlobs()
 		log.Printf("Web logs: scanning globs %v (crowdsec=%v)", globs, cfg.CollectCrowdSecCorrelation)
-		report, err := collector.CollectWebLogs(globs, cfg.WebLogsTailLines, cfg.WebLogsTopN, cfg.WebLogsRequestsLimit, cfg.WebLogsCursorFile, verboseMode, cfg.CrowdSecConnectionString, cfg.CrowdSecAPIKey, cfg.CollectCrowdSecCorrelation)
+		report, err := collector.CollectWebLogs(globs, cfg.WebLogsTailLines, cfg.WebLogsTopN, cfg.WebLogsRequestsLimit, cfg.WebLogsCursorFile, verboseMode, cfg.CrowdSecConnectionString, cfg.CrowdSecAPIKey, cfg.CrowdSecAlertsMachineID, cfg.CrowdSecAlertsPassword, cfg.CollectCrowdSecCorrelation)
 		if err != nil {
 			log.Printf("Web logs collection skipped: %v", err)
 		} else {

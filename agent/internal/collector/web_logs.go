@@ -150,7 +150,7 @@ var suspiciousUANeedles = []string{
 	"masscan", "nmap", "zgrab", "sqlmap", "nikto", "dirbuster", "gobuster", "wpscan", "acunetix", "nessus",
 }
 
-func CollectWebLogs(logPathGlobs []string, tailLines int, topN int, requestLimit int, cursorFile string, verbose bool, crowdSecConnectionString string, crowdSecAPIKey string, crowdSecEnabled bool) (*WebLogReport, error) {
+func CollectWebLogs(logPathGlobs []string, tailLines int, topN int, requestLimit int, cursorFile string, verbose bool, crowdSecConnectionString string, crowdSecAPIKey string, crowdSecAlertsMachineID string, crowdSecAlertsPassword string, crowdSecEnabled bool) (*WebLogReport, error) {
 	if tailLines <= 0 {
 		tailLines = 5000
 	}
@@ -350,7 +350,7 @@ func CollectWebLogs(logPathGlobs []string, tailLines int, topN int, requestLimit
 
 	// Correlate with CrowdSec decisions if enabled
 	if crowdSecEnabled {
-		crowdSecDecisions, err := CollectCrowdSecDecisions(crowdSecConnectionString, crowdSecAPIKey, verbose)
+		crowdSecDecisions, err := CollectCrowdSecDecisions(crowdSecConnectionString, crowdSecAPIKey, crowdSecAlertsMachineID, crowdSecAlertsPassword, verbose)
 		if err != nil {
 			log.Printf("[web_logs] CrowdSec correlation error (non-fatal): %v", err)
 		}

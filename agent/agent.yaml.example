@@ -50,5 +50,10 @@ crowdsec_connection_string: "http://localhost:8080"
 # Leave empty if CrowdSec Local API is unauthenticated or accessible via socket
 crowdsec_api_key: ""
 
+# CrowdSec alerts auth (used only for /v1/alerts via watcher login)
+# Fill with machine_id/password from /etc/crowdsec/local_api_credentials.yaml
+crowdsec_alerts_machine_id: ""
+crowdsec_alerts_password: ""
+
 # Skip TLS verification (for self-signed certs)
 insecure_skip_verify: false

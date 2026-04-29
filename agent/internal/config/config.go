@@ -34,6 +34,8 @@ type Config struct {
 	CollectCrowdSecCorrelation bool   `yaml:"collect_crowdsec_correlation"`
 	CrowdSecConnectionString   string `yaml:"crowdsec_connection_string"`
 	CrowdSecAPIKey             string `yaml:"crowdsec_api_key"`
+	CrowdSecAlertsMachineID    string `yaml:"crowdsec_alerts_machine_id"`
+	CrowdSecAlertsPassword     string `yaml:"crowdsec_alerts_password"`
 
 	// TLS
 	InsecureSkipVerify bool `yaml:"insecure_skip_verify"`
@@ -164,6 +166,12 @@ func Load(path string) (*Config, error) {
 	if env := os.Getenv("SUPERVISOR_CROWDSEC_API_KEY"); env != "" {
 		cfg.CrowdSecAPIKey = strings.TrimSpace(env)
 	}
+	if env := os.Getenv("SUPERVISOR_CROWDSEC_ALERTS_MACHINE_ID"); env != "" {
+		cfg.CrowdSecAlertsMachineID = strings.TrimSpace(env)
+	}
+	if env := os.Getenv("SUPERVISOR_CROWDSEC_ALERTS_PASSWORD"); env != "" {
+		cfg.CrowdSecAlertsPassword = strings.TrimSpace(env)
+	}
 
 	if cfg.APIKey == "" {
 		return nil, fmt.Errorf("api_key is required (set in config or SUPERVISOR_API_KEY env var)")
@@ -195,6 +203,8 @@ func defaultConfig() *Config {
 		CollectCrowdSecCorrelation: false,
 		CrowdSecConnectionString:   "http://localhost:8080",
 		CrowdSecAPIKey:             "",
+		CrowdSecAlertsMachineID:    "",
+		CrowdSecAlertsPassword:     "",
 	}
 }
 
@@ -258,6 +268,11 @@ insecure_skip_verify: false
 collect_crowdsec_correlation: false
 crowdsec_connection_string: "http://localhost:8080"
 crowdsec_api_key: ""
+
+# CrowdSec alerts auth (used only for /v1/alerts via watcher login)
+# Fill with machine_id/password from /etc/crowdsec/local_api_credentials.yaml
+crowdsec_alerts_machine_id: ""
+crowdsec_alerts_password: ""
 `
 
 	if strings.TrimSpace(serverURL) != "" {

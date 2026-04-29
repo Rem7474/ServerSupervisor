@@ -107,6 +107,11 @@ api_key: "$API_KEY"
 report_interval: $REPORT_INTERVAL
 collect_docker: $COLLECT_DOCKER
 collect_apt: $COLLECT_APT
+collect_crowdsec_correlation: false
+crowdsec_connection_string: "http://localhost:8080"
+crowdsec_api_key: ""
+crowdsec_alerts_machine_id: ""
+crowdsec_alerts_password: ""
 insecure_skip_verify: false
 EOF
 
