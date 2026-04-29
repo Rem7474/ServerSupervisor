@@ -457,17 +457,7 @@
             </div>
           </div>
           <div class="d-flex gap-2 flex-wrap timeline-header-actions">
-            <template v-if="isSelectedIPBlocked">
-              <button
-                class="btn btn-sm btn-outline-success"
-                :disabled="blockLoading"
-                @click="unblockIP"
-              >
-                <span v-if="blockLoading" class="spinner-border spinner-border-sm me-1" />
-                Débloquer (CrowdSec)
-              </button>
-            </template>
-            <template v-else>
+            <template v-if="!isSelectedIPBlocked">
               <select
                 v-model="banDuration"
                 class="form-select form-select-sm"
@@ -488,6 +478,12 @@
                 Bloquer (CrowdSec)
               </button>
             </template>
+            <span
+              v-else
+              class="badge bg-success-lt text-success align-self-center"
+            >
+              IP bloquée par CrowdSec
+            </span>
             <button
               class="btn btn-sm btn-outline-secondary"
               @click="closeTimeline"
@@ -1159,23 +1155,6 @@ watch([timelineBuckets, timelineBucketMs], () => {
     selectedBucketKey.value = timelineBuckets.value[timelineBuckets.value.length - 1].key
   }
 })
-
-async function unblockIP() {
-  if (!effectiveHostId.value) {
-    showActionFeedback('Impossible de déterminer l\'hôte cible — renseigne le filtre Hôte')
-    return
-  }
-  blockLoading.value = true
-  try {
-    await apiClient.unblockCrowdSecIP(selectedIP.value, effectiveHostId.value)
-    showActionFeedback(`Commande de déblocage envoyée à l'agent pour ${selectedIP.value}`)
-    setTimeout(() => loadThreats(), 1000)
-  } catch (error) {
-    showActionFeedback(`Impossible de débloquer l'IP : ${getApiErrorMessage(error)}`)
-  } finally {
-    blockLoading.value = false
-  }
-}
 
 async function banIP() {
   if (!effectiveHostId.value) {

@@ -174,9 +174,22 @@ func loginCrowdSecAlertsToken(connectionString, machineID, password string, clie
 	return loginResp.Token, nil
 }
 
+// crowdSecWriteClient returns an http.Client and a Bearer token for write operations
+// (DELETE /v1/decisions, POST /v1/alerts). These endpoints require watcher JWT auth,
+// not the bouncer X-API-Key used for reads.
+func crowdSecWriteClient(connectionString, machineID, password string) (*http.Client, string, error) {
+	client := &http.Client{Timeout: 5 * time.Second}
+	token, err := loginCrowdSecAlertsToken(connectionString, machineID, password, client)
+	if err != nil {
+		return nil, "", fmt.Errorf("watcher login failed: %w", err)
+	}
+	return client, token, nil
+}
+
 // CreateCrowdSecDecision adds a ban decision for a specific IP via the CrowdSec Local API.
 // duration must be a Go duration string, e.g. "4h", "24h", "168h".
-func CreateCrowdSecDecision(connectionString, apiKey, ip, duration string) error {
+// machineID and password are the watcher credentials from /etc/crowdsec/local_api_credentials.yaml.
+func CreateCrowdSecDecision(connectionString, machineID, password, ip, duration string) error {
 	if connectionString == "" {
 		return errors.New("crowdsec connection string is empty")
 	}
@@ -191,19 +204,23 @@ func CreateCrowdSecDecision(connectionString, apiKey, ip, duration string) error
 		return fmt.Errorf("invalid duration %q: %w", duration, err)
 	}
 
+	client, token, err := crowdSecWriteClient(connectionString, machineID, password)
+	if err != nil {
+		return err
+	}
+
 	now := time.Now().UTC()
 	until := now.Add(dur)
 	startAt := now.Format(time.RFC3339Nano)
 	stopAt := until.Format(time.RFC3339Nano)
 
 	type crowdSecBanDecision struct {
-		Origin    string `json:"origin"`
-		Type      string `json:"type"`
-		Scope     string `json:"scope"`
-		Value     string `json:"value"`
-		Duration  string `json:"duration"`
-		Simulated bool   `json:"simulated"`
-		Until     string `json:"until"`
+		Origin   string `json:"origin"`
+		Type     string `json:"type"`
+		Scope    string `json:"scope"`
+		Value    string `json:"value"`
+		Duration string `json:"duration"`
+		Until    string `json:"until"`
 	}
 	type crowdSecAlertSource struct {
 		Scope string `json:"scope"`
@@ -211,21 +228,18 @@ func CreateCrowdSecDecision(connectionString, apiKey, ip, duration string) error
 		IP    string `json:"ip"`
 	}
 	type crowdSecBanAlert struct {
-		MachineID       string              `json:"machine_id"`
-		Scenario        string              `json:"scenario"`
-		ScenarioHash    string              `json:"scenario_hash"`
-		ScenarioVersion string              `json:"scenario_version"`
-		Message         string              `json:"message"`
-		EventsCount     int                 `json:"events_count"`
-		StartAt         string              `json:"start_at"`
-		StopAt          string              `json:"stop_at"`
-		Capacity        int                 `json:"capacity"`
-		LeakSpeed       string              `json:"leakspeed"`
-		Simulated       bool                `json:"simulated"`
-		Events          []any               `json:"events"`
-		Labels          any                 `json:"labels"`
-		Source          crowdSecAlertSource `json:"source"`
-		Decisions       []crowdSecBanDecision `json:"decisions"`
+		Scenario    string               `json:"scenario"`
+		Message     string               `json:"message"`
+		EventsCount int                  `json:"events_count"`
+		StartAt     string               `json:"start_at"`
+		StopAt      string               `json:"stop_at"`
+		Capacity    int                  `json:"capacity"`
+		LeakSpeed   string               `json:"leakspeed"`
+		Simulated   bool                 `json:"simulated"`
+		Events      []any                `json:"events"`
+		Labels      any                  `json:"labels"`
+		Source      crowdSecAlertSource  `json:"source"`
+		Decisions   []crowdSecBanDecision `json:"decisions"`
 	}
 
 	alert := crowdSecBanAlert{
@@ -253,16 +267,13 @@ func CreateCrowdSecDecision(connectionString, apiKey, ip, duration string) error
 		return fmt.Errorf("failed to marshal ban payload: %w", err)
 	}
 
-	client := &http.Client{Timeout: 5 * time.Second}
 	baseURL := strings.TrimRight(connectionString, "/")
 	req, err := http.NewRequest("POST", fmt.Sprintf("%s/v1/alerts", baseURL), strings.NewReader(string(payload)))
 	if err != nil {
 		return fmt.Errorf("failed to create ban request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	if apiKey != "" {
-		req.Header.Set("X-API-Key", apiKey)
-	}
+	req.Header.Set("Authorization", "Bearer "+token)
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -279,7 +290,8 @@ func CreateCrowdSecDecision(connectionString, apiKey, ip, duration string) error
 }
 
 // DeleteCrowdSecDecision removes a ban decision for a specific IP via the CrowdSec Local API.
-func DeleteCrowdSecDecision(connectionString, apiKey, ip string) error {
+// machineID and password are the watcher credentials from /etc/crowdsec/local_api_credentials.yaml.
+func DeleteCrowdSecDecision(connectionString, machineID, password, ip string) error {
 	if connectionString == "" {
 		return errors.New("crowdsec connection string is empty")
 	}
@@ -287,17 +299,17 @@ func DeleteCrowdSecDecision(connectionString, apiKey, ip string) error {
 		return errors.New("IP is empty")
 	}
 
-	client := &http.Client{Timeout: 5 * time.Second}
-	baseURL := strings.TrimRight(connectionString, "/")
-	deleteURL := fmt.Sprintf("%s/v1/decisions?value=%s&type=ban&scope=Ip", baseURL, ip)
+	client, token, err := crowdSecWriteClient(connectionString, machineID, password)
+	if err != nil {
+		return err
+	}
 
-	req, err := http.NewRequest("DELETE", deleteURL, nil)
+	baseURL := strings.TrimRight(connectionString, "/")
+	req, err := http.NewRequest("DELETE", fmt.Sprintf("%s/v1/decisions?value=%s&type=ban&scope=Ip", baseURL, ip), nil)
 	if err != nil {
 		return fmt.Errorf("failed to create delete request: %w", err)
 	}
-	if apiKey != "" {
-		req.Header.Set("X-API-Key", apiKey)
-	}
+	req.Header.Set("Authorization", "Bearer "+token)
 
 	resp, err := client.Do(req)
 	if err != nil {

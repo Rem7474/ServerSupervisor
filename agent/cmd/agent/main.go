@@ -774,7 +774,8 @@ func executeCommand(s *sender.Sender, cmd sender.PendingCommand) {
 			} else {
 				execErr = collector.DeleteCrowdSecDecision(
 					agentConfig.CrowdSecConnectionString,
-					agentConfig.CrowdSecAPIKey,
+					agentConfig.CrowdSecAlertsMachineID,
+					agentConfig.CrowdSecAlertsPassword,
 					cmd.Target,
 				)
 			}
@@ -792,7 +793,8 @@ func executeCommand(s *sender.Sender, cmd sender.PendingCommand) {
 				}
 				execErr = collector.CreateCrowdSecDecision(
 					agentConfig.CrowdSecConnectionString,
-					agentConfig.CrowdSecAPIKey,
+					agentConfig.CrowdSecAlertsMachineID,
+					agentConfig.CrowdSecAlertsPassword,
 					cmd.Target,
 					banPayload.Duration,
 				)
