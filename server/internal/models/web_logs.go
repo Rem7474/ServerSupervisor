@@ -68,6 +68,8 @@ type CrowdSecBlockedEntry struct {
 	IP           string `json:"ip"`
 	Reason       string `json:"reason"`
 	Origin       string `json:"origin"`
+	Country      string `json:"country,omitempty"`
+	ASName       string `json:"as_name,omitempty"`
 	BlockedUntil string `json:"blocked_until,omitempty"`
 }
 

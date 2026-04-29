@@ -374,6 +374,8 @@
                   <th>IP</th>
                   <th>Scénario</th>
                   <th>Origine</th>
+                  <th>Pays</th>
+                  <th>AS / Opérateur</th>
                   <th>Expiration</th>
                 </tr>
               </thead>
@@ -393,6 +395,15 @@
                       class="badge"
                       :class="entry.origin === 'CAPI' ? 'bg-azure-lt text-azure' : 'bg-purple-lt text-purple'"
                     >{{ entry.origin || '—' }}</span>
+                  </td>
+                  <td class="small">
+                    {{ entry.country || '—' }}
+                  </td>
+                  <td
+                    class="small text-secondary"
+                    :title="entry.as_name"
+                  >
+                    {{ entry.as_name ? truncate(entry.as_name, 28) : '—' }}
                   </td>
                   <td class="small">
                     {{ formatBlockedUntil(entry.blocked_until) }}
@@ -952,6 +963,10 @@ function levelClass(level: string): string {
   }
 }
 
+function truncate(s: string, max: number): string {
+  return s.length > max ? s.slice(0, max) + '…' : s
+}
+
 function formatBlockedUntil(blockedUntil?: string): string {
   if (!blockedUntil) return 'Bloquée'
   const d = new Date(blockedUntil)
@@ -961,7 +976,7 @@ function formatBlockedUntil(blockedUntil?: string): string {
   const diff = d.getTime() - now.getTime()
   const hours = Math.floor(diff / 3600000)
   const days = Math.floor(hours / 24)
-  if (days > 0) return `Bloquée jusqu'à ${d.toLocaleDateString()}`
+  if (days > 0) return `Bloquée jusqu'à ${d.toLocaleString()}`
   if (hours > 0) return `Bloquée ${hours}h`
   return 'Bloquée (moins d\'une heure)'
 }

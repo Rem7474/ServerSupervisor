@@ -81,6 +81,8 @@ type CrowdSecBlockedEntry struct {
 	IP           string `json:"ip"`
 	Reason       string `json:"reason"`
 	Origin       string `json:"origin"`
+	Country      string `json:"country,omitempty"`
+	ASName       string `json:"as_name,omitempty"`
 	BlockedUntil string `json:"blocked_until,omitempty"`
 }
 
@@ -379,9 +381,13 @@ func CollectWebLogs(logPathGlobs []string, tailLines int, topN int, requestLimit
 
 		report.Threats.CrowdSecTotalBlocked = len(crowdSecDecisions)
 
-		// Build top 50 decisions sorted: permanent bans first, then longest remaining duration.
+		// Build top 50 local decisions (exclude CAPI community blocklist — not server-specific).
+		// The total count (CrowdSecTotalBlocked) still includes CAPI for the KPI.
 		decSlice := make([]CrowdSecDecision, 0, len(crowdSecDecisions))
 		for _, d := range crowdSecDecisions {
+			if d.Origin == "CAPI" {
+				continue
+			}
 			decSlice = append(decSlice, d)
 		}
 		sort.Slice(decSlice, func(i, j int) bool {
@@ -399,7 +405,13 @@ func CollectWebLogs(logPathGlobs []string, tailLines int, topN int, requestLimit
 		}
 		topBlocked := make([]CrowdSecBlockedEntry, 0, len(decSlice))
 		for _, d := range decSlice {
-			entry := CrowdSecBlockedEntry{IP: d.IP, Reason: d.Reason, Origin: d.Origin}
+			entry := CrowdSecBlockedEntry{
+				IP:      d.IP,
+				Reason:  d.Reason,
+				Origin:  d.Origin,
+				Country: d.Country,
+				ASName:  d.ASName,
+			}
 			if !d.BlockedUntil.IsZero() {
 				entry.BlockedUntil = d.BlockedUntil.UTC().Format(time.RFC3339)
 			}
