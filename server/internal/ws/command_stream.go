@@ -12,6 +12,9 @@ type CommandStreamHub struct {
 	clients    map[string]map[*websocket.Conn]bool // commandID -> set of websocket connections
 	broadcasts map[string]chan string              // commandID -> broadcast channel
 	mu         sync.RWMutex
+
+	bufferMu sync.Mutex
+	buffers  map[string]string // accumulated stream output per active command
 }
 
 // NewCommandStreamHub creates a new streaming hub.
@@ -19,6 +22,7 @@ func NewCommandStreamHub() *CommandStreamHub {
 	return &CommandStreamHub{
 		clients:    make(map[string]map[*websocket.Conn]bool),
 		broadcasts: make(map[string]chan string),
+		buffers:    make(map[string]string),
 	}
 }
 
@@ -51,7 +55,13 @@ func (h *CommandStreamHub) Unregister(commandID string, conn *websocket.Conn) {
 }
 
 // Broadcast sends an output chunk to all connected clients for a given command.
+// The chunk is also appended to an in-memory buffer so late-joining clients
+// can receive the full output history via cmd_stream_init.
 func (h *CommandStreamHub) Broadcast(commandID string, logChunk string) {
+	h.bufferMu.Lock()
+	h.buffers[commandID] += logChunk
+	h.bufferMu.Unlock()
+
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 
@@ -64,8 +74,18 @@ func (h *CommandStreamHub) Broadcast(commandID string, logChunk string) {
 	}
 }
 
+// GetBufferedOutput returns all output chunks accumulated so far for a command.
+// Returns an empty string if no chunks have been buffered (command not yet started
+// or already completed and buffer cleaned up).
+func (h *CommandStreamHub) GetBufferedOutput(commandID string) string {
+	h.bufferMu.Lock()
+	defer h.bufferMu.Unlock()
+	return h.buffers[commandID]
+}
+
 // BroadcastStatus sends a status update to all connected clients for a given command.
 // output is included in the payload when non-empty (e.g. for completed commands).
+// On terminal statuses (completed/failed) the in-memory chunk buffer is released.
 func (h *CommandStreamHub) BroadcastStatus(commandID, status, output string) {
 	h.mu.RLock()
 	conns := make([]*websocket.Conn, 0, len(h.clients[commandID]))
@@ -87,6 +107,12 @@ func (h *CommandStreamHub) BroadcastStatus(commandID, status, output string) {
 			_ = conn.Close()
 			h.Unregister(commandID, conn)
 		}
+	}
+
+	if status == "completed" || status == "failed" {
+		h.bufferMu.Lock()
+		delete(h.buffers, commandID)
+		h.bufferMu.Unlock()
 	}
 }
 

@@ -109,8 +109,33 @@
     v-else
     class="card"
   >
-    <div class="card-body text-secondary">
-      Données APT non disponibles pour cet hôte.
+    <div class="card-header d-flex align-items-center justify-content-between">
+      <h3 class="card-title">
+        APT - Mises à jour système
+      </h3>
+      <div
+        v-if="canRunApt"
+        class="btn-group btn-group-sm"
+      >
+        <button
+          class="btn btn-outline-secondary"
+          :disabled="!!aptCmdLoading"
+          @click="$emit('run-apt-command', 'update')"
+        >
+          <span
+            v-if="aptCmdLoading === 'update'"
+            class="spinner-border spinner-border-sm me-1"
+          />
+          apt update
+        </button>
+      </div>
+      <span
+        v-else
+        class="text-secondary small"
+      >Mode lecture seule</span>
+    </div>
+    <div class="card-body text-secondary small">
+      Aucune donnée APT disponible. Lancez <strong>apt update</strong> pour initialiser.
     </div>
   </div>
 

@@ -713,19 +713,25 @@ async function reconcileCommandStatuses(list) {
   cmds.value = list.map((c) => {
     const snap = patchById[c.id]
     if (!snap) return c
+    const isActive = snap.status === 'running' || snap.status === 'pending'
     return {
       ...c,
       status: snap.status || c.status,
-      output: snap.output ?? c.output,
+      // Don't overwrite streamed output with empty DB value while command is active
+      output: isActive ? c.output : (snap.output ?? c.output),
       started_at: snap.started_at || c.started_at,
       ended_at: snap.ended_at || c.ended_at,
     }
   })
 
   if (selectedCmd.value?.id && patchById[selectedCmd.value.id]) {
+    const snap = patchById[selectedCmd.value.id]
+    const isActive = snap.status === 'running' || snap.status === 'pending'
     selectedCmd.value = {
       ...selectedCmd.value,
-      ...patchById[selectedCmd.value.id],
+      ...snap,
+      // Preserve streamed output accumulated from WebSocket while command is still active
+      output: isActive ? selectedCmd.value.output : (snap.output ?? selectedCmd.value.output),
     }
   }
 }

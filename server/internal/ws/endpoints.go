@@ -150,12 +150,22 @@ func (h *WSHandler) CommandStream(c *gin.Context) {
 
 	h.streamHub.Register(commandID, conn)
 
+	// For active commands, prefer the in-memory buffer which contains all chunks
+	// broadcast since the command started — the DB output column is only written
+	// on completion, so it is empty while the command is running.
+	initOutput := cmd.Output
+	if cmd.Status == "running" || cmd.Status == "pending" {
+		if buffered := h.streamHub.GetBufferedOutput(commandID); buffered != "" {
+			initOutput = buffered
+		}
+	}
+
 	_ = safeWriteJSON(conn, gin.H{
 		"type":       "cmd_stream_init",
 		"command_id": commandID,
 		"status":     cmd.Status,
 		"command":    cmd.Action,
-		"output":     cmd.Output,
+		"output":     initOutput,
 	})
 
 	done := make(chan struct{})
