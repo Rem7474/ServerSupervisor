@@ -377,6 +377,7 @@
                   <th>Pays</th>
                   <th>AS / Opérateur</th>
                   <th>Expiration</th>
+                  <th />
                 </tr>
               </thead>
               <tbody>
@@ -407,6 +408,14 @@
                   </td>
                   <td class="small">
                     {{ formatBlockedUntil(entry.blocked_until) }}
+                  </td>
+                  <td class="text-end">
+                    <button
+                      class="btn btn-sm btn-outline-primary"
+                      @click="openTimeline(entry.ip)"
+                    >
+                      Timeline
+                    </button>
                   </td>
                 </tr>
               </tbody>
@@ -619,11 +628,27 @@
                         </div>
                         <div class="timeline-event-meta small text-secondary">
                           <span><strong>Domaine:</strong> {{ r.domain || '-' }}</span>
+                          <span><strong>Hôte:</strong> {{ r.host_name || '-' }}</span>
                           <span
                             class="text-truncate"
                             :title="r.user_agent || '-'"
                           >
                             <strong>User-Agent:</strong> {{ r.user_agent || '-' }}
+                          </span>
+                          <span v-if="r.blocked">
+                            <strong>Blocage:</strong>
+                            <span
+                              class="badge bg-success-lt text-success ms-1"
+                              :title="r.blocked_reason || '-'"
+                            >
+                              {{ r.blocked_source || 'crowdsec' }}
+                            </span>
+                            <span v-if="r.blocked_reason" class="ms-1">
+                              {{ truncate(r.blocked_reason, 64) }}
+                            </span>
+                          </span>
+                          <span v-if="r.blocked_until">
+                            <strong>Expire:</strong> {{ formatDate(String(r.blocked_until)) }}
                           </span>
                         </div>
                       </article>
