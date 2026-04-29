@@ -88,6 +88,59 @@
       </div>
     </div>
 
+    <!-- Squelette chargement -->
+    <template v-if="loading">
+      <div class="row row-cards mb-4">
+        <div
+          v-for="n in 4"
+          :key="n"
+          class="col-12 col-sm-3"
+        >
+          <div class="card card-sm h-100">
+            <div class="card-body text-center placeholder-glow">
+              <div class="placeholder col-5 mb-2 rounded" style="height:.75rem" />
+              <div class="placeholder col-4 rounded" style="height:2rem" />
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="row row-cards">
+        <div class="col-lg-7">
+          <div class="card h-100">
+            <div class="card-header placeholder-glow">
+              <span class="placeholder col-4 rounded" />
+            </div>
+            <div class="card-body placeholder-glow d-flex flex-column gap-2">
+              <div
+                v-for="n in 6"
+                :key="n"
+                class="placeholder rounded"
+                :style="`height:2.25rem;width:${85 + (n % 3) * 5}%`"
+              />
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-5">
+          <div class="card h-100">
+            <div class="card-header placeholder-glow">
+              <span class="placeholder col-5 rounded" />
+            </div>
+            <div class="card-body placeholder-glow d-flex flex-column gap-2">
+              <div
+                v-for="n in 6"
+                :key="n"
+                class="placeholder rounded"
+                :style="`height:2.25rem;width:${70 + (n % 4) * 7}%`"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <!-- Contenu réel -->
+    <template v-else>
+
     <div class="row row-cards mb-4">
       <div class="col-12 col-sm-3">
         <div class="card card-sm h-100">
@@ -200,10 +253,10 @@
                   <td>
                     <span
                       v-if="ip.blocked"
-                      class="badge bg-success"
+                      class="badge bg-green-lt text-green"
                       :title="formatBlockedUntil(ip.blocked_until)"
                     >
-                      ✓ Bloquée
+                      Bloquée
                     </span>
                     <span
                       v-else
@@ -443,6 +496,8 @@
         </div>
       </div>
     </div>
+
+    </template><!-- fin v-else contenu réel -->
 
     <div
       v-if="showTimeline"
