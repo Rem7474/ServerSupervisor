@@ -838,12 +838,16 @@ const mostTargetedHosts = computed(() => threats.value.most_targeted_hosts || []
 const ipHostMatrix = computed(() => threats.value.ip_host_matrix || [])
 const unblockedIPs = ref(new Set<string>())
 const rowState = ref<Record<string, 'loading' | 'error'>>({})
+const optimisticBans = ref<AnyRecord[]>([])
 
-const crowdSecIPs = computed(() =>
-  (threats.value.crowdsec_top_blocked || []).filter(
+const crowdSecIPs = computed(() => {
+  const fromSnapshot = (threats.value.crowdsec_top_blocked || [] as AnyRecord[]).filter(
     (e: AnyRecord) => !unblockedIPs.value.has(e.ip as string),
-  ),
-)
+  )
+  const snapshotIPs = new Set(fromSnapshot.map((e: AnyRecord) => e.ip as string))
+  const extra = optimisticBans.value.filter((e) => !snapshotIPs.has(e.ip as string) && !unblockedIPs.value.has(e.ip as string))
+  return [...extra, ...fromSnapshot]
+})
 const crowdSecTotal = computed(() => Number(threats.value.crowdsec_blocked_ips) || 0)
 // host_id du snapshot CrowdSec renvoyé par l'API (présent même sans filtre hôte)
 const crowdSecHostId = computed(() => (threats.value.crowdsec_host_id as string) || '')
@@ -1135,6 +1139,9 @@ async function loadThreats() {
   try {
     const res = await apiClient.getWebLogsSummary(period.value, hostId.value || undefined, source.value || undefined)
     summary.value = { threats: res.data?.threats || {} }
+    // Purger les bans optimistes dont le snapshot réel prend le relais
+    const snapshotIPs = new Set((res.data?.threats?.crowdsec_top_blocked || []).map((e: AnyRecord) => e.ip as string))
+    optimisticBans.value = optimisticBans.value.filter((e) => !snapshotIPs.has(e.ip as string))
   } catch (err) {
     console.error('Failed to load threats summary', err)
   } finally {
@@ -1239,8 +1246,18 @@ async function banIP() {
     const { status, output } = await pollCommand(commandId)
     if (status === 'completed') {
       banState.value = 'idle'
-      // L'IP est maintenant bloquée — recharger pour l'afficher dans le tableau CrowdSec
-      await loadThreats()
+      // Mise à jour optimiste : ajouter l'IP immédiatement sans attendre le prochain snapshot agent
+      const dur = banDuration.value
+      const ms = dur.endsWith('h') ? parseInt(dur) * 3600000 : parseInt(dur) * 60000
+      optimisticBans.value = [
+        ...optimisticBans.value.filter((e) => e.ip !== selectedIP.value),
+        {
+          ip: selectedIP.value,
+          reason: 'manual',
+          origin: 'cscli',
+          blocked_until: new Date(Date.now() + ms).toISOString(),
+        },
+      ]
       closeTimeline()
     } else {
       banState.value = 'error'

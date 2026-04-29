@@ -58,6 +58,7 @@ type crowdSecAPIAlert struct {
 }
 
 // CollectCrowdSecDecisions queries the CrowdSec Local API and returns a map of IP -> decision.
+// Auth priority: bouncer X-API-Key → watcher JWT (fallback when no bouncer key configured).
 // Also enriches decisions with country/ASN data from the alerts endpoint.
 func CollectCrowdSecDecisions(connectionString, apiKey, alertsMachineID, alertsPassword string, verbose bool) (map[string]CrowdSecDecision, error) {
 	result := make(map[string]CrowdSecDecision)
@@ -70,16 +71,34 @@ func CollectCrowdSecDecisions(connectionString, apiKey, alertsMachineID, alertsP
 	}
 
 	client := &http.Client{Timeout: 5 * time.Second}
-
 	baseURL := strings.TrimRight(connectionString, "/")
+
+	// Build auth header: prefer bouncer key; fall back to watcher JWT so that
+	// setups with only machine credentials (ban/unban) still report decisions.
+	authHeader := ""
+	if apiKey != "" {
+		authHeader = "X-API-Key " + apiKey
+	} else if alertsMachineID != "" && alertsPassword != "" {
+		token, err := loginCrowdSecAlertsToken(connectionString, alertsMachineID, alertsPassword, client)
+		if err != nil {
+			log.Printf("[crowdsec] watcher fallback auth failed: %v", err)
+		} else {
+			authHeader = "Bearer " + token
+		}
+	}
+
 	apiURL := fmt.Sprintf("%s/v1/decisions?has_active_decision=true", baseURL)
 	req, err := http.NewRequest("GET", apiURL, nil)
 	if err != nil {
 		log.Printf("[crowdsec] failed to create request: %v", err)
 		return result, nil
 	}
-	if apiKey != "" {
-		req.Header.Set("X-API-Key", apiKey)
+	if authHeader != "" {
+		if strings.HasPrefix(authHeader, "X-API-Key ") {
+			req.Header.Set("X-Api-Key", strings.TrimPrefix(authHeader, "X-API-Key "))
+		} else {
+			req.Header.Set("Authorization", authHeader)
+		}
 	}
 
 	resp, err := client.Do(req)
