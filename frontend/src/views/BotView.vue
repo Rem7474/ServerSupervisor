@@ -410,12 +410,22 @@
                     {{ formatBlockedUntil(entry.blocked_until) }}
                   </td>
                   <td class="text-end">
-                    <button
-                      class="btn btn-sm btn-outline-primary"
-                      @click="openTimeline(entry.ip)"
-                    >
-                      Timeline
-                    </button>
+                    <div class="d-flex gap-1 justify-content-end">
+                      <button
+                        class="btn btn-sm btn-outline-success"
+                        :disabled="!hostId"
+                        :title="!hostId ? 'Sélectionne un hôte dans le filtre' : 'Débloquer via CrowdSec'"
+                        @click="unblockCrowdSecEntry(entry.ip)"
+                      >
+                        Débloquer
+                      </button>
+                      <button
+                        class="btn btn-sm btn-outline-primary"
+                        @click="openTimeline(entry.ip)"
+                      >
+                        Timeline
+                      </button>
+                    </div>
                   </td>
                 </tr>
               </tbody>
@@ -450,8 +460,7 @@
             <template v-if="isSelectedIPBlocked">
               <button
                 class="btn btn-sm btn-outline-success"
-                :disabled="blockLoading || !hostId"
-                :title="!hostId ? 'Sélectionne un hôte dans le filtre' : ''"
+                :disabled="blockLoading"
                 @click="unblockIP"
               >
                 <span v-if="blockLoading" class="spinner-border spinner-border-sm me-1" />
@@ -472,8 +481,7 @@
               </select>
               <button
                 class="btn btn-sm btn-outline-danger"
-                :disabled="blockLoading || !hostId"
-                :title="!hostId ? 'Sélectionne un hôte dans le filtre' : ''"
+                :disabled="blockLoading"
                 @click="banIP"
               >
                 <span v-if="blockLoading" class="spinner-border spinner-border-sm me-1" />
@@ -745,6 +753,7 @@ const timelineLoading = ref(false)
 const blockLoading = ref(false)
 const selectedIP = ref('')
 const banDuration = ref('4h')
+const timelineHostId = ref('')
 const timeline = ref<AnyRecord[]>([])
 const selectedBucketKey = ref('')
 const bucketFilterEnabled = ref(true)
@@ -775,6 +784,8 @@ const crowdSecTotal = computed(() => Number(threats.value.crowdsec_blocked_ips) 
 const isSelectedIPBlocked = computed(() =>
   crowdSecIPs.value.some((e: AnyRecord) => e.ip === selectedIP.value),
 )
+// host_id effectif : filtre manuel en priorité, sinon déduit des lignes de la timeline
+const effectiveHostId = computed(() => hostId.value || timelineHostId.value)
 
 const timelineChrono = computed(() => {
   return [...timeline.value].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
@@ -1073,11 +1084,20 @@ function setPeriod(value: string) {
 
 async function openTimeline(ip: string) {
   selectedIP.value = ip
+  timelineHostId.value = ''
   showTimeline.value = true
   timelineLoading.value = true
   try {
     const res = await apiClient.getIPTimeline(ip, hostId.value || undefined, period.value, 500)
     timeline.value = res.data?.requests || []
+    // Déduit le host_id depuis les lignes si toutes viennent du même hôte
+    const rows: AnyRecord[] = timeline.value
+    if (rows.length > 0) {
+      const first = rows[0].host_id as string
+      if (first && rows.every((r) => r.host_id === first)) {
+        timelineHostId.value = first
+      }
+    }
     selectedBucketKey.value = timelineBuckets.value.length ? timelineBuckets.value[timelineBuckets.value.length - 1].key : ''
     bucketFilterEnabled.value = true
   } catch (err) {
@@ -1094,6 +1114,7 @@ function closeTimeline() {
   timeline.value = []
   selectedIP.value = ''
   selectedBucketKey.value = ''
+  timelineHostId.value = ''
 }
 
 function selectBucket(key: string) {
@@ -1140,13 +1161,13 @@ watch([timelineBuckets, timelineBucketMs], () => {
 })
 
 async function unblockIP() {
-  if (!hostId.value) {
-    showActionFeedback('Sélectionne un hôte dans le filtre pour cibler la commande')
+  if (!effectiveHostId.value) {
+    showActionFeedback('Impossible de déterminer l\'hôte cible — renseigne le filtre Hôte')
     return
   }
   blockLoading.value = true
   try {
-    await apiClient.unblockCrowdSecIP(selectedIP.value, hostId.value)
+    await apiClient.unblockCrowdSecIP(selectedIP.value, effectiveHostId.value)
     showActionFeedback(`Commande de déblocage envoyée à l'agent pour ${selectedIP.value}`)
     setTimeout(() => loadThreats(), 1000)
   } catch (error) {
@@ -1157,19 +1178,33 @@ async function unblockIP() {
 }
 
 async function banIP() {
-  if (!hostId.value) {
-    showActionFeedback('Sélectionne un hôte dans le filtre pour cibler la commande')
+  if (!effectiveHostId.value) {
+    showActionFeedback('Impossible de déterminer l\'hôte cible — renseigne le filtre Hôte')
     return
   }
   blockLoading.value = true
   try {
-    await apiClient.blockCrowdSecIP(selectedIP.value, hostId.value, banDuration.value)
+    await apiClient.blockCrowdSecIP(selectedIP.value, effectiveHostId.value, banDuration.value)
     showActionFeedback(`Commande de blocage (${banDuration.value}) envoyée à l'agent pour ${selectedIP.value}`)
     setTimeout(() => loadThreats(), 1000)
   } catch (error) {
     showActionFeedback(`Impossible de bloquer l'IP : ${getApiErrorMessage(error)}`)
   } finally {
     blockLoading.value = false
+  }
+}
+
+async function unblockCrowdSecEntry(ip: string) {
+  if (!hostId.value) {
+    showActionFeedback('Sélectionne un hôte dans le filtre pour cibler la commande')
+    return
+  }
+  try {
+    await apiClient.unblockCrowdSecIP(ip, hostId.value)
+    showActionFeedback(`Commande de déblocage envoyée à l'agent pour ${ip}`)
+    setTimeout(() => loadThreats(), 1000)
+  } catch (error) {
+    showActionFeedback(`Impossible de débloquer l'IP : ${getApiErrorMessage(error)}`)
   }
 }
 
