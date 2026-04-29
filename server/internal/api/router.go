@@ -26,7 +26,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	agentRateLimiter := NewIPRateLimiter(cfg.AgentRateLimitRPS, cfg.AgentRateLimitBurst, cfg.TrustedProxyCIDRs)
 
 	// Instantiate handlers
-	authH := handlers.NewAuthHandler(db, cfg)
+	authH := handlers.NewAuthHandler(db, cfg, dispatcher)
 	hostH := handlers.NewHostHandler(db, cfg, dispatcher)
 	wsH := ws.NewWSHandler(db, cfg, notifHub)
 	agentH := handlers.NewAgentHandler(db, cfg, wsH.GetStreamHub(), notifHub)
@@ -128,6 +128,7 @@ func registerAuthRoutes(g *gin.RouterGroup, h *handlers.AuthHandler) {
 	g.GET("/security/web-logs/timeseries", h.GetWebLogsTimeseries)
 	g.GET("/security/web-logs/live", h.GetWebLogsLive)
 	g.GET("/security/web-logs/ip/:ip", h.GetWebLogsIPTimeline)
+	g.DELETE("/security/web-logs/ip/:ip/decisions", h.UnblockCrowdSecIP)
 	g.GET("/security/web-logs/domain/:domain", h.GetWebLogsDomainDetails)
 	g.DELETE("/auth/blocked-ips/:ip", h.UnblockIP)
 }
@@ -146,6 +147,7 @@ func registerHostRoutes(g *gin.RouterGroup, h *handlers.HostHandler, agentH *han
 	hostViewer.GET("/metrics/aggregated", agentH.GetMetricsAggregated)
 	hostViewer.GET("/disk/metrics", h.GetDiskMetrics)
 	hostViewer.GET("/disk/metrics/history", h.GetDiskMetricsHistory)
+	hostViewer.GET("/disk/metrics/aggregated", h.GetDiskMetricsAggregated)
 	hostViewer.GET("/disk/health", h.GetDiskHealth)
 	hostViewer.GET("/complete", h.GetHostComplete)
 

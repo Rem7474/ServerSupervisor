@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/netip"
 	"strconv"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/serversupervisor/server/internal/dispatch"
 )
 
 type ipCountryInfo struct {
@@ -22,6 +24,56 @@ var (
 	ipCountryCache   = map[string]ipCountryInfo{}
 	ipCountryCacheMu sync.RWMutex
 )
+
+// UnblockCrowdSecIP creates a command for the agent to unban an IP via CrowdSec.
+func (h *AuthHandler) UnblockCrowdSecIP(c *gin.Context) {
+	if c.GetString("role") != "admin" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+		return
+	}
+
+	hostID := c.Query("host_id")
+	if hostID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "host_id is required"})
+		return
+	}
+
+	ip := strings.TrimSpace(c.Param("ip"))
+	if ip == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "IP is required"})
+		return
+	}
+
+	// Validate it's a valid IP
+	if _, err := netip.ParseAddr(ip); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid IP address"})
+		return
+	}
+
+	username := c.GetString("username")
+
+	result, err := h.dispatcher.Create(dispatch.Request{
+		HostID:      hostID,
+		Module:      "crowdsec",
+		Action:      "unban",
+		Target:      ip,
+		Payload:     "{}",
+		TriggeredBy: username,
+		Audit: &dispatch.AuditLogRequest{
+			Username:  username,
+			Action:    "crowdsec_unban",
+			HostID:    hostID,
+			IPAddress: c.ClientIP(),
+			Details:   fmt.Sprintf(`{"ip":"%s"}`, ip),
+		},
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create unban command"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"command_id": result.Command.ID, "status": "pending"})
+}
 
 func (h *AuthHandler) GetWebLogsSummary(c *gin.Context) {
 	if c.GetString("role") != "admin" {

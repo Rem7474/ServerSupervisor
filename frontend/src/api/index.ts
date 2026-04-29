@@ -177,6 +177,10 @@ export default {
     api.get(`/v1/security/web-logs/domain/${encodeURIComponent(domain)}`, {
       params: { period, host_id: hostId ?? '', source: source ?? '', limit },
     }),
+  unblockCrowdSecIP: (ip: string, hostId: string) =>
+    api.delete(`/v1/security/web-logs/ip/${encodeURIComponent(ip)}/decisions`, {
+      params: { host_id: hostId },
+    }),
   unblockIP: (ip: string) => api.delete(`/v1/auth/blocked-ips/${ip}`),
   getMFAStatus: () => api.get('/v1/auth/mfa/status'),
   setupMFA: () => api.post('/v1/auth/mfa/setup'),
@@ -198,6 +202,8 @@ export default {
   // Disk
   getDiskMetrics: (hostId: string) => api.get(`/v1/hosts/${hostId}/disk/metrics`),
   getDiskHealth: (hostId: string) => api.get(`/v1/hosts/${hostId}/disk/health`),
+  getDiskMetricsAggregated: (hostId: string, mountPoint: string, hours?: number) =>
+    api.get(`/v1/hosts/${hostId}/disk/metrics/aggregated`, { params: { mount_point: mountPoint, hours: hours ?? 24 } }),
 
   // Metrics
   getMetricsHistory: (hostId: string, hours?: number) =>

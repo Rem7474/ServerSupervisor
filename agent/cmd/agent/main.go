@@ -32,6 +32,9 @@ var Version = "dev"
 // Capacity 10 lets up to 10 pending batches queue up before we start dropping.
 var commandQueue = make(chan []sender.PendingCommand, 10)
 
+// agentConfig stores the active agent configuration (loaded from config file).
+var agentConfig *config.Config
+
 // agentConfigPath stores the active configuration path for helper commands.
 var agentConfigPath = "/etc/serversupervisor/agent.yaml"
 
@@ -118,6 +121,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
+	agentConfig = cfg
 
 	log.Printf("ServerSupervisor Agent starting (version: %s)", Version)
 	log.Printf("Server: %s", cfg.ServerURL)
@@ -751,6 +755,49 @@ func executeCommand(s *sender.Sender, cmd sender.PendingCommand) {
 
 	case "custom":
 		executeCustomTask(ctx, s, cmd)
+
+	case "crowdsec":
+		if err := s.ReportCommandResult(ctx, &sender.CommandResult{
+			CommandID: cmd.ID,
+			Status:    "running",
+		}); err != nil {
+			log.Printf("Failed to report running status: %v", err)
+		}
+
+		var output string
+		var execErr error
+
+		switch cmd.Action {
+		case "unban":
+			if cmd.Target == "" {
+				execErr = fmt.Errorf("no IP provided for unban action")
+			} else {
+				execErr = collector.DeleteCrowdSecDecision(
+					agentConfig.CrowdSecConnectionString,
+					agentConfig.CrowdSecAPIKey,
+					cmd.Target,
+				)
+			}
+		default:
+			execErr = fmt.Errorf("unknown crowdsec action: %s", cmd.Action)
+		}
+
+		status := "completed"
+		if execErr != nil {
+			status = "failed"
+			output = fmt.Sprintf("ERROR: %v", execErr)
+			log.Printf("crowdsec %s %s failed: %v", cmd.Action, cmd.Target, execErr)
+		} else {
+			output = fmt.Sprintf("Successfully unbanned IP: %s", cmd.Target)
+			log.Printf("crowdsec %s %s completed", cmd.Action, cmd.Target)
+		}
+		if err := s.ReportCommandResult(ctx, &sender.CommandResult{
+			CommandID: cmd.ID,
+			Status:    status,
+			Output:    output,
+		}); err != nil {
+			log.Printf("Failed to report crowdsec command result: %v", err)
+		}
 
 	default:
 		log.Printf("Unknown command module: %s", cmd.Module)

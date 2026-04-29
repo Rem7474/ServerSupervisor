@@ -16,6 +16,7 @@ import (
 	"github.com/serversupervisor/server/internal/auth"
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/database"
+	"github.com/serversupervisor/server/internal/dispatch"
 	"github.com/serversupervisor/server/internal/models"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -45,12 +46,13 @@ func clientIP(c *gin.Context) string {
 }
 
 type AuthHandler struct {
-	db  *database.DB
-	cfg *config.Config
+	db         *database.DB
+	cfg        *config.Config
+	dispatcher *dispatch.Dispatcher
 }
 
-func NewAuthHandler(db *database.DB, cfg *config.Config) *AuthHandler {
-	return &AuthHandler{db: db, cfg: cfg}
+func NewAuthHandler(db *database.DB, cfg *config.Config, dispatcher *dispatch.Dispatcher) *AuthHandler {
+	return &AuthHandler{db: db, cfg: cfg, dispatcher: dispatcher}
 }
 
 func (h *AuthHandler) Login(c *gin.Context) {

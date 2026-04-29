@@ -666,7 +666,8 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import apiClient from '../api'
+import apiClient, { getApiErrorMessage } from '../api'
+import { useToast } from '../composables/useToast'
 
 type AnyRecord = Record<string, any>
 
@@ -721,6 +722,8 @@ const timeline = ref<AnyRecord[]>([])
 const selectedBucketKey = ref('')
 const bucketFilterEnabled = ref(true)
 const selectedInterval = ref('auto')
+
+const { showToast: showActionFeedback } = useToast('')
 
 const timelineIntervalOptions = [
   { value: 'auto', label: 'Auto', ms: 0 },
@@ -1107,10 +1110,24 @@ watch([timelineBuckets, timelineBucketMs], () => {
 })
 
 async function blockIP() {
-  // Reuses existing unblock endpoint path contract inversely is not implemented server-side yet.
   blockLoading.value = true
   try {
-    console.warn('Block endpoint not implemented yet for IP', selectedIP.value)
+    if (!hostId.value) {
+      showActionFeedback('Aucun host sélectionné')
+      return
+    }
+    
+    await apiClient.unblockCrowdSecIP(selectedIP.value, hostId.value)
+    
+    showActionFeedback(`Commande de déblocage envoyée à l'agent pour l'IP ${selectedIP.value}`)
+    
+    // Reload threats after a delay to show the updated state
+    setTimeout(() => {
+      loadThreats()
+    }, 1000)
+  } catch (error) {
+    showActionFeedback(`Impossible de débloquer l'IP: ${getApiErrorMessage(error)}`)
+    console.error('Unblock IP failed:', error)
   } finally {
     blockLoading.value = false
   }

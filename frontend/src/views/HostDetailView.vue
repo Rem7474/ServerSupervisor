@@ -326,6 +326,11 @@
             :initial-metrics="diskMetrics"
             class="mb-4"
           />
+          <DiskHistoryChart
+            :host-id="hostId"
+            :mounts="diskMetrics?.map(d => d.mount_point) ?? []"
+            class="mb-4"
+          />
           <DiskHealthCard
             :host-id="hostId"
             :initial-health="diskHealth"
@@ -604,6 +609,7 @@ import { useHostDetail } from '../composables/useHostDetail'
 import RelativeTime from '../components/RelativeTime.vue'
 import DiskMetricsCard from '../components/DiskMetricsCard.vue'
 import DiskHealthCard from '../components/DiskHealthCard.vue'
+import DiskHistoryChart from '../components/DiskHistoryChart.vue'
 import HostMetricsPanel from '../components/HostMetricsPanel.vue'
 import HostProcessesPanel from '../components/HostProcessesPanel.vue'
 import WsStatusBar from '../components/WsStatusBar.vue'

@@ -407,6 +407,14 @@ func (db *DB) CleanOldMetrics(retentionDays int) (int64, error) {
 		return rawDeleted, err
 	}
 
+	_, err = tx.Exec(
+		`DELETE FROM disk_metrics WHERE timestamp < NOW() - INTERVAL '1 day' * $1`,
+		retentionDays,
+	)
+	if err != nil {
+		return rawDeleted, err
+	}
+
 	if err := tx.Commit(); err != nil {
 		return 0, err
 	}

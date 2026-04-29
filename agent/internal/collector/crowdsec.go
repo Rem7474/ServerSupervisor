@@ -174,6 +174,41 @@ func loginCrowdSecAlertsToken(connectionString, machineID, password string, clie
 	return loginResp.Token, nil
 }
 
+// DeleteCrowdSecDecision removes a ban decision for a specific IP via the CrowdSec Local API.
+func DeleteCrowdSecDecision(connectionString, apiKey, ip string) error {
+	if connectionString == "" {
+		return errors.New("crowdsec connection string is empty")
+	}
+	if ip == "" {
+		return errors.New("IP is empty")
+	}
+
+	client := &http.Client{Timeout: 5 * time.Second}
+	baseURL := strings.TrimRight(connectionString, "/")
+	deleteURL := fmt.Sprintf("%s/v1/decisions?value=%s&type=ban&scope=Ip", baseURL, ip)
+
+	req, err := http.NewRequest("DELETE", deleteURL, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create delete request: %w", err)
+	}
+	if apiKey != "" {
+		req.Header.Set("X-API-Key", apiKey)
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to query CrowdSec delete API: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("CrowdSec delete API returned status %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+
+	return nil
+}
+
 // enrichDecisionsWithAlerts calls /v1/alerts and merges country + ASN into existing decisions.
 // Failures are silently ignored — this is best-effort enrichment only.
 func enrichDecisionsWithAlerts(decisions map[string]CrowdSecDecision, connectionString, apiKey, alertsMachineID, alertsPassword string, client *http.Client) {

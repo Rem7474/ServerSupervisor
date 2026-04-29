@@ -1,6 +1,7 @@
 package database
 
 import (
+	"database/sql"
 	"fmt"
 
 	"github.com/serversupervisor/server/internal/models"
@@ -93,6 +94,92 @@ func (db *DB) GetDiskMetricsHistory(hostID, mountPoint string, limit int) ([]mod
 		metrics = append(metrics, m)
 	}
 	return metrics, nil
+}
+
+func (db *DB) GetDiskMetricsAggregated(hostID, mountPoint string, hours int) ([]models.DiskMetrics, string, error) {
+	if hours <= 0 {
+		hours = 24
+	}
+
+	var (
+		rows *sql.Rows
+		err  error
+		aggType string
+	)
+
+	if hours <= 24 {
+		aggType = "raw"
+		rows, err = db.conn.Query(
+			`SELECT id, host_id, timestamp, mount_point, filesystem,
+				size_gb, used_gb, avail_gb, used_percent,
+				inodes_total, inodes_used, inodes_free, inodes_percent
+			FROM disk_metrics
+			WHERE host_id = $1 AND mount_point = $2
+			  AND timestamp > NOW() - INTERVAL '1 hour' * $3
+			ORDER BY timestamp ASC`,
+			hostID, mountPoint, hours,
+		)
+	} else if hours <= 720 {
+		aggType = "hour"
+		rows, err = db.conn.Query(
+			`SELECT
+				0 AS id,
+				$1 AS host_id,
+				date_trunc('hour', timestamp) AS timestamp,
+				mount_point,
+				'' AS filesystem,
+				AVG(size_gb) AS size_gb,
+				AVG(used_gb) AS used_gb,
+				AVG(avail_gb) AS avail_gb,
+				AVG(used_percent) AS used_percent,
+				0 AS inodes_total, 0 AS inodes_used, 0 AS inodes_free, 0.0 AS inodes_percent
+			FROM disk_metrics
+			WHERE host_id = $1 AND mount_point = $2
+			  AND timestamp > NOW() - INTERVAL '1 hour' * $3
+			GROUP BY date_trunc('hour', timestamp), mount_point
+			ORDER BY timestamp ASC`,
+			hostID, mountPoint, hours,
+		)
+	} else {
+		aggType = "day"
+		rows, err = db.conn.Query(
+			`SELECT
+				0 AS id,
+				$1 AS host_id,
+				date_trunc('day', timestamp) AS timestamp,
+				mount_point,
+				'' AS filesystem,
+				AVG(size_gb) AS size_gb,
+				AVG(used_gb) AS used_gb,
+				AVG(avail_gb) AS avail_gb,
+				AVG(used_percent) AS used_percent,
+				0 AS inodes_total, 0 AS inodes_used, 0 AS inodes_free, 0.0 AS inodes_percent
+			FROM disk_metrics
+			WHERE host_id = $1 AND mount_point = $2
+			  AND timestamp > NOW() - INTERVAL '1 hour' * $3
+			GROUP BY date_trunc('day', timestamp), mount_point
+			ORDER BY timestamp ASC`,
+			hostID, mountPoint, hours,
+		)
+	}
+	if err != nil {
+		return nil, "", err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var metrics []models.DiskMetrics
+	for rows.Next() {
+		var m models.DiskMetrics
+		if err := rows.Scan(
+			&m.ID, &m.HostID, &m.Timestamp, &m.MountPoint, &m.Filesystem,
+			&m.SizeGB, &m.UsedGB, &m.AvailGB, &m.UsedPercent,
+			&m.InodesTotal, &m.InodesUsed, &m.InodesFree, &m.InodesPercent,
+		); err != nil {
+			return nil, "", err
+		}
+		metrics = append(metrics, m)
+	}
+	return metrics, aggType, nil
 }
 
 // ========== Disk Health (SMART) ==========
