@@ -239,7 +239,6 @@ func CollectWebLogs(logPathGlobs []string, tailLines int, topN int, requestLimit
 				Domain:    domain,
 				Category:  category,
 			}
-			// Send every parsed line of this run so progressive backfill really reaches server-side history.
 			report.Requests = append(report.Requests, request)
 
 			if category == "" {
@@ -272,6 +271,11 @@ func CollectWebLogs(logPathGlobs []string, tailLines int, topN int, requestLimit
 				ipReq[e.ip] = append(ipReq[e.ip], request)
 			}
 		}
+	}
+
+	// Cap requests to the configured limit (most recent entries).
+	if requestLimit > 0 && len(report.Requests) > requestLimit {
+		report.Requests = report.Requests[len(report.Requests)-requestLimit:]
 	}
 
 	report.Threats.UniqueSuspiciousIPs = len(ipHits)

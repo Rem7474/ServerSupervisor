@@ -206,6 +206,13 @@ func (db *DB) UpdateHostStatus(id, status string) error {
 	return err
 }
 
+// GetHostStatus returns the current status of a host ("online", "offline", or "" if not found).
+func (db *DB) GetHostStatus(id string) string {
+	var status string
+	_ = db.conn.QueryRow(`SELECT status FROM hosts WHERE id = $1`, id).Scan(&status)
+	return status
+}
+
 func (db *DB) UpdateHost(id string, update *models.HostUpdate) error {
 	var tagsJSON *string
 	if update.Tags != nil {

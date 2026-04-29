@@ -74,14 +74,25 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 		return
 	}
 
+	// Detect reconnect: read previous status before marking online.
+	prevStatus := h.db.GetHostStatus(hostID)
+
 	// Update host status
 	if err := h.db.UpdateHostStatus(hostID, "online"); err != nil {
 		log.Printf("Warning: failed to update host %s status to online: %v", safeHostID, err)
 	}
 
-	// Cleanup any stalled commands for this host (in case agent restarted)
-	if err := h.db.CleanupHostStalledCommands(hostID, 60); err != nil {
-		log.Printf("Warning: failed to cleanup stalled commands for host %s: %v", hostID, err)
+	// On reconnect, immediately fail any 'running' commands from the previous dead session.
+	// These will never complete — the agent that started them has gone away.
+	if prevStatus == "offline" {
+		if err := h.db.FailRunningCommandsOnAgentReconnect(hostID); err != nil {
+			log.Printf("Warning: failed to cleanup running commands on reconnect for host %s: %v", safeHostID, err)
+		}
+	}
+
+	// Cleanup stalled commands older than 10 minutes (pending commands left from extended downtime).
+	if err := h.db.CleanupHostStalledCommands(hostID, 10); err != nil {
+		log.Printf("Warning: failed to cleanup stalled commands for host %s: %v", safeHostID, err)
 	}
 
 	// Check if Proxmox is the exclusive metrics source for this host.

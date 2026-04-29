@@ -828,6 +828,66 @@ func (db *DB) CleanupStalledCommands(timeoutMinutes int) error {
 	return nil
 }
 
+// FailRunningCommandsOnAgentReconnect immediately fails all 'running' commands for a host.
+// Called when an offline agent reconnects — any command still in 'running' state is from
+// the previous crashed session and will never complete.
+func (db *DB) FailRunningCommandsOnAgentReconnect(hostID string) error {
+	rows, err := db.conn.Query(`
+		UPDATE remote_commands
+		SET status = 'failed',
+		    output = 'Agent restarted — command was interrupted',
+		    ended_at = NOW()
+		WHERE host_id = $1 AND status = 'running'
+		RETURNING audit_log_id, scheduled_task_id`,
+		hostID)
+	if err != nil {
+		return fmt.Errorf("failed to fail running commands on reconnect: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var auditIDs []int64
+	var taskIDs []string
+	count := 0
+	for rows.Next() {
+		count++
+		var auditLogID sql.NullInt64
+		var scheduledTaskID sql.NullString
+		if err := rows.Scan(&auditLogID, &scheduledTaskID); err == nil {
+			if auditLogID.Valid {
+				auditIDs = append(auditIDs, auditLogID.Int64)
+			}
+			if scheduledTaskID.Valid {
+				taskIDs = append(taskIDs, scheduledTaskID.String)
+			}
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	if count > 0 {
+		safeHostID := strings.ReplaceAll(strings.ReplaceAll(hostID, "\n", ""), "\r", "")
+		log.Printf("Agent reconnect: failed %d interrupted running commands for host %s", count, safeHostID)
+		if len(auditIDs) > 0 {
+			if _, err := db.conn.Exec(`
+				UPDATE audit_logs SET status = 'failed',
+				    details = 'Agent restarted — command was interrupted'
+				WHERE id = ANY($1)`,
+				pq.Array(auditIDs)); err != nil {
+				log.Printf("Warning: failed to update audit logs on reconnect for host %s: %v", safeHostID, err)
+			}
+		}
+		if len(taskIDs) > 0 {
+			if _, err := db.conn.Exec(`
+				UPDATE scheduled_tasks SET last_run_status = 'failed', last_run_at = NOW()
+				WHERE id = ANY($1)`,
+				pq.Array(taskIDs)); err != nil {
+				log.Printf("Warning: failed to update scheduled tasks on reconnect for host %s: %v", safeHostID, err)
+			}
+		}
+	}
+	return nil
+}
+
 // CleanupHostStalledCommands marks old pending/running commands for a specific host as failed.
 func (db *DB) CleanupHostStalledCommands(hostID string, timeoutMinutes int) error {
 	rows, err := db.conn.Query(`
