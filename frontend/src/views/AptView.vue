@@ -11,9 +11,31 @@
         <span class="text-muted mx-1">/</span>
         <span>APT</span>
       </div>
-      <h2 class="page-title">
-        APT — Mises à jour système
-      </h2>
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <h2 class="page-title">
+          APT — Mises à jour système
+        </h2>
+        <router-link
+          to="/audit?module=apt"
+          class="btn btn-sm btn-outline-secondary"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            class="icon icon-sm me-1"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          ><path
+            stroke="none"
+            d="M0 0h24v24H0z"
+            fill="none"
+          /><path d="M4 6l16 0" /><path d="M4 12l16 0" /><path d="M4 18l12 0" /></svg>
+          Historique des commandes
+        </router-link>
+      </div>
       <div class="text-secondary">
         Gérer les mises à jour APT sur tous les hôtes
       </div>
@@ -28,542 +50,452 @@
       @dismiss-stale-alert="dataStaleAlert = false"
     />
 
-    <!-- Onglets -->
-    <SubNavigation
-      v-model="activeTab"
-      :tabs="[
-        { key: 'hosts', label: 'Hôtes' },
-        { key: 'history', label: 'Historique', badge: allHistory.length || undefined }
-      ]"
-    />
-
-    <!-- Layout partagé pour les deux onglets -->
-    <div class="side-layout">
-      <!-- Contenu principal (bascule entre hôtes et historique) -->
-      <div class="side-main">
-        <!-- === Vue Hôtes === -->
-        <template v-if="activeTab === 'hosts'">
-          <DataToolbar
-            searchable
-            :search="hostSearch"
-            search-placeholder="Rechercher un hôte..."
-            @update:search="hostSearch = $event"
+    <DataToolbar
+      searchable
+      :search="hostSearch"
+      search-placeholder="Rechercher un hôte..."
+      @update:search="hostSearch = $event"
+    >
+      <template #right>
+        <div class="btn-group">
+          <button
+            v-for="f in hostFilterOptions"
+            :key="f.value"
+            class="btn btn-sm"
+            :class="hostQuickFilter === f.value ? 'btn-primary' : 'btn-outline-secondary'"
+            @click="hostQuickFilter = f.value"
           >
-            <template #right>
-              <div class="btn-group">
-                <button
-                  v-for="f in hostFilterOptions"
-                  :key="f.value"
-                  class="btn btn-sm"
-                  :class="hostQuickFilter === f.value ? 'btn-primary' : 'btn-outline-secondary'"
-                  @click="hostQuickFilter = f.value"
-                >
-                  {{ f.label }}
-                </button>
-              </div>
-              <select
-                v-model="hostSortKey"
-                class="form-select form-select-sm sort-select"
-              >
-                <option value="name">
-                  Trier par nom
-                </option>
-                <option value="pending">
-                  Trier par paquets en attente
-                </option>
-                <option value="security">
-                  Trier par mises à jour sécurité
-                </option>
-                <option value="cve">
-                  Trier par CVE
-                </option>
-              </select>
+            {{ f.label }}
+          </button>
+        </div>
+        <select
+          v-model="hostSortKey"
+          class="form-select form-select-sm sort-select"
+        >
+          <option value="name">
+            Trier par nom
+          </option>
+          <option value="pending">
+            Trier par paquets en attente
+          </option>
+          <option value="security">
+            Trier par mises à jour sécurité
+          </option>
+          <option value="cve">
+            Trier par CVE
+          </option>
+        </select>
+        <button
+          class="btn btn-sm btn-outline-secondary"
+          :title="hostSortDir === 'asc' ? 'Croissant' : 'Décroissant'"
+          @click="hostSortDir = hostSortDir === 'asc' ? 'desc' : 'asc'"
+        >
+          <svg
+            v-if="hostSortDir === 'asc'"
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          ><path d="M3 8l4-4 4 4M7 4v16M13 16l4 4 4-4M17 20V4" /></svg>
+          <svg
+            v-else
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          ><path d="M3 16l4 4 4-4M7 20V4M13 8l4-4 4 4M17 4v16" /></svg>
+        </button>
+      </template>
+      <template #bottom>
+        <div class="d-flex flex-wrap align-items-center gap-3">
+          <label class="form-check">
+            <input
+              v-model="selectAll"
+              type="checkbox"
+              class="form-check-input"
+              @change="toggleSelectAll"
+            >
+            <span class="form-check-label">Sélectionner tous les hôtes</span>
+          </label>
+          <div class="ms-auto d-flex flex-wrap gap-2">
+            <template v-if="canRunApt && selectedHosts.length > 0">
               <button
-                class="btn btn-sm btn-outline-secondary"
-                :title="hostSortDir === 'asc' ? 'Croissant' : 'Décroissant'"
-                @click="hostSortDir = hostSortDir === 'asc' ? 'desc' : 'asc'"
+                class="btn btn-outline-secondary btn-sm"
+                :disabled="!!aptBulkLoading"
+                @click="bulkAptCmd('update')"
               >
-                <svg
-                  v-if="hostSortDir === 'asc'"
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                ><path d="M3 8l4-4 4 4M7 4v16M13 16l4 4 4-4M17 20V4" /></svg>
-                <svg
-                  v-else
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                ><path d="M3 16l4 4 4-4M7 20V4M13 8l4-4 4 4M17 4v16" /></svg>
+                <span
+                  v-if="aptBulkLoading === 'update'"
+                  class="spinner-border spinner-border-sm me-1"
+                  role="status"
+                />
+                apt update ({{ selectedHosts.length }})
+              </button>
+              <button
+                class="btn btn-primary btn-sm"
+                :disabled="!!aptBulkLoading"
+                @click="bulkAptCmd('upgrade')"
+              >
+                <span
+                  v-if="aptBulkLoading === 'upgrade'"
+                  class="spinner-border spinner-border-sm me-1"
+                  role="status"
+                />
+                apt upgrade ({{ selectedHosts.length }})
+              </button>
+              <button
+                class="btn btn-outline-danger btn-sm"
+                :disabled="!!aptBulkLoading"
+                @click="bulkAptCmd('dist-upgrade')"
+              >
+                <span
+                  v-if="aptBulkLoading === 'dist-upgrade'"
+                  class="spinner-border spinner-border-sm me-1"
+                  role="status"
+                />
+                apt dist-upgrade ({{ selectedHosts.length }})
               </button>
             </template>
-            <template #bottom>
-              <div class="d-flex flex-wrap align-items-center gap-3">
-                <label class="form-check">
-                  <input
-                    v-model="selectAll"
-                    type="checkbox"
-                    class="form-check-input"
-                    @change="toggleSelectAll"
-                  >
-                  <span class="form-check-label">Sélectionner tous les hôtes</span>
-                </label>
-                <div class="ms-auto d-flex flex-wrap gap-2">
-                  <template v-if="canRunApt">
-                    <button
-                      class="btn btn-outline-secondary btn-sm"
-                      :disabled="selectedHosts.length === 0 || !!aptBulkLoading"
-                      @click="bulkAptCmd('update')"
-                    >
-                      <span
-                        v-if="aptBulkLoading === 'update'"
-                        class="spinner-border spinner-border-sm me-1"
-                        role="status"
-                      />
-                      apt update ({{ selectedHosts.length }})
-                    </button>
-                    <button
-                      class="btn btn-primary btn-sm"
-                      :disabled="selectedHosts.length === 0 || !!aptBulkLoading"
-                      @click="bulkAptCmd('upgrade')"
-                    >
-                      <span
-                        v-if="aptBulkLoading === 'upgrade'"
-                        class="spinner-border spinner-border-sm me-1"
-                        role="status"
-                      />
-                      apt upgrade ({{ selectedHosts.length }})
-                    </button>
-                    <button
-                      class="btn btn-outline-danger btn-sm"
-                      :disabled="selectedHosts.length === 0 || !!aptBulkLoading"
-                      @click="bulkAptCmd('dist-upgrade')"
-                    >
-                      <span
-                        v-if="aptBulkLoading === 'dist-upgrade'"
-                        class="spinner-border spinner-border-sm me-1"
-                        role="status"
-                      />
-                      apt dist-upgrade ({{ selectedHosts.length }})
-                    </button>
-                  </template>
-                  <div
-                    v-else
-                    class="text-secondary small"
-                  >
-                    Mode lecture seule
-                  </div>
-                </div>
-              </div>
-            </template>
-          </DataToolbar>
+            <span
+              v-else-if="selectedHosts.length === 0"
+              class="text-secondary small align-self-center"
+            >Sélectionner des hôtes pour les actions groupées</span>
+          </div>
+        </div>
+      </template>
+    </DataToolbar>
 
-          <div class="row row-cards">
-            <div
-              v-if="filteredHosts.length === 0"
-              class="col-12"
-            >
-              <div class="card">
-                <div class="card-body text-center text-secondary py-4">
-                  <template v-if="wsStatus === 'connecting' || wsStatus === 'reconnecting'">
-                    <span
-                      class="spinner-border spinner-border-sm me-2"
-                      role="status"
-                      aria-hidden="true"
-                    />
-                    Chargement des hôtes...
-                  </template>
-                  <template v-else>
-                    Aucun hôte ne correspond aux filtres.
-                  </template>
-                </div>
+    <div class="side-layout">
+      <div class="side-main">
+        <div class="row row-cards">
+          <div
+            v-if="filteredHosts.length === 0"
+            class="col-12"
+          >
+            <div class="card">
+              <div class="card-body text-center text-secondary py-4">
+                <template v-if="wsStatus === 'connecting' || wsStatus === 'reconnecting'">
+                  <span
+                    class="spinner-border spinner-border-sm me-2"
+                    role="status"
+                    aria-hidden="true"
+                  />
+                  Chargement des hôtes...
+                </template>
+                <template v-else>
+                  Aucun hôte ne correspond aux filtres.
+                </template>
               </div>
             </div>
-            <div
-              v-for="host in filteredHosts"
-              :key="host.id"
-              class="col-12"
-            >
-              <div class="card">
-                <div class="card-body">
-                  <div class="d-flex align-items-center gap-3">
-                    <label class="form-check">
-                      <input
-                        v-model="selectedHosts"
-                        type="checkbox"
-                        class="form-check-input"
-                        :value="host.id"
+          </div>
+
+          <div
+            v-for="host in filteredHosts"
+            :key="host.id"
+            class="col-12"
+          >
+            <div class="card">
+              <!-- Header : identité + statut + actions par hôte -->
+              <div class="card-header">
+                <div class="d-flex align-items-center gap-3 flex-wrap w-100">
+                  <label class="form-check m-0">
+                    <input
+                      v-model="selectedHosts"
+                      type="checkbox"
+                      class="form-check-input"
+                      :value="host.id"
+                    >
+                    <span class="form-check-label" />
+                  </label>
+                  <div class="flex-fill min-w-0">
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                      <router-link
+                        :to="`/hosts/${host.id}`"
+                        class="fw-semibold text-reset text-decoration-none"
                       >
-                      <span class="form-check-label" />
-                    </label>
-                    <div class="flex-fill">
-                      <div class="d-flex align-items-center gap-2 flex-wrap">
-                        <router-link
-                          :to="`/hosts/${host.id}`"
-                          class="fw-semibold text-reset text-decoration-none"
-                        >
-                          {{ host.name || host.hostname }}
-                        </router-link>
+                        {{ host.name || host.hostname }}
+                      </router-link>
+                      <span
+                        v-if="host.name && host.hostname && host.name !== host.hostname"
+                        class="text-secondary small"
+                      >
+                        {{ host.hostname }}
+                      </span>
+                      <span class="text-muted small">{{ host.ip_address }}</span>
+                    </div>
+                  </div>
+                  <span :class="host.status === 'online' ? 'status status-lime' : 'status status-red'">
+                    <span :class="['status-dot', host.status === 'online' ? 'status-dot-animated' : '']" />
+                    <span>{{ host.status === 'online' ? 'En ligne' : 'Hors ligne' }}</span>
+                  </span>
+                  <div
+                    v-if="canRunApt"
+                    class="d-flex gap-1 flex-shrink-0"
+                  >
+                    <div class="btn-group btn-group-sm">
+                      <button
+                        class="btn btn-outline-secondary"
+                        :disabled="isHostCmdLoading(host.id)"
+                        @click="runAptCmdForHost(host, 'update')"
+                      >
                         <span
-                          v-if="host.name && host.hostname && host.name !== host.hostname"
-                          class="text-secondary small"
-                        >
-                          {{ host.hostname }}
-                        </span>
-                      </div>
-                      <div class="text-secondary small">
-                        {{ host.ip_address }}
-                      </div>
-                    </div>
-                    <span :class="host.status === 'online' ? 'status status-lime' : 'status status-red'">
-                      <span :class="['status-dot', host.status === 'online' ? 'status-dot-animated' : '']" />
-                      <span>{{ host.status === 'online' ? 'En ligne' : 'Hors ligne' }}</span>
-                    </span>
-                    <div class="d-flex align-items-center gap-2">
-                      <button
-                        class="btn btn-sm btn-outline-secondary"
-                        @click="toggleHostDetails(host.id)"
-                      >
-                        {{ isHostDetailsExpanded(host.id) ? 'Réduire' : 'Détails' }}
+                          v-if="hostCmdLoading[host.id] === 'update'"
+                          class="spinner-border spinner-border-sm me-1"
+                          role="status"
+                        />
+                        update
                       </button>
                       <button
-                        v-if="canRunApt"
-                        class="btn btn-sm btn-outline-secondary"
-                        title="Planifier une commande APT"
-                        @click="openScheduleModal(host)"
+                        class="btn btn-primary"
+                        :disabled="isHostCmdLoading(host.id)"
+                        @click="runAptCmdForHost(host, 'upgrade')"
                       >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          class="icon icon-sm me-1"
-                          width="16"
-                          height="16"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          stroke-width="2"
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                        >
-                          <rect
-                            x="3"
-                            y="4"
-                            width="18"
-                            height="18"
-                            rx="2"
-                            ry="2"
-                          /><line
-                            x1="16"
-                            y1="2"
-                            x2="16"
-                            y2="6"
-                          /><line
-                            x1="8"
-                            y1="2"
-                            x2="8"
-                            y2="6"
-                          /><line
-                            x1="3"
-                            y1="10"
-                            x2="21"
-                            y2="10"
-                          />
-                        </svg>
-                        Planifier
+                        <span
+                          v-if="hostCmdLoading[host.id] === 'upgrade'"
+                          class="spinner-border spinner-border-sm me-1"
+                          role="status"
+                        />
+                        upgrade
                       </button>
-                    </div>
-                  </div>
-
-                  <div
-                    v-if="aptStatuses[host.id]"
-                    class="d-flex flex-wrap gap-2 mb-3"
-                  >
-                    <template v-if="isHostUpToDate(host.id)">
-                      <span class="badge bg-green-lt text-green">
-                        À jour
-                      </span>
-                      <span class="text-secondary small">
-                        Aucune mise à jour en attente
-                      </span>
-                      <span class="badge bg-secondary-lt text-secondary">
-                        vérifié: {{ formatDate(aptStatuses[host.id].last_update) }}
-                      </span>
-                    </template>
-                    <template v-else>
-                      <span
-                        class="badge"
-                        :class="aptStatuses[host.id].pending_packages > 0 ? 'bg-yellow-lt text-yellow' : 'bg-green-lt text-green'"
-                      >
-                        {{ aptStatuses[host.id].pending_packages }} en attente
-                      </span>
-                      <span
-                        class="badge"
-                        :class="aptStatuses[host.id].security_updates > 0 ? 'bg-red-lt text-red' : 'bg-secondary-lt text-secondary'"
-                      >
-                        {{ aptStatuses[host.id].security_updates }} sécurité
-                      </span>
-                      <span class="badge bg-secondary-lt text-secondary">
-                        Màj: {{ formatDate(aptStatuses[host.id].last_update) }}
-                      </span>
-                      <span class="badge bg-secondary-lt text-secondary">
-                        Upgrade: {{ formatDate(aptStatuses[host.id].last_upgrade) }}
-                      </span>
-                    </template>
-                  </div>
-
-                  <!-- CVE Information -->
-                  <div
-                    v-if="isHostDetailsExpanded(host.id) && aptStatuses[host.id]?.cve_list"
-                    class="mb-3"
-                  >
-                    <div class="border rounded px-3 py-2 bg-body-tertiary">
-                      <div class="text-secondary small mb-1 fw-semibold">
-                        CVE prioritaires
-                      </div>
-                      <CVEList
-                        :cve-list="aptStatuses[host.id].cve_list"
-                        :show-max-severity="true"
-                        :always-expanded="false"
-                        :initially-collapsed="false"
-                        :limit="3"
-                      />
-                    </div>
-                  </div>
-
-                  <!-- Package List -->
-                  <div
-                    v-if="isHostDetailsExpanded(host.id) && getPackages(aptStatuses[host.id]).length > 0"
-                    class="mb-3"
-                  >
-                    <div class="d-flex align-items-center mb-2">
-                      <span class="fw-semibold me-2">Paquets en attente :</span>
-                      <span class="badge bg-yellow-lt text-yellow">{{ getPackages(aptStatuses[host.id]).length }}</span>
-                    </div>
-                    <div
-                      v-if="packagesExpanded[host.id]"
-                      class="d-flex flex-wrap gap-1 mb-1"
-                    >
-                      <span
-                        v-for="pkg in (packagesShowAll[host.id] ? getPackages(aptStatuses[host.id]) : getPackages(aptStatuses[host.id]).slice(0, 12))"
-                        :key="pkg"
-                        class="badge bg-blue-lt text-blue apt-pkg-badge"
-                      >{{ pkg }}</span>
                       <button
-                        v-if="getPackages(aptStatuses[host.id]).length > 12 && !packagesShowAll[host.id]"
-                        class="btn btn-sm btn-link p-0 ms-1"
-                        @click="packagesShowAll[host.id] = true"
+                        class="btn btn-outline-danger"
+                        :disabled="isHostCmdLoading(host.id)"
+                        @click="runAptCmdForHost(host, 'dist-upgrade')"
                       >
-                        +{{ getPackages(aptStatuses[host.id]).length - 12 }} plus...
+                        <span
+                          v-if="hostCmdLoading[host.id] === 'dist-upgrade'"
+                          class="spinner-border spinner-border-sm me-1"
+                          role="status"
+                        />
+                        dist-upgrade
                       </button>
                     </div>
                     <button
-                      class="btn btn-sm btn-link p-0"
-                      @click="packagesExpanded[host.id] = !packagesExpanded[host.id]"
-                    >
-                      {{ packagesExpanded[host.id]
-                        ? 'Masquer'
-                        : `Afficher ${getPackages(aptStatuses[host.id]).length} paquet${getPackages(aptStatuses[host.id]).length > 1 ? 's' : ''}` }}
-                    </button>
-                  </div>
-
-                  <div
-                    v-if="isHostDetailsExpanded(host.id) && aptHistories[host.id]?.length"
-                    class="mt-3"
-                  >
-                    <div class="border rounded px-3 py-2 bg-body-tertiary">
-                      <div class="text-secondary small mb-2 fw-semibold">
-                        Historique récent ({{ aptHistories[host.id].length }})
-                      </div>
-                      <div class="mt-1">
-                        <div
-                          v-for="cmd in displayedHostHistory(host.id)"
-                          :key="cmd.id"
-                          class="border rounded p-2 mb-2"
-                        >
-                          <div class="d-flex align-items-center gap-2 flex-nowrap small">
-                            <span class="fw-semibold text-truncate">apt {{ cmd.action }}</span>
-                            <span
-                              :class="statusClass(cmd.status)"
-                              class="flex-shrink-0"
-                            >{{ statusLabel(cmd.status) }}</span>
-                            <span class="text-secondary flex-shrink-0">{{ formatDuration(cmd.started_at, cmd.ended_at) }}</span>
-                            <span class="text-secondary text-truncate">
-                              {{ formatDate(cmd.created_at) }}
-                              <span v-if="cmd.triggered_by">• {{ cmd.triggered_by }}</span>
-                            </span>
-                            <button
-                              class="btn btn-outline-secondary btn-sm ms-auto flex-shrink-0"
-                              title="Voir les logs"
-                              @click="watchCommand(cmd, host)"
-                            >
-                              <svg
-                                class="icon icon-sm"
-                                width="16"
-                                height="16"
-                                viewBox="0 0 24 24"
-                                stroke-width="2"
-                                stroke="currentColor"
-                                fill="none"
-                                xmlns="http://www.w3.org/2000/svg"
-                              ><path
-                                stroke="none"
-                                d="M0 0h24v24H0z"
-                                fill="none"
-                              /><path d="M4 6l16 0" /><path d="M4 12l16 0" /><path d="M4 18l12 0" /></svg>
-                              <span class="ms-1">Logs</span>
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                      <button
-                        v-if="hasMoreHostHistory(host.id)"
-                        class="btn btn-outline-secondary btn-sm"
-                        @click="toggleHistory(host.id)"
-                      >
-                        {{ expandedHistories[host.id]
-                          ? 'Afficher moins'
-                          : `Afficher plus (${aptHistories[host.id].length - HOST_HISTORY_PREVIEW_COUNT})` }}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </template>
-
-        <!-- === Vue Historique global === -->
-        <div
-          v-else
-          class="card"
-        >
-          <div class="card-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
-            <h3 class="card-title mb-0">
-              Historique des mises à jour
-            </h3>
-            <div class="d-flex flex-wrap gap-2">
-              <!-- Filtre hôte -->
-              <select
-                v-model="historyHostFilter"
-                class="form-select form-select-sm history-host-select"
-                @change="resetHistoryPage"
-              >
-                <option value="all">
-                  Tous les hôtes
-                </option>
-                <option
-                  v-for="host in hosts"
-                  :key="host.id"
-                  :value="host.id"
-                >
-                  {{ host.name || host.hostname }}
-                </option>
-              </select>
-              <!-- Filtre période -->
-              <div class="btn-group btn-group-sm">
-                <button
-                  v-for="p in periodOptions"
-                  :key="p.value"
-                  class="btn"
-                  :class="historyPeriod === p.value ? 'btn-primary' : 'btn-outline-secondary'"
-                  @click="historyPeriod = p.value; resetHistoryPage()"
-                >
-                  {{ p.label }}
-                </button>
-              </div>
-            </div>
-          </div>
-          <div class="table-responsive">
-            <table class="table table-vcenter card-table">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Hôte</th>
-                  <th>Commande</th>
-                  <th>Utilisateur</th>
-                  <th>Statut</th>
-                  <th>Durée</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-if="filteredHistory.length === 0">
-                  <td
-                    colspan="7"
-                    class="text-center text-secondary py-4"
-                  >
-                    Aucun historique pour cette période
-                  </td>
-                </tr>
-                <tr
-                  v-for="cmd in pagedHistory"
-                  :key="cmd.id"
-                >
-                  <td class="text-secondary small">
-                    {{ formatDateExact(cmd.created_at) }}
-                  </td>
-                  <td>
-                    <router-link
-                      :to="`/hosts/${cmd.hostId}`"
-                      class="fw-semibold text-reset text-decoration-none"
-                    >
-                      {{ cmd.hostName }}
-                    </router-link>
-                  </td>
-                  <td><code>apt {{ cmd.action }}</code></td>
-                  <td class="text-secondary">
-                    {{ cmd.triggered_by || '—' }}
-                  </td>
-                  <td><span :class="statusClass(cmd.status)">{{ statusLabel(cmd.status) }}</span></td>
-                  <td class="text-secondary small">
-                    {{ formatDuration(cmd.started_at, cmd.ended_at) }}
-                  </td>
-                  <td>
-                    <button
-                      class="btn btn-outline-secondary btn-sm"
-                      @click="watchCommand(cmd, { hostname: cmd.hostName, id: cmd.hostId })"
+                      class="btn btn-sm btn-outline-secondary"
+                      title="Planifier une commande APT"
+                      @click="openScheduleModal(host)"
                     >
                       <svg
-                        class="icon icon-sm me-1"
+                        xmlns="http://www.w3.org/2000/svg"
+                        class="icon icon-sm"
                         width="16"
                         height="16"
                         viewBox="0 0 24 24"
-                        stroke-width="2"
+                        fill="none"
                         stroke="currentColor"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                      ><path
-                        stroke="none"
-                        d="M0 0h24v24H0z"
-                        fill="none"
-                      /><path d="M4 6l16 0" /><path d="M4 12l16 0" /><path d="M4 18l12 0" /></svg>
-                      Logs
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      >
+                        <rect
+                          x="3"
+                          y="4"
+                          width="18"
+                          height="18"
+                          rx="2"
+                          ry="2"
+                        /><line
+                          x1="16"
+                          y1="2"
+                          x2="16"
+                          y2="6"
+                        /><line
+                          x1="8"
+                          y1="2"
+                          x2="8"
+                          y2="6"
+                        /><line
+                          x1="3"
+                          y1="10"
+                          x2="21"
+                          y2="10"
+                        />
+                      </svg>
                     </button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <div
-            v-if="historyTotalPages > 1"
-            class="card-footer d-flex align-items-center justify-content-between"
-          >
-            <div class="text-secondary small">
-              {{ filteredHistory.length }} entrée{{ filteredHistory.length > 1 ? 's' : '' }} —
-              page {{ historyPage }} / {{ historyTotalPages }}
+                  </div>
+                  <span
+                    v-else
+                    class="text-secondary small flex-shrink-0"
+                  >Mode lecture seule</span>
+                </div>
+              </div>
+
+              <!-- Corps : KPI + CVE + paquets + historique -->
+              <div class="card-body">
+                <!-- Pas de données -->
+                <div
+                  v-if="!aptStatuses[host.id]"
+                  class="text-secondary small"
+                >
+                  Données APT non disponibles — lancez <strong>apt update</strong> pour initialiser.
+                </div>
+
+                <template v-else>
+                  <!-- KPI stats -->
+                  <div class="row g-2 mb-3">
+                    <div class="col-4">
+                      <div
+                        class="text-center p-2 rounded"
+                        :class="aptStatuses[host.id].pending_packages > 0
+                          ? 'bg-yellow-lt'
+                          : 'bg-green-lt'"
+                      >
+                        <div
+                          class="fs-3 fw-bold lh-1 mb-1"
+                          :class="aptStatuses[host.id].pending_packages > 0 ? 'text-yellow' : 'text-green'"
+                        >
+                          {{ aptStatuses[host.id].pending_packages }}
+                        </div>
+                        <div class="text-secondary small">
+                          en attente
+                        </div>
+                      </div>
+                    </div>
+                    <div class="col-4">
+                      <div
+                        class="text-center p-2 rounded"
+                        :class="aptStatuses[host.id].security_updates > 0
+                          ? 'bg-red-lt'
+                          : 'bg-secondary-lt'"
+                      >
+                        <div
+                          class="fs-3 fw-bold lh-1 mb-1"
+                          :class="aptStatuses[host.id].security_updates > 0 ? 'text-red' : 'text-secondary'"
+                        >
+                          {{ aptStatuses[host.id].security_updates }}
+                        </div>
+                        <div class="text-secondary small">
+                          sécurité
+                        </div>
+                      </div>
+                    </div>
+                    <div class="col-4">
+                      <div class="text-center p-2 rounded bg-secondary-lt">
+                        <div class="fw-semibold small lh-1 mb-1 text-truncate">
+                          {{ aptStatuses[host.id].last_update
+                            ? formatDate(aptStatuses[host.id].last_update)
+                            : 'Jamais' }}
+                        </div>
+                        <div class="text-secondary small">
+                          vérification
+                        </div>
+                        <div
+                          v-if="aptStatuses[host.id].last_upgrade"
+                          class="text-muted apt-date-hint"
+                        >
+                          upgrade : {{ formatDate(aptStatuses[host.id].last_upgrade) }}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- CVE -->
+                  <div
+                    v-if="aptStatuses[host.id].cve_list?.length"
+                    class="mb-3"
+                  >
+                    <CVEList
+                      :cve-list="aptStatuses[host.id].cve_list"
+                      :show-max-severity="true"
+                      :always-expanded="false"
+                      :initially-collapsed="false"
+                      :limit="3"
+                    />
+                  </div>
+
+                  <!-- Paquets en attente -->
+                  <div
+                    v-if="getPackages(aptStatuses[host.id]).length > 0"
+                    class="mb-3"
+                  >
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                      <span class="small fw-semibold text-secondary">
+                        Paquets en attente
+                        <span class="badge bg-yellow-lt text-yellow ms-1">
+                          {{ getPackages(aptStatuses[host.id]).length }}
+                        </span>
+                      </span>
+                      <button
+                        v-if="getPackages(aptStatuses[host.id]).length > PKG_PREVIEW_COUNT"
+                        class="btn btn-link btn-sm p-0 small text-secondary"
+                        @click="pkgShowAll[host.id] = !pkgShowAll[host.id]"
+                      >
+                        {{ pkgShowAll[host.id]
+                          ? 'Réduire'
+                          : `Voir tout (${getPackages(aptStatuses[host.id]).length})` }}
+                      </button>
+                    </div>
+                    <div class="row g-1">
+                      <div
+                        v-for="pkg in visiblePackages(host.id)"
+                        :key="pkg"
+                        class="col-12 col-sm-6 col-md-4 col-lg-3"
+                      >
+                        <code
+                          class="small text-body d-block text-truncate"
+                          :title="pkg"
+                        >{{ pkg }}</code>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Historique (2 dernières commandes) -->
+                  <div
+                    v-if="aptHistories[host.id]?.length"
+                    class="border-top pt-2"
+                  >
+                    <div class="d-flex align-items-center justify-content-between mb-1">
+                      <span class="small fw-semibold text-secondary">Dernières commandes</span>
+                      <router-link
+                        to="/audit?module=apt"
+                        class="small text-secondary text-decoration-none"
+                      >
+                        Historique complet →
+                      </router-link>
+                    </div>
+                    <div
+                      v-for="cmd in aptHistories[host.id].slice(0, 2)"
+                      :key="cmd.id"
+                      class="d-flex align-items-center gap-2 py-1 flex-wrap"
+                    >
+                      <code class="small">apt {{ cmd.action }}</code>
+                      <span :class="statusClass(cmd.status)">{{ statusLabel(cmd.status) }}</span>
+                      <span class="text-secondary small flex-shrink-0">{{ formatDate(cmd.created_at) }}</span>
+                      <span
+                        v-if="cmd.triggered_by"
+                        class="text-muted small flex-shrink-0"
+                      >· {{ cmd.triggered_by }}</span>
+                      <button
+                        class="btn btn-sm btn-ghost-secondary ms-auto flex-shrink-0"
+                        title="Voir les logs"
+                        @click="watchCommand(cmd, host)"
+                      >
+                        <svg
+                          class="icon icon-sm"
+                          width="16"
+                          height="16"
+                          viewBox="0 0 24 24"
+                          stroke-width="2"
+                          stroke="currentColor"
+                          fill="none"
+                          xmlns="http://www.w3.org/2000/svg"
+                        ><path
+                          stroke="none"
+                          d="M0 0h24v24H0z"
+                          fill="none"
+                        /><path d="M4 6l16 0" /><path d="M4 12l16 0" /><path d="M4 18l12 0" /></svg>
+                      </button>
+                    </div>
+                  </div>
+                </template>
+              </div>
             </div>
-            <PaginationNav
-              :current-page="historyPage"
-              :total-pages="historyTotalPages"
-              @select="setHistoryPage"
-            />
           </div>
         </div>
       </div>
@@ -579,7 +511,7 @@
       />
     </div>
 
-    <!-- Schedule APT modal -->
+    <!-- Modal planification -->
     <div
       v-if="scheduleModal.open"
       class="modal modal-blur show d-block modal-overlay"
@@ -691,6 +623,7 @@
       </div>
     </div>
 
+    <!-- Toast feedback actions groupées -->
     <div
       v-if="bulkActionFeedback"
       class="position-fixed bottom-0 end-0 p-3 toast-overlay"
@@ -730,38 +663,32 @@ import { useWebSocket } from '../composables/useWebSocket'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
 import { confirmBulkAction } from '../utils/bulkActionHelpers'
 import { useDateFormatter } from '../composables/useDateFormatter'
-import { usePagination } from '../composables/usePagination'
 import { useStatusBadge } from '../composables/useStatusBadge'
 import { useToast } from '../composables/useToast'
 import { useCommandStream } from '../composables/useCommandStream'
 import CommandLogPanel from '../components/CommandLogPanel.vue'
-import PaginationNav from '../components/PaginationNav.vue'
 import WsStatusBar from '../components/WsStatusBar.vue'
-import SubNavigation from '../components/SubNavigation.vue'
 import CronBuilder from '../components/CronBuilder.vue'
 import DataToolbar from '../components/common/DataToolbar.vue'
 
-const { dayjs, formatRelativeDate, formatExactDate } = useDateFormatter()
+const { dayjs, formatRelativeDate } = useDateFormatter()
 const { getStatusBadgeClass } = useStatusBadge()
 
-// ── Tab ──────────────────────────────────────────────────────────────────────
-const activeTab = ref('hosts')
+const PKG_PREVIEW_COUNT = 15
 
-// ── Hosts / APT state ────────────────────────────────────────────────────────
+// ── État hôtes / APT ─────────────────────────────────────────────────────────
 const hosts = ref([])
 const selectedHosts = ref([])
 const selectAll = ref(false)
 const aptStatuses = ref({})
 const aptHistories = ref({})
-const expandedHistories = ref({})
-const expandedHostDetails = ref({})
-const packagesExpanded = ref({})
-const packagesShowAll = ref({})
+const pkgShowAll = ref({})
+const hostCmdLoading = ref({})
 const auth = useAuthStore()
 const dialog = useConfirmDialog()
 const canRunApt = computed(() => auth.role === 'admin' || auth.role === 'operator')
 
-// ── Schedule modal ────────────────────────────────────────────────────────────
+// ── Modal planification ───────────────────────────────────────────────────────
 import { MANUAL_SENTINEL } from '../utils/cron'
 
 const scheduleModal = ref({
@@ -816,9 +743,9 @@ const showConsole = ref(false)
 const liveCommand = ref(null)
 const { value: bulkActionFeedback, showToast: showBulkActionFeedback } = useToast(null)
 const { openCommandStream, closeStream } = useCommandStream({ token: () => auth.token })
-const aptBulkLoading = ref(null) // null | 'update' | 'upgrade' | 'dist-upgrade'
+const aptBulkLoading = ref(null)
 
-// ── Hosts filters / sort ─────────────────────────────────────────────────────
+// ── Filtres / tri des hôtes ───────────────────────────────────────────────────
 const hostSearch = ref('')
 const hostQuickFilter = ref('all')
 const hostSortKey = ref('name')
@@ -830,12 +757,9 @@ const hostFilterOptions = [
   { value: 'security', label: 'Sécu > 0' },
 ]
 
-const HOST_HISTORY_PREVIEW_COUNT = 3
-
 const filteredHosts = computed(() => {
   let list = [...hosts.value]
 
-  // Search by name
   const q = hostSearch.value.trim().toLowerCase()
   if (q) {
     list = list.filter((h) => {
@@ -845,7 +769,6 @@ const filteredHosts = computed(() => {
     })
   }
 
-  // Quick filter
   if (hostQuickFilter.value === 'critical') {
     list = list.filter(h => {
       const cves = aptStatuses.value[h.id]?.cve_list
@@ -855,7 +778,6 @@ const filteredHosts = computed(() => {
     list = list.filter(h => (aptStatuses.value[h.id]?.security_updates || 0) > 0)
   }
 
-  // Sort
   list.sort((a, b) => {
     let va, vb
     if (hostSortKey.value === 'pending') {
@@ -879,100 +801,9 @@ const filteredHosts = computed(() => {
   return list
 })
 
-// ── Historique filters ────────────────────────────────────────────────────────
-const historyHostFilter = ref('all')
-const historyPeriod = ref('7d')
-
-const periodOptions = [
-  { label: '7j',  value: '7d'  },
-  { label: '30j', value: '30d' },
-  { label: '90j', value: '90d' },
-  { label: 'Tout', value: 'all' },
-]
-
-// Flatten all histories into a single array, enriched with host info
-const allHistory = computed(() => {
-  return Object.entries(aptHistories.value).flatMap(([hostId, cmds]) => {
-    const host = hosts.value.find(h => h.id === hostId)
-    const hostName = host?.name || host?.hostname || hostId
-    return (cmds || []).map(cmd => ({ ...cmd, hostId, hostName }))
-  }).sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-})
-
-const filteredHistory = computed(() => {
-  let list = allHistory.value
-
-  // Filter by host
-  if (historyHostFilter.value !== 'all') {
-    list = list.filter(cmd => cmd.hostId === historyHostFilter.value)
-  }
-
-  // Filter by period
-  if (historyPeriod.value !== 'all') {
-    const days = parseInt(historyPeriod.value)
-    const cutoff = dayjs().subtract(days, 'day')
-    list = list.filter(cmd => dayjs(cmd.created_at).isAfter(cutoff))
-  }
-
-  return list
-})
-
-const HISTORY_PAGE_SIZE = 25
-const {
-  currentPage: historyPage,
-  totalPages: historyTotalPages,
-  pagedItems: pagedHistory,
-  resetPage: resetHistoryPage,
-  setPage: setHistoryPage,
-} = usePagination({ items: filteredHistory, pageSize: HISTORY_PAGE_SIZE })
-
-// Reset to page 1 when filters change
-function prevHistoryPage() {
-  setHistoryPage(historyPage.value - 1)
-}
-
-function nextHistoryPage() {
-  setHistoryPage(historyPage.value + 1)
-}
-
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function toggleSelectAll() {
-  if (selectAll.value) {
-    selectedHosts.value = hosts.value.map(h => h.id)
-  } else {
-    selectedHosts.value = []
-  }
-}
-
-function toggleHistory(hostId) {
-  expandedHistories.value[hostId] = !expandedHistories.value[hostId]
-}
-
-function isHostDetailsExpanded(hostId) {
-  return !!expandedHostDetails.value[hostId]
-}
-
-function toggleHostDetails(hostId) {
-  expandedHostDetails.value[hostId] = !expandedHostDetails.value[hostId]
-}
-
-function displayedHostHistory(hostId) {
-  const history = Array.isArray(aptHistories.value[hostId]) ? aptHistories.value[hostId] : []
-  if (expandedHistories.value[hostId]) return history
-  return history.slice(0, HOST_HISTORY_PREVIEW_COUNT)
-}
-
-function hasMoreHostHistory(hostId) {
-  const history = Array.isArray(aptHistories.value[hostId]) ? aptHistories.value[hostId] : []
-  return history.length > HOST_HISTORY_PREVIEW_COUNT
-}
-
-function isHostUpToDate(hostId) {
-  const status = aptStatuses.value[hostId]
-  if (!status) return false
-  const pending = Number(status.pending_packages || 0)
-  const security = Number(status.security_updates || 0)
-  return pending === 0 && security === 0
+  selectedHosts.value = selectAll.value ? hosts.value.map(h => h.id) : []
 }
 
 function getPackages(aptStatus) {
@@ -985,6 +816,15 @@ function getPackages(aptStatus) {
   } catch {
     return []
   }
+}
+
+function visiblePackages(hostId) {
+  const pkgs = getPackages(aptStatuses.value[hostId])
+  return pkgShowAll.value[hostId] ? pkgs : pkgs.slice(0, PKG_PREVIEW_COUNT)
+}
+
+function isHostCmdLoading(hostId) {
+  return !!hostCmdLoading.value[hostId]
 }
 
 function watchCommand(cmd, host) {
@@ -1002,44 +842,28 @@ function watchCommand(cmd, host) {
   connectStreamWebSocket(cmd.id)
 }
 
-function closeStreamSocket() {
-  closeStream()
-}
-
 function closeLiveConsole() {
-  closeStreamSocket()
+  closeStream()
   liveCommand.value = null
   showConsole.value = false
 }
 
 function upsertAptHistory(hostId, nextCommand) {
   if (!hostId || !nextCommand?.id) return
-
   const currentHistory = Array.isArray(aptHistories.value[hostId]) ? [...aptHistories.value[hostId]] : []
   const currentIndex = currentHistory.findIndex(cmd => cmd.id === nextCommand.id)
-
   if (currentIndex >= 0) {
-    currentHistory[currentIndex] = {
-      ...currentHistory[currentIndex],
-      ...nextCommand,
-    }
+    currentHistory[currentIndex] = { ...currentHistory[currentIndex], ...nextCommand }
   } else {
     currentHistory.unshift(nextCommand)
   }
-
   currentHistory.sort((left, right) => new Date(right.created_at || 0) - new Date(left.created_at || 0))
-  aptHistories.value = {
-    ...aptHistories.value,
-    [hostId]: currentHistory,
-  }
+  aptHistories.value = { ...aptHistories.value, [hostId]: currentHistory }
 }
 
 function syncLiveCommand(commandId, patch) {
   if (!liveCommand.value || liveCommand.value.id !== commandId) return
-  liveCommand.value = {
-    ...liveCommand.value,
-    ...patch,
-  }
+  liveCommand.value = { ...liveCommand.value, ...patch }
 }
 
 function syncAptHistoryCommand(commandId, patch) {
@@ -1053,26 +877,8 @@ function syncAptHistoryCommand(commandId, patch) {
   })
 }
 
-function buildBulkActionFeedback(command, launchedHosts, failedHosts) {
-  const hasFailures = failedHosts.length > 0
-  const launchedLabel = launchedHosts.length === 1
-    ? `lancée sur ${launchedHosts[0]}`
-    : `lancée sur ${launchedHosts.length} hôtes`
-  const failedLabel = hasFailures
-    ? `Échec d'envoi sur ${failedHosts.join(', ')}.`
-    : 'Suivi disponible dans l’historique par hôte.'
-
-  return {
-    command,
-    message: launchedHosts.length > 0 ? `commande ${launchedLabel}.` : 'aucune commande n’a été lancée.',
-    details: failedLabel,
-    variantClass: hasFailures ? 'text-bg-warning' : 'text-bg-success',
-    closeClass: hasFailures ? '' : 'btn-close-white',
-  }
-}
-
 function connectStreamWebSocket(commandId) {
-  closeStreamSocket()
+  closeStream()
   openCommandStream(commandId, {
     closeOnTerminalStatus: true,
     onInit: (payload) => {
@@ -1092,6 +898,78 @@ function connectStreamWebSocket(commandId) {
   })
 }
 
+function buildBulkActionFeedback(command, launchedHosts, failedHosts) {
+  const hasFailures = failedHosts.length > 0
+  const launchedLabel = launchedHosts.length === 1
+    ? `lancée sur ${launchedHosts[0]}`
+    : `lancée sur ${launchedHosts.length} hôtes`
+  const failedLabel = hasFailures
+    ? `Échec d'envoi sur ${failedHosts.join(', ')}.`
+    : 'Suivi disponible via l\'historique APT.'
+
+  return {
+    command,
+    message: launchedHosts.length > 0 ? `commande ${launchedLabel}.` : 'aucune commande n\'a été lancée.',
+    details: failedLabel,
+    variantClass: hasFailures ? 'text-bg-warning' : 'text-bg-success',
+    closeClass: hasFailures ? '' : 'btn-close-white',
+  }
+}
+
+// ── Commandes par hôte ────────────────────────────────────────────────────────
+async function runAptCmdForHost(host, command) {
+  if (!canRunApt.value) return
+
+  const confirmed = await confirmBulkAction(
+    `apt ${command}`,
+    1,
+    command === 'dist-upgrade'
+      ? `⚠️ apt dist-upgrade peut supprimer des paquets existants.\nExécuter sur : ${host.name || host.hostname} ?`
+      : `Exécuter sur : ${host.name || host.hostname} ?`
+  )
+  if (!confirmed) return
+
+  hostCmdLoading.value = { ...hostCmdLoading.value, [host.id]: command }
+  try {
+    const response = await apiClient.sendAptCommand([host.id], command)
+    const commandResults = Array.isArray(response.data?.commands) ? response.data.commands : []
+    const launched = commandResults.filter(item => item.command_id)
+    const failed = commandResults.filter(item => item.error)
+    const createdAt = new Date().toISOString()
+
+    launched.forEach(item => {
+      upsertAptHistory(host.id, {
+        id: item.command_id,
+        action: command,
+        status: item.status || 'pending',
+        output: '',
+        created_at: createdAt,
+        triggered_by: auth.username || '',
+      })
+    })
+
+    if (launched.length > 0) {
+      watchCommand(
+        { id: launched[0].command_id, action: command, status: launched[0].status || 'pending', output: '' },
+        host
+      )
+    } else if (failed.length > 0) {
+      await dialog.confirm({
+        title: 'Erreur',
+        message: failed[0].error || 'Erreur lors de l\'envoi de la commande',
+        variant: 'danger',
+      })
+    }
+  } catch (e) {
+    await dialog.confirm({ title: 'Erreur', message: getApiErrorMessage(e), variant: 'danger' })
+  } finally {
+    const next = { ...hostCmdLoading.value }
+    delete next[host.id]
+    hostCmdLoading.value = next
+  }
+}
+
+// ── Commandes groupées ────────────────────────────────────────────────────────
 async function bulkAptCmd(command) {
   const hostnames = hosts.value
     .filter(h => selectedHosts.value.includes(h.id))
@@ -1105,7 +983,6 @@ async function bulkAptCmd(command) {
       ? `⚠️ apt dist-upgrade peut supprimer des paquets existants.\nExécuter sur : ${hostnames || 'les hôtes sélectionnés'} ?`
       : `Exécuter sur : ${hostnames || 'les hôtes sélectionnés'} ?`
   )
-
   if (!confirmed) return
 
   aptBulkLoading.value = command
@@ -1159,25 +1036,9 @@ async function bulkAptCmd(command) {
   }
 }
 
+// ── Formatage ─────────────────────────────────────────────────────────────────
 function formatDate(date) {
   return formatRelativeDate(date)
-}
-
-function formatDateExact(date) {
-  return formatExactDate(date, '—')
-}
-
-function formatDuration(startedAt, endedAt) {
-  if (!startedAt || !endedAt) return '—'
-  const start = dayjs(startedAt)
-  const end = dayjs(endedAt)
-  if (!start.isValid() || !end.isValid()) return '—'
-  const totalSeconds = end.diff(start, 'second')
-  if (totalSeconds < 0) return '—'
-  if (totalSeconds < 60) return `${totalSeconds}s`
-  const minutes = Math.floor(totalSeconds / 60)
-  const seconds = totalSeconds % 60
-  return seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`
 }
 
 const STATUS_LABELS = {
@@ -1195,6 +1056,7 @@ function statusClass(status) {
   return getStatusBadgeClass(status, 'badge bg-yellow-lt text-yellow')
 }
 
+// ── WebSocket ─────────────────────────────────────────────────────────────────
 const { wsStatus, wsError, retryCount, dataStaleAlert, reconnect } = useWebSocket('/api/v1/ws/apt', (payload) => {
   if (payload.type !== 'apt') return
   hosts.value = payload.hosts || []
@@ -1203,14 +1065,13 @@ const { wsStatus, wsError, retryCount, dataStaleAlert, reconnect } = useWebSocke
 })
 
 onUnmounted(() => {
-  closeStreamSocket()
+  closeStream()
 })
 </script>
 
 <style scoped>
 .sort-select { width: auto; }
-.history-host-select { min-width: 160px; }
-.apt-pkg-badge { font-family: monospace; font-size: 0.72rem; }
 .modal-overlay { background: rgba(0,0,0,.5); z-index: 1050; }
 .toast-overlay { z-index: 1100; }
+.apt-date-hint { font-size: 0.68rem; }
 </style>

@@ -797,8 +797,9 @@ function selectConnexionsPage(page) {
   fetchConnexions()
 }
 
-onMounted(fetchCmds)
 onMounted(async () => {
+  if (route.query.module) cmdModuleFilter.value = route.query.module
+  await fetchCmds()
   const cmdId = route.query.command
   if (cmdId) {
     try {
