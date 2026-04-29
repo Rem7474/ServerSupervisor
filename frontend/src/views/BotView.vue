@@ -413,8 +413,6 @@
                     <div class="d-flex gap-1 justify-content-end">
                       <button
                         class="btn btn-sm btn-outline-success"
-                        :disabled="!hostId"
-                        :title="!hostId ? 'Sélectionne un hôte dans le filtre' : 'Débloquer via CrowdSec'"
                         @click="unblockCrowdSecEntry(entry.ip)"
                       >
                         Débloquer
@@ -777,11 +775,13 @@ const mostTargetedHosts = computed(() => threats.value.most_targeted_hosts || []
 const ipHostMatrix = computed(() => threats.value.ip_host_matrix || [])
 const crowdSecIPs = computed(() => threats.value.crowdsec_top_blocked || [])
 const crowdSecTotal = computed(() => Number(threats.value.crowdsec_blocked_ips) || 0)
+// host_id du snapshot CrowdSec renvoyé par l'API (présent même sans filtre hôte)
+const crowdSecHostId = computed(() => (threats.value.crowdsec_host_id as string) || '')
 const isSelectedIPBlocked = computed(() =>
   crowdSecIPs.value.some((e: AnyRecord) => e.ip === selectedIP.value),
 )
-// host_id effectif : filtre manuel en priorité, sinon déduit des lignes de la timeline
-const effectiveHostId = computed(() => hostId.value || timelineHostId.value)
+// host_id effectif : filtre manuel > host_id du snapshot CrowdSec > déduit des lignes de la timeline
+const effectiveHostId = computed(() => hostId.value || crowdSecHostId.value || timelineHostId.value)
 
 const timelineChrono = computed(() => {
   return [...timeline.value].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
@@ -1174,12 +1174,13 @@ async function banIP() {
 }
 
 async function unblockCrowdSecEntry(ip: string) {
-  if (!hostId.value) {
-    showActionFeedback('Sélectionne un hôte dans le filtre pour cibler la commande')
+  const targetHost = hostId.value || crowdSecHostId.value
+  if (!targetHost) {
+    showActionFeedback('Impossible de déterminer l\'hôte cible — renseigne le filtre Hôte')
     return
   }
   try {
-    await apiClient.unblockCrowdSecIP(ip, hostId.value)
+    await apiClient.unblockCrowdSecIP(ip, targetHost)
     showActionFeedback(`Commande de déblocage envoyée à l'agent pour ${ip}`)
     setTimeout(() => loadThreats(), 1000)
   } catch (error) {

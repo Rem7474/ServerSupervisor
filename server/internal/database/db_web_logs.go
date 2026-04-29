@@ -570,6 +570,7 @@ func (db *DB) GetWebLogsSummary(since time.Time, hostID string, source string) (
 	// CrowdSec: return count + top blocked IPs from the most recent snapshot.
 	var crowdSecBlocked int64
 	var crowdSecTopRaw []byte
+	var crowdSecSnapshotHostID string
 	csArgs := []any{since}
 	csWhere := "captured_at >= $1"
 	if hostID != "" {
@@ -581,11 +582,14 @@ func (db *DB) GetWebLogsSummary(since time.Time, hostID string, source string) (
 		csWhere += fmt.Sprintf(" AND source = $%d", len(csArgs))
 	}
 	_ = db.conn.QueryRow(
-		fmt.Sprintf(`SELECT COALESCE(crowdsec_blocked_ips, 0), COALESCE(crowdsec_top_blocked, '[]') FROM web_log_snapshots WHERE %s ORDER BY captured_at DESC LIMIT 1`, csWhere),
+		fmt.Sprintf(`SELECT COALESCE(crowdsec_blocked_ips, 0), COALESCE(crowdsec_top_blocked, '[]'), COALESCE(host_id, '') FROM web_log_snapshots WHERE %s ORDER BY captured_at DESC LIMIT 1`, csWhere),
 		csArgs...,
-	).Scan(&crowdSecBlocked, &crowdSecTopRaw)
+	).Scan(&crowdSecBlocked, &crowdSecTopRaw, &crowdSecSnapshotHostID)
 	if crowdSecBlocked > 0 {
 		threats["crowdsec_blocked_ips"] = crowdSecBlocked
+		if crowdSecSnapshotHostID != "" {
+			threats["crowdsec_host_id"] = crowdSecSnapshotHostID
+		}
 		if len(crowdSecTopRaw) > 2 {
 			var csEntries []map[string]any
 			if err := json.Unmarshal(crowdSecTopRaw, &csEntries); err == nil {
