@@ -24,9 +24,9 @@ type CrowdSecDecision struct {
 }
 
 type crowdSecWatcherLoginResponse struct {
-	Code   int    `json:"code"`
-	Expire string `json:"expire"`
-	Token  string `json:"token"`
+	Code    int    `json:"code"`
+	Expire  string `json:"expire"`
+	Token   string `json:"token"`
 	Message string `json:"message,omitempty"`
 }
 
@@ -47,8 +47,8 @@ type crowdSecAPIAlert struct {
 		Value       string `json:"value"`
 		Country     string `json:"country"`
 		CountryCode string `json:"country_code"`
-		CN          string `json:"cn"`        // ISO-2 country code
-		ASName      string `json:"as_name"`   // AS organisation name
+		CN          string `json:"cn"`      // ISO-2 country code
+		ASName      string `json:"as_name"` // AS organisation name
 		AS          string `json:"as"`
 		ASN         string `json:"asn"`
 		ASNumber    string `json:"as_number"` // AS number
