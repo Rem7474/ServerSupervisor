@@ -57,9 +57,9 @@ echo ""
 ARCH=$(uname -m)
 case $ARCH in
   x86_64)  ARCH="amd64" ;;
-  aarch64) ARCH="arm64" ;;
-  armv7l)  ARCH="arm"   ;;
-  armv6l)  ARCH="arm"   ;;
+  aarch64|arm64) ARCH="arm64" ;;
+  armv7l|armv7)  ARCH="armv7" ;;
+  armv6l|armv6)  ARCH="armv6" ;;
   *) echo "Unsupported architecture: $ARCH"; exit 1 ;;
 esac
 
@@ -72,18 +72,28 @@ fi
 echo "Detected: $OS/$ARCH"
 
 # Download binary from GitHub releases
-BINARY_NAME="serversupervisor-agent-${OS}-${ARCH}"
+# CI release assets are named: agent-linux-amd64.gz, agent-linux-arm64.gz, agent-linux-armv7.gz, agent-linux-armv6.gz
+BINARY_NAME="agent-${OS}-${ARCH}.gz"
 DOWNLOAD_URL="https://github.com/${GITHUB_REPO}/releases/latest/download/${BINARY_NAME}"
+TMP_GZ="/tmp/${BINARY_NAME}"
 
 echo "Downloading agent binary..."
 if command -v curl &>/dev/null; then
-  curl -fsSL "$DOWNLOAD_URL" -o "$INSTALL_DIR/$AGENT_BINARY"
+  curl -fsSL "$DOWNLOAD_URL" -o "$TMP_GZ"
 elif command -v wget &>/dev/null; then
-  wget -qO "$INSTALL_DIR/$AGENT_BINARY" "$DOWNLOAD_URL"
+  wget -qO "$TMP_GZ" "$DOWNLOAD_URL"
 else
   echo "Error: curl or wget is required"
   exit 1
 fi
+
+if ! command -v gunzip &>/dev/null; then
+  echo "Error: gunzip is required to extract release binary"
+  exit 1
+fi
+
+gunzip -c "$TMP_GZ" > "$INSTALL_DIR/$AGENT_BINARY"
+rm -f "$TMP_GZ"
 
 chmod +x "$INSTALL_DIR/$AGENT_BINARY"
 echo "Binary installed: $INSTALL_DIR/$AGENT_BINARY"
