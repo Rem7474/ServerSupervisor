@@ -98,7 +98,13 @@ func (db *DB) InsertWebLogSnapshot(hostID string, report *models.WebLogReport) e
 		if _, err := tx.Exec(
 			`INSERT INTO web_log_requests (snapshot_id, host_id, captured_at, source, ip, method, path, status, bytes, user_agent, domain, category, suspicious, fingerprint, blocked, blocked_source, blocked_reason, blocked_at, blocked_until)
 			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
-			 ON CONFLICT (host_id, source, fingerprint) DO NOTHING`,
+			 ON CONFLICT (host_id, source, fingerprint) DO UPDATE
+			 SET blocked = EXCLUDED.blocked,
+			     blocked_source = EXCLUDED.blocked_source,
+			     blocked_reason = EXCLUDED.blocked_reason,
+			     blocked_at = EXCLUDED.blocked_at,
+			     blocked_until = EXCLUDED.blocked_until
+			 WHERE EXCLUDED.blocked = TRUE`,
 			snapshotID,
 			hostID,
 			ts,

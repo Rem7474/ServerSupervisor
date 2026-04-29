@@ -105,13 +105,30 @@ func (h *AuthHandler) GetWebLogsSummary(c *gin.Context) {
 		},
 	}
 
+	// Promote blocked_ips/blocked_requests into threats so the frontend
+	// "Menaces web" page can read them without also loading the traffic section.
+	threats := summary["threats"]
+	if threatsMap, ok := threats.(map[string]any); ok {
+		if trafficMap, ok := summary["traffic"].(map[string]any); ok {
+			if v, exists := trafficMap["blocked_ips"]; exists {
+				threatsMap["blocked_ips"] = v
+			}
+			if v, exists := trafficMap["blocked_requests"]; exists {
+				threatsMap["blocked_requests"] = v
+			}
+			if v, exists := trafficMap["blocked_ratio"]; exists {
+				threatsMap["blocked_ratio"] = v
+			}
+		}
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"period":  periodRaw,
 		"since":   since,
 		"host_id": hostID,
 		"source":  source,
 		"traffic": summary["traffic"],
-		"threats": summary["threats"],
+		"threats": threats,
 		"compare": compare,
 	})
 }

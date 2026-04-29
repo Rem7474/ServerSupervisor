@@ -747,11 +747,10 @@ func CollectUnattendedUpgrades() *UnattendedUpgradesStatus {
 	}
 	status.Installed = true
 
-	// Is the systemd service enabled?
-	ctx2, cancel2 := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel2()
-	enOut, _ := exec.CommandContext(ctx2, "systemctl", "is-enabled", "unattended-upgrades").Output()
-	status.Enabled = strings.TrimSpace(string(enOut)) == "enabled"
+	// Is UU enabled? The apt periodic config is the source of truth for periodic runs.
+	// systemctl is-enabled is unreliable: it can return "static"/"enabled-runtime" even
+	// when UU is fully active, or "enabled" even when the apt timer has been disabled.
+	status.Enabled = readUUEnabledFromAptConfig()
 
 	// Reboot required?
 	if _, statErr := os.Stat(uuRebootRequired); statErr == nil {
@@ -765,6 +764,30 @@ func CollectUnattendedUpgrades() *UnattendedUpgradesStatus {
 	status.NewRuns = readNewUURuns()
 
 	return status
+}
+
+// readUUEnabledFromAptConfig reads /etc/apt/apt.conf.d/20auto-upgrades to determine
+// whether unattended-upgrades is enabled for periodic runs. Falls back to systemctl
+// if the file is absent or doesn't contain the directive.
+func readUUEnabledFromAptConfig() bool {
+	data, err := os.ReadFile(uuAutoUpgradesConf)
+	if err == nil {
+		for _, line := range strings.Split(string(data), "\n") {
+			line = strings.TrimSpace(line)
+			if strings.HasPrefix(line, "//") || line == "" {
+				continue
+			}
+			if strings.Contains(line, "Unattended-Upgrade") {
+				return strings.Contains(line, `"1"`)
+			}
+		}
+	}
+	// File absent or directive missing: fall back to systemctl is-enabled.
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	out, _ := exec.CommandContext(ctx, "systemctl", "is-enabled", "unattended-upgrades").Output()
+	state := strings.TrimSpace(string(out))
+	return state == "enabled" || state == "enabled-runtime"
 }
 
 // readUUConfig parses the apt config files to extract essential settings.
@@ -908,12 +931,29 @@ func parseUUTimestamp(line string) time.Time {
 }
 
 // writeUUConfig writes the two unattended-upgrades config files based on the given UUConfig.
+// It preserves the current enabled/disabled state in 20auto-upgrades so that configure_uu
+// does not accidentally re-enable UU when toggle_uu previously disabled it.
 func writeUUConfig(cfg UUConfig) error {
-	autoUpgrades := `APT::Periodic::Update-Package-Lists "1";
-APT::Periodic::Download-Upgradeable-Packages "1";
-APT::Periodic::AutocleanInterval "7";
-APT::Periodic::Unattended-Upgrade "1";
-`
+	// Preserve the current Unattended-Upgrade value; default to "1" on first write.
+	enabledVal := "1"
+	if data, err := os.ReadFile(uuAutoUpgradesConf); err == nil {
+		for _, line := range strings.Split(string(data), "\n") {
+			line = strings.TrimSpace(line)
+			if strings.HasPrefix(line, "//") || line == "" {
+				continue
+			}
+			if strings.Contains(line, "Unattended-Upgrade") {
+				if strings.Contains(line, `"0"`) {
+					enabledVal = "0"
+				}
+				break
+			}
+		}
+	}
+	autoUpgrades := "APT::Periodic::Update-Package-Lists \"1\";\n" +
+		"APT::Periodic::Download-Upgradeable-Packages \"1\";\n" +
+		"APT::Periodic::AutocleanInterval \"7\";\n" +
+		"APT::Periodic::Unattended-Upgrade \"" + enabledVal + "\";\n"
 	if err := os.WriteFile(uuAutoUpgradesConf, []byte(autoUpgrades), 0644); err != nil {
 		return fmt.Errorf("writing %s: %w", uuAutoUpgradesConf, err)
 	}
@@ -954,16 +994,30 @@ APT::Periodic::Unattended-Upgrade "1";
 	return nil
 }
 
-// ToggleUnattendedUpgrades enables or disables the unattended-upgrades systemd service.
+// ToggleUnattendedUpgrades enables or disables unattended-upgrades.
+// It updates the apt periodic config (the actual mechanism that schedules periodic runs)
+// and also toggles the systemd service as a best-effort secondary action.
 func ToggleUnattendedUpgrades(enable bool) (string, error) {
+	val := "0"
+	if enable {
+		val = "1"
+	}
+	content := "APT::Periodic::Update-Package-Lists \"1\";\n" +
+		"APT::Periodic::Download-Upgradeable-Packages \"1\";\n" +
+		"APT::Periodic::AutocleanInterval \"7\";\n" +
+		"APT::Periodic::Unattended-Upgrade \"" + val + "\";\n"
+	if err := os.WriteFile(uuAutoUpgradesConf, []byte(content), 0644); err != nil {
+		return "", fmt.Errorf("writing %s: %w", uuAutoUpgradesConf, err)
+	}
+	// Best-effort: also toggle the systemd service (not all distros use it for scheduling).
 	action := "disable"
 	if enable {
 		action = "enable"
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	out, err := exec.CommandContext(ctx, "systemctl", action, "--now", "unattended-upgrades").CombinedOutput()
-	return string(out), err
+	out, _ := exec.CommandContext(ctx, "systemctl", action, "--now", "unattended-upgrades").CombinedOutput()
+	return string(out), nil
 }
 
 // ConfigureUnattendedUpgrades writes config files for unattended-upgrades.

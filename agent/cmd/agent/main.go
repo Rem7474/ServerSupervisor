@@ -262,11 +262,10 @@ func sendReport(ctx context.Context, cfg *config.Config, s *sender.Sender) {
 	// 2. After manual apt update/upgrade commands (with CVE)
 	var aptData interface{} = nil
 
-	// Always collect UU status (cheap: reads config files + log cursor)
-	var uuData interface{}
-	if cfg.CollectAPT {
-		uuData = collector.CollectUnattendedUpgrades()
-	}
+	// Always collect UU status (cheap: reads config files + log cursor).
+	// Intentionally not gated by cfg.CollectAPT — UU is a separate feature from
+	// full APT package-list tracking and must be visible regardless.
+	uuData := collector.CollectUnattendedUpgrades()
 
 	// Collect disk metrics and health
 	diskMetrics, err := collector.CollectDiskMetrics()
