@@ -305,7 +305,7 @@ func DeleteCrowdSecDecision(connectionString, machineID, password, ip string) er
 	}
 
 	baseURL := strings.TrimRight(connectionString, "/")
-	req, err := http.NewRequest("DELETE", fmt.Sprintf("%s/v1/decisions?value=%s&type=ban&scope=Ip", baseURL, ip), nil)
+	req, err := http.NewRequest("DELETE", fmt.Sprintf("%s/v1/decisions?ip=%s", baseURL, ip), nil)
 	if err != nil {
 		return fmt.Errorf("failed to create delete request: %w", err)
 	}
