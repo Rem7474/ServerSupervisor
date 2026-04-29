@@ -215,12 +215,15 @@ func CreateCrowdSecDecision(connectionString, machineID, password, ip, duration 
 	stopAt := until.Format(time.RFC3339Nano)
 
 	type crowdSecBanDecision struct {
-		Origin   string `json:"origin"`
-		Type     string `json:"type"`
-		Scope    string `json:"scope"`
-		Value    string `json:"value"`
-		Duration string `json:"duration"`
-		Until    string `json:"until"`
+		Origin          string `json:"origin"`
+		Type            string `json:"type"`
+		Scope           string `json:"scope"`
+		Value           string `json:"value"`
+		Duration        string `json:"duration"`
+		Until           string `json:"until"`
+		Scenario        string `json:"scenario"`
+		ScenarioHash    string `json:"scenario_hash"`
+		ScenarioVersion string `json:"scenario_version"`
 	}
 	type crowdSecAlertSource struct {
 		Scope string `json:"scope"`
@@ -228,37 +231,44 @@ func CreateCrowdSecDecision(connectionString, machineID, password, ip, duration 
 		IP    string `json:"ip"`
 	}
 	type crowdSecBanAlert struct {
-		Scenario    string               `json:"scenario"`
-		Message     string               `json:"message"`
-		EventsCount int                  `json:"events_count"`
-		StartAt     string               `json:"start_at"`
-		StopAt      string               `json:"stop_at"`
-		Capacity    int                  `json:"capacity"`
-		LeakSpeed   string               `json:"leakspeed"`
-		Simulated   bool                 `json:"simulated"`
-		Events      []any                `json:"events"`
-		Labels      any                  `json:"labels"`
-		Source      crowdSecAlertSource  `json:"source"`
-		Decisions   []crowdSecBanDecision `json:"decisions"`
+		Scenario        string                `json:"scenario"`
+		ScenarioHash    string                `json:"scenario_hash"`
+		ScenarioVersion string                `json:"scenario_version"`
+		Message         string                `json:"message"`
+		EventsCount     int                   `json:"events_count"`
+		StartAt         string                `json:"start_at"`
+		StopAt          string                `json:"stop_at"`
+		Capacity        int                   `json:"capacity"`
+		LeakSpeed       string                `json:"leakspeed"`
+		Simulated       bool                  `json:"simulated"`
+		Events          []any                 `json:"events"`
+		Labels          any                   `json:"labels"`
+		Source          crowdSecAlertSource   `json:"source"`
+		Decisions       []crowdSecBanDecision `json:"decisions"`
 	}
 
 	alert := crowdSecBanAlert{
-		Scenario:    "manual",
-		Message:     "manual ban via ServerSupervisor",
-		EventsCount: 1,
-		StartAt:     startAt,
-		StopAt:      stopAt,
-		Capacity:    -1,
-		LeakSpeed:   "0",
-		Events:      []any{},
-		Source:      crowdSecAlertSource{Scope: "Ip", Value: ip, IP: ip},
+		Scenario:        "manual",
+		ScenarioHash:    "manual",
+		ScenarioVersion: "v0.0.0",
+		Message:         "manual ban via ServerSupervisor",
+		EventsCount:     1,
+		StartAt:         startAt,
+		StopAt:          stopAt,
+		Capacity:        -1,
+		LeakSpeed:       "0",
+		Events:          []any{},
+		Source:          crowdSecAlertSource{Scope: "Ip", Value: ip, IP: ip},
 		Decisions: []crowdSecBanDecision{{
-			Origin:   "cscli",
-			Type:     "ban",
-			Scope:    "Ip",
-			Value:    ip,
-			Duration: duration,
-			Until:    stopAt,
+			Origin:          "cscli",
+			Type:            "ban",
+			Scope:           "Ip",
+			Value:           ip,
+			Duration:        duration,
+			Until:           stopAt,
+			Scenario:        "manual",
+			ScenarioHash:    "manual",
+			ScenarioVersion: "v0.0.0",
 		}},
 	}
 
