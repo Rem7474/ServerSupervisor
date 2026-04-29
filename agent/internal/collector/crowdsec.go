@@ -174,6 +174,110 @@ func loginCrowdSecAlertsToken(connectionString, machineID, password string, clie
 	return loginResp.Token, nil
 }
 
+// CreateCrowdSecDecision adds a ban decision for a specific IP via the CrowdSec Local API.
+// duration must be a Go duration string, e.g. "4h", "24h", "168h".
+func CreateCrowdSecDecision(connectionString, apiKey, ip, duration string) error {
+	if connectionString == "" {
+		return errors.New("crowdsec connection string is empty")
+	}
+	if ip == "" {
+		return errors.New("IP is empty")
+	}
+	if duration == "" {
+		duration = "4h"
+	}
+	dur, err := time.ParseDuration(duration)
+	if err != nil || dur <= 0 {
+		return fmt.Errorf("invalid duration %q: %w", duration, err)
+	}
+
+	now := time.Now().UTC()
+	until := now.Add(dur)
+	startAt := now.Format(time.RFC3339Nano)
+	stopAt := until.Format(time.RFC3339Nano)
+
+	type crowdSecBanDecision struct {
+		Origin    string `json:"origin"`
+		Type      string `json:"type"`
+		Scope     string `json:"scope"`
+		Value     string `json:"value"`
+		Duration  string `json:"duration"`
+		Simulated bool   `json:"simulated"`
+		Until     string `json:"until"`
+	}
+	type crowdSecAlertSource struct {
+		Scope string `json:"scope"`
+		Value string `json:"value"`
+		IP    string `json:"ip"`
+	}
+	type crowdSecBanAlert struct {
+		MachineID       string              `json:"machine_id"`
+		Scenario        string              `json:"scenario"`
+		ScenarioHash    string              `json:"scenario_hash"`
+		ScenarioVersion string              `json:"scenario_version"`
+		Message         string              `json:"message"`
+		EventsCount     int                 `json:"events_count"`
+		StartAt         string              `json:"start_at"`
+		StopAt          string              `json:"stop_at"`
+		Capacity        int                 `json:"capacity"`
+		LeakSpeed       string              `json:"leakspeed"`
+		Simulated       bool                `json:"simulated"`
+		Events          []any               `json:"events"`
+		Labels          any                 `json:"labels"`
+		Source          crowdSecAlertSource `json:"source"`
+		Decisions       []crowdSecBanDecision `json:"decisions"`
+	}
+
+	alert := crowdSecBanAlert{
+		Scenario:    "manual",
+		Message:     "manual ban via ServerSupervisor",
+		EventsCount: 1,
+		StartAt:     startAt,
+		StopAt:      stopAt,
+		Capacity:    -1,
+		LeakSpeed:   "0",
+		Events:      []any{},
+		Source:      crowdSecAlertSource{Scope: "Ip", Value: ip, IP: ip},
+		Decisions: []crowdSecBanDecision{{
+			Origin:   "cscli",
+			Type:     "ban",
+			Scope:    "Ip",
+			Value:    ip,
+			Duration: duration,
+			Until:    stopAt,
+		}},
+	}
+
+	payload, err := json.Marshal([]crowdSecBanAlert{alert})
+	if err != nil {
+		return fmt.Errorf("failed to marshal ban payload: %w", err)
+	}
+
+	client := &http.Client{Timeout: 5 * time.Second}
+	baseURL := strings.TrimRight(connectionString, "/")
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/v1/alerts", baseURL), strings.NewReader(string(payload)))
+	if err != nil {
+		return fmt.Errorf("failed to create ban request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if apiKey != "" {
+		req.Header.Set("X-API-Key", apiKey)
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to query CrowdSec ban API: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("CrowdSec ban API returned status %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+
+	return nil
+}
+
 // DeleteCrowdSecDecision removes a ban decision for a specific IP via the CrowdSec Local API.
 func DeleteCrowdSecDecision(connectionString, apiKey, ip string) error {
 	if connectionString == "" {

@@ -447,13 +447,39 @@
             </div>
           </div>
           <div class="d-flex gap-2 flex-wrap timeline-header-actions">
-            <button
-              class="btn btn-sm btn-outline-danger"
-              :disabled="blockLoading"
-              @click="blockIP"
-            >
-              Bloquer cette IP
-            </button>
+            <template v-if="isSelectedIPBlocked">
+              <button
+                class="btn btn-sm btn-outline-success"
+                :disabled="blockLoading || !hostId"
+                :title="!hostId ? 'Sélectionne un hôte dans le filtre' : ''"
+                @click="unblockIP"
+              >
+                <span v-if="blockLoading" class="spinner-border spinner-border-sm me-1" />
+                Débloquer (CrowdSec)
+              </button>
+            </template>
+            <template v-else>
+              <select
+                v-model="banDuration"
+                class="form-select form-select-sm"
+                style="width: auto;"
+              >
+                <option value="1h">1h</option>
+                <option value="4h">4h</option>
+                <option value="24h">24h</option>
+                <option value="48h">48h</option>
+                <option value="168h">7j</option>
+              </select>
+              <button
+                class="btn btn-sm btn-outline-danger"
+                :disabled="blockLoading || !hostId"
+                :title="!hostId ? 'Sélectionne un hôte dans le filtre' : ''"
+                @click="banIP"
+              >
+                <span v-if="blockLoading" class="spinner-border spinner-border-sm me-1" />
+                Bloquer (CrowdSec)
+              </button>
+            </template>
             <button
               class="btn btn-sm btn-outline-secondary"
               @click="closeTimeline"
@@ -718,6 +744,7 @@ const showTimeline = ref(false)
 const timelineLoading = ref(false)
 const blockLoading = ref(false)
 const selectedIP = ref('')
+const banDuration = ref('4h')
 const timeline = ref<AnyRecord[]>([])
 const selectedBucketKey = ref('')
 const bucketFilterEnabled = ref(true)
@@ -745,6 +772,9 @@ const mostTargetedHosts = computed(() => threats.value.most_targeted_hosts || []
 const ipHostMatrix = computed(() => threats.value.ip_host_matrix || [])
 const crowdSecIPs = computed(() => threats.value.crowdsec_top_blocked || [])
 const crowdSecTotal = computed(() => Number(threats.value.crowdsec_blocked_ips) || 0)
+const isSelectedIPBlocked = computed(() =>
+  crowdSecIPs.value.some((e: AnyRecord) => e.ip === selectedIP.value),
+)
 
 const timelineChrono = computed(() => {
   return [...timeline.value].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
@@ -1109,25 +1139,35 @@ watch([timelineBuckets, timelineBucketMs], () => {
   }
 })
 
-async function blockIP() {
+async function unblockIP() {
+  if (!hostId.value) {
+    showActionFeedback('Sélectionne un hôte dans le filtre pour cibler la commande')
+    return
+  }
   blockLoading.value = true
   try {
-    if (!hostId.value) {
-      showActionFeedback('Aucun host sélectionné')
-      return
-    }
-    
     await apiClient.unblockCrowdSecIP(selectedIP.value, hostId.value)
-    
-    showActionFeedback(`Commande de déblocage envoyée à l'agent pour l'IP ${selectedIP.value}`)
-    
-    // Reload threats after a delay to show the updated state
-    setTimeout(() => {
-      loadThreats()
-    }, 1000)
+    showActionFeedback(`Commande de déblocage envoyée à l'agent pour ${selectedIP.value}`)
+    setTimeout(() => loadThreats(), 1000)
   } catch (error) {
-    showActionFeedback(`Impossible de débloquer l'IP: ${getApiErrorMessage(error)}`)
-    console.error('Unblock IP failed:', error)
+    showActionFeedback(`Impossible de débloquer l'IP : ${getApiErrorMessage(error)}`)
+  } finally {
+    blockLoading.value = false
+  }
+}
+
+async function banIP() {
+  if (!hostId.value) {
+    showActionFeedback('Sélectionne un hôte dans le filtre pour cibler la commande')
+    return
+  }
+  blockLoading.value = true
+  try {
+    await apiClient.blockCrowdSecIP(selectedIP.value, hostId.value, banDuration.value)
+    showActionFeedback(`Commande de blocage (${banDuration.value}) envoyée à l'agent pour ${selectedIP.value}`)
+    setTimeout(() => loadThreats(), 1000)
+  } catch (error) {
+    showActionFeedback(`Impossible de bloquer l'IP : ${getApiErrorMessage(error)}`)
   } finally {
     blockLoading.value = false
   }

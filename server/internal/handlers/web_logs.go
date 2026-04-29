@@ -25,6 +25,65 @@ var (
 	ipCountryCacheMu sync.RWMutex
 )
 
+// BlockCrowdSecIP creates a command for the agent to ban an IP via CrowdSec.
+func (h *AuthHandler) BlockCrowdSecIP(c *gin.Context) {
+	if c.GetString("role") != "admin" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+		return
+	}
+
+	hostID := c.Query("host_id")
+	if hostID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "host_id is required"})
+		return
+	}
+
+	ip := strings.TrimSpace(c.Param("ip"))
+	if ip == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "IP is required"})
+		return
+	}
+
+	if _, err := netip.ParseAddr(ip); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid IP address"})
+		return
+	}
+
+	duration := strings.TrimSpace(c.DefaultQuery("duration", "4h"))
+	if duration == "" {
+		duration = "4h"
+	}
+	if _, err := time.ParseDuration(duration); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid duration (exemples: 1h, 4h, 24h, 168h)"})
+		return
+	}
+
+	username := c.GetString("username")
+	payload := fmt.Sprintf(`{"duration":%q}`, duration)
+
+	result, err := h.dispatcher.Create(dispatch.Request{
+		HostID:      hostID,
+		Module:      "crowdsec",
+		Action:      "ban",
+		Target:      ip,
+		Payload:     payload,
+		TriggeredBy: username,
+		Audit: &dispatch.AuditLogRequest{
+			Username:  username,
+			Action:    "crowdsec_ban",
+			HostID:    hostID,
+			IPAddress: c.ClientIP(),
+			Details:   fmt.Sprintf(`{"ip":%q,"duration":%q}`, ip, duration),
+		},
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create ban command"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"command_id": result.Command.ID, "status": "pending"})
+}
+
 // UnblockCrowdSecIP creates a command for the agent to unban an IP via CrowdSec.
 func (h *AuthHandler) UnblockCrowdSecIP(c *gin.Context) {
 	if c.GetString("role") != "admin" {

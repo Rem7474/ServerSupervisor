@@ -778,6 +778,25 @@ func executeCommand(s *sender.Sender, cmd sender.PendingCommand) {
 					cmd.Target,
 				)
 			}
+		case "ban":
+			if cmd.Target == "" {
+				execErr = fmt.Errorf("no IP provided for ban action")
+			} else {
+				var banPayload struct {
+					Duration string `json:"duration"`
+				}
+				banPayload.Duration = "4h"
+				_ = json.Unmarshal([]byte(cmd.Payload), &banPayload)
+				if banPayload.Duration == "" {
+					banPayload.Duration = "4h"
+				}
+				execErr = collector.CreateCrowdSecDecision(
+					agentConfig.CrowdSecConnectionString,
+					agentConfig.CrowdSecAPIKey,
+					cmd.Target,
+					banPayload.Duration,
+				)
+			}
 		default:
 			execErr = fmt.Errorf("unknown crowdsec action: %s", cmd.Action)
 		}
@@ -788,7 +807,12 @@ func executeCommand(s *sender.Sender, cmd sender.PendingCommand) {
 			output = fmt.Sprintf("ERROR: %v", execErr)
 			log.Printf("crowdsec %s %s failed: %v", cmd.Action, cmd.Target, execErr)
 		} else {
-			output = fmt.Sprintf("Successfully unbanned IP: %s", cmd.Target)
+			switch cmd.Action {
+			case "ban":
+				output = fmt.Sprintf("Successfully banned IP: %s", cmd.Target)
+			default:
+				output = fmt.Sprintf("Successfully unbanned IP: %s", cmd.Target)
+			}
 			log.Printf("crowdsec %s %s completed", cmd.Action, cmd.Target)
 		}
 		if err := s.ReportCommandResult(ctx, &sender.CommandResult{
