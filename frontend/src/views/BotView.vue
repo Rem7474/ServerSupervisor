@@ -412,10 +412,15 @@
                   <td class="text-end">
                     <div class="d-flex gap-1 justify-content-end">
                       <button
-                        class="btn btn-sm btn-outline-success"
+                        class="btn btn-sm"
+                        :class="rowState[entry.ip] === 'error' ? 'btn-danger' : 'btn-outline-success'"
+                        :disabled="rowState[entry.ip] === 'loading'"
                         @click="unblockCrowdSecEntry(entry.ip)"
                       >
-                        Débloquer
+                        <span v-if="rowState[entry.ip] === 'loading'" class="spinner-border spinner-border-sm me-1" />
+                        <span v-if="rowState[entry.ip] === 'loading'">Déblocage…</span>
+                        <span v-else-if="rowState[entry.ip] === 'error'">Erreur — Réessayer</span>
+                        <span v-else>Débloquer</span>
                       </button>
                       <button
                         class="btn btn-sm btn-outline-primary"
@@ -773,7 +778,14 @@ const topIPs = computed(() => threats.value.top_ips || [])
 const topPaths = computed(() => threats.value.top_paths || [])
 const mostTargetedHosts = computed(() => threats.value.most_targeted_hosts || [])
 const ipHostMatrix = computed(() => threats.value.ip_host_matrix || [])
-const crowdSecIPs = computed(() => threats.value.crowdsec_top_blocked || [])
+const unblockedIPs = ref(new Set<string>())
+const rowState = ref<Record<string, 'loading' | 'error'>>({})
+
+const crowdSecIPs = computed(() =>
+  (threats.value.crowdsec_top_blocked || []).filter(
+    (e: AnyRecord) => !unblockedIPs.value.has(e.ip as string),
+  ),
+)
 const crowdSecTotal = computed(() => Number(threats.value.crowdsec_blocked_ips) || 0)
 // host_id du snapshot CrowdSec renvoyé par l'API (présent même sans filtre hôte)
 const crowdSecHostId = computed(() => (threats.value.crowdsec_host_id as string) || '')
@@ -1173,17 +1185,43 @@ async function banIP() {
   }
 }
 
+async function pollCommand(commandId: string): Promise<{ status: string; output: string }> {
+  for (let i = 0; i < 20; i++) {
+    await new Promise((r) => setTimeout(r, 1500))
+    try {
+      const res = await apiClient.getCommand(commandId)
+      const { status, output } = res.data ?? {}
+      if (status === 'completed' || status === 'failed') return { status, output: output ?? '' }
+    } catch {
+      // ignore transient poll errors
+    }
+  }
+  return { status: 'failed', output: 'Timeout: pas de réponse de l\'agent' }
+}
+
 async function unblockCrowdSecEntry(ip: string) {
   const targetHost = hostId.value || crowdSecHostId.value
   if (!targetHost) {
     showActionFeedback('Impossible de déterminer l\'hôte cible — renseigne le filtre Hôte')
     return
   }
+  rowState.value = { ...rowState.value, [ip]: 'loading' }
   try {
-    await apiClient.unblockCrowdSecIP(ip, targetHost)
-    showActionFeedback(`Commande de déblocage envoyée à l'agent pour ${ip}`)
-    setTimeout(() => loadThreats(), 1000)
+    const res = await apiClient.unblockCrowdSecIP(ip, targetHost)
+    const commandId: string = res.data?.command_id
+    const { status, output } = await pollCommand(commandId)
+    if (status === 'completed') {
+      const next = new Set(unblockedIPs.value)
+      next.add(ip)
+      unblockedIPs.value = next
+      const { [ip]: _, ...rest } = rowState.value
+      rowState.value = rest
+    } else {
+      rowState.value = { ...rowState.value, [ip]: 'error' }
+      showActionFeedback(`Échec déblocage ${ip} : ${output}`)
+    }
   } catch (error) {
+    rowState.value = { ...rowState.value, [ip]: 'error' }
     showActionFeedback(`Impossible de débloquer l'IP : ${getApiErrorMessage(error)}`)
   }
 }

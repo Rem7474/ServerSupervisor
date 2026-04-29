@@ -177,6 +177,7 @@ export default {
     api.get(`/v1/security/web-logs/domain/${encodeURIComponent(domain)}`, {
       params: { period, host_id: hostId ?? '', source: source ?? '', limit },
     }),
+  getCommand: (id: string) => api.get(`/v1/commands/${id}`),
   blockCrowdSecIP: (ip: string, hostId: string, duration: string = '4h') =>
     api.post(`/v1/security/web-logs/ip/${encodeURIComponent(ip)}/decisions`, null, {
       params: { host_id: hostId, duration },
