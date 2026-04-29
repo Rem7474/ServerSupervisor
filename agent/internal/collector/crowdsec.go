@@ -13,7 +13,8 @@ import (
 type CrowdSecDecision struct {
 	IP           string
 	Blocked      bool
-	Reason       string    // e.g., "attack:web/cvi", "attack:brute-force"
+	Reason       string    // scenario, e.g., "crowdsecurity/http-bad-user-agent"
+	Origin       string    // "CAPI", "crowdsec", "cscli", etc.
 	BlockedAt    time.Time // When the block started
 	BlockedUntil time.Time // When the block expires
 }
@@ -102,6 +103,7 @@ func CollectCrowdSecDecisions(connectionString, apiKey string, verbose bool) (ma
 			IP:           d.Value,
 			Blocked:      true,
 			Reason:       d.Scenario,
+			Origin:       d.Origin,
 			BlockedAt:    time.Time{},
 			BlockedUntil: blockedUntil,
 		}

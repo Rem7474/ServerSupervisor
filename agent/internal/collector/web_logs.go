@@ -77,11 +77,20 @@ type BotDetectionPath struct {
 	Hits     int    `json:"hits"`
 }
 
+type CrowdSecBlockedEntry struct {
+	IP           string `json:"ip"`
+	Reason       string `json:"reason"`
+	Origin       string `json:"origin"`
+	BlockedUntil string `json:"blocked_until,omitempty"`
+}
+
 type ThreatSummary struct {
-	SuspiciousRequests  int                `json:"suspicious_requests"`
-	UniqueSuspiciousIPs int                `json:"unique_suspicious_ips"`
-	TopSuspiciousIPs    []BotDetectionIP   `json:"top_suspicious_ips"`
-	TopSuspiciousPaths  []BotDetectionPath `json:"top_suspicious_paths"`
+	SuspiciousRequests   int                    `json:"suspicious_requests"`
+	UniqueSuspiciousIPs  int                    `json:"unique_suspicious_ips"`
+	TopSuspiciousIPs     []BotDetectionIP       `json:"top_suspicious_ips"`
+	TopSuspiciousPaths   []BotDetectionPath     `json:"top_suspicious_paths"`
+	CrowdSecTotalBlocked int                    `json:"crowdsec_total_blocked,omitempty"`
+	CrowdSecTopBlocked   []CrowdSecBlockedEntry `json:"crowdsec_top_blocked,omitempty"`
 }
 
 type WebLogReport struct {
@@ -367,6 +376,36 @@ func CollectWebLogs(logPathGlobs []string, tailLines int, topN int, requestLimit
 				blockedCount++
 			}
 		}
+
+		report.Threats.CrowdSecTotalBlocked = len(crowdSecDecisions)
+
+		// Build top 50 decisions sorted: permanent bans first, then longest remaining duration.
+		decSlice := make([]CrowdSecDecision, 0, len(crowdSecDecisions))
+		for _, d := range crowdSecDecisions {
+			decSlice = append(decSlice, d)
+		}
+		sort.Slice(decSlice, func(i, j int) bool {
+			ti, tj := decSlice[i].BlockedUntil, decSlice[j].BlockedUntil
+			if ti.IsZero() {
+				return true
+			}
+			if tj.IsZero() {
+				return false
+			}
+			return ti.After(tj)
+		})
+		if len(decSlice) > 50 {
+			decSlice = decSlice[:50]
+		}
+		topBlocked := make([]CrowdSecBlockedEntry, 0, len(decSlice))
+		for _, d := range decSlice {
+			entry := CrowdSecBlockedEntry{IP: d.IP, Reason: d.Reason, Origin: d.Origin}
+			if !d.BlockedUntil.IsZero() {
+				entry.BlockedUntil = d.BlockedUntil.UTC().Format(time.RFC3339)
+			}
+			topBlocked = append(topBlocked, entry)
+		}
+		report.Threats.CrowdSecTopBlocked = topBlocked
 
 		log.Printf("[web_logs] CrowdSec: %d active decisions, enriched %d suspicious IPs", len(crowdSecDecisions), blockedCount)
 	}

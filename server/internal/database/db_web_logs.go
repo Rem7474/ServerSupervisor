@@ -4,6 +4,7 @@ import (
 	"crypto/md5"
 	"database/sql"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -69,10 +70,17 @@ func (db *DB) InsertWebLogSnapshot(hostID string, report *models.WebLogReport) e
 		_ = tx.Rollback()
 	}()
 
+	crowdSecTopJSON := []byte("[]")
+	if len(threats.CrowdSecTopBlocked) > 0 {
+		if b, err := json.Marshal(threats.CrowdSecTopBlocked); err == nil {
+			crowdSecTopJSON = b
+		}
+	}
+
 	var snapshotID int64
 	err = tx.QueryRow(
-		`INSERT INTO web_log_snapshots (host_id, captured_at, source, total_requests, total_bytes, errors_4xx, errors_5xx, suspicious_requests, suspicious_ips)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		`INSERT INTO web_log_snapshots (host_id, captured_at, source, total_requests, total_bytes, errors_4xx, errors_5xx, suspicious_requests, suspicious_ips, crowdsec_blocked_ips, crowdsec_top_blocked)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 		 RETURNING id`,
 		hostID,
 		report.CollectedAt,
@@ -83,6 +91,8 @@ func (db *DB) InsertWebLogSnapshot(hostID string, report *models.WebLogReport) e
 		traffic.Errors5xx,
 		threats.SuspiciousRequests,
 		threats.UniqueSuspiciousIPs,
+		threats.CrowdSecTotalBlocked,
+		crowdSecTopJSON,
 	).Scan(&snapshotID)
 	if err != nil {
 		return err
@@ -556,6 +566,33 @@ func (db *DB) GetWebLogsSummary(since time.Time, hostID string, source string) (
 		ipHostMatrix = append(ipHostMatrix, map[string]any{"ip": ip, "host_count": hostCount, "hits": hits})
 	}
 	threats["ip_host_matrix"] = ipHostMatrix
+
+	// CrowdSec: return count + top blocked IPs from the most recent snapshot.
+	var crowdSecBlocked int64
+	var crowdSecTopRaw []byte
+	csArgs := []any{since}
+	csWhere := "captured_at >= $1"
+	if hostID != "" {
+		csArgs = append(csArgs, hostID)
+		csWhere += fmt.Sprintf(" AND host_id = $%d", len(csArgs))
+	}
+	if source != "" {
+		csArgs = append(csArgs, source)
+		csWhere += fmt.Sprintf(" AND source = $%d", len(csArgs))
+	}
+	_ = db.conn.QueryRow(
+		fmt.Sprintf(`SELECT COALESCE(crowdsec_blocked_ips, 0), COALESCE(crowdsec_top_blocked, '[]') FROM web_log_snapshots WHERE %s ORDER BY captured_at DESC LIMIT 1`, csWhere),
+		csArgs...,
+	).Scan(&crowdSecBlocked, &crowdSecTopRaw)
+	if crowdSecBlocked > 0 {
+		threats["crowdsec_blocked_ips"] = crowdSecBlocked
+		if len(crowdSecTopRaw) > 2 {
+			var csEntries []map[string]any
+			if err := json.Unmarshal(crowdSecTopRaw, &csEntries); err == nil {
+				threats["crowdsec_top_blocked"] = csEntries
+			}
+		}
+	}
 
 	return map[string]any{
 		"traffic": traffic,

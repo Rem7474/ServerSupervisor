@@ -64,11 +64,20 @@ type BotDetectionPath struct {
 	Hits     int    `json:"hits"`
 }
 
+type CrowdSecBlockedEntry struct {
+	IP           string `json:"ip"`
+	Reason       string `json:"reason"`
+	Origin       string `json:"origin"`
+	BlockedUntil string `json:"blocked_until,omitempty"`
+}
+
 type ThreatSummary struct {
-	SuspiciousRequests  int                `json:"suspicious_requests"`
-	UniqueSuspiciousIPs int                `json:"unique_suspicious_ips"`
-	TopSuspiciousIPs    []BotDetectionIP   `json:"top_suspicious_ips"`
-	TopSuspiciousPaths  []BotDetectionPath `json:"top_suspicious_paths"`
+	SuspiciousRequests   int                    `json:"suspicious_requests"`
+	UniqueSuspiciousIPs  int                    `json:"unique_suspicious_ips"`
+	TopSuspiciousIPs     []BotDetectionIP       `json:"top_suspicious_ips"`
+	TopSuspiciousPaths   []BotDetectionPath     `json:"top_suspicious_paths"`
+	CrowdSecTotalBlocked int                    `json:"crowdsec_total_blocked,omitempty"`
+	CrowdSecTopBlocked   []CrowdSecBlockedEntry `json:"crowdsec_top_blocked,omitempty"`
 }
 
 type WebLogReport struct {

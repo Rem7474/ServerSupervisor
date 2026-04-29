@@ -105,8 +105,8 @@ func (h *AuthHandler) GetWebLogsSummary(c *gin.Context) {
 		},
 	}
 
-	// Promote blocked_ips/blocked_requests into threats so the frontend
-	// "Menaces web" page can read them without also loading the traffic section.
+	// Promote blocked_ips/blocked_requests and crowdsec_blocked_ips into threats
+	// so BotView.vue can read them without loading the traffic section.
 	threats := summary["threats"]
 	if threatsMap, ok := threats.(map[string]any); ok {
 		if trafficMap, ok := summary["traffic"].(map[string]any); ok {
@@ -118,6 +118,14 @@ func (h *AuthHandler) GetWebLogsSummary(c *gin.Context) {
 			}
 			if v, exists := trafficMap["blocked_ratio"]; exists {
 				threatsMap["blocked_ratio"] = v
+			}
+		}
+		// crowdsec_blocked_ips is already in threats (set by GetWebLogsSummary),
+		// but promote it as blocked_ips if it's larger than the web-log count.
+		if csBlocked, ok := threatsMap["crowdsec_blocked_ips"].(int64); ok && csBlocked > 0 {
+			webBlocked := anyToInt64(threatsMap["blocked_ips"])
+			if csBlocked > webBlocked {
+				threatsMap["blocked_ips"] = csBlocked
 			}
 		}
 	}

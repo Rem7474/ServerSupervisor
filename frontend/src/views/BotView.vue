@@ -354,6 +354,64 @@
     </div>
 
     <div
+      v-if="crowdSecIPs.length"
+      class="row row-cards mt-4"
+    >
+      <div class="col-12">
+        <div class="card">
+          <div class="card-header d-flex align-items-center justify-content-between gap-2 flex-wrap">
+            <h3 class="card-title mb-0">
+              IPs bloquées par CrowdSec
+            </h3>
+            <span class="badge bg-success-lt text-success fs-4">
+              {{ crowdSecTotal.toLocaleString() }} décisions actives
+            </span>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-vcenter card-table">
+              <thead>
+                <tr>
+                  <th>IP</th>
+                  <th>Scénario</th>
+                  <th>Origine</th>
+                  <th>Expiration</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="entry in crowdSecIPs"
+                  :key="entry.ip"
+                >
+                  <td class="font-monospace small">
+                    {{ entry.ip }}
+                  </td>
+                  <td class="small text-secondary">
+                    {{ entry.reason || '—' }}
+                  </td>
+                  <td>
+                    <span
+                      class="badge"
+                      :class="entry.origin === 'CAPI' ? 'bg-azure-lt text-azure' : 'bg-purple-lt text-purple'"
+                    >{{ entry.origin || '—' }}</span>
+                  </td>
+                  <td class="small">
+                    {{ formatBlockedUntil(entry.blocked_until) }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div
+            v-if="crowdSecTotal > crowdSecIPs.length"
+            class="card-footer text-secondary small"
+          >
+            Affichage des {{ crowdSecIPs.length }} premières entrées sur {{ crowdSecTotal.toLocaleString() }} IPs bloquées
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div
       v-if="showTimeline"
       class="timeline-drawer-backdrop"
       @click.self="closeTimeline"
@@ -646,6 +704,8 @@ const topIPs = computed(() => threats.value.top_ips || [])
 const topPaths = computed(() => threats.value.top_paths || [])
 const mostTargetedHosts = computed(() => threats.value.most_targeted_hosts || [])
 const ipHostMatrix = computed(() => threats.value.ip_host_matrix || [])
+const crowdSecIPs = computed(() => threats.value.crowdsec_top_blocked || [])
+const crowdSecTotal = computed(() => Number(threats.value.crowdsec_blocked_ips) || 0)
 
 const timelineChrono = computed(() => {
   return [...timeline.value].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
