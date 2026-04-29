@@ -473,12 +473,15 @@
                 <option value="168h">7j</option>
               </select>
               <button
-                class="btn btn-sm btn-outline-danger"
-                :disabled="blockLoading"
+                class="btn btn-sm"
+                :class="banState === 'error' ? 'btn-danger' : 'btn-outline-danger'"
+                :disabled="banState === 'loading'"
                 @click="banIP"
               >
-                <span v-if="blockLoading" class="spinner-border spinner-border-sm me-1" />
-                Bloquer (CrowdSec)
+                <span v-if="banState === 'loading'" class="spinner-border spinner-border-sm me-1" />
+                <span v-if="banState === 'loading'">Blocage…</span>
+                <span v-else-if="banState === 'error'">Erreur — Réessayer</span>
+                <span v-else>Bloquer (CrowdSec)</span>
               </button>
             </template>
             <span
@@ -749,7 +752,7 @@ const summary = ref<AnyRecord>({ threats: {} })
 
 const showTimeline = ref(false)
 const timelineLoading = ref(false)
-const blockLoading = ref(false)
+const banState = ref<'idle' | 'loading' | 'error'>('idle')
 const selectedIP = ref('')
 const banDuration = ref('4h')
 const timelineHostId = ref('')
@@ -1093,6 +1096,7 @@ function setPeriod(value: string) {
 async function openTimeline(ip: string) {
   selectedIP.value = ip
   timelineHostId.value = ''
+  banState.value = 'idle'
   showTimeline.value = true
   timelineLoading.value = true
   try {
@@ -1173,15 +1177,23 @@ async function banIP() {
     showActionFeedback('Impossible de déterminer l\'hôte cible — renseigne le filtre Hôte')
     return
   }
-  blockLoading.value = true
+  banState.value = 'loading'
   try {
-    await apiClient.blockCrowdSecIP(selectedIP.value, effectiveHostId.value, banDuration.value)
-    showActionFeedback(`Commande de blocage (${banDuration.value}) envoyée à l'agent pour ${selectedIP.value}`)
-    setTimeout(() => loadThreats(), 1000)
+    const res = await apiClient.blockCrowdSecIP(selectedIP.value, effectiveHostId.value, banDuration.value)
+    const commandId: string = res.data?.command_id
+    const { status, output } = await pollCommand(commandId)
+    if (status === 'completed') {
+      banState.value = 'idle'
+      // L'IP est maintenant bloquée — recharger pour l'afficher dans le tableau CrowdSec
+      await loadThreats()
+      closeTimeline()
+    } else {
+      banState.value = 'error'
+      showActionFeedback(`Échec blocage ${selectedIP.value} : ${output}`)
+    }
   } catch (error) {
+    banState.value = 'error'
     showActionFeedback(`Impossible de bloquer l'IP : ${getApiErrorMessage(error)}`)
-  } finally {
-    blockLoading.value = false
   }
 }
 
