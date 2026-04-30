@@ -88,6 +88,22 @@
       </div>
     </div>
 
+    <!-- Toast feedback ban/unban -->
+    <div
+      v-if="actionFeedback"
+      class="alert alert-dismissible mb-3"
+      :class="actionFeedback.type === 'success' ? 'alert-success' : 'alert-danger'"
+      role="alert"
+    >
+      {{ actionFeedback.message }}
+      <button
+        type="button"
+        class="btn-close"
+        aria-label="Fermer"
+        @click="actionFeedback = null"
+      />
+    </div>
+
     <!-- Squelette chargement -->
     <template v-if="loading">
       <div class="row row-cards mb-4">
@@ -816,7 +832,7 @@ const selectedBucketKey = ref('')
 const bucketFilterEnabled = ref(true)
 const selectedInterval = ref('auto')
 
-const { showToast: showActionFeedback } = useToast('')
+const { value: actionFeedback, showToast: showActionFeedback } = useToast<{ message: string; type: 'success' | 'error' } | null>(null)
 
 const timelineIntervalOptions = [
   { value: 'auto', label: 'Auto', ms: 0 },
@@ -832,7 +848,6 @@ const timelineIntervalOptions = [
 const AUTO_BUCKET_TARGET = 10
 
 const threats = computed(() => summary.value.threats || {})
-const topIPs = computed(() => threats.value.top_ips || [])
 const topPaths = computed(() => threats.value.top_paths || [])
 const mostTargetedHosts = computed(() => threats.value.most_targeted_hosts || [])
 const ipHostMatrix = computed(() => threats.value.ip_host_matrix || [])
@@ -849,6 +864,18 @@ const crowdSecIPs = computed(() => {
   return [...extra, ...fromSnapshot]
 })
 const crowdSecTotal = computed(() => Number(threats.value.crowdsec_blocked_ips) || 0)
+
+// topIPs enriched: mark IPs as blocked if they appear in the active CrowdSec decisions list
+const topIPs = computed(() => {
+  const blockedSet = new Set(crowdSecIPs.value.map((e: AnyRecord) => e.ip as string))
+  return (threats.value.top_ips || [] as AnyRecord[]).map((ip: AnyRecord) => {
+    if (!ip.blocked && blockedSet.has(ip.ip as string)) {
+      const entry = crowdSecIPs.value.find((e: AnyRecord) => e.ip === ip.ip)
+      return { ...ip, blocked: true, blocked_source: 'crowdsec', blocked_until: entry?.blocked_until }
+    }
+    return ip
+  })
+})
 // host_id du snapshot CrowdSec renvoyé par l'API (présent même sans filtre hôte)
 const crowdSecHostId = computed(() => (threats.value.crowdsec_host_id as string) || '')
 const isSelectedIPBlocked = computed(() =>
@@ -1236,7 +1263,7 @@ watch([timelineBuckets, timelineBucketMs], () => {
 
 async function banIP() {
   if (!effectiveHostId.value) {
-    showActionFeedback('Impossible de déterminer l\'hôte cible — renseigne le filtre Hôte')
+    showActionFeedback({ message: 'Impossible de déterminer l\'hôte cible — renseigne le filtre Hôte', type: 'error' })
     return
   }
   banState.value = 'loading'
@@ -1259,17 +1286,18 @@ async function banIP() {
       },
     ]
     banState.value = 'idle'
+    showActionFeedback({ message: `IP ${ip} bloquée par CrowdSec (${dur})`, type: 'success' })
     closeTimeline()
 
     // Confirmation en arrière-plan : annule le ban optimiste seulement en cas d'échec réel
     const { status, output } = await pollCommand(commandId)
     if (status === 'failed') {
       optimisticBans.value = optimisticBans.value.filter((e) => e.ip !== ip)
-      showActionFeedback(`Échec blocage ${ip} : ${output}`)
+      showActionFeedback({ message: `Échec blocage ${ip} : ${output}`, type: 'error' })
     }
   } catch (error) {
     banState.value = 'error'
-    showActionFeedback(`Impossible de bloquer l'IP : ${getApiErrorMessage(error)}`)
+    showActionFeedback({ message: `Impossible de bloquer l'IP : ${getApiErrorMessage(error)}`, type: 'error' })
   }
 }
 
@@ -1291,7 +1319,7 @@ async function pollCommand(commandId: string): Promise<{ status: string; output:
 async function unblockCrowdSecEntry(ip: string) {
   const targetHost = hostId.value || crowdSecHostId.value
   if (!targetHost) {
-    showActionFeedback('Impossible de déterminer l\'hôte cible — renseigne le filtre Hôte')
+    showActionFeedback({ message: 'Impossible de déterminer l\'hôte cible — renseigne le filtre Hôte', type: 'error' })
     return
   }
   rowState.value = { ...rowState.value, [ip]: 'loading' }
@@ -1305,13 +1333,14 @@ async function unblockCrowdSecEntry(ip: string) {
       unblockedIPs.value = next
       const { [ip]: _, ...rest } = rowState.value
       rowState.value = rest
+      showActionFeedback({ message: `IP ${ip} débloquée`, type: 'success' })
     } else {
       rowState.value = { ...rowState.value, [ip]: 'error' }
-      showActionFeedback(`Échec déblocage ${ip} : ${output}`)
+      showActionFeedback({ message: `Échec déblocage ${ip} : ${output}`, type: 'error' })
     }
   } catch (error) {
     rowState.value = { ...rowState.value, [ip]: 'error' }
-    showActionFeedback(`Impossible de débloquer l'IP : ${getApiErrorMessage(error)}`)
+    showActionFeedback({ message: `Impossible de débloquer l'IP : ${getApiErrorMessage(error)}`, type: 'error' })
   }
 }
 
