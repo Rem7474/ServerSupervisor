@@ -245,6 +245,8 @@
             v-model:host-port-config="hostPortConfig"
             v-model:root-host-id="rootHostId"
             v-model:authelia-host-id="autheliaHostId"
+            v-model:root-port-id="rootPortId"
+            v-model:authelia-port-id="autheliaPortId"
             :hosts="hosts"
             :containers="containers"
           />
@@ -329,6 +331,8 @@
                 :node-positions="nodePositions"
                 :root-host-id="rootHostId"
                 :authelia-host-id="autheliaHostId"
+                :root-port-id="rootPortId"
+                :authelia-port-id="autheliaPortId"
                 @node-select="selectedNode = $event"
                 @update:node-positions="onNodePositionsUpdate"
               />
@@ -395,6 +399,8 @@ const selectedNode = ref(null)
 const networkGraphRef = ref(null)
 const rootHostId = ref('')
 const autheliaHostId = ref('')
+const rootPortId = ref('')
+const autheliaPortId = ref('')
 
 // Graph filters
 const filterInternetOnly = ref(false)
@@ -424,6 +430,8 @@ watch(networkServices, () => debouncedSave(), { deep: true })
 watch(hostPortConfig, () => debouncedSave(), { deep: true })
 watch(rootHostId, () => debouncedSave())
 watch(autheliaHostId, () => debouncedSave())
+watch(rootPortId, () => debouncedSave())
+watch(autheliaPortId, () => debouncedSave())
 
 // ─── Topology config load/save ────────────────────────────────────────────
 async function loadTopologyConfig() {
@@ -438,8 +446,10 @@ async function loadTopologyConfig() {
       internetLabel.value = cfg.internet_label || 'Internet'
       internetIp.value = cfg.internet_ip || ''
       networkServices.value = cfg.manual_services ? JSON.parse(cfg.manual_services) : []
-      rootHostId.value     = cfg.root_host_id     || ''
-      autheliaHostId.value = cfg.authelia_host_id || ''
+      rootHostId.value     = cfg.root_host_id      || ''
+      autheliaHostId.value = cfg.authelia_host_id  || ''
+      rootPortId.value     = cfg.root_port_id      || ''
+      autheliaPortId.value = cfg.authelia_port_id  || ''
       if (cfg.node_positions) {
         try { nodePositions.value = JSON.parse(cfg.node_positions) } catch { nodePositions.value = {} }
       }
@@ -470,8 +480,10 @@ async function saveTopologyConfig() {
       authelia_ip: autheliaIp.value || '',
       internet_label: internetLabel.value || 'Internet',
       internet_ip: internetIp.value || '',
-      root_host_id:     rootHostId.value,
-      authelia_host_id: autheliaHostId.value,
+      root_host_id:      rootHostId.value,
+      authelia_host_id:  autheliaHostId.value,
+      root_port_id:      rootPortId.value,
+      authelia_port_id:  autheliaPortId.value,
     }
     await apiClient.saveTopologyConfig(config)
     saveStatus.value = 'saved'

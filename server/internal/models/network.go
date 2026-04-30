@@ -61,9 +61,11 @@ type NetworkTopologyConfig struct {
 	InternetLabel  string    `json:"internet_label" db:"internet_label"`
 	InternetIP     string    `json:"internet_ip" db:"internet_ip"`
 	NodePositions  string    `json:"node_positions"   db:"node_positions"`   // JSON {nodeId: {x, y}}
-	RootHostID     string    `json:"root_host_id"     db:"root_host_id"`
-	AutheliaHostID string    `json:"authelia_host_id" db:"authelia_host_id"`
-	UpdatedAt      time.Time `json:"updated_at"       db:"updated_at"`
+	RootHostID     string    `json:"root_host_id"      db:"root_host_id"`
+	AutheliaHostID string    `json:"authelia_host_id"  db:"authelia_host_id"`
+	RootPortID     string    `json:"root_port_id"      db:"root_port_id"`     // e.g. "80-tcp"
+	AutheliaPortID string    `json:"authelia_port_id"  db:"authelia_port_id"` // e.g. "9091-tcp"
+	UpdatedAt      time.Time `json:"updated_at"        db:"updated_at"`
 }
 
 // TopologySnapshot is the complete network state sent via WebSocket

@@ -43,6 +43,36 @@
       <div class="text-secondary small mt-1">
         Quand lié, le nœud proxy dans le graphe devient cet hôte — les deux ne sont plus affichés séparément.
       </div>
+      <div
+        v-if="rootHostId && proxyHostPorts.length > 0"
+        class="mt-2"
+      >
+        <label class="form-label">
+          Port spécifique
+          <span class="text-secondary fw-normal">(optionnel)</span>
+        </label>
+        <select
+          v-model="rootPortId"
+          class="form-select form-select-sm"
+        >
+          <option value="">
+            — Nœud hôte (pas de port précis) —
+          </option>
+          <option
+            v-for="p in proxyHostPorts"
+            :key="p.key"
+            :value="p.key"
+          >
+            {{ p.port }}/{{ p.protocol.toUpperCase() }}
+            <template v-if="p.containers?.length">
+              — {{ p.containers.join(', ') }}
+            </template>
+          </option>
+        </select>
+        <div class="text-secondary small mt-1">
+          Le nœud proxy sera ce port précis dans le graphe.
+        </div>
+      </div>
     </div>
 
     <div class="network-config-item mt-3">
@@ -236,6 +266,36 @@
             {{ h.name || h.hostname || h.ip_address || h.id }}
           </option>
         </select>
+        <div
+          v-if="autheliaHostId && autheliaHostPorts.length > 0"
+          class="mt-2"
+        >
+          <label class="form-label">
+            Port spécifique
+            <span class="text-secondary fw-normal">(optionnel)</span>
+          </label>
+          <select
+            v-model="autheliaPortId"
+            class="form-select form-select-sm"
+          >
+            <option value="">
+              — Nœud hôte (pas de port précis) —
+            </option>
+            <option
+              v-for="p in autheliaHostPorts"
+              :key="p.key"
+              :value="p.key"
+            >
+              {{ p.port }}/{{ p.protocol.toUpperCase() }}
+              <template v-if="p.containers?.length">
+                — {{ p.containers.join(', ') }}
+              </template>
+            </option>
+          </select>
+          <div class="text-secondary small mt-1">
+            Le nœud Authelia sera ce port précis dans le graphe.
+          </div>
+        </div>
       </div>
     </div>
 
@@ -476,16 +536,18 @@
 <script setup>
 import { computed, watch } from 'vue'
 
-const rootNodeName   = defineModel('rootNodeName',   { type: String, default: 'Infrastructure' })
-const rootNodeIp     = defineModel('rootNodeIp',     { type: String, default: '' })
-const autheliaLabel  = defineModel('autheliaLabel',  { type: String, default: 'Authelia' })
-const autheliaIp     = defineModel('autheliaIp',     { type: String, default: '' })
-const internetLabel  = defineModel('internetLabel',  { type: String, default: 'Internet' })
-const internetIp     = defineModel('internetIp',     { type: String, default: '' })
+const rootNodeName    = defineModel('rootNodeName',    { type: String, default: 'Infrastructure' })
+const rootNodeIp      = defineModel('rootNodeIp',      { type: String, default: '' })
+const autheliaLabel   = defineModel('autheliaLabel',   { type: String, default: 'Authelia' })
+const autheliaIp      = defineModel('autheliaIp',      { type: String, default: '' })
+const internetLabel   = defineModel('internetLabel',   { type: String, default: 'Internet' })
+const internetIp      = defineModel('internetIp',      { type: String, default: '' })
 const networkServices = defineModel('networkServices', { type: Array, default: () => [] })
 const hostPortConfig  = defineModel('hostPortConfig',  { type: Array, default: () => [] })
 const rootHostId      = defineModel('rootHostId',      { type: String, default: '' })
 const autheliaHostId  = defineModel('autheliaHostId',  { type: String, default: '' })
+const rootPortId      = defineModel('rootPortId',      { type: String, default: '' })
+const autheliaPortId  = defineModel('autheliaPortId',  { type: String, default: '' })
 
 const props = defineProps({
   hosts: {
@@ -530,6 +592,21 @@ const discoveredPortsByHost = computed(() => {
 
   return map
 })
+
+// Ports available for the proxy-host and authelia-host dropdowns
+const proxyHostPorts = computed(() => {
+  if (!rootHostId.value) return []
+  return (discoveredPortsByHost.value[rootHostId.value] || []).filter(p => !p.internal)
+})
+
+const autheliaHostPorts = computed(() => {
+  if (!autheliaHostId.value) return []
+  return (discoveredPortsByHost.value[autheliaHostId.value] || []).filter(p => !p.internal)
+})
+
+// Reset port selection when the linked host changes
+watch(rootHostId, () => { rootPortId.value = '' })
+watch(autheliaHostId, () => { autheliaPortId.value = '' })
 
 watch(
   [() => props.hosts, discoveredPortsByHost],

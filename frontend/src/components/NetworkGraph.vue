@@ -167,6 +167,8 @@ const props = defineProps({
   nodePositions:    { type: Object, default: () => ({}) },
   rootHostId:       { type: String, default: '' },
   autheliaHostId:   { type: String, default: '' },
+  rootPortId:       { type: String, default: '' },
+  autheliaPortId:   { type: String, default: '' },
 })
 
 const emit = defineEmits(['host-click', 'node-select', 'update:nodePositions'])
@@ -212,9 +214,13 @@ function buildElements() {
     servicesByHost.get(svc.hostId).push(svc)
   }
 
-  // Resolve effective node IDs: linked to real host, or abstract node
-  const proxyNodeId    = props.rootHostId     ? `host-${props.rootHostId}`     : 'root'
-  const autheliaNodeId = props.autheliaHostId ? `host-${props.autheliaHostId}` : 'authelia'
+  // Resolve effective node IDs: specific port > host > abstract node
+  const proxyNodeId = props.rootHostId
+    ? (props.rootPortId ? `port-${props.rootHostId}-${props.rootPortId}` : `host-${props.rootHostId}`)
+    : 'root'
+  const autheliaNodeId = props.autheliaHostId
+    ? (props.autheliaPortId ? `port-${props.autheliaHostId}-${props.autheliaPortId}` : `host-${props.autheliaHostId}`)
+    : 'authelia'
 
   // Collect external ports exposed via proxy (for the single aggregated internet→proxy edge)
   const internetViaProxyPorts = []
@@ -223,8 +229,9 @@ function buildElements() {
   for (const host of props.data) {
     const hostStatus = host.status || 'unknown'
     const statusColor = statusColors[hostStatus] || statusColors.unknown
-    const role = host.id === props.rootHostId     ? 'proxy'
-               : host.id === props.autheliaHostId ? 'authelia'
+    // Role goes to the host node only when no specific port is pinned
+    const role = (host.id === props.rootHostId && !props.rootPortId)         ? 'proxy'
+               : (host.id === props.autheliaHostId && !props.autheliaPortId) ? 'authelia'
                : null
     elements.push({
       group: 'nodes',
@@ -269,6 +276,10 @@ function buildElements() {
       const externalPort = internetExposedPorts[portNumber] || null
 
       const nodeId = `port-${host.id}-${portNumber}-${protocol}`
+      const portKey = `${portNumber}-${protocol}`
+      const portRole = (host.id === props.rootHostId && portKey === props.rootPortId)     ? 'proxy'
+                     : (host.id === props.autheliaHostId && portKey === props.autheliaPortId) ? 'authelia'
+                     : null
       elements.push({
         group: 'nodes',
         data: {
@@ -283,7 +294,8 @@ function buildElements() {
           isAutheliaLinked,
           isInternetExposed,
           externalPort,
-          containers: port.containers || []
+          containers: port.containers || [],
+          ...(portRole ? { role: portRole } : {})
         }
       })
 
@@ -833,6 +845,8 @@ watch(
     () => props.internetIp,
     () => props.rootHostId,
     () => props.autheliaHostId,
+    () => props.rootPortId,
+    () => props.autheliaPortId,
   ],
   () => {
     if (!cy) return
