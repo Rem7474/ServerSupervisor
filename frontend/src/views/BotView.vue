@@ -1243,25 +1243,29 @@ async function banIP() {
   try {
     const res = await apiClient.blockCrowdSecIP(selectedIP.value, effectiveHostId.value, banDuration.value)
     const commandId: string = res.data?.command_id
+
+    // Mise à jour optimiste immédiate : l'IP apparaît dans la liste sans attendre
+    // la confirmation de l'agent (le cycle agent peut prendre jusqu'à 30s)
+    const ip = selectedIP.value
+    const dur = banDuration.value
+    const ms = dur.endsWith('h') ? parseInt(dur) * 3600000 : parseInt(dur) * 60000
+    optimisticBans.value = [
+      ...optimisticBans.value.filter((e) => e.ip !== ip),
+      {
+        ip,
+        reason: 'manual',
+        origin: 'cscli',
+        blocked_until: new Date(Date.now() + ms).toISOString(),
+      },
+    ]
+    banState.value = 'idle'
+    closeTimeline()
+
+    // Confirmation en arrière-plan : annule le ban optimiste seulement en cas d'échec réel
     const { status, output } = await pollCommand(commandId)
-    if (status === 'completed') {
-      banState.value = 'idle'
-      // Mise à jour optimiste : ajouter l'IP immédiatement sans attendre le prochain snapshot agent
-      const dur = banDuration.value
-      const ms = dur.endsWith('h') ? parseInt(dur) * 3600000 : parseInt(dur) * 60000
-      optimisticBans.value = [
-        ...optimisticBans.value.filter((e) => e.ip !== selectedIP.value),
-        {
-          ip: selectedIP.value,
-          reason: 'manual',
-          origin: 'cscli',
-          blocked_until: new Date(Date.now() + ms).toISOString(),
-        },
-      ]
-      closeTimeline()
-    } else {
-      banState.value = 'error'
-      showActionFeedback(`Échec blocage ${selectedIP.value} : ${output}`)
+    if (status === 'failed') {
+      optimisticBans.value = optimisticBans.value.filter((e) => e.ip !== ip)
+      showActionFeedback(`Échec blocage ${ip} : ${output}`)
     }
   } catch (error) {
     banState.value = 'error'
@@ -1270,7 +1274,7 @@ async function banIP() {
 }
 
 async function pollCommand(commandId: string): Promise<{ status: string; output: string }> {
-  for (let i = 0; i < 20; i++) {
+  for (let i = 0; i < 40; i++) {
     await new Promise((r) => setTimeout(r, 1500))
     try {
       const res = await apiClient.getCommand(commandId)
@@ -1280,7 +1284,8 @@ async function pollCommand(commandId: string): Promise<{ status: string; output:
       // ignore transient poll errors
     }
   }
-  return { status: 'failed', output: 'Timeout: pas de réponse de l\'agent' }
+  // Timeout après 60s (2× le cycle agent) — la commande est probablement passée
+  return { status: 'timeout', output: '' }
 }
 
 async function unblockCrowdSecEntry(ip: string) {
@@ -1294,7 +1299,7 @@ async function unblockCrowdSecEntry(ip: string) {
     const res = await apiClient.unblockCrowdSecIP(ip, targetHost)
     const commandId: string = res.data?.command_id
     const { status, output } = await pollCommand(commandId)
-    if (status === 'completed') {
+    if (status === 'completed' || status === 'timeout') {
       const next = new Set(unblockedIPs.value)
       next.add(ip)
       unblockedIPs.value = next

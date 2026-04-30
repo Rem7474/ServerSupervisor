@@ -42,7 +42,7 @@ func TestCollectCrowdSecDecisionsUsesWatcherLoginForAlerts(t *testing.T) {
 				t.Fatalf("unexpected limit: %s", got)
 			}
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`[{"source":{"value":"172.212.217.10","country":"US","as_name":"MICROSOFT-CORP-MSN-AS-BLOCK","ip":"172.212.217.10"},"events_count":11,"scenario":"crowdsecurity/http-probing"}]`))
+			_, _ = w.Write([]byte(`[{"source":{"value":"172.212.217.10","cn":"US","as_name":"MICROSOFT-CORP-MSN-AS-BLOCK","ip":"172.212.217.10"},"events_count":11,"scenario":"crowdsecurity/http-probing"}]`))
 		default:
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}

@@ -38,6 +38,7 @@ type crowdSecAPIDecision struct {
 	Origin   string `json:"origin"`   // "crowdsec", "cscli", "CAPI", etc.
 	Scenario string `json:"scenario"` // scenario name, e.g., "crowdsecurity/http-bad-user-agent"
 	Duration string `json:"duration"` // remaining duration, e.g., "3h45m23s"
+	Until    string `json:"until"`    // expiry timestamp when provided
 }
 
 // crowdSecAPIAlert is used to enrich decisions with country/ASN metadata.
@@ -45,12 +46,8 @@ type crowdSecAPIAlert struct {
 	Source struct {
 		IP          string `json:"ip"`
 		Value       string `json:"value"`
-		Country     string `json:"country"`
-		CountryCode string `json:"country_code"`
-		CN          string `json:"cn"`      // ISO-2 country code
-		ASName      string `json:"as_name"` // AS organisation name
-		AS          string `json:"as"`
-		ASN         string `json:"asn"`
+		CN          string `json:"cn"`        // ISO-2 country code
+		ASName      string `json:"as_name"`   // AS organisation name
 		ASNumber    string `json:"as_number"` // AS number
 	} `json:"source"`
 	EventsCount int    `json:"events_count"`
@@ -96,7 +93,7 @@ func CollectCrowdSecDecisions(connectionString, apiKey, alertsMachineID, alertsP
 		}
 	}
 
-	apiURL := fmt.Sprintf("%s/v1/decisions?has_active_decision=true", baseURL)
+	apiURL := fmt.Sprintf("%s/v1/decisions", baseURL)
 	req, err := http.NewRequest("GET", apiURL, nil)
 	if err != nil {
 		log.Printf("[crowdsec] failed to create request: %v", err)
@@ -126,11 +123,16 @@ func CollectCrowdSecDecisions(connectionString, apiKey, alertsMachineID, alertsP
 			} else {
 				now := time.Now()
 				for _, d := range decisions {
-					if (d.Scope != "Ip" && d.Scope != "Range") || d.Value == "" {
+					if !isCrowdSecIPScope(d.Scope) || strings.TrimSpace(d.Value) == "" {
 						continue
 					}
 					blockedUntil := time.Time{}
-					if d.Duration != "" {
+					if d.Until != "" {
+						if t, err := parseCrowdSecTime(d.Until); err == nil {
+							blockedUntil = t
+						}
+					}
+					if blockedUntil.IsZero() && d.Duration != "" {
 						if dur, err := time.ParseDuration(d.Duration); err == nil && dur > 0 {
 							blockedUntil = now.Add(dur)
 						}
@@ -151,7 +153,7 @@ func CollectCrowdSecDecisions(connectionString, apiKey, alertsMachineID, alertsP
 	log.Printf("[crowdsec] collected %d active IP decisions", len(result))
 
 	// Enrich decisions (or populate fallback) with data from the alerts endpoint.
-	enrichDecisionsWithAlerts(result, baseURL, apiKey, alertsMachineID, alertsPassword, client)
+	enrichDecisionsWithAlerts(result, baseURL, alertsMachineID, alertsPassword, client)
 
 	return result, nil
 }
@@ -268,7 +270,7 @@ func CreateCrowdSecDecision(connectionString, machineID, password, ip, duration 
 		LeakSpeed       string                `json:"leakspeed"`
 		Simulated       bool                  `json:"simulated"`
 		Events          []any                 `json:"events"`
-		Labels          any                   `json:"labels"`
+		Labels          []string              `json:"labels,omitempty"`
 		Source          crowdSecAlertSource   `json:"source"`
 		Decisions       []crowdSecBanDecision `json:"decisions"`
 	}
@@ -364,7 +366,7 @@ func DeleteCrowdSecDecision(connectionString, machineID, password, ip string) er
 // enrichDecisionsWithAlerts calls /v1/alerts and merges country + ASN into existing decisions.
 // If decisions is empty (or missing entries), it backfills from alerts so manual bans show up.
 // Failures are silently ignored — this is best-effort enrichment only.
-func enrichDecisionsWithAlerts(decisions map[string]CrowdSecDecision, connectionString, apiKey, alertsMachineID, alertsPassword string, client *http.Client) {
+func enrichDecisionsWithAlerts(decisions map[string]CrowdSecDecision, connectionString, alertsMachineID, alertsPassword string, client *http.Client) {
 	token, err := loginCrowdSecAlertsToken(connectionString, alertsMachineID, alertsPassword, client)
 	if err != nil {
 		log.Printf("[crowdsec] unable to obtain alerts token: %v", err)
@@ -413,8 +415,8 @@ func enrichDecisionsWithAlerts(decisions map[string]CrowdSecDecision, connection
 		if dec.Origin == "" {
 			dec.Origin = origin
 		}
-		country := firstNonEmpty(a.Source.Country, a.Source.CountryCode, a.Source.CN)
-		asName := firstNonEmpty(a.Source.ASName, a.Source.AS, a.Source.ASN)
+		country := firstNonEmpty(a.Source.CN)
+		asName := firstNonEmpty(a.Source.ASName)
 		if asName == "" && a.Source.ASNumber != "" {
 			asName = "AS" + strings.TrimSpace(a.Source.ASNumber)
 		}
@@ -425,9 +427,7 @@ func enrichDecisionsWithAlerts(decisions map[string]CrowdSecDecision, connection
 			dec.ASName = asName
 		}
 		if dec.BlockedUntil.IsZero() && untilRaw != "" {
-			if t, err := time.Parse(time.RFC3339Nano, untilRaw); err == nil {
-				dec.BlockedUntil = t
-			} else if t, err := time.Parse(time.RFC3339, untilRaw); err == nil {
+			if t, err := parseCrowdSecTime(untilRaw); err == nil {
 				dec.BlockedUntil = t
 			}
 		}
@@ -451,12 +451,23 @@ func enrichDecisionsWithAlerts(decisions map[string]CrowdSecDecision, connection
 		}
 
 		for _, d := range a.Decisions {
-			if d.Scope != "Ip" && d.Scope != "Range" {
+			if !isCrowdSecIPScope(d.Scope) {
 				continue
 			}
 			applyDecision(strings.TrimSpace(d.Value), d.Origin, firstNonEmpty(d.Scenario, a.Scenario), d.Until, d.Duration, a)
 		}
 	}
+}
+
+func isCrowdSecIPScope(scope string) bool {
+	return strings.EqualFold(scope, "Ip") || strings.EqualFold(scope, "Range")
+}
+
+func parseCrowdSecTime(value string) (time.Time, error) {
+	if t, err := time.Parse(time.RFC3339Nano, value); err == nil {
+		return t, nil
+	}
+	return time.Parse(time.RFC3339, value)
 }
 
 func firstNonEmpty(values ...string) string {
