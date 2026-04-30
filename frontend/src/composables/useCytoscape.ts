@@ -14,7 +14,7 @@ export function bindCytoscapeResize(
   onResize: () => void
 ): ResizeBinding {
   const observer = new ResizeObserver(() => {
-    onResize()
+    requestAnimationFrame(() => onResize())
   })
   observer.observe(container)
   return {

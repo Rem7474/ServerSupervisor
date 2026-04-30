@@ -809,11 +809,13 @@ watchEffect(() => {
   }
   if (graphSurfaceRef.value) {
     resizeObserver = new ResizeObserver(() => {
-      const rect = graphSurfaceRef.value?.getBoundingClientRect()
-      if (rect) {
-        const availableHeight = window.innerHeight - rect.top - 20
-        graphHeight.value = Math.max(400, availableHeight) + 'px'
-      }
+      requestAnimationFrame(() => {
+        const rect = graphSurfaceRef.value?.getBoundingClientRect()
+        if (rect) {
+          const availableHeight = window.innerHeight - rect.top - 20
+          graphHeight.value = Math.max(400, availableHeight) + 'px'
+        }
+      })
     })
     resizeObserver.observe(graphSurfaceRef.value)
   }
