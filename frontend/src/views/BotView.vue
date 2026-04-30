@@ -886,10 +886,9 @@ const topIPs = computed(() => {
   return (threats.value.top_ips || [] as AnyRecord[]).map((ip: AnyRecord) => {
     const decision = decisionMap.get(ip.ip as string)
     if (!decision) return ip
-    // Only override `blocked` if not already set by snapshot data
-    const decType = (decision.type as string) || 'ban'
+    if (ip.blocked && ip.blocked_type) return ip  // already enriched by agent, trust it
+    const decType = (decision.type as string) || ''
     const isBan = decType === 'ban'
-    if (ip.blocked && ip.blocked_type) return ip  // already enriched by agent
     return {
       ...ip,
       blocked: isBan,
@@ -1153,16 +1152,18 @@ function levelClass(level: string): string {
 }
 
 function decisionLabel(type: string): string {
-  switch ((type || 'ban').toLowerCase()) {
+  if (!type) return '—'
+  switch (type.toLowerCase()) {
     case 'ban': return 'Ban'
     case 'captcha': return 'Captcha'
     case 'audit': return 'Audit'
-    default: return type || 'Ban'
+    default: return type
   }
 }
 
 function decisionBadgeClass(type: string): string {
-  switch ((type || 'ban').toLowerCase()) {
+  if (!type) return 'bg-secondary-lt text-secondary'
+  switch (type.toLowerCase()) {
     case 'ban': return 'bg-red-lt text-red'
     case 'captcha': return 'bg-yellow-lt text-yellow'
     case 'audit': return 'bg-azure-lt text-azure'
