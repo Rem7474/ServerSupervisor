@@ -404,13 +404,22 @@ func enrichDecisionsWithAlerts(decisions map[string]CrowdSecDecision, connection
 	}
 
 	now := time.Now().UTC()
-	applyDecision := func(ip string, origin string, scenario string, untilRaw string, durationRaw string, a crowdSecAPIAlert) {
+	// applyDecision merges metadata from an alert into the existing decision map entry.
+	// decType is the decision type from the alert's per-decision list; empty string means unknown.
+	// Blocked is always derived from Type — never forced to true — so audit/captcha entries stay correct.
+	applyDecision := func(ip string, decType string, origin string, scenario string, untilRaw string, durationRaw string, a crowdSecAPIAlert) {
 		if ip == "" {
 			return
 		}
 		dec := decisions[ip]
 		dec.IP = ip
-		dec.Blocked = true
+		// For backfill entries (not seen in /v1/decisions): set Type from the alert decision.
+		// For existing entries: preserve the Type already set from the decisions endpoint.
+		if dec.Type == "" && decType != "" {
+			dec.Type = decType
+		}
+		// Derive Blocked from Type — never hardcode true.
+		dec.Blocked = strings.EqualFold(dec.Type, "ban")
 		if dec.Reason == "" {
 			dec.Reason = scenario
 		}
@@ -448,7 +457,8 @@ func enrichDecisionsWithAlerts(decisions map[string]CrowdSecDecision, connection
 		}
 
 		if len(a.Decisions) == 0 {
-			applyDecision(alertIP, "", a.Scenario, "", "", a)
+			// No per-decision detail — type is unknown; existing entry's type is preserved.
+			applyDecision(alertIP, "", "", a.Scenario, "", "", a)
 			continue
 		}
 
@@ -456,7 +466,7 @@ func enrichDecisionsWithAlerts(decisions map[string]CrowdSecDecision, connection
 			if !isCrowdSecIPScope(d.Scope) {
 				continue
 			}
-			applyDecision(strings.TrimSpace(d.Value), d.Origin, firstNonEmpty(d.Scenario, a.Scenario), d.Until, d.Duration, a)
+			applyDecision(strings.TrimSpace(d.Value), d.Type, d.Origin, firstNonEmpty(d.Scenario, a.Scenario), d.Until, d.Duration, a)
 		}
 	}
 }
