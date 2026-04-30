@@ -267,13 +267,15 @@
                     >{{ ip.level || 'LOW' }}</span>
                   </td>
                   <td>
-                    <span
-                      v-if="ip.blocked"
-                      class="badge bg-green-lt text-green"
-                      :title="formatBlockedUntil(ip.blocked_until)"
-                    >
-                      Bloquée
-                    </span>
+                    <template v-if="ip.blocked || ip.blocked_type">
+                      <span
+                        class="badge"
+                        :class="decisionBadgeClass(ip.blocked_type)"
+                        :title="formatBlockedUntil(ip.blocked_until)"
+                      >
+                        {{ decisionLabel(ip.blocked_type) }}
+                      </span>
+                    </template>
                     <span
                       v-else
                       class="text-secondary small"
@@ -441,6 +443,7 @@
               <thead>
                 <tr>
                   <th>IP</th>
+                  <th>Action</th>
                   <th>Scénario</th>
                   <th>Origine</th>
                   <th>Pays</th>
@@ -456,6 +459,12 @@
                 >
                   <td class="font-monospace small">
                     {{ entry.ip }}
+                  </td>
+                  <td>
+                    <span
+                      class="badge"
+                      :class="decisionBadgeClass(entry.type)"
+                    >{{ decisionLabel(entry.type) }}</span>
                   </td>
                   <td class="small text-secondary">
                     {{ entry.reason || '—' }}
@@ -865,15 +874,24 @@ const crowdSecIPs = computed(() => {
 })
 const crowdSecTotal = computed(() => Number(threats.value.crowdsec_blocked_ips) || 0)
 
-// topIPs enriched: mark IPs as blocked if they appear in the active CrowdSec decisions list
+// topIPs enriched: merge CrowdSec decision type from the active decisions list so the
+// "Blocage" column reflects the current state even for IPs with no recent blocked requests.
 const topIPs = computed(() => {
-  const blockedSet = new Set(crowdSecIPs.value.map((e: AnyRecord) => e.ip as string))
+  const decisionMap = new Map(crowdSecIPs.value.map((e: AnyRecord) => [e.ip as string, e]))
   return (threats.value.top_ips || [] as AnyRecord[]).map((ip: AnyRecord) => {
-    if (!ip.blocked && blockedSet.has(ip.ip as string)) {
-      const entry = crowdSecIPs.value.find((e: AnyRecord) => e.ip === ip.ip)
-      return { ...ip, blocked: true, blocked_source: 'crowdsec', blocked_until: entry?.blocked_until }
+    const decision = decisionMap.get(ip.ip as string)
+    if (!decision) return ip
+    // Only override `blocked` if not already set by snapshot data
+    const decType = (decision.type as string) || 'ban'
+    const isBan = decType === 'ban'
+    if (ip.blocked && ip.blocked_type) return ip  // already enriched by agent
+    return {
+      ...ip,
+      blocked: isBan,
+      blocked_source: 'crowdsec',
+      blocked_type: decType,
+      blocked_until: ip.blocked_until || decision.blocked_until,
     }
-    return ip
   })
 })
 // host_id du snapshot CrowdSec renvoyé par l'API (présent même sans filtre hôte)
@@ -1129,6 +1147,24 @@ function levelClass(level: string): string {
   }
 }
 
+function decisionLabel(type: string): string {
+  switch ((type || 'ban').toLowerCase()) {
+    case 'ban': return 'Ban'
+    case 'captcha': return 'Captcha'
+    case 'audit': return 'Audit'
+    default: return type || 'Ban'
+  }
+}
+
+function decisionBadgeClass(type: string): string {
+  switch ((type || 'ban').toLowerCase()) {
+    case 'ban': return 'bg-red-lt text-red'
+    case 'captcha': return 'bg-yellow-lt text-yellow'
+    case 'audit': return 'bg-azure-lt text-azure'
+    default: return 'bg-secondary-lt text-secondary'
+  }
+}
+
 function truncate(s: string, max: number): string {
   return s.length > max ? s.slice(0, max) + '…' : s
 }
@@ -1280,6 +1316,7 @@ async function banIP() {
       ...optimisticBans.value.filter((e) => e.ip !== ip),
       {
         ip,
+        type: 'ban',
         reason: 'manual',
         origin: 'cscli',
         blocked_until: new Date(Date.now() + ms).toISOString(),

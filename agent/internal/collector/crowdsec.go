@@ -14,7 +14,8 @@ import (
 // CrowdSecDecision represents a single CrowdSec decision for an IP
 type CrowdSecDecision struct {
 	IP           string
-	Blocked      bool
+	Blocked      bool      // true only for "ban" decisions
+	Type         string    // remediation type: "ban", "captcha", "audit", etc.
 	Reason       string    // scenario, e.g., "crowdsecurity/http-bad-user-agent"
 	Origin       string    // "CAPI", "crowdsec", "cscli", etc.
 	Country      string    // ISO country code from alerts enrichment
@@ -139,7 +140,8 @@ func CollectCrowdSecDecisions(connectionString, apiKey, alertsMachineID, alertsP
 					}
 					result[d.Value] = CrowdSecDecision{
 						IP:           d.Value,
-						Blocked:      true,
+						Blocked:      strings.EqualFold(d.Type, "ban"),
+						Type:         d.Type,
 						Reason:       d.Scenario,
 						Origin:       d.Origin,
 						BlockedAt:    time.Time{},
