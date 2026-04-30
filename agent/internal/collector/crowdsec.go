@@ -44,11 +44,11 @@ type crowdSecAPIDecision struct {
 // crowdSecAPIAlert is used to enrich decisions with country/ASN metadata.
 type crowdSecAPIAlert struct {
 	Source struct {
-		IP          string `json:"ip"`
-		Value       string `json:"value"`
-		CN          string `json:"cn"`        // ISO-2 country code
-		ASName      string `json:"as_name"`   // AS organisation name
-		ASNumber    string `json:"as_number"` // AS number
+		IP       string `json:"ip"`
+		Value    string `json:"value"`
+		CN       string `json:"cn"`        // ISO-2 country code
+		ASName   string `json:"as_name"`   // AS organisation name
+		ASNumber string `json:"as_number"` // AS number
 	} `json:"source"`
 	EventsCount int    `json:"events_count"`
 	Scenario    string `json:"scenario"`
