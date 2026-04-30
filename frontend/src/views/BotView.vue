@@ -594,18 +594,18 @@
           </div>
           <template v-else>
             <div class="timeline-frieze border-bottom px-3 py-3">
-              <div class="timeline-controls d-flex align-items-center justify-content-between mb-2 gap-2 flex-wrap">
-                <div class="d-flex align-items-center gap-2 flex-wrap">
-                  <span class="small text-secondary">Intervalle:</span>
+              <div class="timeline-controls d-flex align-items-center justify-content-between mb-2 gap-2">
+                <div class="timeline-interval-row">
+                  <span class="small text-secondary timeline-interval-label">Intervalle:</span>
                   <div
-                    class="btn-group btn-group-sm"
+                    class="timeline-interval-chips"
                     role="group"
                     aria-label="Intervalle timeline"
                   >
                     <button
                       v-for="opt in timelineIntervalOptions"
                       :key="opt.value"
-                      class="btn"
+                      class="timeline-interval-chip btn btn-sm"
                       :class="selectedInterval === opt.value ? 'btn-primary' : 'btn-outline-secondary'"
                       @click="setTimelineInterval(opt.value)"
                     >
@@ -630,35 +630,40 @@
                 </button>
               </div>
 
-              <div class="timeline-kpis mb-3">
-                <div class="timeline-kpi-chip">
-                  <span class="timeline-kpi-label">Requêtes affichées</span>
-                  <span class="timeline-kpi-value">{{ timelineStats.total }}</span>
+              <details class="timeline-controls-collapsible" open>
+                <summary class="timeline-controls-toggle">
+                  <span>Statistiques</span>
+                  <span class="timeline-controls-toggle-arrow">▾</span>
+                </summary>
+                <div class="timeline-kpis mb-3">
+                  <div class="timeline-kpi-chip">
+                    <span class="timeline-kpi-label">Requêtes affichées</span>
+                    <span class="timeline-kpi-value">{{ timelineStats.total }}</span>
+                  </div>
+                  <div class="timeline-kpi-chip">
+                    <span class="timeline-kpi-label">Erreurs</span>
+                    <span class="timeline-kpi-value text-red">{{ timelineStats.errors }}</span>
+                  </div>
+                  <div class="timeline-kpi-chip">
+                    <span class="timeline-kpi-label">Chemins uniques</span>
+                    <span class="timeline-kpi-value">{{ timelineStats.uniquePaths }}</span>
+                  </div>
+                  <div class="timeline-kpi-chip">
+                    <span class="timeline-kpi-label">Domaines cibles uniques</span>
+                    <span class="timeline-kpi-value">{{ timelineStats.uniqueVhosts }}</span>
+                  </div>
                 </div>
-                <div class="timeline-kpi-chip">
-                  <span class="timeline-kpi-label">Erreurs</span>
-                  <span class="timeline-kpi-value text-red">{{ timelineStats.errors }}</span>
+                <div class="timeline-status-breakdown mb-3">
+                  <span
+                    v-for="item in timelineStatusBreakdown"
+                    :key="item.key"
+                    class="badge"
+                    :class="item.badgeClass"
+                  >
+                    {{ item.label }}: {{ item.count }}
+                  </span>
                 </div>
-                <div class="timeline-kpi-chip">
-                  <span class="timeline-kpi-label">Chemins uniques</span>
-                  <span class="timeline-kpi-value">{{ timelineStats.uniquePaths }}</span>
-                </div>
-                <div class="timeline-kpi-chip">
-                  <span class="timeline-kpi-label">Domaines cibles uniques</span>
-                  <span class="timeline-kpi-value">{{ timelineStats.uniqueVhosts }}</span>
-                </div>
-              </div>
-
-              <div class="timeline-status-breakdown mb-3">
-                <span
-                  v-for="item in timelineStatusBreakdown"
-                  :key="item.key"
-                  class="badge"
-                  :class="item.badgeClass"
-                >
-                  {{ item.label }}: {{ item.count }}
-                </span>
-              </div>
+              </details>
 
               <div class="timeline-frieze-scroll">
                 <div class="timeline-frieze-track">
@@ -1410,6 +1415,8 @@ onMounted(loadThreats)
   border-radius: 0.75rem;
   border: 1px solid var(--tblr-border-color);
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .timeline-header {
@@ -1430,7 +1437,8 @@ onMounted(loadThreats)
 }
 
 .timeline-body {
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   overflow: auto;
   background: linear-gradient(
     180deg,
@@ -1447,8 +1455,54 @@ onMounted(loadThreats)
   background: linear-gradient(180deg, var(--tblr-bg-surface-secondary, #f8fafc) 0%, var(--tblr-bg-surface, #ffffff) 100%);
 }
 
-.timeline-controls .btn-group .btn {
-  min-width: 44px;
+.timeline-interval-row {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.timeline-interval-chips {
+  display: flex;
+  gap: 0.3rem;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+
+.timeline-interval-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.timeline-interval-chip {
+  flex: 0 0 auto;
+  scroll-snap-align: start;
+  border-radius: 1rem;
+  min-width: 2.5rem;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.78rem;
+}
+
+.timeline-controls-collapsible {
+  /* transparent wrapper — no desktop visual change */
+}
+
+.timeline-controls-collapsible > summary {
+  display: none;
+  list-style: none;
+}
+
+.timeline-controls-collapsible > summary::-webkit-details-marker {
+  display: none;
+}
+
+.timeline-controls-toggle-arrow {
+  display: inline-block;
+  transition: transform 180ms ease;
 }
 
 .timeline-kpis {
@@ -1689,32 +1743,155 @@ onMounted(loadThreats)
 }
 
 @media (max-width: 640px) {
-  .timeline-header-actions {
-    width: 100%;
-  }
-
-  .timeline-header-actions .btn {
-    flex: 1 1 auto;
-  }
-
+  /* === Modal === */
   .timeline-modal {
     height: 100dvh;
+    border-radius: 0;
   }
 
-  .timeline-body {
-    max-height: calc(100dvh - 78px) !important;
+  /* === Header compact === */
+  .timeline-header.card-header {
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
   }
 
+  .timeline-header .text-secondary.small {
+    display: none;
+  }
+
+  .timeline-header .card-title {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-size: 0.9rem;
+  }
+
+  .timeline-header-actions {
+    width: 100%;
+    flex-wrap: nowrap;
+    gap: 0.4rem;
+  }
+
+  .timeline-header-actions .form-select {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 0;
+    font-size: 0.8rem;
+    padding-inline: 0.4rem;
+  }
+
+  .timeline-header-actions .btn-outline-secondary {
+    flex: 0 0 auto;
+  }
+
+  .timeline-header-actions .btn:not(.btn-outline-secondary) {
+    flex: 1 1 auto;
+    font-size: 0.78rem;
+    padding: 0.25rem 0.5rem;
+  }
+
+  /* === Intervalle: controls en colonne === */
+  .timeline-interval-label {
+    display: none;
+  }
+
+  .timeline-controls {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.35rem;
+  }
+
+  /* === KPI chips: 2×2 au lieu de 1-colonne === */
   .timeline-kpis {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.3rem;
   }
 
+  .timeline-kpi-chip {
+    padding: 0.3rem 0.45rem;
+  }
+
+  .timeline-kpi-label {
+    font-size: 0.67rem;
+  }
+
+  .timeline-kpi-value {
+    font-size: 0.85rem;
+  }
+
+  /* === Collapsible statistiques === */
+  .timeline-controls-collapsible > summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.3rem 0;
+    margin-bottom: 0.4rem;
+    cursor: pointer;
+    font-size: 0.78rem;
+    color: var(--tblr-secondary);
+    border-bottom: 1px solid var(--tblr-border-color);
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .timeline-controls-collapsible:not([open]) .timeline-controls-toggle-arrow {
+    transform: rotate(-90deg);
+  }
+
+  /* === Frieze === */
+  .timeline-frieze {
+    padding: 0.5rem 0.75rem;
+  }
+
+  .timeline-frieze-item {
+    min-width: 52px;
+    padding: 0.15rem 0.2rem;
+  }
+
+  .timeline-frieze-dot {
+    width: 11px;
+    height: 11px;
+    border-width: 2px;
+  }
+
+  .timeline-frieze-time,
+  .timeline-frieze-count {
+    font-size: 0.65rem;
+  }
+
+  /* === Group headers compacts === */
+  .timeline-group-header {
+    padding-top: 0.35rem;
+    padding-bottom: 0.35rem;
+  }
+
+  .timeline-group-kpis .badge:nth-child(n+3) {
+    display: none;
+  }
+
+  /* === Event cards === */
   .timeline-group-events {
     gap: 0.6rem;
   }
 
   .timeline-status-group-grid {
     grid-template-columns: 1fr;
+  }
+
+  .timeline-event-card {
+    padding: 0.4rem 0.5rem;
+  }
+
+  .timeline-event-topline {
+    margin-bottom: 0.2rem;
+  }
+
+  .timeline-event-path {
+    margin-bottom: 0.2rem;
+  }
+
+  .timeline-event-meta {
+    gap: 0.15rem;
   }
 }
 </style>
