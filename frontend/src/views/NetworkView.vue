@@ -29,14 +29,13 @@
 
     <!-- KPI Cards -->
     <div class="row row-cards mb-4">
-      <!-- Hosts & Containers: context cards, visually de-emphasized -->
       <div class="col-sm-6 col-lg-3">
-        <div class="card card-sm h-100 kpi-context">
+        <div class="card card-sm h-100">
           <div class="card-body">
-            <div class="subheader text-secondary">
+            <div class="subheader">
               Hôtes
             </div>
-            <div class="h2 mb-0 text-secondary">
+            <div class="h2 mb-0">
               {{ hosts.length }}
             </div>
             <div class="text-muted small">
@@ -46,12 +45,12 @@
         </div>
       </div>
       <div class="col-sm-6 col-lg-3">
-        <div class="card card-sm h-100 kpi-context">
+        <div class="card card-sm h-100">
           <div class="card-body">
-            <div class="subheader text-secondary">
+            <div class="subheader">
               Conteneurs
             </div>
-            <div class="h2 mb-0 text-secondary">
+            <div class="h2 mb-0">
               {{ containers.length }}
             </div>
             <div class="text-muted small">
@@ -60,7 +59,6 @@
           </div>
         </div>
       </div>
-      <!-- Network-focused KPIs -->
       <div class="col-sm-6 col-lg-3">
         <div class="card card-sm h-100">
           <div class="card-body">
@@ -111,90 +109,23 @@
       </div>
     </div>
 
-    <!-- View Mode Toggle -->
-    <div class="card mb-4">
-      <div class="card-body py-2">
-        <div class="d-flex align-items-center gap-3 flex-wrap">
-          <div
-            class="btn-group"
-            role="group"
-          >
-            <input
-              id="viewGraph"
-              v-model="viewMode"
-              type="radio"
-              class="btn-check"
-              value="graph"
-            >
-            <label
-              class="btn btn-sm"
-              :class="viewMode === 'graph' ? 'btn-primary' : 'btn-outline-secondary'"
-              for="viewGraph"
-            >
-              <svg
-                width="14"
-                height="14"
-                fill="currentColor"
-                viewBox="0 0 16 16"
-                class="me-1"
-              >
-                <path d="M0 2a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V2zm2.5 7a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-1zm2-4a.5.5 0 0 0-.5.5v5a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-5a.5.5 0 0 0-.5-.5h-1zm2-2a.5.5 0 0 0-.5.5v8a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5V3.5a.5.5 0 0 0-.5-.5h-1zm2-1a.5.5 0 0 0-.5.5v9a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5V2.5a.5.5 0 0 0-.5-.5h-1z" />
-              </svg>
-              Graphe
-            </label>
-
-            <input
-              id="viewCards"
-              v-model="viewMode"
-              type="radio"
-              class="btn-check"
-              value="cards"
-            >
-            <label
-              class="btn btn-sm"
-              :class="viewMode === 'cards' ? 'btn-primary' : 'btn-outline-secondary'"
-              for="viewCards"
-            >
-              <svg
-                width="14"
-                height="14"
-                fill="currentColor"
-                viewBox="0 0 16 16"
-                class="me-1"
-              >
-                <path d="M1 1a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V1zm10 0a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1V1zM1 11a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1v-4zm10 0a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-4z" />
-              </svg>
-              Cartes
-            </label>
-          </div>
-          <span class="text-secondary small d-none d-sm-inline">
-            <strong>Graphe</strong> : vue d'architecture logique &nbsp;•&nbsp;
-            <strong>Cartes</strong> : vue détaillée par hôte / port
-          </span>
-        </div>
-      </div>
-    </div>
-
-    <!-- ══════════════════ GRAPH VIEW ══════════════════ -->
-    <div
-      v-if="viewMode === 'graph'"
-      class="card mb-4 network-topology-card"
-    >
+    <!-- ══════════════════ UNIFIED NETWORK CARD ══════════════════ -->
+    <div class="card mb-4 network-topology-card">
       <!-- Card header -->
-      <div class="card-header d-flex align-items-start justify-content-between flex-wrap gap-2">
+      <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
         <div>
-          <h3 class="card-title mb-1">
-            Topologie réseau
+          <h3 class="card-title mb-0">
+            {{ viewMode === 'graph' ? 'Topologie réseau' : 'Ports &amp; conteneurs' }}
           </h3>
-          <div class="text-secondary small">
+          <div class="text-secondary small mt-1">
             {{ hosts.length }} hôtes · {{ combinedServices.length }} services logiques · {{ totalPorts }} ports mappés
           </div>
         </div>
 
-        <!-- Right: status + toolbar -->
         <div class="d-flex align-items-center gap-2 flex-wrap">
+          <!-- Save status (graph mode only) -->
           <div
-            v-if="saveStatus !== 'idle'"
+            v-if="viewMode === 'graph' && saveStatus !== 'idle'"
             class="d-flex align-items-center gap-2"
           >
             <span
@@ -210,80 +141,53 @@
               class="text-danger small"
             >✗ Erreur</span>
           </div>
-          <!-- Zoom / layout toolbar (visible in topology tab only) -->
+
+          <!-- View mode toggle -->
           <div
-            v-if="networkTab === 'topology'"
             class="btn-group btn-group-sm"
+            role="group"
           >
             <button
-              class="btn btn-outline-secondary"
-              title="Zoom +"
-              @click="networkGraphRef?.zoomIn()"
+              class="btn"
+              :class="viewMode === 'graph' ? 'btn-primary' : 'btn-outline-secondary'"
+              @click="viewMode = 'graph'"
             >
               <svg
-                width="12"
-                height="12"
+                width="14"
+                height="14"
                 fill="currentColor"
                 viewBox="0 0 16 16"
+                class="me-1"
               >
-                <path d="M6.5 1a5.5 5.5 0 1 0 0 11A5.5 5.5 0 0 0 6.5 1zm-4.5 5.5a4.5 4.5 0 1 1 9 0 4.5 4.5 0 0 1-9 0z" />
-                <path d="M6.5 3.5a.5.5 0 0 1 .5.5V6h2a.5.5 0 0 1 0 1H7v2a.5.5 0 0 1-1 0V7H4a.5.5 0 0 1 0-1h2V4a.5.5 0 0 1 .5-.5zm5.35 4.85a.5.5 0 0 1 .707 0l3.5 3.5a.5.5 0 0 1-.707.707l-3.5-3.5a.5.5 0 0 1 0-.707z" />
+                <path d="M0 2a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V2zm2.5 7a.5.5 0 0 0-.5.5v1a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-1a.5.5 0 0 0-.5-.5h-1zm2-4a.5.5 0 0 0-.5.5v5a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5v-5a.5.5 0 0 0-.5-.5h-1zm2-2a.5.5 0 0 0-.5.5v8a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5V3.5a.5.5 0 0 0-.5-.5h-1zm2-1a.5.5 0 0 0-.5.5v9a.5.5 0 0 0 .5.5h1a.5.5 0 0 0 .5-.5V2.5a.5.5 0 0 0-.5-.5h-1z" />
               </svg>
+              Graphe
             </button>
             <button
-              class="btn btn-outline-secondary"
-              title="Zoom −"
-              @click="networkGraphRef?.zoomOut()"
+              class="btn"
+              :class="viewMode === 'cards' ? 'btn-primary' : 'btn-outline-secondary'"
+              @click="viewMode = 'cards'"
             >
               <svg
-                width="12"
-                height="12"
+                width="14"
+                height="14"
                 fill="currentColor"
                 viewBox="0 0 16 16"
+                class="me-1"
               >
-                <path d="M6.5 1a5.5 5.5 0 1 0 0 11A5.5 5.5 0 0 0 6.5 1zm-4.5 5.5a4.5 4.5 0 1 1 9 0 4.5 4.5 0 0 1-9 0z" />
-                <path d="M4 6.5a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 0 1h-4a.5.5 0 0 1-.5-.5zm5.35 1.85a.5.5 0 0 1 .707 0l3.5 3.5a.5.5 0 0 1-.707.707l-3.5-3.5a.5.5 0 0 1 0-.707z" />
+                <path d="M1 1a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V1zm10 0a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1V1zM1 11a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1v-4zm10 0a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-4z" />
               </svg>
-            </button>
-            <button
-              class="btn btn-outline-secondary"
-              title="Ajuster à l'écran"
-              @click="networkGraphRef?.fitView()"
-            >
-              <svg
-                width="12"
-                height="12"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                viewBox="0 0 24 24"
-              >
-                <path d="M3 3h6M3 3v6M21 3h-6M21 3v6M3 21h6M3 21v-6M21 21h-6M21 21v-6" />
-              </svg>
-            </button>
-            <button
-              class="btn btn-outline-secondary"
-              title="Réinitialiser la disposition"
-              @click="handleResetLayout"
-            >
-              <svg
-                width="12"
-                height="12"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                viewBox="0 0 24 24"
-              >
-                <path d="M20 11a8.1 8.1 0 0 0-15.5-2m-.5-4v4h4" />
-                <path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4" />
-              </svg>
+              Cartes
             </button>
           </div>
         </div>
       </div>
 
-      <!-- Tabs -->
-      <ul class="nav nav-tabs px-3 mb-0">
+      <!-- Tabs: only in graph mode -->
+      <ul
+        v-if="viewMode === 'graph'"
+        class="nav nav-tabs px-3 mb-0"
+      >
         <li class="nav-item">
           <button
             class="nav-link"
@@ -322,75 +226,73 @@
         </li>
       </ul>
 
-      <div class="card-body network-topology-body">
-        <!-- Configuration tab -->
-        <NetworkTopologyConfig
-          v-if="networkTab === 'config'"
-          v-model:root-node-name="rootNodeName"
-          v-model:root-node-ip="rootNodeIp"
-          v-model:authelia-label="autheliaLabel"
-          v-model:authelia-ip="autheliaIp"
-          v-model:internet-label="internetLabel"
-          v-model:internet-ip="internetIp"
-          v-model:network-services="networkServices"
-          v-model:host-port-config="hostPortConfig"
-          :hosts="hosts"
-          :containers="containers"
-        />
+      <!-- Card body -->
+      <div class="network-card-body">
 
-        <!-- Topology tab -->
-        <template v-else>
-          <!-- Filters bar -->
-          <div class="graph-filters d-flex align-items-center gap-4 px-3 py-2 border-bottom flex-wrap">
-            <label class="form-check form-switch mb-0 d-flex align-items-center gap-2">
-              <input
-                v-model="filterInternetOnly"
-                type="checkbox"
-                class="form-check-input"
-              >
-              <span class="form-check-label small">Internet uniquement</span>
-            </label>
-            <label class="form-check form-switch mb-0 d-flex align-items-center gap-2">
-              <input
-                v-model="filterHideInternal"
-                type="checkbox"
-                class="form-check-input"
-                :disabled="filterInternetOnly"
-              >
+        <!-- ── GRAPH MODE ── -->
+        <template v-if="viewMode === 'graph'">
+
+          <!-- Configuration tab -->
+          <NetworkTopologyConfig
+            v-if="networkTab === 'config'"
+            v-model:root-node-name="rootNodeName"
+            v-model:root-node-ip="rootNodeIp"
+            v-model:authelia-label="autheliaLabel"
+            v-model:authelia-ip="autheliaIp"
+            v-model:internet-label="internetLabel"
+            v-model:internet-ip="internetIp"
+            v-model:network-services="networkServices"
+            v-model:host-port-config="hostPortConfig"
+            :hosts="hosts"
+            :containers="containers"
+          />
+
+          <!-- Topology tab -->
+          <template v-else>
+            <!-- Filters bar -->
+            <div class="graph-filters d-flex align-items-center gap-4 px-3 py-2 border-bottom flex-wrap">
+              <label class="form-check form-switch mb-0 d-flex align-items-center gap-2">
+                <input
+                  v-model="filterInternetOnly"
+                  type="checkbox"
+                  class="form-check-input"
+                >
+                <span class="form-check-label small">Internet uniquement</span>
+              </label>
+              <label class="form-check form-switch mb-0 d-flex align-items-center gap-2">
+                <input
+                  v-model="filterHideInternal"
+                  type="checkbox"
+                  class="form-check-input"
+                  :disabled="filterInternetOnly"
+                >
+                <span
+                  class="form-check-label small"
+                  :class="{ 'text-muted': filterInternetOnly }"
+                >
+                  Masquer les ports internes
+                </span>
+              </label>
               <span
-                class="form-check-label small"
-                :class="{ 'text-muted': filterInternetOnly }"
+                v-if="filterInternetOnly || filterHideInternal"
+                class="badge bg-blue-lt text-blue small"
               >
-                Masquer les ports internes
+                Filtre actif
               </span>
-            </label>
-            <span
-              v-if="filterInternetOnly || filterHideInternal"
-              class="badge bg-blue-lt text-blue small"
-            >
-              Filtre actif
-            </span>
-          </div>
+            </div>
 
-          <!-- Graph + detail panel layout -->
-          <div class="network-topology-graph-layout">
-            <div
-              ref="graphSurfaceRef"
-              class="network-graph-surface"
-              :style="{ height: graphHeight }"
-            >
-              <!-- Loading state -->
+            <!-- Graph: full width -->
+            <div class="network-graph-surface">
               <div
                 v-if="!topologyConfigLoaded"
-                class="graph-loading"
+                class="graph-state-overlay"
               >
                 <span class="spinner-border spinner-border-sm me-2" />
                 Chargement de la topologie…
               </div>
-              <!-- Empty state -->
               <div
                 v-else-if="hosts.length === 0"
-                class="graph-empty-state"
+                class="graph-state-overlay graph-state-empty"
               >
                 <svg
                   width="40"
@@ -410,7 +312,6 @@
                   Ajoute des hôtes ou configure ta topologie pour voir le diagramme.
                 </div>
               </div>
-              <!-- Graph -->
               <NetworkGraph
                 v-else
                 ref="networkGraphRef"
@@ -429,39 +330,39 @@
               />
             </div>
 
-            <!-- Draggable splitter -->
-            <div
-              class="graph-splitter"
-              title="Redimensionner"
-              @mousedown="onSplitterMouseDown"
-            />
-
-            <!-- Detail panel -->
-            <NetworkNodeDetail
-              :selected-node="selectedNode"
-              :hosts="hosts"
-              :containers="containers"
-              :host-port-overrides="hostPortOverrides"
-              :combined-services="combinedServices"
-              :discovered-ports-by-host="discoveredPortsByHost"
-              :style="{ flexBasis: detailPanelWidth + 'px', flexShrink: 0 }"
-            />
-          </div>
+            <!-- Detail panel: full width, below graph, dismissible -->
+            <Transition name="detail-slide">
+              <NetworkNodeDetail
+                v-if="selectedNode"
+                :selected-node="selectedNode"
+                :hosts="hosts"
+                :containers="containers"
+                :host-port-overrides="hostPortOverrides"
+                :combined-services="combinedServices"
+                :discovered-ports-by-host="discoveredPortsByHost"
+                @close="selectedNode = null"
+              />
+            </Transition>
+          </template>
         </template>
+
+        <!-- ── CARDS MODE ── -->
+        <div
+          v-else
+          class="p-3"
+        >
+          <NetworkPortList
+            :hosts="hosts"
+            :containers="containers"
+          />
+        </div>
       </div>
     </div>
-
-    <!-- ══════════════════ CARDS VIEW ══════════════════ -->
-    <NetworkPortList
-      v-if="viewMode === 'cards'"
-      :hosts="hosts"
-      :containers="containers"
-    />
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch, watchEffect, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useWebSocket } from '../composables/useWebSocket'
 import WsStatusBar from '../components/WsStatusBar.vue'
 import NetworkGraph from '../components/NetworkGraph.vue'
@@ -486,20 +387,12 @@ const hostPortConfig = ref([])
 const nodePositions = ref({})
 const topologyConfigLoaded = ref(false)
 const saveStatus = ref('idle') // 'idle' | 'saving' | 'saved' | 'error'
-const graphSurfaceRef = ref(null)
-const graphHeight = ref('auto')
 const selectedNode = ref(null)
 const networkGraphRef = ref(null)
 
 // Graph filters
 const filterInternetOnly = ref(false)
 const filterHideInternal = ref(false)
-
-// Detail panel resizing
-const detailPanelWidth = ref(300)
-let isDraggingSplitter = false
-let splitterStartX = 0
-let splitterStartWidth = 0
 
 // ─── Persist view mode ────────────────────────────────────────────────────
 watch(viewMode, (newMode) => {
@@ -578,35 +471,11 @@ async function saveTopologyConfig() {
   }
 }
 
-// ─── Layout reset (toolbar button) ────────────────────────────────────────
+// ─── Layout reset ─────────────────────────────────────────────────────────
 function handleResetLayout() {
   nodePositions.value = {}
-  nextTick(() => {
-    networkGraphRef.value?.resetLayout()
-    debouncedSave()
-  })
-}
-
-// ─── Splitter drag ─────────────────────────────────────────────────────────
-function onSplitterMouseDown(e) {
-  isDraggingSplitter = true
-  splitterStartX = e.clientX
-  splitterStartWidth = detailPanelWidth.value
-  document.addEventListener('mousemove', onSplitterMouseMove)
-  document.addEventListener('mouseup', onSplitterMouseUp)
-  e.preventDefault()
-}
-
-function onSplitterMouseMove(e) {
-  if (!isDraggingSplitter) return
-  const delta = splitterStartX - e.clientX // dragging left → panel grows
-  detailPanelWidth.value = Math.max(200, Math.min(560, splitterStartWidth + delta))
-}
-
-function onSplitterMouseUp() {
-  isDraggingSplitter = false
-  document.removeEventListener('mousemove', onSplitterMouseMove)
-  document.removeEventListener('mouseup', onSplitterMouseUp)
+  networkGraphRef.value?.resetLayout()
+  debouncedSave()
 }
 
 // ─── Computed: port discovery ──────────────────────────────────────────────
@@ -711,7 +580,6 @@ const graphHosts = computed(() => {
   }))
 })
 
-// ─── Filtered graph data ───────────────────────────────────────────────────
 const filteredGraphHosts = computed(() => {
   if (!filterInternetOnly.value && !filterHideInternal.value) return graphHosts.value
   return graphHosts.value.map(host => {
@@ -800,27 +668,6 @@ async function fetchSnapshot() {
   }
 }
 
-// ─── Graph surface auto-height ────────────────────────────────────────────
-let resizeObserver = null
-watchEffect(() => {
-  if (resizeObserver) {
-    resizeObserver.disconnect()
-    resizeObserver = null
-  }
-  if (graphSurfaceRef.value) {
-    resizeObserver = new ResizeObserver(() => {
-      requestAnimationFrame(() => {
-        const rect = graphSurfaceRef.value?.getBoundingClientRect()
-        if (rect) {
-          const availableHeight = window.innerHeight - rect.top - 20
-          graphHeight.value = Math.max(400, availableHeight) + 'px'
-        }
-      })
-    })
-    resizeObserver.observe(graphSurfaceRef.value)
-  }
-})
-
 // ─── WebSocket ────────────────────────────────────────────────────────────
 const { wsStatus, wsError, retryCount, reconnect } = useWebSocket('/api/v1/ws/network', (payload) => {
   if (payload.type !== 'network') return
@@ -859,11 +706,8 @@ onMounted(async () => {
   await fetchSnapshot()
 })
 
-onUnmounted(() => {
-  if (resizeObserver) resizeObserver.disconnect()
-  document.removeEventListener('mousemove', onSplitterMouseMove)
-  document.removeEventListener('mouseup', onSplitterMouseUp)
-})
+// expose for toolbar reset button (used nowhere else now — kept for NetworkGraph ref)
+defineExpose({ handleResetLayout })
 </script>
 
 <style scoped>
@@ -871,99 +715,75 @@ onUnmounted(() => {
   overflow: hidden;
 }
 
-/* De-emphasized context KPI cards */
-.kpi-context {
-  opacity: 0.75;
+.network-card-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 /* Filter bar */
 .graph-filters {
   background: rgba(15, 23, 42, 0.3);
   font-size: 13px;
+  flex-shrink: 0;
 }
 
-.network-topology-body {
-  height: auto;
-  min-height: 600px;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-.network-topology-graph-layout {
-  display: flex;
-  flex: 1;
-  min-height: 0;
-  align-items: stretch;
-}
-
+/* Graph canvas: full width, CSS-driven height */
 .network-graph-surface {
-  flex: 1 1 auto;
-  min-width: 0;
-  min-height: 400px;
-  padding: 16px 18px 18px;
+  position: relative;
+  width: 100%;
+  height: calc(100vh - 380px);
+  min-height: 480px;
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
-  overflow-x: hidden;
-  position: relative;
 }
 
-/* Loading / empty state overlays */
-.graph-loading,
-.graph-empty-state {
+/* Loading / empty overlays */
+.graph-state-overlay {
+  position: absolute;
+  inset: 0;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  flex: 1;
+  font-size: 14px;
+  color: #64748b;
+  z-index: 2;
+}
+
+.graph-state-empty {
+  flex-direction: column;
   text-align: center;
   padding: 40px 24px;
-  color: #64748b;
-  min-height: 300px;
 }
 
-.graph-loading {
-  flex-direction: row;
-  font-size: 14px;
-}
-
-.graph-empty-state .fw-semibold {
+.graph-state-empty .fw-semibold {
   color: #94a3b8;
   font-size: 16px;
 }
 
-/* Draggable splitter */
-.graph-splitter {
-  width: 5px;
-  cursor: col-resize;
-  background: rgba(148, 163, 184, 0.1);
-  border-left: 1px solid rgba(148, 163, 184, 0.15);
-  border-right: 1px solid rgba(148, 163, 184, 0.15);
-  flex-shrink: 0;
-  transition: background 0.15s;
+/* Detail panel slide-in transition */
+.detail-slide-enter-active,
+.detail-slide-leave-active {
+  transition: max-height 0.25s ease, opacity 0.2s ease;
+  overflow: hidden;
 }
 
-.graph-splitter:hover {
-  background: rgba(96, 165, 250, 0.25);
+.detail-slide-enter-from,
+.detail-slide-leave-to {
+  max-height: 0;
+  opacity: 0;
+}
+
+.detail-slide-enter-to,
+.detail-slide-leave-from {
+  max-height: 320px;
+  opacity: 1;
 }
 
 @media (max-width: 991px) {
-  .network-topology-body {
-    min-height: 420px;
-  }
-
-  .network-topology-graph-layout {
-    flex-direction: column;
-  }
-
   .network-graph-surface {
     height: 52vh;
-    flex: none;
-  }
-
-  .graph-splitter {
-    display: none;
+    min-height: 360px;
   }
 }
 </style>

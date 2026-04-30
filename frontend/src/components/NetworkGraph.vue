@@ -50,22 +50,35 @@
     </div>
 
     <!-- Controls -->
-    <div class="graph-controls btn-group-vertical">
+    <div class="graph-controls">
       <button
         class="btn btn-sm btn-outline-secondary graph-btn"
-        title="Réinitialiser la disposition"
-        @click="resetLayout"
+        title="Zoom +"
+        @click="zoomIn"
       >
         <svg
           width="14"
           height="14"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          viewBox="0 0 24 24"
+          fill="currentColor"
+          viewBox="0 0 16 16"
         >
-          <path d="M20 11a8.1 8.1 0 0 0-15.5-2m-.5-4v4h4" />
-          <path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4" />
+          <path d="M6.5 1a5.5 5.5 0 1 0 0 11A5.5 5.5 0 0 0 6.5 1zm-4.5 5.5a4.5 4.5 0 1 1 9 0 4.5 4.5 0 0 1-9 0z" />
+          <path d="M6.5 3.5a.5.5 0 0 1 .5.5V6h2a.5.5 0 0 1 0 1H7v2a.5.5 0 0 1-1 0V7H4a.5.5 0 0 1 0-1h2V4a.5.5 0 0 1 .5-.5zm5.35 4.85a.5.5 0 0 1 .707 0l3.5 3.5a.5.5 0 0 1-.707.707l-3.5-3.5a.5.5 0 0 1 0-.707z" />
+        </svg>
+      </button>
+      <button
+        class="btn btn-sm btn-outline-secondary graph-btn"
+        title="Zoom −"
+        @click="zoomOut"
+      >
+        <svg
+          width="14"
+          height="14"
+          fill="currentColor"
+          viewBox="0 0 16 16"
+        >
+          <path d="M6.5 1a5.5 5.5 0 1 0 0 11A5.5 5.5 0 0 0 6.5 1zm-4.5 5.5a4.5 4.5 0 1 1 9 0 4.5 4.5 0 0 1-9 0z" />
+          <path d="M4 6.5a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 0 1h-4a.5.5 0 0 1-.5-.5zm5.35 1.85a.5.5 0 0 1 .707 0l3.5 3.5a.5.5 0 0 1-.707.707l-3.5-3.5a.5.5 0 0 1 0-.707z" />
         </svg>
       </button>
       <button
@@ -82,6 +95,23 @@
           viewBox="0 0 24 24"
         >
           <path d="M3 3h6M3 3v6M21 3h-6M21 3v6M3 21h6M3 21v-6M21 21h-6M21 21v-6" />
+        </svg>
+      </button>
+      <button
+        class="btn btn-sm btn-outline-secondary graph-btn"
+        title="Réinitialiser la disposition"
+        @click="resetLayout"
+      >
+        <svg
+          width="14"
+          height="14"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          viewBox="0 0 24 24"
+        >
+          <path d="M20 11a8.1 8.1 0 0 0-15.5-2m-.5-4v4h4" />
+          <path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4" />
         </svg>
       </button>
     </div>
@@ -878,7 +908,7 @@ watch(
   right: 16px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   z-index: 2;
 }
 

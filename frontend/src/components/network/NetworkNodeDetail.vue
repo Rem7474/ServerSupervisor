@@ -1,357 +1,258 @@
 <template>
-  <aside class="network-node-detail">
-    <!-- Mobile header -->
-    <div class="detail-mobile-header d-flex d-lg-none align-items-center gap-2 px-3 py-2 border-bottom">
-      <svg
-        width="14"
-        height="14"
-        fill="currentColor"
-        viewBox="0 0 16 16"
-      >
-        <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z" />
-        <path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533L8.93 6.588zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0z" />
-      </svg>
-      <span class="text-secondary small fw-semibold">Détails du nœud sélectionné</span>
+  <div class="network-node-detail">
+    <!-- Header bar -->
+    <div class="detail-header">
+      <div class="d-flex align-items-center gap-2">
+        <span :class="typeTagClass">{{ nodeTypeLabel }}</span>
+        <span class="fw-semibold text-light">{{ selectedNode?.label || '—' }}</span>
+        <span
+          v-if="selectedNode?.sublabel && selectedNode?.type !== 'service'"
+          class="text-secondary small"
+        >{{ selectedNode.sublabel }}</span>
+      </div>
+      <button
+        class="btn-close btn-close-white btn-close-sm"
+        aria-label="Fermer"
+        @click="emit('close')"
+      />
     </div>
 
-    <div class="detail-scroll">
+    <!-- Grid of sections -->
+    <div class="detail-grid">
+
+      <!-- Rôle réseau (host) -->
       <div
-        v-if="!selectedNode"
-        class="detail-empty"
+        v-if="selectedNode?.type === 'host'"
+        class="detail-section"
       >
-        <svg
-          width="36"
-          height="36"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.2"
-          viewBox="0 0 24 24"
-          class="mb-3"
-        >
-          <circle
-            cx="12"
-            cy="12"
-            r="3"
-          /><path d="M12 3v2m0 14v2M3 12h2m14 0h2m-3.22-6.78-1.42 1.42M6.64 17.36l-1.42 1.42m0-12.78 1.42 1.42m10.72 10.72 1.42 1.42" />
-        </svg>
-        <div class="text-secondary small">
-          Cliquez sur un nœud du graphe<br>pour afficher ses détails.
+        <div class="detail-section-title">
+          Rôle réseau
+        </div>
+        <div class="detail-kv">
+          <span class="detail-key">Statut</span>
+          <span :class="statusBadgeClass">
+            <span class="status-dot status-dot-animated" />
+            {{ hostData?.status || 'unknown' }}
+          </span>
+        </div>
+        <div class="detail-kv">
+          <span class="detail-key">Trafic</span>
+          <span class="detail-val small">↓ {{ formatBytes(hostData?.network_rx_bytes || 0) }} / ↑ {{ formatBytes(hostData?.network_tx_bytes || 0) }}</span>
+        </div>
+        <div class="detail-kv">
+          <span class="detail-key">Conteneurs</span>
+          <span class="detail-val">{{ hostContainers.length }} <span class="text-secondary">({{ hostContainers.filter(c => c.state === 'running').length }} actifs)</span></span>
         </div>
       </div>
 
-      <template v-else>
-        <!-- ─── Identification ─────────────────────────────────── -->
-        <section class="detail-section">
-          <div class="detail-section-title">
-            Identification
-          </div>
-          <div class="detail-kv">
-            <span class="detail-key">Nom</span>
-            <span class="detail-val fw-semibold">{{ selectedNode.label || '-' }}</span>
-          </div>
-          <div
-            v-if="selectedNode.sublabel && selectedNode.type !== 'service'"
-            class="detail-kv"
+      <!-- Port node details -->
+      <div
+        v-if="selectedNode?.type === 'port'"
+        class="detail-section"
+      >
+        <div class="detail-section-title">
+          Port
+        </div>
+        <div class="detail-kv">
+          <span class="detail-key">Numéro</span>
+          <span class="detail-val fw-semibold">{{ selectedNode.portNumber }}/{{ (selectedNode.protocol || '').toUpperCase() }}</span>
+        </div>
+        <div
+          v-if="selectedNode.containers?.length"
+          class="detail-kv"
+        >
+          <span class="detail-key">Conteneurs</span>
+          <span class="detail-val small">{{ selectedNode.containers.join(', ') }}</span>
+        </div>
+      </div>
+
+      <!-- Service node details -->
+      <div
+        v-if="selectedNode?.type === 'service'"
+        class="detail-section"
+      >
+        <div class="detail-section-title">
+          Service
+        </div>
+        <div class="detail-kv">
+          <span class="detail-key">Port interne</span>
+          <span class="detail-val fw-semibold">{{ selectedNode.internalPort || '-' }}</span>
+        </div>
+        <div
+          v-if="selectedNode.externalPort"
+          class="detail-kv"
+        >
+          <span class="detail-key">Port externe</span>
+          <span class="detail-val">{{ selectedNode.externalPort }}</span>
+        </div>
+        <div
+          v-if="serviceUrl"
+          class="detail-kv"
+        >
+          <span class="detail-key">URL</span>
+          <a
+            :href="serviceUrl"
+            target="_blank"
+            rel="noopener"
+            class="detail-val small text-blue"
+            style="word-break:break-all"
+          >{{ serviceUrl }}</a>
+        </div>
+      </div>
+
+      <!-- Intégration (service / port) -->
+      <div
+        v-if="['service', 'port'].includes(selectedNode?.type)"
+        class="detail-section"
+      >
+        <div class="detail-section-title">
+          Intégration
+        </div>
+        <div class="detail-kv">
+          <span class="detail-key">Reverse proxy</span>
+          <span
+            v-if="selectedNode.isProxyLinked"
+            class="badge bg-blue-lt text-blue"
+          >Oui</span>
+          <span
+            v-else
+            class="text-secondary small"
+          >Non</span>
+        </div>
+        <div class="detail-kv">
+          <span class="detail-key">Authelia</span>
+          <span
+            v-if="selectedNode.isAutheliaLinked"
+            class="badge bg-purple-lt text-purple"
+          >Oui</span>
+          <span
+            v-else
+            class="text-secondary small"
+          >Non</span>
+        </div>
+        <div class="detail-kv">
+          <span class="detail-key">Internet</span>
+          <span
+            v-if="selectedNode.isInternetExposed"
+            class="badge bg-orange-lt text-orange"
           >
-            <span class="detail-key">Adresse</span>
-            <span class="detail-val text-secondary">{{ selectedNode.sublabel }}</span>
-          </div>
-          <div class="detail-kv">
-            <span class="detail-key">Type</span>
-            <span :class="typeTagClass">{{ nodeTypeLabel }}</span>
-          </div>
-        </section>
+            Exposé{{ selectedNode.externalPort ? ' (port ' + selectedNode.externalPort + ')' : '' }}
+          </span>
+          <span
+            v-else
+            class="text-secondary small"
+          >Non exposé</span>
+        </div>
+      </div>
 
-        <!-- ─── Rôle réseau (host) ─────────────────────────────── -->
-        <section
-          v-if="selectedNode.type === 'host'"
-          class="detail-section"
-        >
-          <div class="detail-section-title">
-            Rôle réseau
-          </div>
-          <div class="detail-kv">
-            <span class="detail-key">Statut</span>
-            <span :class="statusBadgeClass">
-              <span class="status-dot status-dot-animated" />
-              <span :data-translation-id="(hostData?.status || props.selectedNode?.status) === 'online' ? 'online' : (hostData?.status || props.selectedNode?.status) === 'offline' ? 'offline' : 'unknown'">{{ hostData?.status || 'unknown' }}</span>
-            </span>
-          </div>
-          <div class="detail-kv">
-            <span class="detail-key">Trafic cumul.</span>
-            <span class="detail-val small">↓ {{ formatBytes(hostData?.network_rx_bytes || 0) }} / ↑ {{ formatBytes(hostData?.network_tx_bytes || 0) }}</span>
-          </div>
-          <div class="detail-kv">
-            <span class="detail-key">Conteneurs</span>
-            <span class="detail-val">{{ hostContainers.length }} <span class="text-secondary">({{ hostContainers.filter(c => c.state === 'running').length }} actifs)</span></span>
-          </div>
-        </section>
-
-        <!-- ─── Ports & services exposés (host) ───────────────── -->
-        <section
-          v-if="selectedNode.type === 'host'"
-          class="detail-section"
-        >
-          <div class="detail-section-title">
-            Ports & services exposés
-          </div>
-
-          <!-- Logical services -->
-          <div
+      <!-- Ports & services (host) -->
+      <div
+        v-if="selectedNode?.type === 'host' && (hostServices.length > 0 || allHostPorts.length > 0)"
+        class="detail-section detail-section-wide"
+      >
+        <div class="detail-section-title">
+          Ports &amp; services exposés
+        </div>
+        <div class="port-chips">
+          <span
             v-for="svc in hostServices"
             :key="svc.id"
-            class="port-entry port-entry-service"
+            class="port-chip port-chip-service"
+            :title="svc.domain ? `https://${svc.domain}${svc.path || '/'}` : `Port ${svc.internalPort}`"
           >
-            <div class="port-entry-head">
-              <span class="fw-semibold">{{ svc.name }}</span>
-              <div class="port-badges">
-                <span class="badge bg-cyan-lt text-cyan">service</span>
-                <span
-                  v-if="svc.linkToProxy"
-                  class="badge bg-blue-lt text-blue"
-                  title="Via reverse proxy"
-                >proxy</span>
-                <span
-                  v-if="svc.linkToAuthelia"
-                  class="badge bg-purple-lt text-purple"
-                  title="Protégé par Authelia"
-                >auth</span>
-                <span
-                  v-if="svc.exposedToInternet"
-                  class="badge bg-orange-lt text-orange"
-                  title="Exposé à Internet"
-                >inet</span>
-              </div>
-            </div>
-            <div class="port-entry-sub text-secondary">
-              Port {{ svc.internalPort }}
-              <template v-if="svc.domain">
-                •
-                <a
-                  :href="`https://${svc.domain}${svc.path || '/'}`"
-                  target="_blank"
-                  rel="noopener"
-                  class="text-blue"
-                >{{ svc.domain }}{{ svc.path || '/' }}</a>
-              </template>
-            </div>
-            <div
-              v-if="svc.domain"
-              class="port-entry-actions"
-            >
-              <a
-                :href="`https://${svc.domain}${svc.path || '/'}`"
-                target="_blank"
-                rel="noopener"
-                class="btn btn-xs btn-outline-primary"
-              >Ouvrir</a>
-              <button
-                class="btn btn-xs btn-outline-secondary"
-                @click="copyUrl(`https://${svc.domain}${svc.path || '/'}`)"
-              >
-                Copier l'URL
-              </button>
-            </div>
-          </div>
-
-          <!-- Raw ports (excluding service-covered ones) -->
-          <div
+            <span class="fw-semibold">{{ svc.name }}</span>
+            <span class="text-secondary ms-1">:{{ svc.internalPort }}</span>
+            <span
+              v-if="svc.linkToProxy"
+              class="badge bg-blue-lt text-blue ms-1"
+            >proxy</span>
+            <span
+              v-if="svc.linkToAuthelia"
+              class="badge bg-purple-lt text-purple ms-1"
+            >auth</span>
+            <span
+              v-if="svc.exposedToInternet"
+              class="badge bg-orange-lt text-orange ms-1"
+            >inet</span>
+          </span>
+          <span
             v-for="p in allHostPorts"
             :key="p.key"
-            class="port-entry"
-            :class="{ 'port-entry-disabled': !p.enabled }"
+            class="port-chip"
+            :class="{ 'port-chip-disabled': !p.enabled }"
           >
-            <div class="port-entry-head">
+            <span :class="{ 'text-secondary': !p.enabled }">{{ p.name || (p.port + '/' + p.protocol.toUpperCase()) }}</span>
+            <span
+              v-if="p.name"
+              class="text-secondary ms-1"
+            >:{{ p.port }}</span>
+            <span
+              v-if="!p.enabled"
+              class="badge bg-secondary-lt text-secondary ms-1"
+            >off</span>
+            <template v-else>
               <span
-                class="fw-medium"
-                :class="{ 'text-secondary': !p.enabled }"
-              >
-                {{ p.name || p.port + '/' + p.protocol.toUpperCase() }}
-              </span>
-              <div class="port-badges">
-                <span
-                  v-if="!p.enabled"
-                  class="badge bg-secondary-lt text-secondary"
-                >désactivé</span>
-                <template v-else>
-                  <span
-                    v-if="p.isProxyLinked"
-                    class="badge bg-blue-lt text-blue"
-                  >proxy</span>
-                  <span
-                    v-if="p.isAutheliaLinked"
-                    class="badge bg-purple-lt text-purple"
-                  >auth</span>
-                  <span
-                    v-if="p.isInternetExposed"
-                    class="badge bg-orange-lt text-orange"
-                  >inet</span>
-                </template>
-              </div>
-            </div>
-            <div class="port-entry-sub text-secondary">
-              {{ p.port }}/{{ p.protocol.toUpperCase() }}
-              <template v-if="p.containers?.length">
-                • {{ p.containers.join(', ') }}
-              </template>
-            </div>
-          </div>
+                v-if="p.isProxyLinked"
+                class="badge bg-blue-lt text-blue ms-1"
+              >proxy</span>
+              <span
+                v-if="p.isAutheliaLinked"
+                class="badge bg-purple-lt text-purple ms-1"
+              >auth</span>
+              <span
+                v-if="p.isInternetExposed"
+                class="badge bg-orange-lt text-orange ms-1"
+              >inet</span>
+            </template>
+          </span>
+        </div>
+      </div>
 
-          <div
-            v-if="hostServices.length === 0 && allHostPorts.length === 0"
-            class="text-secondary small py-2"
-          >
-            Aucun port exposé détecté.
-          </div>
-        </section>
-
-        <!-- ─── Service node details ───────────────────────────── -->
-        <section
-          v-if="selectedNode.type === 'service'"
-          class="detail-section"
+      <!-- Actions -->
+      <div class="detail-section detail-actions">
+        <div class="detail-section-title">
+          Actions
+        </div>
+        <router-link
+          v-if="selectedNode?.type === 'host' && selectedNode.hostId"
+          :to="`/hosts/${selectedNode.hostId}`"
+          class="btn btn-sm btn-outline-primary"
         >
-          <div class="detail-section-title">
-            Ports & services
-          </div>
-          <div class="detail-kv">
-            <span class="detail-key">Port interne</span>
-            <span class="detail-val fw-semibold">{{ selectedNode.internalPort || '-' }}</span>
-          </div>
-          <div
-            v-if="selectedNode.externalPort"
-            class="detail-kv"
+          <svg
+            width="14"
+            height="14"
+            fill="currentColor"
+            viewBox="0 0 16 16"
+            class="me-1"
           >
-            <span class="detail-key">Port externe</span>
-            <span class="detail-val">{{ selectedNode.externalPort }}</span>
-          </div>
-          <div
-            v-if="serviceUrl"
-            class="detail-kv"
-          >
-            <span class="detail-key">URL</span>
-            <a
-              :href="serviceUrl"
-              target="_blank"
-              rel="noopener"
-              class="detail-val small text-blue"
-              style="word-break:break-all"
-            >{{ serviceUrl }}</a>
-          </div>
-        </section>
-
-        <!-- ─── Port node details ──────────────────────────────── -->
-        <section
-          v-if="selectedNode.type === 'port'"
-          class="detail-section"
+            <path d="M6.5 14.5v-3.505c0-.245.25-.495.5-.495h2c.25 0 .5.25.5.5v3.5a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 .5-.5v-7a.5.5 0 0 0-.146-.354L13 5.793V2.5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1.293L8.354 1.146a.5.5 0 0 0-.708 0l-6 6A.5.5 0 0 0 1.5 7.5v7a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 .5-.5z" />
+          </svg>
+          Ouvrir l'hôte
+        </router-link>
+        <router-link
+          v-if="selectedNode?.type !== 'host' && selectedNode?.hostId"
+          :to="`/hosts/${selectedNode.hostId}`"
+          class="btn btn-sm btn-outline-secondary"
         >
-          <div class="detail-section-title">
-            Port
-          </div>
-          <div class="detail-kv">
-            <span class="detail-key">Numéro</span>
-            <span class="detail-val fw-semibold">{{ selectedNode.portNumber }}/{{ (selectedNode.protocol || '').toUpperCase() }}</span>
-          </div>
-          <div
-            v-if="selectedNode.containers?.length"
-            class="detail-kv"
+          Voir l'hôte associé
+        </router-link>
+        <template v-if="selectedNode?.type === 'service' && serviceUrl">
+          <a
+            :href="serviceUrl"
+            target="_blank"
+            rel="noopener"
+            class="btn btn-sm btn-outline-primary"
+          >Ouvrir dans le navigateur</a>
+          <button
+            class="btn btn-sm btn-outline-secondary"
+            @click="copyUrl(serviceUrl)"
           >
-            <span class="detail-key">Conteneurs</span>
-            <span class="detail-val small">{{ selectedNode.containers.join(', ') }}</span>
-          </div>
-        </section>
-
-        <!-- ─── Intégration ───────────────────────────────────── -->
-        <section
-          v-if="['service', 'port'].includes(selectedNode.type)"
-          class="detail-section"
-        >
-          <div class="detail-section-title">
-            Intégration
-          </div>
-          <div class="detail-kv">
-            <span class="detail-key">Reverse proxy</span>
-            <span
-              v-if="selectedNode.isProxyLinked"
-              class="badge bg-blue-lt text-blue"
-            >Oui</span>
-            <span
-              v-else
-              class="text-secondary small"
-            >Non</span>
-          </div>
-          <div class="detail-kv">
-            <span class="detail-key">Authelia</span>
-            <span
-              v-if="selectedNode.isAutheliaLinked"
-              class="badge bg-purple-lt text-purple"
-            >Oui</span>
-            <span
-              v-else
-              class="text-secondary small"
-            >Non</span>
-          </div>
-          <div class="detail-kv">
-            <span class="detail-key">Internet</span>
-            <span
-              v-if="selectedNode.isInternetExposed"
-              class="badge bg-orange-lt text-orange"
-            >
-              Exposé{{ selectedNode.externalPort ? ' (port ' + selectedNode.externalPort + ')' : '' }}
-            </span>
-            <span
-              v-else
-              class="text-secondary small"
-            >Non exposé</span>
-          </div>
-        </section>
-
-        <!-- ─── Actions ───────────────────────────────────────── -->
-        <section class="detail-section detail-actions">
-          <router-link
-            v-if="selectedNode.type === 'host' && selectedNode.hostId"
-            :to="`/hosts/${selectedNode.hostId}`"
-            class="btn btn-sm btn-outline-primary w-100"
-          >
-            <svg
-              width="14"
-              height="14"
-              fill="currentColor"
-              viewBox="0 0 16 16"
-              class="me-1"
-            >
-              <path d="M6.5 14.5v-3.505c0-.245.25-.495.5-.495h2c.25 0 .5.25.5.5v3.5a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 .5-.5v-7a.5.5 0 0 0-.146-.354L13 5.793V2.5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1.293L8.354 1.146a.5.5 0 0 0-.708 0l-6 6A.5.5 0 0 0 1.5 7.5v7a.5.5 0 0 0 .5.5h4a.5.5 0 0 0 .5-.5z" />
-            </svg>
-            Ouvrir l'hôte
-          </router-link>
-
-          <router-link
-            v-if="selectedNode.type !== 'host' && selectedNode.hostId"
-            :to="`/hosts/${selectedNode.hostId}`"
-            class="btn btn-sm btn-outline-secondary w-100"
-          >
-            Voir l'hôte associé
-          </router-link>
-
-          <template v-if="selectedNode.type === 'service' && serviceUrl">
-            <a
-              :href="serviceUrl"
-              target="_blank"
-              rel="noopener"
-              class="btn btn-sm btn-outline-primary w-100"
-            >
-              Ouvrir dans le navigateur
-            </a>
-            <button
-              class="btn btn-sm btn-outline-secondary w-100"
-              @click="copyUrl(serviceUrl)"
-            >
-              Copier l'URL
-            </button>
-          </template>
-        </section>
-      </template>
+            Copier l'URL
+          </button>
+        </template>
+      </div>
     </div>
-  </aside>
+  </div>
 </template>
 
 <script setup>
@@ -365,6 +266,8 @@ const props = defineProps({
   combinedServices: { type: Array, default: () => [] },
   discoveredPortsByHost: { type: Object, default: () => ({}) },
 })
+
+const emit = defineEmits(['close'])
 
 const hostData = computed(() => props.hosts.find(h => h.id === props.selectedNode?.hostId) || null)
 const hostContainers = computed(() => props.containers.filter(c => c.host_id === props.selectedNode?.hostId))
@@ -424,7 +327,7 @@ const nodeTypeLabel = computed(() => {
   const map = {
     root: 'Reverse proxy',
     host: 'Hôte',
-    service: 'Service logique',
+    service: 'Service',
     port: 'Port',
     authelia: 'Authelia',
     internet: 'Internet',
@@ -468,49 +371,46 @@ function copyUrl(url) {
 
 <style scoped>
 .network-node-detail {
-  width: 300px;
-  min-width: 240px;
+  border-top: 1px solid rgba(148, 163, 184, 0.2);
+  background: rgba(10, 15, 30, 0.5);
+}
+
+/* Header bar */
+.detail-header {
   display: flex;
-  flex-direction: column;
-  background: rgba(10, 15, 30, 0.35);
-  border-left: 1px solid rgba(148, 163, 184, 0.15);
-  align-self: stretch;
-  overflow: hidden;
-  flex-shrink: 0;
-}
-
-.detail-mobile-header {
-  background: rgba(15, 23, 42, 0.5);
-  font-size: 12px;
-  flex-shrink: 0;
-}
-
-.detail-scroll {
-  flex: 1;
-  overflow-y: auto;
-  padding: 14px 12px;
-}
-
-.detail-empty {
-  display: flex;
-  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  text-align: center;
-  padding: 40px 16px;
-  color: #475569;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+  background: rgba(15, 23, 42, 0.5);
+  gap: 8px;
+}
+
+/* Grid of info sections */
+.detail-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
 }
 
 .detail-section {
-  margin-bottom: 14px;
-  padding-bottom: 14px;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+  padding: 12px 16px;
+  border-right: 1px solid rgba(148, 163, 184, 0.1);
+  min-width: 180px;
+  flex: 0 0 auto;
 }
 
-.detail-section:last-child {
-  border-bottom: none;
-  margin-bottom: 0;
-  padding-bottom: 0;
+.detail-section-wide {
+  flex: 1 1 260px;
+}
+
+.detail-actions {
+  margin-left: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  border-right: none;
+  min-width: 160px;
 }
 
 .detail-section-title {
@@ -525,8 +425,8 @@ function copyUrl(url) {
 .detail-kv {
   display: flex;
   align-items: baseline;
-  gap: 8px;
-  margin-bottom: 5px;
+  gap: 6px;
+  margin-bottom: 4px;
   font-size: 13px;
 }
 
@@ -534,7 +434,7 @@ function copyUrl(url) {
   color: #64748b;
   font-size: 12px;
   flex-shrink: 0;
-  min-width: 88px;
+  min-width: 80px;
 }
 
 .detail-val {
@@ -542,67 +442,45 @@ function copyUrl(url) {
   word-break: break-word;
 }
 
-.port-entry {
-  padding: 7px 9px;
-  border-radius: 7px;
-  background: rgba(15, 23, 42, 0.45);
-  border: 1px solid rgba(148, 163, 184, 0.12);
-  margin-bottom: 5px;
-}
-
-.port-entry-service {
-  border-color: rgba(34, 211, 238, 0.2);
-  background: rgba(34, 211, 238, 0.04);
-}
-
-.port-entry-disabled {
-  opacity: 0.5;
-}
-
-.port-entry-head {
+/* Port chips (compact display for host ports) */
+.port-chips {
   display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.port-chip {
+  display: inline-flex;
   align-items: center;
-  gap: 5px;
-  flex-wrap: wrap;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.15);
   font-size: 12px;
+  color: #e2e8f0;
 }
 
-.port-badges {
-  display: flex;
-  gap: 3px;
-  flex-wrap: wrap;
-  margin-left: auto;
+.port-chip-service {
+  border-color: rgba(34, 211, 238, 0.25);
+  background: rgba(34, 211, 238, 0.06);
 }
 
-.port-entry-sub {
-  font-size: 11px;
-  margin-top: 3px;
+.port-chip-disabled {
+  opacity: 0.45;
 }
 
-.port-entry-actions {
-  display: flex;
-  gap: 5px;
-  margin-top: 6px;
-}
+@media (max-width: 767px) {
+  .detail-grid {
+    flex-direction: column;
+  }
 
-.detail-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
+  .detail-section {
+    border-right: none;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+  }
 
-.btn-xs {
-  padding: 2px 8px;
-  font-size: 11px;
-  border-radius: 4px;
-}
-
-@media (max-width: 991px) {
-  .network-node-detail {
-    width: 100%;
-    min-width: 0;
-    border-left: none;
-    border-top: 1px solid rgba(148, 163, 184, 0.15);
+  .detail-actions {
+    margin-left: 0;
   }
 }
 </style>
