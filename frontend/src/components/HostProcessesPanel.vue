@@ -171,7 +171,7 @@ const error = ref('')
 const processFilter = ref('')
 const sortKey = ref('cpu_pct')
 const sortDir = ref(-1)
-const STREAM_TIMEOUT_MS = 20000
+const STREAM_TIMEOUT_MS = 60000
 const { collectCommandOutput } = useCommandStream({ token: () => auth.token })
 
 const filteredProcesses = computed(() => {

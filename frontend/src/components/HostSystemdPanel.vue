@@ -148,7 +148,7 @@ const services = ref([])
 const loading = ref(false)
 const error = ref('')
 const filter = useLocalStorage(`host-systemd-filter:${props.hostId}`, 'active')
-const STREAM_TIMEOUT_MS = 20000
+const STREAM_TIMEOUT_MS = 60000
 const { collectCommandOutput } = useCommandStream({ token: () => auth.token })
 
 const filteredServices = computed(() => {

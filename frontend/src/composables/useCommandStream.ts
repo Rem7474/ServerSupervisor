@@ -185,7 +185,7 @@ export function useCommandStream({ token }: { token: TokenSource }): UseCommandS
       })
 
       timeoutId = window.setTimeout(() => {
-        finishReject(new Error('Timeout'))
+        finishReject(new Error("Timeout : l'agent n'a pas répondu dans le délai imparti (hôte hors-ligne ou surchargé ?)"))
       }, timeoutMs)
     })
   }
