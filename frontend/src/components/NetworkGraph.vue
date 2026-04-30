@@ -37,15 +37,22 @@
         v-if="hasAutheliaTargets"
         class="legend-item"
       >
+        <span class="legend-dash proxy-authelia-dash" />
+        Proxy → {{ autheliaLabel || 'Authelia' }}
+      </div>
+      <div
+        v-if="hasAutheliaTargets"
+        class="legend-item"
+      >
         <span class="legend-dash authelia-dash" />
-        {{ autheliaLabel || 'Authelia' }}
+        {{ autheliaLabel || 'Authelia' }} → service
       </div>
       <div
         v-if="hasInternetTargets"
         class="legend-item"
       >
-        <span class="legend-dash internet-dash" />
-        {{ internetLabel || 'Internet' }}
+        <span class="legend-dash internet-proxy-dash" />
+        Internet → Proxy
       </div>
     </div>
 
@@ -201,6 +208,9 @@ function buildElements() {
     servicesByHost.get(svc.hostId).push(svc)
   }
 
+  // Collect external ports exposed via proxy (for the single aggregated internet→proxy edge)
+  const internetViaProxyPorts = []
+
   // === Host nodes (compound parents) ===
   for (const host of props.data) {
     const hostStatus = host.status || 'unknown'
@@ -265,16 +275,18 @@ function buildElements() {
         }
       })
 
-      // Proxy edge
-      if (isProxyLinked) {
+      // proxy → service (direct, only when not going through Authelia)
+      if (isProxyLinked && !isAutheliaLinked) {
         elements.push({ group: 'edges', data: { id: `e-proxy-${nodeId}`, source: 'root', target: nodeId, edgeType: 'proxy' } })
       }
-      // Authelia edge
+      // authelia → service (Authelia routes to the service)
       if (isAutheliaLinked) {
         elements.push({ group: 'edges', data: { id: `e-auth-${nodeId}`, source: 'authelia', target: nodeId, edgeType: 'authelia' } })
       }
-      // Internet edge
-      if (isInternetExposed) {
+      // internet routing: via proxy (aggregated) or direct
+      if (isInternetExposed && isProxyLinked) {
+        internetViaProxyPorts.push(externalPort || portNumber)
+      } else if (isInternetExposed && !isProxyLinked) {
         elements.push({ group: 'edges', data: { id: `e-inet-${nodeId}`, source: 'internet', target: nodeId, edgeType: 'internet', externalPort } })
       }
     }
@@ -305,38 +317,57 @@ function buildElements() {
         }
       })
 
-      if (svc.linkToProxy) {
+      // proxy → service (direct, only when not going through Authelia)
+      if (svc.linkToProxy && !svc.linkToAuthelia) {
         elements.push({ group: 'edges', data: { id: `e-proxy-${nodeId}`, source: 'root', target: nodeId, edgeType: 'proxy' } })
       }
+      // authelia → service
       if (svc.linkToAuthelia) {
         elements.push({ group: 'edges', data: { id: `e-auth-${nodeId}`, source: 'authelia', target: nodeId, edgeType: 'authelia' } })
       }
-      if (svc.exposedToInternet) {
+      // internet routing: via proxy (aggregated) or direct
+      if (svc.exposedToInternet && svc.linkToProxy) {
+        internetViaProxyPorts.push(svc.externalPort || 443)
+      } else if (svc.exposedToInternet && !svc.linkToProxy) {
         elements.push({ group: 'edges', data: { id: `e-inet-${nodeId}`, source: 'internet', target: nodeId, edgeType: 'internet', externalPort: svc.externalPort } })
       }
     }
   }
 
-  // === Authelia node (only if there are linked targets) ===
+  // === Authelia node + proxy→authelia shared edge ===
   const needsAuthelia = elements.some(e => e.group === 'edges' && e.data.edgeType === 'authelia')
   if (needsAuthelia && props.autheliaLabel) {
     elements.push({
       group: 'nodes',
       data: { id: 'authelia', label: props.autheliaLabel || 'Authelia', sublabel: props.autheliaIp || '', type: 'authelia' }
     })
+    // Single proxy→authelia edge representing the auth-check chain
+    elements.push({
+      group: 'edges',
+      data: { id: 'e-proxy-to-authelia', source: 'root', target: 'authelia', edgeType: 'proxy-authelia' }
+    })
   } else {
-    // Remove any pending authelia edges
     const toRemove = elements.filter(e => e.group === 'edges' && e.data.edgeType === 'authelia')
     for (const e of toRemove) elements.splice(elements.indexOf(e), 1)
   }
 
-  // === Internet node (only if there are linked targets) ===
-  const needsInternet = elements.some(e => e.group === 'edges' && e.data.edgeType === 'internet')
+  // === Internet node + aggregated internet→proxy edge ===
+  const hasDirectInternetEdges = elements.some(e => e.group === 'edges' && e.data.edgeType === 'internet')
+  const needsInternet = hasDirectInternetEdges || internetViaProxyPorts.length > 0
   if (needsInternet) {
     elements.push({
       group: 'nodes',
       data: { id: 'internet', label: props.internetLabel || 'Internet', sublabel: props.internetIp || '', type: 'internet' }
     })
+    // Single aggregated internet→proxy edge (replaces per-service internet edges for proxied services)
+    if (internetViaProxyPorts.length > 0) {
+      const uniquePorts = [...new Set(internetViaProxyPorts)].sort((a, b) => a - b)
+      const label = uniquePorts.map(p => `:${p}`).join('  ')
+      elements.push({
+        group: 'edges',
+        data: { id: 'e-inet-to-proxy', source: 'internet', target: 'root', edgeType: 'internet-proxy', label, ports: uniquePorts }
+      })
+    }
   } else {
     const toRemove = elements.filter(e => e.group === 'edges' && e.data.edgeType === 'internet')
     for (const e of toRemove) elements.splice(elements.indexOf(e), 1)
@@ -526,9 +557,46 @@ function getCyStyle() {
         'opacity': 0.75
       }
     },
+    // internet → proxy: arête agrégée, épaisse, avec label de ports
+    {
+      selector: 'edge[edgeType="internet-proxy"]',
+      style: {
+        'line-color': '#fb923c',
+        'target-arrow-color': '#fb923c',
+        'target-arrow-shape': 'triangle',
+        'arrow-scale': 1,
+        'width': 2.5,
+        'curve-style': 'bezier',
+        'opacity': 0.9,
+        'label': 'data(label)',
+        'font-size': '10px',
+        'font-family': 'ui-monospace, monospace',
+        'color': '#fb923c',
+        'text-background-color': '#0b0f1a',
+        'text-background-opacity': 0.85,
+        'text-background-padding': '3px',
+        'text-rotation': 'autorotate',
+        'text-margin-y': -8
+      }
+    },
+    // proxy → authelia: arête partagée, tiretée violette
+    {
+      selector: 'edge[edgeType="proxy-authelia"]',
+      style: {
+        'line-color': '#8b5cf6',
+        'target-arrow-color': '#8b5cf6',
+        'target-arrow-shape': 'triangle',
+        'arrow-scale': 0.85,
+        'width': 1.8,
+        'line-style': 'dashed',
+        'line-dash-pattern': [6, 3],
+        'curve-style': 'bezier',
+        'opacity': 0.85
+      }
+    },
     {
       selector: 'edge:selected',
-      style: { 'opacity': 1, 'width': 2.2 }
+      style: { 'opacity': 1, 'width': 2.5 }
     }
   ]
 }
@@ -656,12 +724,18 @@ function initCytoscape() {
   cy.on('mouseover', 'edge', (event) => {
     const d = event.target.data()
     const lines = []
-    if (d.edgeType === 'inferred') {
-      lines.push(`Lien inféré (${d.linkType || 'unknown'})`)
-      if (d.envKey) lines.push(`Variable : ${d.envKey}`)
-      if (d.confidence) lines.push(`Confiance : ${d.confidence}%`)
+    if (d.edgeType === 'internet-proxy') {
+      lines.push('Trafic Internet → Proxy')
+      if (d.ports?.length) lines.push(`Ports exposés : ${d.ports.map(p => `:${p}`).join(', ')}`)
+    } else if (d.edgeType === 'proxy-authelia') {
+      lines.push('Proxy → Authelia')
+      lines.push('Vérification d\'authentification avant routage')
     } else if (d.edgeType === 'internet' && d.externalPort) {
-      lines.push(`Exposé Internet : port ${d.externalPort}`)
+      lines.push(`Exposé directement sur Internet : port ${d.externalPort}`)
+    } else if (d.edgeType === 'proxy') {
+      lines.push('Proxy → Service (route directe)')
+    } else if (d.edgeType === 'authelia') {
+      lines.push('Authelia → Service (accès autorisé)')
     }
     if (lines.length) showTooltip(event, lines)
   })
@@ -865,13 +939,20 @@ watch(
 }
 
 .authelia-dash {
-  background: #8b5cf6;
+  background: transparent;
   border-top: 2px dashed #8b5cf6;
 }
 
-.internet-dash {
+.proxy-authelia-dash {
+  background: transparent;
+  border-top: 2px dashed #8b5cf6;
+  opacity: 0.6;
+}
+
+.internet-proxy-dash {
   background: #fb923c;
-  border-top: 2px dashed #fb923c;
+  border-top: 2px solid #fb923c;
+  height: 3px;
 }
 
 .legend-title {
