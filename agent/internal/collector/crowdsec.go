@@ -369,6 +369,19 @@ func DeleteCrowdSecDecision(connectionString, machineID, password, ip string) er
 // If decisions is empty (or missing entries), it backfills from alerts so manual bans show up.
 // Failures are silently ignored — this is best-effort enrichment only.
 func enrichDecisionsWithAlerts(decisions map[string]CrowdSecDecision, connectionString, alertsMachineID, alertsPassword string, client *http.Client) {
+	// Skip enrichment if there are no local decisions to enrich: CAPI-only setups
+	// can have tens of thousands of entries and the /v1/alerts call would be wasted.
+	hasLocal := false
+	for _, d := range decisions {
+		if !strings.EqualFold(d.Origin, "CAPI") {
+			hasLocal = true
+			break
+		}
+	}
+	if !hasLocal {
+		return
+	}
+
 	token, err := loginCrowdSecAlertsToken(connectionString, alertsMachineID, alertsPassword, client)
 	if err != nil {
 		log.Printf("[crowdsec] unable to obtain alerts token: %v", err)
