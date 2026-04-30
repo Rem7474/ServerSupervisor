@@ -20,6 +20,30 @@
         >
       </div>
     </div>
+    <div class="network-config-item mt-2">
+      <label class="form-label">
+        Hôte correspondant
+        <span class="text-secondary fw-normal">(optionnel — supprime le nœud fantôme)</span>
+      </label>
+      <select
+        v-model="rootHostId"
+        class="form-select form-select-sm"
+      >
+        <option value="">
+          — Nœud abstrait (non lié à un hôte) —
+        </option>
+        <option
+          v-for="h in hosts"
+          :key="h.id"
+          :value="h.id"
+        >
+          {{ h.name || h.hostname || h.ip_address || h.id }}
+        </option>
+      </select>
+      <div class="text-secondary small mt-1">
+        Quand lié, le nœud proxy dans le graphe devient cet hôte — les deux ne sont plus affichés séparément.
+      </div>
+    </div>
 
     <div class="network-config-item mt-3">
       <div class="d-flex align-items-center justify-content-between mb-2">
@@ -191,6 +215,27 @@
             IP / domaine Authelia
           </div>
         </div>
+      </div>
+      <div class="mt-2">
+        <label class="form-label">
+          Hôte correspondant
+          <span class="text-secondary fw-normal">(optionnel)</span>
+        </label>
+        <select
+          v-model="autheliaHostId"
+          class="form-select form-select-sm"
+        >
+          <option value="">
+            — Nœud abstrait (non lié à un hôte) —
+          </option>
+          <option
+            v-for="h in hosts"
+            :key="h.id"
+            :value="h.id"
+          >
+            {{ h.name || h.hostname || h.ip_address || h.id }}
+          </option>
+        </select>
       </div>
     </div>
 
@@ -431,14 +476,16 @@
 <script setup>
 import { computed, watch } from 'vue'
 
-const rootNodeName = defineModel('rootNodeName', { type: String, default: 'Infrastructure' })
-const rootNodeIp = defineModel('rootNodeIp', { type: String, default: '' })
-const autheliaLabel = defineModel('autheliaLabel', { type: String, default: 'Authelia' })
-const autheliaIp = defineModel('autheliaIp', { type: String, default: '' })
-const internetLabel = defineModel('internetLabel', { type: String, default: 'Internet' })
-const internetIp = defineModel('internetIp', { type: String, default: '' })
+const rootNodeName   = defineModel('rootNodeName',   { type: String, default: 'Infrastructure' })
+const rootNodeIp     = defineModel('rootNodeIp',     { type: String, default: '' })
+const autheliaLabel  = defineModel('autheliaLabel',  { type: String, default: 'Authelia' })
+const autheliaIp     = defineModel('autheliaIp',     { type: String, default: '' })
+const internetLabel  = defineModel('internetLabel',  { type: String, default: 'Internet' })
+const internetIp     = defineModel('internetIp',     { type: String, default: '' })
 const networkServices = defineModel('networkServices', { type: Array, default: () => [] })
-const hostPortConfig = defineModel('hostPortConfig', { type: Array, default: () => [] })
+const hostPortConfig  = defineModel('hostPortConfig',  { type: Array, default: () => [] })
+const rootHostId      = defineModel('rootHostId',      { type: String, default: '' })
+const autheliaHostId  = defineModel('autheliaHostId',  { type: String, default: '' })
 
 const props = defineProps({
   hosts: {

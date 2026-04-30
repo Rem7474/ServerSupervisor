@@ -1,0 +1,3 @@
+ALTER TABLE network_topology_config
+  ADD COLUMN IF NOT EXISTS root_host_id     VARCHAR(255) NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS authelia_host_id VARCHAR(255) NOT NULL DEFAULT '';

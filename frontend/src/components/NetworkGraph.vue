@@ -164,7 +164,9 @@ const props = defineProps({
   autheliaIp: { type: String, default: '' },
   internetLabel: { type: String, default: 'Internet' },
   internetIp: { type: String, default: '' },
-  nodePositions: { type: Object, default: () => ({}) },
+  nodePositions:    { type: Object, default: () => ({}) },
+  rootHostId:       { type: String, default: '' },
+  autheliaHostId:   { type: String, default: '' },
 })
 
 const emit = defineEmits(['host-click', 'node-select', 'update:nodePositions'])
@@ -193,12 +195,14 @@ function escapeHtml(str) {
 function buildElements() {
   const elements = []
 
-  // === Root node ===
+  // === Root node (abstract, only when not linked to a real host) ===
   const rootLabel = props.rootLabel || 'Infrastructure'
-  elements.push({
-    group: 'nodes',
-    data: { id: 'root', label: rootLabel, sublabel: props.rootIp || '', type: 'root' }
-  })
+  if (!props.rootHostId) {
+    elements.push({
+      group: 'nodes',
+      data: { id: 'root', label: rootLabel, sublabel: props.rootIp || '', type: 'root' }
+    })
+  }
 
   // === Services by host ===
   const servicesByHost = new Map()
@@ -208,6 +212,10 @@ function buildElements() {
     servicesByHost.get(svc.hostId).push(svc)
   }
 
+  // Resolve effective node IDs: linked to real host, or abstract node
+  const proxyNodeId    = props.rootHostId     ? `host-${props.rootHostId}`     : 'root'
+  const autheliaNodeId = props.autheliaHostId ? `host-${props.autheliaHostId}` : 'authelia'
+
   // Collect external ports exposed via proxy (for the single aggregated internet→proxy edge)
   const internetViaProxyPorts = []
 
@@ -215,6 +223,9 @@ function buildElements() {
   for (const host of props.data) {
     const hostStatus = host.status || 'unknown'
     const statusColor = statusColors[hostStatus] || statusColors.unknown
+    const role = host.id === props.rootHostId     ? 'proxy'
+               : host.id === props.autheliaHostId ? 'authelia'
+               : null
     elements.push({
       group: 'nodes',
       data: {
@@ -224,7 +235,8 @@ function buildElements() {
         type: 'host',
         status: hostStatus,
         statusColor,
-        hostId: host.id
+        hostId: host.id,
+        ...(role ? { role } : {})
       }
     })
 
@@ -277,11 +289,11 @@ function buildElements() {
 
       // proxy → service (direct, only when not going through Authelia)
       if (isProxyLinked && !isAutheliaLinked) {
-        elements.push({ group: 'edges', data: { id: `e-proxy-${nodeId}`, source: 'root', target: nodeId, edgeType: 'proxy' } })
+        elements.push({ group: 'edges', data: { id: `e-proxy-${nodeId}`, source: proxyNodeId, target: nodeId, edgeType: 'proxy' } })
       }
       // authelia → service (Authelia routes to the service)
       if (isAutheliaLinked) {
-        elements.push({ group: 'edges', data: { id: `e-auth-${nodeId}`, source: 'authelia', target: nodeId, edgeType: 'authelia' } })
+        elements.push({ group: 'edges', data: { id: `e-auth-${nodeId}`, source: autheliaNodeId, target: nodeId, edgeType: 'authelia' } })
       }
       // internet routing: via proxy (aggregated) or direct
       if (isInternetExposed && isProxyLinked) {
@@ -319,11 +331,11 @@ function buildElements() {
 
       // proxy → service (direct, only when not going through Authelia)
       if (svc.linkToProxy && !svc.linkToAuthelia) {
-        elements.push({ group: 'edges', data: { id: `e-proxy-${nodeId}`, source: 'root', target: nodeId, edgeType: 'proxy' } })
+        elements.push({ group: 'edges', data: { id: `e-proxy-${nodeId}`, source: proxyNodeId, target: nodeId, edgeType: 'proxy' } })
       }
       // authelia → service
       if (svc.linkToAuthelia) {
-        elements.push({ group: 'edges', data: { id: `e-auth-${nodeId}`, source: 'authelia', target: nodeId, edgeType: 'authelia' } })
+        elements.push({ group: 'edges', data: { id: `e-auth-${nodeId}`, source: autheliaNodeId, target: nodeId, edgeType: 'authelia' } })
       }
       // internet routing: via proxy (aggregated) or direct
       if (svc.exposedToInternet && svc.linkToProxy) {
@@ -334,19 +346,24 @@ function buildElements() {
     }
   }
 
-  // === Authelia node + proxy→authelia shared edge ===
-  const needsAuthelia = elements.some(e => e.group === 'edges' && e.data.edgeType === 'authelia')
-  if (needsAuthelia && props.autheliaLabel) {
-    elements.push({
-      group: 'nodes',
-      data: { id: 'authelia', label: props.autheliaLabel || 'Authelia', sublabel: props.autheliaIp || '', type: 'authelia' }
-    })
-    // Single proxy→authelia edge representing the auth-check chain
-    elements.push({
-      group: 'edges',
-      data: { id: 'e-proxy-to-authelia', source: 'root', target: 'authelia', edgeType: 'proxy-authelia' }
-    })
-  } else {
+  // === Authelia node (only if abstract, i.e. not linked to a real host) ===
+  const needsAuthelia = elements.some(e => e.group === 'edges' && (e.data.edgeType === 'authelia' || e.data.edgeType === 'proxy-authelia'))
+  if (needsAuthelia) {
+    if (!props.autheliaHostId && props.autheliaLabel) {
+      elements.push({
+        group: 'nodes',
+        data: { id: 'authelia', label: props.autheliaLabel || 'Authelia', sublabel: props.autheliaIp || '', type: 'authelia' }
+      })
+    }
+    // Single proxy→authelia edge (between the two real IDs, whatever they resolve to)
+    const autheliaEdgeExists = elements.some(e => e.data.id === 'e-proxy-to-authelia')
+    if (!autheliaEdgeExists) {
+      elements.push({
+        group: 'edges',
+        data: { id: 'e-proxy-to-authelia', source: proxyNodeId, target: autheliaNodeId, edgeType: 'proxy-authelia' }
+      })
+    }
+  } else if (!props.autheliaHostId) {
     const toRemove = elements.filter(e => e.group === 'edges' && e.data.edgeType === 'authelia')
     for (const e of toRemove) elements.splice(elements.indexOf(e), 1)
   }
@@ -359,13 +376,13 @@ function buildElements() {
       group: 'nodes',
       data: { id: 'internet', label: props.internetLabel || 'Internet', sublabel: props.internetIp || '', type: 'internet' }
     })
-    // Single aggregated internet→proxy edge (replaces per-service internet edges for proxied services)
+    // Single aggregated internet→proxy edge
     if (internetViaProxyPorts.length > 0) {
       const uniquePorts = [...new Set(internetViaProxyPorts)].sort((a, b) => a - b)
       const label = uniquePorts.map(p => `:${p}`).join('  ')
       elements.push({
         group: 'edges',
-        data: { id: 'e-inet-to-proxy', source: 'internet', target: 'root', edgeType: 'internet-proxy', label, ports: uniquePorts }
+        data: { id: 'e-inet-to-proxy', source: 'internet', target: proxyNodeId, edgeType: 'internet-proxy', label, ports: uniquePorts }
       })
     }
   } else {
@@ -594,6 +611,25 @@ function getCyStyle() {
         'opacity': 0.85
       }
     },
+    // Host nodes acting as proxy or authelia (linked via rootHostId / autheliaHostId)
+    {
+      selector: 'node[role="proxy"]',
+      style: {
+        'border-color': '#94a3b8',
+        'border-width': 2.5,
+        'border-style': 'solid',
+        'background-color': 'rgba(15,23,42,0.65)',
+      }
+    },
+    {
+      selector: 'node[role="authelia"]',
+      style: {
+        'border-color': '#8b5cf6',
+        'border-width': 2.5,
+        'border-style': 'solid',
+        'background-color': 'rgba(139,92,246,0.10)',
+      }
+    },
     {
       selector: 'edge:selected',
       style: { 'opacity': 1, 'width': 2.5 }
@@ -795,6 +831,8 @@ watch(
     () => props.autheliaIp,
     () => props.internetLabel,
     () => props.internetIp,
+    () => props.rootHostId,
+    () => props.autheliaHostId,
   ],
   () => {
     if (!cy) return

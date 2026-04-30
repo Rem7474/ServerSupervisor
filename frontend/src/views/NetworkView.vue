@@ -243,6 +243,8 @@
             v-model:internet-ip="internetIp"
             v-model:network-services="networkServices"
             v-model:host-port-config="hostPortConfig"
+            v-model:root-host-id="rootHostId"
+            v-model:authelia-host-id="autheliaHostId"
             :hosts="hosts"
             :containers="containers"
           />
@@ -325,6 +327,8 @@
                 :internet-label="internetLabel"
                 :internet-ip="internetIp"
                 :node-positions="nodePositions"
+                :root-host-id="rootHostId"
+                :authelia-host-id="autheliaHostId"
                 @node-select="selectedNode = $event"
                 @update:node-positions="onNodePositionsUpdate"
               />
@@ -389,6 +393,8 @@ const topologyConfigLoaded = ref(false)
 const saveStatus = ref('idle') // 'idle' | 'saving' | 'saved' | 'error'
 const selectedNode = ref(null)
 const networkGraphRef = ref(null)
+const rootHostId = ref('')
+const autheliaHostId = ref('')
 
 // Graph filters
 const filterInternetOnly = ref(false)
@@ -416,6 +422,8 @@ watch(internetLabel, () => debouncedSave())
 watch(internetIp, () => debouncedSave())
 watch(networkServices, () => debouncedSave(), { deep: true })
 watch(hostPortConfig, () => debouncedSave(), { deep: true })
+watch(rootHostId, () => debouncedSave())
+watch(autheliaHostId, () => debouncedSave())
 
 // ─── Topology config load/save ────────────────────────────────────────────
 async function loadTopologyConfig() {
@@ -430,6 +438,8 @@ async function loadTopologyConfig() {
       internetLabel.value = cfg.internet_label || 'Internet'
       internetIp.value = cfg.internet_ip || ''
       networkServices.value = cfg.manual_services ? JSON.parse(cfg.manual_services) : []
+      rootHostId.value     = cfg.root_host_id     || ''
+      autheliaHostId.value = cfg.authelia_host_id || ''
       if (cfg.node_positions) {
         try { nodePositions.value = JSON.parse(cfg.node_positions) } catch { nodePositions.value = {} }
       }
@@ -460,6 +470,8 @@ async function saveTopologyConfig() {
       authelia_ip: autheliaIp.value || '',
       internet_label: internetLabel.value || 'Internet',
       internet_ip: internetIp.value || '',
+      root_host_id:     rootHostId.value,
+      authelia_host_id: autheliaHostId.value,
     }
     await apiClient.saveTopologyConfig(config)
     saveStatus.value = 'saved'
