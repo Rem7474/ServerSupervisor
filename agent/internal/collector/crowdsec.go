@@ -53,6 +53,7 @@ type crowdSecAPIAlert struct {
 	} `json:"source"`
 	EventsCount int    `json:"events_count"`
 	Scenario    string `json:"scenario"`
+	StartAt     string `json:"start_at"` // when the alert was first triggered
 	Decisions   []struct {
 		Value    string `json:"value"`
 		Scope    string `json:"scope"`
@@ -82,7 +83,9 @@ func CollectCrowdSecDecisions(connectionString, apiKey, alertsMachineID, alertsP
 
 	// Build auth header: prefer bouncer key; fall back to watcher JWT so that
 	// setups with only machine credentials (ban/unban) still report decisions.
+	// watcherToken is kept so enrichDecisionsWithAlerts can reuse it and skip a second login.
 	authHeader := ""
+	watcherToken := ""
 	if apiKey != "" {
 		authHeader = "X-API-Key " + apiKey
 	} else if alertsMachineID != "" && alertsPassword != "" {
@@ -90,6 +93,7 @@ func CollectCrowdSecDecisions(connectionString, apiKey, alertsMachineID, alertsP
 		if err != nil {
 			log.Printf("[crowdsec] watcher fallback auth failed: %v", err)
 		} else {
+			watcherToken = token
 			authHeader = "Bearer " + token
 		}
 	}
@@ -155,7 +159,8 @@ func CollectCrowdSecDecisions(connectionString, apiKey, alertsMachineID, alertsP
 	log.Printf("[crowdsec] collected %d active IP decisions", len(result))
 
 	// Enrich decisions (or populate fallback) with data from the alerts endpoint.
-	enrichDecisionsWithAlerts(result, baseURL, alertsMachineID, alertsPassword, client)
+	// Pass watcherToken so enrichment reuses it and skips a second login call.
+	enrichDecisionsWithAlerts(result, baseURL, alertsMachineID, alertsPassword, watcherToken, client)
 
 	return result, nil
 }
@@ -368,7 +373,7 @@ func DeleteCrowdSecDecision(connectionString, machineID, password, ip string) er
 // enrichDecisionsWithAlerts calls /v1/alerts and merges country + ASN into existing decisions.
 // If decisions is empty (or missing entries), it backfills from alerts so manual bans show up.
 // Failures are silently ignored — this is best-effort enrichment only.
-func enrichDecisionsWithAlerts(decisions map[string]CrowdSecDecision, connectionString, alertsMachineID, alertsPassword string, client *http.Client) {
+func enrichDecisionsWithAlerts(decisions map[string]CrowdSecDecision, connectionString, alertsMachineID, alertsPassword, preToken string, client *http.Client) {
 	// Skip enrichment if there are no local decisions to enrich: CAPI-only setups
 	// can have tens of thousands of entries and the /v1/alerts call would be wasted.
 	hasLocal := false
@@ -382,10 +387,14 @@ func enrichDecisionsWithAlerts(decisions map[string]CrowdSecDecision, connection
 		return
 	}
 
-	token, err := loginCrowdSecAlertsToken(connectionString, alertsMachineID, alertsPassword, client)
-	if err != nil {
-		log.Printf("[crowdsec] unable to obtain alerts token: %v", err)
-		return
+	token := preToken
+	if token == "" {
+		var err error
+		token, err = loginCrowdSecAlertsToken(connectionString, alertsMachineID, alertsPassword, client)
+		if err != nil {
+			log.Printf("[crowdsec] unable to obtain alerts token: %v", err)
+			return
+		}
 	}
 
 	baseURL := strings.TrimRight(connectionString, "/")
@@ -458,6 +467,11 @@ func enrichDecisionsWithAlerts(decisions map[string]CrowdSecDecision, connection
 		if dec.BlockedUntil.IsZero() && durationRaw != "" {
 			if dur, err := time.ParseDuration(durationRaw); err == nil && dur > 0 {
 				dec.BlockedUntil = now.Add(dur)
+			}
+		}
+		if dec.BlockedAt.IsZero() && a.StartAt != "" {
+			if t, err := parseCrowdSecTime(a.StartAt); err == nil {
+				dec.BlockedAt = t
 			}
 		}
 		decisions[ip] = dec

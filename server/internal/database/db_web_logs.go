@@ -176,15 +176,19 @@ func (db *DB) GetWebLogsSummary(since time.Time, hostID string, source string) (
 	traffic := map[string]any{}
 	var totalRequests int64
 	var totalBytes int64
+	var status2xx int64
+	var status3xx int64
 	var errors4xx int64
 	var errors5xx int64
 	if err := db.conn.QueryRow(
 		fmt.Sprintf(`SELECT COALESCE(COUNT(*),0), COALESCE(SUM(bytes),0),
+		COALESCE(SUM(CASE WHEN status BETWEEN 200 AND 299 THEN 1 ELSE 0 END),0),
+		COALESCE(SUM(CASE WHEN status BETWEEN 300 AND 399 THEN 1 ELSE 0 END),0),
 		COALESCE(SUM(CASE WHEN status BETWEEN 400 AND 499 THEN 1 ELSE 0 END),0),
 		COALESCE(SUM(CASE WHEN status >= 500 THEN 1 ELSE 0 END),0)
 		FROM web_log_requests WHERE %s`, where),
 		args...,
-	).Scan(&totalRequests, &totalBytes, &errors4xx, &errors5xx); err != nil {
+	).Scan(&totalRequests, &totalBytes, &status2xx, &status3xx, &errors4xx, &errors5xx); err != nil {
 		return nil, err
 	}
 	traffic["total_requests"] = totalRequests
@@ -199,18 +203,6 @@ func (db *DB) GetWebLogsSummary(since time.Time, hostID string, source string) (
 	} else {
 		traffic["ratio_4xx"] = float64(0)
 		traffic["ratio_5xx"] = float64(0)
-	}
-
-	var status2xx int64
-	var status3xx int64
-	if err := db.conn.QueryRow(
-		fmt.Sprintf(`SELECT
-		COALESCE(SUM(CASE WHEN status BETWEEN 200 AND 299 THEN 1 ELSE 0 END),0),
-		COALESCE(SUM(CASE WHEN status BETWEEN 300 AND 399 THEN 1 ELSE 0 END),0)
-		FROM web_log_requests WHERE %s`, where),
-		args...,
-	).Scan(&status2xx, &status3xx); err != nil {
-		return nil, err
 	}
 	traffic["status_distribution"] = map[string]any{
 		"2xx": status2xx,
@@ -237,6 +229,32 @@ func (db *DB) GetWebLogsSummary(since time.Time, hostID string, source string) (
 			traffic["blocked_ratio"] = float64(0)
 		}
 	}
+
+	// Pre-fetch method distribution for all domains in a single query to avoid N+1.
+	domainMethods := map[string]map[string]int64{}
+	methodBatchRows, err := db.conn.Query(
+		fmt.Sprintf(`SELECT COALESCE(NULLIF(domain,''), '(unknown)'), method, COUNT(*)
+		FROM web_log_requests
+		WHERE %s
+		GROUP BY 1, 2`, where),
+		args...,
+	)
+	if err != nil {
+		return nil, err
+	}
+	for methodBatchRows.Next() {
+		var dom, method string
+		var cnt int64
+		if err := methodBatchRows.Scan(&dom, &method, &cnt); err != nil {
+			_ = methodBatchRows.Close()
+			return nil, err
+		}
+		if domainMethods[dom] == nil {
+			domainMethods[dom] = map[string]int64{}
+		}
+		domainMethods[dom][method] = cnt
+	}
+	_ = methodBatchRows.Close()
 
 	rows, err := db.conn.Query(
 		fmt.Sprintf(`SELECT COALESCE(NULLIF(domain,''), '(unknown)') AS domain,
@@ -266,26 +284,10 @@ func (db *DB) GetWebLogsSummary(since time.Time, hostID string, source string) (
 		if err := rows.Scan(&domain, &hits, &bytes, &errors4xx, &errors5xx); err != nil {
 			return nil, err
 		}
-
-		methodsRows, err := db.conn.Query(
-			fmt.Sprintf(`SELECT method, COUNT(*) FROM web_log_requests WHERE %s AND COALESCE(NULLIF(domain,''), '(unknown)') = $%d GROUP BY method`, where, len(args)+1),
-			append(args, domain)...,
-		)
-		if err != nil {
-			return nil, err
+		methods := domainMethods[domain]
+		if methods == nil {
+			methods = map[string]int64{}
 		}
-		methods := map[string]int64{}
-		for methodsRows.Next() {
-			var method string
-			var methodCount int64
-			if err := methodsRows.Scan(&method, &methodCount); err != nil {
-				_ = methodsRows.Close()
-				return nil, err
-			}
-			methods[method] = methodCount
-		}
-		_ = methodsRows.Close()
-
 		topDomains = append(topDomains, map[string]any{
 			"domain":     domain,
 			"hits":       hits,
@@ -330,39 +332,15 @@ func (db *DB) GetWebLogsSummary(since time.Time, hostID string, source string) (
 	}
 	traffic["top_endpoints"] = topEndpoints
 
-	proxyHostRows, err := db.conn.Query(
-		fmt.Sprintf(`SELECT COALESCE(NULLIF(domain,''), '(unknown)') AS vhost,
-		COUNT(*) AS hits,
-		COALESCE(SUM(bytes),0) AS bytes,
-		SUM(CASE WHEN status BETWEEN 400 AND 499 THEN 1 ELSE 0 END) AS errors_4xx,
-		SUM(CASE WHEN status >= 500 THEN 1 ELSE 0 END) AS errors_5xx
-		FROM web_log_requests
-		WHERE %s
-		GROUP BY vhost
-		ORDER BY hits DESC
-		LIMIT 20`, where),
-		args...,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = proxyHostRows.Close() }()
-	topProxyHosts := make([]map[string]any, 0)
-	for proxyHostRows.Next() {
-		var vhost string
-		var hits int64
-		var bytes int64
-		var errors4xx int64
-		var errors5xx int64
-		if err := proxyHostRows.Scan(&vhost, &hits, &bytes, &errors4xx, &errors5xx); err != nil {
-			return nil, err
-		}
+	// top_proxy_hosts is the same data as top_domains; derive it without an extra query.
+	topProxyHosts := make([]map[string]any, 0, len(topDomains))
+	for _, d := range topDomains {
 		topProxyHosts = append(topProxyHosts, map[string]any{
-			"vhost":      vhost,
-			"hits":       hits,
-			"bytes":      bytes,
-			"errors_4xx": errors4xx,
-			"errors_5xx": errors5xx,
+			"vhost":      d["domain"],
+			"hits":       d["hits"],
+			"bytes":      d["bytes"],
+			"errors_4xx": d["errors_4xx"],
+			"errors_5xx": d["errors_5xx"],
 		})
 	}
 	traffic["top_proxy_hosts"] = topProxyHosts
