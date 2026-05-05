@@ -58,11 +58,74 @@
       class="loading-skeleton-list-item"
     />
   </div>
+
+  <div
+    v-else-if="variant === 'kpi'"
+    class="row row-cards mb-4"
+    aria-hidden="true"
+  >
+    <div
+      v-for="n in lines"
+      :key="n"
+      class="col-6 col-lg-3"
+    >
+      <div class="card card-sm h-100">
+        <div class="card-body">
+          <div class="loading-skeleton-kpi-label" />
+          <div class="loading-skeleton-kpi-value" />
+          <div class="loading-skeleton-kpi-sub" />
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div
+    v-else-if="variant === 'proxmox-cluster'"
+    class="card mb-4"
+    aria-hidden="true"
+  >
+    <div class="card-header d-flex align-items-center justify-content-between">
+      <div class="loading-skeleton-pxmx-title" />
+      <div class="loading-skeleton-pxmx-btn" />
+    </div>
+    <div class="card-body">
+      <div class="row g-3 mb-4">
+        <div
+          v-for="k in 4"
+          :key="k"
+          class="col-6 col-md-3"
+        >
+          <div class="loading-skeleton-pxmx-kpi-label mb-2" />
+          <div class="loading-skeleton-pxmx-kpi-val mb-2" />
+          <div class="loading-skeleton-pxmx-kpi-sub" />
+        </div>
+      </div>
+      <div class="row g-2">
+        <div
+          v-for="n in lines"
+          :key="n"
+          class="col-12 col-md-6 col-xl-4"
+        >
+          <div class="d-flex align-items-center gap-2 p-2">
+            <div class="loading-skeleton-pxmx-dot" />
+            <div class="flex-grow-1">
+              <div class="d-flex justify-content-between mb-1">
+                <div class="loading-skeleton-pxmx-name" />
+                <div class="loading-skeleton-pxmx-stats" />
+              </div>
+              <div class="loading-skeleton-pxmx-bar mb-1" />
+              <div class="loading-skeleton-pxmx-bar" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
 export interface Props {
-  variant?: 'card' | 'table' | 'badge-list' | 'button-group' | 'list'
+  variant?: 'card' | 'table' | 'badge-list' | 'button-group' | 'list' | 'kpi' | 'proxmox-cluster'
   lines?: number
 }
 
@@ -99,7 +162,19 @@ withDefaults(defineProps<Props>(), {
 .loading-skeleton-row,
 .loading-skeleton-badge,
 .loading-skeleton-button,
-.loading-skeleton-list-item {
+.loading-skeleton-list-item,
+.loading-skeleton-kpi-label,
+.loading-skeleton-kpi-value,
+.loading-skeleton-kpi-sub,
+.loading-skeleton-pxmx-title,
+.loading-skeleton-pxmx-btn,
+.loading-skeleton-pxmx-kpi-label,
+.loading-skeleton-pxmx-kpi-val,
+.loading-skeleton-pxmx-kpi-sub,
+.loading-skeleton-pxmx-dot,
+.loading-skeleton-pxmx-name,
+.loading-skeleton-pxmx-stats,
+.loading-skeleton-pxmx-bar {
   background: linear-gradient(90deg, rgba(203, 213, 225, 0.2) 25%, rgba(203, 213, 225, 0.5) 50%, rgba(203, 213, 225, 0.2) 75%);
   background-size: 220% 100%;
   animation: loading-skeleton-wave 1.4s ease infinite;
@@ -146,6 +221,82 @@ withDefaults(defineProps<Props>(), {
 
 .loading-skeleton-list-item:last-child {
   margin-bottom: 0;
+}
+
+/* kpi variant */
+.loading-skeleton-kpi-label {
+  height: 0.65rem;
+  width: 55%;
+  border-radius: 999px;
+  margin-bottom: 0.6rem;
+}
+
+.loading-skeleton-kpi-value {
+  height: 2rem;
+  width: 45%;
+  border-radius: 0.35rem;
+  margin-bottom: 0.5rem;
+}
+
+.loading-skeleton-kpi-sub {
+  height: 0.6rem;
+  width: 75%;
+  border-radius: 999px;
+}
+
+/* proxmox-cluster variant */
+.loading-skeleton-pxmx-title {
+  height: 1rem;
+  width: 160px;
+  border-radius: 999px;
+}
+
+.loading-skeleton-pxmx-btn {
+  height: 28px;
+  width: 72px;
+  border-radius: 0.35rem;
+}
+
+.loading-skeleton-pxmx-kpi-label {
+  height: 0.6rem;
+  width: 50%;
+  border-radius: 999px;
+}
+
+.loading-skeleton-pxmx-kpi-val {
+  height: 1.5rem;
+  width: 40%;
+  border-radius: 0.35rem;
+}
+
+.loading-skeleton-pxmx-kpi-sub {
+  height: 0.55rem;
+  width: 65%;
+  border-radius: 999px;
+}
+
+.loading-skeleton-pxmx-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.loading-skeleton-pxmx-name {
+  height: 0.7rem;
+  width: 50%;
+  border-radius: 999px;
+}
+
+.loading-skeleton-pxmx-stats {
+  height: 0.7rem;
+  width: 25%;
+  border-radius: 999px;
+}
+
+.loading-skeleton-pxmx-bar {
+  height: 4px;
+  border-radius: 999px;
 }
 
 @keyframes loading-skeleton-wave {

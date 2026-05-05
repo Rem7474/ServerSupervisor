@@ -182,311 +182,30 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import RelativeTime from './RelativeTime.vue'
-import apiClient from '../api'
-import { useWebSocket } from '../composables/useWebSocket'
-import { resolveIncidentHostRoute } from '../utils/incidentRouting'
+import { useNotifications } from '../composables/useNotifications'
 
 const bellRef = ref(null)
 const isOpen = ref(false)
-const loading = ref(false)
-const notifications = ref([])
 
-// readAtRef is now server-driven (cross-device sync).
-// Populated from GET /api/v1/notifications (includes read_at field per user).
-// Updated via POST /api/v1/notifications/mark-read and on every 30s poll.
-const readAtRef = ref(null)
-
-let pollTimer = null
-// null = first fetch not done yet → avoid flooding on page load
-let seenIdSet = null
-
-const unreadCount = computed(() =>
-  notifications.value.filter(n =>
-    !readAtRef.value || new Date(n.triggered_at) > new Date(readAtRef.value)
-  ).length
-)
-
-function isUnread(item) {
-  return !readAtRef.value || new Date(item.triggered_at) > new Date(readAtRef.value)
-}
-
-function metricUnit(metric) {
-  if (!metric) return ''
-  if (['cpu', 'memory', 'disk'].includes(metric)) return '%'
-  return ''
-}
-
-function trackerStatusLabel(status) {
-  if (status === 'pending' || status === 'running') return 'Détection en cours'
-  if (status === 'completed' || status === 'success') return 'Exécution réussie'
-  if (status === 'failed' || status === 'error') return 'Exécution échouée'
-  return status || 'État inconnu'
-}
-
-function notificationResolved(item) {
-  if (item?.type === 'release_tracker_detected' || item?.type === 'release_tracker_execution') {
-    return !!item?.resolved_at || ['completed', 'success', 'failed', 'error'].includes((item?.status || '').toLowerCase())
-  }
-  return !!item?.resolved_at
-}
-
-function notificationTitle(item) {
-  if (!item) return 'Notification'
-  if (item.type === 'release_tracker_detected') return item.rule_name || 'Nouvelle release detectee'
-  if (item.type === 'release_tracker_execution') return item.rule_name || 'Execution release tracker'
-  return item.rule_name || 'Alerte'
-}
-
-function notificationRoute(item) {
-  if (item?.type === 'release_tracker_detected' || item?.type === 'release_tracker_execution') {
-    if (item?.tracker_id) return `/release-trackers/${encodeURIComponent(item.tracker_id)}`
-    return '/git-webhooks?tab=trackers'
-  }
-  return resolveIncidentHostRoute(item?.host_id, item?.metric)
-}
+const {
+  notifications,
+  loading,
+  unreadCount,
+  fetchNotifications,
+  markAllRead,
+  isUnread,
+  metricUnit,
+  trackerStatusLabel,
+  notificationResolved,
+  notificationTitle,
+  notificationRoute,
+} = useNotifications()
 
 function toggleOpen() {
   isOpen.value = !isOpen.value
-  if (isOpen.value) {
-    fetchNotifications()
-  }
-}
-
-async function markAllRead() {
-  try {
-    const { data } = await apiClient.markNotificationsRead()
-    readAtRef.value = data.read_at ?? new Date().toISOString()
-  } catch {
-    // Fallback: mark locally if API is temporarily unavailable
-    readAtRef.value = new Date().toISOString()
-  }
-}
-
-function showBrowserNotification(item) {
-  if (item?.type === 'release_tracker_detected' || item?.type === 'release_tracker_execution') {
-    const trackerTypeLabel = item.tracker_type === 'docker' ? 'Docker' : 'Git'
-    showExecutionBrowserNotification(
-      `${trackerTypeLabel} tracker : ${notificationTitle(item)}`,
-      item.type === 'release_tracker_detected'
-        ? `Nouvelle version detectee${item.version ? ` : ${item.version}` : ''}`
-        : `Execution ${trackerStatusLabel(item.status).toLowerCase()}`,
-      `tracker-history-${item.id}`,
-    )
-    return
-  }
-
-  try {
-    const n = new Notification(`Alerte : ${item.rule_name}`, {
-      body: `${item.host_name} — Valeur : ${item.value?.toFixed(2)}${metricUnit(item.metric)}`,
-      icon: '/favicon.ico',
-      tag: `alert-${item.id}`,
-      requireInteraction: false,
-    })
-    n.onclick = () => { window.focus(); n.close() }
-  } catch {
-    // API not supported or permission revoked mid-session
-  }
-}
-
-function showExecutionBrowserNotification(title, body, tag) {
-  try {
-    const n = new Notification(title, {
-      body,
-      icon: '/favicon.ico',
-      tag,
-      requireInteraction: false,
-    })
-    n.onclick = () => { window.focus(); n.close() }
-  } catch {
-    // API not supported or permission revoked mid-session
-  }
-}
-
-// Convert URL-safe base64 to Uint8Array for PushManager.subscribe()
-function urlBase64ToUint8Array(base64String) {
-  const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
-  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
-  const rawData = atob(base64)
-  return Uint8Array.from(rawData, (c) => c.charCodeAt(0))
-}
-
-// Remove the server-side push subscription for this browser.
-// Called on logout and when notification permission is revoked.
-async function cleanupPushSubscription() {
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
-  try {
-    const reg = await navigator.serviceWorker.ready
-    const sub = await reg.pushManager.getSubscription()
-    if (sub) {
-      await apiClient.unsubscribePush(sub.endpoint).catch(() => {})
-      await sub.unsubscribe()
-    }
-    localStorage.removeItem('ss_vapid_public_key')
-  } catch {
-    // Non-critical
-  }
-}
-
-// Register a Web Push subscription so the backend can push alerts to this device
-// even when the app is closed (required for mobile PWA).
-async function setupPushNotifications() {
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
-  if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return
-  try {
-    const reg = await navigator.serviceWorker.ready
-
-    // Fetch VAPID public key first so we can detect key rotation before reusing an existing sub
-    const { data } = await apiClient.getPushVapidPublicKey()
-    if (!data?.public_key) return
-
-    let sub = await reg.pushManager.getSubscription()
-
-    // Force re-subscribe if VAPID key was rotated or subscription expired
-    if (sub) {
-      const cachedKey = localStorage.getItem('ss_vapid_public_key')
-      const expired = sub.expirationTime != null && Date.now() > sub.expirationTime
-      const keyRotated = cachedKey != null && cachedKey !== data.public_key
-      if (expired || keyRotated) {
-        await sub.unsubscribe()
-        sub = null
-      }
-    }
-
-    if (!sub) {
-      sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(data.public_key),
-      })
-    }
-
-    // Cache current key for next rotation check
-    localStorage.setItem('ss_vapid_public_key', data.public_key)
-
-    // Always sync subscription to server (covers new login / key rotation)
-    await apiClient.subscribePush(sub.toJSON())
-  } catch (err) {
-    // Non-critical: push not supported or user declined — desktop Notification API still works
-    console.debug('[Push] subscription setup failed:', err)
-  }
-}
-
-// Watch for the user revoking notification permission from browser settings
-// while the app is open (e.g. site settings panel).
-function watchPermissionChange() {
-  if (!navigator.permissions) return
-  navigator.permissions.query({ name: 'notifications' }).then((status) => {
-    status.onchange = () => {
-      if (status.state === 'denied') {
-        cleanupPushSubscription()
-      } else if (status.state === 'granted') {
-        setupPushNotifications()
-      }
-    }
-  }).catch(() => {})
-}
-
-// WebSocket push — receives real-time browser notifications from backend
-useWebSocket('/api/v1/ws/notifications', (payload) => {
-  if (!payload?.type || !payload.notification) return
-
-  if (payload.type === 'new_alert') {
-    const item = payload.notification
-
-    // Show in-app notification immediately (WS push is always new)
-    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-      showBrowserNotification(item)
-    }
-
-    // Mark as seen so the polling cycle doesn't re-trigger the browser notification
-    if (seenIdSet !== null) seenIdSet.add(item.id)
-
-    // Prepend to the in-app list (max 30)
-    if (!notifications.value.some(n => n.id === item.id)) {
-      notifications.value = [item, ...notifications.value].slice(0, 30)
-    }
-    return
-  }
-
-  if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-    if (payload.type === 'release_tracker_detected') {
-      const n = payload.notification
-      const trackerTypeLabel = n.tracker_type === 'docker' ? 'Docker' : 'Git'
-      const versionLabel = n.version ? ` (${n.version})` : ''
-      showExecutionBrowserNotification(
-        `${trackerTypeLabel} tracker : ${n.tracker_name}${versionLabel}`,
-        `Nouvelle version détectée${n.version ? ` : ${n.version}` : ''}${n.release_name ? ` - ${n.release_name}` : ''}`,
-        `tracker-detected-${n.tracker_id}-${n.version || 'unknown'}`,
-      )
-      fetchNotifications()
-      return
-    }
-
-    if (payload.type === 'release_tracker_execution') {
-      const n = payload.notification
-      const statusLabel = n.status === 'completed' || n.status === 'success' ? 'réussie' : 'échouée'
-      const typeLabel = n.tracker_type === 'docker' ? 'Docker' : 'Git'
-      showExecutionBrowserNotification(
-        `${typeLabel} tracker : ${n.tracker_name}`,
-        `Exécution ${statusLabel}`,
-        `tracker-exec-${n.tracker_id}-${n.status}`,
-      )
-      fetchNotifications()
-      return
-    }
-
-    if (payload.type === 'webhook_execution') {
-      const n = payload.notification
-      const statusLabel = n.status === 'completed' || n.status === 'success' ? 'réussie' : 'échouée'
-      showExecutionBrowserNotification(
-        `Webhook : ${n.webhook_name}`,
-        `Exécution ${statusLabel}`,
-        `webhook-exec-${n.webhook_id}-${n.status}`,
-      )
-      fetchNotifications()
-    }
-  }
-})
-
-async function fetchNotifications() {
-  if (loading.value) return
-  loading.value = true
-  try {
-    const res = await apiClient.getNotifications()
-    const incoming = res.data?.notifications || []
-
-    // Sync server-side readAt (cross-device: if another device marked as read, update here)
-    const serverReadAt = res.data?.read_at
-    if (serverReadAt !== undefined) {
-      readAtRef.value = serverReadAt  // null (never marked) or ISO timestamp
-    }
-
-    // Fallback browser notifications via polling — only for IDs not already seen via WS
-    if (seenIdSet !== null && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-      for (const item of incoming) {
-        if (item.browser_notify && !seenIdSet.has(item.id)) {
-          showBrowserNotification(item)
-        }
-      }
-    }
-
-    seenIdSet = new Set(incoming.map(n => n.id))
-    notifications.value = incoming
-  } catch {
-    // Non-critical — silent fail
-  } finally {
-    loading.value = false
-  }
-}
-
-function syncNotificationsIfVisible() {
-  if (document.visibilityState !== 'visible') return
-  fetchNotifications()
-}
-
-function onAppResume() {
-  syncNotificationsIfVisible()
+  if (isOpen.value) fetchNotifications()
 }
 
 function onClickOutside(e) {
@@ -495,28 +214,12 @@ function onClickOutside(e) {
   }
 }
 
-onMounted(async () => {
-  // Request notification permission on first visit
-  if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
-    const perm = await Notification.requestPermission()
-    if (perm === 'granted') {
-      await setupPushNotifications()
-    }
-  } else if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-    // Already granted (e.g. page reload) — ensure subscription is registered with server
-    await setupPushNotifications()
-  }
-  watchPermissionChange()
-  fetchNotifications()
-  pollTimer = setInterval(fetchNotifications, 30_000)
+onMounted(() => {
   document.addEventListener('click', onClickOutside)
-  window.addEventListener('ss:app-resume', onAppResume)
 })
 
 onUnmounted(() => {
-  clearInterval(pollTimer)
   document.removeEventListener('click', onClickOutside)
-  window.removeEventListener('ss:app-resume', onAppResume)
 })
 </script>
 

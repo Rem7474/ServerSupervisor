@@ -159,14 +159,25 @@
     </div>
 
     <!-- ─── KPIs ─────────────────────────────────────────────────────────────── -->
+    <LoadingSkeleton
+      v-if="loading"
+      variant="kpi"
+      :lines="4"
+    />
     <DashboardKPIs
+      v-else
       :cve-summary="cveSummary"
       :cve-timestamp-text="cveTimestampText"
     />
 
     <!-- ─── Cluster Proxmox (conditionnel) ──────────────────────────────────── -->
+    <LoadingSkeleton
+      v-if="loading && hasProxmox"
+      variant="proxmox-cluster"
+      :lines="3"
+    />
     <ProxmoxClusterCard
-      v-if="hasProxmox && proxmoxNodes.length"
+      v-else-if="hasProxmox && proxmoxNodes.length"
       :nodes="proxmoxNodes"
     />
 
@@ -364,107 +375,110 @@
             </tr>
           </thead>
           <tbody>
-            <tr
-              v-for="host in paginatedHosts"
-              :key="host.id"
-            >
-              <td>
-                <label class="form-check">
-                  <input
-                    v-model="selectedHostIds"
-                    class="form-check-input"
-                    type="checkbox"
-                    :value="host.id"
-                  >
-                  <span class="form-check-label" />
-                </label>
-              </td>
-              <td>
-                <router-link
-                  :to="`/hosts/${host.id}`"
-                  class="fw-semibold text-decoration-none"
-                >
-                  {{ host.name || host.hostname || 'Sans nom' }}
-                </router-link>
-                <div class="text-secondary small">
-                  {{ host.hostname || 'Non connecté' }}
-                </div>
-                <div
-                  v-if="proxmoxGuestPath(host.id)"
-                  class="mt-1"
-                >
-                  <router-link
-                    :to="proxmoxGuestPath(host.id)"
-                    class="badge bg-orange-lt text-orange text-decoration-none"
-                  >
-                    Stats Proxmox
-                  </router-link>
-                </div>
-              </td>
-              <td class="status-col">
-                <span :class="hostStatusClass(host.status)">
-                  <span :class="['status-dot', host.status === 'online' ? 'status-dot-animated' : '']" />
-                  {{ formatHostStatus(host.status) }}
-                </span>
-              </td>
-              <td>
-                <div class="text-body">
-                  {{ host.ip_address }}
-                </div>
-                <div class="text-secondary small">
-                  {{ host.os || 'N/A' }}
-                </div>
-              </td>
-              <td>
-                <span
-                  :class="cpuColor(effectiveMetrics(host.id).cpu)"
-                  :title="effectiveMetrics(host.id).source === 'proxmox' ? 'proxmox' : ''"
-                >
-                  {{ effectiveMetrics(host.id).cpu != null ? effectiveMetrics(host.id).cpu.toFixed(1) + '%' : '-' }}
-                </span>
-              </td>
-              <td>
-                <span
-                  :class="memColor(effectiveMetrics(host.id).memPct)"
-                  :title="effectiveMetrics(host.id).source === 'proxmox' ? 'proxmox' : ''"
-                >
-                  {{ effectiveMetrics(host.id).memPct != null ? effectiveMetrics(host.id).memPct.toFixed(1) + '%' : '-' }}
-                </span>
-              </td>
-              <td>
-                <span :class="diskColor(diskUsage[host.id])">
-                  {{ diskUsage[host.id] != null ? diskUsage[host.id].toFixed(1) + '%' : '-' }}
-                </span>
-              </td>
-              <td>
-                <span
-                  v-if="aptPendingHosts[host.id]"
-                  class="badge bg-yellow-lt text-yellow"
-                >{{ aptPendingHosts[host.id] }}</span>
-                <span
-                  v-else
-                  class="text-secondary"
-                >—</span>
-              </td>
-              <td>{{ hostMetrics[host.id] ? formatUptime(hostMetrics[host.id].uptime) : '-' }}</td>
-              <td class="last-activity-col">
-                <RelativeTime :date="host.last_seen" />
-              </td>
-            </tr>
-            <tr v-if="!loading && hosts.length > 0 && sortedHosts.length === 0">
-              <td
-                colspan="10"
-                class="text-center text-secondary py-4"
+            <template v-if="metricsReady">
+              <tr
+                v-for="host in paginatedHosts"
+                :key="host.id"
+                :class="{ 'table-active': selectedHostIds.includes(host.id) }"
               >
-                Aucun hôte ne correspond à votre recherche.
-              </td>
-            </tr>
+                <td>
+                  <label class="form-check">
+                    <input
+                      v-model="selectedHostIds"
+                      class="form-check-input"
+                      type="checkbox"
+                      :value="host.id"
+                    >
+                    <span class="form-check-label" />
+                  </label>
+                </td>
+                <td>
+                  <router-link
+                    :to="`/hosts/${host.id}`"
+                    class="fw-semibold text-decoration-none"
+                  >
+                    {{ host.name || host.hostname || 'Sans nom' }}
+                  </router-link>
+                  <div class="text-secondary small">
+                    {{ host.hostname || 'Non connecté' }}
+                  </div>
+                  <div
+                    v-if="proxmoxGuestPath(host.id)"
+                    class="mt-1"
+                  >
+                    <router-link
+                      :to="proxmoxGuestPath(host.id)"
+                      class="badge bg-orange-lt text-orange text-decoration-none"
+                    >
+                      Stats Proxmox
+                    </router-link>
+                  </div>
+                </td>
+                <td class="status-col">
+                  <span :class="hostStatusClass(host.status)">
+                    <span :class="['status-dot', host.status === 'online' ? 'status-dot-animated' : '']" />
+                    {{ formatHostStatus(host.status) }}
+                  </span>
+                </td>
+                <td>
+                  <div class="text-body">
+                    {{ host.ip_address }}
+                  </div>
+                  <div class="text-secondary small">
+                    {{ host.os || 'N/A' }}
+                  </div>
+                </td>
+                <td>
+                  <span
+                    :class="cpuColor(effectiveMetrics(host.id).cpu)"
+                    :title="effectiveMetrics(host.id).source === 'proxmox' ? 'proxmox' : ''"
+                  >
+                    {{ effectiveMetrics(host.id).cpu != null ? effectiveMetrics(host.id).cpu.toFixed(1) + '%' : '-' }}
+                  </span>
+                </td>
+                <td>
+                  <span
+                    :class="memColor(effectiveMetrics(host.id).memPct)"
+                    :title="effectiveMetrics(host.id).source === 'proxmox' ? 'proxmox' : ''"
+                  >
+                    {{ effectiveMetrics(host.id).memPct != null ? effectiveMetrics(host.id).memPct.toFixed(1) + '%' : '-' }}
+                  </span>
+                </td>
+                <td>
+                  <span :class="diskColor(diskUsage[host.id])">
+                    {{ diskUsage[host.id] != null ? diskUsage[host.id].toFixed(1) + '%' : '-' }}
+                  </span>
+                </td>
+                <td>
+                  <span
+                    v-if="aptPendingHosts[host.id]"
+                    class="badge bg-yellow-lt text-yellow"
+                  >{{ aptPendingHosts[host.id] }}</span>
+                  <span
+                    v-else
+                    class="text-secondary"
+                  >—</span>
+                </td>
+                <td>{{ hostMetrics[host.id] ? formatUptime(hostMetrics[host.id].uptime) : '-' }}</td>
+                <td class="last-activity-col">
+                  <RelativeTime :date="host.last_seen" />
+                </td>
+              </tr>
+              <tr v-if="hosts.length > 0 && sortedHosts.length === 0">
+                <td
+                  colspan="10"
+                  class="text-center text-secondary py-4"
+                >
+                  Aucun hôte ne correspond à votre recherche.
+                </td>
+              </tr>
+            </template>
           </tbody>
         </table>
       </div>
 
       <div
-        v-if="!loading && sortedHosts.length > 0"
+        v-if="metricsReady && sortedHosts.length > 0"
         class="card-footer d-flex justify-content-end"
       >
         <PaginationNav
@@ -475,7 +489,7 @@
       </div>
 
       <div
-        v-if="loading"
+        v-if="!metricsReady"
         class="p-3"
       >
         <LoadingSkeleton
@@ -550,6 +564,7 @@ const {
   chartSources,
   selectedCount,
   canRunApt,
+  metricsReady,
   wsStatus,
   wsError,
   retryCount,

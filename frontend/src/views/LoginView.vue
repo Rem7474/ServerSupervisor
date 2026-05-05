@@ -19,6 +19,7 @@
           <div class="mb-3">
             <label class="form-label">Utilisateur</label>
             <input
+              ref="usernameInput"
               v-model="username"
               type="text"
               class="form-control"
@@ -43,24 +44,27 @@
             >
           </div>
 
-          <div
-            v-if="needsMFA"
-            class="mb-3"
-          >
-            <label class="form-label">Code TOTP</label>
-            <input
-              v-model="totpCode"
-              type="text"
-              class="form-control"
-              placeholder="123456"
-              inputmode="numeric"
-              maxlength="6"
-              required
+          <Transition name="slide-down">
+            <div
+              v-if="needsMFA"
+              class="mb-3"
             >
-            <div class="text-secondary small mt-1">
-              Entrez le code de votre application d'authentification.
+              <label class="form-label">Code TOTP</label>
+              <input
+                ref="totpInput"
+                v-model="totpCode"
+                type="text"
+                class="form-control"
+                placeholder="123456"
+                inputmode="numeric"
+                maxlength="6"
+                required
+              >
+              <div class="text-secondary small mt-1">
+                Entrez le code de votre application d'authentification.
+              </div>
             </div>
-          </div>
+          </Transition>
 
           <div
             v-if="error"
@@ -76,7 +80,7 @@
               class="btn btn-primary w-100"
               :disabled="loading"
             >
-              {{ loading ? 'Connexion...' : (needsMFA ? 'Verifier le code' : 'Se connecter') }}
+              {{ loading ? 'Connexion...' : (needsMFA ? 'Vérifier le code' : 'Se connecter') }}
             </button>
           </div>
         </div>
@@ -86,7 +90,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, watch, nextTick, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import api from '../api'
@@ -100,6 +104,19 @@ const error = ref('')
 const loading = ref(false)
 const needsMFA = ref(false)
 const totpCode = ref('')
+const usernameInput = ref(null)
+const totpInput = ref(null)
+
+onMounted(() => {
+  usernameInput.value?.focus()
+})
+
+watch(needsMFA, async (val) => {
+  if (val) {
+    await nextTick()
+    totpInput.value?.focus()
+  }
+})
 
 async function handleLogin() {
   loading.value = true
@@ -121,12 +138,30 @@ async function handleLogin() {
         router.push('/')
       }
     } else {
-      error.value = 'Reponse de connexion invalide.'
+      error.value = 'Réponse de connexion invalide.'
     }
   } catch (e) {
-    error.value = e.response?.data?.error || 'Erreur de connexion'
+    if (needsMFA.value) {
+      totpCode.value = ''
+      nextTick(() => totpInput.value?.focus())
+      error.value = e.response?.data?.error || 'Code invalide ou expiré — générez un nouveau code.'
+    } else {
+      error.value = e.response?.data?.error || 'Erreur de connexion'
+    }
   } finally {
     loading.value = false
   }
 }
 </script>
+
+<style scoped>
+.slide-down-enter-active,
+.slide-down-leave-active {
+  transition: all 0.25s ease;
+}
+.slide-down-enter-from,
+.slide-down-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+</style>

@@ -277,6 +277,11 @@ export function useDashboard() {
 
   const selectedCount = computed(() => selectedHostIds.value.length)
   const canRunApt = computed(() => auth.role === 'admin' || auth.role === 'operator')
+  const metricsReady = computed(() => {
+    const keys = Object.keys(hostMetrics.value)
+    if (keys.length === 0) return false
+    return hosts.value.some((h: DashboardHostRecord) => keys.includes(h.id))
+  })
 
   const proxmoxLinkByHostId = computed(() => {
     const m: Record<string, DashboardProxmoxLinkRecord> = {}
@@ -410,7 +415,7 @@ export function useDashboard() {
             callback: (value: string | number) => formatSummaryChartTime(Number(value)),
           },
         },
-        y: { display: true, min: 0, max: 100, grid: { color: colors.grid }, ticks: { color: colors.tickText } },
+        y: { display: true, min: 0, max: 100, grid: { color: colors.grid }, ticks: { color: colors.tickText, callback: (v: number | string) => `${v}%` } },
       },
       elements: { point: { radius: 0, hitRadius: 10, hoverRadius: 5 }, line: { tension: 0.3 } },
       interaction: { mode: 'nearest', axis: 'x', intersect: false },
@@ -657,6 +662,7 @@ export function useDashboard() {
     chartSources,
     selectedCount,
     canRunApt,
+    metricsReady,
     wsStatus,
     wsError,
     retryCount,
