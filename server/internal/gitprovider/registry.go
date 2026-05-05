@@ -342,13 +342,26 @@ func getRegistryToken(client *http.Client, registry, image, authToken string) (s
 		}
 		return result.Token, nil
 	case "ghcr.io":
-		// GHCR public: no auth required.
-		// GHCR private: use runtime auth token from provider config.
+		// ghcr.io requires an anonymous Bearer token even for public images.
+		// Fetch one from its token endpoint, optionally authenticated with a GitHub PAT.
+		authURL := fmt.Sprintf("https://ghcr.io/token?service=ghcr.io&scope=repository:%s:pull", image)
+		req, _ := http.NewRequest("GET", authURL, nil)
+		req.Header.Set("User-Agent", "ServerSupervisor/1.0")
 		if authToken != "" {
-			return authToken, nil
+			req.Header.Set("Authorization", "Bearer "+authToken)
 		}
-		// Fallback: attempt without token (succeeds for public images)
-		return "", nil
+		resp, err := client.Do(req)
+		if err != nil {
+			return "", err
+		}
+		defer func() { _ = resp.Body.Close() }()
+		var result struct {
+			Token string `json:"token"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+			return "", err
+		}
+		return result.Token, nil
 	default:
 		// For unknown registries, attempt unauthenticated access
 		return "", nil
