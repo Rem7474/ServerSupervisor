@@ -312,6 +312,8 @@ export default {
   getScheduledTaskExecutions: (id: string, limit?: number) =>
     api.get(`/v1/scheduled-tasks/${id}/executions`, { params: { limit: limit ?? 20 } }),
   getHostCustomTasks: (hostId: string) => api.get(`/v1/hosts/${hostId}/custom-tasks`),
+  getHostTasksYaml: (hostId: string) => api.get(`/v1/hosts/${hostId}/tasks-yaml`),
+  getHostComposeProjects: (hostId: string) => api.get(`/v1/hosts/${hostId}/compose-projects`),
 
   // Release Trackers
   getReleaseTrackers: () => api.get('/v1/release-trackers'),

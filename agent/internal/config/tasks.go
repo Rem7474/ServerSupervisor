@@ -105,3 +105,17 @@ func (c *TasksConfig) FindTask(id string) *CustomTask {
 	}
 	return nil
 }
+
+// LoadTasksConfigRaw returns the raw YAML content of the tasks config file.
+// Returns empty string if the file does not exist or cannot be read.
+func LoadTasksConfigRaw() string {
+	path := os.Getenv("TASKS_CONFIG_PATH")
+	if path == "" {
+		path = defaultTasksConfigPath
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	return string(data)
+}

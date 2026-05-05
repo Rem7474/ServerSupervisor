@@ -216,6 +216,17 @@ func (h *ScheduledTaskHandler) GetCustomTasks(c *gin.Context) {
 	c.Data(http.StatusOK, "application/json", []byte(tasksJSON))
 }
 
+// GetTasksConfigYAML returns the raw tasks.yaml content cached from the agent's last report.
+func (h *ScheduledTaskHandler) GetTasksConfigYAML(c *gin.Context) {
+	hostID := c.Param("id")
+	yaml, err := h.db.GetHostTasksConfigYAML(hostID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"yaml": yaml})
+}
+
 // GetScheduledTaskExecutions returns the last N executions (remote_commands) for a task.
 func (h *ScheduledTaskHandler) GetScheduledTaskExecutions(c *gin.Context) {
 	taskID := c.Param("id")

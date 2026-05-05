@@ -336,6 +336,7 @@ func sendReport(ctx context.Context, cfg *config.Config, s *sender.Sender) {
 		DiskMetrics:        diskMetrics,
 		DiskHealth:         diskHealth,
 		CustomTasks:        customTasksList,
+		TasksConfigYAML:    config.LoadTasksConfigRaw(),
 		Timestamp:          time.Now(),
 	}
 	trimWebLogsForReportSize(report, cfg.MaxReportBodyBytes)

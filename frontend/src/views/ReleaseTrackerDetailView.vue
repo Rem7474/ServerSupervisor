@@ -416,6 +416,104 @@
             </div>
           </div>
         </div>
+
+        <!-- tasks.yaml snippet card -->
+        <div
+          v-if="tracker.host_id"
+          class="card mt-3"
+        >
+          <div class="card-header d-flex align-items-center justify-content-between">
+            <h3 class="card-title mb-0">
+              Exemple de script tasks.yaml
+            </h3>
+            <div class="d-flex align-items-center gap-2">
+              <span
+                v-if="detectedComposePath"
+                class="badge bg-green-lt text-green"
+                title="Chemin détecté depuis les projets Compose de l'hôte"
+              >
+                Chemin détecté automatiquement
+              </span>
+              <button
+                class="btn btn-sm btn-ghost-secondary"
+                :title="copied ? 'Copié !' : 'Copier'"
+                @click="copySnippet"
+              >
+                <svg
+                  v-if="!copied"
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="14"
+                  height="14"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                >
+                  <rect
+                    x="9"
+                    y="9"
+                    width="13"
+                    height="13"
+                    rx="2"
+                    ry="2"
+                  /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+                </svg>
+                <svg
+                  v-else
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="14"
+                  height="14"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                >
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+          <div class="card-body p-0">
+            <div
+              v-if="loadingSnippet"
+              class="p-3 text-center text-muted small"
+            >
+              Chargement...
+            </div>
+            <template v-else>
+              <div
+                v-if="tasksYaml"
+                class="px-3 pt-2 pb-0"
+              >
+                <p class="small text-muted mb-1">
+                  Contenu actuel de <code>tasks.yaml</code> sur l'hôte — ajoutez la tâche ci-dessous :
+                </p>
+                <pre
+                  class="bg-dark text-light rounded p-2 small"
+                  style="max-height:160px;overflow-y:auto;font-size:0.72rem;"
+                >{{ tasksYaml }}</pre>
+              </div>
+              <div class="px-3 pt-2 pb-3">
+                <p
+                  v-if="!tasksYaml"
+                  class="small text-muted mb-1"
+                >
+                  Ajoutez cette tâche dans <code>/etc/serversupervisor/tasks.yaml</code> sur l'hôte :
+                </p>
+                <p
+                  v-else
+                  class="small text-muted mb-1"
+                >
+                  Tâche à ajouter dans la section <code>tasks:</code> :
+                </p>
+                <pre
+                  class="bg-dark text-light rounded p-2 small mb-0"
+                  style="font-size:0.72rem;"
+                >{{ generatedSnippet }}</pre>
+              </div>
+            </template>
+          </div>
+        </div>
       </div>
 
       <div class="col-lg-7">
@@ -563,6 +661,11 @@ const showConsole = ref(false)
 const nowTick = ref(Date.now())
 let cooldownTimer = null
 
+const composeProjects = ref([])
+const tasksYaml = ref('')
+const loadingSnippet = ref(false)
+const copied = ref(false)
+
 const showModal = ref(false)
 const saving = ref(false)
 const modalError = ref('')
@@ -595,6 +698,52 @@ const dockerEnvVars = [
 const envVars = computed(() =>
   tracker.value?.tracker_type === 'docker' ? dockerEnvVars : gitEnvVars
 )
+
+// Find the compose project whose raw_config references the tracked Docker image.
+const detectedComposePath = computed(() => {
+  const t = tracker.value
+  if (!t || t.tracker_type !== 'docker' || !t.docker_image) return null
+  const imageName = t.docker_image.split(':')[0].toLowerCase()
+  for (const p of composeProjects.value) {
+    const raw = (p.raw_config || '').toLowerCase()
+    if (raw.includes(imageName) && p.working_dir) {
+      return p.working_dir
+    }
+  }
+  return null
+})
+
+// Derive a safe task ID from the tracker name or image name.
+const snippetTaskId = computed(() => {
+  const t = tracker.value
+  if (!t) return 'update-service'
+  const base = (t.tracker_type === 'docker' ? t.docker_image?.split('/').pop()?.split(':')[0] : t.repo_name) || t.name
+  return 'update-' + base.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40)
+})
+
+// Build the YAML snippet tailored to the tracker type.
+const generatedSnippet = computed(() => {
+  const t = tracker.value
+  if (!t) return ''
+  const taskId = snippetTaskId.value
+
+  if (t.tracker_type === 'docker') {
+    const image = t.docker_image || 'mon-image'
+    const path = detectedComposePath.value || '/opt/mon-projet'
+    const name = t.name || image
+    return `  - id: ${taskId}
+    name: "Pull et redémarrage ${name}"
+    command: ["bash", "-c", "cd ${path} && docker compose pull && docker compose down && docker compose up -d"]
+    timeout: 3600`
+  } else {
+    const repo = t.repo_name || 'mon-app'
+    const name = t.name || repo
+    return `  - id: ${taskId}
+    name: "Déploiement ${name}"
+    command: ["bash", "-c", "echo 'Nouvelle release: $SS_TAG_NAME' && /opt/${repo}/deploy.sh"]
+    timeout: 3600`
+  }
+})
 
 const canRunManually = computed(() => {
   if (!tracker.value) return false
@@ -693,6 +842,31 @@ async function load() {
   }
 
   await loadVersionHistory()
+
+  if (tracker.value?.host_id) {
+    await loadSnippetData(tracker.value.host_id)
+  }
+}
+
+async function loadSnippetData(hostId) {
+  loadingSnippet.value = true
+  try {
+    const [composeRes, yamlRes] = await Promise.all([
+      api.getHostComposeProjects(hostId).catch(() => ({ data: [] })),
+      api.getHostTasksYaml(hostId).catch(() => ({ data: { yaml: '' } })),
+    ])
+    composeProjects.value = composeRes.data || []
+    tasksYaml.value = yamlRes.data?.yaml || ''
+  } finally {
+    loadingSnippet.value = false
+  }
+}
+
+function copySnippet() {
+  navigator.clipboard?.writeText(generatedSnippet.value).then(() => {
+    copied.value = true
+    setTimeout(() => { copied.value = false }, 2000)
+  })
 }
 
 async function loadVersionHistory() {

@@ -128,6 +128,22 @@ func (db *DB) GetHostCustomTasks(hostID string) (string, error) {
 	return tasks, err
 }
 
+// UpdateHostTasksConfigYAML stores the raw tasks.yaml content for a host.
+func (db *DB) UpdateHostTasksConfigYAML(hostID, yaml string) error {
+	_, err := db.conn.Exec(
+		`UPDATE hosts SET tasks_config_yaml = $1 WHERE id = $2`,
+		yaml, hostID)
+	return err
+}
+
+// GetHostTasksConfigYAML returns the cached tasks.yaml content for a host.
+func (db *DB) GetHostTasksConfigYAML(hostID string) (string, error) {
+	var yaml string
+	err := db.conn.QueryRow(
+		`SELECT tasks_config_yaml FROM hosts WHERE id = $1`, hostID).Scan(&yaml)
+	return yaml, err
+}
+
 // UpdateHostBotDetection stores the latest bot-detection summary JSON for a host.
 func (db *DB) UpdateHostBotDetection(hostID, botDetectionJSON string) error {
 	_, err := db.conn.Exec(

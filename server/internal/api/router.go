@@ -175,6 +175,7 @@ func registerHostPermissionRoutes(g *gin.RouterGroup, h *handlers.HostPermission
 func registerDockerRoutes(g *gin.RouterGroup, dockerH *handlers.DockerHandler, systemH *handlers.SystemHandler, networkH *handlers.NetworkHandler, agentH *handlers.AgentHandler) {
 	g.GET("/hosts/:id/containers", dockerH.ListContainers)
 	g.GET("/hosts/:id/commands/history", agentH.GetHostCommandHistory)
+	g.GET("/hosts/:id/compose-projects", dockerH.ListHostComposeProjects)
 	g.GET("/docker/containers", dockerH.ListAllContainers)
 	g.GET("/docker/compose", dockerH.ListComposeProjects)
 	g.POST("/docker/command", dockerH.SendDockerCommand)
@@ -249,6 +250,7 @@ func registerTaskRoutes(g *gin.RouterGroup, h *handlers.ScheduledTaskHandler) {
 	g.GET("/hosts/:id/scheduled-tasks", h.ListScheduledTasks)
 	g.POST("/hosts/:id/scheduled-tasks", h.CreateScheduledTask)
 	g.GET("/hosts/:id/custom-tasks", h.GetCustomTasks)
+	g.GET("/hosts/:id/tasks-yaml", h.GetTasksConfigYAML)
 	g.PUT("/scheduled-tasks/:id", h.UpdateScheduledTask)
 	g.DELETE("/scheduled-tasks/:id", h.DeleteScheduledTask)
 	g.POST("/scheduled-tasks/:id/run", h.RunScheduledTask)

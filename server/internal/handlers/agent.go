@@ -262,6 +262,13 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 		}
 	}
 
+	// Store raw tasks.yaml content (used by frontend to show snippet examples)
+	if report.TasksConfigYAML != "" {
+		if err := h.db.UpdateHostTasksConfigYAML(hostID, report.TasksConfigYAML); err != nil {
+			log.Printf("Warning: failed to store tasks config YAML for host %s: %v", safeHostID, err)
+		}
+	}
+
 	// Store agent capabilities (which collectors are enabled on this host)
 	if report.Capabilities != nil {
 		if b, err := json.Marshal(report.Capabilities); err == nil {

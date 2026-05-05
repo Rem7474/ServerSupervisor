@@ -33,5 +33,6 @@ type AgentReport struct {
 	DiskMetrics     []DiskMetrics       `json:"disk_metrics,omitempty"`
 	DiskHealth      []DiskHealth        `json:"disk_health,omitempty"`
 	CustomTasks     []CustomTaskSummary `json:"custom_tasks,omitempty"`
+	TasksConfigYAML string              `json:"tasks_config_yaml,omitempty"`
 	Timestamp       time.Time           `json:"timestamp"`
 }

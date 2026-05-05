@@ -199,3 +199,17 @@ func (h *DockerHandler) ListComposeProjects(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, projects)
 }
+
+// ListHostComposeProjects returns Docker Compose projects for a specific host.
+func (h *DockerHandler) ListHostComposeProjects(c *gin.Context) {
+	hostID := c.Param("id")
+	projects, err := h.db.GetComposeProjectsByHost(hostID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch compose projects"})
+		return
+	}
+	if projects == nil {
+		projects = []models.ComposeProject{}
+	}
+	c.JSON(http.StatusOK, projects)
+}
