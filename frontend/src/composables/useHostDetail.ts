@@ -39,7 +39,13 @@ export function useHostDetail() {
   const dialog = useConfirmDialog()
   const canRunApt = computed(() => auth.canManage)
 
-  const activeTab = ref('metrics')
+  const activeTab = ref<string>(
+    typeof route.query.tab === 'string' ? route.query.tab : 'metrics'
+  )
+
+  watch(activeTab, (tab) => {
+    router.replace({ query: { ...route.query, tab } })
+  })
   const isEditing = ref(false)
   const tasksCount = ref(0)
   const aptCmdLoading = ref('')

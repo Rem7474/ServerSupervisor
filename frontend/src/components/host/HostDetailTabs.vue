@@ -49,6 +49,10 @@ const props = defineProps({
     type: Number,
     default: 0,
   },
+  securityUpdates: {
+    type: Number,
+    default: 0,
+  },
 })
 
 defineEmits(['update:modelValue'])
@@ -65,8 +69,8 @@ const visibleTabs = computed(() => {
     {
       key: 'apt',
       label: 'APT',
-      badge: props.pendingPackages > 0 ? props.pendingPackages : null,
-      badgeClass: 'badge bg-yellow-lt text-yellow ms-1',
+      badge: props.securityUpdates > 0 ? props.securityUpdates : (props.pendingPackages > 0 ? props.pendingPackages : null),
+      badgeClass: props.securityUpdates > 0 ? 'badge bg-red-lt text-red ms-1' : 'badge bg-yellow-lt text-yellow ms-1',
     },
     {
       key: 'commandes',

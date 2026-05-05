@@ -65,6 +65,7 @@
             Mettre à jour l'agent
           </button>
           <button
+            v-if="auth.isAdmin"
             class="btn btn-outline-danger"
             @click="deleteHost"
           >
@@ -310,11 +311,31 @@
           :can-run-apt="canRunApt"
           :containers-count="containers.length"
           :pending-packages="aptStatus?.pending_packages || 0"
+          :security-updates="aptStatus?.security_updates || 0"
           :commands-count="cmdHistory.length"
           :tasks-count="tasksCount"
         />
 
         <div v-show="activeTab === 'metrics'">
+          <div
+            v-if="host && host.status !== 'online'"
+            class="alert alert-warning mb-3"
+          >
+            <svg
+              class="icon me-2"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+            Agent hors ligne — les données affichées peuvent être obsolètes ou indisponibles.
+          </div>
           <HostMetricsPanel
             :host-id="hostId"
             :metrics="effectiveMetrics"

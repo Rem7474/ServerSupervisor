@@ -119,7 +119,6 @@
               v-model="selectAll"
               type="checkbox"
               class="form-check-input"
-              @change="toggleSelectAll"
             >
             <span class="form-check-label">Sélectionner tous les hôtes</span>
           </label>
@@ -174,23 +173,56 @@
     <div class="side-layout">
       <div class="side-main">
         <div class="row row-cards">
+          <template v-if="wsStatus === 'connecting' && hosts.length === 0">
+            <div
+              v-for="n in 3"
+              :key="`sk-${n}`"
+              class="col-12"
+            >
+              <div class="card">
+                <div class="card-header placeholder-glow">
+                  <div class="placeholder col-3 rounded me-2" />
+                  <div class="placeholder col-1 rounded" />
+                  <div class="ms-auto placeholder col-2 rounded" />
+                </div>
+                <div class="card-body placeholder-glow">
+                  <div class="row g-2">
+                    <div class="col-3">
+                      <div
+                        class="placeholder col-12 rounded"
+                        style="height:3.5rem"
+                      />
+                    </div>
+                    <div class="col-3">
+                      <div
+                        class="placeholder col-12 rounded"
+                        style="height:3.5rem"
+                      />
+                    </div>
+                    <div class="col-3">
+                      <div
+                        class="placeholder col-12 rounded"
+                        style="height:3.5rem"
+                      />
+                    </div>
+                    <div class="col-3">
+                      <div
+                        class="placeholder col-12 rounded"
+                        style="height:3.5rem"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </template>
           <div
-            v-if="filteredHosts.length === 0"
+            v-else-if="filteredHosts.length === 0"
             class="col-12"
           >
             <div class="card">
               <div class="card-body text-center text-secondary py-4">
-                <template v-if="wsStatus === 'connecting' || wsStatus === 'reconnecting'">
-                  <span
-                    class="spinner-border spinner-border-sm me-2"
-                    role="status"
-                    aria-hidden="true"
-                  />
-                  Chargement des hôtes...
-                </template>
-                <template v-else>
-                  Aucun hôte ne correspond aux filtres.
-                </template>
+                Aucun hôte ne correspond aux filtres.
               </div>
             </div>
           </div>
@@ -323,6 +355,26 @@
                     v-else
                     class="text-secondary small flex-shrink-0"
                   >Mode lecture seule</span>
+                  <button
+                    class="btn btn-sm btn-ghost-secondary flex-shrink-0"
+                    :title="hostExpanded[host.id] ? 'Réduire' : 'Développer'"
+                    @click="hostExpanded[host.id] = !hostExpanded[host.id]"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      :style="{ transform: hostExpanded[host.id] ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }"
+                    >
+                      <polyline points="6 9 12 15 18 9" />
+                    </svg>
+                  </button>
                 </div>
               </div>
 
@@ -337,14 +389,12 @@
                 </div>
 
                 <template v-else>
-                  <!-- KPI stats -->
-                  <div class="row g-2 mb-3">
-                    <div class="col-4">
+                  <!-- KPI stats (toujours visibles) -->
+                  <div class="row g-2 mb-1">
+                    <div class="col-3">
                       <div
                         class="text-center p-2 rounded"
-                        :class="aptStatuses[host.id].pending_packages > 0
-                          ? 'bg-yellow-lt'
-                          : 'bg-green-lt'"
+                        :class="aptStatuses[host.id].pending_packages > 0 ? 'bg-yellow-lt' : 'bg-green-lt'"
                       >
                         <div
                           class="fs-3 fw-bold lh-1 mb-1"
@@ -357,12 +407,10 @@
                         </div>
                       </div>
                     </div>
-                    <div class="col-4">
+                    <div class="col-3">
                       <div
                         class="text-center p-2 rounded"
-                        :class="aptStatuses[host.id].security_updates > 0
-                          ? 'bg-red-lt'
-                          : 'bg-secondary-lt'"
+                        :class="aptStatuses[host.id].security_updates > 0 ? 'bg-red-lt' : 'bg-secondary-lt'"
                       >
                         <div
                           class="fs-3 fw-bold lh-1 mb-1"
@@ -375,7 +423,27 @@
                         </div>
                       </div>
                     </div>
-                    <div class="col-4">
+                    <div class="col-3">
+                      <div
+                        class="text-center p-2 rounded"
+                        :class="aptStatuses[host.id].cve_list?.length
+                          ? (aptStatuses[host.id].cve_list.some(c => c.severity === 'CRITICAL') ? 'bg-red-lt' : 'bg-orange-lt')
+                          : 'bg-secondary-lt'"
+                      >
+                        <div
+                          class="fs-3 fw-bold lh-1 mb-1"
+                          :class="aptStatuses[host.id].cve_list?.length
+                            ? (aptStatuses[host.id].cve_list.some(c => c.severity === 'CRITICAL') ? 'text-red' : 'text-orange')
+                            : 'text-secondary'"
+                        >
+                          {{ aptStatuses[host.id].cve_list?.length || 0 }}
+                        </div>
+                        <div class="text-secondary small">
+                          CVE
+                        </div>
+                      </div>
+                    </div>
+                    <div class="col-3">
                       <div class="text-center p-2 rounded bg-secondary-lt">
                         <div class="fw-semibold small lh-1 mb-1 text-truncate">
                           {{ aptStatuses[host.id].last_update
@@ -395,104 +463,106 @@
                     </div>
                   </div>
 
-                  <!-- CVE -->
-                  <div
-                    v-if="aptStatuses[host.id].cve_list?.length"
-                    class="mb-3"
-                  >
-                    <CVEList
-                      :cve-list="aptStatuses[host.id].cve_list"
-                      :show-max-severity="true"
-                      :always-expanded="false"
-                      :initially-collapsed="false"
-                      :limit="3"
-                    />
-                  </div>
-
-                  <!-- Paquets en attente -->
-                  <div
-                    v-if="getPackages(aptStatuses[host.id]).length > 0"
-                    class="mb-3"
-                  >
-                    <div class="d-flex align-items-center justify-content-between mb-2">
-                      <span class="small fw-semibold text-secondary">
-                        Paquets en attente
-                        <span class="badge bg-yellow-lt text-yellow ms-1">
-                          {{ getPackages(aptStatuses[host.id]).length }}
-                        </span>
-                      </span>
-                      <button
-                        v-if="getPackages(aptStatuses[host.id]).length > PKG_PREVIEW_COUNT"
-                        class="btn btn-link btn-sm p-0 small text-secondary"
-                        @click="pkgShowAll[host.id] = !pkgShowAll[host.id]"
-                      >
-                        {{ pkgShowAll[host.id]
-                          ? 'Réduire'
-                          : `Voir tout (${getPackages(aptStatuses[host.id]).length})` }}
-                      </button>
+                  <!-- Détail extensible -->
+                  <template v-if="hostExpanded[host.id]">
+                    <!-- CVE -->
+                    <div
+                      v-if="aptStatuses[host.id].cve_list?.length"
+                      class="mt-3 mb-3"
+                    >
+                      <CVEList
+                        :cve-list="aptStatuses[host.id].cve_list"
+                        :show-max-severity="true"
+                        :always-expanded="false"
+                        :initially-collapsed="false"
+                        :limit="3"
+                      />
                     </div>
-                    <div class="row g-1">
-                      <div
-                        v-for="pkg in visiblePackages(host.id)"
-                        :key="pkg"
-                        class="col-12 col-sm-6 col-md-4 col-lg-3"
-                      >
-                        <code
-                          class="small text-body d-block text-truncate"
-                          :title="pkg"
-                        >{{ pkg }}</code>
+
+                    <!-- Paquets en attente -->
+                    <div
+                      v-if="getPackages(aptStatuses[host.id]).length > 0"
+                      class="mb-3"
+                    >
+                      <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span class="small fw-semibold text-secondary">
+                          Paquets en attente
+                          <span class="badge bg-yellow-lt text-yellow ms-1">
+                            {{ getPackages(aptStatuses[host.id]).length }}
+                          </span>
+                        </span>
+                        <button
+                          v-if="getPackages(aptStatuses[host.id]).length > PKG_PREVIEW_COUNT"
+                          class="btn btn-link btn-sm p-0 small text-secondary"
+                          @click="pkgShowAll[host.id] = !pkgShowAll[host.id]"
+                        >
+                          {{ pkgShowAll[host.id]
+                            ? 'Réduire'
+                            : `Voir tout (${getPackages(aptStatuses[host.id]).length})` }}
+                        </button>
+                      </div>
+                      <div class="d-flex flex-column gap-1">
+                        <div
+                          v-for="pkg in visiblePackages(host.id)"
+                          :key="pkg"
+                        >
+                          <code
+                            class="small text-body"
+                            :title="pkg"
+                          >{{ pkg }}</code>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <!-- Historique (2 dernières commandes) -->
-                  <div
-                    v-if="aptHistories[host.id]?.length"
-                    class="border-top pt-2"
-                  >
-                    <div class="d-flex align-items-center justify-content-between mb-1">
-                      <span class="small fw-semibold text-secondary">Dernières commandes</span>
-                      <router-link
-                        to="/audit?module=apt"
-                        class="small text-secondary text-decoration-none"
-                      >
-                        Historique complet →
-                      </router-link>
-                    </div>
+                    <!-- Historique (2 dernières commandes) -->
                     <div
-                      v-for="cmd in aptHistories[host.id].slice(0, 2)"
-                      :key="cmd.id"
-                      class="d-flex align-items-center gap-2 py-1 flex-wrap"
+                      v-if="aptHistories[host.id]?.length"
+                      class="border-top pt-2"
                     >
-                      <code class="small">apt {{ cmd.action }}</code>
-                      <span :class="statusClass(cmd.status)">{{ statusLabel(cmd.status) }}</span>
-                      <span class="text-secondary small flex-shrink-0">{{ formatDate(cmd.created_at) }}</span>
-                      <span
-                        v-if="cmd.triggered_by"
-                        class="text-muted small flex-shrink-0"
-                      >· {{ cmd.triggered_by }}</span>
-                      <button
-                        class="btn btn-sm btn-ghost-secondary ms-auto flex-shrink-0"
-                        title="Voir les logs"
-                        @click="watchCommand(cmd, host)"
+                      <div class="d-flex align-items-center justify-content-between mb-1">
+                        <span class="small fw-semibold text-secondary">Dernières commandes</span>
+                        <router-link
+                          to="/audit?module=apt"
+                          class="small text-secondary text-decoration-none"
+                        >
+                          Historique complet →
+                        </router-link>
+                      </div>
+                      <div
+                        v-for="cmd in aptHistories[host.id].slice(0, 2)"
+                        :key="cmd.id"
+                        class="d-flex align-items-center gap-2 py-1 flex-wrap"
                       >
-                        <svg
-                          class="icon icon-sm"
-                          width="16"
-                          height="16"
-                          viewBox="0 0 24 24"
-                          stroke-width="2"
-                          stroke="currentColor"
-                          fill="none"
-                          xmlns="http://www.w3.org/2000/svg"
-                        ><path
-                          stroke="none"
-                          d="M0 0h24v24H0z"
-                          fill="none"
-                        /><path d="M4 6l16 0" /><path d="M4 12l16 0" /><path d="M4 18l12 0" /></svg>
-                      </button>
+                        <code class="small">apt {{ cmd.action }}</code>
+                        <span :class="statusClass(cmd.status)">{{ statusLabel(cmd.status) }}</span>
+                        <span class="text-secondary small flex-shrink-0">{{ formatDate(cmd.created_at) }}</span>
+                        <span
+                          v-if="cmd.triggered_by"
+                          class="text-muted small flex-shrink-0"
+                        >· {{ cmd.triggered_by }}</span>
+                        <button
+                          class="btn btn-sm btn-ghost-secondary ms-auto flex-shrink-0"
+                          title="Voir les logs"
+                          @click="watchCommand(cmd, host)"
+                        >
+                          <svg
+                            class="icon icon-sm"
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            stroke-width="2"
+                            stroke="currentColor"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                          ><path
+                            stroke="none"
+                            d="M0 0h24v24H0z"
+                            fill="none"
+                          /><path d="M4 6l16 0" /><path d="M4 12l16 0" /><path d="M4 18l12 0" /></svg>
+                        </button>
+                      </div>
                     </div>
-                  </div>
+                  </template>
                 </template>
               </div>
             </div>
@@ -626,7 +696,7 @@
     <!-- Toast feedback actions groupées -->
     <div
       v-if="bulkActionFeedback"
-      class="position-fixed bottom-0 end-0 p-3 toast-overlay"
+      class="position-fixed bottom-0 start-0 p-3 toast-overlay"
     >
       <div
         class="toast show align-items-center border-0"
@@ -679,7 +749,7 @@ const PKG_PREVIEW_COUNT = 15
 // ── État hôtes / APT ─────────────────────────────────────────────────────────
 const hosts = ref([])
 const selectedHosts = ref([])
-const selectAll = ref(false)
+const hostExpanded = ref({})
 const aptStatuses = ref({})
 const aptHistories = ref({})
 const pkgShowAll = ref({})
@@ -687,6 +757,16 @@ const hostCmdLoading = ref({})
 const auth = useAuthStore()
 const dialog = useConfirmDialog()
 const canRunApt = computed(() => auth.role === 'admin' || auth.role === 'operator')
+
+const selectAll = computed({
+  get() {
+    const ids = filteredHosts.value.map(h => h.id)
+    return ids.length > 0 && ids.every(id => selectedHosts.value.includes(id))
+  },
+  set(val) {
+    selectedHosts.value = val ? filteredHosts.value.map(h => h.id) : []
+  },
+})
 
 // ── Modal planification ───────────────────────────────────────────────────────
 import { MANUAL_SENTINEL } from '../utils/cron'
@@ -802,10 +882,6 @@ const filteredHosts = computed(() => {
 })
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-function toggleSelectAll() {
-  selectedHosts.value = selectAll.value ? hosts.value.map(h => h.id) : []
-}
-
 function getPackages(aptStatus) {
   if (!aptStatus?.package_list) return []
   try {
