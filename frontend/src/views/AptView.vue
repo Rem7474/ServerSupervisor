@@ -426,17 +426,17 @@
                     <div class="col-3">
                       <div
                         class="text-center p-2 rounded"
-                        :class="aptStatuses[host.id].cve_list?.length
-                          ? (aptStatuses[host.id].cve_list.some(c => c.severity === 'CRITICAL') ? 'bg-red-lt' : 'bg-orange-lt')
+                        :class="getCveList(aptStatuses[host.id]).length
+                          ? (getCveList(aptStatuses[host.id]).some(c => c.severity === 'CRITICAL') ? 'bg-red-lt' : 'bg-orange-lt')
                           : 'bg-secondary-lt'"
                       >
                         <div
                           class="fs-3 fw-bold lh-1 mb-1"
-                          :class="aptStatuses[host.id].cve_list?.length
-                            ? (aptStatuses[host.id].cve_list.some(c => c.severity === 'CRITICAL') ? 'text-red' : 'text-orange')
+                          :class="getCveList(aptStatuses[host.id]).length
+                            ? (getCveList(aptStatuses[host.id]).some(c => c.severity === 'CRITICAL') ? 'text-red' : 'text-orange')
                             : 'text-secondary'"
                         >
-                          {{ aptStatuses[host.id].cve_list?.length || 0 }}
+                          {{ getCveList(aptStatuses[host.id]).length }}
                         </div>
                         <div class="text-secondary small">
                           CVE
@@ -467,11 +467,11 @@
                   <template v-if="hostExpanded[host.id]">
                     <!-- CVE -->
                     <div
-                      v-if="aptStatuses[host.id].cve_list?.length"
+                      v-if="getCveList(aptStatuses[host.id]).length"
                       class="mt-3 mb-3"
                     >
                       <CVEList
-                        :cve-list="aptStatuses[host.id].cve_list"
+                        :cve-list="getCveList(aptStatuses[host.id])"
                         :show-max-severity="true"
                         :always-expanded="false"
                         :initially-collapsed="false"
@@ -888,6 +888,18 @@ function getPackages(aptStatus) {
     const parsed = typeof aptStatus.package_list === 'string'
       ? JSON.parse(aptStatus.package_list)
       : aptStatus.package_list
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+function getCveList(aptStatus) {
+  if (!aptStatus?.cve_list) return []
+  try {
+    const parsed = typeof aptStatus.cve_list === 'string'
+      ? JSON.parse(aptStatus.cve_list)
+      : aptStatus.cve_list
     return Array.isArray(parsed) ? parsed : []
   } catch {
     return []
