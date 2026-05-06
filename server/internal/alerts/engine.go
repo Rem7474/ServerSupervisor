@@ -1042,18 +1042,19 @@ func syslogLineTime(line proxmoxclient.PVESyslogLine) (time.Time, bool) {
 		return time.Time{}, false
 	}
 
-	parsed, err := time.ParseInLocation("Jan 2 15:04:05", stamp, time.Local)
+	// Parse syslog timestamps as UTC (standard for professional systems like Proxmox).
+	parsed, err := time.ParseInLocation("Jan 2 15:04:05", stamp, time.UTC)
 	if err != nil {
 		return time.Time{}, false
 	}
 
-	now := time.Now()
-	// Reconstruct with current year, then convert to UTC for consistent comparisons.
-	parsed = time.Date(now.Year(), parsed.Month(), parsed.Day(), parsed.Hour(), parsed.Minute(), parsed.Second(), 0, time.Local)
+	now := time.Now().UTC()
+	// Reconstruct with current year in UTC.
+	parsed = time.Date(now.Year(), parsed.Month(), parsed.Day(), parsed.Hour(), parsed.Minute(), parsed.Second(), 0, time.UTC)
 	if parsed.After(now.Add(24 * time.Hour)) {
 		parsed = parsed.AddDate(-1, 0, 0)
 	}
-	return parsed.UTC(), true
+	return parsed, true
 }
 
 func extractSyslogTimestamp(text string) (string, bool) {
