@@ -15,7 +15,7 @@ function isProxmoxDiskMetric(metric: string): boolean {
 
 function isProxmoxCountMetric(metric: string): boolean {
   const meta = getAlertMetricMeta(metric)
-  return meta.category === 'proxmox' && meta.unit === ''
+  return meta.category === 'proxmox' && meta.unit === '' && metric !== 'proxmox_auth_failures_recent'
 }
 
 interface CommandTrigger {
