@@ -301,6 +301,7 @@
                   <th>Date</th>
                   <th>Paquets</th>
                   <th>Statut</th>
+                  <th>Logs</th>
                 </tr>
               </thead>
               <tbody>
@@ -329,6 +330,15 @@
                       class="badge"
                       :class="run.had_error ? 'bg-red-lt text-red' : 'bg-green-lt text-green'"
                     >{{ run.had_error ? 'Erreur' : 'OK' }}</span>
+                  </td>
+                  <td>
+                    <button
+                      class="btn btn-sm btn-ghost-secondary"
+                      :disabled="!run.log_snippet"
+                      @click="openUULog(run)"
+                    >
+                      Logs
+                    </button>
                   </td>
                 </tr>
               </tbody>
@@ -364,9 +374,46 @@
       </div>
     </div>
   </div>
+
+  <div
+    v-if="logModal.open"
+    class="modal modal-blur show d-block modal-overlay"
+    tabindex="-1"
+    @click.self="closeUULog"
+  >
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <div>
+            <h5 class="modal-title">Logs unattended-upgrades</h5>
+            <div class="text-muted small mt-1">
+              {{ logModal.runAt ? formatDate(logModal.runAt) : '—' }}
+            </div>
+          </div>
+          <button
+            type="button"
+            class="btn-close"
+            @click="closeUULog"
+          />
+        </div>
+        <div class="modal-body">
+          <pre class="mb-0 small">{{ logModal.content || 'Aucun log disponible.' }}</pre>
+        </div>
+        <div class="modal-footer">
+          <button
+            class="btn btn-secondary"
+            @click="closeUULog"
+          >
+            Fermer
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup>
+import { ref } from 'vue'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import utc from 'dayjs/plugin/utc'
@@ -410,9 +457,31 @@ dayjs.extend(relativeTime)
 dayjs.extend(utc)
 dayjs.locale('fr')
 
+const logModal = ref({
+  open: false,
+  content: '',
+  runAt: '',
+})
+
+function openUULog(run) {
+  logModal.value = {
+    open: true,
+    content: run?.log_snippet || '',
+    runAt: run?.run_at || '',
+  }
+}
+
+function closeUULog() {
+  logModal.value = { open: false, content: '', runAt: '' }
+}
+
 function formatDate(date) {
   if (!date || date === '0001-01-01T00:00:00Z') return 'Jamais'
   return dayjs.utc(date).local().fromNow()
 }
 </script>
+
+<style scoped>
+.modal-overlay { background: rgba(0,0,0,.5); z-index: 1050; }
+</style>
 
