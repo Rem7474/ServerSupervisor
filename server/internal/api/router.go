@@ -234,6 +234,7 @@ func registerAlertRoutes(g *gin.RouterGroup, rulesH *handlers.AlertRulesHandler)
 	admin.PATCH("/alert-rules/:id", rulesH.UpdateAlertRule)
 	admin.DELETE("/alert-rules/:id", rulesH.DeleteAlertRule)
 	admin.POST("/alert-rules/test", rulesH.TestAlertRule)
+	admin.POST("/alert-rules/test/logs", rulesH.TestAlertRuleLogs)
 }
 
 func registerSettingsRoutes(g *gin.RouterGroup, h *handlers.SettingsHandler) {

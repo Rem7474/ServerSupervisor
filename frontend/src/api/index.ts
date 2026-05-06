@@ -290,6 +290,8 @@ export default {
   updateAlertRule: (id: number, payload: AlertRule) => api.patch(`/v1/alert-rules/${id}`, payload),
   deleteAlertRule: (id: number) => api.delete(`/v1/alert-rules/${id}`),
   testAlertRule: (payload: AlertRule) => api.post('/v1/alert-rules/test', payload),
+  downloadAlertRuleTestLogs: (payload: AlertRule) =>
+    api.post('/v1/alert-rules/test/logs', payload, { responseType: 'blob' }),
 
   // Notifications
   getNotifications: () => api.get('/v1/notifications'),

@@ -1061,6 +1061,66 @@ func (h *AlertRulesHandler) TestAlertRule(c *gin.Context) {
 	})
 }
 
+// TestAlertRuleLogs returns the log lines used to evaluate proxmox_auth_failures_recent.
+func (h *AlertRulesHandler) TestAlertRuleLogs(c *gin.Context) {
+	var req struct {
+		SourceType         models.AlertSourceType     `json:"source_type"`
+		HostID             *string                    `json:"host_id"`
+		ProxmoxScope       *models.ProxmoxMetricScope `json:"proxmox_scope"`
+		Metric             string                     `json:"metric" binding:"required"`
+		Operator           string                     `json:"operator" binding:"required"`
+		ThresholdWarn      float64                    `json:"threshold_warn" binding:"required"`
+		ThresholdCrit      float64                    `json:"threshold_crit" binding:"required"`
+		ThresholdClearWarn *float64                   `json:"threshold_clear_warn"`
+		ThresholdClearCrit *float64                   `json:"threshold_clear_crit"`
+		Duration           int                        `json:"duration"`
+		Actions            models.AlertActions        `json:"actions"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": humanizeValidationError(err)})
+		return
+	}
+	if req.SourceType == "" {
+		req.SourceType = models.InferAlertSourceType(req.Metric)
+	}
+	if req.Metric != "proxmox_auth_failures_recent" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Metrique non supportee pour les logs."})
+		return
+	}
+
+	rule := models.AlertRule{
+		SourceType:         req.SourceType,
+		HostID:             req.HostID,
+		ProxmoxScope:       req.ProxmoxScope,
+		Metric:             req.Metric,
+		Operator:           req.Operator,
+		ThresholdWarn:      &req.ThresholdWarn,
+		ThresholdCrit:      &req.ThresholdCrit,
+		ThresholdClearWarn: req.ThresholdClearWarn,
+		ThresholdClearCrit: req.ThresholdClearCrit,
+		DurationSeconds:    req.Duration,
+		Actions:            req.Actions,
+		Enabled:            true,
+	}
+
+	if rule.SourceType != models.AlertSourceProxmox {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "La metrique requiert une source Proxmox."})
+		return
+	}
+	if err := validateProxmoxScopeExists(h.db, rule.ProxmoxScope); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	lines, since := alerts.FetchProxmoxAuthFailureLogs(h.db, rule)
+	content := strings.Join(lines, "\n")
+	filename := fmt.Sprintf("proxmox-auth-failures-%s.log", time.Now().Format("20060102-150405"))
+
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", filename))
+	c.Header("X-Log-Since", since.UTC().Format(time.RFC3339))
+	c.Data(http.StatusOK, "text/plain; charset=utf-8", []byte(content))
+}
+
 // ListIncidents returns all alert incidents with pagination
 func (h *AlertRulesHandler) ListIncidents(c *gin.Context) {
 	if c.GetString("role") != models.RoleAdmin {

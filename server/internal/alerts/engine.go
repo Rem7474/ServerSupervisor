@@ -809,6 +809,40 @@ func resolveProxmoxAuthFailuresRecent(db *database.DB, rule models.AlertRule) fl
 	}
 }
 
+// FetchProxmoxAuthFailureLogs returns the syslog lines used for the proxmox_auth_failures_recent metric.
+// The returned lines are already filtered by the requested duration window.
+func FetchProxmoxAuthFailureLogs(db *database.DB, rule models.AlertRule) ([]string, time.Time) {
+	window := time.Duration(rule.DurationSeconds) * time.Second
+	if window <= 0 {
+		window = 10 * time.Minute
+	}
+	since := time.Now().Add(-window)
+
+	scope := proxmoxScopeFromRule(rule)
+	if scope == nil || scope.ScopeMode == "" || scope.ScopeMode == "global" {
+		return collectAuthFailureLogsAcrossNodes(db, since, ""), since
+	}
+
+	switch scope.ScopeMode {
+	case "connection":
+		if scope.ConnectionID == "" {
+			return collectAuthFailureLogsAcrossNodes(db, since, ""), since
+		}
+		return collectAuthFailureLogsAcrossNodes(db, since, scope.ConnectionID), since
+	case "node":
+		if scope.NodeID == "" {
+			return collectAuthFailureLogsAcrossNodes(db, since, ""), since
+		}
+		node, err := db.GetProxmoxNode(scope.NodeID)
+		if err != nil || node == nil {
+			return []string{}, since
+		}
+		return collectAuthFailureLogsForNode(db, *node, since), since
+	default:
+		return collectAuthFailureLogsAcrossNodes(db, since, ""), since
+	}
+}
+
 func countAuthFailuresAcrossNodes(db *database.DB, since time.Time, connectionID string) int {
 	var nodes []models.ProxmoxNode
 	var err error
@@ -827,6 +861,26 @@ func countAuthFailuresAcrossNodes(db *database.DB, since time.Time, connectionID
 		count += countAuthFailuresForNode(db, node, since)
 	}
 	return count
+}
+
+func collectAuthFailureLogsAcrossNodes(db *database.DB, since time.Time, connectionID string) []string {
+	var nodes []models.ProxmoxNode
+	var err error
+
+	if strings.TrimSpace(connectionID) == "" {
+		nodes, err = db.ListProxmoxNodes()
+	} else {
+		nodes, err = db.ListProxmoxNodesByConnection(connectionID)
+	}
+	if err != nil || len(nodes) == 0 {
+		return []string{}
+	}
+
+	var out []string
+	for _, node := range nodes {
+		out = append(out, collectAuthFailureLogsForNode(db, node, since)...)
+	}
+	return out
 }
 
 func countAuthFailuresForNode(db *database.DB, node models.ProxmoxNode, since time.Time) int {
@@ -853,6 +907,71 @@ func countAuthFailuresForNode(db *database.DB, node models.ProxmoxNode, since ti
 		count += countAuthFailuresInLines(lines, since)
 	}
 	return count
+}
+
+func collectAuthFailureLogsForNode(db *database.DB, node models.ProxmoxNode, since time.Time) []string {
+	conn, err := db.GetProxmoxConnectionByID(node.ConnectionID)
+	if err != nil || conn == nil {
+		return []string{}
+	}
+	secret, err := db.GetProxmoxTokenSecret(node.ConnectionID)
+	if err != nil || secret == "" {
+		return []string{}
+	}
+
+	client := proxmoxclient.New(conn.APIURL, conn.TokenID, secret, conn.InsecureSkipVerify)
+	services := []string{"pvedaemon", "pveproxy", "sshd"}
+	limit := estimateAuthFailureLimit(since)
+
+	var out []string
+	for _, service := range services {
+		lines, err := client.GetNodeSyslog(node.NodeName, limit, service)
+		if err != nil {
+			log.Printf("Alerts: syslog fetch failed [%s/%s %s]: %v", conn.Name, node.NodeName, service, err)
+			continue
+		}
+		out = append(out, authFailureLogLines(lines, since, node.NodeName)...)
+	}
+	return out
+}
+
+func authFailureLogLines(lines []proxmoxclient.PVESyslogLine, since time.Time, nodeName string) []string {
+	var out []string
+	for _, line := range lines {
+		if !isAuthFailureSyslogLine(line) {
+			continue
+		}
+		ts, ok := syslogLineTime(line)
+		if !ok || ts.Before(since) {
+			continue
+		}
+		text := formatSyslogLineText(line)
+		if text == "" {
+			continue
+		}
+		if nodeName != "" {
+			text = fmt.Sprintf("[%s] %s", nodeName, text)
+		}
+		out = append(out, text)
+	}
+	return out
+}
+
+func formatSyslogLineText(line proxmoxclient.PVESyslogLine) string {
+	if strings.TrimSpace(line.T) != "" {
+		return strings.TrimSpace(line.T)
+	}
+	if strings.TrimSpace(line.Msg) != "" {
+		return strings.TrimSpace(line.Msg)
+	}
+	parts := []string{}
+	if strings.TrimSpace(line.Tag) != "" {
+		parts = append(parts, strings.TrimSpace(line.Tag))
+	}
+	if strings.TrimSpace(line.Level) != "" {
+		parts = append(parts, strings.TrimSpace(line.Level))
+	}
+	return strings.TrimSpace(strings.Join(parts, " "))
 }
 
 func countAuthFailuresInLines(lines []proxmoxclient.PVESyslogLine, since time.Time) int {

@@ -495,7 +495,18 @@
                       class="badge bg-success-lt text-success ms-2"
                     >Aucune alerte déclenchée</span>
                   </div>
-                  <span class="text-secondary small">{{ formatDate(testResults.evaluated_at) }}</span>
+                  <div class="d-flex align-items-center gap-2">
+                    <button
+                      v-if="canDownloadTestLogs"
+                      class="btn btn-sm btn-outline-secondary"
+                      :disabled="downloadingLogs"
+                      @click="downloadTestLogs"
+                    >
+                      <span v-if="downloadingLogs" class="spinner-border spinner-border-sm me-1"></span>
+                      Télécharger logs
+                    </button>
+                    <span class="text-secondary small">{{ formatDate(testResults.evaluated_at) }}</span>
+                  </div>
                 </div>
                 <div class="table-responsive">
                   <table class="table table-sm table-vcenter card-table">
@@ -894,8 +905,12 @@ const {
 const testing = ref(false)
 const testResults = ref(null)
 const testError = ref('')
+const downloadingLogs = ref(false)
 
 const hasNoDataResults = computed(() => testResults.value?.results?.some((result) => !result.has_data) || false)
+const canDownloadTestLogs = computed(
+  () => !!testResults.value && form.value.metric === 'proxmox_auth_failures_recent'
+)
 
 const canProceedStep = computed(() => {
   if (step.value === 1) {
@@ -1078,6 +1093,30 @@ async function testAlert() {
     testError.value = err?.response?.data?.error || 'Échec du test de la règle.'
   } finally {
     testing.value = false
+  }
+}
+
+function formatDownloadTimestamp(date) {
+  const iso = date.toISOString().replace(/\..+$/, '')
+  return iso.replace(/[:T]/g, '-')
+}
+
+async function downloadTestLogs() {
+  if (downloadingLogs.value || !canDownloadTestLogs.value) return
+  downloadingLogs.value = true
+  try {
+    const response = await apiClient.downloadAlertRuleTestLogs(buildPayload())
+    const blob = response.data instanceof Blob ? response.data : new Blob([response.data], { type: 'text/plain' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `proxmox-auth-failures-${formatDownloadTimestamp(new Date())}.log`
+    link.click()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  } catch (err) {
+    testError.value = err?.response?.data?.error || 'Échec du téléchargement des logs.'
+  } finally {
+    downloadingLogs.value = false
   }
 }
 
