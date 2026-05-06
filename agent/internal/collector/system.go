@@ -517,7 +517,7 @@ func getDiskUsage() []DiskInfo {
 			continue
 		}
 		device, mountPoint, fsType := fields[0], fields[1], fields[2]
-		if pseudoFS[fsType] || seen[mountPoint] {
+		if pseudoFS[fsType] || seen[mountPoint] || shouldSkipFilesystem(fsType, device, mountPoint) {
 			continue
 		}
 		seen[mountPoint] = true
