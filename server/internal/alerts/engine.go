@@ -782,7 +782,7 @@ func resolveProxmoxAuthFailuresRecent(db *database.DB, rule models.AlertRule) fl
 	if window <= 0 {
 		window = 10 * time.Minute
 	}
-	since := time.Now().Add(-window)
+	since := time.Now().UTC().Add(-window)
 
 	scope := proxmoxScopeFromRule(rule)
 	if scope == nil || scope.ScopeMode == "" || scope.ScopeMode == "global" {
@@ -816,7 +816,7 @@ func FetchProxmoxAuthFailureLogs(db *database.DB, rule models.AlertRule) ([]stri
 	if window <= 0 {
 		window = 10 * time.Minute
 	}
-	since := time.Now().Add(-window)
+	since := time.Now().UTC().Add(-window)
 
 	scope := proxmoxScopeFromRule(rule)
 	if scope == nil || scope.ScopeMode == "" || scope.ScopeMode == "global" {
@@ -1042,20 +1042,18 @@ func syslogLineTime(line proxmoxclient.PVESyslogLine) (time.Time, bool) {
 		return time.Time{}, false
 	}
 
-	parsed, err := time.ParseInLocation("Jan 2 15:04:05", stamp, time.Now().Location())
+	parsed, err := time.ParseInLocation("Jan 2 15:04:05", stamp, time.Local)
 	if err != nil {
 		return time.Time{}, false
 	}
 
 	now := time.Now()
-	// Convert parsed time to local location before extracting components.
-	// ParseInLocation returns UTC; we need local hour/minute/second.
-	parsedLocal := parsed.In(now.Location())
-	parsed = time.Date(now.Year(), parsedLocal.Month(), parsedLocal.Day(), parsedLocal.Hour(), parsedLocal.Minute(), parsedLocal.Second(), 0, now.Location())
+	// Reconstruct with current year, then convert to UTC for consistent comparisons.
+	parsed = time.Date(now.Year(), parsed.Month(), parsed.Day(), parsed.Hour(), parsed.Minute(), parsed.Second(), 0, time.Local)
 	if parsed.After(now.Add(24 * time.Hour)) {
 		parsed = parsed.AddDate(-1, 0, 0)
 	}
-	return parsed, true
+	return parsed.UTC(), true
 }
 
 func extractSyslogTimestamp(text string) (string, bool) {
