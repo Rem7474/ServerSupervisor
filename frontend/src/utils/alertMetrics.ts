@@ -133,6 +133,13 @@ export const ALERT_METRICS: Record<string, AlertMetricMeta> = {
     badgeClass: 'bg-cyan-lt text-cyan',
     category: 'proxmox',
   },
+  proxmox_auth_failures_recent: {
+    label: 'Echecs auth Proxmox (logs)',
+    unit: '',
+    icon: '\ud83d\udd12',
+    badgeClass: 'bg-cyan-lt text-cyan',
+    category: 'proxmox',
+  },
   proxmox_disk_failed_count: {
     label: 'Disques physiques en échec',
     unit: '',
@@ -168,6 +175,7 @@ export const ALERT_METRIC_ORDER = [
   'proxmox_guest_memory_percent',
   'proxmox_node_pending_updates',
   'proxmox_recent_failed_tasks_24h',
+  'proxmox_auth_failures_recent',
   'proxmox_disk_failed_count',
   'proxmox_disk_min_wearout_percent',
 ]

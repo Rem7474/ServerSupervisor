@@ -72,6 +72,7 @@ var validAlertMetrics = map[string]bool{
 	"proxmox_guest_cpu_percent": true, "proxmox_guest_memory_percent": true,
 	"proxmox_node_pending_updates":    true,
 	"proxmox_recent_failed_tasks_24h": true,
+	"proxmox_auth_failures_recent":    true,
 	"proxmox_disk_failed_count":       true, "proxmox_disk_min_wearout_percent": true,
 }
 
@@ -433,6 +434,7 @@ func allProxmoxAlertMetrics() []alertMetricCapability {
 		{Metric: "proxmox_guest_memory_percent", Label: "RAM VM/LXC Proxmox", Unit: "%", Icon: "\U0001f4ca", BadgeClass: "bg-cyan-lt text-cyan", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: false},
 		{Metric: "proxmox_node_pending_updates", Label: "Paquets APT en attente", Unit: "", Icon: "\U0001f504", BadgeClass: "bg-cyan-lt text-cyan", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: false},
 		{Metric: "proxmox_recent_failed_tasks_24h", Label: "Tâches Proxmox échouées (24h)", Unit: "", Icon: "\U0001f552", BadgeClass: "bg-cyan-lt text-cyan", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: false},
+		{Metric: "proxmox_auth_failures_recent", Label: "Echecs auth Proxmox (logs)", Unit: "", Icon: "\U0001f512", BadgeClass: "bg-cyan-lt text-cyan", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: false},
 		{Metric: "proxmox_disk_failed_count", Label: "Disques physiques en échec", Unit: "", Icon: "\U0001f4a5", BadgeClass: "bg-cyan-lt text-cyan", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: false},
 		{Metric: "proxmox_disk_min_wearout_percent", Label: "Usure disque min", Unit: "%", Icon: "\U0001f6e0", BadgeClass: "bg-cyan-lt text-cyan", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: false},
 	}

@@ -151,6 +151,7 @@ func IsProxmoxMetric(metric string) bool {
 		"proxmox_guest_cpu_percent", "proxmox_guest_memory_percent",
 		"proxmox_node_pending_updates",
 		"proxmox_recent_failed_tasks_24h",
+		"proxmox_auth_failures_recent",
 		"proxmox_disk_failed_count", "proxmox_disk_min_wearout_percent":
 		return true
 	default:

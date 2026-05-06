@@ -17,6 +17,7 @@ import (
 	"github.com/serversupervisor/server/internal/dispatch"
 	"github.com/serversupervisor/server/internal/models"
 	"github.com/serversupervisor/server/internal/notify"
+	"github.com/serversupervisor/server/internal/proxmoxclient"
 )
 
 // NotificationPusher broadcasts a real-time alert event to connected frontend clients.
@@ -155,6 +156,7 @@ func isProxmoxMetric(metric string) bool {
 		"proxmox_guest_memory_percent",
 		"proxmox_node_pending_updates",
 		"proxmox_recent_failed_tasks_24h",
+		"proxmox_auth_failures_recent",
 		"proxmox_disk_failed_count",
 		"proxmox_disk_min_wearout_percent":
 		return true
@@ -262,7 +264,7 @@ func buildAlertEvaluationTargets(db *database.DB, rule models.AlertRule, hosts [
 
 func buildGlobalProxmoxEntityTargets(db *database.DB, rule models.AlertRule) []models.Host {
 	switch rule.Metric {
-	case "proxmox_node_cpu_percent", "proxmox_node_memory_percent", "proxmox_node_cpu_temperature", "proxmox_node_fan_rpm", "proxmox_node_pending_updates", "proxmox_recent_failed_tasks_24h":
+	case "proxmox_node_cpu_percent", "proxmox_node_memory_percent", "proxmox_node_cpu_temperature", "proxmox_node_fan_rpm", "proxmox_node_pending_updates", "proxmox_recent_failed_tasks_24h", "proxmox_auth_failures_recent":
 		nodes, err := db.ListProxmoxNodes()
 		if err != nil {
 			return nil
@@ -514,6 +516,8 @@ func GetMetricValue(db *database.DB, host models.Host, rule models.AlertRule) (f
 		return resolveProxmoxNodePendingUpdates(db, rule), true
 	case "proxmox_recent_failed_tasks_24h":
 		return resolveProxmoxRecentFailedTasks24h(db, rule), true
+	case "proxmox_auth_failures_recent":
+		return resolveProxmoxAuthFailuresRecent(db, rule), true
 	case "proxmox_disk_failed_count":
 		return resolveProxmoxDiskFailedCount(db, rule), true
 	case "proxmox_disk_min_wearout_percent":
@@ -772,6 +776,143 @@ func resolveProxmoxRecentFailedTasks24h(db *database.DB, rule models.AlertRule) 
 	}
 }
 
+func resolveProxmoxAuthFailuresRecent(db *database.DB, rule models.AlertRule) float64 {
+	window := time.Duration(rule.DurationSeconds) * time.Second
+	if window <= 0 {
+		window = 10 * time.Minute
+	}
+	since := time.Now().Add(-window)
+
+	scope := proxmoxScopeFromRule(rule)
+	if scope == nil || scope.ScopeMode == "" || scope.ScopeMode == "global" {
+		return float64(countAuthFailuresAcrossNodes(db, since, ""))
+	}
+
+	switch scope.ScopeMode {
+	case "connection":
+		if scope.ConnectionID == "" {
+			return float64(countAuthFailuresAcrossNodes(db, since, ""))
+		}
+		return float64(countAuthFailuresAcrossNodes(db, since, scope.ConnectionID))
+	case "node":
+		if scope.NodeID == "" {
+			return float64(countAuthFailuresAcrossNodes(db, since, ""))
+		}
+		node, err := db.GetProxmoxNode(scope.NodeID)
+		if err != nil || node == nil {
+			return 0
+		}
+		return float64(countAuthFailuresForNode(db, *node, since))
+	default:
+		return float64(countAuthFailuresAcrossNodes(db, since, ""))
+	}
+}
+
+func countAuthFailuresAcrossNodes(db *database.DB, since time.Time, connectionID string) int {
+	var nodes []models.ProxmoxNode
+	var err error
+
+	if strings.TrimSpace(connectionID) == "" {
+		nodes, err = db.ListProxmoxNodes()
+	} else {
+		nodes, err = db.ListProxmoxNodesByConnection(connectionID)
+	}
+	if err != nil || len(nodes) == 0 {
+		return 0
+	}
+
+	count := 0
+	for _, node := range nodes {
+		count += countAuthFailuresForNode(db, node, since)
+	}
+	return count
+}
+
+func countAuthFailuresForNode(db *database.DB, node models.ProxmoxNode, since time.Time) int {
+	conn, err := db.GetProxmoxConnectionByID(node.ConnectionID)
+	if err != nil || conn == nil {
+		return 0
+	}
+	secret, err := db.GetProxmoxTokenSecret(node.ConnectionID)
+	if err != nil || secret == "" {
+		return 0
+	}
+
+	client := proxmoxclient.New(conn.APIURL, conn.TokenID, secret, conn.InsecureSkipVerify)
+	services := []string{"pvedaemon", "pveproxy", "sshd"}
+	limit := 300
+
+	count := 0
+	for _, service := range services {
+		lines, err := client.GetNodeSyslog(node.NodeName, limit, service)
+		if err != nil {
+			log.Printf("Alerts: syslog fetch failed [%s/%s %s]: %v", conn.Name, node.NodeName, service, err)
+			continue
+		}
+		count += countAuthFailuresInLines(lines, since)
+	}
+	return count
+}
+
+func countAuthFailuresInLines(lines []proxmoxclient.PVESyslogLine, since time.Time) int {
+	count := 0
+	for _, line := range lines {
+		if !isAuthFailureSyslogLine(line) {
+			continue
+		}
+		if ts, ok := syslogLineTime(line); ok {
+			if ts.Before(since) {
+				continue
+			}
+		}
+		count++
+	}
+	return count
+}
+
+func isAuthFailureSyslogLine(line proxmoxclient.PVESyslogLine) bool {
+	text := strings.ToLower(strings.TrimSpace(strings.Join([]string{line.T, line.Msg, line.Tag, line.Level}, " ")))
+	if text == "" {
+		return false
+	}
+	return strings.Contains(text, "authentication failure") ||
+		strings.Contains(text, "failed password") ||
+		strings.Contains(text, "invalid user") ||
+		strings.Contains(text, "too many authentication failures") ||
+		strings.Contains(text, "maximum authentication attempts exceeded")
+}
+
+func syslogLineTime(line proxmoxclient.PVESyslogLine) (time.Time, bool) {
+	if line.Time > 0 {
+		ms := line.Time
+		if ms < 1_000_000_000_000 {
+			ms *= 1000
+		}
+		return time.Unix(0, ms*int64(time.Millisecond)).UTC(), true
+	}
+
+	if strings.TrimSpace(line.T) == "" {
+		return time.Time{}, false
+	}
+
+	parts := strings.Fields(line.T)
+	if len(parts) < 3 {
+		return time.Time{}, false
+	}
+	stamp := strings.Join(parts[:3], " ")
+	parsed, err := time.Parse("Jan 2 15:04:05", stamp)
+	if err != nil {
+		return time.Time{}, false
+	}
+
+	now := time.Now()
+	parsed = time.Date(now.Year(), parsed.Month(), parsed.Day(), parsed.Hour(), parsed.Minute(), parsed.Second(), 0, now.Location())
+	if parsed.After(now.Add(24 * time.Hour)) {
+		parsed = parsed.AddDate(-1, 0, 0)
+	}
+	return parsed, true
+}
+
 func resolveProxmoxDiskFailedCount(db *database.DB, rule models.AlertRule) float64 {
 	scope := proxmoxScopeFromRule(rule)
 	if scope == nil || scope.ScopeMode == "" || scope.ScopeMode == "global" {
@@ -966,13 +1107,15 @@ func buildAlertMessage(rule models.AlertRule, host models.Host, value float64) s
 			metricLabel = "Paquets APT en attente"
 		case "proxmox_recent_failed_tasks_24h":
 			metricLabel = "Tâches Proxmox échouées (24h)"
+		case "proxmox_auth_failures_recent":
+			metricLabel = "Echecs auth Proxmox (logs)"
 		case "proxmox_disk_failed_count":
 			metricLabel = "Disques physiques en échec"
 		case "proxmox_disk_min_wearout_percent":
 			metricLabel = "Usure disque min"
 		}
 		switch rule.Metric {
-		case "proxmox_node_pending_updates", "proxmox_recent_failed_tasks_24h", "proxmox_disk_failed_count":
+		case "proxmox_node_pending_updates", "proxmox_recent_failed_tasks_24h", "proxmox_auth_failures_recent", "proxmox_disk_failed_count":
 			return fmt.Sprintf("Alerte %s %s %.0f sur %s", metricLabel, rule.Operator, value, host.Name)
 		case "proxmox_node_cpu_temperature":
 			return fmt.Sprintf("Alerte %s %s %.1f°C sur %s", metricLabel, rule.Operator, value, host.Name)

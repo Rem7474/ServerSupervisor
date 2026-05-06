@@ -696,7 +696,7 @@ func (db *DB) resolveProxmoxDiskInfo(diskID string) (name, context string) {
 
 func (db *DB) resolveProxmoxGlobalLikelySource(metric string) string {
 	switch metric {
-	case "proxmox_node_cpu_percent", "proxmox_node_memory_percent", "proxmox_node_cpu_temperature", "proxmox_node_fan_rpm", "proxmox_node_pending_updates", "proxmox_recent_failed_tasks_24h":
+	case "proxmox_node_cpu_percent", "proxmox_node_memory_percent", "proxmox_node_cpu_temperature", "proxmox_node_fan_rpm", "proxmox_node_pending_updates", "proxmox_recent_failed_tasks_24h", "proxmox_auth_failures_recent":
 		var nodeID string
 		if err := db.conn.QueryRow(`
 			SELECT n.id
