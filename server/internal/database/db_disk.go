@@ -106,8 +106,8 @@ func (db *DB) GetDiskMetricsAggregated(hostID, mountPoint string, hours int) ([]
 	}
 
 	var (
-		rows *sql.Rows
-		err  error
+		rows    *sql.Rows
+		err     error
 		aggType string
 	)
 
