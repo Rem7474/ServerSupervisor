@@ -144,7 +144,12 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 
 		// Skip storing metrics when Proxmox is the designated source —
 		// Proxmox polling already stores CPU/RAM for this host.
-		if !proxmoxIsMetricsSource {
+		if proxmoxIsMetricsSource {
+			if err := h.db.InsertUptimeMetrics(hostID, report.Metrics.Uptime, report.Metrics.Hostname); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store uptime"})
+				return
+			}
+		} else {
 			report.Metrics.HostID = hostID
 			report.Metrics.Timestamp = time.Now()
 			if _, err := h.db.InsertMetrics(report.Metrics); err != nil {

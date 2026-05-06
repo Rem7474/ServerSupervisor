@@ -38,6 +38,15 @@ func (db *DB) InsertMetrics(m *models.SystemMetrics) (int64, error) {
 	return id, nil
 }
 
+func (db *DB) InsertUptimeMetrics(hostID string, uptime uint64, hostname string) error {
+	_, err := db.conn.Exec(
+		`INSERT INTO system_metrics (host_id, timestamp, uptime, hostname)
+		 VALUES ($1, NOW(), $2, $3)`,
+		hostID, uptime, hostname,
+	)
+	return err
+}
+
 func (db *DB) GetLatestMetrics(hostID string) (*models.SystemMetrics, error) {
 	var m models.SystemMetrics
 	err := db.conn.QueryRow(
