@@ -712,6 +712,7 @@ const {
   handleUUInstall,
   handleUUConfigure,
   handleUURunNow,
+  openUULog,
 } = useHostDetail()
 </script>
 
