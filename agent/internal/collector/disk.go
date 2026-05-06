@@ -78,24 +78,38 @@ func CollectDiskMetrics() ([]DiskMetrics, error) {
 
 	cmdSpace := exec.Command("df", "-T", "-BG")
 	outSpace, err := cmdSpace.CombinedOutput()
+	useType := true
+	useHuman := false
 	if err != nil {
 		// Essayer avec -T -h (human readable) comme fallback
 		cmdSpace = exec.Command("df", "-T", "-h")
 		outSpace, err = cmdSpace.CombinedOutput()
-		if err != nil {
+		if err == nil {
+			useType = true
+			useHuman = true
+		} else {
 			cmdSpace = exec.Command("df", "-BG")
 			outSpace, err = cmdSpace.CombinedOutput()
-			if err != nil {
+			if err == nil {
+				useType = false
+				useHuman = false
+			} else {
 				cmdSpace = exec.Command("df", "-h")
 				outSpace, err = cmdSpace.CombinedOutput()
 				if err != nil {
 					return nil, err
 				}
-				return parseDfHuman(string(outSpace)), nil
+				useType = false
+				useHuman = true
 			}
-			return parseDfSpace(string(outSpace)), nil
 		}
-		return parseDfHumanWithType(string(outSpace)), nil
+	}
+
+	if useHuman {
+		if useType {
+			return parseDfHumanWithType(string(outSpace)), nil
+		}
+		return parseDfHuman(string(outSpace)), nil
 	}
 
 	// Exécuter df -i pour obtenir les informations sur les inodes
@@ -107,7 +121,12 @@ func CollectDiskMetrics() ([]DiskMetrics, error) {
 	}
 
 	// Parser les résultats
-	spaceMap := parseDfSpaceWithType(string(outSpace))
+	var spaceMap map[string]DiskMetrics
+	if useType {
+		spaceMap = parseDfSpaceWithType(string(outSpace))
+	} else {
+		spaceMap = parseDfSpace(string(outSpace))
+	}
 	inodesMap := parseDfInodes(string(outInodes))
 
 	// Fusionner les résultats
