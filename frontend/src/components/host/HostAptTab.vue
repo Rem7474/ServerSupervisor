@@ -151,16 +151,16 @@
       >
         <span
           v-if="!uuStatus.installed"
-          class="badge bg-secondary"
+          class="badge bg-secondary-lt text-secondary"
         >Non installé</span>
         <template v-else>
           <span
             class="badge"
-            :class="uuStatus.enabled ? 'bg-green' : 'bg-secondary'"
+            :class="uuStatus.enabled ? 'bg-green-lt text-green' : 'bg-secondary-lt text-secondary'"
           >{{ uuStatus.enabled ? 'Activé' : 'Désactivé' }}</span>
           <span
             v-if="uuStatus.reboot_required"
-            class="badge bg-orange"
+            class="badge bg-orange-lt text-orange"
           >Redémarrage requis</span>
         </template>
       </div>
@@ -327,7 +327,7 @@
                   <td>
                     <span
                       class="badge"
-                      :class="run.had_error ? 'bg-red' : 'bg-green'"
+                      :class="run.had_error ? 'bg-red-lt text-red' : 'bg-green-lt text-green'"
                     >{{ run.had_error ? 'Erreur' : 'OK' }}</span>
                   </td>
                 </tr>
@@ -346,9 +346,21 @@
       <!-- No data yet -->
       <div
         v-else
-        class="text-secondary small"
+        class="d-flex align-items-center gap-3 text-secondary small"
       >
-        En attente des données de l'agent…
+        <span>En attente des données de l'agent…</span>
+        <button
+          v-if="canRunApt"
+          class="btn btn-sm btn-outline-primary"
+          :disabled="!!uuLoading"
+          @click="$emit('uu-install')"
+        >
+          <span
+            v-if="uuLoading === 'install'"
+            class="spinner-border spinner-border-sm me-1"
+          />
+          Installer
+        </button>
       </div>
     </div>
   </div>

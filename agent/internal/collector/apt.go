@@ -704,6 +704,8 @@ const uuLogPath = "/var/log/unattended-upgrades/unattended-upgrades.log"
 const uuAutoUpgradesConf = "/etc/apt/apt.conf.d/20auto-upgrades"
 const uuMainConf = "/etc/apt/apt.conf.d/50unattended-upgrades"
 const uuRebootRequired = "/var/run/reboot-required"
+const uuInitialBackfillBytes int64 = 256 * 1024
+const uuInitialMaxRuns = 20
 
 // uuLogCursor tracks the byte offset in the UU log file.
 // -1 means "not yet initialised": on the first call we seek to EOF so we
@@ -845,10 +847,26 @@ func readNewUURuns() []UURun {
 	}
 	fileSize := info.Size()
 
-	// First call: initialise cursor to EOF to skip historical entries.
+	// First call: read a limited tail window for history, then initialise cursor to EOF.
 	if uuLogCursor == -1 {
+		startPos := int64(0)
+		if fileSize > uuInitialBackfillBytes {
+			startPos = fileSize - uuInitialBackfillBytes
+		}
+		if _, err := f.Seek(startPos, io.SeekStart); err != nil {
+			return nil
+		}
+		scanner := bufio.NewScanner(f)
+		if startPos > 0 {
+			// Skip partial line when starting mid-file.
+			scanner.Scan()
+		}
+		runs := parseUURuns(scanner)
+		if len(runs) > uuInitialMaxRuns {
+			runs = runs[len(runs)-uuInitialMaxRuns:]
+		}
 		uuLogCursor = fileSize
-		return nil
+		return runs
 	}
 
 	// File was rotated (smaller than cursor) — reset to beginning.
@@ -865,6 +883,17 @@ func readNewUURuns() []UURun {
 	}
 
 	scanner := bufio.NewScanner(f)
+	runs := parseUURuns(scanner)
+
+	// Update cursor to current file position
+	if pos, err := f.Seek(0, io.SeekCurrent); err == nil {
+		uuLogCursor = pos
+	}
+
+	return runs
+}
+
+func parseUURuns(scanner *bufio.Scanner) []UURun {
 	var runs []UURun
 	var current *UURun
 	var snippetLines []string
@@ -907,11 +936,6 @@ func readNewUURuns() []UURun {
 			current = nil
 			snippetLines = nil
 		}
-	}
-
-	// Update cursor to current file position
-	if pos, err := f.Seek(0, io.SeekCurrent); err == nil {
-		uuLogCursor = pos
 	}
 
 	return runs

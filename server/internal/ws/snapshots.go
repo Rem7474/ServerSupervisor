@@ -74,6 +74,8 @@ func (h *WSHandler) sendHostSnapshot(conn *websocket.Conn, hostID string, lastHa
 	containers, _ := h.db.GetDockerContainers(hostID)
 	aptStatus, _ := h.db.GetAptStatus(hostID)
 	aptHistory, _ := h.db.GetAptHistoryWithAgentUpdates(hostID, 50)
+	uuStatus, _ := h.db.GetUUStatus(hostID)
+	uuRuns, _ := h.db.GetUURuns(hostID, 20)
 	auditLogs, _ := h.db.GetAuditLogsByHost(hostID, 50)
 
 	allComparisons, _ := h.buildVersionComparisons()
@@ -93,6 +95,8 @@ func (h *WSHandler) sendHostSnapshot(conn *websocket.Conn, hostID string, lastHa
 		"containers":          containers,
 		"apt_status":          aptStatus,
 		"apt_history":         aptHistory,
+		"uu_status":           uuStatus,
+		"uu_runs":             uuRuns,
 		"audit_logs":          auditLogs,
 		"version_comparisons": comparisons,
 		"proxmox_link":        proxmoxLink,

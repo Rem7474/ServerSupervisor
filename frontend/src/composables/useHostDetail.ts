@@ -109,6 +109,20 @@ export function useHostDetail() {
   const { liveCommand, showConsole, openCommand: _openCommand, closeConsole, updateCommand } = useHostCommandConsole()
   const { openCommandStream, closeStream } = useCommandStream({ token: () => auth.token })
 
+  function syncUUFormFromStatus(status: AnyRecord | null): void {
+    if (!status) return
+    const cfg = (status.config ?? {}) as Record<string, unknown>
+    uuForm.value = {
+      enabled: status.enabled ?? false,
+      config: {
+        security_only: cfg.security_only ?? true,
+        auto_reboot: cfg.auto_reboot ?? false,
+        auto_reboot_time: cfg.auto_reboot_time ?? '02:00',
+        remove_unused: cfg.remove_unused ?? false,
+      },
+    }
+  }
+
   function openCommand(rawCmd: AnyRecord) {
     _openCommand({ ...rawCmd, host_name: host.value?.hostname })
   }
@@ -172,6 +186,15 @@ export function useHostDetail() {
       containers.value = asRecordArray(payload.containers)
       versionComparisons.value = asRecordArray(payload.version_comparisons)
       aptStatus.value = asRecord(payload.apt_status)
+      if ('uu_status' in payload) {
+        uuStatus.value = asRecord(payload.uu_status)
+        if (!uuForm.value) {
+          syncUUFormFromStatus(uuStatus.value)
+        }
+      }
+      if ('uu_runs' in payload) {
+        uuRuns.value = asRecordArray(payload.uu_runs)
+      }
       if ('proxmox_link' in payload) {
         proxmoxLink.value = asRecord(payload.proxmox_link)
       }
@@ -244,18 +267,7 @@ export function useHostDetail() {
       uuStatus.value = statusRes.data || null
       uuRuns.value = runsRes.data || []
       // Initialise the editable form from server state
-      if (uuStatus.value) {
-        const cfg = (uuStatus.value.config ?? {}) as Record<string, unknown>
-        uuForm.value = {
-          enabled: uuStatus.value.enabled ?? false,
-          config: {
-            security_only: cfg.security_only ?? true,
-            auto_reboot: cfg.auto_reboot ?? false,
-            auto_reboot_time: cfg.auto_reboot_time ?? '02:00',
-            remove_unused: cfg.remove_unused ?? false,
-          },
-        }
-      }
+      syncUUFormFromStatus(uuStatus.value)
     } catch {
       // non-critical
     }

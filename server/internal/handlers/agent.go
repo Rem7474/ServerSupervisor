@@ -193,13 +193,15 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 				log.Printf("Warning: failed to insert UU run for host %s: %v", safeHostID, err)
 				continue
 			}
-			if isNew && len(run.Packages) > 0 {
+			if isNew {
 				_ = h.db.UpdateUULastRun(hostID, run.RunAt, len(run.Packages))
-				hostname := hostID
-				if host, err := h.db.GetHost(hostID); err == nil && host != nil {
-					hostname = host.Hostname
+				if len(run.Packages) > 0 {
+					hostname := hostID
+					if host, err := h.db.GetHost(hostID); err == nil && host != nil {
+						hostname = host.Hostname
+					}
+					h.pushUUNotification(hostname, hostID, run)
 				}
-				h.pushUUNotification(hostname, hostID, run)
 			}
 		}
 	}
