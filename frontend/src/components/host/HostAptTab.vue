@@ -334,10 +334,24 @@
                   <td>
                     <button
                       class="btn btn-sm btn-ghost-secondary"
+                      title="Voir les logs"
                       :disabled="!run.log_snippet"
-                      @click="openUULog(run)"
+                      @click="$emit('uu-log', run)"
                     >
-                      Logs
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        class="icon icon-sm"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                      ><path
+                        stroke="none"
+                        d="M0 0h24v24H0z"
+                        fill="none"
+                      /><path d="M4 6l16 0" /><path d="M4 12l16 0" /><path d="M4 18l12 0" /></svg>
                     </button>
                   </td>
                 </tr>
@@ -375,52 +389,16 @@
     </div>
   </div>
 
-  <div
-    v-if="logModal.open"
-    class="modal modal-blur show d-block modal-overlay"
-    tabindex="-1"
-    @click.self="closeUULog"
-  >
-    <div class="modal-dialog modal-dialog-centered modal-lg">
-      <div class="modal-content">
-        <div class="modal-header">
-          <div>
-            <h5 class="modal-title">Logs unattended-upgrades</h5>
-            <div class="text-muted small mt-1">
-              {{ logModal.runAt ? formatDate(logModal.runAt) : '—' }}
-            </div>
-          </div>
-          <button
-            type="button"
-            class="btn-close"
-            @click="closeUULog"
-          />
-        </div>
-        <div class="modal-body">
-          <pre class="mb-0 small">{{ logModal.content || 'Aucun log disponible.' }}</pre>
-        </div>
-        <div class="modal-footer">
-          <button
-            class="btn btn-secondary"
-            @click="closeUULog"
-          >
-            Fermer
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import utc from 'dayjs/plugin/utc'
 import 'dayjs/locale/fr'
 import CVEList from '../CVEList.vue'
 
-defineEmits(['run-apt-command', 'uu-install', 'uu-configure', 'uu-run-now'])
+defineEmits(['run-apt-command', 'uu-install', 'uu-configure', 'uu-run-now', 'uu-log'])
 
 const props = defineProps({
   aptStatus: {
@@ -457,31 +435,9 @@ dayjs.extend(relativeTime)
 dayjs.extend(utc)
 dayjs.locale('fr')
 
-const logModal = ref({
-  open: false,
-  content: '',
-  runAt: '',
-})
-
-function openUULog(run) {
-  logModal.value = {
-    open: true,
-    content: run?.log_snippet || '',
-    runAt: run?.run_at || '',
-  }
-}
-
-function closeUULog() {
-  logModal.value = { open: false, content: '', runAt: '' }
-}
-
 function formatDate(date) {
   if (!date || date === '0001-01-01T00:00:00Z') return 'Jamais'
   return dayjs.utc(date).local().fromNow()
 }
 </script>
-
-<style scoped>
-.modal-overlay { background: rgba(0,0,0,.5); z-index: 1050; }
-</style>
 

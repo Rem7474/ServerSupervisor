@@ -127,6 +127,20 @@ export function useHostDetail() {
     _openCommand({ ...rawCmd, host_name: host.value?.hostname })
   }
 
+  function openUULog(run: AnyRecord) {
+    if (!run || !run.log_snippet) return
+    openCommand({
+      id: '',
+      module: 'apt',
+      action: 'unattended-upgrades',
+      target: 'run',
+      status: run.had_error ? 'failed' : 'completed',
+      output: run.log_snippet,
+      created_at: run.run_at,
+      host_id: hostId,
+    })
+  }
+
   function connectStream(commandId: string) {
     openCommandStream(commandId, {
       onInit: (p: AnyRecord) => {
@@ -627,5 +641,6 @@ export function useHostDetail() {
     handleUUInstall,
     handleUUConfigure,
     handleUURunNow,
+    openUULog,
   }
 }

@@ -379,6 +379,7 @@
             @uu-install="handleUUInstall"
             @uu-configure="handleUUConfigure"
             @uu-run-now="handleUURunNow"
+            @uu-log="openUULog"
           />
         </div>
 
