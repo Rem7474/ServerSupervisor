@@ -33,13 +33,17 @@ func (db *DB) InsertDiskMetrics(metrics []models.DiskMetrics) error {
 
 func (db *DB) GetLatestDiskMetrics(hostID string) ([]models.DiskMetrics, error) {
 	rows, err := db.conn.Query(
-		`SELECT DISTINCT ON (mount_point)
-			id, host_id, timestamp, mount_point, filesystem,
+		`SELECT id, host_id, timestamp, mount_point, filesystem,
 			size_gb, used_gb, avail_gb, used_percent,
 			inodes_total, inodes_used, inodes_free, inodes_percent
 		FROM disk_metrics
 		WHERE host_id = $1
-		ORDER BY mount_point, timestamp DESC`,
+		  AND timestamp = (
+			SELECT MAX(timestamp)
+			FROM disk_metrics
+			WHERE host_id = $1
+		  )
+		ORDER BY mount_point ASC`,
 		hostID,
 	)
 	if err != nil {

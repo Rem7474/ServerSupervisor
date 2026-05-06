@@ -240,9 +240,10 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 
 	// Store disk metrics
 	if len(report.DiskMetrics) > 0 {
+		batchTime := time.Now()
 		for i := range report.DiskMetrics {
 			report.DiskMetrics[i].HostID = hostID
-			report.DiskMetrics[i].Timestamp = time.Now()
+			report.DiskMetrics[i].Timestamp = batchTime
 		}
 		if err := h.db.InsertDiskMetrics(report.DiskMetrics); err != nil {
 			log.Printf("Warning: failed to store disk metrics for host %s: %v", safeHostID, err)
