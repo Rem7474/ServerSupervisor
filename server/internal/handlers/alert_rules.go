@@ -1004,7 +1004,9 @@ func (h *AlertRulesHandler) TestAlertRule(c *gin.Context) {
 	anyFires := false
 
 	ruleNoStaleness := rule
-	ruleNoStaleness.DurationSeconds = 0
+	if rule.Metric != "proxmox_auth_failures_recent" {
+		ruleNoStaleness.DurationSeconds = 0
+	}
 
 	if rule.SourceType == models.AlertSourceProxmox {
 		targetID, targetLabel := h.proxmoxScopeTestTarget(rule.ProxmoxScope)
