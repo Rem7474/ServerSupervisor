@@ -860,10 +860,13 @@ func countAuthFailuresInLines(lines []proxmoxclient.PVESyslogLine, since time.Ti
 		if !isAuthFailureSyslogLine(line) {
 			continue
 		}
-		if ts, ok := syslogLineTime(line); ok {
-			if ts.Before(since) {
-				continue
-			}
+		ts, ok := syslogLineTime(line)
+		if !ok {
+			// Skip lines without a usable timestamp so duration filters remain meaningful.
+			continue
+		}
+		if ts.Before(since) {
+			continue
 		}
 		count++
 	}
