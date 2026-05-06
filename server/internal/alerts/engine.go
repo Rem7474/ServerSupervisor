@@ -1048,7 +1048,10 @@ func syslogLineTime(line proxmoxclient.PVESyslogLine) (time.Time, bool) {
 	}
 
 	now := time.Now()
-	parsed = time.Date(now.Year(), parsed.Month(), parsed.Day(), parsed.Hour(), parsed.Minute(), parsed.Second(), 0, now.Location())
+	// Convert parsed time to local location before extracting components.
+	// ParseInLocation returns UTC; we need local hour/minute/second.
+	parsedLocal := parsed.In(now.Location())
+	parsed = time.Date(now.Year(), parsedLocal.Month(), parsedLocal.Day(), parsedLocal.Hour(), parsedLocal.Minute(), parsedLocal.Second(), 0, now.Location())
 	if parsed.After(now.Add(24 * time.Hour)) {
 		parsed = parsed.AddDate(-1, 0, 0)
 	}
