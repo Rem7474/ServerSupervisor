@@ -141,6 +141,12 @@ function formatChartTime(timestamp) {
   return d.format('DD/MM')
 }
 
+function clampTimestamp(timestampMs) {
+  if (!Number.isFinite(timestampMs)) return NaN
+  const now = Date.now()
+  return Math.min(timestampMs, now)
+}
+
 const chartOptions = computed(() => ({
   responsive: true,
   maintainAspectRatio: false,
@@ -197,7 +203,7 @@ async function loadHistory(hours) {
     const res = await apiClient.getDiskMetricsAggregated(props.hostId, selectedMount.value, hours)
     const raw = Array.isArray(res.data?.points) ? res.data.points : []
     points.value = raw.map(p => ({
-      x: dayjs(p.timestamp).valueOf(),
+      x: clampTimestamp(dayjs(p.timestamp).valueOf()),
       y: p.used_percent,
       used_gb: p.used_gb,
       size_gb: p.size_gb,

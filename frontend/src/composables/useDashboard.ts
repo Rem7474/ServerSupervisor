@@ -480,8 +480,14 @@ export function useDashboard() {
     return date.format('DD/MM')
   }
 
+  function clampTimestamp(timestampMs: number) {
+    if (!Number.isFinite(timestampMs)) return NaN
+    const now = Date.now()
+    return Math.min(timestampMs, now)
+  }
+
   function toSummaryPoint(point: DashboardMetricPoint, key: 'cpu_avg' | 'memory_avg') {
-    const timestamp = dayjs(point.timestamp).valueOf()
+    const timestamp = clampTimestamp(dayjs(point.timestamp).valueOf())
     const value = Number(point[key] ?? 0)
     if (!Number.isFinite(timestamp)) return null
     return { x: timestamp, y: value }

@@ -302,8 +302,14 @@ function formatChartTime(timestamp) {
   return date.format('DD/MM')
 }
 
+function clampTimestamp(timestampMs) {
+  if (!Number.isFinite(timestampMs)) return NaN
+  const now = Date.now()
+  return Math.min(timestampMs, now)
+}
+
 function toChartPoint(metric, field) {
-  const timestamp = dayjs(metric.timestamp).valueOf()
+  const timestamp = clampTimestamp(dayjs(metric.timestamp).valueOf())
   const value = metric[field]
   if (!Number.isFinite(timestamp) || value == null) return null
   return { x: timestamp, y: value }
