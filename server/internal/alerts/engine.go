@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -840,7 +841,7 @@ func countAuthFailuresForNode(db *database.DB, node models.ProxmoxNode, since ti
 
 	client := proxmoxclient.New(conn.APIURL, conn.TokenID, secret, conn.InsecureSkipVerify)
 	services := []string{"pvedaemon", "pveproxy", "sshd"}
-	limit := 300
+	limit := estimateAuthFailureLimit(since)
 
 	count := 0
 	for _, service := range services {
@@ -885,25 +886,44 @@ func isAuthFailureSyslogLine(line proxmoxclient.PVESyslogLine) bool {
 		strings.Contains(text, "maximum authentication attempts exceeded")
 }
 
+func estimateAuthFailureLimit(since time.Time) int {
+	window := time.Since(since)
+	if window <= 0 {
+		return 300
+	}
+	// Heuristic: assume up to ~60 lines/minute for auth-related services.
+	limit := int(window.Minutes()*60) + 50
+	if limit < 300 {
+		return 300
+	}
+	if limit > 5000 {
+		return 5000
+	}
+	return limit
+}
+
 func syslogLineTime(line proxmoxclient.PVESyslogLine) (time.Time, bool) {
 	if line.Time > 0 {
-		ms := line.Time
-		if ms < 1_000_000_000_000 {
-			ms *= 1000
+		sec := line.Time
+		if sec > 946_684_800 {
+			ms := sec
+			if ms < 1_000_000_000_000 {
+				ms *= 1000
+			}
+			return time.Unix(0, ms*int64(time.Millisecond)).UTC(), true
 		}
-		return time.Unix(0, ms*int64(time.Millisecond)).UTC(), true
 	}
 
 	if strings.TrimSpace(line.T) == "" {
 		return time.Time{}, false
 	}
 
-	parts := strings.Fields(line.T)
-	if len(parts) < 3 {
+	stamp, ok := extractSyslogTimestamp(line.T)
+	if !ok {
 		return time.Time{}, false
 	}
-	stamp := strings.Join(parts[:3], " ")
-	parsed, err := time.Parse("Jan 2 15:04:05", stamp)
+
+	parsed, err := time.ParseInLocation("Jan 2 15:04:05", stamp, time.Now().Location())
 	if err != nil {
 		return time.Time{}, false
 	}
@@ -914,6 +934,16 @@ func syslogLineTime(line proxmoxclient.PVESyslogLine) (time.Time, bool) {
 		parsed = parsed.AddDate(-1, 0, 0)
 	}
 	return parsed, true
+}
+
+func extractSyslogTimestamp(text string) (string, bool) {
+	// Expected prefix: "May 6 12:34:56"
+	re := regexp.MustCompile(`^([A-Z][a-z]{2}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2})\s+`)
+	m := re.FindStringSubmatch(strings.TrimSpace(text))
+	if len(m) < 2 {
+		return "", false
+	}
+	return m[1], true
 }
 
 func resolveProxmoxDiskFailedCount(db *database.DB, rule models.AlertRule) float64 {
