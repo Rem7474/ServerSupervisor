@@ -147,6 +147,12 @@ export function useHostDetail() {
         updateCommand({ ...current, status: nextStatus })
         if (nextStatus === 'completed' || nextStatus === 'failed') {
           loadCmdHistoryRefresh()
+          if (current.module === 'apt') {
+            const action = asString(current.action)
+            if (['install_uu', 'configure_uu', 'toggle_uu', 'run_uu'].includes(action)) {
+              loadUUData()
+            }
+          }
         }
       },
     })

@@ -175,7 +175,7 @@
         <button
           v-if="canRunApt"
           class="btn btn-sm btn-primary"
-          :disabled="uuLoading"
+          :disabled="uuLoading === 'install'"
           @click="$emit('uu-install')"
         >
           <span
@@ -352,7 +352,7 @@
         <button
           v-if="canRunApt"
           class="btn btn-sm btn-outline-primary"
-          :disabled="!!uuLoading"
+          :disabled="uuLoading === 'install'"
           @click="$emit('uu-install')"
         >
           <span

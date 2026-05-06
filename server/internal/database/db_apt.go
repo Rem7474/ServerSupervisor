@@ -240,6 +240,22 @@ func (db *DB) GetUUStatus(hostID string) (*models.UnattendedUpgradesDB, error) {
 	if len(cfgRaw) > 0 {
 		_ = json.Unmarshal(cfgRaw, &s.Config)
 	}
+
+	// Fallback: ensure last run reflects the latest run record.
+	var latestRunAt time.Time
+	var latestPkgsRaw []byte
+	if err := db.conn.QueryRow(`
+		SELECT run_at, packages
+		FROM unattended_upgrades_runs
+		WHERE host_id = $1
+		ORDER BY run_at DESC LIMIT 1`, hostID).Scan(&latestRunAt, &latestPkgsRaw); err == nil {
+		if s.LastRunAt == nil || latestRunAt.After(*s.LastRunAt) {
+			var latestPkgs []string
+			_ = json.Unmarshal(latestPkgsRaw, &latestPkgs)
+			s.LastRunAt = &latestRunAt
+			s.LastRunPackages = len(latestPkgs)
+		}
+	}
 	return &s, nil
 }
 
