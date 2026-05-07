@@ -94,6 +94,7 @@ const Line = defineAsyncComponent(async () => {
 const props = defineProps({
   hostId: { type: String, required: true },
   mounts: { type: Array, default: () => [] },
+  refreshTick: { type: Number, default: 0 },
 })
 
 const chartHours = ref(24)
@@ -245,6 +246,15 @@ watch(() => props.mounts, (v) => {
     loadHistory(chartHours.value)
   }
 }, { immediate: false })
+
+let refreshTimer = null
+watch(() => props.refreshTick, () => {
+  if (refreshTimer) clearTimeout(refreshTimer)
+  refreshTimer = setTimeout(() => {
+    refreshTimer = null
+    loadHistory(chartHours.value)
+  }, 400)
+})
 
 onMounted(() => {
   if (props.mounts.length) {

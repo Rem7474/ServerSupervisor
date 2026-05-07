@@ -341,6 +341,7 @@
             :metrics="effectiveMetrics"
             :metrics-source="effectiveMetricsSource"
             :proxmox-guest-id="proxmoxLink?.guest_id ?? null"
+            :refresh-tick="metricsUpdatedAt"
           />
           <DiskMetricsCard
             :host-id="hostId"
@@ -350,6 +351,7 @@
           <DiskHistoryChart
             :host-id="hostId"
             :mounts="diskMetrics?.map(d => d.mount_point) ?? []"
+            :refresh-tick="metricsUpdatedAt"
             class="mb-4"
           />
           <DiskHealthCard
@@ -657,6 +659,7 @@ const {
   aptCmdLoading,
   host,
   containers,
+  metricsUpdatedAt,
   versionComparisons,
   aptStatus,
   cmdHistory,

@@ -53,6 +53,7 @@ export function useHostDetail() {
 
   const host = ref<AnyRecord | null>(null)
   const metrics = ref<AnyRecord | null>(null)
+  const metricsUpdatedAt = ref(0)
   const containers = ref<AnyRecord[]>([])
   const versionComparisons = ref<AnyRecord[]>([])
   const aptStatus = ref<AnyRecord | null>(null)
@@ -203,6 +204,7 @@ export function useHostDetail() {
       if (payload.type !== 'host_detail') return
       host.value = asRecord(payload.host)
       metrics.value = asRecord(payload.metrics)
+      metricsUpdatedAt.value = Date.now()
       containers.value = asRecordArray(payload.containers)
       versionComparisons.value = asRecordArray(payload.version_comparisons)
       aptStatus.value = asRecord(payload.apt_status)
@@ -587,6 +589,7 @@ export function useHostDetail() {
     agentUpdateLoading,
     host,
     containers,
+    metricsUpdatedAt,
     versionComparisons,
     aptStatus,
     cmdHistory,

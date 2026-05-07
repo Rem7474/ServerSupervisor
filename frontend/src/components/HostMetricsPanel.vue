@@ -183,6 +183,7 @@ const props = defineProps({
   metrics: { type: Object, default: null },
   metricsSource: { type: String, default: 'agent' }, // 'agent' | 'proxmox'
   proxmoxGuestId: { type: String, default: null },
+  refreshTick: { type: Number, default: 0 },
 })
 
 const chartHours = ref(24)
@@ -325,6 +326,15 @@ function toChartPoint(metric, field) {
   if (!Number.isFinite(timestamp) || value == null) return null
   return { x: timestamp, y: value }
 }
+
+let refreshTimer = null
+watch(() => props.refreshTick, () => {
+  if (refreshTimer) clearTimeout(refreshTimer)
+  refreshTimer = setTimeout(() => {
+    refreshTimer = null
+    loadHistory(chartHours.value)
+  }, 400)
+})
 
 async function loadHistory(hours) {
   chartHours.value = hours

@@ -452,6 +452,8 @@ export function useDashboard() {
     selectedHostIds.value = selectedHostIds.value.filter((id) => hosts.value.some((h: DashboardHostRecord) => h.id === id))
     loading.value = false
 
+    scheduleSummaryRefresh()
+
     if (!proxmoxAutoSwitched.value && proxmoxNodes.value.length > 0) {
       proxmoxAutoSwitched.value = true
       chartSource.value = 'proxmox'
@@ -460,6 +462,15 @@ export function useDashboard() {
   }, { debounceMs: 200 })
 
   let cveRefreshTimer: ReturnType<typeof setInterval> | null = null
+  let summaryRefreshTimer: ReturnType<typeof setTimeout> | null = null
+
+  function scheduleSummaryRefresh() {
+    if (summaryLoading.value || summaryRefreshTimer) return
+    summaryRefreshTimer = setTimeout(() => {
+      summaryRefreshTimer = null
+      fetchSummary()
+    }, 400)
+  }
 
   async function refreshCveSummary() {
     try {
