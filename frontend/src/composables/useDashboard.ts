@@ -381,8 +381,22 @@ export function useDashboard() {
     return list
   })
 
+  function getSummaryMaxTimestamp(data: SummaryChartData | null) {
+    if (!data?.datasets?.length) return undefined
+    let max = -Infinity
+    for (const dataset of data.datasets) {
+      for (const point of dataset.data || []) {
+        const x = typeof point === 'object' && point ? (point as { x?: number }).x : undefined
+        if (Number.isFinite(x) && (x as number) > max) max = x as number
+      }
+    }
+    if (!Number.isFinite(max)) return undefined
+    return Math.min(Date.now(), max)
+  }
+
   const summaryChartOptions = computed(() => {
     const colors = getDashboardChartPalette()
+    const maxX = getSummaryMaxTimestamp(summaryChartData.value)
     return {
       responsive: true,
       maintainAspectRatio: false,
@@ -409,6 +423,7 @@ export function useDashboard() {
           type: 'linear',
           display: true,
           grid: { color: colors.grid },
+          max: maxX,
           ticks: {
             color: colors.tickText,
             maxTicksLimit: 10,

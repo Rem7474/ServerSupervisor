@@ -147,6 +147,15 @@ function clampTimestamp(timestampMs) {
   return Math.min(timestampMs, now)
 }
 
+function getMaxPointTimestamp(list) {
+  let max = -Infinity
+  for (const point of list || []) {
+    if (Number.isFinite(point?.x) && point.x > max) max = point.x
+  }
+  if (!Number.isFinite(max)) return undefined
+  return Math.min(Date.now(), max)
+}
+
 const chartOptions = computed(() => ({
   responsive: true,
   maintainAspectRatio: false,
@@ -180,6 +189,7 @@ const chartOptions = computed(() => ({
       type: 'linear',
       display: true,
       grid: { color: 'rgba(255,255,255,0.05)' },
+      max: getMaxPointTimestamp(points.value),
       ticks: { color: '#6b7280', maxTicksLimit: 8, callback: (v) => formatChartTime(Number(v)) },
     },
     y: {

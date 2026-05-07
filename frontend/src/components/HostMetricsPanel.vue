@@ -202,7 +202,17 @@ const timeRangeOptions = [
   { hours: 8760, label: '1y' },
 ]
 
-const chartOptions = {
+function getMaxHistoryTimestamp(list) {
+  let max = -Infinity
+  for (const metric of list || []) {
+    const ts = dayjs(metric.timestamp).valueOf()
+    if (Number.isFinite(ts) && ts > max) max = ts
+  }
+  if (!Number.isFinite(max)) return undefined
+  return Math.min(Date.now(), max)
+}
+
+const chartOptions = computed(() => ({
   responsive: true,
   maintainAspectRatio: false,
   plugins: {
@@ -222,6 +232,7 @@ const chartOptions = {
       type: 'linear',
       display: true,
       grid: { color: 'rgba(255,255,255,0.05)' },
+      max: getMaxHistoryTimestamp(metricsHistory.value),
       ticks: {
         color: '#6b7280',
         maxTicksLimit: 10,
@@ -232,14 +243,14 @@ const chartOptions = {
   },
   elements: { point: { radius: 0, hitRadius: 10, hoverRadius: 5 }, line: { tension: 0.3 } },
   interaction: { mode: 'nearest', axis: 'x', intersect: false },
-}
+}))
 
-const memChartOptions = {
-  ...chartOptions,
+const memChartOptions = computed(() => ({
+  ...chartOptions.value,
   plugins: {
-    ...chartOptions.plugins,
+    ...chartOptions.value.plugins,
     tooltip: {
-      ...chartOptions.plugins.tooltip,
+      ...chartOptions.value.plugins.tooltip,
       callbacks: {
         title: (items) => formatChartTime(items[0]?.parsed?.x),
         label: (ctx) => {
@@ -253,7 +264,7 @@ const memChartOptions = {
       },
     },
   },
-}
+}))
 
 function formatBytes(bytes) {
   if (!bytes) return '0 B'
