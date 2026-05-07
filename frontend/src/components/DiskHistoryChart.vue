@@ -157,6 +157,15 @@ function getMaxPointTimestamp(list) {
   return Math.min(Date.now(), max)
 }
 
+function getMinPointTimestamp(list) {
+  let min = Infinity
+  for (const point of list || []) {
+    if (Number.isFinite(point?.x) && point.x < min) min = point.x
+  }
+  if (!Number.isFinite(min)) return undefined
+  return min
+}
+
 const chartOptions = computed(() => ({
   responsive: true,
   maintainAspectRatio: false,
@@ -190,6 +199,7 @@ const chartOptions = computed(() => ({
       type: 'linear',
       display: true,
       grid: { color: 'rgba(255,255,255,0.05)' },
+      min: getMinPointTimestamp(points.value),
       max: getMaxPointTimestamp(points.value),
       ticks: { color: '#6b7280', maxTicksLimit: 8, callback: (v) => formatChartTime(Number(v)) },
     },

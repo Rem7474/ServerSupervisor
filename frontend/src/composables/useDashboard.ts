@@ -394,8 +394,22 @@ export function useDashboard() {
     return Math.min(Date.now(), max)
   }
 
+  function getSummaryMinTimestamp(data: SummaryChartData | null) {
+    if (!data?.datasets?.length) return undefined
+    let min = Infinity
+    for (const dataset of data.datasets) {
+      for (const point of dataset.data || []) {
+        const x = typeof point === 'object' && point ? (point as { x?: number }).x : undefined
+        if (Number.isFinite(x) && (x as number) < min) min = x as number
+      }
+    }
+    if (!Number.isFinite(min)) return undefined
+    return min
+  }
+
   const summaryChartOptions = computed(() => {
     const colors = getDashboardChartPalette()
+    const minX = getSummaryMinTimestamp(summaryChartData.value)
     const maxX = getSummaryMaxTimestamp(summaryChartData.value)
     return {
       responsive: true,
@@ -423,6 +437,7 @@ export function useDashboard() {
           type: 'linear',
           display: true,
           grid: { color: colors.grid },
+          min: minX,
           max: maxX,
           ticks: {
             color: colors.tickText,

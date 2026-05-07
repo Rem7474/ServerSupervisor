@@ -213,6 +213,16 @@ function getMaxHistoryTimestamp(list) {
   return Math.min(Date.now(), max)
 }
 
+function getMinHistoryTimestamp(list) {
+  let min = Infinity
+  for (const metric of list || []) {
+    const ts = dayjs(metric.timestamp).valueOf()
+    if (Number.isFinite(ts) && ts < min) min = ts
+  }
+  if (!Number.isFinite(min)) return undefined
+  return min
+}
+
 const chartOptions = computed(() => ({
   responsive: true,
   maintainAspectRatio: false,
@@ -233,6 +243,7 @@ const chartOptions = computed(() => ({
       type: 'linear',
       display: true,
       grid: { color: 'rgba(255,255,255,0.05)' },
+      min: getMinHistoryTimestamp(metricsHistory.value),
       max: getMaxHistoryTimestamp(metricsHistory.value),
       ticks: {
         color: '#6b7280',
