@@ -50,9 +50,14 @@ func (db *DB) InsertUptimeMetrics(hostID string, uptime uint64, hostname string)
 func (db *DB) GetLatestMetrics(hostID string) (*models.SystemMetrics, error) {
 	var m models.SystemMetrics
 	err := db.conn.QueryRow(
-		`SELECT id, host_id, timestamp, cpu_usage_percent, cpu_cores, cpu_model,
-		 cpu_temperature, fan_rpm, load_avg_1, load_avg_5, load_avg_15, memory_total, memory_used, memory_free, memory_percent,
-		 swap_total, swap_used, network_rx_bytes, network_tx_bytes, uptime, hostname
+		`SELECT id, host_id, timestamp,
+		 COALESCE(cpu_usage_percent, 0), COALESCE(cpu_cores, 0), COALESCE(cpu_model, ''),
+		 COALESCE(cpu_temperature, 0), COALESCE(fan_rpm, 0),
+		 COALESCE(load_avg_1, 0), COALESCE(load_avg_5, 0), COALESCE(load_avg_15, 0),
+		 COALESCE(memory_total, 0), COALESCE(memory_used, 0), COALESCE(memory_free, 0), COALESCE(memory_percent, 0),
+		 COALESCE(swap_total, 0), COALESCE(swap_used, 0),
+		 COALESCE(network_rx_bytes, 0), COALESCE(network_tx_bytes, 0),
+		 COALESCE(uptime, 0), COALESCE(hostname, '')
 		 FROM system_metrics WHERE host_id = $1 ORDER BY timestamp DESC LIMIT 1`, hostID,
 	).Scan(&m.ID, &m.HostID, &m.Timestamp, &m.CPUUsagePercent, &m.CPUCores, &m.CPUModel,
 		&m.CPUTemperature, &m.FanRPM, &m.LoadAvg1, &m.LoadAvg5, &m.LoadAvg15, &m.MemoryTotal, &m.MemoryUsed, &m.MemoryFree, &m.MemoryPercent,
@@ -87,10 +92,13 @@ func (db *DB) GetLatestMetrics(hostID string) (*models.SystemMetrics, error) {
 func (db *DB) GetLatestMetricsAll() (map[string]*models.SystemMetrics, error) {
 	rows, err := db.conn.Query(
 		`SELECT DISTINCT ON (host_id) id, host_id, timestamp,
-		 cpu_usage_percent, cpu_cores, cpu_model,
-		 cpu_temperature, fan_rpm, load_avg_1, load_avg_5, load_avg_15,
-		 memory_total, memory_used, memory_free, memory_percent,
-		 swap_total, swap_used, network_rx_bytes, network_tx_bytes, uptime, hostname
+		 COALESCE(cpu_usage_percent, 0), COALESCE(cpu_cores, 0), COALESCE(cpu_model, ''),
+		 COALESCE(cpu_temperature, 0), COALESCE(fan_rpm, 0),
+		 COALESCE(load_avg_1, 0), COALESCE(load_avg_5, 0), COALESCE(load_avg_15, 0),
+		 COALESCE(memory_total, 0), COALESCE(memory_used, 0), COALESCE(memory_free, 0), COALESCE(memory_percent, 0),
+		 COALESCE(swap_total, 0), COALESCE(swap_used, 0),
+		 COALESCE(network_rx_bytes, 0), COALESCE(network_tx_bytes, 0),
+		 COALESCE(uptime, 0), COALESCE(hostname, '')
 		 FROM system_metrics
 		 ORDER BY host_id, timestamp DESC`,
 	)

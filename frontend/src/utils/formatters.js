@@ -44,7 +44,7 @@ export function formatDurationSecs(seconds) {
  * Format an uptime in seconds to "Xj Xh" or "Xh Xm".
  */
 export function formatUptime(seconds) {
-  if (!seconds) return 'N/A'
+  if (seconds == null || seconds === undefined) return 'N/A'
   const days = Math.floor(seconds / 86400)
   const hours = Math.floor((seconds % 86400) / 3600)
   if (days > 0) return `${days}j ${hours}h`

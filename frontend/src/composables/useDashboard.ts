@@ -615,8 +615,8 @@ export function useDashboard() {
     }
   }
 
-  function formatUptime(seconds: number) {
-    if (!seconds) return 'N/A'
+  function formatUptime(seconds: number | null | undefined) {
+    if (seconds == null) return 'N/A'
     const days = Math.floor(seconds / 86400)
     const hours = Math.floor((seconds % 86400) / 3600)
     if (days > 0) return `${days}j ${hours}h`
