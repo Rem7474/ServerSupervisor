@@ -81,14 +81,14 @@ func CollectSystem(collectCPUTemperature bool) (*SystemMetrics, error) {
 	}
 
 	memInfo := getMemInfo()
-	m.MemoryTotal = memInfo["MemTotal"]
-	m.MemoryFree = memInfo["MemAvailable"]
+	m.MemoryTotal = memInfo.total
+	m.MemoryFree = memInfo.available
 	m.MemoryUsed = m.MemoryTotal - m.MemoryFree
 	if m.MemoryTotal > 0 {
 		m.MemoryPercent = float64(m.MemoryUsed) / float64(m.MemoryTotal) * 100
 	}
-	m.SwapTotal = memInfo["SwapTotal"]
-	m.SwapUsed = m.SwapTotal - memInfo["SwapFree"]
+	m.SwapTotal = memInfo.swapTotal
+	m.SwapUsed = m.SwapTotal - memInfo.swapFree
 
 	m.Disks = getDiskUsage()
 
@@ -290,16 +290,11 @@ func readFanRPMFromHwmon() float64 {
 }
 
 func readFanRPMFromSensors() float64 {
-	if _, err := exec.LookPath("sensors"); err != nil {
+	out, ok := getSensorsOutput()
+	if !ok {
 		return 0
 	}
-	out, err := exec.Command("sensors").Output()
-	if err != nil {
-		return 0
-	}
-
-	re := regexp.MustCompile(`(?im)fan\d+\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*RPM`)
-	matches := re.FindAllStringSubmatch(string(out), -1)
+	matches := fanRPMRegex.FindAllStringSubmatch(out, -1)
 	if len(matches) == 0 {
 		return 0
 	}
@@ -321,6 +316,24 @@ func readFanRPMFromSensors() float64 {
 		return 0
 	}
 	return sum / float64(count)
+}
+
+func getSensorsOutput() (string, bool) {
+	sensorsCacheMu.Lock()
+	defer sensorsCacheMu.Unlock()
+	if sensorsCachedOut != "" && time.Since(sensorsCachedAt) < sensorsTTL {
+		return sensorsCachedOut, true
+	}
+	if _, err := exec.LookPath("sensors"); err != nil {
+		return "", false
+	}
+	out, err := exec.Command("sensors").Output()
+	if err != nil {
+		return "", false
+	}
+	sensorsCachedOut = string(out)
+	sensorsCachedAt = time.Now()
+	return sensorsCachedOut, true
 }
 
 func readCPUTemperatureFromThermalZones() float64 {
@@ -407,20 +420,24 @@ func readCPUTemperatureFromHwmon() float64 {
 }
 
 var cpuTempRegex = regexp.MustCompile(`([-+]?\d+(?:\.\d+)?)\s*°C`)
+var fanRPMRegex = regexp.MustCompile(`(?im)fan\d+\s*:\s*([0-9]+(?:\.[0-9]+)?)\s*RPM`)
+
+var (
+	sensorsCacheMu   sync.Mutex
+	sensorsCachedOut string
+	sensorsCachedAt  time.Time
+	sensorsTTL       = 60 * time.Second
+)
 
 func readCPUTemperatureFromSensors() float64 {
-	if _, err := exec.LookPath("sensors"); err != nil {
-		return 0
-	}
-
-	out, err := exec.Command("sensors").Output()
-	if err != nil {
+	out, ok := getSensorsOutput()
+	if !ok {
 		return 0
 	}
 
 	best := 0.0
 	fallback := 0.0
-	for _, line := range strings.Split(string(out), "\n") {
+	for _, line := range strings.Split(out, "\n") {
 		match := cpuTempRegex.FindStringSubmatch(line)
 		if len(match) < 2 {
 			continue
@@ -483,24 +500,47 @@ func validTemp(t float64) bool {
 	return t >= 1 && t <= 130
 }
 
-func getMemInfo() map[string]uint64 {
-	result := make(map[string]uint64)
+type memInfoFields struct {
+	total     uint64
+	available uint64
+	swapTotal uint64
+	swapFree  uint64
+}
+
+func getMemInfo() memInfoFields {
+	var r memInfoFields
 	data, err := os.ReadFile("/proc/meminfo")
 	if err != nil {
-		return result
+		return r
 	}
+	found := 0
 	for _, line := range strings.Split(string(data), "\n") {
+		if found == 4 {
+			break
+		}
 		parts := strings.SplitN(line, ":", 2)
 		if len(parts) != 2 {
 			continue
 		}
 		key := strings.TrimSpace(parts[0])
-		valStr := strings.TrimSpace(parts[1])
-		valStr = strings.TrimSuffix(valStr, " kB")
+		valStr := strings.TrimSuffix(strings.TrimSpace(parts[1]), " kB")
 		val, _ := strconv.ParseUint(strings.TrimSpace(valStr), 10, 64)
-		result[key] = val * 1024 // Convert to bytes
+		switch key {
+		case "MemTotal":
+			r.total = val * 1024
+			found++
+		case "MemAvailable":
+			r.available = val * 1024
+			found++
+		case "SwapTotal":
+			r.swapTotal = val * 1024
+			found++
+		case "SwapFree":
+			r.swapFree = val * 1024
+			found++
+		}
 	}
-	return result
+	return r
 }
 
 func getDiskUsage() []DiskInfo {

@@ -12,6 +12,8 @@ import (
 	"time"
 
 	docker "github.com/fsouza/go-dockerclient"
+
+	"github.com/serversupervisor/agent/internal/security"
 )
 
 type DockerContainer struct {
@@ -113,113 +115,132 @@ func CollectDocker() ([]DockerContainer, error) {
 		return []DockerContainer{}, nil
 	}
 
-	var containers []DockerContainer
-	for _, ac := range apiContainers {
-		container, err := client.InspectContainerWithOptions(docker.InspectContainerOptions{ID: ac.ID, Context: ctx})
-		if err != nil {
-			log.Printf("Failed to inspect container %s: %v", ac.ID[:12], err)
-			continue
-		}
+	type inspectSlot struct {
+		dc    DockerContainer
+		valid bool
+	}
+	slots := make([]inspectSlot, len(apiContainers))
 
-		name := strings.TrimPrefix(container.Name, "/")
-		fullImage := container.Config.Image
-		image, tag := parseImageTag(fullImage)
+	const maxInspectWorkers = 8
+	inspectSem := make(chan struct{}, maxInspectWorkers)
+	var inspectWg sync.WaitGroup
+	for i, ac := range apiContainers {
+		inspectWg.Add(1)
+		go func(idx int, id string) {
+			defer inspectWg.Done()
+			inspectSem <- struct{}{}
+			defer func() { <-inspectSem }()
 
-		var state string
-		if container.State.Running {
-			state = "running"
-		} else if container.State.Paused {
-			state = "paused"
-		} else {
-			state = "exited"
-		}
-
-		var status string
-		if container.State.Running {
-			uptime := time.Since(container.State.StartedAt)
-			status = fmt.Sprintf("Up %s", formatDuration(uptime))
-		} else if !container.State.FinishedAt.IsZero() {
-			downtime := time.Since(container.State.FinishedAt)
-			status = fmt.Sprintf("Exited %s ago", formatDuration(downtime))
-		} else {
-			status = container.State.StateString()
-		}
-
-		ports := formatPortBindings(container.NetworkSettings.Ports)
-
-		envVars := make(map[string]string)
-		for _, envLine := range container.Config.Env {
-			if idx := strings.Index(envLine, "="); idx > 0 {
-				k := envLine[:idx]
-				v := envLine[idx+1:]
-				if !isSensitiveEnvKey(k) {
-					envVars[k] = v
-				}
+			container, err := client.InspectContainerWithOptions(docker.InspectContainerOptions{ID: id, Context: ctx})
+			if err != nil {
+				log.Printf("Failed to inspect container %s: %v", id[:12], err)
+				return
 			}
-		}
 
-		var volumes []string
-		for _, m := range container.Mounts {
-			if m.Destination != "" {
-				volumes = append(volumes, m.Destination)
+			name := strings.TrimPrefix(container.Name, "/")
+			fullImage := container.Config.Image
+			image, tag := parseImageTag(fullImage)
+
+			var state string
+			if container.State.Running {
+				state = "running"
+			} else if container.State.Paused {
+				state = "paused"
+			} else {
+				state = "exited"
 			}
-		}
 
-		var networks []string
-		for netName := range container.NetworkSettings.Networks {
-			networks = append(networks, netName)
-		}
+			var status string
+			if container.State.Running {
+				uptime := time.Since(container.State.StartedAt)
+				status = fmt.Sprintf("Up %s", formatDuration(uptime))
+			} else if !container.State.FinishedAt.IsZero() {
+				downtime := time.Since(container.State.FinishedAt)
+				status = fmt.Sprintf("Exited %s ago", formatDuration(downtime))
+			} else {
+				status = container.State.StateString()
+			}
 
-		// Fetch the manifest digest (RepoDigest) from the image metadata.
-		// container.Image is the full sha256 image config ID; use it to inspect the image.
-		// Results are cached for 5 minutes since image metadata is static until the image is replaced.
-		var imageDigest string
-		imageDigestCacheMu.RLock()
-		cached, ok := imageDigestCache[container.Image]
-		imageDigestCacheMu.RUnlock()
-		if ok && time.Since(cached.cachedAt) < imageDigestTTL {
-			imageDigest = cached.digest
-		} else {
-			if imgInfo, err := client.InspectImage(container.Image); err == nil {
-				for _, rd := range imgInfo.RepoDigests {
-					// RepoDigest format: "nginx@sha256:f88cbb90..."
-					if at := strings.Index(rd, "@sha256:"); at >= 0 {
-						imageDigest = rd[at+1:] // keep "sha256:..." prefix
-						break
+			ports := formatPortBindings(container.NetworkSettings.Ports)
+
+			envVars := make(map[string]string)
+			for _, envLine := range container.Config.Env {
+				if idx := strings.Index(envLine, "="); idx > 0 {
+					k := envLine[:idx]
+					v := envLine[idx+1:]
+					if !security.IsEnvKeySensitive(k) {
+						envVars[k] = v
 					}
 				}
 			}
-			imageDigestCacheMu.Lock()
-			imageDigestCache[container.Image] = imageDigestEntry{digest: imageDigest, cachedAt: time.Now()}
-			imageDigestCacheMu.Unlock()
-		}
 
-		imageID := container.Image
-		if len(imageID) > 12 {
-			imageID = imageID[:12]
-		}
-		containerID := container.ID
-		if len(containerID) > 12 {
-			containerID = containerID[:12]
-		}
+			var volumes []string
+			for _, m := range container.Mounts {
+				if m.Destination != "" {
+					volumes = append(volumes, m.Destination)
+				}
+			}
 
-		containers = append(containers, DockerContainer{
-			ID:          fmt.Sprintf("%s-%s", containerID, name),
-			ContainerID: containerID,
-			Name:        name,
-			Image:       image,
-			ImageTag:    tag,
-			ImageID:     imageID,
-			ImageDigest: imageDigest,
-			State:       state,
-			Status:      status,
-			Created:     container.Created,
-			Ports:       ports,
-			Labels:      container.Config.Labels,
-			EnvVars:     envVars,
-			Volumes:     volumes,
-			Networks:    networks,
-		})
+			var networks []string
+			for netName := range container.NetworkSettings.Networks {
+				networks = append(networks, netName)
+			}
+
+			var imageDigest string
+			imageDigestCacheMu.RLock()
+			cached, ok := imageDigestCache[container.Image]
+			imageDigestCacheMu.RUnlock()
+			if ok && time.Since(cached.cachedAt) < imageDigestTTL {
+				imageDigest = cached.digest
+			} else {
+				if imgInfo, err := client.InspectImage(container.Image); err == nil {
+					for _, rd := range imgInfo.RepoDigests {
+						if at := strings.Index(rd, "@sha256:"); at >= 0 {
+							imageDigest = rd[at+1:]
+							break
+						}
+					}
+				}
+				imageDigestCacheMu.Lock()
+				imageDigestCache[container.Image] = imageDigestEntry{digest: imageDigest, cachedAt: time.Now()}
+				imageDigestCacheMu.Unlock()
+			}
+
+			imageID := container.Image
+			if len(imageID) > 12 {
+				imageID = imageID[:12]
+			}
+			containerID := container.ID
+			if len(containerID) > 12 {
+				containerID = containerID[:12]
+			}
+
+			slots[idx] = inspectSlot{dc: DockerContainer{
+				ID:          fmt.Sprintf("%s-%s", containerID, name),
+				ContainerID: containerID,
+				Name:        name,
+				Image:       image,
+				ImageTag:    tag,
+				ImageID:     imageID,
+				ImageDigest: imageDigest,
+				State:       state,
+				Status:      status,
+				Created:     container.Created,
+				Ports:       ports,
+				Labels:      container.Config.Labels,
+				EnvVars:     envVars,
+				Volumes:     volumes,
+				Networks:    networks,
+			}, valid: true}
+		}(i, ac.ID)
+	}
+	inspectWg.Wait()
+
+	var containers []DockerContainer
+	for _, sl := range slots {
+		if sl.valid {
+			containers = append(containers, sl.dc)
+		}
 	}
 
 	// Enrich running containers with network I/O stats in parallel.
@@ -407,7 +428,7 @@ func CollectContainerEnvVars(containerNames []string) ([]ContainerEnv, error) {
 			if idx := strings.Index(envLine, "="); idx > 0 {
 				k := envLine[:idx]
 				v := envLine[idx+1:]
-				if !isSensitiveEnvKey(k) {
+				if !security.IsEnvKeySensitive(k) {
 					envMap[k] = v
 				}
 			}
@@ -417,22 +438,6 @@ func CollectContainerEnvVars(containerNames []string) ([]ContainerEnv, error) {
 		}
 	}
 	return result, nil
-}
-
-// isSensitiveEnvKey checks if an env var key should be filtered out.
-func isSensitiveEnvKey(key string) bool {
-	sensitivePatterns := []string{
-		"password", "secret", "token", "key", "pass",
-		"pwd", "credential", "auth", "private", "salt",
-		"api_key", "apikey", "bearer", "jwt",
-	}
-	keyLower := strings.ToLower(key)
-	for _, pattern := range sensitivePatterns {
-		if strings.Contains(keyLower, pattern) {
-			return true
-		}
-	}
-	return false
 }
 
 // composeConfigCache caches the output of `docker compose config` per working directory.
@@ -528,7 +533,7 @@ func CollectComposeProjects() ([]ComposeProject, error) {
 					"--project-directory", p.WorkingDir, "config").Output()
 				cfgCancel()
 				if err == nil {
-					raw := filterSensitiveYAML(string(cfgOut))
+					raw := security.FilterYAML(string(cfgOut))
 					p.RawConfig = raw
 					composeCacheMu.Lock()
 					composeCache[p.WorkingDir] = composeCacheEntry{rawConfig: raw, cachedAt: time.Now()}
@@ -731,32 +736,3 @@ func ExecuteComposeCommand(action, projectName, workingDir string, chunkCB func(
 	return fullOutput.String(), cmdErr
 }
 
-// filterSensitiveYAML redacts lines containing sensitive keys in YAML output.
-func filterSensitiveYAML(yaml string) string {
-	sensitiveKeys := []string{
-		"password", "secret", "token", "key", "pass",
-		"pwd", "credential", "auth", "private", "salt",
-		"apikey", "bearer", "jwt",
-	}
-	var filtered []string
-	for _, line := range strings.Split(yaml, "\n") {
-		lineLower := strings.ToLower(line)
-		sensitive := false
-		for _, k := range sensitiveKeys {
-			if strings.Contains(lineLower, k+"=") || strings.Contains(lineLower, k+":") {
-				sensitive = true
-				break
-			}
-		}
-		if sensitive {
-			if idx := strings.Index(line, ":"); idx >= 0 {
-				filtered = append(filtered, line[:idx+1]+" [REDACTED]")
-			} else {
-				filtered = append(filtered, line)
-			}
-		} else {
-			filtered = append(filtered, line)
-		}
-	}
-	return strings.Join(filtered, "\n")
-}

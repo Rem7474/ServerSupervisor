@@ -24,6 +24,8 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	ipRateLimiter := NewIPRateLimiter(cfg.RateLimitRPS, cfg.RateLimitBurst, cfg.TrustedProxyCIDRs)
 	r.Use(RateLimiterMiddleware(ipRateLimiter))
 	agentRateLimiter := NewIPRateLimiter(cfg.AgentRateLimitRPS, cfg.AgentRateLimitBurst, cfg.TrustedProxyCIDRs)
+	// Stricter limiter for the unauthenticated public webhook receiver (5 req/s, burst 10).
+	webhookRateLimiter := NewIPRateLimiter(5, 10, cfg.TrustedProxyCIDRs)
 
 	// Instantiate handlers
 	authH := handlers.NewAuthHandler(db, cfg, dispatcher)
@@ -50,7 +52,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	hostPermH := handlers.NewHostPermissionHandler(db)
 
 	registerPublicRoutes(r, authH, db)
-	registerWSRoutes(r, wsH)
+	registerWSRoutes(r, wsH, cfg)
 	registerAgentRoutes(r, db, cfg, agentH, agentRateLimiter)
 
 	v1 := r.Group("/api/v1")
@@ -66,7 +68,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	registerSettingsRoutes(v1, settingsH)
 	registerTaskRoutes(v1, scheduledTaskH)
 	registerUserRoutes(v1, userH)
-	registerGitWebhookRoutes(r, v1, gitWebhookH)
+	registerGitWebhookRoutes(r, v1, gitWebhookH, webhookRateLimiter)
 	registerReleaseTrackerRoutes(v1, releaseTrackerH)
 	registerProxmoxRoutes(v1, proxmoxH)
 	registerHostPermissionRoutes(v1, hostPermH)
@@ -76,6 +78,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	cleanup := func() {
 		ipRateLimiter.Stop()
 		agentRateLimiter.Stop()
+		webhookRateLimiter.Stop()
 	}
 	return r, releaseTrackerH, proxmoxH, cleanup
 }
@@ -93,14 +96,16 @@ func registerPublicRoutes(r *gin.Engine, h *handlers.AuthHandler, db *database.D
 	})
 }
 
-func registerWSRoutes(r *gin.Engine, h *ws.WSHandler) {
-	r.GET("/api/v1/ws/dashboard", h.Dashboard)
-	r.GET("/api/v1/ws/hosts/:id", h.HostDetail)
-	r.GET("/api/v1/ws/docker", h.Docker)
-	r.GET("/api/v1/ws/network", h.Network)
-	r.GET("/api/v1/ws/apt", h.Apt)
-	r.GET("/api/v1/ws/commands/stream/:command_id", h.CommandStream)
-	r.GET("/api/v1/ws/notifications", h.NotificationStream)
+func registerWSRoutes(r *gin.Engine, h *ws.WSHandler, cfg *config.Config) {
+	g := r.Group("/api/v1/ws")
+	g.Use(WSTokenMiddleware(cfg))
+	g.GET("/dashboard", h.Dashboard)
+	g.GET("/hosts/:id", h.HostDetail)
+	g.GET("/docker", h.Docker)
+	g.GET("/network", h.Network)
+	g.GET("/apt", h.Apt)
+	g.GET("/commands/stream/:command_id", h.CommandStream)
+	g.GET("/notifications", h.NotificationStream)
 }
 
 func registerAgentRoutes(r *gin.Engine, db *database.DB, cfg *config.Config, h *handlers.AgentHandler, rl *IPRateLimiter) {
@@ -265,7 +270,7 @@ func registerUserRoutes(g *gin.RouterGroup, h *handlers.UserHandler) {
 	g.DELETE("/users/:id", h.DeleteUser)
 }
 
-func registerGitWebhookRoutes(r *gin.Engine, g *gin.RouterGroup, h *handlers.GitWebhookHandler) {
+func registerGitWebhookRoutes(r *gin.Engine, g *gin.RouterGroup, h *handlers.GitWebhookHandler, webhookRL *IPRateLimiter) {
 	g.GET("/webhooks/git", h.ListWebhooks)
 	g.POST("/webhooks/git", h.CreateWebhook)
 	g.GET("/webhooks/git/:id", h.GetWebhook)
@@ -273,8 +278,10 @@ func registerGitWebhookRoutes(r *gin.Engine, g *gin.RouterGroup, h *handlers.Git
 	g.DELETE("/webhooks/git/:id", h.DeleteWebhook)
 	g.POST("/webhooks/git/:id/regenerate-secret", h.RegenerateSecret)
 	g.GET("/webhooks/git/:id/executions", h.GetWebhookExecutions)
-	// Public receiver — HMAC-authenticated, no JWT
-	r.POST("/api/v1/webhooks/git/:id/receive", h.ReceiveWebhook)
+	// Public receiver — HMAC-authenticated, no JWT, dedicated stricter rate limit.
+	recv := r.Group("/api/v1/webhooks/git")
+	recv.Use(RateLimiterMiddleware(webhookRL))
+	recv.POST("/:id/receive", h.ReceiveWebhook)
 }
 
 func registerReleaseTrackerRoutes(g *gin.RouterGroup, h *handlers.ReleaseTrackerHandler) {

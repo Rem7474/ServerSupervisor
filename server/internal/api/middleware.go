@@ -230,11 +230,36 @@ func SecurityHeadersMiddleware() gin.HandlerFunc {
 		c.Header("Content-Security-Policy",
 			"default-src 'self'; "+
 				"script-src 'self'; "+
-				"style-src 'self' 'unsafe-inline'; "+
+				"style-src 'self'; "+
 				"img-src 'self' data: blob:; "+
 				"connect-src 'self' ws: wss:; "+
 				"font-src 'self'; "+
 				"frame-ancestors 'none'")
+		c.Next()
+	}
+}
+
+// WSTokenMiddleware performs optional pre-upgrade JWT validation for WebSocket routes.
+// If a ?token= query parameter is present and invalid, the HTTP upgrade is rejected with
+// 401 before the connection is established. If the parameter is absent the request passes
+// through unchanged — post-upgrade message-based auth remains the primary gate.
+func WSTokenMiddleware(cfg *config.Config) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		token := c.Query("token")
+		if token == "" {
+			c.Next()
+			return
+		}
+		t, err := jwt.Parse(token, func(tok *jwt.Token) (interface{}, error) {
+			if _, ok := tok.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, jwt.ErrSignatureInvalid
+			}
+			return []byte(cfg.JWTSecret), nil
+		})
+		if err != nil || !t.Valid {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+			return
+		}
 		c.Next()
 	}
 }

@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -27,14 +28,44 @@ const (
 )
 
 // isIPBlocked checks the persistent login_events table (respecting manual unblocks)
-// so brute-force blocks survive server restarts.
+// so brute-force blocks survive server restarts. When the DB is unavailable it falls
+// back to an in-memory counter so attacks during a DB outage are still limited.
 func (h *AuthHandler) isIPBlocked(ip string) bool {
 	since := time.Now().Add(-bruteForceWindow)
 	count, err := h.db.CountRecentFailedLoginsAfterUnblock(ip, since)
 	if err != nil {
-		// Fail open: don't block if DB is temporarily unavailable.
-		log.Printf("warn: isIPBlocked DB query failed for %s: %v", ip, err)
-		return false
+		log.Printf("warn: isIPBlocked DB query failed for %s: %v — using in-memory fallback", ip, err)
+		return h.memIsBlocked(ip)
+	}
+	return count >= bruteForceMaxFails
+}
+
+// memRecordFailure records a failed login attempt in the in-memory counter (DB fallback).
+func (h *AuthHandler) memRecordFailure(ip string) {
+	h.memMu.Lock()
+	defer h.memMu.Unlock()
+	now := time.Now()
+	cutoff := now.Add(-bruteForceWindow)
+	prev := h.memFailures[ip]
+	filtered := prev[:0]
+	for _, t := range prev {
+		if t.After(cutoff) {
+			filtered = append(filtered, t)
+		}
+	}
+	h.memFailures[ip] = append(filtered, now)
+}
+
+// memIsBlocked returns true when the in-memory failure count exceeds the threshold.
+func (h *AuthHandler) memIsBlocked(ip string) bool {
+	h.memMu.Lock()
+	defer h.memMu.Unlock()
+	cutoff := time.Now().Add(-bruteForceWindow)
+	count := 0
+	for _, t := range h.memFailures[ip] {
+		if t.After(cutoff) {
+			count++
+		}
 	}
 	return count >= bruteForceMaxFails
 }
@@ -46,13 +77,15 @@ func clientIP(c *gin.Context) string {
 }
 
 type AuthHandler struct {
-	db         *database.DB
-	cfg        *config.Config
-	dispatcher *dispatch.Dispatcher
+	db          *database.DB
+	cfg         *config.Config
+	dispatcher  *dispatch.Dispatcher
+	memFailures map[string][]time.Time
+	memMu       sync.Mutex
 }
 
 func NewAuthHandler(db *database.DB, cfg *config.Config, dispatcher *dispatch.Dispatcher) *AuthHandler {
-	return &AuthHandler{db: db, cfg: cfg, dispatcher: dispatcher}
+	return &AuthHandler{db: db, cfg: cfg, dispatcher: dispatcher, memFailures: make(map[string][]time.Time)}
 }
 
 func (h *AuthHandler) Login(c *gin.Context) {
@@ -77,12 +110,14 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	user, err := h.db.GetUserByUsername(req.Username)
 	if err != nil {
 		_ = h.db.CreateLoginEvent(req.Username, ip, userAgent, false)
+		h.memRecordFailure(ip)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
 		return
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
 		_ = h.db.CreateLoginEvent(req.Username, ip, userAgent, false)
+		h.memRecordFailure(ip)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
 		return
 	}
@@ -109,6 +144,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 			// Try backup codes
 			if !auth.VerifyBackupCode(user.BackupCodes, req.TOTPCode) {
 				_ = h.db.CreateLoginEvent(req.Username, ip, userAgent, false)
+				h.memRecordFailure(ip)
 				c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid TOTP code"})
 				return
 			}
@@ -455,12 +491,18 @@ func (h *AuthHandler) GetSecuritySummary(c *gin.Context) {
 		return
 	}
 
-	topFailed, _ := h.db.GetTopFailedIPs(since, 10)
+	topFailed, err := h.db.GetTopFailedIPs(since, 10)
+	if err != nil {
+		log.Printf("warn: GetTopFailedIPs: %v", err)
+	}
 	if topFailed == nil {
 		topFailed = []models.IPFailCount{}
 	}
 
-	blockedIPs, _ := h.db.GetCurrentlyBlockedIPs(time.Now().Add(-bruteForceWindow), bruteForceMaxFails)
+	blockedIPs, err := h.db.GetCurrentlyBlockedIPs(time.Now().Add(-bruteForceWindow), bruteForceMaxFails)
+	if err != nil {
+		log.Printf("warn: GetCurrentlyBlockedIPs: %v", err)
+	}
 	if blockedIPs == nil {
 		blockedIPs = []string{}
 	}
@@ -470,64 +512,6 @@ func (h *AuthHandler) GetSecuritySummary(c *gin.Context) {
 		"blocked_ips":    blockedIPs,
 		"top_failed_ips": topFailed,
 	})
-}
-
-func toInt(v any) int {
-	switch t := v.(type) {
-	case int:
-		return t
-	case int32:
-		return int(t)
-	case int64:
-		return int(t)
-	case float32:
-		return int(t)
-	case float64:
-		return int(t)
-	default:
-		return 0
-	}
-}
-
-func toInt64(v any) int64 {
-	switch t := v.(type) {
-	case int:
-		return int64(t)
-	case int32:
-		return int64(t)
-	case int64:
-		return t
-	case float32:
-		return int64(t)
-	case float64:
-		return int64(t)
-	case string:
-		n, err := strconv.ParseInt(strings.TrimSpace(t), 10, 64)
-		if err == nil {
-			return n
-		}
-		f, err := strconv.ParseFloat(strings.TrimSpace(t), 64)
-		if err == nil {
-			return int64(f)
-		}
-		return 0
-	default:
-		return 0
-	}
-}
-
-func toString(v any) string {
-	if s, ok := v.(string); ok {
-		return s
-	}
-	return ""
-}
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
 }
 
 // UnblockIP persists an IP unblock to DB so it survives server restarts (admin only).
@@ -553,7 +537,7 @@ func (h *AuthHandler) UnblockIP(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true, "message": "IP unblocked: " + ip})
 }
 
-// GetLoginEvents returns the last 50 login events for the current user
+// GetLoginEvents returns paginated login events for the current user (?page=, ?limit=).
 func (h *AuthHandler) GetLoginEvents(c *gin.Context) {
 	username := c.GetString("username")
 	if username == "" {
@@ -561,13 +545,27 @@ func (h *AuthHandler) GetLoginEvents(c *gin.Context) {
 		return
 	}
 
-	events, err := h.db.GetLoginEventsByUser(username, 50)
+	limit := 50
+	if l := c.Query("limit"); l != "" {
+		if n, err := strconv.Atoi(l); err == nil && n > 0 && n <= 200 {
+			limit = n
+		}
+	}
+	page := 1
+	if p := c.Query("page"); p != "" {
+		if n, err := strconv.Atoi(p); err == nil && n > 0 {
+			page = n
+		}
+	}
+	offset := (page - 1) * limit
+
+	events, err := h.db.GetLoginEventsByUser(username, limit, offset)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch login events"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"events": events})
+	c.JSON(http.StatusOK, gin.H{"events": events, "page": page, "limit": limit})
 }
 
 // RevokeAllSessions revokes all refresh tokens for the current user except the one provided.

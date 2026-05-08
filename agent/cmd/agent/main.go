@@ -2,22 +2,20 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
 	"os"
-	"os/exec"
 	"os/signal"
 	"path/filepath"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
 	"time"
 
-	"github.com/serversupervisor/agent/internal/collector"
 	"github.com/serversupervisor/agent/internal/config"
+	"github.com/serversupervisor/agent/internal/dispatcher"
+	"github.com/serversupervisor/agent/internal/reporter"
 	"github.com/serversupervisor/agent/internal/sender"
 )
 
@@ -32,28 +30,8 @@ var Version = "dev"
 // Capacity 10 lets up to 10 pending batches queue up before we start dropping.
 var commandQueue = make(chan []sender.PendingCommand, 10)
 
-// agentConfig stores the active agent configuration (loaded from config file).
-var agentConfig *config.Config
-
 // agentConfigPath stores the active configuration path for helper commands.
 var agentConfigPath = "/etc/serversupervisor/agent.yaml"
-
-// aptMu serialises APT operations — dpkg cannot run concurrently.
-var aptMu sync.Mutex
-
-// skipSystemMetrics is set to true when the server signals that Proxmox is the
-// designated metrics source for this host. System metrics (CPU/RAM/load) are then
-// omitted from reports to avoid redundant collection and storage.
-var skipSystemMetrics atomic.Bool
-
-// cmdSem limits concurrent non-APT commands to 4 at a time.
-var cmdSem = make(chan struct{}, 4)
-
-// tasksConfig holds custom tasks loaded from the local YAML file at startup.
-var tasksConfig *config.TasksConfig
-
-// verboseMode enables detailed logging for debugging (set via -verbose flag)
-var verboseMode bool
 
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
@@ -69,7 +47,7 @@ func main() {
 	updateVersion := flag.String("update-version", "", "Target version for internal update helper")
 	verbose := flag.Bool("verbose", false, "Enable verbose/debug logging output")
 	flag.Parse()
-	verboseMode = *verbose
+
 	agentConfigPath = *configPath
 
 	if *showVersion {
@@ -85,11 +63,9 @@ func main() {
 		return
 	}
 
-	// Generate/write default config
 	if *initConfig {
 		content := config.DefaultConfigFileWithOverrides(*initServerURL, *initAPIKey)
 
-		// Compatibility mode: print config to stdout only.
 		if *configPath == "-" {
 			fmt.Print(content)
 			return
@@ -116,12 +92,10 @@ func main() {
 		return
 	}
 
-	// Load config
 	cfg, err := config.Load(*configPath)
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
-	agentConfig = cfg
 
 	log.Printf("ServerSupervisor Agent starting (version: %s)", Version)
 	log.Printf("Server: %s", cfg.ServerURL)
@@ -136,7 +110,6 @@ func main() {
 	}
 	log.Printf("Max report body size: %d bytes", cfg.MaxReportBodyBytes)
 
-	// Load custom tasks config (tasks.yaml)
 	tc, err := config.LoadTasksConfig()
 	if err != nil {
 		log.Printf("Warning: failed to load tasks config: %v", err)
@@ -144,811 +117,42 @@ func main() {
 	} else {
 		log.Printf("Loaded %d custom task(s) from tasks config", len(tc.Tasks))
 	}
-	tasksConfig = tc
 
-	// Create sender
 	s := sender.New(cfg)
+
+	var skipMetrics atomic.Bool
+	rep := reporter.New(cfg, tc, *verbose, &skipMetrics, Version)
+	disp := dispatcher.New(cfg, *configPath, tc, startDetachedAgentUpdate)
 
 	// ctx is cancelled on SIGINT/SIGTERM — stops the periodic report loop.
 	// Command execution uses context.Background() so in-flight commands complete.
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	// Start the sequential command worker — ensures commands never overlap and
-	// are never silently dropped by a failed TryLock.
+	// Sequential command worker — ensures command batches never overlap.
 	var workerWg sync.WaitGroup
 	workerWg.Add(1)
 	go func() {
 		defer workerWg.Done()
 		for cmds := range commandQueue {
-			processCommands(s, cmds)
+			disp.Process(s, cmds)
 		}
 	}()
 
-	// Run first report immediately
-	sendReport(ctx, cfg, s)
+	rep.Send(ctx, s, commandQueue)
 
-	// Start periodic reporting
 	ticker := time.NewTicker(time.Duration(cfg.ReportInterval) * time.Second)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ticker.C:
-			sendReport(ctx, cfg, s)
+			rep.Send(ctx, s, commandQueue)
 		case <-ctx.Done():
 			log.Println("Agent shutting down...")
-			// Stop accepting new commands; wait for the current batch to finish.
 			close(commandQueue)
 			workerWg.Wait()
 			return
 		}
-	}
-}
-
-func sendReport(ctx context.Context, cfg *config.Config, s *sender.Sender) {
-	// When the server designates Proxmox as the metrics source for this host,
-	// skip CPU/RAM/load collection entirely — Proxmox polling already covers it.
-	// However, always collect and send uptime (+ basic host info) so the server can
-	// track uptime changes (e.g., on agent restart).
-	// Use interface{} so the JSON field is truly null (not a typed nil interface).
-	var metricsPayload interface{}
-	var collectedMetrics *collector.SystemMetrics
-	if skipSystemMetrics.Load() {
-		log.Printf("System metrics collection skipped (Proxmox is the designated metrics source)")
-		// Collect minimal metrics (uptime only) to track uptime changes on agent restart
-		m, err := collector.CollectMinimalMetrics()
-		if err != nil {
-			log.Printf("Failed to collect minimal metrics: %v", err)
-			return
-		}
-		collectedMetrics = m
-		metricsPayload = m
-	} else {
-		m, err := collector.CollectSystem(cfg.CollectCPUTemperature)
-		if err != nil {
-			log.Printf("Failed to collect system metrics: %v", err)
-			return
-		}
-		collectedMetrics = m
-		metricsPayload = m
-	}
-
-	// Collect Docker containers
-	var dockerData interface{}
-	var dockerNetworks interface{}
-	var containerEnvs interface{}
-	var composeProjects interface{}
-	if cfg.CollectDocker {
-		containers, err := collector.CollectDocker()
-		if err != nil {
-			log.Printf("Docker collection skipped: %v", err)
-			// Keep payload nil on collector failure so server state is not wiped.
-			dockerData = nil
-		} else {
-			dockerData = struct {
-				Containers []collector.DockerContainer `json:"containers"`
-			}{Containers: containers}
-
-			// Collect Docker networks
-			if networks, err := collector.CollectDockerNetworks(); err == nil {
-				dockerNetworks = networks
-			}
-
-			// Build container env vars from already-collected container data (no extra Docker API calls)
-			envs := make([]collector.ContainerEnv, 0, len(containers))
-			for _, c := range containers {
-				if len(c.EnvVars) > 0 {
-					envs = append(envs, collector.ContainerEnv{
-						ContainerName: c.Name,
-						EnvVars:       c.EnvVars,
-					})
-				}
-			}
-			containerEnvs = envs
-
-			// Collect docker-compose projects
-			if projects, err := collector.CollectComposeProjects(); err == nil {
-				composeProjects = projects
-			} else {
-				log.Printf("Compose projects collection skipped: %v", err)
-			}
-		}
-	} else {
-		dockerData = struct {
-			Containers []interface{} `json:"containers"`
-		}{Containers: []interface{}{}}
-	}
-
-	// Don't collect APT in periodic reports to avoid overwriting CVE history
-	// APT status is only collected:
-	// 1. At agent startup (with CVE)
-	// 2. After manual apt update/upgrade commands (with CVE)
-	var aptData interface{} = nil
-
-	// Always collect UU status (cheap: reads config files + log cursor).
-	// Intentionally not gated by cfg.CollectAPT — UU is a separate feature from
-	// full APT package-list tracking and must be visible regardless.
-	uuData := collector.CollectUnattendedUpgrades()
-
-	// Collect disk metrics and health
-	diskMetrics, err := collector.CollectDiskMetrics()
-	if err != nil {
-		log.Printf("Failed to collect disk metrics: %v", err)
-	}
-
-	var diskHealth []collector.DiskHealth
-	if cfg.CollectSMART {
-		diskHealth, err = collector.CollectDiskHealth()
-		if err != nil {
-			log.Printf("Failed to collect disk health (smartctl may not be installed): %v", err)
-		}
-	}
-
-	// Include custom task summaries so the server can display them in the UI.
-	var customTasksList interface{}
-	if tasksConfig != nil && len(tasksConfig.Tasks) > 0 {
-		customTasksList = tasksConfig.Summaries()
-	}
-
-	// Collect and parse web access logs once to build both traffic and threat views.
-	var webLogs interface{}
-	if cfg.CollectWebLogs {
-		globs := cfg.WebLogGlobs()
-		log.Printf("Web logs: scanning globs %v (crowdsec=%v)", globs, cfg.CollectCrowdSecCorrelation)
-		report, err := collector.CollectWebLogs(globs, cfg.WebLogsTailLines, cfg.WebLogsTopN, cfg.WebLogsRequestsLimit, cfg.WebLogsCursorFile, verboseMode, cfg.CrowdSecConnectionString, cfg.CrowdSecAPIKey, cfg.CrowdSecAlertsMachineID, cfg.CrowdSecAlertsPassword, cfg.CollectCrowdSecCorrelation)
-		if err != nil {
-			log.Printf("Web logs collection skipped: %v", err)
-		} else {
-			suspicious := 0
-			if report.Threats != nil {
-				suspicious = report.Threats.SuspiciousRequests
-			}
-			log.Printf("Web logs: source=%s files=%d requests=%d suspicious=%d",
-				report.Source, len(report.LogFilesScanned), report.TotalRequests, suspicious)
-			webLogs = report
-		}
-	}
-
-	// Build agent capabilities (which collectors are enabled)
-	capabilities := map[string]bool{
-		"docker":   cfg.CollectDocker,
-		"apt":      cfg.CollectAPT,
-		"smart":    cfg.CollectSMART,
-		"cpu_temp": cfg.CollectCPUTemperature,
-		"web_logs": cfg.CollectWebLogs,
-		"systemd":  true, // Always available if agent is running
-		"journal":  true, // Always available if agent is running
-	}
-
-	// Send report (with retry on transient network errors)
-	report := &sender.Report{
-		AgentVersion:       Version,
-		Capabilities:       capabilities,
-		Metrics:            metricsPayload,
-		Docker:             dockerData,
-		AptStatus:          aptData,
-		UnattendedUpgrades: uuData,
-		WebLogs:            webLogs,
-		DockerNetworks:     dockerNetworks,
-		ContainerEnvs:      containerEnvs,
-		ComposeProjects:    composeProjects,
-		DiskMetrics:        diskMetrics,
-		DiskHealth:         diskHealth,
-		CustomTasks:        customTasksList,
-		TasksConfigYAML:    config.LoadTasksConfigRaw(),
-		Timestamp:          time.Now(),
-	}
-	trimWebLogsForReportSize(report, cfg.MaxReportBodyBytes)
-
-	response, err := s.SendReportWithRetry(ctx, report)
-	if err != nil {
-		log.Printf("Failed to send report: %v", err)
-		return
-	}
-
-	if skipSystemMetrics.Load() {
-		log.Printf("Report sent successfully (uptime: %ds — Proxmox source)", collectedMetrics.Uptime)
-	} else {
-		log.Printf("Report sent successfully (CPU: %.1f%%, RAM: %.1f%%, Disks: %d)",
-			collectedMetrics.CPUUsagePercent, collectedMetrics.MemoryPercent, len(collectedMetrics.Disks))
-	}
-
-	// Update the skip flag for the next cycle based on server directive.
-	skipSystemMetrics.Store(response.SkipMetrics)
-
-	// Enqueue pending commands — the worker goroutine processes them sequentially.
-	if len(response.Commands) > 0 {
-		select {
-		case commandQueue <- response.Commands:
-		default:
-			// Queue is full. Report each command as failed immediately so the server
-			// doesn't leave them in "pending" state waiting for the stalled-command
-			// cleanup timeout (10 minutes). The user will see a clear failure reason.
-			log.Printf("Command queue full (%d batches pending), reporting %d commands as failed",
-				len(commandQueue), len(response.Commands))
-			for _, cmd := range response.Commands {
-				if err := s.ReportCommandResult(ctx, &sender.CommandResult{
-					CommandID: cmd.ID,
-					Status:    "failed",
-					Output:    "command dropped: agent command queue was full — try again",
-				}); err != nil {
-					log.Printf("Failed to report dropped command %s as failed: %v", cmd.ID, err)
-				}
-			}
-		}
-	}
-}
-
-func trimWebLogsForReportSize(report *sender.Report, maxBodyBytes int) {
-	if report == nil || maxBodyBytes <= 0 {
-		return
-	}
-	web, ok := report.WebLogs.(*collector.WebLogReport)
-	if !ok || web == nil {
-		return
-	}
-
-	encoded, err := json.Marshal(report)
-	if err != nil {
-		return
-	}
-	if len(encoded) <= maxBodyBytes {
-		return
-	}
-
-	original := len(web.Requests)
-	if original == 0 {
-		return
-	}
-
-	trimmed := web.Requests
-	for len(trimmed) > 0 {
-		nextLen := len(trimmed) / 2
-		if nextLen == len(trimmed) {
-			nextLen--
-		}
-		if nextLen < 0 {
-			nextLen = 0
-		}
-		trimmed = trimmed[:nextLen]
-		web.Requests = trimmed
-
-		encoded, err = json.Marshal(report)
-		if err != nil {
-			break
-		}
-		if len(encoded) <= maxBodyBytes {
-			break
-		}
-	}
-
-	log.Printf("Web logs payload trimmed: requests %d -> %d to fit max_report_body_bytes=%d", original, len(web.Requests), maxBodyBytes)
-}
-
-// processCommands dispatches each command in its own goroutine.
-// APT commands are serialised via aptMu (dpkg cannot run concurrently).
-// All other modules share a semaphore limiting parallelism to 4.
-// Commands use context.Background() so they complete even during agent shutdown.
-func processCommands(s *sender.Sender, commands []sender.PendingCommand) {
-	var wg sync.WaitGroup
-	for _, cmd := range commands {
-		wg.Add(1)
-		go func(c sender.PendingCommand) {
-			defer wg.Done()
-			if c.Module == "apt" {
-				aptMu.Lock()
-				defer aptMu.Unlock()
-			} else {
-				cmdSem <- struct{}{}
-				defer func() { <-cmdSem }()
-			}
-			executeCommand(s, c)
-		}(cmd)
-	}
-	wg.Wait()
-}
-
-func executeCommand(s *sender.Sender, cmd sender.PendingCommand) {
-	// Commands use a background context so they complete even if the agent is shutting down.
-	ctx := context.Background()
-	log.Printf("Processing command %s: module=%s action=%s target=%s", cmd.ID, cmd.Module, cmd.Action, cmd.Target)
-
-	switch cmd.Module {
-	case "docker":
-		// Parse extra args (working_dir for compose operations)
-		var extra struct {
-			WorkingDir string `json:"working_dir"`
-		}
-		_ = json.Unmarshal([]byte(cmd.Payload), &extra)
-
-		if err := s.ReportCommandResult(ctx, &sender.CommandResult{
-			CommandID: cmd.ID,
-			Status:    "running",
-		}); err != nil {
-			log.Printf("Failed to report running status: %v", err)
-		}
-
-		isCompose := strings.HasPrefix(cmd.Action, "compose_")
-		var output string
-		var execErr error
-		if isCompose {
-			output, execErr = collector.ExecuteComposeCommand(cmd.Action, cmd.Target, extra.WorkingDir, func(chunk string) {
-				if streamErr := s.StreamCommandChunk(ctx, cmd.ID, chunk); streamErr != nil {
-					log.Printf("Failed to stream compose chunk: %v", streamErr)
-				}
-			})
-		} else {
-			output, execErr = collector.ExecuteDockerCommand(cmd.Action, cmd.Target, func(chunk string) {
-				if streamErr := s.StreamCommandChunk(ctx, cmd.ID, chunk); streamErr != nil {
-					log.Printf("Failed to stream docker chunk: %v", streamErr)
-				}
-			})
-		}
-
-		status := "completed"
-		if execErr != nil {
-			status = "failed"
-			output = fmt.Sprintf("ERROR: %v\n%s", execErr, output)
-			log.Printf("Docker %s %s failed: %v", cmd.Action, cmd.Target, execErr)
-		} else {
-			log.Printf("Docker %s %s completed", cmd.Action, cmd.Target)
-		}
-		if err := s.ReportCommandResult(ctx, &sender.CommandResult{
-			CommandID: cmd.ID,
-			Status:    status,
-			Output:    output,
-		}); err != nil {
-			log.Printf("Failed to report command result: %v", err)
-		}
-
-	case "journal":
-		if err := s.ReportCommandResult(ctx, &sender.CommandResult{
-			CommandID: cmd.ID,
-			Status:    "running",
-		}); err != nil {
-			log.Printf("Failed to report running status: %v", err)
-		}
-
-		output, err := collector.ExecuteJournalctl(cmd.Target, func(chunk string) {
-			if streamErr := s.StreamCommandChunk(ctx, cmd.ID, chunk); streamErr != nil {
-				log.Printf("Failed to stream journal chunk: %v", streamErr)
-			}
-		})
-		status := "completed"
-		if err != nil {
-			status = "failed"
-			output = fmt.Sprintf("ERROR: %v\n%s", err, output)
-			log.Printf("journalctl %s failed: %v", cmd.Target, err)
-		} else {
-			log.Printf("journalctl %s completed", cmd.Target)
-		}
-		if err := s.ReportCommandResult(ctx, &sender.CommandResult{
-			CommandID: cmd.ID,
-			Status:    status,
-			Output:    output,
-		}); err != nil {
-			log.Printf("Failed to report command result: %v", err)
-		}
-
-	case "apt":
-		stream := func(chunk string) {
-			if streamErr := s.StreamCommandChunk(ctx, cmd.ID, chunk); streamErr != nil {
-				log.Printf("Failed to stream apt chunk: %v", streamErr)
-			}
-		}
-
-		// Unattended-upgrades management actions — handled before standard apt-get commands.
-		switch cmd.Action {
-		case "install_uu":
-			_ = s.ReportCommandResult(ctx, &sender.CommandResult{CommandID: cmd.ID, Status: "running"})
-			output, err := collector.InstallUnattendedUpgrades(stream)
-			status := "completed"
-			if err != nil {
-				status = "failed"
-				output = fmt.Sprintf("ERROR: %v\n%s", err, output)
-			}
-			_ = s.ReportCommandResult(ctx, &sender.CommandResult{CommandID: cmd.ID, Status: status, Output: output})
-			return
-
-		case "toggle_uu":
-			enable := cmd.Target == "enable"
-			_ = s.ReportCommandResult(ctx, &sender.CommandResult{CommandID: cmd.ID, Status: "running"})
-			output, err := collector.ToggleUnattendedUpgrades(enable)
-			status := "completed"
-			if err != nil {
-				status = "failed"
-				output = fmt.Sprintf("ERROR: %v\n%s", err, output)
-			}
-			_ = s.ReportCommandResult(ctx, &sender.CommandResult{CommandID: cmd.ID, Status: status, Output: output})
-			return
-
-		case "configure_uu":
-			_ = s.ReportCommandResult(ctx, &sender.CommandResult{CommandID: cmd.ID, Status: "running"})
-			var cfg collector.UUConfig
-			if jsonErr := json.Unmarshal([]byte(cmd.Payload), &cfg); jsonErr != nil {
-				_ = s.ReportCommandResult(ctx, &sender.CommandResult{
-					CommandID: cmd.ID, Status: "failed",
-					Output: fmt.Sprintf("invalid payload: %v", jsonErr),
-				})
-				return
-			}
-			err := collector.ConfigureUnattendedUpgrades(cfg)
-			status := "completed"
-			output := "Configuration applied."
-			if err != nil {
-				status = "failed"
-				output = fmt.Sprintf("ERROR: %v", err)
-			}
-			_ = s.ReportCommandResult(ctx, &sender.CommandResult{CommandID: cmd.ID, Status: status, Output: output})
-			return
-
-		case "run_uu":
-			_ = s.ReportCommandResult(ctx, &sender.CommandResult{CommandID: cmd.ID, Status: "running"})
-			output, err := collector.RunUnattendedUpgrades(stream)
-			status := "completed"
-			if err != nil {
-				status = "failed"
-				output = fmt.Sprintf("ERROR: %v\n%s", err, output)
-			}
-			_ = s.ReportCommandResult(ctx, &sender.CommandResult{CommandID: cmd.ID, Status: status, Output: output})
-			return
-		}
-
-		// Standard apt-get commands: update / upgrade / dist-upgrade
-		if err := s.ReportCommandResult(ctx, &sender.CommandResult{
-			CommandID: cmd.ID,
-			Status:    "running",
-		}); err != nil {
-			log.Printf("Failed to report running status: %v", err)
-		}
-
-		output, err := collector.ExecuteAptCommandWithStreaming(cmd.Action, stream)
-		status := "completed"
-		if err != nil {
-			status = "failed"
-			output = fmt.Sprintf("ERROR: %v\n%s", err, output)
-			log.Printf("APT %s failed: %v", cmd.Action, err)
-		} else {
-			log.Printf("APT %s completed", cmd.Action)
-		}
-
-		// Collect APT status after the command (with CVE extraction)
-		var aptStatus interface{}
-		log.Printf("Collecting APT status with CVE extraction after %s...", cmd.Action)
-		apt, aptErr := collector.CollectAPT(true)
-		if aptErr != nil {
-			log.Printf("Failed to collect APT status after %s: %v", cmd.Action, aptErr)
-		} else {
-			aptStatus = apt
-			log.Printf("APT status collected: %d packages, %d security", apt.PendingPackages, apt.SecurityUpdates)
-		}
-
-		if err := s.ReportCommandResult(ctx, &sender.CommandResult{
-			CommandID: cmd.ID,
-			Status:    status,
-			Output:    output,
-			AptStatus: aptStatus,
-		}); err != nil {
-			log.Printf("Failed to report command result: %v", err)
-		}
-
-	case "agent":
-		if cmd.Action != "update" {
-			if err := s.ReportCommandResult(ctx, &sender.CommandResult{
-				CommandID: cmd.ID,
-				Status:    "failed",
-				Output:    fmt.Sprintf("unsupported agent action: %s", cmd.Action),
-			}); err != nil {
-				log.Printf("Failed to report unsupported agent action: %v", err)
-			}
-			return
-		}
-
-		if err := s.ReportCommandResult(ctx, &sender.CommandResult{
-			CommandID: cmd.ID,
-			Status:    "running",
-			Output:    "Launching detached update helper...",
-		}); err != nil {
-			log.Printf("Failed to report agent update running status: %v", err)
-		}
-
-		if err := startDetachedAgentUpdate(s, cmd, agentConfigPath); err != nil {
-			output := fmt.Sprintf("ERROR: %v", err)
-			if reportErr := s.ReportCommandResult(ctx, &sender.CommandResult{
-				CommandID: cmd.ID,
-				Status:    "failed",
-				Output:    output,
-			}); reportErr != nil {
-				log.Printf("Failed to report agent update launch failure: %v", reportErr)
-			}
-			return
-		}
-
-	case "systemd":
-		if err := s.ReportCommandResult(ctx, &sender.CommandResult{
-			CommandID: cmd.ID,
-			Status:    "running",
-		}); err != nil {
-			log.Printf("Failed to report running status: %v", err)
-		}
-
-		if cmd.Action == "list" {
-			services, listErr := collector.ListSystemdServices()
-			status := "completed"
-			var output string
-			if listErr != nil {
-				status = "failed"
-				output = fmt.Sprintf("ERROR: %v", listErr)
-				log.Printf("systemctl list-units failed: %v", listErr)
-			} else {
-				jsonBytes, jsonErr := json.Marshal(services)
-				if jsonErr != nil {
-					status = "failed"
-					output = fmt.Sprintf("ERROR marshaling services: %v", jsonErr)
-				} else {
-					output = string(jsonBytes)
-					log.Printf("systemctl list: %d services returned", len(services))
-				}
-			}
-			if err := s.ReportCommandResult(ctx, &sender.CommandResult{
-				CommandID: cmd.ID,
-				Status:    status,
-				Output:    output,
-			}); err != nil {
-				log.Printf("Failed to report systemd list result: %v", err)
-			}
-		} else {
-			output, err := collector.ExecuteSystemdCommand(cmd.Target, cmd.Action, func(chunk string) {
-				if streamErr := s.StreamCommandChunk(ctx, cmd.ID, chunk); streamErr != nil {
-					log.Printf("Failed to stream systemd chunk: %v", streamErr)
-				}
-			})
-			status := "completed"
-			if err != nil {
-				status = "failed"
-				output = fmt.Sprintf("ERROR: %v\n%s", err, output)
-				log.Printf("systemctl %s %s failed: %v", cmd.Action, cmd.Target, err)
-			} else {
-				log.Printf("systemctl %s %s completed", cmd.Action, cmd.Target)
-			}
-			if err := s.ReportCommandResult(ctx, &sender.CommandResult{
-				CommandID: cmd.ID,
-				Status:    status,
-				Output:    output,
-			}); err != nil {
-				log.Printf("Failed to report systemd command result: %v", err)
-			}
-		}
-
-	case "processes":
-		if err := s.ReportCommandResult(ctx, &sender.CommandResult{
-			CommandID: cmd.ID,
-			Status:    "running",
-		}); err != nil {
-			log.Printf("Failed to report running status: %v", err)
-		}
-
-		procs, procErr := collector.GetProcessList()
-		status := "completed"
-		var output string
-		if procErr != nil {
-			status = "failed"
-			output = fmt.Sprintf("ERROR: %v", procErr)
-			log.Printf("ps failed: %v", procErr)
-		} else {
-			jsonBytes, jsonErr := json.Marshal(procs)
-			if jsonErr != nil {
-				status = "failed"
-				output = fmt.Sprintf("ERROR marshaling processes: %v", jsonErr)
-			} else {
-				output = string(jsonBytes)
-				log.Printf("processes list: %d processes returned", len(procs))
-			}
-		}
-		if err := s.ReportCommandResult(ctx, &sender.CommandResult{
-			CommandID: cmd.ID,
-			Status:    status,
-			Output:    output,
-		}); err != nil {
-			log.Printf("Failed to report processes result: %v", err)
-		}
-
-	case "custom":
-		executeCustomTask(ctx, s, cmd)
-
-	case "crowdsec":
-		if err := s.ReportCommandResult(ctx, &sender.CommandResult{
-			CommandID: cmd.ID,
-			Status:    "running",
-		}); err != nil {
-			log.Printf("Failed to report running status: %v", err)
-		}
-
-		var output string
-		var execErr error
-
-		switch cmd.Action {
-		case "unban":
-			if cmd.Target == "" {
-				execErr = fmt.Errorf("no IP provided for unban action")
-			} else {
-				execErr = collector.DeleteCrowdSecDecision(
-					agentConfig.CrowdSecConnectionString,
-					agentConfig.CrowdSecAlertsMachineID,
-					agentConfig.CrowdSecAlertsPassword,
-					cmd.Target,
-				)
-			}
-		case "ban":
-			if cmd.Target == "" {
-				execErr = fmt.Errorf("no IP provided for ban action")
-			} else {
-				var banPayload struct {
-					Duration string `json:"duration"`
-				}
-				banPayload.Duration = "4h"
-				_ = json.Unmarshal([]byte(cmd.Payload), &banPayload)
-				if banPayload.Duration == "" {
-					banPayload.Duration = "4h"
-				}
-				execErr = collector.CreateCrowdSecDecision(
-					agentConfig.CrowdSecConnectionString,
-					agentConfig.CrowdSecAlertsMachineID,
-					agentConfig.CrowdSecAlertsPassword,
-					cmd.Target,
-					banPayload.Duration,
-				)
-			}
-		default:
-			execErr = fmt.Errorf("unknown crowdsec action: %s", cmd.Action)
-		}
-
-		status := "completed"
-		if execErr != nil {
-			status = "failed"
-			output = fmt.Sprintf("ERROR: %v", execErr)
-			log.Printf("crowdsec %s %s failed: %v", cmd.Action, cmd.Target, execErr)
-		} else {
-			switch cmd.Action {
-			case "ban":
-				output = fmt.Sprintf("Successfully banned IP: %s", cmd.Target)
-			default:
-				output = fmt.Sprintf("Successfully unbanned IP: %s", cmd.Target)
-			}
-			log.Printf("crowdsec %s %s completed", cmd.Action, cmd.Target)
-		}
-		if err := s.ReportCommandResult(ctx, &sender.CommandResult{
-			CommandID: cmd.ID,
-			Status:    status,
-			Output:    output,
-		}); err != nil {
-			log.Printf("Failed to report crowdsec command result: %v", err)
-		}
-
-	default:
-		log.Printf("Unknown command module: %s", cmd.Module)
-		if err := s.ReportCommandResult(ctx, &sender.CommandResult{
-			CommandID: cmd.ID,
-			Status:    "failed",
-			Output:    fmt.Sprintf("unknown command module: %s", cmd.Module),
-		}); err != nil {
-			log.Printf("Failed to report command result: %v", err)
-		}
-	}
-}
-
-// executeCustomTask runs a task defined in the local tasks.yaml configuration.
-// cmd.Target holds the task ID; the command argv is exec'd directly (no shell).
-func executeCustomTask(ctx context.Context, s *sender.Sender, cmd sender.PendingCommand) {
-	task := tasksConfig.FindTask(cmd.Target)
-	if task == nil {
-		log.Printf("Custom task %q not found in local tasks config", cmd.Target)
-		if err := s.ReportCommandResult(ctx, &sender.CommandResult{
-			CommandID: cmd.ID,
-			Status:    "failed",
-			Output:    fmt.Sprintf("task %q not found in local tasks config (tasks.yaml)", cmd.Target),
-		}); err != nil {
-			log.Printf("Failed to report custom task result: %v", err)
-		}
-		return
-	}
-
-	if err := s.ReportCommandResult(ctx, &sender.CommandResult{
-		CommandID: cmd.ID,
-		Status:    "running",
-	}); err != nil {
-		log.Printf("Failed to report running status: %v", err)
-	}
-
-	timeout := time.Duration(task.Timeout) * time.Second
-	taskCtx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-
-	// exec.CommandContext with argv — no shell, no injection possible.
-	c := exec.CommandContext(taskCtx, task.Command[0], task.Command[1:]...)
-
-	// Inject env vars from payload (e.g. SS_REPO_NAME, SS_BRANCH set by webhook triggers)
-	var payloadData struct {
-		Env map[string]string `json:"env"`
-	}
-	if err := json.Unmarshal([]byte(cmd.Payload), &payloadData); err == nil && len(payloadData.Env) > 0 {
-		extraEnv := make([]string, 0, len(payloadData.Env))
-		for k, v := range payloadData.Env {
-			extraEnv = append(extraEnv, k+"="+v)
-		}
-		c.Env = append(os.Environ(), extraEnv...)
-	}
-
-	stdout, err := c.StdoutPipe()
-	if err != nil {
-		_ = s.ReportCommandResult(ctx, &sender.CommandResult{
-			CommandID: cmd.ID, Status: "failed",
-			Output: fmt.Sprintf("ERROR: %v", err),
-		})
-		return
-	}
-	stderr, err := c.StderrPipe()
-	if err != nil {
-		_ = s.ReportCommandResult(ctx, &sender.CommandResult{
-			CommandID: cmd.ID, Status: "failed",
-			Output: fmt.Sprintf("ERROR: %v", err),
-		})
-		return
-	}
-
-	if err := c.Start(); err != nil {
-		_ = s.ReportCommandResult(ctx, &sender.CommandResult{
-			CommandID: cmd.ID, Status: "failed",
-			Output: fmt.Sprintf("ERROR: failed to start: %v", err),
-		})
-		return
-	}
-
-	var builder strings.Builder
-	streamPipe := func(r interface{ Read([]byte) (int, error) }) {
-		buf := make([]byte, 4096)
-		for {
-			n, readErr := r.Read(buf)
-			if n > 0 {
-				chunk := string(buf[:n])
-				builder.WriteString(chunk)
-				if streamErr := s.StreamCommandChunk(ctx, cmd.ID, chunk); streamErr != nil {
-					log.Printf("Failed to stream custom task chunk: %v", streamErr)
-				}
-			}
-			if readErr != nil {
-				break
-			}
-		}
-	}
-
-	var pipeWg sync.WaitGroup
-	pipeWg.Add(2)
-	go func() { defer pipeWg.Done(); streamPipe(stdout) }()
-	go func() { defer pipeWg.Done(); streamPipe(stderr) }()
-	pipeWg.Wait()
-
-	waitErr := c.Wait()
-	status := "completed"
-	output := builder.String()
-	if waitErr != nil {
-		status = "failed"
-		if taskCtx.Err() == context.DeadlineExceeded {
-			output += fmt.Sprintf("\nERROR: task timed out after %ds", task.Timeout)
-		} else {
-			output += fmt.Sprintf("\nERROR: %v", waitErr)
-		}
-		log.Printf("Custom task %q failed: %v", task.ID, waitErr)
-	} else {
-		log.Printf("Custom task %q completed", task.ID)
-	}
-
-	if err := s.ReportCommandResult(ctx, &sender.CommandResult{
-		CommandID: cmd.ID,
-		Status:    status,
-		Output:    output,
-	}); err != nil {
-		log.Printf("Failed to report custom task result: %v", err)
 	}
 }

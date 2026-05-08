@@ -16,11 +16,11 @@ func (db *DB) CreateLoginEvent(username, ipAddress, userAgent string, success bo
 	return err
 }
 
-func (db *DB) GetLoginEventsByUser(username string, limit int) ([]models.LoginEvent, error) {
+func (db *DB) GetLoginEventsByUser(username string, limit, offset int) ([]models.LoginEvent, error) {
 	rows, err := db.conn.Query(
 		`SELECT id, username, ip_address, success, user_agent, created_at
-		 FROM login_events WHERE username = $1 ORDER BY created_at DESC LIMIT $2`,
-		username, limit,
+		 FROM login_events WHERE username = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
+		username, limit, offset,
 	)
 	if err != nil {
 		return nil, err
