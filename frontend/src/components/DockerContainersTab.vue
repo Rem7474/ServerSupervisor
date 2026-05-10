@@ -214,7 +214,7 @@
                   <button
                     v-if="['exited', 'dead', 'created', 'paused'].includes(c.state)"
                     :disabled="!!actionLoading[c.name]"
-                    class="btn btn-sm btn-ghost-success"
+                    class="btn btn-sm btn-success"
                     title="Démarrer"
                     aria-label="Démarrer le conteneur"
                     @click="$emit('container-action', { hostId: c.host_id, name: c.name, action: 'start', container: c })"
@@ -242,7 +242,7 @@
                   <button
                     v-if="c.state === 'running'"
                     :disabled="!!actionLoading[c.name]"
-                    class="btn btn-sm btn-ghost-danger"
+                    class="btn btn-sm btn-outline-danger"
                     title="Arrêter"
                     aria-label="Arrêter le conteneur"
                     @click="$emit('container-action', { hostId: c.host_id, name: c.name, action: 'stop', container: c })"
@@ -276,7 +276,7 @@
                   <button
                     v-if="c.state === 'running'"
                     :disabled="!!actionLoading[c.name]"
-                    class="btn btn-sm btn-ghost-warning"
+                    class="btn btn-sm btn-outline-warning"
                     title="Redémarrer"
                     aria-label="Redémarrer le conteneur"
                     @click="$emit('container-action', { hostId: c.host_id, name: c.name, action: 'restart', container: c })"
@@ -481,10 +481,10 @@
       />
     </svg>
     <div class="fw-medium">
-      {{ search || hostFilter ? 'Aucun résultat pour ces filtres' : 'Aucun conteneur trouvé' }}
+      {{ search || hostFilter || stateFilter || composeFilter ? 'Aucun résultat pour ces filtres' : 'Aucun conteneur trouvé' }}
     </div>
     <div class="small mt-1 opacity-75">
-      <template v-if="search || hostFilter">
+      <template v-if="search || hostFilter || stateFilter || composeFilter">
         Modifiez vos critères de recherche
       </template>
       <template v-else>
@@ -492,7 +492,7 @@
       </template>
     </div>
     <router-link
-      v-if="!search && !hostFilter"
+      v-if="!search && !hostFilter && !stateFilter && !composeFilter"
       to="/hosts/new"
       class="btn btn-sm btn-primary mt-3"
     >
@@ -534,7 +534,7 @@
             <div>{{ getComposeInfo(selectedContainer).service || '-' }}</div>
           </div>
           <div class="mb-3">
-            <label class="form-label fw-semibold">Repertoire de travail</label>
+            <label class="form-label fw-semibold">Répertoire de travail</label>
             <div class="font-monospace small">
               {{ getComposeInfo(selectedContainer).workingDir || '-' }}
             </div>

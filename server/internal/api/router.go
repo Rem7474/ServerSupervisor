@@ -352,6 +352,7 @@ func registerProxmoxRoutes(g *gin.RouterGroup, h *handlers.ProxmoxHandler) {
 
 	// Node actions (write — require Sys.Modify on the Proxmox token)
 	g.POST("/proxmox/nodes/:id/apt-refresh", h.RefreshNodeApt)
+	g.POST("/proxmox/nodes/:id/guests/:vmid/migrate", h.MigrateGuest)
 }
 
 func registerStaticFiles(r *gin.Engine) {

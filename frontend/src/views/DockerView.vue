@@ -53,6 +53,10 @@
         >
           Conteneurs
           <span class="badge bg-azure-lt text-azure ms-1">{{ containers.length }}</span>
+          <span
+            v-if="runningCount > 0"
+            class="badge bg-green-lt text-green ms-1"
+          >{{ runningCount }} actifs</span>
         </a>
       </li>
       <li class="nav-item">
@@ -126,6 +130,7 @@ const activeTab = useLocalStorage('dockerActiveTab', 'containers')
 const { value: actionError, showToast: showActionError } = useToast('')
 
 const canRunDocker = computed(() => auth.role === 'admin' || auth.role === 'operator')
+const runningCount = computed(() => containers.value.filter(c => c.state === 'running').length)
 
 const dockerActionLoading = ref({})
 const composeActionLoading = ref({})

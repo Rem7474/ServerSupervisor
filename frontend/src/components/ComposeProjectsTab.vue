@@ -2,9 +2,9 @@
   <!-- Filters -->
   <DataToolbar
     searchable
-    :search="composeSearch"
+    :search="composeSearchInput"
     search-placeholder="Rechercher un projet..."
-    @update:search="composeSearch = $event"
+    @update:search="composeSearchInput = $event"
   >
     <template #bottom>
       <div class="row g-3">
@@ -45,7 +45,10 @@
     </template>
   </DataToolbar>
 
-  <div class="card">
+  <div
+    v-if="filteredComposeProjects.length > 0"
+    class="card"
+  >
     <div class="table-responsive">
       <table class="table table-vcenter card-table">
         <thead>
@@ -136,8 +139,9 @@
                   <button
                     v-if="getComposeStatus(p) === 'stopped'"
                     :disabled="!!actionLoading[p.name]"
-                    class="btn btn-sm btn-ghost-success"
+                    class="btn btn-sm btn-success"
                     title="Start (up -d)"
+                    aria-label="Démarrer le projet"
                     @click="$emit('compose-action', { hostId: p.host_id, name: p.name, action: 'compose_up', workingDir: p.working_dir || '' })"
                   >
                     <span
@@ -163,8 +167,9 @@
                   <template v-if="getComposeStatus(p) === 'running'">
                     <button
                       :disabled="!!actionLoading[p.name]"
-                      class="btn btn-sm btn-ghost-danger"
+                      class="btn btn-sm btn-outline-danger"
                       title="Stop (down)"
+                      aria-label="Arrêter le projet"
                       @click="$emit('compose-action', { hostId: p.host_id, name: p.name, action: 'compose_down', workingDir: p.working_dir || '' })"
                     >
                       <span
@@ -195,8 +200,9 @@
                     </button>
                     <button
                       :disabled="!!actionLoading[p.name]"
-                      class="btn btn-sm btn-ghost-warning"
+                      class="btn btn-sm btn-outline-warning"
                       title="Redémarrer"
+                      aria-label="Redémarrer le projet"
                       @click="$emit('compose-action', { hostId: p.host_id, name: p.name, action: 'compose_restart', workingDir: p.working_dir || '' })"
                     >
                       <span
@@ -224,6 +230,7 @@
                     :disabled="!!actionLoading[p.name]"
                     class="btn btn-sm btn-ghost-secondary"
                     title="Voir les logs"
+                    aria-label="Voir les logs du projet"
                     @click="$emit('compose-action', { hostId: p.host_id, name: p.name, action: 'compose_logs', workingDir: p.working_dir || '' })"
                   >
                     <span
@@ -281,17 +288,28 @@
       </table>
     </div>
     <div
-      v-if="filteredComposeProjects.length === 0"
-      class="text-center text-secondary py-4"
-    >
-      Aucun projet Compose trouvé
-    </div>
-    <div
       v-if="trackerFeedback"
       class="alert alert-info m-3 mt-0 py-2"
       role="status"
     >
       {{ trackerFeedback }}
+    </div>
+  </div>
+
+  <div
+    v-if="filteredComposeProjects.length === 0"
+    class="text-center text-secondary py-5"
+  >
+    <div class="fw-medium">
+      {{ composeSearch || composeHostFilter || composeStateFilter ? 'Aucun résultat pour ces filtres' : 'Aucun projet Compose trouvé' }}
+    </div>
+    <div class="small mt-1 opacity-75">
+      <template v-if="composeSearch || composeHostFilter || composeStateFilter">
+        Modifiez vos critères de recherche
+      </template>
+      <template v-else>
+        Les projets Docker Compose apparaissent ici lorsque l'agent les détecte
+      </template>
     </div>
   </div>
 
@@ -405,7 +423,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import apiClient from '../api'
 import DataToolbar from './common/DataToolbar.vue'
 
@@ -419,7 +437,13 @@ const props = defineProps({
 
 defineEmits(['compose-action'])
 
+const composeSearchInput = ref('')
 const composeSearch = ref('')
+let composeSearchDebounce = null
+watch(composeSearchInput, val => {
+  clearTimeout(composeSearchDebounce)
+  composeSearchDebounce = setTimeout(() => { composeSearch.value = val }, 300)
+})
 const composeHostFilter = ref('')
 const composeStateFilter = ref('')
 const selectedProject = ref(null)

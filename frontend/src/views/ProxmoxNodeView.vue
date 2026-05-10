@@ -559,7 +559,7 @@
 
             <!-- VMs tab -->
             <div
-              v-if="tab === 'vms'"
+              v-show="tab === 'vms'"
               class="table-responsive"
             >
               <table class="table table-vcenter card-table">
@@ -577,12 +577,13 @@
                     <th><SortableHeader label="Uptime" :active="vmSortKey === 'uptime'" :direction="vmSortDir" @toggle="toggleVmSort('uptime')" /></th>
                     <th><SortableHeader label="Tags" :active="vmSortKey === 'tags'" :direction="vmSortDir" @toggle="toggleVmSort('tags')" /></th>
                     <th><SortableHeader label="Hôte lié" :active="vmSortKey === 'linked_host'" :direction="vmSortDir" @toggle="toggleVmSort('linked_host')" /></th>
+                    <th />
                   </tr>
                 </thead>
                 <tbody>
                   <tr v-if="sortedVms.length === 0">
                     <td
-                      colspan="12"
+                      colspan="13"
                       class="text-center text-muted py-4"
                     >
                       Aucune VM sur ce nœud.
@@ -650,6 +651,16 @@
                         @go="goToHost(linkForGuest(g))"
                       />
                     </td>
+                    <td>
+                      <button
+                        v-if="peerNodes.length > 0"
+                        class="btn btn-sm btn-ghost-secondary"
+                        title="Migrer vers un autre nœud"
+                        @click="openMigrateModal(g, 'vm')"
+                      >
+                        Migrer
+                      </button>
+                    </td>
                   </tr>
                 </tbody>
               </table>
@@ -657,7 +668,7 @@
 
             <!-- LXC tab -->
             <div
-              v-if="tab === 'lxc'"
+              v-show="tab === 'lxc'"
               class="table-responsive"
             >
               <table class="table table-vcenter card-table">
@@ -753,7 +764,7 @@
 
             <!-- Disks tab -->
             <div
-              v-if="tab === 'disks'"
+              v-show="tab === 'disks'"
               class="table-responsive"
             >
               <table class="table table-vcenter card-table">
@@ -828,7 +839,7 @@
             </div>
 
             <!-- Tasks tab -->
-            <div v-if="tab === 'tasks'">
+            <div v-show="tab === 'tasks'">
               <div class="table-responsive">
                 <table class="table table-vcenter card-table">
                   <thead>
@@ -909,7 +920,7 @@
 
             <!-- Updates tab -->
             <div
-              v-if="tab === 'updates'"
+              v-show="tab === 'updates'"
               class="card-body"
             >
               <!-- Apt update action bar -->
@@ -976,7 +987,7 @@
             </div>
 
             <!-- Services tab -->
-            <div v-if="tab === 'services'">
+            <div v-show="tab === 'services'">
               <div class="card-header d-flex align-items-center gap-2 flex-wrap">
                 <div class="btn-group btn-group-sm">
                   <button
@@ -1107,7 +1118,7 @@
             </div>
 
             <!-- Security tab -->
-            <div v-if="tab === 'security'">
+            <div v-show="tab === 'security'">
               <div class="card-header d-flex align-items-center gap-2 flex-wrap">
                 <select
                   v-model="securityService"
@@ -1208,7 +1219,7 @@
 
             <!-- Storage tab -->
             <div
-              v-if="tab === 'storage'"
+              v-show="tab === 'storage'"
               class="table-responsive"
             >
               <table class="table table-vcenter card-table">
@@ -1293,6 +1304,82 @@
         />
       </div> <!-- /side-layout -->
     </div> <!-- /v-else-if node -->
+
+    <!-- Migration modal -->
+    <div
+      v-if="migrateModal.open"
+      class="modal modal-blur fade show d-block"
+      tabindex="-1"
+      style="background:rgba(0,0,0,.5)"
+      @click.self="migrateModal.open = false"
+    >
+      <div class="modal-dialog modal-sm modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">
+              Migrer {{ migrateModal.guest?.name || `VMID ${migrateModal.guest?.vmid}` }}
+            </h5>
+            <button
+              type="button"
+              class="btn-close"
+              @click="migrateModal.open = false"
+            />
+          </div>
+          <div class="modal-body">
+            <div class="mb-3">
+              <label class="form-label">Nœud cible</label>
+              <select
+                v-model="migrateModal.target"
+                class="form-select"
+              >
+                <option
+                  v-for="n in peerNodes"
+                  :key="n.node_name"
+                  :value="n.node_name"
+                >
+                  {{ n.node_name }}
+                </option>
+              </select>
+            </div>
+            <div class="mb-2">
+              <label class="form-check">
+                <input
+                  v-model="migrateModal.online"
+                  type="checkbox"
+                  class="form-check-input"
+                >
+                <span class="form-check-label">Migration à chaud (sans arrêt)</span>
+              </label>
+            </div>
+            <div
+              v-if="migrateModal.error"
+              class="alert alert-danger mb-0 mt-2 py-2 small"
+            >
+              {{ migrateModal.error }}
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button
+              class="btn btn-secondary"
+              @click="migrateModal.open = false"
+            >
+              Annuler
+            </button>
+            <button
+              class="btn btn-primary"
+              :disabled="migrateModal.loading || !migrateModal.target"
+              @click="submitMigration"
+            >
+              <span
+                v-if="migrateModal.loading"
+                class="spinner-border spinner-border-sm me-1"
+              />
+              Migrer
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -1388,6 +1475,20 @@ const nodeFanRPMCurrent = ref(0)
 const aptRefreshing = ref(false)
 const aptRefreshMsg = ref('')
 const aptRefreshOk = ref(false)
+
+// peer nodes for migration target list
+const peerNodes = ref([])
+
+// migration modal state
+const migrateModal = ref({
+  open: false,
+  guest: null,
+  guestType: 'vm',
+  target: '',
+  online: false,
+  loading: false,
+  error: '',
+})
 
 // live status (iowait, swap, rootfs) — auto-loaded on mount
 const liveStatus = ref(null)
@@ -1819,9 +1920,10 @@ async function load() {
     sensorSourceHostId.value = node.value?.cpu_temp_source_host_id || node.value?.fan_rpm_source_host_id || ''
     await loadSensorSourceCandidates()
     await loadGuestLinks()
-    // fire-and-forget: live status + RRD charts load in parallel
+    // fire-and-forget: live status + RRD charts + peer nodes load in parallel
     loadLiveStatus()
     loadRRD('hour')
+    loadPeerNodes()
     if (tab.value === 'security') {
       loadNodeSecurityEvents()
     }
@@ -2342,7 +2444,7 @@ function wearoutColor(wearout) {
 }
 
 async function loadServices() {
-  if (servicesLoading.value) return
+  if (servicesLoading.value || services.value.length > 0) return
   servicesLoading.value = true
   servicesError.value = ''
   try {
@@ -2369,6 +2471,51 @@ async function svcAction(name, action) {
     svcActionOk.value = false
   }
   setTimeout(() => { svcActionMsg.value = '' }, 6000)
+}
+
+async function loadPeerNodes() {
+  if (!node.value?.connection_id) return
+  try {
+    const res = await api.getProxmoxNodes(node.value.connection_id)
+    peerNodes.value = (res.data ?? []).filter(n => n.node_name !== node.value?.node_name && n.status === 'online')
+  } catch {
+    peerNodes.value = []
+  }
+}
+
+function openMigrateModal(guest, guestType = 'vm') {
+  migrateModal.value = {
+    open: true,
+    guest,
+    guestType,
+    target: peerNodes.value[0]?.node_name ?? '',
+    online: false,
+    loading: false,
+    error: '',
+  }
+}
+
+async function submitMigration() {
+  const m = migrateModal.value
+  if (!m.target || !m.guest) return
+  m.loading = true
+  m.error = ''
+  try {
+    const res = await api.migrateProxmoxGuest(route.params.id, m.guest.vmid, {
+      target: m.target,
+      guest_type: m.guestType,
+      online: m.online,
+    })
+    const upid = res.data?.upid
+    migrateModal.value.open = false
+    if (upid) {
+      startPollingTask(upid, { action: 'migrate', label: `${m.guest.name || m.guest.vmid} → ${m.target}` })
+    }
+  } catch (e) {
+    m.error = e?.response?.data?.error || 'Erreur lors du lancement de la migration.'
+  } finally {
+    m.loading = false
+  }
 }
 
 function svcStateClass(state) {

@@ -428,5 +428,7 @@ export default {
 
   // Node actions
   refreshProxmoxNodeApt: (nodeId: string) => api.post(`/v1/proxmox/nodes/${nodeId}/apt-refresh`),
+  migrateProxmoxGuest: (nodeId: string, vmid: number, payload: { target: string; guest_type: string; online: boolean }) =>
+    api.post(`/v1/proxmox/nodes/${nodeId}/guests/${vmid}/migrate`, payload),
 }
 

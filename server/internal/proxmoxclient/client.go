@@ -660,6 +660,54 @@ func (c *Client) GetLXCInterfaces(node string, vmid int) ([]GuestNetworkIface, e
 
 // NodeServiceAction performs an action on a service. Requires Sys.Modify.
 // action must be one of: start | stop | restart | reload.
+// MigrateGuest migrates a VM or LXC container to another node.
+// guestType must be "vm" or "lxc". online=true requests live migration.
+// Returns the UPID of the migration task.
+func (c *Client) MigrateGuest(node string, vmid int, guestType, target string, online bool) (string, error) {
+	var apiPath string
+	if guestType == "lxc" {
+		apiPath = fmt.Sprintf("/nodes/%s/lxc/%d/migrate", node, vmid)
+	} else {
+		apiPath = fmt.Sprintf("/nodes/%s/qemu/%d/migrate", node, vmid)
+	}
+	onlineVal := "0"
+	if online {
+		onlineVal = "1"
+	}
+	form := url.Values{"target": {target}, "online": {onlineVal}}
+	reqURL := c.baseURL + apiPath
+	req, err := http.NewRequest(http.MethodPost, reqURL, strings.NewReader(form.Encode()))
+	if err != nil {
+		return "", fmt.Errorf("build request: %w", err)
+	}
+	req.Header.Set("Authorization", fmt.Sprintf("PVEAPIToken=%s=%s", c.tokenID, c.tokenSecret))
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("request: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		snippet := string(body)
+		if len(snippet) > 300 {
+			snippet = snippet[:300]
+		}
+		return "", fmt.Errorf("HTTP %d: %s", resp.StatusCode, snippet)
+	}
+
+	var envelope struct {
+		Data string `json:"data"` // UPID of the migration task
+	}
+	if err := json.Unmarshal(body, &envelope); err != nil {
+		return "", fmt.Errorf("parse response: %w", err)
+	}
+	return envelope.Data, nil
+}
+
 func (c *Client) NodeServiceAction(node, service, action string) (string, error) {
 	url := c.baseURL + fmt.Sprintf("/nodes/%s/services/%s/%s", node, service, action)
 	req, err := http.NewRequest(http.MethodPost, url, nil)

@@ -28,8 +28,9 @@
       </div>
     </div>
 
+    <!-- MFA card -->
     <div
-      class="card"
+      class="card mb-4"
       style="max-width: 640px;"
     >
       <div class="card-body">
@@ -38,7 +39,7 @@
             Authentification multi-facteur
           </div>
           <span :class="mfaEnabled ? 'badge bg-green-lt text-green' : 'badge bg-orange-lt text-orange'">
-            {{ mfaEnabled ? 'Active' : 'Desactive' }}
+            {{ mfaEnabled ? 'Activé' : 'Désactivé' }}
           </span>
         </div>
 
@@ -57,16 +58,17 @@
 
         <div v-else>
           <p class="text-secondary">
-            Le MFA est actif. Vous pouvez le desactiver si besoin.
+            Le MFA est actif. Vous pouvez le désactiver si besoin.
           </p>
           <button
             class="btn btn-outline-danger"
             @click="showDisable = true"
           >
-            Desactiver le MFA
+            Désactiver le MFA
           </button>
         </div>
 
+        <!-- Setup panel -->
         <div
           v-if="setupVisible"
           class="mt-4"
@@ -75,8 +77,45 @@
             <div class="fw-semibold mb-2">
               Configuration MFA
             </div>
+
+            <!-- Countdown bar -->
+            <div class="d-flex align-items-center gap-2 mb-3">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="14"
+                height="14"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                :class="setupSecondsLeft < 120 ? 'text-danger' : 'text-secondary'"
+              >
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="10"
+                /><polyline points="12 6 12 12 16 14" />
+              </svg>
+              <span
+                class="small fw-semibold"
+                :class="setupSecondsLeft < 120 ? 'text-danger' : 'text-secondary'"
+              >
+                Expire dans {{ formatCountdown(setupSecondsLeft) }}
+              </span>
+              <div
+                class="progress flex-fill"
+                style="height: 4px;"
+              >
+                <div
+                  class="progress-bar"
+                  :class="setupSecondsLeft < 120 ? 'bg-danger' : 'bg-azure'"
+                  :style="{ width: setupProgressPct + '%', transition: 'width 1s linear' }"
+                />
+              </div>
+            </div>
+
             <div class="text-secondary small mb-3">
-              Scannez le QR code avec votre application d'authentification.
+              Scannez le QR code avec votre application d'authentification, puis saisissez le code généré pour confirmer.
             </div>
             <div class="d-flex flex-column flex-md-row gap-3 align-items-center">
               <img
@@ -87,10 +126,35 @@
               >
               <div class="flex-fill">
                 <div class="text-secondary small mb-1">
-                  Cle secrete
+                  Clé secrète
                 </div>
-                <div class="bg-dark text-light rounded p-2 mb-3">
-                  <code>{{ setup.secret }}</code>
+                <div class="bg-dark text-light rounded p-2 mb-3 d-flex align-items-center justify-content-between gap-2">
+                  <code class="small">{{ setup.secret }}</code>
+                  <button
+                    class="btn btn-sm btn-ghost-light py-0"
+                    title="Copier"
+                    @click="copySecret"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="14"
+                      height="14"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      viewBox="0 0 24 24"
+                    >
+                      <rect
+                        x="9"
+                        y="9"
+                        width="13"
+                        height="13"
+                        rx="2"
+                        ry="2"
+                      /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+                    </svg>
+                    {{ copiedSecret ? '✓' : '' }}
+                  </button>
                 </div>
                 <div class="mb-3">
                   <label class="form-label">Code TOTP</label>
@@ -101,14 +165,15 @@
                     placeholder="123456"
                     inputmode="numeric"
                     maxlength="6"
+                    autocomplete="one-time-code"
                   >
                 </div>
                 <button
                   class="btn btn-success"
-                  :disabled="loading || !verifyCode"
+                  :disabled="loading || verifyCode.length !== 6"
                   @click="verifySetup"
                 >
-                  {{ loading ? 'Verification...' : 'Verifier et activer' }}
+                  {{ loading ? 'Vérification...' : 'Vérifier et activer' }}
                 </button>
               </div>
             </div>
@@ -118,26 +183,27 @@
               class="mt-4"
             >
               <div class="text-secondary small mb-1">
-                Codes de secours
+                Codes de secours — conservez-les dans un endroit sûr
               </div>
               <pre class="bg-dark text-light rounded p-2 small">{{ setup.backup_codes.join('\n') }}</pre>
               <button
                 class="btn btn-outline-light btn-sm"
                 @click="copyBackupCodes"
               >
-                {{ copiedBackup ? 'Copie' : 'Copier les codes' }}
+                {{ copiedBackup ? 'Copié ✓' : 'Copier les codes' }}
               </button>
             </div>
           </div>
         </div>
 
+        <!-- Disable panel -->
         <div
           v-if="showDisable"
           class="mt-4"
         >
           <div class="border rounded p-3">
             <div class="fw-semibold mb-2">
-              Desactiver le MFA
+              Désactiver le MFA
             </div>
             <div class="mb-3">
               <label class="form-label">Mot de passe</label>
@@ -153,7 +219,7 @@
               :disabled="loading || !disablePassword"
               @click="disableMFA"
             >
-              {{ loading ? 'Desactivation...' : 'Confirmer la desactivation' }}
+              {{ loading ? 'Désactivation...' : 'Confirmer la désactivation' }}
             </button>
             <button
               class="btn btn-outline-secondary ms-2"
@@ -181,12 +247,147 @@
         </div>
       </div>
     </div>
+
+    <!-- Sessions actives -->
+    <div
+      class="card"
+      style="max-width: 640px;"
+    >
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <h3 class="card-title mb-0">
+          <svg
+            class="icon me-2"
+            width="18"
+            height="18"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+            />
+          </svg>
+          Sessions actives
+        </h3>
+        <button
+          v-if="auth.refreshToken"
+          class="btn btn-sm btn-outline-danger"
+          :disabled="revokeLoading"
+          @click="revokeOtherSessions"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="14"
+            height="14"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            viewBox="0 0 24 24"
+            class="me-1"
+          >
+            <path d="M18 6L6 18M6 6l12 12" />
+          </svg>
+          {{ revokeLoading ? 'Révocation...' : 'Révoquer les autres sessions' }}
+        </button>
+      </div>
+      <div class="card-body pb-0">
+        <p class="text-secondary small mb-3">
+          Connexions récentes associées à votre compte. Le bouton ci-dessus déconnecte tous les autres appareils immédiatement.
+        </p>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-vcenter card-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>IP</th>
+              <th>Navigateur</th>
+              <th>OS</th>
+              <th>Statut</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-if="sessionsLoading">
+              <td
+                colspan="5"
+                class="text-center text-secondary py-3"
+              >
+                Chargement...
+              </td>
+            </tr>
+            <tr v-else-if="!loginEvents.length">
+              <td
+                colspan="5"
+                class="text-center text-secondary py-3"
+              >
+                Aucune connexion enregistrée
+              </td>
+            </tr>
+            <tr
+              v-for="ev in loginEvents"
+              :key="ev.id"
+            >
+              <td class="text-secondary small">
+                {{ formatDateTime(ev.created_at) }}
+              </td>
+              <td class="text-secondary small font-monospace">
+                {{ ev.ip_address }}
+              </td>
+              <td class="text-secondary small">
+                {{ parseUA(ev.user_agent).browser }}
+              </td>
+              <td class="text-secondary small">
+                {{ parseUA(ev.user_agent).os }}
+              </td>
+              <td>
+                <span
+                  class="badge"
+                  :class="ev.success ? 'bg-green-lt text-green' : 'bg-red-lt text-red'"
+                >
+                  {{ ev.success ? 'Succès' : 'Échec' }}
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div
+        v-if="revokeError"
+        class="card-body pt-0"
+      >
+        <div
+          class="alert alert-danger mb-0"
+          role="alert"
+        >
+          {{ revokeError }}
+        </div>
+      </div>
+      <div
+        v-if="revokeSuccess"
+        class="card-body pt-0"
+      >
+        <div
+          class="alert alert-success mb-0"
+          role="alert"
+        >
+          {{ revokeSuccess }}
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import apiClient from '../api'
+import { formatDateTime } from '../utils/formatters'
+import { useAuthStore } from '../stores/auth'
+
+const auth = useAuthStore()
 
 const mfaEnabled = ref(false)
 const setupVisible = ref(false)
@@ -198,6 +399,47 @@ const loading = ref(false)
 const error = ref('')
 const success = ref('')
 const copiedBackup = ref(false)
+const copiedSecret = ref(false)
+
+// TOTP countdown
+const SETUP_TIMEOUT = 600
+const setupSecondsLeft = ref(0)
+let setupTimer = null
+
+const setupProgressPct = computed(() =>
+  Math.round((setupSecondsLeft.value / SETUP_TIMEOUT) * 100)
+)
+
+function formatCountdown(secs) {
+  const m = Math.floor(secs / 60)
+  const s = secs % 60
+  return `${m}:${String(s).padStart(2, '0')}`
+}
+
+function startSetupTimer() {
+  clearInterval(setupTimer)
+  setupSecondsLeft.value = SETUP_TIMEOUT
+  setupTimer = setInterval(() => {
+    setupSecondsLeft.value = Math.max(0, setupSecondsLeft.value - 1)
+    if (setupSecondsLeft.value === 0) {
+      clearInterval(setupTimer)
+      setupVisible.value = false
+      error.value = 'Le délai de configuration a expiré. Veuillez cliquer sur "Activer MFA" pour recommencer.'
+    }
+  }, 1000)
+}
+
+function stopSetupTimer() {
+  clearInterval(setupTimer)
+  setupSecondsLeft.value = 0
+}
+
+// Sessions
+const loginEvents = ref([])
+const sessionsLoading = ref(false)
+const revokeLoading = ref(false)
+const revokeError = ref('')
+const revokeSuccess = ref('')
 
 async function loadStatus() {
   try {
@@ -205,6 +447,18 @@ async function loadStatus() {
     mfaEnabled.value = !!res.data?.mfa_enabled
   } catch {
     mfaEnabled.value = false
+  }
+}
+
+async function loadLoginEvents() {
+  sessionsLoading.value = true
+  try {
+    const res = await apiClient.getLoginEvents()
+    loginEvents.value = (res.data?.events || []).slice(0, 15)
+  } catch {
+    loginEvents.value = []
+  } finally {
+    sessionsLoading.value = false
   }
 }
 
@@ -216,6 +470,7 @@ async function startSetup() {
     const res = await apiClient.setupMFA()
     setup.value = res.data
     setupVisible.value = true
+    startSetupTimer()
   } catch (e) {
     error.value = e.response?.data?.error || 'Erreur lors de la configuration MFA'
   } finally {
@@ -229,9 +484,10 @@ async function verifySetup() {
   success.value = ''
   try {
     await apiClient.verifyMFA(setup.value.secret, verifyCode.value, setup.value.backup_codes)
-    success.value = 'MFA active avec succes.'
+    success.value = 'MFA activé avec succès.'
     setupVisible.value = false
     verifyCode.value = ''
+    stopSetupTimer()
     await loadStatus()
   } catch (e) {
     error.value = e.response?.data?.error || 'Code invalide'
@@ -246,15 +502,37 @@ async function disableMFA() {
   success.value = ''
   try {
     await apiClient.disableMFA(disablePassword.value)
-    success.value = 'MFA desactive.'
+    success.value = 'MFA désactivé.'
     showDisable.value = false
     disablePassword.value = ''
     await loadStatus()
   } catch (e) {
-    error.value = e.response?.data?.error || 'Erreur lors de la desactivation'
+    error.value = e.response?.data?.error || 'Erreur lors de la désactivation'
   } finally {
     loading.value = false
   }
+}
+
+async function revokeOtherSessions() {
+  if (!auth.refreshToken) return
+  revokeLoading.value = true
+  revokeError.value = ''
+  revokeSuccess.value = ''
+  try {
+    await apiClient.revokeAllSessions(auth.refreshToken)
+    revokeSuccess.value = 'Toutes les autres sessions ont été révoquées.'
+    await loadLoginEvents()
+  } catch (e) {
+    revokeError.value = e.response?.data?.error || 'Erreur lors de la révocation des sessions.'
+  } finally {
+    revokeLoading.value = false
+  }
+}
+
+async function copySecret() {
+  await navigator.clipboard.writeText(setup.value.secret)
+  copiedSecret.value = true
+  setTimeout(() => { copiedSecret.value = false }, 1500)
 }
 
 async function copyBackupCodes() {
@@ -264,6 +542,24 @@ async function copyBackupCodes() {
   setTimeout(() => { copiedBackup.value = false }, 1500)
 }
 
-onMounted(loadStatus)
-</script>
+function parseUA(ua) {
+  if (!ua) return { browser: '—', os: '—' }
+  const browser = ua.includes('Firefox/') ? 'Firefox'
+    : ua.includes('Edg/') ? 'Edge'
+    : ua.includes('Chrome/') ? 'Chrome'
+    : ua.includes('Safari/') ? 'Safari' : 'Other'
+  const os = ua.includes('Windows') ? 'Windows'
+    : ua.includes('Mac OS X') ? 'macOS'
+    : ua.includes('Android') ? 'Android'
+    : (ua.includes('iPhone') || ua.includes('iPad')) ? 'iOS'
+    : ua.includes('Linux') ? 'Linux' : 'Other'
+  return { browser, os }
+}
 
+onMounted(() => {
+  loadStatus()
+  loadLoginEvents()
+})
+
+onUnmounted(() => { stopSetupTimer() })
+</script>

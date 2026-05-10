@@ -1,5 +1,64 @@
 export const MANUAL_SENTINEL = '0 0 29 2 *'
 
+export function nextCronRun(expr) {
+  if (!expr || expr === MANUAL_SENTINEL) return null
+  const presets = {
+    '@daily':   '0 0 * * *',
+    '@hourly':  '0 * * * *',
+    '@weekly':  '0 0 * * 0',
+    '@monthly': '0 0 1 * *',
+    '@yearly':  '0 0 1 1 *',
+  }
+  const normalized = presets[expr] || expr
+  const parts = normalized.trim().split(/\s+/)
+  if (parts.length !== 5) return null
+  const [minPart, hourPart, domPart, monthPart, dowPart] = parts
+
+  function matchField(value, pattern) {
+    if (pattern === '*') return true
+    const m = pattern.match(/^\*\/(\d+)$/)
+    if (m) return value % parseInt(m[1]) === 0
+    const r = pattern.match(/^(\d+)-(\d+)$/)
+    if (r) return value >= parseInt(r[1]) && value <= parseInt(r[2])
+    if (pattern.includes(',')) return pattern.split(',').map(Number).includes(value)
+    return parseInt(pattern) === value
+  }
+
+  const d = new Date()
+  d.setSeconds(0, 0)
+  d.setMinutes(d.getMinutes() + 1)
+
+  const limit = new Date(d)
+  limit.setFullYear(limit.getFullYear() + 1)
+
+  let i = 0
+  while (d < limit && i++ < 200000) {
+    if (!matchField(d.getMonth() + 1, monthPart)) {
+      d.setMonth(d.getMonth() + 1, 1)
+      d.setHours(0, 0, 0, 0)
+      continue
+    }
+    const domOk = matchField(d.getDate(), domPart)
+    const dowOk = matchField(d.getDay(), dowPart)
+    const dayOk = domPart === '*' ? dowOk : dowPart === '*' ? domOk : domOk || dowOk
+    if (!dayOk) {
+      d.setDate(d.getDate() + 1)
+      d.setHours(0, 0, 0, 0)
+      continue
+    }
+    if (!matchField(d.getHours(), hourPart)) {
+      d.setHours(d.getHours() + 1, 0, 0, 0)
+      continue
+    }
+    if (!matchField(d.getMinutes(), minPart)) {
+      d.setMinutes(d.getMinutes() + 1)
+      continue
+    }
+    return new Date(d)
+  }
+  return null
+}
+
 export function isManualOnly(task) {
   return task.cron_expression === MANUAL_SENTINEL && !task.enabled
 }

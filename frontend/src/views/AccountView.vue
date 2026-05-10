@@ -249,7 +249,28 @@
                   >
                     {{ pwErrors.next }}
                   </div>
-                  <div class="form-hint">
+                  <div
+                    v-if="pwStrengthMeta"
+                    class="mt-2"
+                  >
+                    <div
+                      class="progress"
+                      style="height: 4px;"
+                    >
+                      <div
+                        class="progress-bar"
+                        :class="pwStrengthMeta.cls"
+                        :style="{ width: pwStrengthMeta.width, transition: 'width 0.3s' }"
+                      />
+                    </div>
+                    <div class="form-hint mt-1">
+                      Force : <span :class="{ 'text-danger': pwStrength <= 1, 'text-warning': pwStrength === 2, 'text-success': pwStrength >= 4 }">{{ pwStrengthMeta.label }}</span>
+                    </div>
+                  </div>
+                  <div
+                    v-else
+                    class="form-hint"
+                  >
                     Au moins 8 caractères.
                   </div>
                 </div>
@@ -535,7 +556,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import apiClient from '../api'
 import { formatDateLong as formatDate, formatDateTime } from '../utils/formatters'
@@ -556,6 +577,48 @@ const pwErrors = ref({ current: '', next: '', confirm: '' })
 const pwError = ref('')
 const pwSuccess = ref('')
 const pwLoading = ref(false)
+
+const pwStrength = computed(() => {
+  const pw = pwForm.value.next
+  if (!pw) return 0
+  let score = 0
+  if (pw.length >= 8) score++
+  if (pw.length >= 12) score++
+  if (/[A-Z]/.test(pw)) score++
+  if (/[0-9]/.test(pw)) score++
+  if (/[^A-Za-z0-9]/.test(pw)) score++
+  return score
+})
+
+const pwStrengthMeta = computed(() => {
+  if (!pwForm.value.next) return null
+  const s = pwStrength.value
+  if (s <= 1) return { label: 'Faible', cls: 'bg-danger', width: '25%' }
+  if (s <= 2) return { label: 'Moyen', cls: 'bg-warning', width: '50%' }
+  if (s <= 3) return { label: 'Bon', cls: 'bg-info', width: '75%' }
+  return { label: 'Fort', cls: 'bg-success', width: '100%' }
+})
+
+watch(() => pwForm.value.next, (val) => {
+  if (val.length > 0 && val.length < 8) {
+    pwErrors.value.next = 'Au moins 8 caractères requis.'
+  } else {
+    pwErrors.value.next = ''
+  }
+  if (pwForm.value.confirm && val !== pwForm.value.confirm) {
+    pwErrors.value.confirm = 'La confirmation ne correspond pas.'
+  } else if (pwForm.value.confirm) {
+    pwErrors.value.confirm = ''
+  }
+})
+
+watch(() => pwForm.value.confirm, (val) => {
+  if (val && val !== pwForm.value.next) {
+    pwErrors.value.confirm = 'La confirmation ne correspond pas.'
+  } else {
+    pwErrors.value.confirm = ''
+  }
+})
 
 // Commands history
 const allCommands = ref([])

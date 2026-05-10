@@ -108,6 +108,60 @@ func (h *ProxmoxHandler) GetNodeGuestNetworks(c *gin.Context) {
 	c.JSON(http.StatusOK, result)
 }
 
+// ─── Guest migration ──────────────────────────────────────────────────────────
+
+// MigrateGuest migrates a VM or LXC container to another node in the same cluster.
+// URL params: :id = DB node UUID, :vmid = PVE VMID (integer).
+// Body JSON: { target: "pve2", online: true, guest_type: "vm" }
+func (h *ProxmoxHandler) MigrateGuest(c *gin.Context) {
+	node, err := h.db.GetProxmoxNode(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if node == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "node not found"})
+		return
+	}
+
+	var body struct {
+		Target    string `json:"target" binding:"required"`
+		GuestType string `json:"guest_type"` // "vm" or "lxc"; defaults to "vm"
+		Online    bool   `json:"online"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "target requis"})
+		return
+	}
+	if body.GuestType == "" {
+		body.GuestType = "vm"
+	}
+
+	vmidParam := c.Param("vmid")
+	var vmid int
+	if _, err := fmt.Sscanf(vmidParam, "%d", &vmid); err != nil || vmid <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "vmid invalide"})
+		return
+	}
+
+	secret, conn, err := h.resolveSecret(node.ConnectionID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	client := proxmoxclient.New(conn.APIURL, conn.TokenID, secret, conn.InsecureSkipVerify)
+	upid, err := client.MigrateGuest(node.NodeName, vmid, body.GuestType, body.Target, body.Online)
+	if err != nil {
+		log.Printf("proxmox migrate [%s/%s] vmid=%d→%s: %v", conn.Name, node.NodeName, vmid, body.Target, err)
+		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+		return
+	}
+
+	log.Printf("proxmox migrate [%s/%s] vmid=%d→%s: upid=%s", conn.Name, node.NodeName, vmid, body.Target, upid)
+	c.JSON(http.StatusOK, gin.H{"upid": upid, "message": fmt.Sprintf("Migration vers %s lancée", body.Target)})
+}
+
 // ─── Services (systemd) ────────────────────────────────────────────────────────
 
 // validServiceAction is the set of allowed service action verbs.

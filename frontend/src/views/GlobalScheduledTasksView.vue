@@ -17,135 +17,11 @@
             Tâches planifiées
           </h2>
         </div>
-        <div class="d-flex align-items-center gap-2">
-          <span class="text-muted small">{{ tasks.length }} tâche{{ tasks.length !== 1 ? 's' : '' }}</span>
-          <button
-            class="btn btn-outline-secondary btn-sm"
-            @click="loadTasks"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="icon icon-sm"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" />
-              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-            </svg>
-            Actualiser
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Filters & Sort -->
-    <div class="row g-3 mb-3 align-items-center">
-      <div class="col-auto">
-        <input
-          v-model="filterText"
-          type="text"
-          class="form-control tasks-filter-search"
-          placeholder="Rechercher…"
-        >
-      </div>
-      <div class="col-auto">
-        <select
-          v-model="filterHost"
-          class="form-select tasks-filter-select"
-        >
-          <option value="">
-            Tous les hôtes
-          </option>
-          <option
-            v-for="host in hostList"
-            :key="host"
-            :value="host"
-          >
-            {{ host }}
-          </option>
-        </select>
-      </div>
-      <div class="col-auto">
-        <select
-          v-model="filterModule"
-          class="form-select"
-        >
-          <option value="">
-            Tous les modules
-          </option>
-          <option value="apt">
-            apt
-          </option>
-          <option value="docker">
-            docker
-          </option>
-          <option value="systemd">
-            systemd
-          </option>
-          <option value="journal">
-            journal
-          </option>
-          <option value="processes">
-            processes
-          </option>
-          <option value="custom">
-            custom
-          </option>
-        </select>
-      </div>
-      <div class="col-auto">
-        <select
-          v-model="filterStatus"
-          class="form-select"
-        >
-          <option value="">
-            Tous les statuts
-          </option>
-          <option value="enabled">
-            Activées
-          </option>
-          <option value="disabled">
-            Désactivées
-          </option>
-          <option value="manual">
-            Manuelles
-          </option>
-        </select>
-      </div>
-      <div class="col-auto ms-auto d-flex gap-2">
-        <select
-          v-model="sortKey"
-          class="form-select tasks-filter-select"
-        >
-          <option value="name">
-            Nom
-          </option>
-          <option value="host_name">
-            Hôte
-          </option>
-          <option value="module">
-            Module
-          </option>
-          <option value="next_run_at">
-            Prochain run
-          </option>
-          <option value="last_run_at">
-            Dernier run
-          </option>
-        </select>
         <button
-          class="btn btn-sm btn-outline-secondary"
-          :title="sortDir === 'asc' ? 'Croissant' : 'Décroissant'"
-          @click="sortDir = sortDir === 'asc' ? 'desc' : 'asc'"
+          class="btn btn-outline-secondary btn-sm"
+          @click="loadTasks"
         >
           <svg
-            v-if="sortDir === 'asc'"
             xmlns="http://www.w3.org/2000/svg"
             class="icon icon-sm"
             width="16"
@@ -156,23 +32,93 @@
             stroke-width="2"
             stroke-linecap="round"
             stroke-linejoin="round"
-          ><path d="M4 6l7 0" /><path d="M4 12l7 0" /><path d="M4 18l9 0" /><path d="M15 9l3 -3l3 3" /><path d="M18 6l0 12" /></svg>
-          <svg
-            v-else
-            xmlns="http://www.w3.org/2000/svg"
-            class="icon icon-sm"
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          ><path d="M4 6l9 0" /><path d="M4 12l7 0" /><path d="M4 18l7 0" /><path d="M15 15l3 3l3 -3" /><path d="M18 6l0 12" /></svg>
+          >
+            <polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" />
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+          </svg>
+          Actualiser
         </button>
       </div>
     </div>
+
+    <DataToolbar
+      searchable
+      :search="filterText"
+      search-placeholder="Rechercher une tâche..."
+      @update:search="filterText = $event"
+    >
+      <template #right>
+        <span class="text-muted small">
+          {{ filteredTasks.length }}&thinsp;/&thinsp;{{ tasks.length }}
+          tâche{{ tasks.length !== 1 ? 's' : '' }}
+        </span>
+      </template>
+      <template #bottom>
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+          <select
+            v-model="filterHost"
+            class="form-select form-select-sm tasks-filter-select"
+          >
+            <option value="">
+              Tous les hôtes
+            </option>
+            <option
+              v-for="host in hostList"
+              :key="host"
+              :value="host"
+            >
+              {{ host }}
+            </option>
+          </select>
+          <select
+            v-model="filterModule"
+            class="form-select form-select-sm tasks-filter-select"
+          >
+            <option value="">
+              Tous les modules
+            </option>
+            <option value="apt">
+              apt
+            </option>
+            <option value="docker">
+              docker
+            </option>
+            <option value="systemd">
+              systemd
+            </option>
+            <option value="journal">
+              journal
+            </option>
+            <option value="processes">
+              processes
+            </option>
+            <option value="custom">
+              custom
+            </option>
+          </select>
+          <select
+            v-model="filterStatus"
+            class="form-select form-select-sm tasks-filter-select"
+          >
+            <option value="">
+              Tous les statuts
+            </option>
+            <option value="enabled">
+              Activées
+            </option>
+            <option value="disabled">
+              Désactivées
+            </option>
+            <option value="manual">
+              Manuelles
+            </option>
+            <option value="failed">
+              En échec
+            </option>
+          </select>
+        </div>
+      </template>
+    </DataToolbar>
 
     <div
       v-if="error"
@@ -224,12 +170,36 @@
         <table class="table table-vcenter table-hover card-table mb-0">
           <thead>
             <tr>
-              <th>Hôte</th>
-              <th>Nom</th>
-              <th>Module / Action</th>
-              <th>Planification</th>
-              <th>Prochaine exécution</th>
-              <th>Dernier résultat</th>
+              <th>
+                <SortableHeader
+                  label="Hôte"
+                  :active="sortKey === 'host_name'"
+                  :direction="sortDir"
+                  @toggle="toggleSort('host_name')"
+                />
+              </th>
+              <th>
+                <SortableHeader
+                  label="Nom"
+                  :active="sortKey === 'name'"
+                  :direction="sortDir"
+                  @toggle="toggleSort('name')"
+                />
+              </th>
+              <th class="d-none d-sm-table-cell">
+                Module / Action
+              </th>
+              <th class="d-none d-md-table-cell">
+                Planification
+              </th>
+              <th class="d-none d-md-table-cell">
+                <SortableHeader
+                  label="Dernier résultat"
+                  :active="sortKey === 'last_run_at'"
+                  :direction="sortDir"
+                  @toggle="toggleSort('last_run_at')"
+                />
+              </th>
               <th>Activée</th>
               <th />
             </tr>
@@ -248,7 +218,7 @@
                 </router-link>
               </td>
               <td>{{ task.name }}</td>
-              <td>
+              <td class="d-none d-sm-table-cell">
                 <span class="badge bg-blue-lt me-1">{{ task.module }}</span>
                 <span class="text-secondary small">{{ task.action }}</span>
                 <span
@@ -256,30 +226,31 @@
                   class="text-muted small ms-1"
                 >— {{ task.target }}</span>
               </td>
-              <td>
+              <td class="d-none d-md-table-cell">
                 <span
                   v-if="isManualOnly(task)"
                   class="badge bg-secondary-lt text-secondary"
                 >Manuel</span>
                 <template v-else>
                   <code class="small">{{ task.cron_expression }}</code>
-                  <span
+                  <div
                     v-if="describeCron(task.cron_expression)"
-                    class="text-muted small ms-1"
-                  >— {{ describeCron(task.cron_expression) }}</span>
+                    class="text-muted small"
+                  >
+                    {{ describeCron(task.cron_expression) }}
+                  </div>
+                  <div
+                    v-if="task.next_run_at"
+                    class="text-primary small"
+                  >
+                    → {{ formatDate(task.next_run_at) }}
+                  </div>
                 </template>
               </td>
-              <td>
-                <span v-if="task.next_run_at && !isManualOnly(task)">{{ formatDate(task.next_run_at) }}</span>
-                <span
-                  v-else
-                  class="text-muted"
-                >—</span>
-              </td>
-              <td>
+              <td class="d-none d-md-table-cell">
                 <span
                   v-if="task.last_run_status"
-                  :class="task.last_run_status === 'completed' ? 'badge bg-success-lt' : task.last_run_status === 'pending' ? 'badge bg-warning-lt' : 'badge bg-danger-lt'"
+                  :class="statusBadge(task.last_run_status)"
                 >
                   {{ task.last_run_status }}
                   <span
@@ -456,14 +427,20 @@
                 type="text"
                 class="form-control font-monospace"
                 placeholder="ex: 0 3 * * *"
-                aria-describedby="cron-description"
               >
               <div
-                v-if="editForm.cron_expression && describeCron(editForm.cron_expression)"
-                id="cron-description"
+                v-if="editForm.cron_expression"
                 class="form-hint"
               >
-                {{ describeCron(editForm.cron_expression) }}
+                <span v-if="editCronDesc">{{ editCronDesc }}</span>
+                <span
+                  v-if="editNextRun"
+                  :class="editCronDesc ? 'ms-2 text-primary' : 'text-primary'"
+                >→ prochain : {{ formatDate(editNextRun) }}</span>
+                <span
+                  v-else-if="!editCronDesc"
+                  class="text-warning"
+                >Expression non reconnue</span>
               </div>
             </div>
             <div class="mb-3 form-check">
@@ -508,7 +485,6 @@
         </div>
       </div>
     </div>
-
 
     <!-- Execution history modal -->
     <div
@@ -648,8 +624,10 @@
 import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import api from '../api'
-import { isManualOnly, describeCron } from '../utils/cron'
+import { isManualOnly, describeCron, nextCronRun, MANUAL_SENTINEL } from '../utils/cron'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
+import DataToolbar from '../components/common/DataToolbar.vue'
+import SortableHeader from '../components/common/SortableHeader.vue'
 
 const auth = useAuthStore()
 const dialog = useConfirmDialog()
@@ -667,13 +645,11 @@ const filterStatus = ref('')
 const sortKey = ref('name')
 const sortDir = ref('asc')
 
-// Edit modal state
 const editTask = ref(null)
 const editForm = ref({ name: '', cron_expression: '', enabled: false })
 const editSaving = ref(false)
 const editError = ref('')
 
-// History modal state
 const historyTask = ref(null)
 const executions = ref([])
 const historyLoading = ref(false)
@@ -687,6 +663,13 @@ const hostList = computed(() => {
   return names.sort()
 })
 
+const editCronDesc = computed(() => describeCron(editForm.value.cron_expression))
+const editNextRun = computed(() => {
+  const expr = editForm.value.cron_expression
+  if (!expr || expr === MANUAL_SENTINEL) return null
+  return nextCronRun(expr)
+})
+
 const filteredTasks = computed(() => {
   const filtered = tasks.value.filter(task => {
     if (filterHost.value && task.host_name !== filterHost.value) return false
@@ -694,6 +677,7 @@ const filteredTasks = computed(() => {
     if (filterStatus.value === 'enabled' && (!task.enabled || isManualOnly(task))) return false
     if (filterStatus.value === 'disabled' && (task.enabled || isManualOnly(task))) return false
     if (filterStatus.value === 'manual' && !isManualOnly(task)) return false
+    if (filterStatus.value === 'failed' && task.last_run_status !== 'failed') return false
     if (filterText.value) {
       const q = filterText.value.toLowerCase()
       if (!task.name.toLowerCase().includes(q) &&
@@ -712,6 +696,15 @@ const filteredTasks = computed(() => {
     return sortDir.value === 'asc' ? cmp : -cmp
   })
 })
+
+function toggleSort(key) {
+  if (sortKey.value === key) {
+    sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    sortKey.value = key
+    sortDir.value = 'asc'
+  }
+}
 
 function formatDate(iso) {
   if (!iso) return ''
@@ -807,11 +800,18 @@ async function loadTasks() {
 }
 
 async function toggleTask(task) {
+  const enabling = !task.enabled
+  const ok = await dialog.confirm({
+    title: enabling ? 'Activer la tâche' : 'Désactiver la tâche',
+    message: `Voulez-vous ${enabling ? 'activer' : 'désactiver'} « ${task.name} » sur ${task.host_name} ?`,
+    variant: enabling ? 'primary' : 'warning',
+  })
+  if (!ok) return
   try {
     await api.updateScheduledTask(task.id, {
       name: task.name, module: task.module, action: task.action,
       target: task.target, payload: task.payload,
-      cron_expression: task.cron_expression, enabled: !task.enabled,
+      cron_expression: task.cron_expression, enabled: enabling,
     })
     await loadTasks()
   } catch (e) {
@@ -837,18 +837,14 @@ onMounted(loadTasks)
 </script>
 
 <style scoped>
-.tasks-filter-search {
-  min-width: 200px;
-}
-
 .tasks-filter-select {
-  min-width: 160px;
+  min-width: 150px;
 }
 
-@media (max-width: 768px) {
-  .tasks-filter-search,
+@media (max-width: 576px) {
   .tasks-filter-select {
     min-width: 0;
+    width: 100%;
   }
 }
 </style>

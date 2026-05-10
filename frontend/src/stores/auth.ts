@@ -10,6 +10,7 @@ interface AuthData {
   token: string
   role: string
   must_change_password?: boolean
+  refresh_token?: string
 }
 
 interface RolePermissions {
@@ -38,6 +39,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   const token: Ref<string> = ref(localStorage.getItem('token') || '')
+  const refreshToken: Ref<string> = ref(localStorage.getItem('refreshToken') || '')
   const role: Ref<string> = ref(localStorage.getItem('role') || '')
   const username: Ref<string> = ref(localStorage.getItem('username') || '')
   const user: Ref<User> = ref({
@@ -64,6 +66,10 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.setItem('username', usernameValue)
     localStorage.setItem('user', JSON.stringify(nextUser))
     localStorage.setItem('mustChangePassword', data.must_change_password ? 'true' : 'false')
+    if (data.refresh_token) {
+      refreshToken.value = data.refresh_token
+      localStorage.setItem('refreshToken', data.refresh_token)
+    }
   }
 
   /**
@@ -83,11 +89,13 @@ export const useAuthStore = defineStore('auth', () => {
 
   function logout(): void {
     token.value = ''
+    refreshToken.value = ''
     role.value = ''
     username.value = ''
     user.value = { username: '', role: '' }
     mustChangePassword.value = false
     localStorage.removeItem('token')
+    localStorage.removeItem('refreshToken')
     localStorage.removeItem('role')
     localStorage.removeItem('username')
     localStorage.removeItem('user')
@@ -96,6 +104,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   return {
     token,
+    refreshToken,
     role,
     username,
     user,

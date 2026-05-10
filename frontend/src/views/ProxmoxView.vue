@@ -144,21 +144,14 @@
       </div>
     </div>
 
-    <!-- Error / loading state -->
     <div
-      v-if="loading"
-      class="text-center py-5 text-muted"
-    >
-      Chargement...
-    </div>
-    <div
-      v-else-if="error"
+      v-if="error"
       class="alert alert-danger"
     >
       {{ error }}
     </div>
 
-    <!-- Nodes table -->
+    <!-- Nodes table (shown during loading with skeleton rows, then real data) -->
     <div
       v-else
       class="card"
@@ -216,7 +209,24 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-if="sortedNodes.length === 0">
+            <!-- Skeleton rows while loading -->
+            <template v-if="loading">
+              <tr
+                v-for="i in 3"
+                :key="`sk-${i}`"
+              >
+                <td><div class="skeleton-text w-75" /></td>
+                <td><div class="skeleton-text w-50" /></td>
+                <td><div class="skeleton-text w-25" /></td>
+                <td><div class="skeleton-text w-25" /></td>
+                <td><div class="skeleton-text" /></td>
+                <td><div class="skeleton-text" /></td>
+                <td><div class="skeleton-text w-50" /></td>
+                <td><div class="skeleton-text w-75" /></td>
+                <td />
+              </tr>
+            </template>
+            <tr v-else-if="sortedNodes.length === 0">
               <td
                 colspan="9"
                 class="text-center text-muted py-4"
@@ -468,6 +478,24 @@ onMounted(load)
 </script>
 
 <style scoped>
+.skeleton-text {
+  height: 0.85rem;
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--tblr-bg-surface-secondary, #f0f0f0) 25%, rgba(0,0,0,0.04) 50%, var(--tblr-bg-surface-secondary, #f0f0f0) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s infinite;
+  width: 100%;
+}
+
+.w-25 { width: 25% !important; }
+.w-50 { width: 50% !important; }
+.w-75 { width: 75% !important; }
+
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
 @media (max-width: 768px) {
   .proxmox-toolbar-controls {
     width: 100%;

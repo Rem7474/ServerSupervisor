@@ -47,27 +47,66 @@
       <div class="card-body d-flex flex-wrap gap-2 align-items-end traffic-filters">
         <div class="traffic-filter-field">
           <label class="form-label mb-1">Source</label>
-          <select
-            v-model="source"
-            class="form-select form-select-sm"
-            style="min-width: 9rem;"
-          >
-            <option value="">
-              Toutes
-            </option>
-            <option value="npm">
-              npm
-            </option>
-            <option value="nginx">
-              nginx
-            </option>
-            <option value="apache">
-              apache
-            </option>
-            <option value="caddy">
-              caddy
-            </option>
-          </select>
+          <div class="input-group input-group-sm">
+            <select
+              v-model="source"
+              class="form-select form-select-sm"
+              :disabled="loading"
+              style="min-width: 9rem;"
+            >
+              <option value="">
+                Toutes
+              </option>
+              <option value="npm">
+                npm
+              </option>
+              <option value="nginx">
+                nginx
+              </option>
+              <option value="apache">
+                apache
+              </option>
+              <option value="caddy">
+                caddy
+              </option>
+            </select>
+            <span
+              v-if="loading"
+              class="input-group-text px-2"
+            >
+              <span
+                class="spinner-border"
+                style="width:.75rem;height:.75rem;border-width:2px"
+              />
+            </span>
+            <span
+              v-else-if="sourceHasNoData"
+              class="input-group-text px-2 text-warning"
+              title="Aucune donnée pour cette source sur la période sélectionnée"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              ><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line
+                x1="12"
+                y1="9"
+                x2="12"
+                y2="13"
+              /><line
+                x1="12"
+                y1="17"
+                x2="12.01"
+                y2="17"
+              /></svg>
+            </span>
+          </div>
         </div>
 
         <div class="traffic-filter-field">
@@ -192,10 +231,32 @@
             <span class="small text-secondary">Humain vs Bot</span>
           </div>
           <div
-            class="card-body"
+            class="card-body chart-body"
             style="height: 260px;"
           >
-            <canvas ref="trafficCanvas" />
+            <Transition name="skeleton-fade">
+              <div
+                v-if="!chartReady || loading"
+                class="chart-skeleton"
+              >
+                <div class="chart-skeleton-bars">
+                  <div class="skel-bar" style="height:45%" />
+                  <div class="skel-bar" style="height:70%;animation-delay:.1s" />
+                  <div class="skel-bar" style="height:55%;animation-delay:.2s" />
+                  <div class="skel-bar" style="height:82%;animation-delay:.05s" />
+                  <div class="skel-bar" style="height:65%;animation-delay:.15s" />
+                  <div class="skel-bar" style="height:90%;animation-delay:.25s" />
+                  <div class="skel-bar" style="height:50%;animation-delay:.08s" />
+                  <div class="skel-bar" style="height:75%;animation-delay:.18s" />
+                  <div class="skel-bar" style="height:60%;animation-delay:.12s" />
+                  <div class="skel-bar" style="height:85%;animation-delay:.22s" />
+                </div>
+              </div>
+            </Transition>
+            <canvas
+              ref="trafficCanvas"
+              :style="{ opacity: (chartReady && !loading) ? 1 : 0, transition: 'opacity 0.3s' }"
+            />
           </div>
         </div>
       </div>
@@ -207,10 +268,21 @@
             </h3>
           </div>
           <div
-            class="card-body"
+            class="card-body chart-body"
             style="height: 260px;"
           >
-            <canvas ref="statusCanvas" />
+            <Transition name="skeleton-fade">
+              <div
+                v-if="!chartReady || loading"
+                class="chart-skeleton d-flex align-items-center justify-content-center"
+              >
+                <div class="skel-ring" />
+              </div>
+            </Transition>
+            <canvas
+              ref="statusCanvas"
+              :style="{ opacity: (chartReady && !loading) ? 1 : 0, transition: 'opacity 0.3s' }"
+            />
           </div>
         </div>
       </div>
@@ -803,6 +875,7 @@ let statusChart: any = null
 let refreshTimer: number | null = null
 let chartLib: any = null
 let worldMapResizeHandler: (() => void) | null = null
+const chartReady = ref(false)
 
 const traffic = computed(() => summary.value.traffic || {})
 const threats = computed(() => summary.value.threats || {})
@@ -827,6 +900,11 @@ const statusDistribution = computed(() => traffic.value.status_distribution || {
 const lastUpdatedLabel = computed(() => {
   if (!lastUpdatedAt.value) return 'jamais'
   return lastUpdatedAt.value.toLocaleTimeString()
+})
+
+const sourceHasNoData = computed(() => {
+  if (!source.value || loading.value || !chartReady.value) return false
+  return (traffic.value.total_requests || 0) === 0
 })
 
 function numberFormat(v: number): string {
@@ -1028,7 +1106,17 @@ async function renderCharts() {
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: { legend: { position: 'bottom' } },
+        plugins: {
+          legend: {
+            position: 'bottom',
+            onHover: (_e: any, _item: any, legend: any) => {
+              legend.chart.canvas.style.cursor = 'pointer'
+            },
+            onLeave: (_e: any, _item: any, legend: any) => {
+              legend.chart.canvas.style.cursor = 'default'
+            },
+          },
+        },
         scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true } },
       },
     })
@@ -1054,7 +1142,17 @@ async function renderCharts() {
         responsive: true,
         maintainAspectRatio: false,
         cutout: '70%',
-        plugins: { legend: { position: 'bottom' } },
+        plugins: {
+          legend: {
+            position: 'bottom',
+            onHover: (_e: any, _item: any, legend: any) => {
+              legend.chart.canvas.style.cursor = 'pointer'
+            },
+            onLeave: (_e: any, _item: any, legend: any) => {
+              legend.chart.canvas.style.cursor = 'default'
+            },
+          },
+        },
       },
     })
   }
@@ -1084,6 +1182,7 @@ async function loadAll(showSpinner: boolean) {
     console.error('Failed to load traffic dashboard', err)
   } finally {
     if (showSpinner) loading.value = false
+    if (!chartReady.value) chartReady.value = true
   }
 }
 
@@ -1248,6 +1347,65 @@ onBeforeUnmount(() => {
   .world-map {
     height: 220px;
   }
+}
+
+/* Chart skeleton */
+.chart-body {
+  position: relative;
+}
+
+.chart-skeleton {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: var(--tblr-bg-surface, #fff);
+  border-radius: 0 0 4px 4px;
+}
+
+.chart-skeleton-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  padding: 1.25rem 1rem 0.5rem;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.skel-bar {
+  flex: 1;
+  background: var(--tblr-border-color, #dce0e5);
+  border-radius: 3px 3px 0 0;
+  animation: skel-pulse 1.6s ease-in-out infinite;
+  min-height: 8%;
+}
+
+.skel-ring {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  border: 26px solid var(--tblr-border-color, #dce0e5);
+  animation: skel-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes skel-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.skeleton-fade-enter-active,
+.skeleton-fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.skeleton-fade-enter-from,
+.skeleton-fade-leave-to {
+  opacity: 0;
 }
 </style>
 
