@@ -7,7 +7,7 @@
           :class="{ paused: !autoRefresh }"
         />
         <span class="fw-semibold">Stats web</span>
-        <span class="badge bg-green-lt text-green">{{ autoRefresh ? 'Live' : 'Pause' }}</span>
+        <span class="badge bg-green-lt text-green">{{ autoRefresh ? `Auto (${REFRESH_INTERVAL_MS / 1000}s)` : 'Pause' }}</span>
         <span class="text-secondary small">dernière MAJ {{ lastUpdatedLabel }}</span>
       </div>
       <div class="d-flex align-items-center gap-2 flex-wrap">
@@ -39,7 +39,7 @@
         Stats web
       </h2>
       <div class="text-secondary">
-        Trafic HTTP, erreurs, endpoints, géographie des clients et suivi live
+        Trafic HTTP, erreurs, endpoints, géographie des clients et actualisation automatique
       </div>
     </div>
 
@@ -235,23 +235,11 @@
             style="height: 260px;"
           >
             <Transition name="skeleton-fade">
-              <div
+              <LoadingSkeleton
                 v-if="!chartReady || loading"
-                class="chart-skeleton"
-              >
-                <div class="chart-skeleton-bars">
-                  <div class="skel-bar" style="height:45%" />
-                  <div class="skel-bar" style="height:70%;animation-delay:.1s" />
-                  <div class="skel-bar" style="height:55%;animation-delay:.2s" />
-                  <div class="skel-bar" style="height:82%;animation-delay:.05s" />
-                  <div class="skel-bar" style="height:65%;animation-delay:.15s" />
-                  <div class="skel-bar" style="height:90%;animation-delay:.25s" />
-                  <div class="skel-bar" style="height:50%;animation-delay:.08s" />
-                  <div class="skel-bar" style="height:75%;animation-delay:.18s" />
-                  <div class="skel-bar" style="height:60%;animation-delay:.12s" />
-                  <div class="skel-bar" style="height:85%;animation-delay:.22s" />
-                </div>
-              </div>
+                variant="chart"
+                class="position-absolute inset-0"
+              />
             </Transition>
             <canvas
               ref="trafficCanvas"
@@ -272,12 +260,11 @@
             style="height: 260px;"
           >
             <Transition name="skeleton-fade">
-              <div
+              <LoadingSkeleton
                 v-if="!chartReady || loading"
-                class="chart-skeleton d-flex align-items-center justify-content-center"
-              >
-                <div class="skel-ring" />
-              </div>
+                variant="chart"
+                class="position-absolute inset-0"
+              />
             </Transition>
             <canvas
               ref="statusCanvas"
@@ -833,6 +820,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import { max as d3Max } from 'd3-array'
 import { geoNaturalEarth1, geoPath } from 'd3-geo'
 import { scaleSequential } from 'd3-scale'
@@ -849,6 +837,8 @@ const periodOptions = [
   { value: '168h', label: '7j' },
   { value: '720h', label: '30j' },
 ]
+
+const REFRESH_INTERVAL_MS = 8000
 
 const period = ref('24h')
 const source = ref('')
@@ -1194,7 +1184,7 @@ function resetAutoRefresh() {
   if (!autoRefresh.value) return
   refreshTimer = window.setInterval(() => {
     void loadAll(false)
-  }, 8000)
+  }, REFRESH_INTERVAL_MS)
 }
 
 async function openDomain(domain: string) {
@@ -1349,53 +1339,9 @@ onBeforeUnmount(() => {
   }
 }
 
-/* Chart skeleton */
+/* Chart placeholder positioning */
 .chart-body {
   position: relative;
-}
-
-.chart-skeleton {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  background: var(--tblr-bg-surface, #fff);
-  border-radius: 0 0 4px 4px;
-}
-
-.chart-skeleton-bars {
-  display: flex;
-  align-items: flex-end;
-  gap: 3px;
-  padding: 1.25rem 1rem 0.5rem;
-  height: 100%;
-  box-sizing: border-box;
-}
-
-.skel-bar {
-  flex: 1;
-  background: var(--tblr-border-color, #dce0e5);
-  border-radius: 3px 3px 0 0;
-  animation: skel-pulse 1.6s ease-in-out infinite;
-  min-height: 8%;
-}
-
-.skel-ring {
-  width: 120px;
-  height: 120px;
-  border-radius: 50%;
-  border: 26px solid var(--tblr-border-color, #dce0e5);
-  animation: skel-pulse 1.6s ease-in-out infinite;
-}
-
-@keyframes skel-pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-
-  50% {
-    opacity: 0.45;
-  }
 }
 
 .skeleton-fade-enter-active,

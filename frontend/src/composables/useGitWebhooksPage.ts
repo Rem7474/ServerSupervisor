@@ -2,6 +2,7 @@ import { computed, onMounted, onUnmounted, ref, Ref, ComputedRef } from 'vue'
 import { useRoute } from 'vue-router'
 import api, { getApiErrorMessage } from '../api'
 import { useConfirmDialog } from './useConfirmDialog'
+import { execBadgeColor } from '../utils/statusClasses'
 
 interface ExecutionPayload {
   triggered_at?: string
@@ -436,14 +437,7 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
   }
 
   function execStatusBadge(status: string): string {
-    const map: Record<string, string> = {
-      pending: 'bg-yellow-lt text-yellow',
-      running: 'bg-blue-lt text-blue',
-      completed: 'bg-success-lt text-success',
-      failed: 'bg-danger-lt text-danger',
-      skipped: 'bg-secondary-lt text-secondary',
-    }
-    return map[status] || 'bg-secondary-lt text-secondary'
+    return execBadgeColor(status)
   }
 
   function formatRelative(dateStr: string): string {

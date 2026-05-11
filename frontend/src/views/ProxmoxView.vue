@@ -478,24 +478,6 @@ onMounted(load)
 </script>
 
 <style scoped>
-.skeleton-text {
-  height: 0.85rem;
-  border-radius: 4px;
-  background: linear-gradient(90deg, var(--tblr-bg-surface-secondary, #f0f0f0) 25%, rgba(0,0,0,0.04) 50%, var(--tblr-bg-surface-secondary, #f0f0f0) 75%);
-  background-size: 200% 100%;
-  animation: skeleton-shimmer 1.4s infinite;
-  width: 100%;
-}
-
-.w-25 { width: 25% !important; }
-.w-50 { width: 50% !important; }
-.w-75 { width: 75% !important; }
-
-@keyframes skeleton-shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
-}
-
 @media (max-width: 768px) {
   .proxmox-toolbar-controls {
     width: 100%;

@@ -289,163 +289,20 @@
       </div>
 
       <!-- RRD Charts -->
-      <div class="row row-cards mb-4">
-        <div class="col-12 col-lg-4">
-          <div class="card">
-            <div class="card-header d-flex align-items-center justify-content-between">
-              <h3 class="card-title mb-0">
-                CPU
-              </h3>
-              <div
-                v-if="!rrdLoading"
-                class="btn-group btn-group-sm"
-              >
-                <button
-                  v-for="opt in rrdTimeframeOptions"
-                  :key="opt.value"
-                  :class="rrdTimeframe === opt.value ? 'btn btn-primary' : 'btn btn-outline-secondary'"
-                  @click="loadRRD(opt.value)"
-                >
-                  {{ opt.label }}
-                </button>
-              </div>
-              <span
-                v-else
-                class="spinner-border spinner-border-sm text-muted"
-              />
-            </div>
-            <div class="card-body proxmox-chart-body">
-              <Line
-                v-if="rrdCpuChart"
-                :data="rrdCpuChart"
-                :options="rrdPctOptions"
-                class="h-100"
-              />
-              <div
-                v-else
-                class="h-100 d-flex align-items-center justify-content-center text-secondary small"
-              >
-                {{ rrdError || 'Aucune donnée' }}
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="col-12 col-lg-4">
-          <div class="card">
-            <div class="card-header">
-              <h3 class="card-title mb-0">
-                RAM
-              </h3>
-            </div>
-            <div class="card-body proxmox-chart-body">
-              <Line
-                v-if="rrdRamChart"
-                :data="rrdRamChart"
-                :options="rrdRamOptions"
-                class="h-100"
-              />
-              <div
-                v-else
-                class="h-100 d-flex align-items-center justify-content-center text-secondary small"
-              >
-                {{ rrdError || 'Aucune donnée' }}
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="col-12 col-lg-4">
-          <div class="card">
-            <div class="card-header">
-              <h3 class="card-title mb-0">
-                IO Wait
-              </h3>
-            </div>
-            <div class="card-body proxmox-chart-body">
-              <Line
-                v-if="rrdIowaitChart"
-                :data="rrdIowaitChart"
-                :options="rrdPctOptions"
-                class="h-100"
-              />
-              <div
-                v-else
-                class="h-100 d-flex align-items-center justify-content-center text-secondary small"
-              >
-                {{ rrdError || 'Aucune donnée' }}
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="col-12 col-lg-4">
-          <div class="card">
-            <div class="card-header">
-              <h3 class="card-title mb-0">
-                Réseau
-              </h3>
-            </div>
-            <div class="card-body proxmox-chart-body">
-              <Line
-                v-if="rrdNetChart"
-                :data="rrdNetChart"
-                :options="rrdNetOptions"
-                class="h-100"
-              />
-              <div
-                v-else
-                class="h-100 d-flex align-items-center justify-content-center text-secondary small"
-              >
-                {{ rrdError || 'Aucune donnée' }}
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="col-12 col-lg-4">
-          <div class="card">
-            <div class="card-header d-flex align-items-center justify-content-between">
-              <h3 class="card-title mb-0">
-                Température CPU
-              </h3>
-            </div>
-            <div class="card-body proxmox-chart-body">
-              <Line
-                v-if="nodeTempChart"
-                :data="nodeTempChart"
-                :options="tempChartOptions"
-                class="h-100"
-              />
-              <div
-                v-else
-                class="h-100 d-flex align-items-center justify-content-center text-secondary small"
-              >
-                {{ nodeTempLoading ? 'Chargement…' : (nodeTempError || (sensorSourceHostId ? 'Aucune donnée température disponible' : 'Configurez une source capteurs pour ce nœud')) }}
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="col-12 col-lg-4">
-          <div class="card">
-            <div class="card-header d-flex align-items-center justify-content-between">
-              <h3 class="card-title mb-0">
-                RPM Ventilateurs
-              </h3>
-            </div>
-            <div class="card-body proxmox-chart-body">
-              <Line
-                v-if="nodeFanChart"
-                :data="nodeFanChart"
-                :options="fanChartOptions"
-                class="h-100"
-              />
-              <div
-                v-else
-                class="h-100 d-flex align-items-center justify-content-center text-secondary small"
-              >
-                {{ nodeFanLoading ? 'Chargement…' : (nodeFanError || (sensorSourceHostId ? 'Aucune donnée ventilateur disponible' : 'Configurez une source capteurs pour ce nœud')) }}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <ProxmoxNodeChartsPanel
+        :cpu-chart="rrdCpuChart"
+        :ram-chart="rrdRamChart"
+        :iowait-chart="rrdIowaitChart"
+        :net-chart="rrdNetChart"
+        :temp-chart="nodeTempChart"
+        :fan-chart="nodeFanChart"
+        :timeframe="rrdTimeframe"
+        :loading="rrdLoading"
+        :error="rrdError"
+        :temp-empty-text="nodeTempLoading ? 'Chargement…' : (nodeTempError || (sensorSourceHostId ? 'Aucune donnée température disponible' : 'Configurez une source capteurs pour ce nœud'))"
+        :fan-empty-text="nodeFanLoading ? 'Chargement…' : (nodeFanError || (sensorSourceHostId ? 'Aucune donnée ventilateur disponible' : 'Configurez une source capteurs pour ce nœud'))"
+        @timeframe-changed="loadRRD"
+      />
 
       <!-- Updates banner (only shown when pending updates exist) -->
       <div
@@ -1387,17 +1244,9 @@
 import { ref, computed, shallowRef, onMounted, onUnmounted, defineAsyncComponent, defineComponent, h } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 const CommandLogPanel = defineAsyncComponent(() => import('../components/CommandLogPanel.vue'))
+const ProxmoxNodeChartsPanel = defineAsyncComponent(() => import('../components/proxmox/ProxmoxNodeChartsPanel.vue'))
 import SortableHeader from '../components/common/SortableHeader.vue'
 import api from '../api'
-
-const Line = defineAsyncComponent(async () => {
-  const [{ Line }, { Chart: ChartJS, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip }] = await Promise.all([
-    import('vue-chartjs'),
-    import('chart.js'),
-  ])
-  ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip)
-  return Line
-})
 
 // Inline component — renders the "Hôte lié" cell without a separate file.
 const GuestLinkCell = defineComponent({
@@ -1498,13 +1347,6 @@ const liveStatusError = ref('')
 
 // RRD charts
 const rrdTimeframe = ref('hour')
-const rrdTimeframeOptions = [
-  { value: 'hour', label: '1h' },
-  { value: 'day', label: '24h' },
-  { value: 'week', label: '7j' },
-  { value: 'month', label: '30j' },
-  { value: 'year', label: '1 an' },
-]
 const rrdTimeframeToHours = {
   hour: 1,
   day: 24,
@@ -1512,126 +1354,12 @@ const rrdTimeframeToHours = {
   month: 24 * 30,
   year: 24 * 365,
 }
-const rrdTimeframeLabel = computed(() =>
-  rrdTimeframeOptions.find(opt => opt.value === rrdTimeframe.value)?.label ?? '1h'
-)
 const rrdCpuChart = shallowRef(null)
 const rrdRamChart = shallowRef(null)
 const rrdIowaitChart = shallowRef(null)
 const rrdNetChart = shallowRef(null)
 const rrdLoading = ref(false)
 const rrdError = ref('')
-
-const rrdPctOptions = {
-  responsive: true, maintainAspectRatio: false,
-  plugins: {
-    legend: { display: false },
-    tooltip: { enabled: true, mode: 'index', intersect: false, backgroundColor: 'rgba(0,0,0,0.8)', titleColor: '#fff', bodyColor: '#fff', borderColor: '#555', borderWidth: 1, padding: 8, displayColors: false,
-      callbacks: { label: (ctx) => `${ctx.parsed.y != null ? ctx.parsed.y.toFixed(1) : '—'}%` },
-    },
-  },
-  scales: {
-    x: { display: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280', maxTicksLimit: 8 } },
-    y: { display: true, min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280', callback: (v) => `${v}%` } },
-  },
-  elements: { point: { radius: 0, hitRadius: 10, hoverRadius: 4 }, line: { tension: 0.3 } },
-  interaction: { mode: 'nearest', axis: 'x', intersect: false },
-}
-
-const rrdRamOptions = {
-  ...rrdPctOptions,
-  plugins: {
-    ...rrdPctOptions.plugins,
-    tooltip: {
-      ...rrdPctOptions.plugins.tooltip,
-      callbacks: {
-        label: (ctx) => {
-          const pct = ctx.parsed.y != null ? ctx.parsed.y.toFixed(1) : '—'
-          return `${pct}%`
-        },
-      },
-    },
-  },
-}
-
-function formatBytesPerSec(v) {
-  if (v == null) return '—'
-  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)} MB/s`
-  if (v >= 1_000) return `${(v / 1_000).toFixed(1)} KB/s`
-  return `${v.toFixed(0)} B/s`
-}
-
-const rrdNetOptions = {
-  responsive: true, maintainAspectRatio: false,
-  plugins: {
-    legend: { display: true, position: 'top', labels: { color: '#6b7280', boxWidth: 10, padding: 8 } },
-    tooltip: { enabled: true, mode: 'index', intersect: false, backgroundColor: 'rgba(0,0,0,0.8)', titleColor: '#fff', bodyColor: '#fff', borderColor: '#555', borderWidth: 1, padding: 8,
-      callbacks: { label: (ctx) => `${ctx.dataset.label}: ${formatBytesPerSec(ctx.parsed.y)}` },
-    },
-  },
-  scales: {
-    x: { display: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280', maxTicksLimit: 8 } },
-    y: { display: true, min: 0, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280', callback: (v) => formatBytesPerSec(v) } },
-  },
-  elements: { point: { radius: 0, hitRadius: 10, hoverRadius: 4 }, line: { tension: 0.3 } },
-  interaction: { mode: 'nearest', axis: 'x', intersect: false },
-}
-
-const tempChartOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: { display: false },
-    tooltip: {
-      enabled: true,
-      mode: 'index',
-      intersect: false,
-      backgroundColor: 'rgba(0,0,0,0.8)',
-      titleColor: '#fff',
-      bodyColor: '#fff',
-      borderColor: '#555',
-      borderWidth: 1,
-      padding: 8,
-      callbacks: {
-        label: (ctx) => `${ctx.parsed.y != null ? ctx.parsed.y.toFixed(1) : '—'}°C`,
-      },
-    },
-  },
-  scales: {
-    x: { display: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280', maxTicksLimit: 8 } },
-    y: { display: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280', callback: (v) => `${v}°C` } },
-  },
-  elements: { point: { radius: 0, hitRadius: 10, hoverRadius: 4 }, line: { tension: 0.3 } },
-  interaction: { mode: 'nearest', axis: 'x', intersect: false },
-}
-
-const fanChartOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: { display: false },
-    tooltip: {
-      enabled: true,
-      mode: 'index',
-      intersect: false,
-      backgroundColor: 'rgba(0,0,0,0.8)',
-      titleColor: '#fff',
-      bodyColor: '#fff',
-      borderColor: '#555',
-      borderWidth: 1,
-      padding: 8,
-      callbacks: {
-        label: (ctx) => `${ctx.parsed.y != null ? Math.round(ctx.parsed.y) : '—'} RPM`,
-      },
-    },
-  },
-  scales: {
-    x: { display: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280', maxTicksLimit: 8 } },
-    y: { display: true, min: 0, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280', callback: (v) => `${v} RPM` } },
-  },
-  elements: { point: { radius: 0, hitRadius: 10, hoverRadius: 4 }, line: { tension: 0.3 } },
-  interaction: { mode: 'nearest', axis: 'x', intersect: false },
-}
 
 // PVE task console (side panel + polling)
 const showConsole = ref(false)
@@ -1965,8 +1693,8 @@ async function loadNodeCpuTempHistory(hours = rrdTimeframeToHours[rrdTimeframe.v
       labels,
       datasets: [{
         data,
-        borderColor: '#ef4444',
-        backgroundColor: 'rgba(239,68,68,0.12)',
+        borderColor: cssVar('--tblr-red'),
+        backgroundColor: `rgba(${cssVar('--tblr-red-rgb')},0.12)`,
         fill: true,
         tension: 0.3,
         spanGaps: true,
@@ -2010,8 +1738,8 @@ async function loadNodeFanRPMHistory(hours = rrdTimeframeToHours[rrdTimeframe.va
       labels,
       datasets: [{
         data,
-        borderColor: '#2563eb',
-        backgroundColor: 'rgba(37,99,235,0.12)',
+        borderColor: cssVar('--tblr-azure'),
+        backgroundColor: `rgba(${cssVar('--tblr-azure-rgb')},0.12)`,
         fill: true,
         tension: 0.3,
         spanGaps: true,
@@ -2160,6 +1888,10 @@ async function loadRRD(timeframe = rrdTimeframe.value) {
   }
 }
 
+function cssVar(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+}
+
 function buildRRDCharts(points, timeframe) {
   const labels = points.map(p => {
     const d = new Date(p.time * 1000)
@@ -2174,7 +1906,7 @@ function buildRRDCharts(points, timeframe) {
     labels,
     datasets: [{
       data: points.map(p => p.cpu != null ? p.cpu * 100 : null),
-      borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.1)',
+      borderColor: cssVar('--tblr-blue'), backgroundColor: `rgba(${cssVar('--tblr-blue-rgb')},0.1)`,
       fill: true, tension: 0.3, spanGaps: true,
     }],
   }
@@ -2189,7 +1921,7 @@ function buildRRDCharts(points, timeframe) {
     labels,
     datasets: [{
       data: ramData,
-      borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.1)',
+      borderColor: cssVar('--tblr-green'), backgroundColor: `rgba(${cssVar('--tblr-green-rgb')},0.1)`,
       fill: true, tension: 0.3, spanGaps: true,
     }],
   } : null
@@ -2199,7 +1931,7 @@ function buildRRDCharts(points, timeframe) {
     labels,
     datasets: [{
       data: points.map(p => p.iowait != null ? p.iowait * 100 : null),
-      borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.1)',
+      borderColor: cssVar('--tblr-yellow'), backgroundColor: `rgba(${cssVar('--tblr-yellow-rgb')},0.1)`,
       fill: true, tension: 0.3, spanGaps: true,
     }],
   } : null
@@ -2211,13 +1943,13 @@ function buildRRDCharts(points, timeframe) {
       {
         label: 'Entrante',
         data: points.map(p => p.netin ?? null),
-        borderColor: '#6366f1', backgroundColor: 'rgba(99,102,241,0.1)',
+        borderColor: cssVar('--tblr-indigo'), backgroundColor: `rgba(${cssVar('--tblr-indigo-rgb')},0.1)`,
         fill: true, tension: 0.3, spanGaps: true,
       },
       {
         label: 'Sortante',
         data: points.map(p => p.netout ?? null),
-        borderColor: '#ec4899', backgroundColor: 'rgba(236,72,153,0.05)',
+        borderColor: cssVar('--tblr-pink'), backgroundColor: `rgba(${cssVar('--tblr-pink-rgb')},0.05)`,
         fill: false, tension: 0.3, spanGaps: true,
       },
     ],
@@ -2387,9 +2119,9 @@ function storageColor(used, total) {
 
 function guestStatusClass(status) {
   const map = {
-    running: 'badge bg-success-lt text-success',
+    running: 'badge bg-green-lt text-green',
     stopped: 'badge bg-secondary-lt text-secondary',
-    paused: 'badge bg-warning-lt text-warning',
+    paused:  'badge bg-yellow-lt text-yellow',
   }
   return map[status] ?? 'badge bg-secondary-lt text-secondary'
 }

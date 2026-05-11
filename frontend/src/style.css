@@ -319,3 +319,18 @@ button:focus-visible {
 .min-w-160 {
   min-width: 160px;
 }
+
+/* ── Shared skeleton shimmer (used inline in tables, ProxmoxView, etc.) ── */
+.skeleton-text {
+  display: block;
+  height: 0.8rem;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(203,213,225,.2) 25%, rgba(203,213,225,.5) 50%, rgba(203,213,225,.2) 75%);
+  background-size: 220% 100%;
+  animation: loading-skeleton-wave 1.4s ease infinite;
+}
+
+@keyframes loading-skeleton-wave {
+  0%   { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}

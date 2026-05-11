@@ -377,6 +377,10 @@ async function loadHistory(hours) {
   }
 }
 
+function cssVar(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+}
+
 function buildCharts() {
   const cpuPoints = metricsHistory.value
     .map(m => toChartPoint(m, 'cpu_usage_percent'))
@@ -387,8 +391,8 @@ function buildCharts() {
   cpuChartData.value = {
     datasets: [{
       data: cpuPoints,
-      borderColor: '#3b82f6',
-      backgroundColor: 'rgba(59,130,246,0.1)',
+      borderColor: cssVar('--tblr-blue'),
+      backgroundColor: `rgba(${cssVar('--tblr-blue-rgb')},0.1)`,
       fill: true,
       tension: 0.3,
       spanGaps: false,
@@ -397,8 +401,8 @@ function buildCharts() {
   memChartData.value = {
     datasets: [{
       data: memPoints,
-      borderColor: '#10b981',
-      backgroundColor: 'rgba(16,185,129,0.1)',
+      borderColor: cssVar('--tblr-green'),
+      backgroundColor: `rgba(${cssVar('--tblr-green-rgb')},0.1)`,
       fill: true,
       tension: 0.3,
       spanGaps: false,

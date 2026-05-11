@@ -459,46 +459,33 @@
     </div>
   </div>
 
-  <div
+  <EmptyState
     v-if="sortedContainers.length === 0"
-    class="text-center text-secondary py-5"
+    :title="search || hostFilter || stateFilter || composeFilter ? 'Aucun résultat pour ces filtres' : 'Aucun conteneur trouvé'"
+    :subtitle="search || hostFilter || stateFilter || composeFilter ? 'Modifiez vos critères de recherche' : 'Connectez un hôte avec l\'agent Docker activé pour voir vos conteneurs ici'"
+    :cta-label="!search && !hostFilter && !stateFilter && !composeFilter ? 'Ajouter un hôte' : ''"
+    cta-to="/hosts/new"
   >
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      class="mb-2"
-      width="40"
-      height="40"
-      fill="none"
-      stroke="currentColor"
-      viewBox="0 0 24 24"
-      style="opacity:.35"
-    >
-      <path
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        stroke-width="1.5"
-        d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-      />
-    </svg>
-    <div class="fw-medium">
-      {{ search || hostFilter || stateFilter || composeFilter ? 'Aucun résultat pour ces filtres' : 'Aucun conteneur trouvé' }}
-    </div>
-    <div class="small mt-1 opacity-75">
-      <template v-if="search || hostFilter || stateFilter || composeFilter">
-        Modifiez vos critères de recherche
-      </template>
-      <template v-else>
-        Connectez un hôte avec l'agent Docker activé pour voir vos conteneurs ici
-      </template>
-    </div>
-    <router-link
-      v-if="!search && !hostFilter && !stateFilter && !composeFilter"
-      to="/hosts/new"
-      class="btn btn-sm btn-primary mt-3"
-    >
-      Ajouter un hôte
-    </router-link>
-  </div>
+    <template #icon>
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        class="mb-3"
+        width="48"
+        height="48"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+        style="opacity:.35"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="1.5"
+          d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
+        />
+      </svg>
+    </template>
+  </EmptyState>
 
   <!-- Modal conteneur (labels/compose info) -->
   <div
@@ -773,6 +760,7 @@ import apiClient from '../api'
 import DataToolbar from './common/DataToolbar.vue'
 import SortableHeader from './common/SortableHeader.vue'
 import DockerPortBadges from './common/DockerPortBadges.vue'
+import EmptyState from './EmptyState.vue'
 import { useDockerContainerPorts } from '../composables/useDockerContainerPorts'
 
 const router = useRouter()

@@ -156,7 +156,7 @@
             />
           </svg>
           <p class="mb-2">
-            Aucun webhook configure.
+            Aucun webhook configuré.
           </p>
           <p class="text-muted small">
             Recevez des événements depuis GitHub, GitLab, Gitea ou Forgejo pour déclencher des scripts sur vos VMs.
@@ -165,7 +165,7 @@
             class="btn btn-sm btn-primary"
             @click="openCreateWebhook"
           >
-            Creer le premier webhook
+            Créer le premier webhook
           </button>
         </div>
       </div>
@@ -193,7 +193,7 @@
                   <span
                     v-if="!webhook.enabled"
                     class="badge bg-secondary"
-                  >Desactive</span>
+                  >Désactivé</span>
                 </div>
               </div>
               <div class="card-body">
@@ -263,7 +263,7 @@
                   :class="webhook.enabled ? 'btn-outline-warning' : 'btn-outline-success'"
                   @click="toggleWebhook(webhook)"
                 >
-                  {{ webhook.enabled ? 'Desactiver' : 'Activer' }}
+                  {{ webhook.enabled ? 'Désactiver' : 'Activer' }}
                 </button>
                 <button
                   class="btn btn-sm btn-outline-danger ms-auto"
@@ -325,7 +325,7 @@
             <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
           </svg>
           <p class="mb-2">
-            Aucun tracker configure.
+            Aucun tracker configuré.
           </p>
           <p class="text-muted small">
             Surveillez les releases Git ou les images Docker et déclenchez automatiquement un script sur une VM lors d'une mise à jour.
@@ -334,7 +334,7 @@
             class="btn btn-sm btn-primary"
             @click="openCreateTracker"
           >
-            Creer le premier tracker
+            Créer le premier tracker
           </button>
         </div>
       </div>
@@ -368,7 +368,7 @@
                   <span
                     v-if="!tracker.enabled"
                     class="badge bg-secondary"
-                  >Desactive</span>
+                  >Désactivé</span>
                 </div>
               </div>
               <div class="card-body">
@@ -450,7 +450,7 @@
                     <span
                       class="text-muted"
                       style="min-width:60px"
-                    >Maj</span>
+                    >Vérifiée</span>
                     <span>{{ formatDateOnly(tracker.last_checked_at || tracker.last_triggered_at || tracker.last_execution?.triggered_at) }}</span>
                   </div>
                   <div
@@ -483,7 +483,7 @@
                     <span class="ms-1 text-muted">{{ formatRelative(tracker.last_execution.triggered_at) }}</span>
                   </template>
                   <template v-else-if="tracker.last_checked_at">
-                    <span class="text-muted">Derniere verif : {{ formatRelative(tracker.last_checked_at) }}</span>
+                    <span class="text-muted">Dernière vérif : {{ formatRelative(tracker.last_checked_at) }}</span>
                     <span
                       v-if="tracker.last_error"
                       class="ms-1 badge bg-danger-lt text-danger"
@@ -492,7 +492,7 @@
                     <span
                       v-else-if="!tracker.last_release_tag && tracker.tracker_type !== 'docker'"
                       class="ms-1 badge bg-warning-lt text-warning"
-                    >aucune release trouvee</span>
+                    >aucune release trouvée</span>
                   </template>
                   <template v-else>
                     <span class="text-muted">En attente du premier check...</span>
@@ -534,7 +534,7 @@
                   :class="tracker.enabled ? 'btn-outline-warning' : 'btn-outline-success'"
                   @click="toggleTracker(tracker)"
                 >
-                  {{ tracker.enabled ? 'Desactiver' : 'Activer' }}
+                  {{ tracker.enabled ? 'Désactiver' : 'Activer' }}
                 </button>
                 <button
                   class="btn btn-sm btn-outline-danger ms-auto"
@@ -613,12 +613,12 @@
         <div class="modal-content">
           <div class="modal-header">
             <h5 class="modal-title">
-              Webhook cree
+              Webhook créé
             </h5>
           </div>
           <div class="modal-body">
             <div class="alert alert-warning">
-              Copiez ce secret maintenant, il ne sera plus affiche en clair.
+              Copiez ce secret maintenant, il ne sera plus affiché en clair.
             </div>
             <WebhookUrlCard
               :webhook-id="newWebhookId"
@@ -631,7 +631,7 @@
               class="btn btn-primary"
               @click="closeSecretModal"
             >
-              J'ai copie le secret
+              J'ai copié le secret
             </button>
           </div>
         </div>

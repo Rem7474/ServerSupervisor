@@ -63,7 +63,7 @@
         <div class="card card-sm h-100">
           <div class="card-body text-center">
             <div class="text-secondary small mb-1">
-              Echecs ({{ periodLabel }})
+              Échecs ({{ periodLabel }})
             </div>
             <div class="h2 mb-0 text-danger">
               {{ security.stats?.failures ?? '—' }}
@@ -90,22 +90,22 @@
         <div class="card h-100">
           <div class="card-header d-flex align-items-center justify-content-between">
             <h3 class="card-title">
-              IPs bloquees
+              IPs bloquées
             </h3>
           </div>
           <div class="card-body p-0">
             <div
               v-if="threatsLoading && !security.blocked_ips?.length"
-              class="text-center py-4 text-secondary"
+              class="p-3"
             >
-              Chargement...
+              <LoadingSkeleton variant="list" :lines="3" />
             </div>
-            <div
+            <EmptyState
               v-else-if="!security.blocked_ips?.length"
-              class="text-center py-4 text-secondary small"
-            >
-              Aucune IP bloquee actuellement
-            </div>
+              title="Aucune IP bloquée"
+              subtitle="Aucune adresse n'est actuellement dans la liste noire"
+              :icon-size="36"
+            />
             <div v-else>
               <div
                 v-for="ip in security.blocked_ips"
@@ -113,7 +113,7 @@
                 class="d-flex align-items-center justify-content-between px-3 py-2 border-bottom"
               >
                 <div class="d-flex align-items-center gap-2">
-                  <span class="badge bg-red-lt text-red">Bloquee</span>
+                  <span class="badge bg-red-lt text-red">Bloquée</span>
                   <span class="font-monospace small">{{ ip }}</span>
                 </div>
                 <button
@@ -121,7 +121,7 @@
                   :disabled="unblockingIP === ip"
                   @click="unblockIP(ip)"
                 >
-                  {{ unblockingIP === ip ? '...' : 'Debloquer' }}
+                  {{ unblockingIP === ip ? '…' : 'Débloquer' }}
                 </button>
               </div>
             </div>
@@ -133,16 +133,16 @@
         <div class="card h-100">
           <div class="card-header">
             <h3 class="card-title">
-              Top 10 IPs - echecs de connexion ({{ periodLabel }})
+              Top 10 IPs — échecs de connexion ({{ periodLabel }})
             </h3>
           </div>
           <div class="card-body p-0">
-            <div
+            <EmptyState
               v-if="!security.top_failed_ips?.length"
-              class="text-center py-4 text-secondary small"
-            >
-              Aucun échec enregistré sur cette période
-            </div>
+              title="Aucun échec enregistré"
+              :subtitle="`Sur la période ${periodLabel}`"
+              :icon-size="36"
+            />
             <div v-else>
               <div
                 v-for="item in security.top_failed_ips"
@@ -151,7 +151,7 @@
               >
                 <div class="d-flex align-items-center justify-content-between mb-1">
                   <span class="font-monospace small">{{ item.ip_address }}</span>
-                  <span class="badge bg-red-lt text-red">{{ item.fail_count }} echecs</span>
+                  <span class="badge bg-red-lt text-red">{{ item.fail_count }} échecs</span>
                 </div>
                 <div
                   class="progress"
@@ -174,6 +174,9 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import apiClient from '../api'
+import { useConfirmDialog } from '../composables/useConfirmDialog'
+import LoadingSkeleton from '../components/LoadingSkeleton.vue'
+import EmptyState from '../components/EmptyState.vue'
 
 const periodOptions = [
   { hours: 24, label: '24h' },
@@ -181,6 +184,7 @@ const periodOptions = [
   { hours: 720, label: '30j' },
 ]
 
+const dialog = useConfirmDialog()
 const security = ref({ stats: null, blocked_ips: [], top_failed_ips: [] })
 const threatsLoading = ref(false)
 const unblockingIP = ref('')
@@ -205,6 +209,12 @@ function setThreatsPeriod(hours) {
 }
 
 async function unblockIP(ip) {
+  const confirmed = await dialog.confirm({
+    title: 'Débloquer cette IP',
+    message: `Retirer l'IP ${ip} de la liste noire ?`,
+    variant: 'warning',
+  })
+  if (!confirmed) return
   unblockingIP.value = ip
   try {
     await apiClient.unblockIP(ip)

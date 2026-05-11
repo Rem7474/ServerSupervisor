@@ -179,41 +179,7 @@
               :key="`sk-${n}`"
               class="col-12"
             >
-              <div class="card">
-                <div class="card-header placeholder-glow">
-                  <div class="placeholder col-3 rounded me-2" />
-                  <div class="placeholder col-1 rounded" />
-                  <div class="ms-auto placeholder col-2 rounded" />
-                </div>
-                <div class="card-body placeholder-glow">
-                  <div class="row g-2">
-                    <div class="col-3">
-                      <div
-                        class="placeholder col-12 rounded"
-                        style="height:3.5rem"
-                      />
-                    </div>
-                    <div class="col-3">
-                      <div
-                        class="placeholder col-12 rounded"
-                        style="height:3.5rem"
-                      />
-                    </div>
-                    <div class="col-3">
-                      <div
-                        class="placeholder col-12 rounded"
-                        style="height:3.5rem"
-                      />
-                    </div>
-                    <div class="col-3">
-                      <div
-                        class="placeholder col-12 rounded"
-                        style="height:3.5rem"
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <LoadingSkeleton variant="card" :lines="4" />
             </div>
           </template>
           <div
@@ -738,6 +704,7 @@ import { useToast } from '../composables/useToast'
 import { useCommandStream } from '../composables/useCommandStream'
 import CommandLogPanel from '../components/CommandLogPanel.vue'
 import WsStatusBar from '../components/WsStatusBar.vue'
+import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import CronBuilder from '../components/CronBuilder.vue'
 import DataToolbar from '../components/common/DataToolbar.vue'
 

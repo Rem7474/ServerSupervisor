@@ -80,6 +80,21 @@
   </div>
 
   <div
+    v-else-if="variant === 'chart'"
+    class="loading-skeleton-chart"
+    aria-hidden="true"
+  >
+    <div class="loading-skeleton-chart-inner d-flex align-items-end gap-1 h-100">
+      <div
+        v-for="n in 10"
+        :key="n"
+        class="loading-skeleton-chart-bar flex-grow-1"
+        :style="`height:${30 + ((n * 37 + n * n * 13) % 55)}%;animation-delay:${(n - 1) * 0.07}s`"
+      />
+    </div>
+  </div>
+
+  <div
     v-else-if="variant === 'proxmox-cluster'"
     class="card mb-4"
     aria-hidden="true"
@@ -125,7 +140,7 @@
 
 <script setup lang="ts">
 export interface Props {
-  variant?: 'card' | 'table' | 'badge-list' | 'button-group' | 'list' | 'kpi' | 'proxmox-cluster'
+  variant?: 'card' | 'table' | 'badge-list' | 'button-group' | 'list' | 'kpi' | 'proxmox-cluster' | 'chart'
   lines?: number
 }
 
@@ -174,7 +189,8 @@ withDefaults(defineProps<Props>(), {
 .loading-skeleton-pxmx-dot,
 .loading-skeleton-pxmx-name,
 .loading-skeleton-pxmx-stats,
-.loading-skeleton-pxmx-bar {
+.loading-skeleton-pxmx-bar,
+.loading-skeleton-chart-bar {
   background: linear-gradient(90deg, rgba(203, 213, 225, 0.2) 25%, rgba(203, 213, 225, 0.5) 50%, rgba(203, 213, 225, 0.2) 75%);
   background-size: 220% 100%;
   animation: loading-skeleton-wave 1.4s ease infinite;
@@ -297,6 +313,19 @@ withDefaults(defineProps<Props>(), {
 .loading-skeleton-pxmx-bar {
   height: 4px;
   border-radius: 999px;
+}
+
+/* chart variant */
+.loading-skeleton-chart {
+  width: 100%;
+  height: 100%;
+  min-height: 160px;
+  padding: 0.5rem 0.25rem 0;
+}
+
+.loading-skeleton-chart-bar {
+  border-radius: 3px 3px 0 0;
+  min-width: 4px;
 }
 
 @keyframes loading-skeleton-wave {

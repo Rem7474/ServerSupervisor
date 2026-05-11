@@ -201,6 +201,7 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 			if isNew {
 				_ = h.db.UpdateUULastRun(hostID, run.RunAt, len(run.Packages))
 				if len(run.Packages) > 0 {
+					_ = h.db.TouchAptLastUpgradeAt(hostID, run.RunAt)
 					hostname := hostID
 					if host, err := h.db.GetHost(hostID); err == nil && host != nil {
 						hostname = host.Hostname

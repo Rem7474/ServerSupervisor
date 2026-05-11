@@ -273,12 +273,20 @@ async function createUser() {
 }
 
 async function saveRole(user) {
+  const confirmed = await dialog.confirm({
+    title: 'Modifier le rôle',
+    message: `Attribuer le rôle « ${user.role} » à ${user.username} ?`,
+    variant: 'warning',
+  })
+  if (!confirmed) {
+    await fetchUsers()
+    return
+  }
   saving.value = true
   try {
     await apiClient.updateUserRole(user.id, user.role)
   } catch (e) {
     console.error('Erreur lors de la mise à jour du rôle:', e)
-    // Reload to revert changes
     await fetchUsers()
   } finally {
     saving.value = false

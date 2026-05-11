@@ -265,6 +265,10 @@ async function loadGuest(): Promise<void> {
   }
 }
 
+function cssVar(name: string): string {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+}
+
 async function loadGuestSummary(): Promise<void> {
   if (!guest.value) return
   summaryLoading.value = true
@@ -285,15 +289,15 @@ async function loadGuestSummary(): Promise<void> {
         {
           label: 'CPU %',
           data: points.map((p: any) => Number(p.cpu_avg ?? 0)),
-          borderColor: '#3b82f6',
-          backgroundColor: 'rgba(59,130,246,0.10)',
+          borderColor: cssVar('--tblr-blue'),
+          backgroundColor: `rgba(${cssVar('--tblr-blue-rgb')},0.10)`,
           fill: true,
         },
         {
           label: 'RAM %',
           data: points.map((p: any) => Number(p.memory_avg ?? 0)),
-          borderColor: '#10b981',
-          backgroundColor: 'rgba(16,185,129,0.10)',
+          borderColor: cssVar('--tblr-green'),
+          backgroundColor: `rgba(${cssVar('--tblr-green-rgb')},0.10)`,
           fill: true,
         },
       ],

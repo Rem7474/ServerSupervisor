@@ -39,6 +39,19 @@ func (db *DB) GetAptStatus(hostID string) (*models.AptStatus, error) {
 	return &s, nil
 }
 
+// TouchAptLastUpgradeAt updates apt_status.last_upgrade to the given time (used for unattended-upgrades runs).
+func (db *DB) TouchAptLastUpgradeAt(hostID string, t time.Time) error {
+	_, err := db.conn.Exec(
+		`INSERT INTO apt_status (host_id, last_upgrade, pending_packages, package_list, security_updates, updated_at)
+		 VALUES ($1, $2, 0, '[]', 0, NOW())
+		 ON CONFLICT (host_id) DO UPDATE SET
+			last_upgrade = GREATEST(EXCLUDED.last_upgrade, COALESCE(apt_status.last_upgrade, EXCLUDED.last_upgrade)),
+			updated_at = NOW()`,
+		hostID, t,
+	)
+	return err
+}
+
 func (db *DB) TouchAptLastAction(hostID, command string) error {
 	now := time.Now()
 

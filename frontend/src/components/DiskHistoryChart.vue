@@ -215,6 +215,10 @@ const chartOptions = computed(() => ({
   interaction: { mode: 'nearest', axis: 'x', intersect: false },
 }))
 
+function cssVar(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+}
+
 async function loadHistory(hours) {
   if (!selectedMount.value) return
   chartHours.value = hours
@@ -235,8 +239,8 @@ async function loadHistory(hours) {
     chartData.value = {
       datasets: [{
         data: points.value,
-        borderColor: '#f59e0b',
-        backgroundColor: 'rgba(245,158,11,0.12)',
+        borderColor: cssVar('--tblr-yellow'),
+        backgroundColor: `rgba(${cssVar('--tblr-yellow-rgb')},0.12)`,
         fill: true,
         tension: 0.3,
         spanGaps: false,
