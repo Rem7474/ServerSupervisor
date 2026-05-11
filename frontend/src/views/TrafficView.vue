@@ -5,16 +5,18 @@
       class="traffic-page-skeleton"
     >
       <div class="traffic-topbar mb-3">
-        <div class="traffic-skeleton-slot traffic-skeleton-slot-left">
-          <LoadingSkeleton
-            variant="button-group"
-            :lines="3"
-          />
+        <div class="traffic-topbar-skeleton-left">
+          <span class="traffic-topbar-skeleton-dot" />
+          <span class="traffic-topbar-skeleton-line traffic-topbar-skeleton-line-title" />
+          <span class="traffic-topbar-skeleton-pill traffic-topbar-skeleton-pill-wide" />
+          <span class="traffic-topbar-skeleton-line traffic-topbar-skeleton-line-meta" />
         </div>
-        <div class="traffic-skeleton-slot traffic-skeleton-slot-right">
-          <LoadingSkeleton
-            variant="button-group"
-            :lines="4"
+        <div class="traffic-topbar-skeleton-right">
+          <span
+            v-for="n in 4"
+            :key="n"
+            class="traffic-topbar-skeleton-pill"
+            :class="n === 1 ? 'traffic-topbar-skeleton-pill-active' : ''"
           />
         </div>
       </div>
@@ -335,7 +337,7 @@
             <Transition name="skeleton-fade">
               <LoadingSkeleton
                 v-if="!chartReady || loading"
-                variant="donut"
+                variant="chart"
                 class="position-absolute inset-0"
               />
             </Transition>
@@ -1444,17 +1446,67 @@ onBeforeUnmount(() => {
   position: relative;
 }
 
-.traffic-page-skeleton .traffic-skeleton-slot {
+.traffic-page-skeleton .traffic-topbar-skeleton-left,
+.traffic-page-skeleton .traffic-topbar-skeleton-right {
   flex: 1 1 0;
   min-width: 0;
 }
 
-.traffic-page-skeleton .traffic-skeleton-slot-right {
-  max-width: 420px;
+.traffic-page-skeleton .traffic-topbar-skeleton-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
-.traffic-page-skeleton .traffic-skeleton-slot :deep(.loading-skeleton) {
-  margin-bottom: 0;
+.traffic-page-skeleton .traffic-topbar-skeleton-right {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.traffic-topbar-skeleton-dot,
+.traffic-topbar-skeleton-line,
+.traffic-topbar-skeleton-pill {
+  background: linear-gradient(90deg, rgba(203, 213, 225, 0.2) 25%, rgba(203, 213, 225, 0.5) 50%, rgba(203, 213, 225, 0.2) 75%);
+  background-size: 220% 100%;
+  animation: loading-skeleton-wave 1.4s ease infinite;
+}
+
+.traffic-topbar-skeleton-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.traffic-topbar-skeleton-line {
+  height: 0.8rem;
+  border-radius: 999px;
+}
+
+.traffic-topbar-skeleton-line-title {
+  width: 110px;
+}
+
+.traffic-topbar-skeleton-line-meta {
+  width: 120px;
+}
+
+.traffic-topbar-skeleton-pill {
+  width: 88px;
+  height: 2rem;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.traffic-topbar-skeleton-pill-wide {
+  width: 82px;
+}
+
+.traffic-topbar-skeleton-pill-active {
+  width: 96px;
 }
 
 .skeleton-fade-enter-active,
