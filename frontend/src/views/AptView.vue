@@ -467,13 +467,13 @@
                             : `Voir tout (${getPackages(aptStatuses[host.id]).length})` }}
                         </button>
                       </div>
-                      <div class="d-flex flex-column gap-1">
+                      <div class="apt-packages-grid">
                         <div
                           v-for="pkg in visiblePackages(host.id)"
                           :key="pkg"
                         >
                           <code
-                            class="small text-body"
+                            class="small text-body apt-package-item"
                             :title="pkg"
                           >{{ pkg }}</code>
                         </div>
@@ -1129,4 +1129,22 @@ onUnmounted(() => {
 .modal-overlay { background: rgba(0,0,0,.5); z-index: 1050; }
 .toast-overlay { z-index: 1100; }
 .apt-date-hint { font-size: 0.68rem; }
+.apt-packages-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.35rem 0.75rem;
+}
+.apt-package-item {
+  display: block;
+}
+@media (min-width: 768px) {
+  .apt-packages-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (min-width: 1200px) {
+  .apt-packages-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
 </style>

@@ -21,10 +21,7 @@
       {{ cveGroups.length }} CVE • {{ impactedPackageCount }} paquet{{ impactedPackageCount > 1 ? 's' : '' }} impacté{{ impactedPackageCount > 1 ? 's' : '' }}
     </div>
     
-    <div
-      v-if="!collapsed || alwaysExpanded"
-      class="cve-groups"
-    >
+    <div class="cve-groups">
       <div
         v-for="group in displayedCveGroups"
         :key="group.id"
@@ -66,21 +63,14 @@
         </div>
       </div>
 
-      <button
-        v-if="cveGroups.length > limit && !showAll"
-        class="btn btn-sm btn-link p-0 mt-2"
-        @click="showAll = true"
-      >
-        Afficher plus
-      </button>
     </div>
-    
-    <button 
-      v-if="!alwaysExpanded"
-      class="btn btn-sm btn-link p-0 mt-1"
-      @click="collapsed = !collapsed"
+
+    <button
+      v-if="cveGroups.length > limit && !alwaysExpanded"
+      class="btn btn-link btn-sm p-0 small text-secondary mt-1"
+      @click="showAll = !showAll"
     >
-      {{ collapsed ? `Afficher ${cves.length} CVE${cves.length > 1 ? 's' : ''}` : 'Masquer' }}
+      {{ showAll ? 'Réduire' : `Voir tout (${cveGroups.length})` }}
     </button>
   </div>
   <div
@@ -118,7 +108,6 @@ const props = defineProps({
   }
 })
 
-const collapsed = ref(props.initiallyCollapsed ?? !props.alwaysExpanded)
 const showAll = ref(false)
 
 const cves = computed(() => {
