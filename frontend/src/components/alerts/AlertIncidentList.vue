@@ -630,6 +630,17 @@ function isCompleted(incident) {
   return !!incident?.resolved_at
 }
 
+function incidentMetricLabel(metric) {
+  const meta = getAlertMetricMeta(metric)
+  return meta?.label || metric || '-'
+}
+
+function defaultNotificationTitle(incident) {
+  if (incident?.type === 'release_tracker_detected') return 'Nouvelle version détectée'
+  if (incident?.type === 'release_tracker_execution') return 'Exécution de tracker'
+  return incident?.metric ? incidentMetricLabel(incident.metric) : 'Notification'
+}
+
 function incidentFormatValue(value, metric) {
   if (metric === 'release_tracker') return '-'
   if (metric === 'status_offline') return value === 1 ? 'offline' : 'online'
