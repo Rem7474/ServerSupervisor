@@ -411,19 +411,21 @@
                     </div>
                     <div class="col-3">
                       <div class="text-center p-2 rounded bg-secondary-lt">
-                        <div class="fw-semibold small lh-1 mb-1 text-truncate">
+                        <div class="text-secondary small">
+                          Dernier apt update
+                        </div>
+                        <div class="fw-semibold small lh-1 mb-2 text-truncate">
                           {{ aptStatuses[host.id].last_update
                             ? formatDate(aptStatuses[host.id].last_update)
                             : 'Jamais' }}
                         </div>
                         <div class="text-secondary small">
-                          vérification
+                          Dernier upgrade
                         </div>
-                        <div
-                          v-if="aptStatuses[host.id].last_upgrade"
-                          class="text-muted apt-date-hint"
-                        >
-                          upgrade : {{ formatDate(aptStatuses[host.id].last_upgrade) }}
+                        <div class="fw-semibold small lh-1 text-truncate">
+                          {{ aptStatuses[host.id].last_upgrade
+                            ? formatDate(aptStatuses[host.id].last_upgrade)
+                            : 'Jamais' }}
                         </div>
                       </div>
                     </div>

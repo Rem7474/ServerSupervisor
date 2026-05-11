@@ -82,11 +82,17 @@
         <div class="col-md-4">
           <div class="card card-sm">
             <div class="card-body text-center">
+              <div class="text-secondary small">
+                Dernier apt update
+              </div>
               <div class="fw-semibold">
                 {{ formatDate(aptStatus.last_update) }}
               </div>
-              <div class="text-secondary small">
-                Dernière mise à jour
+              <div class="text-secondary small mt-2">
+                Dernier upgrade
+              </div>
+              <div class="fw-semibold">
+                {{ formatDate(lastUpgradeDate) }}
               </div>
             </div>
           </div>
@@ -392,6 +398,7 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import utc from 'dayjs/plugin/utc'
@@ -434,6 +441,14 @@ const props = defineProps({
 dayjs.extend(relativeTime)
 dayjs.extend(utc)
 dayjs.locale('fr')
+
+const lastUpgradeDate = computed(() => {
+  const aptUpgrade = props.aptStatus?.last_upgrade
+  if (aptUpgrade && aptUpgrade !== '0001-01-01T00:00:00Z') return aptUpgrade
+  const uuUpgrade = props.uuStatus?.last_run_at
+  if (uuUpgrade && uuUpgrade !== '0001-01-01T00:00:00Z') return uuUpgrade
+  return null
+})
 
 function formatDate(date) {
   if (!date || date === '0001-01-01T00:00:00Z') return 'Jamais'
