@@ -80,25 +80,32 @@
           </div>
         </div>
         <div class="col-12 col-xl-8">
-          <div class="d-flex flex-wrap align-items-center justify-content-xl-end gap-2">
-            <button
-              v-for="opt in TYPE_FILTERS"
-              :key="opt.value"
-              class="btn btn-sm rounded-pill"
-              :class="filterType === opt.value ? opt.activeClass : 'btn-ghost-secondary'"
-              @click="setTypeFilter(opt.value)"
-            >
-              {{ opt.label }}
-            </button>
-            <button
-              v-for="opt in STATUS_FILTERS"
-              :key="opt.value"
-              class="btn btn-sm rounded-pill"
-              :class="filterStatus === opt.value ? opt.activeClass : 'btn-ghost-secondary'"
-              @click="setStatusFilter(opt.value)"
-            >
-              {{ opt.label }}
-            </button>
+          <div class="d-flex flex-wrap align-items-center justify-content-xl-end gap-3">
+            <div class="d-flex flex-wrap align-items-center gap-2">
+              <span class="text-muted small me-1 fw-semibold">Type :</span>
+              <button
+                v-for="opt in TYPE_FILTERS"
+                :key="opt.value"
+                class="btn btn-sm rounded-pill"
+                :class="filterType === opt.value ? opt.activeClass : 'btn-ghost-secondary'"
+                @click="setTypeFilter(opt.value)"
+              >
+                {{ opt.label }}
+              </button>
+            </div>
+            <div class="vr opacity-50" style="height: 24px;" />
+            <div class="d-flex flex-wrap align-items-center gap-2">
+              <span class="text-muted small me-1 fw-semibold">État :</span>
+              <button
+                v-for="opt in STATUS_FILTERS"
+                :key="opt.value"
+                class="btn btn-sm rounded-pill"
+                :class="filterStatus === opt.value ? opt.activeClass : 'btn-ghost-secondary'"
+                @click="setStatusFilter(opt.value)"
+              >
+                {{ opt.label }}
+              </button>
+            </div>
           </div>
         </div>
         <div class="col-12 d-flex flex-wrap align-items-center gap-2">
