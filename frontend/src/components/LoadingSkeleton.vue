@@ -95,6 +95,25 @@
   </div>
 
   <div
+    v-else-if="variant === 'donut'"
+    class="loading-skeleton loading-skeleton-donut"
+    aria-hidden="true"
+  >
+    <div class="loading-skeleton-donut-chart">
+      <div class="loading-skeleton-donut-ring" />
+      <div class="loading-skeleton-donut-center" />
+    </div>
+    <div class="loading-skeleton-donut-legend">
+      <div
+        v-for="n in 3"
+        :key="n"
+        class="loading-skeleton-donut-legend-item"
+        :style="`width:${72 - n * 10}%;animation-delay:${(n - 1) * 0.08}s`"
+      />
+    </div>
+  </div>
+
+  <div
     v-else-if="variant === 'proxmox-cluster'"
     class="card mb-4"
     aria-hidden="true"
@@ -140,7 +159,7 @@
 
 <script setup lang="ts">
 export interface Props {
-  variant?: 'card' | 'table' | 'badge-list' | 'button-group' | 'list' | 'kpi' | 'proxmox-cluster' | 'chart'
+  variant?: 'card' | 'table' | 'badge-list' | 'button-group' | 'list' | 'kpi' | 'proxmox-cluster' | 'chart' | 'donut'
   lines?: number
 }
 
@@ -326,6 +345,54 @@ withDefaults(defineProps<Props>(), {
 .loading-skeleton-chart-bar {
   border-radius: 3px 3px 0 0;
   min-width: 4px;
+}
+
+/* donut variant */
+.loading-skeleton-donut {
+  min-height: 160px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.9rem;
+}
+
+.loading-skeleton-donut-chart {
+  position: relative;
+  width: 122px;
+  height: 122px;
+  flex-shrink: 0;
+}
+
+.loading-skeleton-donut-ring {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: linear-gradient(135deg, rgba(203, 213, 225, 0.18), rgba(203, 213, 225, 0.52), rgba(203, 213, 225, 0.18));
+  animation: loading-skeleton-wave 1.4s ease infinite;
+}
+
+.loading-skeleton-donut-center {
+  position: absolute;
+  inset: 28px;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.5);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+}
+
+.loading-skeleton-donut-legend {
+  width: min(180px, 100%);
+  display: grid;
+  gap: 0.45rem;
+}
+
+.loading-skeleton-donut-legend-item {
+  height: 0.7rem;
+  margin: 0 auto;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(203, 213, 225, 0.2) 25%, rgba(203, 213, 225, 0.5) 50%, rgba(203, 213, 225, 0.2) 75%);
+  background-size: 220% 100%;
+  animation: loading-skeleton-wave 1.4s ease infinite;
 }
 
 @keyframes loading-skeleton-wave {

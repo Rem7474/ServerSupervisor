@@ -1,6 +1,104 @@
 <template>
   <div>
-    <div class="traffic-topbar mb-3">
+    <div
+      v-if="showInitialLoading"
+      class="traffic-page-skeleton"
+    >
+      <div class="traffic-topbar mb-3">
+        <div class="traffic-skeleton-slot traffic-skeleton-slot-left">
+          <LoadingSkeleton
+            variant="button-group"
+            :lines="3"
+          />
+        </div>
+        <div class="traffic-skeleton-slot traffic-skeleton-slot-right">
+          <LoadingSkeleton
+            variant="button-group"
+            :lines="4"
+          />
+        </div>
+      </div>
+
+      <div class="page-header mb-4">
+        <LoadingSkeleton
+          variant="card"
+          :lines="3"
+        />
+      </div>
+
+      <LoadingSkeleton
+        variant="card"
+        :lines="2"
+        class="mb-4"
+      />
+
+      <LoadingSkeleton
+        variant="kpi"
+        :lines="4"
+      />
+
+      <div class="row row-cards mb-4">
+        <div class="col-xl-7">
+          <LoadingSkeleton variant="chart" />
+        </div>
+        <div class="col-xl-5">
+          <LoadingSkeleton variant="donut" />
+        </div>
+      </div>
+
+      <div class="row row-cards mb-4">
+        <div class="col-xl-7">
+          <LoadingSkeleton
+            variant="table"
+            :lines="7"
+          />
+        </div>
+        <div class="col-xl-5">
+          <LoadingSkeleton
+            variant="table"
+            :lines="7"
+          />
+        </div>
+      </div>
+
+      <div class="row row-cards mb-4">
+        <div class="col-xl-8">
+          <LoadingSkeleton
+            variant="card"
+            :lines="4"
+          />
+        </div>
+        <div class="col-xl-4">
+          <LoadingSkeleton
+            variant="table"
+            :lines="8"
+          />
+        </div>
+      </div>
+
+      <div class="row row-cards mb-4">
+        <div class="col-xl-6">
+          <LoadingSkeleton
+            variant="card"
+            :lines="4"
+          />
+        </div>
+        <div class="col-xl-6">
+          <LoadingSkeleton
+            variant="table"
+            :lines="8"
+          />
+        </div>
+      </div>
+
+      <LoadingSkeleton
+        variant="table"
+        :lines="8"
+      />
+    </div>
+
+    <div v-else>
+      <div class="traffic-topbar mb-3">
       <div class="d-flex align-items-center gap-2">
         <span
           class="live-dot"
@@ -237,7 +335,7 @@
             <Transition name="skeleton-fade">
               <LoadingSkeleton
                 v-if="!chartReady || loading"
-                variant="chart"
+                variant="donut"
                 class="position-absolute inset-0"
               />
             </Transition>
@@ -262,7 +360,7 @@
             <Transition name="skeleton-fade">
               <LoadingSkeleton
                 v-if="!chartReady || loading"
-                variant="chart"
+                variant="donut"
                 class="position-absolute inset-0"
               />
             </Transition>
@@ -815,6 +913,7 @@
         </div>
       </div>
     </div>
+    </div>
   </div>
 </template>
 
@@ -886,6 +985,7 @@ const countryDistribution = computed(() => {
   return [...rows].sort((a: AnyRecord, b: AnyRecord) => (Number(b?.hits) || 0) - (Number(a?.hits) || 0))
 })
 const statusDistribution = computed(() => traffic.value.status_distribution || { '2xx': 0, '3xx': 0, '4xx': 0, '5xx': 0 })
+const showInitialLoading = computed(() => loading.value && !chartReady.value)
 
 const lastUpdatedLabel = computed(() => {
   if (!lastUpdatedAt.value) return 'jamais'
@@ -1342,6 +1442,19 @@ onBeforeUnmount(() => {
 /* Chart placeholder positioning */
 .chart-body {
   position: relative;
+}
+
+.traffic-page-skeleton .traffic-skeleton-slot {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.traffic-page-skeleton .traffic-skeleton-slot-right {
+  max-width: 420px;
+}
+
+.traffic-page-skeleton .traffic-skeleton-slot :deep(.loading-skeleton) {
+  margin-bottom: 0;
 }
 
 .skeleton-fade-enter-active,
