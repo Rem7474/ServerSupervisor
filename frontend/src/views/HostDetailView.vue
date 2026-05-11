@@ -128,21 +128,29 @@
       <div class="card-body py-2 px-3 d-flex flex-wrap align-items-center gap-3">
         <!-- Guest info -->
         <div class="d-flex align-items-center gap-2">
-          <span class="badge bg-orange-lt text-orange">Proxmox</span>
+          <BadgePill
+            text="Proxmox"
+            tone="orange"
+            compact
+          />
           <span class="fw-medium">{{ proxmoxLink.guest_name || `VMID ${proxmoxLink.vmid}` }}</span>
           <span class="text-muted small">({{ proxmoxLink.guest_type?.toUpperCase() }} · {{ proxmoxLink.node_name }})</span>
         </div>
 
         <!-- Status badge + suggestion actions -->
         <div class="d-flex align-items-center gap-2">
-          <span
+          <BadgePill
             v-if="proxmoxLink.status === 'suggested'"
-            class="badge bg-warning-lt text-warning"
-          >Suggestion</span>
-          <span
+            text="Suggestion"
+            tone="warning"
+            compact
+          />
+          <BadgePill
             v-else
-            class="badge bg-success-lt text-success"
-          >Lié</span>
+            text="Lié"
+            tone="success"
+            compact
+          />
           <template v-if="proxmoxLink.status === 'suggested'">
             <button
               class="btn btn-sm btn-success"
