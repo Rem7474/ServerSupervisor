@@ -108,9 +108,9 @@ body {
 
 /* Fix badge contrast in dark mode.
  * bg-secondary (solid gray) becomes invisible on dark card backgrounds.
- * Force it to use the -lt (light) style: translucent bg + legible text. */
+ * Force it to use the -lt (light) style: translucent bg + legible text.
+ * Keep bg-dark untouched so intended dark surfaces remain dark. */
 [data-bs-theme="dark"] .badge.bg-secondary,
-[data-bs-theme="dark"] .badge.bg-dark,
 [data-bs-theme="dark"] .badge.bg-gray,
 [data-bs-theme="dark"] .badge.bg-gray-900,
 [data-bs-theme="dark"] .badge:not([class*="bg-"]) {
