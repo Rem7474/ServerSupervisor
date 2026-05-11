@@ -1,83 +1,165 @@
 <template>
   <div class="card">
-    <div class="card-header flex-column flex-sm-row align-items-start align-items-sm-center gap-2">
-      <h3 class="card-title mb-0">
-        Historique de notifications
-      </h3>
-      <div class="d-flex align-items-center gap-2 flex-wrap ms-sm-auto">
-        <div class="btn-group btn-group-sm">
-          <button
-            v-for="opt in TYPE_FILTERS"
-            :key="opt.value"
-            class="btn"
-            :class="filterType === opt.value ? opt.activeClass : 'btn-ghost-secondary'"
-            @click="filterType = opt.value; currentPage = 1"
-          >
-            {{ opt.label }}
-          </button>
+    <div class="card-header d-flex flex-column flex-lg-row align-items-start align-items-lg-center justify-content-between gap-3">
+      <div>
+        <h3 class="card-title mb-1">
+          Historique de notifications
+        </h3>
+        <div class="text-muted small">
+          Recherche, filtre par type ou par état, puis ouvre le détail en un clic.
         </div>
-        <div class="btn-group btn-group-sm">
-          <button
-            v-for="opt in STATUS_FILTERS"
-            :key="opt.value"
-            class="btn"
-            :class="filterStatus === opt.value ? opt.activeClass : 'btn-ghost-secondary'"
-            @click="filterStatus = opt.value; currentPage = 1"
-          >
-            {{ opt.label }}
-          </button>
-        </div>
-        <span
+      </div>
+      <div class="d-flex flex-wrap align-items-center gap-2">
+        <BadgePill
           v-if="activeIncidentCount > 0"
-          class="badge bg-red-lt text-red"
-        >{{ activeIncidentCount }} actif{{ activeIncidentCount > 1 ? 's' : '' }}</span>
-        <span class="text-secondary small text-nowrap">
-          {{ filteredIncidents.length }}<template v-if="filteredIncidents.length !== incidents.length">/{{ incidents.length }}</template>
-          notification{{ filteredIncidents.length !== 1 ? 's' : '' }}
-        </span>
-        <button
-          class="btn btn-sm btn-ghost-secondary"
-          :disabled="markingRead"
-          @click="markAllRead"
-        >
-          <svg
-            class="icon me-1"
-            width="16"
-            height="16"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
+          :text="`${activeIncidentCount} actif${activeIncidentCount > 1 ? 's' : ''}`"
+          tone="danger"
+          compact
+        />
+        <BadgePill
+          :text="incidentCountLabel"
+          tone="secondary"
+          compact
+        />
+      </div>
+    </div>
+
+    <div class="card-body border-bottom py-3">
+      <div class="row g-3 align-items-end">
+        <div class="col-12 col-xl-4">
+          <label class="form-label text-muted small mb-2">
+            Recherche
+          </label>
+          <div class="input-icon">
+            <span class="input-icon-addon">
+              <svg
+                class="icon"
+                width="16"
+                height="16"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  cx="11"
+                  cy="11"
+                  r="8"
+                />
+                <path d="M21 21l-4.35-4.35" />
+              </svg>
+            </span>
+            <input
+              v-model="searchQuery"
+              type="text"
+              class="form-control"
+              placeholder="Rechercher une règle, un hôte, une source..."
+            >
+            <button
+              v-if="searchQuery"
+              class="btn btn-icon btn-outline-secondary"
+              type="button"
+              aria-label="Effacer la recherche"
+              @click="clearSearch"
+            >
+              <svg
+                class="icon"
+                width="16"
+                height="16"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M18 6L6 18M6 6l12 12"
+                />
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="col-12 col-xl-8">
+          <div class="d-flex flex-wrap align-items-center justify-content-xl-end gap-2">
+            <button
+              v-for="opt in TYPE_FILTERS"
+              :key="opt.value"
+              class="btn btn-sm rounded-pill"
+              :class="filterType === opt.value ? opt.activeClass : 'btn-ghost-secondary'"
+              @click="setTypeFilter(opt.value)"
+            >
+              {{ opt.label }}
+            </button>
+            <button
+              v-for="opt in STATUS_FILTERS"
+              :key="opt.value"
+              class="btn btn-sm rounded-pill"
+              :class="filterStatus === opt.value ? opt.activeClass : 'btn-ghost-secondary'"
+              @click="setStatusFilter(opt.value)"
+            >
+              {{ opt.label }}
+            </button>
+          </div>
+        </div>
+        <div class="col-12 d-flex flex-wrap align-items-center gap-2">
+          <span class="text-muted small me-1">
+            Actions rapides
+          </span>
+          <button
+            class="btn btn-sm btn-ghost-secondary"
+            :disabled="markingRead"
+            @click="markAllRead"
           >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M5 13l4 4L19 7"
-            />
-          </svg>
-          Tout marquer lu
-        </button>
-        <button
-          class="btn btn-sm btn-ghost-secondary"
-          @click="$emit('refresh')"
-        >
-          <svg
-            class="icon"
-            width="16"
-            height="16"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
+            <svg
+              class="icon me-1"
+              width="16"
+              height="16"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M5 13l4 4L19 7"
+              />
+            </svg>
+            Tout marquer lu
+          </button>
+          <button
+            class="btn btn-sm btn-ghost-secondary"
+            @click="$emit('refresh')"
           >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-            />
-          </svg>
-          Actualiser
-        </button>
+            <svg
+              class="icon me-1"
+              width="16"
+              height="16"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              />
+            </svg>
+            Actualiser
+          </button>
+          <button
+            v-if="hasActiveFilters"
+            class="btn btn-sm btn-outline-secondary"
+            type="button"
+            @click="resetFilters"
+          >
+            Réinitialiser
+          </button>
+          <span class="ms-auto text-secondary small text-nowrap">
+            {{ incidentCountLabel }}
+          </span>
+        </div>
       </div>
     </div>
 
@@ -118,16 +200,44 @@
           d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
         />
       </svg>
-      <div>Aucune notification enregistree</div>
+      <div>Aucune notification enregistrée</div>
       <div class="text-muted small mt-1">
-        Les alertes et notifications release tracker apparaitront ici
+        Les alertes et les notifications du release tracker apparaîtront ici
       </div>
     </div>
     <div
       v-else-if="filteredIncidents.length === 0"
       class="card-body text-center py-5 text-muted"
     >
-      Aucune notification ne correspond aux filtres selectionnes.
+      <svg
+        class="icon icon-lg mb-3"
+        width="48"
+        height="48"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="1.5"
+          d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+        />
+      </svg>
+      <div class="fw-semibold text-body">
+        Aucune notification ne correspond à cette recherche.
+      </div>
+      <div class="text-muted small mt-1">
+        Essayez un autre mot-clé ou réinitialisez les filtres.
+      </div>
+      <button
+        v-if="hasActiveFilters"
+        class="btn btn-sm btn-outline-secondary mt-3"
+        type="button"
+        @click="resetFilters"
+      >
+        Réinitialiser
+      </button>
     </div>
     <div
       v-else
@@ -144,7 +254,7 @@
             <th>Source</th>
             <th>Détails</th>
             <th>Déclenché</th>
-            <th>Termine</th>
+            <th>Terminé</th>
           </tr>
         </thead>
         <tbody>
@@ -168,7 +278,7 @@
                 <span
                   v-if="isCompleted(item)"
                   class="badge bg-green-lt text-green"
-                >Termine</span>
+                >Terminé</span>
                 <span
                   v-else
                   class="badge bg-red-lt text-red"
@@ -182,7 +292,7 @@
                 <span
                   v-else-if="item.type === 'release_tracker_execution'"
                   class="badge bg-indigo-lt text-indigo"
-                >Execution tracker</span>
+                >Exécution tracker</span>
                 <span
                   v-else-if="(item.severity || '').toLowerCase() === 'crit'"
                   class="badge bg-red-lt text-red"
@@ -335,8 +445,9 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import apiClient from '../../api'
+import BadgePill from '../common/BadgePill.vue'
 import { getAlertMetricMeta } from '../../utils/alertMetrics'
 import { resolveIncidentHostRoute } from '../../utils/incidentRouting'
 
@@ -344,16 +455,16 @@ const PAGE_SIZE = 50
 const AGE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000
 
 const TYPE_FILTERS = [
-  { value: 'all', label: 'Tous', activeClass: 'btn-secondary' },
-  { value: 'crit', label: 'Critique', activeClass: 'btn-danger' },
-  { value: 'warn', label: 'Avertissement', activeClass: 'btn-warning' },
-  { value: 'tracker', label: 'Tracker', activeClass: 'btn-info' },
+  { value: 'all', label: 'Tous', activeClass: 'btn-primary shadow-sm' },
+  { value: 'crit', label: 'Critique', activeClass: 'btn-danger shadow-sm' },
+  { value: 'warn', label: 'Avertissement', activeClass: 'btn-warning shadow-sm' },
+  { value: 'tracker', label: 'Tracker', activeClass: 'btn-info shadow-sm' },
 ]
 
 const STATUS_FILTERS = [
-  { value: 'all', label: 'Tous états', activeClass: 'btn-secondary' },
-  { value: 'active', label: 'Actifs', activeClass: 'btn-danger' },
-  { value: 'resolved', label: 'Terminés', activeClass: 'btn-success' },
+  { value: 'all', label: 'Tous états', activeClass: 'btn-primary shadow-sm' },
+  { value: 'active', label: 'Actifs', activeClass: 'btn-danger shadow-sm' },
+  { value: 'resolved', label: 'Terminés', activeClass: 'btn-success shadow-sm' },
 ]
 
 const props = defineProps({
@@ -379,11 +490,12 @@ defineEmits(['refresh'])
 
 const filterType = ref('all')
 const filterStatus = ref('all')
+const searchQuery = ref('')
 const currentPage = ref(1)
 const markingRead = ref(false)
 
 const filteredIncidents = computed(() => {
-  const now = Date.now()
+  const search = searchQuery.value.trim().toLowerCase()
   return props.incidents.filter((incident) => {
     if (filterType.value === 'crit') {
       if (incident.type === 'release_tracker_detected' || incident.type === 'release_tracker_execution') return false
@@ -398,8 +510,37 @@ const filteredIncidents = computed(() => {
     if (filterStatus.value === 'active' && isCompleted(incident)) return false
     if (filterStatus.value === 'resolved' && !isCompleted(incident)) return false
 
+    if (search) {
+      const haystack = [
+        incident.rule_name,
+        incident.host_name,
+        incident.source_label,
+        incident.metric,
+        incident.type,
+        incident.status,
+        incident.version,
+        incident.value,
+      ]
+        .filter(Boolean)
+        .map((value) => String(value).toLowerCase())
+        .join(' ')
+      if (!haystack.includes(search)) return false
+    }
+
     return true
   })
+})
+
+const hasActiveFilters = computed(() => filterType.value !== 'all' || filterStatus.value !== 'all' || searchQuery.value.trim().length > 0)
+
+const incidentCountLabel = computed(() => {
+  const visible = filteredIncidents.value.length
+  const total = props.incidents.length
+  return `${visible}${visible !== total ? `/${total}` : ''} notification${visible !== 1 ? 's' : ''}`
+})
+
+watch([filterType, filterStatus, searchQuery], () => {
+  currentPage.value = 1
 })
 
 const annotatedIncidents = computed(() => {
@@ -437,6 +578,27 @@ const visiblePages = computed(() => {
   return pages
 })
 
+function setTypeFilter(value) {
+  filterType.value = value
+  currentPage.value = 1
+}
+
+function setStatusFilter(value) {
+  filterStatus.value = value
+  currentPage.value = 1
+}
+
+function clearSearch() {
+  searchQuery.value = ''
+}
+
+function resetFilters() {
+  filterType.value = 'all'
+  filterStatus.value = 'all'
+  searchQuery.value = ''
+  currentPage.value = 1
+}
+
 async function markAllRead() {
   markingRead.value = true
   try {
@@ -444,18 +606,6 @@ async function markAllRead() {
   } finally {
     markingRead.value = false
   }
-}
-
-function incidentMetricLabel(metric) {
-  if (!metric) return ''
-  if (metric === 'release_tracker') return 'Suivi de version'
-  return getAlertMetricMeta(metric).label
-}
-
-function defaultNotificationTitle(incident) {
-  if (incident?.type === 'release_tracker_detected') return 'Nouvelle release detectee'
-  if (incident?.type === 'release_tracker_execution') return 'Execution release tracker'
-  return 'Alerte'
 }
 
 function notificationRoute(incident) {

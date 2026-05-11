@@ -11,6 +11,9 @@
 <script setup>
 import { computed } from 'vue'
 
+// Define valid tone values as reference (not used in validator to avoid hoisting issues)
+const VALID_TONES = ['success', 'warning', 'danger', 'info', 'secondary', 'orange', 'cyan', 'blue', 'green', 'red', 'purple', 'azure', 'teal', 'indigo']
+
 const toneClasses = {
   success: 'bg-success-lt text-success',
   warning: 'bg-yellow-lt text-yellow',
@@ -36,7 +39,6 @@ const props = defineProps({
   tone: {
     type: String,
     default: 'secondary',
-    validator: (value) => Object.prototype.hasOwnProperty.call(toneClasses, value),
   },
   title: {
     type: String,
