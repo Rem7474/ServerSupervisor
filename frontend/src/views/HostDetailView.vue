@@ -1,7 +1,7 @@
 <template>
   <div class="host-detail-page">
     <div class="page-header mb-3">
-      <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3">
+      <div class="d-flex flex-column flex-lg-row align-items-lg-start justify-content-between gap-3">
         <div>
           <div class="page-pretitle">
             <router-link
@@ -20,8 +20,26 @@
             {{ host?.hostname || 'Non connecté' }} - {{ host?.os || 'OS inconnu' }} - {{ host?.ip_address }}
             <span v-if="host?.last_seen">- Dernière activité: <RelativeTime :date="host.last_seen" /></span>
           </div>
+          <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
+            <span
+              v-if="host"
+              :class="hostStatusClass(host.status)"
+              :aria-label="`Statut de l'hôte : ${formatHostStatus(host.status)}`"
+            >
+              <span :class="['status-dot', host.status === 'online' ? 'status-dot-animated' : '']" />
+              {{ formatHostStatus(host.status) }}
+            </span>
+            <BadgePill
+              v-if="host?.agent_version"
+              :tone="isAgentUpToDate(host.agent_version) ? 'success' : 'warning'"
+              :text="`Agent v${host.agent_version}`"
+              :aria-label="isAgentUpToDate(host.agent_version) ? `Agent version ${host.agent_version}, à jour` : `Agent version ${host.agent_version}, mise à jour disponible`"
+              :title="isAgentUpToDate(host.agent_version) ? 'Agent à jour' : 'Mise à jour de l\'agent disponible'"
+              compact
+            />
+          </div>
         </div>
-        <div class="d-flex align-items-center gap-2">
+        <div class="d-flex flex-wrap align-items-center justify-content-lg-end gap-2">
           <button
             class="btn btn-outline-secondary"
             @click="isEditing = true"
@@ -84,24 +102,6 @@
             </svg>
             Supprimer
           </button>
-          <span
-            v-if="host"
-            :class="hostStatusClass(host.status)"
-            :aria-label="`Statut de l'hôte : ${formatHostStatus(host.status)}`"
-          >
-            <span :class="['status-dot', host.status === 'online' ? 'status-dot-animated' : '']" />
-            {{ formatHostStatus(host.status) }}
-          </span>
-          <span
-            v-if="host?.agent_version"
-            :class="isAgentUpToDate(host.agent_version) ? 'badge bg-green-lt text-green d-inline-flex align-items-center gap-1' : 'badge bg-yellow-lt text-yellow d-inline-flex align-items-center gap-1'"
-            :aria-label="isAgentUpToDate(host.agent_version) ? `Agent version ${host.agent_version}, à jour` : `Agent version ${host.agent_version}, mise à jour disponible`"
-          >
-            <span>{{ isAgentUpToDate(host.agent_version) ? '✓' : '⚠' }}</span>
-            <span>{{ isAgentUpToDate(host.agent_version) ? 'À jour' : 'MAJ dispo' }}</span>
-            <span class="text-muted">·</span>
-            <span class="font-monospace">v{{ host.agent_version }}</span>
-          </span>
         </div>
       </div>
     </div>
@@ -646,7 +646,7 @@ import HostSystemTab from '../components/host/HostSystemTab.vue'
 import HostTasksTab from '../components/host/HostTasksTab.vue'
 import CommandLogPanel from '../components/CommandLogPanel.vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
-import MetricsSourceBadge from '../components/common/MetricsSourceBadge.vue'
+import BadgePill from '../components/common/BadgePill.vue'
 import { formatHostStatus, hostStatusClass } from '../utils/formatHostStatus'
 
 const {

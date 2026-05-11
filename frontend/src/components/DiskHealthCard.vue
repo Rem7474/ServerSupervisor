@@ -1,6 +1,6 @@
 <template>
   <div class="card">
-    <div class="card-header">
+    <div class="card-header d-flex align-items-center justify-content-between">
       <h3 class="card-title">
         État SMART des disques
       </h3>
@@ -16,28 +16,55 @@
     </div>
     <div
       v-else-if="health.length === 0"
-      class="card-body text-muted small"
+      class="card-body text-center text-muted py-5"
     >
-      Aucune donnée SMART disponible pour cet hôte.
-      Vérifie que l'agent a `collect_smart: true`, que `smartmontools` est installé et que l'agent a accès aux disques physiques.
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        class="mb-2 icon icon-md icon-responsive-lg"
+        width="36"
+        height="36"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+        style="opacity:.35"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="1.5"
+          d="M5 12a7 7 0 1014 0A7 7 0 005 12zm7-3v3l2 2"
+        />
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="1.5"
+          d="M3 6h18M3 18h18"
+        />
+      </svg>
+      <div class="small fw-medium">
+        Aucune donnée SMART disponible
+      </div>
+      <div class="mt-1 opacity-75 small">
+        Vérifie que l'agent collecte SMART et que smartmontools est installé.
+      </div>
     </div>
     <div
       v-else
       class="card-body"
     >
       <div class="d-flex flex-column gap-3">
-        <div 
-          v-for="disk in health" 
+        <div
+          v-for="disk in health"
           :key="disk.device"
-          class="border rounded p-3"
+          class="border rounded-3 p-3 shadow-sm"
           :class="getCardClass(disk.smart_status)"
         >
-          <div class="d-flex align-items-start justify-content-between">
-            <div>
-              <div class="fw-bold">
+          <div class="d-flex flex-wrap align-items-start justify-content-between gap-2">
+            <div class="min-w-0">
+              <div class="fw-semibold text-truncate">
                 {{ disk.device }}
               </div>
-              <div class="text-muted small">
+              <div class="text-muted small text-truncate">
                 {{ disk.model }}
                 <span
                   v-if="disk.serial_number"
@@ -45,19 +72,17 @@
                 >{{ disk.serial_number }}</span>
               </div>
             </div>
-            <span
-              :class="getStatusBadgeClass(disk.smart_status)"
-              class="badge"
-            >
-              {{ disk.smart_status }}
-            </span>
+            <BadgePill
+              :tone="getStatusBadgeClass(disk.smart_status)"
+              :text="disk.smart_status"
+              compact
+            />
           </div>
 
-          <div class="row mt-3 text-sm">
+          <div class="row mt-3 g-3 text-sm">
             <div class="col-6">
               <div
-                class="text-muted"
-                style="font-size: 0.8rem"
+                class="text-muted small"
               >
                 Température
               </div>
@@ -71,8 +96,7 @@
             </div>
             <div class="col-6">
               <div
-                class="text-muted"
-                style="font-size: 0.8rem"
+                class="text-muted small"
               >
                 Heures d'utilisation
               </div>
@@ -86,8 +110,7 @@
             </div>
             <div class="col-6 mt-2">
               <div
-                class="text-muted"
-                style="font-size: 0.8rem"
+                class="text-muted small"
               >
                 Secteurs réalloués
               </div>
@@ -100,8 +123,7 @@
             </div>
             <div class="col-6 mt-2">
               <div
-                class="text-muted"
-                style="font-size: 0.8rem"
+                class="text-muted small"
               >
                 Secteurs en attente
               </div>
@@ -123,6 +145,7 @@
 import { ref, onMounted } from 'vue'
 import apiClient from '../api'
 import LoadingSkeleton from './LoadingSkeleton.vue'
+import BadgePill from './common/BadgePill.vue'
 
 const props = defineProps({
   hostId: { type: String, required: true },
@@ -151,11 +174,11 @@ async function loadDiskHealth() {
 
 function getStatusBadgeClass(status) {
   switch (status) {
-    case 'PASSED': return 'bg-success-lt text-success'
-    case 'FAILED': return 'bg-danger-lt text-danger'
-    case 'UNKNOWN': return 'bg-warning-lt text-warning'
-    case 'NOT_AVAILABLE': return 'bg-secondary-lt text-secondary'
-    default: return 'bg-secondary-lt text-secondary'
+    case 'PASSED': return 'success'
+    case 'FAILED': return 'danger'
+    case 'UNKNOWN': return 'warning'
+    case 'NOT_AVAILABLE': return 'secondary'
+    default: return 'secondary'
   }
 }
 

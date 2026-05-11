@@ -1,6 +1,6 @@
 <template>
   <div class="card">
-    <div class="card-header">
+    <div class="card-header d-flex align-items-center justify-content-between">
       <h3 class="card-title">
         Santé des disques
       </h3>
@@ -44,10 +44,7 @@
       <div class="small fw-medium">
         Aucune donnée de disque disponible
       </div>
-      <div
-        class="mt-1 opacity-75"
-        style="font-size:.78rem"
-      >
+      <div class="mt-1 opacity-75 small">
         L'agent doit être actif pour collecter les métriques disque
       </div>
     </div>
@@ -55,7 +52,7 @@
       v-else
       class="table-responsive"
     >
-      <table class="table table-vcenter card-table table-sm">
+      <table class="table table-vcenter card-table mb-0">
         <thead>
           <tr>
             <th>Point de montage</th>

@@ -1,15 +1,16 @@
 <template>
-  <span
-    :class="badgeClass"
+  <BadgePill
+    :tone="badgeTone"
+    :text="badgeText"
     :aria-label="ariaLabel"
     :title="badgeText"
-  >
-    {{ badgeText }}
-  </span>
+    compact
+  />
 </template>
 
 <script setup>
 import { computed } from 'vue'
+import BadgePill from './BadgePill.vue'
 
 const props = defineProps({
   source: {
@@ -32,27 +33,18 @@ const badgeText = computed(() => {
   }
 })
 
-const badgeClass = computed(() => {
+const badgeTone = computed(() => {
   switch (props.source) {
     case 'proxmox':
-      return 'badge bg-orange-lt text-orange'
+      return 'orange'
     case 'agent':
-      return 'badge bg-cyan-lt text-cyan'
+      return 'cyan'
     case 'auto':
-      return 'badge bg-blue-lt text-blue'
+      return 'blue'
     default:
-      return 'badge bg-secondary-lt text-secondary'
+      return 'secondary'
   }
 })
 
 const ariaLabel = computed(() => badgeText.value)
 </script>
-
-<style scoped>
-/* Ensure badge displays inline when needed */
-:deep(.badge) {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-}
-</style>
