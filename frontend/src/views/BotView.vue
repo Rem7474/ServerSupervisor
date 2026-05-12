@@ -727,7 +727,8 @@ async function pollCommand(commandId: string): Promise<{ status: string; output:
 }
 
 async function unblockCrowdSecEntry(ip: string) {
-  const targetHost = hostId.value || crowdSecHostId.value
+  const matchedEntry = crowdSecIPs.value.find((entry: AnyRecord) => entry.ip === ip)
+  const targetHost = hostId.value || (matchedEntry?.host_id as string) || crowdSecHostId.value
   if (!targetHost) {
     showActionFeedback({ message: 'Impossible de déterminer l\'hôte cible — renseigne le filtre Hôte', type: 'error' })
     return

@@ -547,8 +547,7 @@ func (db *DB) GetWebLogsSummary(since time.Time, hostID string, source string) (
 
 	// CrowdSec: return count + top blocked IPs from the most recent snapshot.
 	var crowdSecBlocked int64
-	var crowdSecTopRaw []byte
-	var crowdSecSnapshotHostID string
+	var crowdSecHostCount int64
 	csArgs := []any{since}
 	csWhere := "captured_at >= $1"
 	if hostID != "" {
@@ -559,20 +558,119 @@ func (db *DB) GetWebLogsSummary(since time.Time, hostID string, source string) (
 		csArgs = append(csArgs, source)
 		csWhere += fmt.Sprintf(" AND source = $%d", len(csArgs))
 	}
-	_ = db.conn.QueryRow(
-		fmt.Sprintf(`SELECT COALESCE(crowdsec_blocked_ips, 0), COALESCE(crowdsec_top_blocked, '[]'), COALESCE(host_id, '') FROM web_log_snapshots WHERE %s ORDER BY captured_at DESC LIMIT 1`, csWhere),
-		csArgs...,
-	).Scan(&crowdSecBlocked, &crowdSecTopRaw, &crowdSecSnapshotHostID)
+	countQuery := fmt.Sprintf(`
+		WITH snapshots AS (
+			SELECT captured_at, host_id, COALESCE(crowdsec_top_blocked, '[]'::jsonb) AS top_blocked
+			FROM web_log_snapshots
+			WHERE %s
+		),
+		expanded AS (
+			SELECT
+				snapshots.captured_at,
+				snapshots.host_id,
+				elem->>'ip' AS ip
+			FROM snapshots
+			CROSS JOIN LATERAL jsonb_array_elements(snapshots.top_blocked) AS elem
+		)
+		SELECT COALESCE(COUNT(DISTINCT ip), 0), COALESCE(COUNT(DISTINCT host_id), 0)
+		FROM expanded
+		WHERE ip IS NOT NULL AND ip <> ''`, csWhere)
+	if err := db.conn.QueryRow(countQuery, csArgs...).Scan(&crowdSecBlocked, &crowdSecHostCount); err != nil {
+		return nil, err
+	}
+	threats["crowdsec_blocked_ips"] = crowdSecBlocked
+
 	if crowdSecBlocked > 0 {
-		threats["crowdsec_blocked_ips"] = crowdSecBlocked
-		if crowdSecSnapshotHostID != "" {
-			threats["crowdsec_host_id"] = crowdSecSnapshotHostID
+		const crowdSecTopBlockedLimit = 500
+		listQuery := fmt.Sprintf(`
+			WITH snapshots AS (
+				SELECT captured_at, host_id, COALESCE(crowdsec_top_blocked, '[]'::jsonb) AS top_blocked
+				FROM web_log_snapshots
+				WHERE %s
+			),
+			expanded AS (
+				SELECT
+					snapshots.captured_at,
+					snapshots.host_id,
+					elem->>'ip' AS ip,
+					elem->>'type' AS type,
+					elem->>'reason' AS reason,
+					elem->>'origin' AS origin,
+					elem->>'country' AS country,
+					elem->>'as_name' AS as_name,
+					elem->>'blocked_until' AS blocked_until
+				FROM snapshots
+				CROSS JOIN LATERAL jsonb_array_elements(snapshots.top_blocked) AS elem
+			),
+			dedup AS (
+				SELECT DISTINCT ON (ip)
+					ip, type, reason, origin, country, as_name, blocked_until, captured_at, host_id
+				FROM expanded
+				WHERE ip IS NOT NULL AND ip <> ''
+				ORDER BY ip, captured_at DESC
+			)
+			SELECT ip, type, reason, origin, country, as_name, blocked_until, captured_at, host_id
+			FROM dedup
+			ORDER BY captured_at DESC, ip
+			LIMIT %d`, csWhere, crowdSecTopBlockedLimit)
+		rows, err := db.conn.Query(listQuery, csArgs...)
+		if err != nil {
+			return nil, err
 		}
-		if len(crowdSecTopRaw) > 2 {
-			var csEntries []map[string]any
-			if err := json.Unmarshal(crowdSecTopRaw, &csEntries); err == nil {
-				threats["crowdsec_top_blocked"] = csEntries
+		defer func() { _ = rows.Close() }()
+
+		csEntries := make([]map[string]any, 0)
+		for rows.Next() {
+			var ip string
+			var decisionType sql.NullString
+			var reason sql.NullString
+			var origin sql.NullString
+			var country sql.NullString
+			var asName sql.NullString
+			var blockedUntil sql.NullString
+			var capturedAt time.Time
+			var rowHostID string
+			if err := rows.Scan(&ip, &decisionType, &reason, &origin, &country, &asName, &blockedUntil, &capturedAt, &rowHostID); err != nil {
+				return nil, err
 			}
+			entry := map[string]any{"ip": ip}
+			if decisionType.Valid && decisionType.String != "" {
+				entry["type"] = decisionType.String
+			}
+			if reason.Valid && reason.String != "" {
+				entry["reason"] = reason.String
+			}
+			if origin.Valid && origin.String != "" {
+				entry["origin"] = origin.String
+			}
+			if country.Valid && country.String != "" {
+				entry["country"] = country.String
+			}
+			if asName.Valid && asName.String != "" {
+				entry["as_name"] = asName.String
+			}
+			if blockedUntil.Valid && blockedUntil.String != "" {
+				entry["blocked_until"] = blockedUntil.String
+			}
+			entry["last_seen"] = capturedAt
+			entry["host_id"] = rowHostID
+			csEntries = append(csEntries, entry)
+		}
+		if err := rows.Err(); err != nil {
+			return nil, err
+		}
+		threats["crowdsec_top_blocked"] = csEntries
+	}
+
+	if hostID != "" {
+		threats["crowdsec_host_id"] = hostID
+	} else if crowdSecHostCount == 1 {
+		var singleHostID string
+		if err := db.conn.QueryRow(
+			fmt.Sprintf(`SELECT MAX(host_id) FROM web_log_snapshots WHERE %s`, csWhere),
+			csArgs...,
+		).Scan(&singleHostID); err == nil && singleHostID != "" {
+			threats["crowdsec_host_id"] = singleHostID
 		}
 	}
 
