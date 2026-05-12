@@ -241,7 +241,7 @@
                     <template v-if="ip.blocked || ip.blocked_type || ip.blocked_source">
                       <span
                         class="badge"
-                        :class="decisionBadgeClass(ip.blocked_type)"
+                        :class="decisionBadgeClass(ip.blocked_type, ip.blocked_until)"
                         :title="formatBlockedUntil(ip.blocked_until)"
                       >
                         {{ decisionLabel(ip.blocked_type) }}
@@ -434,7 +434,7 @@
                   <td>
                     <span
                       class="badge"
-                      :class="decisionBadgeClass(entry.type)"
+                      :class="decisionBadgeClass(entry.type, entry.blocked_until)"
                     >{{ decisionLabel(entry.type) }}</span>
                   </td>
                   <td class="small text-secondary">
@@ -610,14 +610,26 @@ function decisionLabel(type: string | undefined | null): string {
   }
 }
 
-function decisionBadgeClass(type: string): string {
+function decisionBadgeClass(type: string, blockedUntil?: string): string {
   if (!type) return 'bg-secondary-lt text-secondary'
-  switch (type.toLowerCase()) {
-    case 'ban': return 'bg-red-lt text-red'
-    case 'captcha': return 'bg-yellow-lt text-yellow'
-    case 'audit': return 'bg-azure-lt text-azure'
-    default: return 'bg-secondary-lt text-secondary'
+  
+  const t = type.toLowerCase()
+  let baseClass = 'bg-secondary-lt text-secondary'
+  switch (t) {
+    case 'ban': baseClass = 'bg-red-lt text-red'; break
+    case 'captcha': baseClass = 'bg-yellow-lt text-yellow'; break
+    case 'audit': baseClass = 'bg-azure-lt text-azure'; break
   }
+  
+  // Si blockedUntil est fourni et valide, c'est un blocage temporaire → orange
+  if (blockedUntil) {
+    const d = new Date(blockedUntil)
+    if (!Number.isNaN(d.getTime()) && d > new Date()) {
+      return 'bg-orange-lt text-orange'  // blocage temporaire en orange
+    }
+  }
+  
+  return baseClass
 }
 
 function truncate(s: string, max: number): string {
