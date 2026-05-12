@@ -238,7 +238,7 @@
                     >{{ ip.level || 'LOW' }}</span>
                   </td>
                   <td>
-                    <template v-if="ip.blocked || ip.blocked_type">
+                    <template v-if="ip.blocked || ip.blocked_type || ip.blocked_source">
                       <span
                         class="badge"
                         :class="decisionBadgeClass(ip.blocked_type)"
@@ -599,13 +599,14 @@ function levelClass(level: string): string {
   }
 }
 
-function decisionLabel(type: string): string {
-  if (!type) return '—'
-  switch (type.toLowerCase()) {
+function decisionLabel(type: string | undefined | null): string {
+  const t = (type || 'ban').toLowerCase().trim()
+  if (!t) return 'Ban'
+  switch (t) {
     case 'ban': return 'Ban'
     case 'captcha': return 'Captcha'
     case 'audit': return 'Audit'
-    default: return type
+    default: return t.charAt(0).toUpperCase() + t.slice(1)
   }
 }
 
