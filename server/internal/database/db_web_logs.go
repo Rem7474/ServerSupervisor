@@ -456,6 +456,9 @@ func (db *DB) GetWebLogsSummary(since time.Time, hostID string, source string) (
 			ipData["blocked"] = true
 			if blockedSource.Valid {
 				ipData["blocked_source"] = blockedSource.String
+				if blockedSource.String == "crowdsec" {
+					ipData["blocked_type"] = "ban"
+				}
 			}
 			if blockedReason.Valid {
 				ipData["blocked_reason"] = blockedReason.String

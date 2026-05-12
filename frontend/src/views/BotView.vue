@@ -455,10 +455,7 @@
                   >
                     {{ entry.as_name ? truncate(entry.as_name, 28) : '—' }}
                   </td>
-                  <td
-                    class="small"
-                    :title="`Raw: ${entry.blocked_until || 'undefined'}`"
-                  >
+                  <td class="small">
                     {{ formatBlockedUntil(entry.blocked_until) }}
                   </td>
                   <td class="text-end">
