@@ -567,13 +567,13 @@ const topIPs = computed(() => {
     const decision = decisionMap.get(ip.ip as string)
     if (!decision) return ip
     if (ip.blocked && ip.blocked_type) return ip  // already enriched by agent, trust it
-    const decType = (decision.type as string) || ''
+    const decType = ((decision.type as string) || 'ban').toLowerCase()
     const isBan = decType === 'ban'
     return {
       ...ip,
-      blocked: isBan,
+      blocked: isBan || Boolean(decision.blocked_until),
       blocked_source: 'crowdsec',
-      blocked_type: decType,
+      blocked_type: decType || 'ban',
       blocked_until: ip.blocked_until || decision.blocked_until,
     }
   })

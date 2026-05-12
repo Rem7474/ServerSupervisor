@@ -593,7 +593,7 @@ func (db *DB) GetWebLogsSummary(since time.Time, hostID string, source string) (
 					snapshots.captured_at,
 					snapshots.host_id,
 					elem->>'ip' AS ip,
-					elem->>'type' AS type,
+					COALESCE(NULLIF(elem->>'type', ''), 'ban') AS type,
 					elem->>'reason' AS reason,
 					elem->>'origin' AS origin,
 					elem->>'country' AS country,
