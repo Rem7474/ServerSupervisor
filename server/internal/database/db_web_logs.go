@@ -634,9 +634,12 @@ func (db *DB) GetWebLogsSummary(since time.Time, hostID string, source string) (
 				return nil, err
 			}
 			entry := map[string]any{"ip": ip}
+			// Always include type with default 'ban'
+			typeStr := "ban"
 			if decisionType.Valid && decisionType.String != "" {
-				entry["type"] = decisionType.String
+				typeStr = decisionType.String
 			}
+			entry["type"] = typeStr
 			if reason.Valid && reason.String != "" {
 				entry["reason"] = reason.String
 			}

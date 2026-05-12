@@ -434,8 +434,7 @@
                   <td>
                     <span
                       class="badge"
-                      :class="decisionBadgeClass(entry.type || 'ban', entry.blocked_until)"
-                      :title="`type='${entry.type}' until='${entry.blocked_until}'`"
+                      :class="decisionBadgeClass(entry.type, entry.blocked_until)"
                     >{{ decisionLabel(entry.type) }}</span>
                   </td>
                   <td class="small text-secondary">
