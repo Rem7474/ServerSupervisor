@@ -455,7 +455,10 @@
                   >
                     {{ entry.as_name ? truncate(entry.as_name, 28) : '—' }}
                   </td>
-                  <td class="small">
+                  <td
+                    class="small"
+                    :title="`Raw: ${entry.blocked_until || 'undefined'}`"
+                  >
                     {{ formatBlockedUntil(entry.blocked_until) }}
                   </td>
                   <td class="text-end">
@@ -623,15 +626,22 @@ function truncate(s: string, max: number): string {
 function formatBlockedUntil(blockedUntil?: string): string {
   if (!blockedUntil) return 'Bloquée'
   const d = new Date(blockedUntil)
-  if (Number.isNaN(d.getTime())) return 'Bloquée'
+  if (Number.isNaN(d.getTime())) return `Bloquée (date invalide: ${blockedUntil})`
   const now = new Date()
   if (d <= now) return 'Bloquée (permanent)'
   const diff = d.getTime() - now.getTime()
-  const hours = Math.floor(diff / 3600000)
-  const days = Math.floor(hours / 24)
-  if (days > 0) return `Bloquée jusqu'à ${d.toLocaleString()}`
-  if (hours > 0) return `Bloquée ${hours}h`
-  return 'Bloquée (moins d\'une heure)'
+  const totalSeconds = Math.floor(diff / 1000)
+  const seconds = totalSeconds % 60
+  const totalMinutes = Math.floor(totalSeconds / 60)
+  const minutes = totalMinutes % 60
+  const totalHours = Math.floor(totalMinutes / 60)
+  const hours = totalHours % 24
+  const days = Math.floor(totalHours / 24)
+  
+  if (days > 0) return `Bloquée ${days}j ${hours}h`
+  if (totalHours > 0) return `Bloquée ${totalHours}h ${minutes}m`
+  if (totalMinutes > 0) return `Bloquée ${totalMinutes}m`
+  return `Bloquée ${seconds}s`
 }
 
 async function loadThreats() {
