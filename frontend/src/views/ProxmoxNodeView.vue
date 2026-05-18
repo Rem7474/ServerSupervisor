@@ -1243,7 +1243,7 @@
 <script setup>
 import { ref, computed, shallowRef, onMounted, onUnmounted, defineAsyncComponent, defineComponent, h } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-const CommandLogPanel = defineAsyncComponent(() => import('../components/CommandLogPanel.vue'))
+const CommandLogPanel = defineAsyncComponent(() => import('../components/host/CommandLogPanel.vue'))
 const ProxmoxNodeChartsPanel = defineAsyncComponent(() => import('../components/proxmox/ProxmoxNodeChartsPanel.vue'))
 import SortableHeader from '../components/common/SortableHeader.vue'
 import api from '../api'

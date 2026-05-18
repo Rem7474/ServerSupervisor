@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"time"
@@ -69,7 +70,7 @@ func (h *ProxmoxHandler) pollOne(conn database.ProxmoxConnectionFull) {
 
 // ListConnections returns all connections (no secrets).
 func (h *ProxmoxHandler) ListConnections(c *gin.Context) {
-	conns, err := h.db.ListProxmoxConnections()
+	conns, err := h.db.ListProxmoxConnections(context.Background())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -89,7 +90,7 @@ func (h *ProxmoxHandler) CreateConnection(c *gin.Context) {
 		return
 	}
 
-	id, err := h.db.CreateProxmoxConnection(
+	id, err := h.db.CreateProxmoxConnection(context.Background(), 
 		req.Name, req.APIURL, req.TokenID, req.TokenSecret,
 		req.InsecureSkipVerify, req.Enabled, req.PollIntervalSec,
 	)
@@ -98,13 +99,13 @@ func (h *ProxmoxHandler) CreateConnection(c *gin.Context) {
 		return
 	}
 
-	conn, _ := h.db.GetProxmoxConnectionByID(id)
+	conn, _ := h.db.GetProxmoxConnectionByID(context.Background(), id)
 	c.JSON(http.StatusCreated, conn)
 }
 
 // GetConnection returns one connection (no secret).
 func (h *ProxmoxHandler) GetConnection(c *gin.Context) {
-	conn, err := h.db.GetProxmoxConnectionByID(c.Param("id"))
+	conn, err := h.db.GetProxmoxConnectionByID(context.Background(), c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -119,7 +120,7 @@ func (h *ProxmoxHandler) GetConnection(c *gin.Context) {
 // UpdateConnection updates a connection. Empty token_secret keeps the existing one.
 func (h *ProxmoxHandler) UpdateConnection(c *gin.Context) {
 	id := c.Param("id")
-	existing, err := h.db.GetProxmoxConnectionByID(id)
+	existing, err := h.db.GetProxmoxConnectionByID(context.Background(), id)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -135,7 +136,7 @@ func (h *ProxmoxHandler) UpdateConnection(c *gin.Context) {
 		return
 	}
 
-	if err := h.db.UpdateProxmoxConnection(
+	if err := h.db.UpdateProxmoxConnection(context.Background(), 
 		id, req.Name, req.APIURL, req.TokenID, req.TokenSecret,
 		req.InsecureSkipVerify, req.Enabled, req.PollIntervalSec,
 	); err != nil {
@@ -143,14 +144,14 @@ func (h *ProxmoxHandler) UpdateConnection(c *gin.Context) {
 		return
 	}
 
-	conn, _ := h.db.GetProxmoxConnectionByID(id)
+	conn, _ := h.db.GetProxmoxConnectionByID(context.Background(), id)
 	c.JSON(http.StatusOK, conn)
 }
 
 // DeleteConnection removes a connection (and cascade-deletes its nodes/guests/storages).
 func (h *ProxmoxHandler) DeleteConnection(c *gin.Context) {
 	id := c.Param("id")
-	existing, err := h.db.GetProxmoxConnectionByID(id)
+	existing, err := h.db.GetProxmoxConnectionByID(context.Background(), id)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -159,7 +160,7 @@ func (h *ProxmoxHandler) DeleteConnection(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "connection not found"})
 		return
 	}
-	if err := h.db.DeleteProxmoxConnection(id); err != nil {
+	if err := h.db.DeleteProxmoxConnection(context.Background(), id); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -190,12 +191,12 @@ func (h *ProxmoxHandler) TestConnection(c *gin.Context) {
 // TestConnectionByID tests an existing saved connection (uses stored secret).
 func (h *ProxmoxHandler) TestConnectionByID(c *gin.Context) {
 	id := c.Param("id")
-	conn, err := h.db.GetProxmoxConnectionByID(id)
+	conn, err := h.db.GetProxmoxConnectionByID(context.Background(), id)
 	if err != nil || conn == nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "connection not found"})
 		return
 	}
-	secret, err := h.db.GetProxmoxTokenSecret(id)
+	secret, err := h.db.GetProxmoxTokenSecret(context.Background(), id)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -211,7 +212,7 @@ func (h *ProxmoxHandler) TestConnectionByID(c *gin.Context) {
 // PollNow triggers an immediate poll for one connection.
 func (h *ProxmoxHandler) PollNow(c *gin.Context) {
 	id := c.Param("id")
-	conns, err := h.db.GetEnabledProxmoxConnections()
+	conns, err := h.db.GetEnabledProxmoxConnections(context.Background())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -230,7 +231,7 @@ func (h *ProxmoxHandler) PollNow(c *gin.Context) {
 
 // GetSummary returns aggregate stats (connection/node/guest/storage counts).
 func (h *ProxmoxHandler) GetSummary(c *gin.Context) {
-	summary, err := h.db.GetProxmoxSummary()
+	summary, err := h.db.GetProxmoxSummary(context.Background())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

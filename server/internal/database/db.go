@@ -1,6 +1,7 @@
 package database
 
 import (
+	"context"
 	"database/sql"
 	"embed"
 	"fmt"
@@ -100,19 +101,23 @@ func New(cfg *config.Config) (*DB, error) {
 func (db *DB) Close() error { return db.conn.Close() }
 func (db *DB) Ping() error  { return db.conn.Ping() }
 
-// Query executes a query that returns rows.
-func (db *DB) Query(query string, args ...interface{}) (*sql.Rows, error) {
-	return db.conn.Query(query, args...)
+// Query executes a query that returns rows. The provided context controls
+// cancellation and per-request timeouts: when ctx is cancelled the in-flight
+// statement is aborted and Postgres returns an error rather than blocking.
+func (db *DB) Query(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
+	return db.conn.QueryContext(ctx, query, args...)
 }
 
 // QueryRow executes a query that is expected to return at most one row.
-func (db *DB) QueryRow(query string, args ...interface{}) *sql.Row {
-	return db.conn.QueryRow(query, args...)
+// The provided context propagates cancellation to the database driver.
+func (db *DB) QueryRow(ctx context.Context, query string, args ...interface{}) *sql.Row {
+	return db.conn.QueryRowContext(ctx, query, args...)
 }
 
-// Exec executes a query without returning any rows.
-func (db *DB) Exec(query string, args ...interface{}) (sql.Result, error) {
-	return db.conn.Exec(query, args...)
+// Exec executes a query without returning any rows. The provided context
+// propagates cancellation to the database driver.
+func (db *DB) Exec(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
+	return db.conn.ExecContext(ctx, query, args...)
 }
 
 // migrate runs all embedded SQL migration files in alphabetical order.

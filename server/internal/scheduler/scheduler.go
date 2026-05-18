@@ -4,6 +4,7 @@
 package scheduler
 
 import (
+	"context"
 	"log"
 	"sync"
 	"time"
@@ -15,9 +16,9 @@ import (
 
 // DB is the subset of database.DB methods needed by the scheduler.
 type DB interface {
-	GetAllScheduledTasks() ([]models.ScheduledTask, error)
-	UpdateScheduledTaskRun(id, status string, lastRunAt, nextRunAt time.Time) error
-	LinkCommandToScheduledTask(commandID, taskID string) error
+	GetAllScheduledTasks(ctx context.Context) ([]models.ScheduledTask, error)
+	UpdateScheduledTaskRun(ctx context.Context, id, status string, lastRunAt, nextRunAt time.Time) error
+	LinkCommandToScheduledTask(ctx context.Context, commandID, taskID string) error
 }
 
 // TaskScheduler runs scheduled tasks using robfig/cron.
@@ -41,7 +42,7 @@ func New(db DB, dispatcher *dispatch.Dispatcher) *TaskScheduler {
 
 // Start loads all enabled tasks from DB and registers them with the cron runner.
 func (s *TaskScheduler) Start() {
-	tasks, err := s.db.GetAllScheduledTasks()
+	tasks, err := s.db.GetAllScheduledTasks(context.Background())
 	if err != nil {
 		log.Printf("[scheduler] failed to load tasks: %v", err)
 	} else {
@@ -131,15 +132,15 @@ func (s *TaskScheduler) makeJob(t models.ScheduledTask) func() {
 			log.Printf("[scheduler] task %s (%s): failed to create command: %v", t.ID, t.Name, err)
 			now := time.Now()
 			next := s.NextRun(t.ID)
-			_ = s.db.UpdateScheduledTaskRun(t.ID, "failed", now, next)
+			_ = s.db.UpdateScheduledTaskRun(context.Background(), t.ID, "failed", now, next)
 			return
 		}
-		if err := s.db.LinkCommandToScheduledTask(result.Command.ID, t.ID); err != nil {
+		if err := s.db.LinkCommandToScheduledTask(context.Background(), result.Command.ID, t.ID); err != nil {
 			log.Printf("[scheduler] task %s: failed to link command: %v", t.ID, err)
 		}
 		now := time.Now()
 		next := s.NextRun(t.ID)
-		if err := s.db.UpdateScheduledTaskRun(t.ID, "pending", now, next); err != nil {
+		if err := s.db.UpdateScheduledTaskRun(context.Background(), t.ID, "pending", now, next); err != nil {
 			log.Printf("[scheduler] task %s: failed to update run metadata: %v", t.ID, err)
 		}
 		log.Printf("[scheduler] task %s (%s): queued command %s on host %s", t.ID, t.Name, result.Command.ID, t.HostID)

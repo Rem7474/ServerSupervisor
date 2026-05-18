@@ -373,7 +373,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useWebSocket } from '../composables/useWebSocket'
 import WsStatusBar from '../components/WsStatusBar.vue'
-import NetworkGraph from '../components/NetworkGraph.vue'
+import NetworkGraph from '../components/network/NetworkGraph.vue'
 import NetworkNodeDetail from '../components/network/NetworkNodeDetail.vue'
 import NetworkPortList from '../components/network/NetworkPortList.vue'
 import NetworkTopologyConfig from '../components/network/NetworkTopologyConfig.vue'

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -176,35 +177,35 @@ func validateProxmoxScopeExists(db *database.DB, scope *models.ProxmoxMetricScop
 
 	if scope.ScopeMode == "connection" {
 		var exists bool
-		if err := db.QueryRow(`SELECT EXISTS(SELECT 1 FROM proxmox_connections WHERE id = $1)`, scope.ConnectionID).Scan(&exists); err != nil || !exists {
+		if err := db.QueryRow(context.Background(), `SELECT EXISTS(SELECT 1 FROM proxmox_connections WHERE id = $1)`, scope.ConnectionID).Scan(&exists); err != nil || !exists {
 			return errors.New("Connexion Proxmox introuvable pour ce scope.")
 		}
 	}
 
 	if scope.ScopeMode == "node" {
 		var exists bool
-		if err := db.QueryRow(`SELECT EXISTS(SELECT 1 FROM proxmox_nodes WHERE id = $1)`, scope.NodeID).Scan(&exists); err != nil || !exists {
+		if err := db.QueryRow(context.Background(), `SELECT EXISTS(SELECT 1 FROM proxmox_nodes WHERE id = $1)`, scope.NodeID).Scan(&exists); err != nil || !exists {
 			return errors.New("Noeud Proxmox introuvable pour ce scope.")
 		}
 	}
 
 	if scope.ScopeMode == "storage" {
 		var exists bool
-		if err := db.QueryRow(`SELECT EXISTS(SELECT 1 FROM proxmox_storages WHERE id = $1)`, scope.StorageID).Scan(&exists); err != nil || !exists {
+		if err := db.QueryRow(context.Background(), `SELECT EXISTS(SELECT 1 FROM proxmox_storages WHERE id = $1)`, scope.StorageID).Scan(&exists); err != nil || !exists {
 			return errors.New("Stockage Proxmox introuvable pour ce scope.")
 		}
 	}
 
 	if scope.ScopeMode == "guest" {
 		var exists bool
-		if err := db.QueryRow(`SELECT EXISTS(SELECT 1 FROM proxmox_guests WHERE id = $1)`, scope.GuestID).Scan(&exists); err != nil || !exists {
+		if err := db.QueryRow(context.Background(), `SELECT EXISTS(SELECT 1 FROM proxmox_guests WHERE id = $1)`, scope.GuestID).Scan(&exists); err != nil || !exists {
 			return errors.New("VM/LXC Proxmox introuvable pour ce scope.")
 		}
 	}
 
 	if scope.ScopeMode == "disk" {
 		var exists bool
-		if err := db.QueryRow(`SELECT EXISTS(SELECT 1 FROM proxmox_disks WHERE id = $1)`, scope.DiskID).Scan(&exists); err != nil || !exists {
+		if err := db.QueryRow(context.Background(), `SELECT EXISTS(SELECT 1 FROM proxmox_disks WHERE id = $1)`, scope.DiskID).Scan(&exists); err != nil || !exists {
 			return errors.New("Disque physique Proxmox introuvable pour ce scope.")
 		}
 	}
@@ -230,7 +231,7 @@ func (h *AlertRulesHandler) proxmoxScopeTestTarget(scope *models.ProxmoxMetricSc
 			return "proxmox:global", "Cluster Proxmox"
 		}
 		var connName string
-		if err := h.db.QueryRow(`SELECT name FROM proxmox_connections WHERE id = $1`, scope.ConnectionID).Scan(&connName); err == nil && strings.TrimSpace(connName) != "" {
+		if err := h.db.QueryRow(context.Background(), `SELECT name FROM proxmox_connections WHERE id = $1`, scope.ConnectionID).Scan(&connName); err == nil && strings.TrimSpace(connName) != "" {
 			return "proxmox:connection:" + scope.ConnectionID, "Connexion: " + connName
 		}
 		return "proxmox:connection:" + scope.ConnectionID, "Connexion: " + scope.ConnectionID
@@ -239,7 +240,7 @@ func (h *AlertRulesHandler) proxmoxScopeTestTarget(scope *models.ProxmoxMetricSc
 			return "proxmox:global", "Cluster Proxmox"
 		}
 		var connName, nodeName string
-		if err := h.db.QueryRow(`
+		if err := h.db.QueryRow(context.Background(), `
 			SELECT COALESCE(c.name, ''), n.node_name
 			FROM proxmox_nodes n
 			LEFT JOIN proxmox_connections c ON c.id = n.connection_id
@@ -255,7 +256,7 @@ func (h *AlertRulesHandler) proxmoxScopeTestTarget(scope *models.ProxmoxMetricSc
 			return "proxmox:global", "Cluster Proxmox"
 		}
 		var connName, nodeName, storageName string
-		if err := h.db.QueryRow(`
+		if err := h.db.QueryRow(context.Background(), `
 			SELECT COALESCE(c.name, ''), s.node_name, s.storage_name
 			FROM proxmox_storages s
 			LEFT JOIN proxmox_connections c ON c.id = s.connection_id
@@ -272,7 +273,7 @@ func (h *AlertRulesHandler) proxmoxScopeTestTarget(scope *models.ProxmoxMetricSc
 		}
 		var connName, nodeName, guestName, guestType string
 		var vmid int
-		if err := h.db.QueryRow(`
+		if err := h.db.QueryRow(context.Background(), `
 			SELECT COALESCE(c.name, ''), g.node_name, g.name, g.guest_type, g.vmid
 			FROM proxmox_guests g
 			LEFT JOIN proxmox_connections c ON c.id = g.connection_id
@@ -289,7 +290,7 @@ func (h *AlertRulesHandler) proxmoxScopeTestTarget(scope *models.ProxmoxMetricSc
 			return "proxmox:global", "Cluster Proxmox"
 		}
 		var connName, nodeName, devPath, model string
-		if err := h.db.QueryRow(`
+		if err := h.db.QueryRow(context.Background(), `
 			SELECT COALESCE(c.name, ''), d.node_name, d.dev_path, d.model
 			FROM proxmox_disks d
 			LEFT JOIN proxmox_connections c ON c.id = d.connection_id
@@ -317,7 +318,7 @@ func (h *AlertRulesHandler) loadProxmoxScopeOptions() (modes []string, connectio
 	guests = []alertScopeOption{}
 	disks = []alertScopeOption{}
 
-	if rows, err := h.db.Query(`SELECT id, name FROM proxmox_connections ORDER BY name`); err == nil {
+	if rows, err := h.db.Query(context.Background(), `SELECT id, name FROM proxmox_connections ORDER BY name`); err == nil {
 		defer func() { _ = rows.Close() }()
 		for rows.Next() {
 			var id, name string
@@ -327,7 +328,7 @@ func (h *AlertRulesHandler) loadProxmoxScopeOptions() (modes []string, connectio
 		}
 	}
 
-	if rows, err := h.db.Query(`
+	if rows, err := h.db.Query(context.Background(), `
 		SELECT n.id, COALESCE(c.name,'?') || ' / ' || n.node_name
 		FROM proxmox_nodes n
 		LEFT JOIN proxmox_connections c ON c.id = n.connection_id
@@ -341,7 +342,7 @@ func (h *AlertRulesHandler) loadProxmoxScopeOptions() (modes []string, connectio
 		}
 	}
 
-	if rows, err := h.db.Query(`
+	if rows, err := h.db.Query(context.Background(), `
 		SELECT s.id, COALESCE(c.name,'?') || ' / ' || s.node_name || ' / ' || s.storage_name
 		FROM proxmox_storages s
 		LEFT JOIN proxmox_connections c ON c.id = s.connection_id
@@ -355,7 +356,7 @@ func (h *AlertRulesHandler) loadProxmoxScopeOptions() (modes []string, connectio
 		}
 	}
 
-	if rows, err := h.db.Query(`
+	if rows, err := h.db.Query(context.Background(), `
 		SELECT g.id,
 		       COALESCE(c.name,'?') || ' / ' || g.node_name || ' / ' || COALESCE(NULLIF(g.name,''), '(sans nom)') || ' (' || UPPER(g.guest_type) || ':' || g.vmid || ')'
 		FROM proxmox_guests g
@@ -370,7 +371,7 @@ func (h *AlertRulesHandler) loadProxmoxScopeOptions() (modes []string, connectio
 		}
 	}
 
-	if rows, err := h.db.Query(`
+	if rows, err := h.db.Query(context.Background(), `
 		SELECT d.id,
 		       COALESCE(c.name,'?') || ' / ' || d.node_name || ' / ' ||
 		       CASE
@@ -489,7 +490,7 @@ func (h *AlertRulesHandler) GetHostAlertMetrics(c *gin.Context) {
 	}
 
 	// Fetch the host to get collectors
-	host, err := h.db.GetHost(hostID)
+	host, err := h.db.GetHost(context.Background(), hostID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "host not found"})
 		return
@@ -610,7 +611,7 @@ threshold_clear_warn, threshold_clear_crit, duration_seconds, actions, last_fire
 
 // ListAlertRules returns all alert rules
 func (h *AlertRulesHandler) ListAlertRules(c *gin.Context) {
-	rows, err := h.db.Query(`SELECT` + alertRuleSelectCols + `
+	rows, err := h.db.Query(context.Background(), `SELECT` + alertRuleSelectCols + `
 FROM alert_rules ORDER BY created_at DESC`)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -633,7 +634,7 @@ FROM alert_rules ORDER BY created_at DESC`)
 // GetAlertRule returns a single alert rule by ID
 func (h *AlertRulesHandler) GetAlertRule(c *gin.Context) {
 	id := c.Param("id")
-	row := h.db.QueryRow(`SELECT`+alertRuleSelectCols+`
+	row := h.db.QueryRow(context.Background(), `SELECT`+alertRuleSelectCols+`
 FROM alert_rules WHERE id = $1`, id)
 
 	rule, err := scanAlertRule(row)
@@ -701,7 +702,7 @@ func (h *AlertRulesHandler) CreateAlertRule(c *gin.Context) {
 	actionsJSON, _ := json.Marshal(rule.Actions)
 	proxmoxScopeJSON, _ := json.Marshal(rule.ProxmoxScope)
 
-	err := h.db.QueryRow(`
+	err := h.db.QueryRow(context.Background(), `
 INSERT INTO alert_rules (name, enabled, source_type, host_id, proxmox_scope, metric, operator, threshold_warn, threshold_crit, threshold_clear_warn, threshold_clear_crit, duration_seconds, actions)
 VALUES ($1, $2, $3, $4, CAST($5 AS JSONB), $6, $7, $8, $9, $10, $11, $12, CAST($13 AS JSONB))
 RETURNING id, created_at, updated_at`,
@@ -726,7 +727,7 @@ func (h *AlertRulesHandler) UpdateAlertRule(c *gin.Context) {
 		return
 	}
 
-	row := h.db.QueryRow(`SELECT`+alertRuleSelectCols+`
+	row := h.db.QueryRow(context.Background(), `SELECT`+alertRuleSelectCols+`
 FROM alert_rules WHERE id = $1`, id)
 	existing, err := scanAlertRule(row)
 	if err == sql.ErrNoRows {
@@ -890,7 +891,7 @@ FROM alert_rules WHERE id = $1`, id)
 	}
 	query += " WHERE id = $" + strconv.Itoa(argCount)
 
-	result, err := h.db.Exec(query, args...)
+	result, err := h.db.Exec(context.Background(), query, args...)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -903,7 +904,7 @@ FROM alert_rules WHERE id = $1`, id)
 	if req.Enabled != nil && !next.Enabled {
 		ruleID, parseErr := strconv.ParseInt(id, 10, 64)
 		if parseErr == nil {
-			if _, err := h.db.ResolveOpenAlertIncidentsByRule(ruleID); err != nil {
+			if _, err := h.db.ResolveOpenAlertIncidentsByRule(context.Background(), ruleID); err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "Regle mise a jour, mais echec de resolution des incidents ouverts."})
 				return
 			}
@@ -915,7 +916,7 @@ FROM alert_rules WHERE id = $1`, id)
 // DeleteAlertRule deletes an alert rule
 func (h *AlertRulesHandler) DeleteAlertRule(c *gin.Context) {
 	id := c.Param("id")
-	result, err := h.db.Exec("DELETE FROM alert_rules WHERE id = $1", id)
+	result, err := h.db.Exec(context.Background(), "DELETE FROM alert_rules WHERE id = $1", id)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -1025,7 +1026,7 @@ func (h *AlertRulesHandler) TestAlertRule(c *gin.Context) {
 			HasData:      ok,
 		})
 	} else {
-		hosts, err := h.db.GetAllHosts()
+		hosts, err := h.db.GetAllHosts(context.Background())
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch hosts"})
 			return
@@ -1138,7 +1139,7 @@ func (h *AlertRulesHandler) ListIncidents(c *gin.Context) {
 	}
 
 	offset := (page - 1) * limit
-	incidents, err := h.db.GetAlertIncidents(limit, offset)
+	incidents, err := h.db.GetAlertIncidents(context.Background(), limit, offset)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch incidents"})
 		return

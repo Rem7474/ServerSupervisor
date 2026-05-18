@@ -273,7 +273,7 @@
           Sessions actives
         </h3>
         <button
-          v-if="auth.refreshToken"
+          v-if="auth.isAuthenticated"
           class="btn btn-sm btn-outline-danger"
           :disabled="revokeLoading"
           @click="revokeOtherSessions"
@@ -514,12 +514,12 @@ async function disableMFA() {
 }
 
 async function revokeOtherSessions() {
-  if (!auth.refreshToken) return
+  if (!auth.isAuthenticated) return
   revokeLoading.value = true
   revokeError.value = ''
   revokeSuccess.value = ''
   try {
-    await apiClient.revokeAllSessions(auth.refreshToken)
+    await apiClient.revokeAllSessions()
     revokeSuccess.value = 'Toutes les autres sessions ont été révoquées.'
     await loadLoginEvents()
   } catch (e) {

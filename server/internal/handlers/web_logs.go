@@ -1,6 +1,7 @@
 package handlers
 
-import (
+import (	"context"
+
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -158,14 +159,14 @@ func (h *AuthHandler) GetWebLogsSummary(c *gin.Context) {
 	}
 
 	since := time.Now().Add(-period)
-	summary, err := h.db.GetWebLogsSummary(since, hostID, source)
+	summary, err := h.db.GetWebLogsSummary(context.Background(), since, hostID, source)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to aggregate web logs"})
 		return
 	}
 
 	if traffic, ok := summary["traffic"].(map[string]any); ok {
-		topIPs, err := h.db.GetWebLogsTopClientIPs(since, hostID, source, 120)
+		topIPs, err := h.db.GetWebLogsTopClientIPs(context.Background(), since, hostID, source, 120)
 		if err == nil {
 			traffic["top_client_ips"] = topIPs
 
@@ -195,12 +196,12 @@ func (h *AuthHandler) GetWebLogsSummary(c *gin.Context) {
 	now := time.Now().UTC()
 	currentSince := now.Add(-period)
 	previousSince := currentSince.Add(-period)
-	currentKPI, err := h.db.GetWebLogsKPIWindow(currentSince, now, hostID, source)
+	currentKPI, err := h.db.GetWebLogsKPIWindow(context.Background(), currentSince, now, hostID, source)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to compute KPI comparison"})
 		return
 	}
-	previousKPI, err := h.db.GetWebLogsKPIWindow(previousSince, currentSince, hostID, source)
+	previousKPI, err := h.db.GetWebLogsKPIWindow(context.Background(), previousSince, currentSince, hostID, source)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to compute KPI comparison"})
 		return
@@ -280,7 +281,7 @@ func (h *AuthHandler) GetWebLogsIPTimeline(c *gin.Context) {
 	}
 
 	since := time.Now().Add(-period)
-	rows, err := h.db.GetIPTimeline(ip, since, hostID, limit)
+	rows, err := h.db.GetIPTimeline(context.Background(), ip, since, hostID, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load IP timeline"})
 		return
@@ -325,7 +326,7 @@ func (h *AuthHandler) GetWebLogsDomainDetails(c *gin.Context) {
 	}
 
 	since := time.Now().Add(-period)
-	data, err := h.db.GetDomainDetails(domain, since, hostID, source, limit)
+	data, err := h.db.GetDomainDetails(context.Background(), domain, since, hostID, source, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load domain details"})
 		return
@@ -374,7 +375,7 @@ func (h *AuthHandler) GetWebLogsTimeseries(c *gin.Context) {
 	}
 
 	since := time.Now().Add(-period)
-	points, err := h.db.GetWebLogsTimeseries(since, hostID, source, bucket)
+	points, err := h.db.GetWebLogsTimeseries(context.Background(), since, hostID, source, bucket)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load web logs timeseries"})
 		return
@@ -414,7 +415,7 @@ func (h *AuthHandler) GetWebLogsLive(c *gin.Context) {
 		}
 	}
 
-	rows, err := h.db.GetWebLogsLive(hostID, source, limit)
+	rows, err := h.db.GetWebLogsLive(context.Background(), hostID, source, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load web logs live feed"})
 		return

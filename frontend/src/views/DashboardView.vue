@@ -520,7 +520,7 @@
 import { computed, defineAsyncComponent, ref, watch } from 'vue'
 import RelativeTime from '../components/RelativeTime.vue'
 import WsStatusBar from '../components/WsStatusBar.vue'
-import ProxmoxClusterCard from '../components/ProxmoxClusterCard.vue'
+import ProxmoxClusterCard from '../components/proxmox/ProxmoxClusterCard.vue'
 import DashboardKPIs from '../components/dashboard/DashboardKPIs.vue'
 import DashboardDockerVersions from '../components/dashboard/DashboardDockerVersions.vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'

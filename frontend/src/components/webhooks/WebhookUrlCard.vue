@@ -197,7 +197,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { useConfirmDialog } from '../composables/useConfirmDialog'
+import { useConfirmDialog } from '../../composables/useConfirmDialog'
 import api from '../api'
 
 const props = defineProps({

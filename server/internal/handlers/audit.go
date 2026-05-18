@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 
@@ -43,7 +44,7 @@ func (h *AuditHandler) GetAuditLogs(c *gin.Context) {
 
 	offset := (page - 1) * limit
 
-	logs, err := h.db.GetAuditLogs(limit, offset)
+	logs, err := h.db.GetAuditLogs(context.Background(), limit, offset)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch audit logs"})
 		return
@@ -76,7 +77,7 @@ func (h *AuditHandler) GetAuditLogsByHost(c *gin.Context) {
 		}
 	}
 
-	logs, err := h.db.GetAuditLogsByHost(hostID, limit)
+	logs, err := h.db.GetAuditLogsByHost(context.Background(), hostID, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch audit logs"})
 		return
@@ -104,7 +105,7 @@ func (h *AuditHandler) GetMyAuditLogs(c *gin.Context) {
 		}
 	}
 
-	logs, err := h.db.GetAuditLogsByUser(username, limit)
+	logs, err := h.db.GetAuditLogsByUser(context.Background(), username, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch logs"})
 		return
@@ -141,12 +142,12 @@ func (h *AuditHandler) GetCommandsHistory(c *gin.Context) {
 		Status: c.Query("status"),
 	}
 
-	cmds, err := h.db.GetAllRemoteCommands(limit, offset, f)
+	cmds, err := h.db.GetAllRemoteCommands(context.Background(), limit, offset, f)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch commands history"})
 		return
 	}
-	total, _ := h.db.CountAllRemoteCommands(f)
+	total, _ := h.db.CountAllRemoteCommands(context.Background(), f)
 	if cmds == nil {
 		cmds = []database.RemoteCommandWithHost{}
 	}
@@ -168,7 +169,7 @@ func (h *AuditHandler) GetCommandByID(c *gin.Context) {
 		return
 	}
 
-	cmd, err := h.db.GetRemoteCommandByID(id)
+	cmd, err := h.db.GetRemoteCommandByID(context.Background(), id)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "command not found"})
 		return
@@ -198,7 +199,7 @@ func (h *AuditHandler) GetAuditLogsByUser(c *gin.Context) {
 		}
 	}
 
-	logs, err := h.db.GetAuditLogsByUser(username, limit)
+	logs, err := h.db.GetAuditLogsByUser(context.Background(), username, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch logs"})
 		return

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
 	"net/http"
 	"strconv"
@@ -26,7 +27,7 @@ func (h *UserHandler) ListUsers(c *gin.Context) {
 		return
 	}
 
-	users, err := h.db.GetUsers()
+	users, err := h.db.GetUsers(context.Background())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch users"})
 		return
@@ -65,7 +66,7 @@ func (h *UserHandler) UpdateUserRole(c *gin.Context) {
 		return
 	}
 
-	if err := h.db.UpdateUserRole(id, req.Role); err != nil {
+	if err := h.db.UpdateUserRole(context.Background(), id, req.Role); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update user role"})
 		return
 	}
@@ -89,7 +90,7 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 		return
 	}
 
-	if _, err := h.db.GetUserByUsername(req.Username); err == nil {
+	if _, err := h.db.GetUserByUsername(context.Background(), req.Username); err == nil {
 		c.JSON(http.StatusConflict, gin.H{"error": "username already exists"})
 		return
 	} else if err != sql.ErrNoRows {
@@ -116,7 +117,7 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 		return
 	}
 
-	if err := h.db.CreateUser(req.Username, hash, req.Role); err != nil {
+	if err := h.db.CreateUser(context.Background(), req.Username, hash, req.Role); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create user"})
 		return
 	}
@@ -136,7 +137,7 @@ func (h *UserHandler) DeleteUser(c *gin.Context) {
 		return
 	}
 
-	if err := h.db.DeleteUser(id); err != nil {
+	if err := h.db.DeleteUser(context.Background(), id); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete user"})
 		return
 	}

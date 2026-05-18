@@ -108,7 +108,7 @@ export function useHostDetail() {
   const selectedCandidate = ref('')
 
   const { liveCommand, showConsole, openCommand: _openCommand, closeConsole, updateCommand } = useHostCommandConsole()
-  const { openCommandStream, closeStream } = useCommandStream({ token: () => auth.token })
+  const { openCommandStream, closeStream } = useCommandStream()
 
   function syncUUFormFromStatus(status: AnyRecord | null): void {
     if (!status) return

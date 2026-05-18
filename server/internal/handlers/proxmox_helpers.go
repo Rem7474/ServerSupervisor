@@ -1,6 +1,7 @@
 package handlers
 
-import (
+import (	"context"
+
 	"fmt"
 	"strconv"
 
@@ -20,7 +21,7 @@ func parseVMID(s string) int {
 // resolveSecret returns the token secret and connection details for a connection ID.
 // It reads the secret from GetEnabledProxmoxConnections (which includes TokenSecret).
 func (h *ProxmoxHandler) resolveSecret(connectionID string) (secret string, conn *models.ProxmoxConnection, err error) {
-	conns, err := h.db.GetEnabledProxmoxConnections()
+	conns, err := h.db.GetEnabledProxmoxConnections(context.Background())
 	if err != nil {
 		return "", nil, err
 	}
@@ -33,7 +34,7 @@ func (h *ProxmoxHandler) resolveSecret(connectionID string) (secret string, conn
 	if secret == "" {
 		return "", nil, fmt.Errorf("connection not found or disabled")
 	}
-	c, err := h.db.GetProxmoxConnectionByID(connectionID)
+	c, err := h.db.GetProxmoxConnectionByID(context.Background(), connectionID)
 	if err != nil || c == nil {
 		return "", nil, fmt.Errorf("failed to load connection")
 	}

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"crypto/tls"
 	"fmt"
 	"log"
@@ -84,7 +85,7 @@ func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 	}
 
 	save := func(key, value string) {
-		if err := h.db.SetSetting(key, value); err != nil {
+		if err := h.db.SetSetting(context.Background(), key, value); err != nil {
 			log.Printf("Failed to persist setting %s: %v", key, err)
 		}
 	}
@@ -118,7 +119,7 @@ func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 	h.cfg.OverrideFromDB(h.db)
 
 	user := c.GetString("username")
-	_, _ = h.db.CreateAuditLog(user, "update_settings", "", c.ClientIP(), "Settings updated via UI", "success")
+	_, _ = h.db.CreateAuditLog(context.Background(), user, "update_settings", "", c.ClientIP(), "Settings updated via UI", "success")
 
 	c.JSON(http.StatusOK, gin.H{"success": true, "message": "Paramètres mis à jour"})
 }
@@ -249,14 +250,14 @@ func (h *SettingsHandler) CleanupMetrics(c *gin.Context) {
 	user := c.GetString("username")
 	log.Printf("User %s triggered manual metrics cleanup", user)
 
-	deleted, err := h.db.CleanOldMetrics(h.cfg.MetricsRetentionDays)
+	deleted, err := h.db.CleanOldMetrics(context.Background(), h.cfg.MetricsRetentionDays)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Cleanup failed: %v", err)})
 		return
 	}
 
 	// Also trim old tracker tag digests (keep last 100 per tracker).
-	deletedDigests, digestErr := h.db.CleanupTrackerTagDigests(100)
+	deletedDigests, digestErr := h.db.CleanupTrackerTagDigests(context.Background(), 100)
 	if digestErr != nil {
 		log.Printf("CleanupMetrics: failed to trim tracker tag digests: %v", digestErr)
 	}
@@ -265,7 +266,7 @@ func (h *SettingsHandler) CleanupMetrics(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true, "message": message, "deleted": deleted, "deleted_digests": deletedDigests})
 
 	// Log the action
-	_, _ = h.db.CreateAuditLog(user, "cleanup_metrics", "", c.ClientIP(), message, "success")
+	_, _ = h.db.CreateAuditLog(context.Background(), user, "cleanup_metrics", "", c.ClientIP(), message, "success")
 }
 
 // CleanupAuditLogs triggers manual cleanup of old audit logs
@@ -277,7 +278,7 @@ func (h *SettingsHandler) CleanupAuditLogs(c *gin.Context) {
 	user := c.GetString("username")
 	log.Printf("User %s triggered manual audit logs cleanup", user)
 
-	deleted, err := h.db.CleanOldAuditLogs(h.cfg.AuditRetentionDays)
+	deleted, err := h.db.CleanOldAuditLogs(context.Background(), h.cfg.AuditRetentionDays)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Cleanup failed: %v", err)})
 		return
@@ -287,7 +288,7 @@ func (h *SettingsHandler) CleanupAuditLogs(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true, "message": message, "deleted": deleted})
 
 	// Log the action
-	_, _ = h.db.CreateAuditLog(user, "cleanup_audit_logs", "", c.ClientIP(), message, "success")
+	_, _ = h.db.CreateAuditLog(context.Background(), user, "cleanup_audit_logs", "", c.ClientIP(), message, "success")
 }
 
 // getDatabaseStatus returns current database statistics
@@ -296,9 +297,9 @@ func (h *SettingsHandler) getDatabaseStatus() gin.H {
 
 	var auditLogCount, metricsCount, hostsCount int64
 	if connected {
-		auditLogCount, _ = h.db.CountAuditLogs()
-		metricsCount, _ = h.db.CountMetrics()
-		hostsCount, _ = h.db.CountHosts()
+		auditLogCount, _ = h.db.CountAuditLogs(context.Background())
+		metricsCount, _ = h.db.CountMetrics(context.Background())
+		hostsCount, _ = h.db.CountHosts(context.Background())
 	}
 
 	return gin.H{

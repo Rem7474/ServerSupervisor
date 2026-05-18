@@ -1,6 +1,7 @@
 package alerts
 
 import (
+	"context"
 	"bytes"
 	"database/sql"
 	"encoding/json"
@@ -28,7 +29,7 @@ type NotificationPusher interface {
 }
 
 func EvaluateAlerts(db *database.DB, cfg *config.Config, dispatcher *dispatch.Dispatcher, pusher NotificationPusher) {
-	rules, err := db.GetAlertRules()
+	rules, err := db.GetAlertRules(context.Background())
 	if err != nil {
 		log.Printf("Alerts: failed to fetch rules: %v", err)
 		return
@@ -37,7 +38,7 @@ func EvaluateAlerts(db *database.DB, cfg *config.Config, dispatcher *dispatch.Di
 		return
 	}
 
-	hosts, err := db.GetAllHosts()
+	hosts, err := db.GetAllHosts(context.Background())
 	if err != nil {
 		log.Printf("Alerts: failed to fetch hosts: %v", err)
 		return
@@ -47,7 +48,7 @@ func EvaluateAlerts(db *database.DB, cfg *config.Config, dispatcher *dispatch.Di
 
 	for _, rule := range rules {
 		if !rule.Enabled {
-			resolvedCount, err := db.ResolveOpenAlertIncidentsByRule(rule.ID)
+			resolvedCount, err := db.ResolveOpenAlertIncidentsByRule(context.Background(), rule.ID)
 			if err != nil {
 				log.Printf("Alerts: failed to resolve open incidents for disabled rule#%d: %v", rule.ID, err)
 			} else if resolvedCount > 0 {
@@ -83,7 +84,7 @@ func EvaluateAlerts(db *database.DB, cfg *config.Config, dispatcher *dispatch.Di
 			currentSeveration := DetermineSeverity(rule, host, value)
 
 			// Get any open incident (regardless of severity)
-			inc, err := db.GetOpenAlertIncident(rule.ID, host.ID)
+			inc, err := db.GetOpenAlertIncident(context.Background(), rule.ID, host.ID)
 			if err != nil && err != sql.ErrNoRows {
 				log.Printf("Alerts: failed to check incidents: %v", err)
 				continue
@@ -93,14 +94,14 @@ func EvaluateAlerts(db *database.DB, cfg *config.Config, dispatcher *dispatch.Di
 				// Alert is triggered at current severity level
 				if err == sql.ErrNoRows || inc == nil {
 					// No existing incident - create new one with current severity
-					incID, err := db.CreateAlertIncident(rule.ID, host.ID, value, string(currentSeveration))
+					incID, err := db.CreateAlertIncident(context.Background(), rule.ID, host.ID, value, string(currentSeveration))
 					if err != nil {
 						log.Printf("Alerts: failed to create incident: %v", err)
 						continue
 					}
 					log.Printf("Alerts: FIRED %s host=%s value=%.2f severity=%s → incident#%d created", ruleName, host.Name, value, currentSeveration, incID)
 					details := fmt.Sprintf(`{"rule_id":%d,"metric":"%s","operator":"%s","value":%.4f,"severity":"%s"}`, rule.ID, rule.Metric, rule.Operator, value, currentSeveration)
-					_, _ = db.CreateAuditLog("alert-engine", "alert_fired", host.ID, "", details, "success")
+					_, _ = db.CreateAuditLog(context.Background(), "alert-engine", "alert_fired", host.ID, "", details, "success")
 					sendAlertNotifications(n, cfg, rule, host, value)
 					triggerAlertCommand(dispatcher, rule, host)
 					pushBrowserNotification(pusher, rule, host, value, incID)
@@ -112,7 +113,7 @@ func EvaluateAlerts(db *database.DB, cfg *config.Config, dispatcher *dispatch.Di
 					valueChanged := inc.Value != value
 					hostChanged := inc.HostID != host.ID
 					if severityChanged || valueChanged || hostChanged {
-						if err := db.UpdateAlertIncidentContext(inc.ID, host.ID, value, string(currentSeveration)); err != nil {
+						if err := db.UpdateAlertIncidentContext(context.Background(), inc.ID, host.ID, value, string(currentSeveration)); err != nil {
 							log.Printf("Alerts: failed to update incident context for incident#%d: %v", inc.ID, err)
 						} else if severityChanged {
 							log.Printf("Alerts: UPDATED %s host=%s value=%.2f severity %s→%s incident#%d", ruleName, host.Name, value, inc.Severity, currentSeveration, inc.ID)
@@ -122,10 +123,10 @@ func EvaluateAlerts(db *database.DB, cfg *config.Config, dispatcher *dispatch.Di
 			} else if inc != nil {
 				// No alert triggered - resolve if one exists
 				if ShouldResolveAlertSeverity(rule, host, value, AlertSeverity(inc.Severity)) {
-					_ = db.ResolveAlertIncident(inc.ID)
+					_ = db.ResolveAlertIncident(context.Background(), inc.ID)
 					log.Printf("Alerts: %s host=%s severity=%s — resolved incident#%d", ruleName, host.Name, inc.Severity, inc.ID)
 					details := fmt.Sprintf(`{"rule_id":%d,"incident_id":%d,"severity":"%s"}`, rule.ID, inc.ID, inc.Severity)
-					_, _ = db.CreateAuditLog("alert-engine", "alert_resolved", host.ID, "", details, "success")
+					_, _ = db.CreateAuditLog(context.Background(), "alert-engine", "alert_resolved", host.ID, "", details, "success")
 					broadcastIncidentUpdate(pusher, "resolved", rule, host.ID)
 				}
 			}
@@ -266,7 +267,7 @@ func buildAlertEvaluationTargets(db *database.DB, rule models.AlertRule, hosts [
 func buildGlobalProxmoxEntityTargets(db *database.DB, rule models.AlertRule) []models.Host {
 	switch rule.Metric {
 	case "proxmox_node_cpu_percent", "proxmox_node_memory_percent", "proxmox_node_cpu_temperature", "proxmox_node_fan_rpm", "proxmox_node_pending_updates", "proxmox_recent_failed_tasks_24h", "proxmox_auth_failures_recent":
-		nodes, err := db.ListProxmoxNodes()
+		nodes, err := db.ListProxmoxNodes(context.Background())
 		if err != nil {
 			return nil
 		}
@@ -281,7 +282,7 @@ func buildGlobalProxmoxEntityTargets(db *database.DB, rule models.AlertRule) []m
 		}
 		return targets
 	case "proxmox_guest_cpu_percent", "proxmox_guest_memory_percent":
-		guests, err := db.ListProxmoxGuests("", "", "")
+		guests, err := db.ListProxmoxGuests(context.Background(), "", "", "")
 		if err != nil {
 			return nil
 		}
@@ -300,13 +301,13 @@ func buildGlobalProxmoxEntityTargets(db *database.DB, rule models.AlertRule) []m
 		}
 		return targets
 	case "proxmox_storage_percent":
-		nodes, err := db.ListProxmoxNodes()
+		nodes, err := db.ListProxmoxNodes(context.Background())
 		if err != nil {
 			return nil
 		}
 		targets := make([]models.Host, 0)
 		for _, n := range nodes {
-			storages, err := db.ListProxmoxStoragesByNode(n.ConnectionID, n.NodeName)
+			storages, err := db.ListProxmoxStoragesByNode(context.Background(), n.ConnectionID, n.NodeName)
 			if err != nil {
 				continue
 			}
@@ -321,13 +322,13 @@ func buildGlobalProxmoxEntityTargets(db *database.DB, rule models.AlertRule) []m
 		}
 		return targets
 	case "proxmox_disk_failed_count", "proxmox_disk_min_wearout_percent":
-		nodes, err := db.ListProxmoxNodes()
+		nodes, err := db.ListProxmoxNodes(context.Background())
 		if err != nil {
 			return nil
 		}
 		targets := make([]models.Host, 0)
 		for _, n := range nodes {
-			disks, err := db.ListProxmoxDisksByNode(n.ConnectionID, n.NodeName)
+			disks, err := db.ListProxmoxDisksByNode(context.Background(), n.ConnectionID, n.NodeName)
 			if err != nil {
 				continue
 			}
@@ -383,7 +384,7 @@ func proxmoxScopedRuleForSyntheticTarget(rule models.AlertRule, targetID string)
 }
 
 func resolveStaleGlobalProxmoxIncidents(db *database.DB, rule models.AlertRule, evaluatedTargets map[string]struct{}) {
-	openIncidents, err := db.ListOpenAlertIncidentsByRule(rule.ID)
+	openIncidents, err := db.ListOpenAlertIncidentsByRule(context.Background(), rule.ID)
 	if err != nil {
 		log.Printf("Alerts: failed to list open incidents for stale cleanup rule#%d: %v", rule.ID, err)
 		return
@@ -396,7 +397,7 @@ func resolveStaleGlobalProxmoxIncidents(db *database.DB, rule models.AlertRule, 
 		if _, ok := evaluatedTargets[inc.HostID]; ok {
 			continue
 		}
-		if err := db.ResolveAlertIncident(inc.ID); err != nil {
+		if err := db.ResolveAlertIncident(context.Background(), inc.ID); err != nil {
 			log.Printf("Alerts: failed to resolve stale incident#%d for rule#%d: %v", inc.ID, rule.ID, err)
 		}
 	}
@@ -427,8 +428,8 @@ func GetMetricValue(db *database.DB, host models.Host, rule models.AlertRule) (f
 		// When a host is explicitly linked to a Proxmox guest in confirmed+auto mode,
 		// CPU/RAM alerts must use guest metrics collected from Proxmox (hypervisor view).
 		if rule.Metric == "cpu" || rule.Metric == "memory" {
-			if link, err := db.GetProxmoxGuestLinkByHost(host.ID); err == nil && link != nil && link.Status == "confirmed" && link.MetricsSource == "auto" {
-				cpuPct, memPct, ts, err := db.GetLatestProxmoxGuestMetricPercent(link.GuestID)
+			if link, err := db.GetProxmoxGuestLinkByHost(context.Background(), host.ID); err == nil && link != nil && link.Status == "confirmed" && link.MetricsSource == "auto" {
+				cpuPct, memPct, ts, err := db.GetLatestProxmoxGuestMetricPercent(context.Background(), link.GuestID)
 				if err == nil {
 					if rule.DurationSeconds > 0 && now.Sub(ts) > duration {
 						return 0, false
@@ -441,7 +442,7 @@ func GetMetricValue(db *database.DB, host models.Host, rule models.AlertRule) (f
 			}
 		}
 
-		metrics, err := db.GetLatestMetrics(host.ID)
+		metrics, err := db.GetLatestMetrics(context.Background(), host.ID)
 		if err != nil {
 			return 0, false
 		}
@@ -452,7 +453,7 @@ func GetMetricValue(db *database.DB, host models.Host, rule models.AlertRule) (f
 		case "cpu":
 			return metrics.CPUUsagePercent, true
 		case "cpu_temperature":
-			temp, ok := db.GetEffectiveHostCPUTemperature(host.ID, metrics.CPUTemperature)
+			temp, ok := db.GetEffectiveHostCPUTemperature(context.Background(), host.ID, metrics.CPUTemperature)
 			if !ok || temp <= 0 {
 				return 0, false
 			}
@@ -473,7 +474,7 @@ func GetMetricValue(db *database.DB, host models.Host, rule models.AlertRule) (f
 		return 0, false
 	case "disk_smart_status":
 		// Returns 1 if any disk has FAILED SMART status, 0 otherwise.
-		healthData, err := db.GetLatestDiskHealth(host.ID)
+		healthData, err := db.GetLatestDiskHealth(context.Background(), host.ID)
 		if err != nil || len(healthData) == 0 {
 			return 0, false
 		}
@@ -485,7 +486,7 @@ func GetMetricValue(db *database.DB, host models.Host, rule models.AlertRule) (f
 		return 0, true
 	case "disk_temperature":
 		// Returns the maximum temperature (°C) across all disks for this host.
-		healthData, err := db.GetLatestDiskHealth(host.ID)
+		healthData, err := db.GetLatestDiskHealth(context.Background(), host.ID)
 		if err != nil || len(healthData) == 0 {
 			return 0, false
 		}
@@ -530,27 +531,27 @@ func GetMetricValue(db *database.DB, host models.Host, rule models.AlertRule) (f
 func resolveProxmoxStoragePercent(db *database.DB, rule models.AlertRule) float64 {
 	scope := proxmoxScopeFromRule(rule)
 	if scope == nil || scope.ScopeMode == "" || scope.ScopeMode == "global" {
-		return db.GetMaxProxmoxStorageUsagePercent()
+		return db.GetMaxProxmoxStorageUsagePercent(context.Background())
 	}
 
 	switch scope.ScopeMode {
 	case "connection":
 		if scope.ConnectionID == "" {
-			return db.GetMaxProxmoxStorageUsagePercent()
+			return db.GetMaxProxmoxStorageUsagePercent(context.Background())
 		}
-		return db.GetMaxProxmoxStorageUsagePercentByConnection(scope.ConnectionID)
+		return db.GetMaxProxmoxStorageUsagePercentByConnection(context.Background(), scope.ConnectionID)
 	case "node":
 		if scope.NodeID == "" {
-			return db.GetMaxProxmoxStorageUsagePercent()
+			return db.GetMaxProxmoxStorageUsagePercent(context.Background())
 		}
-		return db.GetMaxProxmoxStorageUsagePercentByNode(scope.NodeID)
+		return db.GetMaxProxmoxStorageUsagePercentByNode(context.Background(), scope.NodeID)
 	case "storage":
 		if scope.StorageID == "" {
-			return db.GetMaxProxmoxStorageUsagePercent()
+			return db.GetMaxProxmoxStorageUsagePercent(context.Background())
 		}
-		return db.GetProxmoxStorageUsagePercentByStorage(scope.StorageID)
+		return db.GetProxmoxStorageUsagePercentByStorage(context.Background(), scope.StorageID)
 	default:
-		return db.GetMaxProxmoxStorageUsagePercent()
+		return db.GetMaxProxmoxStorageUsagePercent(context.Background())
 	}
 }
 
@@ -559,22 +560,22 @@ func resolveProxmoxStoragePercent(db *database.DB, rule models.AlertRule) float6
 func resolveProxmoxNodeCPUPercent(db *database.DB, rule models.AlertRule) float64 {
 	scope := proxmoxScopeFromRule(rule)
 	if scope == nil || scope.ScopeMode == "" || scope.ScopeMode == "global" {
-		return db.GetMaxProxmoxNodeCPUUsagePercent()
+		return db.GetMaxProxmoxNodeCPUUsagePercent(context.Background())
 	}
 
 	switch scope.ScopeMode {
 	case "connection":
 		if scope.ConnectionID == "" {
-			return db.GetMaxProxmoxNodeCPUUsagePercent()
+			return db.GetMaxProxmoxNodeCPUUsagePercent(context.Background())
 		}
-		return db.GetMaxProxmoxNodeCPUUsagePercentByConnection(scope.ConnectionID)
+		return db.GetMaxProxmoxNodeCPUUsagePercentByConnection(context.Background(), scope.ConnectionID)
 	case "node":
 		if scope.NodeID == "" {
-			return db.GetMaxProxmoxNodeCPUUsagePercent()
+			return db.GetMaxProxmoxNodeCPUUsagePercent(context.Background())
 		}
-		return db.GetProxmoxNodeCPUUsagePercentByNode(scope.NodeID)
+		return db.GetProxmoxNodeCPUUsagePercentByNode(context.Background(), scope.NodeID)
 	default:
-		return db.GetMaxProxmoxNodeCPUUsagePercent()
+		return db.GetMaxProxmoxNodeCPUUsagePercent(context.Background())
 	}
 }
 
@@ -583,150 +584,150 @@ func resolveProxmoxNodeCPUPercent(db *database.DB, rule models.AlertRule) float6
 func resolveProxmoxNodeMemoryPercent(db *database.DB, rule models.AlertRule) float64 {
 	scope := proxmoxScopeFromRule(rule)
 	if scope == nil || scope.ScopeMode == "" || scope.ScopeMode == "global" {
-		return db.GetMaxProxmoxNodeMemoryUsagePercent()
+		return db.GetMaxProxmoxNodeMemoryUsagePercent(context.Background())
 	}
 
 	switch scope.ScopeMode {
 	case "connection":
 		if scope.ConnectionID == "" {
-			return db.GetMaxProxmoxNodeMemoryUsagePercent()
+			return db.GetMaxProxmoxNodeMemoryUsagePercent(context.Background())
 		}
-		return db.GetMaxProxmoxNodeMemoryUsagePercentByConnection(scope.ConnectionID)
+		return db.GetMaxProxmoxNodeMemoryUsagePercentByConnection(context.Background(), scope.ConnectionID)
 	case "node":
 		if scope.NodeID == "" {
-			return db.GetMaxProxmoxNodeMemoryUsagePercent()
+			return db.GetMaxProxmoxNodeMemoryUsagePercent(context.Background())
 		}
-		return db.GetProxmoxNodeMemoryUsagePercentByNode(scope.NodeID)
+		return db.GetProxmoxNodeMemoryUsagePercentByNode(context.Background(), scope.NodeID)
 	default:
-		return db.GetMaxProxmoxNodeMemoryUsagePercent()
+		return db.GetMaxProxmoxNodeMemoryUsagePercent(context.Background())
 	}
 }
 
 func resolveProxmoxNodeCPUTemperature(db *database.DB, rule models.AlertRule) float64 {
 	scope := proxmoxScopeFromRule(rule)
 	if scope == nil || scope.ScopeMode == "" || scope.ScopeMode == "global" {
-		return db.GetMaxProxmoxNodeCPUTemperature()
+		return db.GetMaxProxmoxNodeCPUTemperature(context.Background())
 	}
 
 	switch scope.ScopeMode {
 	case "connection":
 		if scope.ConnectionID == "" {
-			return db.GetMaxProxmoxNodeCPUTemperature()
+			return db.GetMaxProxmoxNodeCPUTemperature(context.Background())
 		}
-		return db.GetMaxProxmoxNodeCPUTemperatureByConnection(scope.ConnectionID)
+		return db.GetMaxProxmoxNodeCPUTemperatureByConnection(context.Background(), scope.ConnectionID)
 	case "node":
 		if scope.NodeID == "" {
-			return db.GetMaxProxmoxNodeCPUTemperature()
+			return db.GetMaxProxmoxNodeCPUTemperature(context.Background())
 		}
-		return db.GetProxmoxNodeCPUTemperatureByNode(scope.NodeID)
+		return db.GetProxmoxNodeCPUTemperatureByNode(context.Background(), scope.NodeID)
 	default:
-		return db.GetMaxProxmoxNodeCPUTemperature()
+		return db.GetMaxProxmoxNodeCPUTemperature(context.Background())
 	}
 }
 
 func resolveProxmoxNodeFanRPM(db *database.DB, rule models.AlertRule) float64 {
 	scope := proxmoxScopeFromRule(rule)
 	if scope == nil || scope.ScopeMode == "" || scope.ScopeMode == "global" {
-		return db.GetMaxProxmoxNodeFanRPM()
+		return db.GetMaxProxmoxNodeFanRPM(context.Background())
 	}
 
 	switch scope.ScopeMode {
 	case "connection":
 		if scope.ConnectionID == "" {
-			return db.GetMaxProxmoxNodeFanRPM()
+			return db.GetMaxProxmoxNodeFanRPM(context.Background())
 		}
-		return db.GetMaxProxmoxNodeFanRPMByConnection(scope.ConnectionID)
+		return db.GetMaxProxmoxNodeFanRPMByConnection(context.Background(), scope.ConnectionID)
 	case "node":
 		if scope.NodeID == "" {
-			return db.GetMaxProxmoxNodeFanRPM()
+			return db.GetMaxProxmoxNodeFanRPM(context.Background())
 		}
-		return db.GetProxmoxNodeFanRPMByNode(scope.NodeID)
+		return db.GetProxmoxNodeFanRPMByNode(context.Background(), scope.NodeID)
 	default:
-		return db.GetMaxProxmoxNodeFanRPM()
+		return db.GetMaxProxmoxNodeFanRPM(context.Background())
 	}
 }
 
 func resolveProxmoxGuestCPUPercent(db *database.DB, rule models.AlertRule) float64 {
 	scope := proxmoxScopeFromRule(rule)
 	if scope == nil || scope.ScopeMode == "" || scope.ScopeMode == "global" {
-		return db.GetMaxProxmoxGuestCPUUsagePercent()
+		return db.GetMaxProxmoxGuestCPUUsagePercent(context.Background())
 	}
 
 	switch scope.ScopeMode {
 	case "connection":
 		if scope.ConnectionID == "" {
-			return db.GetMaxProxmoxGuestCPUUsagePercent()
+			return db.GetMaxProxmoxGuestCPUUsagePercent(context.Background())
 		}
-		return db.GetMaxProxmoxGuestCPUUsagePercentByConnection(scope.ConnectionID)
+		return db.GetMaxProxmoxGuestCPUUsagePercentByConnection(context.Background(), scope.ConnectionID)
 	case "node":
 		if scope.NodeID == "" {
-			return db.GetMaxProxmoxGuestCPUUsagePercent()
+			return db.GetMaxProxmoxGuestCPUUsagePercent(context.Background())
 		}
-		return db.GetMaxProxmoxGuestCPUUsagePercentByNode(scope.NodeID)
+		return db.GetMaxProxmoxGuestCPUUsagePercentByNode(context.Background(), scope.NodeID)
 	case "guest":
 		if scope.GuestID == "" {
-			return db.GetMaxProxmoxGuestCPUUsagePercent()
+			return db.GetMaxProxmoxGuestCPUUsagePercent(context.Background())
 		}
-		cpu, _, _, err := db.GetLatestProxmoxGuestMetricPercent(scope.GuestID)
+		cpu, _, _, err := db.GetLatestProxmoxGuestMetricPercent(context.Background(), scope.GuestID)
 		if err != nil {
 			return 0
 		}
 		return cpu
 	default:
-		return db.GetMaxProxmoxGuestCPUUsagePercent()
+		return db.GetMaxProxmoxGuestCPUUsagePercent(context.Background())
 	}
 }
 
 func resolveProxmoxGuestMemoryPercent(db *database.DB, rule models.AlertRule) float64 {
 	scope := proxmoxScopeFromRule(rule)
 	if scope == nil || scope.ScopeMode == "" || scope.ScopeMode == "global" {
-		return db.GetMaxProxmoxGuestMemoryUsagePercent()
+		return db.GetMaxProxmoxGuestMemoryUsagePercent(context.Background())
 	}
 
 	switch scope.ScopeMode {
 	case "connection":
 		if scope.ConnectionID == "" {
-			return db.GetMaxProxmoxGuestMemoryUsagePercent()
+			return db.GetMaxProxmoxGuestMemoryUsagePercent(context.Background())
 		}
-		return db.GetMaxProxmoxGuestMemoryUsagePercentByConnection(scope.ConnectionID)
+		return db.GetMaxProxmoxGuestMemoryUsagePercentByConnection(context.Background(), scope.ConnectionID)
 	case "node":
 		if scope.NodeID == "" {
-			return db.GetMaxProxmoxGuestMemoryUsagePercent()
+			return db.GetMaxProxmoxGuestMemoryUsagePercent(context.Background())
 		}
-		return db.GetMaxProxmoxGuestMemoryUsagePercentByNode(scope.NodeID)
+		return db.GetMaxProxmoxGuestMemoryUsagePercentByNode(context.Background(), scope.NodeID)
 	case "guest":
 		if scope.GuestID == "" {
-			return db.GetMaxProxmoxGuestMemoryUsagePercent()
+			return db.GetMaxProxmoxGuestMemoryUsagePercent(context.Background())
 		}
-		_, mem, _, err := db.GetLatestProxmoxGuestMetricPercent(scope.GuestID)
+		_, mem, _, err := db.GetLatestProxmoxGuestMetricPercent(context.Background(), scope.GuestID)
 		if err != nil {
 			return 0
 		}
 		return mem
 	default:
-		return db.GetMaxProxmoxGuestMemoryUsagePercent()
+		return db.GetMaxProxmoxGuestMemoryUsagePercent(context.Background())
 	}
 }
 
 func resolveProxmoxNodePendingUpdates(db *database.DB, rule models.AlertRule) float64 {
 	scope := proxmoxScopeFromRule(rule)
 	if scope == nil || scope.ScopeMode == "" || scope.ScopeMode == "global" {
-		return float64(db.GetMaxProxmoxNodePendingUpdates())
+		return float64(db.GetMaxProxmoxNodePendingUpdates(context.Background()))
 	}
 
 	switch scope.ScopeMode {
 	case "connection":
 		if scope.ConnectionID == "" {
-			return float64(db.GetMaxProxmoxNodePendingUpdates())
+			return float64(db.GetMaxProxmoxNodePendingUpdates(context.Background()))
 		}
-		return float64(db.GetMaxProxmoxNodePendingUpdatesByConnection(scope.ConnectionID))
+		return float64(db.GetMaxProxmoxNodePendingUpdatesByConnection(context.Background(), scope.ConnectionID))
 	case "node":
 		if scope.NodeID == "" {
-			return float64(db.GetMaxProxmoxNodePendingUpdates())
+			return float64(db.GetMaxProxmoxNodePendingUpdates(context.Background()))
 		}
-		return float64(db.GetMaxProxmoxNodePendingUpdatesByNode(scope.NodeID))
+		return float64(db.GetMaxProxmoxNodePendingUpdatesByNode(context.Background(), scope.NodeID))
 	default:
-		return float64(db.GetMaxProxmoxNodePendingUpdates())
+		return float64(db.GetMaxProxmoxNodePendingUpdates(context.Background()))
 	}
 }
 
@@ -734,7 +735,7 @@ func resolveProxmoxRecentFailedTasks24h(db *database.DB, rule models.AlertRule) 
 	since := time.Now().Add(-24 * time.Hour)
 	scope := proxmoxScopeFromRule(rule)
 	if scope == nil || scope.ScopeMode == "" || scope.ScopeMode == "global" {
-		count, err := db.GetRecentFailedTaskCount(since)
+		count, err := db.GetRecentFailedTaskCount(context.Background(), since)
 		if err != nil {
 			return 0
 		}
@@ -744,32 +745,32 @@ func resolveProxmoxRecentFailedTasks24h(db *database.DB, rule models.AlertRule) 
 	switch scope.ScopeMode {
 	case "connection":
 		if scope.ConnectionID == "" {
-			count, err := db.GetRecentFailedTaskCount(since)
+			count, err := db.GetRecentFailedTaskCount(context.Background(), since)
 			if err != nil {
 				return 0
 			}
 			return float64(count)
 		}
-		count, err := db.GetRecentFailedTaskCountByConnection(scope.ConnectionID, since)
+		count, err := db.GetRecentFailedTaskCountByConnection(context.Background(), scope.ConnectionID, since)
 		if err != nil {
 			return 0
 		}
 		return float64(count)
 	case "node":
 		if scope.NodeID == "" {
-			count, err := db.GetRecentFailedTaskCount(since)
+			count, err := db.GetRecentFailedTaskCount(context.Background(), since)
 			if err != nil {
 				return 0
 			}
 			return float64(count)
 		}
-		count, err := db.GetRecentFailedTaskCountByNodeID(scope.NodeID, since)
+		count, err := db.GetRecentFailedTaskCountByNodeID(context.Background(), scope.NodeID, since)
 		if err != nil {
 			return 0
 		}
 		return float64(count)
 	default:
-		count, err := db.GetRecentFailedTaskCount(since)
+		count, err := db.GetRecentFailedTaskCount(context.Background(), since)
 		if err != nil {
 			return 0
 		}
@@ -799,7 +800,7 @@ func resolveProxmoxAuthFailuresRecent(db *database.DB, rule models.AlertRule) fl
 		if scope.NodeID == "" {
 			return float64(countAuthFailuresAcrossNodes(db, since, ""))
 		}
-		node, err := db.GetProxmoxNode(scope.NodeID)
+		node, err := db.GetProxmoxNode(context.Background(), scope.NodeID)
 		if err != nil || node == nil {
 			return 0
 		}
@@ -833,7 +834,7 @@ func FetchProxmoxAuthFailureLogs(db *database.DB, rule models.AlertRule) ([]stri
 		if scope.NodeID == "" {
 			return collectAuthFailureLogsAcrossNodes(db, since, ""), since
 		}
-		node, err := db.GetProxmoxNode(scope.NodeID)
+		node, err := db.GetProxmoxNode(context.Background(), scope.NodeID)
 		if err != nil || node == nil {
 			return []string{}, since
 		}
@@ -848,9 +849,9 @@ func countAuthFailuresAcrossNodes(db *database.DB, since time.Time, connectionID
 	var err error
 
 	if strings.TrimSpace(connectionID) == "" {
-		nodes, err = db.ListProxmoxNodes()
+		nodes, err = db.ListProxmoxNodes(context.Background())
 	} else {
-		nodes, err = db.ListProxmoxNodesByConnection(connectionID)
+		nodes, err = db.ListProxmoxNodesByConnection(context.Background(), connectionID)
 	}
 	if err != nil || len(nodes) == 0 {
 		return 0
@@ -868,9 +869,9 @@ func collectAuthFailureLogsAcrossNodes(db *database.DB, since time.Time, connect
 	var err error
 
 	if strings.TrimSpace(connectionID) == "" {
-		nodes, err = db.ListProxmoxNodes()
+		nodes, err = db.ListProxmoxNodes(context.Background())
 	} else {
-		nodes, err = db.ListProxmoxNodesByConnection(connectionID)
+		nodes, err = db.ListProxmoxNodesByConnection(context.Background(), connectionID)
 	}
 	if err != nil || len(nodes) == 0 {
 		return []string{}
@@ -884,11 +885,11 @@ func collectAuthFailureLogsAcrossNodes(db *database.DB, since time.Time, connect
 }
 
 func countAuthFailuresForNode(db *database.DB, node models.ProxmoxNode, since time.Time) int {
-	conn, err := db.GetProxmoxConnectionByID(node.ConnectionID)
+	conn, err := db.GetProxmoxConnectionByID(context.Background(), node.ConnectionID)
 	if err != nil || conn == nil {
 		return 0
 	}
-	secret, err := db.GetProxmoxTokenSecret(node.ConnectionID)
+	secret, err := db.GetProxmoxTokenSecret(context.Background(), node.ConnectionID)
 	if err != nil || secret == "" {
 		return 0
 	}
@@ -910,11 +911,11 @@ func countAuthFailuresForNode(db *database.DB, node models.ProxmoxNode, since ti
 }
 
 func collectAuthFailureLogsForNode(db *database.DB, node models.ProxmoxNode, since time.Time) []string {
-	conn, err := db.GetProxmoxConnectionByID(node.ConnectionID)
+	conn, err := db.GetProxmoxConnectionByID(context.Background(), node.ConnectionID)
 	if err != nil || conn == nil {
 		return []string{}
 	}
-	secret, err := db.GetProxmoxTokenSecret(node.ConnectionID)
+	secret, err := db.GetProxmoxTokenSecret(context.Background(), node.ConnectionID)
 	if err != nil || secret == "" {
 		return []string{}
 	}
@@ -1070,54 +1071,54 @@ func extractSyslogTimestamp(text string) (string, bool) {
 func resolveProxmoxDiskFailedCount(db *database.DB, rule models.AlertRule) float64 {
 	scope := proxmoxScopeFromRule(rule)
 	if scope == nil || scope.ScopeMode == "" || scope.ScopeMode == "global" {
-		return float64(db.GetProxmoxDiskFailedCount())
+		return float64(db.GetProxmoxDiskFailedCount(context.Background()))
 	}
 
 	switch scope.ScopeMode {
 	case "connection":
 		if scope.ConnectionID == "" {
-			return float64(db.GetProxmoxDiskFailedCount())
+			return float64(db.GetProxmoxDiskFailedCount(context.Background()))
 		}
-		return float64(db.GetProxmoxDiskFailedCountByConnection(scope.ConnectionID))
+		return float64(db.GetProxmoxDiskFailedCountByConnection(context.Background(), scope.ConnectionID))
 	case "node":
 		if scope.NodeID == "" {
-			return float64(db.GetProxmoxDiskFailedCount())
+			return float64(db.GetProxmoxDiskFailedCount(context.Background()))
 		}
-		return float64(db.GetProxmoxDiskFailedCountByNodeID(scope.NodeID))
+		return float64(db.GetProxmoxDiskFailedCountByNodeID(context.Background(), scope.NodeID))
 	case "disk":
 		if scope.DiskID == "" {
-			return float64(db.GetProxmoxDiskFailedCount())
+			return float64(db.GetProxmoxDiskFailedCount(context.Background()))
 		}
-		return float64(db.GetProxmoxDiskFailedCountByDiskID(scope.DiskID))
+		return float64(db.GetProxmoxDiskFailedCountByDiskID(context.Background(), scope.DiskID))
 	default:
-		return float64(db.GetProxmoxDiskFailedCount())
+		return float64(db.GetProxmoxDiskFailedCount(context.Background()))
 	}
 }
 
 func resolveProxmoxDiskMinWearoutPercent(db *database.DB, rule models.AlertRule) float64 {
 	scope := proxmoxScopeFromRule(rule)
 	if scope == nil || scope.ScopeMode == "" || scope.ScopeMode == "global" {
-		return db.GetProxmoxDiskMinWearoutPercent()
+		return db.GetProxmoxDiskMinWearoutPercent(context.Background())
 	}
 
 	switch scope.ScopeMode {
 	case "connection":
 		if scope.ConnectionID == "" {
-			return db.GetProxmoxDiskMinWearoutPercent()
+			return db.GetProxmoxDiskMinWearoutPercent(context.Background())
 		}
-		return db.GetProxmoxDiskMinWearoutPercentByConnection(scope.ConnectionID)
+		return db.GetProxmoxDiskMinWearoutPercentByConnection(context.Background(), scope.ConnectionID)
 	case "node":
 		if scope.NodeID == "" {
-			return db.GetProxmoxDiskMinWearoutPercent()
+			return db.GetProxmoxDiskMinWearoutPercent(context.Background())
 		}
-		return db.GetProxmoxDiskMinWearoutPercentByNodeID(scope.NodeID)
+		return db.GetProxmoxDiskMinWearoutPercentByNodeID(context.Background(), scope.NodeID)
 	case "disk":
 		if scope.DiskID == "" {
-			return db.GetProxmoxDiskMinWearoutPercent()
+			return db.GetProxmoxDiskMinWearoutPercent(context.Background())
 		}
-		return db.GetProxmoxDiskWearoutPercentByDiskID(scope.DiskID)
+		return db.GetProxmoxDiskWearoutPercentByDiskID(context.Background(), scope.DiskID)
 	default:
-		return db.GetProxmoxDiskMinWearoutPercent()
+		return db.GetProxmoxDiskMinWearoutPercent(context.Background())
 	}
 }
 
@@ -1366,11 +1367,11 @@ func pushWebNotifications(db *database.DB, cfg *config.Config, rule models.Alert
 		return
 	}
 
-	privateKey, err := db.GetSetting("vapid_private_key")
+	privateKey, err := db.GetSetting(context.Background(), "vapid_private_key")
 	if err != nil || privateKey == "" {
 		return
 	}
-	publicKey, err := db.GetSetting("vapid_public_key")
+	publicKey, err := db.GetSetting(context.Background(), "vapid_public_key")
 	if err != nil || publicKey == "" {
 		return
 	}
@@ -1397,7 +1398,7 @@ func pushWebNotifications(db *database.DB, cfg *config.Config, rule models.Alert
 		"url":   "/alerts?tab=incidents",
 	})
 
-	subs, err := db.GetPushSubscriptionsByRole("admin")
+	subs, err := db.GetPushSubscriptionsByRole(context.Background(), "admin")
 	if err != nil || len(subs) == 0 {
 		return
 	}
@@ -1418,7 +1419,7 @@ func pushWebNotifications(db *database.DB, cfg *config.Config, rule models.Alert
 		if sendErr != nil {
 			log.Printf("Push: delivery failed (%s…): %v", truncateStr(sub.Endpoint, 40), sendErr)
 			if resp != nil && resp.StatusCode == http.StatusGone {
-				_ = db.DeletePushSubscription(sub.Endpoint)
+				_ = db.DeletePushSubscription(context.Background(), sub.Endpoint)
 			}
 			continue
 		}

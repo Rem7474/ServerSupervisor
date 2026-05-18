@@ -2,6 +2,11 @@ import { ref, onMounted, onUnmounted, Ref } from 'vue'
 import mitt from 'mitt'
 import { useAuthStore } from '../stores/auth'
 
+// The session cookie (ss_access) is sent automatically by the browser on the
+// WebSocket upgrade; no in-band auth message is necessary anymore. We keep the
+// auth store reference around to gate connection attempts on whether the user
+// is logged in at all.
+
 type WebSocketStatus = 'connecting' | 'connected' | 'reconnecting' | 'error' | 'disconnected'
 
 type WsEvents = {
@@ -63,7 +68,7 @@ export function useWebSocket<TPayload = unknown>(
   }
 
   function connect(): void {
-    if (!auth.token) return
+    if (!auth.isAuthenticated) return
     manualClose = false
 
     // Cancel any pending retry timer so handleAppResume can't trigger a double-connect
@@ -82,7 +87,8 @@ export function useWebSocket<TPayload = unknown>(
 
     ws.onopen = () => {
       const wasReconnecting = retryCount.value > 0 || wsStatus.value === 'reconnecting'
-      ws!.send(JSON.stringify({ type: 'auth', token: auth.token }))
+      // Authentication is carried by the ss_access httpOnly cookie attached to
+      // the upgrade request; no in-band auth message is sent anymore.
       if (wasReconnecting) {
         dataStaleAlert.value = true
         wsEvents.emit('reconnected', { timestamp: Date.now() })

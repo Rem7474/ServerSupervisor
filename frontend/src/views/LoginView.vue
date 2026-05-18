@@ -130,7 +130,7 @@ async function handleLogin() {
       return
     }
 
-    if (data?.token) {
+    if (data?.role) {
       auth.setAuth(data, username.value)
       if (data.must_change_password) {
         router.push('/account')

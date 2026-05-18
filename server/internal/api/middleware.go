@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"log"
 	"net"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/serversupervisor/server/internal/config"
+	"github.com/serversupervisor/server/internal/cookies"
 	"github.com/serversupervisor/server/internal/database"
 	errs "github.com/serversupervisor/server/internal/errors"
 	"golang.org/x/time/rate"
@@ -239,13 +241,17 @@ func SecurityHeadersMiddleware() gin.HandlerFunc {
 	}
 }
 
-// WSTokenMiddleware performs optional pre-upgrade JWT validation for WebSocket routes.
-// If a ?token= query parameter is present and invalid, the HTTP upgrade is rejected with
-// 401 before the connection is established. If the parameter is absent the request passes
-// through unchanged — post-upgrade message-based auth remains the primary gate.
+// WSTokenMiddleware performs optional pre-upgrade JWT validation for WebSocket
+// routes. The JWT is read from the session cookie (preferred) or from the
+// legacy ?token= query parameter. An invalid token aborts the upgrade with
+// 401. When neither is present the request passes through and the post-upgrade
+// message-based handshake remains the authoritative gate.
 func WSTokenMiddleware(cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		token := c.Query("token")
+		token := cookies.ReadAccessToken(c.Request)
+		if token == "" {
+			token = c.Query("token")
+		}
 		if token == "" {
 			c.Next()
 			return
@@ -269,7 +275,10 @@ func WSTokenMiddleware(cfg *config.Config) gin.HandlerFunc {
 // additional front-end origins (e.g. dev server, reverse proxy) are accepted.
 func CORSMiddleware(baseURL string, extraOrigins []string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// WebSocket upgrades handle their own origin check via the upgrader.
+		// WebSocket upgrades skip CORS headers on purpose: the browser does
+		// not send a CORS preflight for the upgrade and gorilla/websocket
+		// enforces origin validation post-handshake via Upgrader.CheckOrigin
+		// (see ws/base.go: isAllowedOrigin).
 		if c.Request.Header.Get("Upgrade") == "websocket" {
 			c.Next()
 			return
@@ -319,23 +328,18 @@ func resolveAllowedOrigin(requestOrigin, baseURL string, extraOrigins []string) 
 }
 
 // JWTMiddleware validates JWT tokens for dashboard access.
+// The token is read from the session cookie (browser SPA flow) or from the
+// Authorization: Bearer header (curl/scripts/mobile clients).
 func JWTMiddleware(cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		authHeader := c.GetHeader("Authorization")
-		if authHeader == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "missing authorization header"})
+		tokenString := cookies.ReadAccessToken(c.Request)
+		if tokenString == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "missing credentials"})
 			c.Abort()
 			return
 		}
 
-		parts := strings.SplitN(authHeader, " ", 2)
-		if len(parts) != 2 || parts[0] != "Bearer" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid authorization header"})
-			c.Abort()
-			return
-		}
-
-		token, err := jwt.Parse(parts[1], func(token *jwt.Token) (interface{}, error) {
+		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 				return nil, jwt.ErrSignatureInvalid
 			}
@@ -396,7 +400,7 @@ func HostPermissionMiddleware(db *database.DB, requiredLevel string) gin.Handler
 		}
 
 		username := c.GetString("username")
-		restricted, level, err := db.GetHostAccess(username, hostID)
+		restricted, level, err := db.GetHostAccess(context.Background(), username, hostID)
 		if err != nil {
 			lang := errs.GetLanguageFromAcceptLanguage(c.GetHeader("Accept-Language"))
 			c.JSON(http.StatusInternalServerError, gin.H{"error": errs.GetMessage(errs.CodePermissionFailed, lang)})
@@ -439,7 +443,7 @@ func APIKeyMiddleware(db *database.DB, cfg *config.Config) gin.HandlerFunc {
 			return
 		}
 
-		host, err := db.GetHostByAPIKey(apiKey)
+		host, err := db.GetHostByAPIKey(context.Background(), apiKey)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid API key"})
 			c.Abort()

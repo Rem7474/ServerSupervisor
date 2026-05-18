@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -71,7 +72,7 @@ func (h *ReleaseTrackerHandler) StopPoller() {
 }
 
 func (h *ReleaseTrackerHandler) checkAll() {
-	trackers, err := h.db.GetEnabledReleaseTrackers()
+	trackers, err := h.db.GetEnabledReleaseTrackers(context.Background())
 	if err != nil {
 		log.Printf("Release tracker poller: failed to fetch trackers: %v", err)
 		return
@@ -97,25 +98,25 @@ func (h *ReleaseTrackerHandler) checkOneGit(t models.ReleaseTracker) {
 	cooldown := time.Duration(t.CooldownHours) * time.Hour
 	if err != nil {
 		log.Printf("Git tracker %s (%s/%s): fetch error: %v", t.Name, t.RepoOwner, t.RepoName, err)
-		_ = h.db.UpdateReleaseTrackerError(t.ID, err.Error())
+		_ = h.db.UpdateReleaseTrackerError(context.Background(), t.ID, err.Error())
 		return
 	}
 
 	if tag == "" {
-		_ = h.db.UpdateReleaseTrackerError(t.ID, "aucune release ou tag trouvé sur ce dépôt")
+		_ = h.db.UpdateReleaseTrackerError(context.Background(), t.ID, "aucune release ou tag trouvé sur ce dépôt")
 		return
 	}
 
 	// First check — just record the current tag without triggering
 	if t.LastReleaseTag == "" {
 		log.Printf("Git tracker %s: initial tag recorded: %s", t.Name, tag)
-		_ = h.db.UpdateReleaseTrackerLastSeen(t.ID, tag, false)
+		_ = h.db.UpdateReleaseTrackerLastSeen(context.Background(), t.ID, tag, false)
 		return
 	}
 
 	// No change
 	if tag == t.LastReleaseTag {
-		_ = h.db.UpdateReleaseTrackerLastSeen(t.ID, "", false)
+		_ = h.db.UpdateReleaseTrackerLastSeen(context.Background(), t.ID, "", false)
 		if cooldown > 0 && t.HostID != "" && t.CustomTaskID != "" && t.LastReleaseDetectedAt != nil && (t.LastTriggeredAt == nil || t.LastTriggeredAt.Before(*t.LastReleaseDetectedAt)) {
 			if time.Since(*t.LastReleaseDetectedAt) >= cooldown {
 				log.Printf("Git tracker %s: cooldown elapsed (%dh) for %s → dispatching", t.Name, t.CooldownHours, tag)
@@ -126,7 +127,7 @@ func (h *ReleaseTrackerHandler) checkOneGit(t models.ReleaseTracker) {
 	}
 
 	// New release detected
-	_ = h.db.UpdateReleaseTrackerDetected(t.ID, tag)
+	_ = h.db.UpdateReleaseTrackerDetected(context.Background(), t.ID, tag)
 	h.notifyReleaseTrackerDetected(t, tag, releaseURL, releaseName)
 	if t.HostID == "" || t.CustomTaskID == "" {
 		log.Printf("Git tracker %s: new release %s detected (monitor-only, no task dispatched)", t.Name, tag)
@@ -146,7 +147,7 @@ func (h *ReleaseTrackerHandler) checkOneGit(t models.ReleaseTracker) {
 // checkOneDocker polls the Docker registry for a new image digest.
 func (h *ReleaseTrackerHandler) checkOneDocker(t models.ReleaseTracker) {
 	if t.DockerImage == "" {
-		_ = h.db.UpdateReleaseTrackerError(t.ID, "docker_image manquant")
+		_ = h.db.UpdateReleaseTrackerError(context.Background(), t.ID, "docker_image manquant")
 		return
 	}
 	tag := t.DockerTag
@@ -163,11 +164,11 @@ func (h *ReleaseTrackerHandler) checkOneDocker(t models.ReleaseTracker) {
 		if tag == "latest" && strings.Contains(strings.ToLower(errMsg), "status 404") {
 			errMsg = "tag latest introuvable pour cette image; utilisez un tag versionne (ex: v4, v4.4, v4.4.1)"
 		}
-		_ = h.db.UpdateReleaseTrackerError(t.ID, errMsg)
+		_ = h.db.UpdateReleaseTrackerError(context.Background(), t.ID, errMsg)
 		return
 	}
 	if digest == "" {
-		_ = h.db.UpdateReleaseTrackerError(t.ID, "digest vide retourné par le registre")
+		_ = h.db.UpdateReleaseTrackerError(context.Background(), t.ID, "digest vide retourné par le registre")
 		return
 	}
 
@@ -188,9 +189,9 @@ func (h *ReleaseTrackerHandler) checkOneDocker(t models.ReleaseTracker) {
 	// First check — record current digest without triggering
 	if t.LatestImageDigest == "" {
 		log.Printf("Docker tracker %s: initial digest recorded for %s:%s", t.Name, t.DockerImage, tag)
-		_ = h.db.UpdateReleaseTrackerDigest(t.ID, digest)
-		_ = h.db.UpdateReleaseTrackerLastSeen(t.ID, resolvedVersion, false)
-		_ = h.db.StoreTrackerTagDigest(t.ID, resolvedVersion, digest)
+		_ = h.db.UpdateReleaseTrackerDigest(context.Background(), t.ID, digest)
+		_ = h.db.UpdateReleaseTrackerLastSeen(context.Background(), t.ID, resolvedVersion, false)
+		_ = h.db.StoreTrackerTagDigest(context.Background(), t.ID, resolvedVersion, digest)
 		return
 	}
 
@@ -198,10 +199,10 @@ func (h *ReleaseTrackerHandler) checkOneDocker(t models.ReleaseTracker) {
 	if digest == t.LatestImageDigest {
 		// If we previously stored "latest" as the tag but can now resolve a version, update it.
 		if resolvedVersion != tag && t.LastReleaseTag == tag {
-			_ = h.db.UpdateReleaseTrackerLastSeen(t.ID, resolvedVersion, false)
-			_ = h.db.StoreTrackerTagDigest(t.ID, resolvedVersion, digest)
+			_ = h.db.UpdateReleaseTrackerLastSeen(context.Background(), t.ID, resolvedVersion, false)
+			_ = h.db.StoreTrackerTagDigest(context.Background(), t.ID, resolvedVersion, digest)
 		} else {
-			_ = h.db.UpdateReleaseTrackerLastSeen(t.ID, "", false)
+			_ = h.db.UpdateReleaseTrackerLastSeen(context.Background(), t.ID, "", false)
 		}
 
 		if cooldown > 0 && t.CustomTaskID != "" && t.HostID != "" && t.LastReleaseDetectedAt != nil && (t.LastTriggeredAt == nil || t.LastTriggeredAt.Before(*t.LastReleaseDetectedAt)) {
@@ -215,15 +216,15 @@ func (h *ReleaseTrackerHandler) checkOneDocker(t models.ReleaseTracker) {
 
 	// New image detected
 	oldDigest := t.LatestImageDigest
-	_ = h.db.UpdateReleaseTrackerDigest(t.ID, digest)
-	_ = h.db.StoreTrackerTagDigest(t.ID, resolvedVersion, digest)
-	_ = h.db.UpdateReleaseTrackerDetected(t.ID, resolvedVersion)
+	_ = h.db.UpdateReleaseTrackerDigest(context.Background(), t.ID, digest)
+	_ = h.db.StoreTrackerTagDigest(context.Background(), t.ID, resolvedVersion, digest)
+	_ = h.db.UpdateReleaseTrackerDetected(context.Background(), t.ID, resolvedVersion)
 	h.notifyReleaseTrackerDetected(t, resolvedVersion, "", t.DockerImage+":"+tag)
 
 	// Monitor-only mode: no task configured, just record the new version.
 	if t.CustomTaskID == "" || t.HostID == "" {
 		log.Printf("Docker tracker %s: new digest for %s:%s (monitor-only, no task dispatched)", t.Name, t.DockerImage, tag)
-		_ = h.db.UpdateReleaseTrackerLastSeen(t.ID, resolvedVersion, false)
+		_ = h.db.UpdateReleaseTrackerLastSeen(context.Background(), t.ID, resolvedVersion, false)
 		return
 	}
 
@@ -263,14 +264,14 @@ func shouldResolveDockerTag(tag string) bool {
 
 func (h *ReleaseTrackerHandler) dispatchGitRelease(t models.ReleaseTracker, tag, releaseURL, releaseName string) {
 	// Skip if already running
-	running, _ := h.db.GetRunningExecutionForReleaseTracker(t.ID)
+	running, _ := h.db.GetRunningExecutionForReleaseTracker(context.Background(), t.ID)
 	if running {
 		log.Printf("Git tracker %s: skipping dispatch (already running)", t.Name)
-		_ = h.db.UpdateReleaseTrackerLastSeen(t.ID, tag, false)
+		_ = h.db.UpdateReleaseTrackerLastSeen(context.Background(), t.ID, tag, false)
 		return
 	}
 
-	exec, err := h.db.CreateReleaseTrackerExecution(models.ReleaseTrackerExecution{
+	exec, err := h.db.CreateReleaseTrackerExecution(context.Background(), models.ReleaseTrackerExecution{
 		TrackerID:   t.ID,
 		TagName:     tag,
 		ReleaseURL:  releaseURL,
@@ -310,24 +311,24 @@ func (h *ReleaseTrackerHandler) dispatchGitRelease(t models.ReleaseTracker, tag,
 	if err != nil {
 		log.Printf("Git tracker %s: failed to create command: %v", t.Name, err)
 		now := time.Now()
-		_ = h.db.UpdateReleaseTrackerExecutionStatus(exec.ID, "failed", &now)
+		_ = h.db.UpdateReleaseTrackerExecutionStatus(context.Background(), exec.ID, "failed", &now)
 		return
 	}
 
-	_ = h.db.UpdateReleaseTrackerExecutionCommandID(exec.ID, result.Command.ID)
-	_ = h.db.MarkReleaseTrackerTriggered(t.ID)
+	_ = h.db.UpdateReleaseTrackerExecutionCommandID(context.Background(), exec.ID, result.Command.ID)
+	_ = h.db.MarkReleaseTrackerTriggered(context.Background(), t.ID)
 }
 
 func (h *ReleaseTrackerHandler) dispatchDockerUpdate(t models.ReleaseTracker, tag, resolvedVersion, oldDigest, newDigest string) {
-	running, _ := h.db.GetRunningExecutionForReleaseTracker(t.ID)
+	running, _ := h.db.GetRunningExecutionForReleaseTracker(context.Background(), t.ID)
 	if running {
 		log.Printf("Docker tracker %s: skipping dispatch (already running)", t.Name)
-		_ = h.db.UpdateReleaseTrackerLastSeen(t.ID, resolvedVersion, false)
+		_ = h.db.UpdateReleaseTrackerLastSeen(context.Background(), t.ID, resolvedVersion, false)
 		return
 	}
 
 	imageFull := t.DockerImage + ":" + tag
-	exec, err := h.db.CreateReleaseTrackerExecution(models.ReleaseTrackerExecution{
+	exec, err := h.db.CreateReleaseTrackerExecution(context.Background(), models.ReleaseTrackerExecution{
 		TrackerID:   t.ID,
 		TagName:     resolvedVersion,
 		ReleaseURL:  "",
@@ -368,12 +369,12 @@ func (h *ReleaseTrackerHandler) dispatchDockerUpdate(t models.ReleaseTracker, ta
 	if err != nil {
 		log.Printf("Docker tracker %s: failed to create command: %v", t.Name, err)
 		now := time.Now()
-		_ = h.db.UpdateReleaseTrackerExecutionStatus(exec.ID, "failed", &now)
+		_ = h.db.UpdateReleaseTrackerExecutionStatus(context.Background(), exec.ID, "failed", &now)
 		return
 	}
 
-	_ = h.db.UpdateReleaseTrackerExecutionCommandID(exec.ID, result.Command.ID)
-	_ = h.db.MarkReleaseTrackerTriggered(t.ID)
+	_ = h.db.UpdateReleaseTrackerExecutionCommandID(context.Background(), exec.ID, result.Command.ID)
+	_ = h.db.MarkReleaseTrackerTriggered(context.Background(), t.ID)
 }
 
 func (h *ReleaseTrackerHandler) notifyReleaseTrackerDetected(t models.ReleaseTracker, version, releaseURL, releaseName string) {
@@ -415,7 +416,7 @@ func (h *ReleaseTrackerHandler) notifyReleaseTrackerDetected(t models.ReleaseTra
 
 // NotifyComplete is called by the agent handler when a command completes.
 func (h *ReleaseTrackerHandler) NotifyComplete(commandID, status string) {
-	trackerID, notifyOnRelease, channels, err := h.db.UpdateReleaseTrackerExecutionByCommandID(commandID, status)
+	trackerID, notifyOnRelease, channels, err := h.db.UpdateReleaseTrackerExecutionByCommandID(context.Background(), commandID, status)
 	if err != nil {
 		return // not a tracker command
 	}
@@ -424,7 +425,7 @@ func (h *ReleaseTrackerHandler) NotifyComplete(commandID, status string) {
 		return
 	}
 
-	tracker, err := h.db.GetReleaseTrackerByID(trackerID)
+	tracker, err := h.db.GetReleaseTrackerByID(context.Background(), trackerID)
 	if err != nil {
 		return
 	}
@@ -495,7 +496,7 @@ func (h *ReleaseTrackerHandler) HandleCommandCompletion(commandID, status string
 // ========== HTTP handlers ==========
 
 func (h *ReleaseTrackerHandler) List(c *gin.Context) {
-	trackers, err := h.db.ListReleaseTrackers()
+	trackers, err := h.db.ListReleaseTrackers(context.Background())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list trackers"})
 		return
@@ -572,7 +573,7 @@ func (h *ReleaseTrackerHandler) Create(c *gin.Context) {
 		req.NotifyChannels = []string{}
 	}
 
-	created, err := h.db.CreateReleaseTracker(req)
+	created, err := h.db.CreateReleaseTracker(context.Background(), req)
 	if err != nil {
 		log.Printf("CreateReleaseTracker: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create tracker"})
@@ -583,7 +584,7 @@ func (h *ReleaseTrackerHandler) Create(c *gin.Context) {
 
 func (h *ReleaseTrackerHandler) Get(c *gin.Context) {
 	id := c.Param("id")
-	t, err := h.db.GetReleaseTrackerByID(id)
+	t, err := h.db.GetReleaseTrackerByID(context.Background(), id)
 	if err == sql.ErrNoRows {
 		log.Printf("Release tracker history: tracker not found (id=%s)", id)
 		c.JSON(http.StatusNotFound, gin.H{"error": "tracker not found"})
@@ -594,7 +595,7 @@ func (h *ReleaseTrackerHandler) Get(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get tracker"})
 		return
 	}
-	execs, _ := h.db.ListReleaseTrackerExecutions(id, 20)
+	execs, _ := h.db.ListReleaseTrackerExecutions(context.Background(), id, 20)
 	c.JSON(http.StatusOK, gin.H{"tracker": t, "executions": execs})
 }
 
@@ -653,7 +654,7 @@ func (h *ReleaseTrackerHandler) Update(c *gin.Context) {
 		}
 	}
 
-	if err := h.db.UpdateReleaseTracker(id, req); err != nil {
+	if err := h.db.UpdateReleaseTracker(context.Background(), id, req); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update tracker"})
 		return
 	}
@@ -667,7 +668,7 @@ func (h *ReleaseTrackerHandler) Delete(c *gin.Context) {
 		return
 	}
 	id := c.Param("id")
-	if err := h.db.DeleteReleaseTracker(id); err != nil {
+	if err := h.db.DeleteReleaseTracker(context.Background(), id); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete tracker"})
 		return
 	}
@@ -682,7 +683,7 @@ func (h *ReleaseTrackerHandler) TriggerCheck(c *gin.Context) {
 	}
 	id := c.Param("id")
 
-	t, err := h.db.GetReleaseTrackerByID(id)
+	t, err := h.db.GetReleaseTrackerByID(context.Background(), id)
 	if err == sql.ErrNoRows {
 		c.JSON(http.StatusNotFound, gin.H{"error": "tracker not found"})
 		return
@@ -705,7 +706,7 @@ func (h *ReleaseTrackerHandler) Run(c *gin.Context) {
 	}
 	id := c.Param("id")
 
-	t, err := h.db.GetReleaseTrackerByID(id)
+	t, err := h.db.GetReleaseTrackerByID(context.Background(), id)
 	if err == sql.ErrNoRows {
 		c.JSON(http.StatusNotFound, gin.H{"error": "tracker not found"})
 		return
@@ -741,7 +742,7 @@ func (h *ReleaseTrackerHandler) Run(c *gin.Context) {
 
 func (h *ReleaseTrackerHandler) GetExecutions(c *gin.Context) {
 	id := c.Param("id")
-	execs, err := h.db.ListReleaseTrackerExecutions(id, 50)
+	execs, err := h.db.ListReleaseTrackerExecutions(context.Background(), id, 50)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list executions"})
 		return
@@ -765,7 +766,7 @@ func (h *ReleaseTrackerHandler) GetVersionHistory(c *gin.Context) {
 		}
 	}
 
-	t, err := h.db.GetReleaseTrackerByID(id)
+	t, err := h.db.GetReleaseTrackerByID(context.Background(), id)
 	if err == sql.ErrNoRows {
 		c.JSON(http.StatusNotFound, gin.H{"error": "tracker not found"})
 		return
@@ -777,7 +778,7 @@ func (h *ReleaseTrackerHandler) GetVersionHistory(c *gin.Context) {
 
 	history := make([]models.ReleaseVersionHistoryItem, 0)
 	if t.TrackerType == "docker" {
-		history, err = h.db.ListTrackerTagDigests(id, limit)
+		history, err = h.db.ListTrackerTagDigests(context.Background(), id, limit)
 		if err != nil {
 			log.Printf("Release tracker history: docker history load error (tracker=%s id=%s image=%s tag=%s limit=%d): %v", t.Name, t.ID, t.DockerImage, t.DockerTag, limit, err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load docker version history"})

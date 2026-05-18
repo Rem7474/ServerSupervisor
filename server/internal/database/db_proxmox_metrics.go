@@ -1,6 +1,7 @@
 package database
 
 import (
+	"context"
 	"time"
 
 	"github.com/serversupervisor/server/internal/models"
@@ -8,8 +9,8 @@ import (
 
 // InsertProxmoxNodeMetric stores a point-in-time snapshot of a node's CPU/RAM.
 // Called by the poller after each successful UpsertProxmoxNode.
-func (db *DB) InsertProxmoxNodeMetric(nodeID, connectionID, nodeName string, cpuUsage float64, memTotal, memUsed int64) error {
-	_, err := db.conn.Exec(`
+func (db *DB) InsertProxmoxNodeMetric(ctx context.Context, nodeID, connectionID, nodeName string, cpuUsage float64, memTotal, memUsed int64) error {
+	_, err := db.conn.ExecContext(ctx, `
 		INSERT INTO proxmox_node_metrics (node_id, connection_id, node_name, cpu_usage, mem_total, mem_used, timestamp)
 		VALUES ($1, $2, $3, $4, $5, $6, NOW())`,
 		nodeID, connectionID, nodeName, cpuUsage, memTotal, memUsed,
@@ -19,7 +20,7 @@ func (db *DB) InsertProxmoxNodeMetric(nodeID, connectionID, nodeName string, cpu
 
 // GetProxmoxNodeMetricsSummary returns time-bucketed avg CPU% and RAM% across all nodes,
 // using the same bucket logic as GetMetricsSummary for host agents.
-func (db *DB) GetProxmoxNodeMetricsSummary(hours, bucketMinutes int) ([]models.ProxmoxNodeMetricsSummary, error) {
+func (db *DB) GetProxmoxNodeMetricsSummary(ctx context.Context, hours, bucketMinutes int) ([]models.ProxmoxNodeMetricsSummary, error) {
 	if bucketMinutes <= 0 {
 		bucketMinutes = 5
 	}
@@ -50,7 +51,7 @@ func (db *DB) GetProxmoxNodeMetricsSummary(hours, bucketMinutes int) ([]models.P
 		ORDER BY ts ASC`
 	args = []interface{}{hours, bucketMinutes}
 
-	rows, err := db.conn.Query(query, args...)
+	rows, err := db.conn.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -69,8 +70,8 @@ func (db *DB) GetProxmoxNodeMetricsSummary(hours, bucketMinutes int) ([]models.P
 
 // CleanOldProxmoxNodeMetrics removes snapshots older than retentionDays.
 // Mirrors CleanOldMetrics for host agent data.
-func (db *DB) CleanOldProxmoxNodeMetrics(retentionDays int) (int64, error) {
-	res, err := db.conn.Exec(
+func (db *DB) CleanOldProxmoxNodeMetrics(ctx context.Context, retentionDays int) (int64, error) {
+	res, err := db.conn.ExecContext(ctx, 
 		`DELETE FROM proxmox_node_metrics WHERE timestamp < NOW() - INTERVAL '1 day' * $1`,
 		retentionDays,
 	)
@@ -85,8 +86,8 @@ func (db *DB) CleanOldProxmoxNodeMetrics(retentionDays int) (int64, error) {
 
 // InsertProxmoxGuestMetric stores a point-in-time snapshot of a guest's CPU/RAM.
 // Called by the poller after each successful UpsertProxmoxGuest for running guests.
-func (db *DB) InsertProxmoxGuestMetric(guestID string, cpuUsage float64, memTotal, memUsed int64) error {
-	_, err := db.conn.Exec(`
+func (db *DB) InsertProxmoxGuestMetric(ctx context.Context, guestID string, cpuUsage float64, memTotal, memUsed int64) error {
+	_, err := db.conn.ExecContext(ctx, `
 		INSERT INTO proxmox_guest_metrics (guest_id, cpu_usage, mem_total, mem_used, timestamp)
 		VALUES ($1, $2, $3, $4, NOW())`,
 		guestID, cpuUsage, memTotal, memUsed,
@@ -96,7 +97,7 @@ func (db *DB) InsertProxmoxGuestMetric(guestID string, cpuUsage float64, memTota
 
 // GetProxmoxGuestMetricsSummary returns time-bucketed CPU% and RAM% for a single guest.
 // Same format as ProxmoxNodeMetricsSummary so the frontend can reuse the same chart logic.
-func (db *DB) GetProxmoxGuestMetricsSummary(guestID string, hours, bucketMinutes int) ([]models.ProxmoxNodeMetricsSummary, error) {
+func (db *DB) GetProxmoxGuestMetricsSummary(ctx context.Context, guestID string, hours, bucketMinutes int) ([]models.ProxmoxNodeMetricsSummary, error) {
 	if bucketMinutes <= 0 {
 		bucketMinutes = 5
 	}
@@ -120,7 +121,7 @@ func (db *DB) GetProxmoxGuestMetricsSummary(guestID string, hours, bucketMinutes
 		GROUP BY ts
 		ORDER BY ts ASC`
 
-	rows, err := db.conn.Query(query, guestID, hours, bucketMinutes)
+	rows, err := db.conn.QueryContext(ctx, query, guestID, hours, bucketMinutes)
 	if err != nil {
 		return nil, err
 	}
@@ -139,8 +140,8 @@ func (db *DB) GetProxmoxGuestMetricsSummary(guestID string, hours, bucketMinutes
 
 // GetLatestProxmoxGuestMetricPercent returns the freshest guest CPU% and RAM% sample.
 // cpu_usage is stored as 0-1 ratio in DB and is converted to 0-100 percentage.
-func (db *DB) GetLatestProxmoxGuestMetricPercent(guestID string) (cpuPercent float64, memoryPercent float64, ts time.Time, err error) {
-	err = db.conn.QueryRow(`
+func (db *DB) GetLatestProxmoxGuestMetricPercent(ctx context.Context, guestID string) (cpuPercent float64, memoryPercent float64, ts time.Time, err error) {
+	err = db.conn.QueryRowContext(ctx, `
 		SELECT
 			cpu_usage * 100,
 			CASE WHEN mem_total > 0 THEN mem_used::float / mem_total * 100 ELSE 0 END,
@@ -155,36 +156,36 @@ func (db *DB) GetLatestProxmoxGuestMetricPercent(guestID string) (cpuPercent flo
 }
 
 // GetMaxProxmoxGuestCPUUsagePercent returns the maximum freshest guest CPU usage across all guests.
-func (db *DB) GetMaxProxmoxGuestCPUUsagePercent() float64 {
-	return db.getMaxLatestProxmoxGuestMetricPercent(`gm.cpu_usage * 100`)
+func (db *DB) GetMaxProxmoxGuestCPUUsagePercent(ctx context.Context) float64 {
+	return db.getMaxLatestProxmoxGuestMetricPercent(ctx, `gm.cpu_usage * 100`)
 }
 
 // GetMaxProxmoxGuestCPUUsagePercentByConnection returns the maximum freshest guest CPU usage for one connection.
-func (db *DB) GetMaxProxmoxGuestCPUUsagePercentByConnection(connectionID string) float64 {
-	return db.getMaxLatestProxmoxGuestMetricPercent(`gm.cpu_usage * 100`, `WHERE g.connection_id = $1`, connectionID)
+func (db *DB) GetMaxProxmoxGuestCPUUsagePercentByConnection(ctx context.Context, connectionID string) float64 {
+	return db.getMaxLatestProxmoxGuestMetricPercent(ctx, `gm.cpu_usage * 100`, `WHERE g.connection_id = $1`, connectionID)
 }
 
 // GetMaxProxmoxGuestCPUUsagePercentByNode returns the maximum freshest guest CPU usage for one node.
-func (db *DB) GetMaxProxmoxGuestCPUUsagePercentByNode(nodeID string) float64 {
-	return db.getMaxLatestProxmoxGuestMetricPercent(`gm.cpu_usage * 100`, `JOIN proxmox_nodes n ON n.connection_id = g.connection_id AND n.node_name = g.node_name WHERE n.id = $1`, nodeID)
+func (db *DB) GetMaxProxmoxGuestCPUUsagePercentByNode(ctx context.Context, nodeID string) float64 {
+	return db.getMaxLatestProxmoxGuestMetricPercent(ctx, `gm.cpu_usage * 100`, `JOIN proxmox_nodes n ON n.connection_id = g.connection_id AND n.node_name = g.node_name WHERE n.id = $1`, nodeID)
 }
 
 // GetMaxProxmoxGuestMemoryUsagePercent returns the maximum freshest guest memory usage across all guests.
-func (db *DB) GetMaxProxmoxGuestMemoryUsagePercent() float64 {
-	return db.getMaxLatestProxmoxGuestMetricPercent(`CASE WHEN gm.mem_total > 0 THEN gm.mem_used::float / gm.mem_total * 100 ELSE 0 END`)
+func (db *DB) GetMaxProxmoxGuestMemoryUsagePercent(ctx context.Context) float64 {
+	return db.getMaxLatestProxmoxGuestMetricPercent(ctx, `CASE WHEN gm.mem_total > 0 THEN gm.mem_used::float / gm.mem_total * 100 ELSE 0 END`)
 }
 
 // GetMaxProxmoxGuestMemoryUsagePercentByConnection returns the maximum freshest guest memory usage for one connection.
-func (db *DB) GetMaxProxmoxGuestMemoryUsagePercentByConnection(connectionID string) float64 {
-	return db.getMaxLatestProxmoxGuestMetricPercent(`CASE WHEN gm.mem_total > 0 THEN gm.mem_used::float / gm.mem_total * 100 ELSE 0 END`, `WHERE g.connection_id = $1`, connectionID)
+func (db *DB) GetMaxProxmoxGuestMemoryUsagePercentByConnection(ctx context.Context, connectionID string) float64 {
+	return db.getMaxLatestProxmoxGuestMetricPercent(ctx, `CASE WHEN gm.mem_total > 0 THEN gm.mem_used::float / gm.mem_total * 100 ELSE 0 END`, `WHERE g.connection_id = $1`, connectionID)
 }
 
 // GetMaxProxmoxGuestMemoryUsagePercentByNode returns the maximum freshest guest memory usage for one node.
-func (db *DB) GetMaxProxmoxGuestMemoryUsagePercentByNode(nodeID string) float64 {
-	return db.getMaxLatestProxmoxGuestMetricPercent(`CASE WHEN gm.mem_total > 0 THEN gm.mem_used::float / gm.mem_total * 100 ELSE 0 END`, `JOIN proxmox_nodes n ON n.connection_id = g.connection_id AND n.node_name = g.node_name WHERE n.id = $1`, nodeID)
+func (db *DB) GetMaxProxmoxGuestMemoryUsagePercentByNode(ctx context.Context, nodeID string) float64 {
+	return db.getMaxLatestProxmoxGuestMetricPercent(ctx, `CASE WHEN gm.mem_total > 0 THEN gm.mem_used::float / gm.mem_total * 100 ELSE 0 END`, `JOIN proxmox_nodes n ON n.connection_id = g.connection_id AND n.node_name = g.node_name WHERE n.id = $1`, nodeID)
 }
 
-func (db *DB) getMaxLatestProxmoxGuestMetricPercent(metricExpr string, extraClausesAndArgs ...interface{}) float64 {
+func (db *DB) getMaxLatestProxmoxGuestMetricPercent(ctx context.Context, metricExpr string, extraClausesAndArgs ...interface{}) float64 {
 	whereClause := ""
 	args := []interface{}{}
 	if len(extraClausesAndArgs) > 0 {
@@ -208,69 +209,69 @@ func (db *DB) getMaxLatestProxmoxGuestMetricPercent(metricExpr string, extraClau
 
 	var pct float64
 	if len(args) == 0 {
-		_ = db.conn.QueryRow(query).Scan(&pct)
+		_ = db.conn.QueryRowContext(ctx, query).Scan(&pct)
 	} else {
-		_ = db.conn.QueryRow(query, args...).Scan(&pct)
+		_ = db.conn.QueryRowContext(ctx, query, args...).Scan(&pct)
 	}
 	return pct
 }
 
 // GetMaxProxmoxNodePendingUpdates returns the maximum pending update count across online nodes.
-func (db *DB) GetMaxProxmoxNodePendingUpdates() int {
-	return db.queryMaxProxmoxNodeInt(`TRUE`, nil)
+func (db *DB) GetMaxProxmoxNodePendingUpdates(ctx context.Context) int {
+	return db.queryMaxProxmoxNodeInt(ctx, `TRUE`, nil)
 }
 
 // GetMaxProxmoxNodePendingUpdatesByConnection returns the maximum pending update count for a connection.
-func (db *DB) GetMaxProxmoxNodePendingUpdatesByConnection(connectionID string) int {
-	return db.queryMaxProxmoxNodeInt(`connection_id = $1`, []interface{}{connectionID})
+func (db *DB) GetMaxProxmoxNodePendingUpdatesByConnection(ctx context.Context, connectionID string) int {
+	return db.queryMaxProxmoxNodeInt(ctx, `connection_id = $1`, []interface{}{connectionID})
 }
 
 // GetMaxProxmoxNodePendingUpdatesByNode returns the pending update count for one node.
-func (db *DB) GetMaxProxmoxNodePendingUpdatesByNode(nodeID string) int {
-	return db.queryMaxProxmoxNodeInt(`id = $1`, []interface{}{nodeID})
+func (db *DB) GetMaxProxmoxNodePendingUpdatesByNode(ctx context.Context, nodeID string) int {
+	return db.queryMaxProxmoxNodeInt(ctx, `id = $1`, []interface{}{nodeID})
 }
 
 // GetMaxProxmoxNodeSecurityUpdates returns the maximum security update count across online nodes.
-func (db *DB) GetMaxProxmoxNodeSecurityUpdates() int {
-	return db.queryMaxProxmoxNodeSecurityInt(`TRUE`, nil)
+func (db *DB) GetMaxProxmoxNodeSecurityUpdates(ctx context.Context) int {
+	return db.queryMaxProxmoxNodeSecurityInt(ctx, `TRUE`, nil)
 }
 
 // GetMaxProxmoxNodeSecurityUpdatesByConnection returns the maximum security update count for a connection.
-func (db *DB) GetMaxProxmoxNodeSecurityUpdatesByConnection(connectionID string) int {
-	return db.queryMaxProxmoxNodeSecurityInt(`connection_id = $1`, []interface{}{connectionID})
+func (db *DB) GetMaxProxmoxNodeSecurityUpdatesByConnection(ctx context.Context, connectionID string) int {
+	return db.queryMaxProxmoxNodeSecurityInt(ctx, `connection_id = $1`, []interface{}{connectionID})
 }
 
 // GetMaxProxmoxNodeSecurityUpdatesByNode returns the security update count for one node.
-func (db *DB) GetMaxProxmoxNodeSecurityUpdatesByNode(nodeID string) int {
-	return db.queryMaxProxmoxNodeSecurityInt(`id = $1`, []interface{}{nodeID})
+func (db *DB) GetMaxProxmoxNodeSecurityUpdatesByNode(ctx context.Context, nodeID string) int {
+	return db.queryMaxProxmoxNodeSecurityInt(ctx, `id = $1`, []interface{}{nodeID})
 }
 
-func (db *DB) queryMaxProxmoxNodeInt(whereClause string, args []interface{}) int {
+func (db *DB) queryMaxProxmoxNodeInt(ctx context.Context, whereClause string, args []interface{}) int {
 	query := `SELECT COALESCE(MAX(pending_updates), 0) FROM proxmox_nodes WHERE ` + whereClause
 	var value int
 	if len(args) == 0 {
-		_ = db.conn.QueryRow(query).Scan(&value)
+		_ = db.conn.QueryRowContext(ctx, query).Scan(&value)
 	} else {
-		_ = db.conn.QueryRow(query, args...).Scan(&value)
+		_ = db.conn.QueryRowContext(ctx, query, args...).Scan(&value)
 	}
 	return value
 }
 
-func (db *DB) queryMaxProxmoxNodeSecurityInt(whereClause string, args []interface{}) int {
+func (db *DB) queryMaxProxmoxNodeSecurityInt(ctx context.Context, whereClause string, args []interface{}) int {
 	query := `SELECT COALESCE(MAX(security_updates), 0) FROM proxmox_nodes WHERE ` + whereClause
 	var value int
 	if len(args) == 0 {
-		_ = db.conn.QueryRow(query).Scan(&value)
+		_ = db.conn.QueryRowContext(ctx, query).Scan(&value)
 	} else {
-		_ = db.conn.QueryRow(query, args...).Scan(&value)
+		_ = db.conn.QueryRowContext(ctx, query, args...).Scan(&value)
 	}
 	return value
 }
 
 // GetRecentFailedTaskCountByConnection returns the number of failed tasks since the given time for one connection.
-func (db *DB) GetRecentFailedTaskCountByConnection(connectionID string, since time.Time) (int, error) {
+func (db *DB) GetRecentFailedTaskCountByConnection(ctx context.Context, connectionID string, since time.Time) (int, error) {
 	var count int
-	err := db.conn.QueryRow(`
+	err := db.conn.QueryRowContext(ctx, `
 		SELECT COUNT(*) FROM proxmox_tasks
 		WHERE connection_id = $1
 		  AND status='stopped' AND exit_status != '' AND exit_status != 'OK'
@@ -280,9 +281,9 @@ func (db *DB) GetRecentFailedTaskCountByConnection(connectionID string, since ti
 }
 
 // GetRecentFailedTaskCountByNode returns the number of failed tasks since the given time for one node.
-func (db *DB) GetRecentFailedTaskCountByNode(connectionID, nodeName string, since time.Time) (int, error) {
+func (db *DB) GetRecentFailedTaskCountByNode(ctx context.Context, connectionID, nodeName string, since time.Time) (int, error) {
 	var count int
-	err := db.conn.QueryRow(`
+	err := db.conn.QueryRowContext(ctx, `
 		SELECT COUNT(*) FROM proxmox_tasks
 		WHERE connection_id = $1 AND node_name = $2
 		  AND status='stopped' AND exit_status != '' AND exit_status != 'OK'
@@ -292,9 +293,9 @@ func (db *DB) GetRecentFailedTaskCountByNode(connectionID, nodeName string, sinc
 }
 
 // GetRecentFailedTaskCountByNodeID returns failed task count for a Proxmox node UUID.
-func (db *DB) GetRecentFailedTaskCountByNodeID(nodeID string, since time.Time) (int, error) {
+func (db *DB) GetRecentFailedTaskCountByNodeID(ctx context.Context, nodeID string, since time.Time) (int, error) {
 	var count int
-	err := db.conn.QueryRow(`
+	err := db.conn.QueryRowContext(ctx, `
 		SELECT COUNT(*)
 		FROM proxmox_tasks t
 		JOIN proxmox_nodes n ON n.connection_id = t.connection_id AND n.node_name = t.node_name
@@ -306,23 +307,23 @@ func (db *DB) GetRecentFailedTaskCountByNodeID(nodeID string, since time.Time) (
 }
 
 // GetProxmoxDiskFailedCount returns the number of failed disks across all active disks.
-func (db *DB) GetProxmoxDiskFailedCount() int {
-	return db.queryProxmoxDiskCount(`health = 'FAILED'`, nil)
+func (db *DB) GetProxmoxDiskFailedCount(ctx context.Context) int {
+	return db.queryProxmoxDiskCount(ctx, `health = 'FAILED'`, nil)
 }
 
 // GetProxmoxDiskFailedCountByConnection returns the number of failed disks for a connection.
-func (db *DB) GetProxmoxDiskFailedCountByConnection(connectionID string) int {
-	return db.queryProxmoxDiskCount(`connection_id = $1 AND health = 'FAILED'`, []interface{}{connectionID})
+func (db *DB) GetProxmoxDiskFailedCountByConnection(ctx context.Context, connectionID string) int {
+	return db.queryProxmoxDiskCount(ctx, `connection_id = $1 AND health = 'FAILED'`, []interface{}{connectionID})
 }
 
 // GetProxmoxDiskFailedCountByNode returns the number of failed disks for a node.
-func (db *DB) GetProxmoxDiskFailedCountByNode(connectionID, nodeName string) int {
-	return db.queryProxmoxDiskCount(`connection_id = $1 AND node_name = $2 AND health = 'FAILED'`, []interface{}{connectionID, nodeName})
+func (db *DB) GetProxmoxDiskFailedCountByNode(ctx context.Context, connectionID, nodeName string) int {
+	return db.queryProxmoxDiskCount(ctx, `connection_id = $1 AND node_name = $2 AND health = 'FAILED'`, []interface{}{connectionID, nodeName})
 }
 
 // GetProxmoxDiskFailedCountByNodeID returns the number of failed disks for a node UUID.
-func (db *DB) GetProxmoxDiskFailedCountByNodeID(nodeID string) int {
-	return db.queryProxmoxDiskCount(`EXISTS (
+func (db *DB) GetProxmoxDiskFailedCountByNodeID(ctx context.Context, nodeID string) int {
+	return db.queryProxmoxDiskCount(ctx, `EXISTS (
 		SELECT 1 FROM proxmox_nodes n
 		WHERE n.id = $1
 		  AND n.connection_id = proxmox_disks.connection_id
@@ -331,39 +332,39 @@ func (db *DB) GetProxmoxDiskFailedCountByNodeID(nodeID string) int {
 }
 
 // GetProxmoxDiskFailedCountByDiskID returns 1 when the targeted disk is FAILED, else 0.
-func (db *DB) GetProxmoxDiskFailedCountByDiskID(diskID string) int {
-	return db.queryProxmoxDiskCount(`id = $1 AND health = 'FAILED'`, []interface{}{diskID})
+func (db *DB) GetProxmoxDiskFailedCountByDiskID(ctx context.Context, diskID string) int {
+	return db.queryProxmoxDiskCount(ctx, `id = $1 AND health = 'FAILED'`, []interface{}{diskID})
 }
 
-func (db *DB) queryProxmoxDiskCount(whereClause string, args []interface{}) int {
+func (db *DB) queryProxmoxDiskCount(ctx context.Context, whereClause string, args []interface{}) int {
 	query := `SELECT COALESCE(COUNT(*), 0) FROM proxmox_disks WHERE ` + whereClause
 	var count int
 	if len(args) == 0 {
-		_ = db.conn.QueryRow(query).Scan(&count)
+		_ = db.conn.QueryRowContext(ctx, query).Scan(&count)
 	} else {
-		_ = db.conn.QueryRow(query, args...).Scan(&count)
+		_ = db.conn.QueryRowContext(ctx, query, args...).Scan(&count)
 	}
 	return count
 }
 
 // GetProxmoxDiskMinWearoutPercent returns the minimum wearout percentage across active disks.
-func (db *DB) GetProxmoxDiskMinWearoutPercent() float64 {
-	return db.queryProxmoxDiskMinWearout(`wearout >= 0`, nil)
+func (db *DB) GetProxmoxDiskMinWearoutPercent(ctx context.Context) float64 {
+	return db.queryProxmoxDiskMinWearout(ctx, `wearout >= 0`, nil)
 }
 
 // GetProxmoxDiskMinWearoutPercentByConnection returns the minimum wearout percentage for a connection.
-func (db *DB) GetProxmoxDiskMinWearoutPercentByConnection(connectionID string) float64 {
-	return db.queryProxmoxDiskMinWearout(`connection_id = $1 AND wearout >= 0`, []interface{}{connectionID})
+func (db *DB) GetProxmoxDiskMinWearoutPercentByConnection(ctx context.Context, connectionID string) float64 {
+	return db.queryProxmoxDiskMinWearout(ctx, `connection_id = $1 AND wearout >= 0`, []interface{}{connectionID})
 }
 
 // GetProxmoxDiskMinWearoutPercentByNode returns the minimum wearout percentage for a node.
-func (db *DB) GetProxmoxDiskMinWearoutPercentByNode(connectionID, nodeName string) float64 {
-	return db.queryProxmoxDiskMinWearout(`connection_id = $1 AND node_name = $2 AND wearout >= 0`, []interface{}{connectionID, nodeName})
+func (db *DB) GetProxmoxDiskMinWearoutPercentByNode(ctx context.Context, connectionID, nodeName string) float64 {
+	return db.queryProxmoxDiskMinWearout(ctx, `connection_id = $1 AND node_name = $2 AND wearout >= 0`, []interface{}{connectionID, nodeName})
 }
 
 // GetProxmoxDiskMinWearoutPercentByNodeID returns the minimum wearout percentage for a node UUID.
-func (db *DB) GetProxmoxDiskMinWearoutPercentByNodeID(nodeID string) float64 {
-	return db.queryProxmoxDiskMinWearout(`EXISTS (
+func (db *DB) GetProxmoxDiskMinWearoutPercentByNodeID(ctx context.Context, nodeID string) float64 {
+	return db.queryProxmoxDiskMinWearout(ctx, `EXISTS (
 		SELECT 1 FROM proxmox_nodes n
 		WHERE n.id = $1
 		  AND n.connection_id = proxmox_disks.connection_id
@@ -372,24 +373,24 @@ func (db *DB) GetProxmoxDiskMinWearoutPercentByNodeID(nodeID string) float64 {
 }
 
 // GetProxmoxDiskWearoutPercentByDiskID returns the wearout value for one physical disk.
-func (db *DB) GetProxmoxDiskWearoutPercentByDiskID(diskID string) float64 {
-	return db.queryProxmoxDiskMinWearout(`id = $1 AND wearout >= 0`, []interface{}{diskID})
+func (db *DB) GetProxmoxDiskWearoutPercentByDiskID(ctx context.Context, diskID string) float64 {
+	return db.queryProxmoxDiskMinWearout(ctx, `id = $1 AND wearout >= 0`, []interface{}{diskID})
 }
 
-func (db *DB) queryProxmoxDiskMinWearout(whereClause string, args []interface{}) float64 {
+func (db *DB) queryProxmoxDiskMinWearout(ctx context.Context, whereClause string, args []interface{}) float64 {
 	query := `SELECT COALESCE(MIN(wearout), 0) FROM proxmox_disks WHERE ` + whereClause
 	var pct float64
 	if len(args) == 0 {
-		_ = db.conn.QueryRow(query).Scan(&pct)
+		_ = db.conn.QueryRowContext(ctx, query).Scan(&pct)
 	} else {
-		_ = db.conn.QueryRow(query, args...).Scan(&pct)
+		_ = db.conn.QueryRowContext(ctx, query, args...).Scan(&pct)
 	}
 	return pct
 }
 
 // CleanOldProxmoxGuestMetrics removes guest snapshots older than retentionDays.
-func (db *DB) CleanOldProxmoxGuestMetrics(retentionDays int) (int64, error) {
-	res, err := db.conn.Exec(
+func (db *DB) CleanOldProxmoxGuestMetrics(ctx context.Context, retentionDays int) (int64, error) {
+	res, err := db.conn.ExecContext(ctx, 
 		`DELETE FROM proxmox_guest_metrics WHERE timestamp < NOW() - INTERVAL '1 day' * $1`,
 		retentionDays,
 	)
@@ -402,9 +403,9 @@ func (db *DB) CleanOldProxmoxGuestMetrics(retentionDays int) (int64, error) {
 
 // GetNodeIDByConnectionAndName resolves a proxmox_nodes UUID from its composite key.
 // Used by the poller so we can insert node metrics without an extra JOIN.
-func (db *DB) GetProxmoxNodeID(connectionID, nodeName string) (string, error) {
+func (db *DB) GetProxmoxNodeID(ctx context.Context, connectionID, nodeName string) (string, error) {
 	var id string
-	err := db.conn.QueryRow(
+	err := db.conn.QueryRowContext(ctx, 
 		`SELECT id FROM proxmox_nodes WHERE connection_id = $1 AND node_name = $2`,
 		connectionID, nodeName,
 	).Scan(&id)
@@ -412,7 +413,7 @@ func (db *DB) GetProxmoxNodeID(connectionID, nodeName string) (string, error) {
 }
 
 // GetProxmoxNodeMetricsSummaryByNode returns time-bucketed stats for a single node.
-func (db *DB) GetProxmoxNodeMetricsSummaryByNode(nodeID string, hours, bucketMinutes int) ([]models.ProxmoxNodeMetricsSummary, error) {
+func (db *DB) GetProxmoxNodeMetricsSummaryByNode(ctx context.Context, nodeID string, hours, bucketMinutes int) ([]models.ProxmoxNodeMetricsSummary, error) {
 	if bucketMinutes <= 0 {
 		bucketMinutes = 5
 	}
@@ -436,7 +437,7 @@ func (db *DB) GetProxmoxNodeMetricsSummaryByNode(nodeID string, hours, bucketMin
 		GROUP BY ts
 		ORDER BY ts ASC`
 
-	rows, err := db.conn.Query(query, nodeID, hours, bucketMinutes)
+	rows, err := db.conn.QueryContext(ctx, query, nodeID, hours, bucketMinutes)
 	if err != nil {
 		return nil, err
 	}

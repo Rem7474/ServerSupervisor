@@ -694,7 +694,7 @@
 
 <script setup>
 import { ref, onUnmounted, computed } from 'vue'
-import CVEList from '../components/CVEList.vue'
+import CVEList from '../components/apt/CVEList.vue'
 import apiClient, { getApiErrorMessage } from '../api'
 import { useAuthStore } from '../stores/auth'
 import { useWebSocket } from '../composables/useWebSocket'
@@ -704,7 +704,7 @@ import { useDateFormatter } from '../composables/useDateFormatter'
 import { useStatusBadge } from '../composables/useStatusBadge'
 import { useToast } from '../composables/useToast'
 import { useCommandStream } from '../composables/useCommandStream'
-import CommandLogPanel from '../components/CommandLogPanel.vue'
+import CommandLogPanel from '../components/host/CommandLogPanel.vue'
 import WsStatusBar from '../components/WsStatusBar.vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import CronBuilder from '../components/CronBuilder.vue'
@@ -791,7 +791,7 @@ async function saveSchedule() {
 const showConsole = ref(false)
 const liveCommand = ref(null)
 const { value: bulkActionFeedback, showToast: showBulkActionFeedback } = useToast(null)
-const { openCommandStream, closeStream } = useCommandStream({ token: () => auth.token })
+const { openCommandStream, closeStream } = useCommandStream()
 const aptBulkLoading = ref(null)
 
 // ── Filtres / tri des hôtes ───────────────────────────────────────────────────

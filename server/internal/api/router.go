@@ -3,6 +3,7 @@ package api
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/serversupervisor/server/internal/config"
+	"github.com/serversupervisor/server/internal/cookies"
 	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/dispatch"
 	"github.com/serversupervisor/server/internal/handlers"
@@ -57,6 +58,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 
 	v1 := r.Group("/api/v1")
 	v1.Use(JWTMiddleware(cfg))
+	v1.Use(cookies.CSRFMiddleware())
 	registerAuthRoutes(v1, authH)
 	registerHostRoutes(v1, hostH, agentH, db)
 	registerDockerRoutes(v1, dockerH, systemH, networkH, agentH)

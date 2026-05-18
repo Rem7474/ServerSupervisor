@@ -1,6 +1,7 @@
 package networkview
 
 import (
+	"context"
 	"strconv"
 	"strings"
 	"time"
@@ -10,18 +11,18 @@ import (
 )
 
 func BuildSnapshot(db *database.DB) (*models.NetworkSnapshot, error) {
-	hosts, err := db.GetAllHosts()
+	hosts, err := db.GetAllHosts(context.Background())
 	if err != nil {
 		return nil, err
 	}
-	containers, err := db.GetAllDockerContainers()
+	containers, err := db.GetAllDockerContainers(context.Background())
 	if err != nil {
 		return nil, err
 	}
 
 	metricsByHost := make(map[string]*models.SystemMetrics)
 	for _, host := range hosts {
-		metrics, err := db.GetLatestMetrics(host.ID)
+		metrics, err := db.GetLatestMetrics(context.Background(), host.ID)
 		if err == nil {
 			metricsByHost[host.ID] = metrics
 		}

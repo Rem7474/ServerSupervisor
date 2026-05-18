@@ -761,7 +761,7 @@ import DataToolbar from './common/DataToolbar.vue'
 import SortableHeader from './common/SortableHeader.vue'
 import DockerPortBadges from './common/DockerPortBadges.vue'
 import EmptyState from './EmptyState.vue'
-import { useDockerContainerPorts } from '../composables/useDockerContainerPorts'
+import { useDockerContainerPorts } from '../../composables/useDockerContainerPorts'
 
 const router = useRouter()
 

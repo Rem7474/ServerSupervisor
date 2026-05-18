@@ -1,23 +1,28 @@
 package ws
 
 import (
-	"strings"
+	"context"
 
 	"github.com/serversupervisor/server/internal/models"
+	"github.com/serversupervisor/server/internal/releasetracker"
 )
 
+// buildVersionComparisons aggregates running containers per release tracker
+// and produces a comparison row used by dashboard / host detail snapshots.
+// The pure version logic lives in the releasetracker package — this method
+// owns only the WS-handler-side DB orchestration.
 func (h *WSHandler) buildVersionComparisons() ([]models.VersionComparison, error) {
-	trackers, err := h.db.ListReleaseTrackers()
+	trackers, err := h.db.ListReleaseTrackers(context.Background())
 	if err != nil {
 		return nil, err
 	}
 
-	containers, err := h.db.GetAllDockerContainers()
+	containers, err := h.db.GetAllDockerContainers(context.Background())
 	if err != nil {
 		return nil, err
 	}
 
-	digestTagMap, _ := h.db.GetAllTrackerTagDigests()
+	digestTagMap, _ := h.db.GetAllTrackerTagDigests(context.Background())
 	if digestTagMap == nil {
 		digestTagMap = make(map[string]string)
 	}
@@ -48,12 +53,12 @@ func (h *WSHandler) buildVersionComparisons() ([]models.VersionComparison, error
 				continue
 			}
 
-			nd := normalizeDigest(container.ImageDigest)
-			ld := normalizeDigest(tracker.LatestImageDigest)
+			nd := releasetracker.NormalizeDigest(container.ImageDigest)
+			ld := releasetracker.NormalizeDigest(tracker.LatestImageDigest)
 
 			// Resolve display version with digest priority: digest can reveal an exact
 			// deployed release (e.g. v5.13.2) even if runtime tag stays broad (e.g. v5).
-			runningVersion := resolveContainerVersion(container.ImageTag, container.Labels)
+			runningVersion := releasetracker.ResolveContainerVersion(container.ImageTag, container.Labels)
 			if nd != "" {
 				if nd == ld {
 					runningVersion = tracker.LastReleaseTag
@@ -71,7 +76,7 @@ func (h *WSHandler) buildVersionComparisons() ([]models.VersionComparison, error
 			if effectiveTag == "latest" && runningVersion != "" {
 				effectiveTag = runningVersion
 			}
-			isUpToDate := isVersionUpToDate(effectiveTag, container.ImageDigest, tracker.LastReleaseTag, tracker.LatestImageDigest)
+			isUpToDate := releasetracker.IsVersionUpToDate(effectiveTag, container.ImageDigest, tracker.LastReleaseTag, tracker.LatestImageDigest)
 			updateConfirmed := !isUpToDate && nd != "" && ld != ""
 
 			matchCount++
@@ -122,61 +127,4 @@ func (h *WSHandler) buildVersionComparisons() ([]models.VersionComparison, error
 	}
 
 	return comparisons, nil
-}
-
-func normalizeDigest(d string) string {
-	return strings.TrimPrefix(d, "sha256:")
-}
-
-func isVersionUpToDate(runningTag, runningDigest, latestTag, latestDigest string) bool {
-	// Digest equality is the strongest signal when both are known.
-	nd := normalizeDigest(runningDigest)
-	ld := normalizeDigest(latestDigest)
-	if nd != "" && ld != "" && nd == ld {
-		return true
-	}
-
-	// When both tags are explicit (non-"latest") versions, tag equality wins.
-	// Digest may legitimately differ across architectures or registry re-pushes.
-	if runningTag != "latest" && latestTag != "latest" {
-		r := normalizeVersion(runningTag)
-		l := normalizeVersion(latestTag)
-		if r == l {
-			return true
-		}
-		// Support channel-like tags such as "v5" while running explicit patch versions like "v5.13.2".
-		if l != "" && strings.HasPrefix(r, l+".") {
-			return true
-		}
-		return false
-	}
-
-	// For "latest" tags, rely on digest comparison when available.
-	if nd != "" && ld != "" {
-		return nd == ld
-	}
-	return false
-}
-
-func normalizeVersion(v string) string {
-	if len(v) > 0 && v[0] == 'v' {
-		return v[1:]
-	}
-	return v
-}
-
-func resolveContainerVersion(imageTag string, labels map[string]string) string {
-	if imageTag != "latest" {
-		return imageTag
-	}
-	for _, key := range []string{
-		"org.opencontainers.image.version",
-		"org.label-schema.version",
-		"version",
-	} {
-		if v := labels[key]; v != "" {
-			return v
-		}
-	}
-	return imageTag
 }

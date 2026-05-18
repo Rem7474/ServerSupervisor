@@ -1,6 +1,7 @@
 package database
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"time"
@@ -9,8 +10,8 @@ import (
 )
 
 // GetScheduledTasks returns all scheduled tasks for a host, including the last command ID.
-func (db *DB) GetScheduledTasks(hostID string) ([]models.ScheduledTask, error) {
-	rows, err := db.conn.Query(`
+func (db *DB) GetScheduledTasks(ctx context.Context, hostID string) ([]models.ScheduledTask, error) {
+	rows, err := db.conn.QueryContext(ctx, `
 		SELECT st.id, st.host_id, st.name, st.module, st.action, st.target, st.payload::text,
 		       st.cron_expression, st.enabled, st.last_run_at, st.next_run_at, st.last_run_status,
 		       st.created_by, st.created_at,
@@ -55,8 +56,8 @@ func (db *DB) GetScheduledTasks(hostID string) ([]models.ScheduledTask, error) {
 
 // GetGlobalScheduledTasks returns all scheduled tasks across all hosts, with host name.
 // Used by the global scheduled-tasks view.
-func (db *DB) GetGlobalScheduledTasks() ([]models.ScheduledTaskWithHost, error) {
-	rows, err := db.conn.Query(`
+func (db *DB) GetGlobalScheduledTasks(ctx context.Context) ([]models.ScheduledTaskWithHost, error) {
+	rows, err := db.conn.QueryContext(ctx, `
 		SELECT st.id, st.host_id, st.name, st.module, st.action, st.target, st.payload::text,
 		       st.cron_expression, st.enabled, st.last_run_at, st.next_run_at, st.last_run_status,
 		       st.created_by, st.created_at, h.name
@@ -95,8 +96,8 @@ func (db *DB) GetGlobalScheduledTasks() ([]models.ScheduledTaskWithHost, error) 
 
 // GetAllScheduledTasks returns all enabled scheduled tasks across all hosts.
 // Used by the scheduler on startup.
-func (db *DB) GetAllScheduledTasks() ([]models.ScheduledTask, error) {
-	rows, err := db.conn.Query(`
+func (db *DB) GetAllScheduledTasks(ctx context.Context) ([]models.ScheduledTask, error) {
+	rows, err := db.conn.QueryContext(ctx, `
 		SELECT id, host_id, name, module, action, target, payload::text,
 		       cron_expression, enabled, last_run_at, next_run_at, last_run_status,
 		       created_by, created_at
@@ -111,7 +112,7 @@ func (db *DB) GetAllScheduledTasks() ([]models.ScheduledTask, error) {
 }
 
 // CreateScheduledTask inserts a new scheduled task and returns it.
-func (db *DB) CreateScheduledTask(t models.ScheduledTask) (*models.ScheduledTask, error) {
+func (db *DB) CreateScheduledTask(ctx context.Context, t models.ScheduledTask) (*models.ScheduledTask, error) {
 	payload := t.Payload
 	if payload == "" {
 		payload = "{}"
@@ -119,7 +120,7 @@ func (db *DB) CreateScheduledTask(t models.ScheduledTask) (*models.ScheduledTask
 	var out models.ScheduledTask
 	var lastRunAt, nextRunAt sql.NullTime
 	var lastRunStatus sql.NullString
-	err := db.conn.QueryRow(`
+	err := db.conn.QueryRowContext(ctx, `
 		INSERT INTO scheduled_tasks (host_id, name, module, action, target, payload,
 		                             cron_expression, enabled, created_by)
 		VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9)
@@ -149,12 +150,12 @@ func (db *DB) CreateScheduledTask(t models.ScheduledTask) (*models.ScheduledTask
 }
 
 // UpdateScheduledTask updates mutable fields of a scheduled task.
-func (db *DB) UpdateScheduledTask(id string, t models.ScheduledTask) error {
+func (db *DB) UpdateScheduledTask(ctx context.Context, id string, t models.ScheduledTask) error {
 	payload := t.Payload
 	if payload == "" {
 		payload = "{}"
 	}
-	_, err := db.conn.Exec(`
+	_, err := db.conn.ExecContext(ctx, `
 		UPDATE scheduled_tasks
 		SET name=$1, module=$2, action=$3, target=$4, payload=$5::jsonb,
 		    cron_expression=$6, enabled=$7
@@ -166,14 +167,14 @@ func (db *DB) UpdateScheduledTask(id string, t models.ScheduledTask) error {
 }
 
 // DeleteScheduledTask removes a scheduled task by ID.
-func (db *DB) DeleteScheduledTask(id string) error {
-	_, err := db.conn.Exec(`DELETE FROM scheduled_tasks WHERE id=$1`, id)
+func (db *DB) DeleteScheduledTask(ctx context.Context, id string) error {
+	_, err := db.conn.ExecContext(ctx, `DELETE FROM scheduled_tasks WHERE id=$1`, id)
 	return err
 }
 
 // UpdateScheduledTaskRun records the result of a task execution and updates next_run_at.
-func (db *DB) UpdateScheduledTaskRun(id, status string, lastRunAt, nextRunAt time.Time) error {
-	_, err := db.conn.Exec(`
+func (db *DB) UpdateScheduledTaskRun(ctx context.Context, id, status string, lastRunAt, nextRunAt time.Time) error {
+	_, err := db.conn.ExecContext(ctx, `
 		UPDATE scheduled_tasks
 		SET last_run_at=$1, next_run_at=$2, last_run_status=$3
 		WHERE id=$4`,
@@ -184,25 +185,25 @@ func (db *DB) UpdateScheduledTaskRun(id, status string, lastRunAt, nextRunAt tim
 
 // UpdateScheduledTaskStatus updates only last_run_status and last_run_at to NOW().
 // Used when a command result arrives (completed/failed) to reflect the final outcome.
-func (db *DB) UpdateScheduledTaskStatus(id, status string) error {
-	_, err := db.conn.Exec(`
+func (db *DB) UpdateScheduledTaskStatus(ctx context.Context, id, status string) error {
+	_, err := db.conn.ExecContext(ctx, `
 		UPDATE scheduled_tasks SET last_run_status = $1, last_run_at = NOW() WHERE id = $2`,
 		status, id)
 	return err
 }
 
 // SetScheduledTaskNextRun updates only the next_run_at field (used after registration).
-func (db *DB) SetScheduledTaskNextRun(id string, nextRunAt time.Time) error {
-	_, err := db.conn.Exec(`UPDATE scheduled_tasks SET next_run_at=$1 WHERE id=$2`, nextRunAt, id)
+func (db *DB) SetScheduledTaskNextRun(ctx context.Context, id string, nextRunAt time.Time) error {
+	_, err := db.conn.ExecContext(ctx, `UPDATE scheduled_tasks SET next_run_at=$1 WHERE id=$2`, nextRunAt, id)
 	return err
 }
 
 // GetScheduledTask returns a single scheduled task by ID.
-func (db *DB) GetScheduledTask(id string) (*models.ScheduledTask, error) {
+func (db *DB) GetScheduledTask(ctx context.Context, id string) (*models.ScheduledTask, error) {
 	var out models.ScheduledTask
 	var lastRunAt, nextRunAt sql.NullTime
 	var lastRunStatus sql.NullString
-	err := db.conn.QueryRow(`
+	err := db.conn.QueryRowContext(ctx, `
 		SELECT id, host_id, name, module, action, target, payload::text,
 		       cron_expression, enabled, last_run_at, next_run_at, last_run_status,
 		       created_by, created_at
@@ -228,11 +229,11 @@ func (db *DB) GetScheduledTask(id string) (*models.ScheduledTask, error) {
 }
 
 // GetScheduledTaskExecutions returns the last N remote_commands linked to a scheduled task.
-func (db *DB) GetScheduledTaskExecutions(taskID string, limit int) ([]models.RemoteCommand, error) {
+func (db *DB) GetScheduledTaskExecutions(ctx context.Context, taskID string, limit int) ([]models.RemoteCommand, error) {
 	if limit <= 0 {
 		limit = 20
 	}
-	rows, err := db.conn.Query(`
+	rows, err := db.conn.QueryContext(ctx, `
 		SELECT id, host_id, module, action, target, payload::text,
 		       status, output, triggered_by, created_at, started_at, ended_at
 		FROM remote_commands

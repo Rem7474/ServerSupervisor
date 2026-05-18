@@ -1,6 +1,7 @@
 package database
 
 import (
+	"context"
 	"time"
 
 	"github.com/serversupervisor/server/internal/models"
@@ -8,16 +9,16 @@ import (
 
 // ========== Login Events ==========
 
-func (db *DB) CreateLoginEvent(username, ipAddress, userAgent string, success bool) error {
-	_, err := db.conn.Exec(
+func (db *DB) CreateLoginEvent(ctx context.Context, username, ipAddress, userAgent string, success bool) error {
+	_, err := db.conn.ExecContext(ctx, 
 		`INSERT INTO login_events (username, ip_address, user_agent, success) VALUES ($1, $2, $3, $4)`,
 		username, ipAddress, userAgent, success,
 	)
 	return err
 }
 
-func (db *DB) GetLoginEventsByUser(username string, limit, offset int) ([]models.LoginEvent, error) {
-	rows, err := db.conn.Query(
+func (db *DB) GetLoginEventsByUser(ctx context.Context, username string, limit, offset int) ([]models.LoginEvent, error) {
+	rows, err := db.conn.QueryContext(ctx, 
 		`SELECT id, username, ip_address, success, user_agent, created_at
 		 FROM login_events WHERE username = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
 		username, limit, offset,
@@ -38,9 +39,9 @@ func (db *DB) GetLoginEventsByUser(username string, limit, offset int) ([]models
 	return events, nil
 }
 
-func (db *DB) CountRecentFailedLogins(ipAddress string, since time.Time) (int, error) {
+func (db *DB) CountRecentFailedLogins(ctx context.Context, ipAddress string, since time.Time) (int, error) {
 	var count int
-	err := db.conn.QueryRow(
+	err := db.conn.QueryRowContext(ctx, 
 		`SELECT COUNT(*) FROM login_events WHERE ip_address = $1 AND success = FALSE AND created_at >= $2`,
 		ipAddress, since,
 	).Scan(&count)
@@ -49,9 +50,9 @@ func (db *DB) CountRecentFailedLogins(ipAddress string, since time.Time) (int, e
 
 // CountRecentFailedLoginsAfterUnblock counts failures in the window that occurred after the last
 // manual unblock for this IP (if any), so an admin unblock is respected across restarts.
-func (db *DB) CountRecentFailedLoginsAfterUnblock(ipAddress string, since time.Time) (int, error) {
+func (db *DB) CountRecentFailedLoginsAfterUnblock(ctx context.Context, ipAddress string, since time.Time) (int, error) {
 	var count int
-	err := db.conn.QueryRow(`
+	err := db.conn.QueryRowContext(ctx, `
 		SELECT COUNT(*) FROM login_events
 		WHERE ip_address = $1
 		  AND success = FALSE
@@ -66,8 +67,8 @@ func (db *DB) CountRecentFailedLoginsAfterUnblock(ipAddress string, since time.T
 }
 
 // UpsertIPUnblock records a manual admin unblock for an IP, persisting it across restarts.
-func (db *DB) UpsertIPUnblock(ipAddress, unblockedBy string) error {
-	_, err := db.conn.Exec(`
+func (db *DB) UpsertIPUnblock(ctx context.Context, ipAddress, unblockedBy string) error {
+	_, err := db.conn.ExecContext(ctx, `
 		INSERT INTO ip_block_overrides (ip_address, unblocked_at, unblocked_by)
 		VALUES ($1, NOW(), $2)
 		ON CONFLICT (ip_address) DO UPDATE
@@ -79,8 +80,8 @@ func (db *DB) UpsertIPUnblock(ipAddress, unblockedBy string) error {
 
 // GetCurrentlyBlockedIPs returns IPs that have >= threshold failures within the window,
 // excluding those that have been manually unblocked after their last failure.
-func (db *DB) GetCurrentlyBlockedIPs(since time.Time, threshold int) ([]string, error) {
-	rows, err := db.conn.Query(`
+func (db *DB) GetCurrentlyBlockedIPs(ctx context.Context, since time.Time, threshold int) ([]string, error) {
+	rows, err := db.conn.QueryContext(ctx, `
 		SELECT l.ip_address
 		FROM login_events l
 		WHERE l.success = FALSE
@@ -110,9 +111,9 @@ func (db *DB) GetCurrentlyBlockedIPs(since time.Time, threshold int) ([]string, 
 }
 
 // GetLoginStats returns aggregate login counts for the given time window.
-func (db *DB) GetLoginStats(since time.Time) (*models.LoginStats, error) {
+func (db *DB) GetLoginStats(ctx context.Context, since time.Time) (*models.LoginStats, error) {
 	var stats models.LoginStats
-	err := db.conn.QueryRow(`
+	err := db.conn.QueryRowContext(ctx, `
 		SELECT
 			COUNT(*) AS total,
 			COUNT(*) FILTER (WHERE NOT success) AS failures,
@@ -125,8 +126,8 @@ func (db *DB) GetLoginStats(since time.Time) (*models.LoginStats, error) {
 	return &stats, nil
 }
 
-func (db *DB) GetAllLoginEvents(limit, offset int) ([]models.LoginEvent, error) {
-	rows, err := db.conn.Query(
+func (db *DB) GetAllLoginEvents(ctx context.Context, limit, offset int) ([]models.LoginEvent, error) {
+	rows, err := db.conn.QueryContext(ctx, 
 		`SELECT id, username, ip_address, success, user_agent, created_at
 		 FROM login_events ORDER BY created_at DESC LIMIT $1 OFFSET $2`,
 		limit, offset,
@@ -147,15 +148,15 @@ func (db *DB) GetAllLoginEvents(limit, offset int) ([]models.LoginEvent, error) 
 	return events, nil
 }
 
-func (db *DB) CountLoginEvents() (int64, error) {
+func (db *DB) CountLoginEvents(ctx context.Context) (int64, error) {
 	var count int64
-	err := db.conn.QueryRow(`SELECT COUNT(*) FROM login_events`).Scan(&count)
+	err := db.conn.QueryRowContext(ctx, `SELECT COUNT(*) FROM login_events`).Scan(&count)
 	return count, err
 }
 
 // GetTopFailedIPs returns the IPs with the most failed login attempts in the given window.
-func (db *DB) GetTopFailedIPs(since time.Time, limit int) ([]models.IPFailCount, error) {
-	rows, err := db.conn.Query(`
+func (db *DB) GetTopFailedIPs(ctx context.Context, since time.Time, limit int) ([]models.IPFailCount, error) {
+	rows, err := db.conn.QueryContext(ctx, `
 		SELECT ip_address, COUNT(*) AS fail_count
 		FROM login_events
 		WHERE success = false AND created_at > $1

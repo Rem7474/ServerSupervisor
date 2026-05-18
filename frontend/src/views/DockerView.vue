@@ -114,9 +114,9 @@ import { useConfirmDialog } from '../composables/useConfirmDialog'
 import { useLocalStorage } from '../composables/useLocalStorage'
 import { useToast } from '../composables/useToast'
 import WsStatusBar from '../components/WsStatusBar.vue'
-import DockerContainersTab from '../components/DockerContainersTab.vue'
-import ComposeProjectsTab from '../components/ComposeProjectsTab.vue'
-import CommandLogPanel from '../components/CommandLogPanel.vue'
+import DockerContainersTab from '../components/docker/DockerContainersTab.vue'
+import ComposeProjectsTab from '../components/docker/ComposeProjectsTab.vue'
+import CommandLogPanel from '../components/host/CommandLogPanel.vue'
 import { useCommandStream } from '../composables/useCommandStream'
 import apiClient from '../api'
 
@@ -139,7 +139,7 @@ const composeActionLoading = ref({})
 const showDockerConsole = ref(false)
 const dockerLiveCmd = ref(null)
 
-const { openCommandStream, closeStream: closeDockerStream } = useCommandStream({ token: () => auth.token })
+const { openCommandStream, closeStream: closeDockerStream } = useCommandStream()
 
 const hostMap = computed(() => {
   const map = {}

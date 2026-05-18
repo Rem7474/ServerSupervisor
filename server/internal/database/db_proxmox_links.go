@@ -1,6 +1,7 @@
 package database
 
 import (
+	"context"
 	"database/sql"
 	"strings"
 
@@ -13,7 +14,7 @@ import (
 // If a link already exists for the given guest_id, it is updated only if the incoming
 // status has higher priority (confirmed > suggested > ignored), or if the caller explicitly
 // changes metrics_source.
-func (db *DB) UpsertProxmoxGuestLink(guestID, hostID, status, metricsSource string) (*models.ProxmoxGuestLink, error) {
+func (db *DB) UpsertProxmoxGuestLink(ctx context.Context, guestID, hostID, status, metricsSource string) (*models.ProxmoxGuestLink, error) {
 	if status == "" {
 		status = "confirmed"
 	}
@@ -22,7 +23,7 @@ func (db *DB) UpsertProxmoxGuestLink(guestID, hostID, status, metricsSource stri
 	}
 
 	var id string
-	err := db.conn.QueryRow(`
+	err := db.conn.QueryRowContext(ctx, `
 		INSERT INTO proxmox_guest_links (guest_id, host_id, status, metrics_source)
 		VALUES ($1, $2, $3, $4)
 		ON CONFLICT (guest_id) DO UPDATE SET
@@ -37,23 +38,23 @@ func (db *DB) UpsertProxmoxGuestLink(guestID, hostID, status, metricsSource stri
 		return nil, err
 	}
 	if status == "confirmed" {
-		_ = db.setNodeCPUTempSourceIfUnset(guestID, hostID)
-		_ = db.setNodeFanRPMSourceIfUnset(guestID, hostID)
+		_ = db.setNodeCPUTempSourceIfUnset(ctx, guestID, hostID)
+		_ = db.setNodeFanRPMSourceIfUnset(ctx, guestID, hostID)
 	}
-	return db.GetProxmoxGuestLink(id)
+	return db.GetProxmoxGuestLink(ctx, id)
 }
 
 // AutoSuggestProxmoxLink tries to create a 'suggested' link for the given guest
 // by matching the guest name against host hostnames and names.
 // It does nothing if a link already exists for this guest.
-func (db *DB) AutoSuggestProxmoxLink(guestID, guestName string) error {
+func (db *DB) AutoSuggestProxmoxLink(ctx context.Context, guestID, guestName string) error {
 	if guestName == "" {
 		return nil
 	}
 
 	// Skip if a link already exists (in any status).
 	var exists bool
-	if err := db.conn.QueryRow(
+	if err := db.conn.QueryRowContext(ctx, 
 		`SELECT EXISTS(SELECT 1 FROM proxmox_guest_links WHERE guest_id = $1)`, guestID,
 	).Scan(&exists); err != nil {
 		return err
@@ -64,7 +65,7 @@ func (db *DB) AutoSuggestProxmoxLink(guestID, guestName string) error {
 
 	// Search for exactly one host that matches by hostname or name (case-insensitive).
 	name := strings.ToLower(guestName)
-	rows, err := db.conn.Query(`
+	rows, err := db.conn.QueryContext(ctx, `
 		SELECT id FROM hosts
 		WHERE LOWER(hostname) = $1 OR LOWER(name) = $1
 		LIMIT 2`, name)
@@ -92,7 +93,7 @@ func (db *DB) AutoSuggestProxmoxLink(guestID, guestName string) error {
 		return nil
 	}
 
-	_, err = db.conn.Exec(`
+	_, err = db.conn.ExecContext(ctx, `
 		INSERT INTO proxmox_guest_links (guest_id, host_id, status, metrics_source)
 		VALUES ($1, $2, 'suggested', 'auto')
 		ON CONFLICT (guest_id) DO NOTHING`,
@@ -102,9 +103,9 @@ func (db *DB) AutoSuggestProxmoxLink(guestID, guestName string) error {
 }
 
 // GetProxmoxGuestLink returns a single link by its ID with joined display fields.
-func (db *DB) GetProxmoxGuestLink(id string) (*models.ProxmoxGuestLink, error) {
+func (db *DB) GetProxmoxGuestLink(ctx context.Context, id string) (*models.ProxmoxGuestLink, error) {
 	var l models.ProxmoxGuestLink
-	err := db.conn.QueryRow(`
+	err := db.conn.QueryRowContext(ctx, `
 		SELECT l.id, l.guest_id, l.host_id, l.status, l.metrics_source, l.created_at, l.updated_at,
 		       g.name, g.guest_type, g.node_name, g.vmid,
 		       h.name, h.hostname,
@@ -126,9 +127,9 @@ func (db *DB) GetProxmoxGuestLink(id string) (*models.ProxmoxGuestLink, error) {
 }
 
 // GetProxmoxGuestLinkByGuest returns the link for a specific Proxmox guest (if any).
-func (db *DB) GetProxmoxGuestLinkByGuest(guestID string) (*models.ProxmoxGuestLink, error) {
+func (db *DB) GetProxmoxGuestLinkByGuest(ctx context.Context, guestID string) (*models.ProxmoxGuestLink, error) {
 	var l models.ProxmoxGuestLink
-	err := db.conn.QueryRow(`
+	err := db.conn.QueryRowContext(ctx, `
 		SELECT l.id, l.guest_id, l.host_id, l.status, l.metrics_source, l.created_at, l.updated_at,
 		       g.name, g.guest_type, g.node_name, g.vmid,
 		       h.name, h.hostname,
@@ -150,9 +151,9 @@ func (db *DB) GetProxmoxGuestLinkByGuest(guestID string) (*models.ProxmoxGuestLi
 }
 
 // GetProxmoxGuestLinkByHost returns the confirmed/suggested Proxmox link for a host (if any).
-func (db *DB) GetProxmoxGuestLinkByHost(hostID string) (*models.ProxmoxGuestLink, error) {
+func (db *DB) GetProxmoxGuestLinkByHost(ctx context.Context, hostID string) (*models.ProxmoxGuestLink, error) {
 	var l models.ProxmoxGuestLink
-	err := db.conn.QueryRow(`
+	err := db.conn.QueryRowContext(ctx, `
 		SELECT l.id, l.guest_id, l.host_id, l.status, l.metrics_source, l.created_at, l.updated_at,
 		       g.name, g.guest_type, g.node_name, g.vmid,
 		       h.name, h.hostname,
@@ -176,7 +177,7 @@ func (db *DB) GetProxmoxGuestLinkByHost(hostID string) (*models.ProxmoxGuestLink
 }
 
 // ListProxmoxGuestLinks returns all links, optionally filtered by status.
-func (db *DB) ListProxmoxGuestLinks(status string) ([]models.ProxmoxGuestLink, error) {
+func (db *DB) ListProxmoxGuestLinks(ctx context.Context, status string) ([]models.ProxmoxGuestLink, error) {
 	q := `
 		SELECT l.id, l.guest_id, l.host_id, l.status, l.metrics_source, l.created_at, l.updated_at,
 		       g.name, g.guest_type, g.node_name, g.vmid,
@@ -192,7 +193,7 @@ func (db *DB) ListProxmoxGuestLinks(status string) ([]models.ProxmoxGuestLink, e
 	}
 	q += ` ORDER BY l.updated_at DESC`
 
-	rows, err := db.conn.Query(q, args...)
+	rows, err := db.conn.QueryContext(ctx, q, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -201,8 +202,8 @@ func (db *DB) ListProxmoxGuestLinks(status string) ([]models.ProxmoxGuestLink, e
 }
 
 // UpdateProxmoxGuestLink updates status and/or metrics_source for a link.
-func (db *DB) UpdateProxmoxGuestLink(id string, status, metricsSource *string) (*models.ProxmoxGuestLink, error) {
-	_, err := db.conn.Exec(`
+func (db *DB) UpdateProxmoxGuestLink(ctx context.Context, id string, status, metricsSource *string) (*models.ProxmoxGuestLink, error) {
+	_, err := db.conn.ExecContext(ctx, `
 		UPDATE proxmox_guest_links SET
 		    status         = COALESCE($2, status),
 		    metrics_source = COALESCE($3, metrics_source),
@@ -213,27 +214,27 @@ func (db *DB) UpdateProxmoxGuestLink(id string, status, metricsSource *string) (
 	if err != nil {
 		return nil, err
 	}
-	link, err := db.GetProxmoxGuestLink(id)
+	link, err := db.GetProxmoxGuestLink(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 	if link != nil && link.Status == "confirmed" {
-		_ = db.setNodeCPUTempSourceIfUnset(link.GuestID, link.HostID)
-		_ = db.setNodeFanRPMSourceIfUnset(link.GuestID, link.HostID)
+		_ = db.setNodeCPUTempSourceIfUnset(ctx, link.GuestID, link.HostID)
+		_ = db.setNodeFanRPMSourceIfUnset(ctx, link.GuestID, link.HostID)
 	}
 	return link, nil
 }
 
 // DeleteProxmoxGuestLink removes a link by ID.
-func (db *DB) DeleteProxmoxGuestLink(id string) error {
-	_, err := db.conn.Exec(`DELETE FROM proxmox_guest_links WHERE id = $1`, id)
+func (db *DB) DeleteProxmoxGuestLink(ctx context.Context, id string) error {
+	_, err := db.conn.ExecContext(ctx, `DELETE FROM proxmox_guest_links WHERE id = $1`, id)
 	return err
 }
 
 // GetProxmoxGuestIDByVMID returns the DB UUID for a guest identified by (connection_id, node_name, vmid).
-func (db *DB) GetProxmoxGuestIDByVMID(connectionID, nodeName string, vmid int) (string, error) {
+func (db *DB) GetProxmoxGuestIDByVMID(ctx context.Context, connectionID, nodeName string, vmid int) (string, error) {
 	var id string
-	err := db.conn.QueryRow(`
+	err := db.conn.QueryRowContext(ctx, `
 		SELECT id FROM proxmox_guests WHERE connection_id=$1 AND node_name=$2 AND vmid=$3`,
 		connectionID, nodeName, vmid,
 	).Scan(&id)
@@ -245,16 +246,16 @@ func (db *DB) GetProxmoxGuestIDByVMID(connectionID, nodeName string, vmid int) (
 
 // ListProxmoxLinkCandidates returns Proxmox guests that could be linked to the given host,
 // ranked by name similarity. Used to populate the "link" dropdown from the host side.
-func (db *DB) ListProxmoxLinkCandidates(hostID string) ([]models.ProxmoxGuest, error) {
+func (db *DB) ListProxmoxLinkCandidates(ctx context.Context, hostID string) ([]models.ProxmoxGuest, error) {
 	// Get the host hostname/name for matching
 	var hostname, name string
-	if err := db.conn.QueryRow(
+	if err := db.conn.QueryRowContext(ctx, 
 		`SELECT LOWER(hostname), LOWER(name) FROM hosts WHERE id = $1`, hostID,
 	).Scan(&hostname, &name); err != nil {
 		return nil, err
 	}
 
-	rows, err := db.conn.Query(`
+	rows, err := db.conn.QueryContext(ctx, `
 		SELECT g.id, g.connection_id, g.node_name, g.guest_type, g.vmid, g.name, g.status,
 		       g.cpu_alloc, g.cpu_usage, g.mem_alloc, g.mem_usage, g.disk_alloc, g.tags, g.uptime, g.last_seen_at
 		FROM proxmox_guests g
@@ -277,9 +278,9 @@ func (db *DB) ListProxmoxLinkCandidates(hostID string) ([]models.ProxmoxGuest, e
 // IsProxmoxGuestDataFresh returns true when the confirmed 'auto' link for the given
 // host has Proxmox guest data that was updated within 3× the connection's poll interval.
 // Returns (false, nil) when no qualifying link exists (caller should treat Proxmox as absent).
-func (db *DB) IsProxmoxGuestDataFresh(hostID string) (bool, error) {
+func (db *DB) IsProxmoxGuestDataFresh(ctx context.Context, hostID string) (bool, error) {
 	var fresh bool
-	err := db.conn.QueryRow(`
+	err := db.conn.QueryRowContext(ctx, `
 		SELECT g.last_seen_at >= NOW() - (c.poll_interval_sec * 3 || ' seconds')::interval
 		FROM proxmox_guest_links l
 		JOIN proxmox_guests g      ON g.id = l.guest_id
@@ -315,8 +316,8 @@ func scanGuestLinks(rows *sql.Rows) ([]models.ProxmoxGuestLink, error) {
 	return links, rows.Err()
 }
 
-func (db *DB) setNodeCPUTempSourceIfUnset(guestID, hostID string) error {
-	_, err := db.conn.Exec(`
+func (db *DB) setNodeCPUTempSourceIfUnset(ctx context.Context, guestID, hostID string) error {
+	_, err := db.conn.ExecContext(ctx, `
 		UPDATE proxmox_nodes n
 		SET cpu_temp_source_host_id = $2
 		FROM proxmox_guests g
@@ -329,8 +330,8 @@ func (db *DB) setNodeCPUTempSourceIfUnset(guestID, hostID string) error {
 	return err
 }
 
-func (db *DB) setNodeFanRPMSourceIfUnset(guestID, hostID string) error {
-	_, err := db.conn.Exec(`
+func (db *DB) setNodeFanRPMSourceIfUnset(ctx context.Context, guestID, hostID string) error {
+	_, err := db.conn.ExecContext(ctx, `
 		UPDATE proxmox_nodes n
 		SET fan_rpm_source_host_id = $2
 		FROM proxmox_guests g
@@ -346,8 +347,8 @@ func (db *DB) setNodeFanRPMSourceIfUnset(guestID, hostID string) error {
 // BackfillProxmoxNodeSensorSources assigns missing CPU temp / fan RPM source hosts
 // from already confirmed guest links on each node.
 // This keeps legacy confirmed links compatible with node sensor widgets.
-func (db *DB) BackfillProxmoxNodeSensorSources() error {
-	if _, err := db.conn.Exec(`
+func (db *DB) BackfillProxmoxNodeSensorSources(ctx context.Context) error {
+	if _, err := db.conn.ExecContext(ctx, `
 		WITH ranked AS (
 			SELECT
 				g.connection_id,
@@ -371,7 +372,7 @@ func (db *DB) BackfillProxmoxNodeSensorSources() error {
 		return err
 	}
 
-	if _, err := db.conn.Exec(`
+	if _, err := db.conn.ExecContext(ctx, `
 		WITH ranked AS (
 			SELECT
 				g.connection_id,

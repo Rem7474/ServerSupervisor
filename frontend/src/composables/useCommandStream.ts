@@ -33,9 +33,10 @@ interface UseCommandStreamApi {
   closeStream: () => void
 }
 
-function resolveToken(tokenSource: TokenSource): string {
+function resolveToken(tokenSource: TokenSource | undefined): string {
+  if (!tokenSource) return ''
   if (typeof tokenSource === 'function') return tokenSource() || ''
-  if (tokenSource && typeof tokenSource === 'object' && 'value' in tokenSource)
+  if (typeof tokenSource === 'object' && 'value' in tokenSource)
     return (tokenSource as { value: string }).value || ''
   return tokenSource || ''
 }
@@ -44,7 +45,13 @@ function isTerminalStatus(status: string): boolean {
   return status === 'completed' || status === 'failed'
 }
 
-export function useCommandStream({ token }: { token: TokenSource }): UseCommandStreamApi {
+/**
+ * `token` is kept as an optional argument for source-level backwards compat
+ * with call sites that still hand a token getter. WebSocket authentication is
+ * now carried by the ss_access cookie attached to the upgrade request, so the
+ * token value itself is no longer consulted.
+ */
+export function useCommandStream({ token }: { token?: TokenSource } = {}): UseCommandStreamApi {
   let activeStream: WebSocket | null = null
 
   function closeStream(): void {
@@ -90,7 +97,11 @@ export function useCommandStream({ token }: { token: TokenSource }): UseCommandS
 
     ws.onopen = (): void => {
       if (activeStream !== ws) return
-      ws.send(JSON.stringify({ type: 'auth', token: resolveToken(token) }))
+      // The session cookie attached by the browser to the WebSocket upgrade
+      // authenticates the connection; no in-band auth message is needed.
+      // resolveToken stays callable for backwards compatibility with older
+      // call sites that still pass a token getter — its value is unused now.
+      void resolveToken(token)
     }
 
     ws.onmessage = (event: MessageEvent): void => {

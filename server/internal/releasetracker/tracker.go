@@ -1,6 +1,11 @@
-package github
+// Package releasetracker periodically polls Git providers (GitHub today,
+// GitLab / Gitea via the gitprovider package) for new releases of repos the
+// user has registered, and updates the tracked_repos table when a new tag is
+// detected.
+package releasetracker
 
 import (
+	"context"
 	"log"
 	"time"
 
@@ -49,7 +54,7 @@ func (t *Tracker) Stop() {
 }
 
 func (t *Tracker) checkAllRepos() {
-	repos, err := t.db.GetTrackedRepos()
+	repos, err := t.db.GetTrackedRepos(context.Background())
 	if err != nil {
 		log.Printf("GitHub tracker: failed to fetch repos: %v", err)
 		return
@@ -67,7 +72,7 @@ func (t *Tracker) checkAllRepos() {
 		if tag != repo.LatestVersion && tag != "" {
 			log.Printf("GitHub tracker: new release for %s/%s: %s (was %s)",
 				repo.Owner, repo.Repo, tag, repo.LatestVersion)
-			_ = t.db.UpdateTrackedRepo(repo.ID, tag, htmlURL, time.Time{})
+			_ = t.db.UpdateTrackedRepo(context.Background(), repo.ID, tag, htmlURL, time.Time{})
 		}
 	}
 }

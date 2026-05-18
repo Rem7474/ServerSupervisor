@@ -1,6 +1,7 @@
 package ws
 
 import (
+	"context"
 	"net/http"
 	"time"
 
@@ -63,7 +64,7 @@ func (h *WSHandler) servePollingSnapshot(c *gin.Context, enforceIPLimit bool, se
 		_ = conn.Close()
 	}()
 
-	if !h.authenticateWS(conn) {
+	if !h.authenticateWS(c, conn) {
 		return
 	}
 
@@ -126,13 +127,13 @@ func (h *WSHandler) CommandStream(c *gin.Context) {
 		_ = conn.Close()
 	}()
 
-	claims, ok := h.authenticateWSClaims(conn)
+	claims, ok := h.authenticateWSClaims(c, conn)
 	if !ok {
 		return
 	}
 
 	// Fetch the command to verify existence and, for non-admins, host ownership.
-	cmd, err := h.db.GetRemoteCommandByID(commandID)
+	cmd, err := h.db.GetRemoteCommandByID(context.Background(), commandID)
 	if err != nil {
 		_ = safeWriteJSON(conn, gin.H{"type": "error", "error": "command not found"})
 		return
@@ -141,7 +142,7 @@ func (h *WSHandler) CommandStream(c *gin.Context) {
 	role, _ := claims["role"].(string)
 	if role != "admin" {
 		username, _ := claims["sub"].(string)
-		restricted, level, accessErr := h.db.GetHostAccess(username, cmd.HostID)
+		restricted, level, accessErr := h.db.GetHostAccess(context.Background(), username, cmd.HostID)
 		if accessErr != nil || (restricted && level == "") {
 			_ = safeWriteJSON(conn, gin.H{"type": "auth_error", "error": "access denied"})
 			return
@@ -194,7 +195,7 @@ func (h *WSHandler) NotificationStream(c *gin.Context) {
 		_ = conn.Close()
 	}()
 
-	ok, role := h.authenticateWSWithRole(conn)
+	ok, role := h.authenticateWSWithRole(c, conn)
 	if !ok {
 		return
 	}
