@@ -143,9 +143,9 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import apiClient from '../api'
-import LoadingSkeleton from './LoadingSkeleton.vue'
-import BadgePill from './common/BadgePill.vue'
+import apiClient from '../../api'
+import LoadingSkeleton from '../LoadingSkeleton.vue'
+import BadgePill from '../common/BadgePill.vue'
 
 const props = defineProps({
   hostId: { type: String, required: true },

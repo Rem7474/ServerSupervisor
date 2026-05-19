@@ -74,7 +74,7 @@
 
 <script setup>
 import { ref, shallowRef, watch, onMounted, computed, defineAsyncComponent } from 'vue'
-import apiClient from '../api'
+import apiClient from '../../api'
 import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc'
 import 'dayjs/locale/fr'

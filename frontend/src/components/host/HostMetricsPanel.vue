@@ -158,8 +158,8 @@
 
 <script setup>
 import { computed, ref, shallowRef, defineAsyncComponent, onMounted, watch, toRef } from 'vue'
-import apiClient from '../api'
-import MetricsSourceBadge from './common/MetricsSourceBadge.vue'
+import apiClient from '../../api'
+import MetricsSourceBadge from '../common/MetricsSourceBadge.vue'
 import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import utc from 'dayjs/plugin/utc'

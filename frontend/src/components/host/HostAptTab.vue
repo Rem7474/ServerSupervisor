@@ -403,7 +403,7 @@ import dayjs from 'dayjs'
 import relativeTime from 'dayjs/plugin/relativeTime'
 import utc from 'dayjs/plugin/utc'
 import 'dayjs/locale/fr'
-import CVEList from '../CVEList.vue'
+import CVEList from '../apt/CVEList.vue'
 
 defineEmits(['run-apt-command', 'uu-install', 'uu-configure', 'uu-run-now', 'uu-log'])
 

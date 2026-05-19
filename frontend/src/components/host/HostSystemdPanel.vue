@@ -130,7 +130,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useAuthStore } from '../../stores/auth'
-import apiClient, { getApiErrorMessage } from '../api'
+import apiClient, { getApiErrorMessage } from '../../api'
 import { useCommandStream } from '../../composables/useCommandStream'
 import { useLocalStorage } from '../../composables/useLocalStorage'
 import { useConfirmDialog } from '../../composables/useConfirmDialog'
