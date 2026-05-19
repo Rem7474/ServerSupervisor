@@ -1,19 +1,34 @@
+# syntax=docker/dockerfile:1.7
+#
+# BuildKit is required (Docker >= 23 enables it by default). The
+# `--mount=type=cache` directives below persist npm, Go module, Go build, and
+# Vite caches between builds even when lockfiles change.
+
 # ==== Stage 1: Build Frontend ====
 FROM node:25-slim AS frontend-builder
 WORKDIR /app/frontend
+
 COPY frontend/package.json frontend/package-lock.json ./
-RUN npm ci
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --prefer-offline --no-audit --no-fund
+
 COPY frontend/ .
-RUN npm run build
+RUN --mount=type=cache,target=/app/frontend/node_modules/.vite \
+    npm run build
 
 # ==== Stage 2: Build Go Server ====
 FROM golang:1.26-alpine AS server-builder
 RUN apk add --no-cache git
 WORKDIR /app
+
 COPY server/go.mod server/go.sum ./
-RUN go mod download
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download
+
 COPY server/ .
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /serversupervisor ./cmd/server
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /serversupervisor ./cmd/server
 
 # ==== Stage 3: Final Image ====
 FROM alpine:3.23
