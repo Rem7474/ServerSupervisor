@@ -160,14 +160,7 @@
 import { computed, ref, shallowRef, defineAsyncComponent, onMounted, watch, toRef } from 'vue'
 import apiClient from '../../api'
 import MetricsSourceBadge from '../common/MetricsSourceBadge.vue'
-import dayjs from 'dayjs'
-import relativeTime from 'dayjs/plugin/relativeTime'
-import utc from 'dayjs/plugin/utc'
-import 'dayjs/locale/fr'
-
-dayjs.extend(relativeTime)
-dayjs.extend(utc)
-dayjs.locale('fr')
+import dayjs from '../../utils/dayjs'
 
 const Line = defineAsyncComponent(async () => {
   const [{ Line }, { Chart: ChartJS, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip }] = await Promise.all([

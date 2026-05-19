@@ -170,7 +170,7 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import dayjs from 'dayjs'
+import dayjs from '../utils/dayjs'
 import api from '../api'
 import MetricsSourceBadge from '../components/common/MetricsSourceBadge.vue'
 

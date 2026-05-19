@@ -61,6 +61,7 @@ export function useWebSocket<TPayload = unknown>(
   let staleAlertTimer: ReturnType<typeof setTimeout> | null = null
   let manualClose = false
   let lastResumeReconnectAt = 0
+  let receivedFirstMessage = false
 
   // Exponential backoff: 2s, 4s, 8s, capped at 30s
   function retryDelay(): number {
@@ -70,6 +71,7 @@ export function useWebSocket<TPayload = unknown>(
   function connect(): void {
     if (!auth.isAuthenticated) return
     manualClose = false
+    receivedFirstMessage = false
 
     // Cancel any pending retry timer so handleAppResume can't trigger a double-connect
     if (retryTimer) { clearTimeout(retryTimer); retryTimer = null }
@@ -119,10 +121,13 @@ export function useWebSocket<TPayload = unknown>(
           retryCount.value = 0
         }
 
-        if (debounceMs > 0) {
+        // First message bypasses the debounce so the initial paint is instant.
+        // Subsequent messages are throttled by `debounceMs` to coalesce bursts.
+        if (debounceMs > 0 && receivedFirstMessage) {
           clearTimeout(debounceTimer!)
           debounceTimer = setTimeout(() => onMessage(payload), debounceMs)
         } else {
+          receivedFirstMessage = true
           onMessage(payload)
         }
       } catch {
