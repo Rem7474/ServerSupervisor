@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"net"
 	"net/http"
@@ -73,7 +74,7 @@ func (h *HostHandler) RegisterHost(c *gin.Context) {
 		Status:    "offline",
 	}
 
-	if err := h.db.RegisterHost(host); err != nil {
+	if err := h.db.RegisterHost(context.Background(), host); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to register host"})
 		return
 	}
@@ -87,7 +88,7 @@ func (h *HostHandler) RegisterHost(c *gin.Context) {
 
 // ListHosts returns all hosts
 func (h *HostHandler) ListHosts(c *gin.Context) {
-	hosts, err := h.db.GetAllHosts()
+	hosts, err := h.db.GetAllHosts(context.Background())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch hosts"})
 		return
@@ -101,7 +102,7 @@ func (h *HostHandler) ListHosts(c *gin.Context) {
 // GetHost returns a specific host
 func (h *HostHandler) GetHost(c *gin.Context) {
 	hostID := c.Param("id")
-	host, err := h.db.GetHost(hostID)
+	host, err := h.db.GetHost(context.Background(), hostID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "host not found"})
 		return
@@ -126,11 +127,11 @@ func (h *HostHandler) UpdateHost(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "no fields to update"})
 		return
 	}
-	if err := h.db.UpdateHost(hostID, &req); err != nil {
+	if err := h.db.UpdateHost(context.Background(), hostID, &req); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update host"})
 		return
 	}
-	updated, err := h.db.GetHost(hostID)
+	updated, err := h.db.GetHost(context.Background(), hostID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch updated host"})
 		return
@@ -146,7 +147,7 @@ func (h *HostHandler) TriggerAgentUpdate(c *gin.Context) {
 	}
 
 	hostID := c.Param("id")
-	host, err := h.db.GetHost(hostID)
+	host, err := h.db.GetHost(context.Background(), hostID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "host not found"})
 		return
@@ -159,7 +160,7 @@ func (h *HostHandler) TriggerAgentUpdate(c *gin.Context) {
 		return
 	}
 
-	if cmds, err := h.db.GetRemoteCommandsByHostAndModule(hostID, "agent", 20); err == nil {
+	if cmds, err := h.db.GetRemoteCommandsByHostAndModule(context.Background(), hostID, "agent", 20); err == nil {
 		for _, cmd := range cmds {
 			if cmd.Action == "update" && (cmd.Status == "pending" || cmd.Status == "running") {
 				c.JSON(http.StatusConflict, gin.H{"error": "an agent update is already in progress for this host"})
@@ -213,7 +214,7 @@ func (h *HostHandler) DeleteHost(c *gin.Context) {
 	}
 
 	hostID := c.Param("id")
-	if err := h.db.DeleteHost(hostID); err != nil {
+	if err := h.db.DeleteHost(context.Background(), hostID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete host"})
 		return
 	}
@@ -225,7 +226,7 @@ func (h *HostHandler) DeleteHost(c *gin.Context) {
 func (h *HostHandler) GetHostComplete(c *gin.Context) {
 	hostID := c.Param("id")
 
-	host, err := h.db.GetHost(hostID)
+	host, err := h.db.GetHost(context.Background(), hostID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "host not found"})
 		return
@@ -242,15 +243,15 @@ func (h *HostHandler) GetHostComplete(c *gin.Context) {
 
 	var wg sync.WaitGroup
 	wg.Add(6)
-	go func() { defer wg.Done(); metrics, _ = h.db.GetLatestMetrics(hostID) }()
-	go func() { defer wg.Done(); containers, _ = h.db.GetDockerContainers(hostID) }()
-	go func() { defer wg.Done(); aptStatus, _ = h.db.GetAptStatus(hostID) }()
-	go func() { defer wg.Done(); diskMetrics, _ = h.db.GetLatestDiskMetrics(hostID) }()
-	go func() { defer wg.Done(); diskHealth, _ = h.db.GetLatestDiskHealth(hostID) }()
-	go func() { defer wg.Done(); cmdHistory, _ = h.db.GetRecentCommandsByHost(hostID, 20) }()
+	go func() { defer wg.Done(); metrics, _ = h.db.GetLatestMetrics(context.Background(), hostID) }()
+	go func() { defer wg.Done(); containers, _ = h.db.GetDockerContainers(context.Background(), hostID) }()
+	go func() { defer wg.Done(); aptStatus, _ = h.db.GetAptStatus(context.Background(), hostID) }()
+	go func() { defer wg.Done(); diskMetrics, _ = h.db.GetLatestDiskMetrics(context.Background(), hostID) }()
+	go func() { defer wg.Done(); diskHealth, _ = h.db.GetLatestDiskHealth(context.Background(), hostID) }()
+	go func() { defer wg.Done(); cmdHistory, _ = h.db.GetRecentCommandsByHost(context.Background(), hostID, 20) }()
 	wg.Wait()
 	if metrics != nil {
-		if temp, ok := h.db.GetEffectiveHostCPUTemperature(hostID, metrics.CPUTemperature); ok {
+		if temp, ok := h.db.GetEffectiveHostCPUTemperature(context.Background(), hostID, metrics.CPUTemperature); ok {
 			metrics.CPUTemperature = temp
 		}
 	}
@@ -294,7 +295,7 @@ func (h *HostHandler) RotateAPIKey(c *gin.Context) {
 		return
 	}
 
-	if err := h.db.UpdateHostAPIKey(hostID, hashedAPIKey); err != nil {
+	if err := h.db.UpdateHostAPIKey(context.Background(), hostID, hashedAPIKey); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to rotate API key"})
 		return
 	}
@@ -309,20 +310,20 @@ func (h *HostHandler) RotateAPIKey(c *gin.Context) {
 func (h *HostHandler) GetHostDashboard(c *gin.Context) {
 	hostID := c.Param("id")
 
-	host, err := h.db.GetHost(hostID)
+	host, err := h.db.GetHost(context.Background(), hostID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "host not found"})
 		return
 	}
 
-	metrics, _ := h.db.GetLatestMetrics(hostID)
+	metrics, _ := h.db.GetLatestMetrics(context.Background(), hostID)
 	if metrics != nil {
-		if temp, ok := h.db.GetEffectiveHostCPUTemperature(hostID, metrics.CPUTemperature); ok {
+		if temp, ok := h.db.GetEffectiveHostCPUTemperature(context.Background(), hostID, metrics.CPUTemperature); ok {
 			metrics.CPUTemperature = temp
 		}
 	}
-	containers, _ := h.db.GetDockerContainers(hostID)
-	aptStatus, _ := h.db.GetAptStatus(hostID)
+	containers, _ := h.db.GetDockerContainers(context.Background(), hostID)
+	aptStatus, _ := h.db.GetAptStatus(context.Background(), hostID)
 
 	c.JSON(http.StatusOK, gin.H{
 		"host":       host,

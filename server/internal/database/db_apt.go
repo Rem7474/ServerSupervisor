@@ -1,6 +1,7 @@
 package database
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"time"
@@ -10,8 +11,8 @@ import (
 
 // ========== APT Status ==========
 
-func (db *DB) UpsertAptStatus(status *models.AptStatus) error {
-	_, err := db.conn.Exec(
+func (db *DB) UpsertAptStatus(ctx context.Context, status *models.AptStatus) error {
+	_, err := db.conn.ExecContext(ctx, 
 		`INSERT INTO apt_status (host_id, last_update, last_upgrade, pending_packages, package_list, security_updates, cve_list, updated_at)
 		 VALUES ($1,$2,$3,$4,$5,$6,CAST($7 AS JSONB),NOW())
 		 ON CONFLICT (host_id) DO UPDATE SET
@@ -27,9 +28,9 @@ func (db *DB) UpsertAptStatus(status *models.AptStatus) error {
 	return err
 }
 
-func (db *DB) GetAptStatus(hostID string) (*models.AptStatus, error) {
+func (db *DB) GetAptStatus(ctx context.Context, hostID string) (*models.AptStatus, error) {
 	var s models.AptStatus
-	err := db.conn.QueryRow(
+	err := db.conn.QueryRowContext(ctx, 
 		`SELECT id, host_id, last_update, last_upgrade, pending_packages, package_list, security_updates, cve_list, updated_at
 		 FROM apt_status WHERE host_id = $1`, hostID,
 	).Scan(&s.ID, &s.HostID, &s.LastUpdate, &s.LastUpgrade, &s.PendingPackages, &s.PackageList, &s.SecurityUpdates, &s.CVEList, &s.UpdatedAt)
@@ -40,8 +41,8 @@ func (db *DB) GetAptStatus(hostID string) (*models.AptStatus, error) {
 }
 
 // TouchAptLastUpgradeAt updates apt_status.last_upgrade to the given time (used for unattended-upgrades runs).
-func (db *DB) TouchAptLastUpgradeAt(hostID string, t time.Time) error {
-	_, err := db.conn.Exec(
+func (db *DB) TouchAptLastUpgradeAt(ctx context.Context, hostID string, t time.Time) error {
+	_, err := db.conn.ExecContext(ctx, 
 		`INSERT INTO apt_status (host_id, last_upgrade, pending_packages, package_list, security_updates, updated_at)
 		 VALUES ($1, $2, 0, '[]', 0, NOW())
 		 ON CONFLICT (host_id) DO UPDATE SET
@@ -52,11 +53,11 @@ func (db *DB) TouchAptLastUpgradeAt(hostID string, t time.Time) error {
 	return err
 }
 
-func (db *DB) TouchAptLastAction(hostID, command string) error {
+func (db *DB) TouchAptLastAction(ctx context.Context, hostID, command string) error {
 	now := time.Now()
 
 	if command == "update" {
-		_, err := db.conn.Exec(
+		_, err := db.conn.ExecContext(ctx, 
 			`INSERT INTO apt_status (host_id, last_update, pending_packages, package_list, security_updates, updated_at)
 			 VALUES ($1, $2, 0, '[]', 0, NOW())
 			 ON CONFLICT (host_id) DO UPDATE SET
@@ -68,7 +69,7 @@ func (db *DB) TouchAptLastAction(hostID, command string) error {
 	}
 
 	if command == "upgrade" || command == "dist-upgrade" {
-		_, err := db.conn.Exec(
+		_, err := db.conn.ExecContext(ctx, 
 			`INSERT INTO apt_status (host_id, last_upgrade, pending_packages, package_list, security_updates, updated_at)
 			 VALUES ($1, $2, 0, '[]', 0, NOW())
 			 ON CONFLICT (host_id) DO UPDATE SET
@@ -83,14 +84,14 @@ func (db *DB) TouchAptLastAction(hostID, command string) error {
 }
 
 // GetAptHistoryWithAgentUpdates returns APT remote commands for a host.
-func (db *DB) GetAptHistoryWithAgentUpdates(hostID string, limit int) ([]models.RemoteCommand, error) {
-	return db.GetRemoteCommandsByHostAndModule(hostID, "apt", limit)
+func (db *DB) GetAptHistoryWithAgentUpdates(ctx context.Context, hostID string, limit int) ([]models.RemoteCommand, error) {
+	return db.GetRemoteCommandsByHostAndModule(ctx, hostID, "apt", limit)
 }
 
 // GetAptCVESummary returns aggregated CVE severity counts across all hosts.
-func (db *DB) GetAptCVESummary() (*models.AptCVESummary, error) {
+func (db *DB) GetAptCVESummary(ctx context.Context) (*models.AptCVESummary, error) {
 	var s models.AptCVESummary
-	err := db.conn.QueryRow(`
+	err := db.conn.QueryRowContext(ctx, `
 		SELECT
 			COUNT(DISTINCT CASE WHEN cve->>'severity' = 'CRITICAL' THEN host_id END),
 			COUNT(DISTINCT CASE WHEN cve->>'severity' = 'HIGH'     THEN host_id END),
@@ -111,15 +112,15 @@ func (db *DB) GetAptCVESummary() (*models.AptCVESummary, error) {
 }
 
 // GetTotalAptPending returns the total number of pending APT packages across all hosts.
-func (db *DB) GetTotalAptPending() int {
+func (db *DB) GetTotalAptPending(ctx context.Context) int {
 	var total int
-	_ = db.conn.QueryRow(`SELECT COALESCE(SUM(pending_packages), 0) FROM apt_status`).Scan(&total)
+	_ = db.conn.QueryRowContext(ctx, `SELECT COALESCE(SUM(pending_packages), 0) FROM apt_status`).Scan(&total)
 	return total
 }
 
 // GetAptPendingAll returns a map of host_id → pending_packages for hosts with pending > 0.
-func (db *DB) GetAptPendingAll() map[string]int {
-	rows, err := db.conn.Query(`SELECT host_id, pending_packages FROM apt_status WHERE pending_packages > 0`)
+func (db *DB) GetAptPendingAll(ctx context.Context) map[string]int {
+	rows, err := db.conn.QueryContext(ctx, `SELECT host_id, pending_packages FROM apt_status WHERE pending_packages > 0`)
 	if err != nil {
 		return map[string]int{}
 	}
@@ -137,16 +138,16 @@ func (db *DB) GetAptPendingAll() map[string]int {
 
 // ========== Tracked Repos ==========
 
-func (db *DB) CreateTrackedRepo(repo *models.TrackedRepo) error {
-	return db.conn.QueryRow(
+func (db *DB) CreateTrackedRepo(ctx context.Context, repo *models.TrackedRepo) error {
+	return db.conn.QueryRowContext(ctx, 
 		`INSERT INTO tracked_repos (owner, repo, display_name, docker_image)
 		 VALUES ($1,$2,$3,$4) RETURNING id, created_at`,
 		repo.Owner, repo.Repo, repo.DisplayName, repo.DockerImage,
 	).Scan(&repo.ID, &repo.CreatedAt)
 }
 
-func (db *DB) GetTrackedRepos() ([]models.TrackedRepo, error) {
-	rows, err := db.conn.Query(
+func (db *DB) GetTrackedRepos(ctx context.Context) ([]models.TrackedRepo, error) {
+	rows, err := db.conn.QueryContext(ctx, 
 		`SELECT id, owner, repo, display_name, latest_version, COALESCE(latest_date, NOW()),
 		 release_url, docker_image, checked_at, created_at
 		 FROM tracked_repos ORDER BY display_name`,
@@ -168,8 +169,8 @@ func (db *DB) GetTrackedRepos() ([]models.TrackedRepo, error) {
 	return repos, nil
 }
 
-func (db *DB) UpdateTrackedRepo(id int64, version, url string, date time.Time) error {
-	_, err := db.conn.Exec(
+func (db *DB) UpdateTrackedRepo(ctx context.Context, id int64, version, url string, date time.Time) error {
+	_, err := db.conn.ExecContext(ctx, 
 		`UPDATE tracked_repos SET latest_version = $1, release_url = $2, latest_date = $3, checked_at = NOW() WHERE id = $4`,
 		version, url, date, id,
 	)
@@ -178,12 +179,12 @@ func (db *DB) UpdateTrackedRepo(id int64, version, url string, date time.Time) e
 
 // ========== Unattended-Upgrades ==========
 
-func (db *DB) UpsertUUStatus(hostID string, s models.UnattendedUpgradesStatus) error {
+func (db *DB) UpsertUUStatus(ctx context.Context, hostID string, s models.UnattendedUpgradesStatus) error {
 	cfgJSON, err := json.Marshal(s.Config)
 	if err != nil {
 		cfgJSON = []byte("{}")
 	}
-	_, err = db.conn.Exec(`
+	_, err = db.conn.ExecContext(ctx, `
 		INSERT INTO unattended_upgrades_status
 			(host_id, installed, enabled, reboot_required, config, updated_at)
 		VALUES ($1, $2, $3, $4, $5, NOW())
@@ -199,8 +200,8 @@ func (db *DB) UpsertUUStatus(hostID string, s models.UnattendedUpgradesStatus) e
 }
 
 // UpdateUULastRun bumps the last_run_at / last_run_packages counters after a new run is stored.
-func (db *DB) UpdateUULastRun(hostID string, runAt time.Time, pkgCount int) error {
-	_, err := db.conn.Exec(`
+func (db *DB) UpdateUULastRun(ctx context.Context, hostID string, runAt time.Time, pkgCount int) error {
+	_, err := db.conn.ExecContext(ctx, `
 		INSERT INTO unattended_upgrades_status (host_id, last_run_at, last_run_packages, updated_at)
 		VALUES ($1, $2, $3, NOW())
 		ON CONFLICT (host_id) DO UPDATE SET
@@ -213,13 +214,13 @@ func (db *DB) UpdateUULastRun(hostID string, runAt time.Time, pkgCount int) erro
 }
 
 // InsertUURunIfNew inserts a run record and returns true if it was actually new.
-func (db *DB) InsertUURunIfNew(hostID string, run models.UURun) (bool, error) {
+func (db *DB) InsertUURunIfNew(ctx context.Context, hostID string, run models.UURun) (bool, error) {
 	pkgsJSON, err := json.Marshal(run.Packages)
 	if err != nil {
 		pkgsJSON = []byte("[]")
 	}
 	var id int64
-	err = db.conn.QueryRow(`
+	err = db.conn.QueryRowContext(ctx, `
 		INSERT INTO unattended_upgrades_runs (host_id, run_at, packages, had_error, log_snippet)
 		VALUES ($1, $2, $3, $4, $5)
 		ON CONFLICT (host_id, run_at) DO NOTHING
@@ -232,8 +233,8 @@ func (db *DB) InsertUURunIfNew(hostID string, run models.UURun) (bool, error) {
 	return err == nil, err
 }
 
-func (db *DB) GetUUStatus(hostID string) (*models.UnattendedUpgradesDB, error) {
-	row := db.conn.QueryRow(`
+func (db *DB) GetUUStatus(ctx context.Context, hostID string) (*models.UnattendedUpgradesDB, error) {
+	row := db.conn.QueryRowContext(ctx, `
 		SELECT installed, enabled, reboot_required, last_run_at, last_run_packages, config
 		FROM unattended_upgrades_status WHERE host_id = $1`, hostID)
 
@@ -257,7 +258,7 @@ func (db *DB) GetUUStatus(hostID string) (*models.UnattendedUpgradesDB, error) {
 	// Fallback: ensure last run reflects the latest run record.
 	var latestRunAt time.Time
 	var latestPkgsRaw []byte
-	if err := db.conn.QueryRow(`
+	if err := db.conn.QueryRowContext(ctx, `
 		SELECT run_at, packages
 		FROM unattended_upgrades_runs
 		WHERE host_id = $1
@@ -272,11 +273,11 @@ func (db *DB) GetUUStatus(hostID string) (*models.UnattendedUpgradesDB, error) {
 	return &s, nil
 }
 
-func (db *DB) GetUURuns(hostID string, limit int) ([]models.UURun, error) {
+func (db *DB) GetUURuns(ctx context.Context, hostID string, limit int) ([]models.UURun, error) {
 	if limit <= 0 {
 		limit = 20
 	}
-	rows, err := db.conn.Query(`
+	rows, err := db.conn.QueryContext(ctx, `
 		SELECT run_at, packages, had_error, COALESCE(log_snippet, '')
 		FROM unattended_upgrades_runs
 		WHERE host_id = $1
@@ -302,7 +303,7 @@ func (db *DB) GetUURuns(hostID string, limit int) ([]models.UURun, error) {
 	return runs, nil
 }
 
-func (db *DB) DeleteTrackedRepo(id int64) error {
-	_, err := db.conn.Exec(`DELETE FROM tracked_repos WHERE id = $1`, id)
+func (db *DB) DeleteTrackedRepo(ctx context.Context, id int64) error {
+	_, err := db.conn.ExecContext(ctx, `DELETE FROM tracked_repos WHERE id = $1`, id)
 	return err
 }

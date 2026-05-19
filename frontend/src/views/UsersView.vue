@@ -186,8 +186,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
 import apiClient from '../api'
-import dayjs from 'dayjs'
-import utc from 'dayjs/plugin/utc'
+import dayjs from '../utils/dayjs'
 
 const auth = useAuthStore()
 const dialog = useConfirmDialog()
@@ -204,8 +203,6 @@ const newUserForm = ref({
 
 const createMessage = ref('')
 const createSuccess = ref(false)
-
-dayjs.extend(utc)
 
 function formatDate(date) {
   if (!date) return '-'

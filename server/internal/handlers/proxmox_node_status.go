@@ -1,6 +1,7 @@
 package handlers
 
-import (
+import (	"context"
+
 	"log"
 	"net/http"
 
@@ -14,7 +15,7 @@ import (
 // GetNodeStatus proxies GET /nodes/{node}/status from PVE.
 // Returns real-time iowait, swap, rootfs — not cached in DB.
 func (h *ProxmoxHandler) GetNodeStatus(c *gin.Context) {
-	node, err := h.db.GetProxmoxNode(c.Param("id"))
+	node, err := h.db.GetProxmoxNode(context.Background(), c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -44,7 +45,7 @@ func (h *ProxmoxHandler) GetNodeStatus(c *gin.Context) {
 // GetNodeRRD proxies GET /nodes/{node}/rrddata from PVE.
 // Accepts ?timeframe=hour|day|week|month|year (default: hour).
 func (h *ProxmoxHandler) GetNodeRRD(c *gin.Context) {
-	node, err := h.db.GetProxmoxNode(c.Param("id"))
+	node, err := h.db.GetProxmoxNode(context.Background(), c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

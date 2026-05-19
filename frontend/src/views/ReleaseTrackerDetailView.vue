@@ -639,7 +639,7 @@ import { formatDateTime } from '../utils/formatters'
 import RelativeTime from '../components/RelativeTime.vue'
 import WebhookExecutionList from '../components/webhooks/WebhookExecutionList.vue'
 import WebhookModal from '../components/webhooks/WebhookModal.vue'
-import CommandLogPanel from '../components/CommandLogPanel.vue'
+import CommandLogPanel from '../components/host/CommandLogPanel.vue'
 import { useCommandStream } from '../composables/useCommandStream'
 
 const route = useRoute()
@@ -670,7 +670,7 @@ const showModal = ref(false)
 const saving = ref(false)
 const modalError = ref('')
 
-const { openCommandStream, closeStream } = useCommandStream({ token: () => auth.token })
+const { openCommandStream, closeStream } = useCommandStream()
 
 const VERSION_HISTORY_PREVIEW_LIMIT = 5
 

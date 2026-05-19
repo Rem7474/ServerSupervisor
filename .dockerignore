@@ -1,0 +1,48 @@
+# Keep the build context lean — anything not strictly needed by the Dockerfile
+# stages should be listed here. Re-add explicitly with `!path` when needed.
+
+# VCS / IDE
+.git
+.github
+.gitignore
+.gitattributes
+.vscode
+.idea
+.claude
+
+# Docs & screenshots
+*.md
+!server/**/*.md
+screenshot
+
+# Local env files (secrets must never leak into images)
+.env
+.env.*
+!.env.example
+
+# ---------- Frontend ----------
+frontend/node_modules
+frontend/dist
+frontend/.vite
+frontend/coverage
+frontend/eslint-*.json
+frontend/*.log
+
+# ---------- Go server ----------
+server/bin
+server/docs
+server/*.exe
+server/coverage.out
+server/*.test
+server/*.log
+
+# ---------- Agent (not built by the server image) ----------
+agent
+
+# Compose / tooling — irrelevant to the image
+docker-compose*.yml
+Dockerfile*
+
+# OS junk
+**/.DS_Store
+**/Thumbs.db

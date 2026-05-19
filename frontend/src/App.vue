@@ -592,6 +592,12 @@ async function handleLogout() {
     }
   }
   localStorage.removeItem('ss_vapid_public_key')
+  // Invalidate the refresh token server-side and let the server clear cookies.
+  try {
+    await apiClient.logout()
+  } catch {
+    // Server might be unreachable; we still purge local state.
+  }
   auth.logout()
   router.push('/login')
 }

@@ -1,6 +1,7 @@
 package database
 
 import (
+	"context"
 	"encoding/json"
 
 	"github.com/lib/pq"
@@ -9,14 +10,14 @@ import (
 
 // ========== Docker Containers ==========
 
-func (db *DB) UpsertDockerContainers(hostID string, containers []models.DockerContainer) error {
+func (db *DB) UpsertDockerContainers(ctx context.Context, hostID string, containers []models.DockerContainer) error {
 	ids := make([]string, 0, len(containers))
 	for _, c := range containers {
 		labelsJSON, _ := json.Marshal(c.Labels)
 		envVarsJSON, _ := json.Marshal(c.EnvVars)
 		volumesJSON, _ := json.Marshal(c.Volumes)
 		networksJSON, _ := json.Marshal(c.Networks)
-		_, err := db.conn.Exec(`
+		_, err := db.conn.ExecContext(ctx, `
 			INSERT INTO docker_containers (id, host_id, container_id, name, image, image_tag, image_id, image_digest, state, status, created, ports, labels, env_vars, volumes, networks, net_rx_bytes, net_tx_bytes, updated_at)
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,NOW())
 			ON CONFLICT (id) DO UPDATE SET
@@ -47,18 +48,18 @@ func (db *DB) UpsertDockerContainers(hostID string, containers []models.DockerCo
 	}
 
 	if len(ids) > 0 {
-		_, err := db.conn.Exec(
+		_, err := db.conn.ExecContext(ctx, 
 			`DELETE FROM docker_containers WHERE host_id = $1 AND NOT (id = ANY($2))`,
 			hostID, pq.Array(ids),
 		)
 		return err
 	}
-	_, err := db.conn.Exec(`DELETE FROM docker_containers WHERE host_id = $1`, hostID)
+	_, err := db.conn.ExecContext(ctx, `DELETE FROM docker_containers WHERE host_id = $1`, hostID)
 	return err
 }
 
-func (db *DB) GetDockerContainers(hostID string) ([]models.DockerContainer, error) {
-	rows, err := db.conn.Query(
+func (db *DB) GetDockerContainers(ctx context.Context, hostID string) ([]models.DockerContainer, error) {
+	rows, err := db.conn.QueryContext(ctx, 
 		`SELECT id, host_id, container_id, name, image, image_tag, image_id, image_digest, state, status, created, ports, labels,
 		 COALESCE(env_vars::text, '{}'), COALESCE(volumes::text, '[]'), COALESCE(networks::text, '[]'),
 		 COALESCE(net_rx_bytes, 0), COALESCE(net_tx_bytes, 0), updated_at
@@ -87,8 +88,8 @@ func (db *DB) GetDockerContainers(hostID string) ([]models.DockerContainer, erro
 	return containers, nil
 }
 
-func (db *DB) GetAllDockerContainers() ([]models.DockerContainer, error) {
-	rows, err := db.conn.Query(
+func (db *DB) GetAllDockerContainers(ctx context.Context) ([]models.DockerContainer, error) {
+	rows, err := db.conn.QueryContext(ctx, 
 		`SELECT dc.id, dc.host_id, h.hostname, dc.container_id, dc.name, dc.image, dc.image_tag, dc.image_id, dc.image_digest,
 		 dc.state, dc.status, dc.created, dc.ports, dc.labels,
 		 COALESCE(dc.env_vars::text, '{}'), COALESCE(dc.volumes::text, '[]'), COALESCE(dc.networks::text, '[]'),
@@ -122,13 +123,13 @@ func (db *DB) GetAllDockerContainers() ([]models.DockerContainer, error) {
 
 // ========== Docker Networks ==========
 
-func (db *DB) UpsertDockerNetworks(hostID string, networks []models.DockerNetwork) error {
-	if _, err := db.conn.Exec(`DELETE FROM docker_networks WHERE host_id = $1`, hostID); err != nil {
+func (db *DB) UpsertDockerNetworks(ctx context.Context, hostID string, networks []models.DockerNetwork) error {
+	if _, err := db.conn.ExecContext(ctx, `DELETE FROM docker_networks WHERE host_id = $1`, hostID); err != nil {
 		return err
 	}
 	for _, n := range networks {
 		containerIDsJSON, _ := json.Marshal(n.ContainerIDs)
-		_, err := db.conn.Exec(
+		_, err := db.conn.ExecContext(ctx, 
 			`INSERT INTO docker_networks (id, host_id, network_id, name, driver, scope, container_ids, updated_at)
  VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())`,
 			n.ID, hostID, n.NetworkID, n.Name, n.Driver, n.Scope, containerIDsJSON,
@@ -140,8 +141,8 @@ func (db *DB) UpsertDockerNetworks(hostID string, networks []models.DockerNetwor
 	return nil
 }
 
-func (db *DB) GetDockerNetworksByHost(hostID string) ([]models.DockerNetwork, error) {
-	rows, err := db.conn.Query(
+func (db *DB) GetDockerNetworksByHost(ctx context.Context, hostID string) ([]models.DockerNetwork, error) {
+	rows, err := db.conn.QueryContext(ctx, 
 		`SELECT id, host_id, network_id, name, driver, scope, container_ids, updated_at
 		 FROM docker_networks WHERE host_id = $1`,
 		hostID,
@@ -164,8 +165,8 @@ func (db *DB) GetDockerNetworksByHost(hostID string) ([]models.DockerNetwork, er
 	return networks, nil
 }
 
-func (db *DB) GetAllDockerNetworks() ([]models.DockerNetwork, error) {
-	rows, err := db.conn.Query(
+func (db *DB) GetAllDockerNetworks(ctx context.Context) ([]models.DockerNetwork, error) {
+	rows, err := db.conn.QueryContext(ctx, 
 		`SELECT id, host_id, network_id, name, driver, scope, container_ids, updated_at
 		 FROM docker_networks ORDER BY host_id, name`,
 	)
@@ -190,8 +191,8 @@ func (db *DB) GetAllDockerNetworks() ([]models.DockerNetwork, error) {
 // ========== Container Envs ==========
 // Env vars are stored in docker_containers.env_vars (no separate table).
 
-func (db *DB) GetAllContainerEnvs() ([]models.ContainerEnv, error) {
-	rows, err := db.conn.Query(
+func (db *DB) GetAllContainerEnvs(ctx context.Context) ([]models.ContainerEnv, error) {
+	rows, err := db.conn.QueryContext(ctx, 
 		`SELECT name AS container_name, COALESCE(env_vars::text, '{}')
 		 FROM docker_containers
 		 WHERE env_vars IS NOT NULL AND env_vars != '{}'::jsonb

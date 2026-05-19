@@ -1,6 +1,10 @@
 package database
 
-import "github.com/serversupervisor/server/internal/models"
+import (
+	"context"
+
+	"github.com/serversupervisor/server/internal/models"
+)
 
 // HostPermission stores a per-host access entry.
 type HostPermission struct {
@@ -13,11 +17,11 @@ type HostPermission struct {
 // GetHostAccess returns whether the user has explicit host restrictions and,
 // if so, the level granted for hostID ("" = host not in their allow-list).
 // Returns (restricted=false, ...) when the user has no host_permissions rows at all.
-func (db *DB) GetHostAccess(username, hostID string) (restricted bool, level string, err error) {
+func (db *DB) GetHostAccess(ctx context.Context, username, hostID string) (restricted bool, level string, err error) {
 	// Single query: check total count + level for this specific host.
 	var totalCount int
 	var hostLevel *string
-	err = db.conn.QueryRow(`
+	err = db.conn.QueryRowContext(ctx, `
 		SELECT
 			COUNT(*),
 			MAX(CASE WHEN host_id = $2 THEN level END)
@@ -37,8 +41,8 @@ func (db *DB) GetHostAccess(username, hostID string) (restricted bool, level str
 }
 
 // ListHostPermissions returns all entries for a given host.
-func (db *DB) ListHostPermissions(hostID string) ([]models.HostPermission, error) {
-	rows, err := db.conn.Query(`
+func (db *DB) ListHostPermissions(ctx context.Context, hostID string) ([]models.HostPermission, error) {
+	rows, err := db.conn.QueryContext(ctx, `
 		SELECT username, host_id, level, created_at
 		FROM host_permissions
 		WHERE host_id = $1
@@ -60,8 +64,8 @@ func (db *DB) ListHostPermissions(hostID string) ([]models.HostPermission, error
 }
 
 // ListUserHostPermissions returns all host permission entries for a given username.
-func (db *DB) ListUserHostPermissions(username string) ([]models.HostPermission, error) {
-	rows, err := db.conn.Query(`
+func (db *DB) ListUserHostPermissions(ctx context.Context, username string) ([]models.HostPermission, error) {
+	rows, err := db.conn.QueryContext(ctx, `
 		SELECT username, host_id, level, created_at
 		FROM host_permissions
 		WHERE username = $1
@@ -83,8 +87,8 @@ func (db *DB) ListUserHostPermissions(username string) ([]models.HostPermission,
 }
 
 // SetHostPermission upserts an access entry for username+hostID.
-func (db *DB) SetHostPermission(username, hostID, level string) error {
-	_, err := db.conn.Exec(`
+func (db *DB) SetHostPermission(ctx context.Context, username, hostID, level string) error {
+	_, err := db.conn.ExecContext(ctx, `
 		INSERT INTO host_permissions (username, host_id, level)
 		VALUES ($1, $2, $3)
 		ON CONFLICT (username, host_id) DO UPDATE SET level = EXCLUDED.level
@@ -93,8 +97,8 @@ func (db *DB) SetHostPermission(username, hostID, level string) error {
 }
 
 // DeleteHostPermission removes an access entry for username+hostID.
-func (db *DB) DeleteHostPermission(username, hostID string) error {
-	_, err := db.conn.Exec(`
+func (db *DB) DeleteHostPermission(ctx context.Context, username, hostID string) error {
+	_, err := db.conn.ExecContext(ctx, `
 		DELETE FROM host_permissions WHERE username = $1 AND host_id = $2
 	`, username, hostID)
 	return err

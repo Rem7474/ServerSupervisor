@@ -1,6 +1,7 @@
 package database
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 
@@ -9,10 +10,10 @@ import (
 
 // ========== Network Topology ==========
 
-func (db *DB) GetNetworkTopologyConfig() (*models.NetworkTopologyConfig, error) {
+func (db *DB) GetNetworkTopologyConfig(ctx context.Context) (*models.NetworkTopologyConfig, error) {
 	var cfg models.NetworkTopologyConfig
 	var excludedPortsJSON []byte
-	err := db.conn.QueryRow(
+	err := db.conn.QueryRowContext(ctx, 
 		`SELECT id, root_label, root_ip, excluded_ports, service_map, host_overrides, manual_services,
 		        COALESCE(authelia_label, 'Authelia'), COALESCE(authelia_ip, ''),
 		        COALESCE(internet_label, 'Internet'), COALESCE(internet_ip, ''),
@@ -51,13 +52,13 @@ func (db *DB) GetNetworkTopologyConfig() (*models.NetworkTopologyConfig, error) 
 	return &cfg, nil
 }
 
-func (db *DB) SaveNetworkTopologyConfig(cfg *models.NetworkTopologyConfig) error {
+func (db *DB) SaveNetworkTopologyConfig(ctx context.Context, cfg *models.NetworkTopologyConfig) error {
 	excludedPortsJSON, _ := json.Marshal(cfg.ExcludedPorts)
 	nodePositions := cfg.NodePositions
 	if nodePositions == "" {
 		nodePositions = "{}"
 	}
-	_, err := db.conn.Exec(
+	_, err := db.conn.ExecContext(ctx, 
 		`INSERT INTO network_topology_config (id, root_label, root_ip, excluded_ports, service_map, host_overrides, manual_services,
 		        authelia_label, authelia_ip, internet_label, internet_ip, node_positions,
 		        root_host_id, authelia_host_id, root_port_id, authelia_port_id, updated_at)

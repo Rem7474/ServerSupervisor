@@ -25,13 +25,13 @@ func NewMetricsRetentionJob(db *database.DB, cfg *config.Config) Job {
 					if days <= 0 {
 						days = 30
 					}
-					if deleted, err := db.CleanOldMetrics(days); err != nil {
+					if deleted, err := db.CleanOldMetrics(context.Background(), days); err != nil {
 						log.Printf("Metrics retention error: %v", err)
 					} else if deleted > 0 {
 						log.Printf("Deleted %d old metric rows (retention: %d days)", deleted, days)
 					}
 
-					if deleted, err := db.CleanupTrackerTagDigests(100); err != nil {
+					if deleted, err := db.CleanupTrackerTagDigests(context.Background(), 100); err != nil {
 						log.Printf("Tracker tag digests cleanup error: %v", err)
 					} else if deleted > 0 {
 						log.Printf("Trimmed %d old tracker tag digest rows", deleted)

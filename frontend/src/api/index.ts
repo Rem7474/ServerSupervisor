@@ -22,7 +22,31 @@ function asApiErrorLike(error: unknown): ApiErrorLike {
 const api: AxiosInstance = axios.create({
   baseURL: '/api',
   timeout: 30000,
+  withCredentials: true,
 })
+
+const CSRF_COOKIE = 'ss_csrf'
+
+function readCSRFFromCookie(): string {
+  const prefix = `${CSRF_COOKIE}=`
+  const parts = document.cookie ? document.cookie.split('; ') : []
+  for (const part of parts) {
+    if (part.startsWith(prefix)) {
+      try {
+        return decodeURIComponent(part.slice(prefix.length))
+      } catch {
+        return part.slice(prefix.length)
+      }
+    }
+  }
+  return ''
+}
+
+function isStateChangingMethod(method?: string): boolean {
+  if (!method) return false
+  const m = method.toUpperCase()
+  return m === 'POST' || m === 'PUT' || m === 'PATCH' || m === 'DELETE'
+}
 
 let redirectingToLogin = false
 
@@ -56,14 +80,17 @@ export function getApiErrorMessage(
 }
 
 /**
- * Add JWT token and standard headers to every request.
- * X-Requested-With is a defense-in-depth measure to prevent CSRF attacks.
+ * The session is carried by an httpOnly cookie (ss_access) set by the server
+ * on /api/auth/login and rotated on /api/auth/refresh. The CSRF token is
+ * mirrored in a readable cookie (ss_csrf) and must be echoed in the
+ * X-CSRF-Token header on every state-changing request (double-submit pattern).
+ * X-Requested-With remains as defense-in-depth.
  */
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-  const auth = useAuthStore()
   const headers = config.headers as Record<string, string>
-  if (auth.token) {
-    headers.Authorization = `Bearer ${auth.token}`
+  if (isStateChangingMethod(config.method)) {
+    const csrf = readCSRFFromCookie()
+    if (csrf) headers['X-CSRF-Token'] = csrf
   }
   headers['X-Requested-With'] = 'XMLHttpRequest'
   return config
@@ -157,7 +184,9 @@ export default {
   getLoginEvents: () => api.get('/v1/auth/login-events'),
   getLoginEventsAdmin: (page?: number, limit?: number) =>
     api.get('/v1/auth/login-events/admin', { params: { page: page ?? 1, limit: limit ?? 50 } }),
-  revokeAllSessions: (refreshToken: string) => api.post('/v1/auth/revoke-all-sessions', { refresh_token: refreshToken }),
+  revokeAllSessions: () => api.post('/v1/auth/revoke-all-sessions', {}),
+  logout: () => api.post('/auth/logout', {}),
+  refreshSession: () => api.post('/auth/refresh', {}),
   getSecuritySummary: (hours?: number) => api.get('/v1/auth/security', { params: { hours: hours ?? 24 } }),
   getWebLogsSummary: (period: string = '24h', hostId?: string, source?: string) =>
     api.get('/v1/security/web-logs', { params: { period, host_id: hostId ?? '', source: source ?? '' } }),

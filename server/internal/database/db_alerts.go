@@ -1,6 +1,7 @@
 package database
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 
@@ -9,11 +10,11 @@ import (
 
 // ========== Alert Rules ==========
 
-func (db *DB) CreateAlertRule(rule *models.AlertRule) error {
+func (db *DB) CreateAlertRule(ctx context.Context, rule *models.AlertRule) error {
 	rule.NormalizeCompatibility()
 	actionsJSON, _ := json.Marshal(rule.Actions)
 	proxmoxScopeJSON, _ := json.Marshal(rule.ProxmoxScope)
-	return db.conn.QueryRow(
+	return db.conn.QueryRowContext(ctx, 
 		`INSERT INTO alert_rules (source_type, host_id, proxmox_scope, metric, operator, threshold_warn, threshold_crit, threshold_clear_warn, threshold_clear_crit, duration_seconds, actions, enabled)
  VALUES ($1,$2,CAST($3 AS JSONB),$4,$5,$6,$7,$8,$9,$10,CAST($11 AS JSONB),$12)
  RETURNING id`,
@@ -21,11 +22,11 @@ func (db *DB) CreateAlertRule(rule *models.AlertRule) error {
 	).Scan(&rule.ID)
 }
 
-func (db *DB) UpdateAlertRule(rule *models.AlertRule) error {
+func (db *DB) UpdateAlertRule(ctx context.Context, rule *models.AlertRule) error {
 	rule.NormalizeCompatibility()
 	actionsJSON, _ := json.Marshal(rule.Actions)
 	proxmoxScopeJSON, _ := json.Marshal(rule.ProxmoxScope)
-	_, err := db.conn.Exec(
+	_, err := db.conn.ExecContext(ctx, 
 		`UPDATE alert_rules SET
 source_type = $1,
 host_id = $2,
@@ -46,13 +47,13 @@ updated_at = NOW()
 	return err
 }
 
-func (db *DB) DeleteAlertRule(id int64) error {
-	_, err := db.conn.Exec(`DELETE FROM alert_rules WHERE id = $1`, id)
+func (db *DB) DeleteAlertRule(ctx context.Context, id int64) error {
+	_, err := db.conn.ExecContext(ctx, `DELETE FROM alert_rules WHERE id = $1`, id)
 	return err
 }
 
-func (db *DB) GetAlertRules() ([]models.AlertRule, error) {
-	rows, err := db.conn.Query(
+func (db *DB) GetAlertRules(ctx context.Context) ([]models.AlertRule, error) {
+	rows, err := db.conn.QueryContext(ctx, 
 		`SELECT ar.id, ar.name, ar.source_type, ar.host_id, ar.proxmox_scope, ar.metric, ar.operator,
         ar.threshold_warn, ar.threshold_crit, ar.threshold_clear_warn, ar.threshold_clear_crit,
         ar.duration_seconds, ar.actions, ar.last_fired, ar.enabled, ar.created_at, ar.updated_at,
@@ -133,10 +134,10 @@ func (db *DB) GetAlertRules() ([]models.AlertRule, error) {
 
 // ========== Alert Incidents ==========
 
-func (db *DB) GetOpenAlertIncident(ruleID int64, hostID string) (*models.AlertIncident, error) {
+func (db *DB) GetOpenAlertIncident(ctx context.Context, ruleID int64, hostID string) (*models.AlertIncident, error) {
 	var inc models.AlertIncident
 	var nullableRuleID sql.NullInt64
-	err := db.conn.QueryRow(
+	err := db.conn.QueryRowContext(ctx, 
 		`SELECT id, rule_id, host_id, severity, triggered_at, resolved_at, value
  FROM alert_incidents
  WHERE rule_id = $1 AND host_id = $2 AND resolved_at IS NULL
@@ -153,8 +154,8 @@ func (db *DB) GetOpenAlertIncident(ruleID int64, hostID string) (*models.AlertIn
 }
 
 // ListOpenAlertIncidentsByRule returns all unresolved incidents for a rule.
-func (db *DB) ListOpenAlertIncidentsByRule(ruleID int64) ([]models.AlertIncident, error) {
-	rows, err := db.conn.Query(
+func (db *DB) ListOpenAlertIncidentsByRule(ctx context.Context, ruleID int64) ([]models.AlertIncident, error) {
+	rows, err := db.conn.QueryContext(ctx, 
 		`SELECT id, rule_id, host_id, severity, triggered_at, resolved_at, value
 		 FROM alert_incidents
 		 WHERE rule_id = $1 AND resolved_at IS NULL
@@ -182,20 +183,20 @@ func (db *DB) ListOpenAlertIncidentsByRule(ruleID int64) ([]models.AlertIncident
 }
 
 // CreateAlertIncident inserts a new alert incident and returns its generated ID.
-func (db *DB) CreateAlertIncident(ruleID int64, hostID string, value float64, severity string) (int64, error) {
+func (db *DB) CreateAlertIncident(ctx context.Context, ruleID int64, hostID string, value float64, severity string) (int64, error) {
 	var id int64
 	if severity == "" {
 		severity = "crit"
 	}
-	err := db.conn.QueryRow(
+	err := db.conn.QueryRowContext(ctx, 
 		`INSERT INTO alert_incidents (rule_id, host_id, value, severity) VALUES ($1, $2, $3, $4) RETURNING id`,
 		ruleID, hostID, value, severity,
 	).Scan(&id)
 	return id, err
 }
 
-func (db *DB) ResolveAlertIncident(id int64) error {
-	_, err := db.conn.Exec(
+func (db *DB) ResolveAlertIncident(ctx context.Context, id int64) error {
+	_, err := db.conn.ExecContext(ctx, 
 		`UPDATE alert_incidents SET resolved_at = NOW() WHERE id = $1 AND resolved_at IS NULL`,
 		id,
 	)
@@ -204,11 +205,11 @@ func (db *DB) ResolveAlertIncident(id int64) error {
 
 // UpdateAlertIncidentContext refreshes the host/value/severity of an open incident.
 // This keeps the active incident aligned with the latest evaluation state.
-func (db *DB) UpdateAlertIncidentContext(id int64, hostID string, value float64, severity string) error {
+func (db *DB) UpdateAlertIncidentContext(ctx context.Context, id int64, hostID string, value float64, severity string) error {
 	if severity == "" {
 		severity = "crit"
 	}
-	_, err := db.conn.Exec(
+	_, err := db.conn.ExecContext(ctx, 
 		`UPDATE alert_incidents
 		 SET host_id = $2,
 		     value = $3,
@@ -221,8 +222,8 @@ func (db *DB) UpdateAlertIncidentContext(id int64, hostID string, value float64,
 
 // ResolveOpenAlertIncidentsByRule marks all open incidents for a rule as resolved.
 // It returns the number of incidents that were updated.
-func (db *DB) ResolveOpenAlertIncidentsByRule(ruleID int64) (int64, error) {
-	result, err := db.conn.Exec(
+func (db *DB) ResolveOpenAlertIncidentsByRule(ctx context.Context, ruleID int64) (int64, error) {
+	result, err := db.conn.ExecContext(ctx, 
 		`UPDATE alert_incidents SET resolved_at = NOW() WHERE rule_id = $1 AND resolved_at IS NULL`,
 		ruleID,
 	)
@@ -236,8 +237,8 @@ func (db *DB) ResolveOpenAlertIncidentsByRule(ruleID int64) (int64, error) {
 	return rows, nil
 }
 
-func (db *DB) GetAlertIncidents(limit, offset int) ([]models.AlertIncident, error) {
-	rows, err := db.conn.Query(
+func (db *DB) GetAlertIncidents(ctx context.Context, limit, offset int) ([]models.AlertIncident, error) {
+	rows, err := db.conn.QueryContext(ctx, 
 		`SELECT id, rule_id, host_id, severity, triggered_at, resolved_at, value
  FROM alert_incidents ORDER BY triggered_at DESC LIMIT $1 OFFSET $2`,
 		limit, offset,

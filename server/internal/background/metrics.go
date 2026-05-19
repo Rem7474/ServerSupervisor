@@ -24,20 +24,20 @@ func NewMetricsDownsampleJob(db *database.DB) Job {
 					end := now.Truncate(5 * time.Minute)
 					start5 := end.Add(-5 * time.Minute)
 
-					if n, err := db.BatchAggregateMetrics(start5, end, "5min"); err != nil {
+					if n, err := db.BatchAggregateMetrics(context.Background(), start5, end, "5min"); err != nil {
 						log.Printf("5min downsampling error: %v", err)
 					} else if n > 0 {
 						log.Printf("Downsampled 5min metrics for %d hosts", n)
 					}
 
 					if end.Minute() == 0 {
-						if _, err := db.BatchAggregateMetrics(end.Add(-time.Hour), end, "hour"); err != nil {
+						if _, err := db.BatchAggregateMetrics(context.Background(), end.Add(-time.Hour), end, "hour"); err != nil {
 							log.Printf("Hourly downsampling error: %v", err)
 						}
 					}
 
 					if end.Hour() == 0 && end.Minute() == 0 {
-						if _, err := db.BatchAggregateMetrics(end.Add(-24*time.Hour), end, "day"); err != nil {
+						if _, err := db.BatchAggregateMetrics(context.Background(), end.Add(-24*time.Hour), end, "day"); err != nil {
 							log.Printf("Daily downsampling error: %v", err)
 						}
 					}

@@ -1,6 +1,7 @@
 package database
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -11,15 +12,15 @@ import (
 )
 
 // UpsertComposeProjects replaces all compose projects for a host
-func (db *DB) UpsertComposeProjects(hostID string, projects []models.ComposeProject) error {
-	tx, err := db.conn.Begin()
+func (db *DB) UpsertComposeProjects(ctx context.Context, hostID string, projects []models.ComposeProject) error {
+	tx, err := db.conn.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
 
 	// Delete existing projects for this host
-	if _, err := tx.Exec("DELETE FROM compose_projects WHERE host_id = $1", hostID); err != nil {
+	if _, err := tx.ExecContext(ctx, "DELETE FROM compose_projects WHERE host_id = $1", hostID); err != nil {
 		return fmt.Errorf("failed to delete old compose projects: %w", err)
 	}
 
@@ -27,7 +28,7 @@ func (db *DB) UpsertComposeProjects(hostID string, projects []models.ComposeProj
 		id := fmt.Sprintf("%s-%s", hostID, p.Name)
 		servicesJSON, _ := json.Marshal(p.Services)
 
-		_, err := tx.Exec(`
+		_, err := tx.ExecContext(ctx, `
 			INSERT INTO compose_projects (id, host_id, name, working_dir, config_file, services, raw_config, updated_at)
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		`, id, hostID, p.Name, p.WorkingDir, p.ConfigFile, string(servicesJSON), p.RawConfig, time.Now())
@@ -41,8 +42,8 @@ func (db *DB) UpsertComposeProjects(hostID string, projects []models.ComposeProj
 }
 
 // GetComposeProjectsByHost returns compose projects for a specific host
-func (db *DB) GetComposeProjectsByHost(hostID string) ([]models.ComposeProject, error) {
-	rows, err := db.conn.Query(`
+func (db *DB) GetComposeProjectsByHost(ctx context.Context, hostID string) ([]models.ComposeProject, error) {
+	rows, err := db.conn.QueryContext(ctx, `
 		SELECT cp.id, cp.host_id, COALESCE(h.hostname, ''), cp.name,
 		       cp.working_dir, cp.config_file, cp.services, cp.raw_config, cp.updated_at
 		FROM compose_projects cp
@@ -58,8 +59,8 @@ func (db *DB) GetComposeProjectsByHost(hostID string) ([]models.ComposeProject, 
 }
 
 // GetAllComposeProjects returns all compose projects across all hosts
-func (db *DB) GetAllComposeProjects() ([]models.ComposeProject, error) {
-	rows, err := db.conn.Query(`
+func (db *DB) GetAllComposeProjects(ctx context.Context) ([]models.ComposeProject, error) {
+	rows, err := db.conn.QueryContext(ctx, `
 		SELECT cp.id, cp.host_id, COALESCE(h.hostname, ''), cp.name,
 		       cp.working_dir, cp.config_file, cp.services, cp.raw_config, cp.updated_at
 		FROM compose_projects cp

@@ -1,6 +1,7 @@
 package handlers
 
-import (
+import (	"context"
+
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -19,7 +20,7 @@ func NewHostPermissionHandler(db *database.DB) *HostPermissionHandler {
 // ListHostPermissions returns all users who have explicit permissions on a host.
 func (h *HostPermissionHandler) ListHostPermissions(c *gin.Context) {
 	hostID := c.Param("id")
-	perms, err := h.db.ListHostPermissions(hostID)
+	perms, err := h.db.ListHostPermissions(context.Background(), hostID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -47,7 +48,7 @@ func (h *HostPermissionHandler) SetHostPermission(c *gin.Context) {
 		return
 	}
 
-	if err := h.db.SetHostPermission(username, hostID, req.Level); err != nil {
+	if err := h.db.SetHostPermission(context.Background(), username, hostID, req.Level); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -59,7 +60,7 @@ func (h *HostPermissionHandler) DeleteHostPermission(c *gin.Context) {
 	hostID := c.Param("id")
 	username := c.Param("username")
 
-	if err := h.db.DeleteHostPermission(username, hostID); err != nil {
+	if err := h.db.DeleteHostPermission(context.Background(), username, hostID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -69,7 +70,7 @@ func (h *HostPermissionHandler) DeleteHostPermission(c *gin.Context) {
 // GetMyHostPermissions returns the calling user's host permission entries.
 func (h *HostPermissionHandler) GetMyHostPermissions(c *gin.Context) {
 	username := c.GetString("username")
-	perms, err := h.db.ListUserHostPermissions(username)
+	perms, err := h.db.ListUserHostPermissions(context.Background(), username)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

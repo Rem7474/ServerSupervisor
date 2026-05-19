@@ -756,12 +756,12 @@
 <script setup>
 import { ref, computed, watch, toRef } from 'vue'
 import { useRouter } from 'vue-router'
-import apiClient from '../api'
-import DataToolbar from './common/DataToolbar.vue'
-import SortableHeader from './common/SortableHeader.vue'
-import DockerPortBadges from './common/DockerPortBadges.vue'
-import EmptyState from './EmptyState.vue'
-import { useDockerContainerPorts } from '../composables/useDockerContainerPorts'
+import apiClient from '../../api'
+import DataToolbar from '../common/DataToolbar.vue'
+import SortableHeader from '../common/SortableHeader.vue'
+import DockerPortBadges from '../common/DockerPortBadges.vue'
+import EmptyState from '../EmptyState.vue'
+import { useDockerContainerPorts } from '../../composables/useDockerContainerPorts'
 
 const router = useRouter()
 

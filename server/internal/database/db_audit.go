@@ -1,14 +1,15 @@
 package database
 
 import (
+	"context"
 	"github.com/serversupervisor/server/internal/models"
 )
 
 // ========== Audit Logs ==========
 
-func (db *DB) CreateAuditLog(username, action, hostID, ipAddress, details, status string) (int64, error) {
+func (db *DB) CreateAuditLog(ctx context.Context, username, action, hostID, ipAddress, details, status string) (int64, error) {
 	var id int64
-	err := db.conn.QueryRow(
+	err := db.conn.QueryRowContext(ctx, 
 		`INSERT INTO audit_logs (username, action, host_id, ip_address, details, status)
 		 VALUES ($1, $2, $3, $4, $5, $6)
 		 RETURNING id`,
@@ -20,8 +21,8 @@ func (db *DB) CreateAuditLog(username, action, hostID, ipAddress, details, statu
 	return id, nil
 }
 
-func (db *DB) GetAuditLogs(limit, offset int) ([]models.AuditLog, error) {
-	rows, err := db.conn.Query(
+func (db *DB) GetAuditLogs(ctx context.Context, limit, offset int) ([]models.AuditLog, error) {
+	rows, err := db.conn.QueryContext(ctx, 
 		`SELECT al.id, al.username, al.action, al.host_id,
 			COALESCE(h.name, '') AS host_name,
 			al.ip_address, al.details, al.status, al.created_at
@@ -47,8 +48,8 @@ func (db *DB) GetAuditLogs(limit, offset int) ([]models.AuditLog, error) {
 	return logs, nil
 }
 
-func (db *DB) GetAuditLogsByHost(hostID string, limit int) ([]models.AuditLog, error) {
-	rows, err := db.conn.Query(
+func (db *DB) GetAuditLogsByHost(ctx context.Context, hostID string, limit int) ([]models.AuditLog, error) {
+	rows, err := db.conn.QueryContext(ctx, 
 		`SELECT al.id, al.username, al.action, al.host_id,
 			COALESCE(h.name, '') AS host_name,
 			al.ip_address, al.details, al.status, al.created_at
@@ -75,8 +76,8 @@ func (db *DB) GetAuditLogsByHost(hostID string, limit int) ([]models.AuditLog, e
 	return logs, nil
 }
 
-func (db *DB) GetAuditLogsByUser(username string, limit int) ([]models.AuditLog, error) {
-	rows, err := db.conn.Query(
+func (db *DB) GetAuditLogsByUser(ctx context.Context, username string, limit int) ([]models.AuditLog, error) {
+	rows, err := db.conn.QueryContext(ctx, 
 		`SELECT al.id, al.username, al.action, al.host_id,
 			COALESCE(h.name, '') AS host_name,
 			al.ip_address, al.details, al.status, al.created_at
@@ -104,8 +105,8 @@ func (db *DB) GetAuditLogsByUser(username string, limit int) ([]models.AuditLog,
 }
 
 // CleanOldAuditLogs removes audit logs older than retentionDays.
-func (db *DB) CleanOldAuditLogs(retentionDays int) (int64, error) {
-	result, err := db.conn.Exec(
+func (db *DB) CleanOldAuditLogs(ctx context.Context, retentionDays int) (int64, error) {
+	result, err := db.conn.ExecContext(ctx, 
 		`DELETE FROM audit_logs WHERE created_at < NOW() - INTERVAL '1 day' * $1`,
 		retentionDays,
 	)
@@ -115,8 +116,8 @@ func (db *DB) CleanOldAuditLogs(retentionDays int) (int64, error) {
 	return result.RowsAffected()
 }
 
-func (db *DB) UpdateAuditLogStatus(id int64, status, details string) error {
-	_, err := db.conn.Exec(
+func (db *DB) UpdateAuditLogStatus(ctx context.Context, id int64, status, details string) error {
+	_, err := db.conn.ExecContext(ctx, 
 		`UPDATE audit_logs
 		 SET status = $1,
 		     details = COALESCE(NULLIF($2, ''), details)
@@ -127,8 +128,8 @@ func (db *DB) UpdateAuditLogStatus(id int64, status, details string) error {
 }
 
 // CountAuditLogs returns the total number of audit log entries.
-func (db *DB) CountAuditLogs() (int64, error) {
+func (db *DB) CountAuditLogs(ctx context.Context) (int64, error) {
 	var count int64
-	err := db.conn.QueryRow(`SELECT COUNT(*) FROM audit_logs`).Scan(&count)
+	err := db.conn.QueryRowContext(ctx, `SELECT COUNT(*) FROM audit_logs`).Scan(&count)
 	return count, err
 }

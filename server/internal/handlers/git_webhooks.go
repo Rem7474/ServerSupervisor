@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"database/sql"
@@ -42,7 +43,7 @@ func NewGitWebhookHandler(db *database.DB, cfg *config.Config, dispatcher *dispa
 // ========== CRUD (authenticated, admin only) ==========
 
 func (h *GitWebhookHandler) ListWebhooks(c *gin.Context) {
-	webhooks, err := h.db.ListGitWebhooks()
+	webhooks, err := h.db.ListGitWebhooks(context.Background())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list webhooks"})
 		return
@@ -88,7 +89,7 @@ func (h *GitWebhookHandler) CreateWebhook(c *gin.Context) {
 		req.NotifyChannels = []string{}
 	}
 
-	created, err := h.db.CreateGitWebhook(req)
+	created, err := h.db.CreateGitWebhook(context.Background(), req)
 	if err != nil {
 		log.Printf("CreateWebhook: db error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create webhook"})
@@ -99,7 +100,7 @@ func (h *GitWebhookHandler) CreateWebhook(c *gin.Context) {
 
 func (h *GitWebhookHandler) GetWebhook(c *gin.Context) {
 	id := c.Param("id")
-	wh, err := h.db.GetGitWebhookByID(id)
+	wh, err := h.db.GetGitWebhookByID(context.Background(), id)
 	if err == sql.ErrNoRows {
 		c.JSON(http.StatusNotFound, gin.H{"error": "webhook not found"})
 		return
@@ -108,7 +109,7 @@ func (h *GitWebhookHandler) GetWebhook(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get webhook"})
 		return
 	}
-	execs, _ := h.db.ListWebhookExecutions(id, 20)
+	execs, _ := h.db.ListWebhookExecutions(context.Background(), id, 20)
 	c.JSON(http.StatusOK, gin.H{"webhook": wh, "executions": execs})
 }
 
@@ -138,7 +139,7 @@ func (h *GitWebhookHandler) UpdateWebhook(c *gin.Context) {
 		return
 	}
 
-	if err := h.db.UpdateGitWebhook(id, req); err != nil {
+	if err := h.db.UpdateGitWebhook(context.Background(), id, req); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update webhook"})
 		return
 	}
@@ -152,7 +153,7 @@ func (h *GitWebhookHandler) DeleteWebhook(c *gin.Context) {
 		return
 	}
 	id := c.Param("id")
-	if err := h.db.DeleteGitWebhook(id); err != nil {
+	if err := h.db.DeleteGitWebhook(context.Background(), id); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete webhook"})
 		return
 	}
@@ -166,7 +167,7 @@ func (h *GitWebhookHandler) RegenerateSecret(c *gin.Context) {
 		return
 	}
 	id := c.Param("id")
-	secret, err := h.db.RegenerateWebhookSecret(id)
+	secret, err := h.db.RegenerateWebhookSecret(context.Background(), id)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to regenerate secret"})
 		return
@@ -182,7 +183,7 @@ func (h *GitWebhookHandler) GetWebhookExecutions(c *gin.Context) {
 			limit = v
 		}
 	}
-	execs, err := h.db.ListWebhookExecutions(id, limit)
+	execs, err := h.db.ListWebhookExecutions(context.Background(), id, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list executions"})
 		return
@@ -207,7 +208,7 @@ func (h *GitWebhookHandler) ReceiveWebhook(c *gin.Context) {
 		return
 	}
 
-	wh, err := h.db.GetGitWebhookForReceive(id)
+	wh, err := h.db.GetGitWebhookForReceive(context.Background(), id)
 	if err == sql.ErrNoRows || (err == nil && !wh.Enabled) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "webhook not found"})
 		return
@@ -268,7 +269,7 @@ func (h *GitWebhookHandler) ReceiveWebhook(c *gin.Context) {
 	}
 
 	// Check for already-running execution (skip to avoid concurrent conflicts)
-	running, _ := h.db.GetRunningExecutionForWebhook(id)
+	running, _ := h.db.GetRunningExecutionForWebhook(context.Background(), id)
 	if running {
 		exec := models.GitWebhookExecution{
 			WebhookID:     id,
@@ -280,10 +281,10 @@ func (h *GitWebhookHandler) ReceiveWebhook(c *gin.Context) {
 			Pusher:        parsed.Pusher,
 			Status:        "skipped",
 		}
-		created, _ := h.db.CreateWebhookExecution(exec)
+		created, _ := h.db.CreateWebhookExecution(context.Background(), exec)
 		now := time.Now()
 		if created != nil {
-			_ = h.db.UpdateWebhookExecutionStatus(created.ID, "skipped", &now)
+			_ = h.db.UpdateWebhookExecutionStatus(context.Background(), created.ID, "skipped", &now)
 		}
 		c.JSON(http.StatusOK, gin.H{"status": "skipped", "reason": "already_running"})
 		return
@@ -300,7 +301,7 @@ func (h *GitWebhookHandler) ReceiveWebhook(c *gin.Context) {
 		Pusher:        parsed.Pusher,
 		Status:        "pending",
 	}
-	createdExec, err := h.db.CreateWebhookExecution(exec)
+	createdExec, err := h.db.CreateWebhookExecution(context.Background(), exec)
 	if err != nil {
 		log.Printf("Webhook %s: failed to create execution record: %v", id, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create execution"})
@@ -339,14 +340,14 @@ func (h *GitWebhookHandler) ReceiveWebhook(c *gin.Context) {
 	})
 	if err != nil {
 		log.Printf("Webhook %s: failed to create remote command: %v", id, err)
-		_ = h.db.UpdateWebhookExecutionStatus(createdExec.ID, "failed", ptrNow())
+		_ = h.db.UpdateWebhookExecutionStatus(context.Background(), createdExec.ID, "failed", ptrNow())
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to dispatch command"})
 		return
 	}
 
 	// Link execution to command
-	_ = h.db.UpdateWebhookExecutionCommandID(createdExec.ID, result.Command.ID)
-	_ = h.db.UpdateGitWebhookLastTriggered(id)
+	_ = h.db.UpdateWebhookExecutionCommandID(context.Background(), createdExec.ID, result.Command.ID)
+	_ = h.db.UpdateGitWebhookLastTriggered(context.Background(), id)
 
 	log.Printf("Webhook %s: dispatched command %s → host %s task %s (repo=%s branch=%s)",
 		id, result.Command.ID, wh.HostID, wh.CustomTaskID, parsed.RepoName, parsed.Branch)
@@ -368,7 +369,7 @@ func ptrNow() *time.Time {
 // NotifyWebhookExecutionComplete updates the execution status and sends notifications
 // when a webhook-triggered command completes or fails. Safe to call in a goroutine.
 func (h *GitWebhookHandler) NotifyWebhookExecutionComplete(commandID, status string) {
-	webhookID, notifyOnSuccess, notifyOnFailure, channels, err := h.db.UpdateWebhookExecutionByCommandID(commandID, status)
+	webhookID, notifyOnSuccess, notifyOnFailure, channels, err := h.db.UpdateWebhookExecutionByCommandID(context.Background(), commandID, status)
 	if err != nil {
 		// Not a webhook-triggered command — nothing to do
 		return
@@ -381,7 +382,7 @@ func (h *GitWebhookHandler) NotifyWebhookExecutionComplete(commandID, status str
 	}
 
 	// Get webhook info for the notification message
-	wh, err := h.db.GetGitWebhookForReceive(webhookID)
+	wh, err := h.db.GetGitWebhookForReceive(context.Background(), webhookID)
 	if err != nil {
 		return
 	}

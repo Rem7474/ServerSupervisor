@@ -223,9 +223,12 @@
           </button>
         </div>
       </div>
-      <div class="card-body summary-chart-body">
+      <div
+        ref="chartContainerRef"
+        class="card-body summary-chart-body"
+      >
         <div
-          v-if="summaryLoading"
+          v-if="summaryLoading || !chartVisible"
           class="h-100 d-flex align-items-center justify-content-center"
         >
           <div
@@ -430,18 +433,18 @@
                 </td>
                 <td>
                   <span
-                    :class="cpuColor(effectiveMetrics(host.id).cpu)"
-                    :title="effectiveMetrics(host.id).source === 'proxmox' ? 'proxmox' : ''"
+                    :class="cpuColor(effectiveMetricsByHost[host.id]?.cpu)"
+                    :title="effectiveMetricsByHost[host.id]?.source === 'proxmox' ? 'proxmox' : ''"
                   >
-                    {{ effectiveMetrics(host.id).cpu != null ? effectiveMetrics(host.id).cpu.toFixed(1) + '%' : '-' }}
+                    {{ effectiveMetricsByHost[host.id]?.cpu != null ? effectiveMetricsByHost[host.id].cpu.toFixed(1) + '%' : '-' }}
                   </span>
                 </td>
                 <td>
                   <span
-                    :class="memColor(effectiveMetrics(host.id).memPct)"
-                    :title="effectiveMetrics(host.id).source === 'proxmox' ? 'proxmox' : ''"
+                    :class="memColor(effectiveMetricsByHost[host.id]?.memPct)"
+                    :title="effectiveMetricsByHost[host.id]?.source === 'proxmox' ? 'proxmox' : ''"
                   >
-                    {{ effectiveMetrics(host.id).memPct != null ? effectiveMetrics(host.id).memPct.toFixed(1) + '%' : '-' }}
+                    {{ effectiveMetricsByHost[host.id]?.memPct != null ? effectiveMetricsByHost[host.id].memPct.toFixed(1) + '%' : '-' }}
                   </span>
                 </td>
                 <td>
@@ -517,10 +520,10 @@
 </template>
 
 <script setup>
-import { computed, defineAsyncComponent, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import RelativeTime from '../components/RelativeTime.vue'
 import WsStatusBar from '../components/WsStatusBar.vue'
-import ProxmoxClusterCard from '../components/ProxmoxClusterCard.vue'
+import ProxmoxClusterCard from '../components/proxmox/ProxmoxClusterCard.vue'
 import DashboardKPIs from '../components/dashboard/DashboardKPIs.vue'
 import DashboardDockerVersions from '../components/dashboard/DashboardDockerVersions.vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
@@ -571,6 +574,7 @@ const {
   dataStaleAlert,
   reconnect,
   effectiveMetrics,
+  effectiveMetricsByHost,
   sortedHosts,
   summaryChartOptions,
   fetchSummary,
@@ -635,6 +639,37 @@ watch(totalHostPages, (pages) => {
   if (currentHostPage.value > pages) {
     currentHostPage.value = pages
   }
+})
+
+// Lazy-mount the chart: defer loading chart.js + vue-chartjs until the chart
+// card is actually scrolled into view. The card is above the fold for most
+// users, so the observer fires almost immediately — but on smaller viewports
+// or when the user scrolls past quickly, we skip the work entirely.
+const chartContainerRef = ref(null)
+const chartVisible = ref(false)
+let chartObserver = null
+
+onMounted(() => {
+  if (typeof IntersectionObserver === 'undefined' || !chartContainerRef.value) {
+    chartVisible.value = true
+    return
+  }
+  chartObserver = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      if (entry.isIntersecting) {
+        chartVisible.value = true
+        chartObserver?.disconnect()
+        chartObserver = null
+        break
+      }
+    }
+  }, { rootMargin: '200px' })
+  chartObserver.observe(chartContainerRef.value)
+})
+
+onBeforeUnmount(() => {
+  chartObserver?.disconnect()
+  chartObserver = null
 })
 </script>
 

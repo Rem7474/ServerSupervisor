@@ -216,10 +216,10 @@ import { useAuthStore } from '../stores/auth'
 import api from '../api'
 import { formatDateTime } from '../utils/formatters'
 import RelativeTime from '../components/RelativeTime.vue'
-import WebhookUrlCard from '../components/WebhookUrlCard.vue'
+import WebhookUrlCard from '../components/webhooks/WebhookUrlCard.vue'
 import WebhookExecutionList from '../components/webhooks/WebhookExecutionList.vue'
 import WebhookModal from '../components/webhooks/WebhookModal.vue'
-import CommandLogPanel from '../components/CommandLogPanel.vue'
+import CommandLogPanel from '../components/host/CommandLogPanel.vue'
 import { useCommandStream } from '../composables/useCommandStream'
 
 const route = useRoute()
@@ -239,7 +239,7 @@ const showConsole = ref(false)
 const showModal = ref(false)
 const saving = ref(false)
 const modalError = ref('')
-const { openCommandStream, closeStream } = useCommandStream({ token: () => auth.token })
+const { openCommandStream, closeStream } = useCommandStream()
 
 const envVars = [
   { name: 'SS_REPO_NAME', desc: 'Nom complet du dépôt (ex: monorg/mon-app)' },

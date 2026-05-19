@@ -117,8 +117,8 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import apiClient from '../api'
-import LoadingSkeleton from './LoadingSkeleton.vue'
+import apiClient from '../../api'
+import LoadingSkeleton from '../LoadingSkeleton.vue'
 
 const props = defineProps({
   hostId: { type: String, required: true },

@@ -399,11 +399,8 @@
 
 <script setup>
 import { computed } from 'vue'
-import dayjs from 'dayjs'
-import relativeTime from 'dayjs/plugin/relativeTime'
-import utc from 'dayjs/plugin/utc'
-import 'dayjs/locale/fr'
-import CVEList from '../CVEList.vue'
+import dayjs from '../../utils/dayjs'
+import CVEList from '../apt/CVEList.vue'
 
 defineEmits(['run-apt-command', 'uu-install', 'uu-configure', 'uu-run-now', 'uu-log'])
 
@@ -437,10 +434,6 @@ const props = defineProps({
     default: '',
   },
 })
-
-dayjs.extend(relativeTime)
-dayjs.extend(utc)
-dayjs.locale('fr')
 
 const lastUpgradeDate = computed(() => {
   const aptUpgrade = props.aptStatus?.last_upgrade

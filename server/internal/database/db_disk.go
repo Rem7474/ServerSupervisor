@@ -1,6 +1,7 @@
 package database
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 
@@ -9,12 +10,12 @@ import (
 
 // ========== Disk Metrics ==========
 
-func (db *DB) InsertDiskMetrics(metrics []models.DiskMetrics) error {
+func (db *DB) InsertDiskMetrics(ctx context.Context, metrics []models.DiskMetrics) error {
 	if len(metrics) == 0 {
 		return nil
 	}
 	for _, m := range metrics {
-		_, err := db.conn.Exec(
+		_, err := db.conn.ExecContext(ctx, 
 			`INSERT INTO disk_metrics (
 				host_id, timestamp, mount_point, filesystem,
 				size_gb, used_gb, avail_gb, used_percent,
@@ -31,8 +32,8 @@ func (db *DB) InsertDiskMetrics(metrics []models.DiskMetrics) error {
 	return nil
 }
 
-func (db *DB) GetLatestDiskMetrics(hostID string) ([]models.DiskMetrics, error) {
-	rows, err := db.conn.Query(
+func (db *DB) GetLatestDiskMetrics(ctx context.Context, hostID string) ([]models.DiskMetrics, error) {
+	rows, err := db.conn.QueryContext(ctx, 
 		`SELECT id, host_id, timestamp, mount_point, filesystem,
 			size_gb, used_gb, avail_gb, used_percent,
 			inodes_total, inodes_used, inodes_free, inodes_percent
@@ -66,11 +67,11 @@ func (db *DB) GetLatestDiskMetrics(hostID string) ([]models.DiskMetrics, error) 
 	return metrics, nil
 }
 
-func (db *DB) GetDiskMetricsHistory(hostID, mountPoint string, limit int) ([]models.DiskMetrics, error) {
+func (db *DB) GetDiskMetricsHistory(ctx context.Context, hostID, mountPoint string, limit int) ([]models.DiskMetrics, error) {
 	if limit <= 0 {
 		limit = 100
 	}
-	rows, err := db.conn.Query(
+	rows, err := db.conn.QueryContext(ctx, 
 		`SELECT id, host_id, timestamp, mount_point, filesystem,
 			   size_gb, used_gb, avail_gb, used_percent,
 			   inodes_total, inodes_used, inodes_free, inodes_percent
@@ -100,7 +101,7 @@ func (db *DB) GetDiskMetricsHistory(hostID, mountPoint string, limit int) ([]mod
 	return metrics, nil
 }
 
-func (db *DB) GetDiskMetricsAggregated(hostID, mountPoint string, hours int) ([]models.DiskMetrics, string, error) {
+func (db *DB) GetDiskMetricsAggregated(ctx context.Context, hostID, mountPoint string, hours int) ([]models.DiskMetrics, string, error) {
 	if hours <= 0 {
 		hours = 24
 	}
@@ -113,7 +114,7 @@ func (db *DB) GetDiskMetricsAggregated(hostID, mountPoint string, hours int) ([]
 
 	if hours <= 24 {
 		aggType = "raw"
-		rows, err = db.conn.Query(
+		rows, err = db.conn.QueryContext(ctx, 
 			`SELECT id, host_id, timestamp, mount_point, filesystem,
 				size_gb, used_gb, avail_gb, used_percent,
 				inodes_total, inodes_used, inodes_free, inodes_percent
@@ -125,7 +126,7 @@ func (db *DB) GetDiskMetricsAggregated(hostID, mountPoint string, hours int) ([]
 		)
 	} else if hours <= 720 {
 		aggType = "hour"
-		rows, err = db.conn.Query(
+		rows, err = db.conn.QueryContext(ctx, 
 			`SELECT
 				0 AS id,
 				$1 AS host_id,
@@ -146,7 +147,7 @@ func (db *DB) GetDiskMetricsAggregated(hostID, mountPoint string, hours int) ([]
 		)
 	} else {
 		aggType = "day"
-		rows, err = db.conn.Query(
+		rows, err = db.conn.QueryContext(ctx, 
 			`SELECT
 				0 AS id,
 				$1 AS host_id,
@@ -188,12 +189,12 @@ func (db *DB) GetDiskMetricsAggregated(hostID, mountPoint string, hours int) ([]
 
 // ========== Disk Health (SMART) ==========
 
-func (db *DB) InsertDiskHealth(healthData []models.DiskHealth) error {
+func (db *DB) InsertDiskHealth(ctx context.Context, healthData []models.DiskHealth) error {
 	if len(healthData) == 0 {
 		return nil
 	}
 	for _, h := range healthData {
-		_, err := db.conn.Exec(
+		_, err := db.conn.ExecContext(ctx, 
 			`INSERT INTO disk_health (
 				host_id, timestamp, device, model, serial_number,
 				smart_status, temperature, power_on_hours, power_cycles,
@@ -210,8 +211,8 @@ func (db *DB) InsertDiskHealth(healthData []models.DiskHealth) error {
 	return nil
 }
 
-func (db *DB) GetLatestDiskHealth(hostID string) ([]models.DiskHealth, error) {
-	rows, err := db.conn.Query(
+func (db *DB) GetLatestDiskHealth(ctx context.Context, hostID string) ([]models.DiskHealth, error) {
+	rows, err := db.conn.QueryContext(ctx, 
 		`SELECT DISTINCT ON (device)
 			id, host_id, timestamp, device, model, serial_number,
 			smart_status, temperature, power_on_hours, power_cycles,

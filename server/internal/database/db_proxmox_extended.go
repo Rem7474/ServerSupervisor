@@ -1,6 +1,7 @@
 package database
 
 import (
+	"context"
 	"database/sql"
 	"time"
 
@@ -10,8 +11,8 @@ import (
 // ─── Tasks ────────────────────────────────────────────────────────────────────
 
 // UpsertProxmoxTask inserts or updates a task record (keyed on connection_id + upid).
-func (db *DB) UpsertProxmoxTask(connectionID, nodeName, upid, taskType, status, userName string, startTime, endTime *time.Time, exitStatus, objectID string) error {
-	_, err := db.conn.Exec(`
+func (db *DB) UpsertProxmoxTask(ctx context.Context, connectionID, nodeName, upid, taskType, status, userName string, startTime, endTime *time.Time, exitStatus, objectID string) error {
+	_, err := db.conn.ExecContext(ctx, `
 		INSERT INTO proxmox_tasks
 		    (connection_id, node_name, upid, task_type, status, user_name,
 		     start_time, end_time, exit_status, object_id, last_seen_at)
@@ -33,11 +34,11 @@ func (db *DB) UpsertProxmoxTask(connectionID, nodeName, upid, taskType, status, 
 }
 
 // ListProxmoxTasksByNode returns recent tasks for a node (newest first).
-func (db *DB) ListProxmoxTasksByNode(connectionID, nodeName string, limit int) ([]models.ProxmoxTask, error) {
+func (db *DB) ListProxmoxTasksByNode(ctx context.Context, connectionID, nodeName string, limit int) ([]models.ProxmoxTask, error) {
 	if limit <= 0 {
 		limit = 50
 	}
-	rows, err := db.conn.Query(`
+	rows, err := db.conn.QueryContext(ctx, `
 		SELECT id, connection_id, node_name, upid, task_type, status, user_name,
 		       start_time, end_time, exit_status, object_id, last_seen_at
 		FROM proxmox_tasks
@@ -54,7 +55,7 @@ func (db *DB) ListProxmoxTasksByNode(connectionID, nodeName string, limit int) (
 
 // ListProxmoxTasks returns tasks across all nodes for a connection (newest first).
 // Pass empty connectionID to get tasks from all connections.
-func (db *DB) ListProxmoxTasks(connectionID string, limit int) ([]models.ProxmoxTask, error) {
+func (db *DB) ListProxmoxTasks(ctx context.Context, connectionID string, limit int) ([]models.ProxmoxTask, error) {
 	if limit <= 0 {
 		limit = 100
 	}
@@ -63,7 +64,7 @@ func (db *DB) ListProxmoxTasks(connectionID string, limit int) ([]models.Proxmox
 		err  error
 	)
 	if connectionID != "" {
-		rows, err = db.conn.Query(`
+		rows, err = db.conn.QueryContext(ctx, `
 			SELECT id, connection_id, node_name, upid, task_type, status, user_name,
 			       start_time, end_time, exit_status, object_id, last_seen_at
 			FROM proxmox_tasks
@@ -72,7 +73,7 @@ func (db *DB) ListProxmoxTasks(connectionID string, limit int) ([]models.Proxmox
 			LIMIT $2`,
 			connectionID, limit)
 	} else {
-		rows, err = db.conn.Query(`
+		rows, err = db.conn.QueryContext(ctx, `
 			SELECT id, connection_id, node_name, upid, task_type, status, user_name,
 			       start_time, end_time, exit_status, object_id, last_seen_at
 			FROM proxmox_tasks
@@ -88,9 +89,9 @@ func (db *DB) ListProxmoxTasks(connectionID string, limit int) ([]models.Proxmox
 }
 
 // GetRecentFailedTaskCount returns the number of failed tasks since the given time.
-func (db *DB) GetRecentFailedTaskCount(since time.Time) (int, error) {
+func (db *DB) GetRecentFailedTaskCount(ctx context.Context, since time.Time) (int, error) {
 	var count int
-	err := db.conn.QueryRow(`
+	err := db.conn.QueryRowContext(ctx, `
 		SELECT COUNT(*) FROM proxmox_tasks
 		WHERE status='stopped' AND exit_status != '' AND exit_status != 'OK'
 		  AND start_time >= $1`,
@@ -99,8 +100,8 @@ func (db *DB) GetRecentFailedTaskCount(since time.Time) (int, error) {
 }
 
 // DeleteStaleProxmoxTasks removes tasks not seen since the cutoff for a connection.
-func (db *DB) DeleteStaleProxmoxTasks(connectionID string, cutoff time.Time) error {
-	_, err := db.conn.Exec(
+func (db *DB) DeleteStaleProxmoxTasks(ctx context.Context, connectionID string, cutoff time.Time) error {
+	_, err := db.conn.ExecContext(ctx, 
 		`DELETE FROM proxmox_tasks WHERE connection_id=$1 AND last_seen_at < $2`,
 		connectionID, cutoff)
 	return err
@@ -137,8 +138,8 @@ func scanTasks(rows *sql.Rows) ([]models.ProxmoxTask, error) {
 // ─── Backup Jobs ──────────────────────────────────────────────────────────────
 
 // UpsertProxmoxBackupJob inserts or updates a backup job record.
-func (db *DB) UpsertProxmoxBackupJob(connectionID, jobID string, enabled bool, schedule, storage, mode, compress, vmids, mailTo string) error {
-	_, err := db.conn.Exec(`
+func (db *DB) UpsertProxmoxBackupJob(ctx context.Context, connectionID, jobID string, enabled bool, schedule, storage, mode, compress, vmids, mailTo string) error {
+	_, err := db.conn.ExecContext(ctx, `
 		INSERT INTO proxmox_backup_jobs
 		    (connection_id, job_id, enabled, schedule, storage, mode, compress, vmids, mail_to, last_seen_at)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW())
@@ -158,18 +159,18 @@ func (db *DB) UpsertProxmoxBackupJob(connectionID, jobID string, enabled bool, s
 
 // ListProxmoxBackupJobs returns all backup jobs for a connection.
 // Pass empty connectionID to get jobs from all connections.
-func (db *DB) ListProxmoxBackupJobs(connectionID string) ([]models.ProxmoxBackupJob, error) {
+func (db *DB) ListProxmoxBackupJobs(ctx context.Context, connectionID string) ([]models.ProxmoxBackupJob, error) {
 	var (
 		rows *sql.Rows
 		err  error
 	)
 	if connectionID != "" {
-		rows, err = db.conn.Query(`
+		rows, err = db.conn.QueryContext(ctx, `
 			SELECT id, connection_id, job_id, enabled, schedule, storage, mode, compress, vmids, mail_to, last_seen_at
 			FROM proxmox_backup_jobs WHERE connection_id=$1 ORDER BY job_id`,
 			connectionID)
 	} else {
-		rows, err = db.conn.Query(`
+		rows, err = db.conn.QueryContext(ctx, `
 			SELECT id, connection_id, job_id, enabled, schedule, storage, mode, compress, vmids, mail_to, last_seen_at
 			FROM proxmox_backup_jobs ORDER BY job_id`)
 	}
@@ -196,8 +197,8 @@ func (db *DB) ListProxmoxBackupJobs(connectionID string) ([]models.ProxmoxBackup
 }
 
 // DeleteStaleProxmoxBackupJobs removes jobs not seen since the cutoff.
-func (db *DB) DeleteStaleProxmoxBackupJobs(connectionID string, cutoff time.Time) error {
-	_, err := db.conn.Exec(
+func (db *DB) DeleteStaleProxmoxBackupJobs(ctx context.Context, connectionID string, cutoff time.Time) error {
+	_, err := db.conn.ExecContext(ctx, 
 		`DELETE FROM proxmox_backup_jobs WHERE connection_id=$1 AND last_seen_at < $2`,
 		connectionID, cutoff)
 	return err
@@ -207,8 +208,8 @@ func (db *DB) DeleteStaleProxmoxBackupJobs(connectionID string, cutoff time.Time
 
 // UpsertProxmoxBackupRun upserts the latest backup result for a VM.
 // UNIQUE on (connection_id, vmid) — one row per VM, always the most recent run.
-func (db *DB) UpsertProxmoxBackupRun(connectionID, nodeName string, vmid int, taskUPID, status string, startTime, endTime *time.Time, exitStatus string) error {
-	_, err := db.conn.Exec(`
+func (db *DB) UpsertProxmoxBackupRun(ctx context.Context, connectionID, nodeName string, vmid int, taskUPID, status string, startTime, endTime *time.Time, exitStatus string) error {
+	_, err := db.conn.ExecContext(ctx, `
 		INSERT INTO proxmox_backup_runs
 		    (connection_id, node_name, vmid, task_upid, status, start_time, end_time, exit_status, last_seen_at)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,NOW())
@@ -227,7 +228,7 @@ func (db *DB) UpsertProxmoxBackupRun(connectionID, nodeName string, vmid int, ta
 
 // ListProxmoxBackupRuns returns the latest backup run per VM for a connection.
 // Guest name is joined from proxmox_guests when available.
-func (db *DB) ListProxmoxBackupRuns(connectionID string) ([]models.ProxmoxBackupRun, error) {
+func (db *DB) ListProxmoxBackupRuns(ctx context.Context, connectionID string) ([]models.ProxmoxBackupRun, error) {
 	var (
 		rows *sql.Rows
 		err  error
@@ -240,9 +241,9 @@ func (db *DB) ListProxmoxBackupRuns(connectionID string) ([]models.ProxmoxBackup
 		LEFT JOIN proxmox_guests g ON g.connection_id = r.connection_id
 		    AND g.node_name = r.node_name AND g.vmid = r.vmid`
 	if connectionID != "" {
-		rows, err = db.conn.Query(q+` WHERE r.connection_id=$1 ORDER BY r.start_time DESC NULLS LAST`, connectionID)
+		rows, err = db.conn.QueryContext(ctx, q+` WHERE r.connection_id=$1 ORDER BY r.start_time DESC NULLS LAST`, connectionID)
 	} else {
-		rows, err = db.conn.Query(q + ` ORDER BY r.start_time DESC NULLS LAST`)
+		rows, err = db.conn.QueryContext(ctx, q + ` ORDER BY r.start_time DESC NULLS LAST`)
 	}
 	if err != nil {
 		return nil, err
@@ -279,8 +280,8 @@ func (db *DB) ListProxmoxBackupRuns(connectionID string) ([]models.ProxmoxBackup
 // ─── Disks ────────────────────────────────────────────────────────────────────
 
 // UpsertProxmoxDisk inserts or updates a physical disk record.
-func (db *DB) UpsertProxmoxDisk(connectionID, nodeName, devPath, model, serial string, sizeBytes int64, diskType, health string, wearout int) error {
-	_, err := db.conn.Exec(`
+func (db *DB) UpsertProxmoxDisk(ctx context.Context, connectionID, nodeName, devPath, model, serial string, sizeBytes int64, diskType, health string, wearout int) error {
+	_, err := db.conn.ExecContext(ctx, `
 		INSERT INTO proxmox_disks
 		    (connection_id, node_name, dev_path, model, serial, size_bytes, disk_type, health, wearout, last_seen_at)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW())
@@ -298,8 +299,8 @@ func (db *DB) UpsertProxmoxDisk(connectionID, nodeName, devPath, model, serial s
 }
 
 // ListProxmoxDisksByNode returns all physical disks for a given node.
-func (db *DB) ListProxmoxDisksByNode(connectionID, nodeName string) ([]models.ProxmoxDisk, error) {
-	rows, err := db.conn.Query(`
+func (db *DB) ListProxmoxDisksByNode(ctx context.Context, connectionID, nodeName string) ([]models.ProxmoxDisk, error) {
+	rows, err := db.conn.QueryContext(ctx, `
 		SELECT id, connection_id, node_name, dev_path, model, serial, size_bytes, disk_type, health, wearout, last_seen_at
 		FROM proxmox_disks
 		WHERE connection_id=$1 AND node_name=$2
@@ -313,8 +314,8 @@ func (db *DB) ListProxmoxDisksByNode(connectionID, nodeName string) ([]models.Pr
 }
 
 // DeleteStaleProxmoxDisks removes disks not seen since the cutoff for a connection + node.
-func (db *DB) DeleteStaleProxmoxDisks(connectionID string, cutoff time.Time) error {
-	_, err := db.conn.Exec(
+func (db *DB) DeleteStaleProxmoxDisks(ctx context.Context, connectionID string, cutoff time.Time) error {
+	_, err := db.conn.ExecContext(ctx, 
 		`DELETE FROM proxmox_disks WHERE connection_id=$1 AND last_seen_at < $2`,
 		connectionID, cutoff)
 	return err
@@ -341,8 +342,8 @@ func scanDisks(rows *sql.Rows) ([]models.ProxmoxDisk, error) {
 // ─── Node update counters ─────────────────────────────────────────────────────
 
 // UpdateProxmoxNodeUpdates sets the pending/security update counts for a node.
-func (db *DB) UpdateProxmoxNodeUpdates(connectionID, nodeName string, pendingUpdates, securityUpdates int) error {
-	_, err := db.conn.Exec(`
+func (db *DB) UpdateProxmoxNodeUpdates(ctx context.Context, connectionID, nodeName string, pendingUpdates, securityUpdates int) error {
+	_, err := db.conn.ExecContext(ctx, `
 		UPDATE proxmox_nodes
 		SET pending_updates=$3, security_updates=$4, last_update_check_at=NOW()
 		WHERE connection_id=$1 AND node_name=$2`,

@@ -1,6 +1,7 @@
 package database
 
 import (
+	"context"
 	"database/sql"
 	"strconv"
 	"strings"
@@ -12,7 +13,7 @@ import (
 
 // ========== Release Trackers ==========
 
-func (db *DB) CreateReleaseTracker(t models.ReleaseTracker) (*models.ReleaseTracker, error) {
+func (db *DB) CreateReleaseTracker(ctx context.Context, t models.ReleaseTracker) (*models.ReleaseTracker, error) {
 	channels := t.NotifyChannels
 	if channels == nil {
 		channels = []string{}
@@ -26,7 +27,7 @@ func (db *DB) CreateReleaseTracker(t models.ReleaseTracker) (*models.ReleaseTrac
 		hostID = sql.NullString{String: t.HostID, Valid: true}
 	}
 	var scannedHostID sql.NullString
-	err := db.conn.QueryRow(
+	err := db.conn.QueryRowContext(ctx, 
 		`INSERT INTO release_trackers
 		 (name, tracker_type, provider, repo_owner, repo_name, docker_image, docker_tag, host_id, custom_task_id,
 		  notify_channels, notify_on_release, enabled, cooldown_hours)
@@ -54,8 +55,8 @@ func (db *DB) CreateReleaseTracker(t models.ReleaseTracker) (*models.ReleaseTrac
 	return &result, nil
 }
 
-func (db *DB) ListReleaseTrackers() ([]models.ReleaseTracker, error) {
-	rows, err := db.conn.Query(
+func (db *DB) ListReleaseTrackers(ctx context.Context) ([]models.ReleaseTracker, error) {
+	rows, err := db.conn.QueryContext(ctx, 
 		`SELECT t.id, t.name, t.tracker_type, t.provider, t.repo_owner, t.repo_name,
 		        t.docker_image, t.docker_tag,
 		        t.host_id, t.custom_task_id, t.last_release_tag, t.latest_image_digest, t.cooldown_hours, t.last_release_detected_at,
@@ -124,10 +125,10 @@ func (db *DB) ListReleaseTrackers() ([]models.ReleaseTracker, error) {
 	return out, rows.Err()
 }
 
-func (db *DB) GetReleaseTrackerByID(id string) (*models.ReleaseTracker, error) {
+func (db *DB) GetReleaseTrackerByID(ctx context.Context, id string) (*models.ReleaseTracker, error) {
 	var t models.ReleaseTracker
 	var hostID sql.NullString
-	err := db.conn.QueryRow(
+	err := db.conn.QueryRowContext(ctx, 
 		`SELECT t.id, t.name, t.tracker_type, t.provider, t.repo_owner, t.repo_name,
 		        t.docker_image, t.docker_tag,
 		        t.host_id, t.custom_task_id, t.last_release_tag, t.latest_image_digest, t.cooldown_hours, t.last_release_detected_at,
@@ -155,7 +156,7 @@ func (db *DB) GetReleaseTrackerByID(id string) (*models.ReleaseTracker, error) {
 	return &t, nil
 }
 
-func (db *DB) UpdateReleaseTracker(id string, t models.ReleaseTracker) error {
+func (db *DB) UpdateReleaseTracker(ctx context.Context, id string, t models.ReleaseTracker) error {
 	channels := t.NotifyChannels
 	if channels == nil {
 		channels = []string{}
@@ -167,7 +168,7 @@ func (db *DB) UpdateReleaseTracker(id string, t models.ReleaseTracker) error {
 	if t.HostID != "" {
 		hostID = sql.NullString{String: t.HostID, Valid: true}
 	}
-	_, err := db.conn.Exec(
+	_, err := db.conn.ExecContext(ctx, 
 		`UPDATE release_trackers SET
 		   name=$1, tracker_type=$2, provider=$3, repo_owner=$4, repo_name=$5,
 		   docker_image=$6, docker_tag=$7,
@@ -183,14 +184,14 @@ func (db *DB) UpdateReleaseTracker(id string, t models.ReleaseTracker) error {
 	return err
 }
 
-func (db *DB) DeleteReleaseTracker(id string) error {
-	_, err := db.conn.Exec(`DELETE FROM release_trackers WHERE id=$1`, id)
+func (db *DB) DeleteReleaseTracker(ctx context.Context, id string) error {
+	_, err := db.conn.ExecContext(ctx, `DELETE FROM release_trackers WHERE id=$1`, id)
 	return err
 }
 
 // GetEnabledReleaseTrackers returns all enabled trackers for polling.
-func (db *DB) GetEnabledReleaseTrackers() ([]models.ReleaseTracker, error) {
-	rows, err := db.conn.Query(
+func (db *DB) GetEnabledReleaseTrackers(ctx context.Context) ([]models.ReleaseTracker, error) {
+	rows, err := db.conn.QueryContext(ctx, 
 		`SELECT id, name, tracker_type, provider, repo_owner, repo_name,
 		        docker_image, docker_tag, host_id, custom_task_id,
 		        last_release_tag, latest_image_digest, cooldown_hours, last_release_detected_at, last_triggered_at, notify_channels, notify_on_release
@@ -223,30 +224,30 @@ func (db *DB) GetEnabledReleaseTrackers() ([]models.ReleaseTracker, error) {
 
 // UpdateReleaseTrackerLastSeen updates the last known tag, check timestamp, and clears any error.
 // If triggered=true, also updates last_triggered_at.
-func (db *DB) UpdateReleaseTrackerLastSeen(id, newTag string, triggered bool) error {
+func (db *DB) UpdateReleaseTrackerLastSeen(ctx context.Context, id, newTag string, triggered bool) error {
 	now := time.Now()
 	if triggered {
-		_, err := db.conn.Exec(
+		_, err := db.conn.ExecContext(ctx, 
 			`UPDATE release_trackers SET last_release_tag=$1, last_checked_at=$2, last_triggered_at=$2, last_error='' WHERE id=$3`,
 			newTag, now, id)
 		return err
 	}
 	if newTag != "" {
-		_, err := db.conn.Exec(
+		_, err := db.conn.ExecContext(ctx, 
 			`UPDATE release_trackers SET last_release_tag=$1, last_checked_at=$2, last_error='' WHERE id=$3`,
 			newTag, now, id)
 		return err
 	}
-	_, err := db.conn.Exec(
+	_, err := db.conn.ExecContext(ctx, 
 		`UPDATE release_trackers SET last_checked_at=$1, last_error='' WHERE id=$2`, now, id)
 	return err
 }
 
 // UpdateReleaseTrackerDetected updates the last known release tag and records
 // when this release was first detected, without marking it as triggered.
-func (db *DB) UpdateReleaseTrackerDetected(id, newTag string) error {
+func (db *DB) UpdateReleaseTrackerDetected(ctx context.Context, id, newTag string) error {
 	now := time.Now()
-	_, err := db.conn.Exec(
+	_, err := db.conn.ExecContext(ctx, 
 		`UPDATE release_trackers
 		 SET last_release_tag=$1,
 		     last_release_detected_at=$2,
@@ -259,9 +260,9 @@ func (db *DB) UpdateReleaseTrackerDetected(id, newTag string) error {
 }
 
 // MarkReleaseTrackerTriggered marks a tracker as triggered now and clears errors.
-func (db *DB) MarkReleaseTrackerTriggered(id string) error {
+func (db *DB) MarkReleaseTrackerTriggered(ctx context.Context, id string) error {
 	now := time.Now()
-	_, err := db.conn.Exec(
+	_, err := db.conn.ExecContext(ctx, 
 		`UPDATE release_trackers
 		 SET last_triggered_at=$1,
 		     last_checked_at=$1,
@@ -273,16 +274,16 @@ func (db *DB) MarkReleaseTrackerTriggered(id string) error {
 }
 
 // UpdateReleaseTrackerDigest stores the manifest digest of the latest release image.
-func (db *DB) UpdateReleaseTrackerDigest(id, digest string) error {
-	_, err := db.conn.Exec(
+func (db *DB) UpdateReleaseTrackerDigest(ctx context.Context, id, digest string) error {
+	_, err := db.conn.ExecContext(ctx, 
 		`UPDATE release_trackers SET latest_image_digest=$1 WHERE id=$2`, digest, id)
 	return err
 }
 
 // StoreTrackerTagDigest persists a (tag, digest) pair for historical version lookup.
 // Uses ON CONFLICT to update the digest if the tag was already recorded (re-tagged image).
-func (db *DB) StoreTrackerTagDigest(trackerID, tag, digest string) error {
-	_, err := db.conn.Exec(
+func (db *DB) StoreTrackerTagDigest(ctx context.Context, trackerID, tag, digest string) error {
+	_, err := db.conn.ExecContext(ctx, 
 		`INSERT INTO release_tracker_tag_digests (tracker_id, tag, digest)
 		 VALUES ($1, $2, $3)
 		 ON CONFLICT (tracker_id, tag, digest) DO UPDATE SET
@@ -294,8 +295,8 @@ func (db *DB) StoreTrackerTagDigest(trackerID, tag, digest string) error {
 
 // GetAllTrackerTagDigests returns all stored (trackerID, tag, digest) triples.
 // Used by buildVersionComparisons to resolve a container's image digest to a version tag.
-func (db *DB) GetAllTrackerTagDigests() (map[string]string, error) {
-	rows, err := db.conn.Query(
+func (db *DB) GetAllTrackerTagDigests(ctx context.Context) (map[string]string, error) {
+	rows, err := db.conn.QueryContext(ctx, 
 		`SELECT tracker_id, tag, digest FROM release_tracker_tag_digests`)
 	if err != nil {
 		return nil, err
@@ -400,11 +401,11 @@ func leadingDigitsForDB(s string) string {
 	return s
 }
 
-func (db *DB) ListTrackerTagDigests(trackerID string, limit int) ([]models.ReleaseVersionHistoryItem, error) {
+func (db *DB) ListTrackerTagDigests(ctx context.Context, trackerID string, limit int) ([]models.ReleaseVersionHistoryItem, error) {
 	if limit <= 0 {
 		limit = 20
 	}
-	rows, err := db.conn.Query(
+	rows, err := db.conn.QueryContext(ctx, 
 		`SELECT tag, created_at
 		 FROM release_tracker_tag_digests
 		 WHERE tracker_id=$1
@@ -436,11 +437,11 @@ func (db *DB) ListTrackerTagDigests(trackerID string, limit int) ([]models.Relea
 // CleanupTrackerTagDigests removes old digest entries, keeping only the most recent
 // keepPerTracker rows per tracker. This prevents unbounded growth of the table.
 // Returns the total number of deleted rows.
-func (db *DB) CleanupTrackerTagDigests(keepPerTracker int) (int64, error) {
+func (db *DB) CleanupTrackerTagDigests(ctx context.Context, keepPerTracker int) (int64, error) {
 	if keepPerTracker <= 0 {
 		keepPerTracker = 100
 	}
-	res, err := db.conn.Exec(`
+	res, err := db.conn.ExecContext(ctx, `
 		DELETE FROM release_tracker_tag_digests
 		WHERE (tracker_id, tag) NOT IN (
 		    SELECT tracker_id, tag
@@ -458,26 +459,26 @@ func (db *DB) CleanupTrackerTagDigests(keepPerTracker int) (int64, error) {
 }
 
 // UpdateReleaseTrackerError stores an error from the last check attempt.
-func (db *DB) UpdateReleaseTrackerError(id, errMsg string) error {
+func (db *DB) UpdateReleaseTrackerError(ctx context.Context, id, errMsg string) error {
 	now := time.Now()
-	_, err := db.conn.Exec(
+	_, err := db.conn.ExecContext(ctx, 
 		`UPDATE release_trackers SET last_checked_at=$1, last_error=$2 WHERE id=$3`, now, errMsg, id)
 	return err
 }
 
 // GetRunningExecutionForReleaseTracker returns true if a pending/running execution exists.
-func (db *DB) GetRunningExecutionForReleaseTracker(trackerID string) (bool, error) {
+func (db *DB) GetRunningExecutionForReleaseTracker(ctx context.Context, trackerID string) (bool, error) {
 	var count int
-	err := db.conn.QueryRow(
+	err := db.conn.QueryRowContext(ctx, 
 		`SELECT COUNT(*) FROM release_tracker_executions
 		 WHERE tracker_id=$1 AND status IN ('pending','running')`, trackerID,
 	).Scan(&count)
 	return count > 0, err
 }
 
-func (db *DB) CreateReleaseTrackerExecution(e models.ReleaseTrackerExecution) (*models.ReleaseTrackerExecution, error) {
+func (db *DB) CreateReleaseTrackerExecution(ctx context.Context, e models.ReleaseTrackerExecution) (*models.ReleaseTrackerExecution, error) {
 	var result models.ReleaseTrackerExecution
-	err := db.conn.QueryRow(
+	err := db.conn.QueryRowContext(ctx, 
 		`INSERT INTO release_tracker_executions
 		 (tracker_id, tag_name, release_url, release_name, status)
 		 VALUES ($1,$2,$3,$4,$5)
@@ -490,14 +491,14 @@ func (db *DB) CreateReleaseTrackerExecution(e models.ReleaseTrackerExecution) (*
 	return &result, err
 }
 
-func (db *DB) UpdateReleaseTrackerExecutionCommandID(execID, commandID string) error {
-	_, err := db.conn.Exec(
+func (db *DB) UpdateReleaseTrackerExecutionCommandID(ctx context.Context, execID, commandID string) error {
+	_, err := db.conn.ExecContext(ctx, 
 		`UPDATE release_tracker_executions SET command_id=$1 WHERE id=$2`, commandID, execID)
 	return err
 }
 
-func (db *DB) UpdateReleaseTrackerExecutionStatus(id, status string, completedAt *time.Time) error {
-	_, err := db.conn.Exec(
+func (db *DB) UpdateReleaseTrackerExecutionStatus(ctx context.Context, id, status string, completedAt *time.Time) error {
+	_, err := db.conn.ExecContext(ctx, 
 		`UPDATE release_tracker_executions SET status=$1, completed_at=$2 WHERE id=$3`,
 		status, completedAt, id)
 	return err
@@ -505,11 +506,11 @@ func (db *DB) UpdateReleaseTrackerExecutionStatus(id, status string, completedAt
 
 // UpdateReleaseTrackerExecutionByCommandID updates execution status when a command completes.
 // Returns tracker info for notification dispatch.
-func (db *DB) UpdateReleaseTrackerExecutionByCommandID(commandID, status string) (
+func (db *DB) UpdateReleaseTrackerExecutionByCommandID(ctx context.Context, commandID, status string) (
 	trackerID string, notifyOnRelease bool, channels []string, err error,
 ) {
 	now := time.Now()
-	err = db.conn.QueryRow(
+	err = db.conn.QueryRowContext(ctx, 
 		`UPDATE release_tracker_executions SET status=$1, completed_at=$2
 		 WHERE command_id=$3
 		 RETURNING tracker_id`,
@@ -518,14 +519,14 @@ func (db *DB) UpdateReleaseTrackerExecutionByCommandID(commandID, status string)
 	if err != nil {
 		return
 	}
-	err = db.conn.QueryRow(
+	err = db.conn.QueryRowContext(ctx, 
 		`SELECT notify_on_release, notify_channels FROM release_trackers WHERE id=$1`, trackerID,
 	).Scan(&notifyOnRelease, pq.Array(&channels))
 	return
 }
 
-func (db *DB) ListReleaseTrackerExecutions(trackerID string, limit int) ([]models.ReleaseTrackerExecution, error) {
-	rows, err := db.conn.Query(
+func (db *DB) ListReleaseTrackerExecutions(ctx context.Context, trackerID string, limit int) ([]models.ReleaseTrackerExecution, error) {
+	rows, err := db.conn.QueryContext(ctx, 
 		`SELECT id, tracker_id, command_id, tag_name, release_url, release_name,
 		        status, triggered_at, completed_at
 		 FROM release_tracker_executions

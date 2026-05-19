@@ -1,6 +1,7 @@
 package database
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -19,9 +20,9 @@ type RefreshTokenRecord struct {
 
 // ========== Users ==========
 
-func (db *DB) CreateUser(username, passwordHash, role string, mustChangePassword ...bool) error {
+func (db *DB) CreateUser(ctx context.Context, username, passwordHash, role string, mustChangePassword ...bool) error {
 	mcp := len(mustChangePassword) > 0 && mustChangePassword[0]
-	_, err := db.conn.Exec(
+	_, err := db.conn.ExecContext(ctx, 
 		`INSERT INTO users (username, password_hash, role, must_change_password) VALUES ($1, $2, $3, $4)
 		 ON CONFLICT (username) DO NOTHING`,
 		username, passwordHash, role, mcp,
@@ -29,17 +30,17 @@ func (db *DB) CreateUser(username, passwordHash, role string, mustChangePassword
 	return err
 }
 
-func (db *DB) SetUserMustChangePassword(username string, value bool) error {
-	_, err := db.conn.Exec(
+func (db *DB) SetUserMustChangePassword(ctx context.Context, username string, value bool) error {
+	_, err := db.conn.ExecContext(ctx, 
 		`UPDATE users SET must_change_password = $1 WHERE username = $2`,
 		value, username,
 	)
 	return err
 }
 
-func (db *DB) GetUserByUsername(username string) (*models.User, error) {
+func (db *DB) GetUserByUsername(ctx context.Context, username string) (*models.User, error) {
 	var u models.User
-	err := db.conn.QueryRow(
+	err := db.conn.QueryRowContext(ctx, 
 		`SELECT id, username, password_hash, role, totp_secret, backup_codes, mfa_enabled, must_change_password, created_at
 		 FROM users WHERE username = $1`,
 		username,
@@ -50,9 +51,9 @@ func (db *DB) GetUserByUsername(username string) (*models.User, error) {
 	return &u, nil
 }
 
-func (db *DB) GetUserByID(id int64) (*models.User, error) {
+func (db *DB) GetUserByID(ctx context.Context, id int64) (*models.User, error) {
 	var u models.User
-	err := db.conn.QueryRow(
+	err := db.conn.QueryRowContext(ctx, 
 		`SELECT id, username, password_hash, role, totp_secret, backup_codes, mfa_enabled, must_change_password, created_at
 		 FROM users WHERE id = $1`,
 		id,
@@ -63,8 +64,8 @@ func (db *DB) GetUserByID(id int64) (*models.User, error) {
 	return &u, nil
 }
 
-func (db *DB) GetUsers() ([]models.User, error) {
-	rows, err := db.conn.Query(
+func (db *DB) GetUsers(ctx context.Context) ([]models.User, error) {
+	rows, err := db.conn.QueryContext(ctx, 
 		`SELECT id, username, role, created_at FROM users ORDER BY username`,
 	)
 	if err != nil {
@@ -83,41 +84,41 @@ func (db *DB) GetUsers() ([]models.User, error) {
 	return users, nil
 }
 
-func (db *DB) UpdateUserRole(id int64, role string) error {
-	_, err := db.conn.Exec(
+func (db *DB) UpdateUserRole(ctx context.Context, id int64, role string) error {
+	_, err := db.conn.ExecContext(ctx, 
 		`UPDATE users SET role = $1 WHERE id = $2`,
 		role, id,
 	)
 	return err
 }
 
-func (db *DB) UpdateUserPassword(username, passwordHash string) error {
-	_, err := db.conn.Exec(
+func (db *DB) UpdateUserPassword(ctx context.Context, username, passwordHash string) error {
+	_, err := db.conn.ExecContext(ctx, 
 		`UPDATE users SET password_hash = $1, must_change_password = FALSE WHERE username = $2`,
 		passwordHash, username,
 	)
 	return err
 }
 
-func (db *DB) DeleteUser(id int64) error {
-	_, err := db.conn.Exec(`DELETE FROM users WHERE id = $1`, id)
+func (db *DB) DeleteUser(ctx context.Context, id int64) error {
+	_, err := db.conn.ExecContext(ctx, `DELETE FROM users WHERE id = $1`, id)
 	return err
 }
 
 // ========== Refresh Tokens ==========
 
-func (db *DB) CreateRefreshToken(userID int64, tokenHash string, expiresAt time.Time) error {
-	_, err := db.conn.Exec(
+func (db *DB) CreateRefreshToken(ctx context.Context, userID int64, tokenHash string, expiresAt time.Time) error {
+	_, err := db.conn.ExecContext(ctx, 
 		`INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)`,
 		userID, tokenHash, expiresAt,
 	)
 	return err
 }
 
-func (db *DB) GetRefreshToken(tokenHash string) (*RefreshTokenRecord, error) {
+func (db *DB) GetRefreshToken(ctx context.Context, tokenHash string) (*RefreshTokenRecord, error) {
 	var rec RefreshTokenRecord
 	var revoked sql.NullTime
-	err := db.conn.QueryRow(
+	err := db.conn.QueryRowContext(ctx, 
 		`SELECT user_id, expires_at, revoked_at FROM refresh_tokens WHERE token_hash = $1`,
 		tokenHash,
 	).Scan(&rec.UserID, &rec.ExpiresAt, &revoked)
@@ -130,8 +131,8 @@ func (db *DB) GetRefreshToken(tokenHash string) (*RefreshTokenRecord, error) {
 	return &rec, nil
 }
 
-func (db *DB) RevokeRefreshToken(tokenHash string) error {
-	_, err := db.conn.Exec(
+func (db *DB) RevokeRefreshToken(ctx context.Context, tokenHash string) error {
+	_, err := db.conn.ExecContext(ctx, 
 		`UPDATE refresh_tokens SET revoked_at = NOW() WHERE token_hash = $1 AND revoked_at IS NULL`,
 		tokenHash,
 	)
@@ -140,8 +141,8 @@ func (db *DB) RevokeRefreshToken(tokenHash string) error {
 
 // RotateRefreshToken atomically revokes the current token and inserts a replacement.
 // Returns the owning user ID if rotation succeeds.
-func (db *DB) RotateRefreshToken(currentTokenHash, newTokenHash string, expiresAt time.Time) (int64, error) {
-	tx, err := db.conn.Begin()
+func (db *DB) RotateRefreshToken(ctx context.Context, currentTokenHash, newTokenHash string, expiresAt time.Time) (int64, error) {
+	tx, err := db.conn.BeginTx(ctx, nil)
 	if err != nil {
 		return 0, err
 	}
@@ -154,7 +155,7 @@ func (db *DB) RotateRefreshToken(currentTokenHash, newTokenHash string, expiresA
 	var userID int64
 	var currentExpiresAt time.Time
 	var revokedAt sql.NullTime
-	if err = tx.QueryRow(
+	if err = tx.QueryRowContext(ctx, 
 		`SELECT user_id, expires_at, revoked_at FROM refresh_tokens WHERE token_hash = $1 FOR UPDATE`,
 		currentTokenHash,
 	).Scan(&userID, &currentExpiresAt, &revokedAt); err != nil {
@@ -164,14 +165,14 @@ func (db *DB) RotateRefreshToken(currentTokenHash, newTokenHash string, expiresA
 		return 0, fmt.Errorf("refresh token expired or revoked")
 	}
 
-	if _, err = tx.Exec(
+	if _, err = tx.ExecContext(ctx, 
 		`UPDATE refresh_tokens SET revoked_at = NOW() WHERE token_hash = $1 AND revoked_at IS NULL`,
 		currentTokenHash,
 	); err != nil {
 		return 0, err
 	}
 
-	if _, err = tx.Exec(
+	if _, err = tx.ExecContext(ctx, 
 		`INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)`,
 		userID, newTokenHash, expiresAt,
 	); err != nil {
@@ -183,8 +184,8 @@ func (db *DB) RotateRefreshToken(currentTokenHash, newTokenHash string, expiresA
 	}
 	return userID, nil
 }
-func (db *DB) RevokeAllOtherSessions(username, currentTokenHash string) error {
-	_, err := db.conn.Exec(
+func (db *DB) RevokeAllOtherSessions(ctx context.Context, username, currentTokenHash string) error {
+	_, err := db.conn.ExecContext(ctx, 
 		`UPDATE refresh_tokens SET revoked_at = NOW()
 		 WHERE user_id = (SELECT id FROM users WHERE username = $1)
 		   AND token_hash != $2
@@ -196,43 +197,43 @@ func (db *DB) RevokeAllOtherSessions(username, currentTokenHash string) error {
 
 // ========== User TOTP / MFA ==========
 
-func (db *DB) SetUserTOTPSecret(userID int64, secret, backupCodes string, enabled bool) error {
-	_, err := db.conn.Exec(
+func (db *DB) SetUserTOTPSecret(ctx context.Context, userID int64, secret, backupCodes string, enabled bool) error {
+	_, err := db.conn.ExecContext(ctx, 
 		`UPDATE users SET totp_secret = $1, backup_codes = $2, mfa_enabled = $3 WHERE id = $4`,
 		secret, backupCodes, enabled, userID,
 	)
 	return err
 }
 
-func (db *DB) GetUserTOTPSecret(username string) (string, error) {
+func (db *DB) GetUserTOTPSecret(ctx context.Context, username string) (string, error) {
 	var secret string
-	err := db.conn.QueryRow(
+	err := db.conn.QueryRowContext(ctx, 
 		`SELECT COALESCE(totp_secret, '') FROM users WHERE username = $1`,
 		username,
 	).Scan(&secret)
 	return secret, err
 }
 
-func (db *DB) GetUserMFAStatus(username string) (bool, error) {
+func (db *DB) GetUserMFAStatus(ctx context.Context, username string) (bool, error) {
 	var enabled bool
-	err := db.conn.QueryRow(
+	err := db.conn.QueryRowContext(ctx, 
 		`SELECT mfa_enabled FROM users WHERE username = $1`,
 		username,
 	).Scan(&enabled)
 	return enabled, err
 }
 
-func (db *DB) DisableUserMFA(username string) error {
-	_, err := db.conn.Exec(
+func (db *DB) DisableUserMFA(ctx context.Context, username string) error {
+	_, err := db.conn.ExecContext(ctx, 
 		`UPDATE users SET mfa_enabled = FALSE, totp_secret = '', backup_codes = '[]' WHERE username = $1`,
 		username,
 	)
 	return err
 }
 
-func (db *DB) ConsumeMFABackupCode(username, usedCode string) error {
+func (db *DB) ConsumeMFABackupCode(ctx context.Context, username, usedCode string) error {
 	var rawJSON string
-	err := db.conn.QueryRow(
+	err := db.conn.QueryRowContext(ctx, 
 		`SELECT backup_codes FROM users WHERE username = $1`, username,
 	).Scan(&rawJSON)
 	if err != nil {
@@ -259,7 +260,7 @@ func (db *DB) ConsumeMFABackupCode(username, usedCode string) error {
 	}
 
 	newJSON, _ := json.Marshal(remaining)
-	_, err = db.conn.Exec(
+	_, err = db.conn.ExecContext(ctx, 
 		`UPDATE users SET backup_codes = $1 WHERE username = $2`, string(newJSON), username,
 	)
 	return err

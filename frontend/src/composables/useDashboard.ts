@@ -8,14 +8,7 @@ import { useConfirmDialog } from './useConfirmDialog'
 import { confirmBulkAction } from '../utils/bulkActionHelpers'
 import { translateError } from '../utils/translateError'
 import { formatRelativeTime } from './useDateFormatter'
-import dayjs from 'dayjs'
-import relativeTime from 'dayjs/plugin/relativeTime'
-import utc from 'dayjs/plugin/utc'
-import 'dayjs/locale/fr'
-
-dayjs.extend(relativeTime)
-dayjs.extend(utc)
-dayjs.locale('fr')
+import dayjs from '../utils/dayjs'
 
 type AnyRecord = Record<string, unknown>
 type SortDirection = 'asc' | 'desc'
@@ -291,26 +284,45 @@ export function useDashboard() {
     return m
   })
 
-  function effectiveMetrics(hostId: string) {
-    const link = proxmoxLinkByHostId.value[hostId]
-    const agent = hostMetrics.value[hostId]
+  interface EffectiveMetric {
+    cpu: number | null
+    memPct: number | null
+    source: 'agent' | 'proxmox'
+  }
+  const EMPTY_METRIC: EffectiveMetric = { cpu: null, memPct: null, source: 'agent' }
 
-    if (link) {
-      const src = link.metrics_source
-      const useProxmox = src === 'proxmox' || (src === 'auto' && link.cpu_usage != null)
-      if (useProxmox) {
-        const cpu = link.cpu_usage != null ? link.cpu_usage * 100 : null
-        const memAlloc = typeof link.mem_alloc === 'number' ? link.mem_alloc : 0
-        const memUsage = typeof link.mem_usage === 'number' ? link.mem_usage : 0
-        const memPct = memAlloc > 0 ? (memUsage / memAlloc) * 100 : null
-        return { cpu, memPct, source: 'proxmox' }
+  // Pre-computed once per WS update; consumers do O(1) lookup instead of
+  // re-running the link/source resolution on every row render.
+  const effectiveMetricsByHost = computed<Record<string, EffectiveMetric>>(() => {
+    const map: Record<string, EffectiveMetric> = {}
+    const links = proxmoxLinkByHostId.value
+    const metrics = hostMetrics.value
+    for (const host of hosts.value as DashboardHostRecord[]) {
+      const link = links[host.id]
+      if (link) {
+        const src = link.metrics_source
+        const useProxmox = src === 'proxmox' || (src === 'auto' && link.cpu_usage != null)
+        if (useProxmox) {
+          const cpu = link.cpu_usage != null ? link.cpu_usage * 100 : null
+          const memAlloc = typeof link.mem_alloc === 'number' ? link.mem_alloc : 0
+          const memUsage = typeof link.mem_usage === 'number' ? link.mem_usage : 0
+          const memPct = memAlloc > 0 ? (memUsage / memAlloc) * 100 : null
+          map[host.id] = { cpu, memPct, source: 'proxmox' }
+          continue
+        }
+      }
+      const agent = metrics[host.id]
+      map[host.id] = {
+        cpu: agent?.cpu_usage_percent ?? null,
+        memPct: agent?.memory_percent ?? null,
+        source: 'agent',
       }
     }
-    return {
-      cpu: agent?.cpu_usage_percent ?? null,
-      memPct: agent?.memory_percent ?? null,
-      source: 'agent',
-    }
+    return map
+  })
+
+  function effectiveMetrics(hostId: string): EffectiveMetric {
+    return effectiveMetricsByHost.value[hostId] ?? EMPTY_METRIC
   }
 
   const filteredHosts = computed(() => {
@@ -330,6 +342,7 @@ export function useDashboard() {
     const list = [...filteredHosts.value]
     const direction = sortDir.value === 'asc' ? 1 : -1
     const statusOrder: Record<HostStatus, number> = { online: 0, warning: 1, offline: 2 }
+    const metricsMap = effectiveMetricsByHost.value
 
     list.sort((a: DashboardHostRecord, b: DashboardHostRecord) => {
       let aVal, bVal
@@ -347,12 +360,12 @@ export function useDashboard() {
           bVal = String(b.agent_version || '').toLowerCase()
           break
         case 'cpu':
-          aVal = effectiveMetrics(a.id).cpu ?? -1
-          bVal = effectiveMetrics(b.id).cpu ?? -1
+          aVal = metricsMap[a.id]?.cpu ?? -1
+          bVal = metricsMap[b.id]?.cpu ?? -1
           break
         case 'ram':
-          aVal = effectiveMetrics(a.id).memPct ?? -1
-          bVal = effectiveMetrics(b.id).memPct ?? -1
+          aVal = metricsMap[a.id]?.memPct ?? -1
+          bVal = metricsMap[b.id]?.memPct ?? -1
           break
         case 'disk':
           aVal = diskUsage.value[a.id] ?? -1
@@ -407,8 +420,17 @@ export function useDashboard() {
     return min
   }
 
+  // Palette is expensive to compute (probes the DOM via getComputedStyle) so we
+  // memoize it and only recompute when the document theme actually changes.
+  const chartPalette = ref<DashboardChartPalette>(FALLBACK_CHART_PALETTE)
+  let themeObserver: MutationObserver | null = null
+
+  function refreshChartPalette() {
+    chartPalette.value = getDashboardChartPalette()
+  }
+
   const summaryChartOptions = computed(() => {
-    const colors = getDashboardChartPalette()
+    const colors = chartPalette.value
     const minX = getSummaryMinTimestamp(summaryChartData.value)
     const maxX = getSummaryMaxTimestamp(summaryChartData.value)
     return {
@@ -467,8 +489,6 @@ export function useDashboard() {
     selectedHostIds.value = selectedHostIds.value.filter((id) => hosts.value.some((h: DashboardHostRecord) => h.id === id))
     loading.value = false
 
-    scheduleSummaryRefresh()
-
     if (!proxmoxAutoSwitched.value && proxmoxNodes.value.length > 0) {
       proxmoxAutoSwitched.value = true
       chartSource.value = 'proxmox'
@@ -477,14 +497,21 @@ export function useDashboard() {
   }, { debounceMs: 200 })
 
   let cveRefreshTimer: ReturnType<typeof setInterval> | null = null
-  let summaryRefreshTimer: ReturnType<typeof setTimeout> | null = null
+  let summaryRefreshTimer: ReturnType<typeof setInterval> | null = null
 
-  function scheduleSummaryRefresh() {
-    if (summaryLoading.value || summaryRefreshTimer) return
-    summaryRefreshTimer = setTimeout(() => {
-      summaryRefreshTimer = null
+  // Refresh the summary chart on a cadence matching its bucket granularity,
+  // not on every WS tick (the chart spans 1h–30d so per-tick refreshes are wasted).
+  function summaryRefreshIntervalMs(): number {
+    return bucketMinutesFor(summaryHours.value) * 60_000
+  }
+
+  function startSummaryRefreshTimer() {
+    if (summaryRefreshTimer) clearInterval(summaryRefreshTimer)
+    summaryRefreshTimer = setInterval(() => {
+      if (document.visibilityState !== 'visible') return
+      if (summaryLoading.value) return
       fetchSummary()
-    }, 400)
+    }, summaryRefreshIntervalMs())
   }
 
   async function refreshCveSummary() {
@@ -537,7 +564,7 @@ export function useDashboard() {
   async function fetchSummary() {
     summaryLoading.value = true
     try {
-      const colors = getDashboardChartPalette()
+      const colors = chartPalette.value
       const bucketMinutes = bucketMinutesFor(summaryHours.value)
       const isProxmox = chartSource.value === 'proxmox'
       const res = isProxmox
@@ -580,6 +607,7 @@ export function useDashboard() {
   function changeSummaryRange(hours: number) {
     summaryHours.value = hours
     fetchSummary()
+    startSummaryRefreshTimer()
   }
 
   function selectAllFiltered() {
@@ -658,6 +686,18 @@ export function useDashboard() {
   }
 
   onMounted(() => {
+    refreshChartPalette()
+    if (typeof MutationObserver !== 'undefined' && typeof document !== 'undefined') {
+      themeObserver = new MutationObserver(refreshChartPalette)
+      themeObserver.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ['data-bs-theme', 'class'],
+      })
+      themeObserver.observe(document.body, {
+        attributes: true,
+        attributeFilter: ['data-bs-theme', 'class'],
+      })
+    }
     loading.value = true
     fetchSummary()
     fetchProxmoxSummary()
@@ -670,11 +710,17 @@ export function useDashboard() {
 
     refreshCveSummary()
     cveRefreshTimer = setInterval(refreshCveSummary, 5 * 60 * 1000)
+    startSummaryRefreshTimer()
     wsEvents.on('reconnected', refreshDashboardOnReconnect)
   })
 
   onUnmounted(() => {
     if (cveRefreshTimer) clearInterval(cveRefreshTimer)
+    if (summaryRefreshTimer) clearInterval(summaryRefreshTimer)
+    if (themeObserver) {
+      themeObserver.disconnect()
+      themeObserver = null
+    }
     wsEvents.off('reconnected', refreshDashboardOnReconnect)
   })
 
@@ -716,6 +762,7 @@ export function useDashboard() {
     dataStaleAlert,
     reconnect,
     effectiveMetrics,
+    effectiveMetricsByHost,
     filteredHosts,
     sortedHosts,
     summaryChartOptions,

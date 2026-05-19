@@ -1,6 +1,7 @@
 package database
 
 import (
+	"context"
 	"database/sql"
 	"time"
 
@@ -11,8 +12,8 @@ import (
 
 // SavePushSubscription inserts or updates a Web Push subscription for a user.
 // The endpoint is the unique key; updating it refreshes keys and re-links to the current user.
-func (db *DB) SavePushSubscription(username, endpoint, p256dh, authKey, userAgent string) error {
-	_, err := db.conn.Exec(`
+func (db *DB) SavePushSubscription(ctx context.Context, username, endpoint, p256dh, authKey, userAgent string) error {
+	_, err := db.conn.ExecContext(ctx, `
 		INSERT INTO push_subscriptions (username, endpoint, p256dh_key, auth_key, user_agent)
 		VALUES ($1, $2, $3, $4, $5)
 		ON CONFLICT (endpoint) DO UPDATE SET
@@ -26,15 +27,15 @@ func (db *DB) SavePushSubscription(username, endpoint, p256dh, authKey, userAgen
 
 // DeletePushSubscription removes a subscription by its push service endpoint URL.
 // Called when the client unsubscribes or the push service returns 410 Gone.
-func (db *DB) DeletePushSubscription(endpoint string) error {
-	_, err := db.conn.Exec(`DELETE FROM push_subscriptions WHERE endpoint = $1`, endpoint)
+func (db *DB) DeletePushSubscription(ctx context.Context, endpoint string) error {
+	_, err := db.conn.ExecContext(ctx, `DELETE FROM push_subscriptions WHERE endpoint = $1`, endpoint)
 	return err
 }
 
 // GetAllPushSubscriptions returns all stored Web Push subscriptions across all users.
 // Used by the alert engine to fan-out notifications to every registered device.
-func (db *DB) GetAllPushSubscriptions() ([]models.PushSubscription, error) {
-	rows, err := db.conn.Query(`
+func (db *DB) GetAllPushSubscriptions(ctx context.Context) ([]models.PushSubscription, error) {
+	rows, err := db.conn.QueryContext(ctx, `
 		SELECT id, username, endpoint, p256dh_key, auth_key, user_agent, created_at
 		FROM push_subscriptions
 	`)
@@ -58,8 +59,8 @@ func (db *DB) GetAllPushSubscriptions() ([]models.PushSubscription, error) {
 
 // UpsertNotificationReadAt sets the "read up to" timestamp for a user.
 // All notifications triggered before readAt are considered read on every device.
-func (db *DB) UpsertNotificationReadAt(username string, readAt time.Time) error {
-	_, err := db.conn.Exec(`
+func (db *DB) UpsertNotificationReadAt(ctx context.Context, username string, readAt time.Time) error {
+	_, err := db.conn.ExecContext(ctx, `
 		INSERT INTO notification_read_at (username, read_at) VALUES ($1, $2)
 		ON CONFLICT (username) DO UPDATE SET read_at = $2
 	`, username, readAt)
@@ -67,9 +68,9 @@ func (db *DB) UpsertNotificationReadAt(username string, readAt time.Time) error 
 }
 
 // GetNotificationReadAt returns the stored read-at timestamp for a user, or nil if never set.
-func (db *DB) GetNotificationReadAt(username string) (*time.Time, error) {
+func (db *DB) GetNotificationReadAt(ctx context.Context, username string) (*time.Time, error) {
 	var readAt time.Time
-	err := db.conn.QueryRow(`SELECT read_at FROM notification_read_at WHERE username = $1`, username).Scan(&readAt)
+	err := db.conn.QueryRowContext(ctx, `SELECT read_at FROM notification_read_at WHERE username = $1`, username).Scan(&readAt)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}
@@ -80,8 +81,8 @@ func (db *DB) GetNotificationReadAt(username string) (*time.Time, error) {
 }
 
 // GetPushSubscriptionsByRole returns subscriptions for users with a specific role.
-func (db *DB) GetPushSubscriptionsByRole(role string) ([]models.PushSubscription, error) {
-	rows, err := db.conn.Query(`
+func (db *DB) GetPushSubscriptionsByRole(ctx context.Context, role string) ([]models.PushSubscription, error) {
+	rows, err := db.conn.QueryContext(ctx, `
 SELECT ps.id, ps.username, ps.endpoint, ps.p256dh_key, ps.auth_key, ps.user_agent, ps.created_at
 FROM push_subscriptions ps
 JOIN users u ON u.username = ps.username

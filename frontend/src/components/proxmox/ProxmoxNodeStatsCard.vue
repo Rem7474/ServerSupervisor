@@ -164,7 +164,7 @@
 
 <script setup>
 import { defineProps } from 'vue'
-import { formatBytes, formatUptime } from '../utils/formatters'
+import { formatBytes, formatUptime } from '../../utils/formatters'
 
 const props = defineProps({
   node: { type: Object, required: true },

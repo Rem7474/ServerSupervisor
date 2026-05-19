@@ -129,11 +129,11 @@
 
 <script setup>
 import { ref, computed } from 'vue'
-import { useAuthStore } from '../stores/auth'
-import apiClient, { getApiErrorMessage } from '../api'
-import { useCommandStream } from '../composables/useCommandStream'
-import { useLocalStorage } from '../composables/useLocalStorage'
-import { useConfirmDialog } from '../composables/useConfirmDialog'
+import { useAuthStore } from '../../stores/auth'
+import apiClient, { getApiErrorMessage } from '../../api'
+import { useCommandStream } from '../../composables/useCommandStream'
+import { useLocalStorage } from '../../composables/useLocalStorage'
+import { useConfirmDialog } from '../../composables/useConfirmDialog'
 
 const props = defineProps({
   hostId: { type: String, required: true },
@@ -149,7 +149,7 @@ const loading = ref(false)
 const error = ref('')
 const filter = useLocalStorage(`host-systemd-filter:${props.hostId}`, 'active')
 const STREAM_TIMEOUT_MS = 60000
-const { collectCommandOutput } = useCommandStream({ token: () => auth.token })
+const { collectCommandOutput } = useCommandStream()
 
 const filteredServices = computed(() => {
   if (filter.value === 'all') return services.value

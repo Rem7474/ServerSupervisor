@@ -1,6 +1,7 @@
 package dispatch
 
 import (
+	"context"
 	"log"
 
 	"github.com/serversupervisor/server/internal/database"
@@ -41,7 +42,7 @@ func New(db *database.DB) *Dispatcher {
 func (d *Dispatcher) Create(req Request) (*Result, error) {
 	var auditLogIDPtr *int64
 	if req.Audit != nil {
-		auditLogID, err := d.db.CreateAuditLog(
+		auditLogID, err := d.db.CreateAuditLog(context.Background(), 
 			req.Audit.Username,
 			req.Audit.Action,
 			req.Audit.HostID,
@@ -56,7 +57,7 @@ func (d *Dispatcher) Create(req Request) (*Result, error) {
 		}
 	}
 
-	cmd, err := d.db.CreateRemoteCommand(
+	cmd, err := d.db.CreateRemoteCommand(context.Background(), 
 		req.HostID,
 		req.Module,
 		req.Action,
@@ -67,7 +68,7 @@ func (d *Dispatcher) Create(req Request) (*Result, error) {
 	)
 	if err != nil {
 		if auditLogIDPtr != nil {
-			_ = d.db.UpdateAuditLogStatus(*auditLogIDPtr, "failed", err.Error())
+			_ = d.db.UpdateAuditLogStatus(context.Background(), *auditLogIDPtr, "failed", err.Error())
 		}
 		return nil, err
 	}

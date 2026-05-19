@@ -1,6 +1,7 @@
 package handlers
 
-import (
+import (	"context"
+
 	"net/http"
 	"strconv"
 
@@ -24,7 +25,7 @@ func (h *ProxmoxHandler) GetGuestMetricsSummary(c *gin.Context) {
 		bucketMinutes = 5
 	}
 
-	summary, err := h.db.GetProxmoxGuestMetricsSummary(guestID, hours, bucketMinutes)
+	summary, err := h.db.GetProxmoxGuestMetricsSummary(context.Background(), guestID, hours, bucketMinutes)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -37,7 +38,7 @@ func (h *ProxmoxHandler) GetGuestMetricsSummary(c *gin.Context) {
 
 // ListGuests returns all guests with optional filters: connection_id, type (vm|lxc), status.
 func (h *ProxmoxHandler) ListGuests(c *gin.Context) {
-	guests, err := h.db.ListProxmoxGuests(
+	guests, err := h.db.ListProxmoxGuests(context.Background(), 
 		c.Query("connection_id"),
 		c.Query("type"),
 		c.Query("status"),

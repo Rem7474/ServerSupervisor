@@ -561,7 +561,7 @@ import { useAuthStore } from '../stores/auth'
 import apiClient from '../api'
 import { formatDateLong as formatDate, formatDateTime } from '../utils/formatters'
 import { useCommandStream } from '../composables/useCommandStream'
-import CommandLogPanel from '../components/CommandLogPanel.vue'
+import CommandLogPanel from '../components/host/CommandLogPanel.vue'
 import { moduleLabel, moduleClass } from '../utils/moduleMeta'
 import { useStatusBadge } from '../composables/useStatusBadge'
 
@@ -635,7 +635,7 @@ const loginEventsLoaded = ref(false)
 // Log viewer
 const selectedCmd = ref(null)
 
-const { openCommandStream, closeStream } = useCommandStream({ token: () => auth.token })
+const { openCommandStream, closeStream } = useCommandStream()
 const { getStatusBadgeClass } = useStatusBadge()
 
 const roleBadgeClass = computed(() => {

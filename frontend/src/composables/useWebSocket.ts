@@ -2,6 +2,11 @@ import { ref, onMounted, onUnmounted, Ref } from 'vue'
 import mitt from 'mitt'
 import { useAuthStore } from '../stores/auth'
 
+// The session cookie (ss_access) is sent automatically by the browser on the
+// WebSocket upgrade; no in-band auth message is necessary anymore. We keep the
+// auth store reference around to gate connection attempts on whether the user
+// is logged in at all.
+
 type WebSocketStatus = 'connecting' | 'connected' | 'reconnecting' | 'error' | 'disconnected'
 
 type WsEvents = {
@@ -56,6 +61,7 @@ export function useWebSocket<TPayload = unknown>(
   let staleAlertTimer: ReturnType<typeof setTimeout> | null = null
   let manualClose = false
   let lastResumeReconnectAt = 0
+  let receivedFirstMessage = false
 
   // Exponential backoff: 2s, 4s, 8s, capped at 30s
   function retryDelay(): number {
@@ -63,8 +69,9 @@ export function useWebSocket<TPayload = unknown>(
   }
 
   function connect(): void {
-    if (!auth.token) return
+    if (!auth.isAuthenticated) return
     manualClose = false
+    receivedFirstMessage = false
 
     // Cancel any pending retry timer so handleAppResume can't trigger a double-connect
     if (retryTimer) { clearTimeout(retryTimer); retryTimer = null }
@@ -82,7 +89,8 @@ export function useWebSocket<TPayload = unknown>(
 
     ws.onopen = () => {
       const wasReconnecting = retryCount.value > 0 || wsStatus.value === 'reconnecting'
-      ws!.send(JSON.stringify({ type: 'auth', token: auth.token }))
+      // Authentication is carried by the ss_access httpOnly cookie attached to
+      // the upgrade request; no in-band auth message is sent anymore.
       if (wasReconnecting) {
         dataStaleAlert.value = true
         wsEvents.emit('reconnected', { timestamp: Date.now() })
@@ -113,10 +121,13 @@ export function useWebSocket<TPayload = unknown>(
           retryCount.value = 0
         }
 
-        if (debounceMs > 0) {
+        // First message bypasses the debounce so the initial paint is instant.
+        // Subsequent messages are throttled by `debounceMs` to coalesce bursts.
+        if (debounceMs > 0 && receivedFirstMessage) {
           clearTimeout(debounceTimer!)
           debounceTimer = setTimeout(() => onMessage(payload), debounceMs)
         } else {
+          receivedFirstMessage = true
           onMessage(payload)
         }
       } catch {

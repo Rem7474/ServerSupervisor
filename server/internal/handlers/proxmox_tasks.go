@@ -1,6 +1,7 @@
 package handlers
 
-import (
+import (	"context"
+
 	"log"
 	"net/http"
 	"strconv"
@@ -16,7 +17,7 @@ import (
 // ListTasks returns recent tasks, optionally filtered by ?connection_id= and limited by ?limit=.
 func (h *ProxmoxHandler) ListTasks(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "100"))
-	tasks, err := h.db.ListProxmoxTasks(c.Query("connection_id"), limit)
+	tasks, err := h.db.ListProxmoxTasks(context.Background(), c.Query("connection_id"), limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -26,7 +27,7 @@ func (h *ProxmoxHandler) ListTasks(c *gin.Context) {
 
 // ListNodeTasks returns recent tasks for a specific node, optionally limited by ?limit=.
 func (h *ProxmoxHandler) ListNodeTasks(c *gin.Context) {
-	node, err := h.db.GetProxmoxNode(c.Param("id"))
+	node, err := h.db.GetProxmoxNode(context.Background(), c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -37,7 +38,7 @@ func (h *ProxmoxHandler) ListNodeTasks(c *gin.Context) {
 		return
 	}
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
-	tasks, err := h.db.ListProxmoxTasksByNode(node.ConnectionID, node.NodeName, limit)
+	tasks, err := h.db.ListProxmoxTasksByNode(context.Background(), node.ConnectionID, node.NodeName, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -49,7 +50,7 @@ func (h *ProxmoxHandler) ListNodeTasks(c *gin.Context) {
 
 // ListBackupJobs returns backup job configurations, optionally filtered by ?connection_id=.
 func (h *ProxmoxHandler) ListBackupJobs(c *gin.Context) {
-	jobs, err := h.db.ListProxmoxBackupJobs(c.Query("connection_id"))
+	jobs, err := h.db.ListProxmoxBackupJobs(context.Background(), c.Query("connection_id"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -61,7 +62,7 @@ func (h *ProxmoxHandler) ListBackupJobs(c *gin.Context) {
 
 // ListBackupRuns returns the latest backup result per VM, optionally filtered by ?connection_id=.
 func (h *ProxmoxHandler) ListBackupRuns(c *gin.Context) {
-	runs, err := h.db.ListProxmoxBackupRuns(c.Query("connection_id"))
+	runs, err := h.db.ListProxmoxBackupRuns(context.Background(), c.Query("connection_id"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -74,7 +75,7 @@ func (h *ProxmoxHandler) ListBackupRuns(c *gin.Context) {
 // GetTaskLog proxies GET /nodes/{node}/tasks/{upid}/log from PVE.
 // upid must be URL-encoded if it contains slashes (it typically doesn't).
 func (h *ProxmoxHandler) GetTaskLog(c *gin.Context) {
-	node, err := h.db.GetProxmoxNode(c.Param("id"))
+	node, err := h.db.GetProxmoxNode(context.Background(), c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -110,7 +111,7 @@ func (h *ProxmoxHandler) GetTaskLog(c *gin.Context) {
 // GetNodeSyslog proxies GET /nodes/{node}/syslog from PVE.
 // Supports ?limit= (default 200) and optional case-insensitive ?search= filtering.
 func (h *ProxmoxHandler) GetNodeSyslog(c *gin.Context) {
-	node, err := h.db.GetProxmoxNode(c.Param("id"))
+	node, err := h.db.GetProxmoxNode(context.Background(), c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

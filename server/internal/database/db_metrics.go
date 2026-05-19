@@ -1,6 +1,7 @@
 package database
 
 import (
+	"context"
 	"database/sql"
 	"log"
 
@@ -9,9 +10,9 @@ import (
 
 // ========== System Metrics ==========
 
-func (db *DB) InsertMetrics(m *models.SystemMetrics) (int64, error) {
+func (db *DB) InsertMetrics(ctx context.Context, m *models.SystemMetrics) (int64, error) {
 	var id int64
-	err := db.conn.QueryRow(
+	err := db.conn.QueryRowContext(ctx, 
 		`INSERT INTO system_metrics (host_id, timestamp, cpu_usage_percent, cpu_cores, cpu_model,
 		 cpu_temperature, fan_rpm, load_avg_1, load_avg_5, load_avg_15, memory_total, memory_used, memory_free, memory_percent,
 		 swap_total, swap_used, network_rx_bytes, network_tx_bytes, uptime, hostname)
@@ -26,7 +27,7 @@ func (db *DB) InsertMetrics(m *models.SystemMetrics) (int64, error) {
 	}
 
 	for _, d := range m.Disks {
-		_, err := db.conn.Exec(
+		_, err := db.conn.ExecContext(ctx, 
 			`INSERT INTO disk_info (metrics_id, mount_point, device, fs_type, total_bytes, used_bytes, free_bytes, used_percent)
 			 VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
 			id, d.MountPoint, d.Device, d.FSType, d.TotalBytes, d.UsedBytes, d.FreeBytes, d.UsedPercent,
@@ -38,8 +39,8 @@ func (db *DB) InsertMetrics(m *models.SystemMetrics) (int64, error) {
 	return id, nil
 }
 
-func (db *DB) InsertUptimeMetrics(hostID string, uptime uint64, hostname string) error {
-	_, err := db.conn.Exec(
+func (db *DB) InsertUptimeMetrics(ctx context.Context, hostID string, uptime uint64, hostname string) error {
+	_, err := db.conn.ExecContext(ctx, 
 		`INSERT INTO system_metrics (host_id, timestamp, uptime, hostname)
 		 VALUES ($1, NOW(), $2, $3)`,
 		hostID, uptime, hostname,
@@ -47,9 +48,9 @@ func (db *DB) InsertUptimeMetrics(hostID string, uptime uint64, hostname string)
 	return err
 }
 
-func (db *DB) GetLatestMetrics(hostID string) (*models.SystemMetrics, error) {
+func (db *DB) GetLatestMetrics(ctx context.Context, hostID string) (*models.SystemMetrics, error) {
 	var m models.SystemMetrics
-	err := db.conn.QueryRow(
+	err := db.conn.QueryRowContext(ctx, 
 		`SELECT id, host_id, timestamp,
 		 COALESCE(cpu_usage_percent, 0), COALESCE(cpu_cores, 0), COALESCE(cpu_model, ''),
 		 COALESCE(cpu_temperature, 0), COALESCE(fan_rpm, 0),
@@ -66,7 +67,7 @@ func (db *DB) GetLatestMetrics(hostID string) (*models.SystemMetrics, error) {
 		return nil, err
 	}
 
-	rows, err := db.conn.Query(
+	rows, err := db.conn.QueryContext(ctx, 
 		`SELECT id, mount_point, device, fs_type, total_bytes, used_bytes, free_bytes, used_percent
 		 FROM disk_info WHERE metrics_id = $1`, m.ID,
 	)
@@ -89,8 +90,8 @@ func (db *DB) GetLatestMetrics(hostID string) (*models.SystemMetrics, error) {
 // GetLatestMetricsAll returns the most recent SystemMetrics row for every host
 // in a single query, avoiding N+1 lookups on the dashboard.
 // Disk details are intentionally omitted (dashboard only needs CPU/mem/net).
-func (db *DB) GetLatestMetricsAll() (map[string]*models.SystemMetrics, error) {
-	rows, err := db.conn.Query(
+func (db *DB) GetLatestMetricsAll(ctx context.Context) (map[string]*models.SystemMetrics, error) {
+	rows, err := db.conn.QueryContext(ctx, 
 		`SELECT DISTINCT ON (host_id) id, host_id, timestamp,
 		 COALESCE(cpu_usage_percent, 0), COALESCE(cpu_cores, 0), COALESCE(cpu_model, ''),
 		 COALESCE(cpu_temperature, 0), COALESCE(fan_rpm, 0),
@@ -129,8 +130,8 @@ func (db *DB) GetLatestMetricsAll() (map[string]*models.SystemMetrics, error) {
 // each host, based on the most recent disk_metrics row. Uses disk_metrics (not
 // disk_info) so the value is always current even when Proxmox is the metrics source
 // and InsertMetrics is skipped. Hosts with no disk_metrics row for "/" are omitted.
-func (db *DB) GetRootDiskPercentAll() map[string]float64 {
-	rows, err := db.conn.Query(
+func (db *DB) GetRootDiskPercentAll(ctx context.Context) map[string]float64 {
+	rows, err := db.conn.QueryContext(ctx, 
 		`SELECT DISTINCT ON (host_id) host_id, used_percent
 		 FROM disk_metrics
 		 WHERE mount_point = '/'
@@ -153,8 +154,8 @@ func (db *DB) GetRootDiskPercentAll() map[string]float64 {
 	return result
 }
 
-func (db *DB) GetMetricsHistory(hostID string, hours int) ([]models.SystemMetrics, error) {
-	rows, err := db.conn.Query(
+func (db *DB) GetMetricsHistory(ctx context.Context, hostID string, hours int) ([]models.SystemMetrics, error) {
+	rows, err := db.conn.QueryContext(ctx, 
 		`SELECT id, host_id, timestamp, cpu_usage_percent, cpu_cores, cpu_temperature, fan_rpm, load_avg_1, load_avg_5, load_avg_15,
 		 memory_total, memory_used, memory_free, memory_percent, swap_total, swap_used,
 		 network_rx_bytes, network_tx_bytes, uptime
@@ -179,12 +180,12 @@ func (db *DB) GetMetricsHistory(hostID string, hours int) ([]models.SystemMetric
 	return metrics, nil
 }
 
-func (db *DB) GetSystemCPUTemperatureHistoryByHost(hostID string, hours int) ([]models.SystemMetrics, error) {
+func (db *DB) GetSystemCPUTemperatureHistoryByHost(ctx context.Context, hostID string, hours int) ([]models.SystemMetrics, error) {
 	if hours <= 0 {
 		hours = 24
 	}
 	if hours <= 24 {
-		return db.GetMetricsHistory(hostID, hours)
+		return db.GetMetricsHistory(ctx, hostID, hours)
 	}
 
 	bucketMinutes := 60
@@ -228,7 +229,7 @@ func (db *DB) GetSystemCPUTemperatureHistoryByHost(hostID string, hours int) ([]
 		GROUP BY ` + bucketExpr + `
 		ORDER BY ` + bucketExpr + ` ASC`
 
-	rows, err := db.conn.Query(query, hostID, bucketMinutes, hours)
+	rows, err := db.conn.QueryContext(ctx, query, hostID, bucketMinutes, hours)
 	if err != nil {
 		return nil, err
 	}
@@ -247,12 +248,12 @@ func (db *DB) GetSystemCPUTemperatureHistoryByHost(hostID string, hours int) ([]
 	return metrics, rows.Err()
 }
 
-func (db *DB) GetSystemFanRPMHistoryByHost(hostID string, hours int) ([]models.SystemMetrics, error) {
+func (db *DB) GetSystemFanRPMHistoryByHost(ctx context.Context, hostID string, hours int) ([]models.SystemMetrics, error) {
 	if hours <= 0 {
 		hours = 24
 	}
 	if hours <= 24 {
-		return db.GetMetricsHistory(hostID, hours)
+		return db.GetMetricsHistory(ctx, hostID, hours)
 	}
 
 	bucketMinutes := 60
@@ -296,7 +297,7 @@ func (db *DB) GetSystemFanRPMHistoryByHost(hostID string, hours int) ([]models.S
 		GROUP BY ` + bucketExpr + `
 		ORDER BY ` + bucketExpr + ` ASC`
 
-	rows, err := db.conn.Query(query, hostID, bucketMinutes, hours)
+	rows, err := db.conn.QueryContext(ctx, query, hostID, bucketMinutes, hours)
 	if err != nil {
 		return nil, err
 	}
@@ -316,8 +317,8 @@ func (db *DB) GetSystemFanRPMHistoryByHost(hostID string, hours int) ([]models.S
 }
 
 // GetMetricsAggregatesByType returns pre-aggregated metrics for long time ranges.
-func (db *DB) GetMetricsAggregatesByType(hostID string, hours int, aggregationType string) ([]models.SystemMetrics, error) {
-	rows, err := db.conn.Query(
+func (db *DB) GetMetricsAggregatesByType(ctx context.Context, hostID string, hours int, aggregationType string) ([]models.SystemMetrics, error) {
+	rows, err := db.conn.QueryContext(ctx, 
 		`SELECT id, host_id, timestamp, cpu_usage_avg as cpu_usage_percent, 0 as cpu_cores, 0 as cpu_temperature, 0 as fan_rpm,
 		 0 as load_avg_1, 0 as load_avg_5, 0 as load_avg_15,
 		 0 as memory_total, memory_usage_avg as memory_used, 0 as memory_free, memory_percent_avg as memory_percent,
@@ -345,7 +346,7 @@ func (db *DB) GetMetricsAggregatesByType(hostID string, hours int, aggregationTy
 	return metrics, nil
 }
 
-func (db *DB) GetMetricsSummary(hours int, bucketMinutes int) ([]models.SystemMetricsSummary, error) {
+func (db *DB) GetMetricsSummary(ctx context.Context, hours int, bucketMinutes int) ([]models.SystemMetricsSummary, error) {
 	if bucketMinutes <= 0 {
 		bucketMinutes = 5
 	}
@@ -356,7 +357,7 @@ func (db *DB) GetMetricsSummary(hours int, bucketMinutes int) ([]models.SystemMe
 	)
 
 	if db.hasTimescaleDB {
-		rows, err = db.conn.Query(
+		rows, err = db.conn.QueryContext(ctx, 
 			`SELECT
 				time_bucket($2 * '1 minute'::interval, timestamp) AS ts,
 				AVG(cpu_usage_percent) AS cpu_avg,
@@ -369,7 +370,7 @@ func (db *DB) GetMetricsSummary(hours int, bucketMinutes int) ([]models.SystemMe
 			hours, bucketMinutes,
 		)
 	} else {
-		rows, err = db.conn.Query(
+		rows, err = db.conn.QueryContext(ctx, 
 			`SELECT
 				to_timestamp(
 					floor(EXTRACT(EPOCH FROM timestamp) / ($2 * 60)) * ($2 * 60)
@@ -400,14 +401,14 @@ func (db *DB) GetMetricsSummary(hours int, bucketMinutes int) ([]models.SystemMe
 	return summary, nil
 }
 
-func (db *DB) CleanOldMetrics(retentionDays int) (int64, error) {
-	tx, err := db.conn.Begin()
+func (db *DB) CleanOldMetrics(ctx context.Context, retentionDays int) (int64, error) {
+	tx, err := db.conn.BeginTx(ctx, nil)
 	if err != nil {
 		return 0, err
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	rawResult, err := tx.Exec(
+	rawResult, err := tx.ExecContext(ctx, 
 		`DELETE FROM system_metrics WHERE timestamp < NOW() - INTERVAL '1 day' * $1`,
 		retentionDays,
 	)
@@ -416,7 +417,7 @@ func (db *DB) CleanOldMetrics(retentionDays int) (int64, error) {
 	}
 	rawDeleted, _ := rawResult.RowsAffected()
 
-	_, err = tx.Exec(
+	_, err = tx.ExecContext(ctx, 
 		`DELETE FROM metrics_aggregates WHERE timestamp < NOW() - INTERVAL '1 day' * $1`,
 		retentionDays,
 	)
@@ -424,7 +425,7 @@ func (db *DB) CleanOldMetrics(retentionDays int) (int64, error) {
 		return rawDeleted, err
 	}
 
-	_, err = tx.Exec(
+	_, err = tx.ExecContext(ctx, 
 		`DELETE FROM disk_metrics WHERE timestamp < NOW() - INTERVAL '1 day' * $1`,
 		retentionDays,
 	)
@@ -439,8 +440,8 @@ func (db *DB) CleanOldMetrics(retentionDays int) (int64, error) {
 }
 
 // CountMetrics returns the total number of metrics records.
-func (db *DB) CountMetrics() (int64, error) {
+func (db *DB) CountMetrics(ctx context.Context) (int64, error) {
 	var count int64
-	err := db.conn.QueryRow(`SELECT COUNT(*) FROM system_metrics`).Scan(&count)
+	err := db.conn.QueryRowContext(ctx, `SELECT COUNT(*) FROM system_metrics`).Scan(&count)
 	return count, err
 }

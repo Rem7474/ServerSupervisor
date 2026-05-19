@@ -14,8 +14,8 @@ import (
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/dispatch"
-	"github.com/serversupervisor/server/internal/github"
 	"github.com/serversupervisor/server/internal/handlers"
+	"github.com/serversupervisor/server/internal/releasetracker"
 	"github.com/serversupervisor/server/internal/scheduler"
 	"github.com/serversupervisor/server/internal/ws"
 )
@@ -33,6 +33,15 @@ func main() {
 		log.Printf("⚠️  WARNING: %s", w)
 	}
 
+	// In production (APP_ENV != "dev"/"development"), refuse to start when
+	// insecure defaults are present (JWT_SECRET, ADMIN_PASSWORD, DB_PASSWORD).
+	if err := cfg.ValidateStrict(); err != nil {
+		log.Fatalf("Refusing to start: %v. Set APP_ENV=dev to bypass for local development.", err)
+	}
+	if config.IsDevEnv() {
+		log.Printf("[dev] APP_ENV=%s — strict secret validation disabled. Do NOT use this mode in production.", config.AppEnv())
+	}
+
 	// Ensure database exists
 	if err := database.EnsureDatabaseExists(cfg); err != nil {
 		log.Printf("Warning: could not ensure database exists: %v (will retry on connection)", err)
@@ -46,7 +55,7 @@ func main() {
 	defer func() { _ = db.Close() }()
 
 	// Cleanup stalled commands at startup (commands older than 10 minutes)
-	if err := db.CleanupStalledCommands(10); err != nil {
+	if err := db.CleanupStalledCommands(context.Background(), 10); err != nil {
 		log.Printf("Warning: failed to cleanup stalled commands: %v", err)
 	}
 
@@ -56,12 +65,12 @@ func main() {
 		log.Fatalf("Failed to hash admin password: %v", err)
 	}
 	mustChangePassword := cfg.AdminPassword == "admin"
-	if err := db.CreateUser(cfg.AdminUser, hash, "admin", mustChangePassword); err != nil {
+	if err := db.CreateUser(context.Background(), cfg.AdminUser, hash, "admin", mustChangePassword); err != nil {
 		log.Printf("Admin user creation: %v (may already exist)", err)
 	}
 	// For existing installations still using default password, ensure flag is set
 	if mustChangePassword {
-		if err := db.SetUserMustChangePassword(cfg.AdminUser, true); err != nil {
+		if err := db.SetUserMustChangePassword(context.Background(), cfg.AdminUser, true); err != nil {
 			log.Printf("Warning: failed to set must_change_password for admin: %v", err)
 		}
 	}
@@ -74,7 +83,7 @@ func main() {
 	defer sched.Stop()
 
 	// Start GitHub release tracker (TrackedRepo / Docker version compare)
-	tracker := github.NewTracker(db, cfg)
+	tracker := releasetracker.NewTracker(db, cfg)
 	tracker.Start()
 	defer tracker.Stop()
 

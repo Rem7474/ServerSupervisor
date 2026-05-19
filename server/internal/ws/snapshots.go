@@ -1,6 +1,7 @@
 package ws
 
 import (
+	"context"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"github.com/serversupervisor/server/internal/models"
@@ -8,12 +9,12 @@ import (
 )
 
 func (h *WSHandler) sendDashboardSnapshot(conn *websocket.Conn, lastHash *string) error {
-	hosts, err := h.db.GetAllHosts()
+	hosts, err := h.db.GetAllHosts(context.Background())
 	if err != nil {
 		return err
 	}
 
-	hostMetrics, _ := h.db.GetLatestMetricsAll()
+	hostMetrics, _ := h.db.GetLatestMetricsAll(context.Background())
 	if hostMetrics == nil {
 		hostMetrics = map[string]*models.SystemMetrics{}
 	}
@@ -21,7 +22,7 @@ func (h *WSHandler) sendDashboardSnapshot(conn *websocket.Conn, lastHash *string
 		if m == nil {
 			continue
 		}
-		if temp, ok := h.db.GetEffectiveHostCPUTemperature(hostID, m.CPUTemperature); ok {
+		if temp, ok := h.db.GetEffectiveHostCPUTemperature(context.Background(), hostID, m.CPUTemperature); ok {
 			m.CPUTemperature = temp
 		}
 	}
@@ -31,14 +32,14 @@ func (h *WSHandler) sendDashboardSnapshot(conn *websocket.Conn, lastHash *string
 		comparisons = []models.VersionComparison{}
 	}
 
-	proxmoxNodes, _ := h.db.ListProxmoxNodes()
+	proxmoxNodes, _ := h.db.ListProxmoxNodes(context.Background())
 	if proxmoxNodes == nil {
 		proxmoxNodes = []models.ProxmoxNode{}
 	}
 
 	// Confirmed guest-host links with live guest metrics (cpu_usage, mem_alloc, mem_usage).
 	// Used by the dashboard to override agent CPU/RAM when metrics_source=proxmox.
-	proxmoxLinks, _ := h.db.ListProxmoxGuestLinks("confirmed")
+	proxmoxLinks, _ := h.db.ListProxmoxGuestLinks(context.Background(), "confirmed")
 	if proxmoxLinks == nil {
 		proxmoxLinks = []models.ProxmoxGuestLink{}
 	}
@@ -48,9 +49,9 @@ func (h *WSHandler) sendDashboardSnapshot(conn *websocket.Conn, lastHash *string
 		"hosts":               hosts,
 		"host_metrics":        hostMetrics,
 		"version_comparisons": comparisons,
-		"apt_pending":         h.db.GetTotalAptPending(),
-		"apt_pending_hosts":   h.db.GetAptPendingAll(),
-		"disk_usage":          h.db.GetRootDiskPercentAll(),
+		"apt_pending":         h.db.GetTotalAptPending(context.Background()),
+		"apt_pending_hosts":   h.db.GetAptPendingAll(context.Background()),
+		"disk_usage":          h.db.GetRootDiskPercentAll(context.Background()),
 		"proxmox_nodes":       proxmoxNodes,
 		"proxmox_links":       proxmoxLinks,
 	}
@@ -61,22 +62,22 @@ func (h *WSHandler) sendDashboardSnapshot(conn *websocket.Conn, lastHash *string
 }
 
 func (h *WSHandler) sendHostSnapshot(conn *websocket.Conn, hostID string, lastHash *string) error {
-	host, err := h.db.GetHost(hostID)
+	host, err := h.db.GetHost(context.Background(), hostID)
 	if err != nil {
 		return err
 	}
-	metrics, _ := h.db.GetLatestMetrics(hostID)
+	metrics, _ := h.db.GetLatestMetrics(context.Background(), hostID)
 	if metrics != nil {
-		if temp, ok := h.db.GetEffectiveHostCPUTemperature(hostID, metrics.CPUTemperature); ok {
+		if temp, ok := h.db.GetEffectiveHostCPUTemperature(context.Background(), hostID, metrics.CPUTemperature); ok {
 			metrics.CPUTemperature = temp
 		}
 	}
-	containers, _ := h.db.GetDockerContainers(hostID)
-	aptStatus, _ := h.db.GetAptStatus(hostID)
-	aptHistory, _ := h.db.GetAptHistoryWithAgentUpdates(hostID, 50)
-	uuStatus, _ := h.db.GetUUStatus(hostID)
-	uuRuns, _ := h.db.GetUURuns(hostID, 20)
-	auditLogs, _ := h.db.GetAuditLogsByHost(hostID, 50)
+	containers, _ := h.db.GetDockerContainers(context.Background(), hostID)
+	aptStatus, _ := h.db.GetAptStatus(context.Background(), hostID)
+	aptHistory, _ := h.db.GetAptHistoryWithAgentUpdates(context.Background(), hostID, 50)
+	uuStatus, _ := h.db.GetUUStatus(context.Background(), hostID)
+	uuRuns, _ := h.db.GetUURuns(context.Background(), hostID, 20)
+	auditLogs, _ := h.db.GetAuditLogsByHost(context.Background(), hostID, 50)
 
 	allComparisons, _ := h.buildVersionComparisons()
 	comparisons := make([]models.VersionComparison, 0)
@@ -86,7 +87,7 @@ func (h *WSHandler) sendHostSnapshot(conn *websocket.Conn, hostID string, lastHa
 		}
 	}
 
-	proxmoxLink, _ := h.db.GetProxmoxGuestLinkByHost(hostID)
+	proxmoxLink, _ := h.db.GetProxmoxGuestLinkByHost(context.Background(), hostID)
 
 	payload := gin.H{
 		"type":                "host_detail",
@@ -108,12 +109,12 @@ func (h *WSHandler) sendHostSnapshot(conn *websocket.Conn, hostID string, lastHa
 }
 
 func (h *WSHandler) sendDockerSnapshot(conn *websocket.Conn, lastHash *string) error {
-	containers, err := h.db.GetAllDockerContainers()
+	containers, err := h.db.GetAllDockerContainers(context.Background())
 	if err != nil {
 		return err
 	}
 
-	composeProjects, _ := h.db.GetAllComposeProjects()
+	composeProjects, _ := h.db.GetAllComposeProjects(context.Background())
 	if composeProjects == nil {
 		composeProjects = []models.ComposeProject{}
 	}
@@ -141,7 +142,7 @@ func (h *WSHandler) sendNetworkSnapshot(conn *websocket.Conn, lastHash *string) 
 		return err
 	}
 
-	config, _ := h.db.GetNetworkTopologyConfig()
+	config, _ := h.db.GetNetworkTopologyConfig(context.Background())
 
 	payload := gin.H{
 		"type":       "network",
@@ -157,7 +158,7 @@ func (h *WSHandler) sendNetworkSnapshot(conn *websocket.Conn, lastHash *string) 
 }
 
 func (h *WSHandler) sendAptSnapshot(conn *websocket.Conn, lastHash *string) error {
-	hosts, err := h.db.GetAllHosts()
+	hosts, err := h.db.GetAllHosts(context.Background())
 	if err != nil {
 		return err
 	}
@@ -166,11 +167,11 @@ func (h *WSHandler) sendAptSnapshot(conn *websocket.Conn, lastHash *string) erro
 	aptHistories := map[string][]models.RemoteCommand{}
 
 	for _, host := range hosts {
-		status, err := h.db.GetAptStatus(host.ID)
+		status, err := h.db.GetAptStatus(context.Background(), host.ID)
 		if err == nil {
 			aptStatuses[host.ID] = status
 		}
-		hist, err := h.db.GetAptHistoryWithAgentUpdates(host.ID, 20)
+		hist, err := h.db.GetAptHistoryWithAgentUpdates(context.Background(), host.ID, 20)
 		if err == nil {
 			aptHistories[host.ID] = hist
 		}

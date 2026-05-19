@@ -1,6 +1,7 @@
 package database
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"time"
@@ -10,8 +11,8 @@ import (
 
 // ========== Metrics Aggregates (Downsampling) ==========
 
-func (db *DB) InsertMetricsAggregate(agg *models.MetricsAggregate) error {
-	_, err := db.conn.Exec(
+func (db *DB) InsertMetricsAggregate(ctx context.Context, agg *models.MetricsAggregate) error {
+	_, err := db.conn.ExecContext(ctx, 
 		`INSERT INTO metrics_aggregates (host_id, aggregation_type, timestamp, cpu_usage_avg, cpu_usage_max,
 		 memory_usage_avg, memory_usage_max, memory_percent_avg, disk_usage_avg, network_rx_bytes, network_tx_bytes, sample_count)
 		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
@@ -22,14 +23,14 @@ func (db *DB) InsertMetricsAggregate(agg *models.MetricsAggregate) error {
 	return err
 }
 
-func (db *DB) BuildMetricsAggregate(hostID string, start, end time.Time) (*models.MetricsAggregate, error) {
+func (db *DB) BuildMetricsAggregate(ctx context.Context, hostID string, start, end time.Time) (*models.MetricsAggregate, error) {
 	var agg models.MetricsAggregate
 	var sampleCount int
 	var diskAvg sql.NullFloat64
 	var rxDelta, txDelta sql.NullInt64
 	var cpuAvg, cpuMax, memAvg, memMax, memPctAvg sql.NullFloat64
 
-	err := db.conn.QueryRow(
+	err := db.conn.QueryRowContext(ctx, 
 		`SELECT
 			AVG(cpu_usage_percent) AS cpu_avg,
 			MAX(cpu_usage_percent) AS cpu_max,
@@ -50,7 +51,7 @@ func (db *DB) BuildMetricsAggregate(hostID string, start, end time.Time) (*model
 		return nil, nil
 	}
 
-	err = db.conn.QueryRow(
+	err = db.conn.QueryRowContext(ctx, 
 		`SELECT AVG(di.used_percent)
 		 FROM system_metrics sm
 		 JOIN disk_info di ON di.metrics_id = sm.id
@@ -91,8 +92,8 @@ func (db *DB) BuildMetricsAggregate(hostID string, start, end time.Time) (*model
 	return &agg, nil
 }
 
-func (db *DB) GetMetricsAggregates(hostID string, aggregationType string, limit int) ([]models.MetricsAggregate, error) {
-	rows, err := db.conn.Query(
+func (db *DB) GetMetricsAggregates(ctx context.Context, hostID string, aggregationType string, limit int) ([]models.MetricsAggregate, error) {
+	rows, err := db.conn.QueryContext(ctx, 
 		`SELECT id, host_id, aggregation_type, timestamp, cpu_usage_avg, cpu_usage_max,
 		 memory_usage_avg, memory_usage_max, disk_usage_avg, network_rx_bytes, network_tx_bytes, sample_count, created_at
 		 FROM metrics_aggregates WHERE host_id = $1 AND aggregation_type = $2
@@ -117,9 +118,9 @@ func (db *DB) GetMetricsAggregates(hostID string, aggregationType string, limit 
 }
 
 // DeleteOldMetrics deletes raw metrics older than retentionDays for a specific host.
-func (db *DB) DeleteOldMetrics(hostID string, retentionDays int) error {
+func (db *DB) DeleteOldMetrics(ctx context.Context, hostID string, retentionDays int) error {
 	cutoffTime := time.Now().AddDate(0, 0, -retentionDays)
-	_, err := db.conn.Exec(
+	_, err := db.conn.ExecContext(ctx, 
 		`DELETE FROM system_metrics WHERE host_id = $1 AND timestamp < $2`,
 		hostID, cutoffTime,
 	)
@@ -129,8 +130,8 @@ func (db *DB) DeleteOldMetrics(hostID string, retentionDays int) error {
 // BatchAggregateMetrics inserts aggregate rows for ALL hosts in a single SQL statement,
 // replacing the per-host N+1 loop that called BuildMetricsAggregate + InsertMetricsAggregate.
 // Returns the number of hosts for which aggregates were written.
-func (db *DB) BatchAggregateMetrics(start, end time.Time, aggType string) (int, error) {
-	result, err := db.conn.Exec(`
+func (db *DB) BatchAggregateMetrics(ctx context.Context, start, end time.Time, aggType string) (int, error) {
+	result, err := db.conn.ExecContext(ctx, `
 		WITH disk_avgs AS (
 			SELECT sm.host_id, AVG(di.used_percent) AS avg_disk
 			FROM system_metrics sm

@@ -424,8 +424,8 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
-import apiClient from '../api'
-import DataToolbar from './common/DataToolbar.vue'
+import apiClient from '../../api'
+import DataToolbar from '../common/DataToolbar.vue'
 
 const props = defineProps({
   composeProjects: { type: Array, default: () => [] },

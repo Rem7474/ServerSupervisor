@@ -1,6 +1,7 @@
 package handlers
 
-import (
+import (	"context"
+
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
@@ -16,6 +17,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/serversupervisor/server/internal/auth"
 	"github.com/serversupervisor/server/internal/config"
+	"github.com/serversupervisor/server/internal/cookies"
 	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/dispatch"
 	"github.com/serversupervisor/server/internal/models"
@@ -32,7 +34,7 @@ const (
 // back to an in-memory counter so attacks during a DB outage are still limited.
 func (h *AuthHandler) isIPBlocked(ip string) bool {
 	since := time.Now().Add(-bruteForceWindow)
-	count, err := h.db.CountRecentFailedLoginsAfterUnblock(ip, since)
+	count, err := h.db.CountRecentFailedLoginsAfterUnblock(context.Background(), ip, since)
 	if err != nil {
 		log.Printf("warn: isIPBlocked DB query failed for %s: %v — using in-memory fallback", ip, err)
 		return h.memIsBlocked(ip)
@@ -107,16 +109,16 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	user, err := h.db.GetUserByUsername(req.Username)
+	user, err := h.db.GetUserByUsername(context.Background(), req.Username)
 	if err != nil {
-		_ = h.db.CreateLoginEvent(req.Username, ip, userAgent, false)
+		_ = h.db.CreateLoginEvent(context.Background(), req.Username, ip, userAgent, false)
 		h.memRecordFailure(ip)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
 		return
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
-		_ = h.db.CreateLoginEvent(req.Username, ip, userAgent, false)
+		_ = h.db.CreateLoginEvent(context.Background(), req.Username, ip, userAgent, false)
 		h.memRecordFailure(ip)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
 		return
@@ -143,20 +145,20 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		if !auth.VerifyTOTPCode(user.TOTPSecret, req.TOTPCode) {
 			// Try backup codes
 			if !auth.VerifyBackupCode(user.BackupCodes, req.TOTPCode) {
-				_ = h.db.CreateLoginEvent(req.Username, ip, userAgent, false)
+				_ = h.db.CreateLoginEvent(context.Background(), req.Username, ip, userAgent, false)
 				h.memRecordFailure(ip)
 				c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid TOTP code"})
 				return
 			}
 			// Consume the backup code to prevent reuse
-			if err := h.db.ConsumeMFABackupCode(user.Username, req.TOTPCode); err != nil {
+			if err := h.db.ConsumeMFABackupCode(context.Background(), user.Username, req.TOTPCode); err != nil {
 				log.Printf("Warning: failed to consume backup code for %s: %v", user.Username, err)
 				// Don't fail login, just log the error
 			}
 		}
 	}
 
-	_ = h.db.CreateLoginEvent(req.Username, ip, userAgent, true)
+	_ = h.db.CreateLoginEvent(context.Background(), req.Username, ip, userAgent, true)
 
 	expiresAt := time.Now().Add(h.cfg.JWTExpiration)
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
@@ -178,28 +180,42 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 	refreshExpiresAt := time.Now().Add(h.cfg.RefreshTokenExpiration)
-	if err := h.db.CreateRefreshToken(user.ID, hashToken(refreshToken), refreshExpiresAt); err != nil {
+	if err := h.db.CreateRefreshToken(context.Background(), user.ID, hashToken(refreshToken), refreshExpiresAt); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store refresh token"})
 		return
 	}
 
+	csrfToken, err := cookies.GenerateCSRFToken()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate CSRF token"})
+		return
+	}
+	cookies.SetAccess(c, h.cfg, tokenString, expiresAt, csrfToken)
+	cookies.SetRefresh(c, h.cfg, refreshToken, refreshExpiresAt)
+
 	c.JSON(http.StatusOK, gin.H{
-		"token":                tokenString,
-		"expires_at":           expiresAt,
+		"username":             user.Username,
 		"role":                 user.Role,
-		"refresh_token":        refreshToken,
-		"refresh_expires_at":   refreshExpiresAt,
+		"expires_at":           expiresAt,
 		"must_change_password": user.MustChangePassword,
+		"csrf_token":           csrfToken,
 	})
 }
 
-// RefreshToken exchanges a refresh token for a new JWT + refresh token
+// RefreshToken exchanges a refresh token for a new JWT + refresh token.
+// The refresh token is read from the ss_refresh cookie (preferred) or the JSON
+// body so legacy clients keep working.
 func (h *AuthHandler) RefreshToken(c *gin.Context) {
-	var req struct {
-		RefreshToken string `json:"refresh_token" binding:"required"`
+	refreshTokenStr := cookies.ReadRefreshToken(c.Request)
+	if refreshTokenStr == "" {
+		var req struct {
+			RefreshToken string `json:"refresh_token"`
+		}
+		_ = c.ShouldBindJSON(&req)
+		refreshTokenStr = strings.TrimSpace(req.RefreshToken)
 	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+	if refreshTokenStr == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing refresh token"})
 		return
 	}
 
@@ -210,14 +226,16 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 	}
 	refreshExpiresAt := time.Now().Add(h.cfg.RefreshTokenExpiration)
 
-	userID, err := h.db.RotateRefreshToken(hashToken(req.RefreshToken), hashToken(newRefreshToken), refreshExpiresAt)
+	userID, err := h.db.RotateRefreshToken(context.Background(), hashToken(refreshTokenStr), hashToken(newRefreshToken), refreshExpiresAt)
 	if err != nil {
+		cookies.Clear(c, h.cfg)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid refresh token"})
 		return
 	}
 
-	user, err := h.db.GetUserByID(userID)
+	user, err := h.db.GetUserByID(context.Background(), userID)
 	if err != nil {
+		cookies.Clear(c, h.cfg)
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid refresh token"})
 		return
 	}
@@ -236,25 +254,36 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 		return
 	}
 
+	csrfToken, err := cookies.GenerateCSRFToken()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate CSRF token"})
+		return
+	}
+	cookies.SetAccess(c, h.cfg, newTokenString, expiresAt, csrfToken)
+	cookies.SetRefresh(c, h.cfg, newRefreshToken, refreshExpiresAt)
+
 	c.JSON(http.StatusOK, gin.H{
-		"token":              newTokenString,
-		"expires_at":         expiresAt,
-		"refresh_token":      newRefreshToken,
-		"refresh_expires_at": refreshExpiresAt,
+		"username":   user.Username,
+		"role":       user.Role,
+		"expires_at": expiresAt,
+		"csrf_token": csrfToken,
 	})
 }
 
-// Logout revokes a refresh token
+// Logout revokes the refresh token (if any) and clears the auth cookies.
 func (h *AuthHandler) Logout(c *gin.Context) {
-	var req struct {
-		RefreshToken string `json:"refresh_token" binding:"required"`
+	refreshTokenStr := cookies.ReadRefreshToken(c.Request)
+	if refreshTokenStr == "" {
+		var req struct {
+			RefreshToken string `json:"refresh_token"`
+		}
+		_ = c.ShouldBindJSON(&req)
+		refreshTokenStr = strings.TrimSpace(req.RefreshToken)
 	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
-		return
+	if refreshTokenStr != "" {
+		_ = h.db.RevokeRefreshToken(context.Background(), hashToken(refreshTokenStr))
 	}
-
-	_ = h.db.RevokeRefreshToken(hashToken(req.RefreshToken))
+	cookies.Clear(c, h.cfg)
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
 
@@ -278,7 +307,7 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 		return
 	}
 
-	user, err := h.db.GetUserByUsername(username)
+	user, err := h.db.GetUserByUsername(context.Background(), username)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
 		return
@@ -295,7 +324,7 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 		return
 	}
 
-	if err := h.db.UpdateUserPassword(username, hash); err != nil {
+	if err := h.db.UpdateUserPassword(context.Background(), username, hash); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update password"})
 		return
 	}
@@ -376,13 +405,13 @@ func (h *AuthHandler) VerifyMFA(c *gin.Context) {
 	}
 
 	// Get user and update MFA
-	user, err := h.db.GetUserByUsername(username)
+	user, err := h.db.GetUserByUsername(context.Background(), username)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
 
-	if err := h.db.SetUserTOTPSecret(user.ID, req.Secret, hashedCodes, true); err != nil {
+	if err := h.db.SetUserTOTPSecret(context.Background(), user.ID, req.Secret, hashedCodes, true); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to enable MFA"})
 		return
 	}
@@ -407,7 +436,7 @@ func (h *AuthHandler) DisableMFA(c *gin.Context) {
 	}
 
 	// Verify password
-	user, err := h.db.GetUserByUsername(username)
+	user, err := h.db.GetUserByUsername(context.Background(), username)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
@@ -418,7 +447,7 @@ func (h *AuthHandler) DisableMFA(c *gin.Context) {
 		return
 	}
 
-	if err := h.db.DisableUserMFA(username); err != nil {
+	if err := h.db.DisableUserMFA(context.Background(), username); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to disable MFA"})
 		return
 	}
@@ -434,7 +463,7 @@ func (h *AuthHandler) GetMFAStatus(c *gin.Context) {
 		return
 	}
 
-	user, err := h.db.GetUserByUsername(username)
+	user, err := h.db.GetUserByUsername(context.Background(), username)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
@@ -454,7 +483,7 @@ func (h *AuthHandler) GetProfile(c *gin.Context) {
 		return
 	}
 
-	user, err := h.db.GetUserByUsername(username)
+	user, err := h.db.GetUserByUsername(context.Background(), username)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
@@ -485,13 +514,13 @@ func (h *AuthHandler) GetSecuritySummary(c *gin.Context) {
 	}
 	since := time.Now().Add(-time.Duration(hours) * time.Hour)
 
-	stats, err := h.db.GetLoginStats(since)
+	stats, err := h.db.GetLoginStats(context.Background(), since)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch login stats"})
 		return
 	}
 
-	topFailed, err := h.db.GetTopFailedIPs(since, 10)
+	topFailed, err := h.db.GetTopFailedIPs(context.Background(), since, 10)
 	if err != nil {
 		log.Printf("warn: GetTopFailedIPs: %v", err)
 	}
@@ -499,7 +528,7 @@ func (h *AuthHandler) GetSecuritySummary(c *gin.Context) {
 		topFailed = []models.IPFailCount{}
 	}
 
-	blockedIPs, err := h.db.GetCurrentlyBlockedIPs(time.Now().Add(-bruteForceWindow), bruteForceMaxFails)
+	blockedIPs, err := h.db.GetCurrentlyBlockedIPs(context.Background(), time.Now().Add(-bruteForceWindow), bruteForceMaxFails)
 	if err != nil {
 		log.Printf("warn: GetCurrentlyBlockedIPs: %v", err)
 	}
@@ -528,12 +557,12 @@ func (h *AuthHandler) UnblockIP(c *gin.Context) {
 	}
 
 	user := c.GetString("username")
-	if err := h.db.UpsertIPUnblock(ip, user); err != nil {
+	if err := h.db.UpsertIPUnblock(context.Background(), ip, user); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to unblock IP"})
 		return
 	}
 
-	_, _ = h.db.CreateAuditLog(user, "unblock_ip", "", c.ClientIP(), "IP unblocked: "+ip, "success")
+	_, _ = h.db.CreateAuditLog(context.Background(), user, "unblock_ip", "", c.ClientIP(), "IP unblocked: "+ip, "success")
 	c.JSON(http.StatusOK, gin.H{"success": true, "message": "IP unblocked: " + ip})
 }
 
@@ -559,7 +588,7 @@ func (h *AuthHandler) GetLoginEvents(c *gin.Context) {
 	}
 	offset := (page - 1) * limit
 
-	events, err := h.db.GetLoginEventsByUser(username, limit, offset)
+	events, err := h.db.GetLoginEventsByUser(context.Background(), username, limit, offset)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch login events"})
 		return
@@ -568,26 +597,28 @@ func (h *AuthHandler) GetLoginEvents(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"events": events, "page": page, "limit": limit})
 }
 
-// RevokeAllSessions revokes all refresh tokens for the current user except the one provided.
+// RevokeAllSessions revokes all refresh tokens for the current user except
+// the one in the session cookie (or in the JSON body for legacy clients).
 func (h *AuthHandler) RevokeAllSessions(c *gin.Context) {
 	username := c.GetString("username")
 	if username == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
-	var req struct {
-		RefreshToken string `json:"refresh_token"`
+	refreshTokenStr := cookies.ReadRefreshToken(c.Request)
+	if refreshTokenStr == "" {
+		var req struct {
+			RefreshToken string `json:"refresh_token"`
+		}
+		_ = c.ShouldBindJSON(&req)
+		refreshTokenStr = strings.TrimSpace(req.RefreshToken)
 	}
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+	if refreshTokenStr == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing refresh token"})
 		return
 	}
-	if strings.TrimSpace(req.RefreshToken) == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "refresh_token is required"})
-		return
-	}
-	currentHash := hashToken(req.RefreshToken)
-	if err := h.db.RevokeAllOtherSessions(username, currentHash); err != nil {
+	currentHash := hashToken(refreshTokenStr)
+	if err := h.db.RevokeAllOtherSessions(context.Background(), username, currentHash); err != nil {
 		log.Printf("Failed to revoke sessions for user %s: %v", username, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to revoke sessions"})
 		return
@@ -608,12 +639,12 @@ func (h *AuthHandler) GetAllLoginEventsAdmin(c *gin.Context) {
 	limit := 50
 	offset := (page - 1) * limit
 
-	events, err := h.db.GetAllLoginEvents(limit, offset)
+	events, err := h.db.GetAllLoginEvents(context.Background(), limit, offset)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch login events"})
 		return
 	}
-	total, _ := h.db.CountLoginEvents()
+	total, _ := h.db.CountLoginEvents(context.Background())
 	if events == nil {
 		events = []models.LoginEvent{}
 	}

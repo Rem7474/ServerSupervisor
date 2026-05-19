@@ -22,7 +22,7 @@ func NewWebLogsRetentionJob(db *database.DB, cfg *config.Config) Job {
 					if days <= 0 {
 						days = 30
 					}
-					if deleted, err := db.CleanOldWebLogs(days); err != nil {
+					if deleted, err := db.CleanOldWebLogs(context.Background(), days); err != nil {
 						log.Printf("Web logs retention error: %v", err)
 					} else if deleted > 0 {
 						log.Printf("Deleted %d old web log snapshots (retention: %d days)", deleted, days)

@@ -150,7 +150,7 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import cytoscape from 'cytoscape'
 import fcose from 'cytoscape-fcose'
-import { createCytoscapeInstance, bindCytoscapeResize, destroyCytoscapeInstance } from '../composables/useCytoscape'
+import { createCytoscapeInstance, bindCytoscapeResize, destroyCytoscapeInstance } from '../../composables/useCytoscape'
 
 cytoscape.use(fcose)
 

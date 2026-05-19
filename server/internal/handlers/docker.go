@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"path/filepath"
@@ -41,7 +42,7 @@ func NewDockerHandler(db *database.DB, cfg *config.Config, dispatcher *dispatch.
 // ListContainers returns Docker containers for a specific host
 func (h *DockerHandler) ListContainers(c *gin.Context) {
 	hostID := c.Param("id")
-	containers, err := h.db.GetDockerContainers(hostID)
+	containers, err := h.db.GetDockerContainers(context.Background(), hostID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch containers"})
 		return
@@ -64,7 +65,7 @@ func (h *DockerHandler) ListAllContainers(c *gin.Context) {
 		offset = 0
 	}
 
-	containers, err := h.db.GetAllDockerContainers()
+	containers, err := h.db.GetAllDockerContainers(context.Background())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch containers"})
 		return
@@ -90,7 +91,7 @@ func (h *DockerHandler) ListAllContainers(c *gin.Context) {
 // TrackedRepos management
 
 func (h *DockerHandler) ListTrackedRepos(c *gin.Context) {
-	repos, err := h.db.GetTrackedRepos()
+	repos, err := h.db.GetTrackedRepos(context.Background())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch repos"})
 		return
@@ -118,7 +119,7 @@ func (h *DockerHandler) AddTrackedRepo(c *gin.Context) {
 		repo.DisplayName = req.Owner + "/" + req.Repo
 	}
 
-	if err := h.db.CreateTrackedRepo(repo); err != nil {
+	if err := h.db.CreateTrackedRepo(context.Background(), repo); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create tracked repo"})
 		return
 	}
@@ -132,7 +133,7 @@ func (h *DockerHandler) DeleteTrackedRepo(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
 		return
 	}
-	if err := h.db.DeleteTrackedRepo(id); err != nil {
+	if err := h.db.DeleteTrackedRepo(context.Background(), id); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete repo"})
 		return
 	}
@@ -189,7 +190,7 @@ func (h *DockerHandler) SendDockerCommand(c *gin.Context) {
 
 // ListComposeProjects returns all Docker Compose projects across all hosts.
 func (h *DockerHandler) ListComposeProjects(c *gin.Context) {
-	projects, err := h.db.GetAllComposeProjects()
+	projects, err := h.db.GetAllComposeProjects(context.Background())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch compose projects"})
 		return
@@ -203,7 +204,7 @@ func (h *DockerHandler) ListComposeProjects(c *gin.Context) {
 // ListHostComposeProjects returns Docker Compose projects for a specific host.
 func (h *DockerHandler) ListHostComposeProjects(c *gin.Context) {
 	hostID := c.Param("id")
-	projects, err := h.db.GetComposeProjectsByHost(hostID)
+	projects, err := h.db.GetComposeProjectsByHost(context.Background(), hostID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch compose projects"})
 		return

@@ -1,6 +1,10 @@
 package config
 
 import (
+	"context"
+	"crypto/rand"
+	"encoding/hex"
+	"errors"
 	"os"
 	"strconv"
 	"strings"
@@ -8,6 +12,11 @@ import (
 )
 
 const DefaultJWTSecret = "change-me-in-production-please"
+
+// ErrInsecureConfig is returned by ValidateStrict when the configuration
+// contains values unsafe for production (default JWT secret, default admin
+// password, default DB password) and APP_ENV is not "dev"/"development".
+var ErrInsecureConfig = errors.New("insecure configuration detected")
 
 type Config struct {
 	// Server
@@ -62,7 +71,42 @@ type Config struct {
 	WebLogsRetentionDays int
 }
 
+// AppEnv reports the current deployment environment ("dev"/"development"
+// for local work, anything else — including unset — is treated as production).
+func AppEnv() string {
+	return strings.ToLower(strings.TrimSpace(getEnv("APP_ENV", "production")))
+}
+
+// IsDevEnv returns true when APP_ENV is "dev" or "development".
+func IsDevEnv() bool {
+	e := AppEnv()
+	return e == "dev" || e == "development"
+}
+
+// generateRandomSecret returns a 64-character hex string (32 random bytes).
+// Used as a dev-only fallback when JWT_SECRET is unset so local runs work
+// out of the box without ever using the hardcoded default.
+func generateRandomSecret() string {
+	var b [32]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		// Extremely unlikely; fall back to the well-known default so the
+		// dev server can still boot. ValidateStrict() will refuse to start
+		// in production anyway.
+		return DefaultJWTSecret
+	}
+	return hex.EncodeToString(b[:])
+}
+
 func Load() *Config {
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		if IsDevEnv() {
+			jwtSecret = generateRandomSecret()
+		} else {
+			jwtSecret = DefaultJWTSecret
+		}
+	}
+
 	return &Config{
 		Port:       getEnv("SERVER_PORT", "8080"),
 		BaseURL:    getEnv("BASE_URL", "http://localhost:8080"),
@@ -78,7 +122,7 @@ func Load() *Config {
 		DBName:     getEnv("DB_NAME", "serversupervisor"),
 		DBSSLMode:  getEnv("DB_SSLMODE", "disable"),
 
-		JWTSecret:              getEnv("JWT_SECRET", DefaultJWTSecret),
+		JWTSecret:              jwtSecret,
 		JWTExpiration:          getDurationEnv("JWT_EXPIRATION", 24*time.Hour),
 		RefreshTokenExpiration: getDurationEnv("REFRESH_TOKEN_EXPIRATION", 7*24*time.Hour),
 		APIKeyHeader:           "X-API-Key",
@@ -111,13 +155,13 @@ func Load() *Config {
 
 // DBSettingsLoader is a minimal interface to avoid import cycles.
 type DBSettingsLoader interface {
-	GetAllSettings() (map[string]string, error)
+	GetAllSettings(ctx context.Context) (map[string]string, error)
 }
 
 // OverrideFromDB applies DB-persisted settings on top of env vars.
 // Call this after the database is connected.
 func (c *Config) OverrideFromDB(db DBSettingsLoader) {
-	settings, err := db.GetAllSettings()
+	settings, err := db.GetAllSettings(context.Background())
 	if err != nil {
 		return
 	}
@@ -191,6 +235,32 @@ func (c *Config) Validate() []string {
 		warnings = append(warnings, "WEB_LOGS_RETENTION_DAYS must be a positive integer")
 	}
 	return warnings
+}
+
+// ValidateStrict returns ErrInsecureConfig (wrapped with details) when any
+// insecure default is detected and APP_ENV is not a development environment.
+// Server startup should refuse to continue in that case.
+func (c *Config) ValidateStrict() error {
+	if IsDevEnv() {
+		return nil
+	}
+	var problems []string
+	if c.JWTSecret == DefaultJWTSecret || c.JWTSecret == "" {
+		problems = append(problems, "JWT_SECRET must be set to a unique random value (>=32 chars)")
+	}
+	if len(c.JWTSecret) < 32 {
+		problems = append(problems, "JWT_SECRET is too short (minimum 32 characters)")
+	}
+	if c.AdminPassword == "admin" {
+		problems = append(problems, "ADMIN_PASSWORD must not be 'admin'")
+	}
+	if c.DBPassword == "supervisor" {
+		problems = append(problems, "DB_PASSWORD must not be the default 'supervisor'")
+	}
+	if len(problems) == 0 {
+		return nil
+	}
+	return errors.Join(ErrInsecureConfig, errors.New(strings.Join(problems, "; ")))
 }
 
 func (c *Config) DBDSN() string {

@@ -457,7 +457,7 @@ import { useDateFormatter } from '../composables/useDateFormatter'
 import { useStatusBadge } from '../composables/useStatusBadge'
 import { useCommandStream } from '../composables/useCommandStream'
 import PaginationNav from '../components/PaginationNav.vue'
-import CommandLogPanel from '../components/CommandLogPanel.vue'
+import CommandLogPanel from '../components/host/CommandLogPanel.vue'
 import DataToolbar from '../components/common/DataToolbar.vue'
 import SortableHeader from '../components/common/SortableHeader.vue'
 
@@ -536,7 +536,7 @@ const selectedCmd = ref(null)
 const showLogViewer = ref(false)
 let auditPollTimer = null
 
-const { openCommandStream, closeStream } = useCommandStream({ token: () => auth.token })
+const { openCommandStream, closeStream } = useCommandStream()
 
 // ── Connexions (admin) ───────────────────────────────────────────────────────
 const connexions = ref([])

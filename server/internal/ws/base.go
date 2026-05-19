@@ -15,6 +15,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/gorilla/websocket"
 	"github.com/serversupervisor/server/internal/config"
+	"github.com/serversupervisor/server/internal/cookies"
 	"github.com/serversupervisor/server/internal/database"
 )
 
@@ -151,13 +152,13 @@ func isAllowedOrigin(origin string, baseURL string, extraOrigins []string) bool 
 	return false
 }
 
-func (h *WSHandler) authenticateWS(conn *websocket.Conn) bool {
-	ok, _ := h.authenticateWSWithRole(conn)
+func (h *WSHandler) authenticateWS(c *gin.Context, conn *websocket.Conn) bool {
+	ok, _ := h.authenticateWSWithRole(c, conn)
 	return ok
 }
 
-func (h *WSHandler) authenticateWSWithRole(conn *websocket.Conn) (bool, string) {
-	claims, ok := h.authenticateWSClaims(conn)
+func (h *WSHandler) authenticateWSWithRole(c *gin.Context, conn *websocket.Conn) (bool, string) {
+	claims, ok := h.authenticateWSClaims(c, conn)
 	if !ok {
 		return false, ""
 	}
@@ -165,8 +166,24 @@ func (h *WSHandler) authenticateWSWithRole(conn *websocket.Conn) (bool, string) 
 	return true, role
 }
 
-// authenticateWSClaims reads the auth handshake message and returns the full JWT claims.
-func (h *WSHandler) authenticateWSClaims(conn *websocket.Conn) (jwt.MapClaims, bool) {
+// authenticateWSClaims authorises the connection. It prefers the session
+// cookie (sent automatically by the browser on the upgrade request) and falls
+// back to the legacy in-band {"type":"auth","token":"…"} handshake for older
+// clients. Returns the JWT claims on success.
+func (h *WSHandler) authenticateWSClaims(c *gin.Context, conn *websocket.Conn) (jwt.MapClaims, bool) {
+	if c != nil && c.Request != nil {
+		if tok := cookies.ReadAccessToken(c.Request); tok != "" {
+			if claims, ok := h.parseTokenClaims(tok); ok {
+				return claims, true
+			}
+		}
+		if tok := c.Query("token"); tok != "" {
+			if claims, ok := h.parseTokenClaims(tok); ok {
+				return claims, true
+			}
+		}
+	}
+
 	_ = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 	var msg wsAuthMessage
 	if err := conn.ReadJSON(&msg); err != nil {

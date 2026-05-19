@@ -152,10 +152,10 @@
 
 <script setup>
 import { ref, computed } from 'vue'
-import { useAuthStore } from '../stores/auth'
-import apiClient, { getApiErrorMessage } from '../api'
-import { useCommandStream } from '../composables/useCommandStream'
-import LoadingSkeleton from './LoadingSkeleton.vue'
+import { useAuthStore } from '../../stores/auth'
+import apiClient, { getApiErrorMessage } from '../../api'
+import { useCommandStream } from '../../composables/useCommandStream'
+import LoadingSkeleton from '../LoadingSkeleton.vue'
 
 const props = defineProps({
   hostId: { type: String, required: true },
@@ -172,7 +172,7 @@ const processFilter = ref('')
 const sortKey = ref('cpu_pct')
 const sortDir = ref(-1)
 const STREAM_TIMEOUT_MS = 60000
-const { collectCommandOutput } = useCommandStream({ token: () => auth.token })
+const { collectCommandOutput } = useCommandStream()
 
 const filteredProcesses = computed(() => {
   let list = processes.value

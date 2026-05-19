@@ -642,10 +642,10 @@
 
 <script setup>
 import { useGitWebhooksPage } from '../composables/useGitWebhooksPage'
-import WebhookUrlCard from '../components/WebhookUrlCard.vue'
+import WebhookUrlCard from '../components/webhooks/WebhookUrlCard.vue'
 import WebhookExecutionList from '../components/webhooks/WebhookExecutionList.vue'
 import WebhookModal from '../components/webhooks/WebhookModal.vue'
-import CommandLogPanel from '../components/CommandLogPanel.vue'
+import CommandLogPanel from '../components/host/CommandLogPanel.vue'
 import { ref } from 'vue'
 import api from '../api'
 import { useAuthStore } from '../stores/auth'
@@ -695,7 +695,7 @@ const {
 } = useGitWebhooksPage()
 
 const auth = useAuthStore()
-const { openCommandStream, closeStream } = useCommandStream({ token: () => auth.token })
+const { openCommandStream, closeStream } = useCommandStream()
 const selectedTrackerCmd = ref(null)
 const showTrackerConsole = ref(false)
 

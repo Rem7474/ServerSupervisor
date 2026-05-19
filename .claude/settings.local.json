@@ -8,7 +8,8 @@
       "Bash(node_modules/.bin/vue-tsc:*)",
       "Bash(node ./node_modules/vite/bin/vite.js build:*)",
       "Bash(go vet:*)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(npx eslint *)"
     ]
   }
 }

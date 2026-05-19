@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 
@@ -12,7 +13,7 @@ import (
 func (h *HostHandler) GetDiskMetrics(c *gin.Context) {
 	hostID := c.Param("id")
 
-	metrics, err := h.db.GetLatestDiskMetrics(hostID)
+	metrics, err := h.db.GetLatestDiskMetrics(context.Background(), hostID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch disk metrics"})
 		return
@@ -42,7 +43,7 @@ func (h *HostHandler) GetDiskMetricsHistory(c *gin.Context) {
 		return
 	}
 
-	history, err := h.db.GetDiskMetricsHistory(hostID, mountPoint, limit)
+	history, err := h.db.GetDiskMetricsHistory(context.Background(), hostID, mountPoint, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch disk metrics history"})
 		return
@@ -73,7 +74,7 @@ func (h *HostHandler) GetDiskMetricsAggregated(c *gin.Context) {
 		hours = 8760
 	}
 
-	points, aggType, err := h.db.GetDiskMetricsAggregated(hostID, mountPoint, hours)
+	points, aggType, err := h.db.GetDiskMetricsAggregated(context.Background(), hostID, mountPoint, hours)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch disk metrics history"})
 		return
@@ -94,7 +95,7 @@ func (h *HostHandler) GetDiskMetricsAggregated(c *gin.Context) {
 func (h *HostHandler) GetDiskHealth(c *gin.Context) {
 	hostID := c.Param("id")
 
-	health, err := h.db.GetLatestDiskHealth(hostID)
+	health, err := h.db.GetLatestDiskHealth(context.Background(), hostID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch disk health"})
 		return

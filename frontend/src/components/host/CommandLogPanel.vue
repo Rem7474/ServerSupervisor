@@ -283,10 +283,10 @@
 
 <script setup>
 import { computed, nextTick, ref, watch } from 'vue'
-import { copyConsoleOutput, downloadConsoleOutput } from '../utils/consoleOutput'
-import { moduleLabel, moduleClass } from '../utils/moduleMeta'
-import { useStatusBadge } from '../composables/useStatusBadge'
-import { useDateFormatter } from '../composables/useDateFormatter'
+import { copyConsoleOutput, downloadConsoleOutput } from '../../utils/consoleOutput'
+import { moduleLabel, moduleClass } from '../../utils/moduleMeta'
+import { useStatusBadge } from '../../composables/useStatusBadge'
+import { useDateFormatter } from '../../composables/useDateFormatter'
 
 const props = defineProps({
   /** The command record: { host_name?, host_id?, module, action, target?, status, output? } */

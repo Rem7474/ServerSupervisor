@@ -55,7 +55,7 @@
 <script setup>
 import { ref } from 'vue'
 import apiClient from '../../api'
-import HostSystemdPanel from '../HostSystemdPanel.vue'
+import HostSystemdPanel from './HostSystemdPanel.vue'
 
 const emit = defineEmits(['open-command', 'history-changed'])
 

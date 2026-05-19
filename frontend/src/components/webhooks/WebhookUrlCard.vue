@@ -197,8 +197,8 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { useConfirmDialog } from '../composables/useConfirmDialog'
-import api from '../api'
+import { useConfirmDialog } from '../../composables/useConfirmDialog'
+import api from '../../api'
 
 const props = defineProps({
   webhookId: { type: String, default: '' },

@@ -515,7 +515,7 @@ import { computed, onMounted, ref } from 'vue'
 import apiClient, { getApiErrorMessage } from '../api'
 import { useToast } from '../composables/useToast'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
-import IPTimelineModal from '../components/IPTimelineModal.vue'
+import IPTimelineModal from '../components/security/IPTimelineModal.vue'
 
 type AnyRecord = Record<string, any>
 
