@@ -334,3 +334,36 @@ button:focus-visible {
   0%   { background-position: 100% 0; }
   100% { background-position: -100% 0; }
 }
+
+/* Inline code styling: make inline <code> look like lightweight pills and respect dark mode */
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", monospace;
+  font-size: 0.9em;
+  padding: 0.12rem 0.45rem;
+  border-radius: 0.35rem;
+  background-color: rgba(0,0,0,0.04);
+  color: inherit;
+}
+
+[data-bs-theme="dark"] code {
+  background-color: rgba(255,255,255,0.04);
+  color: #e6eef6;
+}
+
+/* Slight visual tweak for apt package chips */
+.apt-package-item,
+.apt-package-item code {
+  display: inline-block;
+  background: rgba(0,0,0,0.3);
+  padding: 0.15rem 0.4rem;
+  border-radius: 0.25rem;
+  color: #94a3b8;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 0.9em;
+}
+
+[data-bs-theme="dark"] .apt-package-item,
+[data-bs-theme="dark"] .apt-package-item code {
+  background: rgba(255,255,255,0.04);
+  color: #94a3b8;
+}
