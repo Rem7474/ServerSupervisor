@@ -5,7 +5,7 @@
 # Vite caches between builds even when lockfiles change.
 
 # ==== Stage 1: Build Frontend ====
-FROM node:25-slim AS frontend-builder
+FROM node:26-slim AS frontend-builder
 WORKDIR /app/frontend
 
 COPY frontend/package.json frontend/package-lock.json ./
