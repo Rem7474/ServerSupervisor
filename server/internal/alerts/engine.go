@@ -524,6 +524,21 @@ func GetMetricValue(db *database.DB, host models.Host, rule models.AlertRule) (f
 		return resolveProxmoxDiskFailedCount(db, rule), true
 	case "proxmox_disk_min_wearout_percent":
 		return resolveProxmoxDiskMinWearoutPercent(db, rule), true
+	case "uptime_down_count":
+		// Global: how many enabled uptime probes are currently DOWN.
+		n, err := db.CountDownProbes(context.Background())
+		if err != nil {
+			return 0, false
+		}
+		return float64(n), true
+	case "ssl_min_days_remaining":
+		// Global: smallest "days until expiration" across all enabled SSL certs.
+		// Returns false (skip evaluation) when no cert has a known valid_to yet.
+		days, ok, err := db.GetMinSSLDaysRemaining(context.Background())
+		if err != nil || !ok {
+			return 0, false
+		}
+		return float64(days), true
 	}
 	return 0, false
 }

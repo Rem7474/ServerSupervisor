@@ -51,6 +51,8 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 
 	proxmoxH := handlers.NewProxmoxHandler(db, cfg)
 	hostPermH := handlers.NewHostPermissionHandler(db)
+	uptimeH := handlers.NewUptimeHandler(db, cfg)
+	sslH := handlers.NewSSLHandler(db, cfg)
 
 	registerPublicRoutes(r, authH, db)
 	registerWSRoutes(r, wsH, cfg)
@@ -74,6 +76,8 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	registerReleaseTrackerRoutes(v1, releaseTrackerH)
 	registerProxmoxRoutes(v1, proxmoxH)
 	registerHostPermissionRoutes(v1, hostPermH)
+	registerUptimeRoutes(v1, uptimeH)
+	registerSSLRoutes(v1, sslH)
 
 	registerStaticFiles(r)
 
@@ -234,6 +238,7 @@ func registerAlertRoutes(g *gin.RouterGroup, rulesH *handlers.AlertRulesHandler)
 	admin.GET("/alerts/incidents", rulesH.ListIncidents)
 	admin.GET("/alert-rules/capabilities/agent", rulesH.GetAgentAlertRuleCapabilities)
 	admin.GET("/alert-rules/capabilities/proxmox", rulesH.GetProxmoxAlertRuleCapabilities)
+	admin.GET("/alert-rules/capabilities/synthetic", rulesH.GetSyntheticAlertRuleCapabilities)
 	admin.GET("/hosts/:id/capabilities", rulesH.GetHostAlertMetrics)
 	admin.GET("/alert-rules", rulesH.ListAlertRules)
 	admin.GET("/alert-rules/:id", rulesH.GetAlertRule)
@@ -355,6 +360,34 @@ func registerProxmoxRoutes(g *gin.RouterGroup, h *handlers.ProxmoxHandler) {
 	// Node actions (write — require Sys.Modify on the Proxmox token)
 	g.POST("/proxmox/nodes/:id/apt-refresh", h.RefreshNodeApt)
 	g.POST("/proxmox/nodes/:id/guests/:vmid/migrate", h.MigrateGuest)
+}
+
+func registerUptimeRoutes(g *gin.RouterGroup, h *handlers.UptimeHandler) {
+	// Read endpoints: any authenticated user
+	g.GET("/uptime/probes", h.List)
+	g.GET("/uptime/probes/:id", h.Get)
+	g.GET("/uptime/probes/:id/history", h.History)
+	g.GET("/uptime/probes/:id/stats", h.Stats)
+
+	// Write endpoints: admin only
+	admin := g.Group("")
+	admin.Use(AdminOnlyMiddleware())
+	admin.POST("/uptime/probes", h.Create)
+	admin.PUT("/uptime/probes/:id", h.Update)
+	admin.DELETE("/uptime/probes/:id", h.Delete)
+	admin.POST("/uptime/probes/:id/check-now", h.CheckNow)
+}
+
+func registerSSLRoutes(g *gin.RouterGroup, h *handlers.SSLHandler) {
+	g.GET("/ssl/certificates", h.List)
+	g.GET("/ssl/certificates/:id", h.Get)
+
+	admin := g.Group("")
+	admin.Use(AdminOnlyMiddleware())
+	admin.POST("/ssl/certificates", h.Create)
+	admin.PUT("/ssl/certificates/:id", h.Update)
+	admin.DELETE("/ssl/certificates/:id", h.Delete)
+	admin.POST("/ssl/certificates/:id/check-now", h.CheckNow)
 }
 
 func registerStaticFiles(r *gin.Engine) {
