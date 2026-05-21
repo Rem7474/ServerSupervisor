@@ -1,10 +1,15 @@
 <template>
   <div>
-    <div
-      v-if="loading"
-      class="text-center py-5 text-muted"
-    >
-      Chargement...
+    <div v-if="loading">
+      <LoadingSkeleton
+        variant="kpi"
+        :lines="4"
+      />
+      <LoadingSkeleton
+        variant="card"
+        :lines="4"
+        class="mt-4"
+      />
     </div>
     <div
       v-else-if="error"
@@ -173,6 +178,7 @@ import { useRoute } from 'vue-router'
 import dayjs from '../utils/dayjs'
 import api from '../api'
 import MetricsSourceBadge from '../components/common/MetricsSourceBadge.vue'
+import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 
 interface ProxmoxGuest {
   id: string

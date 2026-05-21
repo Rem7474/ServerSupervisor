@@ -1,10 +1,15 @@
 <template>
   <div>
-    <div
-      v-if="loading"
-      class="text-center py-5 text-muted"
-    >
-      Chargement...
+    <div v-if="loading">
+      <LoadingSkeleton
+        variant="kpi"
+        :lines="4"
+      />
+      <LoadingSkeleton
+        variant="card"
+        :lines="4"
+        class="mt-4"
+      />
     </div>
     <div
       v-else-if="error"
@@ -1246,6 +1251,7 @@ import { useRoute, useRouter } from 'vue-router'
 const CommandLogPanel = defineAsyncComponent(() => import('../components/host/CommandLogPanel.vue'))
 const ProxmoxNodeChartsPanel = defineAsyncComponent(() => import('../components/proxmox/ProxmoxNodeChartsPanel.vue'))
 import SortableHeader from '../components/common/SortableHeader.vue'
+import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import api from '../api'
 
 // Inline component — renders the "Hôte lié" cell without a separate file.

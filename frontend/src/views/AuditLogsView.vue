@@ -191,9 +191,12 @@
                 <tr v-if="cmdsLoading">
                   <td
                     colspan="8"
-                    class="text-center text-secondary py-3"
+                    class="py-2"
                   >
-                    Chargement...
+                    <LoadingSkeleton
+                      variant="table"
+                      :lines="5"
+                    />
                   </td>
                 </tr>
                 <tr v-else-if="!sortedCmds.length">
@@ -389,9 +392,12 @@
               <tr v-if="connexionsLoading">
                 <td
                   colspan="6"
-                  class="text-center text-secondary py-3"
+                  class="py-2"
                 >
-                  Chargement...
+                  <LoadingSkeleton
+                    variant="table"
+                    :lines="4"
+                  />
                 </td>
               </tr>
               <tr v-else-if="!connexions.length">
@@ -460,6 +466,7 @@ import PaginationNav from '../components/PaginationNav.vue'
 import CommandLogPanel from '../components/host/CommandLogPanel.vue'
 import DataToolbar from '../components/common/DataToolbar.vue'
 import SortableHeader from '../components/common/SortableHeader.vue'
+import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 
 const { formatLocaleDateTime: formatDate, formatRelativeTime } = useDateFormatter()
 const { getStatusBadgeClass } = useStatusBadge()
