@@ -101,7 +101,14 @@
                 >—</span>
               </td>
               <td class="text-secondary small">
-                <RelativeTime :timestamp="p.last_checked_at" />
+                <RelativeTime
+                  v-if="p.last_checked_at"
+                  :date="p.last_checked_at"
+                />
+                <span
+                  v-else
+                  class="text-secondary"
+                >Jamais</span>
               </td>
               <td class="text-end">
                 <div class="btn-list">
@@ -301,7 +308,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import api from '../api'
 import { useAuthStore } from '../stores/auth'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
@@ -441,5 +448,12 @@ async function confirmDelete (p) {
   }
 }
 
-onMounted(fetchProbes)
+let refreshTimer
+onMounted(() => {
+  fetchProbes()
+  refreshTimer = setInterval(fetchProbes, 15000)
+})
+onUnmounted(() => {
+  if (refreshTimer) clearInterval(refreshTimer)
+})
 </script>

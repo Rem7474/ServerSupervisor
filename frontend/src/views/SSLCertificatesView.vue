@@ -91,7 +91,14 @@
                 </span>
               </td>
               <td class="text-secondary small">
-                <RelativeTime :timestamp="c.last_checked_at" />
+                <RelativeTime
+                  v-if="c.last_checked_at"
+                  :date="c.last_checked_at"
+                />
+                <span
+                  v-else
+                  class="text-secondary"
+                >Jamais</span>
                 <div
                   v-if="c.last_error"
                   class="text-danger small"
@@ -243,7 +250,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import api from '../api'
 import { useAuthStore } from '../stores/auth'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
@@ -379,5 +386,12 @@ async function confirmDelete (c) {
   }
 }
 
-onMounted(fetchCerts)
+let refreshTimer
+onMounted(() => {
+  fetchCerts()
+  refreshTimer = setInterval(fetchCerts, 60000)
+})
+onUnmounted(() => {
+  if (refreshTimer) clearInterval(refreshTimer)
+})
 </script>
