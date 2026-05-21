@@ -267,15 +267,15 @@ async function fetchAll () {
   error.value = ''
   try {
     const [pr, hr, sr] = await Promise.all([
-      api.get(`/v1/uptime/probes/${probeId}`),
-      api.get(`/v1/uptime/probes/${probeId}/history?limit=200`),
-      api.get(`/v1/uptime/probes/${probeId}/stats?hours=${statsWindow}`),
+      api.getUptimeProbe(probeId),
+      api.getUptimeHistory(probeId, 200),
+      api.getUptimeStats(probeId, statsWindow),
     ])
     probe.value = pr.data
     results.value = hr.data?.results || []
     stats.value = sr.data
   } catch (e) {
-    error.value = e?.response?.data?.error || 'Impossible de charger la sonde'
+    error.value = e?.response?.data?.error || e?.message || 'Impossible de charger la sonde'
   } finally {
     loading.value = false
   }

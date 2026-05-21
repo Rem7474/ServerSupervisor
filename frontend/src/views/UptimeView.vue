@@ -355,10 +355,10 @@ async function fetchProbes () {
   loading.value = true
   error.value = ''
   try {
-    const { data } = await api.get('/v1/uptime/probes')
+    const { data } = await api.getUptimeProbes()
     probes.value = data?.probes || []
   } catch (e) {
-    error.value = e?.response?.data?.error || 'Impossible de charger les sondes'
+    error.value = e?.response?.data?.error || e?.message || 'Impossible de charger les sondes'
   } finally {
     loading.value = false
   }
@@ -400,14 +400,14 @@ async function save () {
     const body = { ...form.value }
     delete body.id
     if (form.value.id) {
-      await api.put(`/v1/uptime/probes/${form.value.id}`, body)
+      await api.updateUptimeProbe(form.value.id, body)
     } else {
-      await api.post('/v1/uptime/probes', body)
+      await api.createUptimeProbe(body)
     }
     closeModal()
     await fetchProbes()
   } catch (e) {
-    formError.value = e?.response?.data?.error || 'Erreur lors de l\'enregistrement'
+    formError.value = e?.response?.data?.error || e?.message || 'Erreur lors de l\'enregistrement'
   } finally {
     saving.value = false
   }
@@ -416,10 +416,10 @@ async function save () {
 async function checkNow (p) {
   checkingId.value = p.id
   try {
-    await api.post(`/v1/uptime/probes/${p.id}/check-now`)
+    await api.checkUptimeProbeNow(p.id)
     await fetchProbes()
   } catch (e) {
-    error.value = e?.response?.data?.error || 'Échec de la vérification'
+    error.value = e?.response?.data?.error || e?.message || 'Échec de la vérification'
   } finally {
     checkingId.value = ''
   }
@@ -434,10 +434,10 @@ async function confirmDelete (p) {
   })
   if (!ok) return
   try {
-    await api.delete(`/v1/uptime/probes/${p.id}`)
+    await api.deleteUptimeProbe(p.id)
     await fetchProbes()
   } catch (e) {
-    error.value = e?.response?.data?.error || 'Suppression impossible'
+    error.value = e?.response?.data?.error || e?.message || 'Suppression impossible'
   }
 }
 

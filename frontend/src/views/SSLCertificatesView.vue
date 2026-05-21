@@ -298,10 +298,10 @@ async function fetchCerts () {
   loading.value = true
   error.value = ''
   try {
-    const { data } = await api.get('/v1/ssl/certificates')
+    const { data } = await api.getSSLCertificates()
     certs.value = data?.certificates || []
   } catch (e) {
-    error.value = e?.response?.data?.error || 'Impossible de charger les certificats'
+    error.value = e?.response?.data?.error || e?.message || 'Impossible de charger les certificats'
   } finally {
     loading.value = false
   }
@@ -338,14 +338,14 @@ async function save () {
     const body = { ...form.value }
     delete body.id
     if (form.value.id) {
-      await api.put(`/v1/ssl/certificates/${form.value.id}`, body)
+      await api.updateSSLCertificate(form.value.id, body)
     } else {
-      await api.post('/v1/ssl/certificates', body)
+      await api.createSSLCertificate(body)
     }
     closeModal()
     await fetchCerts()
   } catch (e) {
-    formError.value = e?.response?.data?.error || 'Erreur lors de l\'enregistrement'
+    formError.value = e?.response?.data?.error || e?.message || 'Erreur lors de l\'enregistrement'
   } finally {
     saving.value = false
   }
@@ -354,10 +354,10 @@ async function save () {
 async function checkNow (c) {
   checkingId.value = c.id
   try {
-    await api.post(`/v1/ssl/certificates/${c.id}/check-now`)
+    await api.checkSSLCertificateNow(c.id)
     await fetchCerts()
   } catch (e) {
-    error.value = e?.response?.data?.error || 'Échec de la vérification'
+    error.value = e?.response?.data?.error || e?.message || 'Échec de la vérification'
   } finally {
     checkingId.value = ''
   }
@@ -372,10 +372,10 @@ async function confirmDelete (c) {
   })
   if (!ok) return
   try {
-    await api.delete(`/v1/ssl/certificates/${c.id}`)
+    await api.deleteSSLCertificate(c.id)
     await fetchCerts()
   } catch (e) {
-    error.value = e?.response?.data?.error || 'Suppression impossible'
+    error.value = e?.response?.data?.error || e?.message || 'Suppression impossible'
   }
 }
 
