@@ -313,6 +313,7 @@ export default {
   // Alert Rules
   getAgentAlertRuleCapabilities: () => api.get('/v1/alert-rules/capabilities/agent'),
   getProxmoxAlertRuleCapabilities: () => api.get('/v1/alert-rules/capabilities/proxmox'),
+  getSyntheticAlertRuleCapabilities: () => api.get('/v1/alert-rules/capabilities/synthetic'),
   getHostCapabilities: (hostId: string) => api.get(`/v1/hosts/${hostId}/capabilities`),
   getAlertRules: () => api.get('/v1/alert-rules'),
   createAlertRule: (payload: AlertRule) => api.post('/v1/alert-rules', payload),

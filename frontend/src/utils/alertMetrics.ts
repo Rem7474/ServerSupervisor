@@ -3,7 +3,7 @@ export interface AlertMetricMeta {
   unit: string
   icon: string
   badgeClass: string
-  category: 'host' | 'proxmox'
+  category: 'host' | 'proxmox' | 'synthetic'
 }
 
 export const ALERT_METRICS: Record<string, AlertMetricMeta> = {
@@ -154,6 +154,20 @@ export const ALERT_METRICS: Record<string, AlertMetricMeta> = {
     badgeClass: 'bg-cyan-lt text-cyan',
     category: 'proxmox',
   },
+  uptime_down_count: {
+    label: 'Sondes uptime down',
+    unit: '',
+    icon: '\ud83d\udea8',
+    badgeClass: 'bg-red-lt text-red',
+    category: 'synthetic',
+  },
+  ssl_min_days_remaining: {
+    label: 'Cert SSL \u2014 jours restants',
+    unit: 'j',
+    icon: '\ud83d\udd10',
+    badgeClass: 'bg-yellow-lt text-yellow',
+    category: 'synthetic',
+  },
 }
 
 export const ALERT_METRIC_ORDER = [
@@ -178,6 +192,8 @@ export const ALERT_METRIC_ORDER = [
   'proxmox_auth_failures_recent',
   'proxmox_disk_failed_count',
   'proxmox_disk_min_wearout_percent',
+  'uptime_down_count',
+  'ssl_min_days_remaining',
 ]
 
 export function getAlertMetricMeta(metric: string): AlertMetricMeta {

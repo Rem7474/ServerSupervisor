@@ -167,6 +167,18 @@ func isProxmoxMetric(metric string) bool {
 	}
 }
 
+// isSyntheticMetric detects if a metric belongs to the synthetic monitoring
+// subsystem (uptime probes, SSL certificates). These metrics are global and
+// evaluated once per rule, not per host.
+func isSyntheticMetric(metric string) bool {
+	switch metric {
+	case "uptime_down_count", "ssl_min_days_remaining":
+		return true
+	default:
+		return false
+	}
+}
+
 // hasHostID checks if a rule explicitly filters by host ID.
 func hasHostID(rule models.AlertRule) bool {
 	return rule.HostID != nil && *rule.HostID != ""
@@ -231,6 +243,16 @@ func proxmoxScopeLabel(scope *models.ProxmoxMetricScope) string {
 // For agent metrics, returns the provided hosts. For Proxmox metrics, returns a single
 // synthetic host record with ID from proxmoxScopeKey() to deduplicate incidents per scope.
 func buildAlertEvaluationTargets(db *database.DB, rule models.AlertRule, hosts []models.Host) []models.Host {
+	if isSyntheticMetric(rule.Metric) {
+		// Synthetic metrics are global — evaluate once with a single synthetic target so
+		// the engine creates exactly one incident per rule on fire.
+		return []models.Host{{
+			ID:       "synthetic:" + rule.Metric,
+			Name:     "Monitoring synthétique",
+			Status:   "online",
+			LastSeen: time.Now(),
+		}}
+	}
 	if !isProxmoxMetric(rule.Metric) {
 		// For agent metrics, filter by HostID if set
 		if hasHostID(rule) {
