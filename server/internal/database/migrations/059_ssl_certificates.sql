@@ -1,5 +1,5 @@
 -- SSL/TLS certificate monitoring: track expiration of remote TLS endpoints.
--- Checked daily by the server; alerts fire at J-30 and J-7 via the alert engine.
+-- Checked daily by the server. Alerts fire at J-30 and J-7 via the alert engine.
 
 CREATE TABLE IF NOT EXISTS ssl_certificates (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),

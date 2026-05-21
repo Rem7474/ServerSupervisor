@@ -1,5 +1,5 @@
 -- Uptime / synthetic monitoring: HTTP(S) and TCP probes executed from the server.
--- Each probe has its own interval; results history feeds uptime % and latency charts.
+-- Each probe has its own interval, and the results history feeds uptime % and latency charts.
 
 CREATE TABLE IF NOT EXISTS uptime_probes (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),

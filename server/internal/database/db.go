@@ -237,17 +237,63 @@ WHERE table_schema = 'public' AND table_name = 'hosts'
 }
 
 // splitSQLStatements splits a SQL file into individual statements on ";",
-// but ignores semicolons that appear inside dollar-quoted strings ($$...$$)
-// or single-quoted string literals ('...'). This is necessary for files that
-// contain PL/pgSQL anonymous blocks (DO $$ ... END $$;).
+// ignoring semicolons that appear inside:
+//   - dollar-quoted strings ($$...$$), used by PL/pgSQL DO blocks
+//   - single-quoted string literals ('...')
+//   - line comments ("-- ..." until end of line)
+//   - block comments ("/* ... */")
+//
+// Comment-aware splitting matters because a single ';' inside a "--" comment
+// would otherwise be treated as a statement terminator and break parsing.
 func splitSQLStatements(sql string) []string {
 	var statements []string
 	var cur strings.Builder
 	inDollarQuote := false
 	inSingleQuote := false
+	inLineComment := false
+	inBlockComment := false
 
 	for i := 0; i < len(sql); i++ {
 		ch := sql[i]
+
+		// Line comment: skip from "--" until newline. Comment characters are
+		// kept in the output so the executed SQL remains identical, but the
+		// ';' inside no longer triggers a split.
+		if inLineComment {
+			cur.WriteByte(ch)
+			if ch == '\n' {
+				inLineComment = false
+			}
+			continue
+		}
+		if inBlockComment {
+			cur.WriteByte(ch)
+			if ch == '*' && i+1 < len(sql) && sql[i+1] == '/' {
+				cur.WriteByte('/')
+				i++
+				inBlockComment = false
+			}
+			continue
+		}
+
+		// Detect comment starts only outside of strings.
+		if !inSingleQuote && !inDollarQuote {
+			if ch == '-' && i+1 < len(sql) && sql[i+1] == '-' {
+				cur.WriteByte('-')
+				cur.WriteByte('-')
+				i++
+				inLineComment = true
+				continue
+			}
+			if ch == '/' && i+1 < len(sql) && sql[i+1] == '*' {
+				cur.WriteByte('/')
+				cur.WriteByte('*')
+				i++
+				inBlockComment = true
+				continue
+			}
+		}
+
 		if !inDollarQuote && ch == '\'' {
 			inSingleQuote = !inSingleQuote
 			cur.WriteByte(ch)
