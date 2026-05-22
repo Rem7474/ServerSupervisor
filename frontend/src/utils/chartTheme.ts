@@ -32,29 +32,46 @@ const FALLBACK_LIGHT: ChartThemePalette = {
   tooltipBorder: 'rgba(15,23,42,0.12)',
 }
 
+// cssVar resolves a CSS custom property by checking <body> first, then
+// <html>. Tabler attaches the [data-bs-theme="dark"] selector to <body>, so
+// reading only from documentElement returns the light defaults inherited from
+// :root which leads to white tooltips on the dark theme.
 function cssVar(name: string, fallback: string): string {
   if (typeof window === 'undefined' || typeof document === 'undefined') return fallback
-  const value = window.getComputedStyle(document.documentElement).getPropertyValue(name).trim()
-  return value || fallback
+  const fromBody = document.body
+    ? window.getComputedStyle(document.body).getPropertyValue(name).trim()
+    : ''
+  if (fromBody) return fromBody
+  const fromRoot = window.getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+  return fromRoot || fallback
 }
 
 function isDarkTheme(): boolean {
   if (typeof document === 'undefined') return true
+  const bodyTheme = document.body?.getAttribute('data-bs-theme')
+  if (bodyTheme) return bodyTheme !== 'light'
   return document.documentElement.getAttribute('data-bs-theme') !== 'light'
 }
 
 export function getChartPalette(): ChartThemePalette {
-  const fallback = isDarkTheme() ? FALLBACK_DARK : FALLBACK_LIGHT
+  const dark = isDarkTheme()
+  const fallback = dark ? FALLBACK_DARK : FALLBACK_LIGHT
   const bodyColor = cssVar('--tblr-body-color', fallback.legendText)
-  const bgSurface = cssVar('--tblr-bg-surface', fallback.tooltipBackground)
   const borderColor = cssVar('--tblr-border-color', fallback.tooltipBorder)
+
+  // Force an opaque dark/light tooltip background regardless of what Tabler
+  // exposes via --tblr-bg-surface, because a translucent or near-page-color
+  // tooltip is illegible over a chart of the same hue.
+  const tooltipBackground = dark
+    ? FALLBACK_DARK.tooltipBackground
+    : FALLBACK_LIGHT.tooltipBackground
 
   return {
     legendText: bodyColor,
     tickText: cssVar('--tblr-secondary', fallback.tickText) || bodyColor,
     grid: fallback.grid,
-    tooltipBackground: bgSurface,
-    tooltipText: bodyColor,
+    tooltipBackground,
+    tooltipText: dark ? FALLBACK_DARK.tooltipText : FALLBACK_LIGHT.tooltipText,
     tooltipBorder: borderColor,
   }
 }

@@ -122,44 +122,66 @@
       </div>
 
       <div class="card">
-        <div class="card-header">
+        <div class="card-header d-flex align-items-center justify-content-between">
           <h3 class="card-title mb-0">
             Historique récent
           </h3>
+          <small class="text-secondary">
+            {{ groupedResults.length }} séquence(s) sur {{ results.length }} check(s)
+          </small>
         </div>
         <div class="table-responsive">
           <table class="table table-vcenter card-table">
             <thead>
               <tr>
-                <th>Horodatage</th>
+                <th>Période</th>
                 <th>Résultat</th>
                 <th>Statut HTTP</th>
                 <th>Latence</th>
+                <th>Checks</th>
                 <th>Erreur</th>
               </tr>
             </thead>
             <tbody>
               <tr
-                v-for="r in results"
-                :key="r.id"
+                v-for="g in groupedResults"
+                :key="g.key"
               >
                 <td class="text-secondary small">
-                  {{ formatDateTime(r.checked_at) }}
+                  <div>{{ formatDateTime(g.from) }}</div>
+                  <div
+                    v-if="g.count > 1"
+                    class="text-muted"
+                  >
+                    → {{ formatDateTime(g.to) }}
+                  </div>
                 </td>
                 <td>
-                  <span :class="['badge', r.success ? 'bg-green-lt text-green' : 'bg-red-lt text-red']">
-                    {{ r.success ? 'OK' : 'KO' }}
+                  <span :class="['badge', g.success ? 'bg-green-lt text-green' : 'bg-red-lt text-red']">
+                    {{ g.success ? 'OK' : 'KO' }}
                   </span>
                 </td>
-                <td>{{ r.status_code ?? '—' }}</td>
-                <td>{{ r.latency_ms }} ms</td>
+                <td>{{ g.statusCode ?? '—' }}</td>
+                <td>
+                  <template v-if="g.minLatency === g.maxLatency">
+                    {{ g.minLatency }} ms
+                  </template>
+                  <template v-else>
+                    <span :title="`min ${g.minLatency} / avg ${g.avgLatency} / max ${g.maxLatency}`">
+                      {{ g.minLatency }}–{{ g.maxLatency }} ms
+                    </span>
+                  </template>
+                </td>
+                <td>
+                  <span class="badge bg-secondary-lt text-secondary">×{{ g.count }}</span>
+                </td>
                 <td class="text-secondary small">
-                  {{ r.error || '' }}
+                  {{ g.error || '' }}
                 </td>
               </tr>
               <tr v-if="!results.length">
                 <td
-                  colspan="5"
+                  colspan="6"
                   class="text-center text-secondary py-4"
                 >
                   Aucun résultat encore. La première vérification arrive sous {{ probe.interval_sec }}s.
@@ -231,6 +253,46 @@ const chartOptions = {
   },
   elements: { point: { radius: 0, hitRadius: 8 }, line: { tension: 0.3 } },
 }
+
+// Collapse consecutive results that share the same outcome (success +
+// status_code + error) into a single run so the table shows transitions and
+// failures clearly instead of hundreds of identical "OK 50ms" rows.
+const groupedResults = computed(() => {
+  if (!results.value.length) return []
+  const groups = []
+  // results.value is ordered newest-first; iterate as-is so the table reads
+  // most-recent at the top.
+  for (const r of results.value) {
+    const codeKey = r.status_code ?? 'null'
+    const sigKey = `${r.success ? 'ok' : 'ko'}|${codeKey}|${r.error || ''}`
+    const last = groups[groups.length - 1]
+    if (last && last.sigKey === sigKey) {
+      last.count += 1
+      last.from = r.checked_at // older bound moves backwards
+      if (r.latency_ms < last.minLatency) last.minLatency = r.latency_ms
+      if (r.latency_ms > last.maxLatency) last.maxLatency = r.latency_ms
+      last.latencySum += r.latency_ms
+      continue
+    }
+    groups.push({
+      key: r.id,
+      sigKey,
+      success: r.success,
+      statusCode: r.status_code,
+      error: r.error || '',
+      count: 1,
+      from: r.checked_at,
+      to: r.checked_at,
+      minLatency: r.latency_ms,
+      maxLatency: r.latency_ms,
+      latencySum: r.latency_ms,
+    })
+  }
+  for (const g of groups) {
+    g.avgLatency = Math.round(g.latencySum / g.count)
+  }
+  return groups
+})
 
 const chartData = computed(() => {
   if (!results.value.length) return null
