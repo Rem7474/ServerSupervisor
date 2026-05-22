@@ -79,6 +79,14 @@
                   >
                     Proxmox
                   </button>
+                  <button
+                    type="button"
+                    class="btn"
+                    :class="form.source_type === 'synthetic' ? 'btn-primary' : 'btn-outline-primary'"
+                    @click="setSourceType('synthetic')"
+                  >
+                    Synthétique
+                  </button>
                 </div>
               </div>
 
@@ -854,20 +862,27 @@ const metricCards = computed(() => {
     }))
   }
 
+  function matchesSource(metricName) {
+    const cat = getAlertMetricMeta(metricName).category
+    if (metricSource === 'proxmox') return cat === 'proxmox'
+    if (metricSource === 'synthetic') return cat === 'synthetic'
+    return cat === 'host'
+  }
+
   // Otherwise, use global capabilities (all hosts)
   const fromCapabilities = props.capabilities?.metrics
   if (Array.isArray(fromCapabilities) && fromCapabilities.length > 0) {
     return fromCapabilities
-      .filter((metric) => metricSource === 'proxmox' ? isProxmoxMetric(metric.metric) : !isProxmoxMetric(metric.metric))
+      .filter((metric) => matchesSource(metric.metric))
       .map((metric) => ({
-      value: metric.metric,
-      label: metric.label,
-      icon: metric.icon || getAlertMetricMeta(metric.metric).icon,
+        value: metric.metric,
+        label: metric.label,
+        icon: metric.icon || getAlertMetricMeta(metric.metric).icon,
       }))
   }
 
   return ALERT_METRIC_ORDER
-    .filter((metric) => metricSource === 'proxmox' ? isProxmoxMetric(metric) : !isProxmoxMetric(metric))
+    .filter(matchesSource)
     .map((metric) => ({ value: metric, label: getAlertMetricMeta(metric).label, icon: getAlertMetricMeta(metric).icon }))
 })
 
@@ -918,6 +933,8 @@ const canProceedStep = computed(() => {
     if (!hasBase) return false
     // "Tous les hôtes" is a valid selection for agent-based rules.
     if (form.value.source_type === 'agent') return true
+    // Synthetic rules are global by construction — no scope to validate.
+    if (form.value.source_type === 'synthetic') return true
 
     const scope = form.value.proxmox_scope || { scope_mode: 'global' }
     if (scope.scope_mode === 'connection') return !!scope.connection_id
@@ -1135,18 +1152,15 @@ function selectMetric(metric) {
 
 function setSourceType(sourceType) {
   form.value.source_type = sourceType
-  if (sourceType === 'proxmox') {
+  const currentCat = getAlertMetricMeta(form.value.metric).category
+  const wantedCat = sourceType === 'proxmox' ? 'proxmox' : sourceType === 'synthetic' ? 'synthetic' : 'host'
+
+  // Host filter only applies to agent rules.
+  if (sourceType !== 'agent') {
     form.value.host_id = null
-    if (!isProxmoxMetric(form.value.metric)) {
-      const first = metricCards.value[0]
-      if (first?.value) {
-        form.value.metric = first.value
-      }
-    }
-    return
   }
 
-  if (isProxmoxMetric(form.value.metric)) {
+  if (currentCat !== wantedCat) {
     const first = metricCards.value[0]
     if (first?.value) {
       form.value.metric = first.value

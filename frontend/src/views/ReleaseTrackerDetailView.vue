@@ -476,9 +476,12 @@
           <div class="card-body p-0">
             <div
               v-if="loadingSnippet"
-              class="p-3 text-center text-muted small"
+              class="p-3"
             >
-              Chargement...
+              <LoadingSkeleton
+                variant="list"
+                :lines="3"
+              />
             </div>
             <template v-else>
               <div
@@ -527,9 +530,12 @@
           <div class="card-body p-0">
             <div
               v-if="historyLoading"
-              class="p-3 text-center text-muted"
+              class="p-3"
             >
-              Chargement...
+              <LoadingSkeleton
+                variant="table"
+                :lines="4"
+              />
             </div>
             <div
               v-else-if="!versionHistory.length"
@@ -637,6 +643,7 @@ import { useAuthStore } from '../stores/auth'
 import api from '../api'
 import { formatDateTime } from '../utils/formatters'
 import RelativeTime from '../components/RelativeTime.vue'
+import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import WebhookExecutionList from '../components/webhooks/WebhookExecutionList.vue'
 import WebhookModal from '../components/webhooks/WebhookModal.vue'
 import CommandLogPanel from '../components/host/CommandLogPanel.vue'

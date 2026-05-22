@@ -5,6 +5,10 @@ function isProxmoxMetric(metric: string): boolean {
   return getAlertMetricMeta(metric).category === 'proxmox'
 }
 
+function isSyntheticMetric(metric: string): boolean {
+  return getAlertMetricMeta(metric).category === 'synthetic'
+}
+
 function isProxmoxGuestMetric(metric: string): boolean {
   return metric === 'proxmox_guest_cpu_percent' || metric === 'proxmox_guest_memory_percent'
 }
@@ -44,7 +48,7 @@ interface ProxmoxScope {
 interface AlertRuleFormData {
   name: string
   enabled: boolean
-  source_type: 'agent' | 'proxmox'
+  source_type: 'agent' | 'proxmox' | 'synthetic'
   host_id: string | null
   proxmox_scope: ProxmoxScope
   metric: string
@@ -60,7 +64,7 @@ interface AlertRuleFormData {
 interface AlertRuleInput {
   name?: string
   enabled?: boolean
-  source_type?: 'agent' | 'proxmox'
+  source_type?: 'agent' | 'proxmox' | 'synthetic'
   host_id?: string | null
   metric?: string
   proxmox_scope?: Partial<ProxmoxScope>
@@ -158,7 +162,9 @@ export function useAlertRuleForm(): AlertRuleFormApi {
     form.value = {
       name: rule.name || '',
       enabled: rule.enabled ?? true,
-      source_type: rule.source_type || (isProxmoxMetric(metric) ? 'proxmox' : 'agent'),
+      source_type:
+        rule.source_type ||
+        (isProxmoxMetric(metric) ? 'proxmox' : isSyntheticMetric(metric) ? 'synthetic' : 'agent'),
       host_id: rule.host_id ?? null,
       metric,
       proxmox_scope: {
@@ -221,6 +227,9 @@ export function useAlertRuleForm(): AlertRuleFormApi {
         form.value.proxmox_scope.guest_id = ''
         form.value.proxmox_scope.disk_id = ''
       }
+    } else if (isSyntheticMetric(form.value.metric)) {
+      form.value.source_type = 'synthetic'
+      form.value.host_id = null
     } else {
       form.value.source_type = 'agent'
     }

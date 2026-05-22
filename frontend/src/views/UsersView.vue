@@ -111,7 +111,19 @@
 
     <!-- Users List -->
     <div class="card">
-      <div class="table-responsive">
+      <div
+        v-if="loading && !users.length"
+        class="card-body"
+      >
+        <LoadingSkeleton
+          variant="table"
+          :lines="4"
+        />
+      </div>
+      <div
+        v-else
+        class="table-responsive"
+      >
         <table class="table table-vcenter card-table">
           <thead>
             <tr>
@@ -185,6 +197,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
+import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import apiClient from '../api'
 import dayjs from '../utils/dayjs'
 

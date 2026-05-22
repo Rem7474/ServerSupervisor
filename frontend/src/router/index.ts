@@ -141,6 +141,24 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true },
   },
   {
+    path: '/uptime',
+    name: 'Uptime',
+    component: () => import('../views/UptimeView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/uptime/probes/:id',
+    name: 'UptimeProbeDetail',
+    component: () => import('../views/UptimeProbeDetailView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/ssl',
+    name: 'SSLCertificates',
+    component: () => import('../views/SSLCertificatesView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
     path: '/proxmox/nodes/:id',
     name: 'ProxmoxNode',
     component: () => import('../views/ProxmoxNodeView.vue'),

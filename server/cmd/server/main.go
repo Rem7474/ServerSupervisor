@@ -98,6 +98,8 @@ func main() {
 	bg.Add(background.NewMetricsDownsampleJob(db))
 	bg.Add(background.NewMetricsRetentionJob(db, cfg))
 	bg.Add(background.NewWebLogsRetentionJob(db, cfg))
+	bg.Add(background.NewUptimeWorkerJob(db))
+	bg.Add(background.NewSSLWorkerJob(db))
 	bg.Start()
 	defer bg.Stop()
 

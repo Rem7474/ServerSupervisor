@@ -187,7 +187,7 @@ function getCardClass(status) {
     case 'FAILED': return 'bg-danger-lt border-danger'
     case 'UNKNOWN': return 'bg-warning-lt border-warning'
     case 'PASSED': return 'bg-success-lt border-success'
-    default: return 'bg-light'
+    default: return 'bg-secondary-lt border-secondary'
   }
 }
 </script>

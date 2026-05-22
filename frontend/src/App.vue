@@ -261,6 +261,55 @@
                     Réseau
                   </router-link>
                   <router-link
+                    to="/uptime"
+                    class="dropdown-item"
+                    role="menuitem"
+                    @click="secondaryMenuOpen = false"
+                  >
+                    <svg
+                      class="icon icon-sm me-2"
+                      width="16"
+                      height="16"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    ><path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M3 12h3l3-7 4 14 3-7h5"
+                    /></svg>
+                    Uptime
+                  </router-link>
+                  <router-link
+                    to="/ssl"
+                    class="dropdown-item"
+                    role="menuitem"
+                    @click="secondaryMenuOpen = false"
+                  >
+                    <svg
+                      class="icon icon-sm me-2"
+                      width="16"
+                      height="16"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    ><rect
+                      x="4"
+                      y="11"
+                      width="16"
+                      height="9"
+                      rx="2"
+                      stroke-width="2"
+                    /><path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M8 11V8a4 4 0 018 0v3"
+                    /></svg>
+                    Certificats SSL
+                  </router-link>
+                  <router-link
                     to="/settings"
                     class="dropdown-item"
                     role="menuitem"

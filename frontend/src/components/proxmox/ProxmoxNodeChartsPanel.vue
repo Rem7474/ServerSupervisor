@@ -78,6 +78,18 @@
 
 <script setup>
 import RRDChartCard from './RRDChartCard.vue'
+import { getChartPalette } from '../../utils/chartTheme'
+
+const palette = getChartPalette()
+const tooltipBase = {
+  enabled: true, mode: 'index', intersect: false,
+  backgroundColor: palette.tooltipBackground,
+  titleColor: palette.tooltipText,
+  bodyColor: palette.tooltipText,
+  borderColor: palette.tooltipBorder,
+  borderWidth: 1,
+  padding: 8,
+}
 
 defineProps({
   cpuChart: { type: Object, default: null },
@@ -115,15 +127,14 @@ const pctOptions = {
   plugins: {
     legend: { display: false },
     tooltip: {
-      enabled: true, mode: 'index', intersect: false,
-      backgroundColor: 'rgba(0,0,0,0.8)', titleColor: '#fff', bodyColor: '#fff',
-      borderColor: '#555', borderWidth: 1, padding: 8, displayColors: false,
+      ...tooltipBase,
+      displayColors: false,
       callbacks: { label: (ctx) => `${ctx.parsed.y != null ? ctx.parsed.y.toFixed(1) : '—'}%` },
     },
   },
   scales: {
-    x: { display: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280', maxTicksLimit: 8 } },
-    y: { display: true, min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280', callback: (v) => `${v}%` } },
+    x: { display: true, grid: { color: palette.grid }, ticks: { color: palette.tickText, maxTicksLimit: 8 } },
+    y: { display: true, min: 0, max: 100, grid: { color: palette.grid }, ticks: { color: palette.tickText, callback: (v) => `${v}%` } },
   },
   elements: { point: { radius: 0, hitRadius: 10, hoverRadius: 4 }, line: { tension: 0.3 } },
   interaction: { mode: 'nearest', axis: 'x', intersect: false },
@@ -148,17 +159,15 @@ const ramOptions = {
 const netOptions = {
   responsive: true, maintainAspectRatio: false,
   plugins: {
-    legend: { display: true, position: 'top', labels: { color: '#6b7280', boxWidth: 10, padding: 8 } },
+    legend: { display: true, position: 'top', labels: { color: palette.legendText, boxWidth: 10, padding: 8 } },
     tooltip: {
-      enabled: true, mode: 'index', intersect: false,
-      backgroundColor: 'rgba(0,0,0,0.8)', titleColor: '#fff', bodyColor: '#fff',
-      borderColor: '#555', borderWidth: 1, padding: 8,
+      ...tooltipBase,
       callbacks: { label: (ctx) => `${ctx.dataset.label}: ${formatBytesPerSec(ctx.parsed.y)}` },
     },
   },
   scales: {
-    x: { display: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280', maxTicksLimit: 8 } },
-    y: { display: true, min: 0, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280', callback: (v) => formatBytesPerSec(v) } },
+    x: { display: true, grid: { color: palette.grid }, ticks: { color: palette.tickText, maxTicksLimit: 8 } },
+    y: { display: true, min: 0, grid: { color: palette.grid }, ticks: { color: palette.tickText, callback: (v) => formatBytesPerSec(v) } },
   },
   elements: { point: { radius: 0, hitRadius: 10, hoverRadius: 4 }, line: { tension: 0.3 } },
   interaction: { mode: 'nearest', axis: 'x', intersect: false },
@@ -169,15 +178,13 @@ const tempOptions = {
   plugins: {
     legend: { display: false },
     tooltip: {
-      enabled: true, mode: 'index', intersect: false,
-      backgroundColor: 'rgba(0,0,0,0.8)', titleColor: '#fff', bodyColor: '#fff',
-      borderColor: '#555', borderWidth: 1, padding: 8,
+      ...tooltipBase,
       callbacks: { label: (ctx) => `${ctx.parsed.y != null ? ctx.parsed.y.toFixed(1) : '—'}°C` },
     },
   },
   scales: {
-    x: { display: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280', maxTicksLimit: 8 } },
-    y: { display: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280', callback: (v) => `${v}°C` } },
+    x: { display: true, grid: { color: palette.grid }, ticks: { color: palette.tickText, maxTicksLimit: 8 } },
+    y: { display: true, grid: { color: palette.grid }, ticks: { color: palette.tickText, callback: (v) => `${v}°C` } },
   },
   elements: { point: { radius: 0, hitRadius: 10, hoverRadius: 4 }, line: { tension: 0.3 } },
   interaction: { mode: 'nearest', axis: 'x', intersect: false },
@@ -188,15 +195,13 @@ const fanOptions = {
   plugins: {
     legend: { display: false },
     tooltip: {
-      enabled: true, mode: 'index', intersect: false,
-      backgroundColor: 'rgba(0,0,0,0.8)', titleColor: '#fff', bodyColor: '#fff',
-      borderColor: '#555', borderWidth: 1, padding: 8,
+      ...tooltipBase,
       callbacks: { label: (ctx) => `${ctx.parsed.y != null ? Math.round(ctx.parsed.y) : '—'} RPM` },
     },
   },
   scales: {
-    x: { display: true, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280', maxTicksLimit: 8 } },
-    y: { display: true, min: 0, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280', callback: (v) => `${v} RPM` } },
+    x: { display: true, grid: { color: palette.grid }, ticks: { color: palette.tickText, maxTicksLimit: 8 } },
+    y: { display: true, min: 0, grid: { color: palette.grid }, ticks: { color: palette.tickText, callback: (v) => `${v} RPM` } },
   },
   elements: { point: { radius: 0, hitRadius: 10, hoverRadius: 4 }, line: { tension: 0.3 } },
   interaction: { mode: 'nearest', axis: 'x', intersect: false },

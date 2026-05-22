@@ -161,6 +161,9 @@ import { computed, ref, shallowRef, defineAsyncComponent, onMounted, watch, toRe
 import apiClient from '../../api'
 import MetricsSourceBadge from '../common/MetricsSourceBadge.vue'
 import dayjs from '../../utils/dayjs'
+import { getChartPalette } from '../../utils/chartTheme'
+
+const palette = getChartPalette()
 
 const Line = defineAsyncComponent(async () => {
   const [{ Line }, { Chart: ChartJS, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip }] = await Promise.all([
@@ -223,8 +226,11 @@ const chartOptions = computed(() => ({
     legend: { display: false },
     tooltip: {
       enabled: true, mode: 'index', intersect: false,
-      backgroundColor: 'rgba(0,0,0,0.8)', titleColor: '#fff', bodyColor: '#fff',
-      borderColor: '#555', borderWidth: 1, padding: 10, displayColors: false,
+      backgroundColor: palette.tooltipBackground,
+      titleColor: palette.tooltipText,
+      bodyColor: palette.tooltipText,
+      borderColor: palette.tooltipBorder,
+      borderWidth: 1, padding: 10, displayColors: false,
       callbacks: {
         title: (items) => formatChartTime(items[0]?.parsed?.x),
         label: (ctx) => `${ctx.parsed.y.toFixed(1)}%`,
@@ -235,16 +241,16 @@ const chartOptions = computed(() => ({
     x: {
       type: 'linear',
       display: true,
-      grid: { color: 'rgba(255,255,255,0.05)' },
+      grid: { color: palette.grid },
       min: getMinHistoryTimestamp(metricsHistory.value),
       max: getMaxHistoryTimestamp(metricsHistory.value),
       ticks: {
-        color: '#6b7280',
+        color: palette.tickText,
         maxTicksLimit: 10,
         callback: (value) => formatChartTime(Number(value)),
       },
     },
-    y: { display: true, min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#6b7280' } },
+    y: { display: true, min: 0, max: 100, grid: { color: palette.grid }, ticks: { color: palette.tickText } },
   },
   elements: { point: { radius: 0, hitRadius: 10, hoverRadius: 5 }, line: { tension: 0.3 } },
   interaction: { mode: 'nearest', axis: 'x', intersect: false },

@@ -397,6 +397,13 @@ func (h *AlertRulesHandler) GetAgentAlertRuleCapabilities(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"metrics": allAgentAlertMetrics()})
 }
 
+// GetSyntheticAlertRuleCapabilities returns metrics exposed by the synthetic
+// monitoring workers (uptime probes and SSL certificates). These are global
+// metrics — they don't target a specific host.
+func (h *AlertRulesHandler) GetSyntheticAlertRuleCapabilities(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{"metrics": allSyntheticAlertMetrics()})
+}
+
 func (h *AlertRulesHandler) GetProxmoxAlertRuleCapabilities(c *gin.Context) {
 	modes, connections, nodes, storages, guests, disks := h.loadProxmoxScopeOptions()
 	response := alertSplitCapabilitiesResponse{AgentMetrics: []alertMetricCapability{}, ProxmoxMetrics: allProxmoxAlertMetrics()}
@@ -438,6 +445,13 @@ func allProxmoxAlertMetrics() []alertMetricCapability {
 		{Metric: "proxmox_auth_failures_recent", Label: "Echecs auth Proxmox (logs)", Unit: "", Icon: "\U0001f512", BadgeClass: "bg-cyan-lt text-cyan", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: false},
 		{Metric: "proxmox_disk_failed_count", Label: "Disques physiques en échec", Unit: "", Icon: "\U0001f4a5", BadgeClass: "bg-cyan-lt text-cyan", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: false},
 		{Metric: "proxmox_disk_min_wearout_percent", Label: "Usure disque min", Unit: "%", Icon: "\U0001f6e0", BadgeClass: "bg-cyan-lt text-cyan", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: false},
+	}
+}
+
+func allSyntheticAlertMetrics() []alertMetricCapability {
+	return []alertMetricCapability{
+		{Metric: "uptime_down_count", Label: "Sondes uptime down", Unit: "", Icon: "\U0001f6a8", BadgeClass: "bg-red-lt text-red", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: false},
+		{Metric: "ssl_min_days_remaining", Label: "Cert SSL — jours restants", Unit: "j", Icon: "\U0001f510", BadgeClass: "bg-yellow-lt text-yellow", SupportsThreshold: true, SupportsDuration: false, SupportsHostFilter: false},
 	}
 }
 
