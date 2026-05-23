@@ -136,47 +136,6 @@ func (db *DB) GetAptPendingAll(ctx context.Context) map[string]int {
 	return result
 }
 
-// ========== Tracked Repos ==========
-
-func (db *DB) CreateTrackedRepo(ctx context.Context, repo *models.TrackedRepo) error {
-	return db.conn.QueryRowContext(ctx, 
-		`INSERT INTO tracked_repos (owner, repo, display_name, docker_image)
-		 VALUES ($1,$2,$3,$4) RETURNING id, created_at`,
-		repo.Owner, repo.Repo, repo.DisplayName, repo.DockerImage,
-	).Scan(&repo.ID, &repo.CreatedAt)
-}
-
-func (db *DB) GetTrackedRepos(ctx context.Context) ([]models.TrackedRepo, error) {
-	rows, err := db.conn.QueryContext(ctx, 
-		`SELECT id, owner, repo, display_name, latest_version, COALESCE(latest_date, NOW()),
-		 release_url, docker_image, checked_at, created_at
-		 FROM tracked_repos ORDER BY display_name`,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-
-	var repos []models.TrackedRepo
-	for rows.Next() {
-		var r models.TrackedRepo
-		if err := rows.Scan(&r.ID, &r.Owner, &r.Repo, &r.DisplayName, &r.LatestVersion,
-			&r.LatestDate, &r.ReleaseURL, &r.DockerImage, &r.CheckedAt, &r.CreatedAt); err != nil {
-			continue
-		}
-		repos = append(repos, r)
-	}
-	return repos, nil
-}
-
-func (db *DB) UpdateTrackedRepo(ctx context.Context, id int64, version, url string, date time.Time) error {
-	_, err := db.conn.ExecContext(ctx, 
-		`UPDATE tracked_repos SET latest_version = $1, release_url = $2, latest_date = $3, checked_at = NOW() WHERE id = $4`,
-		version, url, date, id,
-	)
-	return err
-}
-
 // ========== Unattended-Upgrades ==========
 
 func (db *DB) UpsertUUStatus(ctx context.Context, hostID string, s models.UnattendedUpgradesStatus) error {
@@ -303,7 +262,3 @@ func (db *DB) GetUURuns(ctx context.Context, hostID string, limit int) ([]models
 	return runs, nil
 }
 
-func (db *DB) DeleteTrackedRepo(ctx context.Context, id int64) error {
-	_, err := db.conn.ExecContext(ctx, `DELETE FROM tracked_repos WHERE id = $1`, id)
-	return err
-}

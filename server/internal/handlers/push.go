@@ -23,10 +23,10 @@ func NewPushHandler(db *database.DB, cfg *config.Config) *PushHandler {
 
 // ensureVapidKeys returns the stored VAPID key pair, generating and persisting a new one on first use.
 // Keys are stored as URL-safe base64 in the settings table under "vapid_private_key" / "vapid_public_key".
-func (h *PushHandler) ensureVapidKeys() (privateKey, publicKey string, err error) {
-	privateKey, err = h.db.GetSetting(context.Background(), "vapid_private_key")
+func (h *PushHandler) ensureVapidKeys(ctx context.Context) (privateKey, publicKey string, err error) {
+	privateKey, err = h.db.GetSetting(ctx, "vapid_private_key")
 	if err == nil && privateKey != "" {
-		publicKey, err = h.db.GetSetting(context.Background(), "vapid_public_key")
+		publicKey, err = h.db.GetSetting(ctx, "vapid_public_key")
 		if err == nil && publicKey != "" {
 			return privateKey, publicKey, nil
 		}
@@ -35,8 +35,8 @@ func (h *PushHandler) ensureVapidKeys() (privateKey, publicKey string, err error
 	if err != nil {
 		return "", "", err
 	}
-	_ = h.db.SetSetting(context.Background(), "vapid_private_key", privateKey)
-	_ = h.db.SetSetting(context.Background(), "vapid_public_key", publicKey)
+	_ = h.db.SetSetting(ctx, "vapid_private_key", privateKey)
+	_ = h.db.SetSetting(ctx, "vapid_public_key", publicKey)
 	log.Println("Push: generated new VAPID key pair")
 	return privateKey, publicKey, nil
 }
@@ -44,7 +44,7 @@ func (h *PushHandler) ensureVapidKeys() (privateKey, publicKey string, err error
 // GetVapidPublicKey returns the VAPID public key that the frontend needs to subscribe.
 // GET /api/v1/push/vapid-public-key
 func (h *PushHandler) GetVapidPublicKey(c *gin.Context) {
-	_, publicKey, err := h.ensureVapidKeys()
+	_, publicKey, err := h.ensureVapidKeys(c.Request.Context())
 	if err != nil {
 		log.Printf("Push: failed to get/generate VAPID keys: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get VAPID key"})
@@ -73,7 +73,7 @@ func (h *PushHandler) Subscribe(c *gin.Context) {
 	if len(userAgent) > 500 {
 		userAgent = userAgent[:500]
 	}
-	if err := h.db.SavePushSubscription(context.Background(), username, req.Endpoint, req.Keys.P256DH, req.Keys.Auth, userAgent); err != nil {
+	if err := h.db.SavePushSubscription(c.Request.Context(), username, req.Endpoint, req.Keys.P256DH, req.Keys.Auth, userAgent); err != nil {
 		log.Printf("Push: failed to save subscription for %s: %v", username, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save subscription"})
 		return
@@ -92,7 +92,7 @@ func (h *PushHandler) Unsubscribe(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
 		return
 	}
-	if err := h.db.DeletePushSubscription(context.Background(), req.Endpoint); err != nil {
+	if err := h.db.DeletePushSubscription(c.Request.Context(), req.Endpoint); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to remove subscription"})
 		return
 	}

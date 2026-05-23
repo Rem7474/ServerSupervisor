@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"database/sql"
 	"log"
 	"net/http"
@@ -34,7 +33,7 @@ var validTaskModules = map[string]bool{
 
 // ListAllScheduledTasks returns all scheduled tasks across all hosts (global view).
 func (h *ScheduledTaskHandler) ListAllScheduledTasks(c *gin.Context) {
-	tasks, err := h.db.GetGlobalScheduledTasks(context.Background())
+	tasks, err := h.db.GetGlobalScheduledTasks(c.Request.Context())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -48,7 +47,7 @@ func (h *ScheduledTaskHandler) ListAllScheduledTasks(c *gin.Context) {
 // ListScheduledTasks returns all scheduled tasks for a host.
 func (h *ScheduledTaskHandler) ListScheduledTasks(c *gin.Context) {
 	hostID := c.Param("id")
-	tasks, err := h.db.GetScheduledTasks(context.Background(), hostID)
+	tasks, err := h.db.GetScheduledTasks(c.Request.Context(), hostID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -98,7 +97,7 @@ func (h *ScheduledTaskHandler) CreateScheduledTask(c *gin.Context) {
 		CreatedBy:      username,
 	}
 
-	created, err := h.db.CreateScheduledTask(context.Background(), task)
+	created, err := h.db.CreateScheduledTask(c.Request.Context(), task)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -110,7 +109,7 @@ func (h *ScheduledTaskHandler) CreateScheduledTask(c *gin.Context) {
 			return
 		}
 		if next := h.scheduler.NextRun(created.ID); !next.IsZero() {
-			_ = h.db.SetScheduledTaskNextRun(context.Background(), created.ID, next)
+			_ = h.db.SetScheduledTaskNextRun(c.Request.Context(), created.ID, next)
 			created.NextRunAt = &next
 		}
 	}
@@ -141,7 +140,7 @@ func (h *ScheduledTaskHandler) UpdateScheduledTask(c *gin.Context) {
 		req.Payload = "{}"
 	}
 
-	existing, err := h.db.GetScheduledTask(context.Background(), taskID)
+	existing, err := h.db.GetScheduledTask(c.Request.Context(), taskID)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			c.JSON(http.StatusNotFound, gin.H{"error": "task not found"})
@@ -163,7 +162,7 @@ func (h *ScheduledTaskHandler) UpdateScheduledTask(c *gin.Context) {
 		Enabled:        req.Enabled,
 	}
 
-	if err := h.db.UpdateScheduledTask(context.Background(), taskID, updated); err != nil {
+	if err := h.db.UpdateScheduledTask(c.Request.Context(), taskID, updated); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -175,11 +174,11 @@ func (h *ScheduledTaskHandler) UpdateScheduledTask(c *gin.Context) {
 
 	if req.Enabled {
 		if next := h.scheduler.NextRun(taskID); !next.IsZero() {
-			_ = h.db.SetScheduledTaskNextRun(context.Background(), taskID, next)
+			_ = h.db.SetScheduledTaskNextRun(c.Request.Context(), taskID, next)
 		}
 	}
 
-	if t, err := h.db.GetScheduledTask(context.Background(), taskID); err == nil {
+	if t, err := h.db.GetScheduledTask(c.Request.Context(), taskID); err == nil {
 		c.JSON(http.StatusOK, t)
 	} else {
 		c.JSON(http.StatusOK, updated)
@@ -189,7 +188,7 @@ func (h *ScheduledTaskHandler) UpdateScheduledTask(c *gin.Context) {
 // DeleteScheduledTask removes a scheduled task.
 func (h *ScheduledTaskHandler) DeleteScheduledTask(c *gin.Context) {
 	taskID := c.Param("id")
-	if _, err := h.db.GetScheduledTask(context.Background(), taskID); err != nil {
+	if _, err := h.db.GetScheduledTask(c.Request.Context(), taskID); err != nil {
 		if err == sql.ErrNoRows {
 			c.JSON(http.StatusNotFound, gin.H{"error": "task not found"})
 		} else {
@@ -198,7 +197,7 @@ func (h *ScheduledTaskHandler) DeleteScheduledTask(c *gin.Context) {
 		return
 	}
 	h.scheduler.Remove(taskID)
-	if err := h.db.DeleteScheduledTask(context.Background(), taskID); err != nil {
+	if err := h.db.DeleteScheduledTask(c.Request.Context(), taskID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -209,7 +208,7 @@ func (h *ScheduledTaskHandler) DeleteScheduledTask(c *gin.Context) {
 // as reported by the agent from its local tasks.yaml.
 func (h *ScheduledTaskHandler) GetCustomTasks(c *gin.Context) {
 	hostID := c.Param("id")
-	tasksJSON, err := h.db.GetHostCustomTasks(context.Background(), hostID)
+	tasksJSON, err := h.db.GetHostCustomTasks(c.Request.Context(), hostID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -220,7 +219,7 @@ func (h *ScheduledTaskHandler) GetCustomTasks(c *gin.Context) {
 // GetTasksConfigYAML returns the raw tasks.yaml content cached from the agent's last report.
 func (h *ScheduledTaskHandler) GetTasksConfigYAML(c *gin.Context) {
 	hostID := c.Param("id")
-	yaml, err := h.db.GetHostTasksConfigYAML(context.Background(), hostID)
+	yaml, err := h.db.GetHostTasksConfigYAML(c.Request.Context(), hostID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -237,7 +236,7 @@ func (h *ScheduledTaskHandler) GetScheduledTaskExecutions(c *gin.Context) {
 			limit = n
 		}
 	}
-	cmds, err := h.db.GetScheduledTaskExecutions(context.Background(), taskID, limit)
+	cmds, err := h.db.GetScheduledTaskExecutions(c.Request.Context(), taskID, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -256,7 +255,7 @@ func (h *ScheduledTaskHandler) RunScheduledTask(c *gin.Context) {
 		username = "unknown"
 	}
 
-	task, err := h.db.GetScheduledTask(context.Background(), taskID)
+	task, err := h.db.GetScheduledTask(c.Request.Context(), taskID)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			c.JSON(http.StatusNotFound, gin.H{"error": "task not found"})
@@ -286,10 +285,10 @@ func (h *ScheduledTaskHandler) RunScheduledTask(c *gin.Context) {
 		return
 	}
 
-	if err := h.db.LinkCommandToScheduledTask(context.Background(), result.Command.ID, task.ID); err != nil {
+	if err := h.db.LinkCommandToScheduledTask(c.Request.Context(), result.Command.ID, task.ID); err != nil {
 		log.Printf("Failed to link command %s to scheduled task %s: %v", result.Command.ID, task.ID, err)
 	}
-	_ = h.db.UpdateScheduledTaskStatus(context.Background(), task.ID, "pending")
+	_ = h.db.UpdateScheduledTaskStatus(c.Request.Context(), task.ID, "pending")
 
 	c.JSON(http.StatusOK, gin.H{"command_id": result.Command.ID, "status": "pending"})
 }

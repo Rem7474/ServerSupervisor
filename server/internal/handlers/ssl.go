@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"database/sql"
 	"errors"
 	"net/http"
@@ -126,8 +125,8 @@ func (h *SSLHandler) CheckNow(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	updated := synthetic.CheckCertificate(context.Background(), *cert)
-	if err := h.db.UpdateSSLCertificateCheckResult(context.Background(), updated); err != nil {
+	updated := synthetic.CheckCertificate(c.Request.Context(), *cert)
+	if err := h.db.UpdateSSLCertificateCheckResult(c.Request.Context(), updated); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

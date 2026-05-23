@@ -1,7 +1,6 @@
 package handlers
 
-import (	"context"
-
+import (
 	"fmt"
 	"log"
 	"net/http"
@@ -18,7 +17,7 @@ import (	"context"
 // Requires Sys.Modify privilege on the token.
 // Returns the task UPID so the frontend can poll the task list for completion.
 func (h *ProxmoxHandler) RefreshNodeApt(c *gin.Context) {
-	node, err := h.db.GetProxmoxNode(context.Background(), c.Param("id"))
+	node, err := h.db.GetProxmoxNode(c.Request.Context(), c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -28,7 +27,7 @@ func (h *ProxmoxHandler) RefreshNodeApt(c *gin.Context) {
 		return
 	}
 
-	secret, conn, err := h.resolveSecret(node.ConnectionID)
+	secret, conn, err := h.resolveSecret(c.Request.Context(), node.ConnectionID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -52,7 +51,7 @@ func (h *ProxmoxHandler) RefreshNodeApt(c *gin.Context) {
 // VM interfaces are fetched via the QEMU guest agent (errors are silently skipped).
 // LXC interfaces are fetched natively (always available).
 func (h *ProxmoxHandler) GetNodeGuestNetworks(c *gin.Context) {
-	node, err := h.db.GetProxmoxNode(context.Background(), c.Param("id"))
+	node, err := h.db.GetProxmoxNode(c.Request.Context(), c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -62,13 +61,13 @@ func (h *ProxmoxHandler) GetNodeGuestNetworks(c *gin.Context) {
 		return
 	}
 
-	secret, conn, err := h.resolveSecret(node.ConnectionID)
+	secret, conn, err := h.resolveSecret(c.Request.Context(), node.ConnectionID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	guests, err := h.db.ListProxmoxGuestsByNode(context.Background(), node.ConnectionID, node.NodeName)
+	guests, err := h.db.ListProxmoxGuestsByNode(c.Request.Context(), node.ConnectionID, node.NodeName)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -115,7 +114,7 @@ func (h *ProxmoxHandler) GetNodeGuestNetworks(c *gin.Context) {
 // URL params: :id = DB node UUID, :vmid = PVE VMID (integer).
 // Body JSON: { target: "pve2", online: true, guest_type: "vm" }
 func (h *ProxmoxHandler) MigrateGuest(c *gin.Context) {
-	node, err := h.db.GetProxmoxNode(context.Background(), c.Param("id"))
+	node, err := h.db.GetProxmoxNode(c.Request.Context(), c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -145,7 +144,7 @@ func (h *ProxmoxHandler) MigrateGuest(c *gin.Context) {
 		return
 	}
 
-	secret, conn, err := h.resolveSecret(node.ConnectionID)
+	secret, conn, err := h.resolveSecret(c.Request.Context(), node.ConnectionID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -179,7 +178,7 @@ func (h *ProxmoxHandler) NodeServiceAction(c *gin.Context) {
 		return
 	}
 
-	node, err := h.db.GetProxmoxNode(context.Background(), c.Param("id"))
+	node, err := h.db.GetProxmoxNode(c.Request.Context(), c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -191,7 +190,7 @@ func (h *ProxmoxHandler) NodeServiceAction(c *gin.Context) {
 
 	service := c.Param("service")
 
-	secret, conn, err := h.resolveSecret(node.ConnectionID)
+	secret, conn, err := h.resolveSecret(c.Request.Context(), node.ConnectionID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

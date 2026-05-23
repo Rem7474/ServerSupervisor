@@ -15,7 +15,6 @@ import (
 	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/dispatch"
 	"github.com/serversupervisor/server/internal/handlers"
-	"github.com/serversupervisor/server/internal/releasetracker"
 	"github.com/serversupervisor/server/internal/scheduler"
 	"github.com/serversupervisor/server/internal/ws"
 )
@@ -81,11 +80,6 @@ func main() {
 	sched := scheduler.New(db, dispatcher)
 	sched.Start()
 	defer sched.Stop()
-
-	// Start GitHub release tracker (TrackedRepo / Docker version compare)
-	tracker := releasetracker.NewTracker(db, cfg)
-	tracker.Start()
-	defer tracker.Stop()
 
 	// Notification hub — shared between alert engine (push on fire) and WS handler
 	notifHub := ws.NewNotificationHub()

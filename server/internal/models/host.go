@@ -44,19 +44,6 @@ type HostUpdate struct {
 	Tags         *[]string `json:"tags"`
 }
 
-// HostBotDetection stores per-host cached bot detection JSON in DB reads.
-type HostBotDetection struct {
-	HostID           string `json:"host_id"`
-	HostName         string `json:"host_name"`
-	BotDetectionJSON string `json:"bot_detection"`
-}
-
-type HostNPMAnalytics struct {
-	HostID           string `json:"host_id"`
-	HostName         string `json:"host_name"`
-	NPMAnalyticsJSON string `json:"npm_analytics"`
-}
-
 // ========== System Metrics ==========
 
 type SystemMetrics struct {

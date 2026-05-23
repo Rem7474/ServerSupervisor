@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"database/sql"
 	"errors"
 	"net/http"
@@ -185,8 +184,8 @@ func (h *UptimeHandler) CheckNow(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	result := synthetic.RunOnce(context.Background(), *probe)
-	if err := h.db.RecordUptimeProbeResult(context.Background(), result); err != nil {
+	result := synthetic.RunOnce(c.Request.Context(), *probe)
+	if err := h.db.RecordUptimeProbeResult(c.Request.Context(), result); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

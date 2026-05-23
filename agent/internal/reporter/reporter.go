@@ -45,7 +45,6 @@ func (r *Reporter) Send(ctx context.Context, s *sender.Sender, cmdQueue chan<- [
 		collectedMetrics *collector.SystemMetrics
 		dockerData       interface{}
 		dockerNetworks   interface{}
-		containerEnvs    interface{}
 		composeProjects  interface{}
 		diskMetrics      []collector.DiskMetrics
 		diskHealth       []collector.DiskHealth
@@ -94,17 +93,6 @@ func (r *Reporter) Send(ctx context.Context, s *sender.Sender, cmdQueue chan<- [
 			if networks, err := collector.CollectDockerNetworks(); err == nil {
 				dockerNetworks = networks
 			}
-
-			envs := make([]collector.ContainerEnv, 0, len(containers))
-			for _, c := range containers {
-				if len(c.EnvVars) > 0 {
-					envs = append(envs, collector.ContainerEnv{
-						ContainerName: c.Name,
-						EnvVars:       c.EnvVars,
-					})
-				}
-			}
-			containerEnvs = envs
 
 			if projects, err := collector.CollectComposeProjects(); err == nil {
 				composeProjects = projects
@@ -209,7 +197,6 @@ func (r *Reporter) Send(ctx context.Context, s *sender.Sender, cmdQueue chan<- [
 		UnattendedUpgrades: uuData,
 		WebLogs:            webLogs,
 		DockerNetworks:     dockerNetworks,
-		ContainerEnvs:      containerEnvs,
 		ComposeProjects:    composeProjects,
 		DiskMetrics:        diskMetrics,
 		DiskHealth:         diskHealth,

@@ -496,7 +496,7 @@ func (h *ReleaseTrackerHandler) HandleCommandCompletion(commandID, status string
 // ========== HTTP handlers ==========
 
 func (h *ReleaseTrackerHandler) List(c *gin.Context) {
-	trackers, err := h.db.ListReleaseTrackers(context.Background())
+	trackers, err := h.db.ListReleaseTrackers(c.Request.Context())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list trackers"})
 		return
@@ -573,7 +573,7 @@ func (h *ReleaseTrackerHandler) Create(c *gin.Context) {
 		req.NotifyChannels = []string{}
 	}
 
-	created, err := h.db.CreateReleaseTracker(context.Background(), req)
+	created, err := h.db.CreateReleaseTracker(c.Request.Context(), req)
 	if err != nil {
 		log.Printf("CreateReleaseTracker: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create tracker"})
@@ -584,7 +584,7 @@ func (h *ReleaseTrackerHandler) Create(c *gin.Context) {
 
 func (h *ReleaseTrackerHandler) Get(c *gin.Context) {
 	id := c.Param("id")
-	t, err := h.db.GetReleaseTrackerByID(context.Background(), id)
+	t, err := h.db.GetReleaseTrackerByID(c.Request.Context(), id)
 	if err == sql.ErrNoRows {
 		log.Printf("Release tracker history: tracker not found (id=%s)", id)
 		c.JSON(http.StatusNotFound, gin.H{"error": "tracker not found"})
@@ -595,7 +595,7 @@ func (h *ReleaseTrackerHandler) Get(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get tracker"})
 		return
 	}
-	execs, _ := h.db.ListReleaseTrackerExecutions(context.Background(), id, 20)
+	execs, _ := h.db.ListReleaseTrackerExecutions(c.Request.Context(), id, 20)
 	c.JSON(http.StatusOK, gin.H{"tracker": t, "executions": execs})
 }
 
@@ -654,7 +654,7 @@ func (h *ReleaseTrackerHandler) Update(c *gin.Context) {
 		}
 	}
 
-	if err := h.db.UpdateReleaseTracker(context.Background(), id, req); err != nil {
+	if err := h.db.UpdateReleaseTracker(c.Request.Context(), id, req); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update tracker"})
 		return
 	}
@@ -668,7 +668,7 @@ func (h *ReleaseTrackerHandler) Delete(c *gin.Context) {
 		return
 	}
 	id := c.Param("id")
-	if err := h.db.DeleteReleaseTracker(context.Background(), id); err != nil {
+	if err := h.db.DeleteReleaseTracker(c.Request.Context(), id); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete tracker"})
 		return
 	}
@@ -683,7 +683,7 @@ func (h *ReleaseTrackerHandler) TriggerCheck(c *gin.Context) {
 	}
 	id := c.Param("id")
 
-	t, err := h.db.GetReleaseTrackerByID(context.Background(), id)
+	t, err := h.db.GetReleaseTrackerByID(c.Request.Context(), id)
 	if err == sql.ErrNoRows {
 		c.JSON(http.StatusNotFound, gin.H{"error": "tracker not found"})
 		return
@@ -706,7 +706,7 @@ func (h *ReleaseTrackerHandler) Run(c *gin.Context) {
 	}
 	id := c.Param("id")
 
-	t, err := h.db.GetReleaseTrackerByID(context.Background(), id)
+	t, err := h.db.GetReleaseTrackerByID(c.Request.Context(), id)
 	if err == sql.ErrNoRows {
 		c.JSON(http.StatusNotFound, gin.H{"error": "tracker not found"})
 		return
@@ -742,7 +742,7 @@ func (h *ReleaseTrackerHandler) Run(c *gin.Context) {
 
 func (h *ReleaseTrackerHandler) GetExecutions(c *gin.Context) {
 	id := c.Param("id")
-	execs, err := h.db.ListReleaseTrackerExecutions(context.Background(), id, 50)
+	execs, err := h.db.ListReleaseTrackerExecutions(c.Request.Context(), id, 50)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list executions"})
 		return
@@ -766,7 +766,7 @@ func (h *ReleaseTrackerHandler) GetVersionHistory(c *gin.Context) {
 		}
 	}
 
-	t, err := h.db.GetReleaseTrackerByID(context.Background(), id)
+	t, err := h.db.GetReleaseTrackerByID(c.Request.Context(), id)
 	if err == sql.ErrNoRows {
 		c.JSON(http.StatusNotFound, gin.H{"error": "tracker not found"})
 		return
@@ -778,7 +778,7 @@ func (h *ReleaseTrackerHandler) GetVersionHistory(c *gin.Context) {
 
 	history := make([]models.ReleaseVersionHistoryItem, 0)
 	if t.TrackerType == "docker" {
-		history, err = h.db.ListTrackerTagDigests(context.Background(), id, limit)
+		history, err = h.db.ListTrackerTagDigests(c.Request.Context(), id, limit)
 		if err != nil {
 			log.Printf("Release tracker history: docker history load error (tracker=%s id=%s image=%s tag=%s limit=%d): %v", t.Name, t.ID, t.DockerImage, t.DockerTag, limit, err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load docker version history"})

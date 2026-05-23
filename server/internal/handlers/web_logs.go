@@ -1,7 +1,6 @@
 package handlers
 
-import (	"context"
-
+import (
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -12,8 +11,21 @@ import (	"context"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/dispatch"
 )
+
+// WebLogsHandler serves the /security/web-logs/* endpoints. Previously these
+// methods were attached to AuthHandler for historical reasons; they only
+// need a DB and a dispatcher.
+type WebLogsHandler struct {
+	db         *database.DB
+	dispatcher *dispatch.Dispatcher
+}
+
+func NewWebLogsHandler(db *database.DB, dispatcher *dispatch.Dispatcher) *WebLogsHandler {
+	return &WebLogsHandler{db: db, dispatcher: dispatcher}
+}
 
 type ipCountryInfo struct {
 	Country     string
@@ -27,7 +39,7 @@ var (
 )
 
 // BlockCrowdSecIP creates a command for the agent to ban an IP via CrowdSec.
-func (h *AuthHandler) BlockCrowdSecIP(c *gin.Context) {
+func (h *WebLogsHandler) BlockCrowdSecIP(c *gin.Context) {
 	if c.GetString("role") != "admin" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
 		return
@@ -86,7 +98,7 @@ func (h *AuthHandler) BlockCrowdSecIP(c *gin.Context) {
 }
 
 // UnblockCrowdSecIP creates a command for the agent to unban an IP via CrowdSec.
-func (h *AuthHandler) UnblockCrowdSecIP(c *gin.Context) {
+func (h *WebLogsHandler) UnblockCrowdSecIP(c *gin.Context) {
 	if c.GetString("role") != "admin" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
 		return
@@ -135,7 +147,7 @@ func (h *AuthHandler) UnblockCrowdSecIP(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"command_id": result.Command.ID, "status": "pending"})
 }
 
-func (h *AuthHandler) GetWebLogsSummary(c *gin.Context) {
+func (h *WebLogsHandler) GetWebLogsSummary(c *gin.Context) {
 	if c.GetString("role") != "admin" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
 		return
@@ -159,14 +171,14 @@ func (h *AuthHandler) GetWebLogsSummary(c *gin.Context) {
 	}
 
 	since := time.Now().Add(-period)
-	summary, err := h.db.GetWebLogsSummary(context.Background(), since, hostID, source)
+	summary, err := h.db.GetWebLogsSummary(c.Request.Context(), since, hostID, source)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to aggregate web logs"})
 		return
 	}
 
 	if traffic, ok := summary["traffic"].(map[string]any); ok {
-		topIPs, err := h.db.GetWebLogsTopClientIPs(context.Background(), since, hostID, source, 120)
+		topIPs, err := h.db.GetWebLogsTopClientIPs(c.Request.Context(), since, hostID, source, 120)
 		if err == nil {
 			traffic["top_client_ips"] = topIPs
 
@@ -196,12 +208,12 @@ func (h *AuthHandler) GetWebLogsSummary(c *gin.Context) {
 	now := time.Now().UTC()
 	currentSince := now.Add(-period)
 	previousSince := currentSince.Add(-period)
-	currentKPI, err := h.db.GetWebLogsKPIWindow(context.Background(), currentSince, now, hostID, source)
+	currentKPI, err := h.db.GetWebLogsKPIWindow(c.Request.Context(), currentSince, now, hostID, source)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to compute KPI comparison"})
 		return
 	}
-	previousKPI, err := h.db.GetWebLogsKPIWindow(context.Background(), previousSince, currentSince, hostID, source)
+	previousKPI, err := h.db.GetWebLogsKPIWindow(c.Request.Context(), previousSince, currentSince, hostID, source)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to compute KPI comparison"})
 		return
@@ -253,7 +265,7 @@ func (h *AuthHandler) GetWebLogsSummary(c *gin.Context) {
 	})
 }
 
-func (h *AuthHandler) GetWebLogsIPTimeline(c *gin.Context) {
+func (h *WebLogsHandler) GetWebLogsIPTimeline(c *gin.Context) {
 	if c.GetString("role") != "admin" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
 		return
@@ -281,7 +293,7 @@ func (h *AuthHandler) GetWebLogsIPTimeline(c *gin.Context) {
 	}
 
 	since := time.Now().Add(-period)
-	rows, err := h.db.GetIPTimeline(context.Background(), ip, since, hostID, limit)
+	rows, err := h.db.GetIPTimeline(c.Request.Context(), ip, since, hostID, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load IP timeline"})
 		return
@@ -297,7 +309,7 @@ func (h *AuthHandler) GetWebLogsIPTimeline(c *gin.Context) {
 	})
 }
 
-func (h *AuthHandler) GetWebLogsDomainDetails(c *gin.Context) {
+func (h *WebLogsHandler) GetWebLogsDomainDetails(c *gin.Context) {
 	if c.GetString("role") != "admin" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
 		return
@@ -326,7 +338,7 @@ func (h *AuthHandler) GetWebLogsDomainDetails(c *gin.Context) {
 	}
 
 	since := time.Now().Add(-period)
-	data, err := h.db.GetDomainDetails(context.Background(), domain, since, hostID, source, limit)
+	data, err := h.db.GetDomainDetails(c.Request.Context(), domain, since, hostID, source, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load domain details"})
 		return
@@ -342,7 +354,7 @@ func (h *AuthHandler) GetWebLogsDomainDetails(c *gin.Context) {
 	})
 }
 
-func (h *AuthHandler) GetWebLogsTimeseries(c *gin.Context) {
+func (h *WebLogsHandler) GetWebLogsTimeseries(c *gin.Context) {
 	if c.GetString("role") != "admin" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
 		return
@@ -375,7 +387,7 @@ func (h *AuthHandler) GetWebLogsTimeseries(c *gin.Context) {
 	}
 
 	since := time.Now().Add(-period)
-	points, err := h.db.GetWebLogsTimeseries(context.Background(), since, hostID, source, bucket)
+	points, err := h.db.GetWebLogsTimeseries(c.Request.Context(), since, hostID, source, bucket)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load web logs timeseries"})
 		return
@@ -391,7 +403,7 @@ func (h *AuthHandler) GetWebLogsTimeseries(c *gin.Context) {
 	})
 }
 
-func (h *AuthHandler) GetWebLogsLive(c *gin.Context) {
+func (h *WebLogsHandler) GetWebLogsLive(c *gin.Context) {
 	if c.GetString("role") != "admin" {
 		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
 		return
@@ -415,7 +427,7 @@ func (h *AuthHandler) GetWebLogsLive(c *gin.Context) {
 		}
 	}
 
-	rows, err := h.db.GetWebLogsLive(context.Background(), hostID, source, limit)
+	rows, err := h.db.GetWebLogsLive(c.Request.Context(), hostID, source, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load web logs live feed"})
 		return
