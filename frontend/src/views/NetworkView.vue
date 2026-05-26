@@ -228,10 +228,8 @@
 
       <!-- Card body -->
       <div class="network-card-body">
-
         <!-- ── GRAPH MODE ── -->
         <template v-if="viewMode === 'graph'">
-
           <!-- Configuration tab -->
           <NetworkTopologyConfig
             v-if="networkTab === 'config'"

@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -77,7 +76,7 @@ func (h *AptHandler) SendCommand(c *gin.Context) {
 
 // GetCVESummary returns aggregated CVE severity counts across all hosts.
 func (h *AptHandler) GetCVESummary(c *gin.Context) {
-	summary, err := h.db.GetAptCVESummary(context.Background())
+	summary, err := h.db.GetAptCVESummary(c.Request.Context())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -88,7 +87,7 @@ func (h *AptHandler) GetCVESummary(c *gin.Context) {
 // GetAptStatus returns APT status for a host
 func (h *AptHandler) GetAptStatus(c *gin.Context) {
 	hostID := c.Param("id")
-	status, err := h.db.GetAptStatus(context.Background(), hostID)
+	status, err := h.db.GetAptStatus(c.Request.Context(), hostID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "apt status not found"})
 		return
@@ -101,7 +100,7 @@ func (h *AptHandler) GetAptStatus(c *gin.Context) {
 // GetUUStatus returns the unattended-upgrades status for a host.
 func (h *AptHandler) GetUUStatus(c *gin.Context) {
 	hostID := c.Param("id")
-	s, err := h.db.GetUUStatus(context.Background(), hostID)
+	s, err := h.db.GetUUStatus(c.Request.Context(), hostID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -118,7 +117,7 @@ func (h *AptHandler) GetUURuns(c *gin.Context) {
 			limit = n
 		}
 	}
-	runs, err := h.db.GetUURuns(context.Background(), hostID, limit)
+	runs, err := h.db.GetUURuns(c.Request.Context(), hostID, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

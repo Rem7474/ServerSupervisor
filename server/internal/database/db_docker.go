@@ -188,30 +188,3 @@ func (db *DB) GetAllDockerNetworks(ctx context.Context) ([]models.DockerNetwork,
 	return networks, nil
 }
 
-// ========== Container Envs ==========
-// Env vars are stored in docker_containers.env_vars (no separate table).
-
-func (db *DB) GetAllContainerEnvs(ctx context.Context) ([]models.ContainerEnv, error) {
-	rows, err := db.conn.QueryContext(ctx, 
-		`SELECT name AS container_name, COALESCE(env_vars::text, '{}')
-		 FROM docker_containers
-		 WHERE env_vars IS NOT NULL AND env_vars != '{}'::jsonb
-		 ORDER BY host_id, name`,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-
-	var envs []models.ContainerEnv
-	for rows.Next() {
-		var env models.ContainerEnv
-		var envVarsJSON string
-		if err := rows.Scan(&env.ContainerName, &envVarsJSON); err != nil {
-			continue
-		}
-		_ = json.Unmarshal([]byte(envVarsJSON), &env.EnvVars)
-		envs = append(envs, env)
-	}
-	return envs, nil
-}

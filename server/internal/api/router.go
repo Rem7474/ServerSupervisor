@@ -53,6 +53,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	hostPermH := handlers.NewHostPermissionHandler(db)
 	uptimeH := handlers.NewUptimeHandler(db, cfg)
 	sslH := handlers.NewSSLHandler(db, cfg)
+	webLogsH := handlers.NewWebLogsHandler(db, dispatcher)
 
 	registerPublicRoutes(r, authH, db)
 	registerWSRoutes(r, wsH, cfg)
@@ -62,6 +63,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	v1.Use(JWTMiddleware(cfg))
 	v1.Use(cookies.CSRFMiddleware())
 	registerAuthRoutes(v1, authH)
+	registerWebLogsRoutes(v1, webLogsH)
 	registerHostRoutes(v1, hostH, agentH, db)
 	registerDockerRoutes(v1, dockerH, systemH, networkH, agentH)
 	registerAPTRoutes(v1, aptH)
@@ -135,6 +137,10 @@ func registerAuthRoutes(g *gin.RouterGroup, h *handlers.AuthHandler) {
 	g.POST("/auth/mfa/verify", h.VerifyMFA)
 	g.POST("/auth/mfa/disable", h.DisableMFA)
 	g.GET("/auth/security", h.GetSecuritySummary)
+	g.DELETE("/auth/blocked-ips/:ip", h.UnblockIP)
+}
+
+func registerWebLogsRoutes(g *gin.RouterGroup, h *handlers.WebLogsHandler) {
 	g.GET("/security/web-logs", h.GetWebLogsSummary)
 	g.GET("/security/web-logs/timeseries", h.GetWebLogsTimeseries)
 	g.GET("/security/web-logs/live", h.GetWebLogsLive)
@@ -142,7 +148,6 @@ func registerAuthRoutes(g *gin.RouterGroup, h *handlers.AuthHandler) {
 	g.POST("/security/web-logs/ip/:ip/decisions", h.BlockCrowdSecIP)
 	g.DELETE("/security/web-logs/ip/:ip/decisions", h.UnblockCrowdSecIP)
 	g.GET("/security/web-logs/domain/:domain", h.GetWebLogsDomainDetails)
-	g.DELETE("/auth/blocked-ips/:ip", h.UnblockIP)
 }
 
 func registerHostRoutes(g *gin.RouterGroup, h *handlers.HostHandler, agentH *handlers.AgentHandler, db *database.DB) {

@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"log"
 	"net/http"
 	"strconv"
@@ -14,7 +13,7 @@ import (
 
 // ListNodes returns all nodes, optionally filtered by connection_id query param.
 func (h *ProxmoxHandler) ListNodes(c *gin.Context) {
-	_ = h.db.BackfillProxmoxNodeSensorSources(context.Background())
+	_ = h.db.BackfillProxmoxNodeSensorSources(c.Request.Context())
 
 	connID := c.Query("connection_id")
 	var (
@@ -22,9 +21,9 @@ func (h *ProxmoxHandler) ListNodes(c *gin.Context) {
 		err   error
 	)
 	if connID != "" {
-		nodes, err = h.db.ListProxmoxNodesByConnection(context.Background(), connID)
+		nodes, err = h.db.ListProxmoxNodesByConnection(c.Request.Context(), connID)
 	} else {
-		nodes, err = h.db.ListProxmoxNodes(context.Background())
+		nodes, err = h.db.ListProxmoxNodes(c.Request.Context())
 	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -35,9 +34,9 @@ func (h *ProxmoxHandler) ListNodes(c *gin.Context) {
 
 // GetNode returns a single node with its guests and storages.
 func (h *ProxmoxHandler) GetNode(c *gin.Context) {
-	_ = h.db.BackfillProxmoxNodeSensorSources(context.Background())
+	_ = h.db.BackfillProxmoxNodeSensorSources(c.Request.Context())
 
-	node, err := h.db.GetProxmoxNode(context.Background(), c.Param("id"))
+	node, err := h.db.GetProxmoxNode(c.Request.Context(), c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -65,7 +64,7 @@ func (h *ProxmoxHandler) GetNodeMetricsSummary(c *gin.Context) {
 		bucketMinutes = 5
 	}
 
-	summary, err := h.db.GetProxmoxNodeMetricsSummary(context.Background(), hours, bucketMinutes)
+	summary, err := h.db.GetProxmoxNodeMetricsSummary(c.Request.Context(), hours, bucketMinutes)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -78,7 +77,7 @@ func (h *ProxmoxHandler) GetNodeMetricsSummary(c *gin.Context) {
 
 // GetNodeCPUTemperatureHistory returns the source host's CPU temperature history for this Proxmox node.
 func (h *ProxmoxHandler) GetNodeCPUTemperatureHistory(c *gin.Context) {
-	_ = h.db.BackfillProxmoxNodeSensorSources(context.Background())
+	_ = h.db.BackfillProxmoxNodeSensorSources(c.Request.Context())
 
 	hours, _ := strconv.Atoi(c.DefaultQuery("hours", "24"))
 	if hours <= 0 {
@@ -88,7 +87,7 @@ func (h *ProxmoxHandler) GetNodeCPUTemperatureHistory(c *gin.Context) {
 		hours = 8760
 	}
 
-	history, err := h.db.GetProxmoxNodeCPUTemperatureHistory(context.Background(), c.Param("id"), hours)
+	history, err := h.db.GetProxmoxNodeCPUTemperatureHistory(c.Request.Context(), c.Param("id"), hours)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -101,7 +100,7 @@ func (h *ProxmoxHandler) GetNodeCPUTemperatureHistory(c *gin.Context) {
 
 // GetNodeFanRPMHistory returns the source host's fan RPM history for this Proxmox node.
 func (h *ProxmoxHandler) GetNodeFanRPMHistory(c *gin.Context) {
-	_ = h.db.BackfillProxmoxNodeSensorSources(context.Background())
+	_ = h.db.BackfillProxmoxNodeSensorSources(c.Request.Context())
 
 	hours, _ := strconv.Atoi(c.DefaultQuery("hours", "24"))
 	if hours <= 0 {
@@ -111,7 +110,7 @@ func (h *ProxmoxHandler) GetNodeFanRPMHistory(c *gin.Context) {
 		hours = 8760
 	}
 
-	history, err := h.db.GetProxmoxNodeFanRPMHistory(context.Background(), c.Param("id"), hours)
+	history, err := h.db.GetProxmoxNodeFanRPMHistory(c.Request.Context(), c.Param("id"), hours)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -125,7 +124,7 @@ func (h *ProxmoxHandler) GetNodeFanRPMHistory(c *gin.Context) {
 // ListNodeSensorSourceCandidates returns candidate hosts for node sensors (CPU temp + fan RPM).
 // Candidates are hosts already linked (confirmed) to guests on the same node.
 func (h *ProxmoxHandler) ListNodeSensorSourceCandidates(c *gin.Context) {
-	node, err := h.db.GetProxmoxNode(context.Background(), c.Param("id"))
+	node, err := h.db.GetProxmoxNode(c.Request.Context(), c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -135,7 +134,7 @@ func (h *ProxmoxHandler) ListNodeSensorSourceCandidates(c *gin.Context) {
 		return
 	}
 
-	hosts, err := h.db.ListProxmoxNodeCPUTempSourceCandidates(context.Background(), node.ConnectionID, node.NodeName)
+	hosts, err := h.db.ListProxmoxNodeCPUTempSourceCandidates(c.Request.Context(), node.ConnectionID, node.NodeName)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -149,7 +148,7 @@ func (h *ProxmoxHandler) ListNodeSensorSourceCandidates(c *gin.Context) {
 // UpdateNodeSensorSource sets or clears a shared source host for node sensors (CPU temp + fan RPM).
 func (h *ProxmoxHandler) UpdateNodeSensorSource(c *gin.Context) {
 	nodeID := c.Param("id")
-	node, err := h.db.GetProxmoxNode(context.Background(), nodeID)
+	node, err := h.db.GetProxmoxNode(c.Request.Context(), nodeID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -168,19 +167,19 @@ func (h *ProxmoxHandler) UpdateNodeSensorSource(c *gin.Context) {
 	}
 
 	if req.HostID != "" {
-		host, err := h.db.GetHost(context.Background(), req.HostID)
+		host, err := h.db.GetHost(c.Request.Context(), req.HostID)
 		if err != nil || host == nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid host_id"})
 			return
 		}
 	}
 
-	if err := h.db.SetProxmoxNodeSensorSource(context.Background(), nodeID, req.HostID); err != nil {
+	if err := h.db.SetProxmoxNodeSensorSource(c.Request.Context(), nodeID, req.HostID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	updated, err := h.db.GetProxmoxNode(context.Background(), nodeID)
+	updated, err := h.db.GetProxmoxNode(c.Request.Context(), nodeID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -192,7 +191,7 @@ func (h *ProxmoxHandler) UpdateNodeSensorSource(c *gin.Context) {
 
 // ListNodeDisks returns physical disks for a node identified by its UUID.
 func (h *ProxmoxHandler) ListNodeDisks(c *gin.Context) {
-	node, err := h.db.GetProxmoxNode(context.Background(), c.Param("id"))
+	node, err := h.db.GetProxmoxNode(c.Request.Context(), c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -201,7 +200,7 @@ func (h *ProxmoxHandler) ListNodeDisks(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "node not found"})
 		return
 	}
-	disks, err := h.db.ListProxmoxDisksByNode(context.Background(), node.ConnectionID, node.NodeName)
+	disks, err := h.db.ListProxmoxDisksByNode(c.Request.Context(), node.ConnectionID, node.NodeName)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -213,7 +212,7 @@ func (h *ProxmoxHandler) ListNodeDisks(c *gin.Context) {
 
 // ListNodeServices returns all systemd services on a Proxmox node. Requires Sys.Audit.
 func (h *ProxmoxHandler) ListNodeServices(c *gin.Context) {
-	node, err := h.db.GetProxmoxNode(context.Background(), c.Param("id"))
+	node, err := h.db.GetProxmoxNode(c.Request.Context(), c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -223,7 +222,7 @@ func (h *ProxmoxHandler) ListNodeServices(c *gin.Context) {
 		return
 	}
 
-	secret, conn, err := h.resolveSecret(node.ConnectionID)
+	secret, conn, err := h.resolveSecret(c.Request.Context(), node.ConnectionID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

@@ -1,3 +1,7 @@
+// Package releasetracker provides pure version-comparison helpers used by the
+// release_trackers feature (handlers/release_trackers.go) and dashboard
+// version-comparison snapshots. The legacy GitHub-polling Tracker was removed
+// in favour of the configurable release_trackers table.
 package releasetracker
 
 import "strings"

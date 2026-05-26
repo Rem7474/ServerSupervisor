@@ -510,7 +510,10 @@
                       :disabled="downloadingLogs"
                       @click="downloadTestLogs"
                     >
-                      <span v-if="downloadingLogs" class="spinner-border spinner-border-sm me-1"></span>
+                      <span
+                        v-if="downloadingLogs"
+                        class="spinner-border spinner-border-sm me-1"
+                      />
                       Télécharger logs
                     </button>
                     <span class="text-secondary small">{{ formatDate(testResults.evaluated_at) }}</span>

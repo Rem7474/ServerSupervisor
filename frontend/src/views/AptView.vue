@@ -179,7 +179,10 @@
               :key="`sk-${n}`"
               class="col-12"
             >
-              <LoadingSkeleton variant="card" :lines="4" />
+              <LoadingSkeleton
+                variant="card"
+                :lines="4"
+              />
             </div>
           </template>
           <div

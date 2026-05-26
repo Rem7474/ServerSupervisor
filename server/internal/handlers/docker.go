@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"path/filepath"
@@ -42,7 +41,7 @@ func NewDockerHandler(db *database.DB, cfg *config.Config, dispatcher *dispatch.
 // ListContainers returns Docker containers for a specific host
 func (h *DockerHandler) ListContainers(c *gin.Context) {
 	hostID := c.Param("id")
-	containers, err := h.db.GetDockerContainers(context.Background(), hostID)
+	containers, err := h.db.GetDockerContainers(c.Request.Context(), hostID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch containers"})
 		return
@@ -65,7 +64,7 @@ func (h *DockerHandler) ListAllContainers(c *gin.Context) {
 		offset = 0
 	}
 
-	containers, err := h.db.GetAllDockerContainers(context.Background())
+	containers, err := h.db.GetAllDockerContainers(c.Request.Context())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch containers"})
 		return
@@ -86,58 +85,6 @@ func (h *DockerHandler) ListAllContainers(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"containers": containers, "total": total, "limit": limit, "offset": offset})
-}
-
-// TrackedRepos management
-
-func (h *DockerHandler) ListTrackedRepos(c *gin.Context) {
-	repos, err := h.db.GetTrackedRepos(context.Background())
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch repos"})
-		return
-	}
-	if repos == nil {
-		repos = []models.TrackedRepo{}
-	}
-	c.JSON(http.StatusOK, repos)
-}
-
-func (h *DockerHandler) AddTrackedRepo(c *gin.Context) {
-	var req models.TrackedRepoCreate
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	repo := &models.TrackedRepo{
-		Owner:       req.Owner,
-		Repo:        req.Repo,
-		DisplayName: req.DisplayName,
-		DockerImage: req.DockerImage,
-	}
-	if repo.DisplayName == "" {
-		repo.DisplayName = req.Owner + "/" + req.Repo
-	}
-
-	if err := h.db.CreateTrackedRepo(context.Background(), repo); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create tracked repo"})
-		return
-	}
-	c.JSON(http.StatusCreated, repo)
-}
-
-func (h *DockerHandler) DeleteTrackedRepo(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
-		return
-	}
-	if err := h.db.DeleteTrackedRepo(context.Background(), id); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete repo"})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"message": "repo deleted"})
 }
 
 // SendDockerCommand creates a pending docker command for an agent to execute.
@@ -190,7 +137,7 @@ func (h *DockerHandler) SendDockerCommand(c *gin.Context) {
 
 // ListComposeProjects returns all Docker Compose projects across all hosts.
 func (h *DockerHandler) ListComposeProjects(c *gin.Context) {
-	projects, err := h.db.GetAllComposeProjects(context.Background())
+	projects, err := h.db.GetAllComposeProjects(c.Request.Context())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch compose projects"})
 		return
@@ -204,7 +151,7 @@ func (h *DockerHandler) ListComposeProjects(c *gin.Context) {
 // ListHostComposeProjects returns Docker Compose projects for a specific host.
 func (h *DockerHandler) ListHostComposeProjects(c *gin.Context) {
 	hostID := c.Param("id")
-	projects, err := h.db.GetComposeProjectsByHost(context.Background(), hostID)
+	projects, err := h.db.GetComposeProjectsByHost(c.Request.Context(), hostID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch compose projects"})
 		return

@@ -43,7 +43,7 @@ func NewGitWebhookHandler(db *database.DB, cfg *config.Config, dispatcher *dispa
 // ========== CRUD (authenticated, admin only) ==========
 
 func (h *GitWebhookHandler) ListWebhooks(c *gin.Context) {
-	webhooks, err := h.db.ListGitWebhooks(context.Background())
+	webhooks, err := h.db.ListGitWebhooks(c.Request.Context())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list webhooks"})
 		return
@@ -89,7 +89,7 @@ func (h *GitWebhookHandler) CreateWebhook(c *gin.Context) {
 		req.NotifyChannels = []string{}
 	}
 
-	created, err := h.db.CreateGitWebhook(context.Background(), req)
+	created, err := h.db.CreateGitWebhook(c.Request.Context(), req)
 	if err != nil {
 		log.Printf("CreateWebhook: db error: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create webhook"})
@@ -100,7 +100,7 @@ func (h *GitWebhookHandler) CreateWebhook(c *gin.Context) {
 
 func (h *GitWebhookHandler) GetWebhook(c *gin.Context) {
 	id := c.Param("id")
-	wh, err := h.db.GetGitWebhookByID(context.Background(), id)
+	wh, err := h.db.GetGitWebhookByID(c.Request.Context(), id)
 	if err == sql.ErrNoRows {
 		c.JSON(http.StatusNotFound, gin.H{"error": "webhook not found"})
 		return
@@ -109,7 +109,7 @@ func (h *GitWebhookHandler) GetWebhook(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get webhook"})
 		return
 	}
-	execs, _ := h.db.ListWebhookExecutions(context.Background(), id, 20)
+	execs, _ := h.db.ListWebhookExecutions(c.Request.Context(), id, 20)
 	c.JSON(http.StatusOK, gin.H{"webhook": wh, "executions": execs})
 }
 
@@ -139,7 +139,7 @@ func (h *GitWebhookHandler) UpdateWebhook(c *gin.Context) {
 		return
 	}
 
-	if err := h.db.UpdateGitWebhook(context.Background(), id, req); err != nil {
+	if err := h.db.UpdateGitWebhook(c.Request.Context(), id, req); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update webhook"})
 		return
 	}
@@ -153,7 +153,7 @@ func (h *GitWebhookHandler) DeleteWebhook(c *gin.Context) {
 		return
 	}
 	id := c.Param("id")
-	if err := h.db.DeleteGitWebhook(context.Background(), id); err != nil {
+	if err := h.db.DeleteGitWebhook(c.Request.Context(), id); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete webhook"})
 		return
 	}
@@ -167,7 +167,7 @@ func (h *GitWebhookHandler) RegenerateSecret(c *gin.Context) {
 		return
 	}
 	id := c.Param("id")
-	secret, err := h.db.RegenerateWebhookSecret(context.Background(), id)
+	secret, err := h.db.RegenerateWebhookSecret(c.Request.Context(), id)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to regenerate secret"})
 		return
@@ -183,7 +183,7 @@ func (h *GitWebhookHandler) GetWebhookExecutions(c *gin.Context) {
 			limit = v
 		}
 	}
-	execs, err := h.db.ListWebhookExecutions(context.Background(), id, limit)
+	execs, err := h.db.ListWebhookExecutions(c.Request.Context(), id, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list executions"})
 		return
@@ -208,7 +208,7 @@ func (h *GitWebhookHandler) ReceiveWebhook(c *gin.Context) {
 		return
 	}
 
-	wh, err := h.db.GetGitWebhookForReceive(context.Background(), id)
+	wh, err := h.db.GetGitWebhookForReceive(c.Request.Context(), id)
 	if err == sql.ErrNoRows || (err == nil && !wh.Enabled) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "webhook not found"})
 		return
@@ -269,7 +269,7 @@ func (h *GitWebhookHandler) ReceiveWebhook(c *gin.Context) {
 	}
 
 	// Check for already-running execution (skip to avoid concurrent conflicts)
-	running, _ := h.db.GetRunningExecutionForWebhook(context.Background(), id)
+	running, _ := h.db.GetRunningExecutionForWebhook(c.Request.Context(), id)
 	if running {
 		exec := models.GitWebhookExecution{
 			WebhookID:     id,
@@ -281,10 +281,10 @@ func (h *GitWebhookHandler) ReceiveWebhook(c *gin.Context) {
 			Pusher:        parsed.Pusher,
 			Status:        "skipped",
 		}
-		created, _ := h.db.CreateWebhookExecution(context.Background(), exec)
+		created, _ := h.db.CreateWebhookExecution(c.Request.Context(), exec)
 		now := time.Now()
 		if created != nil {
-			_ = h.db.UpdateWebhookExecutionStatus(context.Background(), created.ID, "skipped", &now)
+			_ = h.db.UpdateWebhookExecutionStatus(c.Request.Context(), created.ID, "skipped", &now)
 		}
 		c.JSON(http.StatusOK, gin.H{"status": "skipped", "reason": "already_running"})
 		return
@@ -301,7 +301,7 @@ func (h *GitWebhookHandler) ReceiveWebhook(c *gin.Context) {
 		Pusher:        parsed.Pusher,
 		Status:        "pending",
 	}
-	createdExec, err := h.db.CreateWebhookExecution(context.Background(), exec)
+	createdExec, err := h.db.CreateWebhookExecution(c.Request.Context(), exec)
 	if err != nil {
 		log.Printf("Webhook %s: failed to create execution record: %v", id, err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create execution"})
@@ -340,14 +340,14 @@ func (h *GitWebhookHandler) ReceiveWebhook(c *gin.Context) {
 	})
 	if err != nil {
 		log.Printf("Webhook %s: failed to create remote command: %v", id, err)
-		_ = h.db.UpdateWebhookExecutionStatus(context.Background(), createdExec.ID, "failed", ptrNow())
+		_ = h.db.UpdateWebhookExecutionStatus(c.Request.Context(), createdExec.ID, "failed", ptrNow())
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to dispatch command"})
 		return
 	}
 
 	// Link execution to command
-	_ = h.db.UpdateWebhookExecutionCommandID(context.Background(), createdExec.ID, result.Command.ID)
-	_ = h.db.UpdateGitWebhookLastTriggered(context.Background(), id)
+	_ = h.db.UpdateWebhookExecutionCommandID(c.Request.Context(), createdExec.ID, result.Command.ID)
+	_ = h.db.UpdateGitWebhookLastTriggered(c.Request.Context(), id)
 
 	log.Printf("Webhook %s: dispatched command %s → host %s task %s (repo=%s branch=%s)",
 		id, result.Command.ID, wh.HostID, wh.CustomTaskID, parsed.RepoName, parsed.Branch)

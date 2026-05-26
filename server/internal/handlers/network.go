@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"net/http"
 	"strconv"
 	"strings"
@@ -116,7 +115,7 @@ func parsePortNumber(raw string) int {
 
 // GetTopologyConfig returns persisted network configuration
 func (h *NetworkHandler) GetTopologyConfig(c *gin.Context) {
-	cfg, err := h.db.GetNetworkTopologyConfig(context.Background())
+	cfg, err := h.db.GetNetworkTopologyConfig(c.Request.Context())
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -132,7 +131,7 @@ func (h *NetworkHandler) SaveTopologyConfig(c *gin.Context) {
 		return
 	}
 
-	if err := h.db.SaveNetworkTopologyConfig(context.Background(), &cfg); err != nil {
+	if err := h.db.SaveNetworkTopologyConfig(c.Request.Context(), &cfg); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -148,7 +147,7 @@ func (h *NetworkHandler) GetTopologySnapshot(c *gin.Context) {
 		return
 	}
 
-	config, _ := h.db.GetNetworkTopologyConfig(context.Background())
+	config, _ := h.db.GetNetworkTopologyConfig(c.Request.Context())
 
 	snapshot := &models.TopologySnapshot{
 		Hosts:      baseSnapshot.Hosts,

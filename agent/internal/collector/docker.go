@@ -364,12 +364,6 @@ type DockerNetwork struct {
 	ContainerIDs []string `json:"container_ids"`
 }
 
-// ContainerEnv represents environment variables of a container (filtered for non-sensitive data).
-type ContainerEnv struct {
-	ContainerName string            `json:"container_name"`
-	EnvVars       map[string]string `json:"env_vars"`
-}
-
 // CollectDockerNetworks retrieves Docker networks and their connected containers via the Docker API.
 func CollectDockerNetworks() ([]DockerNetwork, error) {
 	client, err := newDockerClient()
@@ -404,38 +398,6 @@ func CollectDockerNetworks() ([]DockerNetwork, error) {
 			n.ContainerIDs = append(n.ContainerIDs, ep.Name)
 		}
 		result = append(result, n)
-	}
-	return result, nil
-}
-
-// CollectContainerEnvVars retrieves environment variables from containers via the Docker API
-// (sensitive values are filtered out).
-func CollectContainerEnvVars(containerNames []string) ([]ContainerEnv, error) {
-	client, err := newDockerClient()
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to Docker: %w", err)
-	}
-
-	var result []ContainerEnv
-	for _, name := range containerNames {
-		container, err := client.InspectContainerWithOptions(docker.InspectContainerOptions{ID: name})
-		if err != nil {
-			continue
-		}
-
-		envMap := make(map[string]string)
-		for _, envLine := range container.Config.Env {
-			if idx := strings.Index(envLine, "="); idx > 0 {
-				k := envLine[:idx]
-				v := envLine[idx+1:]
-				if !security.IsEnvKeySensitive(k) {
-					envMap[k] = v
-				}
-			}
-		}
-		if len(envMap) > 0 {
-			result = append(result, ContainerEnv{ContainerName: name, EnvVars: envMap})
-		}
 	}
 	return result, nil
 }

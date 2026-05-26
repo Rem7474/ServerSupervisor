@@ -1,7 +1,6 @@
 package handlers
 
-import (	"context"
-
+import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -12,7 +11,7 @@ import (	"context"
 
 // ListLinks returns all guest-host links, optionally filtered by ?status=suggested|confirmed|ignored.
 func (h *ProxmoxHandler) ListLinks(c *gin.Context) {
-	links, err := h.db.ListProxmoxGuestLinks(context.Background(), c.Query("status"))
+	links, err := h.db.ListProxmoxGuestLinks(c.Request.Context(), c.Query("status"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -33,7 +32,7 @@ func (h *ProxmoxHandler) CreateLink(c *gin.Context) {
 	if req.MetricsSource == "" {
 		req.MetricsSource = "auto"
 	}
-	link, err := h.db.UpsertProxmoxGuestLink(context.Background(), req.GuestID, req.HostID, req.Status, req.MetricsSource)
+	link, err := h.db.UpsertProxmoxGuestLink(c.Request.Context(), req.GuestID, req.HostID, req.Status, req.MetricsSource)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -43,7 +42,7 @@ func (h *ProxmoxHandler) CreateLink(c *gin.Context) {
 
 // GetLink returns a single link by its ID.
 func (h *ProxmoxHandler) GetLink(c *gin.Context) {
-	link, err := h.db.GetProxmoxGuestLink(context.Background(), c.Param("id"))
+	link, err := h.db.GetProxmoxGuestLink(c.Request.Context(), c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -58,7 +57,7 @@ func (h *ProxmoxHandler) GetLink(c *gin.Context) {
 // UpdateLink updates status and/or metrics_source for a link.
 func (h *ProxmoxHandler) UpdateLink(c *gin.Context) {
 	id := c.Param("id")
-	existing, err := h.db.GetProxmoxGuestLink(context.Background(), id)
+	existing, err := h.db.GetProxmoxGuestLink(c.Request.Context(), id)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -85,7 +84,7 @@ func (h *ProxmoxHandler) UpdateLink(c *gin.Context) {
 		return
 	}
 
-	link, err := h.db.UpdateProxmoxGuestLink(context.Background(), id, req.Status, req.MetricsSource)
+	link, err := h.db.UpdateProxmoxGuestLink(c.Request.Context(), id, req.Status, req.MetricsSource)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -96,7 +95,7 @@ func (h *ProxmoxHandler) UpdateLink(c *gin.Context) {
 // DeleteLink removes a guest-host link.
 func (h *ProxmoxHandler) DeleteLink(c *gin.Context) {
 	id := c.Param("id")
-	existing, err := h.db.GetProxmoxGuestLink(context.Background(), id)
+	existing, err := h.db.GetProxmoxGuestLink(c.Request.Context(), id)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -105,7 +104,7 @@ func (h *ProxmoxHandler) DeleteLink(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "link not found"})
 		return
 	}
-	if err := h.db.DeleteProxmoxGuestLink(context.Background(), id); err != nil {
+	if err := h.db.DeleteProxmoxGuestLink(c.Request.Context(), id); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -115,7 +114,7 @@ func (h *ProxmoxHandler) DeleteLink(c *gin.Context) {
 // GetLinkByGuest returns the link for a specific Proxmox guest, or null when none exists.
 // Returns 200 in both cases to avoid spurious 404s in the browser console.
 func (h *ProxmoxHandler) GetLinkByGuest(c *gin.Context) {
-	link, err := h.db.GetProxmoxGuestLinkByGuest(context.Background(), c.Param("id"))
+	link, err := h.db.GetProxmoxGuestLinkByGuest(c.Request.Context(), c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -126,7 +125,7 @@ func (h *ProxmoxHandler) GetLinkByGuest(c *gin.Context) {
 // GetLinkByHost returns the confirmed/suggested Proxmox link for a host, or null when none exists.
 // Returns 200 in both cases to avoid spurious 404s in the browser console.
 func (h *ProxmoxHandler) GetLinkByHost(c *gin.Context) {
-	link, err := h.db.GetProxmoxGuestLinkByHost(context.Background(), c.Param("id"))
+	link, err := h.db.GetProxmoxGuestLinkByHost(c.Request.Context(), c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -138,7 +137,7 @@ func (h *ProxmoxHandler) GetLinkByHost(c *gin.Context) {
 // ordered by name similarity. Used for the manual-link dropdown.
 func (h *ProxmoxHandler) ListLinkCandidates(c *gin.Context) {
 	hostID := c.Param("id")
-	candidates, err := h.db.ListProxmoxLinkCandidates(context.Background(), hostID)
+	candidates, err := h.db.ListProxmoxLinkCandidates(c.Request.Context(), hostID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

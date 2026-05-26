@@ -47,28 +47,6 @@ type ComposeProject struct {
 	UpdatedAt  time.Time `json:"updated_at" db:"updated_at"`
 }
 
-// ========== GitHub Release Tracking ==========
-
-type TrackedRepo struct {
-	ID            int64     `json:"id" db:"id"`
-	Owner         string    `json:"owner" db:"owner"`
-	Repo          string    `json:"repo" db:"repo"`
-	DisplayName   string    `json:"display_name" db:"display_name"`
-	LatestVersion string    `json:"latest_version" db:"latest_version"`
-	LatestDate    time.Time `json:"latest_date" db:"latest_date"`
-	ReleaseURL    string    `json:"release_url" db:"release_url"`
-	DockerImage   string    `json:"docker_image" db:"docker_image"` // associated docker image name for comparison
-	CheckedAt     time.Time `json:"checked_at" db:"checked_at"`
-	CreatedAt     time.Time `json:"created_at" db:"created_at"`
-}
-
-type TrackedRepoCreate struct {
-	Owner       string `json:"owner" binding:"required"`
-	Repo        string `json:"repo" binding:"required"`
-	DisplayName string `json:"display_name"`
-	DockerImage string `json:"docker_image"` // e.g. "homeassistant/home-assistant"
-}
-
 // ========== Version Comparison ==========
 
 type VersionComparison struct {
@@ -99,12 +77,6 @@ type DockerNetwork struct {
 	Scope        string    `json:"scope" db:"scope"`     // local, swarm
 	ContainerIDs []string  `json:"container_ids" db:"-"` // Stored as JSONB, not queried directly
 	UpdatedAt    time.Time `json:"updated_at" db:"updated_at"`
-}
-
-// ContainerEnv represents container environment variables for topology inference
-type ContainerEnv struct {
-	ContainerName string            `json:"container_name"`
-	EnvVars       map[string]string `json:"env_vars"`
 }
 
 // ========== APT Updates (belongs to host, included here for convenience) ==========

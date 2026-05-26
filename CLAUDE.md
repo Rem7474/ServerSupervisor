@@ -27,48 +27,93 @@ cd frontend && npm run typecheck && npm run lint
 
 ## Architecture
 
-Three independent modules: **server** (Go), **agent** (Go), **frontend** (Vue 3 SPA).
+Three independent Go/Vue modules: **server** (Go API), **agent** (Go collector), **frontend** (Vue 3 SPA).
 
 ### Server (`server/`)
-- Entry point: `cmd/server/main.go` — loads config, runs DB migrations, starts all background goroutines, then serves HTTP.
-- `internal/api/router.go` — all Gin routes and middleware registration.
-- `internal/database/db.go` — DB connection + embedded migration runner (`migrations/*.sql`). Migrations run in filename order on every startup via `schema_version` tracking. All DB methods live in `db.go` and `db_*.go` domain files.
-- `internal/models/models.go` — all shared structs between packages.
-- `internal/config/config.go` — config loaded from env vars, then overridden by DB settings table at startup (`OverrideFromDB()`). The `DBSettingsLoader` interface avoids import cycles.
-- `internal/handlers/` — long-lived stateful handlers (ProxmoxHandler with 30s poller, ReleaseTrackerHandler with GitHub poller).
-- `internal/alerts/engine.go` — evaluates alert rules and dispatches notifications (smtp/ntfy/browser channels).
-- Background goroutines started in `main.go`: audit cleanup, host status monitor, alert engine, metrics downsampling, metrics/web-logs retention.
+
+- Entry point: [cmd/server/main.go](server/cmd/server/main.go) — loads config, validates strict secrets, runs DB migrations, starts background goroutines + pollers, serves HTTP, handles graceful shutdown.
+- [internal/api/router.go](server/internal/api/router.go) — only routes/middleware wiring. `SetupRouter` returns `(*gin.Engine, *ReleaseTrackerHandler, *ProxmoxHandler, cleanup func())`. The cleanup fn must be called on shutdown to stop the rate-limiter goroutines.
+- [internal/api/middleware.go](server/internal/api/middleware.go) — JWT / CSRF / WS-token / rate limiter / API-key middlewares (CORS, security headers, request logger).
+- [internal/handlers/](server/internal/handlers/) — one or more files per domain (auth, hosts, agent, docker, apt, proxmox*, alert_rules, web_logs, ssl, uptime, …). Long-lived handlers (`ProxmoxHandler` 30s poller, `ReleaseTrackerHandler` GitHub poller) own their own goroutines.
+- [internal/database/db.go](server/internal/database/db.go) — DB connection + embedded migration runner (`migrations/*.sql`). Migrations run in filename order on every startup; `schema_migrations` tracks applied ones. `000_full_baseline_breaking.sql` is the consolidated baseline — it declares its subsumed migrations via `-- ===== BEGIN <file>.sql =====` markers parsed by [migrations_baseline.go](server/internal/database/migrations_baseline.go).
+- [internal/database/db_*.go](server/internal/database/) — DB methods split by domain (≈ 25 files). **All DB methods take `context.Context` as first arg.** Use `c.Request.Context()` from handlers; `context.Background()` only for background goroutines.
+- [internal/models/](server/internal/models/) — shared structs **split per domain file** (alert.go, auth.go, command.go, docker.go, host.go, network.go, proxmox.go, report.go, synthetic.go, task.go, tracker.go, user.go, web_logs.go, webhook.go). There is **no single `models.go`**.
+- [internal/config/config.go](server/internal/config/config.go) — config loaded from env vars then overridden by `settings` table via `OverrideFromDB()`. The `DBSettingsLoader` interface avoids the database→config import cycle.
+- [internal/alerts/engine.go](server/internal/alerts/engine.go) — evaluates alert rules and dispatches notifications. Note: **monolithic (1500+ lines)** — flagged for split into engine / metric resolvers / notify.
+- [internal/ws/](server/internal/ws/) — `WSHandler` (per-page WebSocket endpoints), `CommandStreamHub` (live command output), `NotificationHub` (push-on-fire notifications). WS routes: `dashboard / hosts/:id / docker / network / apt / commands/stream/:id / notifications`.
+- [internal/background/](server/internal/background/) — `bg.Add(...)` jobs: audit cleanup, host status monitor, alert eval, metrics downsample / retention, web-logs retention, uptime worker, SSL worker.
+- [internal/dispatch/](server/internal/dispatch/) — server-side helper that persists `remote_commands` rows used by handlers + alert engine to queue agent commands.
+- [internal/proxmoxclient/](server/internal/proxmoxclient/) — PVE HTTP API client (PVEAPIToken auth, optional TLS skip-verify).
+- [internal/releasetracker/](server/internal/releasetracker/) — pure version-comparison helpers (`NormalizeDigest`, `IsVersionUpToDate`, `ResolveContainerVersion`). **Does not contain a Tracker** — the active release-tracking lives in [handlers/release_trackers.go](server/internal/handlers/release_trackers.go).
+- [internal/synthetic/](server/internal/synthetic/) — uptime probe runner + SSL certificate checker (run from background jobs).
+- [internal/gitprovider/](server/internal/gitprovider/) — GitHub / GitLab / Gitea release-API client (used by `ReleaseTrackerHandler`).
+- [internal/scheduler/](server/internal/scheduler/) — cron-based `TaskScheduler` for scheduled-task executions.
+- [internal/notify/](server/internal/notify/) — SMTP + ntfy senders + HTML alert email template.
 
 ### Agent (`agent/`)
-- Entry point: `cmd/agent/main.go` — collects data every 30s, POSTs to `/api/agent/report`, processes commands from the response.
-- `internal/collector/` — one file per domain (system, docker, apt, disk, web_logs, etc.).
-- `internal/config/tasks.go` — loads `tasks.yaml` (custom task definitions with id/command/timeout).
-- Command dispatch: `processCommands()` in `main.go` switches on `PendingCommand.Module` → `docker|apt|systemd|journal|processes|custom|agent`.
+
+- Entry point: [cmd/agent/main.go](agent/cmd/agent/main.go) — flag parsing, `--init` config generation, `--internal-update` self-update helper, main loop with sequential command worker.
+- [internal/reporter/reporter.go](agent/internal/reporter/reporter.go) — collects metrics in parallel goroutines, builds `Report`, POSTs `/api/agent/report`, returns commands to the queue.
+- [internal/dispatcher/](agent/internal/dispatcher/) — concurrent command runner with:
+  - `dispatcher.go` — APT mutex + 4-slot semaphore for other modules + 45-min absolute timeout.
+  - `registry.go` — module → handler map (`docker`, `apt`, `journal`, `agent`, `systemd`, `processes`, `custom`, `crowdsec`).
+  - `handler_<module>.go` — one file per module.
+- [internal/sender/sender.go](agent/internal/sender/sender.go) — `Report` / `PendingCommand` / `CommandResult` structs + HTTP client (`X-API-Key` header, two timeouts: 30s reports / 30min commands).
+- [internal/collector/](agent/internal/collector/) — one file per domain (system, docker, apt, disk, web_logs, systemd, journal, processes, crowdsec).
+- [internal/config/tasks.go](agent/internal/config/tasks.go) — loads `tasks.yaml` (custom task definitions: id/command/timeout/env).
 
 ### Frontend (`frontend/src/`)
-- `api/index.js` — single Axios client for all HTTP calls.
-- `router/index.ts` — all routes use dynamic `import()` for lazy loading. Includes chunk-retry logic on `ChunkLoadError`.
-- `stores/` — Pinia stores (auth token/role, hosts).
-- Views in `views/`, reusable pieces in `components/`.
+
+- [api/index.ts](frontend/src/api/index.ts) — single Axios client (`baseURL: /api`, `withCredentials: true`) + monolithic default-export of all API methods. Handles CSRF double-submit (X-CSRF-Token) and 401 → hard redirect to login.
+- [router/index.ts](frontend/src/router/index.ts) — all routes use dynamic `import()` for lazy loading + chunk-retry logic on `ChunkLoadError`.
+- [stores/](frontend/src/stores/) — Pinia (`auth`, `hosts`, `alertRules`, `dashboard`).
+- [views/](frontend/src/views/) — one per route.
+- [components/](frontend/src/components/) — organised by domain (alerts/, apt/, common/, dashboard/, disk/, docker/, host/, network/, proxmox/, security/, settings/, webhooks/) + a flat layer of generic components.
+- [composables/](frontend/src/composables/) — `useWebSocket`, `useCommandStream`, `useDashboard`, `useHostDetail`, `useFormValidator`, `useToast`, `useConfirmDialog`, `usePagination`, …
+- [utils/](frontend/src/utils/) — formatters, chart theme, dockerPorts, cron, dayjs, httpErrorBus, statusClasses, …
+
+**TypeScript adoption is mixed**: 6/88 `.vue` files use `<script setup lang="ts">`, the rest are plain `<script setup>`. A few `utils/*.js` files remain unconverted.
 
 ### Agent ↔ Server protocol
-Agents authenticate with a per-host API key (`Authorization: Bearer <key>`, bcrypt-hashed in DB).
+
+Agents authenticate with a per-host API key sent in the `X-API-Key` header (cfg.APIKeyHeader). Keys are bcrypt-hashed at rest; agents are looked up via `db.GetHostByAPIKey`.
 
 | Direction | Endpoint | Purpose |
 |---|---|---|
-| Agent → Server | `POST /api/agent/report` | Metrics, Docker state, APT status, web logs |
-| Server → Agent | Response body of `/report` | `commands: []PendingCommand{ID, Module, Action, Target, Payload}` |
-| Agent → Server | `POST /api/agent/command/result` | `CommandResult{CommandID, Status, Output}` |
-| Agent → Server | `POST /api/agent/command/stream` | Streaming output for long commands |
+| Agent → Server | `POST /api/agent/report` | Metrics, Docker state, APT status, web logs, disk health, capabilities |
+| Server → Agent | Response body of `/report` | `{commands: []PendingCommand{ID, Module, Action, Target, Payload}, skip_metrics: bool}` |
+| Agent → Server | `POST /api/agent/command/result` | `CommandResult{CommandID, Status, Output, AptStatus}` |
+| Agent → Server | `POST /api/agent/command/stream` | Streaming chunk output for long commands |
 | Agent → Server | `POST /api/agent/audit` | Autonomous actions (e.g. apt update on start) |
 
-Commands are persisted in the `remote_commands` table (UUID PK, `module`, `action`, `target`, `payload` JSONB, `status`, `audit_log_id`). The WebSocket stream for a running command is at `GET /api/v1/ws/commands/stream/:id` (hub in `internal/api/command_stream.go`).
+Commands persist in `remote_commands` (UUID PK, `module`, `action`, `target`, `payload` JSONB, `status`, `audit_log_id` FK to audit_logs ON DELETE SET NULL). Live command output streams over WebSocket at `GET /api/v1/ws/commands/stream/:id` (hub in [ws/command_stream.go](server/internal/ws/command_stream.go)).
+
+The agent `Report` struct currently uses `interface{}` for most payload fields. Server-side `models.AgentReport` is strongly typed. **There is no shared protocol module** — keep both sides in sync manually when adding/removing fields.
 
 ### Alert rules
-Rules have a single `actions JSONB` column: `{channels: ["smtp","ntfy","browser","notify"], smtp_to, ntfy_topic, cooldown}`. The engine in `alerts/engine.go` iterates `rule.Actions.Channels` to dispatch. Frontend always sends the full `actions` object on create/update.
+
+Rules have a single `actions JSONB` column: `{channels: ["smtp","ntfy","browser","notify"], smtp_to, ntfy_topic, cooldown, command_trigger}`. The engine in `alerts/engine.go` iterates `rule.Actions.Channels` to dispatch. `source_type` is one of `agent | proxmox | synthetic`. Hysteresis: `threshold_warn / threshold_crit / threshold_clear_warn / threshold_clear_crit` per severity.
 
 ### Proxmox integration
-`SetupRouter` returns `(*gin.Engine, *ReleaseTrackerHandler, *ProxmoxHandler)` — the Proxmox handler owns the 30s poll loop. Token secrets are stored in DB and never returned to the frontend; retrieved only by poller/test via `GetProxmoxTokenSecret()`.
+
+`SetupRouter` returns the `ProxmoxHandler` so `main.go` can `StartPoller()` it (30s tick by default, respects per-connection `poll_interval_sec`). Token secrets are stored in `proxmox_connections.token_secret` and never returned to the frontend; retrieved only by poller/test via `GetProxmoxTokenSecret()`.
+
+Guest ↔ host links live in `proxmox_guest_links` with `status: suggested|confirmed|ignored` and `metrics_source: auto|agent|proxmox`. When `metrics_source = proxmox` and Proxmox data is fresh, the server signals `skip_metrics: true` to the agent so it stops sending CPU/RAM. Sensor-source-providing hosts (cpu_temperature / fan_rpm) keep sending metrics regardless.
+
+### Release trackers + Git webhooks
+
+- `release_trackers` table: monitors GitHub/GitLab/Gitea releases **or** Docker registry digests. Detects new versions, then either notifies only (monitor-only) or dispatches a `module=custom` agent command. Handler: [handlers/release_trackers.go](server/internal/handlers/release_trackers.go). Background poller managed by `releaseTrackerH.StartPoller()`.
+- `git_webhooks` table: public HMAC-authenticated endpoint `POST /api/v1/webhooks/git/:id/receive` (no JWT, dedicated 5 req/s rate limiter) that triggers a `module=custom` agent command. SS_REPO_NAME / SS_BRANCH / SS_COMMIT_SHA / SS_COMMIT_MESSAGE / SS_PUSHER are injected into the subprocess env.
 
 ### Key env vars
-`JWT_SECRET`, `ADMIN_PASSWORD`, `DB_PASSWORD` are required for any non-trivial run. See `.env.example` for the full list. DB settings table can override most runtime config after first boot.
+
+`JWT_SECRET`, `ADMIN_PASSWORD`, `DB_PASSWORD` are required for any non-trivial run. See [.env.example](.env.example) for the full list. `APP_ENV=dev` bypasses strict-secret validation for local development. The `settings` table can override most runtime config after first boot.
+
+## Known refactor debt
+
+- **Phase B context.Context** — handlers still pass `context.Background()` to DB calls in many places ([docs](server/docs/context-rollout.md)). Should use `c.Request.Context()` so client disconnects cancel DB queries.
+- **Monolithic files** flagged for split:
+  - server: [handlers/alert_rules.go](server/internal/handlers/alert_rules.go) (1165 LoC), [alerts/engine.go](server/internal/alerts/engine.go) (1560 LoC), [handlers/release_trackers.go](server/internal/handlers/release_trackers.go) (813 LoC), [handlers/agent.go](server/internal/handlers/agent.go) (`ReceiveReport` ingest is 250 lines).
+  - frontend: [views/ProxmoxNodeView.vue](frontend/src/views/ProxmoxNodeView.vue) (2384 LoC), [views/TrafficView.vue](frontend/src/views/TrafficView.vue) (1522), [components/alerts/AlertRuleModal.vue](frontend/src/components/alerts/AlertRuleModal.vue) (1321), [api/index.ts](frontend/src/api/index.ts) (single 484-line default export — split per domain).
+- **TypeScript migration** — most `.vue` files still use plain JS in `<script setup>`. New components should use `<script setup lang="ts">`.
+- **`WebLogsHandler` greffé sur `AuthHandler`** — methods in [handlers/web_logs.go](server/internal/handlers/web_logs.go) are attached to `*AuthHandler` for historical reasons; should be extracted to its own handler.

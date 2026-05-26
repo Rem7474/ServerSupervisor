@@ -93,7 +93,10 @@
                 {{ opt.label }}
               </button>
             </div>
-            <div class="vr opacity-50" style="height: 24px;" />
+            <div
+              class="vr opacity-50"
+              style="height: 24px;"
+            />
             <div class="d-flex flex-wrap align-items-center gap-2">
               <span class="text-muted small me-1 fw-semibold">État :</span>
               <button

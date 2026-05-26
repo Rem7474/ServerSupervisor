@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"net/http"
 	"time"
 
@@ -28,7 +27,7 @@ func (h *NotificationsHandler) GetNotifications(c *gin.Context) {
 	}
 
 	username := c.GetString("username")
-	items, err := h.db.GetRecentNotifications(context.Background(), 30)
+	items, err := h.db.GetRecentNotifications(c.Request.Context(), 30)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch notifications"})
 		return
@@ -39,7 +38,7 @@ func (h *NotificationsHandler) GetNotifications(c *gin.Context) {
 
 	var readAt *time.Time
 	if username != "" {
-		readAt, _ = h.db.GetNotificationReadAt(context.Background(), username)
+		readAt, _ = h.db.GetNotificationReadAt(c.Request.Context(), username)
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -63,7 +62,7 @@ func (h *NotificationsHandler) MarkRead(c *gin.Context) {
 		return
 	}
 	readAt := time.Now().UTC()
-	if err := h.db.UpsertNotificationReadAt(context.Background(), username, readAt); err != nil {
+	if err := h.db.UpsertNotificationReadAt(c.Request.Context(), username, readAt); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update read timestamp"})
 		return
 	}

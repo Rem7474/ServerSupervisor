@@ -28,7 +28,6 @@ type AgentReport struct {
 	UnattendedUpgrades   *UnattendedUpgradesStatus `json:"unattended_upgrades,omitempty"`
 	WebLogs         *WebLogReport       `json:"web_logs,omitempty"`
 	DockerNetworks  []DockerNetwork     `json:"docker_networks,omitempty"`
-	ContainerEnvs   []ContainerEnv      `json:"container_envs,omitempty"`
 	ComposeProjects []ComposeProject    `json:"compose_projects,omitempty"`
 	DiskMetrics     []DiskMetrics       `json:"disk_metrics,omitempty"`
 	DiskHealth      []DiskHealth        `json:"disk_health,omitempty"`

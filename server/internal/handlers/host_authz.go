@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -23,7 +22,7 @@ func requireHostAccess(c *gin.Context, db *database.DB, hostID string, requiredL
 	}
 
 	username := c.GetString("username")
-	restricted, level, err := db.GetHostAccess(context.Background(), username, hostID)
+	restricted, level, err := db.GetHostAccess(c.Request.Context(), username, hostID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to validate host permissions"})
 		return false

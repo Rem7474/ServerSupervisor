@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -76,23 +75,23 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 	}
 
 	// Detect reconnect: read previous status before marking online.
-	prevStatus := h.db.GetHostStatus(context.Background(), hostID)
+	prevStatus := h.db.GetHostStatus(c.Request.Context(), hostID)
 
 	// Update host status
-	if err := h.db.UpdateHostStatus(context.Background(), hostID, "online"); err != nil {
+	if err := h.db.UpdateHostStatus(c.Request.Context(), hostID, "online"); err != nil {
 		log.Printf("Warning: failed to update host %s status to online: %v", safeHostID, err)
 	}
 
 	// On reconnect, immediately fail any 'running' commands from the previous dead session.
 	// These will never complete — the agent that started them has gone away.
 	if prevStatus == "offline" {
-		if err := h.db.FailRunningCommandsOnAgentReconnect(context.Background(), hostID); err != nil {
+		if err := h.db.FailRunningCommandsOnAgentReconnect(c.Request.Context(), hostID); err != nil {
 			log.Printf("Warning: failed to cleanup running commands on reconnect for host %s: %v", safeHostID, err)
 		}
 	}
 
 	// Cleanup stalled commands older than 10 minutes (pending commands left from extended downtime).
-	if err := h.db.CleanupHostStalledCommands(context.Background(), hostID, 10); err != nil {
+	if err := h.db.CleanupHostStalledCommands(c.Request.Context(), hostID, 10); err != nil {
 		log.Printf("Warning: failed to cleanup stalled commands for host %s: %v", safeHostID, err)
 	}
 
@@ -106,14 +105,14 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 	//               a Proxmox outage doesn't leave the host with no data at all.
 	//   "agent"   → Agent is always used; Proxmox data is ignored.
 	proxmoxIsMetricsSource := false
-	if link, err := h.db.GetProxmoxGuestLinkByHost(context.Background(), hostID); err == nil && link != nil {
+	if link, err := h.db.GetProxmoxGuestLinkByHost(c.Request.Context(), hostID); err == nil && link != nil {
 		switch link.MetricsSource {
 		case "proxmox":
 			proxmoxIsMetricsSource = true
 		case "auto":
 			// Skip agent collection only when Proxmox data is recent (within 3× poll interval).
 			// If Proxmox becomes unavailable, the freshness check fails and the agent resumes.
-			if fresh, err := h.db.IsProxmoxGuestDataFresh(context.Background(), hostID); err == nil {
+			if fresh, err := h.db.IsProxmoxGuestDataFresh(c.Request.Context(), hostID); err == nil {
 				proxmoxIsMetricsSource = fresh
 			}
 		}
@@ -121,12 +120,12 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 
 	// A host used as Proxmox CPU temperature source must keep sending local
 	// metrics so cpu_temperature can be resolved for all linked guests on that node.
-	if proxmoxIsMetricsSource && h.db.IsHostUsedAsProxmoxCPUTempSource(context.Background(), hostID) {
+	if proxmoxIsMetricsSource && h.db.IsHostUsedAsProxmoxCPUTempSource(c.Request.Context(), hostID) {
 		proxmoxIsMetricsSource = false
 	}
 
 	// Same guard for fan RPM source hosts.
-	if proxmoxIsMetricsSource && h.db.IsHostUsedAsProxmoxFanRPMSource(context.Background(), hostID) {
+	if proxmoxIsMetricsSource && h.db.IsHostUsedAsProxmoxFanRPMSource(c.Request.Context(), hostID) {
 		proxmoxIsMetricsSource = false
 	}
 
@@ -138,7 +137,7 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 			AgentVersion: stringPtrIfNotEmpty(report.AgentVersion),
 		}
 		if update.Hostname != nil || update.OS != nil || update.AgentVersion != nil {
-			if err := h.db.UpdateHost(context.Background(), hostID, &update); err != nil {
+			if err := h.db.UpdateHost(c.Request.Context(), hostID, &update); err != nil {
 				log.Printf("Warning: failed to update host %s: %v", hostID, err)
 			}
 		}
@@ -146,14 +145,14 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 		// Skip storing metrics when Proxmox is the designated source —
 		// Proxmox polling already stores CPU/RAM for this host.
 		if proxmoxIsMetricsSource {
-			if err := h.db.InsertUptimeMetrics(context.Background(), hostID, report.Metrics.Uptime, report.Metrics.Hostname); err != nil {
+			if err := h.db.InsertUptimeMetrics(c.Request.Context(), hostID, report.Metrics.Uptime, report.Metrics.Hostname); err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store uptime"})
 				return
 			}
 		} else {
 			report.Metrics.HostID = hostID
 			report.Metrics.Timestamp = time.Now()
-			if _, err := h.db.InsertMetrics(context.Background(), report.Metrics); err != nil {
+			if _, err := h.db.InsertMetrics(c.Request.Context(), report.Metrics); err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store metrics"})
 				return
 			}
@@ -164,7 +163,7 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 			update := models.HostUpdate{
 				AgentVersion: stringPtrIfNotEmpty(report.AgentVersion),
 			}
-			if err := h.db.UpdateHost(context.Background(), hostID, &update); err != nil {
+			if err := h.db.UpdateHost(c.Request.Context(), hostID, &update); err != nil {
 				log.Printf("Warning: failed to update host %s: %v", hostID, err)
 			}
 		}
@@ -175,7 +174,7 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 		for i := range report.Docker.Containers {
 			report.Docker.Containers[i].HostID = hostID
 		}
-		if err := h.db.UpsertDockerContainers(context.Background(), hostID, report.Docker.Containers); err != nil {
+		if err := h.db.UpsertDockerContainers(c.Request.Context(), hostID, report.Docker.Containers); err != nil {
 			log.Printf("Warning: failed to store docker containers for host %s: %v", safeHostID, err)
 		}
 	}
@@ -183,29 +182,29 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 	// Store apt status
 	if report.AptStatus != nil {
 		report.AptStatus.HostID = hostID
-		if err := h.db.UpsertAptStatus(context.Background(), report.AptStatus); err != nil {
+		if err := h.db.UpsertAptStatus(c.Request.Context(), report.AptStatus); err != nil {
 			log.Printf("Warning: failed to store apt status for host %s: %v", safeHostID, err)
 		}
 	}
 
 	// Store unattended-upgrades status and notify on new upgrade runs
 	if report.UnattendedUpgrades != nil {
-		if err := h.db.UpsertUUStatus(context.Background(), hostID, *report.UnattendedUpgrades); err != nil {
+		if err := h.db.UpsertUUStatus(c.Request.Context(), hostID, *report.UnattendedUpgrades); err != nil {
 			log.Printf("Warning: failed to store UU status for host %s: %v", safeHostID, err)
 		}
 		for _, run := range report.UnattendedUpgrades.NewRuns {
-			isNew, err := h.db.InsertUURunIfNew(context.Background(), hostID, run)
+			isNew, err := h.db.InsertUURunIfNew(c.Request.Context(), hostID, run)
 			if err != nil {
 				log.Printf("Warning: failed to insert UU run for host %s: %v", safeHostID, err)
 				continue
 			}
 			if isNew {
-				_ = h.db.UpdateUULastRun(context.Background(), hostID, run.RunAt, len(run.Packages))
-				_ = h.db.TouchAptLastAction(context.Background(), hostID, "update")
+				_ = h.db.UpdateUULastRun(c.Request.Context(), hostID, run.RunAt, len(run.Packages))
+				_ = h.db.TouchAptLastAction(c.Request.Context(), hostID, "update")
 				if len(run.Packages) > 0 {
-					_ = h.db.TouchAptLastUpgradeAt(context.Background(), hostID, run.RunAt)
+					_ = h.db.TouchAptLastUpgradeAt(c.Request.Context(), hostID, run.RunAt)
 					hostname := hostID
-					if host, err := h.db.GetHost(context.Background(), hostID); err == nil && host != nil {
+					if host, err := h.db.GetHost(c.Request.Context(), hostID); err == nil && host != nil {
 						hostname = host.Hostname
 					}
 					h.pushUUNotification(hostname, hostID, run)
@@ -229,14 +228,14 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 				UpdatedAt:    time.Now(),
 			})
 		}
-		if err := h.db.UpsertDockerNetworks(context.Background(), hostID, dbNetworks); err != nil {
+		if err := h.db.UpsertDockerNetworks(c.Request.Context(), hostID, dbNetworks); err != nil {
 			log.Printf("Warning: failed to store docker networks for host %s: %v", safeHostID, err)
 		}
 	}
 
 	// Store docker-compose projects
 	if report.ComposeProjects != nil {
-		if err := h.db.UpsertComposeProjects(context.Background(), hostID, report.ComposeProjects); err != nil {
+		if err := h.db.UpsertComposeProjects(c.Request.Context(), hostID, report.ComposeProjects); err != nil {
 			log.Printf("Warning: failed to store compose projects for host %s: %v", safeHostID, err)
 		}
 	}
@@ -248,7 +247,7 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 			report.DiskMetrics[i].HostID = hostID
 			report.DiskMetrics[i].Timestamp = batchTime
 		}
-		if err := h.db.InsertDiskMetrics(context.Background(), report.DiskMetrics); err != nil {
+		if err := h.db.InsertDiskMetrics(c.Request.Context(), report.DiskMetrics); err != nil {
 			log.Printf("Warning: failed to store disk metrics for host %s: %v", safeHostID, err)
 		}
 	}
@@ -259,7 +258,7 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 			report.DiskHealth[i].HostID = hostID
 			report.DiskHealth[i].CollectedAt = time.Now()
 		}
-		if err := h.db.InsertDiskHealth(context.Background(), report.DiskHealth); err != nil {
+		if err := h.db.InsertDiskHealth(c.Request.Context(), report.DiskHealth); err != nil {
 			log.Printf("Warning: failed to store disk health for host %s: %v", safeHostID, err)
 		}
 	}
@@ -267,7 +266,7 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 	// Store available custom tasks from agent's tasks.yaml
 	if report.CustomTasks != nil {
 		if b, err := json.Marshal(report.CustomTasks); err == nil {
-			if err := h.db.UpdateHostCustomTasks(context.Background(), hostID, string(b)); err != nil {
+			if err := h.db.UpdateHostCustomTasks(c.Request.Context(), hostID, string(b)); err != nil {
 				log.Printf("Warning: failed to store custom tasks for host %s: %v", safeHostID, err)
 			}
 		}
@@ -275,7 +274,7 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 
 	// Store raw tasks.yaml content (used by frontend to show snippet examples)
 	if report.TasksConfigYAML != "" {
-		if err := h.db.UpdateHostTasksConfigYAML(context.Background(), hostID, report.TasksConfigYAML); err != nil {
+		if err := h.db.UpdateHostTasksConfigYAML(c.Request.Context(), hostID, report.TasksConfigYAML); err != nil {
 			log.Printf("Warning: failed to store tasks config YAML for host %s: %v", safeHostID, err)
 		}
 	}
@@ -283,7 +282,7 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 	// Store agent capabilities (which collectors are enabled on this host)
 	if report.Capabilities != nil {
 		if b, err := json.Marshal(report.Capabilities); err == nil {
-			if err := h.db.UpdateHostCollectors(context.Background(), hostID, string(b)); err != nil {
+			if err := h.db.UpdateHostCollectors(c.Request.Context(), hostID, string(b)); err != nil {
 				log.Printf("Warning: failed to store collectors for host %s: %v", safeHostID, err)
 			}
 		}
@@ -291,16 +290,16 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 
 	// Store unified web logs cache + snapshot history.
 	if report.WebLogs != nil {
-		if err := h.db.UpdateHostWebLogs(context.Background(), hostID, report.WebLogs); err != nil {
+		if err := h.db.UpdateHostWebLogs(c.Request.Context(), hostID, report.WebLogs); err != nil {
 			log.Printf("Warning: failed to update web logs cache for host %s: %v", safeHostID, err)
 		}
-		if err := h.db.InsertWebLogSnapshot(context.Background(), hostID, report.WebLogs); err != nil {
+		if err := h.db.InsertWebLogSnapshot(c.Request.Context(), hostID, report.WebLogs); err != nil {
 			log.Printf("Warning: failed to insert web logs snapshot for host %s: %v", safeHostID, err)
 		}
 	}
 
 	// Return pending commands for this host (unified remote_commands table)
-	commands, err := h.db.ClaimPendingRemoteCommands(context.Background(), hostID)
+	commands, err := h.db.ClaimPendingRemoteCommands(c.Request.Context(), hostID)
 	if err != nil {
 		log.Printf("Warning: failed to get pending commands for host %s: %v", safeHostID, err)
 	}
@@ -330,13 +329,13 @@ func (h *AgentHandler) ReportCommandResult(c *gin.Context) {
 	}
 
 	// Lookup command by UUID — ownership verified via host_id
-	cmd, cmdErr := h.db.GetRemoteCommandByID(context.Background(), result.CommandID)
+	cmd, cmdErr := h.db.GetRemoteCommandByID(c.Request.Context(), result.CommandID)
 	if cmdErr != nil || cmd.HostID != hostID {
 		c.JSON(http.StatusForbidden, gin.H{"error": "command does not belong to host"})
 		return
 	}
 
-	if err := h.db.UpdateRemoteCommandStatus(context.Background(), result.CommandID, result.Status, result.Output); err != nil {
+	if err := h.db.UpdateRemoteCommandStatus(c.Request.Context(), result.CommandID, result.Status, result.Output); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update command"})
 		return
 	}
@@ -347,7 +346,7 @@ func (h *AgentHandler) ReportCommandResult(c *gin.Context) {
 		if result.Status == "failed" {
 			details = truncateOutput(result.Output, 2000)
 		}
-		if err := h.db.UpdateAuditLogStatus(context.Background(), *cmd.AuditLogID, result.Status, details); err != nil {
+		if err := h.db.UpdateAuditLogStatus(c.Request.Context(), *cmd.AuditLogID, result.Status, details); err != nil {
 			log.Printf("Warning: failed to update audit log %d for command %s: %v", *cmd.AuditLogID, result.CommandID, err)
 		}
 	}
@@ -357,7 +356,7 @@ func (h *AgentHandler) ReportCommandResult(c *gin.Context) {
 
 	// Update linked scheduled task with final status
 	if cmd.ScheduledTaskID != nil && (result.Status == "completed" || result.Status == "failed") {
-		if err := h.db.UpdateScheduledTaskStatus(context.Background(), *cmd.ScheduledTaskID, result.Status); err != nil {
+		if err := h.db.UpdateScheduledTaskStatus(c.Request.Context(), *cmd.ScheduledTaskID, result.Status); err != nil {
 			log.Printf("Failed to update scheduled task %s status: %v", *cmd.ScheduledTaskID, err)
 		}
 	}
@@ -375,10 +374,10 @@ func (h *AgentHandler) ReportCommandResult(c *gin.Context) {
 
 	// APT post-processing
 	if cmd.Module == "apt" && result.Status == "completed" {
-		_ = h.db.TouchAptLastAction(context.Background(), cmd.HostID, cmd.Action)
+		_ = h.db.TouchAptLastAction(c.Request.Context(), cmd.HostID, cmd.Action)
 		if result.AptStatus != nil {
 			result.AptStatus.HostID = cmd.HostID
-			if err := h.db.UpsertAptStatus(context.Background(), result.AptStatus); err != nil {
+			if err := h.db.UpsertAptStatus(c.Request.Context(), result.AptStatus); err != nil {
 				log.Printf("Failed to update APT status: %v", err)
 			}
 		}
@@ -405,7 +404,7 @@ func (h *AgentHandler) StreamCommandOutput(c *gin.Context) {
 	}
 
 	// Verify ownership via unified remote_commands table
-	cmd, err := h.db.GetRemoteCommandByID(context.Background(), chunk.CommandID)
+	cmd, err := h.db.GetRemoteCommandByID(c.Request.Context(), chunk.CommandID)
 	if err != nil || cmd.HostID != hostID {
 		c.JSON(http.StatusForbidden, gin.H{"error": "command does not belong to host"})
 		return
@@ -424,7 +423,7 @@ func (h *AgentHandler) GetHostCommandHistory(c *gin.Context) {
 	if limit <= 0 || limit > 200 {
 		limit = 50
 	}
-	cmds, err := h.db.GetRecentCommandsByHost(context.Background(), hostID, limit)
+	cmds, err := h.db.GetRecentCommandsByHost(c.Request.Context(), hostID, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch command history"})
 		return
@@ -455,7 +454,7 @@ func (h *AgentHandler) GetMetricsHistory(c *gin.Context) {
 		hours = 8760
 	}
 
-	metrics, err := h.db.GetMetricsHistory(context.Background(), hostID, hours)
+	metrics, err := h.db.GetMetricsHistory(c.Request.Context(), hostID, hours)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch metrics"})
 		return
@@ -489,15 +488,15 @@ func (h *AgentHandler) GetMetricsAggregated(c *gin.Context) {
 	// Determine which aggregation to use based on time range
 	if hours <= 24 {
 		// Raw metrics (5-minute intervals)
-		metrics, err = h.db.GetMetricsHistory(context.Background(), hostID, hours)
+		metrics, err = h.db.GetMetricsHistory(c.Request.Context(), hostID, hours)
 		aggregationType = "raw"
 	} else if hours <= 720 { // 30 days
 		// Hourly aggregates
-		metrics, err = h.db.GetMetricsAggregatesByType(context.Background(), hostID, hours, "hour")
+		metrics, err = h.db.GetMetricsAggregatesByType(c.Request.Context(), hostID, hours, "hour")
 		aggregationType = "hour"
 	} else {
 		// Daily aggregates
-		metrics, err = h.db.GetMetricsAggregatesByType(context.Background(), hostID, hours, "day")
+		metrics, err = h.db.GetMetricsAggregatesByType(c.Request.Context(), hostID, hours, "day")
 		aggregationType = "day"
 	}
 
@@ -531,7 +530,7 @@ func (h *AgentHandler) GetMetricsSummary(c *gin.Context) {
 		bucketMinutes = 5
 	}
 
-	summary, err := h.db.GetMetricsSummary(context.Background(), hours, bucketMinutes)
+	summary, err := h.db.GetMetricsSummary(c.Request.Context(), hours, bucketMinutes)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch metrics summary"})
 		return
@@ -571,7 +570,7 @@ func (h *AgentHandler) LogAuditAction(c *gin.Context) {
 	}
 
 	// Create audit log entry with "agent" as the username
-	auditLogID, err := h.db.CreateAuditLog(context.Background(), "agent", auditAction, hostID, c.ClientIP(), audit.Details, audit.Status)
+	auditLogID, err := h.db.CreateAuditLog(c.Request.Context(), "agent", auditAction, hostID, c.ClientIP(), audit.Details, audit.Status)
 	if err != nil {
 		log.Printf("Failed to log audit action: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to record audit log"})
@@ -585,7 +584,7 @@ func (h *AgentHandler) LogAuditAction(c *gin.Context) {
 		if auditLogID != 0 {
 			auditIDPtr = &auditLogID
 		}
-		if cerr := h.db.CreateCompletedRemoteCommand(context.Background(), 
+		if cerr := h.db.CreateCompletedRemoteCommand(c.Request.Context(), 
 			hostID, audit.Module, audit.Action, "", audit.Details, "agent", audit.Status, auditIDPtr,
 		); cerr != nil {
 			log.Printf("Warning: failed to create self-reported command record: %v", cerr)
@@ -594,7 +593,7 @@ func (h *AgentHandler) LogAuditAction(c *gin.Context) {
 
 	// If this is an apt update action, also update the last_update timestamp
 	if audit.Action == "update" && audit.Status == "completed" {
-		_ = h.db.TouchAptLastAction(context.Background(), hostID, "update")
+		_ = h.db.TouchAptLastAction(c.Request.Context(), hostID, "update")
 	}
 
 	c.JSON(http.StatusOK, gin.H{"success": true, "message": "Audit log recorded"})

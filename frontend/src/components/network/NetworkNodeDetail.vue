@@ -19,7 +19,6 @@
 
     <!-- Grid of sections -->
     <div class="detail-grid">
-
       <!-- Rôle réseau (host) -->
       <div
         v-if="selectedNode?.type === 'host'"

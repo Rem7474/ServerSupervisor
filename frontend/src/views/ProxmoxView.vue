@@ -197,14 +197,70 @@
         <table class="table table-vcenter card-table">
           <thead>
             <tr>
-              <th><SortableHeader label="Nœud" :active="nodeSortKey === 'node_name'" :direction="nodeSortDir" @toggle="toggleNodeSort('node_name')" /></th>
-              <th><SortableHeader label="Instance / Cluster" :active="nodeSortKey === 'cluster_name'" :direction="nodeSortDir" @toggle="toggleNodeSort('cluster_name')" /></th>
-              <th><SortableHeader label="VMs" :active="nodeSortKey === 'vm_count'" :direction="nodeSortDir" @toggle="toggleNodeSort('vm_count')" /></th>
-              <th><SortableHeader label="LXC" :active="nodeSortKey === 'lxc_count'" :direction="nodeSortDir" @toggle="toggleNodeSort('lxc_count')" /></th>
-              <th><SortableHeader label="CPU" :active="nodeSortKey === 'cpu_usage'" :direction="nodeSortDir" @toggle="toggleNodeSort('cpu_usage')" /></th>
-              <th><SortableHeader label="RAM" :active="nodeSortKey === 'mem_used'" :direction="nodeSortDir" @toggle="toggleNodeSort('mem_used')" /></th>
-              <th><SortableHeader label="Statut" :active="nodeSortKey === 'status'" :direction="nodeSortDir" @toggle="toggleNodeSort('status')" /></th>
-              <th><SortableHeader label="Dernier contact" :active="nodeSortKey === 'last_seen_at'" :direction="nodeSortDir" @toggle="toggleNodeSort('last_seen_at')" /></th>
+              <th>
+                <SortableHeader
+                  label="Nœud"
+                  :active="nodeSortKey === 'node_name'"
+                  :direction="nodeSortDir"
+                  @toggle="toggleNodeSort('node_name')"
+                />
+              </th>
+              <th>
+                <SortableHeader
+                  label="Instance / Cluster"
+                  :active="nodeSortKey === 'cluster_name'"
+                  :direction="nodeSortDir"
+                  @toggle="toggleNodeSort('cluster_name')"
+                />
+              </th>
+              <th>
+                <SortableHeader
+                  label="VMs"
+                  :active="nodeSortKey === 'vm_count'"
+                  :direction="nodeSortDir"
+                  @toggle="toggleNodeSort('vm_count')"
+                />
+              </th>
+              <th>
+                <SortableHeader
+                  label="LXC"
+                  :active="nodeSortKey === 'lxc_count'"
+                  :direction="nodeSortDir"
+                  @toggle="toggleNodeSort('lxc_count')"
+                />
+              </th>
+              <th>
+                <SortableHeader
+                  label="CPU"
+                  :active="nodeSortKey === 'cpu_usage'"
+                  :direction="nodeSortDir"
+                  @toggle="toggleNodeSort('cpu_usage')"
+                />
+              </th>
+              <th>
+                <SortableHeader
+                  label="RAM"
+                  :active="nodeSortKey === 'mem_used'"
+                  :direction="nodeSortDir"
+                  @toggle="toggleNodeSort('mem_used')"
+                />
+              </th>
+              <th>
+                <SortableHeader
+                  label="Statut"
+                  :active="nodeSortKey === 'status'"
+                  :direction="nodeSortDir"
+                  @toggle="toggleNodeSort('status')"
+                />
+              </th>
+              <th>
+                <SortableHeader
+                  label="Dernier contact"
+                  :active="nodeSortKey === 'last_seen_at'"
+                  :direction="nodeSortDir"
+                  @toggle="toggleNodeSort('last_seen_at')"
+                />
+              </th>
               <th />
             </tr>
           </thead>
