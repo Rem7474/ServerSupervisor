@@ -103,7 +103,7 @@ func EvaluateAlerts(db *database.DB, cfg *config.Config, dispatcher *dispatch.Di
 					details := fmt.Sprintf(`{"rule_id":%d,"metric":"%s","operator":"%s","value":%.4f,"severity":"%s"}`, rule.ID, rule.Metric, rule.Operator, value, currentSeveration)
 					_, _ = db.CreateAuditLog(context.Background(), "alert-engine", "alert_fired", host.ID, "", details, "success")
 					sendAlertNotifications(n, cfg, rule, host, value)
-					triggerAlertCommand(dispatcher, rule, host)
+					triggerAlertCommand(dispatcher, db, rule, host)
 					pushBrowserNotification(pusher, rule, host, value, incID)
 					go pushWebNotifications(db, cfg, rule, host, value)
 					broadcastIncidentUpdate(pusher, "fired", rule, host.ID)
@@ -1532,7 +1532,13 @@ func broadcastIncidentUpdate(pusher NotificationPusher, event string, rule model
 
 // triggerAlertCommand creates a remote command on the host when an alert fires,
 // if the rule's actions include a CommandTrigger.
-func triggerAlertCommand(dispatcher *dispatch.Dispatcher, rule models.AlertRule, host models.Host) {
+//
+// For Proxmox-scoped alerts the engine builds a synthetic host (ID prefixed by
+// "proxmox:") that does not exist in the hosts table. We resolve the target to
+// the agent host linked to the Proxmox guest (when scope_mode=guest and a
+// confirmed link exists); other Proxmox scopes have no unique linked host, so
+// the trigger is skipped.
+func triggerAlertCommand(dispatcher *dispatch.Dispatcher, db *database.DB, rule models.AlertRule, host models.Host) {
 	if dispatcher == nil {
 		return
 	}
@@ -1540,21 +1546,43 @@ func triggerAlertCommand(dispatcher *dispatch.Dispatcher, rule models.AlertRule,
 	if ct == nil || ct.Module == "" || ct.Action == "" {
 		return
 	}
+
+	targetHostID := host.ID
+	targetLabel := host.Name
+	if strings.HasPrefix(host.ID, "proxmox:") {
+		parts := strings.SplitN(host.ID, ":", 3)
+		if len(parts) != 3 || parts[1] != "guest" || parts[2] == "" {
+			log.Printf("Alerts: rule#%d command_trigger skipped — no linked host for Proxmox scope %s", rule.ID, host.ID)
+			return
+		}
+		link, err := db.GetProxmoxGuestLinkByGuest(context.Background(), parts[2])
+		if err != nil || link == nil {
+			log.Printf("Alerts: rule#%d command_trigger skipped — no host link for Proxmox guest %s", rule.ID, parts[2])
+			return
+		}
+		if link.Status != "confirmed" {
+			log.Printf("Alerts: rule#%d command_trigger skipped — link for Proxmox guest %s is not confirmed (status=%s)", rule.ID, parts[2], link.Status)
+			return
+		}
+		targetHostID = link.HostID
+		targetLabel = link.HostName
+	}
+
 	payload := ct.Payload
 	if payload == "" {
 		payload = "{}"
 	}
 	triggeredBy := fmt.Sprintf("alert:%d", rule.ID)
 	if _, err := dispatcher.Create(dispatch.Request{
-		HostID:      host.ID,
+		HostID:      targetHostID,
 		Module:      ct.Module,
 		Action:      ct.Action,
 		Target:      ct.Target,
 		Payload:     payload,
 		TriggeredBy: triggeredBy,
 	}); err != nil {
-		log.Printf("Alerts: failed to create command trigger for rule %d on host %s: %v", rule.ID, host.ID, err)
+		log.Printf("Alerts: failed to create command trigger for rule %d on host %s: %v", rule.ID, targetHostID, err)
 	} else {
-		log.Printf("Alerts: triggered command %s/%s on host %s (rule %d)", ct.Module, ct.Action, host.Name, rule.ID)
+		log.Printf("Alerts: triggered command %s/%s on host %s (rule %d)", ct.Module, ct.Action, targetLabel, rule.ID)
 	}
 }
