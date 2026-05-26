@@ -21,11 +21,21 @@
               class="form-select form-select-sm"
               style="width: auto;"
             >
-              <option value="1h">1h</option>
-              <option value="4h">4h</option>
-              <option value="24h">24h</option>
-              <option value="48h">48h</option>
-              <option value="168h">7j</option>
+              <option value="1h">
+                1h
+              </option>
+              <option value="4h">
+                4h
+              </option>
+              <option value="24h">
+                24h
+              </option>
+              <option value="48h">
+                48h
+              </option>
+              <option value="168h">
+                7j
+              </option>
             </select>
             <button
               class="btn btn-sm"

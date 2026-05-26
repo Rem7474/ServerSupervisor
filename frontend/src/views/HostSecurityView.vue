@@ -98,7 +98,10 @@
               v-if="threatsLoading && !security.blocked_ips?.length"
               class="p-3"
             >
-              <LoadingSkeleton variant="list" :lines="3" />
+              <LoadingSkeleton
+                variant="list"
+                :lines="3"
+              />
             </div>
             <EmptyState
               v-else-if="!security.blocked_ips?.length"

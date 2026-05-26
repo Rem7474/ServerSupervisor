@@ -427,18 +427,102 @@
               <table class="table table-vcenter card-table">
                 <thead>
                   <tr>
-                    <th><SortableHeader label="VMID" :active="vmSortKey === 'vmid'" :direction="vmSortDir" @toggle="toggleVmSort('vmid')" /></th>
-                    <th><SortableHeader label="Nom" :active="vmSortKey === 'name'" :direction="vmSortDir" @toggle="toggleVmSort('name')" /></th>
-                    <th><SortableHeader label="Statut" :active="vmSortKey === 'status'" :direction="vmSortDir" @toggle="toggleVmSort('status')" /></th>
-                    <th><SortableHeader label="IP" :active="vmSortKey === 'ip'" :direction="vmSortDir" @toggle="toggleVmSort('ip')" /></th>
-                    <th><SortableHeader label="CPU alloué" :active="vmSortKey === 'cpu_alloc'" :direction="vmSortDir" @toggle="toggleVmSort('cpu_alloc')" /></th>
-                    <th><SortableHeader label="CPU utilisé" :active="vmSortKey === 'cpu_used'" :direction="vmSortDir" @toggle="toggleVmSort('cpu_used')" /></th>
-                    <th><SortableHeader label="RAM allouée" :active="vmSortKey === 'mem_alloc'" :direction="vmSortDir" @toggle="toggleVmSort('mem_alloc')" /></th>
-                    <th><SortableHeader label="RAM utilisée" :active="vmSortKey === 'mem_used'" :direction="vmSortDir" @toggle="toggleVmSort('mem_used')" /></th>
-                    <th><SortableHeader label="Disque" :active="vmSortKey === 'disk_alloc'" :direction="vmSortDir" @toggle="toggleVmSort('disk_alloc')" /></th>
-                    <th><SortableHeader label="Uptime" :active="vmSortKey === 'uptime'" :direction="vmSortDir" @toggle="toggleVmSort('uptime')" /></th>
-                    <th><SortableHeader label="Tags" :active="vmSortKey === 'tags'" :direction="vmSortDir" @toggle="toggleVmSort('tags')" /></th>
-                    <th><SortableHeader label="Hôte lié" :active="vmSortKey === 'linked_host'" :direction="vmSortDir" @toggle="toggleVmSort('linked_host')" /></th>
+                    <th>
+                      <SortableHeader
+                        label="VMID"
+                        :active="vmSortKey === 'vmid'"
+                        :direction="vmSortDir"
+                        @toggle="toggleVmSort('vmid')"
+                      />
+                    </th>
+                    <th>
+                      <SortableHeader
+                        label="Nom"
+                        :active="vmSortKey === 'name'"
+                        :direction="vmSortDir"
+                        @toggle="toggleVmSort('name')"
+                      />
+                    </th>
+                    <th>
+                      <SortableHeader
+                        label="Statut"
+                        :active="vmSortKey === 'status'"
+                        :direction="vmSortDir"
+                        @toggle="toggleVmSort('status')"
+                      />
+                    </th>
+                    <th>
+                      <SortableHeader
+                        label="IP"
+                        :active="vmSortKey === 'ip'"
+                        :direction="vmSortDir"
+                        @toggle="toggleVmSort('ip')"
+                      />
+                    </th>
+                    <th>
+                      <SortableHeader
+                        label="CPU alloué"
+                        :active="vmSortKey === 'cpu_alloc'"
+                        :direction="vmSortDir"
+                        @toggle="toggleVmSort('cpu_alloc')"
+                      />
+                    </th>
+                    <th>
+                      <SortableHeader
+                        label="CPU utilisé"
+                        :active="vmSortKey === 'cpu_used'"
+                        :direction="vmSortDir"
+                        @toggle="toggleVmSort('cpu_used')"
+                      />
+                    </th>
+                    <th>
+                      <SortableHeader
+                        label="RAM allouée"
+                        :active="vmSortKey === 'mem_alloc'"
+                        :direction="vmSortDir"
+                        @toggle="toggleVmSort('mem_alloc')"
+                      />
+                    </th>
+                    <th>
+                      <SortableHeader
+                        label="RAM utilisée"
+                        :active="vmSortKey === 'mem_used'"
+                        :direction="vmSortDir"
+                        @toggle="toggleVmSort('mem_used')"
+                      />
+                    </th>
+                    <th>
+                      <SortableHeader
+                        label="Disque"
+                        :active="vmSortKey === 'disk_alloc'"
+                        :direction="vmSortDir"
+                        @toggle="toggleVmSort('disk_alloc')"
+                      />
+                    </th>
+                    <th>
+                      <SortableHeader
+                        label="Uptime"
+                        :active="vmSortKey === 'uptime'"
+                        :direction="vmSortDir"
+                        @toggle="toggleVmSort('uptime')"
+                      />
+                    </th>
+                    <th>
+                      <SortableHeader
+                        label="Tags"
+                        :active="vmSortKey === 'tags'"
+                        :direction="vmSortDir"
+                        @toggle="toggleVmSort('tags')"
+                      />
+                    </th>
+                    <th>
+                      <SortableHeader
+                        label="Hôte lié"
+                        :active="vmSortKey === 'linked_host'"
+                        :direction="vmSortDir"
+                        @toggle="toggleVmSort('linked_host')"
+                      />
+                    </th>
                     <th />
                   </tr>
                 </thead>
@@ -536,17 +620,94 @@
               <table class="table table-vcenter card-table">
                 <thead>
                   <tr>
-                    <th><SortableHeader label="CT ID" :active="lxcSortKey === 'vmid'" :direction="lxcSortDir" @toggle="toggleLxcSort('vmid')" /></th>
-                    <th><SortableHeader label="Nom" :active="lxcSortKey === 'name'" :direction="lxcSortDir" @toggle="toggleLxcSort('name')" /></th>
-                    <th><SortableHeader label="Statut" :active="lxcSortKey === 'status'" :direction="lxcSortDir" @toggle="toggleLxcSort('status')" /></th>
-                    <th><SortableHeader label="IP" :active="lxcSortKey === 'ip'" :direction="lxcSortDir" @toggle="toggleLxcSort('ip')" /></th>
-                    <th><SortableHeader label="CPU alloué" :active="lxcSortKey === 'cpu_alloc'" :direction="lxcSortDir" @toggle="toggleLxcSort('cpu_alloc')" /></th>
-                    <th><SortableHeader label="CPU utilisé" :active="lxcSortKey === 'cpu_used'" :direction="lxcSortDir" @toggle="toggleLxcSort('cpu_used')" /></th>
-                    <th><SortableHeader label="RAM allouée" :active="lxcSortKey === 'mem_alloc'" :direction="lxcSortDir" @toggle="toggleLxcSort('mem_alloc')" /></th>
-                    <th><SortableHeader label="RAM utilisée" :active="lxcSortKey === 'mem_used'" :direction="lxcSortDir" @toggle="toggleLxcSort('mem_used')" /></th>
-                    <th><SortableHeader label="Disque" :active="lxcSortKey === 'disk_alloc'" :direction="lxcSortDir" @toggle="toggleLxcSort('disk_alloc')" /></th>
-                    <th><SortableHeader label="Uptime" :active="lxcSortKey === 'uptime'" :direction="lxcSortDir" @toggle="toggleLxcSort('uptime')" /></th>
-                    <th><SortableHeader label="Hôte lié" :active="lxcSortKey === 'linked_host'" :direction="lxcSortDir" @toggle="toggleLxcSort('linked_host')" /></th>
+                    <th>
+                      <SortableHeader
+                        label="CT ID"
+                        :active="lxcSortKey === 'vmid'"
+                        :direction="lxcSortDir"
+                        @toggle="toggleLxcSort('vmid')"
+                      />
+                    </th>
+                    <th>
+                      <SortableHeader
+                        label="Nom"
+                        :active="lxcSortKey === 'name'"
+                        :direction="lxcSortDir"
+                        @toggle="toggleLxcSort('name')"
+                      />
+                    </th>
+                    <th>
+                      <SortableHeader
+                        label="Statut"
+                        :active="lxcSortKey === 'status'"
+                        :direction="lxcSortDir"
+                        @toggle="toggleLxcSort('status')"
+                      />
+                    </th>
+                    <th>
+                      <SortableHeader
+                        label="IP"
+                        :active="lxcSortKey === 'ip'"
+                        :direction="lxcSortDir"
+                        @toggle="toggleLxcSort('ip')"
+                      />
+                    </th>
+                    <th>
+                      <SortableHeader
+                        label="CPU alloué"
+                        :active="lxcSortKey === 'cpu_alloc'"
+                        :direction="lxcSortDir"
+                        @toggle="toggleLxcSort('cpu_alloc')"
+                      />
+                    </th>
+                    <th>
+                      <SortableHeader
+                        label="CPU utilisé"
+                        :active="lxcSortKey === 'cpu_used'"
+                        :direction="lxcSortDir"
+                        @toggle="toggleLxcSort('cpu_used')"
+                      />
+                    </th>
+                    <th>
+                      <SortableHeader
+                        label="RAM allouée"
+                        :active="lxcSortKey === 'mem_alloc'"
+                        :direction="lxcSortDir"
+                        @toggle="toggleLxcSort('mem_alloc')"
+                      />
+                    </th>
+                    <th>
+                      <SortableHeader
+                        label="RAM utilisée"
+                        :active="lxcSortKey === 'mem_used'"
+                        :direction="lxcSortDir"
+                        @toggle="toggleLxcSort('mem_used')"
+                      />
+                    </th>
+                    <th>
+                      <SortableHeader
+                        label="Disque"
+                        :active="lxcSortKey === 'disk_alloc'"
+                        :direction="lxcSortDir"
+                        @toggle="toggleLxcSort('disk_alloc')"
+                      />
+                    </th>
+                    <th>
+                      <SortableHeader
+                        label="Uptime"
+                        :active="lxcSortKey === 'uptime'"
+                        :direction="lxcSortDir"
+                        @toggle="toggleLxcSort('uptime')"
+                      />
+                    </th>
+                    <th>
+                      <SortableHeader
+                        label="Hôte lié"
+                        :active="lxcSortKey === 'linked_host'"
+                        :direction="lxcSortDir"
+                        @toggle="toggleLxcSort('linked_host')"
+                      />
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -632,12 +793,54 @@
               <table class="table table-vcenter card-table">
                 <thead>
                   <tr>
-                    <th><SortableHeader label="Périphérique" :active="diskSortKey === 'dev_path'" :direction="diskSortDir" @toggle="toggleDiskSort('dev_path')" /></th>
-                    <th><SortableHeader label="Modèle" :active="diskSortKey === 'model'" :direction="diskSortDir" @toggle="toggleDiskSort('model')" /></th>
-                    <th><SortableHeader label="Type" :active="diskSortKey === 'disk_type'" :direction="diskSortDir" @toggle="toggleDiskSort('disk_type')" /></th>
-                    <th><SortableHeader label="Taille" :active="diskSortKey === 'size_bytes'" :direction="diskSortDir" @toggle="toggleDiskSort('size_bytes')" /></th>
-                    <th><SortableHeader label="Santé SMART" :active="diskSortKey === 'health'" :direction="diskSortDir" @toggle="toggleDiskSort('health')" /></th>
-                    <th><SortableHeader label="Usure SSD" :active="diskSortKey === 'wearout'" :direction="diskSortDir" @toggle="toggleDiskSort('wearout')" /></th>
+                    <th>
+                      <SortableHeader
+                        label="Périphérique"
+                        :active="diskSortKey === 'dev_path'"
+                        :direction="diskSortDir"
+                        @toggle="toggleDiskSort('dev_path')"
+                      />
+                    </th>
+                    <th>
+                      <SortableHeader
+                        label="Modèle"
+                        :active="diskSortKey === 'model'"
+                        :direction="diskSortDir"
+                        @toggle="toggleDiskSort('model')"
+                      />
+                    </th>
+                    <th>
+                      <SortableHeader
+                        label="Type"
+                        :active="diskSortKey === 'disk_type'"
+                        :direction="diskSortDir"
+                        @toggle="toggleDiskSort('disk_type')"
+                      />
+                    </th>
+                    <th>
+                      <SortableHeader
+                        label="Taille"
+                        :active="diskSortKey === 'size_bytes'"
+                        :direction="diskSortDir"
+                        @toggle="toggleDiskSort('size_bytes')"
+                      />
+                    </th>
+                    <th>
+                      <SortableHeader
+                        label="Santé SMART"
+                        :active="diskSortKey === 'health'"
+                        :direction="diskSortDir"
+                        @toggle="toggleDiskSort('health')"
+                      />
+                    </th>
+                    <th>
+                      <SortableHeader
+                        label="Usure SSD"
+                        :active="diskSortKey === 'wearout'"
+                        :direction="diskSortDir"
+                        @toggle="toggleDiskSort('wearout')"
+                      />
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -706,12 +909,54 @@
                 <table class="table table-vcenter card-table">
                   <thead>
                     <tr>
-                      <th><SortableHeader label="Type" :active="taskSortKey === 'task_type'" :direction="taskSortDir" @toggle="toggleTaskSort('task_type')" /></th>
-                      <th><SortableHeader label="Objet" :active="taskSortKey === 'object_id'" :direction="taskSortDir" @toggle="toggleTaskSort('object_id')" /></th>
-                      <th><SortableHeader label="Utilisateur" :active="taskSortKey === 'user_name'" :direction="taskSortDir" @toggle="toggleTaskSort('user_name')" /></th>
-                      <th><SortableHeader label="Début" :active="taskSortKey === 'start_time'" :direction="taskSortDir" @toggle="toggleTaskSort('start_time')" /></th>
-                      <th><SortableHeader label="Durée" :active="taskSortKey === 'duration'" :direction="taskSortDir" @toggle="toggleTaskSort('duration')" /></th>
-                      <th><SortableHeader label="Statut" :active="taskSortKey === 'status'" :direction="taskSortDir" @toggle="toggleTaskSort('status')" /></th>
+                      <th>
+                        <SortableHeader
+                          label="Type"
+                          :active="taskSortKey === 'task_type'"
+                          :direction="taskSortDir"
+                          @toggle="toggleTaskSort('task_type')"
+                        />
+                      </th>
+                      <th>
+                        <SortableHeader
+                          label="Objet"
+                          :active="taskSortKey === 'object_id'"
+                          :direction="taskSortDir"
+                          @toggle="toggleTaskSort('object_id')"
+                        />
+                      </th>
+                      <th>
+                        <SortableHeader
+                          label="Utilisateur"
+                          :active="taskSortKey === 'user_name'"
+                          :direction="taskSortDir"
+                          @toggle="toggleTaskSort('user_name')"
+                        />
+                      </th>
+                      <th>
+                        <SortableHeader
+                          label="Début"
+                          :active="taskSortKey === 'start_time'"
+                          :direction="taskSortDir"
+                          @toggle="toggleTaskSort('start_time')"
+                        />
+                      </th>
+                      <th>
+                        <SortableHeader
+                          label="Durée"
+                          :active="taskSortKey === 'duration'"
+                          :direction="taskSortDir"
+                          @toggle="toggleTaskSort('duration')"
+                        />
+                      </th>
+                      <th>
+                        <SortableHeader
+                          label="Statut"
+                          :active="taskSortKey === 'status'"
+                          :direction="taskSortDir"
+                          @toggle="toggleTaskSort('status')"
+                        />
+                      </th>
                       <th />
                     </tr>
                   </thead>

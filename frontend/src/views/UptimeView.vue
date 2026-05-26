@@ -243,7 +243,7 @@
                       v-model="form.expected_body_regex"
                       type="text"
                       class="form-control"
-                      placeholder='Ex: "status":\s*"ok"'
+                      placeholder="Ex: &quot;status&quot;:\s*&quot;ok&quot;"
                     >
                   </div>
                   <div class="col-md-6">
