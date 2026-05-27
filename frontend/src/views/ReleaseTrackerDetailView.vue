@@ -419,7 +419,7 @@
 
         <!-- tasks.yaml snippet card -->
         <div
-          v-if="tracker.host_id"
+          v-if="tracker.host_id && !tracker.custom_task_id"
           class="card mt-3"
         >
           <div class="card-header d-flex align-items-center justify-content-between">
