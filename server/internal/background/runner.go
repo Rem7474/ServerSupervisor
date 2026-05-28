@@ -2,7 +2,7 @@ package background
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"runtime/debug"
 	"sync"
 )
@@ -44,7 +44,7 @@ func (r *Runner) Start(parent context.Context) {
 		r.wg.Add(1)
 		go r.run(ctx, job)
 	}
-	log.Printf("background: started %d jobs", len(r.jobs))
+	slog.Info("background jobs started", slog.Int("count", len(r.jobs)))
 }
 
 // Stop cancels the shared context and waits for all jobs to return.
@@ -53,14 +53,17 @@ func (r *Runner) Stop() {
 		r.cancel()
 	}
 	r.wg.Wait()
-	log.Printf("background: all jobs stopped")
+	slog.Info("background jobs stopped")
 }
 
 func (r *Runner) run(ctx context.Context, job Job) {
 	defer r.wg.Done()
 	defer func() {
 		if rec := recover(); rec != nil {
-			log.Printf("background: job %q panicked: %v\n%s", job.Name, rec, debug.Stack())
+			slog.ErrorContext(ctx, "background job panicked",
+				slog.String("job", job.Name),
+				slog.Any("panic", rec),
+				slog.String("stack", string(debug.Stack())))
 		}
 	}()
 	job.Run(ctx)

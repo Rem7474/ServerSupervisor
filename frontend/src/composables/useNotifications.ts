@@ -3,60 +3,86 @@ import apiClient from '../api'
 import { useWebSocket } from './useWebSocket'
 import { resolveIncidentHostRoute } from '../utils/incidentRouting'
 
-export function useNotifications() {
-  const notifications = ref([])
-  const loading = ref(false)
-  const readAtRef = ref(null)
+export interface NotificationItem {
+  id: string | number
+  type?: string
+  triggered_at?: string
+  status?: string
+  resolved_at?: string | null
+  rule_name?: string
+  tracker_id?: string | number
+  tracker_type?: string
+  tracker_name?: string
+  version?: string
+  release_name?: string
+  host_id?: string
+  host_name?: string
+  metric?: string
+  value?: number
+  browser_notify?: boolean
+  webhook_id?: string | number
+  webhook_name?: string
+}
 
-  let pollTimer = null
-  let seenIdSet = null
+interface WSPayload {
+  type?: string
+  notification?: NotificationItem
+}
+
+export function useNotifications() {
+  const notifications = ref<NotificationItem[]>([])
+  const loading = ref(false)
+  const readAtRef = ref<string | null>(null)
+
+  let pollTimer: ReturnType<typeof setInterval> | null = null
+  let seenIdSet: Set<string | number> | null = null
 
   const unreadCount = computed(() =>
-    notifications.value.filter(n =>
-      !readAtRef.value || new Date(n.triggered_at) > new Date(readAtRef.value)
+    notifications.value.filter((n) =>
+      !readAtRef.value || new Date(n.triggered_at ?? 0) > new Date(readAtRef.value)
     ).length
   )
 
-  function isUnread(item) {
-    return !readAtRef.value || new Date(item.triggered_at) > new Date(readAtRef.value)
+  function isUnread(item: NotificationItem): boolean {
+    return !readAtRef.value || new Date(item.triggered_at ?? 0) > new Date(readAtRef.value)
   }
 
-  function metricUnit(metric) {
+  function metricUnit(metric?: string): string {
     if (!metric) return ''
     if (['cpu', 'memory', 'disk'].includes(metric)) return '%'
     return ''
   }
 
-  function trackerStatusLabel(status) {
+  function trackerStatusLabel(status?: string): string {
     if (status === 'pending' || status === 'running') return 'Détection en cours'
     if (status === 'completed' || status === 'success') return 'Exécution réussie'
     if (status === 'failed' || status === 'error') return 'Exécution échouée'
     return status || 'État inconnu'
   }
 
-  function notificationResolved(item) {
+  function notificationResolved(item?: NotificationItem): boolean {
     if (item?.type === 'release_tracker_detected' || item?.type === 'release_tracker_execution') {
       return !!item?.resolved_at || ['completed', 'success', 'failed', 'error'].includes((item?.status || '').toLowerCase())
     }
     return !!item?.resolved_at
   }
 
-  function notificationTitle(item) {
+  function notificationTitle(item?: NotificationItem): string {
     if (!item) return 'Notification'
     if (item.type === 'release_tracker_detected') return item.rule_name || 'Nouvelle release detectee'
     if (item.type === 'release_tracker_execution') return item.rule_name || 'Execution release tracker'
     return item.rule_name || 'Alerte'
   }
 
-  function notificationRoute(item) {
+  function notificationRoute(item?: NotificationItem): string {
     if (item?.type === 'release_tracker_detected' || item?.type === 'release_tracker_execution') {
-      if (item?.tracker_id) return `/release-trackers/${encodeURIComponent(item.tracker_id)}`
+      if (item?.tracker_id) return `/release-trackers/${encodeURIComponent(String(item.tracker_id))}`
       return '/git-webhooks?tab=trackers'
     }
     return resolveIncidentHostRoute(item?.host_id, item?.metric)
   }
 
-  async function markAllRead() {
+  async function markAllRead(): Promise<void> {
     try {
       const { data } = await apiClient.markNotificationsRead()
       readAtRef.value = data.read_at ?? new Date().toISOString()
@@ -65,7 +91,7 @@ export function useNotifications() {
     }
   }
 
-  function showExecutionBrowserNotification(title, body, tag) {
+  function showExecutionBrowserNotification(title: string, body: string, tag: string): void {
     try {
       const n = new Notification(title, {
         body,
@@ -79,7 +105,7 @@ export function useNotifications() {
     }
   }
 
-  function showBrowserNotification(item) {
+  function showBrowserNotification(item: NotificationItem): void {
     if (item?.type === 'release_tracker_detected' || item?.type === 'release_tracker_execution') {
       const trackerTypeLabel = item.tracker_type === 'docker' ? 'Docker' : 'Git'
       showExecutionBrowserNotification(
@@ -104,14 +130,18 @@ export function useNotifications() {
     }
   }
 
-  function urlBase64ToUint8Array(base64String) {
+  function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
     const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
     const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
     const rawData = atob(base64)
-    return Uint8Array.from(rawData, (c) => c.charCodeAt(0))
+    const bytes = new Uint8Array(rawData.length)
+    for (let i = 0; i < rawData.length; i += 1) {
+      bytes[i] = rawData.charCodeAt(i)
+    }
+    return bytes
   }
 
-  async function cleanupPushSubscription() {
+  async function cleanupPushSubscription(): Promise<void> {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
     try {
       const reg = await navigator.serviceWorker.ready
@@ -126,7 +156,7 @@ export function useNotifications() {
     }
   }
 
-  async function setupPushNotifications() {
+  async function setupPushNotifications(): Promise<void> {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
     if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return
     try {
@@ -160,9 +190,9 @@ export function useNotifications() {
     }
   }
 
-  function watchPermissionChange() {
+  function watchPermissionChange(): void {
     if (!navigator.permissions) return
-    navigator.permissions.query({ name: 'notifications' }).then((status) => {
+    navigator.permissions.query({ name: 'notifications' as PermissionName }).then((status) => {
       status.onchange = () => {
         if (status.state === 'denied') {
           cleanupPushSubscription()
@@ -173,12 +203,12 @@ export function useNotifications() {
     }).catch(() => {})
   }
 
-  async function fetchNotifications() {
+  async function fetchNotifications(): Promise<void> {
     if (loading.value) return
     loading.value = true
     try {
       const res = await apiClient.getNotifications()
-      const incoming = res.data?.notifications || []
+      const incoming: NotificationItem[] = res.data?.notifications || []
 
       const serverReadAt = res.data?.read_at
       if (serverReadAt !== undefined) {
@@ -193,7 +223,7 @@ export function useNotifications() {
         }
       }
 
-      seenIdSet = new Set(incoming.map(n => n.id))
+      seenIdSet = new Set(incoming.map((n) => n.id))
       notifications.value = incoming
     } catch {
       // Non-critical — silent fail
@@ -202,7 +232,7 @@ export function useNotifications() {
     }
   }
 
-  useWebSocket('/api/v1/ws/notifications', (payload) => {
+  useWebSocket<WSPayload>('/api/v1/ws/notifications', (payload) => {
     if (!payload?.type || !payload.notification) return
 
     if (payload.type === 'new_alert') {
@@ -211,7 +241,7 @@ export function useNotifications() {
         showBrowserNotification(item)
       }
       if (seenIdSet !== null) seenIdSet.add(item.id)
-      if (!notifications.value.some(n => n.id === item.id)) {
+      if (!notifications.value.some((n) => n.id === item.id)) {
         notifications.value = [item, ...notifications.value].slice(0, 30)
       }
       return
@@ -257,7 +287,7 @@ export function useNotifications() {
     }
   })
 
-  function syncNotificationsIfVisible() {
+  function syncNotificationsIfVisible(): void {
     if (document.visibilityState !== 'visible') return
     fetchNotifications()
   }
@@ -278,7 +308,7 @@ export function useNotifications() {
   })
 
   onUnmounted(() => {
-    clearInterval(pollTimer)
+    if (pollTimer) clearInterval(pollTimer)
     window.removeEventListener('ss:app-resume', syncNotificationsIfVisible)
   })
 

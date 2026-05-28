@@ -1,8 +1,8 @@
 export const MANUAL_SENTINEL = '0 0 29 2 *'
 
-export function nextCronRun(expr) {
+export function nextCronRun(expr: string | null | undefined): Date | null {
   if (!expr || expr === MANUAL_SENTINEL) return null
-  const presets = {
+  const presets: Record<string, string> = {
     '@daily':   '0 0 * * *',
     '@hourly':  '0 * * * *',
     '@weekly':  '0 0 * * 0',
@@ -14,7 +14,7 @@ export function nextCronRun(expr) {
   if (parts.length !== 5) return null
   const [minPart, hourPart, domPart, monthPart, dowPart] = parts
 
-  function matchField(value, pattern) {
+  function matchField(value: number, pattern: string): boolean {
     if (pattern === '*') return true
     const m = pattern.match(/^\*\/(\d+)$/)
     if (m) return value % parseInt(m[1]) === 0
@@ -59,13 +59,13 @@ export function nextCronRun(expr) {
   return null
 }
 
-export function isManualOnly(task) {
+export function isManualOnly(task: { cron_expression?: string; enabled?: boolean }): boolean {
   return task.cron_expression === MANUAL_SENTINEL && !task.enabled
 }
 
-export function describeCron(expr) {
+export function describeCron(expr: string | null | undefined): string {
   if (!expr) return ''
-  const presets = {
+  const presets: Record<string, string> = {
     '@daily':   'tous les jours à minuit',
     '@hourly':  'toutes les heures',
     '@weekly':  'hebdomadaire (dim. minuit)',
@@ -118,7 +118,7 @@ export function describeCron(expr) {
 
   // M H * * D — day(s) of week
   if (dom === '*' && dow !== '*') {
-    const days = dow.split(',').map(d => {
+    const days = dow.split(',').map((d) => {
       const n = parseInt(d)
       return !isNaN(n) && n <= 6 ? dayNames[n] : d
     })

@@ -2,7 +2,7 @@ package background
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/serversupervisor/server/internal/database"
@@ -25,20 +25,20 @@ func NewMetricsDownsampleJob(db *database.DB) Job {
 					start5 := end.Add(-5 * time.Minute)
 
 					if n, err := db.BatchAggregateMetrics(ctx, start5, end, "5min"); err != nil {
-						log.Printf("5min downsampling error: %v", err)
+						slog.ErrorContext(ctx, "5min downsampling failed", slog.String("job", "metrics-downsample"), slog.Any("err", err))
 					} else if n > 0 {
-						log.Printf("Downsampled 5min metrics for %d hosts", n)
+						slog.InfoContext(ctx, "downsampled 5min metrics", slog.String("job", "metrics-downsample"), slog.Int("hosts", n))
 					}
 
 					if end.Minute() == 0 {
 						if _, err := db.BatchAggregateMetrics(ctx, end.Add(-time.Hour), end, "hour"); err != nil {
-							log.Printf("Hourly downsampling error: %v", err)
+							slog.ErrorContext(ctx, "hourly downsampling failed", slog.String("job", "metrics-downsample"), slog.Any("err", err))
 						}
 					}
 
 					if end.Hour() == 0 && end.Minute() == 0 {
 						if _, err := db.BatchAggregateMetrics(ctx, end.Add(-24*time.Hour), end, "day"); err != nil {
-							log.Printf("Daily downsampling error: %v", err)
+							slog.ErrorContext(ctx, "daily downsampling failed", slog.String("job", "metrics-downsample"), slog.Any("err", err))
 						}
 					}
 

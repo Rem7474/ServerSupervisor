@@ -1,4 +1,9 @@
-export const MODULE_META = {
+interface ModuleMeta {
+  label: string
+  cls: string
+}
+
+export const MODULE_META: Record<string, ModuleMeta> = {
   apt:       { label: 'APT',       cls: 'badge bg-azure-lt text-azure' },
   docker:    { label: 'Docker',    cls: 'badge bg-blue-lt text-blue' },
   systemd:   { label: 'Systemd',   cls: 'badge bg-green-lt text-green' },
@@ -8,10 +13,10 @@ export const MODULE_META = {
   proxmox:   { label: 'Proxmox',  cls: 'badge bg-yellow-lt text-yellow' },
 }
 
-export function moduleLabel(module) {
+export function moduleLabel(module: string): string {
   return MODULE_META[module]?.label ?? module
 }
 
-export function moduleClass(module) {
+export function moduleClass(module: string): string {
   return MODULE_META[module]?.cls ?? 'badge bg-secondary-lt text-secondary'
 }

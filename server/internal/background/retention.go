@@ -2,7 +2,7 @@ package background
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/serversupervisor/server/internal/config"
@@ -26,15 +26,15 @@ func NewMetricsRetentionJob(db *database.DB, cfg *config.Config) Job {
 						days = 30
 					}
 					if deleted, err := db.CleanOldMetrics(ctx, days); err != nil {
-						log.Printf("Metrics retention error: %v", err)
+						slog.ErrorContext(ctx, "metrics retention failed", slog.String("job", "metrics-retention"), slog.Any("err", err))
 					} else if deleted > 0 {
-						log.Printf("Deleted %d old metric rows (retention: %d days)", deleted, days)
+						slog.InfoContext(ctx, "deleted old metric rows", slog.String("job", "metrics-retention"), slog.Int64("deleted", deleted), slog.Int("retention_days", days))
 					}
 
 					if deleted, err := db.CleanupTrackerTagDigests(ctx, 100); err != nil {
-						log.Printf("Tracker tag digests cleanup error: %v", err)
+						slog.ErrorContext(ctx, "tracker tag digests cleanup failed", slog.String("job", "metrics-retention"), slog.Any("err", err))
 					} else if deleted > 0 {
-						log.Printf("Trimmed %d old tracker tag digest rows", deleted)
+						slog.InfoContext(ctx, "trimmed old tracker tag digests", slog.String("job", "metrics-retention"), slog.Int64("deleted", deleted))
 					}
 
 					// Reset to 24-hour interval after first run.

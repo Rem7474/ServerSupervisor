@@ -2,7 +2,7 @@ package background
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/serversupervisor/server/internal/config"
@@ -24,9 +24,9 @@ func NewAuditCleanupJob(db *database.DB, cfg *config.Config) Job {
 						days = 90
 					}
 					if deleted, err := db.CleanOldAuditLogs(ctx, days); err != nil {
-						log.Printf("Audit cleanup error: %v", err)
+						slog.ErrorContext(ctx, "audit cleanup failed", slog.String("job", "audit-cleanup"), slog.Any("err", err))
 					} else if deleted > 0 {
-						log.Printf("Cleaned up %d old audit log records (retention: %d days)", deleted, days)
+						slog.InfoContext(ctx, "audit cleanup done", slog.String("job", "audit-cleanup"), slog.Int64("deleted", deleted), slog.Int("retention_days", days))
 					}
 				case <-ctx.Done():
 					return

@@ -1,18 +1,24 @@
-function escapeHtml(value) {
+interface AnsiStyle {
+  color: string
+  backgroundColor: string
+  fontWeight: string
+}
+
+function escapeHtml(value: string): string {
   return value
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
 }
 
-function normalizeAnsiCodes(rawCodes) {
+function normalizeAnsiCodes(rawCodes: string): number[] {
   return rawCodes
     .split(';')
-    .map(code => Number.parseInt(code, 10))
-    .filter(code => !Number.isNaN(code))
+    .map((code) => Number.parseInt(code, 10))
+    .filter((code) => !Number.isNaN(code))
 }
 
-function statusLineColor(line) {
+function statusLineColor(line: string): string {
   const lower = line.toLowerCase()
   if (/\berror\b|err:|erreur|failed|echec|exception/i.test(lower)) return 'var(--tblr-danger)'
   if (/\bwarn(?:ing)?\b|attention|deprecated/i.test(lower)) return 'var(--tblr-warning)'
@@ -20,11 +26,11 @@ function statusLineColor(line) {
   return ''
 }
 
-function applyAnsiCode(style, code) {
+function applyAnsiCode(style: AnsiStyle, code: number): AnsiStyle {
   if (code === 0) return { color: '', backgroundColor: '', fontWeight: '' }
   if (code === 1) return { ...style, fontWeight: '700' }
 
-  const foregroundColors = {
+  const foregroundColors: Record<number, string> = {
     30: '#94a3b8',
     31: 'var(--tblr-danger)',
     32: 'var(--tblr-success)',
@@ -43,7 +49,7 @@ function applyAnsiCode(style, code) {
     97: '#f8fafc',
   }
 
-  const backgroundColors = {
+  const backgroundColors: Record<number, string> = {
     40: '#0f172a',
     41: 'rgba(239, 68, 68, 0.18)',
     42: 'rgba(34, 197, 94, 0.18)',
@@ -70,23 +76,23 @@ function applyAnsiCode(style, code) {
   return style
 }
 
-function styleToString(style) {
+function styleToString(style: AnsiStyle): string {
   return Object.entries(style)
     .filter(([, value]) => Boolean(value))
-    .map(([key, value]) => `${key.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`)}:${value}`)
+    .map(([key, value]) => `${key.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)}:${value}`)
     .join(';')
 }
 
-function colorizeLine(line) {
-  const ansiPattern = /(\u001b\[[0-9;]*m)/g
+function colorizeLine(line: string): string {
+  const ansiPattern = /(\[[0-9;]*m)/g
   const parts = line.split(ansiPattern)
-  let style = { color: '', backgroundColor: '', fontWeight: '' }
+  let style: AnsiStyle = { color: '', backgroundColor: '', fontWeight: '' }
   let html = ''
   let hasAnsi = false
 
   for (const part of parts) {
     if (!part) continue
-    const ansiMatch = part.match(/^\u001b\[([0-9;]*)m$/)
+    const ansiMatch = part.match(/^\[([0-9;]*)m$/)
     if (ansiMatch) {
       hasAnsi = true
       const codes = normalizeAnsiCodes(ansiMatch[1] || '0')
@@ -106,7 +112,7 @@ function colorizeLine(line) {
   return keywordColor ? `<span style="color:${keywordColor}">${escapedLine}</span>` : escapedLine
 }
 
-export function normalizeConsoleOutput(raw) {
+export function normalizeConsoleOutput(raw: string | null | undefined): string {
   if (!raw) return ''
   const lines = ['']
   let currentLine = ''
@@ -130,17 +136,17 @@ export function normalizeConsoleOutput(raw) {
   return lines.join('\n')
 }
 
-export function colorizeConsoleOutput(raw) {
+export function colorizeConsoleOutput(raw: string | null | undefined): string {
   const plain = normalizeConsoleOutput(raw)
   if (!plain) return ''
   return plain.split('\n').map(colorizeLine).join('\n')
 }
 
-export async function copyConsoleOutput(raw) {
+export async function copyConsoleOutput(raw: string | null | undefined): Promise<void> {
   await navigator.clipboard.writeText(normalizeConsoleOutput(raw))
 }
 
-export function downloadConsoleOutput(raw, filename) {
+export function downloadConsoleOutput(raw: string | null | undefined, filename: string): void {
   const blob = new Blob([normalizeConsoleOutput(raw)], { type: 'text/plain' })
   const url = URL.createObjectURL(blob)
   const link = document.createElement('a')

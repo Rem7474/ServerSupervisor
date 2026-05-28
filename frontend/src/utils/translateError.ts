@@ -2,7 +2,7 @@
  * Dictionnaire de traduction des messages d'erreur backend → français.
  * Les clés sont des sous-chaînes (insensibles à la casse) du message d'origine.
  */
-const ERROR_MESSAGES = {
+const ERROR_MESSAGES: Record<string, string> = {
   'host not found':        'Hôte introuvable',
   'unauthorized':          'Accès non autorisé',
   'forbidden':             'Action non autorisée',
@@ -19,19 +19,21 @@ const ERROR_MESSAGES = {
   'permission denied':     'Permission refusée',
 }
 
-/**
- * Traduit un objet erreur (Axios ou native Error) en message français lisible.
- * @param {Error|unknown} error
- * @returns {string}
- */
-export function translateError(error) {
+interface ErrorLike {
+  response?: { data?: { error?: unknown; message?: unknown } }
+  message?: unknown
+}
+
+/** Traduit un objet erreur (Axios ou native Error) en message français lisible. */
+export function translateError(error: unknown): string {
   if (!error) return 'Une erreur est survenue'
 
-  const raw = (
-    error?.response?.data?.error ||
-    error?.response?.data?.message ||
-    error?.message ||
-    String(error)
+  const e = (typeof error === 'object' && error !== null ? error : {}) as ErrorLike
+  const raw = String(
+    e.response?.data?.error ||
+    e.response?.data?.message ||
+    e.message ||
+    error
   )
 
   const lower = raw.toLowerCase()

@@ -2,26 +2,23 @@
  * Shared date/time/number formatters used across multiple views.
  */
 
-/**
- * Format an ISO date string as a short date (DD/MM/YYYY).
- */
-export function formatDate(dt) {
+type DateInput = string | number | Date | null | undefined
+type NumberInput = number | null | undefined
+
+/** Format an ISO date string as a short date (DD/MM/YYYY). */
+export function formatDate(dt: DateInput): string {
   if (!dt) return '-'
   return new Date(dt).toLocaleDateString('fr-FR', { year: 'numeric', month: '2-digit', day: '2-digit' })
 }
 
-/**
- * Format an ISO date string as "DD/MM/YYYY HH:mm".
- */
-export function formatDateTime(dt) {
+/** Format an ISO date string as "DD/MM/YYYY HH:mm". */
+export function formatDateTime(dt: DateInput): string {
   if (!dt) return '-'
   return new Date(dt).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
 }
 
-/**
- * Format an ISO date string as a long date (e.g. "25 février 2026").
- */
-export function formatDateLong(dt) {
+/** Format an ISO date string as a long date (e.g. "25 février 2026"). */
+export function formatDateLong(dt: DateInput): string {
   if (!dt) return '-'
   return new Date(dt).toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' })
 }
@@ -30,7 +27,7 @@ export function formatDateLong(dt) {
  * Format a duration in seconds to a human-readable string.
  * e.g. 65 → "1min 5s", 3661 → "1h 1min", 30 → "30s"
  */
-export function formatDurationSecs(seconds) {
+export function formatDurationSecs(seconds: NumberInput): string {
   if (!seconds && seconds !== 0) return '-'
   const h = Math.floor(seconds / 3600)
   const m = Math.floor((seconds % 3600) / 60)
@@ -40,11 +37,9 @@ export function formatDurationSecs(seconds) {
   return `${s}s`
 }
 
-/**
- * Format an uptime in seconds to "Xj Xh" or "Xh Xm".
- */
-export function formatUptime(seconds) {
-  if (seconds == null || seconds === undefined) return 'N/A'
+/** Format an uptime in seconds to "Xj Xh" or "Xh Xm". */
+export function formatUptime(seconds: NumberInput): string {
+  if (seconds == null) return 'N/A'
   const days = Math.floor(seconds / 86400)
   const hours = Math.floor((seconds % 86400) / 3600)
   if (days > 0) return `${days}j ${hours}h`
@@ -52,10 +47,8 @@ export function formatUptime(seconds) {
   return `${hours}h ${mins}m`
 }
 
-/**
- * Format bytes to a human-readable string (KB, MB, GB).
- */
-export function formatBytes(bytes) {
+/** Format bytes to a human-readable string (KB, MB, GB). */
+export function formatBytes(bytes: NumberInput): string {
   if (!bytes && bytes !== 0) return '-'
   if (bytes === 0) return '0 B'
   const units = ['B', 'KB', 'MB', 'GB', 'TB']

@@ -2,7 +2,7 @@ package background
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/serversupervisor/server/internal/database"
@@ -20,7 +20,7 @@ func NewHostStatusJob(db *database.DB) Job {
 				select {
 				case <-ticker.C:
 					if err := db.UpdateHostStatusBasedOnLastSeen(ctx, 2); err != nil {
-						log.Printf("Failed to update host status: %v", err)
+						slog.ErrorContext(ctx, "host status update failed", slog.String("job", "host-status"), slog.Any("err", err))
 					}
 				case <-ctx.Done():
 					return

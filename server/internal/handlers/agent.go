@@ -1,14 +1,12 @@
 package handlers
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/serversupervisor/server/internal/config"
@@ -95,208 +93,18 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 		log.Printf("Warning: failed to cleanup stalled commands for host %s: %v", safeHostID, err)
 	}
 
-	// Check if Proxmox is the exclusive metrics source for this host.
-	//
-	// metrics_source semantics:
-	//   "proxmox" → Proxmox is the sole source; skip storing agent metrics and signal
-	//               the agent to stop collecting CPU/RAM (saves resources).
-	//   "auto"    → Proxmox is preferred for display, but agent data is kept as fallback.
-	//               Agent continues collecting; server still stores agent metrics so that
-	//               a Proxmox outage doesn't leave the host with no data at all.
-	//   "agent"   → Agent is always used; Proxmox data is ignored.
-	proxmoxIsMetricsSource := false
-	if link, err := h.db.GetProxmoxGuestLinkByHost(c.Request.Context(), hostID); err == nil && link != nil {
-		switch link.MetricsSource {
-		case "proxmox":
-			proxmoxIsMetricsSource = true
-		case "auto":
-			// Skip agent collection only when Proxmox data is recent (within 3× poll interval).
-			// If Proxmox becomes unavailable, the freshness check fails and the agent resumes.
-			if fresh, err := h.db.IsProxmoxGuestDataFresh(c.Request.Context(), hostID); err == nil {
-				proxmoxIsMetricsSource = fresh
-			}
-		}
+	// Determine whether Proxmox is the exclusive metrics source for this host.
+	proxmoxIsMetricsSource := h.reportProxmoxIsMetricsSource(c.Request.Context(), hostID)
+
+	// Persist host info + metrics (only fatal storage failures abort with 500).
+	if err := h.storeAgentMetrics(c.Request.Context(), hostID, &report, proxmoxIsMetricsSource); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
 	}
 
-	// A host used as Proxmox CPU temperature source must keep sending local
-	// metrics so cpu_temperature can be resolved for all linked guests on that node.
-	if proxmoxIsMetricsSource && h.db.IsHostUsedAsProxmoxCPUTempSource(c.Request.Context(), hostID) {
-		proxmoxIsMetricsSource = false
-	}
-
-	// Same guard for fan RPM source hosts.
-	if proxmoxIsMetricsSource && h.db.IsHostUsedAsProxmoxFanRPMSource(c.Request.Context(), hostID) {
-		proxmoxIsMetricsSource = false
-	}
-
-	// Update host info from agent report (only if metrics are provided)
-	if report.Metrics != nil {
-		update := models.HostUpdate{
-			Hostname:     stringPtrIfNotEmpty(report.Metrics.Hostname),
-			OS:           stringPtrIfNotEmpty(report.Metrics.OS),
-			AgentVersion: stringPtrIfNotEmpty(report.AgentVersion),
-		}
-		if update.Hostname != nil || update.OS != nil || update.AgentVersion != nil {
-			if err := h.db.UpdateHost(c.Request.Context(), hostID, &update); err != nil {
-				log.Printf("Warning: failed to update host %s: %v", hostID, err)
-			}
-		}
-
-		// Skip storing metrics when Proxmox is the designated source —
-		// Proxmox polling already stores CPU/RAM for this host.
-		if proxmoxIsMetricsSource {
-			if err := h.db.InsertUptimeMetrics(c.Request.Context(), hostID, report.Metrics.Uptime, report.Metrics.Hostname); err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store uptime"})
-				return
-			}
-		} else {
-			report.Metrics.HostID = hostID
-			report.Metrics.Timestamp = time.Now()
-			if _, err := h.db.InsertMetrics(c.Request.Context(), report.Metrics); err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to store metrics"})
-				return
-			}
-		}
-	} else {
-		// If no metrics, still update agent version
-		if report.AgentVersion != "" {
-			update := models.HostUpdate{
-				AgentVersion: stringPtrIfNotEmpty(report.AgentVersion),
-			}
-			if err := h.db.UpdateHost(c.Request.Context(), hostID, &update); err != nil {
-				log.Printf("Warning: failed to update host %s: %v", hostID, err)
-			}
-		}
-	}
-
-	// Store docker containers
-	if report.Docker != nil {
-		for i := range report.Docker.Containers {
-			report.Docker.Containers[i].HostID = hostID
-		}
-		if err := h.db.UpsertDockerContainers(c.Request.Context(), hostID, report.Docker.Containers); err != nil {
-			log.Printf("Warning: failed to store docker containers for host %s: %v", safeHostID, err)
-		}
-	}
-
-	// Store apt status
-	if report.AptStatus != nil {
-		report.AptStatus.HostID = hostID
-		if err := h.db.UpsertAptStatus(c.Request.Context(), report.AptStatus); err != nil {
-			log.Printf("Warning: failed to store apt status for host %s: %v", safeHostID, err)
-		}
-	}
-
-	// Store unattended-upgrades status and notify on new upgrade runs
-	if report.UnattendedUpgrades != nil {
-		if err := h.db.UpsertUUStatus(c.Request.Context(), hostID, *report.UnattendedUpgrades); err != nil {
-			log.Printf("Warning: failed to store UU status for host %s: %v", safeHostID, err)
-		}
-		for _, run := range report.UnattendedUpgrades.NewRuns {
-			isNew, err := h.db.InsertUURunIfNew(c.Request.Context(), hostID, run)
-			if err != nil {
-				log.Printf("Warning: failed to insert UU run for host %s: %v", safeHostID, err)
-				continue
-			}
-			if isNew {
-				_ = h.db.UpdateUULastRun(c.Request.Context(), hostID, run.RunAt, len(run.Packages))
-				_ = h.db.TouchAptLastAction(c.Request.Context(), hostID, "update")
-				if len(run.Packages) > 0 {
-					_ = h.db.TouchAptLastUpgradeAt(c.Request.Context(), hostID, run.RunAt)
-					hostname := hostID
-					if host, err := h.db.GetHost(c.Request.Context(), hostID); err == nil && host != nil {
-						hostname = host.Hostname
-					}
-					h.pushUUNotification(hostname, hostID, run)
-				}
-			}
-		}
-	}
-
-	// Store Docker networks
-	if report.DockerNetworks != nil {
-		dbNetworks := make([]models.DockerNetwork, 0, len(report.DockerNetworks))
-		for _, n := range report.DockerNetworks {
-			dbNetworks = append(dbNetworks, models.DockerNetwork{
-				ID:           fmt.Sprintf("%s-%s", hostID, n.NetworkID),
-				HostID:       hostID,
-				NetworkID:    n.NetworkID,
-				Name:         n.Name,
-				Driver:       n.Driver,
-				Scope:        n.Scope,
-				ContainerIDs: n.ContainerIDs,
-				UpdatedAt:    time.Now(),
-			})
-		}
-		if err := h.db.UpsertDockerNetworks(c.Request.Context(), hostID, dbNetworks); err != nil {
-			log.Printf("Warning: failed to store docker networks for host %s: %v", safeHostID, err)
-		}
-	}
-
-	// Store docker-compose projects
-	if report.ComposeProjects != nil {
-		if err := h.db.UpsertComposeProjects(c.Request.Context(), hostID, report.ComposeProjects); err != nil {
-			log.Printf("Warning: failed to store compose projects for host %s: %v", safeHostID, err)
-		}
-	}
-
-	// Store disk metrics
-	if len(report.DiskMetrics) > 0 {
-		batchTime := time.Now()
-		for i := range report.DiskMetrics {
-			report.DiskMetrics[i].HostID = hostID
-			report.DiskMetrics[i].Timestamp = batchTime
-		}
-		if err := h.db.InsertDiskMetrics(c.Request.Context(), report.DiskMetrics); err != nil {
-			log.Printf("Warning: failed to store disk metrics for host %s: %v", safeHostID, err)
-		}
-	}
-
-	// Store disk health
-	if len(report.DiskHealth) > 0 {
-		for i := range report.DiskHealth {
-			report.DiskHealth[i].HostID = hostID
-			report.DiskHealth[i].CollectedAt = time.Now()
-		}
-		if err := h.db.InsertDiskHealth(c.Request.Context(), report.DiskHealth); err != nil {
-			log.Printf("Warning: failed to store disk health for host %s: %v", safeHostID, err)
-		}
-	}
-
-	// Store available custom tasks from agent's tasks.yaml
-	if report.CustomTasks != nil {
-		if b, err := json.Marshal(report.CustomTasks); err == nil {
-			if err := h.db.UpdateHostCustomTasks(c.Request.Context(), hostID, string(b)); err != nil {
-				log.Printf("Warning: failed to store custom tasks for host %s: %v", safeHostID, err)
-			}
-		}
-	}
-
-	// Store raw tasks.yaml content (used by frontend to show snippet examples)
-	if report.TasksConfigYAML != "" {
-		if err := h.db.UpdateHostTasksConfigYAML(c.Request.Context(), hostID, report.TasksConfigYAML); err != nil {
-			log.Printf("Warning: failed to store tasks config YAML for host %s: %v", safeHostID, err)
-		}
-	}
-
-	// Store agent capabilities (which collectors are enabled on this host)
-	if report.Capabilities != nil {
-		if b, err := json.Marshal(report.Capabilities); err == nil {
-			if err := h.db.UpdateHostCollectors(c.Request.Context(), hostID, string(b)); err != nil {
-				log.Printf("Warning: failed to store collectors for host %s: %v", safeHostID, err)
-			}
-		}
-	}
-
-	// Store unified web logs cache + snapshot history.
-	if report.WebLogs != nil {
-		if err := h.db.UpdateHostWebLogs(c.Request.Context(), hostID, report.WebLogs); err != nil {
-			log.Printf("Warning: failed to update web logs cache for host %s: %v", safeHostID, err)
-		}
-		if err := h.db.InsertWebLogSnapshot(c.Request.Context(), hostID, report.WebLogs); err != nil {
-			log.Printf("Warning: failed to insert web logs snapshot for host %s: %v", safeHostID, err)
-		}
-	}
+	// Persist the remaining report sections (all best-effort, failures logged).
+	h.storeContainersAndPackages(c.Request.Context(), hostID, safeHostID, &report)
+	h.storeDiskAndMetadata(c.Request.Context(), hostID, safeHostID, &report)
 
 	// Return pending commands for this host (unified remote_commands table)
 	commands, err := h.db.ClaimPendingRemoteCommands(c.Request.Context(), hostID)
@@ -584,7 +392,7 @@ func (h *AgentHandler) LogAuditAction(c *gin.Context) {
 		if auditLogID != 0 {
 			auditIDPtr = &auditLogID
 		}
-		if cerr := h.db.CreateCompletedRemoteCommand(c.Request.Context(), 
+		if cerr := h.db.CreateCompletedRemoteCommand(c.Request.Context(),
 			hostID, audit.Module, audit.Action, "", audit.Details, "agent", audit.Status, auditIDPtr,
 		); cerr != nil {
 			log.Printf("Warning: failed to create self-reported command record: %v", cerr)

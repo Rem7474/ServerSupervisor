@@ -2,7 +2,7 @@ package background
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/serversupervisor/server/internal/config"
@@ -23,9 +23,9 @@ func NewWebLogsRetentionJob(db *database.DB, cfg *config.Config) Job {
 						days = 30
 					}
 					if deleted, err := db.CleanOldWebLogs(ctx, days); err != nil {
-						log.Printf("Web logs retention error: %v", err)
+						slog.ErrorContext(ctx, "web logs retention failed", slog.String("job", "web-logs-retention"), slog.Any("err", err))
 					} else if deleted > 0 {
-						log.Printf("Deleted %d old web log snapshots (retention: %d days)", deleted, days)
+						slog.InfoContext(ctx, "deleted old web log snapshots", slog.String("job", "web-logs-retention"), slog.Int64("deleted", deleted), slog.Int("retention_days", days))
 					}
 				case <-ctx.Done():
 					return
