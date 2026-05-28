@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"time"
@@ -15,18 +16,19 @@ import (
 // ProxmoxHandler manages Proxmox connections, exposes read-only data,
 // and runs the background polling loop.
 type ProxmoxHandler struct {
-	db   *database.DB
-	cfg  *config.Config
-	svc  *proxmoxService
-	stop chan struct{}
+	db        *database.DB
+	cfg       *config.Config
+	svc       *proxmoxService
+	pollerCtx context.Context // detached ctx for goroutines fired from handlers
+	cancel    context.CancelFunc
 }
 
 func NewProxmoxHandler(db *database.DB, cfg *config.Config) *ProxmoxHandler {
 	return &ProxmoxHandler{
-		db:   db,
-		cfg:  cfg,
-		svc:  newProxmoxService(db, cfg),
-		stop: make(chan struct{}),
+		db:        db,
+		cfg:       cfg,
+		svc:       newProxmoxService(db, cfg),
+		pollerCtx: context.Background(),
 	}
 }
 
@@ -34,17 +36,23 @@ func NewProxmoxHandler(db *database.DB, cfg *config.Config) *ProxmoxHandler {
 
 // StartPoller begins periodic collection for all enabled Proxmox connections.
 // It runs an immediate first pass, then repeats at the minimum configured interval.
-func (h *ProxmoxHandler) StartPoller() {
-	go h.pollAll() // immediate first pass
+// The provided parent ctx is propagated to every DB call; cancelling it (or
+// calling StopPoller) terminates the loop.
+func (h *ProxmoxHandler) StartPoller(parent context.Context) {
+	ctx, cancel := context.WithCancel(parent)
+	h.pollerCtx = ctx
+	h.cancel = cancel
+
+	go h.svc.PollAll(ctx) // immediate first pass
 
 	ticker := time.NewTicker(30 * time.Second)
 	go func() {
+		defer ticker.Stop()
 		for {
 			select {
 			case <-ticker.C:
-				h.pollAll()
-			case <-h.stop:
-				ticker.Stop()
+				h.svc.PollAll(ctx)
+			case <-ctx.Done():
 				return
 			}
 		}
@@ -53,16 +61,9 @@ func (h *ProxmoxHandler) StartPoller() {
 }
 
 func (h *ProxmoxHandler) StopPoller() {
-	close(h.stop)
-}
-
-// pollAll iterates all enabled connections and polls each one.
-func (h *ProxmoxHandler) pollAll() {
-	h.svc.PollAll()
-}
-
-func (h *ProxmoxHandler) pollOne(conn database.ProxmoxConnectionFull) {
-	h.svc.PollOne(conn)
+	if h.cancel != nil {
+		h.cancel()
+	}
 }
 
 // ─── CRUD: Connections ────────────────────────────────────────────────────────
@@ -218,7 +219,7 @@ func (h *ProxmoxHandler) PollNow(c *gin.Context) {
 	}
 	for _, conn := range conns {
 		if conn.ID == id {
-			go h.pollOne(conn)
+			go h.svc.PollOne(h.pollerCtx, conn)
 			c.JSON(http.StatusOK, gin.H{"message": "poll triggered"})
 			return
 		}

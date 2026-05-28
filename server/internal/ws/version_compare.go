@@ -11,18 +11,18 @@ import (
 // and produces a comparison row used by dashboard / host detail snapshots.
 // The pure version logic lives in the releasetracker package — this method
 // owns only the WS-handler-side DB orchestration.
-func (h *WSHandler) buildVersionComparisons() ([]models.VersionComparison, error) {
-	trackers, err := h.db.ListReleaseTrackers(context.Background())
+func (h *WSHandler) buildVersionComparisons(ctx context.Context) ([]models.VersionComparison, error) {
+	trackers, err := h.db.ListReleaseTrackers(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	containers, err := h.db.GetAllDockerContainers(context.Background())
+	containers, err := h.db.GetAllDockerContainers(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	digestTagMap, _ := h.db.GetAllTrackerTagDigests(context.Background())
+	digestTagMap, _ := h.db.GetAllTrackerTagDigests(ctx)
 	if digestTagMap == nil {
 		digestTagMap = make(map[string]string)
 	}

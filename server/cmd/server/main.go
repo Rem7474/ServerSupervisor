@@ -4,7 +4,6 @@ import (
 	"context"
 	"log"
 	"net/http"
-	"os"
 	"os/signal"
 	"syscall"
 	"time"
@@ -22,6 +21,11 @@ import (
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	log.Println("ServerSupervisor - Starting server...")
+
+	// Root ctx — cancelled by SIGINT/SIGTERM. Propagated to background jobs,
+	// scheduler, pollers, and any DB call made outside an HTTP request context.
+	rootCtx, stopSignals := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stopSignals()
 
 	// Load config
 	cfg := config.Load()
@@ -54,7 +58,7 @@ func main() {
 	defer func() { _ = db.Close() }()
 
 	// Cleanup stalled commands at startup (commands older than 10 minutes)
-	if err := db.CleanupStalledCommands(context.Background(), 10); err != nil {
+	if err := db.CleanupStalledCommands(rootCtx, 10); err != nil {
 		log.Printf("Warning: failed to cleanup stalled commands: %v", err)
 	}
 
@@ -64,12 +68,12 @@ func main() {
 		log.Fatalf("Failed to hash admin password: %v", err)
 	}
 	mustChangePassword := cfg.AdminPassword == "admin"
-	if err := db.CreateUser(context.Background(), cfg.AdminUser, hash, "admin", mustChangePassword); err != nil {
+	if err := db.CreateUser(rootCtx, cfg.AdminUser, hash, "admin", mustChangePassword); err != nil {
 		log.Printf("Admin user creation: %v (may already exist)", err)
 	}
 	// For existing installations still using default password, ensure flag is set
 	if mustChangePassword {
-		if err := db.SetUserMustChangePassword(context.Background(), cfg.AdminUser, true); err != nil {
+		if err := db.SetUserMustChangePassword(rootCtx, cfg.AdminUser, true); err != nil {
 			log.Printf("Warning: failed to set must_change_password for admin: %v", err)
 		}
 	}
@@ -78,7 +82,7 @@ func main() {
 
 	// Start task scheduler
 	sched := scheduler.New(db, dispatcher)
-	sched.Start()
+	sched.Start(rootCtx)
 	defer sched.Stop()
 
 	// Notification hub — shared between alert engine (push on fire) and WS handler
@@ -94,15 +98,15 @@ func main() {
 	bg.Add(background.NewWebLogsRetentionJob(db, cfg))
 	bg.Add(background.NewUptimeWorkerJob(db))
 	bg.Add(background.NewSSLWorkerJob(db))
-	bg.Start()
+	bg.Start(rootCtx)
 	defer bg.Stop()
 
 	// Setup router
 	router, releaseTrackerH, proxmoxH, cleanupRouter := api.SetupRouter(db, cfg, notifHub, sched, dispatcher)
 	defer cleanupRouter()
-	releaseTrackerH.StartPoller()
+	releaseTrackerH.StartPoller(rootCtx)
 	defer releaseTrackerH.StopPoller()
-	proxmoxH.StartPoller()
+	proxmoxH.StartPoller(rootCtx)
 	defer proxmoxH.StopPoller()
 
 	// Start server
@@ -121,15 +125,13 @@ func main() {
 		}
 	}()
 
-	// Graceful shutdown
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
+	// Graceful shutdown — wait for SIGINT/SIGTERM (already wired via signal.NotifyContext).
+	<-rootCtx.Done()
 	log.Println("Shutting down server...")
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	if err := srv.Shutdown(ctx); err != nil {
+	if err := srv.Shutdown(shutdownCtx); err != nil {
 		log.Fatalf("Server forced to shutdown: %v", err)
 	}
 	log.Println("Server stopped")

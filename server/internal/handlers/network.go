@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 	"strings"
@@ -21,7 +22,7 @@ func NewNetworkHandler(db *database.DB) *NetworkHandler {
 }
 
 func (h *NetworkHandler) GetNetworkSnapshot(c *gin.Context) {
-	snapshot, err := networkview.BuildSnapshot(h.db)
+	snapshot, err := networkview.BuildSnapshot(c.Request.Context(), h.db)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch network snapshot"})
 		return
@@ -29,8 +30,8 @@ func (h *NetworkHandler) GetNetworkSnapshot(c *gin.Context) {
 	c.JSON(http.StatusOK, snapshot)
 }
 
-func BuildNetworkSnapshot(db *database.DB) (*models.NetworkSnapshot, error) {
-	return networkview.BuildSnapshot(db)
+func BuildNetworkSnapshot(ctx context.Context, db *database.DB) (*models.NetworkSnapshot, error) {
+	return networkview.BuildSnapshot(ctx, db)
 }
 
 func parseDockerPorts(raw string) []models.PortMapping {
@@ -141,7 +142,7 @@ func (h *NetworkHandler) SaveTopologyConfig(c *gin.Context) {
 
 // GetTopologySnapshot returns topology with config
 func (h *NetworkHandler) GetTopologySnapshot(c *gin.Context) {
-	baseSnapshot, err := networkview.BuildSnapshot(h.db)
+	baseSnapshot, err := networkview.BuildSnapshot(c.Request.Context(), h.db)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch network snapshot"})
 		return

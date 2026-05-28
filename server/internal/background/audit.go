@@ -23,7 +23,7 @@ func NewAuditCleanupJob(db *database.DB, cfg *config.Config) Job {
 					if days <= 0 {
 						days = 90
 					}
-					if deleted, err := db.CleanOldAuditLogs(context.Background(), days); err != nil {
+					if deleted, err := db.CleanOldAuditLogs(ctx, days); err != nil {
 						log.Printf("Audit cleanup error: %v", err)
 					} else if deleted > 0 {
 						log.Printf("Cleaned up %d old audit log records (retention: %d days)", deleted, days)

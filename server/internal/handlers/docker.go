@@ -112,7 +112,7 @@ func (h *DockerHandler) SendDockerCommand(c *gin.Context) {
 	}
 
 	payload := fmt.Sprintf(`{"working_dir":%q}`, req.WorkingDir)
-	result, err := h.dispatcher.Create(dispatch.Request{
+	result, err := h.dispatcher.Create(c.Request.Context(), dispatch.Request{
 		HostID:      req.HostID,
 		Module:      "docker",
 		Action:      req.Action,

@@ -34,8 +34,11 @@ func (r *Runner) Add(job Job) {
 }
 
 // Start launches all registered jobs concurrently.
-func (r *Runner) Start() {
-	ctx, cancel := context.WithCancel(context.Background())
+// The provided parent ctx is the root cancellation signal (typically the one
+// owned by cmd/server/main.go and wired to SIGINT/SIGTERM). Cancelling parent
+// or calling Stop both terminate every job.
+func (r *Runner) Start(parent context.Context) {
+	ctx, cancel := context.WithCancel(parent)
 	r.cancel = cancel
 	for _, job := range r.jobs {
 		r.wg.Add(1)

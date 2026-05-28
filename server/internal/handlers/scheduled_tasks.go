@@ -272,7 +272,7 @@ func (h *ScheduledTaskHandler) RunScheduledTask(c *gin.Context) {
 	if payload == "" {
 		payload = "{}"
 	}
-	result, err := h.dispatcher.Create(dispatch.Request{
+	result, err := h.dispatcher.Create(c.Request.Context(), dispatch.Request{
 		HostID:      task.HostID,
 		Module:      task.Module,
 		Action:      task.Action,

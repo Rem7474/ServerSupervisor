@@ -34,10 +34,24 @@ type GitWebhookHandler struct {
 	cfg        *config.Config
 	dispatcher *dispatch.Dispatcher
 	notifHub   *ws.NotificationHub
+	// bgCtx is the long-lived ctx used by fire-and-forget completion callbacks
+	// (NotifyWebhookExecutionComplete). Defaults to context.Background(); replace
+	// it with a SIGTERM-bound ctx via SetBackgroundContext so completion writes
+	// are cancelled at shutdown rather than running uncancellable.
+	bgCtx context.Context
 }
 
 func NewGitWebhookHandler(db *database.DB, cfg *config.Config, dispatcher *dispatch.Dispatcher, notifHub *ws.NotificationHub) *GitWebhookHandler {
-	return &GitWebhookHandler{db: db, cfg: cfg, dispatcher: dispatcher, notifHub: notifHub}
+	return &GitWebhookHandler{
+		db: db, cfg: cfg, dispatcher: dispatcher, notifHub: notifHub,
+		bgCtx: context.Background(),
+	}
+}
+
+// SetBackgroundContext threads a long-lived (typically SIGTERM-bound) ctx into
+// the handler. Called once from main.go after construction.
+func (h *GitWebhookHandler) SetBackgroundContext(ctx context.Context) {
+	h.bgCtx = ctx
 }
 
 // ========== CRUD (authenticated, admin only) ==========
@@ -322,7 +336,7 @@ func (h *GitWebhookHandler) ReceiveWebhook(c *gin.Context) {
 
 	username := fmt.Sprintf("webhook:%s", wh.Name)
 	triggeredBy := fmt.Sprintf("webhook:%s", wh.Name)
-	result, err := h.dispatcher.Create(dispatch.Request{
+	result, err := h.dispatcher.Create(c.Request.Context(), dispatch.Request{
 		HostID:      wh.HostID,
 		Module:      "custom",
 		Action:      "run",
@@ -369,7 +383,8 @@ func ptrNow() *time.Time {
 // NotifyWebhookExecutionComplete updates the execution status and sends notifications
 // when a webhook-triggered command completes or fails. Safe to call in a goroutine.
 func (h *GitWebhookHandler) NotifyWebhookExecutionComplete(commandID, status string) {
-	webhookID, notifyOnSuccess, notifyOnFailure, channels, err := h.db.UpdateWebhookExecutionByCommandID(context.Background(), commandID, status)
+	ctx := h.bgCtx
+	webhookID, notifyOnSuccess, notifyOnFailure, channels, err := h.db.UpdateWebhookExecutionByCommandID(ctx, commandID, status)
 	if err != nil {
 		// Not a webhook-triggered command — nothing to do
 		return
@@ -382,7 +397,7 @@ func (h *GitWebhookHandler) NotifyWebhookExecutionComplete(commandID, status str
 	}
 
 	// Get webhook info for the notification message
-	wh, err := h.db.GetGitWebhookForReceive(context.Background(), webhookID)
+	wh, err := h.db.GetGitWebhookForReceive(ctx, webhookID)
 	if err != nil {
 		return
 	}

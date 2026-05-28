@@ -1,7 +1,6 @@
 package ws
 
 import (
-	"context"
 	"net/http"
 	"time"
 
@@ -10,8 +9,9 @@ import (
 )
 
 func (h *WSHandler) Dashboard(c *gin.Context) {
+	ctx := c.Request.Context()
 	h.servePollingSnapshot(c, true, func(conn *websocket.Conn, lastHash *string) error {
-		return h.sendDashboardSnapshot(conn, lastHash)
+		return h.sendDashboardSnapshot(ctx, conn, lastHash)
 	})
 }
 
@@ -22,26 +22,30 @@ func (h *WSHandler) HostDetail(c *gin.Context) {
 		return
 	}
 
+	ctx := c.Request.Context()
 	h.servePollingSnapshot(c, false, func(conn *websocket.Conn, lastHash *string) error {
-		return h.sendHostSnapshot(conn, hostID, lastHash)
+		return h.sendHostSnapshot(ctx, conn, hostID, lastHash)
 	})
 }
 
 func (h *WSHandler) Docker(c *gin.Context) {
+	ctx := c.Request.Context()
 	h.servePollingSnapshot(c, false, func(conn *websocket.Conn, lastHash *string) error {
-		return h.sendDockerSnapshot(conn, lastHash)
+		return h.sendDockerSnapshot(ctx, conn, lastHash)
 	})
 }
 
 func (h *WSHandler) Network(c *gin.Context) {
+	ctx := c.Request.Context()
 	h.servePollingSnapshot(c, false, func(conn *websocket.Conn, lastHash *string) error {
-		return h.sendNetworkSnapshot(conn, lastHash)
+		return h.sendNetworkSnapshot(ctx, conn, lastHash)
 	})
 }
 
 func (h *WSHandler) Apt(c *gin.Context) {
+	ctx := c.Request.Context()
 	h.servePollingSnapshot(c, false, func(conn *websocket.Conn, lastHash *string) error {
-		return h.sendAptSnapshot(conn, lastHash)
+		return h.sendAptSnapshot(ctx, conn, lastHash)
 	})
 }
 
@@ -133,7 +137,7 @@ func (h *WSHandler) CommandStream(c *gin.Context) {
 	}
 
 	// Fetch the command to verify existence and, for non-admins, host ownership.
-	cmd, err := h.db.GetRemoteCommandByID(context.Background(), commandID)
+	cmd, err := h.db.GetRemoteCommandByID(c.Request.Context(), commandID)
 	if err != nil {
 		_ = safeWriteJSON(conn, gin.H{"type": "error", "error": "command not found"})
 		return
@@ -142,7 +146,7 @@ func (h *WSHandler) CommandStream(c *gin.Context) {
 	role, _ := claims["role"].(string)
 	if role != "admin" {
 		username, _ := claims["sub"].(string)
-		restricted, level, accessErr := h.db.GetHostAccess(context.Background(), username, cmd.HostID)
+		restricted, level, accessErr := h.db.GetHostAccess(c.Request.Context(), username, cmd.HostID)
 		if accessErr != nil || (restricted && level == "") {
 			_ = safeWriteJSON(conn, gin.H{"type": "auth_error", "error": "access denied"})
 			return

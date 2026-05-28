@@ -39,10 +39,10 @@ func New(db *database.DB) *Dispatcher {
 	return &Dispatcher{db: db}
 }
 
-func (d *Dispatcher) Create(req Request) (*Result, error) {
+func (d *Dispatcher) Create(ctx context.Context, req Request) (*Result, error) {
 	var auditLogIDPtr *int64
 	if req.Audit != nil {
-		auditLogID, err := d.db.CreateAuditLog(context.Background(), 
+		auditLogID, err := d.db.CreateAuditLog(ctx,
 			req.Audit.Username,
 			req.Audit.Action,
 			req.Audit.HostID,
@@ -57,7 +57,7 @@ func (d *Dispatcher) Create(req Request) (*Result, error) {
 		}
 	}
 
-	cmd, err := d.db.CreateRemoteCommand(context.Background(), 
+	cmd, err := d.db.CreateRemoteCommand(ctx,
 		req.HostID,
 		req.Module,
 		req.Action,
@@ -68,7 +68,7 @@ func (d *Dispatcher) Create(req Request) (*Result, error) {
 	)
 	if err != nil {
 		if auditLogIDPtr != nil {
-			_ = d.db.UpdateAuditLogStatus(context.Background(), *auditLogIDPtr, "failed", err.Error())
+			_ = d.db.UpdateAuditLogStatus(ctx, *auditLogIDPtr, "failed", err.Error())
 		}
 		return nil, err
 	}

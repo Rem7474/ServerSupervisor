@@ -74,7 +74,7 @@ func (h *WebLogsHandler) BlockCrowdSecIP(c *gin.Context) {
 	username := c.GetString("username")
 	payload := fmt.Sprintf(`{"duration":%q}`, duration)
 
-	result, err := h.dispatcher.Create(dispatch.Request{
+	result, err := h.dispatcher.Create(c.Request.Context(), dispatch.Request{
 		HostID:      hostID,
 		Module:      "crowdsec",
 		Action:      "ban",
@@ -124,7 +124,7 @@ func (h *WebLogsHandler) UnblockCrowdSecIP(c *gin.Context) {
 
 	username := c.GetString("username")
 
-	result, err := h.dispatcher.Create(dispatch.Request{
+	result, err := h.dispatcher.Create(c.Request.Context(), dispatch.Request{
 		HostID:      hostID,
 		Module:      "crowdsec",
 		Action:      "unban",

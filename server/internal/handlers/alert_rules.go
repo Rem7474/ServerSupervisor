@@ -1026,8 +1026,8 @@ func (h *AlertRulesHandler) TestAlertRule(c *gin.Context) {
 	if rule.SourceType == models.AlertSourceProxmox {
 		targetID, targetLabel := h.proxmoxScopeTestTarget(c.Request.Context(), rule.ProxmoxScope)
 		target := models.Host{ID: targetID, Name: targetLabel, Status: "online", LastSeen: time.Now()}
-		value, ok := alerts.GetMetricValue(h.db, target, ruleNoStaleness)
-		_, freshOk := alerts.GetMetricValue(h.db, target, rule)
+		value, ok := alerts.GetMetricValue(c.Request.Context(), h.db, target, ruleNoStaleness)
+		_, freshOk := alerts.GetMetricValue(c.Request.Context(), h.db, target, rule)
 		wouldFire := ok && freshOk && alerts.MatchRule(rule, target, value)
 		if wouldFire {
 			anyFires = true
@@ -1050,8 +1050,8 @@ func (h *AlertRulesHandler) TestAlertRule(c *gin.Context) {
 			if rule.HostID != nil && *rule.HostID != host.ID {
 				continue
 			}
-			value, ok := alerts.GetMetricValue(h.db, host, ruleNoStaleness)
-			_, freshOk := alerts.GetMetricValue(h.db, host, rule)
+			value, ok := alerts.GetMetricValue(c.Request.Context(), h.db, host, ruleNoStaleness)
+			_, freshOk := alerts.GetMetricValue(c.Request.Context(), h.db, host, rule)
 			wouldFire := ok && freshOk && alerts.MatchRule(rule, host, value)
 			if wouldFire {
 				anyFires = true
@@ -1127,7 +1127,7 @@ func (h *AlertRulesHandler) TestAlertRuleLogs(c *gin.Context) {
 		return
 	}
 
-	lines, since := alerts.FetchProxmoxAuthFailureLogs(h.db, rule)
+	lines, since := alerts.FetchProxmoxAuthFailureLogs(c.Request.Context(), h.db, rule)
 	content := strings.Join(lines, "\n")
 	filename := fmt.Sprintf("proxmox-auth-failures-%s.log", time.Now().Format("20060102-150405"))
 

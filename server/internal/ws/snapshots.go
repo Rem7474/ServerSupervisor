@@ -8,13 +8,13 @@ import (
 	"github.com/serversupervisor/server/internal/networkview"
 )
 
-func (h *WSHandler) sendDashboardSnapshot(conn *websocket.Conn, lastHash *string) error {
-	hosts, err := h.db.GetAllHosts(context.Background())
+func (h *WSHandler) sendDashboardSnapshot(ctx context.Context, conn *websocket.Conn, lastHash *string) error {
+	hosts, err := h.db.GetAllHosts(ctx)
 	if err != nil {
 		return err
 	}
 
-	hostMetrics, _ := h.db.GetLatestMetricsAll(context.Background())
+	hostMetrics, _ := h.db.GetLatestMetricsAll(ctx)
 	if hostMetrics == nil {
 		hostMetrics = map[string]*models.SystemMetrics{}
 	}
@@ -22,24 +22,24 @@ func (h *WSHandler) sendDashboardSnapshot(conn *websocket.Conn, lastHash *string
 		if m == nil {
 			continue
 		}
-		if temp, ok := h.db.GetEffectiveHostCPUTemperature(context.Background(), hostID, m.CPUTemperature); ok {
+		if temp, ok := h.db.GetEffectiveHostCPUTemperature(ctx, hostID, m.CPUTemperature); ok {
 			m.CPUTemperature = temp
 		}
 	}
 
-	comparisons, err := h.buildVersionComparisons()
+	comparisons, err := h.buildVersionComparisons(ctx)
 	if err != nil {
 		comparisons = []models.VersionComparison{}
 	}
 
-	proxmoxNodes, _ := h.db.ListProxmoxNodes(context.Background())
+	proxmoxNodes, _ := h.db.ListProxmoxNodes(ctx)
 	if proxmoxNodes == nil {
 		proxmoxNodes = []models.ProxmoxNode{}
 	}
 
 	// Confirmed guest-host links with live guest metrics (cpu_usage, mem_alloc, mem_usage).
 	// Used by the dashboard to override agent CPU/RAM when metrics_source=proxmox.
-	proxmoxLinks, _ := h.db.ListProxmoxGuestLinks(context.Background(), "confirmed")
+	proxmoxLinks, _ := h.db.ListProxmoxGuestLinks(ctx, "confirmed")
 	if proxmoxLinks == nil {
 		proxmoxLinks = []models.ProxmoxGuestLink{}
 	}
@@ -49,9 +49,9 @@ func (h *WSHandler) sendDashboardSnapshot(conn *websocket.Conn, lastHash *string
 		"hosts":               hosts,
 		"host_metrics":        hostMetrics,
 		"version_comparisons": comparisons,
-		"apt_pending":         h.db.GetTotalAptPending(context.Background()),
-		"apt_pending_hosts":   h.db.GetAptPendingAll(context.Background()),
-		"disk_usage":          h.db.GetRootDiskPercentAll(context.Background()),
+		"apt_pending":         h.db.GetTotalAptPending(ctx),
+		"apt_pending_hosts":   h.db.GetAptPendingAll(ctx),
+		"disk_usage":          h.db.GetRootDiskPercentAll(ctx),
 		"proxmox_nodes":       proxmoxNodes,
 		"proxmox_links":       proxmoxLinks,
 	}
@@ -61,25 +61,25 @@ func (h *WSHandler) sendDashboardSnapshot(conn *websocket.Conn, lastHash *string
 	return safeWriteJSON(conn, payload)
 }
 
-func (h *WSHandler) sendHostSnapshot(conn *websocket.Conn, hostID string, lastHash *string) error {
-	host, err := h.db.GetHost(context.Background(), hostID)
+func (h *WSHandler) sendHostSnapshot(ctx context.Context, conn *websocket.Conn, hostID string, lastHash *string) error {
+	host, err := h.db.GetHost(ctx, hostID)
 	if err != nil {
 		return err
 	}
-	metrics, _ := h.db.GetLatestMetrics(context.Background(), hostID)
+	metrics, _ := h.db.GetLatestMetrics(ctx, hostID)
 	if metrics != nil {
-		if temp, ok := h.db.GetEffectiveHostCPUTemperature(context.Background(), hostID, metrics.CPUTemperature); ok {
+		if temp, ok := h.db.GetEffectiveHostCPUTemperature(ctx, hostID, metrics.CPUTemperature); ok {
 			metrics.CPUTemperature = temp
 		}
 	}
-	containers, _ := h.db.GetDockerContainers(context.Background(), hostID)
-	aptStatus, _ := h.db.GetAptStatus(context.Background(), hostID)
-	aptHistory, _ := h.db.GetAptHistoryWithAgentUpdates(context.Background(), hostID, 50)
-	uuStatus, _ := h.db.GetUUStatus(context.Background(), hostID)
-	uuRuns, _ := h.db.GetUURuns(context.Background(), hostID, 20)
-	auditLogs, _ := h.db.GetAuditLogsByHost(context.Background(), hostID, 50)
+	containers, _ := h.db.GetDockerContainers(ctx, hostID)
+	aptStatus, _ := h.db.GetAptStatus(ctx, hostID)
+	aptHistory, _ := h.db.GetAptHistoryWithAgentUpdates(ctx, hostID, 50)
+	uuStatus, _ := h.db.GetUUStatus(ctx, hostID)
+	uuRuns, _ := h.db.GetUURuns(ctx, hostID, 20)
+	auditLogs, _ := h.db.GetAuditLogsByHost(ctx, hostID, 50)
 
-	allComparisons, _ := h.buildVersionComparisons()
+	allComparisons, _ := h.buildVersionComparisons(ctx)
 	comparisons := make([]models.VersionComparison, 0)
 	for _, vc := range allComparisons {
 		if vc.HostID == hostID {
@@ -87,7 +87,7 @@ func (h *WSHandler) sendHostSnapshot(conn *websocket.Conn, hostID string, lastHa
 		}
 	}
 
-	proxmoxLink, _ := h.db.GetProxmoxGuestLinkByHost(context.Background(), hostID)
+	proxmoxLink, _ := h.db.GetProxmoxGuestLinkByHost(ctx, hostID)
 
 	payload := gin.H{
 		"type":                "host_detail",
@@ -108,18 +108,18 @@ func (h *WSHandler) sendHostSnapshot(conn *websocket.Conn, hostID string, lastHa
 	return safeWriteJSON(conn, payload)
 }
 
-func (h *WSHandler) sendDockerSnapshot(conn *websocket.Conn, lastHash *string) error {
-	containers, err := h.db.GetAllDockerContainers(context.Background())
+func (h *WSHandler) sendDockerSnapshot(ctx context.Context, conn *websocket.Conn, lastHash *string) error {
+	containers, err := h.db.GetAllDockerContainers(ctx)
 	if err != nil {
 		return err
 	}
 
-	composeProjects, _ := h.db.GetAllComposeProjects(context.Background())
+	composeProjects, _ := h.db.GetAllComposeProjects(ctx)
 	if composeProjects == nil {
 		composeProjects = []models.ComposeProject{}
 	}
 
-	comparisons, err := h.buildVersionComparisons()
+	comparisons, err := h.buildVersionComparisons(ctx)
 	if err != nil {
 		comparisons = []models.VersionComparison{}
 	}
@@ -136,13 +136,13 @@ func (h *WSHandler) sendDockerSnapshot(conn *websocket.Conn, lastHash *string) e
 	return safeWriteJSON(conn, payload)
 }
 
-func (h *WSHandler) sendNetworkSnapshot(conn *websocket.Conn, lastHash *string) error {
-	snapshot, err := networkview.BuildSnapshot(h.db)
+func (h *WSHandler) sendNetworkSnapshot(ctx context.Context, conn *websocket.Conn, lastHash *string) error {
+	snapshot, err := networkview.BuildSnapshot(ctx, h.db)
 	if err != nil {
 		return err
 	}
 
-	config, _ := h.db.GetNetworkTopologyConfig(context.Background())
+	config, _ := h.db.GetNetworkTopologyConfig(ctx)
 
 	payload := gin.H{
 		"type":       "network",
@@ -157,8 +157,8 @@ func (h *WSHandler) sendNetworkSnapshot(conn *websocket.Conn, lastHash *string) 
 	return safeWriteJSON(conn, payload)
 }
 
-func (h *WSHandler) sendAptSnapshot(conn *websocket.Conn, lastHash *string) error {
-	hosts, err := h.db.GetAllHosts(context.Background())
+func (h *WSHandler) sendAptSnapshot(ctx context.Context, conn *websocket.Conn, lastHash *string) error {
+	hosts, err := h.db.GetAllHosts(ctx)
 	if err != nil {
 		return err
 	}
@@ -167,11 +167,11 @@ func (h *WSHandler) sendAptSnapshot(conn *websocket.Conn, lastHash *string) erro
 	aptHistories := map[string][]models.RemoteCommand{}
 
 	for _, host := range hosts {
-		status, err := h.db.GetAptStatus(context.Background(), host.ID)
+		status, err := h.db.GetAptStatus(ctx, host.ID)
 		if err == nil {
 			aptStatuses[host.ID] = status
 		}
-		hist, err := h.db.GetAptHistoryWithAgentUpdates(context.Background(), host.ID, 20)
+		hist, err := h.db.GetAptHistoryWithAgentUpdates(ctx, host.ID, 20)
 		if err == nil {
 			aptHistories[host.ID] = hist
 		}

@@ -49,7 +49,7 @@ func (h *AptHandler) SendCommand(c *gin.Context) {
 			continue
 		}
 
-		result, err := h.dispatcher.Create(dispatch.Request{
+		result, err := h.dispatcher.Create(c.Request.Context(), dispatch.Request{
 			HostID:      hostID,
 			Module:      "apt",
 			Action:      req.Command,
@@ -156,7 +156,7 @@ func (h *AptHandler) ConfigureUU(c *gin.Context) {
 	var commandIDs []string
 
 	// Dispatch configure_uu
-	r, err := h.dispatcher.Create(dispatch.Request{
+	r, err := h.dispatcher.Create(c.Request.Context(), dispatch.Request{
 		HostID:      hostID,
 		Module:      "apt",
 		Action:      "configure_uu",
@@ -181,7 +181,7 @@ func (h *AptHandler) ConfigureUU(c *gin.Context) {
 	if req.Enabled {
 		target = "enable"
 	}
-	r2, err := h.dispatcher.Create(dispatch.Request{
+	r2, err := h.dispatcher.Create(c.Request.Context(), dispatch.Request{
 		HostID:      hostID,
 		Module:      "apt",
 		Action:      "toggle_uu",
@@ -208,7 +208,7 @@ func (h *AptHandler) InstallUU(c *gin.Context) {
 		username = "unknown"
 	}
 
-	r, err := h.dispatcher.Create(dispatch.Request{
+	r, err := h.dispatcher.Create(c.Request.Context(), dispatch.Request{
 		HostID:      hostID,
 		Module:      "apt",
 		Action:      "install_uu",
@@ -241,7 +241,7 @@ func (h *AptHandler) RunUUNow(c *gin.Context) {
 		username = "unknown"
 	}
 
-	r, err := h.dispatcher.Create(dispatch.Request{
+	r, err := h.dispatcher.Create(c.Request.Context(), dispatch.Request{
 		HostID:      hostID,
 		Module:      "apt",
 		Action:      "run_uu",

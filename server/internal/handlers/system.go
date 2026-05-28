@@ -54,7 +54,7 @@ func (h *SystemHandler) SendJournalCommand(c *gin.Context) {
 		return
 	}
 
-	result, err := h.dispatcher.Create(dispatch.Request{
+	result, err := h.dispatcher.Create(c.Request.Context(), dispatch.Request{
 		HostID:      req.HostID,
 		Module:      "journal",
 		Action:      "logs",
@@ -97,7 +97,7 @@ func (h *SystemHandler) SendProcessesCommand(c *gin.Context) {
 		return
 	}
 
-	result, err := h.dispatcher.Create(dispatch.Request{
+	result, err := h.dispatcher.Create(c.Request.Context(), dispatch.Request{
 		HostID:      req.HostID,
 		Module:      "processes",
 		Action:      "list",
@@ -146,7 +146,7 @@ func (h *SystemHandler) SendSystemdCommand(c *gin.Context) {
 		return
 	}
 
-	result, err := h.dispatcher.Create(dispatch.Request{
+	result, err := h.dispatcher.Create(c.Request.Context(), dispatch.Request{
 		HostID:      req.HostID,
 		Module:      "systemd",
 		Action:      req.Action,

@@ -19,7 +19,7 @@ func NewHostStatusJob(db *database.DB) Job {
 			for {
 				select {
 				case <-ticker.C:
-					if err := db.UpdateHostStatusBasedOnLastSeen(context.Background(), 2); err != nil {
+					if err := db.UpdateHostStatusBasedOnLastSeen(ctx, 2); err != nil {
 						log.Printf("Failed to update host status: %v", err)
 					}
 				case <-ctx.Done():

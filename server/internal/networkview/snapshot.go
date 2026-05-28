@@ -10,19 +10,19 @@ import (
 	"github.com/serversupervisor/server/internal/models"
 )
 
-func BuildSnapshot(db *database.DB) (*models.NetworkSnapshot, error) {
-	hosts, err := db.GetAllHosts(context.Background())
+func BuildSnapshot(ctx context.Context, db *database.DB) (*models.NetworkSnapshot, error) {
+	hosts, err := db.GetAllHosts(ctx)
 	if err != nil {
 		return nil, err
 	}
-	containers, err := db.GetAllDockerContainers(context.Background())
+	containers, err := db.GetAllDockerContainers(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	metricsByHost := make(map[string]*models.SystemMetrics)
 	for _, host := range hosts {
-		metrics, err := db.GetLatestMetrics(context.Background(), host.ID)
+		metrics, err := db.GetLatestMetrics(ctx, host.ID)
 		if err == nil {
 			metricsByHost[host.ID] = metrics
 		}

@@ -179,7 +179,7 @@ func (h *HostHandler) TriggerAgentUpdate(c *gin.Context) {
 		username = "system"
 	}
 
-	result, err := h.dispatcher.Create(dispatch.Request{
+	result, err := h.dispatcher.Create(c.Request.Context(), dispatch.Request{
 		HostID:      hostID,
 		Module:      "agent",
 		Action:      "update",

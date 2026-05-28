@@ -1,7 +1,6 @@
 package api
 
 import (
-	"context"
 	"log"
 	"net"
 	"net/http"
@@ -400,7 +399,7 @@ func HostPermissionMiddleware(db *database.DB, requiredLevel string) gin.Handler
 		}
 
 		username := c.GetString("username")
-		restricted, level, err := db.GetHostAccess(context.Background(), username, hostID)
+		restricted, level, err := db.GetHostAccess(c.Request.Context(), username, hostID)
 		if err != nil {
 			lang := errs.GetLanguageFromAcceptLanguage(c.GetHeader("Accept-Language"))
 			c.JSON(http.StatusInternalServerError, gin.H{"error": errs.GetMessage(errs.CodePermissionFailed, lang)})
@@ -443,7 +442,7 @@ func APIKeyMiddleware(db *database.DB, cfg *config.Config) gin.HandlerFunc {
 			return
 		}
 
-		host, err := db.GetHostByAPIKey(context.Background(), apiKey)
+		host, err := db.GetHostByAPIKey(c.Request.Context(), apiKey)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid API key"})
 			c.Abort()

@@ -28,6 +28,7 @@ type TaskScheduler struct {
 	dispatcher *dispatch.Dispatcher
 	jobs       map[string]cron.EntryID // scheduled_task.id → cron entry
 	mu         sync.Mutex
+	ctx        context.Context // root ctx for cron jobs' DB calls
 }
 
 // New creates a TaskScheduler. Call Start() to begin scheduling.
@@ -37,12 +38,15 @@ func New(db DB, dispatcher *dispatch.Dispatcher) *TaskScheduler {
 		db:         db,
 		dispatcher: dispatcher,
 		jobs:       make(map[string]cron.EntryID),
+		ctx:        context.Background(),
 	}
 }
 
 // Start loads all enabled tasks from DB and registers them with the cron runner.
-func (s *TaskScheduler) Start() {
-	tasks, err := s.db.GetAllScheduledTasks(context.Background())
+// The provided ctx becomes the parent ctx of every cron job's DB call.
+func (s *TaskScheduler) Start(ctx context.Context) {
+	s.ctx = ctx
+	tasks, err := s.db.GetAllScheduledTasks(ctx)
 	if err != nil {
 		log.Printf("[scheduler] failed to load tasks: %v", err)
 	} else {
@@ -120,7 +124,7 @@ func (s *TaskScheduler) makeJob(t models.ScheduledTask) func() {
 		if payload == "" {
 			payload = "{}"
 		}
-		result, err := s.dispatcher.Create(dispatch.Request{
+		result, err := s.dispatcher.Create(s.ctx, dispatch.Request{
 			HostID:      t.HostID,
 			Module:      t.Module,
 			Action:      t.Action,
@@ -132,15 +136,15 @@ func (s *TaskScheduler) makeJob(t models.ScheduledTask) func() {
 			log.Printf("[scheduler] task %s (%s): failed to create command: %v", t.ID, t.Name, err)
 			now := time.Now()
 			next := s.NextRun(t.ID)
-			_ = s.db.UpdateScheduledTaskRun(context.Background(), t.ID, "failed", now, next)
+			_ = s.db.UpdateScheduledTaskRun(s.ctx, t.ID, "failed", now, next)
 			return
 		}
-		if err := s.db.LinkCommandToScheduledTask(context.Background(), result.Command.ID, t.ID); err != nil {
+		if err := s.db.LinkCommandToScheduledTask(s.ctx, result.Command.ID, t.ID); err != nil {
 			log.Printf("[scheduler] task %s: failed to link command: %v", t.ID, err)
 		}
 		now := time.Now()
 		next := s.NextRun(t.ID)
-		if err := s.db.UpdateScheduledTaskRun(context.Background(), t.ID, "pending", now, next); err != nil {
+		if err := s.db.UpdateScheduledTaskRun(s.ctx, t.ID, "pending", now, next); err != nil {
 			log.Printf("[scheduler] task %s: failed to update run metadata: %v", t.ID, err)
 		}
 		log.Printf("[scheduler] task %s (%s): queued command %s on host %s", t.ID, t.Name, result.Command.ID, t.HostID)

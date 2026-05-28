@@ -21,7 +21,7 @@ func NewAlertEvalJob(db *database.DB, cfg *config.Config, dispatcher *dispatch.D
 			for {
 				select {
 				case <-ticker.C:
-					alerts.EvaluateAlerts(db, cfg, dispatcher, pusher)
+					alerts.EvaluateAlerts(ctx, db, cfg, dispatcher, pusher)
 				case <-ctx.Done():
 					return
 				}

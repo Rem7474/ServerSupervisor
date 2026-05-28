@@ -19,7 +19,36 @@ Side effects of Phase A:
 The whole server still builds (`go build ./...`) and tests still pass
 (`go test ./...`).
 
-## Phase B — TODO
+## Phase B — DONE
+
+A root `ctx` is now created in `cmd/server/main.go` via
+`signal.NotifyContext(ctx, SIGINT, SIGTERM)` and threaded through:
+
+- `background.Runner.Start(ctx)` — every background job inherits it
+- `scheduler.TaskScheduler.Start(ctx)` — cron jobs' DB calls use it
+- `ProxmoxHandler.StartPoller(ctx)` / `ReleaseTrackerHandler.StartPoller(ctx)`
+- `alerts.EvaluateAlerts(ctx, ...)` and every helper in `alerts/engine.go`
+- `dispatch.Dispatcher.Create(ctx, req)` — all call sites updated
+- `networkview.BuildSnapshot(ctx, db)`
+- `ws.snapshots` and `version_compare` use the request ctx via Gin handlers
+
+HTTP handlers now uniformly use `c.Request.Context()`. Fire-and-forget
+goroutines started from handlers (release tracker check-now, Proxmox poll-now,
+agent command completion callbacks) use a long-lived `pollerCtx` / `bgCtx`
+field on the handler struct, set when the poller starts. Cancelling the root
+ctx (SIGINT/SIGTERM) propagates to every in-flight DB call.
+
+Remaining `context.Background()` occurrences are intentional and limited to:
+
+- Struct field placeholders (`pollerCtx: context.Background()`) — overwritten
+  at startup.
+- Test helpers (`testutil/postgres.go`, `_test.go` files) — Phase B exempts
+  tests; `t.Context()` works fine as a follow-up.
+- Database migration runner (`database/db.go`) — runs once at startup, before
+  the root ctx is fully wired, and must complete unconditionally.
+- `config.OverrideFromDB` — startup-only.
+
+## Phase B — historical (kept for reference)
 
 Replace every `context.Background()` placeholder by a context that propagates
 cancellation correctly:
