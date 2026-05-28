@@ -25,6 +25,35 @@ var validReleaseProviders = map[string]bool{
 	"github": true, "gitlab": true, "gitea": true,
 }
 
+// validateDockerTracker normalizes and validates a docker tracker's deployment
+// mode. Returns (httpStatus, message); status 0 means valid. Compose mode
+// requires host + project; custom mode keeps the legacy monitor-only/task rules.
+func validateDockerTracker(req *models.ReleaseTracker) (int, string) {
+	if req.UpdateAction == "" {
+		req.UpdateAction = "custom"
+	}
+	if req.UpdateAction != "custom" && req.UpdateAction != "compose" {
+		return http.StatusBadRequest, "update_action must be 'custom' or 'compose'"
+	}
+	if req.DockerImage == "" {
+		return http.StatusBadRequest, "docker_image is required for docker trackers"
+	}
+	if req.DockerTag == "" {
+		req.DockerTag = "latest"
+	}
+	if req.UpdateAction == "compose" {
+		if req.HostID == "" || req.ComposeProject == "" {
+			return http.StatusBadRequest, "host_id and compose_project are required for compose update mode"
+		}
+	} else if req.HostID != "" && req.CustomTaskID == "" {
+		return http.StatusBadRequest, "custom_task_id is required when host_id is set"
+	}
+	if req.HealthcheckTimeoutSec < 0 || req.HealthcheckTimeoutSec > 3600 {
+		return http.StatusBadRequest, "healthcheck_timeout_sec must be between 0 and 3600"
+	}
+	return 0, ""
+}
+
 type ReleaseTrackerHandler struct {
 	db         *database.DB
 	cfg        *config.Config
@@ -167,9 +196,14 @@ func (h *ReleaseTrackerHandler) checkOneDocker(ctx context.Context, t models.Rel
 		tag = "latest"
 	}
 
-	providerClient := gitprovider.NewClient("github", h.cfg.GitHubToken)
 	cooldown := time.Duration(t.CooldownHours) * time.Hour
-	digest, err := providerClient.FetchDockerManifestDigest(t.DockerImage, tag)
+
+	// Private-registry credentials (optional) authenticate manifest polling.
+	var regUser, regPass string
+	if t.RegistryCredentialsID != "" {
+		regUser, regPass, _ = h.db.GetRegistryCredentialAuth(ctx, t.RegistryCredentialsID)
+	}
+	digest, err := gitprovider.FetchDockerManifestDigestWithAuth(t.DockerImage, tag, h.cfg.GitHubToken, regUser, regPass)
 	if err != nil {
 		log.Printf("Docker tracker %s (%s:%s): fetch error: %v", t.Name, t.DockerImage, tag, err)
 		errMsg := err.Error()
@@ -190,7 +224,7 @@ func (h *ReleaseTrackerHandler) checkOneDocker(ctx context.Context, t models.Rel
 	// Others: enumerates semver-looking tags and HEADs each manifest.
 	resolvedVersion := tag
 	if shouldResolveDockerTag(tag) {
-		if v := providerClient.FetchDockerVersionForDigest(t.DockerImage, digest); v != "" {
+		if v := gitprovider.FetchDockerVersionForDigestWithAuth(t.DockerImage, digest, h.cfg.GitHubToken, regUser, regPass); v != "" {
 			resolvedVersion = v
 			if v != tag {
 				log.Printf("Docker tracker %s: resolved mutable tag %q to %q", t.Name, tag, v)
@@ -217,10 +251,10 @@ func (h *ReleaseTrackerHandler) checkOneDocker(ctx context.Context, t models.Rel
 			_ = h.db.UpdateReleaseTrackerLastSeen(ctx, t.ID, "", false)
 		}
 
-		if cooldown > 0 && t.CustomTaskID != "" && t.HostID != "" && t.LastReleaseDetectedAt != nil && (t.LastTriggeredAt == nil || t.LastTriggeredAt.Before(*t.LastReleaseDetectedAt)) {
+		if cooldown > 0 && trackerHasDispatchTarget(t) && t.LastReleaseDetectedAt != nil && (t.LastTriggeredAt == nil || t.LastTriggeredAt.Before(*t.LastReleaseDetectedAt)) {
 			if time.Since(*t.LastReleaseDetectedAt) >= cooldown {
 				log.Printf("Docker tracker %s: cooldown elapsed (%dh) for %s:%s → dispatching", t.Name, t.CooldownHours, t.DockerImage, tag)
-				h.dispatchDockerUpdate(ctx, t, tag, resolvedVersion, digest, digest)
+				h.dispatchDockerTracker(ctx, t, tag, resolvedVersion, digest, digest)
 			}
 		}
 		return
@@ -233,8 +267,8 @@ func (h *ReleaseTrackerHandler) checkOneDocker(ctx context.Context, t models.Rel
 	_ = h.db.UpdateReleaseTrackerDetected(ctx, t.ID, resolvedVersion)
 	h.notifyReleaseTrackerDetected(t, resolvedVersion, "", t.DockerImage+":"+tag)
 
-	// Monitor-only mode: no task configured, just record the new version.
-	if t.CustomTaskID == "" || t.HostID == "" {
+	// Monitor-only mode: no dispatch target configured, just record the version.
+	if !trackerHasDispatchTarget(t) {
 		log.Printf("Docker tracker %s: new digest for %s:%s (monitor-only, no task dispatched)", t.Name, t.DockerImage, tag)
 		_ = h.db.UpdateReleaseTrackerLastSeen(ctx, t.ID, resolvedVersion, false)
 		return
@@ -245,9 +279,9 @@ func (h *ReleaseTrackerHandler) checkOneDocker(ctx context.Context, t models.Rel
 		return
 	}
 
-	log.Printf("Docker tracker %s: new digest for %s:%s → dispatching task %s on host %s",
-		t.Name, t.DockerImage, tag, t.CustomTaskID, t.HostID)
-	h.dispatchDockerUpdate(ctx, t, tag, resolvedVersion, oldDigest, digest)
+	log.Printf("Docker tracker %s: new digest for %s:%s → dispatching (%s) on host %s",
+		t.Name, t.DockerImage, tag, t.UpdateAction, t.HostID)
+	h.dispatchDockerTracker(ctx, t, tag, resolvedVersion, oldDigest, digest)
 }
 
 func shouldResolveDockerTag(tag string) bool {
@@ -380,6 +414,102 @@ func (h *ReleaseTrackerHandler) dispatchDockerUpdate(ctx context.Context, t mode
 	})
 	if err != nil {
 		log.Printf("Docker tracker %s: failed to create command: %v", t.Name, err)
+		now := time.Now()
+		_ = h.db.UpdateReleaseTrackerExecutionStatus(ctx, exec.ID, "failed", &now)
+		return
+	}
+
+	_ = h.db.UpdateReleaseTrackerExecutionCommandID(ctx, exec.ID, result.Command.ID)
+	_ = h.db.MarkReleaseTrackerTriggered(ctx, t.ID)
+}
+
+// trackerHasDispatchTarget reports whether a tracker is configured to deploy
+// (vs monitor-only). Compose mode needs host + project; custom needs host + task.
+func trackerHasDispatchTarget(t models.ReleaseTracker) bool {
+	if t.UpdateAction == "compose" {
+		return t.HostID != "" && t.ComposeProject != ""
+	}
+	return t.HostID != "" && t.CustomTaskID != ""
+}
+
+// dispatchDockerTracker routes a docker tracker to the native compose module or
+// the legacy tasks.yaml command depending on its configured update_action.
+func (h *ReleaseTrackerHandler) dispatchDockerTracker(ctx context.Context, t models.ReleaseTracker, tag, resolvedVersion, oldDigest, newDigest string) {
+	if t.UpdateAction == "compose" {
+		h.dispatchComposeUpdate(ctx, t, tag, resolvedVersion, newDigest)
+		return
+	}
+	h.dispatchDockerUpdate(ctx, t, tag, resolvedVersion, oldDigest, newDigest)
+}
+
+// dispatchComposeUpdate dispatches the native compose update module (pull + up
+// -d, with optional hooks/healthcheck/rollback/cleanup). It skips the dispatch
+// when the digest already deployed on the host matches the registry's latest
+// (drift detection — the stack is already current).
+func (h *ReleaseTrackerHandler) dispatchComposeUpdate(ctx context.Context, t models.ReleaseTracker, tag, resolvedVersion, newDigest string) {
+	running, _ := h.db.GetRunningExecutionForReleaseTracker(ctx, t.ID)
+	if running {
+		log.Printf("Compose tracker %s: skipping dispatch (already running)", t.Name)
+		_ = h.db.UpdateReleaseTrackerLastSeen(ctx, t.ID, resolvedVersion, false)
+		return
+	}
+
+	if newDigest != "" {
+		deployed, _ := h.db.GetDeployedImageDigest(ctx, t.HostID, t.DockerImage, t.DockerTag)
+		if deployed != "" && deployed == newDigest {
+			log.Printf("Compose tracker %s: deployed digest already current, skipping update", t.Name)
+			_ = h.db.UpdateReleaseTrackerLastSeen(ctx, t.ID, resolvedVersion, false)
+			return
+		}
+	}
+
+	imageFull := t.DockerImage + ":" + tag
+	exec, err := h.db.CreateReleaseTrackerExecution(ctx, models.ReleaseTrackerExecution{
+		TrackerID:   t.ID,
+		TagName:     resolvedVersion,
+		ReleaseName: imageFull,
+		Status:      "pending",
+	})
+	if err != nil {
+		log.Printf("Compose tracker %s: failed to create execution: %v", t.Name, err)
+		return
+	}
+
+	payload := map[string]interface{}{
+		"service":                 t.ComposeService,
+		"pre_task_id":             t.PreUpdateTaskID,
+		"post_task_id":            t.PostUpdateTaskID,
+		"cleanup":                 t.CleanupAfterUpdate,
+		"healthcheck_timeout_sec": t.HealthcheckTimeoutSec,
+		"rollback":                t.RollbackOnFailure,
+		"env": map[string]string{
+			"SS_IMAGE_NAME":    imageFull,
+			"SS_IMAGE_TAG":     tag,
+			"SS_IMAGE_VERSION": resolvedVersion,
+			"SS_NEW_DIGEST":    newDigest,
+			"SS_TRACKER_NAME":  t.Name,
+		},
+	}
+	envPayload, _ := json.Marshal(payload)
+
+	username := fmt.Sprintf("tracker:%s", t.Name)
+	result, err := h.dispatcher.Create(ctx, dispatch.Request{
+		HostID:      t.HostID,
+		Module:      "compose",
+		Action:      "update",
+		Target:      t.ComposeProject,
+		Payload:     string(envPayload),
+		TriggeredBy: username,
+		Audit: &dispatch.AuditLogRequest{
+			Username:  username,
+			Action:    "compose_tracker_trigger",
+			HostID:    t.HostID,
+			IPAddress: "poller",
+			Details:   fmt.Sprintf(`{"tracker_id":%q,"project":%q,"image":%q,"digest":%q}`, t.ID, t.ComposeProject, imageFull, newDigest),
+		},
+	})
+	if err != nil {
+		log.Printf("Compose tracker %s: failed to create command: %v", t.Name, err)
 		now := time.Now()
 		_ = h.db.UpdateReleaseTrackerExecutionStatus(ctx, exec.ID, "failed", &now)
 		return
@@ -570,17 +700,9 @@ func (h *ReleaseTrackerHandler) Create(c *gin.Context) {
 			return
 		}
 	} else { // docker
-		// Docker trackers can run in monitor-only mode (no host/task).
-		if req.HostID != "" && req.CustomTaskID == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "custom_task_id is required when host_id is set"})
+		if status, msg := validateDockerTracker(&req); status != 0 {
+			c.JSON(status, gin.H{"error": msg})
 			return
-		}
-		if req.DockerImage == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "docker_image is required for docker trackers"})
-			return
-		}
-		if req.DockerTag == "" {
-			req.DockerTag = "latest"
 		}
 	}
 
@@ -595,6 +717,81 @@ func (h *ReleaseTrackerHandler) Create(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"tracker": created})
+}
+
+// ListTrackableContainers returns compose-managed containers without a tracker,
+// for the auto-discovery UI ("Conteneurs détectés").
+func (h *ReleaseTrackerHandler) ListTrackableContainers(c *gin.Context) {
+	containers, err := h.db.ListTrackableContainers(c.Request.Context())
+	if err != nil {
+		log.Printf("ListTrackableContainers: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list trackable containers"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"containers": containers})
+}
+
+// CreateBulk creates multiple compose trackers in one call (auto-discovery).
+// Each entry is validated independently; the response reports per-entry results
+// so a few invalid rows do not abort the whole batch.
+func (h *ReleaseTrackerHandler) CreateBulk(c *gin.Context) {
+	role := c.GetString("role")
+	if role != models.RoleAdmin {
+		c.JSON(http.StatusForbidden, gin.H{"error": "admin role required"})
+		return
+	}
+
+	var req struct {
+		Trackers []models.ReleaseTracker `json:"trackers"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if len(req.Trackers) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "trackers array is required"})
+		return
+	}
+	if len(req.Trackers) > 100 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "too many trackers (max 100)"})
+		return
+	}
+
+	type bulkResult struct {
+		Name    string `json:"name"`
+		Created bool   `json:"created"`
+		Error   string `json:"error,omitempty"`
+	}
+	results := make([]bulkResult, 0, len(req.Trackers))
+	createdCount := 0
+
+	for _, t := range req.Trackers {
+		t.TrackerType = "docker"
+		if t.Name == "" {
+			results = append(results, bulkResult{Name: t.Name, Error: "name is required"})
+			continue
+		}
+		if t.CooldownHours < 0 || t.CooldownHours > 168 {
+			results = append(results, bulkResult{Name: t.Name, Error: "cooldown_hours must be between 0 and 168"})
+			continue
+		}
+		if status, msg := validateDockerTracker(&t); status != 0 {
+			results = append(results, bulkResult{Name: t.Name, Error: msg})
+			continue
+		}
+		if t.NotifyChannels == nil {
+			t.NotifyChannels = []string{}
+		}
+		if _, err := h.db.CreateReleaseTracker(c.Request.Context(), t); err != nil {
+			log.Printf("CreateBulk: failed to create %q: %v", t.Name, err)
+			results = append(results, bulkResult{Name: t.Name, Error: "failed to create"})
+			continue
+		}
+		createdCount++
+		results = append(results, bulkResult{Name: t.Name, Created: true})
+	}
+
+	c.JSON(http.StatusOK, gin.H{"created": createdCount, "results": results})
 }
 
 func (h *ReleaseTrackerHandler) Get(c *gin.Context) {
@@ -656,16 +853,9 @@ func (h *ReleaseTrackerHandler) Update(c *gin.Context) {
 			return
 		}
 	} else { // docker
-		if req.HostID != "" && req.CustomTaskID == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "custom_task_id is required when host_id is set"})
+		if status, msg := validateDockerTracker(&req); status != 0 {
+			c.JSON(status, gin.H{"error": msg})
 			return
-		}
-		if req.DockerImage == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "docker_image is required for docker trackers"})
-			return
-		}
-		if req.DockerTag == "" {
-			req.DockerTag = "latest"
 		}
 	}
 
@@ -732,6 +922,10 @@ func (h *ReleaseTrackerHandler) Run(c *gin.Context) {
 	}
 
 	if t.TrackerType == "docker" {
+		if t.UpdateAction == "compose" && !trackerHasDispatchTarget(*t) {
+			c.JSON(http.StatusConflict, gin.H{"error": "mode compose : configurez une VM cible et un projet compose pour déclencher manuellement"})
+			return
+		}
 		if t.LatestImageDigest == "" {
 			c.JSON(http.StatusConflict, gin.H{"error": "aucune vérification initiale effectuée — attendez le prochain cycle de polling avant de déclencher manuellement"})
 			return
@@ -740,7 +934,7 @@ func (h *ReleaseTrackerHandler) Run(c *gin.Context) {
 		if tag == "" {
 			tag = "latest"
 		}
-		go h.dispatchDockerUpdate(h.pollerCtx, *t, tag, t.LastReleaseTag, t.LatestImageDigest, t.LatestImageDigest)
+		go h.dispatchDockerTracker(h.pollerCtx, *t, tag, t.LastReleaseTag, t.LatestImageDigest, t.LatestImageDigest)
 	} else {
 		if t.HostID == "" || t.CustomTaskID == "" {
 			c.JSON(http.StatusConflict, gin.H{"error": "tracker en mode surveillance seule — configurez une VM cible et une tâche pour déclencher manuellement"})

@@ -24,6 +24,10 @@ type Config struct {
 	BaseURL    string
 	TLSEnabled bool // Whether HTTPS is enabled
 
+	// Logging
+	LogLevel  string // debug|info|warn|error
+	LogFormat string // json|text
+
 	// Proxies
 	TrustedProxyCIDRs []string
 	AllowedOrigins    []string // Extra allowed WebSocket origins (ALLOWED_ORIGINS env var)
@@ -97,6 +101,18 @@ func generateRandomSecret() string {
 	return hex.EncodeToString(b[:])
 }
 
+// logFormatDefault honours LOG_FORMAT when set, otherwise defaults to
+// human-friendly text in dev and machine-parseable json in production.
+func logFormatDefault() string {
+	if v := strings.TrimSpace(os.Getenv("LOG_FORMAT")); v != "" {
+		return v
+	}
+	if IsDevEnv() {
+		return "text"
+	}
+	return "json"
+}
+
 func Load() *Config {
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
@@ -111,6 +127,9 @@ func Load() *Config {
 		Port:       getEnv("SERVER_PORT", "8080"),
 		BaseURL:    getEnv("BASE_URL", "http://localhost:8080"),
 		TLSEnabled: getBoolEnv("TLS_ENABLED", false),
+
+		LogLevel:  getEnv("LOG_LEVEL", "info"),
+		LogFormat: logFormatDefault(),
 
 		TrustedProxyCIDRs: getCSVEnv("TRUSTED_PROXIES"),
 		AllowedOrigins:    getCSVEnv("ALLOWED_ORIGINS"),

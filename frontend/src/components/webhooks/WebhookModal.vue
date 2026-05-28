@@ -217,6 +217,28 @@
                   </div>
                 </div>
 
+                <div class="col-md-6">
+                  <label class="form-label">Registre privé <span class="text-muted">(optionnel)</span></label>
+                  <select
+                    v-model="form.registry_credentials_id"
+                    class="form-select"
+                  >
+                    <option value="">
+                      Public (aucune authentification)
+                    </option>
+                    <option
+                      v-for="cred in registryCredentials"
+                      :key="cred.id"
+                      :value="cred.id"
+                    >
+                      {{ cred.name }} ({{ cred.registry_host }})
+                    </option>
+                  </select>
+                  <div class="form-hint">
+                    Identifiants pour interroger une image sur un registre privé (GHCR, Harbor…).
+                  </div>
+                </div>
+
                 <div class="col-12">
                   <div class="border rounded p-2">
                     <div class="fw-medium mb-2">
@@ -304,6 +326,50 @@
               </div>
             </div>
 
+            <!-- Docker tracker: choose deployment mode -->
+            <div
+              v-if="mode === 'tracker' && form.dispatch_task && form.tracker_type === 'docker'"
+              class="col-12"
+            >
+              <label class="form-label">Mode de mise a jour</label>
+              <div class="row g-2">
+                <div class="col-6">
+                  <label
+                    class="tracker-type-card"
+                    :class="form.update_action === 'compose' ? 'tracker-type-card--active' : 'tracker-type-card--idle'"
+                  >
+                    <input
+                      v-model="form.update_action"
+                      class="tracker-type-input"
+                      type="radio"
+                      value="compose"
+                    >
+                    <span>
+                      <span class="fw-semibold d-block">Compose (natif)</span>
+                      <span class="text-muted small">pull + up -d automatique sur un projet compose, sans script</span>
+                    </span>
+                  </label>
+                </div>
+                <div class="col-6">
+                  <label
+                    class="tracker-type-card"
+                    :class="form.update_action !== 'compose' ? 'tracker-type-card--active' : 'tracker-type-card--idle'"
+                  >
+                    <input
+                      v-model="form.update_action"
+                      class="tracker-type-input"
+                      type="radio"
+                      value="custom"
+                    >
+                    <span>
+                      <span class="fw-semibold d-block">Tache (tasks.yaml)</span>
+                      <span class="text-muted small">Execute un script declare cote agent</span>
+                    </span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
             <template v-if="mode === 'webhook' || (mode === 'tracker' && form.dispatch_task)">
               <div class="col-md-6">
                 <label
@@ -326,7 +392,130 @@
                   </option>
                 </select>
               </div>
-              <div class="col-md-6">
+
+              <!-- Compose mode: project + service -->
+              <template v-if="isComposeMode">
+                <div class="col-md-6">
+                  <label class="form-label required">Projet compose</label>
+                  <input
+                    v-model="form.compose_project"
+                    type="text"
+                    class="form-control"
+                    placeholder="ex: mon-app"
+                    aria-describedby="compose-project-hint"
+                  >
+                  <div
+                    id="compose-project-hint"
+                    class="form-hint"
+                  >
+                    Nom du projet compose tel que decouvert sur l'hote (label <code>com.docker.compose.project</code>).
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Service <span class="text-muted">(optionnel)</span></label>
+                  <input
+                    v-model="form.compose_service"
+                    type="text"
+                    class="form-control"
+                    placeholder="laisser vide = tout le projet"
+                  >
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Healthcheck (s)</label>
+                  <input
+                    v-model.number="form.healthcheck_timeout_sec"
+                    type="number"
+                    min="0"
+                    max="3600"
+                    class="form-control"
+                    placeholder="0"
+                  >
+                  <div class="form-hint">
+                    Attente max de l'etat healthy apres up -d (0 = desactive).
+                  </div>
+                </div>
+                <div class="col-md-8 d-flex align-items-end">
+                  <div class="d-flex flex-wrap gap-3 pb-2">
+                    <label class="form-check">
+                      <input
+                        v-model="form.rollback_on_failure"
+                        class="form-check-input"
+                        type="checkbox"
+                      >
+                      <span class="form-check-label">Rollback si echec / unhealthy</span>
+                    </label>
+                    <label class="form-check">
+                      <input
+                        v-model="form.cleanup_after_update"
+                        class="form-check-input"
+                        type="checkbox"
+                      >
+                      <span class="form-check-label">Nettoyer les images orphelines</span>
+                    </label>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Hook avant MAJ <span class="text-muted">(optionnel)</span></label>
+                  <select
+                    v-if="customTasks.length"
+                    v-model="form.pre_update_task_id"
+                    class="form-select"
+                  >
+                    <option value="">
+                      -- Aucun --
+                    </option>
+                    <option
+                      v-for="task in customTasks"
+                      :key="task.id"
+                      :value="task.id"
+                    >
+                      {{ task.name }} ({{ task.id }})
+                    </option>
+                  </select>
+                  <input
+                    v-else
+                    v-model="form.pre_update_task_id"
+                    type="text"
+                    class="form-control"
+                    placeholder="ex: backup-postgres"
+                  >
+                  <div class="form-hint">
+                    Tache <code>tasks.yaml</code> executee avant le pull (ex: sauvegarde).
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Hook apres MAJ <span class="text-muted">(optionnel)</span></label>
+                  <select
+                    v-if="customTasks.length"
+                    v-model="form.post_update_task_id"
+                    class="form-select"
+                  >
+                    <option value="">
+                      -- Aucun --
+                    </option>
+                    <option
+                      v-for="task in customTasks"
+                      :key="task.id"
+                      :value="task.id"
+                    >
+                      {{ task.name }} ({{ task.id }})
+                    </option>
+                  </select>
+                  <input
+                    v-else
+                    v-model="form.post_update_task_id"
+                    type="text"
+                    class="form-control"
+                    placeholder="ex: verify-health"
+                  >
+                </div>
+              </template>
+
+              <!-- Custom / webhook mode: tasks.yaml task -->
+              <div
+                v-else
+                class="col-md-6"
+              >
                 <label
                   class="form-label"
                   :class="(mode === 'webhook' || (mode === 'tracker' && form.dispatch_task)) ? 'required' : ''"
@@ -527,6 +716,10 @@ const props = defineProps({
     type: String,
     default: '',
   },
+  prefillComposeProject: {
+    type: String,
+    default: '',
+  },
 })
 
 const emit = defineEmits(['close', 'submit'])
@@ -535,6 +728,7 @@ const modalRef = ref(null)
 useModalFocusTrap(modalRef)
 
 const customTasks = ref([])
+const registryCredentials = ref([])
 const validationError = ref('')
 
 const gitEnvVars = [
@@ -556,6 +750,13 @@ const dockerEnvVars = [
 
 const currentEnvVars = computed(() =>
   form.value.tracker_type === 'docker' ? dockerEnvVars : gitEnvVars
+)
+
+const isComposeMode = computed(() =>
+  props.mode === 'tracker' &&
+  form.value.dispatch_task &&
+  form.value.tracker_type === 'docker' &&
+  form.value.update_action === 'compose'
 )
 
 const defaultWebhookForm = () => ({
@@ -583,10 +784,19 @@ const defaultTrackerForm = () => ({
   host_id: '',
   custom_task_id: '',
   cooldown_hours: 0,
-  dispatch_task: props.prefillDockerImage ? false : true,
+  dispatch_task: props.prefillComposeProject ? true : (props.prefillDockerImage ? false : true),
   notify_channels: [],
   notify_on_release: true,
   enabled: true,
+  update_action: props.prefillComposeProject ? 'compose' : 'custom',
+  compose_project: props.prefillComposeProject || '',
+  compose_service: '',
+  pre_update_task_id: '',
+  post_update_task_id: '',
+  cleanup_after_update: false,
+  healthcheck_timeout_sec: 0,
+  rollback_on_failure: false,
+  registry_credentials_id: '',
 })
 
 const form = ref(defaultWebhookForm())
@@ -609,6 +819,7 @@ watch(
     validationError.value = ''
     hydrateForm()
     await loadCustomTasks(form.value.host_id)
+    if (props.mode === 'tracker') await loadRegistryCredentials()
   },
   { immediate: true, deep: true }
 )
@@ -662,10 +873,19 @@ function hydrateForm() {
           host_id: props.item.host_id || '',
           custom_task_id: props.item.custom_task_id || '',
           cooldown_hours: Number.isFinite(props.item.cooldown_hours) ? props.item.cooldown_hours : 0,
-          dispatch_task: !!(props.item.host_id && props.item.custom_task_id),
+          dispatch_task: !!(props.item.host_id && (props.item.custom_task_id || props.item.compose_project)),
           notify_channels: [...(props.item.notify_channels || [])],
           notify_on_release: props.item.notify_on_release,
           enabled: props.item.enabled,
+          update_action: props.item.update_action || 'custom',
+          compose_project: props.item.compose_project || '',
+          compose_service: props.item.compose_service || '',
+          pre_update_task_id: props.item.pre_update_task_id || '',
+          post_update_task_id: props.item.post_update_task_id || '',
+          cleanup_after_update: !!props.item.cleanup_after_update,
+          healthcheck_timeout_sec: Number.isFinite(props.item.healthcheck_timeout_sec) ? props.item.healthcheck_timeout_sec : 0,
+          rollback_on_failure: !!props.item.rollback_on_failure,
+          registry_credentials_id: props.item.registry_credentials_id || '',
         }
       : defaultTrackerForm()
     return
@@ -701,6 +921,15 @@ async function loadCustomTasks(hostId) {
   }
 }
 
+async function loadRegistryCredentials() {
+  try {
+    const response = await api.getRegistryCredentials()
+    registryCredentials.value = Array.isArray(response.data?.credentials) ? response.data.credentials : []
+  } catch {
+    registryCredentials.value = []
+  }
+}
+
 function validate() {
   if (props.mode === 'tracker') {
     if (!form.value.name) return 'Le nom est obligatoire.'
@@ -721,8 +950,14 @@ function validate() {
       if ((form.value.repo_owner && !form.value.repo_name) || (!form.value.repo_owner && form.value.repo_name)) {
         return 'Pour le repo Git lie, renseignez owner et depot ensemble (ou laissez les deux vides).'
       }
-      if (form.value.dispatch_task && (!form.value.host_id || !form.value.custom_task_id)) {
-        return 'VM cible et ID de tâche sont obligatoires si le déclenchement de tâche est activé.'
+      if (form.value.dispatch_task) {
+        if (form.value.update_action === 'compose') {
+          if (!form.value.host_id || !form.value.compose_project) {
+            return 'VM cible et projet compose sont obligatoires en mode Compose.'
+          }
+        } else if (!form.value.host_id || !form.value.custom_task_id) {
+          return 'VM cible et ID de tâche sont obligatoires si le déclenchement de tâche est activé.'
+        }
       }
     }
     return ''
@@ -741,10 +976,30 @@ function submit() {
   if (props.mode === 'tracker' && (!Array.isArray(payload.notify_channels) || payload.notify_channels.length === 0)) {
     payload.notify_on_release = false
   }
-  // For monitor-only trackers, clear host/task before sending
-  if (props.mode === 'tracker' && !payload.dispatch_task) {
-    payload.host_id = ''
-    payload.custom_task_id = ''
+  if (props.mode === 'tracker') {
+    // Monitor-only: clear all dispatch targets and reset to custom so the
+    // backend's compose CHECK constraint (host+project required) is not hit.
+    if (!payload.dispatch_task) {
+      payload.host_id = ''
+      payload.custom_task_id = ''
+      payload.update_action = 'custom'
+      payload.compose_project = ''
+      payload.compose_service = ''
+    } else if (payload.update_action === 'compose') {
+      // Compose mode does not use a tasks.yaml command target.
+      payload.custom_task_id = ''
+    } else {
+      // Custom mode does not use compose fields.
+      payload.compose_project = ''
+      payload.compose_service = ''
+      payload.pre_update_task_id = ''
+      payload.post_update_task_id = ''
+    }
+    // Git trackers never use the compose path or registry credentials.
+    if (payload.tracker_type !== 'docker') {
+      payload.update_action = 'custom'
+      payload.registry_credentials_id = ''
+    }
   }
   delete payload.dispatch_task
   emit('submit', payload)

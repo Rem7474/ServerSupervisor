@@ -794,7 +794,14 @@ defineEmits(['container-action'])
 function trackImage(c) {
   const image = c.image || ''
   const tag = c.image_tag || 'latest'
-  router.push({ path: '/git-webhooks', query: { tab: 'trackers', docker_image: image, docker_tag: tag } })
+  const query = { tab: 'trackers', docker_image: image, docker_tag: tag }
+  const project = c.labels?.['com.docker.compose.project']
+  if (project) {
+    query.compose_project = project
+    const service = c.labels?.['com.docker.compose.service']
+    if (service) query.compose_service = service
+  }
+  router.push({ path: '/git-webhooks', query })
 }
 
 const searchInput = ref('')

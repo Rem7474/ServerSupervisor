@@ -28,6 +28,19 @@ type ReleaseTracker struct {
 	CreatedAt             time.Time                `json:"created_at"`
 	HostName              string                   `json:"host_name,omitempty"`
 	LastExecution         *ReleaseTrackerExecution `json:"last_execution,omitempty"`
+
+	// Compose update mode (Watchtower-like). UpdateAction "custom" (default)
+	// dispatches a tasks.yaml command; "compose" dispatches the native compose
+	// module which runs pull + up -d on ComposeProject.
+	UpdateAction          string `json:"update_action"`
+	ComposeProject        string `json:"compose_project,omitempty"`
+	ComposeService        string `json:"compose_service,omitempty"` // empty = whole project
+	PreUpdateTaskID       string `json:"pre_update_task_id,omitempty"`
+	PostUpdateTaskID      string `json:"post_update_task_id,omitempty"`
+	CleanupAfterUpdate    bool   `json:"cleanup_after_update"`
+	HealthcheckTimeoutSec int    `json:"healthcheck_timeout_sec"`
+	RollbackOnFailure     bool   `json:"rollback_on_failure"`
+	RegistryCredentialsID string `json:"registry_credentials_id,omitempty"`
 }
 
 type ReleaseTrackerExecution struct {
@@ -40,6 +53,29 @@ type ReleaseTrackerExecution struct {
 	Status      string     `json:"status"`
 	TriggeredAt time.Time  `json:"triggered_at"`
 	CompletedAt *time.Time `json:"completed_at,omitempty"`
+}
+
+// RegistryCredential stores authentication for polling private image registries.
+// Password is write-only at the API boundary (omitted from list/get responses).
+type RegistryCredential struct {
+	ID           string    `json:"id"`
+	Name         string    `json:"name"`
+	RegistryHost string    `json:"registry_host"`
+	Username     string    `json:"username"`
+	Password     string    `json:"password,omitempty"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+}
+
+// TrackableContainer is a compose-managed container discovered across hosts
+// that does not yet have a release tracker — used to pre-fill bulk creation.
+type TrackableContainer struct {
+	HostID         string `json:"host_id"`
+	HostName       string `json:"host_name"`
+	Image          string `json:"image"`
+	ImageTag       string `json:"image_tag"`
+	ComposeProject string `json:"compose_project"`
+	ComposeService string `json:"compose_service"`
 }
 
 type ReleaseVersionHistoryItem struct {

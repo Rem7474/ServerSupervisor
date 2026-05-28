@@ -1,7 +1,7 @@
 package api
 
 import (
-	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
@@ -11,10 +11,12 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/cookies"
 	"github.com/serversupervisor/server/internal/database"
 	errs "github.com/serversupervisor/server/internal/errors"
+	"github.com/serversupervisor/server/internal/logging"
 	"golang.org/x/time/rate"
 )
 
@@ -169,7 +171,10 @@ func RateLimiterMiddleware(rl *IPRateLimiter) gin.HandlerFunc {
 		clientIP := rl.getClientIP(c)
 
 		if !rl.Allow(clientIP) {
-			log.Printf("[rate-limit] blocked %s %s from %s", c.Request.Method, c.Request.URL.Path, clientIP)
+			slog.WarnContext(c.Request.Context(), "rate limit blocked",
+				slog.String("method", c.Request.Method),
+				slog.String("path", c.Request.URL.Path),
+				slog.String("client_ip", clientIP))
 			c.JSON(429, gin.H{"error": "rate limit exceeded"})
 			c.Abort()
 			return
@@ -178,26 +183,67 @@ func RateLimiterMiddleware(rl *IPRateLimiter) gin.HandlerFunc {
 	}
 }
 
-// RequestLogger logs all requests (with sensitive info masked)
+// RequestIDMiddleware assigns a correlation ID to every request. It honours an
+// inbound X-Request-ID header (e.g. from a reverse proxy) when present,
+// otherwise generates a UUID. The ID is stored on the gin context and the
+// request context (so DB calls and slog records inherit it) and echoed back in
+// the X-Request-ID response header.
+func RequestIDMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id := strings.TrimSpace(c.GetHeader("X-Request-ID"))
+		if id == "" {
+			id = uuid.NewString()
+		}
+		c.Set("request_id", id)
+		c.Request = c.Request.WithContext(logging.ContextWithRequestID(c.Request.Context(), id))
+		c.Header("X-Request-ID", id)
+		c.Next()
+	}
+}
+
+// RequestLogger emits a structured access log per request (sensitive query
+// params masked). The request_id is added automatically by the logging
+// contextHandler from the request context.
 func RequestLogger() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
 		path := c.Request.URL.Path
 		query := c.Request.URL.RawQuery
-
-		// Mask sensitive query parameters in logs
 		if query != "" {
 			query = maskSensitiveParams(query)
-			path = path + "?" + query
 		}
 
 		c.Next()
 
-		latency := time.Since(start)
 		status := c.Writer.Status()
-
-		log.Printf("[%d] %s %s (%v)", status, c.Request.Method, path, latency)
+		attrs := []any{
+			slog.Int("status", status),
+			slog.String("method", c.Request.Method),
+			slog.String("path", path),
+			slog.Duration("latency", time.Since(start)),
+			slog.String("client_ip", c.ClientIP()),
+		}
+		if query != "" {
+			attrs = append(attrs, slog.String("query", query))
+		}
+		if status >= 500 {
+			slog.LogAttrs(c.Request.Context(), slog.LevelError, "request", toLogAttrs(attrs)...)
+		} else if status >= 400 {
+			slog.LogAttrs(c.Request.Context(), slog.LevelWarn, "request", toLogAttrs(attrs)...)
+		} else {
+			slog.LogAttrs(c.Request.Context(), slog.LevelInfo, "request", toLogAttrs(attrs)...)
+		}
 	}
+}
+
+func toLogAttrs(attrs []any) []slog.Attr {
+	out := make([]slog.Attr, 0, len(attrs))
+	for _, a := range attrs {
+		if at, ok := a.(slog.Attr); ok {
+			out = append(out, at)
+		}
+	}
+	return out
 }
 
 // maskSensitiveParams removes or masks sensitive query parameters like tokens, passwords, keys

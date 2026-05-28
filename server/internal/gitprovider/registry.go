@@ -4,17 +4,45 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
+	"time"
 )
+
+// regCreds carries optional authentication for registry requests. token is a
+// bearer (e.g. GitHub PAT for ghcr.io); username/password enable Basic auth on
+// token endpoints / challenges for private registries (GHCR, Harbor, ...).
+type regCreds struct {
+	token    string
+	username string
+	password string
+}
+
+func (rc regCreds) hasBasic() bool { return rc.username != "" && rc.password != "" }
+
+// FetchDockerManifestDigestWithAuth is the credential-aware entry point used by
+// the release-tracker poller for private registries. username/password are
+// optional; pass "" for anonymous/public pulls.
+func FetchDockerManifestDigestWithAuth(imageName, tag, authToken, username, password string) (string, error) {
+	client := &http.Client{Timeout: 15 * time.Second}
+	return fetchDockerManifestDigest(client, imageName, tag, regCreds{token: authToken, username: username, password: password})
+}
+
+// FetchDockerVersionForDigestWithAuth resolves a versioned tag for a digest with
+// optional private-registry credentials.
+func FetchDockerVersionForDigestWithAuth(imageName, digest, authToken, username, password string) string {
+	client := &http.Client{Timeout: 15 * time.Second}
+	return fetchDockerVersionForDigest(client, imageName, digest, regCreds{token: authToken, username: username, password: password})
+}
 
 // fetchDockerManifestDigest queries the Docker registry for the manifest digest
 // of imageRef:tag (e.g. "nginx:v1.25.3" or "ghcr.io/org/app:v2.0.0").
 // Returns the digest without "sha256:" prefix, e.g. "f88cbb90...".
-func fetchDockerManifestDigest(client *http.Client, imageRef, tag, authToken string) (string, error) {
+func fetchDockerManifestDigest(client *http.Client, imageRef, tag string, creds regCreds) (string, error) {
 	registry, image := parseDockerRegistry(imageRef)
 
-	token, err := getRegistryToken(client, registry, image, authToken)
+	token, err := getRegistryToken(client, registry, image, creds)
 	if err != nil {
 		return "", fmt.Errorf("auth: %w", err)
 	}
@@ -30,6 +58,9 @@ func fetchDockerManifestDigest(client *http.Client, imageRef, tag, authToken str
 	req.Header.Set("User-Agent", "ServerSupervisor/1.0")
 	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
+	} else if creds.hasBasic() {
+		// Registries that accept Basic auth directly on the manifest endpoint.
+		req.SetBasicAuth(creds.username, creds.password)
 	}
 
 	resp, err := client.Do(req)
@@ -75,7 +106,7 @@ func parseDockerRegistry(imageRef string) (registry, image string) {
 // For Docker Hub, it uses the hub.docker.com API (tags with digest in one call).
 // For other registries, it enumerates tags and HEADs each semver-looking tag.
 // Returns "" if resolution fails.
-func fetchDockerVersionForDigest(client *http.Client, imageRef, targetDigest, authToken string) string {
+func fetchDockerVersionForDigest(client *http.Client, imageRef, targetDigest string, creds regCreds) string {
 	if targetDigest == "" {
 		return ""
 	}
@@ -87,7 +118,7 @@ func fetchDockerVersionForDigest(client *http.Client, imageRef, targetDigest, au
 			return v
 		}
 	}
-	return registryVersionForDigest(client, registry, image, normTarget, authToken)
+	return registryVersionForDigest(client, registry, image, normTarget, creds)
 }
 
 // dockerHubVersionForDigest queries hub.docker.com to find a versioned tag for a digest.
@@ -128,8 +159,8 @@ func dockerHubVersionForDigest(client *http.Client, image, normDigest string) st
 
 // registryVersionForDigest uses the v2 tags/list API + HEAD manifest per tag
 // to find a versioned tag matching normDigest. Checks up to 30 semver-looking tags.
-func registryVersionForDigest(client *http.Client, registry, image, normDigest, authToken string) string {
-	token, err := getRegistryToken(client, registry, image, authToken)
+func registryVersionForDigest(client *http.Client, registry, image, normDigest string, creds regCreds) string {
+	token, err := getRegistryToken(client, registry, image, creds)
 	if err != nil {
 		return ""
 	}
@@ -139,6 +170,8 @@ func registryVersionForDigest(client *http.Client, registry, image, normDigest, 
 	req.Header.Set("User-Agent", "ServerSupervisor/1.0")
 	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
+	} else if creds.hasBasic() {
+		req.SetBasicAuth(creds.username, creds.password)
 	}
 	resp, err := client.Do(req)
 	if err != nil || resp.StatusCode != http.StatusOK {
@@ -176,6 +209,8 @@ func registryVersionForDigest(client *http.Client, registry, image, normDigest, 
 		hreq.Header.Set("User-Agent", "ServerSupervisor/1.0")
 		if token != "" {
 			hreq.Header.Set("Authorization", "Bearer "+token)
+		} else if creds.hasBasic() {
+			hreq.SetBasicAuth(creds.username, creds.password)
 		}
 		hresp, err := client.Do(hreq)
 		if hresp != nil {
@@ -322,48 +357,104 @@ func leadingDigits(s string) string {
 	return s
 }
 
-// getRegistryToken fetches an anonymous pull token for the given registry and image.
-func getRegistryToken(client *http.Client, registry, image, authToken string) (string, error) {
+// getRegistryToken fetches a pull token for the given registry and image.
+// When creds carry a username/password, Basic auth is used on the token endpoint
+// so private repositories can be polled (Docker Hub, GHCR, and generic registries
+// discovered via the WWW-Authenticate challenge). Returns "" with no error when
+// the registry is reached without a token (caller may then try Basic directly).
+func getRegistryToken(client *http.Client, registry, image string, creds regCreds) (string, error) {
 	switch registry {
 	case "registry-1.docker.io":
 		authURL := fmt.Sprintf("https://auth.docker.io/token?service=registry.docker.io&scope=repository:%s:pull", image)
-		req, _ := http.NewRequest("GET", authURL, nil)
-		req.Header.Set("User-Agent", "ServerSupervisor/1.0")
-		resp, err := client.Do(req)
-		if err != nil {
-			return "", err
-		}
-		defer func() { _ = resp.Body.Close() }()
-		var result struct {
-			Token string `json:"token"`
-		}
-		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-			return "", err
-		}
-		return result.Token, nil
+		return fetchBearerToken(client, authURL, creds, false)
 	case "ghcr.io":
-		// ghcr.io requires an anonymous Bearer token even for public images.
-		// Fetch one from its token endpoint, optionally authenticated with a GitHub PAT.
+		// ghcr.io requires a Bearer token even for public images. A GitHub PAT
+		// (creds.token) or username/password authenticate access to private images.
 		authURL := fmt.Sprintf("https://ghcr.io/token?service=ghcr.io&scope=repository:%s:pull", image)
-		req, _ := http.NewRequest("GET", authURL, nil)
-		req.Header.Set("User-Agent", "ServerSupervisor/1.0")
-		if authToken != "" {
-			req.Header.Set("Authorization", "Bearer "+authToken)
-		}
-		resp, err := client.Do(req)
-		if err != nil {
-			return "", err
-		}
-		defer func() { _ = resp.Body.Close() }()
-		var result struct {
-			Token string `json:"token"`
-		}
-		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-			return "", err
-		}
-		return result.Token, nil
+		return fetchBearerToken(client, authURL, creds, true)
 	default:
-		// For unknown registries, attempt unauthenticated access
+		// Generic registries: discover the auth scheme via the v2 challenge.
+		return discoverRegistryToken(client, registry, image, creds)
+	}
+}
+
+// fetchBearerToken requests a token from a known token endpoint, applying Basic
+// auth (username/password) or a Bearer PAT (when allowBearer) if provided.
+func fetchBearerToken(client *http.Client, authURL string, creds regCreds, allowBearer bool) (string, error) {
+	req, _ := http.NewRequest("GET", authURL, nil)
+	req.Header.Set("User-Agent", "ServerSupervisor/1.0")
+	if creds.hasBasic() {
+		req.SetBasicAuth(creds.username, creds.password)
+	} else if allowBearer && creds.token != "" {
+		req.Header.Set("Authorization", "Bearer "+creds.token)
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	var result struct {
+		Token       string `json:"token"`
+		AccessToken string `json:"access_token"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", err
+	}
+	if result.Token != "" {
+		return result.Token, nil
+	}
+	return result.AccessToken, nil
+}
+
+// discoverRegistryToken probes /v2/ on an unknown registry, parses the
+// WWW-Authenticate challenge, and obtains a Bearer token from the advertised
+// realm (with Basic auth when credentials are present). Returns "" for Basic-only
+// registries so the caller authenticates directly on the resource request.
+func discoverRegistryToken(client *http.Client, registry, image string, creds regCreds) (string, error) {
+	probe, _ := http.NewRequest("GET", fmt.Sprintf("https://%s/v2/", registry), nil)
+	probe.Header.Set("User-Agent", "ServerSupervisor/1.0")
+	resp, err := client.Do(probe)
+	if err != nil {
+		return "", err
+	}
+	challenge := resp.Header.Get("WWW-Authenticate")
+	_ = resp.Body.Close()
+	if resp.StatusCode == http.StatusOK || challenge == "" {
+		return "", nil // open registry, no token needed
+	}
+	if !strings.HasPrefix(strings.ToLower(challenge), "bearer") {
+		return "", nil // Basic (or unsupported) — caller falls back to Basic auth
+	}
+
+	params := parseAuthChallenge(challenge)
+	realm := params["realm"]
+	if realm == "" {
 		return "", nil
 	}
+	authURL := realm
+	q := url.Values{}
+	if svc := params["service"]; svc != "" {
+		q.Set("service", svc)
+	}
+	q.Set("scope", fmt.Sprintf("repository:%s:pull", image))
+	authURL += "?" + q.Encode()
+	return fetchBearerToken(client, authURL, creds, true)
+}
+
+// parseAuthChallenge parses a "Bearer realm=...,service=...,scope=..." header
+// into its key/value parameters.
+func parseAuthChallenge(header string) map[string]string {
+	out := make(map[string]string)
+	rest := strings.TrimSpace(header)
+	if idx := strings.IndexByte(rest, ' '); idx >= 0 {
+		rest = rest[idx+1:]
+	}
+	for _, part := range strings.Split(rest, ",") {
+		kv := strings.SplitN(strings.TrimSpace(part), "=", 2)
+		if len(kv) != 2 {
+			continue
+		}
+		out[strings.TrimSpace(kv[0])] = strings.Trim(strings.TrimSpace(kv[1]), `"`)
+	}
+	return out
 }

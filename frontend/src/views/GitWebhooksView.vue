@@ -10,24 +10,50 @@
             Webhooks entrants et suivi de releases pour déclencher des scripts sur vos VMs.
           </div>
         </div>
-        <button
-          class="btn btn-primary"
-          @click="activeTab === 'webhooks' ? openCreateWebhook() : openCreateTracker()"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="icon me-1"
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
+        <div class="btn-list">
+          <button
+            v-if="activeTab === 'trackers'"
+            class="btn btn-outline-primary"
+            @click="showDiscoverModal = true"
           >
-            <path d="M12 5v14M5 12h14" />
-          </svg>
-          {{ activeTab === 'webhooks' ? 'Nouveau webhook' : 'Nouveau tracker' }}
-        </button>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="icon me-1"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <circle
+                cx="10"
+                cy="10"
+                r="7"
+              />
+              <path d="M21 21l-6-6" />
+            </svg>
+            Découvrir
+          </button>
+          <button
+            class="btn btn-primary"
+            @click="activeTab === 'webhooks' ? openCreateWebhook() : openCreateTracker()"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="icon me-1"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            {{ activeTab === 'webhooks' ? 'Nouveau webhook' : 'Nouveau tracker' }}
+          </button>
+        </div>
       </div>
     </div>
 
@@ -411,7 +437,23 @@
                       >{{ tracker.repo_owner }}/{{ tracker.repo_name }}</a>
                     </div>
                   </template>
-                  <template v-if="tracker.host_id && tracker.custom_task_id">
+                  <template v-if="tracker.host_id && tracker.update_action === 'compose' && tracker.compose_project">
+                    <div class="d-flex gap-2 mb-1">
+                      <span
+                        class="text-muted"
+                        style="min-width:60px"
+                      >VM</span>
+                      <span class="text-truncate">{{ tracker.host_name || tracker.host_id }}</span>
+                    </div>
+                    <div class="d-flex gap-2 mb-1">
+                      <span
+                        class="text-muted"
+                        style="min-width:60px"
+                      >Compose</span>
+                      <code class="small text-truncate">{{ tracker.compose_project }}{{ tracker.compose_service ? ' / ' + tracker.compose_service : '' }}</code>
+                    </div>
+                  </template>
+                  <template v-else-if="tracker.host_id && tracker.custom_task_id">
                     <div class="d-flex gap-2 mb-1">
                       <span
                         class="text-muted"
@@ -427,7 +469,7 @@
                       <code class="small text-truncate">{{ tracker.custom_task_id }}</code>
                     </div>
                   </template>
-                  <template v-else-if="!tracker.host_id || !tracker.custom_task_id">
+                  <template v-else>
                     <div class="d-flex gap-2 mb-1">
                       <span
                         class="text-muted"
@@ -600,8 +642,15 @@
       :error="modalError"
       :prefill-docker-image="prefillDockerImage"
       :prefill-docker-tag="prefillDockerTag"
+      :prefill-compose-project="prefillComposeProject"
       @close="closeTrackerModal"
       @submit="saveTracker"
+    />
+
+    <TrackableContainersModal
+      :visible="showDiscoverModal"
+      @close="showDiscoverModal = false"
+      @created="onBulkCreated"
     />
 
     <div
@@ -645,6 +694,7 @@ import { useGitWebhooksPage } from '../composables/useGitWebhooksPage'
 import WebhookUrlCard from '../components/webhooks/WebhookUrlCard.vue'
 import WebhookExecutionList from '../components/webhooks/WebhookExecutionList.vue'
 import WebhookModal from '../components/webhooks/WebhookModal.vue'
+import TrackableContainersModal from '../components/webhooks/TrackableContainersModal.vue'
 import CommandLogPanel from '../components/host/CommandLogPanel.vue'
 import { ref } from 'vue'
 import api from '../api'
@@ -668,6 +718,7 @@ const {
   editingTracker,
   prefillDockerImage,
   prefillDockerTag,
+  prefillComposeProject,
   recentWebhookExecutions,
   recentTrackerExecutions,
   openCreateWebhook,
@@ -684,6 +735,7 @@ const {
   toggleTracker,
   checkNow,
   confirmDeleteTracker,
+  loadTrackers,
   repoURL,
   providerBadge,
   execStatusBadge,
@@ -698,6 +750,11 @@ const auth = useAuthStore()
 const { openCommandStream, closeStream } = useCommandStream()
 const selectedTrackerCmd = ref(null)
 const showTrackerConsole = ref(false)
+const showDiscoverModal = ref(false)
+
+async function onBulkCreated() {
+  await loadTrackers()
+}
 
 function closeTrackerLogs() {
   closeStream()

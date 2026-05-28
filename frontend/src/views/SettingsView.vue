@@ -122,6 +122,7 @@
     <!-- Intégrations -->
     <div v-show="tab === 'integrations'">
       <SettingsProxmoxCard :auth-is-admin="auth.isAdmin" />
+      <SettingsRegistryCredentialsCard :auth-is-admin="auth.isAdmin" />
     </div>
 
     <!-- Rétention -->
@@ -164,6 +165,7 @@ import SettingsRetentionCard from '../components/settings/SettingsRetentionCard.
 import SettingsSmtpCard from '../components/settings/SettingsSmtpCard.vue'
 import SettingsSystemInfoCard from '../components/settings/SettingsSystemInfoCard.vue'
 import SettingsProxmoxCard from '../components/settings/SettingsProxmoxCard.vue'
+import SettingsRegistryCredentialsCard from '../components/settings/SettingsRegistryCredentialsCard.vue'
 
 const auth = useAuthStore()
 

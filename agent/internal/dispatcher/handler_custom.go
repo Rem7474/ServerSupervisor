@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/serversupervisor/agent/internal/config"
 	"github.com/serversupervisor/agent/internal/sender"
 )
 
@@ -28,18 +29,38 @@ func handleCustom(ctx context.Context, d *Dispatcher, s *sender.Sender, cmd send
 
 	reportRunning(ctx, s, cmd)
 
+	var payloadData struct {
+		Env map[string]string `json:"env"`
+	}
+	_ = json.Unmarshal([]byte(cmd.Payload), &payloadData)
+
+	stream := func(chunk string) { streamChunk(ctx, s, cmd.ID, chunk) }
+	output, err := executeTask(ctx, task, payloadData.Env, stream)
+	status := "completed"
+	if err != nil {
+		status = "failed"
+		output += "\nERROR: " + err.Error()
+		log.Printf("Custom task %q failed: %v", task.ID, err)
+	} else {
+		log.Printf("Custom task %q completed", task.ID)
+	}
+	reportTerminal(ctx, s, cmd, status, output)
+}
+
+// executeTask runs a tasks.yaml-declared task, streaming combined output via
+// streamCB, and returns the captured output plus any execution error. It does
+// NOT report command status — the caller owns reporting. Used by handleCustom
+// and as pre/post hooks by the compose module. The argv is exec'd directly (no
+// shell), so env values cannot expand into shell metacharacters.
+func executeTask(ctx context.Context, task *config.CustomTask, env map[string]string, streamCB func(string)) (string, error) {
 	timeout := time.Duration(task.Timeout) * time.Second
 	taskCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	c := exec.CommandContext(taskCtx, task.Command[0], task.Command[1:]...)
-
-	var payloadData struct {
-		Env map[string]string `json:"env"`
-	}
-	if err := json.Unmarshal([]byte(cmd.Payload), &payloadData); err == nil && len(payloadData.Env) > 0 {
-		extraEnv := make([]string, 0, len(payloadData.Env))
-		for k, v := range payloadData.Env {
+	if len(env) > 0 {
+		extraEnv := make([]string, 0, len(env))
+		for k, v := range env {
 			extraEnv = append(extraEnv, k+"="+v)
 		}
 		c.Env = append(os.Environ(), extraEnv...)
@@ -47,18 +68,14 @@ func handleCustom(ctx context.Context, d *Dispatcher, s *sender.Sender, cmd send
 
 	stdout, err := c.StdoutPipe()
 	if err != nil {
-		reportTerminal(ctx, s, cmd, "failed", fmt.Sprintf("ERROR: %v", err))
-		return
+		return "", err
 	}
 	stderr, err := c.StderrPipe()
 	if err != nil {
-		reportTerminal(ctx, s, cmd, "failed", fmt.Sprintf("ERROR: %v", err))
-		return
+		return "", err
 	}
-
 	if err := c.Start(); err != nil {
-		reportTerminal(ctx, s, cmd, "failed", fmt.Sprintf("ERROR: failed to start: %v", err))
-		return
+		return "", fmt.Errorf("failed to start: %w", err)
 	}
 
 	var builder strings.Builder
@@ -69,7 +86,9 @@ func handleCustom(ctx context.Context, d *Dispatcher, s *sender.Sender, cmd send
 			if n > 0 {
 				chunk := string(buf[:n])
 				builder.WriteString(chunk)
-				streamChunk(ctx, s, cmd.ID, chunk)
+				if streamCB != nil {
+					streamCB(chunk)
+				}
 			}
 			if readErr != nil {
 				break
@@ -84,18 +103,8 @@ func handleCustom(ctx context.Context, d *Dispatcher, s *sender.Sender, cmd send
 	pipeWg.Wait()
 
 	waitErr := c.Wait()
-	status := "completed"
-	output := builder.String()
-	if waitErr != nil {
-		status = "failed"
-		if taskCtx.Err() == context.DeadlineExceeded {
-			output += fmt.Sprintf("\nERROR: task timed out after %ds", task.Timeout)
-		} else {
-			output += fmt.Sprintf("\nERROR: %v", waitErr)
-		}
-		log.Printf("Custom task %q failed: %v", task.ID, waitErr)
-	} else {
-		log.Printf("Custom task %q completed", task.ID)
+	if waitErr != nil && taskCtx.Err() == context.DeadlineExceeded {
+		return builder.String(), fmt.Errorf("task timed out after %ds", task.Timeout)
 	}
-	reportTerminal(ctx, s, cmd, status, output)
+	return builder.String(), waitErr
 }

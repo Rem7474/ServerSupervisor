@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"log/slog"
 	"net/http"
 	"os/signal"
 	"syscall"
@@ -14,21 +15,23 @@ import (
 	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/dispatch"
 	"github.com/serversupervisor/server/internal/handlers"
+	"github.com/serversupervisor/server/internal/logging"
 	"github.com/serversupervisor/server/internal/scheduler"
 	"github.com/serversupervisor/server/internal/ws"
 )
 
 func main() {
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
-	log.Println("ServerSupervisor - Starting server...")
-
 	// Root ctx — cancelled by SIGINT/SIGTERM. Propagated to background jobs,
 	// scheduler, pollers, and any DB call made outside an HTTP request context.
 	rootCtx, stopSignals := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stopSignals()
 
-	// Load config
+	// Load config (must precede logging.Init so LOG_LEVEL/LOG_FORMAT apply).
 	cfg := config.Load()
+
+	// Structured logging — also bridges the standard log package through slog.
+	logging.Init(cfg.LogLevel, cfg.LogFormat)
+	slog.Info("ServerSupervisor starting", slog.String("log_level", cfg.LogLevel), slog.String("log_format", cfg.LogFormat))
 	log.Printf("Database Config: host=%s port=%s dbname=%s", cfg.DBHost, cfg.DBPort, cfg.DBName)
 
 	// ⚠️  Validate configuration — log all warnings before connecting to the database

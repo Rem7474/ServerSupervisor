@@ -18,6 +18,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
 	r.Use(gin.Recovery())
+	r.Use(RequestIDMiddleware())
 	r.Use(RequestLogger())
 	r.Use(SecurityHeadersMiddleware())
 	r.Use(CORSMiddleware(cfg.BaseURL, cfg.AllowedOrigins))
@@ -299,6 +300,8 @@ func registerGitWebhookRoutes(r *gin.Engine, g *gin.RouterGroup, h *handlers.Git
 func registerReleaseTrackerRoutes(g *gin.RouterGroup, h *handlers.ReleaseTrackerHandler) {
 	g.GET("/release-trackers", h.List)
 	g.POST("/release-trackers", h.Create)
+	g.POST("/release-trackers/bulk", h.CreateBulk)
+	g.GET("/release-trackers/trackable-containers", h.ListTrackableContainers)
 	g.GET("/release-trackers/:id", h.Get)
 	g.PUT("/release-trackers/:id", h.Update)
 	g.DELETE("/release-trackers/:id", h.Delete)
@@ -306,6 +309,11 @@ func registerReleaseTrackerRoutes(g *gin.RouterGroup, h *handlers.ReleaseTracker
 	g.POST("/release-trackers/:id/run", h.Run)
 	g.GET("/release-trackers/:id/executions", h.GetExecutions)
 	g.GET("/release-trackers/:id/version-history", h.GetVersionHistory)
+
+	g.GET("/registry-credentials", h.ListRegistryCredentials)
+	g.POST("/registry-credentials", h.CreateRegistryCredential)
+	g.PUT("/registry-credentials/:id", h.UpdateRegistryCredential)
+	g.DELETE("/registry-credentials/:id", h.DeleteRegistryCredential)
 }
 
 func registerProxmoxRoutes(g *gin.RouterGroup, h *handlers.ProxmoxHandler) {

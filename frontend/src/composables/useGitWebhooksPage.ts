@@ -78,6 +78,7 @@ interface UseGitWebhooksPageApi {
   editingTracker: Ref<ReleaseTracker | null>
   prefillDockerImage: Ref<string>
   prefillDockerTag: Ref<string>
+  prefillComposeProject: Ref<string>
   recentWebhookExecutions: ComputedRef<RecentExecution[]>
   recentTrackerExecutions: ComputedRef<RecentExecution[]>
   openCreateWebhook: () => void
@@ -94,6 +95,7 @@ interface UseGitWebhooksPageApi {
   toggleTracker: (tracker: ReleaseTracker) => Promise<void>
   checkNow: (tracker: ReleaseTracker) => Promise<void>
   confirmDeleteTracker: (tracker: ReleaseTracker) => Promise<void>
+  loadTrackers: () => Promise<void>
   repoURL: (tracker: ReleaseTracker) => string
   providerBadge: (provider: string) => string
   execStatusBadge: (status: string) => string
@@ -126,6 +128,7 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
 
   const prefillDockerImage: Ref<string> = ref('')
   const prefillDockerTag: Ref<string> = ref('')
+  const prefillComposeProject: Ref<string> = ref('')
   const nowTick: Ref<number> = ref(Date.now())
   let cooldownTimer: number | null = null
   let runningRefreshTimer: number | null = null
@@ -188,6 +191,7 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
     if (route.query.docker_image) {
       prefillDockerImage.value = String(route.query.docker_image)
       prefillDockerTag.value = String(route.query.docker_tag || 'latest')
+      prefillComposeProject.value = String(route.query.compose_project || '')
       activeTab.value = 'trackers'
       await Promise.all([loadWebhooks(), loadTrackers(), loadHosts()])
       ensureRunningRefresh()
@@ -350,6 +354,7 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
   function openEditTracker(tracker: ReleaseTracker): void {
     prefillDockerImage.value = ''
     prefillDockerTag.value = ''
+    prefillComposeProject.value = ''
     editingTracker.value = tracker
     modalError.value = ''
     showTrackerModal.value = true
@@ -361,6 +366,7 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
     modalError.value = ''
     prefillDockerImage.value = ''
     prefillDockerTag.value = ''
+    prefillComposeProject.value = ''
   }
 
   async function saveTracker(payload: FormPayload): Promise<void> {
@@ -509,6 +515,7 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
     editingTracker,
     prefillDockerImage,
     prefillDockerTag,
+    prefillComposeProject,
     recentWebhookExecutions,
     recentTrackerExecutions,
     openCreateWebhook,
@@ -525,6 +532,7 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
     toggleTracker,
     checkNow,
     confirmDeleteTracker,
+    loadTrackers,
     repoURL,
     providerBadge,
     execStatusBadge,

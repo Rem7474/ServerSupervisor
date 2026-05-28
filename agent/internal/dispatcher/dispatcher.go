@@ -28,12 +28,23 @@ type UpdaterFunc func(s *sender.Sender, cmd sender.PendingCommand, cfgPath strin
 
 // Dispatcher executes agent commands with concurrency controls.
 type Dispatcher struct {
-	aptMu   sync.Mutex
-	cmdSem  chan struct{}
-	tasks   *config.TasksConfig
-	cfg     *config.Config
-	cfgPath string
-	updater UpdaterFunc
+	aptMu     sync.Mutex
+	cmdSem    chan struct{}
+	tasks     *config.TasksConfig
+	cfg       *config.Config
+	cfgPath   string
+	updater   UpdaterFunc
+	composeMu sync.Map // project name -> *sync.Mutex (serialize compose updates per project)
+}
+
+// lockCompose serializes compose updates for a single project. Concurrent
+// pull/up on the same project can corrupt container state, so each project gets
+// its own mutex. Returns an unlock function for `defer`.
+func (d *Dispatcher) lockCompose(project string) func() {
+	muIface, _ := d.composeMu.LoadOrStore(project, &sync.Mutex{})
+	mu := muIface.(*sync.Mutex)
+	mu.Lock()
+	return mu.Unlock
 }
 
 // New returns a ready Dispatcher. updater is called for module=agent action=update.

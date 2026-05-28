@@ -13,6 +13,31 @@ import (
 
 // ========== Release Trackers ==========
 
+// nullStrTracker maps "" to SQL NULL for nullable text/uuid columns.
+func nullStrTracker(s string) sql.NullString {
+	if s == "" {
+		return sql.NullString{}
+	}
+	return sql.NullString{String: s, Valid: true}
+}
+
+// applyComposeFields copies scanned compose-update columns onto a tracker.
+// Column order matches composeSelectCols.
+func applyComposeFields(t *models.ReleaseTracker,
+	updateAction string,
+	composeProject, composeService, preTask, postTask, regCredID sql.NullString,
+	cleanup, rollback bool, healthTimeout int) {
+	t.UpdateAction = updateAction
+	t.ComposeProject = composeProject.String
+	t.ComposeService = composeService.String
+	t.PreUpdateTaskID = preTask.String
+	t.PostUpdateTaskID = postTask.String
+	t.RegistryCredentialsID = regCredID.String
+	t.CleanupAfterUpdate = cleanup
+	t.RollbackOnFailure = rollback
+	t.HealthcheckTimeoutSec = healthTimeout
+}
+
 func (db *DB) CreateReleaseTracker(ctx context.Context, t models.ReleaseTracker) (*models.ReleaseTracker, error) {
 	channels := t.NotifyChannels
 	if channels == nil {
@@ -21,22 +46,30 @@ func (db *DB) CreateReleaseTracker(ctx context.Context, t models.ReleaseTracker)
 	if t.TrackerType == "" {
 		t.TrackerType = "git"
 	}
+	if t.UpdateAction == "" {
+		t.UpdateAction = "custom"
+	}
 	var result models.ReleaseTracker
 	var hostID sql.NullString
 	if t.HostID != "" {
 		hostID = sql.NullString{String: t.HostID, Valid: true}
 	}
 	var scannedHostID sql.NullString
-	err := db.conn.QueryRowContext(ctx, 
+	err := db.conn.QueryRowContext(ctx,
 		`INSERT INTO release_trackers
 		 (name, tracker_type, provider, repo_owner, repo_name, docker_image, docker_tag, host_id, custom_task_id,
-		  notify_channels, notify_on_release, enabled, cooldown_hours)
-		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+		  notify_channels, notify_on_release, enabled, cooldown_hours,
+		  update_action, compose_project, compose_service, pre_update_task_id, post_update_task_id,
+		  cleanup_after_update, healthcheck_timeout_sec, rollback_on_failure, registry_credentials_id)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
 		 RETURNING id, name, tracker_type, provider, repo_owner, repo_name, docker_image, docker_tag,
 		           host_id, custom_task_id, last_release_tag, cooldown_hours, last_release_detected_at, last_checked_at, last_triggered_at,
 		           notify_channels, notify_on_release, enabled, created_at`,
 		t.Name, t.TrackerType, t.Provider, t.RepoOwner, t.RepoName, t.DockerImage, t.DockerTag,
 		hostID, t.CustomTaskID, pq.Array(channels), t.NotifyOnRelease, t.Enabled, t.CooldownHours,
+		t.UpdateAction, nullStrTracker(t.ComposeProject), nullStrTracker(t.ComposeService),
+		nullStrTracker(t.PreUpdateTaskID), nullStrTracker(t.PostUpdateTaskID),
+		t.CleanupAfterUpdate, t.HealthcheckTimeoutSec, t.RollbackOnFailure, nullStrTracker(t.RegistryCredentialsID),
 	).Scan(
 		&result.ID, &result.Name, &result.TrackerType, &result.Provider, &result.RepoOwner, &result.RepoName,
 		&result.DockerImage, &result.DockerTag, &scannedHostID, &result.CustomTaskID, &result.LastReleaseTag,
@@ -52,17 +85,29 @@ func (db *DB) CreateReleaseTracker(ctx context.Context, t models.ReleaseTracker)
 	if result.NotifyChannels == nil {
 		result.NotifyChannels = []string{}
 	}
+	// Compose fields are echoed from the input since they were just persisted.
+	result.UpdateAction = t.UpdateAction
+	result.ComposeProject = t.ComposeProject
+	result.ComposeService = t.ComposeService
+	result.PreUpdateTaskID = t.PreUpdateTaskID
+	result.PostUpdateTaskID = t.PostUpdateTaskID
+	result.CleanupAfterUpdate = t.CleanupAfterUpdate
+	result.HealthcheckTimeoutSec = t.HealthcheckTimeoutSec
+	result.RollbackOnFailure = t.RollbackOnFailure
+	result.RegistryCredentialsID = t.RegistryCredentialsID
 	return &result, nil
 }
 
 func (db *DB) ListReleaseTrackers(ctx context.Context) ([]models.ReleaseTracker, error) {
-	rows, err := db.conn.QueryContext(ctx, 
+	rows, err := db.conn.QueryContext(ctx,
 		`SELECT t.id, t.name, t.tracker_type, t.provider, t.repo_owner, t.repo_name,
 		        t.docker_image, t.docker_tag,
 		        t.host_id, t.custom_task_id, t.last_release_tag, t.latest_image_digest, t.cooldown_hours, t.last_release_detected_at,
 		        t.last_checked_at, t.last_triggered_at, t.last_error,
 		        t.notify_channels, t.notify_on_release, t.enabled, t.created_at,
 		        COALESCE(h.name, '') AS host_name,
+		        t.update_action, t.compose_project, t.compose_service, t.pre_update_task_id, t.post_update_task_id,
+		        t.cleanup_after_update, t.healthcheck_timeout_sec, t.rollback_on_failure, t.registry_credentials_id,
 		        le.id, le.command_id, le.tag_name, le.release_url, le.release_name,
 		        le.status, le.triggered_at, le.completed_at
 		 FROM release_trackers t
@@ -83,6 +128,10 @@ func (db *DB) ListReleaseTrackers(ctx context.Context) ([]models.ReleaseTracker,
 	for rows.Next() {
 		var t models.ReleaseTracker
 		var hostID sql.NullString
+		var updateAction string
+		var composeProject, composeService, preTask, postTask, regCredID sql.NullString
+		var cleanup, rollback bool
+		var healthTimeout int
 		var leID, leTag, leURL, leName, leStatus sql.NullString
 		var leCommandID sql.NullString
 		var leTriggered sql.NullTime
@@ -94,11 +143,14 @@ func (db *DB) ListReleaseTrackers(ctx context.Context) ([]models.ReleaseTracker,
 			&t.LastCheckedAt, &t.LastTriggeredAt, &t.LastError,
 			pq.Array(&t.NotifyChannels), &t.NotifyOnRelease, &t.Enabled, &t.CreatedAt,
 			&t.HostName,
+			&updateAction, &composeProject, &composeService, &preTask, &postTask,
+			&cleanup, &healthTimeout, &rollback, &regCredID,
 			&leID, &leCommandID, &leTag, &leURL, &leName, &leStatus, &leTriggered, &leCompleted,
 		); err != nil {
 			return nil, err
 		}
 		t.HostID = hostID.String
+		applyComposeFields(&t, updateAction, composeProject, composeService, preTask, postTask, regCredID, cleanup, rollback, healthTimeout)
 		if t.NotifyChannels == nil {
 			t.NotifyChannels = []string{}
 		}
@@ -128,13 +180,19 @@ func (db *DB) ListReleaseTrackers(ctx context.Context) ([]models.ReleaseTracker,
 func (db *DB) GetReleaseTrackerByID(ctx context.Context, id string) (*models.ReleaseTracker, error) {
 	var t models.ReleaseTracker
 	var hostID sql.NullString
-	err := db.conn.QueryRowContext(ctx, 
+	var updateAction string
+	var composeProject, composeService, preTask, postTask, regCredID sql.NullString
+	var cleanup, rollback bool
+	var healthTimeout int
+	err := db.conn.QueryRowContext(ctx,
 		`SELECT t.id, t.name, t.tracker_type, t.provider, t.repo_owner, t.repo_name,
 		        t.docker_image, t.docker_tag,
 		        t.host_id, t.custom_task_id, t.last_release_tag, t.latest_image_digest, t.cooldown_hours, t.last_release_detected_at,
 		        t.last_checked_at, t.last_triggered_at, t.last_error,
 		        t.notify_channels, t.notify_on_release, t.enabled, t.created_at,
-		        COALESCE(h.name, '') AS host_name
+		        COALESCE(h.name, '') AS host_name,
+		        t.update_action, t.compose_project, t.compose_service, t.pre_update_task_id, t.post_update_task_id,
+		        t.cleanup_after_update, t.healthcheck_timeout_sec, t.rollback_on_failure, t.registry_credentials_id
 		 FROM release_trackers t
 		 LEFT JOIN hosts h ON h.id = t.host_id
 		 WHERE t.id = $1`, id,
@@ -145,11 +203,14 @@ func (db *DB) GetReleaseTrackerByID(ctx context.Context, id string) (*models.Rel
 		&t.LastCheckedAt, &t.LastTriggeredAt, &t.LastError,
 		pq.Array(&t.NotifyChannels), &t.NotifyOnRelease, &t.Enabled, &t.CreatedAt,
 		&t.HostName,
+		&updateAction, &composeProject, &composeService, &preTask, &postTask,
+		&cleanup, &healthTimeout, &rollback, &regCredID,
 	)
 	t.HostID = hostID.String
 	if err != nil {
 		return nil, err
 	}
+	applyComposeFields(&t, updateAction, composeProject, composeService, preTask, postTask, regCredID, cleanup, rollback, healthTimeout)
 	if t.NotifyChannels == nil {
 		t.NotifyChannels = []string{}
 	}
@@ -164,22 +225,32 @@ func (db *DB) UpdateReleaseTracker(ctx context.Context, id string, t models.Rele
 	if t.TrackerType == "" {
 		t.TrackerType = "git"
 	}
+	if t.UpdateAction == "" {
+		t.UpdateAction = "custom"
+	}
 	var hostID sql.NullString
 	if t.HostID != "" {
 		hostID = sql.NullString{String: t.HostID, Valid: true}
 	}
-	_, err := db.conn.ExecContext(ctx, 
+	_, err := db.conn.ExecContext(ctx,
 		`UPDATE release_trackers SET
 		   name=$1, tracker_type=$2, provider=$3, repo_owner=$4, repo_name=$5,
 		   docker_image=$6, docker_tag=$7,
 		   host_id=$8, custom_task_id=$9,
-		   notify_channels=$10, notify_on_release=$11, enabled=$12, cooldown_hours=$13
+		   notify_channels=$10, notify_on_release=$11, enabled=$12, cooldown_hours=$13,
+		   update_action=$15, compose_project=$16, compose_service=$17,
+		   pre_update_task_id=$18, post_update_task_id=$19,
+		   cleanup_after_update=$20, healthcheck_timeout_sec=$21, rollback_on_failure=$22,
+		   registry_credentials_id=$23
 		 WHERE id=$14`,
 		t.Name, t.TrackerType, t.Provider, t.RepoOwner, t.RepoName,
 		t.DockerImage, t.DockerTag,
 		hostID, t.CustomTaskID,
 		pq.Array(channels), t.NotifyOnRelease, t.Enabled, t.CooldownHours,
 		id,
+		t.UpdateAction, nullStrTracker(t.ComposeProject), nullStrTracker(t.ComposeService),
+		nullStrTracker(t.PreUpdateTaskID), nullStrTracker(t.PostUpdateTaskID),
+		t.CleanupAfterUpdate, t.HealthcheckTimeoutSec, t.RollbackOnFailure, nullStrTracker(t.RegistryCredentialsID),
 	)
 	return err
 }
@@ -189,12 +260,72 @@ func (db *DB) DeleteReleaseTracker(ctx context.Context, id string) error {
 	return err
 }
 
+// ListTrackableContainers returns compose-managed containers (across hosts) that
+// do not yet have a docker release tracker, for the auto-discovery UI. Results
+// are deduplicated by (host, image, tag, project, service).
+func (db *DB) ListTrackableContainers(ctx context.Context) ([]models.TrackableContainer, error) {
+	rows, err := db.conn.QueryContext(ctx, `
+		SELECT DISTINCT
+		    dc.host_id,
+		    COALESCE(h.name, '') AS host_name,
+		    dc.image,
+		    dc.image_tag,
+		    COALESCE(dc.labels->>'com.docker.compose.project', '') AS compose_project,
+		    COALESCE(dc.labels->>'com.docker.compose.service', '') AS compose_service
+		FROM docker_containers dc
+		JOIN hosts h ON h.id = dc.host_id
+		WHERE dc.image <> ''
+		  AND COALESCE(dc.labels->>'com.docker.compose.project', '') <> ''
+		  AND NOT EXISTS (
+		    SELECT 1 FROM release_trackers rt
+		    WHERE rt.tracker_type = 'docker'
+		      AND rt.docker_image = dc.image
+		      AND COALESCE(rt.host_id, '') = dc.host_id
+		  )
+		ORDER BY host_name, dc.image, dc.image_tag`)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	out := make([]models.TrackableContainer, 0)
+	for rows.Next() {
+		var tc models.TrackableContainer
+		if err := rows.Scan(&tc.HostID, &tc.HostName, &tc.Image, &tc.ImageTag, &tc.ComposeProject, &tc.ComposeService); err != nil {
+			return nil, err
+		}
+		out = append(out, tc)
+	}
+	return out, rows.Err()
+}
+
+// GetDeployedImageDigest returns the manifest digest of a container currently
+// running image:tag on the given host, or "" if none is found. Used for drift
+// detection: if the deployed digest already matches the registry's latest, a
+// compose update would be a no-op and is skipped.
+func (db *DB) GetDeployedImageDigest(ctx context.Context, hostID, image, tag string) (string, error) {
+	if tag == "" {
+		tag = "latest"
+	}
+	var digest string
+	err := db.conn.QueryRowContext(ctx,
+		`SELECT image_digest FROM docker_containers
+		 WHERE host_id=$1 AND image=$2 AND image_tag=$3 AND image_digest <> ''
+		 LIMIT 1`, hostID, image, tag).Scan(&digest)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	return digest, err
+}
+
 // GetEnabledReleaseTrackers returns all enabled trackers for polling.
 func (db *DB) GetEnabledReleaseTrackers(ctx context.Context) ([]models.ReleaseTracker, error) {
-	rows, err := db.conn.QueryContext(ctx, 
+	rows, err := db.conn.QueryContext(ctx,
 		`SELECT id, name, tracker_type, provider, repo_owner, repo_name,
 		        docker_image, docker_tag, host_id, custom_task_id,
-		        last_release_tag, latest_image_digest, cooldown_hours, last_release_detected_at, last_triggered_at, notify_channels, notify_on_release
+		        last_release_tag, latest_image_digest, cooldown_hours, last_release_detected_at, last_triggered_at, notify_channels, notify_on_release,
+		        update_action, compose_project, compose_service, pre_update_task_id, post_update_task_id,
+		        cleanup_after_update, healthcheck_timeout_sec, rollback_on_failure, registry_credentials_id
 		 FROM release_trackers WHERE enabled = TRUE ORDER BY id`)
 	if err != nil {
 		return nil, err
@@ -205,15 +336,22 @@ func (db *DB) GetEnabledReleaseTrackers(ctx context.Context) ([]models.ReleaseTr
 	for rows.Next() {
 		var t models.ReleaseTracker
 		var hostID sql.NullString
+		var updateAction string
+		var composeProject, composeService, preTask, postTask, regCredID sql.NullString
+		var cleanup, rollback bool
+		var healthTimeout int
 		if err := rows.Scan(
 			&t.ID, &t.Name, &t.TrackerType, &t.Provider, &t.RepoOwner, &t.RepoName,
 			&t.DockerImage, &t.DockerTag, &hostID, &t.CustomTaskID,
 			&t.LastReleaseTag, &t.LatestImageDigest, &t.CooldownHours, &t.LastReleaseDetectedAt, &t.LastTriggeredAt,
 			pq.Array(&t.NotifyChannels), &t.NotifyOnRelease,
+			&updateAction, &composeProject, &composeService, &preTask, &postTask,
+			&cleanup, &healthTimeout, &rollback, &regCredID,
 		); err != nil {
 			return nil, err
 		}
 		t.HostID = hostID.String
+		applyComposeFields(&t, updateAction, composeProject, composeService, preTask, postTask, regCredID, cleanup, rollback, healthTimeout)
 		if t.NotifyChannels == nil {
 			t.NotifyChannels = []string{}
 		}

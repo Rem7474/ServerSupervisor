@@ -101,12 +101,12 @@ func (c *giteaClient) FetchReleaseHistory(owner, repo string, limit int) ([]Rele
 
 // FetchDockerManifestDigest returns the SHA256 digest from Docker registries
 func (c *giteaClient) FetchDockerManifestDigest(imageName, tag string) (string, error) {
-	return fetchDockerManifestDigest(c.client, imageName, tag, c.authToken)
+	return fetchDockerManifestDigest(c.client, imageName, tag, regCreds{token: c.authToken})
 }
 
 // FetchDockerVersionForDigest finds a versioned tag matching the given digest.
 func (c *giteaClient) FetchDockerVersionForDigest(imageName, digest string) string {
-	return fetchDockerVersionForDigest(c.client, imageName, digest, c.authToken)
+	return fetchDockerVersionForDigest(c.client, imageName, digest, regCreds{token: c.authToken})
 }
 
 func (c *giteaClient) fetchGiteaRelease(owner, repo string) (*models.GitHubRelease, error) {
