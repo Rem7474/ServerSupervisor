@@ -411,370 +411,46 @@
                   <button
                     class="nav-link"
                     :class="{ active: tab === 'security' }"
-                    @click="tab = 'security'; loadNodeSecurityEvents()"
+                    @click="tab = 'security'"
                   >
-                    Sécurité <span class="badge bg-azure-lt text-azure ms-1">{{ securityEvents.length }}</span>
+                    Sécurité <span class="badge bg-azure-lt text-azure ms-1">{{ securityEventsCount }}</span>
                   </button>
                 </li>
               </ul>
             </div>
 
             <!-- VMs tab -->
-            <div
-              v-show="tab === 'vms'"
-              class="table-responsive"
-            >
-              <table class="table table-vcenter card-table">
-                <thead>
-                  <tr>
-                    <th>
-                      <SortableHeader
-                        label="VMID"
-                        :active="vmSortKey === 'vmid'"
-                        :direction="vmSortDir"
-                        @toggle="toggleVmSort('vmid')"
-                      />
-                    </th>
-                    <th>
-                      <SortableHeader
-                        label="Nom"
-                        :active="vmSortKey === 'name'"
-                        :direction="vmSortDir"
-                        @toggle="toggleVmSort('name')"
-                      />
-                    </th>
-                    <th>
-                      <SortableHeader
-                        label="Statut"
-                        :active="vmSortKey === 'status'"
-                        :direction="vmSortDir"
-                        @toggle="toggleVmSort('status')"
-                      />
-                    </th>
-                    <th>
-                      <SortableHeader
-                        label="IP"
-                        :active="vmSortKey === 'ip'"
-                        :direction="vmSortDir"
-                        @toggle="toggleVmSort('ip')"
-                      />
-                    </th>
-                    <th>
-                      <SortableHeader
-                        label="CPU alloué"
-                        :active="vmSortKey === 'cpu_alloc'"
-                        :direction="vmSortDir"
-                        @toggle="toggleVmSort('cpu_alloc')"
-                      />
-                    </th>
-                    <th>
-                      <SortableHeader
-                        label="CPU utilisé"
-                        :active="vmSortKey === 'cpu_used'"
-                        :direction="vmSortDir"
-                        @toggle="toggleVmSort('cpu_used')"
-                      />
-                    </th>
-                    <th>
-                      <SortableHeader
-                        label="RAM allouée"
-                        :active="vmSortKey === 'mem_alloc'"
-                        :direction="vmSortDir"
-                        @toggle="toggleVmSort('mem_alloc')"
-                      />
-                    </th>
-                    <th>
-                      <SortableHeader
-                        label="RAM utilisée"
-                        :active="vmSortKey === 'mem_used'"
-                        :direction="vmSortDir"
-                        @toggle="toggleVmSort('mem_used')"
-                      />
-                    </th>
-                    <th>
-                      <SortableHeader
-                        label="Disque"
-                        :active="vmSortKey === 'disk_alloc'"
-                        :direction="vmSortDir"
-                        @toggle="toggleVmSort('disk_alloc')"
-                      />
-                    </th>
-                    <th>
-                      <SortableHeader
-                        label="Uptime"
-                        :active="vmSortKey === 'uptime'"
-                        :direction="vmSortDir"
-                        @toggle="toggleVmSort('uptime')"
-                      />
-                    </th>
-                    <th>
-                      <SortableHeader
-                        label="Tags"
-                        :active="vmSortKey === 'tags'"
-                        :direction="vmSortDir"
-                        @toggle="toggleVmSort('tags')"
-                      />
-                    </th>
-                    <th>
-                      <SortableHeader
-                        label="Hôte lié"
-                        :active="vmSortKey === 'linked_host'"
-                        :direction="vmSortDir"
-                        @toggle="toggleVmSort('linked_host')"
-                      />
-                    </th>
-                    <th />
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-if="sortedVms.length === 0">
-                    <td
-                      colspan="13"
-                      class="text-center text-muted py-4"
-                    >
-                      Aucune VM sur ce nœud.
-                    </td>
-                  </tr>
-                  <tr
-                    v-for="g in sortedVms"
-                    :key="g.id"
-                  >
-                    <td class="text-muted">
-                      {{ g.vmid }}
-                    </td>
-                    <td class="fw-medium">
-                      <router-link
-                        :to="`/proxmox/guests/${g.id}?nodeId=${route.params.id}`"
-                        class="text-decoration-none"
-                      >
-                        {{ g.name || '—' }}
-                      </router-link>
-                    </td>
-                    <td><span :class="guestStatusClass(g.status)">{{ g.status }}</span></td>
-                    <td>
-                      <span
-                        v-if="guestNetworksLoading"
-                        class="text-muted small"
-                      >…</span>
-                      <template v-else-if="guestNetworks[g.vmid]?.length">
-                        <div
-                          v-for="iface in guestNetworks[g.vmid]"
-                          :key="iface.name"
-                          class="small lh-sm"
-                        >
-                          <span class="text-muted me-1">{{ iface.name }}</span>
-                          <span
-                            v-for="ip in iface.ips.filter(i => !i.startsWith('fe80'))"
-                            :key="ip"
-                          >{{ ip.split('/')[0] }}</span>
-                        </div>
-                      </template>
-                      <span
-                        v-else
-                        class="text-muted"
-                      >—</span>
-                    </td>
-                    <td>{{ g.cpu_alloc }} vCPU</td>
-                    <td>{{ (g.cpu_usage * 100).toFixed(1) }}%</td>
-                    <td>{{ formatBytes(g.mem_alloc) }}</td>
-                    <td>{{ formatBytes(g.mem_usage) }}</td>
-                    <td>{{ formatBytes(g.disk_alloc) }}</td>
-                    <td>{{ g.status === 'running' ? formatUptime(g.uptime) : '—' }}</td>
-                    <td>
-                      <template v-if="g.tags">
-                        <span
-                          v-for="tag in g.tags.split(';').filter(Boolean)"
-                          :key="tag"
-                          class="badge bg-blue-lt text-blue me-1"
-                        >{{ tag.trim() }}</span>
-                      </template>
-                    </td>
-                    <td>
-                      <GuestLinkCell
-                        :link="linkForGuest(g)"
-                        @confirm="confirmGuestLink(g)"
-                        @ignore="ignoreGuestLink(g)"
-                        @go="goToHost(linkForGuest(g))"
-                      />
-                    </td>
-                    <td>
-                      <button
-                        v-if="peerNodes.length > 0"
-                        class="btn btn-sm btn-ghost-secondary"
-                        title="Migrer vers un autre nœud"
-                        @click="openMigrateModal(g, 'vm')"
-                      >
-                        Migrer
-                      </button>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+            <div v-show="tab === 'vms'">
+              <ProxmoxNodeGuestsTab
+                kind="vm"
+                :guests="vms"
+                :guest-networks="guestNetworks"
+                :guest-networks-loading="guestNetworksLoading"
+                :links="guestLinks"
+                :peer-nodes="peerNodes"
+                :node-id="route.params.id"
+                @confirm-link="confirmGuestLink"
+                @ignore-link="ignoreGuestLink"
+                @go-host="goToHost"
+                @migrate="openMigrateModal($event, 'vm')"
+              />
             </div>
 
             <!-- LXC tab -->
-            <div
-              v-show="tab === 'lxc'"
-              class="table-responsive"
-            >
-              <table class="table table-vcenter card-table">
-                <thead>
-                  <tr>
-                    <th>
-                      <SortableHeader
-                        label="CT ID"
-                        :active="lxcSortKey === 'vmid'"
-                        :direction="lxcSortDir"
-                        @toggle="toggleLxcSort('vmid')"
-                      />
-                    </th>
-                    <th>
-                      <SortableHeader
-                        label="Nom"
-                        :active="lxcSortKey === 'name'"
-                        :direction="lxcSortDir"
-                        @toggle="toggleLxcSort('name')"
-                      />
-                    </th>
-                    <th>
-                      <SortableHeader
-                        label="Statut"
-                        :active="lxcSortKey === 'status'"
-                        :direction="lxcSortDir"
-                        @toggle="toggleLxcSort('status')"
-                      />
-                    </th>
-                    <th>
-                      <SortableHeader
-                        label="IP"
-                        :active="lxcSortKey === 'ip'"
-                        :direction="lxcSortDir"
-                        @toggle="toggleLxcSort('ip')"
-                      />
-                    </th>
-                    <th>
-                      <SortableHeader
-                        label="CPU alloué"
-                        :active="lxcSortKey === 'cpu_alloc'"
-                        :direction="lxcSortDir"
-                        @toggle="toggleLxcSort('cpu_alloc')"
-                      />
-                    </th>
-                    <th>
-                      <SortableHeader
-                        label="CPU utilisé"
-                        :active="lxcSortKey === 'cpu_used'"
-                        :direction="lxcSortDir"
-                        @toggle="toggleLxcSort('cpu_used')"
-                      />
-                    </th>
-                    <th>
-                      <SortableHeader
-                        label="RAM allouée"
-                        :active="lxcSortKey === 'mem_alloc'"
-                        :direction="lxcSortDir"
-                        @toggle="toggleLxcSort('mem_alloc')"
-                      />
-                    </th>
-                    <th>
-                      <SortableHeader
-                        label="RAM utilisée"
-                        :active="lxcSortKey === 'mem_used'"
-                        :direction="lxcSortDir"
-                        @toggle="toggleLxcSort('mem_used')"
-                      />
-                    </th>
-                    <th>
-                      <SortableHeader
-                        label="Disque"
-                        :active="lxcSortKey === 'disk_alloc'"
-                        :direction="lxcSortDir"
-                        @toggle="toggleLxcSort('disk_alloc')"
-                      />
-                    </th>
-                    <th>
-                      <SortableHeader
-                        label="Uptime"
-                        :active="lxcSortKey === 'uptime'"
-                        :direction="lxcSortDir"
-                        @toggle="toggleLxcSort('uptime')"
-                      />
-                    </th>
-                    <th>
-                      <SortableHeader
-                        label="Hôte lié"
-                        :active="lxcSortKey === 'linked_host'"
-                        :direction="lxcSortDir"
-                        @toggle="toggleLxcSort('linked_host')"
-                      />
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-if="sortedLxcs.length === 0">
-                    <td
-                      colspan="11"
-                      class="text-center text-muted py-4"
-                    >
-                      Aucun conteneur LXC sur ce nœud.
-                    </td>
-                  </tr>
-                  <tr
-                    v-for="g in sortedLxcs"
-                    :key="g.id"
-                  >
-                    <td class="text-muted">
-                      {{ g.vmid }}
-                    </td>
-                    <td class="fw-medium">
-                      <router-link
-                        :to="`/proxmox/guests/${g.id}?nodeId=${route.params.id}`"
-                        class="text-decoration-none"
-                      >
-                        {{ g.name || '—' }}
-                      </router-link>
-                    </td>
-                    <td><span :class="guestStatusClass(g.status)">{{ g.status }}</span></td>
-                    <td>
-                      <span
-                        v-if="guestNetworksLoading"
-                        class="text-muted small"
-                      >…</span>
-                      <template v-else-if="guestNetworks[g.vmid]?.length">
-                        <div
-                          v-for="iface in guestNetworks[g.vmid]"
-                          :key="iface.name"
-                          class="small lh-sm"
-                        >
-                          <span class="text-muted me-1">{{ iface.name }}</span>
-                          <span
-                            v-for="ip in iface.ips.filter(i => !i.startsWith('fe80'))"
-                            :key="ip"
-                          >{{ ip.split('/')[0] }}</span>
-                        </div>
-                      </template>
-                      <span
-                        v-else
-                        class="text-muted"
-                      >—</span>
-                    </td>
-                    <td>{{ g.cpu_alloc }}</td>
-                    <td>{{ (g.cpu_usage * 100).toFixed(1) }}%</td>
-                    <td>{{ formatBytes(g.mem_alloc) }}</td>
-                    <td>{{ formatBytes(g.mem_usage) }}</td>
-                    <td>{{ formatBytes(g.disk_alloc) }}</td>
-                    <td>{{ g.status === 'running' ? formatUptime(g.uptime) : '—' }}</td>
-                    <td>
-                      <GuestLinkCell
-                        :link="linkForGuest(g)"
-                        @confirm="confirmGuestLink(g)"
-                        @ignore="ignoreGuestLink(g)"
-                        @go="goToHost(linkForGuest(g))"
-                      />
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+            <div v-show="tab === 'lxc'">
+              <ProxmoxNodeGuestsTab
+                kind="lxc"
+                :guests="lxcs"
+                :guest-networks="guestNetworks"
+                :guest-networks-loading="guestNetworksLoading"
+                :links="guestLinks"
+                :peer-nodes="peerNodes"
+                :node-id="route.params.id"
+                @confirm-link="confirmGuestLink"
+                @ignore-link="ignoreGuestLink"
+                @go-host="goToHost"
+                @migrate="openMigrateModal($event, 'lxc')"
+              />
             </div>
 
             <!-- Link action feedback -->
@@ -792,498 +468,50 @@
 
             <!-- Tasks tab -->
             <div v-show="tab === 'tasks'">
-              <div class="table-responsive">
-                <table class="table table-vcenter card-table">
-                  <thead>
-                    <tr>
-                      <th>
-                        <SortableHeader
-                          label="Type"
-                          :active="taskSortKey === 'task_type'"
-                          :direction="taskSortDir"
-                          @toggle="toggleTaskSort('task_type')"
-                        />
-                      </th>
-                      <th>
-                        <SortableHeader
-                          label="Objet"
-                          :active="taskSortKey === 'object_id'"
-                          :direction="taskSortDir"
-                          @toggle="toggleTaskSort('object_id')"
-                        />
-                      </th>
-                      <th>
-                        <SortableHeader
-                          label="Utilisateur"
-                          :active="taskSortKey === 'user_name'"
-                          :direction="taskSortDir"
-                          @toggle="toggleTaskSort('user_name')"
-                        />
-                      </th>
-                      <th>
-                        <SortableHeader
-                          label="Début"
-                          :active="taskSortKey === 'start_time'"
-                          :direction="taskSortDir"
-                          @toggle="toggleTaskSort('start_time')"
-                        />
-                      </th>
-                      <th>
-                        <SortableHeader
-                          label="Durée"
-                          :active="taskSortKey === 'duration'"
-                          :direction="taskSortDir"
-                          @toggle="toggleTaskSort('duration')"
-                        />
-                      </th>
-                      <th>
-                        <SortableHeader
-                          label="Statut"
-                          :active="taskSortKey === 'status'"
-                          :direction="taskSortDir"
-                          @toggle="toggleTaskSort('status')"
-                        />
-                      </th>
-                      <th />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <template v-if="!node.tasks?.length">
-                      <tr>
-                        <td
-                          colspan="7"
-                          class="text-center text-muted py-4"
-                        >
-                          Aucune tâche récente pour ce nœud.
-                        </td>
-                      </tr>
-                    </template>
-                    <tr
-                      v-for="t in sortedTasks"
-                      v-else
-                      :key="t.id"
-                      :class="activeUpid === t.upid ? 'table-active' : ''"
-                    >
-                      <td><span class="badge bg-azure-lt text-azure font-monospace">{{ t.task_type }}</span></td>
-                      <td class="text-muted">
-                        {{ t.object_id || '—' }}
-                      </td>
-                      <td class="text-muted small">
-                        {{ t.user_name }}
-                      </td>
-                      <td class="text-muted small">
-                        {{ formatDate(t.start_time) }}
-                      </td>
-                      <td class="text-muted small">
-                        {{ taskDuration(t) }}
-                      </td>
-                      <td>
-                        <span
-                          class="badge task-status-badge"
-                          :class="taskStatusBadgeClass(t)"
-                          :title="taskStatusLabel(t)"
-                        >{{ taskStatusLabel(t) }}</span>
-                      </td>
-                      <td>
-                        <button
-                          class="btn btn-sm btn-ghost-secondary"
-                          title="Voir les logs"
-                          @click="startPollingTask(t.upid, {action: t.task_type, label: t.object_id})"
-                        >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            class="icon icon-sm"
-                            width="16"
-                            height="16"
-                            viewBox="0 0 24 24"
-                            stroke-width="2"
-                            stroke="currentColor"
-                            fill="none"
-                          ><path
-                            stroke="none"
-                            d="M0 0h24v24H0z"
-                            fill="none"
-                          /><path d="M4 6l16 0" /><path d="M4 12l16 0" /><path d="M4 18l12 0" /></svg>
-                        </button>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+              <ProxmoxNodeTasksTab
+                :tasks="node.tasks || []"
+                :active-upid="activeUpid"
+                @view-logs="startPollingTask($event.upid, { action: $event.action, label: $event.label })"
+              />
             </div>
 
             <!-- Updates tab -->
-            <div
-              v-show="tab === 'updates'"
-              class="card-body"
-            >
-              <!-- Apt update action bar -->
-              <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
-                <button
-                  class="btn btn-outline-secondary"
-                  :disabled="aptRefreshing"
-                  @click="triggerAptRefresh"
-                >
-                  <span
-                    v-if="aptRefreshing"
-                    class="spinner-border spinner-border-sm me-1"
-                  />
-                  apt update
-                </button>
-                <span
-                  v-if="aptRefreshMsg"
-                  :class="['small', aptRefreshOk ? 'text-success' : 'text-danger']"
-                >{{ aptRefreshMsg }}</span>
-              </div>
-
-              <div
-                v-if="node.pending_updates === 0"
-                class="text-center text-muted py-3"
-              >
-                <div class="mb-1">
-                  Aucune mise à jour en attente détectée.
-                </div>
-                <div
-                  v-if="node.last_update_check_at"
-                  class="small"
-                >
-                  Dernière vérification : {{ formatDate(node.last_update_check_at) }}
-                </div>
-                <div
-                  v-else
-                  class="small"
-                >
-                  Données non encore disponibles (prochain cycle de polling).
-                </div>
-              </div>
-              <div v-else>
-                <div class="d-flex align-items-center gap-3 mb-3">
-                  <div class="h2 mb-0">
-                    {{ node.pending_updates }}
-                  </div>
-                  <div>
-                    <div class="fw-medium">
-                      paquet(s) en attente de mise à jour
-                    </div>
-                    <div
-                      v-if="node.last_update_check_at"
-                      class="text-muted small"
-                    >
-                      Détecté le {{ formatDate(node.last_update_check_at) }}
-                    </div>
-                  </div>
-                </div>
-                <div class="alert alert-info mb-0">
-                  Ces informations proviennent du cache apt du nœud Proxmox (lecture seule).
-                  Pour appliquer les mises à jour, connectez-vous directement au nœud.
-                </div>
-              </div>
+            <div v-show="tab === 'updates'">
+              <ProxmoxNodeUpdatesTab
+                :pending-updates="node.pending_updates"
+                :last-update-check-at="node.last_update_check_at"
+                :apt-refreshing="aptRefreshing"
+                :apt-refresh-msg="aptRefreshMsg"
+                :apt-refresh-ok="aptRefreshOk"
+                @refresh-apt="triggerAptRefresh"
+              />
             </div>
 
             <!-- Services tab -->
             <div v-show="tab === 'services'">
-              <div class="card-header d-flex align-items-center gap-2 flex-wrap">
-                <div class="btn-group btn-group-sm">
-                  <button
-                    :class="servicesFilter === 'active' ? 'btn btn-primary' : 'btn btn-outline-secondary'"
-                    @click="servicesFilter = 'active'"
-                  >
-                    Actifs
-                  </button>
-                  <button
-                    :class="servicesFilter === 'all' ? 'btn btn-primary' : 'btn btn-outline-secondary'"
-                    @click="servicesFilter = 'all'"
-                  >
-                    Tous
-                  </button>
-                </div>
-                <button
-                  class="btn btn-sm btn-outline-secondary ms-2"
-                  :disabled="servicesLoading"
-                  @click="loadServices"
-                >
-                  <span
-                    v-if="servicesLoading"
-                    class="spinner-border spinner-border-sm me-1"
-                  />
-                  {{ servicesLoading ? 'Chargement...' : '↻ Actualiser' }}
-                </button>
-                <span
-                  v-if="svcActionMsg"
-                  :class="['small ms-2', svcActionOk ? 'text-success' : 'text-danger']"
-                >{{ svcActionMsg }}</span>
-              </div>
-              <div
-                v-if="servicesError"
-                class="card-body pb-0"
-              >
-                <div class="alert alert-danger mb-0">
-                  {{ servicesError }}
-                </div>
-              </div>
-              <div
-                v-if="!services.length && !servicesLoading && !servicesError"
-                class="card-body"
-              >
-                <div class="text-secondary small">
-                  Cliquez sur "Actualiser" pour charger les services du nœud Proxmox.
-                </div>
-              </div>
-              <div
-                v-if="filteredServices.length"
-                class="table-responsive"
-              >
-                <table class="table table-vcenter table-hover card-table mb-0">
-                  <thead>
-                    <tr>
-                      <th>Service</th>
-                      <th>État</th>
-                      <th>Sous-état</th>
-                      <th>Démarrage</th>
-                      <th>Description</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr
-                      v-for="svc in filteredServices"
-                      :key="svc.name"
-                    >
-                      <td class="font-monospace small fw-medium">
-                        {{ svc.name }}
-                      </td>
-                      <td><span :class="svcStateClass(svc['active-state'])">{{ svc['active-state'] || svc.state }}</span></td>
-                      <td class="text-secondary small">
-                        {{ svc['sub-state'] || '—' }}
-                      </td>
-                      <td class="text-secondary small">
-                        {{ svc['unit-state'] || '—' }}
-                      </td>
-                      <td
-                        class="text-secondary small text-truncate proxmox-service-desc"
-                        :title="svc.desc"
-                      >
-                        {{ svc.desc || '—' }}
-                      </td>
-                      <td class="text-nowrap">
-                        <div class="btn-group btn-group-sm">
-                          <button
-                            v-if="svc['active-state'] !== 'active'"
-                            class="btn btn-outline-success"
-                            title="Démarrer"
-                            @click="svcAction(svc.name, 'start')"
-                          >
-                            Start
-                          </button>
-                          <button
-                            v-if="svc['active-state'] === 'active'"
-                            class="btn btn-outline-danger"
-                            title="Arrêter"
-                            @click="svcAction(svc.name, 'stop')"
-                          >
-                            Stop
-                          </button>
-                          <button
-                            class="btn btn-outline-secondary"
-                            title="Redémarrer"
-                            @click="svcAction(svc.name, 'restart')"
-                          >
-                            Restart
-                          </button>
-                          <button
-                            class="btn btn-outline-secondary"
-                            title="Recharger"
-                            @click="svcAction(svc.name, 'reload')"
-                          >
-                            Reload
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-              <div
-                v-if="servicesError"
-                class="card-footer text-muted small"
-              >
-                Lecture : Sys.Audit requis · Actions (start/stop/restart/reload) : Sys.Modify requis sur le token API.
-              </div>
+              <ProxmoxNodeServicesTab
+                :services="services"
+                :loading="servicesLoading"
+                :error="servicesError"
+                :action-msg="svcActionMsg"
+                :action-ok="svcActionOk"
+                @refresh="loadServices"
+                @action="svcAction($event.name, $event.action)"
+              />
             </div>
 
             <!-- Security tab -->
             <div v-show="tab === 'security'">
-              <div class="card-header d-flex align-items-center gap-2 flex-wrap">
-                <select
-                  v-model="securityService"
-                  class="form-select proxmox-security-service-select"
-                >
-                  <option value="rotate">
-                    Rotation (3 services)
-                  </option>
-                  <option value="pveproxy">
-                    pveproxy
-                  </option>
-                  <option value="sshd">
-                    sshd
-                  </option>
-                  <option value="pvedaemon">
-                    pvedaemon
-                  </option>
-                  <option value="">
-                    Tous les services
-                  </option>
-                </select>
-                <input
-                  v-model="securitySearch"
-                  type="text"
-                  class="form-control proxmox-security-search"
-                  placeholder="Filtre syslog (ex: failed, denied, apparmor)"
-                >
-                <button
-                  class="btn btn-sm btn-outline-secondary"
-                  :disabled="securityEventsLoading"
-                  @click="loadNodeSecurityEvents"
-                >
-                  <span
-                    v-if="securityEventsLoading"
-                    class="spinner-border spinner-border-sm me-1"
-                  />
-                  Rechercher
-                </button>
-              </div>
-              <div
-                v-if="securityEventsError"
-                class="card-body pb-0"
-              >
-                <div class="alert alert-danger mb-0">
-                  {{ securityEventsError }}
-                </div>
-              </div>
-              <div
-                v-if="securityEventsLoading"
-                class="card-body text-muted small"
-              >
-                <span class="spinner-border spinner-border-sm me-1" />Chargement des événements de sécurité…
-              </div>
-              <div
-                v-else-if="securityEvents.length"
-                class="table-responsive"
-              >
-                <table class="table table-vcenter card-table">
-                  <thead>
-                    <tr>
-                      <th>Date</th>
-                      <th>Niveau</th>
-                      <th>Tag</th>
-                      <th>Message</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr
-                      v-for="(item, idx) in securityEvents"
-                      :key="item.id || `${item.parsedTimeMs || item.time || 't'}-${idx}`"
-                    >
-                      <td class="text-muted small">
-                        {{ formatSyslogTime(item) }}
-                      </td>
-                      <td>
-                        <span
-                          class="badge text-uppercase"
-                          :class="syslogLevelBadgeClass(item)"
-                        >{{ item.parsedLevel || item.pri || item.level || '—' }}</span>
-                      </td>
-                      <td class="font-monospace small">
-                        {{ item.parsedTag || item.tag || item.ident || '—' }}
-                      </td>
-                      <td class="small">
-                        {{ item.parsedMsg || item.msg || item.t || '—' }}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-              <div
-                v-else
-                class="card-body text-center text-muted py-4"
-              >
-                Aucun événement de sécurité trouvé pour ce filtre.
-              </div>
+              <ProxmoxNodeSecurityTab
+                :node-id="route.params.id"
+                :active="tab === 'security'"
+                @count="securityEventsCount = $event"
+              />
             </div>
 
             <!-- Storage tab -->
-            <div
-              v-show="tab === 'storage'"
-              class="table-responsive"
-            >
-              <table class="table table-vcenter card-table">
-                <thead>
-                  <tr>
-                    <th>Stockage</th>
-                    <th>Type</th>
-                    <th>Total</th>
-                    <th>Utilisé</th>
-                    <th>Disponible</th>
-                    <th>Utilisation</th>
-                    <th>Partagé</th>
-                    <th>Statut</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-if="!node.storages?.length">
-                    <td
-                      colspan="8"
-                      class="text-center text-muted py-4"
-                    >
-                      Aucun stockage sur ce nœud.
-                    </td>
-                  </tr>
-                  <tr
-                    v-for="s in node.storages"
-                    :key="s.id"
-                  >
-                    <td class="fw-medium">
-                      {{ s.storage_name }}
-                    </td>
-                    <td><span class="badge bg-secondary-lt text-secondary">{{ s.storage_type }}</span></td>
-                    <td>{{ formatBytes(s.total) }}</td>
-                    <td>{{ formatBytes(s.used) }}</td>
-                    <td>{{ formatBytes(s.avail) }}</td>
-                    <td>
-                      <div class="d-flex align-items-center gap-2">
-                        <div class="progress progress-xs flex-grow-1 proxmox-progress-min-80">
-                          <div
-                            class="progress-bar"
-                            :class="storageColor(s.used, s.total)"
-                            :style="`width:${storagePct(s)}%`"
-                          />
-                        </div>
-                        <span class="text-muted small">{{ storagePct(s) }}%</span>
-                      </div>
-                    </td>
-                    <td>
-                      <span
-                        v-if="s.shared"
-                        class="badge bg-azure-lt text-azure"
-                      >Oui</span>
-                      <span
-                        v-else
-                        class="text-muted"
-                      >—</span>
-                    </td>
-                    <td>
-                      <span
-                        v-if="s.active && s.enabled"
-                        class="badge bg-success-lt text-success"
-                      >Actif</span>
-                      <span
-                        v-else
-                        class="badge bg-danger-lt text-danger"
-                      >Inactif</span>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+            <div v-show="tab === 'storage'">
+              <ProxmoxNodeStorageTab :storages="node.storages || []" />
             </div>
           </div>
         </div> <!-- /side-main -->
@@ -1386,6 +614,12 @@ import SortableHeader from '../components/common/SortableHeader.vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import GuestLinkCell from '../components/proxmox/GuestLinkCell.vue'
 import ProxmoxNodeDisksTab from '../components/proxmox/ProxmoxNodeDisksTab.vue'
+import ProxmoxNodeStorageTab from '../components/proxmox/ProxmoxNodeStorageTab.vue'
+import ProxmoxNodeTasksTab from '../components/proxmox/ProxmoxNodeTasksTab.vue'
+import ProxmoxNodeUpdatesTab from '../components/proxmox/ProxmoxNodeUpdatesTab.vue'
+import ProxmoxNodeServicesTab from '../components/proxmox/ProxmoxNodeServicesTab.vue'
+import ProxmoxNodeSecurityTab from '../components/proxmox/ProxmoxNodeSecurityTab.vue'
+import ProxmoxNodeGuestsTab from '../components/proxmox/ProxmoxNodeGuestsTab.vue'
 import api from '../api'
 
 const route = useRoute()
@@ -1395,12 +629,6 @@ const loading = ref(true)
 const error = ref('')
 const tab = ref('vms')
 
-const vmSortKey = ref('vmid')
-const vmSortDir = ref('asc')
-const lxcSortKey = ref('vmid')
-const lxcSortDir = ref('asc')
-const taskSortKey = ref('start_time')
-const taskSortDir = ref('desc')
 
 // guest_id → link object (loaded after node data)
 const guestLinks = ref({})
@@ -1493,245 +721,17 @@ async function loadGuestNetworks() {
 const services = ref([])
 const servicesLoading = ref(false)
 const servicesError = ref('')
-const servicesFilter = ref('active')
 const svcActionMsg = ref('')
 const svcActionOk = ref(false)
 
 // node syslog security events
-const securityEvents = ref([])
-const securityEventsLoading = ref(false)
-const securityEventsError = ref('')
-const securitySearch = ref('')
-const securityService = ref('rotate')
-
-function mergeAndRankSyslogLines(groups, maxLines = 200) {
-  const flat = groups.flatMap(g => Array.isArray(g) ? g : []).map(normalizeSyslogEntry)
-  const uniq = new Map()
-  for (const item of flat) {
-    const key = `${item.parsedTimeMs ?? item.time ?? ''}|${item.parsedTag ?? item.tag ?? ''}|${item.parsedMsg ?? item.msg ?? item.t ?? ''}`
-    if (!uniq.has(key)) uniq.set(key, item)
-  }
-  const ranked = [...uniq.values()].sort((a, b) => {
-    const ta = Number(a?.parsedTimeMs ?? a?.time ?? 0)
-    const tb = Number(b?.parsedTimeMs ?? b?.time ?? 0)
-    if (ta !== tb) return tb - ta
-    return Number(b?.n ?? 0) - Number(a?.n ?? 0)
-  })
-  return ranked.slice(0, maxLines)
-}
-
-const SYSLOG_MONTHS = {
-  Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5,
-  Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11,
-}
-
-function guessLevel(text) {
-  const v = String(text || '').toLowerCase()
-  if (!v) return ''
-
-  if (
-    v.includes('successful auth') ||
-    v.includes('authentication success') ||
-    v.includes('authentication succeeded') ||
-    v.includes('login successful')
-  ) return 'success'
-
-  // Security-significant auth events are elevated to critical for quick triage.
-  if (
-    v.includes('authentication failure') ||
-    v.includes('failed password') ||
-    v.includes('invalid user') ||
-    v.includes('too many authentication failures') ||
-    v.includes('maximum authentication attempts exceeded') ||
-    v.includes('user root@pam msg=authentication failure')
-  ) return 'critical'
-
-  if (v.includes('critical') || v.includes('panic') || v.includes('fatal')) return 'critical'
-  if (v.includes('error') || v.includes('failed') || v.includes('denied')) return 'error'
-  if (v.includes('failure')) return 'error'
-  if (v.includes('warn')) return 'warning'
-  if (v.includes('info')) return 'info'
-  return ''
-}
-
-function parseHeaderDate(prefix) {
-  const m = /^([A-Z][a-z]{2})\s+(\d{1,2})\s+(\d{2}):(\d{2}):(\d{2})$/.exec(String(prefix || '').trim())
-  if (!m) return null
-  const month = SYSLOG_MONTHS[m[1]]
-  if (month == null) return null
-  const now = new Date()
-  let year = now.getFullYear()
-  let d = new Date(year, month, Number(m[2]), Number(m[3]), Number(m[4]), Number(m[5]))
-  if (d.getTime() > now.getTime() + 86_400_000) {
-    year -= 1
-    d = new Date(year, month, Number(m[2]), Number(m[3]), Number(m[4]), Number(m[5]))
-  }
-  return d
-}
-
-function normalizeSyslogEntry(item) {
-  const out = { ...(item || {}) }
-  const raw = String(out.t || '')
-  if (raw) {
-    const m = /^([A-Z][a-z]{2}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2})\s+(\S+)\s+([^\s:]+)(?:\[(\d+)\])?:\s*(.*)$/.exec(raw)
-    if (m) {
-      const parsedDate = parseHeaderDate(m[1])
-      if (parsedDate) out.parsedTimeMs = parsedDate.getTime()
-      if (!out.parsedTag) out.parsedTag = m[3]
-      const pidSuffix = m[4] ? `[${m[4]}]` : ''
-      const message = (m[5] || '').trim()
-      out.parsedMsg = message || `${m[2]} ${m[3]}${pidSuffix}`
-      out.parsedLevel = out.level || guessLevel(out.parsedMsg)
-    } else {
-      out.parsedMsg = out.msg || raw
-      out.parsedLevel = out.level || guessLevel(out.parsedMsg)
-      out.parsedTag = out.tag || out.ident || ''
-    }
-  } else {
-    out.parsedMsg = out.msg || ''
-    out.parsedLevel = out.level || guessLevel(out.parsedMsg)
-    out.parsedTag = out.tag || out.ident || ''
-  }
-
-  if (!out.parsedTimeMs && out.time) {
-    const rawTime = out.time
-    const ms = typeof rawTime === 'number'
-      ? (rawTime < 1_000_000_000_000 ? rawTime * 1000 : rawTime)
-      : Date.parse(rawTime)
-    if (Number.isFinite(ms)) out.parsedTimeMs = ms
-  }
-
-  return out
-}
-
-function toggleSort(sortKeyRef, sortDirRef, key) {
-  if (sortKeyRef.value === key) {
-    sortDirRef.value = sortDirRef.value === 'asc' ? 'desc' : 'asc'
-    return
-  }
-  sortKeyRef.value = key
-  sortDirRef.value = 'asc'
-}
-
-function compareValues(a, b, direction = 'asc') {
-  const dir = direction === 'asc' ? 1 : -1
-  if (a == null && b == null) return 0
-  if (a == null) return 1 * dir
-  if (b == null) return -1 * dir
-
-  if (typeof a === 'string' || typeof b === 'string') {
-    return String(a).localeCompare(String(b), 'fr', { sensitivity: 'base' }) * dir
-  }
-
-  if (a < b) return -1 * dir
-  if (a > b) return 1 * dir
-  return 0
-}
-
-function guestPrimaryIp(guest) {
-  const ifaces = guestNetworks.value?.[guest.vmid]
-  if (!Array.isArray(ifaces)) return ''
-  for (const iface of ifaces) {
-    const ips = Array.isArray(iface?.ips) ? iface.ips : []
-    const first = ips.find(ip => typeof ip === 'string' && !ip.startsWith('fe80'))
-    if (first) return first.split('/')[0]
-  }
-  return ''
-}
-
-function linkedHostLabel(guest) {
-  const link = linkForGuest(guest)
-  if (!link) return ''
-  return link.host_hostname || link.host_name || ''
-}
-
-function taskDurationSeconds(task) {
-  if (!task?.start_time) return null
-  const startMs = new Date(task.start_time).getTime()
-  if (!Number.isFinite(startMs)) return null
-  const endMs = task.end_time
-    ? new Date(task.end_time).getTime()
-    : (task.status === 'running' ? Date.now() : null)
-  if (!Number.isFinite(endMs)) return null
-  return Math.max(0, Math.floor((endMs - startMs) / 1000))
-}
+const securityEventsCount = ref(0)
 
 const vms = computed(() => node.value?.guests?.filter(g => g.guest_type === 'vm') ?? [])
 const lxcs = computed(() => node.value?.guests?.filter(g => g.guest_type === 'lxc') ?? [])
-const sortedVms = computed(() => {
-  const list = [...vms.value]
-  list.sort((a, b) => {
-    switch (vmSortKey.value) {
-      case 'vmid': return compareValues(a.vmid, b.vmid, vmSortDir.value)
-      case 'name': return compareValues(a.name || '', b.name || '', vmSortDir.value)
-      case 'status': return compareValues(a.status || '', b.status || '', vmSortDir.value)
-      case 'ip': return compareValues(guestPrimaryIp(a), guestPrimaryIp(b), vmSortDir.value)
-      case 'cpu_alloc': return compareValues(a.cpu_alloc, b.cpu_alloc, vmSortDir.value)
-      case 'cpu_used': return compareValues(a.cpu_usage, b.cpu_usage, vmSortDir.value)
-      case 'mem_alloc': return compareValues(a.mem_alloc, b.mem_alloc, vmSortDir.value)
-      case 'mem_used': return compareValues(a.mem_usage, b.mem_usage, vmSortDir.value)
-      case 'disk_alloc': return compareValues(a.disk_alloc, b.disk_alloc, vmSortDir.value)
-      case 'uptime': return compareValues(a.status === 'running' ? a.uptime : -1, b.status === 'running' ? b.uptime : -1, vmSortDir.value)
-      case 'tags': return compareValues(a.tags || '', b.tags || '', vmSortDir.value)
-      case 'linked_host': return compareValues(linkedHostLabel(a), linkedHostLabel(b), vmSortDir.value)
-      default: return 0
-    }
-  })
-  return list
-})
-
-const sortedLxcs = computed(() => {
-  const list = [...lxcs.value]
-  list.sort((a, b) => {
-    switch (lxcSortKey.value) {
-      case 'vmid': return compareValues(a.vmid, b.vmid, lxcSortDir.value)
-      case 'name': return compareValues(a.name || '', b.name || '', lxcSortDir.value)
-      case 'status': return compareValues(a.status || '', b.status || '', lxcSortDir.value)
-      case 'ip': return compareValues(guestPrimaryIp(a), guestPrimaryIp(b), lxcSortDir.value)
-      case 'cpu_alloc': return compareValues(a.cpu_alloc, b.cpu_alloc, lxcSortDir.value)
-      case 'cpu_used': return compareValues(a.cpu_usage, b.cpu_usage, lxcSortDir.value)
-      case 'mem_alloc': return compareValues(a.mem_alloc, b.mem_alloc, lxcSortDir.value)
-      case 'mem_used': return compareValues(a.mem_usage, b.mem_usage, lxcSortDir.value)
-      case 'disk_alloc': return compareValues(a.disk_alloc, b.disk_alloc, lxcSortDir.value)
-      case 'uptime': return compareValues(a.status === 'running' ? a.uptime : -1, b.status === 'running' ? b.uptime : -1, lxcSortDir.value)
-      case 'linked_host': return compareValues(linkedHostLabel(a), linkedHostLabel(b), lxcSortDir.value)
-      default: return 0
-    }
-  })
-  return list
-})
-
-const sortedTasks = computed(() => {
-  const list = [...(node.value?.tasks ?? [])]
-  list.sort((a, b) => {
-    if (taskSortKey.value === 'duration') {
-      return compareValues(taskDurationSeconds(a), taskDurationSeconds(b), taskSortDir.value)
-    }
-    return compareValues(a?.[taskSortKey.value], b?.[taskSortKey.value], taskSortDir.value)
-  })
-  return list
-})
-
-function toggleVmSort(key) {
-  toggleSort(vmSortKey, vmSortDir, key)
-}
-
-function toggleLxcSort(key) {
-  toggleSort(lxcSortKey, lxcSortDir, key)
-}
-
-function toggleTaskSort(key) {
-  toggleSort(taskSortKey, taskSortDir, key)
-}
-
 const failedTaskCount = computed(() =>
   (node.value?.tasks ?? []).filter(t => t.status === 'stopped' && t.exit_status && t.exit_status !== 'OK').length
 )
-const filteredServices = computed(() => {
-  if (servicesFilter.value === 'all') return services.value
-  return services.value.filter(s => s['active-state'] === 'active' || s.state === 'running')
-})
-
 async function load() {
   loading.value = true
   error.value = ''
@@ -1749,9 +749,6 @@ async function load() {
     loadLiveStatus()
     loadRRD('hour')
     loadPeerNodes()
-    if (tab.value === 'security') {
-      loadNodeSecurityEvents()
-    }
   } catch (e) {
     error.value = e?.response?.data?.error || 'Erreur lors du chargement.'
   } finally {
@@ -2067,45 +1064,6 @@ async function loadLiveStatus() {
   }
 }
 
-async function loadNodeSecurityEvents() {
-  if (securityEventsLoading.value) return
-  securityEventsLoading.value = true
-  securityEventsError.value = ''
-  try {
-    if (securityService.value === 'rotate') {
-      const services = ['pveproxy', 'sshd', 'pvedaemon']
-      const calls = services.map(service =>
-        api.getProxmoxNodeSyslog(route.params.id, {
-          limit: 120,
-          search: securitySearch.value,
-          service,
-        })
-      )
-      const results = await Promise.allSettled(calls)
-      const groups = results
-        .filter(r => r.status === 'fulfilled')
-        .map(r => Array.isArray(r.value?.data) ? r.value.data : [])
-
-      if (!groups.length) {
-        throw new Error('Aucun service syslog accessible (pveproxy, sshd, pvedaemon).')
-      }
-
-      securityEvents.value = mergeAndRankSyslogLines(groups, 200)
-    } else {
-      const res = await api.getProxmoxNodeSyslog(route.params.id, {
-        limit: 200,
-        search: securitySearch.value,
-        service: securityService.value,
-      })
-      securityEvents.value = mergeAndRankSyslogLines([Array.isArray(res.data) ? res.data : []], 200)
-    }
-  } catch (e) {
-    securityEventsError.value = e?.response?.data?.error || 'Erreur lors du chargement des événements de sécurité.'
-    securityEvents.value = []
-  } finally {
-    securityEventsLoading.value = false
-  }
-}
 
 function stopPolling() {
   if (pollTimer) clearTimeout(pollTimer)
@@ -2173,10 +1131,6 @@ function memPct(n) {
   return ((n.mem_used / n.mem_total) * 100).toFixed(1)
 }
 
-function storagePct(s) {
-  if (!s.total) return 0
-  return ((s.used / s.total) * 100).toFixed(1)
-}
 
 function cpuColor(usage) {
   if (usage > 0.85) return 'bg-danger'
@@ -2189,13 +1143,6 @@ function tempColor(temp) {
   if (temp >= 85) return 'text-danger'
   if (temp >= 70) return 'text-warning'
   return 'text-success'
-}
-
-function tempBadgeClass(temp) {
-  if (!temp) return 'bg-secondary-lt text-secondary'
-  if (temp >= 85) return 'bg-danger-lt text-danger'
-  if (temp >= 70) return 'bg-warning-lt text-warning'
-  return 'bg-success-lt text-success'
 }
 
 function ramColor(used, total) {
@@ -2212,15 +1159,6 @@ function storageColor(used, total) {
   if (pct > 0.85) return 'bg-danger'
   if (pct > 0.6) return 'bg-warning'
   return 'bg-primary'
-}
-
-function guestStatusClass(status) {
-  const map = {
-    running: 'badge bg-green-lt text-green',
-    stopped: 'badge bg-secondary-lt text-secondary',
-    paused:  'badge bg-yellow-lt text-yellow',
-  }
-  return map[status] ?? 'badge bg-secondary-lt text-secondary'
 }
 
 function formatBytes(bytes) {
@@ -2244,24 +1182,6 @@ function formatUptime(seconds) {
 function formatDate(iso) {
   if (!iso) return '—'
   return new Date(iso).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
-}
-
-function formatSyslogTime(item) {
-  const raw = item?.parsedTimeMs ?? item?.time
-  if (!raw) return '—'
-  const ms = typeof raw === 'number' ? (raw < 1_000_000_000_000 ? raw * 1000 : raw) : Date.parse(raw)
-  if (!Number.isFinite(ms)) return '—'
-  return new Date(ms).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'medium' })
-}
-
-function syslogLevelBadgeClass(item) {
-  const raw = String(item?.parsedLevel || item?.pri || item?.level || '').toLowerCase()
-  if (raw.includes('critical') || raw.includes('fatal') || raw.includes('panic')) return 'bg-danger-lt text-danger'
-  if (raw.includes('error') || raw.includes('err')) return 'bg-danger-lt text-danger'
-  if (raw.includes('warning') || raw.includes('warn')) return 'bg-orange-lt text-orange'
-  if (raw.includes('success') || raw.includes('ok')) return 'bg-success-lt text-success'
-  if (raw.includes('info') || raw.includes('notice')) return 'bg-azure-lt text-azure'
-  return 'bg-secondary-lt text-secondary'
 }
 
 async function loadServices() {
@@ -2339,39 +1259,6 @@ async function submitMigration() {
   }
 }
 
-function svcStateClass(state) {
-  if (state === 'active') return 'badge bg-green-lt text-green'
-  if (state === 'failed') return 'badge bg-red-lt text-red'
-  if (state === 'activating' || state === 'deactivating') return 'badge bg-yellow-lt text-yellow'
-  return 'badge bg-secondary-lt text-secondary'
-}
-
-function taskDuration(t) {
-  if (!t.start_time) return '—'
-  const end = t.end_time ? new Date(t.end_time) : (t.status === 'running' ? new Date() : null)
-  if (!end) return '—'
-  const secs = Math.floor((end - new Date(t.start_time)) / 1000)
-  if (secs < 60) return `${secs}s`
-  const m = Math.floor(secs / 60)
-  const s = secs % 60
-  if (m < 60) return `${m}m ${s}s`
-  const h = Math.floor(m / 60)
-  return `${h}h ${m % 60}m`
-}
-
-function taskStatusLabel(t) {
-  if (t.status === 'running') return 'En cours'
-  if (t.exit_status === 'OK' || t.status === 'OK') return 'OK'
-  if (t.exit_status) return String(t.exit_status)
-  return String(t.status || '—')
-}
-
-function taskStatusBadgeClass(t) {
-  if (t.status === 'running') return 'bg-blue-lt text-blue'
-  if (t.exit_status === 'OK' || t.status === 'OK') return 'bg-success-lt text-success'
-  if (t.exit_status) return 'bg-danger-lt text-danger'
-  return 'bg-secondary-lt text-secondary'
-}
 
 onMounted(() => {
   load()
@@ -2413,47 +1300,12 @@ onUnmounted(() => {
   border-width: 0.1em;
 }
 
-.proxmox-progress-min-60 {
-  min-width: 60px;
-}
-
-.proxmox-progress-min-80 {
-  min-width: 80px;
-}
-
-.proxmox-service-desc {
-  max-width: 240px;
-}
-
-.proxmox-security-service-select {
-  max-width: 11rem;
-}
-
-.proxmox-security-search {
-  max-width: 18rem;
-}
-
-.task-status-badge {
-  max-width: 11rem;
-  display: inline-block;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  vertical-align: bottom;
-}
-
 @media (max-width: 992px) {
   .node-live-meta {
     position: static !important;
     margin-top: 0.75rem;
     padding: 0;
     justify-content: flex-end;
-    width: 100%;
-  }
-
-  .proxmox-security-service-select,
-  .proxmox-security-search {
-    max-width: 100%;
     width: 100%;
   }
 }
