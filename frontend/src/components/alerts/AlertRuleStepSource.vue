@@ -1,0 +1,336 @@
+<template>
+  <div>
+    <div class="mb-3">
+      <label class="form-label required">Nom</label>
+      <input
+        v-model="form.name"
+        type="text"
+        class="form-control"
+        placeholder="Ex: CPU élevé sur serveur web"
+      >
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label required">Source des données</label>
+      <div
+        class="btn-group w-100"
+        role="group"
+        aria-label="Source type"
+      >
+        <button
+          type="button"
+          class="btn"
+          :class="form.source_type === 'agent' ? 'btn-primary' : 'btn-outline-primary'"
+          @click="emit('set-source-type', 'agent')"
+        >
+          Agent
+        </button>
+        <button
+          type="button"
+          class="btn"
+          :class="form.source_type === 'proxmox' ? 'btn-primary' : 'btn-outline-primary'"
+          @click="emit('set-source-type', 'proxmox')"
+        >
+          Proxmox
+        </button>
+        <button
+          type="button"
+          class="btn"
+          :class="form.source_type === 'synthetic' ? 'btn-primary' : 'btn-outline-primary'"
+          @click="emit('set-source-type', 'synthetic')"
+        >
+          Synthétique
+        </button>
+      </div>
+    </div>
+
+    <div
+      v-if="form.source_type === 'agent'"
+      class="mb-3"
+    >
+      <label class="form-label">Hôte cible</label>
+      <select
+        v-model="form.host_id"
+        class="form-select"
+        :disabled="!metricSupportsHostFilter"
+      >
+        <option :value="null">
+          Tous les hôtes
+        </option>
+        <option
+          v-for="host in hosts"
+          :key="host.id"
+          :value="host.id"
+        >
+          {{ host.name }}
+        </option>
+      </select>
+      <small
+        v-if="!metricSupportsHostFilter"
+        :id="`host-filter-hint-${rule?.id || 'new'}`"
+        class="form-hint"
+      >Cette métrique est globale et n'est pas liée à un hôte.</small>
+    </div>
+
+
+    <div class="mb-2 fw-semibold">
+      Choisissez une métrique à surveiller
+    </div>
+    <div
+      v-if="capabilitiesLoading"
+      class="alert alert-info py-2 small mb-2"
+    >
+      Chargement des métriques...
+    </div>
+    <div
+      v-else-if="capabilitiesError"
+      class="alert alert-warning py-2 small mb-2"
+    >
+      {{ capabilitiesError }}
+    </div>
+    <div
+      v-if="form.host_id && hostMetricsLoading"
+      class="alert alert-info py-2 small mb-2"
+    >
+      Chargement des métriques pour cet hôte...
+    </div>
+    <div
+      v-else-if="form.host_id && hostMetricsError"
+      class="alert alert-warning py-2 small mb-2"
+    >
+      {{ hostMetricsError }}
+    </div>
+    <div
+      v-else-if="form.host_id && hostMetrics?.metrics && hostMetrics.metrics.length < (capabilities?.metrics?.length || 0)"
+      class="alert alert-info py-2 small mb-2"
+    >
+      ℹ️ Cet hôte dispose de {{ hostMetrics.metrics.length }} métrique(s) — certains collecteurs peuvent ne pas être actifs.
+    </div>
+    <div class="metric-grid">
+      <button
+        v-for="metric in metricCards"
+        :key="metric.value"
+        type="button"
+        class="metric-card"
+        :class="{ selected: form.metric === metric.value }"
+        @click="emit('select-metric', metric.value)"
+      >
+        <span class="metric-icon">{{ metric.icon }}</span>
+        <span class="metric-label">{{ metric.label }}</span>
+      </button>
+    </div>
+    <div
+      v-if="isProxmoxMetric(form.metric)"
+      class="row g-2 mt-2"
+    >
+      <div class="col-md-4">
+        <label class="form-label">Scope Proxmox</label>
+        <select
+          v-model="form.proxmox_scope.scope_mode"
+          class="form-select"
+        >
+          <option value="global">
+            Global
+          </option>
+          <option
+            v-if="!metricAllowsGuestScope"
+            value="connection"
+          >
+            Connexion
+          </option>
+          <option
+            v-if="!metricAllowsGuestScope"
+            value="node"
+          >
+            Nœud
+          </option>
+          <option
+            v-if="metricAllowsGuestScope"
+            value="guest"
+          >
+            VM/LXC
+          </option>
+          <option
+            v-if="metricAllowsStorageScope"
+            value="storage"
+          >
+            Stockage
+          </option>
+          <option
+            v-if="metricAllowsDiskScope"
+            value="disk"
+          >
+            Disque physique
+          </option>
+        </select>
+      </div>
+      <div
+        v-if="!metricAllowsGuestScope && form.proxmox_scope.scope_mode === 'connection'"
+        class="col-md-8"
+      >
+        <label class="form-label">Connexion</label>
+        <select
+          v-model="form.proxmox_scope.connection_id"
+          class="form-select"
+        >
+          <option value="">
+            Sélectionner...
+          </option>
+          <option
+            v-for="opt in proxmoxConnections"
+            :key="opt.id"
+            :value="opt.id"
+          >
+            {{ opt.label }}
+          </option>
+        </select>
+      </div>
+      <div
+        v-if="!metricAllowsGuestScope && form.proxmox_scope.scope_mode === 'node'"
+        class="col-md-8"
+      >
+        <label class="form-label">Nœud</label>
+        <select
+          v-model="form.proxmox_scope.node_id"
+          class="form-select"
+        >
+          <option value="">
+            Sélectionner...
+          </option>
+          <option
+            v-for="opt in proxmoxNodes"
+            :key="opt.id"
+            :value="opt.id"
+          >
+            {{ opt.label }}
+          </option>
+        </select>
+      </div>
+      <div
+        v-if="metricAllowsGuestScope && form.proxmox_scope.scope_mode === 'guest'"
+        class="col-md-8"
+      >
+        <label class="form-label">VM/LXC</label>
+        <select
+          v-model="form.proxmox_scope.guest_id"
+          class="form-select"
+        >
+          <option value="">
+            Sélectionner...
+          </option>
+          <option
+            v-for="opt in proxmoxGuests"
+            :key="opt.id"
+            :value="opt.id"
+          >
+            {{ opt.label }}
+          </option>
+        </select>
+      </div>
+      <div
+        v-if="metricAllowsStorageScope && form.proxmox_scope.scope_mode === 'storage'"
+        class="col-md-8"
+      >
+        <label class="form-label">Stockage</label>
+        <select
+          v-model="form.proxmox_scope.storage_id"
+          class="form-select"
+        >
+          <option value="">
+            Sélectionner...
+          </option>
+          <option
+            v-for="opt in proxmoxStorages"
+            :key="opt.id"
+            :value="opt.id"
+          >
+            {{ opt.label }}
+          </option>
+        </select>
+      </div>
+      <div
+        v-if="metricAllowsDiskScope && form.proxmox_scope.scope_mode === 'disk'"
+        class="col-md-8"
+      >
+        <label class="form-label">Disque physique</label>
+        <select
+          v-model="form.proxmox_scope.disk_id"
+          class="form-select"
+        >
+          <option value="">
+            Sélectionner...
+          </option>
+          <option
+            v-for="opt in proxmoxDisks"
+            :key="opt.id"
+            :value="opt.id"
+          >
+            {{ opt.label }}
+          </option>
+        </select>
+      </div>
+      <div class="col-12">
+        <small
+          :id="`proxmox-scope-hint-${rule?.id || 'new'}`"
+          class="form-hint d-block"
+        >
+          Connexion = toute l'instance Proxmox liée. Nœud = un hôte Proxmox précis à l'intérieur de cette connexion.
+        </small>
+      </div>
+    </div>
+    <div
+      v-if="form.metric === 'proxmox_storage_percent'"
+      class="text-secondary small mt-2"
+    >
+      Cette métrique est globale Proxmox: elle surveille le stockage le plus rempli parmi les stockages actifs.
+    </div>
+    <div
+      v-else-if="form.metric === 'disk_smart_status'"
+      class="text-secondary small mt-2"
+    >
+      Utilisez typiquement un seuil > 0.5 pour déclencher quand au moins un disque est en état SMART FAILED.
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import type { AlertRuleFormData } from '../../composables/useAlertRuleForm'
+import { getAlertMetricMeta } from '../../utils/alertMetrics'
+
+interface ScopeOption { id: string; label: string }
+interface MetricCard { value: string; label: string; icon: string }
+interface HostOption { id: string; name: string }
+interface HostMetrics { metrics?: Array<{ metric: string; label: string; icon?: string }> }
+interface Capabilities { metrics?: Array<{ metric: string }> }
+
+defineProps<{
+  form: AlertRuleFormData
+  rule?: { id?: number | string } | null
+  hosts: HostOption[]
+  capabilities?: Capabilities | null
+  capabilitiesLoading?: boolean
+  capabilitiesError?: string
+  hostMetrics?: HostMetrics | null
+  hostMetricsLoading?: boolean
+  hostMetricsError?: string
+  metricCards: MetricCard[]
+  metricSupportsHostFilter: boolean
+  metricAllowsGuestScope: boolean
+  metricAllowsStorageScope: boolean
+  metricAllowsDiskScope: boolean
+  proxmoxConnections: ScopeOption[]
+  proxmoxNodes: ScopeOption[]
+  proxmoxStorages: ScopeOption[]
+  proxmoxGuests: ScopeOption[]
+  proxmoxDisks: ScopeOption[]
+}>()
+
+const emit = defineEmits<{
+  (e: 'select-metric', value: string): void
+  (e: 'set-source-type', value: 'agent' | 'proxmox' | 'synthetic'): void
+}>()
+
+function isProxmoxMetric(metric: string): boolean {
+  return getAlertMetricMeta(metric).category === 'proxmox'
+}
+</script>

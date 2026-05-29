@@ -46,671 +46,56 @@
             </div>
 
             <div v-if="step === 1">
-              <div class="mb-3">
-                <label class="form-label required">Nom</label>
-                <input
-                  v-model="form.name"
-                  type="text"
-                  class="form-control"
-                  placeholder="Ex: CPU élevé sur serveur web"
-                >
-              </div>
-
-              <div class="mb-3">
-                <label class="form-label required">Source des données</label>
-                <div
-                  class="btn-group w-100"
-                  role="group"
-                  aria-label="Source type"
-                >
-                  <button
-                    type="button"
-                    class="btn"
-                    :class="form.source_type === 'agent' ? 'btn-primary' : 'btn-outline-primary'"
-                    @click="setSourceType('agent')"
-                  >
-                    Agent
-                  </button>
-                  <button
-                    type="button"
-                    class="btn"
-                    :class="form.source_type === 'proxmox' ? 'btn-primary' : 'btn-outline-primary'"
-                    @click="setSourceType('proxmox')"
-                  >
-                    Proxmox
-                  </button>
-                  <button
-                    type="button"
-                    class="btn"
-                    :class="form.source_type === 'synthetic' ? 'btn-primary' : 'btn-outline-primary'"
-                    @click="setSourceType('synthetic')"
-                  >
-                    Synthétique
-                  </button>
-                </div>
-              </div>
-
-              <div
-                v-if="form.source_type === 'agent'"
-                class="mb-3"
-              >
-                <label class="form-label">Hôte cible</label>
-                <select
-                  v-model="form.host_id"
-                  class="form-select"
-                  :disabled="!metricSupportsHostFilter"
-                >
-                  <option :value="null">
-                    Tous les hôtes
-                  </option>
-                  <option
-                    v-for="host in hosts"
-                    :key="host.id"
-                    :value="host.id"
-                  >
-                    {{ host.name }}
-                  </option>
-                </select>
-                <small
-                  v-if="!metricSupportsHostFilter"
-                  :id="`host-filter-hint-${rule?.id || 'new'}`"
-                  class="form-hint"
-                >Cette métrique est globale et n'est pas liée à un hôte.</small>
-              </div>
-
-
-              <div class="mb-2 fw-semibold">
-                Choisissez une métrique à surveiller
-              </div>
-              <div
-                v-if="capabilitiesLoading"
-                class="alert alert-info py-2 small mb-2"
-              >
-                Chargement des métriques...
-              </div>
-              <div
-                v-else-if="capabilitiesError"
-                class="alert alert-warning py-2 small mb-2"
-              >
-                {{ capabilitiesError }}
-              </div>
-              <div
-                v-if="form.host_id && hostMetricsLoading"
-                class="alert alert-info py-2 small mb-2"
-              >
-                Chargement des métriques pour cet hôte...
-              </div>
-              <div
-                v-else-if="form.host_id && hostMetricsError"
-                class="alert alert-warning py-2 small mb-2"
-              >
-                {{ hostMetricsError }}
-              </div>
-              <div
-                v-else-if="form.host_id && hostMetrics?.metrics && hostMetrics.metrics.length < (capabilities?.metrics?.length || 0)"
-                class="alert alert-info py-2 small mb-2"
-              >
-                ℹ️ Cet hôte dispose de {{ hostMetrics.metrics.length }} métrique(s) — certains collecteurs peuvent ne pas être actifs.
-              </div>
-              <div class="metric-grid">
-                <button
-                  v-for="metric in metricCards"
-                  :key="metric.value"
-                  type="button"
-                  class="metric-card"
-                  :class="{ selected: form.metric === metric.value }"
-                  @click="selectMetric(metric.value)"
-                >
-                  <span class="metric-icon">{{ metric.icon }}</span>
-                  <span class="metric-label">{{ metric.label }}</span>
-                </button>
-              </div>
-              <div
-                v-if="isProxmoxMetric(form.metric)"
-                class="row g-2 mt-2"
-              >
-                <div class="col-md-4">
-                  <label class="form-label">Scope Proxmox</label>
-                  <select
-                    v-model="form.proxmox_scope.scope_mode"
-                    class="form-select"
-                  >
-                    <option value="global">
-                      Global
-                    </option>
-                    <option
-                      v-if="!metricAllowsGuestScope"
-                      value="connection"
-                    >
-                      Connexion
-                    </option>
-                    <option
-                      v-if="!metricAllowsGuestScope"
-                      value="node"
-                    >
-                      Nœud
-                    </option>
-                    <option
-                      v-if="metricAllowsGuestScope"
-                      value="guest"
-                    >
-                      VM/LXC
-                    </option>
-                    <option
-                      v-if="metricAllowsStorageScope"
-                      value="storage"
-                    >
-                      Stockage
-                    </option>
-                    <option
-                      v-if="metricAllowsDiskScope"
-                      value="disk"
-                    >
-                      Disque physique
-                    </option>
-                  </select>
-                </div>
-                <div
-                  v-if="!metricAllowsGuestScope && form.proxmox_scope.scope_mode === 'connection'"
-                  class="col-md-8"
-                >
-                  <label class="form-label">Connexion</label>
-                  <select
-                    v-model="form.proxmox_scope.connection_id"
-                    class="form-select"
-                  >
-                    <option value="">
-                      Sélectionner...
-                    </option>
-                    <option
-                      v-for="opt in proxmoxConnections"
-                      :key="opt.id"
-                      :value="opt.id"
-                    >
-                      {{ opt.label }}
-                    </option>
-                  </select>
-                </div>
-                <div
-                  v-if="!metricAllowsGuestScope && form.proxmox_scope.scope_mode === 'node'"
-                  class="col-md-8"
-                >
-                  <label class="form-label">Nœud</label>
-                  <select
-                    v-model="form.proxmox_scope.node_id"
-                    class="form-select"
-                  >
-                    <option value="">
-                      Sélectionner...
-                    </option>
-                    <option
-                      v-for="opt in proxmoxNodes"
-                      :key="opt.id"
-                      :value="opt.id"
-                    >
-                      {{ opt.label }}
-                    </option>
-                  </select>
-                </div>
-                <div
-                  v-if="metricAllowsGuestScope && form.proxmox_scope.scope_mode === 'guest'"
-                  class="col-md-8"
-                >
-                  <label class="form-label">VM/LXC</label>
-                  <select
-                    v-model="form.proxmox_scope.guest_id"
-                    class="form-select"
-                  >
-                    <option value="">
-                      Sélectionner...
-                    </option>
-                    <option
-                      v-for="opt in proxmoxGuests"
-                      :key="opt.id"
-                      :value="opt.id"
-                    >
-                      {{ opt.label }}
-                    </option>
-                  </select>
-                </div>
-                <div
-                  v-if="metricAllowsStorageScope && form.proxmox_scope.scope_mode === 'storage'"
-                  class="col-md-8"
-                >
-                  <label class="form-label">Stockage</label>
-                  <select
-                    v-model="form.proxmox_scope.storage_id"
-                    class="form-select"
-                  >
-                    <option value="">
-                      Sélectionner...
-                    </option>
-                    <option
-                      v-for="opt in proxmoxStorages"
-                      :key="opt.id"
-                      :value="opt.id"
-                    >
-                      {{ opt.label }}
-                    </option>
-                  </select>
-                </div>
-                <div
-                  v-if="metricAllowsDiskScope && form.proxmox_scope.scope_mode === 'disk'"
-                  class="col-md-8"
-                >
-                  <label class="form-label">Disque physique</label>
-                  <select
-                    v-model="form.proxmox_scope.disk_id"
-                    class="form-select"
-                  >
-                    <option value="">
-                      Sélectionner...
-                    </option>
-                    <option
-                      v-for="opt in proxmoxDisks"
-                      :key="opt.id"
-                      :value="opt.id"
-                    >
-                      {{ opt.label }}
-                    </option>
-                  </select>
-                </div>
-                <div class="col-12">
-                  <small
-                    :id="`proxmox-scope-hint-${rule?.id || 'new'}`"
-                    class="form-hint d-block"
-                  >
-                    Connexion = toute l'instance Proxmox liée. Nœud = un hôte Proxmox précis à l'intérieur de cette connexion.
-                  </small>
-                </div>
-              </div>
-              <div
-                v-if="form.metric === 'proxmox_storage_percent'"
-                class="text-secondary small mt-2"
-              >
-                Cette métrique est globale Proxmox: elle surveille le stockage le plus rempli parmi les stockages actifs.
-              </div>
-              <div
-                v-else-if="form.metric === 'disk_smart_status'"
-                class="text-secondary small mt-2"
-              >
-                Utilisez typiquement un seuil > 0.5 pour déclencher quand au moins un disque est en état SMART FAILED.
-              </div>
+              <AlertRuleStepSource
+                :form="form"
+                :rule="rule"
+                :hosts="hosts"
+                :capabilities="capabilities"
+                :capabilities-loading="capabilitiesLoading"
+                :capabilities-error="capabilitiesError"
+                :host-metrics="hostMetrics"
+                :host-metrics-loading="hostMetricsLoading"
+                :host-metrics-error="hostMetricsError"
+                :metric-cards="metricCards"
+                :metric-supports-host-filter="metricSupportsHostFilter"
+                :metric-allows-guest-scope="metricAllowsGuestScope"
+                :metric-allows-storage-scope="metricAllowsStorageScope"
+                :metric-allows-disk-scope="metricAllowsDiskScope"
+                :proxmox-connections="proxmoxConnections"
+                :proxmox-nodes="proxmoxNodes"
+                :proxmox-storages="proxmoxStorages"
+                :proxmox-guests="proxmoxGuests"
+                :proxmox-disks="proxmoxDisks"
+                @select-metric="selectMetric"
+                @set-source-type="setSourceType"
+              />
             </div>
 
             <div v-if="step === 2">
-              <div class="row">
-                <div
-                  v-if="form.metric !== 'heartbeat_timeout'"
-                  class="col-md-6 mb-3"
-                >
-                  <label class="form-label required">Opérateur</label>
-                  <select
-                    v-model="form.operator"
-                    class="form-select"
-                  >
-                    <option value=">">
-                      Supérieur à (>)
-                    </option>
-                    <option value=">=">
-                      Supérieur ou égal (>=)
-                    </option>
-                    <option value="<">
-                      Inférieur à (&lt;)
-                    </option>
-                    <option value="<=">
-                      Inférieur ou égal (&lt;=)
-                    </option>
-                  </select>
-                </div>
-              </div>
-
-              <div
-                v-if="form.metric !== 'heartbeat_timeout'"
-                class="row"
-              >
-                <div class="col-md-6 mb-3">
-                  <label class="form-label required">Seuil d'avertissement (warn)</label>
-                  <input
-                    v-model.number="form.threshold_warn"
-                    type="number"
-                    step="0.1"
-                    class="form-control"
-                    placeholder="70"
-                  >
-                  <small class="form-hint">Déclenche une alerte de niveau avertissement.</small>
-                </div>
-                <div class="col-md-6 mb-3">
-                  <label class="form-label required">Seuil critique (crit)</label>
-                  <input
-                    v-model.number="form.threshold_crit"
-                    type="number"
-                    step="0.1"
-                    class="form-control"
-                    placeholder="85"
-                  >
-                  <small class="form-hint">Déclenche une alerte de niveau critique.</small>
-                </div>
-              </div>
-
-              <div
-                v-if="form.metric === 'heartbeat_timeout'"
-                class="row"
-              >
-                <div class="col-md-12 mb-3">
-                  <label class="form-label required">Silence maximum (secondes)</label>
-                  <input
-                    v-model.number="form.threshold_crit"
-                    type="number"
-                    step="60"
-                    class="form-control"
-                    placeholder="300"
-                    :aria-describedby="`heartbeat-hint-${rule?.id || 'new'}`"
-                  >
-                  <small
-                    :id="`heartbeat-hint-${rule?.id || 'new'}`"
-                    class="form-hint"
-                  >
-                    Durée en secondes sans rapport avant alerte.
-                  </small>
-                </div>
-              </div>
-
-              <div
-                v-if="form.metric !== 'heartbeat_timeout'"
-                class="row"
-              >
-                <div class="col-md-6 mb-3">
-                  <label class="form-label">Désactivation warn (hystérésis)</label>
-                  <input
-                    v-model.number="form.threshold_clear_warn"
-                    type="number"
-                    step="0.1"
-                    class="form-control"
-                    placeholder="(Laisser vide pour auto)"
-                    :aria-describedby="`threshold-clear-warn-hint-${rule?.id || 'new'}`"
-                  >
-                  <small
-                    :id="`threshold-clear-warn-hint-${rule?.id || 'new'}`"
-                    class="form-hint"
-                  >
-                    Seuil pour résoudre l'alerte warn. Évite le fluttering.
-                  </small>
-                </div>
-                <div class="col-md-6 mb-3">
-                  <label class="form-label">Désactivation crit (hystérésis)</label>
-                  <input
-                    v-model.number="form.threshold_clear_crit"
-                    type="number"
-                    step="0.1"
-                    class="form-control"
-                    placeholder="(Laisser vide pour auto)"
-                    :aria-describedby="`threshold-clear-crit-hint-${rule?.id || 'new'}`"
-                  >
-                  <small
-                    :id="`threshold-clear-crit-hint-${rule?.id || 'new'}`"
-                    class="form-hint"
-                  >
-                    Seuil pour résoudre l'alerte crit. Évite le fluttering.
-                  </small>
-                </div>
-              </div>
-
-              <div
-                v-if="form.metric !== 'heartbeat_timeout'"
-                class="mb-3"
-              >
-                <label class="form-label">Durée (secondes)</label>
-                <input
-                  v-model.number="form.duration"
-                  type="number"
-                  class="form-control"
-                  placeholder="300"
-                  :aria-describedby="`duration-hint-${rule?.id || 'new'}`"
-                >
-                <small
-                  :id="`duration-hint-${rule?.id || 'new'}`"
-                  class="form-hint"
-                >Le seuil doit être dépassé pendant cette durée avant de déclencher l'alerte.</small>
-                <small
-                  v-if="Number.isFinite(Number(form.duration)) && form.duration > 0 && form.duration < 60"
-                  :id="`duration-warn-${rule?.id || 'new'}`"
-                  class="form-hint text-warning d-block mt-1"
-                >
-                  Si l'agent reporte toutes les 60s, une durée inférieure peut empêcher le déclenchement.
-                </small>
-              </div>
-
-              <div
-                v-if="testResults"
-                class="mt-3"
-              >
-                <div
-                  v-if="hasNoDataResults"
-                  class="alert alert-warning py-2 small mb-2"
-                >
-                  <strong>Aucune donnée disponible</strong> pour un ou plusieurs hôtes.
-                </div>
-                <div class="d-flex align-items-center justify-content-between mb-2">
-                  <div class="fw-bold">
-                    Résultat du test
-                    <span
-                      v-if="testResults.any_fires"
-                      class="badge bg-danger-lt text-danger ms-2"
-                    >Déclencherait une alerte</span>
-                    <span
-                      v-else
-                      class="badge bg-success-lt text-success ms-2"
-                    >Aucune alerte déclenchée</span>
-                  </div>
-                  <div class="d-flex align-items-center gap-2">
-                    <button
-                      v-if="canDownloadTestLogs"
-                      class="btn btn-sm btn-outline-secondary"
-                      :disabled="downloadingLogs"
-                      @click="downloadTestLogs"
-                    >
-                      <span
-                        v-if="downloadingLogs"
-                        class="spinner-border spinner-border-sm me-1"
-                      />
-                      Télécharger logs
-                    </button>
-                    <span class="text-secondary small">{{ formatDate(testResults.evaluated_at) }}</span>
-                  </div>
-                </div>
-                <div class="table-responsive">
-                  <table class="table table-sm table-vcenter card-table">
-                    <thead>
-                      <tr>
-                        <th>{{ form.source_type === 'proxmox' ? 'Portée' : 'Hôte' }}</th>
-                        <th>Valeur actuelle</th>
-                        <th>Résultat</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr v-if="!testResults.results?.length">
-                        <td
-                          colspan="3"
-                          class="text-center text-secondary"
-                        >
-                          Aucun hôte concerné
-                        </td>
-                      </tr>
-                      <tr
-                        v-for="result in testResults.results"
-                        :key="result.host_id"
-                      >
-                        <td class="fw-medium">
-                          {{ result.host_name }}
-                        </td>
-                        <td>
-                          <span v-if="result.has_data">{{ result.current_value.toFixed(1) }}{{ getMetricUnit(form.metric) }}</span>
-                          <span
-                            v-else
-                            class="text-secondary"
-                          >Pas de données</span>
-                        </td>
-                        <td>
-                          <span
-                            v-if="result.would_fire"
-                            class="badge bg-danger-lt text-danger"
-                          >Alerte</span>
-                          <span
-                            v-else
-                            class="badge bg-success-lt text-success"
-                          >OK</span>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
+              <AlertRuleStepConditions
+                :form="form"
+                :rule="rule"
+                :test-results="testResults"
+                :has-no-data-results="hasNoDataResults"
+                :can-download-test-logs="canDownloadTestLogs"
+                :downloading-logs="downloadingLogs"
+                :metric-unit="currentMetricUnit"
+                @download-logs="downloadTestLogs"
+              />
             </div>
 
             <div v-if="step === 3">
-              <div
-                v-if="testResults"
-                class="alert py-2 small mb-3"
-                :class="testResults.any_fires ? 'alert-warning' : 'alert-success'"
-              >
-                <strong>Dernier test :</strong>
-                {{ testResults.any_fires ? ' la règle déclencherait une alerte.' : ' la règle ne déclencherait pas d\'alerte.' }}
-                <span class="text-secondary ms-1">({{ formatDate(testResults.evaluated_at) }})</span>
-              </div>
-
-              <div
-                v-if="testError"
-                class="alert alert-danger py-2 small mb-3"
-                role="alert"
-              >
-                {{ testError }}
-              </div>
-
-              <div
-                v-if="commandTriggerEnabled"
-                class="mb-3"
-              >
-                <label class="form-label">Période de silence (secondes)</label>
-                <input
-                  v-model.number="form.actions.cooldown"
-                  type="number"
-                  class="form-control"
-                  placeholder="3600"
-                  :aria-describedby="`cooldown-hint-${rule?.id || 'new'}`"
-                >
-                <small
-                  :id="`cooldown-hint-${rule?.id || 'new'}`"
-                  class="form-hint"
-                >Temps minimum entre deux alertes successives pour cette règle</small>
-              </div>
-
-              <div class="mb-3">
-                <label class="form-label">Canaux de notification</label>
-                <div>
-                  <label class="form-check form-check-inline">
-                    <input
-                      v-model="channelSmtp"
-                      class="form-check-input"
-                      type="checkbox"
-                    >
-                    <span class="form-check-label">SMTP (Email)</span>
-                  </label>
-                  <label class="form-check form-check-inline">
-                    <input
-                      v-model="channelNtfy"
-                      class="form-check-input"
-                      type="checkbox"
-                    >
-                    <span class="form-check-label">Ntfy (Push)</span>
-                  </label>
-                  <label class="form-check form-check-inline">
-                    <input
-                      v-model="channelBrowser"
-                      class="form-check-input"
-                      type="checkbox"
-                    >
-                    <span class="form-check-label">Navigateur</span>
-                  </label>
-                </div>
-                <div
-                  v-if="channelBrowser"
-                  class="mt-2"
-                >
-                  <div
-                    v-if="browserPermission === 'denied'"
-                    class="alert alert-warning py-2 small mb-0"
-                  >
-                    Notifications bloquées par le navigateur.
-                  </div>
-                  <div
-                    v-else-if="browserPermission === 'granted'"
-                    class="alert alert-success py-2 small mb-0"
-                  >
-                    Notifications navigateur autorisées.
-                  </div>
-                  <div
-                    v-else-if="browserPermission === 'unsupported'"
-                    class="alert alert-warning py-2 small mb-0"
-                  >
-                    Ce navigateur ne supporte pas les notifications.
-                  </div>
-                  <div
-                    v-else
-                    class="text-secondary small mt-1"
-                  >
-                    La permission sera demandée à l'enregistrement.
-                  </div>
-                </div>
-              </div>
-
-              <div
-                v-if="channelSmtp"
-                class="mb-3"
-              >
-                <label class="form-label">Destinataire(s) email</label>
-                <input
-                  v-model="form.actions.smtp_to"
-                  type="text"
-                  class="form-control"
-                  placeholder="admin@example.com, ops@example.com"
-                  aria-describedby="smtp-hint"
-                >
-                <small
-                  id="smtp-hint"
-                  class="form-hint"
-                >Séparez plusieurs emails par des virgules</small>
-              </div>
-
-              <div
-                v-if="channelNtfy"
-                class="mb-3"
-              >
-                <label class="form-label">Topic ntfy</label>
-                <input
-                  v-model="form.actions.ntfy_topic"
-                  type="text"
-                  class="form-control"
-                  placeholder="mon-serveur-alerts"
-                >
-              </div>
-
-              <AlertRuleCommandTrigger
-                v-model:enabled="commandTriggerEnabled"
-                :model-value="form.actions.command_trigger"
-                @update:model-value="form.actions.command_trigger = $event"
+              <AlertRuleStepNotifications
+                v-model:channel-smtp="channelSmtp"
+                v-model:channel-ntfy="channelNtfy"
+                v-model:channel-browser="channelBrowser"
+                v-model:command-trigger-enabled="commandTriggerEnabled"
+                :form="form"
+                :rule="rule"
+                :test-results="testResults"
+                :test-error="testError"
+                :browser-permission="browserPermission"
               />
-
-              <div class="mb-3">
-                <label class="form-check">
-                  <input
-                    v-model="form.enabled"
-                    class="form-check-input"
-                    type="checkbox"
-                  >
-                  <span class="form-check-label">Activer immédiatement</span>
-                </label>
-              </div>
             </div>
           </div>
           <div
@@ -802,7 +187,9 @@
 <script setup>
 import { computed, onUnmounted, ref, watch } from 'vue'
 import apiClient from '../../api'
-import AlertRuleCommandTrigger from './AlertRuleCommandTrigger.vue'
+import AlertRuleStepSource from './AlertRuleStepSource.vue'
+import AlertRuleStepConditions from './AlertRuleStepConditions.vue'
+import AlertRuleStepNotifications from './AlertRuleStepNotifications.vue'
 import { useAlertRuleForm } from '../../composables/useAlertRuleForm'
 import { useModalFocusTrap } from '../../composables/useModalFocusTrap'
 import { ALERT_METRIC_ORDER, getAlertMetricMeta } from '../../utils/alertMetrics'
@@ -900,7 +287,6 @@ const metricMetaByKey = computed(() => {
   return Object.fromEntries(items.map((item) => [item.metric, item]))
 })
 
-const isProxmoxMetric = (metric) => getAlertMetricMeta(metric).category === 'proxmox'
 const metricAllowsStorageScope = computed(() => form.value.metric === 'proxmox_storage_percent')
 const metricAllowsGuestScope = computed(() => form.value.metric === 'proxmox_guest_cpu_percent' || form.value.metric === 'proxmox_guest_memory_percent')
 const metricAllowsDiskScope = computed(() => form.value.metric === 'proxmox_disk_failed_count' || form.value.metric === 'proxmox_disk_min_wearout_percent')
@@ -1179,6 +565,8 @@ function goNextStep() {
 function getMetricUnit(metric) {
   return metricMetaByKey.value?.[metric]?.unit || getAlertMetricMeta(metric).unit
 }
+
+const currentMetricUnit = computed(() => getMetricUnit(form.value.metric))
 
 function formatDate(dateStr) {
   if (!dateStr) return ''

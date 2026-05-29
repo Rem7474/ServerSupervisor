@@ -45,7 +45,7 @@ interface ProxmoxScope {
   disk_id: string
 }
 
-interface AlertRuleFormData {
+export interface AlertRuleFormData {
   name: string
   enabled: boolean
   source_type: 'agent' | 'proxmox' | 'synthetic'
