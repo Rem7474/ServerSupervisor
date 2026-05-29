@@ -265,16 +265,11 @@
               class="card-body chart-body"
               style="height: 260px;"
             >
-              <Transition name="skeleton-fade">
-                <LoadingSkeleton
-                  v-if="!chartReady || loading"
-                  variant="chart"
-                  class="position-absolute inset-0"
-                />
-              </Transition>
-              <canvas
-                ref="trafficCanvas"
-                :style="{ opacity: (chartReady && !loading) ? 1 : 0, transition: 'opacity 0.3s' }"
+              <TrafficRequestsChart
+                :timeseries="timeseries"
+                :period="period"
+                :chart-ready="chartReady"
+                :loading="loading"
               />
             </div>
           </div>
@@ -290,16 +285,10 @@
               class="card-body chart-body"
               style="height: 260px;"
             >
-              <Transition name="skeleton-fade">
-                <LoadingSkeleton
-                  v-if="!chartReady || loading"
-                  variant="donut"
-                  class="position-absolute inset-0"
-                />
-              </Transition>
-              <canvas
-                ref="statusCanvas"
-                :style="{ opacity: (chartReady && !loading) ? 1 : 0, transition: 'opacity 0.3s' }"
+              <TrafficStatusChart
+                :status-distribution="statusDistribution"
+                :chart-ready="chartReady"
+                :loading="loading"
               />
             </div>
           </div>
@@ -409,12 +398,7 @@
               </h3>
             </div>
             <div class="card-body">
-              <svg
-                ref="worldMapSvg"
-                class="world-map"
-                role="img"
-                aria-label="Carte mondiale du trafic par pays"
-              />
+              <TrafficWorldMap :country-distribution="countryDistribution" />
             </div>
           </div>
         </div>
@@ -851,15 +835,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import TrafficKpiCards from '../components/security/TrafficKpiCards.vue'
-import { max as d3Max } from 'd3-array'
-import { geoNaturalEarth1, geoPath } from 'd3-geo'
-import { scaleSequential } from 'd3-scale'
-import { interpolateYlOrRd } from 'd3-scale-chromatic'
-import { select } from 'd3-selection'
-import { feature } from 'topojson-client'
+import TrafficWorldMap from '../components/security/TrafficWorldMap.vue'
+import TrafficRequestsChart from '../components/security/TrafficRequestsChart.vue'
+import TrafficStatusChart from '../components/security/TrafficStatusChart.vue'
 import apiClient from '../api'
 
 type AnyRecord = Record<string, any>
@@ -890,14 +871,7 @@ const selectedDomain = ref('')
 const domainLoading = ref(false)
 const domainDetails = ref<AnyRecord>({})
 
-const trafficCanvas = ref<HTMLCanvasElement | null>(null)
-const statusCanvas = ref<HTMLCanvasElement | null>(null)
-const worldMapSvg = ref<SVGSVGElement | null>(null)
-let trafficChart: any = null
-let statusChart: any = null
 let refreshTimer: number | null = null
-let chartLib: any = null
-let worldMapResizeHandler: (() => void) | null = null
 const chartReady = ref(false)
 
 const traffic = computed(() => summary.value.traffic || {})
@@ -961,85 +935,6 @@ function statusClass(status: number): string {
   return 'bg-secondary-lt text-secondary'
 }
 
-function normalizeCountryName(name: string): string {
-  return (name || '')
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]/g, '')
-}
-
-function mapCountryKey(name: string): string {
-  const key = normalizeCountryName(name)
-  const aliases: Record<string, string> = {
-    usa: 'unitedstatesofamerica',
-    unitedstates: 'unitedstatesofamerica',
-    uk: 'unitedkingdom',
-    greatbritain: 'unitedkingdom',
-    russia: 'russianfederation',
-    southkorea: 'southkorea',
-    northkorea: 'northkorea',
-    czechia: 'czechrepublic',
-    ivorycoast: 'cotedivoire',
-    uae: 'unitedarabemirates',
-  }
-  return aliases[key] || key
-}
-
-async function renderWorldMap() {
-  if (!worldMapSvg.value) return
-
-  const worldMod = await import('world-atlas/countries-110m.json')
-  const worldAtlas = (worldMod as any).default || worldMod
-  const world = feature(worldAtlas, worldAtlas.objects.countries) as AnyRecord
-  const features = world?.features || []
-  if (!Array.isArray(features) || !features.length) return
-
-  const width = Math.max(320, worldMapSvg.value.clientWidth || 320)
-  const height = width < 540 ? 240 : 340
-  const svg = select(worldMapSvg.value)
-  svg.attr('viewBox', `0 0 ${width} ${height}`)
-
-  const countryHits = new Map<string, number>()
-  for (const row of countryDistribution.value) {
-    const key = mapCountryKey(String(row?.country || ''))
-    if (!key) continue
-    countryHits.set(key, Number(row?.hits) || 0)
-  }
-
-  const maxHits = Math.max(1, d3Max(countryDistribution.value, (d: AnyRecord) => Number(d?.hits) || 0) || 1)
-  const color = scaleSequential(interpolateYlOrRd).domain([0, maxHits])
-
-  const projection = geoNaturalEarth1().fitSize([width, height], world as any)
-  const path = geoPath(projection as any)
-
-  const root = svg.selectAll<SVGGElement, null>('g.world-root').data([null]).join('g').attr('class', 'world-root')
-
-  const countries = root
-    .selectAll<SVGPathElement, any>('path.country')
-    .data(features)
-    .join('path')
-    .attr('class', 'country')
-    .attr('d', path as any)
-    .attr('fill', (d: AnyRecord) => {
-      const key = mapCountryKey(String(d?.properties?.name || ''))
-      const hits = countryHits.get(key) || 0
-      return hits > 0 ? color(hits) : '#e9edf2'
-    })
-    .attr('stroke', '#ffffff')
-    .attr('stroke-width', 0.6)
-
-  countries
-    .selectAll('title')
-    .data((d: any) => [d])
-    .join('title')
-    .text((d: AnyRecord) => {
-      const country = String(d?.properties?.name || 'Unknown')
-      const key = mapCountryKey(country)
-      const hits = countryHits.get(key) || 0
-      return `${country}: ${numberFormat(hits)} hits`
-    })
-}
 
 function hostWidth(hits: number): number {
   const max = Math.max(...(topProxyHosts.value.map((h: AnyRecord) => Number(h.hits) || 0)), 1)
@@ -1050,102 +945,6 @@ function setPeriod(value: string) {
   if (period.value === value) return
   period.value = value
   void loadAll(true)
-}
-
-async function ensureChartLib() {
-  if (chartLib) return chartLib
-  const mod = await import('chart.js')
-  mod.Chart.register(...mod.registerables)
-  chartLib = mod.Chart
-  return chartLib
-}
-
-function bucketLabel(ts: string): string {
-  const d = new Date(ts)
-  if (Number.isNaN(d.getTime())) return ts
-  return period.value === '1h'
-    ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    : d.toLocaleString([], { day: '2-digit', month: '2-digit', hour: '2-digit' })
-}
-
-async function renderCharts() {
-  const Chart = await ensureChartLib()
-
-  if (trafficChart) {
-    trafficChart.destroy()
-    trafficChart = null
-  }
-  if (statusChart) {
-    statusChart.destroy()
-    statusChart = null
-  }
-
-  if (trafficCanvas.value) {
-    const labels = timeseries.value.map((p) => bucketLabel(p.timestamp))
-    const human = timeseries.value.map((p) => Number(p.human) || 0)
-    const bot = timeseries.value.map((p) => Number(p.bot) || 0)
-    trafficChart = new Chart(trafficCanvas.value.getContext('2d'), {
-      type: 'bar',
-      data: {
-        labels,
-        datasets: [
-          { label: 'Humain', data: human, backgroundColor: '#378ADD', stack: 'traffic' },
-          { label: 'Bot/scan', data: bot, backgroundColor: '#E24B4A', stack: 'traffic' },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: {
-            position: 'bottom',
-            onHover: (_e: any, _item: any, legend: any) => {
-              legend.chart.canvas.style.cursor = 'pointer'
-            },
-            onLeave: (_e: any, _item: any, legend: any) => {
-              legend.chart.canvas.style.cursor = 'default'
-            },
-          },
-        },
-        scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true } },
-      },
-    })
-  }
-
-  if (statusCanvas.value) {
-    statusChart = new Chart(statusCanvas.value.getContext('2d'), {
-      type: 'doughnut',
-      data: {
-        labels: ['2xx', '3xx', '4xx', '5xx'],
-        datasets: [{
-          data: [
-            Number(statusDistribution.value['2xx']) || 0,
-            Number(statusDistribution.value['3xx']) || 0,
-            Number(statusDistribution.value['4xx']) || 0,
-            Number(statusDistribution.value['5xx']) || 0,
-          ],
-          backgroundColor: ['#639922', '#185FA5', '#BA7517', '#E24B4A'],
-          borderWidth: 0,
-        }],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        cutout: '70%',
-        plugins: {
-          legend: {
-            position: 'bottom',
-            onHover: (_e: any, _item: any, legend: any) => {
-              legend.chart.canvas.style.cursor = 'pointer'
-            },
-            onLeave: (_e: any, _item: any, legend: any) => {
-              legend.chart.canvas.style.cursor = 'default'
-            },
-          },
-        },
-      },
-    })
-  }
 }
 
 async function loadAll(showSpinner: boolean) {
@@ -1165,9 +964,6 @@ async function loadAll(showSpinner: boolean) {
     timeseries.value = timeseriesRes.data?.points || []
     liveRequests.value = liveRes.data?.requests || []
     lastUpdatedAt.value = new Date()
-    await nextTick()
-    await renderCharts()
-    await renderWorldMap()
   } catch (err) {
     console.error('Failed to load traffic dashboard', err)
   } finally {
@@ -1211,24 +1007,13 @@ function closeDomainModal() {
 
 watch(autoRefresh, resetAutoRefresh)
 
-watch(countryDistribution, () => {
-  void nextTick().then(renderWorldMap)
-})
-
 onMounted(async () => {
   await loadAll(true)
   resetAutoRefresh()
-  worldMapResizeHandler = () => {
-    void renderWorldMap()
-  }
-  window.addEventListener('resize', worldMapResizeHandler)
 })
 
 onBeforeUnmount(() => {
   if (refreshTimer) window.clearInterval(refreshTimer)
-  if (trafficChart) trafficChart.destroy()
-  if (statusChart) statusChart.destroy()
-  if (worldMapResizeHandler) window.removeEventListener('resize', worldMapResizeHandler)
 })
 </script>
 
@@ -1281,12 +1066,6 @@ onBeforeUnmount(() => {
   overflow: auto;
 }
 
-.world-map {
-  width: 100%;
-  height: 340px;
-  display: block;
-}
-
 @media (max-width: 992px) {
   .traffic-filters {
     align-items: stretch !important;
@@ -1304,10 +1083,6 @@ onBeforeUnmount(() => {
 
   .traffic-refresh-btn {
     width: 100%;
-  }
-
-  .world-map {
-    height: 260px;
   }
 }
 
@@ -1332,10 +1107,6 @@ onBeforeUnmount(() => {
   .domain-path,
   .domain-ua {
     max-width: 12rem !important;
-  }
-
-  .world-map {
-    height: 220px;
   }
 }
 

@@ -786,121 +786,8 @@
             </div>
 
             <!-- Disks tab -->
-            <div
-              v-show="tab === 'disks'"
-              class="table-responsive"
-            >
-              <table class="table table-vcenter card-table">
-                <thead>
-                  <tr>
-                    <th>
-                      <SortableHeader
-                        label="Périphérique"
-                        :active="diskSortKey === 'dev_path'"
-                        :direction="diskSortDir"
-                        @toggle="toggleDiskSort('dev_path')"
-                      />
-                    </th>
-                    <th>
-                      <SortableHeader
-                        label="Modèle"
-                        :active="diskSortKey === 'model'"
-                        :direction="diskSortDir"
-                        @toggle="toggleDiskSort('model')"
-                      />
-                    </th>
-                    <th>
-                      <SortableHeader
-                        label="Type"
-                        :active="diskSortKey === 'disk_type'"
-                        :direction="diskSortDir"
-                        @toggle="toggleDiskSort('disk_type')"
-                      />
-                    </th>
-                    <th>
-                      <SortableHeader
-                        label="Taille"
-                        :active="diskSortKey === 'size_bytes'"
-                        :direction="diskSortDir"
-                        @toggle="toggleDiskSort('size_bytes')"
-                      />
-                    </th>
-                    <th>
-                      <SortableHeader
-                        label="Santé SMART"
-                        :active="diskSortKey === 'health'"
-                        :direction="diskSortDir"
-                        @toggle="toggleDiskSort('health')"
-                      />
-                    </th>
-                    <th>
-                      <SortableHeader
-                        label="Usure SSD"
-                        :active="diskSortKey === 'wearout'"
-                        :direction="diskSortDir"
-                        @toggle="toggleDiskSort('wearout')"
-                      />
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr v-if="!sortedDisks.length">
-                    <td
-                      colspan="6"
-                      class="text-center text-muted py-4"
-                    >
-                      Aucun disque détecté sur ce nœud.
-                    </td>
-                  </tr>
-                  <tr
-                    v-for="d in sortedDisks"
-                    :key="d.id"
-                  >
-                    <td class="fw-medium font-monospace">
-                      {{ d.dev_path }}
-                    </td>
-                    <td>
-                      {{ d.model || '—' }}<div class="text-muted small">
-                        {{ d.serial }}
-                      </div>
-                    </td>
-                    <td><span class="badge bg-secondary-lt text-secondary text-uppercase">{{ d.disk_type || '?' }}</span></td>
-                    <td>{{ formatBytes(d.size_bytes) }}</td>
-                    <td>
-                      <span
-                        v-if="d.health === 'PASSED'"
-                        class="badge bg-success-lt text-success"
-                      >PASSED</span>
-                      <span
-                        v-else-if="d.health === 'FAILED'"
-                        class="badge bg-danger-lt text-danger"
-                      >FAILED</span>
-                      <span
-                        v-else
-                        class="badge bg-secondary-lt text-secondary"
-                      >{{ d.health }}</span>
-                    </td>
-                    <td>
-                      <template v-if="d.wearout >= 0">
-                        <div class="d-flex align-items-center gap-2">
-                          <div class="progress progress-xs flex-grow-1 proxmox-progress-min-60">
-                            <div
-                              class="progress-bar"
-                              :class="wearoutColor(d.wearout)"
-                              :style="`width:${d.wearout}%`"
-                            />
-                          </div>
-                          <span class="text-muted small">{{ d.wearout }}%</span>
-                        </div>
-                      </template>
-                      <span
-                        v-else
-                        class="text-muted"
-                      >—</span>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+            <div v-show="tab === 'disks'">
+              <ProxmoxNodeDisksTab :disks="node.disks || []" />
             </div>
 
             <!-- Tasks tab -->
@@ -1491,44 +1378,15 @@
 </template>
 
 <script setup>
-import { ref, computed, shallowRef, onMounted, onUnmounted, defineAsyncComponent, defineComponent, h } from 'vue'
+import { ref, computed, shallowRef, onMounted, onUnmounted, defineAsyncComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 const CommandLogPanel = defineAsyncComponent(() => import('../components/host/CommandLogPanel.vue'))
 const ProxmoxNodeChartsPanel = defineAsyncComponent(() => import('../components/proxmox/ProxmoxNodeChartsPanel.vue'))
 import SortableHeader from '../components/common/SortableHeader.vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
+import GuestLinkCell from '../components/proxmox/GuestLinkCell.vue'
+import ProxmoxNodeDisksTab from '../components/proxmox/ProxmoxNodeDisksTab.vue'
 import api from '../api'
-
-// Inline component — renders the "Hôte lié" cell without a separate file.
-const GuestLinkCell = defineComponent({
-  props: { link: { type: Object, default: null } },
-  emits: ['confirm', 'ignore', 'go'],
-  setup(props, { emit }) {
-    return () => {
-      const link = props.link
-      if (!link) return h('span', { class: 'text-muted small' }, '—')
-      if (link.status === 'suggested') {
-        return h('div', { class: 'd-flex align-items-center gap-1' }, [
-          h('span', { class: 'badge bg-warning-lt text-warning' }, 'Suggéré'),
-          h('span', { class: 'text-muted small' }, link.host_hostname || link.host_name),
-          h('button', { class: 'btn btn-xs btn-success ms-1', onClick: () => emit('confirm') }, '✓'),
-          h('button', { class: 'btn btn-xs btn-outline-secondary', onClick: () => emit('ignore') }, '✗'),
-        ])
-      }
-      if (link.status === 'confirmed') {
-        return h('div', { class: 'd-flex align-items-center gap-1' }, [
-          h('span', { class: 'badge bg-success-lt text-success' }, 'Lié'),
-          h('button', {
-            class: 'btn btn-xs btn-outline-primary ms-1',
-            onClick: () => emit('go'),
-            title: 'Voir la fiche hôte',
-          }, link.host_hostname || link.host_name),
-        ])
-      }
-      return h('span', { class: 'text-muted small' }, '—')
-    }
-  },
-})
 
 const route = useRoute()
 const router = useRouter()
@@ -1541,8 +1399,6 @@ const vmSortKey = ref('vmid')
 const vmSortDir = ref('asc')
 const lxcSortKey = ref('vmid')
 const lxcSortDir = ref('asc')
-const diskSortKey = ref('dev_path')
-const diskSortDir = ref('asc')
 const taskSortKey = ref('start_time')
 const taskSortDir = ref('desc')
 
@@ -1845,12 +1701,6 @@ const sortedLxcs = computed(() => {
   return list
 })
 
-const sortedDisks = computed(() => {
-  const list = [...(node.value?.disks ?? [])]
-  list.sort((a, b) => compareValues(a?.[diskSortKey.value], b?.[diskSortKey.value], diskSortDir.value))
-  return list
-})
-
 const sortedTasks = computed(() => {
   const list = [...(node.value?.tasks ?? [])]
   list.sort((a, b) => {
@@ -1868,10 +1718,6 @@ function toggleVmSort(key) {
 
 function toggleLxcSort(key) {
   toggleSort(lxcSortKey, lxcSortDir, key)
-}
-
-function toggleDiskSort(key) {
-  toggleSort(diskSortKey, diskSortDir, key)
 }
 
 function toggleTaskSort(key) {
@@ -2416,14 +2262,6 @@ function syslogLevelBadgeClass(item) {
   if (raw.includes('success') || raw.includes('ok')) return 'bg-success-lt text-success'
   if (raw.includes('info') || raw.includes('notice')) return 'bg-azure-lt text-azure'
   return 'bg-secondary-lt text-secondary'
-}
-
-// wearout for SSD: 100=new, lower=more worn → invert to show wear percentage
-function wearoutColor(wearout) {
-  // wearout is wear level remaining (100=new). Low value = danger.
-  if (wearout < 20) return 'bg-danger'
-  if (wearout < 50) return 'bg-warning'
-  return 'bg-success'
 }
 
 async function loadServices() {

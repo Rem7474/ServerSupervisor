@@ -12,6 +12,8 @@ export default defineConfig({
     globals: true,
     environment: 'happy-dom',
     include: ['src/**/*.{test,spec}.{ts,js}'],
+    // Browser-mode tests run under a separate config (vitest.browser.config.ts).
+    exclude: ['**/node_modules/**', '**/*.browser.test.ts'],
     setupFiles: ['src/test/setup.ts'],
   },
 })

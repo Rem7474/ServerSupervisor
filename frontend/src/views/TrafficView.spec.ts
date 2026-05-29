@@ -48,8 +48,21 @@ describe('TrafficView (characterization)', () => {
     vi.clearAllMocks()
   })
 
+  // Charts + world map render imperatively (Chart.js / D3) and are verified in
+  // the real-browser test; stub them here so the happy-dom shell test stays clean.
+  const mountOpts = {
+    global: {
+      stubs: {
+        TrafficRequestsChart: true,
+        TrafficStatusChart: true,
+        TrafficWorldMap: true,
+        'router-link': true,
+      },
+    },
+  }
+
   it('fetches web-logs summary on mount', async () => {
-    mount(TrafficView)
+    mount(TrafficView, mountOpts)
     await flushPromises()
     expect(apiClient.getWebLogsSummary).toHaveBeenCalled()
     expect(apiClient.getWebLogsTimeseries).toHaveBeenCalled()
@@ -57,7 +70,7 @@ describe('TrafficView (characterization)', () => {
   })
 
   it('renders the page shell + KPI labels once data has loaded', async () => {
-    const wrapper = mount(TrafficView)
+    const wrapper = mount(TrafficView, mountOpts)
     await flushPromises()
     await flushPromises()
 
@@ -70,7 +83,7 @@ describe('TrafficView (characterization)', () => {
   })
 
   it('renders the formatted total requests KPI value', async () => {
-    const wrapper = mount(TrafficView)
+    const wrapper = mount(TrafficView, mountOpts)
     await flushPromises()
     await flushPromises()
     // fr-FR grouping uses a (narrow) no-break space; strip whitespace first.

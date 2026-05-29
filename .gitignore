@@ -11,3 +11,10 @@ Thumbs.db
 agent/agent
 agent/agent.exe
 server/server
+
+# Frontend test artifacts (Vitest browser / Playwright)
+frontend/**/__screenshots__/
+frontend/.vitest-attachments/
+frontend/test-results/
+frontend/playwright-report/
+frontend/.vitest-reports/
