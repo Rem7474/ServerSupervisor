@@ -2,7 +2,7 @@ package handlers
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -77,20 +77,20 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 
 	// Update host status
 	if err := h.db.UpdateHostStatus(c.Request.Context(), hostID, "online"); err != nil {
-		log.Printf("Warning: failed to update host %s status to online: %v", safeHostID, err)
+		slog.ErrorContext(c.Request.Context(), fmt.Sprintf("Warning: failed to update host %s status to online: %v", safeHostID, err))
 	}
 
 	// On reconnect, immediately fail any 'running' commands from the previous dead session.
 	// These will never complete — the agent that started them has gone away.
 	if prevStatus == "offline" {
 		if err := h.db.FailRunningCommandsOnAgentReconnect(c.Request.Context(), hostID); err != nil {
-			log.Printf("Warning: failed to cleanup running commands on reconnect for host %s: %v", safeHostID, err)
+			slog.ErrorContext(c.Request.Context(), fmt.Sprintf("Warning: failed to cleanup running commands on reconnect for host %s: %v", safeHostID, err))
 		}
 	}
 
 	// Cleanup stalled commands older than 10 minutes (pending commands left from extended downtime).
 	if err := h.db.CleanupHostStalledCommands(c.Request.Context(), hostID, 10); err != nil {
-		log.Printf("Warning: failed to cleanup stalled commands for host %s: %v", safeHostID, err)
+		slog.ErrorContext(c.Request.Context(), fmt.Sprintf("Warning: failed to cleanup stalled commands for host %s: %v", safeHostID, err))
 	}
 
 	// Determine whether Proxmox is the exclusive metrics source for this host.
@@ -109,7 +109,7 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 	// Return pending commands for this host (unified remote_commands table)
 	commands, err := h.db.ClaimPendingRemoteCommands(c.Request.Context(), hostID)
 	if err != nil {
-		log.Printf("Warning: failed to get pending commands for host %s: %v", safeHostID, err)
+		slog.ErrorContext(c.Request.Context(), fmt.Sprintf("Warning: failed to get pending commands for host %s: %v", safeHostID, err))
 	}
 	if commands == nil {
 		commands = []models.PendingCommand{}
@@ -155,7 +155,7 @@ func (h *AgentHandler) ReportCommandResult(c *gin.Context) {
 			details = truncateOutput(result.Output, 2000)
 		}
 		if err := h.db.UpdateAuditLogStatus(c.Request.Context(), *cmd.AuditLogID, result.Status, details); err != nil {
-			log.Printf("Warning: failed to update audit log %d for command %s: %v", *cmd.AuditLogID, result.CommandID, err)
+			slog.ErrorContext(c.Request.Context(), fmt.Sprintf("Warning: failed to update audit log %d for command %s: %v", *cmd.AuditLogID, result.CommandID, err))
 		}
 	}
 
@@ -165,7 +165,7 @@ func (h *AgentHandler) ReportCommandResult(c *gin.Context) {
 	// Update linked scheduled task with final status
 	if cmd.ScheduledTaskID != nil && (result.Status == "completed" || result.Status == "failed") {
 		if err := h.db.UpdateScheduledTaskStatus(c.Request.Context(), *cmd.ScheduledTaskID, result.Status); err != nil {
-			log.Printf("Failed to update scheduled task %s status: %v", *cmd.ScheduledTaskID, err)
+			slog.ErrorContext(c.Request.Context(), fmt.Sprintf("Failed to update scheduled task %s status: %v", *cmd.ScheduledTaskID, err))
 		}
 	}
 
@@ -186,7 +186,7 @@ func (h *AgentHandler) ReportCommandResult(c *gin.Context) {
 		if result.AptStatus != nil {
 			result.AptStatus.HostID = cmd.HostID
 			if err := h.db.UpsertAptStatus(c.Request.Context(), result.AptStatus); err != nil {
-				log.Printf("Failed to update APT status: %v", err)
+				slog.ErrorContext(c.Request.Context(), fmt.Sprintf("Failed to update APT status: %v", err))
 			}
 		}
 	}
@@ -380,7 +380,7 @@ func (h *AgentHandler) LogAuditAction(c *gin.Context) {
 	// Create audit log entry with "agent" as the username
 	auditLogID, err := h.db.CreateAuditLog(c.Request.Context(), "agent", auditAction, hostID, c.ClientIP(), audit.Details, audit.Status)
 	if err != nil {
-		log.Printf("Failed to log audit action: %v", err)
+		slog.ErrorContext(c.Request.Context(), fmt.Sprintf("Failed to log audit action: %v", err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to record audit log"})
 		return
 	}
@@ -395,7 +395,7 @@ func (h *AgentHandler) LogAuditAction(c *gin.Context) {
 		if cerr := h.db.CreateCompletedRemoteCommand(c.Request.Context(),
 			hostID, audit.Module, audit.Action, "", audit.Details, "agent", audit.Status, auditIDPtr,
 		); cerr != nil {
-			log.Printf("Warning: failed to create self-reported command record: %v", cerr)
+			slog.ErrorContext(c.Request.Context(), fmt.Sprintf("Warning: failed to create self-reported command record: %v", cerr))
 		}
 	}
 
@@ -446,7 +446,7 @@ func (h *AgentHandler) pushUUNotification(hostname, hostID string, run models.UU
 	if h.cfg.NotifyURL != "" {
 		n := notify.New()
 		if err := n.SendNtfy(h.cfg, h.cfg.NotifyURL, title, msg); err != nil {
-			log.Printf("UU ntfy notification failed for host %s: %v", hostID, err)
+			slog.Error("UU ntfy notification failed", slog.String("host_id", hostID), slog.Any("err", err))
 		}
 	}
 }

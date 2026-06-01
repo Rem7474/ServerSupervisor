@@ -2,7 +2,8 @@ package handlers
 
 import (
 	"context"
-	"log"
+	"fmt"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -73,7 +74,7 @@ func (h *ReleaseTrackerHandler) StartPoller(parent context.Context) {
 	if interval == 0 {
 		interval = 15 * time.Minute
 	}
-	log.Printf("Release tracker poller started (interval: %v)", interval)
+	slog.InfoContext(parent, fmt.Sprintf("Release tracker poller started (interval: %v)", interval))
 
 	ctx, cancel := context.WithCancel(parent)
 	h.pollerCtx = ctx

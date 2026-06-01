@@ -2,7 +2,8 @@ package handlers
 
 import (
 	"database/sql"
-	"log"
+	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -85,7 +86,7 @@ func (h *ReleaseTrackerHandler) Create(c *gin.Context) {
 
 	created, err := h.db.CreateReleaseTracker(c.Request.Context(), req)
 	if err != nil {
-		log.Printf("CreateReleaseTracker: %v", err)
+		slog.ErrorContext(c.Request.Context(), fmt.Sprintf("CreateReleaseTracker: %v", err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create tracker"})
 		return
 	}
@@ -97,7 +98,7 @@ func (h *ReleaseTrackerHandler) Create(c *gin.Context) {
 func (h *ReleaseTrackerHandler) ListTrackableContainers(c *gin.Context) {
 	containers, err := h.db.ListTrackableContainers(c.Request.Context())
 	if err != nil {
-		log.Printf("ListTrackableContainers: %v", err)
+		slog.ErrorContext(c.Request.Context(), fmt.Sprintf("ListTrackableContainers: %v", err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list trackable containers"})
 		return
 	}
@@ -156,7 +157,7 @@ func (h *ReleaseTrackerHandler) CreateBulk(c *gin.Context) {
 			t.NotifyChannels = []string{}
 		}
 		if _, err := h.db.CreateReleaseTracker(c.Request.Context(), t); err != nil {
-			log.Printf("CreateBulk: failed to create %q: %v", t.Name, err)
+			slog.ErrorContext(c.Request.Context(), fmt.Sprintf("CreateBulk: failed to create %q: %v", t.Name, err))
 			results = append(results, bulkResult{Name: t.Name, Error: "failed to create"})
 			continue
 		}
@@ -171,12 +172,12 @@ func (h *ReleaseTrackerHandler) Get(c *gin.Context) {
 	id := c.Param("id")
 	t, err := h.db.GetReleaseTrackerByID(c.Request.Context(), id)
 	if err == sql.ErrNoRows {
-		log.Printf("Release tracker history: tracker not found (id=%s)", id)
+		slog.InfoContext(c.Request.Context(), fmt.Sprintf("Release tracker history: tracker not found (id=%s)", id))
 		c.JSON(http.StatusNotFound, gin.H{"error": "tracker not found"})
 		return
 	}
 	if err != nil {
-		log.Printf("Release tracker history: failed to load tracker (id=%s): %v", id, err)
+		slog.ErrorContext(c.Request.Context(), fmt.Sprintf("Release tracker history: failed to load tracker (id=%s): %v", id, err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get tracker"})
 		return
 	}
@@ -362,7 +363,7 @@ func (h *ReleaseTrackerHandler) GetVersionHistory(c *gin.Context) {
 	if t.TrackerType == "docker" {
 		history, err = h.db.ListTrackerTagDigests(c.Request.Context(), id, limit)
 		if err != nil {
-			log.Printf("Release tracker history: docker history load error (tracker=%s id=%s image=%s tag=%s limit=%d): %v", t.Name, t.ID, t.DockerImage, t.DockerTag, limit, err)
+			slog.ErrorContext(c.Request.Context(), fmt.Sprintf("Release tracker history: docker history load error (tracker=%s id=%s image=%s tag=%s limit=%d): %v", t.Name, t.ID, t.DockerImage, t.DockerTag, limit, err))
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load docker version history"})
 			return
 		}
@@ -370,7 +371,7 @@ func (h *ReleaseTrackerHandler) GetVersionHistory(c *gin.Context) {
 		providerClient := gitprovider.NewClient(t.Provider, h.cfg.GitHubToken)
 		releases, ferr := providerClient.FetchReleaseHistory(t.RepoOwner, t.RepoName, limit)
 		if ferr != nil {
-			log.Printf("Release tracker history: provider call failed (tracker=%s id=%s provider=%s repo=%s/%s limit=%d): %v", t.Name, t.ID, t.Provider, t.RepoOwner, t.RepoName, limit, ferr)
+			slog.ErrorContext(c.Request.Context(), fmt.Sprintf("Release tracker history: provider call failed (tracker=%s id=%s provider=%s repo=%s/%s limit=%d): %v", t.Name, t.ID, t.Provider, t.RepoOwner, t.RepoName, limit, ferr))
 			c.JSON(http.StatusBadGateway, gin.H{"error": ferr.Error()})
 			return
 		}

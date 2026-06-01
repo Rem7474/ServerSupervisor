@@ -436,7 +436,7 @@
                 <span
                   v-if="editNextRun"
                   :class="editCronDesc ? 'ms-2 text-primary' : 'text-primary'"
-                >→ prochain : {{ formatDate(editNextRun) }}</span>
+                >→ prochain : {{ formatDate(editNextRun?.toISOString()) }}</span>
                 <span
                   v-else-if="!editCronDesc"
                   class="text-warning"
@@ -620,7 +620,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import api from '../api'
@@ -632,34 +632,34 @@ import SortableHeader from '../components/common/SortableHeader.vue'
 const auth = useAuthStore()
 const dialog = useConfirmDialog()
 
-const tasks = ref([])
+const tasks = ref<any[]>([])
 const loading = ref(false)
 const error = ref('')
-const runningId = ref(null)
-const runResult = ref(null)
+const runningId = ref<string | number | null>(null)
+const runResult = ref<{ id: string; name: string } | null>(null)
 
 const filterText = ref('')
 const filterHost = ref('')
 const filterModule = ref('')
 const filterStatus = ref('')
 const sortKey = ref('name')
-const sortDir = ref('asc')
+const sortDir = ref<'asc' | 'desc'>('asc')
 
-const editTask = ref(null)
+const editTask = ref<any>(null)
 const editForm = ref({ name: '', cron_expression: '', enabled: false })
 const editSaving = ref(false)
 const editError = ref('')
 
-const historyTask = ref(null)
-const executions = ref([])
+const historyTask = ref<any>(null)
+const executions = ref<any[]>([])
 const historyLoading = ref(false)
 const historyError = ref('')
-const expandedId = ref(null)
+const expandedId = ref<string | number | null>(null)
 
 const canManage = computed(() => auth.role === 'admin' || auth.role === 'operator')
 
 const hostList = computed(() => {
-  const names = [...new Set(tasks.value.map(t => t.host_name))]
+  const names = [...new Set(tasks.value.map((t: any) => t.host_name))]
   return names.sort()
 })
 
@@ -671,7 +671,7 @@ const editNextRun = computed(() => {
 })
 
 const filteredTasks = computed(() => {
-  const filtered = tasks.value.filter(task => {
+  const filtered = tasks.value.filter((task: any) => {
     if (filterHost.value && task.host_name !== filterHost.value) return false
     if (filterModule.value && task.module !== filterModule.value) return false
     if (filterStatus.value === 'enabled' && (!task.enabled || isManualOnly(task))) return false
@@ -697,7 +697,7 @@ const filteredTasks = computed(() => {
   })
 })
 
-function toggleSort(key) {
+function toggleSort(key: string): void {
   if (sortKey.value === key) {
     sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
   } else {
@@ -706,34 +706,34 @@ function toggleSort(key) {
   }
 }
 
-function formatDate(iso) {
+function formatDate(iso: string | undefined): string {
   if (!iso) return ''
   return new Date(iso).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
 }
 
-function statusBadge(status) {
+function statusBadge(status: string | undefined): string {
   if (status === 'completed') return 'badge bg-success-lt'
   if (status === 'failed') return 'badge bg-danger-lt'
   if (status === 'running') return 'badge bg-info-lt'
   return 'badge bg-warning-lt'
 }
 
-function durationSec(start, end) {
-  const ms = new Date(end) - new Date(start)
+function durationSec(start: string, end: string): string {
+  const ms = new Date(end).getTime() - new Date(start).getTime()
   return (ms / 1000).toFixed(1)
 }
 
-function firstLine(output) {
+function firstLine(output: string | undefined): string {
   return (output || '').split('\n')[0].trim()
 }
 
-function openEdit(task) {
+function openEdit(task: any): void {
   editTask.value = task
   editForm.value = { name: task.name, cron_expression: task.cron_expression, enabled: task.enabled }
   editError.value = ''
 }
 
-async function saveEdit() {
+async function saveEdit(): Promise<void> {
   editSaving.value = true
   editError.value = ''
   try {
@@ -748,14 +748,14 @@ async function saveEdit() {
     })
     editTask.value = null
     await loadTasks()
-  } catch (e) {
-    editError.value = e.response?.data?.error || 'Erreur lors de la sauvegarde'
+  } catch (e: any) {
+    editError.value = e?.response?.data?.error || 'Erreur lors de la sauvegarde'
   } finally {
     editSaving.value = false
   }
 }
 
-async function confirmDelete(task) {
+async function confirmDelete(task: any): Promise<void> {
   const ok = await dialog.confirm({
     title: 'Supprimer la tâche',
     message: `Supprimer « ${task.name} » sur ${task.host_name} ?`,
@@ -765,12 +765,12 @@ async function confirmDelete(task) {
   try {
     await api.deleteScheduledTask(task.id)
     await loadTasks()
-  } catch (e) {
-    error.value = e.response?.data?.error || 'Erreur lors de la suppression'
+  } catch (e: any) {
+    error.value = e?.response?.data?.error || 'Erreur lors de la suppression'
   }
 }
 
-async function openHistory(task) {
+async function openHistory(task: any): Promise<void> {
   historyTask.value = task
   executions.value = []
   expandedId.value = null
@@ -779,32 +779,32 @@ async function openHistory(task) {
   try {
     const { data } = await api.getScheduledTaskExecutions(task.id, 20)
     executions.value = data
-  } catch (e) {
-    historyError.value = e.response?.data?.error || 'Erreur de chargement'
+  } catch (e: any) {
+    historyError.value = e?.response?.data?.error || 'Erreur de chargement'
   } finally {
     historyLoading.value = false
   }
 }
 
-async function loadTasks() {
+async function loadTasks(): Promise<void> {
   loading.value = true
   error.value = ''
   try {
     const { data } = await api.getAllScheduledTasks()
     tasks.value = data
-  } catch (e) {
-    error.value = e.response?.data?.error || 'Erreur de chargement'
+  } catch (e: any) {
+    error.value = e?.response?.data?.error || 'Erreur de chargement'
   } finally {
     loading.value = false
   }
 }
 
-async function toggleTask(task) {
+async function toggleTask(task: any): Promise<void> {
   const enabling = !task.enabled
   const ok = await dialog.confirm({
     title: enabling ? 'Activer la tâche' : 'Désactiver la tâche',
     message: `Voulez-vous ${enabling ? 'activer' : 'désactiver'} « ${task.name} » sur ${task.host_name} ?`,
-    variant: enabling ? 'primary' : 'warning',
+    variant: 'warning',
   })
   if (!ok) return
   try {
@@ -814,20 +814,20 @@ async function toggleTask(task) {
       cron_expression: task.cron_expression, enabled: enabling,
     })
     await loadTasks()
-  } catch (e) {
-    error.value = e.response?.data?.error || 'Erreur'
+  } catch (e: any) {
+    error.value = e?.response?.data?.error || 'Erreur'
   }
 }
 
-async function runNow(task) {
+async function runNow(task: any): Promise<void> {
   runningId.value = task.id
   try {
     const { data } = await api.runScheduledTask(task.id)
     runResult.value = { id: data.command_id, name: task.name }
     setTimeout(() => { runResult.value = null }, 5000)
     await loadTasks()
-  } catch (e) {
-    error.value = e.response?.data?.error || 'Erreur'
+  } catch (e: any) {
+    error.value = e?.response?.data?.error || 'Erreur'
   } finally {
     runningId.value = null
   }

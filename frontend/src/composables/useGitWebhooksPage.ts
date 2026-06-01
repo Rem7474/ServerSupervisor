@@ -13,7 +13,7 @@ interface ExecutionPayload {
   command_id?: string
   host_name?: string
   host_id?: string
-  [key: string]: unknown
+  [key: string]: any
 }
 
 interface GitWebhook {
@@ -24,7 +24,7 @@ interface GitWebhook {
   repo_filter?: string
   branch_filter?: string
   last_execution?: ExecutionPayload
-  [key: string]: unknown
+  [key: string]: any
 }
 
 interface ReleaseTracker {
@@ -39,12 +39,12 @@ interface ReleaseTracker {
   repo_name: string
   last_release_tag?: string
   last_execution?: ExecutionPayload
-  [key: string]: unknown
+  [key: string]: any
 }
 
 interface Host {
   id: string
-  [key: string]: unknown
+  [key: string]: any
 }
 
 interface RecentExecution extends ExecutionPayload {

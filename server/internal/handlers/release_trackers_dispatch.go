@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/serversupervisor/server/internal/dispatch"
@@ -15,7 +15,7 @@ func (h *ReleaseTrackerHandler) dispatchGitRelease(ctx context.Context, t models
 	// Skip if already running
 	running, _ := h.db.GetRunningExecutionForReleaseTracker(ctx, t.ID)
 	if running {
-		log.Printf("Git tracker %s: skipping dispatch (already running)", t.Name)
+		slog.InfoContext(ctx, fmt.Sprintf("Git tracker %s: skipping dispatch (already running)", t.Name))
 		_ = h.db.UpdateReleaseTrackerLastSeen(ctx, t.ID, tag, false)
 		return
 	}
@@ -28,7 +28,7 @@ func (h *ReleaseTrackerHandler) dispatchGitRelease(ctx context.Context, t models
 		Status:      "pending",
 	})
 	if err != nil {
-		log.Printf("Git tracker %s: failed to create execution: %v", t.Name, err)
+		slog.ErrorContext(ctx, fmt.Sprintf("Git tracker %s: failed to create execution: %v", t.Name, err))
 		return
 	}
 
@@ -58,7 +58,7 @@ func (h *ReleaseTrackerHandler) dispatchGitRelease(ctx context.Context, t models
 		},
 	})
 	if err != nil {
-		log.Printf("Git tracker %s: failed to create command: %v", t.Name, err)
+		slog.ErrorContext(ctx, fmt.Sprintf("Git tracker %s: failed to create command: %v", t.Name, err))
 		now := time.Now()
 		_ = h.db.UpdateReleaseTrackerExecutionStatus(ctx, exec.ID, "failed", &now)
 		return
@@ -71,7 +71,7 @@ func (h *ReleaseTrackerHandler) dispatchGitRelease(ctx context.Context, t models
 func (h *ReleaseTrackerHandler) dispatchDockerUpdate(ctx context.Context, t models.ReleaseTracker, tag, resolvedVersion, oldDigest, newDigest string) {
 	running, _ := h.db.GetRunningExecutionForReleaseTracker(ctx, t.ID)
 	if running {
-		log.Printf("Docker tracker %s: skipping dispatch (already running)", t.Name)
+		slog.InfoContext(ctx, fmt.Sprintf("Docker tracker %s: skipping dispatch (already running)", t.Name))
 		_ = h.db.UpdateReleaseTrackerLastSeen(ctx, t.ID, resolvedVersion, false)
 		return
 	}
@@ -85,7 +85,7 @@ func (h *ReleaseTrackerHandler) dispatchDockerUpdate(ctx context.Context, t mode
 		Status:      "pending",
 	})
 	if err != nil {
-		log.Printf("Docker tracker %s: failed to create execution: %v", t.Name, err)
+		slog.ErrorContext(ctx, fmt.Sprintf("Docker tracker %s: failed to create execution: %v", t.Name, err))
 		return
 	}
 
@@ -116,7 +116,7 @@ func (h *ReleaseTrackerHandler) dispatchDockerUpdate(ctx context.Context, t mode
 		},
 	})
 	if err != nil {
-		log.Printf("Docker tracker %s: failed to create command: %v", t.Name, err)
+		slog.ErrorContext(ctx, fmt.Sprintf("Docker tracker %s: failed to create command: %v", t.Name, err))
 		now := time.Now()
 		_ = h.db.UpdateReleaseTrackerExecutionStatus(ctx, exec.ID, "failed", &now)
 		return
@@ -152,7 +152,7 @@ func (h *ReleaseTrackerHandler) dispatchDockerTracker(ctx context.Context, t mod
 func (h *ReleaseTrackerHandler) dispatchComposeUpdate(ctx context.Context, t models.ReleaseTracker, tag, resolvedVersion, newDigest string) {
 	running, _ := h.db.GetRunningExecutionForReleaseTracker(ctx, t.ID)
 	if running {
-		log.Printf("Compose tracker %s: skipping dispatch (already running)", t.Name)
+		slog.InfoContext(ctx, fmt.Sprintf("Compose tracker %s: skipping dispatch (already running)", t.Name))
 		_ = h.db.UpdateReleaseTrackerLastSeen(ctx, t.ID, resolvedVersion, false)
 		return
 	}
@@ -160,7 +160,7 @@ func (h *ReleaseTrackerHandler) dispatchComposeUpdate(ctx context.Context, t mod
 	if newDigest != "" {
 		deployed, _ := h.db.GetDeployedImageDigest(ctx, t.HostID, t.DockerImage, t.DockerTag)
 		if deployed != "" && deployed == newDigest {
-			log.Printf("Compose tracker %s: deployed digest already current, skipping update", t.Name)
+			slog.InfoContext(ctx, fmt.Sprintf("Compose tracker %s: deployed digest already current, skipping update", t.Name))
 			_ = h.db.UpdateReleaseTrackerLastSeen(ctx, t.ID, resolvedVersion, false)
 			return
 		}
@@ -174,7 +174,7 @@ func (h *ReleaseTrackerHandler) dispatchComposeUpdate(ctx context.Context, t mod
 		Status:      "pending",
 	})
 	if err != nil {
-		log.Printf("Compose tracker %s: failed to create execution: %v", t.Name, err)
+		slog.ErrorContext(ctx, fmt.Sprintf("Compose tracker %s: failed to create execution: %v", t.Name, err))
 		return
 	}
 
@@ -212,7 +212,7 @@ func (h *ReleaseTrackerHandler) dispatchComposeUpdate(ctx context.Context, t mod
 		},
 	})
 	if err != nil {
-		log.Printf("Compose tracker %s: failed to create command: %v", t.Name, err)
+		slog.ErrorContext(ctx, fmt.Sprintf("Compose tracker %s: failed to create command: %v", t.Name, err))
 		now := time.Now()
 		_ = h.db.UpdateReleaseTrackerExecutionStatus(ctx, exec.ID, "failed", &now)
 		return

@@ -262,17 +262,43 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import api from '../../api/index.js'
+import api from '../../api/index'
 
-const props = defineProps({
-  authIsAdmin: { type: Boolean, default: false },
+interface ProxmoxInstance {
+  id: string
+  name: string
+  api_url: string
+  token_id: string
+  insecure_skip_verify?: boolean
+  enabled?: boolean
+  poll_interval_sec?: number
+  node_count?: number
+  guest_count?: number
+  last_error?: string
+  last_success_at?: string
+}
+
+interface ProxmoxForm {
+  name: string
+  api_url: string
+  token_id: string
+  token_secret: string
+  insecure_skip_verify: boolean
+  enabled: boolean
+  poll_interval_sec: number
+}
+
+withDefaults(defineProps<{
+  authIsAdmin?: boolean
+}>(), {
+  authIsAdmin: false,
 })
 
-const instances = ref([])
+const instances = ref<ProxmoxInstance[]>([])
 const showForm = ref(false)
-const editingId = ref(null)
+const editingId = ref<string | null>(null)
 const saving = ref(false)
 const testing = ref(false)
 const formMsg = ref('')
@@ -280,7 +306,7 @@ const formOk = ref(false)
 const listMsg = ref('')
 const listOk = ref(false)
 
-const emptyForm = () => ({
+const emptyForm = (): ProxmoxForm => ({
   name: '',
   api_url: '',
   token_id: '',
@@ -290,9 +316,9 @@ const emptyForm = () => ({
   poll_interval_sec: 60,
 })
 
-const form = ref(emptyForm())
+const form = ref<ProxmoxForm>(emptyForm())
 
-async function load() {
+async function load(): Promise<void> {
   try {
     const res = await api.getProxmoxInstances()
     instances.value = res.data
@@ -301,35 +327,35 @@ async function load() {
   }
 }
 
-function openAddForm() {
+function openAddForm(): void {
   editingId.value = null
   form.value = emptyForm()
   formMsg.value = ''
   showForm.value = true
 }
 
-function openEditForm(inst) {
+function openEditForm(inst: ProxmoxInstance): void {
   editingId.value = inst.id
   form.value = {
     name: inst.name,
     api_url: inst.api_url,
     token_id: inst.token_id,
     token_secret: '',
-    insecure_skip_verify: inst.insecure_skip_verify,
-    enabled: inst.enabled,
-    poll_interval_sec: inst.poll_interval_sec,
+    insecure_skip_verify: inst.insecure_skip_verify ?? false,
+    enabled: inst.enabled ?? true,
+    poll_interval_sec: inst.poll_interval_sec ?? 60,
   }
   formMsg.value = ''
   showForm.value = true
 }
 
-function cancelForm() {
+function cancelForm(): void {
   showForm.value = false
   formMsg.value = ''
   editingId.value = null
 }
 
-async function save() {
+async function save(): Promise<void> {
   if (!form.value.name || !form.value.api_url || !form.value.token_id) {
     formMsg.value = 'Nom, URL API et Token ID sont obligatoires.'
     formOk.value = false
@@ -354,7 +380,7 @@ async function save() {
     await load()
     showForm.value = false
     editingId.value = null
-  } catch (e) {
+  } catch (e: any) {
     formMsg.value = e?.response?.data?.error || 'Erreur lors de l\'enregistrement.'
     formOk.value = false
   } finally {
@@ -362,7 +388,7 @@ async function save() {
   }
 }
 
-async function testForm() {
+async function testForm(): Promise<void> {
   if (!form.value.api_url || !form.value.token_id || !form.value.token_secret) {
     formMsg.value = 'Renseignez l\'URL, le token ID et le secret pour tester.'
     formOk.value = false
@@ -384,7 +410,7 @@ async function testForm() {
       formMsg.value = res.data.error || 'Échec de connexion.'
       formOk.value = false
     }
-  } catch (e) {
+  } catch (e: any) {
     formMsg.value = e?.response?.data?.error || 'Erreur réseau.'
     formOk.value = false
   } finally {
@@ -392,7 +418,7 @@ async function testForm() {
   }
 }
 
-async function testById(inst) {
+async function testById(inst: ProxmoxInstance): Promise<void> {
   listMsg.value = ''
   try {
     const res = await api.testProxmoxInstanceById(inst.id)
@@ -403,38 +429,38 @@ async function testById(inst) {
       listMsg.value = `[${inst.name}] ${res.data.error}`
       listOk.value = false
     }
-  } catch (e) {
+  } catch (e: any) {
     listMsg.value = e?.response?.data?.error || 'Erreur réseau.'
     listOk.value = false
   }
 }
 
-async function pollNow(inst) {
+async function pollNow(inst: ProxmoxInstance): Promise<void> {
   try {
     await api.pollProxmoxNow(inst.id)
     listMsg.value = `[${inst.name}] Collecte déclenchée.`
     listOk.value = true
     setTimeout(load, 3000)
-  } catch (e) {
+  } catch (e: any) {
     listMsg.value = e?.response?.data?.error || 'Erreur.'
     listOk.value = false
   }
 }
 
-async function remove(inst) {
+async function remove(inst: ProxmoxInstance): Promise<void> {
   if (!confirm(`Supprimer la connexion Proxmox « ${inst.name} » ? Toutes les données collectées seront effacées.`)) return
   try {
     await api.deleteProxmoxInstance(inst.id)
     await load()
     listMsg.value = 'Connexion supprimée.'
     listOk.value = true
-  } catch (e) {
+  } catch (e: any) {
     listMsg.value = e?.response?.data?.error || 'Erreur lors de la suppression.'
     listOk.value = false
   }
 }
 
-function formatDate(iso) {
+function formatDate(iso: string | undefined): string {
   if (!iso) return '—'
   return new Date(iso).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
 }

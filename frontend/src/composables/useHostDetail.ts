@@ -7,7 +7,7 @@ import { useConfirmDialog } from './useConfirmDialog'
 import { useWebSocket } from './useWebSocket'
 import { useAuthStore } from '../stores/auth'
 
-type AnyRecord = Record<string, unknown>
+type AnyRecord = Record<string, any>
 
 function asString(value: unknown, fallback = ''): string {
   return typeof value === 'string' ? value : value == null ? fallback : String(value)

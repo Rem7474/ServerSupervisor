@@ -2,7 +2,7 @@ package handlers
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"sync"
 
@@ -36,12 +36,12 @@ func (h *ProxmoxHandler) RefreshNodeApt(c *gin.Context) {
 	client := proxmoxclient.New(conn.APIURL, conn.TokenID, secret, conn.InsecureSkipVerify)
 	upid, err := client.TriggerNodeAptUpdate(node.NodeName)
 	if err != nil {
-		log.Printf("proxmox apt-refresh [%s/%s]: %v", conn.Name, node.NodeName, err)
+		slog.ErrorContext(c.Request.Context(), fmt.Sprintf("proxmox apt-refresh [%s/%s]: %v", conn.Name, node.NodeName, err))
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 		return
 	}
 
-	log.Printf("proxmox apt-refresh [%s/%s]: triggered, upid=%s", conn.Name, node.NodeName, upid)
+	slog.InfoContext(c.Request.Context(), fmt.Sprintf("proxmox apt-refresh [%s/%s]: triggered, upid=%s", conn.Name, node.NodeName, upid))
 	c.JSON(http.StatusOK, gin.H{"upid": upid, "message": "apt update lancé sur le nœud"})
 }
 
@@ -153,12 +153,12 @@ func (h *ProxmoxHandler) MigrateGuest(c *gin.Context) {
 	client := proxmoxclient.New(conn.APIURL, conn.TokenID, secret, conn.InsecureSkipVerify)
 	upid, err := client.MigrateGuest(node.NodeName, vmid, body.GuestType, body.Target, body.Online)
 	if err != nil {
-		log.Printf("proxmox migrate [%s/%s] vmid=%d→%s: %v", conn.Name, node.NodeName, vmid, body.Target, err)
+		slog.ErrorContext(c.Request.Context(), fmt.Sprintf("proxmox migrate [%s/%s] vmid=%d→%s: %v", conn.Name, node.NodeName, vmid, body.Target, err))
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 		return
 	}
 
-	log.Printf("proxmox migrate [%s/%s] vmid=%d→%s: upid=%s", conn.Name, node.NodeName, vmid, body.Target, upid)
+	slog.InfoContext(c.Request.Context(), fmt.Sprintf("proxmox migrate [%s/%s] vmid=%d→%s: upid=%s", conn.Name, node.NodeName, vmid, body.Target, upid))
 	c.JSON(http.StatusOK, gin.H{"upid": upid, "message": fmt.Sprintf("Migration vers %s lancée", body.Target)})
 }
 
@@ -199,11 +199,11 @@ func (h *ProxmoxHandler) NodeServiceAction(c *gin.Context) {
 	client := proxmoxclient.New(conn.APIURL, conn.TokenID, secret, conn.InsecureSkipVerify)
 	upid, err := client.NodeServiceAction(node.NodeName, service, action)
 	if err != nil {
-		log.Printf("proxmox service-action [%s/%s] %s %s: %v", conn.Name, node.NodeName, action, service, err)
+		slog.ErrorContext(c.Request.Context(), fmt.Sprintf("proxmox service-action [%s/%s] %s %s: %v", conn.Name, node.NodeName, action, service, err))
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 		return
 	}
 
-	log.Printf("proxmox service-action [%s/%s] %s %s: upid=%s", conn.Name, node.NodeName, action, service, upid)
+	slog.InfoContext(c.Request.Context(), fmt.Sprintf("proxmox service-action [%s/%s] %s %s: upid=%s", conn.Name, node.NodeName, action, service, upid))
 	c.JSON(http.StatusOK, gin.H{"upid": upid})
 }

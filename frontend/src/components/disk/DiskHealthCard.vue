@@ -141,18 +141,31 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import apiClient from '../../api'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 import BadgePill from '../common/BadgePill.vue'
 
-const props = defineProps({
-  hostId: { type: String, required: true },
-  initialHealth: { type: Array, default: null },
+interface DiskHealth {
+  device: string
+  model?: string
+  serial_number?: string
+  smart_status: string
+  temperature: number
+  power_on_hours: number
+  realloc_sectors: number
+  pending_sectors: number
+}
+
+const props = withDefaults(defineProps<{
+  hostId: string
+  initialHealth?: DiskHealth[] | null
+}>(), {
+  initialHealth: null,
 })
 
-const health = ref(props.initialHealth || [])
+const health = ref<DiskHealth[]>(props.initialHealth || [])
 const loading = ref(!props.initialHealth)
 
 onMounted(async () => {
@@ -160,7 +173,7 @@ onMounted(async () => {
   await loadDiskHealth()
 })
 
-async function loadDiskHealth() {
+async function loadDiskHealth(): Promise<void> {
   try {
     loading.value = true
     const res = await apiClient.getDiskHealth(props.hostId)
@@ -172,7 +185,9 @@ async function loadDiskHealth() {
   }
 }
 
-function getStatusBadgeClass(status) {
+type Tone = 'success' | 'danger' | 'warning' | 'secondary'
+
+function getStatusBadgeClass(status: string): Tone {
   switch (status) {
     case 'PASSED': return 'success'
     case 'FAILED': return 'danger'
@@ -182,7 +197,7 @@ function getStatusBadgeClass(status) {
   }
 }
 
-function getCardClass(status) {
+function getCardClass(status: string): string {
   switch (status) {
     case 'FAILED': return 'bg-danger-lt border-danger'
     case 'UNKNOWN': return 'bg-warning-lt border-warning'

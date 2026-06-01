@@ -162,39 +162,57 @@
   </div>
 </template>
 
-<script setup>
-import { defineProps } from 'vue'
+<script setup lang="ts">
 import { formatBytes, formatUptime } from '../../utils/formatters'
 
-const props = defineProps({
-  node: { type: Object, required: true },
-  liveStatus: { type: Object, default: null },
-  liveStatusLoading: { type: Boolean, default: false },
-  liveStatusError: { type: String, default: '' },
-  liveStatusTime: { type: String, default: '' },
-})
+interface ProxmoxNode {
+  cpu_usage: number
+  cpu_count: number
+  mem_used: number
+  mem_total: number
+  uptime: number
+  vm_count: number
+  lxc_count: number
+}
 
-function cpuColor(val) {
+interface SwapInfo { used: number; total: number }
+interface FsInfo { used: number; total: number }
+
+interface LiveStatus {
+  wait: number
+  swap: SwapInfo
+  rootfs: FsInfo
+}
+
+defineProps<{
+  node: ProxmoxNode
+  liveStatus?: LiveStatus | null
+  liveStatusLoading?: boolean
+  liveStatusError?: string
+  liveStatusTime?: string
+}>()
+
+function cpuColor(val: number): string {
   if (val >= 0.8) return 'bg-danger'
   if (val >= 0.5) return 'bg-warning'
   return 'bg-success'
 }
 
-function ramColor(used, total) {
+function ramColor(used: number, total: number): string {
   const pct = used / total
   if (pct >= 0.8) return 'bg-danger'
   if (pct >= 0.5) return 'bg-warning'
   return 'bg-success'
 }
 
-function storageColor(used, total) {
+function storageColor(used: number, total: number): string {
   const pct = used / total
   if (pct >= 0.9) return 'bg-danger'
   if (pct >= 0.7) return 'bg-warning'
   return 'bg-success'
 }
 
-function memPct(node) {
+function memPct(node: ProxmoxNode): string | number {
   return node.mem_total ? ((node.mem_used / node.mem_total) * 100).toFixed(1) : 0
 }
 </script>

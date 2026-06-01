@@ -135,28 +135,46 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import apiClient from '../../api'
 
-const emit = defineEmits(['close', 'updated'])
+interface Host {
+  name?: string
+  hostname?: string
+  ip_address?: string
+  os?: string
+}
 
-const props = defineProps({
-  hostId: {
-    type: [String, Number],
-    required: true,
-  },
-  host: {
-    type: Object,
-    default: null,
-  },
+interface HostForm {
+  name: string
+  hostname: string
+  ip_address: string
+  os: string
+}
+
+interface RotateKeyResult {
+  api_key: string
+  [key: string]: unknown
+}
+
+const emit = defineEmits<{
+  (e: 'close'): void
+  (e: 'updated', data: unknown): void
+}>()
+
+const props = withDefaults(defineProps<{
+  hostId: string | number
+  host?: Host | null
+}>(), {
+  host: null,
 })
 
 const saving = ref(false)
 const editError = ref('')
-const editForm = ref({ name: '', hostname: '', ip_address: '', os: '' })
+const editForm = ref<HostForm>({ name: '', hostname: '', ip_address: '', os: '' })
 const rotateKeyLoading = ref(false)
-const rotateKeyResult = ref(null)
+const rotateKeyResult = ref<RotateKeyResult | null>(null)
 const rotateCopiedKey = ref(false)
 const rotateCopiedConfig = ref(false)
 
@@ -183,34 +201,34 @@ watch(
   { immediate: true }
 )
 
-async function saveEdit() {
+async function saveEdit(): Promise<void> {
   editError.value = ''
   saving.value = true
   try {
-    const res = await apiClient.updateHost(props.hostId, editForm.value)
+    const res = await apiClient.updateHost(String(props.hostId), editForm.value)
     emit('updated', res.data)
     emit('close')
-  } catch (e) {
-    editError.value = e.response?.data?.error || e.message
+  } catch (e: any) {
+    editError.value = e?.response?.data?.error || e?.message
   } finally {
     saving.value = false
   }
 }
 
-async function rotateHostKey() {
+async function rotateHostKey(): Promise<void> {
   rotateKeyLoading.value = true
   rotateKeyResult.value = null
   try {
-    const res = await apiClient.rotateHostKey(props.hostId)
+    const res = await apiClient.rotateHostKey(String(props.hostId))
     rotateKeyResult.value = res.data
-  } catch (e) {
-    console.error('Failed to rotate API key:', e.response?.data || e.message)
+  } catch (e: any) {
+    console.error('Failed to rotate API key:', e?.response?.data || e?.message)
   } finally {
     rotateKeyLoading.value = false
   }
 }
 
-async function copyRotatedKey() {
+async function copyRotatedKey(): Promise<void> {
   if (!rotateKeyResult.value?.api_key) return
   await navigator.clipboard.writeText(rotateKeyResult.value.api_key)
   rotateCopiedKey.value = true
@@ -219,7 +237,7 @@ async function copyRotatedKey() {
   }, 1500)
 }
 
-async function copyRotatedConfig() {
+async function copyRotatedConfig(): Promise<void> {
   if (!rotatedAgentConfig.value) return
   await navigator.clipboard.writeText(rotatedAgentConfig.value)
   rotateCopiedConfig.value = true

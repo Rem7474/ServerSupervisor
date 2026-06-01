@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -24,7 +24,7 @@ type NotificationPusher interface {
 func EvaluateAlerts(ctx context.Context, db *database.DB, cfg *config.Config, dispatcher *dispatch.Dispatcher, pusher NotificationPusher) {
 	rules, err := db.GetAlertRules(ctx)
 	if err != nil {
-		log.Printf("Alerts: failed to fetch rules: %v", err)
+		slog.ErrorContext(ctx, "alerts: failed to fetch rules", slog.Any("err", err))
 		return
 	}
 	if len(rules) == 0 {
@@ -33,7 +33,7 @@ func EvaluateAlerts(ctx context.Context, db *database.DB, cfg *config.Config, di
 
 	hosts, err := db.GetAllHosts(ctx)
 	if err != nil {
-		log.Printf("Alerts: failed to fetch hosts: %v", err)
+		slog.ErrorContext(ctx, "alerts: failed to fetch hosts", slog.Any("err", err))
 		return
 	}
 
@@ -43,9 +43,9 @@ func EvaluateAlerts(ctx context.Context, db *database.DB, cfg *config.Config, di
 		if !rule.Enabled {
 			resolvedCount, err := db.ResolveOpenAlertIncidentsByRule(ctx, rule.ID)
 			if err != nil {
-				log.Printf("Alerts: failed to resolve open incidents for disabled rule#%d: %v", rule.ID, err)
+				slog.ErrorContext(ctx, "alerts: failed to resolve open incidents for disabled rule", slog.Int64("rule_id", rule.ID), slog.Any("err", err))
 			} else if resolvedCount > 0 {
-				log.Printf("Alerts: disabled rule#%d resolved %d open incident(s)", rule.ID, resolvedCount)
+				slog.InfoContext(ctx, "alerts: disabled rule resolved open incidents", slog.Int64("rule_id", rule.ID), slog.Int64("resolved", resolvedCount))
 				broadcastIncidentUpdate(pusher, "resolved", rule, "")
 			}
 			continue
@@ -79,7 +79,7 @@ func EvaluateAlerts(ctx context.Context, db *database.DB, cfg *config.Config, di
 			// Get any open incident (regardless of severity)
 			inc, err := db.GetOpenAlertIncident(ctx, rule.ID, host.ID)
 			if err != nil && err != sql.ErrNoRows {
-				log.Printf("Alerts: failed to check incidents: %v", err)
+				slog.ErrorContext(ctx, "alerts: failed to check incidents", slog.Any("err", err))
 				continue
 			}
 
@@ -89,10 +89,10 @@ func EvaluateAlerts(ctx context.Context, db *database.DB, cfg *config.Config, di
 					// No existing incident - create new one with current severity
 					incID, err := db.CreateAlertIncident(ctx, rule.ID, host.ID, value, string(currentSeveration))
 					if err != nil {
-						log.Printf("Alerts: failed to create incident: %v", err)
+						slog.ErrorContext(ctx, "alerts: failed to create incident", slog.Any("err", err))
 						continue
 					}
-					log.Printf("Alerts: FIRED %s host=%s value=%.2f severity=%s → incident#%d created", ruleName, host.Name, value, currentSeveration, incID)
+					slog.InfoContext(ctx, "alerts: incident FIRED", slog.String("rule", ruleName), slog.String("host", host.Name), slog.Float64("value", value), slog.String("severity", string(currentSeveration)), slog.Int64("incident_id", incID))
 					details := fmt.Sprintf(`{"rule_id":%d,"metric":"%s","operator":"%s","value":%.4f,"severity":"%s"}`, rule.ID, rule.Metric, rule.Operator, value, currentSeveration)
 					_, _ = db.CreateAuditLog(ctx, "alert-engine", "alert_fired", host.ID, "", details, "success")
 					sendAlertNotifications(n, cfg, rule, host, value)
@@ -107,9 +107,9 @@ func EvaluateAlerts(ctx context.Context, db *database.DB, cfg *config.Config, di
 					hostChanged := inc.HostID != host.ID
 					if severityChanged || valueChanged || hostChanged {
 						if err := db.UpdateAlertIncidentContext(ctx, inc.ID, host.ID, value, string(currentSeveration)); err != nil {
-							log.Printf("Alerts: failed to update incident context for incident#%d: %v", inc.ID, err)
+							slog.ErrorContext(ctx, "alerts: failed to update incident context", slog.Int64("incident_id", inc.ID), slog.Any("err", err))
 						} else if severityChanged {
-							log.Printf("Alerts: UPDATED %s host=%s value=%.2f severity %s→%s incident#%d", ruleName, host.Name, value, inc.Severity, currentSeveration, inc.ID)
+							slog.InfoContext(ctx, "alerts: incident UPDATED", slog.String("rule", ruleName), slog.String("host", host.Name), slog.Float64("value", value), slog.String("severity_from", inc.Severity), slog.String("severity_to", string(currentSeveration)), slog.Int64("incident_id", inc.ID))
 						}
 					}
 				}
@@ -117,7 +117,7 @@ func EvaluateAlerts(ctx context.Context, db *database.DB, cfg *config.Config, di
 				// No alert triggered - resolve if one exists
 				if ShouldResolveAlertSeverity(rule, host, value, AlertSeverity(inc.Severity)) {
 					_ = db.ResolveAlertIncident(ctx, inc.ID)
-					log.Printf("Alerts: %s host=%s severity=%s — resolved incident#%d", ruleName, host.Name, inc.Severity, inc.ID)
+					slog.InfoContext(ctx, "alerts: incident resolved", slog.String("rule", ruleName), slog.String("host", host.Name), slog.String("severity", inc.Severity), slog.Int64("incident_id", inc.ID))
 					details := fmt.Sprintf(`{"rule_id":%d,"incident_id":%d,"severity":"%s"}`, rule.ID, inc.ID, inc.Severity)
 					_, _ = db.CreateAuditLog(ctx, "alert-engine", "alert_resolved", host.ID, "", details, "success")
 					broadcastIncidentUpdate(pusher, "resolved", rule, host.ID)
@@ -401,7 +401,7 @@ func proxmoxScopedRuleForSyntheticTarget(rule models.AlertRule, targetID string)
 func resolveStaleGlobalProxmoxIncidents(ctx context.Context, db *database.DB, rule models.AlertRule, evaluatedTargets map[string]struct{}) {
 	openIncidents, err := db.ListOpenAlertIncidentsByRule(ctx, rule.ID)
 	if err != nil {
-		log.Printf("Alerts: failed to list open incidents for stale cleanup rule#%d: %v", rule.ID, err)
+		slog.ErrorContext(ctx, "alerts: failed to list open incidents for stale cleanup", slog.Int64("rule_id", rule.ID), slog.Any("err", err))
 		return
 	}
 
@@ -413,7 +413,7 @@ func resolveStaleGlobalProxmoxIncidents(ctx context.Context, db *database.DB, ru
 			continue
 		}
 		if err := db.ResolveAlertIncident(ctx, inc.ID); err != nil {
-			log.Printf("Alerts: failed to resolve stale incident#%d for rule#%d: %v", inc.ID, rule.ID, err)
+			slog.ErrorContext(ctx, "alerts: failed to resolve stale incident", slog.Int64("incident_id", inc.ID), slog.Int64("rule_id", rule.ID), slog.Any("err", err))
 		}
 	}
 }

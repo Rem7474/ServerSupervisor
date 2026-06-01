@@ -83,7 +83,7 @@
       class="row row-cards mb-4"
     >
       <div
-        v-if="summary.nodes_down > 0"
+        v-if="(summary.nodes_down ?? 0) > 0"
         class="col-6 col-lg-3"
       >
         <div class="card card-sm h-100 border-danger">
@@ -98,7 +98,7 @@
         </div>
       </div>
       <div
-        v-if="summary.storage_near_full > 0"
+        v-if="(summary.storage_near_full ?? 0) > 0"
         class="col-6 col-lg-3"
       >
         <div class="card card-sm h-100 border-warning">
@@ -113,7 +113,7 @@
         </div>
       </div>
       <div
-        v-if="summary.storage_offline > 0"
+        v-if="(summary.storage_offline ?? 0) > 0"
         class="col-6 col-lg-3"
       >
         <div class="card card-sm h-100 border-danger">
@@ -128,7 +128,7 @@
         </div>
       </div>
       <div
-        v-if="summary.recent_failed_tasks > 0"
+        v-if="(summary.recent_failed_tasks ?? 0) > 0"
         class="col-6 col-lg-3"
       >
         <div class="card card-sm h-100 border-warning">
@@ -343,11 +343,11 @@
                   >
                     <div
                       class="progress-bar"
-                      :class="cpuColor(node.cpu_usage)"
-                      :style="`width:${(node.cpu_usage * 100).toFixed(1)}%`"
+                      :class="cpuColor(node.cpu_usage ?? 0)"
+                      :style="`width:${((node.cpu_usage ?? 0) * 100).toFixed(1)}%`"
                     />
                   </div>
-                  <span class="text-muted small">{{ (node.cpu_usage * 100).toFixed(1) }}%</span>
+                  <span class="text-muted small">{{ ((node.cpu_usage ?? 0) * 100).toFixed(1) }}%</span>
                 </div>
               </td>
               <td>
@@ -358,7 +358,7 @@
                   >
                     <div
                       class="progress-bar"
-                      :class="ramColor(node.mem_used, node.mem_total)"
+                      :class="ramColor(node.mem_used ?? 0, node.mem_total ?? 0)"
                       :style="`width:${memPct(node)}%`"
                     />
                   </div>
@@ -400,26 +400,48 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import SortableHeader from '../components/common/SortableHeader.vue'
 import api from '../api'
 
+interface ProxmoxSummary {
+  nodes_down?: number
+  storage_near_full?: number
+  storage_offline?: number
+  recent_failed_tasks?: number
+  [key: string]: any
+}
+
+interface ProxmoxNode {
+  id: string
+  node_name: string
+  cluster_name?: string
+  status?: string
+  connection_id?: string
+  cpu_usage?: number
+  cpu_count?: number
+  mem_used?: number
+  mem_total?: number
+  last_seen_at?: string
+  [key: string]: any
+}
+
 const auth = useAuthStore()
 
-const summary = ref({})
-const nodes = ref([])
-const instances = ref([])
+const summary = ref<ProxmoxSummary>({})
+const nodes = ref<ProxmoxNode[]>([])
+const instances = ref<any[]>([])
 const filterConnection = ref('')
 const loading = ref(true)
 const error = ref('')
-const nodeSortKey = ref('node_name')
-const nodeSortDir = ref('asc')
+const nodeSortKey = ref<string>('node_name')
+const nodeSortDir = ref<'asc' | 'desc'>('asc')
 
 const filteredNodes = computed(() =>
   filterConnection.value
-    ? nodes.value.filter(n => n.connection_id === filterConnection.value)
+    ? nodes.value.filter((n) => n.connection_id === filterConnection.value)
     : nodes.value
 )
 
@@ -427,8 +449,8 @@ const sortedNodes = computed(() => {
   const list = [...filteredNodes.value]
   const dir = nodeSortDir.value === 'asc' ? 1 : -1
   list.sort((a, b) => {
-    let aVal
-    let bVal
+    let aVal: number | string
+    let bVal: number | string
     switch (nodeSortKey.value) {
       case 'node_name':
       case 'cluster_name':
@@ -452,7 +474,7 @@ const sortedNodes = computed(() => {
   return list
 })
 
-function toggleNodeSort(key) {
+function toggleNodeSort(key: string): void {
   if (nodeSortKey.value === key) {
     nodeSortDir.value = nodeSortDir.value === 'asc' ? 'desc' : 'asc'
     return
@@ -468,7 +490,7 @@ const hasHealthAlerts = computed(() =>
   (summary.value.recent_failed_tasks ?? 0) > 0
 )
 
-async function load() {
+async function load(): Promise<void> {
   loading.value = true
   error.value = ''
   try {
@@ -479,13 +501,11 @@ async function load() {
     ])
     if (sumRes.status === 'fulfilled') summary.value = sumRes.value.data
     if (nodesRes.status === 'fulfilled') nodes.value = nodesRes.value.data
-    // getProxmoxInstances() is admin-only — silently skip on 403
     if (instRes.status === 'fulfilled') {
       instances.value = instRes.value.data
     } else if (instRes.reason?.response?.status !== 403) {
       error.value = instRes.reason?.response?.data?.error || 'Erreur lors du chargement.'
     }
-    // Surface non-403 errors from summary/nodes
     if (sumRes.status === 'rejected' && sumRes.reason?.response?.status !== 403) {
       error.value = sumRes.reason?.response?.data?.error || 'Erreur lors du chargement.'
     }
@@ -497,18 +517,18 @@ async function load() {
   }
 }
 
-function memPct(node) {
+function memPct(node: ProxmoxNode): string | number {
   if (!node.mem_total) return 0
-  return ((node.mem_used / node.mem_total) * 100).toFixed(1)
+  return (((node.mem_used || 0) / node.mem_total) * 100).toFixed(1)
 }
 
-function cpuColor(usage) {
+function cpuColor(usage: number): string {
   if (usage > 0.85) return 'bg-danger'
   if (usage > 0.6) return 'bg-warning'
   return 'bg-success'
 }
 
-function ramColor(used, total) {
+function ramColor(used: number, total: number): string {
   if (!total) return 'bg-secondary'
   const pct = used / total
   if (pct > 0.85) return 'bg-danger'
@@ -516,7 +536,7 @@ function ramColor(used, total) {
   return 'bg-success'
 }
 
-function formatBytes(bytes) {
+function formatBytes(bytes: number | undefined): string {
   if (!bytes) return '0 B'
   const units = ['B', 'Ko', 'Mo', 'Go', 'To']
   let i = 0
@@ -525,7 +545,7 @@ function formatBytes(bytes) {
   return `${v.toFixed(i === 0 ? 0 : 1)} ${units[i]}`
 }
 
-function formatDate(iso) {
+function formatDate(iso: string | undefined): string {
   if (!iso) return '—'
   return new Date(iso).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
 }

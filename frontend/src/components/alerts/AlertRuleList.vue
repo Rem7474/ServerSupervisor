@@ -77,10 +77,10 @@
               <div class="d-flex align-items-center gap-2">
                 <span class="fw-bold">{{ rule.name || 'Sans nom' }}</span>
                 <span
-                  v-if="rule.active_incident_count > 0"
+                  v-if="(rule.active_incident_count ?? 0) > 0"
                   class="badge bg-red-lt text-red"
-                  :title="`${rule.active_incident_count} incident${rule.active_incident_count > 1 ? 's' : ''} actif${rule.active_incident_count > 1 ? 's' : ''}`"
-                >{{ rule.active_incident_count }} actif{{ rule.active_incident_count > 1 ? 's' : '' }}</span>
+                  :title="`${rule.active_incident_count} incident${(rule.active_incident_count ?? 0) > 1 ? 's' : ''} actif${(rule.active_incident_count ?? 0) > 1 ? 's' : ''}`"
+                >{{ rule.active_incident_count }} actif{{ (rule.active_incident_count ?? 0) > 1 ? 's' : '' }}</span>
               </div>
               <div
                 v-if="rule.last_fired"
@@ -201,92 +201,128 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import EmptyState from '../EmptyState.vue'
 import { formatDurationSecs } from '../../utils/formatters'
 import { getAlertMetricMeta } from '../../utils/alertMetrics'
 
-const CHANNEL_LABELS = { browser: 'Navigateur', smtp: 'Email', ntfy: 'Ntfy', notify: 'Système' }
-const CHANNEL_BADGE_CLASSES = {
+interface Host {
+  id: string
+  name?: string
+}
+
+interface ProxmoxScope {
+  scope_mode?: string
+  connection_id?: string | number
+  node_id?: string | number
+  guest_id?: string | number
+  storage_id?: string | number
+  disk_id?: string | number
+}
+
+interface CommandTrigger {
+  module: string
+  action: string
+  target?: string
+}
+
+interface AlertActions {
+  channels?: string[]
+  command_trigger?: CommandTrigger | null
+}
+
+interface AlertRule {
+  id: string | number
+  name?: string
+  enabled?: boolean
+  host_id?: string
+  source_type?: string
+  metric: string
+  operator: string
+  threshold_warn?: number
+  threshold_crit?: number
+  threshold_clear_warn?: number | null
+  threshold_clear_crit?: number | null
+  duration_seconds?: number
+  active_incident_count?: number
+  last_fired?: string
+  actions?: AlertActions
+  proxmox_scope?: ProxmoxScope
+}
+
+const CHANNEL_LABELS: Record<string, string> = { browser: 'Navigateur', smtp: 'Email', ntfy: 'Ntfy', notify: 'Système' }
+const CHANNEL_BADGE_CLASSES: Record<string, string> = {
   browser: 'bg-green-lt text-green',
   smtp: 'bg-azure-lt text-azure',
   ntfy: 'bg-azure-lt text-azure',
   notify: 'bg-purple-lt text-purple',
 }
 
-function channelLabel(channel) {
+function channelLabel(channel: string): string {
   return CHANNEL_LABELS[channel] || channel
 }
 
-function channelBadgeClass(channel) {
+function channelBadgeClass(channel: string): string {
   return CHANNEL_BADGE_CLASSES[channel] || 'bg-azure-lt text-azure'
 }
 
-const props = defineProps({
-  rules: {
-    type: Array,
-    default: () => [],
-  },
-  hosts: {
-    type: Array,
-    default: () => [],
-  },
-  loading: {
-    type: Boolean,
-    default: false,
-  },
-  // fetched = true une fois que le premier fetch a abouti (succès ou erreur)
-  fetched: {
-    type: Boolean,
-    default: false,
-  },
-  error: {
-    type: String,
-    default: '',
-  },
-  formatDate: {
-    type: Function,
-    required: true,
-  },
+const props = withDefaults(defineProps<{
+  rules?: AlertRule[]
+  hosts?: Host[]
+  loading?: boolean
+  fetched?: boolean
+  error?: string
+  formatDate: (d: string | undefined) => string
+}>(), {
+  rules: () => [],
+  hosts: () => [],
+  loading: false,
+  fetched: false,
+  error: '',
 })
 
-defineEmits(['add', 'edit', 'toggle', 'delete'])
+defineEmits<{
+  (e: 'add'): void
+  (e: 'edit', rule: AlertRule): void
+  (e: 'toggle', rule: AlertRule): void
+  (e: 'delete', rule: AlertRule): void
+}>()
 
-function getHostName(hostId) {
+function getHostName(hostId: string | undefined): string | undefined {
   return hostId
     ? (Array.isArray(props.hosts) ? props.hosts.find((host) => host.id === hostId)?.name || hostId : hostId)
     : hostId
 }
 
-function getMetricLabel(metric) {
+function getMetricLabel(metric: string): string {
   return getAlertMetricMeta(metric).label
 }
 
-function getMetricBadgeClass(metric) {
+function getMetricBadgeClass(metric: string): string {
   return getAlertMetricMeta(metric).badgeClass
 }
 
-function getMetricUnit(metric) {
+function getMetricUnit(metric: string): string {
   return getAlertMetricMeta(metric).unit
 }
 
-function formatClearThreshold(rule, value) {
+function formatClearThreshold(rule: AlertRule, value: number): string {
   return `${rule.operator} ${value}${getMetricUnit(rule.metric)}`
 }
 
-function autoHysteresisHint(rule, level) {
+function autoHysteresisHint(_rule: AlertRule, level: 'warn' | 'crit'): string {
   if (level === 'crit') {
     return 'auto : résolution quand la condition crit n\'est plus vraie'
   }
   return 'auto : résolution quand aucune condition n\'est vraie'
 }
 
-function ruleSourceType(rule) {
+function ruleSourceType(rule: AlertRule): string {
   if (rule?.source_type) return rule.source_type
   return String(rule?.metric || '').startsWith('proxmox_') ? 'proxmox' : 'agent'
 }
 
-function proxmoxScopeLabel(rule) {
+function proxmoxScopeLabel(rule: AlertRule): string {
   const scope = rule?.proxmox_scope
   if (!scope || !scope.scope_mode || scope.scope_mode === 'global') return 'Proxmox › Cluster'
   if (scope.scope_mode === 'connection') return `Proxmox › Connexion ${scope.connection_id || ''}`.trim()

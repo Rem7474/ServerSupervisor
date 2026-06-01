@@ -9,7 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"path/filepath"
 	"strconv"
@@ -105,7 +105,7 @@ func (h *GitWebhookHandler) CreateWebhook(c *gin.Context) {
 
 	created, err := h.db.CreateGitWebhook(c.Request.Context(), req)
 	if err != nil {
-		log.Printf("CreateWebhook: db error: %v", err)
+		slog.ErrorContext(c.Request.Context(), fmt.Sprintf("CreateWebhook: db error: %v", err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create webhook"})
 		return
 	}
@@ -234,7 +234,7 @@ func (h *GitWebhookHandler) ReceiveWebhook(c *gin.Context) {
 
 	// Verify signature
 	if !verifyWebhookSignature(wh.Provider, wh.Secret, body, c.Request.Header) {
-		log.Printf("Webhook %s: signature verification failed (IP: %s)", id, c.ClientIP())
+		slog.ErrorContext(c.Request.Context(), fmt.Sprintf("Webhook %s: signature verification failed (IP: %s)", id, c.ClientIP()))
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid signature"})
 		return
 	}
@@ -256,7 +256,7 @@ func (h *GitWebhookHandler) ReceiveWebhook(c *gin.Context) {
 
 	parsed, err := parseGitPayload(wh.Provider, body, eventHeader)
 	if err != nil {
-		log.Printf("Webhook %s: failed to parse payload: %v", id, err)
+		slog.ErrorContext(c.Request.Context(), fmt.Sprintf("Webhook %s: failed to parse payload: %v", id, err))
 		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to parse git payload"})
 		return
 	}
@@ -317,7 +317,7 @@ func (h *GitWebhookHandler) ReceiveWebhook(c *gin.Context) {
 	}
 	createdExec, err := h.db.CreateWebhookExecution(c.Request.Context(), exec)
 	if err != nil {
-		log.Printf("Webhook %s: failed to create execution record: %v", id, err)
+		slog.ErrorContext(c.Request.Context(), fmt.Sprintf("Webhook %s: failed to create execution record: %v", id, err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create execution"})
 		return
 	}
@@ -353,7 +353,7 @@ func (h *GitWebhookHandler) ReceiveWebhook(c *gin.Context) {
 		},
 	})
 	if err != nil {
-		log.Printf("Webhook %s: failed to create remote command: %v", id, err)
+		slog.ErrorContext(c.Request.Context(), fmt.Sprintf("Webhook %s: failed to create remote command: %v", id, err))
 		_ = h.db.UpdateWebhookExecutionStatus(c.Request.Context(), createdExec.ID, "failed", ptrNow())
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to dispatch command"})
 		return
@@ -363,8 +363,8 @@ func (h *GitWebhookHandler) ReceiveWebhook(c *gin.Context) {
 	_ = h.db.UpdateWebhookExecutionCommandID(c.Request.Context(), createdExec.ID, result.Command.ID)
 	_ = h.db.UpdateGitWebhookLastTriggered(c.Request.Context(), id)
 
-	log.Printf("Webhook %s: dispatched command %s → host %s task %s (repo=%s branch=%s)",
-		id, result.Command.ID, wh.HostID, wh.CustomTaskID, parsed.RepoName, parsed.Branch)
+	slog.InfoContext(c.Request.Context(), fmt.Sprintf("Webhook %s: dispatched command %s → host %s task %s (repo=%s branch=%s)",
+		id, result.Command.ID, wh.HostID, wh.CustomTaskID, parsed.RepoName, parsed.Branch))
 
 	c.JSON(http.StatusOK, gin.H{
 		"status":       "dispatched",
@@ -419,7 +419,7 @@ func (h *GitWebhookHandler) NotifyWebhookExecutionComplete(commandID, status str
 				continue
 			}
 			if err := n.SendSMTP(h.cfg, h.cfg.SMTPFrom, to, subject, msg); err != nil {
-				log.Printf("Webhook SMTP send: %v", err)
+				slog.ErrorContext(ctx, fmt.Sprintf("Webhook SMTP send: %v", err))
 			}
 
 		case "ntfy":
@@ -428,7 +428,7 @@ func (h *GitWebhookHandler) NotifyWebhookExecutionComplete(commandID, status str
 				continue
 			}
 			if err := n.SendNtfy(h.cfg, ntfyURL, subject, msg); err != nil {
-				log.Printf("Webhook notify ntfy: %v", err)
+				slog.ErrorContext(ctx, fmt.Sprintf("Webhook notify ntfy: %v", err))
 			}
 
 		case "browser":

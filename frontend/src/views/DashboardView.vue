@@ -131,7 +131,7 @@
     </div>
 
     <div
-      v-if="proxmoxSummary && (proxmoxSummary.nodes_down > 0 || proxmoxSummary.recent_failed_tasks > 0 || proxmoxSummary.storage_near_full > 0 || proxmoxSummary.storage_offline > 0)"
+      v-if="proxmoxSummary && ((proxmoxSummary.nodes_down ?? 0) > 0 || (proxmoxSummary.recent_failed_tasks ?? 0) > 0 || (proxmoxSummary.storage_near_full ?? 0) > 0 || (proxmoxSummary.storage_offline ?? 0) > 0)"
       class="alert alert-warning mb-3 d-flex align-items-center gap-3"
     >
       <AppIcon
@@ -144,10 +144,10 @@
           Alertes Proxmox
         </div>
         <div class="text-secondary small d-flex flex-wrap gap-2">
-          <span v-if="proxmoxSummary.nodes_down > 0">{{ proxmoxSummary.nodes_down }} nœud{{ proxmoxSummary.nodes_down > 1 ? 's' : '' }} hors ligne</span>
-          <span v-if="proxmoxSummary.storage_near_full > 0">{{ proxmoxSummary.storage_near_full }} stockage{{ proxmoxSummary.storage_near_full > 1 ? 's' : '' }} presque plein{{ proxmoxSummary.storage_near_full > 1 ? 's' : '' }}</span>
-          <span v-if="proxmoxSummary.storage_offline > 0">{{ proxmoxSummary.storage_offline }} stockage{{ proxmoxSummary.storage_offline > 1 ? 's' : '' }} hors ligne</span>
-          <span v-if="proxmoxSummary.recent_failed_tasks > 0">{{ proxmoxSummary.recent_failed_tasks }} tâche{{ proxmoxSummary.recent_failed_tasks > 1 ? 's' : '' }} échouée{{ proxmoxSummary.recent_failed_tasks > 1 ? 's' : '' }} (24h)</span>
+          <span v-if="(proxmoxSummary.nodes_down ?? 0) > 0">{{ proxmoxSummary.nodes_down }} nœud{{ (proxmoxSummary.nodes_down ?? 0) > 1 ? 's' : '' }} hors ligne</span>
+          <span v-if="(proxmoxSummary.storage_near_full ?? 0) > 0">{{ proxmoxSummary.storage_near_full }} stockage{{ (proxmoxSummary.storage_near_full ?? 0) > 1 ? 's' : '' }} presque plein{{ (proxmoxSummary.storage_near_full ?? 0) > 1 ? 's' : '' }}</span>
+          <span v-if="(proxmoxSummary.storage_offline ?? 0) > 0">{{ proxmoxSummary.storage_offline }} stockage{{ (proxmoxSummary.storage_offline ?? 0) > 1 ? 's' : '' }} hors ligne</span>
+          <span v-if="(proxmoxSummary.recent_failed_tasks ?? 0) > 0">{{ proxmoxSummary.recent_failed_tasks }} tâche{{ (proxmoxSummary.recent_failed_tasks ?? 0) > 1 ? 's' : '' }} échouée{{ (proxmoxSummary.recent_failed_tasks ?? 0) > 1 ? 's' : '' }} (24h)</span>
         </div>
       </div>
       <router-link
@@ -166,8 +166,7 @@
     />
     <DashboardKPIs
       v-else
-      :cve-summary="cveSummary"
-      :cve-timestamp-text="cveTimestampText"
+      :cve-summary="(cveSummary as any)"
     />
 
     <!-- ─── Cluster Proxmox (conditionnel) ──────────────────────────────────── -->
@@ -178,7 +177,7 @@
     />
     <ProxmoxClusterCard
       v-else-if="hasProxmox && proxmoxNodes.length"
-      :nodes="proxmoxNodes"
+      :nodes="(proxmoxNodes as any)"
     />
 
     <!-- ─── Graphiques de tendance ───────────────────────────────────────────── -->
@@ -238,8 +237,8 @@
         </div>
         <Line
           v-else-if="summaryChartData"
-          :data="summaryChartData"
-          :options="summaryChartOptions"
+          :data="(summaryChartData as any)"
+          :options="(summaryChartOptions as any)"
           class="h-100"
         />
         <div
@@ -418,9 +417,9 @@
                   </div>
                 </td>
                 <td class="status-col">
-                  <span :class="hostStatusClass(host.status)">
+                  <span :class="hostStatusClass(host.status || '')">
                     <span :class="['status-dot', host.status === 'online' ? 'status-dot-animated' : '']" />
-                    {{ formatHostStatus(host.status) }}
+                    {{ formatHostStatus(host.status || '') }}
                   </span>
                 </td>
                 <td>
@@ -436,7 +435,7 @@
                     :class="cpuColor(effectiveMetricsByHost[host.id]?.cpu)"
                     :title="effectiveMetricsByHost[host.id]?.source === 'proxmox' ? 'proxmox' : ''"
                   >
-                    {{ effectiveMetricsByHost[host.id]?.cpu != null ? effectiveMetricsByHost[host.id].cpu.toFixed(1) + '%' : '-' }}
+                    {{ effectiveMetricsByHost[host.id]?.cpu != null ? effectiveMetricsByHost[host.id]!.cpu!.toFixed(1) + '%' : '-' }}
                   </span>
                 </td>
                 <td>
@@ -444,7 +443,7 @@
                     :class="memColor(effectiveMetricsByHost[host.id]?.memPct)"
                     :title="effectiveMetricsByHost[host.id]?.source === 'proxmox' ? 'proxmox' : ''"
                   >
-                    {{ effectiveMetricsByHost[host.id]?.memPct != null ? effectiveMetricsByHost[host.id].memPct.toFixed(1) + '%' : '-' }}
+                    {{ effectiveMetricsByHost[host.id]?.memPct != null ? effectiveMetricsByHost[host.id]!.memPct!.toFixed(1) + '%' : '-' }}
                   </span>
                 </td>
                 <td>
@@ -464,7 +463,7 @@
                 </td>
                 <td>{{ hostMetrics[host.id] ? formatUptime(hostMetrics[host.id].uptime) : '-' }}</td>
                 <td class="last-activity-col">
-                  <RelativeTime :date="host.last_seen" />
+                  <RelativeTime :date="(host.last_seen as any) || ''" />
                 </td>
               </tr>
               <tr v-if="hosts.length > 0 && sortedHosts.length === 0">
@@ -515,11 +514,11 @@
     </div>
 
     <!-- ─── Versions Docker (collapsible) ───────────────────────────────────── -->
-    <DashboardDockerVersions :versions="versionComparisons" />
+    <DashboardDockerVersions :versions="(versionComparisons as any)" />
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import RelativeTime from '../components/RelativeTime.vue'
 import WsStatusBar from '../components/WsStatusBar.vue'
@@ -573,7 +572,6 @@ const {
   retryCount,
   dataStaleAlert,
   reconnect,
-  effectiveMetrics,
   effectiveMetricsByHost,
   sortedHosts,
   summaryChartOptions,
@@ -586,11 +584,10 @@ const {
   cpuColor,
   memColor,
   diskColor,
-  isAgentUpToDate,
 } = useDashboard()
 
-const proxmoxLinkByHostId = computed(() => {
-  const map = {}
+const proxmoxLinkByHostId = computed<Record<string, any>>(() => {
+  const map: Record<string, any> = {}
   for (const link of proxmoxLinks.value || []) {
     if (!link?.host_id || !link?.guest_id) continue
     map[link.host_id] = link
@@ -598,7 +595,7 @@ const proxmoxLinkByHostId = computed(() => {
   return map
 })
 
-function proxmoxGuestPath(hostId) {
+function proxmoxGuestPath(hostId: string): string {
   const link = proxmoxLinkByHostId.value[hostId]
   if (!link || !link.guest_id || link.status === 'ignored') return ''
   return `/proxmox/guests/${link.guest_id}`
@@ -617,11 +614,11 @@ const paginatedHosts = computed(() => {
   return sortedHosts.value.slice(start, start + hostsPerPage)
 })
 
-function setHostPage(page) {
+function setHostPage(page: number): void {
   currentHostPage.value = page
 }
 
-function toggleSort(key) {
+function toggleSort(key: string): void {
   if (sortKey.value === key) {
     sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
     return
@@ -645,9 +642,9 @@ watch(totalHostPages, (pages) => {
 // card is actually scrolled into view. The card is above the fold for most
 // users, so the observer fires almost immediately — but on smaller viewports
 // or when the user scrolls past quickly, we skip the work entirely.
-const chartContainerRef = ref(null)
+const chartContainerRef = ref<HTMLElement | null>(null)
 const chartVisible = ref(false)
-let chartObserver = null
+let chartObserver: IntersectionObserver | null = null
 
 onMounted(() => {
   if (typeof IntersectionObserver === 'undefined' || !chartContainerRef.value) {

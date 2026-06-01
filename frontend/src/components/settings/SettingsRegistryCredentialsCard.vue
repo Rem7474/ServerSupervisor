@@ -153,33 +153,49 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import api from '../../api/index.js'
+import api from '../../api/index'
 
-const props = defineProps({
-  authIsAdmin: { type: Boolean, default: false },
+interface Credential {
+  id: string
+  name: string
+  registry_host: string
+  username: string
+}
+
+interface CredentialForm {
+  name: string
+  registry_host: string
+  username: string
+  password: string
+}
+
+withDefaults(defineProps<{
+  authIsAdmin?: boolean
+}>(), {
+  authIsAdmin: false,
 })
 
-const credentials = ref([])
+const credentials = ref<Credential[]>([])
 const showForm = ref(false)
-const editingId = ref(null)
+const editingId = ref<string | null>(null)
 const saving = ref(false)
 const formMsg = ref('')
 const formOk = ref(false)
 const listMsg = ref('')
 const listOk = ref(false)
 
-const emptyForm = () => ({
+const emptyForm = (): CredentialForm => ({
   name: '',
   registry_host: '',
   username: '',
   password: '',
 })
 
-const form = ref(emptyForm())
+const form = ref<CredentialForm>(emptyForm())
 
-async function load() {
+async function load(): Promise<void> {
   try {
     const res = await api.getRegistryCredentials()
     credentials.value = Array.isArray(res.data?.credentials) ? res.data.credentials : []
@@ -188,14 +204,14 @@ async function load() {
   }
 }
 
-function openAddForm() {
+function openAddForm(): void {
   editingId.value = null
   form.value = emptyForm()
   formMsg.value = ''
   showForm.value = true
 }
 
-function openEditForm(cred) {
+function openEditForm(cred: Credential): void {
   editingId.value = cred.id
   form.value = {
     name: cred.name,
@@ -207,13 +223,13 @@ function openEditForm(cred) {
   showForm.value = true
 }
 
-function cancelForm() {
+function cancelForm(): void {
   showForm.value = false
   formMsg.value = ''
   editingId.value = null
 }
 
-async function save() {
+async function save(): Promise<void> {
   if (!form.value.name || !form.value.registry_host || !form.value.username) {
     formMsg.value = 'Nom, hôte et utilisateur sont obligatoires.'
     formOk.value = false
@@ -237,7 +253,7 @@ async function save() {
     await load()
     showForm.value = false
     editingId.value = null
-  } catch (e) {
+  } catch (e: any) {
     formMsg.value = e?.response?.data?.error || "Erreur lors de l'enregistrement."
     formOk.value = false
   } finally {
@@ -245,14 +261,14 @@ async function save() {
   }
 }
 
-async function remove(cred) {
+async function remove(cred: Credential): Promise<void> {
   if (!confirm(`Supprimer l'identifiant « ${cred.name} » ? Les trackers qui l'utilisent repasseront en accès public.`)) return
   try {
     await api.deleteRegistryCredential(cred.id)
     await load()
     listMsg.value = 'Identifiant supprimé.'
     listOk.value = true
-  } catch (e) {
+  } catch (e: any) {
     listMsg.value = e?.response?.data?.error || 'Erreur lors de la suppression.'
     listOk.value = false
   }

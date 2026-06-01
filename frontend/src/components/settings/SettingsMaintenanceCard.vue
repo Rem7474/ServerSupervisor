@@ -171,51 +171,45 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref } from 'vue'
 
-defineProps({
-  settings: {
-    type: Object,
-    required: true,
-  },
-  cleaningMetrics: {
-    type: Boolean,
-    default: false,
-  },
-  cleanMessage: {
-    type: String,
-    default: '',
-  },
-  cleanSuccess: {
-    type: Boolean,
-    default: false,
-  },
-  cleaningAuditLogs: {
-    type: Boolean,
-    default: false,
-  },
-  auditCleanMessage: {
-    type: String,
-    default: '',
-  },
-  auditCleanSuccess: {
-    type: Boolean,
-    default: false,
-  },
+interface Settings {
+  metricsRetentionDays: number
+  auditRetentionDays: number
+}
+
+withDefaults(defineProps<{
+  settings: Settings
+  cleaningMetrics?: boolean
+  cleanMessage?: string
+  cleanSuccess?: boolean
+  cleaningAuditLogs?: boolean
+  auditCleanMessage?: string
+  auditCleanSuccess?: boolean
+}>(), {
+  cleaningMetrics: false,
+  cleanMessage: '',
+  cleanSuccess: false,
+  cleaningAuditLogs: false,
+  auditCleanMessage: '',
+  auditCleanSuccess: false,
 })
 
-const emit = defineEmits(['clean-metrics', 'clean-audit'])
+const emit = defineEmits<{
+  (e: 'clean-metrics'): void
+  (e: 'clean-audit'): void
+}>()
 
 const showCleanMetricsModal = ref(false)
 const showCleanAuditModal = ref(false)
 
-function confirmCleanMetrics() {
+function confirmCleanMetrics(): void {
   showCleanMetricsModal.value = false
   emit('clean-metrics')
 }
 
-function confirmCleanAudit() {
+function confirmCleanAudit(): void {
   showCleanAuditModal.value = false
   emit('clean-audit')
 }

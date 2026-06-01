@@ -5,7 +5,7 @@ package scheduler
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -48,14 +48,14 @@ func (s *TaskScheduler) Start(ctx context.Context) {
 	s.ctx = ctx
 	tasks, err := s.db.GetAllScheduledTasks(ctx)
 	if err != nil {
-		log.Printf("[scheduler] failed to load tasks: %v", err)
+		slog.ErrorContext(ctx, "scheduler: failed to load tasks", slog.Any("err", err))
 	} else {
 		for _, t := range tasks {
 			if err := s.add(t); err != nil {
-				log.Printf("[scheduler] failed to register task %s (%s): %v", t.ID, t.Name, err)
+				slog.ErrorContext(ctx, "scheduler: failed to register task", slog.String("task_id", t.ID), slog.String("task_name", t.Name), slog.Any("err", err))
 			}
 		}
-		log.Printf("[scheduler] started with %d task(s)", len(tasks))
+		slog.InfoContext(ctx, "scheduler started", slog.Int("tasks", len(tasks)))
 	}
 	s.c.Start()
 }
@@ -133,20 +133,20 @@ func (s *TaskScheduler) makeJob(t models.ScheduledTask) func() {
 			TriggeredBy: "scheduler",
 		})
 		if err != nil {
-			log.Printf("[scheduler] task %s (%s): failed to create command: %v", t.ID, t.Name, err)
+			slog.ErrorContext(s.ctx, "scheduler: failed to create command", slog.String("task_id", t.ID), slog.String("task_name", t.Name), slog.Any("err", err))
 			now := time.Now()
 			next := s.NextRun(t.ID)
 			_ = s.db.UpdateScheduledTaskRun(s.ctx, t.ID, "failed", now, next)
 			return
 		}
 		if err := s.db.LinkCommandToScheduledTask(s.ctx, result.Command.ID, t.ID); err != nil {
-			log.Printf("[scheduler] task %s: failed to link command: %v", t.ID, err)
+			slog.ErrorContext(s.ctx, "scheduler: failed to link command", slog.String("task_id", t.ID), slog.Any("err", err))
 		}
 		now := time.Now()
 		next := s.NextRun(t.ID)
 		if err := s.db.UpdateScheduledTaskRun(s.ctx, t.ID, "pending", now, next); err != nil {
-			log.Printf("[scheduler] task %s: failed to update run metadata: %v", t.ID, err)
+			slog.ErrorContext(s.ctx, "scheduler: failed to update run metadata", slog.String("task_id", t.ID), slog.Any("err", err))
 		}
-		log.Printf("[scheduler] task %s (%s): queued command %s on host %s", t.ID, t.Name, result.Command.ID, t.HostID)
+		slog.InfoContext(s.ctx, "scheduler queued command", slog.String("task_id", t.ID), slog.String("task_name", t.Name), slog.String("command_id", result.Command.ID), slog.String("host_id", t.HostID))
 	}
 }

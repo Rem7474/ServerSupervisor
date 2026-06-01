@@ -555,7 +555,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import apiClient from '../api'
@@ -570,7 +570,7 @@ const auth = useAuthStore()
 const activeTab = ref('profil')
 const showConsole = ref(false)
 
-const profile = ref(null)
+const profile = ref<any>(null)
 
 const pwForm = ref({ current: '', next: '', confirm: '' })
 const pwErrors = ref({ current: '', next: '', confirm: '' })
@@ -621,50 +621,48 @@ watch(() => pwForm.value.confirm, (val) => {
 })
 
 // Commands history
-const allCommands = ref([])
+const allCommands = ref<any[]>([])
 const cmdsLoading = ref(false)
 const myCommands = computed(() =>
-  allCommands.value.filter(c => c.triggered_by === auth.username).slice(0, 50)
+  allCommands.value.filter((c: any) => c.triggered_by === auth.username).slice(0, 50)
 )
 
-// Login events
-const loginEvents = ref([])
+const loginEvents = ref<any[]>([])
 const loginEventsLoading = ref(false)
 const loginEventsLoaded = ref(false)
 
-// Log viewer
-const selectedCmd = ref(null)
+const selectedCmd = ref<any>(null)
 
 const { openCommandStream, closeStream } = useCommandStream()
 const { getStatusBadgeClass } = useStatusBadge()
 
 const roleBadgeClass = computed(() => {
-  const map = { admin: 'bg-danger-lt text-danger', operator: 'bg-warning-lt text-warning', viewer: 'bg-secondary-lt text-secondary' }
+  const map: Record<string, string> = { admin: 'bg-danger-lt text-danger', operator: 'bg-warning-lt text-warning', viewer: 'bg-secondary-lt text-secondary' }
   return map[profile.value?.role] || 'bg-secondary-lt text-secondary'
 })
 
 const roleLabel = computed(() => {
-  const map = { admin: 'Administrateur', operator: 'Opérateur', viewer: 'Lecteur' }
+  const map: Record<string, string> = { admin: 'Administrateur', operator: 'Opérateur', viewer: 'Lecteur' }
   return map[profile.value?.role] || profile.value?.role || auth.role
 })
 
-function formatDuration(startedAt, endedAt) {
+function formatDuration(startedAt: string | undefined, endedAt: string | undefined): string {
   if (!startedAt || !endedAt) return '—'
-  const diff = Math.max(0, Math.round((new Date(endedAt) - new Date(startedAt)) / 1000))
+  const diff = Math.max(0, Math.round((new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 1000))
   if (diff < 60) return `${diff}s`
   const m = Math.floor(diff / 60), s = diff % 60
   return s > 0 ? `${m}m ${s}s` : `${m}m`
 }
 
-function cmdLabel(cmd) {
+function cmdLabel(cmd: any): string {
   return [cmd?.action, cmd?.target].filter(Boolean).join(' ')
 }
 
-function statusClass(status) {
+function statusClass(status: string | undefined): string {
   return getStatusBadgeClass(status, 'badge bg-yellow-lt text-yellow')
 }
 
-function parseUA(ua) {
+function parseUA(ua: string | undefined): { browser: string; os: string } {
   if (!ua) return { browser: '—', os: '—' }
   const browser = ua.includes('Firefox/') ? 'Firefox'
     : ua.includes('Edg/') ? 'Edge'
@@ -678,7 +676,7 @@ function parseUA(ua) {
   return { browser, os }
 }
 
-function openLogViewer(cmd) {
+function openLogViewer(cmd: any): void {
   if (selectedCmd.value?.id === cmd.id) { closeLogViewer(); return }
   closeLogViewer()
   selectedCmd.value = { ...cmd }
@@ -686,34 +684,34 @@ function openLogViewer(cmd) {
   if (cmd.status === 'running' || cmd.status === 'pending') connectStream(cmd.id)
 }
 
-function closeLogViewer() {
+function closeLogViewer(): void {
   closeStream()
   selectedCmd.value = null
   showConsole.value = false
 }
 
-function connectStream(commandId) {
+function connectStream(commandId: string): void {
   openCommandStream(commandId, {
-    onInit(p) {
+    onInit(p: any) {
       if (selectedCmd.value) { selectedCmd.value.status = p.status; selectedCmd.value.output = p.output || '' }
     },
-    onChunk(p) {
+    onChunk(p: any) {
       if (selectedCmd.value) selectedCmd.value.output = (selectedCmd.value.output || '') + p.chunk
     },
-    onStatus(p) {
+    onStatus(p: any) {
       if (selectedCmd.value) { selectedCmd.value.status = p.status; if (p.output) selectedCmd.value.output = p.output }
     },
   })
 }
 
-function resetPwForm() {
+function resetPwForm(): void {
   pwForm.value = { current: '', next: '', confirm: '' }
   pwErrors.value = { current: '', next: '', confirm: '' }
   pwError.value = ''
   pwSuccess.value = ''
 }
 
-async function submitChangePassword() {
+async function submitChangePassword(): Promise<void> {
   pwErrors.value = { current: '', next: '', confirm: '' }
   pwError.value = ''
   pwSuccess.value = ''
@@ -730,21 +728,21 @@ async function submitChangePassword() {
     pwSuccess.value = 'Mot de passe mis à jour avec succès.'
     pwForm.value = { current: '', next: '', confirm: '' }
     auth.clearMustChangePassword()
-  } catch (e) {
-    pwError.value = e.response?.data?.error || 'Erreur lors de la mise à jour du mot de passe.'
+  } catch (e: any) {
+    pwError.value = e?.response?.data?.error || 'Erreur lors de la mise à jour du mot de passe.'
   } finally {
     pwLoading.value = false
   }
 }
 
-async function loadProfile() {
+async function loadProfile(): Promise<void> {
   try {
     const { data } = await apiClient.getProfile()
     profile.value = data
   } catch { /* fallback to store data */ }
 }
 
-async function loadMyCommands() {
+async function loadMyCommands(): Promise<void> {
   cmdsLoading.value = true
   try {
     const res = await apiClient.getCommandsHistory(1, 100)
@@ -761,7 +759,7 @@ function switchToHistorique() {
   if (!allCommands.value.length && !cmdsLoading.value) loadMyCommands()
 }
 
-async function loadLoginEvents() {
+async function loadLoginEvents(): Promise<void> {
   loginEventsLoading.value = true
   try {
     const res = await apiClient.getLoginEvents()

@@ -193,7 +193,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
@@ -201,9 +201,16 @@ import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import apiClient from '../api'
 import dayjs from '../utils/dayjs'
 
+interface User {
+  id: string
+  username: string
+  role: string
+  created_at?: string
+}
+
 const auth = useAuthStore()
 const dialog = useConfirmDialog()
-const users = ref([])
+const users = ref<User[]>([])
 const loading = ref(false)
 const saving = ref(false)
 const creatingUser = ref(false)
@@ -217,25 +224,25 @@ const newUserForm = ref({
 const createMessage = ref('')
 const createSuccess = ref(false)
 
-function formatDate(date) {
+function formatDate(date: string | undefined): string {
   if (!date) return '-'
   return dayjs.utc(date).local().format('YYYY-MM-DD HH:mm')
 }
 
-const adminCount = computed(() => users.value.filter(u => u.role === 'admin').length)
+const adminCount = computed(() => users.value.filter((u) => u.role === 'admin').length)
 
-function isLastAdmin(userId) {
-  const user = users.value.find(u => u.id === userId)
-  return user && user.role === 'admin' && adminCount.value === 1
+function isLastAdmin(userId: string): boolean {
+  const user = users.value.find((u) => u.id === userId)
+  return !!user && user.role === 'admin' && adminCount.value === 1
 }
 
-function getDeleteButtonTitle(user) {
+function getDeleteButtonTitle(user: User): string {
   if (user.username === auth.username) return 'Impossible de supprimer votre propre compte'
   if (isLastAdmin(user.id)) return 'Impossible de supprimer le dernier admin'
   return 'Supprimer cet utilisateur'
 }
 
-async function fetchUsers() {
+async function fetchUsers(): Promise<void> {
   loading.value = true
   try {
     const res = await apiClient.getUsers()
@@ -248,15 +255,14 @@ async function fetchUsers() {
   }
 }
 
-async function createUser() {
+async function createUser(): Promise<void> {
   if (!newUserForm.value.username || !newUserForm.value.password) {
     createMessage.value = 'Veuillez remplir tous les champs'
     createSuccess.value = false
     return
   }
 
-  // Check if username already exists
-  if (users.value.find(u => u.username === newUserForm.value.username)) {
+  if (users.value.find((u) => u.username === newUserForm.value.username)) {
     createMessage.value = 'Ce nom d\'utilisateur existe déjà'
     createSuccess.value = false
     return
@@ -274,15 +280,15 @@ async function createUser() {
     createMessage.value = 'Utilisateur créé avec succès'
     newUserForm.value = { username: '', password: '', role: 'viewer' }
     await fetchUsers()
-  } catch (e) {
+  } catch (e: any) {
     createSuccess.value = false
-    createMessage.value = e.response?.data?.error || 'Erreur lors de la création'
+    createMessage.value = e?.response?.data?.error || 'Erreur lors de la création'
   } finally {
     creatingUser.value = false
   }
 }
 
-async function saveRole(user) {
+async function saveRole(user: User): Promise<void> {
   const confirmed = await dialog.confirm({
     title: 'Modifier le rôle',
     message: `Attribuer le rôle « ${user.role} » à ${user.username} ?`,
@@ -303,7 +309,7 @@ async function saveRole(user) {
   }
 }
 
-async function deleteUser(user) {
+async function deleteUser(user: User): Promise<void> {
   const confirmed = await dialog.confirm({
     title: `Supprimer l'utilisateur`,
     message: `Cette action est irréversible.`,

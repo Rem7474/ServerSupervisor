@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -98,29 +98,29 @@ func sendAlertNotifications(n notify.Notifier, cfg *config.Config, rule models.A
 				to = cfg.SMTPTo
 			}
 			if to == "" || cfg.SMTPFrom == "" {
-				log.Printf("Alerts: SMTP to/from not configured for rule %d", rule.ID)
+				slog.Warn("alerts: SMTP to/from not configured", slog.Int64("rule_id", rule.ID))
 				continue
 			}
 			if err := n.SendSMTP(cfg, cfg.SMTPFrom, to, "[ServerSupervisor] Alert triggered", msg); err != nil {
-				log.Printf("Alerts: SMTP send failed for rule %d: %v", rule.ID, err)
+				slog.Error("alerts: SMTP send failed", slog.Int64("rule_id", rule.ID), slog.Any("err", err))
 			}
 
 		case "ntfy":
 			topic := rule.Actions.NtfyTopic
 			if topic == "" {
-				log.Printf("Alerts: ntfy topic not configured for rule %d", rule.ID)
+				slog.Warn("alerts: ntfy topic not configured", slog.Int64("rule_id", rule.ID))
 				continue
 			}
 			ntfyURL := "https://ntfy.sh/" + topic
 			if err := n.SendNtfy(cfg, ntfyURL, "ServerSupervisor Alert", msg); err != nil {
-				log.Printf("Alerts: ntfy failed for rule %d: %v", rule.ID, err)
+				slog.Error("alerts: ntfy failed", slog.Int64("rule_id", rule.ID), slog.Any("err", err))
 			}
 
 		case "notify":
 			// Legacy webhook channel — send to configured notify URL
 			notifyURL := cfg.NotifyURL
 			if notifyURL == "" {
-				log.Printf("Alerts: notify URL not configured")
+				slog.Warn("alerts: notify URL not configured")
 				continue
 			}
 			data, _ := json.Marshal(payload)
@@ -128,7 +128,7 @@ func sendAlertNotifications(n notify.Notifier, cfg *config.Config, rule models.A
 			req.Header.Set("Content-Type", "application/json")
 			client := &http.Client{Timeout: 10 * time.Second}
 			if resp, err := client.Do(req); err != nil {
-				log.Printf("Alerts: notify failed: %v", err)
+				slog.Error("alerts: notify failed", slog.Any("err", err))
 			} else {
 				_ = resp.Body.Close()
 			}
@@ -137,7 +137,7 @@ func sendAlertNotifications(n notify.Notifier, cfg *config.Config, rule models.A
 			// Browser notifications are delivered via the WebSocket push mechanism; no backend action needed here.
 
 		default:
-			log.Printf("Alerts: unknown channel %q for rule %d", channel, rule.ID)
+			slog.Warn("alerts: unknown channel", slog.String("channel", channel), slog.Int64("rule_id", rule.ID))
 		}
 	}
 }
@@ -207,7 +207,7 @@ func pushWebNotifications(ctx context.Context, db *database.DB, cfg *config.Conf
 			TTL:             120,
 		})
 		if sendErr != nil {
-			log.Printf("Push: delivery failed (%s…): %v", truncateStr(sub.Endpoint, 40), sendErr)
+			slog.ErrorContext(ctx, "push: delivery failed", slog.String("endpoint", truncateStr(sub.Endpoint, 40)), slog.Any("err", sendErr))
 			if resp != nil && resp.StatusCode == http.StatusGone {
 				_ = db.DeletePushSubscription(ctx, sub.Endpoint)
 			}
@@ -305,16 +305,16 @@ func triggerAlertCommand(ctx context.Context, dispatcher *dispatch.Dispatcher, d
 	if strings.HasPrefix(host.ID, "proxmox:") {
 		parts := strings.SplitN(host.ID, ":", 3)
 		if len(parts) != 3 || parts[1] != "guest" || parts[2] == "" {
-			log.Printf("Alerts: rule#%d command_trigger skipped — no linked host for Proxmox scope %s", rule.ID, host.ID)
+			slog.WarnContext(ctx, "alerts: command_trigger skipped — no linked host for Proxmox scope", slog.Int64("rule_id", rule.ID), slog.String("scope", host.ID))
 			return
 		}
 		link, err := db.GetProxmoxGuestLinkByGuest(ctx, parts[2])
 		if err != nil || link == nil {
-			log.Printf("Alerts: rule#%d command_trigger skipped — no host link for Proxmox guest %s", rule.ID, parts[2])
+			slog.WarnContext(ctx, "alerts: command_trigger skipped — no host link for Proxmox guest", slog.Int64("rule_id", rule.ID), slog.String("guest", parts[2]))
 			return
 		}
 		if link.Status != "confirmed" {
-			log.Printf("Alerts: rule#%d command_trigger skipped — link for Proxmox guest %s is not confirmed (status=%s)", rule.ID, parts[2], link.Status)
+			slog.WarnContext(ctx, "alerts: command_trigger skipped — Proxmox guest link not confirmed", slog.Int64("rule_id", rule.ID), slog.String("guest", parts[2]), slog.String("status", link.Status))
 			return
 		}
 		targetHostID = link.HostID
@@ -334,8 +334,8 @@ func triggerAlertCommand(ctx context.Context, dispatcher *dispatch.Dispatcher, d
 		Payload:     payload,
 		TriggeredBy: triggeredBy,
 	}); err != nil {
-		log.Printf("Alerts: failed to create command trigger for rule %d on host %s: %v", rule.ID, targetHostID, err)
+		slog.ErrorContext(ctx, "alerts: failed to create command trigger", slog.Int64("rule_id", rule.ID), slog.String("host_id", targetHostID), slog.Any("err", err))
 	} else {
-		log.Printf("Alerts: triggered command %s/%s on host %s (rule %d)", ct.Module, ct.Action, targetLabel, rule.ID)
+		slog.InfoContext(ctx, "alerts: triggered command", slog.String("module", ct.Module), slog.String("action", ct.Action), slog.String("host", targetLabel), slog.Int64("rule_id", rule.ID))
 	}
 }

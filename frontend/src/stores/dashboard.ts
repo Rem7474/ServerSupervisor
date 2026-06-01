@@ -3,13 +3,23 @@ import { defineStore } from 'pinia'
 
 interface HostSummary {
   id: string
+  name?: string
+  hostname?: string
+  ip_address?: string
+  os?: string
   status?: string
+  last_seen?: string | number | Date | null
+  agent_version?: string
+  [key: string]: any
 }
 
 interface VersionComparison {
+  docker_image?: string
+  host_id?: string
   is_up_to_date?: boolean
   running_version?: string
   update_confirmed?: boolean
+  [key: string]: any
 }
 
 interface ProxmoxSummary {
@@ -20,6 +30,10 @@ interface ProxmoxSummary {
   lxc_count?: number
   storage_used?: number
   storage_total?: number
+  recent_failed_tasks?: number
+  storage_near_full?: number
+  storage_offline?: number
+  [key: string]: any
 }
 
 export const useDashboardStore = defineStore('dashboard', () => {

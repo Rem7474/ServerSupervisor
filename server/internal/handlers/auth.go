@@ -6,7 +6,8 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
-	"log"
+	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -36,7 +37,7 @@ func (h *AuthHandler) isIPBlocked(ctx context.Context, ip string) bool {
 	since := time.Now().Add(-bruteForceWindow)
 	count, err := h.db.CountRecentFailedLoginsAfterUnblock(ctx, ip, since)
 	if err != nil {
-		log.Printf("warn: isIPBlocked DB query failed for %s: %v — using in-memory fallback", ip, err)
+		slog.ErrorContext(ctx, fmt.Sprintf("isIPBlocked DB query failed for %s: %v — using in-memory fallback", ip, err))
 		return h.memIsBlocked(ip)
 	}
 	return count >= bruteForceMaxFails
@@ -152,7 +153,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 			}
 			// Consume the backup code to prevent reuse
 			if err := h.db.ConsumeMFABackupCode(c.Request.Context(), user.Username, req.TOTPCode); err != nil {
-				log.Printf("Warning: failed to consume backup code for %s: %v", user.Username, err)
+				slog.ErrorContext(c.Request.Context(), fmt.Sprintf("Warning: failed to consume backup code for %s: %v", user.Username, err))
 				// Don't fail login, just log the error
 			}
 		}
@@ -522,7 +523,7 @@ func (h *AuthHandler) GetSecuritySummary(c *gin.Context) {
 
 	topFailed, err := h.db.GetTopFailedIPs(c.Request.Context(), since, 10)
 	if err != nil {
-		log.Printf("warn: GetTopFailedIPs: %v", err)
+		slog.ErrorContext(c.Request.Context(), fmt.Sprintf("warn: GetTopFailedIPs: %v", err))
 	}
 	if topFailed == nil {
 		topFailed = []models.IPFailCount{}
@@ -530,7 +531,7 @@ func (h *AuthHandler) GetSecuritySummary(c *gin.Context) {
 
 	blockedIPs, err := h.db.GetCurrentlyBlockedIPs(c.Request.Context(), time.Now().Add(-bruteForceWindow), bruteForceMaxFails)
 	if err != nil {
-		log.Printf("warn: GetCurrentlyBlockedIPs: %v", err)
+		slog.ErrorContext(c.Request.Context(), fmt.Sprintf("warn: GetCurrentlyBlockedIPs: %v", err))
 	}
 	if blockedIPs == nil {
 		blockedIPs = []string{}
@@ -619,7 +620,7 @@ func (h *AuthHandler) RevokeAllSessions(c *gin.Context) {
 	}
 	currentHash := hashToken(refreshTokenStr)
 	if err := h.db.RevokeAllOtherSessions(c.Request.Context(), username, currentHash); err != nil {
-		log.Printf("Failed to revoke sessions for user %s: %v", username, err)
+		slog.ErrorContext(c.Request.Context(), fmt.Sprintf("Failed to revoke sessions for user %s: %v", username, err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to revoke sessions"})
 		return
 	}

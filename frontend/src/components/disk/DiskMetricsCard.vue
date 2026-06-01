@@ -115,17 +115,30 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import apiClient from '../../api'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 
-const props = defineProps({
-  hostId: { type: String, required: true },
-  initialMetrics: { type: Array, default: null },
+interface DiskMetric {
+  mount_point: string
+  filesystem?: string
+  used_gb: number
+  size_gb: number
+  used_percent: number
+  inodes_total: number
+  inodes_used: number
+  inodes_percent: number
+}
+
+const props = withDefaults(defineProps<{
+  hostId: string
+  initialMetrics?: DiskMetric[] | null
+}>(), {
+  initialMetrics: null,
 })
 
-const metrics = ref(props.initialMetrics || [])
+const metrics = ref<DiskMetric[]>(props.initialMetrics || [])
 const loading = ref(!props.initialMetrics)
 
 onMounted(async () => {
@@ -133,7 +146,7 @@ onMounted(async () => {
   await loadDiskMetrics()
 })
 
-async function loadDiskMetrics() {
+async function loadDiskMetrics(): Promise<void> {
   try {
     loading.value = true
     const res = await apiClient.getDiskMetrics(props.hostId)
@@ -145,11 +158,11 @@ async function loadDiskMetrics() {
   }
 }
 
-function formatGB(bytes) {
+function formatGB(bytes: number): string {
   return `${bytes.toFixed(1)}G`
 }
 
-function getProgressBarClass(percent) {
+function getProgressBarClass(percent: number): string {
   if (percent >= 90) return 'bg-danger'
   if (percent >= 80) return 'bg-warning'
   if (percent >= 70) return 'bg-info'

@@ -33,21 +33,22 @@
   </a>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
 
-const props = defineProps({
-  cve: {
-    type: Object,
-    required: true,
-    validator: (value) => {
-      return value.id && value.severity
-    }
-  },
-  showIcon: {
-    type: Boolean,
-    default: true
-  }
+interface CVE {
+  id: string
+  severity?: string
+  package?: string
+  ubuntu_priority?: string
+  cvss_score?: number
+}
+
+const props = withDefaults(defineProps<{
+  cve: CVE
+  showIcon?: boolean
+}>(), {
+  showIcon: true,
 })
 
 const cveUrl = computed(() => {
@@ -60,8 +61,8 @@ const cveUrl = computed(() => {
 
 const badgeClass = computed(() => {
   const severity = props.cve.severity?.toUpperCase() || 'UNKNOWN'
-  
-  const classes = {
+
+  const classes: Record<string, string> = {
     'CRITICAL': 'bg-red-lt text-red',
     'HIGH': 'bg-orange-lt text-orange',
     'MEDIUM': 'bg-yellow-lt text-yellow',
@@ -69,7 +70,7 @@ const badgeClass = computed(() => {
     'NEGLIGIBLE': 'bg-secondary-lt text-secondary',
     'UNKNOWN': 'bg-secondary-lt text-secondary'
   }
-  
+
   return classes[severity] || classes['UNKNOWN']
 })
 

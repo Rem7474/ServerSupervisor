@@ -27,7 +27,7 @@
         v-else
         class="page-link"
         href="#"
-        @click.prevent="emitSelect(item.value)"
+        @click.prevent="emitSelect(item.value || 1)"
       >{{ item.value }}</a>
     </li>
     <li
@@ -43,27 +43,28 @@
   </ul>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
 
-const props = defineProps({
-  currentPage: {
-    type: Number,
-    required: true,
-  },
-  totalPages: {
-    type: Number,
-    required: true,
-  },
-  siblingCount: {
-    type: Number,
-    default: 1,
-  },
+interface PageItem {
+  type: 'page' | 'ellipsis'
+  value?: number
+  key: string
+}
+
+const props = withDefaults(defineProps<{
+  currentPage: number
+  totalPages: number
+  siblingCount?: number
+}>(), {
+  siblingCount: 1,
 })
 
-const emit = defineEmits(['select'])
+const emit = defineEmits<{
+  (e: 'select', page: number): void
+}>()
 
-const visibleItems = computed(() => {
+const visibleItems = computed<PageItem[]>(() => {
   const total = Math.max(1, props.totalPages)
   const current = Math.min(Math.max(1, props.currentPage), total)
   const siblingCount = Math.max(1, props.siblingCount)
@@ -76,7 +77,7 @@ const visibleItems = computed(() => {
     }))
   }
 
-  const items = []
+  const items: PageItem[] = []
   const startPage = Math.max(2, current - siblingCount)
   const endPage = Math.min(total - 1, current + siblingCount)
 
@@ -99,7 +100,7 @@ const visibleItems = computed(() => {
   return items
 })
 
-function emitSelect(page) {
+function emitSelect(page: number): void {
   if (page < 1 || page > props.totalPages || page === props.currentPage) return
   emit('select', page)
 }

@@ -27,43 +27,44 @@
   </ul>
 </template>
 
-<script setup>
-defineProps({
-  modelValue: {
-    type: String,
-    required: true,
-  },
-  tabs: {
-    type: Array,
-    required: true
-    // [{ key: String, label: String, badge?: Number|String }]
-  }
-})
+<script setup lang="ts">
+interface Tab {
+  key: string
+  label: string
+  badge?: number | string
+}
 
-const emit = defineEmits(['update:modelValue'])
+const props = defineProps<{
+  modelValue: string
+  tabs: Tab[]
+}>()
 
-const handleKeyDown = (e) => {
-  if (!tabs || tabs.length === 0) return
-  
-  const currentIndex = tabs.findIndex(t => t.key === modelValue)
+const emit = defineEmits<{
+  (e: 'update:modelValue', key: string): void
+}>()
+
+const handleKeyDown = (e: KeyboardEvent): void => {
+  if (!props.tabs || props.tabs.length === 0) return
+
+  const currentIndex = props.tabs.findIndex((t) => t.key === props.modelValue)
   if (currentIndex === -1) return
-  
-  let nextIndex
-  
+
+  let nextIndex: number
+
   if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
     e.preventDefault()
-    nextIndex = (currentIndex + 1) % tabs.length
-    emit('update:modelValue', tabs[nextIndex].key)
+    nextIndex = (currentIndex + 1) % props.tabs.length
+    emit('update:modelValue', props.tabs[nextIndex].key)
   } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
     e.preventDefault()
-    nextIndex = (currentIndex - 1 + tabs.length) % tabs.length
-    emit('update:modelValue', tabs[nextIndex].key)
+    nextIndex = (currentIndex - 1 + props.tabs.length) % props.tabs.length
+    emit('update:modelValue', props.tabs[nextIndex].key)
   } else if (e.key === 'Home') {
     e.preventDefault()
-    emit('update:modelValue', tabs[0].key)
+    emit('update:modelValue', props.tabs[0].key)
   } else if (e.key === 'End') {
     e.preventDefault()
-    emit('update:modelValue', tabs[tabs.length - 1].key)
+    emit('update:modelValue', props.tabs[props.tabs.length - 1].key)
   }
 }
 </script>

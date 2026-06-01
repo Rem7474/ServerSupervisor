@@ -150,26 +150,40 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed } from 'vue'
-import { useAuthStore } from '../../stores/auth'
 import apiClient, { getApiErrorMessage } from '../../api'
 import { useCommandStream } from '../../composables/useCommandStream'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 
-const props = defineProps({
-  hostId: { type: String, required: true },
-  canRun: { type: Boolean, default: false },
+interface Process {
+  pid: number
+  name: string
+  user: string
+  cpu_pct: number
+  mem_pct: number
+  mem_rss_kb: number
+  state: string
+}
+
+type SortKey = keyof Process
+
+const props = withDefaults(defineProps<{
+  hostId: string
+  canRun?: boolean
+}>(), {
+  canRun: false,
 })
 
-const emit = defineEmits(['history-changed'])
+const emit = defineEmits<{
+  (e: 'history-changed'): void
+}>()
 
-const auth = useAuthStore()
-const processes = ref([])
+const processes = ref<Process[]>([])
 const loading = ref(false)
 const error = ref('')
 const processFilter = ref('')
-const sortKey = ref('cpu_pct')
+const sortKey = ref<SortKey>('cpu_pct')
 const sortDir = ref(-1)
 const STREAM_TIMEOUT_MS = 60000
 const { collectCommandOutput } = useCommandStream()
@@ -178,17 +192,17 @@ const filteredProcesses = computed(() => {
   let list = processes.value
   if (processFilter.value) {
     const q = processFilter.value.toLowerCase()
-    list = list.filter(p => p.name.toLowerCase().includes(q) || p.user.toLowerCase().includes(q))
+    list = list.filter((p) => p.name.toLowerCase().includes(q) || p.user.toLowerCase().includes(q))
   }
   return [...list].sort((a, b) => {
     const av = a[sortKey.value]
     const bv = b[sortKey.value]
-    if (typeof av === 'string') return sortDir.value * av.localeCompare(bv)
-    return sortDir.value * (bv - av)
+    if (typeof av === 'string') return sortDir.value * av.localeCompare(String(bv))
+    return sortDir.value * ((bv as number) - (av as number))
   })
 })
 
-function sortBy(key) {
+function sortBy(key: SortKey): void {
   if (sortKey.value === key) {
     sortDir.value *= -1
   } else {
@@ -197,26 +211,26 @@ function sortBy(key) {
   }
 }
 
-function sortIcon(key) {
+function sortIcon(key: SortKey): string {
   if (sortKey.value !== key) return ''
   return sortDir.value === -1 ? '▼' : '▲'
 }
 
-async function loadProcesses() {
+async function loadProcesses(): Promise<void> {
   loading.value = true
   error.value = ''
   try {
     const res = await apiClient.sendProcessesCommand(props.hostId)
     const cmdId = res.data.command_id
 
-    await collectCommandOutput(cmdId, { timeoutMs: STREAM_TIMEOUT_MS }).then(output => {
+    await collectCommandOutput(cmdId, { timeoutMs: STREAM_TIMEOUT_MS }).then((output: string) => {
       try {
         processes.value = JSON.parse(output)
       } catch {
         error.value = 'Impossible de parser la liste des processus'
       }
-    }).catch(e => {
-      error.value = e.message || 'Erreur lors du chargement des processus'
+    }).catch((e: any) => {
+      error.value = e?.message || 'Erreur lors du chargement des processus'
     }).finally(() => { emit('history-changed') })
   } catch (e) {
     error.value = getApiErrorMessage(e, "Impossible d'envoyer la commande")

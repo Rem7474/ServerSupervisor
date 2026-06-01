@@ -8,13 +8,15 @@
   </span>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
 
-// Define valid tone values as reference (not used in validator to avoid hoisting issues)
-const VALID_TONES = ['success', 'warning', 'danger', 'info', 'secondary', 'orange', 'cyan', 'blue', 'green', 'red', 'purple', 'azure', 'teal', 'indigo']
+type Tone =
+  | 'success' | 'warning' | 'danger' | 'info' | 'secondary'
+  | 'orange' | 'cyan' | 'blue' | 'green' | 'red'
+  | 'purple' | 'azure' | 'teal' | 'indigo'
 
-const toneClasses = {
+const toneClasses: Record<Tone, string> = {
   success: 'bg-success-lt text-success',
   warning: 'bg-yellow-lt text-yellow',
   danger: 'bg-danger-lt text-danger',
@@ -31,31 +33,20 @@ const toneClasses = {
   indigo: 'bg-indigo-lt text-indigo',
 }
 
-const props = defineProps({
-  text: {
-    type: String,
-    default: '',
-  },
-  tone: {
-    type: String,
-    default: 'secondary',
-  },
-  title: {
-    type: String,
-    default: '',
-  },
-  ariaLabel: {
-    type: String,
-    default: '',
-  },
-  compact: {
-    type: Boolean,
-    default: false,
-  },
-  monospace: {
-    type: Boolean,
-    default: false,
-  },
+const props = withDefaults(defineProps<{
+  text?: string
+  tone?: Tone
+  title?: string
+  ariaLabel?: string
+  compact?: boolean
+  monospace?: boolean
+}>(), {
+  text: '',
+  tone: 'secondary',
+  title: '',
+  ariaLabel: '',
+  compact: false,
+  monospace: false,
 })
 
 const badgeClass = computed(() => [

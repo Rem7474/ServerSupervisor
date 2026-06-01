@@ -50,13 +50,20 @@
   </div>
 </template>
 
-<script setup>
-defineProps({
-  title: { type: String, required: true },
-  subtitle: { type: String, default: '' },
-  ctaLabel: { type: String, default: '' },
-  ctaTo: { type: String, default: '' },
-  iconSize: { type: Number, default: 48 },
+<script setup lang="ts">
+withDefaults(defineProps<{
+  title: string
+  subtitle?: string
+  ctaLabel?: string
+  ctaTo?: string
+  iconSize?: number
+}>(), {
+  subtitle: '',
+  ctaLabel: '',
+  ctaTo: '',
+  iconSize: 48,
 })
-defineEmits(['cta'])
+defineEmits<{
+  (e: 'cta'): void
+}>()
 </script>

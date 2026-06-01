@@ -49,11 +49,11 @@
               <AlertRuleStepSource
                 :form="form"
                 :rule="rule"
-                :hosts="hosts"
-                :capabilities="capabilities"
+                :hosts="(hosts as any)"
+                :capabilities="(capabilities as any)"
                 :capabilities-loading="capabilitiesLoading"
                 :capabilities-error="capabilitiesError"
-                :host-metrics="hostMetrics"
+                :host-metrics="(hostMetrics as any)"
                 :host-metrics-loading="hostMetricsLoading"
                 :host-metrics-error="hostMetricsError"
                 :metric-cards="metricCards"
@@ -61,11 +61,11 @@
                 :metric-allows-guest-scope="metricAllowsGuestScope"
                 :metric-allows-storage-scope="metricAllowsStorageScope"
                 :metric-allows-disk-scope="metricAllowsDiskScope"
-                :proxmox-connections="proxmoxConnections"
-                :proxmox-nodes="proxmoxNodes"
-                :proxmox-storages="proxmoxStorages"
-                :proxmox-guests="proxmoxGuests"
-                :proxmox-disks="proxmoxDisks"
+                :proxmox-connections="(proxmoxConnections as any)"
+                :proxmox-nodes="(proxmoxNodes as any)"
+                :proxmox-storages="(proxmoxStorages as any)"
+                :proxmox-guests="(proxmoxGuests as any)"
+                :proxmox-disks="(proxmoxDisks as any)"
                 @select-metric="selectMetric"
                 @set-source-type="setSourceType"
               />
@@ -74,8 +74,8 @@
             <div v-if="step === 2">
               <AlertRuleStepConditions
                 :form="form"
-                :rule="rule"
-                :test-results="testResults"
+                :rule="(rule as any)"
+                :test-results="(testResults as any)"
                 :has-no-data-results="hasNoDataResults"
                 :can-download-test-logs="canDownloadTestLogs"
                 :downloading-logs="downloadingLogs"
@@ -91,8 +91,8 @@
                 v-model:channel-browser="channelBrowser"
                 v-model:command-trigger-enabled="commandTriggerEnabled"
                 :form="form"
-                :rule="rule"
-                :test-results="testResults"
+                :rule="(rule as any)"
+                :test-results="(testResults as any)"
                 :test-error="testError"
                 :browser-permission="browserPermission"
               />
@@ -184,7 +184,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from 'vue'
 import apiClient from '../../api'
 import AlertRuleStepSource from './AlertRuleStepSource.vue'
@@ -194,49 +194,89 @@ import { useAlertRuleForm } from '../../composables/useAlertRuleForm'
 import { useModalFocusTrap } from '../../composables/useModalFocusTrap'
 import { ALERT_METRIC_ORDER, getAlertMetricMeta } from '../../utils/alertMetrics'
 
-const props = defineProps({
-  visible: {
-    type: Boolean,
-    default: false,
-  },
-  rule: {
-    type: Object,
-    default: null,
-  },
-  hosts: {
-    type: Array,
-    default: () => [],
-  },
-  capabilities: {
-    type: Object,
-    default: null,
-  },
-  capabilitiesLoading: {
-    type: Boolean,
-    default: false,
-  },
-  capabilitiesError: {
-    type: String,
-    default: '',
-  },
-  saving: {
-    type: Boolean,
-    default: false,
-  },
-  error: {
-    type: String,
-    default: '',
-  },
+interface Host {
+  id: string
+  name?: string
+}
+
+interface MetricMeta {
+  metric: string
+  label: string
+  icon?: string
+  unit?: string
+  supports_host_filter?: boolean
+}
+
+interface ProxmoxScopeItem {
+  id: string | number
+  name?: string
+  [key: string]: unknown
+}
+
+interface Capabilities {
+  metrics?: MetricMeta[]
+  proxmox_scope?: {
+    connections?: ProxmoxScopeItem[]
+    nodes?: ProxmoxScopeItem[]
+    storages?: ProxmoxScopeItem[]
+    guests?: ProxmoxScopeItem[]
+    disks?: ProxmoxScopeItem[]
+  }
+}
+
+interface AlertRule {
+  id?: string | number
+  [key: string]: unknown
+}
+
+interface TestResult {
+  has_data?: boolean
+  [key: string]: unknown
+}
+
+interface TestResults {
+  results?: TestResult[]
+  [key: string]: unknown
+}
+
+interface HostMetrics {
+  metrics?: MetricMeta[]
+  [key: string]: unknown
+}
+
+const props = withDefaults(defineProps<{
+  visible?: boolean
+  rule?: AlertRule | null
+  hosts?: Host[]
+  capabilities?: Capabilities | null
+  capabilitiesLoading?: boolean
+  capabilitiesError?: string
+  saving?: boolean
+  error?: string
+}>(), {
+  visible: false,
+  rule: null,
+  hosts: () => [],
+  capabilities: null,
+  capabilitiesLoading: false,
+  capabilitiesError: '',
+  saving: false,
+  error: '',
 })
 
-const emit = defineEmits(['close', 'submit'])
+const emit = defineEmits<{
+  (e: 'close'): void
+  (e: 'submit', payload: unknown): void
+}>()
 
 const modalRef = ref<HTMLElement | null>(null)
 useModalFocusTrap(modalRef)
 
-const browserPermission = ref(typeof Notification !== 'undefined' ? Notification.permission : 'unsupported')
+const browserPermission = ref<NotificationPermission | 'unsupported'>(
+  typeof Notification !== 'undefined' ? Notification.permission : 'unsupported'
+)
 const step = ref(1)
-const hostMetrics = ref(null)
+const hostMetrics = ref<HostMetrics | null>(null)
 const hostMetricsLoading = ref(false)
 const hostMetricsError = ref('')
 
@@ -252,7 +292,7 @@ const metricCards = computed(() => {
     }))
   }
 
-  function matchesSource(metricName) {
+  function matchesSource(metricName: string): boolean {
     const cat = getAlertMetricMeta(metricName).category
     if (metricSource === 'proxmox') return cat === 'proxmox'
     if (metricSource === 'synthetic') return cat === 'synthetic'
@@ -263,8 +303,8 @@ const metricCards = computed(() => {
   const fromCapabilities = props.capabilities?.metrics
   if (Array.isArray(fromCapabilities) && fromCapabilities.length > 0) {
     return fromCapabilities
-      .filter((metric) => matchesSource(metric.metric))
-      .map((metric) => ({
+      .filter((metric: MetricMeta) => matchesSource(metric.metric))
+      .map((metric: MetricMeta) => ({
         value: metric.metric,
         label: metric.label,
         icon: metric.icon || getAlertMetricMeta(metric.metric).icon,
@@ -282,9 +322,9 @@ const proxmoxStorages = computed(() => props.capabilities?.proxmox_scope?.storag
 const proxmoxGuests = computed(() => props.capabilities?.proxmox_scope?.guests || [])
 const proxmoxDisks = computed(() => props.capabilities?.proxmox_scope?.disks || [])
 
-const metricMetaByKey = computed(() => {
+const metricMetaByKey = computed<Record<string, MetricMeta>>(() => {
   const items = props.capabilities?.metrics || []
-  return Object.fromEntries(items.map((item) => [item.metric, item]))
+  return Object.fromEntries(items.map((item: MetricMeta) => [item.metric, item]))
 })
 
 const metricAllowsStorageScope = computed(() => form.value.metric === 'proxmox_storage_percent')
@@ -307,11 +347,11 @@ const {
 } = useAlertRuleForm()
 
 const testing = ref(false)
-const testResults = ref(null)
+const testResults = ref<TestResults | null>(null)
 const testError = ref('')
 const downloadingLogs = ref(false)
 
-const hasNoDataResults = computed(() => testResults.value?.results?.some((result) => !result.has_data) || false)
+const hasNoDataResults = computed(() => testResults.value?.results?.some((result: TestResult) => !result.has_data) || false)
 const canDownloadTestLogs = computed(
   () => !!testResults.value && form.value.metric === 'proxmox_auth_failures_recent'
 )
@@ -343,13 +383,13 @@ const canProceedStep = computed(() => {
   return true
 })
 
-let autoTestTimer = null
+let autoTestTimer: ReturnType<typeof setTimeout> | null = null
 
 watch(
   () => [props.visible, props.rule],
   () => {
     if (!props.visible) {
-      clearTimeout(autoTestTimer)
+      if (autoTestTimer) clearTimeout(autoTestTimer)
       testResults.value = null
       testError.value = ''
       step.value = 1
@@ -357,7 +397,7 @@ watch(
     }
     testResults.value = null
     testError.value = ''
-    hydrateFormFromRule(props.rule)
+    hydrateFormFromRule(props.rule as any)
     step.value = 1
   },
   { immediate: true, deep: true }
@@ -380,7 +420,7 @@ watch(
     try {
       const response = await apiClient.getHostCapabilities(hostId)
       hostMetrics.value = response.data
-    } catch (error) {
+    } catch (_error) {
       hostMetricsError.value = 'Échec du chargement des métriques pour cet hôte'
       hostMetrics.value = null
     } finally {
@@ -410,7 +450,7 @@ watch(
   () => {
     if (!props.visible) return
     if (step.value !== 2) return
-    clearTimeout(autoTestTimer)
+    if (autoTestTimer) clearTimeout(autoTestTimer)
     autoTestTimer = setTimeout(testAlert, 600)
   }
 )
@@ -420,7 +460,7 @@ watch(
   (currentStep) => {
     if (!props.visible) return
     if (currentStep !== 2) return
-    clearTimeout(autoTestTimer)
+    if (autoTestTimer) clearTimeout(autoTestTimer)
     autoTestTimer = setTimeout(testAlert, 100)
   }
 )
@@ -464,7 +504,7 @@ watch(
   (cards) => {
     if (!Array.isArray(cards) || cards.length === 0) return
     const current = form.value.metric
-    const exists = cards.some((item) => item.value === current)
+    const exists = cards.some((item: { value: string }) => item.value === current)
     if (!exists && cards.length > 0) {
       // Selected metric is no longer available for this host
       form.value.metric = cards[0].value
@@ -475,7 +515,7 @@ watch(
 )
 
 onUnmounted(() => {
-  clearTimeout(autoTestTimer)
+  if (autoTestTimer) clearTimeout(autoTestTimer)
   document.removeEventListener('keydown', onKeyDown)
 })
 
@@ -486,15 +526,15 @@ async function submit() {
   emit('submit', buildPayload())
 }
 
-async function testAlert() {
+async function testAlert(): Promise<void> {
   if (!props.visible) return
   testing.value = true
   testResults.value = null
   testError.value = ''
   try {
-    const response = await apiClient.testAlertRule(buildPayload())
+    const response = await apiClient.testAlertRule(buildPayload() as any)
     testResults.value = response.data
-  } catch (err) {
+  } catch (err: any) {
     testResults.value = null
     testError.value = err?.response?.data?.error || 'Échec du test de la règle.'
   } finally {
@@ -502,16 +542,16 @@ async function testAlert() {
   }
 }
 
-function formatDownloadTimestamp(date) {
+function formatDownloadTimestamp(date: Date): string {
   const iso = date.toISOString().replace(/\..+$/, '')
   return iso.replace(/[:T]/g, '-')
 }
 
-async function downloadTestLogs() {
+async function downloadTestLogs(): Promise<void> {
   if (downloadingLogs.value || !canDownloadTestLogs.value) return
   downloadingLogs.value = true
   try {
-    const response = await apiClient.downloadAlertRuleTestLogs(buildPayload())
+    const response = await apiClient.downloadAlertRuleTestLogs(buildPayload() as any)
     const blob = response.data instanceof Blob ? response.data : new Blob([response.data], { type: 'text/plain' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
@@ -519,28 +559,28 @@ async function downloadTestLogs() {
     link.download = `proxmox-auth-failures-${formatDownloadTimestamp(new Date())}.log`
     link.click()
     setTimeout(() => URL.revokeObjectURL(url), 1000)
-  } catch (err) {
+  } catch (err: any) {
     testError.value = err?.response?.data?.error || 'Échec du téléchargement des logs.'
   } finally {
     downloadingLogs.value = false
   }
 }
 
-function close() {
+function close(): void {
   emit('close')
 }
 
-function onKeyDown(event) {
+function onKeyDown(event: KeyboardEvent): void {
   if (event.key === 'Escape' && props.visible) close()
 }
 
-function selectMetric(metric) {
+function selectMetric(metric: string): void {
   form.value.metric = metric
   onMetricChange()
 }
 
-function setSourceType(sourceType) {
-  form.value.source_type = sourceType
+function setSourceType(sourceType: string): void {
+  form.value.source_type = sourceType as 'agent' | 'proxmox' | 'synthetic'
   const currentCat = getAlertMetricMeta(form.value.metric).category
   const wantedCat = sourceType === 'proxmox' ? 'proxmox' : sourceType === 'synthetic' ? 'synthetic' : 'host'
 
@@ -557,21 +597,16 @@ function setSourceType(sourceType) {
   }
 }
 
-function goNextStep() {
+function goNextStep(): void {
   if (!canProceedStep.value || step.value >= 3) return
   step.value += 1
 }
 
-function getMetricUnit(metric) {
+function getMetricUnit(metric: string): string {
   return metricMetaByKey.value?.[metric]?.unit || getAlertMetricMeta(metric).unit
 }
 
 const currentMetricUnit = computed(() => getMetricUnit(form.value.metric))
-
-function formatDate(dateStr) {
-  if (!dateStr) return ''
-  return new Date(dateStr).toLocaleString('fr-FR')
-}
 </script>
 
 <style scoped>

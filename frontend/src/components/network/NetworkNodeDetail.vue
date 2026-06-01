@@ -13,7 +13,7 @@
       <button
         class="btn-close btn-close-white btn-close-sm"
         aria-label="Fermer"
-        @click="emit('close')"
+        @click="$emit('close')"
       />
     </div>
 
@@ -101,7 +101,7 @@
 
       <!-- Intégration (service / port) -->
       <div
-        v-if="['service', 'port'].includes(selectedNode?.type)"
+        v-if="['service', 'port'].includes(selectedNode?.type || '')"
         class="detail-section"
       >
         <div class="detail-section-title">
@@ -110,7 +110,7 @@
         <div class="detail-kv">
           <span class="detail-key">Reverse proxy</span>
           <span
-            v-if="selectedNode.isProxyLinked"
+            v-if="selectedNode?.isProxyLinked"
             class="badge bg-blue-lt text-blue"
           >Oui</span>
           <span
@@ -121,7 +121,7 @@
         <div class="detail-kv">
           <span class="detail-key">Authelia</span>
           <span
-            v-if="selectedNode.isAutheliaLinked"
+            v-if="selectedNode?.isAutheliaLinked"
             class="badge bg-purple-lt text-purple"
           >Oui</span>
           <span
@@ -132,10 +132,10 @@
         <div class="detail-kv">
           <span class="detail-key">Internet</span>
           <span
-            v-if="selectedNode.isInternetExposed"
+            v-if="selectedNode?.isInternetExposed"
             class="badge bg-orange-lt text-orange"
           >
-            Exposé{{ selectedNode.externalPort ? ' (port ' + selectedNode.externalPort + ')' : '' }}
+            Exposé{{ selectedNode?.externalPort ? ' (port ' + selectedNode.externalPort + ')' : '' }}
           </span>
           <span
             v-else
@@ -180,7 +180,7 @@
             class="port-chip"
             :class="{ 'port-chip-disabled': !p.enabled }"
           >
-            <span :class="{ 'text-secondary': !p.enabled }">{{ p.name || (p.port + '/' + p.protocol.toUpperCase()) }}</span>
+            <span :class="{ 'text-secondary': !p.enabled }">{{ p.name || (p.port + '/' + (p.protocol || '').toUpperCase()) }}</span>
             <span
               v-if="p.name"
               class="text-secondary ms-1"
@@ -254,19 +254,86 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
 
-const props = defineProps({
-  selectedNode: { type: Object, default: null },
-  hosts: { type: Array, default: () => [] },
-  containers: { type: Array, default: () => [] },
-  hostPortOverrides: { type: Object, default: () => ({}) },
-  combinedServices: { type: Array, default: () => [] },
-  discoveredPortsByHost: { type: Object, default: () => ({}) },
+interface SelectedNode {
+  type?: string
+  hostId?: string
+  status?: string
+  sublabel?: string
+  portNumber?: number | string
+  protocol?: string
+  containers?: string[]
+  internalPort?: number | string
+  externalPort?: number | string
+  isProxyLinked?: boolean
+  isAutheliaLinked?: boolean
+  isInternetExposed?: boolean
+  [key: string]: any
+}
+
+interface Host {
+  id: string
+  status?: string
+  network_rx_bytes?: number
+  network_tx_bytes?: number
+  [key: string]: any
+}
+
+interface Container {
+  host_id: string
+  state?: string
+  [key: string]: any
+}
+
+interface ServicePort {
+  id?: string | number
+  hostId?: string
+  internalPort?: number | string
+  name?: string
+  domain?: string
+  path?: string
+  linkToProxy?: boolean
+  linkToAuthelia?: boolean
+  exposedToInternet?: boolean
+}
+
+interface DiscoveredPort {
+  key: string
+  port: number
+  protocol?: string
+  internal?: boolean
+  containers?: unknown[]
+}
+
+interface HostPortOverride {
+  excludedPorts?: number[]
+  portMap?: Record<number, string>
+  proxyPorts?: Set<number>
+  autheliaPortNumbers?: Set<number>
+  internetExposedPorts?: Record<number, number | null>
+}
+
+const props = withDefaults(defineProps<{
+  selectedNode?: SelectedNode | null
+  hosts?: Host[]
+  containers?: Container[]
+  hostPortOverrides?: Record<string, HostPortOverride>
+  combinedServices?: ServicePort[]
+  discoveredPortsByHost?: Record<string, DiscoveredPort[]>
+}>(), {
+  selectedNode: null,
+  hosts: () => [],
+  containers: () => [],
+  hostPortOverrides: () => ({}),
+  combinedServices: () => [],
+  discoveredPortsByHost: () => ({}),
 })
 
-const emit = defineEmits(['close'])
+defineEmits<{
+  (e: 'close'): void
+}>()
 
 const hostData = computed(() => props.hosts.find(h => h.id === props.selectedNode?.hostId) || null)
 const hostContainers = computed(() => props.containers.filter(c => c.host_id === props.selectedNode?.hostId))
@@ -283,12 +350,12 @@ const allHostPorts = computed(() => {
   if (!hostId) return []
 
   const discovered = props.discoveredPortsByHost?.[hostId] || []
-  const override = props.hostPortOverrides?.[hostId] || {}
+  const override: HostPortOverride = props.hostPortOverrides?.[hostId] || {}
   const excludedPorts = new Set((override.excludedPorts || []).map(Number))
-  const portMap = override.portMap || {}
-  const proxyPorts = override.proxyPorts || new Set()
-  const autheliaPortNumbers = override.autheliaPortNumbers || new Set()
-  const internetExposedPorts = override.internetExposedPorts || {}
+  const portMap: Record<number, string> = override.portMap || {}
+  const proxyPorts: Set<number> = override.proxyPorts || new Set<number>()
+  const autheliaPortNumbers: Set<number> = override.autheliaPortNumbers || new Set<number>()
+  const internetExposedPorts: Record<number, number | null> = override.internetExposedPorts || {}
 
   const servicePorts = new Set(
     props.combinedServices
@@ -323,7 +390,7 @@ const serviceUrl = computed(() => {
 })
 
 const nodeTypeLabel = computed(() => {
-  const map = {
+  const map: Record<string, string> = {
     root: 'Reverse proxy',
     host: 'Hôte',
     service: 'Service',
@@ -331,7 +398,7 @@ const nodeTypeLabel = computed(() => {
     authelia: 'Authelia',
     internet: 'Internet',
   }
-  return map[props.selectedNode?.type] || 'Nœud'
+  return map[props.selectedNode?.type || ''] || 'Nœud'
 })
 
 const typeTagClass = computed(() => {
@@ -353,7 +420,7 @@ const statusBadgeClass = computed(() => {
   return 'status status-secondary'
 })
 
-function formatBytes(bytes) {
+function formatBytes(bytes: number | undefined): string {
   if (!bytes && bytes !== 0) return '-'
   if (bytes < 1024) return `${bytes} B`
   const units = ['KB', 'MB', 'GB', 'TB']
@@ -363,7 +430,7 @@ function formatBytes(bytes) {
   return `${value.toFixed(1)} ${units[idx]}`
 }
 
-function copyUrl(url) {
+function copyUrl(url: string): void {
   navigator.clipboard.writeText(url).catch(() => {})
 }
 </script>

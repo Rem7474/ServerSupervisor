@@ -4,7 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"net/smtp"
 	"net/url"
@@ -86,7 +86,7 @@ func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 
 	save := func(key, value string) {
 		if err := h.db.SetSetting(c.Request.Context(), key, value); err != nil {
-			log.Printf("Failed to persist setting %s: %v", key, err)
+			slog.ErrorContext(c.Request.Context(), fmt.Sprintf("Failed to persist setting %s: %v", key, err))
 		}
 	}
 
@@ -248,7 +248,7 @@ func (h *SettingsHandler) CleanupMetrics(c *gin.Context) {
 		return
 	}
 	user := c.GetString("username")
-	log.Printf("User %s triggered manual metrics cleanup", user)
+	slog.InfoContext(c.Request.Context(), fmt.Sprintf("User %s triggered manual metrics cleanup", user))
 
 	deleted, err := h.db.CleanOldMetrics(c.Request.Context(), h.cfg.MetricsRetentionDays)
 	if err != nil {
@@ -259,7 +259,7 @@ func (h *SettingsHandler) CleanupMetrics(c *gin.Context) {
 	// Also trim old tracker tag digests (keep last 100 per tracker).
 	deletedDigests, digestErr := h.db.CleanupTrackerTagDigests(c.Request.Context(), 100)
 	if digestErr != nil {
-		log.Printf("CleanupMetrics: failed to trim tracker tag digests: %v", digestErr)
+		slog.ErrorContext(c.Request.Context(), fmt.Sprintf("CleanupMetrics: failed to trim tracker tag digests: %v", digestErr))
 	}
 
 	message := fmt.Sprintf("Deleted %d old metrics records, %d old tracker tag digest entries", deleted, deletedDigests)
@@ -276,7 +276,7 @@ func (h *SettingsHandler) CleanupAuditLogs(c *gin.Context) {
 		return
 	}
 	user := c.GetString("username")
-	log.Printf("User %s triggered manual audit logs cleanup", user)
+	slog.InfoContext(c.Request.Context(), fmt.Sprintf("User %s triggered manual audit logs cleanup", user))
 
 	deleted, err := h.db.CleanOldAuditLogs(c.Request.Context(), h.cfg.AuditRetentionDays)
 	if err != nil {

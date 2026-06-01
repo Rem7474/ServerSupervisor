@@ -25,18 +25,18 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { onErrorCaptured, ref } from 'vue'
 
 const hasError = ref(false)
 const errorMessage = ref('')
 
-function resetBoundary() {
+function resetBoundary(): void {
   hasError.value = false
   errorMessage.value = ''
 }
 
-onErrorCaptured((error) => {
+onErrorCaptured((error: Error) => {
   hasError.value = true
   errorMessage.value =
     error?.message ||

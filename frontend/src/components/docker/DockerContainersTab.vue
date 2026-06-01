@@ -169,13 +169,13 @@
                 <code>{{ containerVersion(c)?.running_version || c.image_tag }}</code>
                 <template v-if="containerVersion(c)">
                   <span
-                    v-if="containerVersion(c).is_up_to_date"
+                    v-if="containerVersion(c)?.is_up_to_date"
                     class="badge bg-green-lt text-green"
                   >À jour</span>
                   <span
-                    v-else-if="containerVersion(c).running_version || containerVersion(c).update_confirmed"
+                    v-else-if="containerVersion(c)?.running_version || containerVersion(c)?.update_confirmed"
                     class="badge bg-yellow-lt text-yellow"
-                    :title="`Dernière version : ${containerVersion(c).latest_version}`"
+                    :title="`Dernière version : ${containerVersion(c)?.latest_version}`"
                   >Mise à jour disponible</span>
                   <span
                     v-else
@@ -200,7 +200,7 @@
               />
             </td>
             <td class="text-secondary small font-monospace">
-              <template v-if="c.state === 'running' && (c.net_rx_bytes > 0 || c.net_tx_bytes > 0)">
+              <template v-if="c.state === 'running' && ((c.net_rx_bytes ?? 0) > 0 || (c.net_tx_bytes ?? 0) > 0)">
                 ↓ {{ formatBytes(c.net_rx_bytes) }} / ↑ {{ formatBytes(c.net_tx_bytes) }}
               </template>
               <span
@@ -359,7 +359,7 @@
                   class="btn btn-sm btn-ghost-secondary"
                   title="Voir le suivi de version"
                   aria-label="Voir le suivi de version"
-                  @click="openTracker(containerVersion(c).tracker_id)"
+                  @click="openTracker(containerVersion(c)?.tracker_id)"
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -385,7 +385,7 @@
                   @click="runTracker(containerVersion(c), c)"
                 >
                   <span
-                    v-if="trackerRunLoading[containerVersion(c).tracker_id]"
+                    v-if="trackerRunLoading[containerVersion(c)?.tracker_id || '']"
                     class="spinner-border spinner-border-sm"
                   />
                   <svg
@@ -707,7 +707,7 @@
                 >{{ net }}</span>
               </div>
               <div
-                v-if="inspectTarget?.net_rx_bytes > 0 || inspectTarget?.net_tx_bytes > 0"
+                v-if="(inspectTarget?.net_rx_bytes ?? 0) > 0 || (inspectTarget?.net_tx_bytes ?? 0) > 0"
                 class="mt-3 border-top pt-3"
               >
                 <div class="text-secondary small fw-semibold mb-1">
@@ -753,7 +753,7 @@
   />
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, watch, toRef } from 'vue'
 import { useRouter } from 'vue-router'
 import apiClient from '../../api'
@@ -763,38 +763,71 @@ import DockerPortBadges from '../common/DockerPortBadges.vue'
 import EmptyState from '../EmptyState.vue'
 import { useDockerContainerPorts } from '../../composables/useDockerContainerPorts'
 
+interface Container {
+  id: string
+  name: string
+  hostname?: string
+  host_id: string
+  image: string
+  image_tag?: string
+  state: string
+  labels?: Record<string, string>
+  env_vars?: Record<string, string>
+  volumes?: string[]
+  networks?: string[]
+  net_rx_bytes?: number
+  net_tx_bytes?: number
+  [key: string]: any
+}
+
+interface VersionComparison {
+  tracker_id?: string
+  host_id: string
+  docker_image: string
+  running_version?: string
+  latest_version?: string
+  is_up_to_date?: boolean
+  update_confirmed?: boolean
+}
+
 const router = useRouter()
 
-const props = defineProps({
-  containers: { type: Array, default: () => [] },
-  versionComparisons: { type: Array, default: () => [] },
-  canRunDocker: { type: Boolean, default: false },
-  actionLoading: { type: Object, default: () => ({}) },
+const props = withDefaults(defineProps<{
+  containers?: Container[]
+  versionComparisons?: VersionComparison[]
+  canRunDocker?: boolean
+  actionLoading?: Record<string, string | boolean>
+}>(), {
+  containers: () => [],
+  versionComparisons: () => [],
+  canRunDocker: false,
+  actionLoading: () => ({}),
 })
 
-const { normalizedPortsForContainer } = useDockerContainerPorts(toRef(props, 'containers'))
+const { normalizedPortsForContainer } = useDockerContainerPorts(toRef(props, 'containers') as any)
 
-// Map host_id+image → comparison for quick lookup
-const versionMap = computed(() => {
-  const m = {}
+const versionMap = computed<Record<string, VersionComparison>>(() => {
+  const m: Record<string, VersionComparison> = {}
   for (const vc of props.versionComparisons) {
     m[vc.host_id + '|' + vc.docker_image] = vc
   }
   return m
 })
 
-function containerVersion(c) {
+function containerVersion(c: Container): VersionComparison | null {
   return versionMap.value[c.host_id + '|' + c.image] ||
          versionMap.value[c.host_id + '|' + c.image + ':' + c.image_tag] ||
          null
 }
 
-defineEmits(['container-action'])
+defineEmits<{
+  (e: 'container-action', ...args: unknown[]): void
+}>()
 
-function trackImage(c) {
+function trackImage(c: Container): void {
   const image = c.image || ''
   const tag = c.image_tag || 'latest'
-  const query = { tab: 'trackers', docker_image: image, docker_tag: tag }
+  const query: Record<string, string> = { tab: 'trackers', docker_image: image, docker_tag: tag }
   const project = c.labels?.['com.docker.compose.project']
   if (project) {
     query.compose_project = project
@@ -806,23 +839,23 @@ function trackImage(c) {
 
 const searchInput = ref('')
 const search = ref('')
-let searchDebounce = null
-watch(searchInput, val => {
-  clearTimeout(searchDebounce)
+let searchDebounce: ReturnType<typeof setTimeout> | null = null
+watch(searchInput, (val) => {
+  if (searchDebounce) clearTimeout(searchDebounce)
   searchDebounce = setTimeout(() => { search.value = val }, 300)
 })
 const stateFilter = ref('')
 const hostFilter = ref('')
 const composeFilter = ref('')
-const sortBy = ref('hostname')
-const sortDir = ref('asc')
-const inspectTarget = ref(null)
+const sortBy = ref<keyof Container>('hostname')
+const sortDir = ref<'asc' | 'desc'>('asc')
+const inspectTarget = ref<Container | null>(null)
 const inspectTab = ref('env')
-const selectedContainer = ref(null)
-const trackerRunLoading = ref({})
+const selectedContainer = ref<Container | null>(null)
+const trackerRunLoading = ref<Record<string, boolean>>({})
 const trackerFeedback = ref('')
 
-function toggleSort(key) {
+function toggleSort(key: keyof Container): void {
   if (sortBy.value === key) {
     sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
     return
@@ -831,7 +864,14 @@ function toggleSort(key) {
   sortDir.value = 'asc'
 }
 
-function getComposeInfo(container) {
+interface ComposeInfo {
+  project: string
+  service: string
+  workingDir: string
+  configFiles: string
+}
+
+function getComposeInfo(container: Container): Partial<ComposeInfo> {
   if (!container.labels) return {}
   return {
     project: container.labels['com.docker.compose.project'] || '',
@@ -841,22 +881,22 @@ function getComposeInfo(container) {
   }
 }
 
-function normalizeComposeName(value) {
+function normalizeComposeName(value: string | undefined): string {
   return String(value || '').toLowerCase().replace(/[^a-z0-9]/g, '')
 }
 
-function isComposeServiceRedundant(container) {
+function isComposeServiceRedundant(container: Container): boolean {
   const info = getComposeInfo(container)
   if (!info.project || !info.service) return true
   return normalizeComposeName(info.project) === normalizeComposeName(info.service)
 }
 
-function isComposeContainer(container) {
+function isComposeContainer(container: Container): boolean {
   return !!container.labels?.['com.docker.compose.project']
 }
 
-function stateClass(state) {
-  const map = {
+function stateClass(state: string | undefined): string {
+  const map: Record<string, string> = {
     running:    'badge bg-green-lt text-green',
     restarting: 'badge bg-yellow-lt text-yellow',
     paused:     'badge bg-yellow-lt text-yellow',
@@ -865,10 +905,10 @@ function stateClass(state) {
     dead:       'badge bg-red-lt text-red',
     removing:   'badge bg-orange-lt text-orange',
   }
-  return map[state] || 'badge bg-secondary-lt text-secondary'
+  return map[state || ''] || 'badge bg-secondary-lt text-secondary'
 }
 
-function formatBytes(bytes) {
+function formatBytes(bytes: number | undefined): string {
   if (!bytes) return '0 B'
   const k = 1024
   const sizes = ['B', 'KiB', 'MiB', 'GiB', 'TiB']
@@ -876,41 +916,42 @@ function formatBytes(bytes) {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
 }
 
-function openTracker(trackerId) {
+function openTracker(trackerId: string | undefined): void {
   if (!trackerId) return
   router.push(`/release-trackers/${trackerId}`)
 }
 
-function canRunTracker(vc) {
+function canRunTracker(vc: VersionComparison | null | undefined): boolean {
   return props.canRunDocker && !!vc?.tracker_id
 }
 
-function hasManualTrackerData(vc) {
+function hasManualTrackerData(vc: VersionComparison | null | undefined): boolean {
   return !!(vc?.latest_version && String(vc.latest_version).trim())
 }
 
-function isTrackerRunDisabled(vc) {
+function isTrackerRunDisabled(vc: VersionComparison | null | undefined): boolean {
+  if (!vc) return true
   if (!canRunTracker(vc)) return true
   if (!hasManualTrackerData(vc)) return true
-  return !!trackerRunLoading.value[vc.tracker_id]
+  return !!trackerRunLoading.value[vc.tracker_id!]
 }
 
-function trackerRunTooltip(vc) {
+function trackerRunTooltip(vc: VersionComparison | null | undefined): string {
   if (!props.canRunDocker) return 'Action réservée admin/opérateur'
   if (!hasManualTrackerData(vc)) return 'Attendez la première vérification automatique'
   return 'Déclencher la tâche du tracker maintenant'
 }
 
-async function runTracker(vc, container) {
-  if (isTrackerRunDisabled(vc)) return
-  const id = vc.tracker_id
+async function runTracker(vc: VersionComparison | null | undefined, container?: Container): Promise<void> {
+  if (!vc || isTrackerRunDisabled(vc)) return
+  const id = vc.tracker_id!
   trackerRunLoading.value = { ...trackerRunLoading.value, [id]: true }
   trackerFeedback.value = ''
   try {
     await apiClient.runReleaseTracker(id)
     trackerFeedback.value = `Déclenchement lancé pour ${container?.image || 'le tracker'}.`
-  } catch (e) {
-    trackerFeedback.value = e.response?.data?.error || 'Échec du déclenchement manuel.'
+  } catch (e: any) {
+    trackerFeedback.value = e?.response?.data?.error || 'Échec du déclenchement manuel.'
   } finally {
     const next = { ...trackerRunLoading.value }
     delete next[id]
@@ -919,7 +960,7 @@ async function runTracker(vc, container) {
 }
 
 const filteredContainers = computed(() => {
-  return props.containers.filter(c => {
+  return props.containers.filter((c) => {
     const matchSearch = !search.value ||
       c.name?.toLowerCase().includes(search.value.toLowerCase()) ||
       c.image?.toLowerCase().includes(search.value.toLowerCase()) ||
@@ -937,8 +978,8 @@ const sortedContainers = computed(() => {
   const dir = sortDir.value === 'asc' ? 1 : -1
   const sorted = [...filteredContainers.value]
   sorted.sort((a, b) => {
-    let av = a[sortBy.value]
-    let bv = b[sortBy.value]
+    let av: unknown = a[sortBy.value]
+    let bv: unknown = b[sortBy.value]
 
     if (sortBy.value === 'image') {
       av = `${a.image || ''}:${a.image_tag || ''}`
@@ -953,10 +994,10 @@ const sortedContainers = computed(() => {
 })
 
 const uniqueHosts = computed(() => {
-  const seen = new Set()
+  const seen = new Set<string>()
   return props.containers
-    .filter(c => { if (seen.has(c.hostname)) return false; seen.add(c.hostname); return true })
-    .map(c => c.hostname)
+    .filter((c) => { if (!c.hostname || seen.has(c.hostname)) return false; seen.add(c.hostname); return true })
+    .map((c) => c.hostname!)
     .sort()
 })
 </script>

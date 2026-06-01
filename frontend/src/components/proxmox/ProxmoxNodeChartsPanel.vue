@@ -27,7 +27,7 @@
       <div class="col-12 col-lg-4">
         <RRDChartCard
           title="CPU"
-          :chart-data="cpuChart"
+          :chart-data="cpuChart || undefined"
           :options="pctOptions"
           :empty-text="error || 'Aucune donnée'"
         />
@@ -35,7 +35,7 @@
       <div class="col-12 col-lg-4">
         <RRDChartCard
           title="RAM"
-          :chart-data="ramChart"
+          :chart-data="ramChart || undefined"
           :options="ramOptions"
           :empty-text="error || 'Aucune donnée'"
         />
@@ -43,7 +43,7 @@
       <div class="col-12 col-lg-4">
         <RRDChartCard
           title="IO Wait"
-          :chart-data="iowaitChart"
+          :chart-data="iowaitChart || undefined"
           :options="pctOptions"
           :empty-text="error || 'Aucune donnée'"
         />
@@ -51,7 +51,7 @@
       <div class="col-12 col-lg-4">
         <RRDChartCard
           title="Réseau"
-          :chart-data="netChart"
+          :chart-data="netChart || undefined"
           :options="netOptions"
           :empty-text="error || 'Aucune donnée'"
         />
@@ -59,7 +59,7 @@
       <div class="col-12 col-lg-4">
         <RRDChartCard
           title="Température CPU"
-          :chart-data="tempChart"
+          :chart-data="tempChart || undefined"
           :options="tempOptions"
           :empty-text="tempEmptyText"
         />
@@ -67,7 +67,7 @@
       <div class="col-12 col-lg-4">
         <RRDChartCard
           title="RPM Ventilateurs"
-          :chart-data="fanChart"
+          :chart-data="fanChart || undefined"
           :options="fanOptions"
           :empty-text="fanEmptyText"
         />
@@ -76,13 +76,13 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import RRDChartCard from './RRDChartCard.vue'
 import { getChartPalette } from '../../utils/chartTheme'
 
 const palette = getChartPalette()
 const tooltipBase = {
-  enabled: true, mode: 'index', intersect: false,
+  enabled: true, mode: 'index' as const, intersect: false,
   backgroundColor: palette.tooltipBackground,
   titleColor: palette.tooltipText,
   bodyColor: palette.tooltipText,
@@ -91,21 +91,35 @@ const tooltipBase = {
   padding: 8,
 }
 
-defineProps({
-  cpuChart: { type: Object, default: null },
-  ramChart: { type: Object, default: null },
-  iowaitChart: { type: Object, default: null },
-  netChart: { type: Object, default: null },
-  tempChart: { type: Object, default: null },
-  fanChart: { type: Object, default: null },
-  timeframe: { type: String, default: 'hour' },
-  loading: { type: Boolean, default: false },
-  error: { type: String, default: '' },
-  tempEmptyText: { type: String, default: 'Aucune donnée température disponible' },
-  fanEmptyText: { type: String, default: 'Aucune donnée ventilateur disponible' },
+withDefaults(defineProps<{
+  cpuChart?: object | null
+  ramChart?: object | null
+  iowaitChart?: object | null
+  netChart?: object | null
+  tempChart?: object | null
+  fanChart?: object | null
+  timeframe?: string
+  loading?: boolean
+  error?: string
+  tempEmptyText?: string
+  fanEmptyText?: string
+}>(), {
+  cpuChart: null,
+  ramChart: null,
+  iowaitChart: null,
+  netChart: null,
+  tempChart: null,
+  fanChart: null,
+  timeframe: 'hour',
+  loading: false,
+  error: '',
+  tempEmptyText: 'Aucune donnée température disponible',
+  fanEmptyText: 'Aucune donnée ventilateur disponible',
 })
 
-defineEmits(['timeframe-changed'])
+defineEmits<{
+  (e: 'timeframe-changed', value: string): void
+}>()
 
 const timeframeOptions = [
   { value: 'hour', label: '1h' },
@@ -115,7 +129,7 @@ const timeframeOptions = [
   { value: 'year', label: '1 an' },
 ]
 
-function formatBytesPerSec(v) {
+function formatBytesPerSec(v: number | null | undefined): string {
   if (v == null) return '—'
   if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)} MB/s`
   if (v >= 1_000) return `${(v / 1_000).toFixed(1)} KB/s`
@@ -129,12 +143,12 @@ const pctOptions = {
     tooltip: {
       ...tooltipBase,
       displayColors: false,
-      callbacks: { label: (ctx) => `${ctx.parsed.y != null ? ctx.parsed.y.toFixed(1) : '—'}%` },
+      callbacks: { label: (ctx: any) => `${ctx.parsed.y != null ? ctx.parsed.y.toFixed(1) : '—'}%` },
     },
   },
   scales: {
     x: { display: true, grid: { color: palette.grid }, ticks: { color: palette.tickText, maxTicksLimit: 8 } },
-    y: { display: true, min: 0, max: 100, grid: { color: palette.grid }, ticks: { color: palette.tickText, callback: (v) => `${v}%` } },
+    y: { display: true, min: 0, max: 100, grid: { color: palette.grid }, ticks: { color: palette.tickText, callback: (v: number | string) => `${v}%` } },
   },
   elements: { point: { radius: 0, hitRadius: 10, hoverRadius: 4 }, line: { tension: 0.3 } },
   interaction: { mode: 'nearest', axis: 'x', intersect: false },
@@ -147,7 +161,7 @@ const ramOptions = {
     tooltip: {
       ...pctOptions.plugins.tooltip,
       callbacks: {
-        label: (ctx) => {
+        label: (ctx: any) => {
           const pct = ctx.parsed.y != null ? ctx.parsed.y.toFixed(1) : '—'
           return `${pct}%`
         },
@@ -162,12 +176,12 @@ const netOptions = {
     legend: { display: true, position: 'top', labels: { color: palette.legendText, boxWidth: 10, padding: 8 } },
     tooltip: {
       ...tooltipBase,
-      callbacks: { label: (ctx) => `${ctx.dataset.label}: ${formatBytesPerSec(ctx.parsed.y)}` },
+      callbacks: { label: (ctx: any) => `${ctx.dataset.label}: ${formatBytesPerSec(ctx.parsed.y)}` },
     },
   },
   scales: {
     x: { display: true, grid: { color: palette.grid }, ticks: { color: palette.tickText, maxTicksLimit: 8 } },
-    y: { display: true, min: 0, grid: { color: palette.grid }, ticks: { color: palette.tickText, callback: (v) => formatBytesPerSec(v) } },
+    y: { display: true, min: 0, grid: { color: palette.grid }, ticks: { color: palette.tickText, callback: (v: number | string) => formatBytesPerSec(typeof v === 'number' ? v : Number(v)) } },
   },
   elements: { point: { radius: 0, hitRadius: 10, hoverRadius: 4 }, line: { tension: 0.3 } },
   interaction: { mode: 'nearest', axis: 'x', intersect: false },
@@ -179,12 +193,12 @@ const tempOptions = {
     legend: { display: false },
     tooltip: {
       ...tooltipBase,
-      callbacks: { label: (ctx) => `${ctx.parsed.y != null ? ctx.parsed.y.toFixed(1) : '—'}°C` },
+      callbacks: { label: (ctx: any) => `${ctx.parsed.y != null ? ctx.parsed.y.toFixed(1) : '—'}°C` },
     },
   },
   scales: {
     x: { display: true, grid: { color: palette.grid }, ticks: { color: palette.tickText, maxTicksLimit: 8 } },
-    y: { display: true, grid: { color: palette.grid }, ticks: { color: palette.tickText, callback: (v) => `${v}°C` } },
+    y: { display: true, grid: { color: palette.grid }, ticks: { color: palette.tickText, callback: (v: number | string) => `${v}°C` } },
   },
   elements: { point: { radius: 0, hitRadius: 10, hoverRadius: 4 }, line: { tension: 0.3 } },
   interaction: { mode: 'nearest', axis: 'x', intersect: false },
@@ -196,12 +210,12 @@ const fanOptions = {
     legend: { display: false },
     tooltip: {
       ...tooltipBase,
-      callbacks: { label: (ctx) => `${ctx.parsed.y != null ? Math.round(ctx.parsed.y) : '—'} RPM` },
+      callbacks: { label: (ctx: any) => `${ctx.parsed.y != null ? Math.round(ctx.parsed.y) : '—'} RPM` },
     },
   },
   scales: {
     x: { display: true, grid: { color: palette.grid }, ticks: { color: palette.tickText, maxTicksLimit: 8 } },
-    y: { display: true, min: 0, grid: { color: palette.grid }, ticks: { color: palette.tickText, callback: (v) => `${v} RPM` } },
+    y: { display: true, min: 0, grid: { color: palette.grid }, ticks: { color: palette.tickText, callback: (v: number | string) => `${v} RPM` } },
   },
   elements: { point: { radius: 0, hitRadius: 10, hoverRadius: 4 }, line: { tension: 0.3 } },
   interaction: { mode: 'nearest', axis: 'x', intersect: false },

@@ -36,16 +36,17 @@
   </div>
 </template>
 
-<script setup>
-defineProps({
-  dbStatus: {
-    type: Object,
-    required: true,
-  },
-  formatNumber: {
-    type: Function,
-    required: true,
-  },
-})
+<script setup lang="ts">
+interface DBStatus {
+  connected: boolean
+  auditLogCount: number
+  metricsCount: number
+  hostsCount: number
+}
+
+defineProps<{
+  dbStatus: DBStatus
+  formatNumber: (n: number) => string
+}>()
 </script>
 

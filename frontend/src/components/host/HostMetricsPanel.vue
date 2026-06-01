@@ -32,7 +32,7 @@
           >
             <span class="text-muted small">Temp:</span>
             <span :class="['text-sm fw-semibold', tempColor(metrics.cpu_temperature)]">
-              {{ `${metrics.cpu_temperature.toFixed(1)}°C` }}
+              {{ `${(metrics.cpu_temperature ?? 0).toFixed(1)}°C` }}
             </span>
           </div>
         </div>
@@ -114,8 +114,8 @@
         >
           <Line
             v-if="cpuChartData"
-            :data="cpuChartData"
-            :options="chartOptions"
+            :data="(cpuChartData as any)"
+            :options="(chartOptions as any)"
             class="h-100"
           />
           <div
@@ -140,8 +140,8 @@
         >
           <Line
             v-if="memChartData"
-            :data="memChartData"
-            :options="memChartOptions"
+            :data="(memChartData as any)"
+            :options="(memChartOptions as any)"
             class="h-100"
           />
           <div
@@ -156,12 +156,34 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, ref, shallowRef, defineAsyncComponent, onMounted, watch, toRef } from 'vue'
 import apiClient from '../../api'
 import MetricsSourceBadge from '../common/MetricsSourceBadge.vue'
 import dayjs from '../../utils/dayjs'
 import { getChartPalette } from '../../utils/chartTheme'
+
+interface MetricsData {
+  cpu_cores?: number
+  cpu_usage_percent?: number
+  cpu_model?: string
+  cpu_temperature?: number
+  memory_percent?: number
+  memory_used?: number
+  memory_total?: number
+  uptime?: number
+  load_avg_1?: number
+  load_avg_5?: number
+  load_avg_15?: number
+}
+
+interface HistoryPoint {
+  timestamp: string
+  cpu_usage_percent?: number
+  memory_percent?: number
+  memory_used?: number
+  memory_total?: number
+}
 
 const palette = getChartPalette()
 
@@ -174,18 +196,23 @@ const Line = defineAsyncComponent(async () => {
   return Line
 })
 
-const props = defineProps({
-  hostId: { type: String, required: true },
-  metrics: { type: Object, default: null },
-  metricsSource: { type: String, default: 'agent' }, // 'agent' | 'proxmox'
-  proxmoxGuestId: { type: String, default: null },
-  refreshTick: { type: Number, default: 0 },
+const props = withDefaults(defineProps<{
+  hostId: string
+  metrics?: MetricsData | null
+  metricsSource?: string
+  proxmoxGuestId?: string | null
+  refreshTick?: number
+}>(), {
+  metrics: null,
+  metricsSource: 'agent',
+  proxmoxGuestId: null,
+  refreshTick: 0,
 })
 
 const chartHours = ref(24)
-const metricsHistory = ref([])
-const cpuChartData = shallowRef(null)
-const memChartData = shallowRef(null)
+const metricsHistory = ref<HistoryPoint[]>([])
+const cpuChartData = shallowRef<any>(null)
+const memChartData = shallowRef<any>(null)
 
 const hasCpuTemp = computed(() => Number(props.metrics?.cpu_temperature) > 0)
 
@@ -199,7 +226,7 @@ const timeRangeOptions = [
   { hours: 8760, label: '1y' },
 ]
 
-function getMaxHistoryTimestamp(list) {
+function getMaxHistoryTimestamp(list: HistoryPoint[]): number | undefined {
   let max = -Infinity
   for (const metric of list || []) {
     const ts = dayjs(metric.timestamp).valueOf()
@@ -209,7 +236,7 @@ function getMaxHistoryTimestamp(list) {
   return Math.min(Date.now(), max)
 }
 
-function getMinHistoryTimestamp(list) {
+function getMinHistoryTimestamp(list: HistoryPoint[]): number | undefined {
   let min = Infinity
   for (const metric of list || []) {
     const ts = dayjs(metric.timestamp).valueOf()
@@ -232,8 +259,8 @@ const chartOptions = computed(() => ({
       borderColor: palette.tooltipBorder,
       borderWidth: 1, padding: 10, displayColors: false,
       callbacks: {
-        title: (items) => formatChartTime(items[0]?.parsed?.x),
-        label: (ctx) => `${ctx.parsed.y.toFixed(1)}%`,
+        title: (items: any[]) => formatChartTime(items[0]?.parsed?.x),
+        label: (ctx: any) => `${ctx.parsed.y.toFixed(1)}%`,
       },
     },
   },
@@ -247,7 +274,7 @@ const chartOptions = computed(() => ({
       ticks: {
         color: palette.tickText,
         maxTicksLimit: 10,
-        callback: (value) => formatChartTime(Number(value)),
+        callback: (value: number | string) => formatChartTime(Number(value)),
       },
     },
     y: { display: true, min: 0, max: 100, grid: { color: palette.grid }, ticks: { color: palette.tickText } },
@@ -263,8 +290,8 @@ const memChartOptions = computed(() => ({
     tooltip: {
       ...chartOptions.value.plugins.tooltip,
       callbacks: {
-        title: (items) => formatChartTime(items[0]?.parsed?.x),
-        label: (ctx) => {
+        title: (items: any[]) => formatChartTime(items[0]?.parsed?.x),
+        label: (ctx: any) => {
           const pct = ctx.parsed.y.toFixed(1)
           const m = metricsHistory.value[ctx.dataIndex]
           if (m?.memory_used && m?.memory_total) {
@@ -277,7 +304,7 @@ const memChartOptions = computed(() => ({
   },
 }))
 
-function formatBytes(bytes) {
+function formatBytes(bytes: number | undefined): string {
   if (!bytes) return '0 B'
   const k = 1024
   const sizes = ['B', 'KiB', 'MiB', 'GiB', 'TiB']
@@ -285,7 +312,7 @@ function formatBytes(bytes) {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
 }
 
-function formatUptime(seconds) {
+function formatUptime(seconds: number | undefined): string {
   if (!seconds) return 'N/A'
   const days = Math.floor(seconds / 86400)
   const hours = Math.floor((seconds % 86400) / 3600)
@@ -294,28 +321,28 @@ function formatUptime(seconds) {
   return `${hours}h ${mins}m`
 }
 
-function cpuColor(pct) {
+function cpuColor(pct: number | undefined): string {
   if (!pct) return 'text-secondary'
   if (pct > 90) return 'text-red'
   if (pct > 70) return 'text-yellow'
   return 'text-green'
 }
 
-function memColor(pct) {
+function memColor(pct: number | undefined): string {
   if (!pct) return 'text-secondary'
   if (pct > 90) return 'text-red'
   if (pct > 75) return 'text-yellow'
   return 'text-green'
 }
 
-function tempColor(temp) {
+function tempColor(temp: number | undefined): string {
   if (!temp) return 'text-secondary'
   if (temp >= 85) return 'text-red'
   if (temp >= 70) return 'text-yellow'
   return 'text-green'
 }
 
-function formatChartTime(timestamp) {
+function formatChartTime(timestamp: number | string | undefined): string {
   if (!timestamp) return ''
   const date = dayjs(timestamp)
   if (!date.isValid()) return ''
@@ -324,20 +351,20 @@ function formatChartTime(timestamp) {
   return date.format('DD/MM')
 }
 
-function clampTimestamp(timestampMs) {
+function clampTimestamp(timestampMs: number): number {
   if (!Number.isFinite(timestampMs)) return NaN
   const now = Date.now()
   return Math.min(timestampMs, now)
 }
 
-function toChartPoint(metric, field) {
+function toChartPoint(metric: HistoryPoint, field: keyof HistoryPoint): { x: number; y: number } | null {
   const timestamp = clampTimestamp(dayjs(metric.timestamp).valueOf())
-  const value = metric[field]
+  const value = metric[field] as number | undefined
   if (!Number.isFinite(timestamp) || value == null) return null
   return { x: timestamp, y: value }
 }
 
-let refreshTimer = null
+let refreshTimer: ReturnType<typeof setTimeout> | null = null
 watch(() => props.refreshTick, () => {
   if (refreshTimer) clearTimeout(refreshTimer)
   refreshTimer = setTimeout(() => {
@@ -346,7 +373,7 @@ watch(() => props.refreshTick, () => {
   }, 400)
 })
 
-async function loadHistory(hours) {
+async function loadHistory(hours: number): Promise<void> {
   chartHours.value = hours
   try {
     let history
@@ -355,8 +382,8 @@ async function loadHistory(hours) {
       // Response shape: [{timestamp, cpu_avg, memory_avg}] — remap to chart field names.
       const bucketMinutes = hours <= 1 ? 1 : hours <= 6 ? 2 : hours <= 24 ? 5 : hours <= 168 ? 30 : 60
       const res = await apiClient.getProxmoxGuestMetrics(props.proxmoxGuestId, hours, bucketMinutes)
-      const raw = Array.isArray(res.data) ? res.data : []
-      history = raw.map(p => ({
+      const raw: any[] = Array.isArray(res.data) ? res.data : []
+      history = raw.map((p: any) => ({
         timestamp: p.timestamp,
         cpu_usage_percent: p.cpu_avg,
         memory_percent: p.memory_avg,
@@ -371,16 +398,16 @@ async function loadHistory(hours) {
     metricsHistory.value = history
     if (!history.length) { cpuChartData.value = null; memChartData.value = null; return }
     buildCharts()
-  } catch (e) {
-    console.error(`Failed to fetch metrics history (${hours}h):`, e.response?.data || e.message)
+  } catch (e: any) {
+    console.error(`Failed to fetch metrics history (${hours}h):`, e?.response?.data || e?.message)
   }
 }
 
-function cssVar(name) {
+function cssVar(name: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
 }
 
-function buildCharts() {
+function buildCharts(): void {
   const cpuPoints = metricsHistory.value
     .map(m => toChartPoint(m, 'cpu_usage_percent'))
     .filter(Boolean)

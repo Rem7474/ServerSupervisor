@@ -8,17 +8,15 @@
   />
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
 import BadgePill from './BadgePill.vue'
 
-const props = defineProps({
-  source: {
-    type: String,
-    required: true,
-    validator: (value) => ['proxmox', 'agent', 'auto'].includes(value),
-  },
-})
+type Source = 'proxmox' | 'agent' | 'auto'
+
+const props = defineProps<{
+  source: Source
+}>()
 
 const badgeText = computed(() => {
   switch (props.source) {

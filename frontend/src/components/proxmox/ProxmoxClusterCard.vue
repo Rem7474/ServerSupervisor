@@ -155,20 +155,35 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
 
-const props = defineProps({
-  nodes: { type: Array, default: () => [] },
+interface ClusterNode {
+  id: string | number
+  node_name: string
+  status: string
+  cluster_name?: string
+  cpu_usage: number
+  cpu_count?: number
+  mem_used?: number
+  mem_total?: number
+  vm_count?: number
+  lxc_count?: number
+}
+
+const props = withDefaults(defineProps<{
+  nodes?: ClusterNode[]
+}>(), {
+  nodes: () => [],
 })
 
 const clusterName = computed(() => {
-  const n = props.nodes.find(n => n.cluster_name)
+  const n = props.nodes.find((node) => node.cluster_name)
   return n?.cluster_name || ''
 })
 
-const onlineNodes = computed(() => props.nodes.filter(n => n.status === 'online').length)
-const nodesDown = computed(() => props.nodes.filter(n => n.status !== 'online').length)
+const onlineNodes = computed(() => props.nodes.filter((n) => n.status === 'online').length)
+const nodesDown = computed(() => props.nodes.filter((n) => n.status !== 'online').length)
 
 const totalVMs = computed(() => props.nodes.reduce((s, n) => s + (n.vm_count || 0), 0))
 const totalLXC = computed(() => props.nodes.reduce((s, n) => s + (n.lxc_count || 0), 0))
@@ -176,9 +191,8 @@ const totalCpus = computed(() => props.nodes.reduce((s, n) => s + (n.cpu_count |
 const totalMemTotal = computed(() => props.nodes.reduce((s, n) => s + (n.mem_total || 0), 0))
 const totalMemUsed = computed(() => props.nodes.reduce((s, n) => s + (n.mem_used || 0), 0))
 
-// Weighted-average CPU across all online nodes (each node's cpu_usage * its cpu_count)
 const clusterCpuPct = computed(() => {
-  const online = props.nodes.filter(n => n.status === 'online')
+  const online = props.nodes.filter((n) => n.status === 'online')
   const totalW = online.reduce((s, n) => s + (n.cpu_count || 1), 0)
   if (totalW === 0) return 0
   const weighted = online.reduce((s, n) => s + (n.cpu_usage || 0) * (n.cpu_count || 1), 0)
@@ -193,30 +207,30 @@ const clusterRamPct = computed(() => {
 const clusterCpuColor = computed(() => pctColor(clusterCpuPct.value))
 const clusterRamColor = computed(() => pctColor(clusterRamPct.value))
 
-function nodRamPct(node) {
+function nodRamPct(node: ClusterNode): number {
   if (!node.mem_total) return 0
-  return (node.mem_used / node.mem_total) * 100
+  return ((node.mem_used || 0) / node.mem_total) * 100
 }
 
-function pctColor(pct) {
+function pctColor(pct: number): string {
   if (pct > 90) return 'text-red'
   if (pct > 70) return 'text-yellow'
   return 'text-green'
 }
 
-function cpuBarColor(pct) {
+function cpuBarColor(pct: number): string {
   if (pct > 90) return 'bg-red'
   if (pct > 70) return 'bg-yellow'
   return 'bg-blue'
 }
 
-function ramBarColor(pct) {
+function ramBarColor(pct: number): string {
   if (pct > 90) return 'bg-red'
   if (pct > 75) return 'bg-yellow'
   return 'bg-green'
 }
 
-function formatBytes(bytes) {
+function formatBytes(bytes: number): string {
   if (!bytes) return '0 B'
   const units = ['B', 'Ko', 'Mo', 'Go', 'To']
   let i = 0

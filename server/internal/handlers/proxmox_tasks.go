@@ -1,7 +1,8 @@
 package handlers
 
 import (
-	"log"
+	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -100,7 +101,7 @@ func (h *ProxmoxHandler) GetTaskLog(c *gin.Context) {
 	client := proxmoxclient.New(conn.APIURL, conn.TokenID, secret, conn.InsecureSkipVerify)
 	lines, err := client.GetNodeTaskLog(node.NodeName, upid)
 	if err != nil {
-		log.Printf("proxmox task-log [%s/%s/%s]: %v", conn.Name, node.NodeName, upid, err)
+		slog.ErrorContext(c.Request.Context(), fmt.Sprintf("proxmox task-log [%s/%s/%s]: %v", conn.Name, node.NodeName, upid, err))
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 		return
 	}
@@ -145,7 +146,7 @@ func (h *ProxmoxHandler) GetNodeSyslog(c *gin.Context) {
 	client := proxmoxclient.New(conn.APIURL, conn.TokenID, secret, conn.InsecureSkipVerify)
 	lines, err := client.GetNodeSyslog(node.NodeName, limit, service)
 	if err != nil {
-		log.Printf("proxmox syslog [%s/%s]: %v", conn.Name, node.NodeName, err)
+		slog.ErrorContext(c.Request.Context(), fmt.Sprintf("proxmox syslog [%s/%s]: %v", conn.Name, node.NodeName, err))
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 		return
 	}

@@ -454,12 +454,35 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import apiClient from '../../api'
 import BadgePill from '../common/BadgePill.vue'
 import { getAlertMetricMeta } from '../../utils/alertMetrics'
 import { resolveIncidentHostRoute } from '../../utils/incidentRouting'
+
+interface Incident {
+  id?: string | number
+  type?: string
+  severity?: string
+  rule_name?: string
+  host_id?: string
+  host_name?: string
+  source_label?: string
+  metric?: string
+  status?: string
+  version?: string
+  value?: number | string
+  triggered_at?: string
+  resolved_at?: string | null
+  tracker_id?: string | number
+  [key: string]: unknown
+}
+
+interface AnnotatedIncident extends Incident {
+  _isOld: boolean
+  _showSeparator: boolean
+}
 
 const PAGE_SIZE = 50
 const AGE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000
@@ -469,34 +492,29 @@ const TYPE_FILTERS = [
   { value: 'crit', label: 'Critique', activeClass: 'btn-danger shadow-sm' },
   { value: 'warn', label: 'Avertissement', activeClass: 'btn-warning shadow-sm' },
   { value: 'tracker', label: 'Tracker', activeClass: 'btn-info shadow-sm' },
-]
+] as const
 
 const STATUS_FILTERS = [
   { value: 'all', label: 'Tous états', activeClass: 'btn-primary shadow-sm' },
   { value: 'active', label: 'Actifs', activeClass: 'btn-danger shadow-sm' },
   { value: 'resolved', label: 'Terminés', activeClass: 'btn-success shadow-sm' },
-]
+] as const
 
-const props = defineProps({
-  incidents: {
-    type: Array,
-    default: () => [],
-  },
-  loading: {
-    type: Boolean,
-    default: false,
-  },
-  error: {
-    type: String,
-    default: '',
-  },
-  activeIncidentCount: {
-    type: Number,
-    default: 0,
-  },
+const props = withDefaults(defineProps<{
+  incidents?: Incident[]
+  loading?: boolean
+  error?: string
+  activeIncidentCount?: number
+}>(), {
+  incidents: () => [],
+  loading: false,
+  error: '',
+  activeIncidentCount: 0,
 })
 
-defineEmits(['refresh'])
+defineEmits<{
+  (e: 'refresh'): void
+}>()
 
 const filterType = ref('all')
 const filterStatus = ref('all')
@@ -553,7 +571,7 @@ watch([filterType, filterStatus, searchQuery], () => {
   currentPage.value = 1
 })
 
-const annotatedIncidents = computed(() => {
+const annotatedIncidents = computed<AnnotatedIncident[]>(() => {
   const now = Date.now()
   let separatorShown = false
   return filteredIncidents.value.map((incident) => {
@@ -573,11 +591,11 @@ const paginatedIncidents = computed(() => {
   return annotatedIncidents.value.slice(start, start + PAGE_SIZE)
 })
 
-const visiblePages = computed(() => {
+const visiblePages = computed<(number | string)[]>(() => {
   const total = totalPages.value
   const cur = currentPage.value
   if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1)
-  const pages = []
+  const pages: (number | string)[] = []
   if (cur <= 4) {
     pages.push(1, 2, 3, 4, 5, '…', total)
   } else if (cur >= total - 3) {
@@ -588,12 +606,12 @@ const visiblePages = computed(() => {
   return pages
 })
 
-function setTypeFilter(value) {
+function setTypeFilter(value: string): void {
   filterType.value = value
   currentPage.value = 1
 }
 
-function setStatusFilter(value) {
+function setStatusFilter(value: string): void {
   filterStatus.value = value
   currentPage.value = 1
 }
@@ -618,48 +636,48 @@ async function markAllRead() {
   }
 }
 
-function notificationRoute(incident) {
+function notificationRoute(incident: Incident): string {
   if (incident?.type === 'release_tracker_detected' || incident?.type === 'release_tracker_execution') {
-    if (incident?.tracker_id) return `/release-trackers/${encodeURIComponent(incident.tracker_id)}`
+    if (incident?.tracker_id) return `/release-trackers/${encodeURIComponent(String(incident.tracker_id))}`
     return '/git-webhooks?tab=trackers'
   }
   return resolveIncidentHostRoute(incident?.host_id, incident?.metric)
 }
 
-function trackerStatusLabel(status) {
+function trackerStatusLabel(status: string | undefined): string {
   if (status === 'pending' || status === 'running') return 'Détection en cours'
   if (status === 'completed' || status === 'success') return 'Exécution réussie'
   if (status === 'failed' || status === 'error') return 'Exécution échouée'
   return status || 'État inconnu'
 }
 
-function isCompleted(incident) {
+function isCompleted(incident: Incident): boolean {
   if (incident?.type === 'release_tracker_detected' || incident?.type === 'release_tracker_execution') {
     return !!incident?.resolved_at || ['completed', 'success', 'failed', 'error'].includes((incident?.status || '').toLowerCase())
   }
   return !!incident?.resolved_at
 }
 
-function incidentMetricLabel(metric) {
-  const meta = getAlertMetricMeta(metric)
+function incidentMetricLabel(metric: string | undefined): string {
+  const meta = getAlertMetricMeta(metric || '')
   return meta?.label || metric || '-'
 }
 
-function defaultNotificationTitle(incident) {
+function defaultNotificationTitle(incident: Incident): string {
   if (incident?.type === 'release_tracker_detected') return 'Nouvelle version détectée'
   if (incident?.type === 'release_tracker_execution') return 'Exécution de tracker'
   return incident?.metric ? incidentMetricLabel(incident.metric) : 'Notification'
 }
 
-function incidentFormatValue(value, metric) {
+function incidentFormatValue(value: number | string | undefined, metric: string | undefined): string {
   if (metric === 'release_tracker') return '-'
   if (metric === 'status_offline') return value === 1 ? 'offline' : 'online'
   if (metric === 'disk_smart_status') return Number(value) >= 1 ? 'FAILED' : 'OK'
-  const unit = getAlertMetricMeta(metric).unit
+  const unit = getAlertMetricMeta(metric || '').unit
   return `${Number(value).toFixed(2)}${unit}`
 }
 
-function formatDate(dateStr) {
+function formatDate(dateStr: string | undefined | null): string {
   if (!dateStr) return ''
   return new Date(dateStr).toLocaleString('fr-FR')
 }

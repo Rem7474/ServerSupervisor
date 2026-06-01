@@ -1,7 +1,6 @@
 package handlers
 
 import (
-
 	"net/http"
 	"strconv"
 
@@ -38,7 +37,7 @@ func (h *ProxmoxHandler) GetGuestMetricsSummary(c *gin.Context) {
 
 // ListGuests returns all guests with optional filters: connection_id, type (vm|lxc), status.
 func (h *ProxmoxHandler) ListGuests(c *gin.Context) {
-	guests, err := h.db.ListProxmoxGuests(c.Request.Context(), 
+	guests, err := h.db.ListProxmoxGuests(c.Request.Context(),
 		c.Query("connection_id"),
 		c.Query("type"),
 		c.Query("status"),

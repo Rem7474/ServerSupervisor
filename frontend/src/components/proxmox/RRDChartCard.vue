@@ -8,8 +8,8 @@
     <div class="card-body proxmox-chart-body">
       <Line
         v-if="chartData"
-        :data="chartData"
-        :options="options"
+        :data="(chartData as any)"
+        :options="(options as any)"
         class="h-100"
       />
       <div
@@ -22,7 +22,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { defineAsyncComponent } from 'vue'
 
 defineProps({

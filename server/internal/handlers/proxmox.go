@@ -2,7 +2,7 @@ package handlers
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -57,7 +57,7 @@ func (h *ProxmoxHandler) StartPoller(parent context.Context) {
 			}
 		}
 	}()
-	log.Println("Proxmox poller started (tick: 30s, respects per-connection poll_interval_sec)")
+	slog.InfoContext(ctx, "Proxmox poller started (tick: 30s, respects per-connection poll_interval_sec)")
 }
 
 func (h *ProxmoxHandler) StopPoller() {
@@ -90,7 +90,7 @@ func (h *ProxmoxHandler) CreateConnection(c *gin.Context) {
 		return
 	}
 
-	id, err := h.db.CreateProxmoxConnection(c.Request.Context(), 
+	id, err := h.db.CreateProxmoxConnection(c.Request.Context(),
 		req.Name, req.APIURL, req.TokenID, req.TokenSecret,
 		req.InsecureSkipVerify, req.Enabled, req.PollIntervalSec,
 	)
@@ -136,7 +136,7 @@ func (h *ProxmoxHandler) UpdateConnection(c *gin.Context) {
 		return
 	}
 
-	if err := h.db.UpdateProxmoxConnection(c.Request.Context(), 
+	if err := h.db.UpdateProxmoxConnection(c.Request.Context(),
 		id, req.Name, req.APIURL, req.TokenID, req.TokenSecret,
 		req.InsecureSkipVerify, req.Enabled, req.PollIntervalSec,
 	); err != nil {

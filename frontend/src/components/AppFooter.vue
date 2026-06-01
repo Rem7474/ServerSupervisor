@@ -65,17 +65,16 @@
   </footer>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
 
-const props = defineProps({
-  /** WebSocket global status: 'connected' | 'connecting' | 'reconnecting' | 'error' | 'disconnected' | null */
-  wsStatus: {
-    type: String,
-    default: null,
-  },
+const props = withDefaults(defineProps<{
+  wsStatus?: string | null
+}>(), {
+  wsStatus: null,
 })
 
+declare const __APP_VERSION__: string
 const appVersion = __APP_VERSION__
 const year = new Date().getFullYear()
 

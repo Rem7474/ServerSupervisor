@@ -146,7 +146,7 @@
                 {{ item.host_name }}
               </router-link>
               <span class="flex-shrink-0 ms-2">
-                <RelativeTime :date="item.triggered_at" />
+                <RelativeTime :date="item.triggered_at || ''" />
               </span>
             </div>
             <div
@@ -181,12 +181,12 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import RelativeTime from './RelativeTime.vue'
 import { useNotifications } from '../composables/useNotifications'
 
-const bellRef = ref(null)
+const bellRef = ref<HTMLElement | null>(null)
 const isOpen = ref(false)
 
 const {
@@ -203,13 +203,13 @@ const {
   notificationRoute,
 } = useNotifications()
 
-function toggleOpen() {
+function toggleOpen(): void {
   isOpen.value = !isOpen.value
   if (isOpen.value) fetchNotifications()
 }
 
-function onClickOutside(e) {
-  if (bellRef.value && !bellRef.value.contains(e.target)) {
+function onClickOutside(e: MouseEvent): void {
+  if (bellRef.value && !bellRef.value.contains(e.target as Node)) {
     isOpen.value = false
   }
 }

@@ -249,7 +249,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import api from '../api'
 import { useAuthStore } from '../stores/auth'
@@ -259,10 +259,29 @@ import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import RelativeTime from '../components/RelativeTime.vue'
 import dayjs from '../utils/dayjs'
 
+interface SSLCert {
+  id: string
+  name: string
+  host: string
+  port: number
+  server_name?: string
+  enabled: boolean
+  [key: string]: any
+}
+
+interface CertForm {
+  id: string
+  name: string
+  host: string
+  port: number
+  server_name: string
+  enabled: boolean
+}
+
 const auth = useAuthStore()
 const dialog = useConfirmDialog()
 
-const certs = ref([])
+const certs = ref<SSLCert[]>([])
 const loading = ref(false)
 const error = ref('')
 const checkingId = ref('')
@@ -270,30 +289,29 @@ const checkingId = ref('')
 const modalOpen = ref(false)
 const saving = ref(false)
 const formError = ref('')
-const form = ref(emptyForm())
+const form = ref<CertForm>(emptyForm())
 
-function emptyForm () {
+function emptyForm(): CertForm {
   return { id: '', name: '', host: '', port: 443, server_name: '', enabled: true }
 }
 
-function formatDate (ts) {
+function formatDate(ts: string | undefined | null): string {
   return ts ? dayjs(ts).format('YYYY-MM-DD') : '—'
 }
 
-function shortIssuer (s) {
+function shortIssuer(s: string | undefined): string {
   if (!s) return ''
-  // Extract CN from "CN=Let's Encrypt R3,O=..." or fallback to first segment
   const cn = /CN=([^,]+)/.exec(s)
   return cn ? cn[1] : s.split(',')[0]
 }
 
-function daysLabel (d) {
+function daysLabel(d: number | null | undefined): string {
   if (d == null) return 'Inconnu'
   if (d < 0) return `Expiré (${Math.abs(d)}j)`
   return `${d}j`
 }
 
-function daysBadge (d) {
+function daysBadge(d: number | null | undefined): string {
   if (d == null) return 'bg-secondary-lt text-secondary'
   if (d < 0) return 'bg-red text-white'
   if (d <= 7) return 'bg-red-lt text-red'
@@ -301,26 +319,26 @@ function daysBadge (d) {
   return 'bg-green-lt text-green'
 }
 
-async function fetchCerts () {
+async function fetchCerts(): Promise<void> {
   loading.value = true
   error.value = ''
   try {
     const { data } = await api.getSSLCertificates()
     certs.value = data?.certificates || []
-  } catch (e) {
+  } catch (e: any) {
     error.value = e?.response?.data?.error || e?.message || 'Impossible de charger les certificats'
   } finally {
     loading.value = false
   }
 }
 
-function openCreate () {
+function openCreate(): void {
   form.value = emptyForm()
   formError.value = ''
   modalOpen.value = true
 }
 
-function openEdit (c) {
+function openEdit(c: SSLCert): void {
   form.value = {
     id: c.id,
     name: c.name,
@@ -333,17 +351,16 @@ function openEdit (c) {
   modalOpen.value = true
 }
 
-function closeModal () {
+function closeModal(): void {
   modalOpen.value = false
   saving.value = false
 }
 
-async function save () {
+async function save(): Promise<void> {
   saving.value = true
   formError.value = ''
   try {
-    const body = { ...form.value }
-    delete body.id
+    const { id: _id, ...body } = form.value
     if (form.value.id) {
       await api.updateSSLCertificate(form.value.id, body)
     } else {
@@ -351,26 +368,26 @@ async function save () {
     }
     closeModal()
     await fetchCerts()
-  } catch (e) {
+  } catch (e: any) {
     formError.value = e?.response?.data?.error || e?.message || 'Erreur lors de l\'enregistrement'
   } finally {
     saving.value = false
   }
 }
 
-async function checkNow (c) {
+async function checkNow(c: SSLCert): Promise<void> {
   checkingId.value = c.id
   try {
     await api.checkSSLCertificateNow(c.id)
     await fetchCerts()
-  } catch (e) {
+  } catch (e: any) {
     error.value = e?.response?.data?.error || e?.message || 'Échec de la vérification'
   } finally {
     checkingId.value = ''
   }
 }
 
-async function confirmDelete (c) {
+async function confirmDelete(c: SSLCert): Promise<void> {
   const ok = await dialog.confirm({
     title: 'Supprimer le certificat ?',
     message: `Cette action supprimera "${c.name}" du suivi.`,
@@ -381,12 +398,12 @@ async function confirmDelete (c) {
   try {
     await api.deleteSSLCertificate(c.id)
     await fetchCerts()
-  } catch (e) {
+  } catch (e: any) {
     error.value = e?.response?.data?.error || e?.message || 'Suppression impossible'
   }
 }
 
-let refreshTimer
+let refreshTimer: ReturnType<typeof setInterval> | undefined
 onMounted(() => {
   fetchCerts()
   refreshTimer = setInterval(fetchCerts, 60000)

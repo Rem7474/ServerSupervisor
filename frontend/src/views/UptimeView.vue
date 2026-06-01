@@ -307,7 +307,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import api from '../api'
 import { useAuthStore } from '../stores/auth'
@@ -316,10 +316,40 @@ import EmptyState from '../components/EmptyState.vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import RelativeTime from '../components/RelativeTime.vue'
 
+interface Probe {
+  id: string
+  name: string
+  type: string
+  target: string
+  interval_sec: number
+  timeout_sec: number
+  expected_status: number
+  expected_body_regex?: string
+  follow_redirects: boolean
+  verify_tls: boolean
+  enabled: boolean
+  last_status?: string
+  [key: string]: any
+}
+
+interface ProbeForm {
+  id: string
+  name: string
+  type: string
+  target: string
+  interval_sec: number
+  timeout_sec: number
+  expected_status: number
+  expected_body_regex: string
+  follow_redirects: boolean
+  verify_tls: boolean
+  enabled: boolean
+}
+
 const auth = useAuthStore()
 const dialog = useConfirmDialog()
 
-const probes = ref([])
+const probes = ref<Probe[]>([])
 const loading = ref(false)
 const error = ref('')
 const checkingId = ref('')
@@ -327,9 +357,9 @@ const checkingId = ref('')
 const modalOpen = ref(false)
 const saving = ref(false)
 const formError = ref('')
-const form = ref(emptyForm())
+const form = ref<ProbeForm>(emptyForm())
 
-function emptyForm () {
+function emptyForm(): ProbeForm {
   return {
     id: '',
     name: '',
@@ -345,39 +375,39 @@ function emptyForm () {
   }
 }
 
-function statusBadge (p) {
+function statusBadge(p: Probe): string {
   if (!p.enabled) return 'bg-secondary-lt text-secondary'
   if (p.last_status === 'up') return 'bg-green-lt text-green'
   if (p.last_status === 'down') return 'bg-red-lt text-red'
   return 'bg-secondary-lt text-secondary'
 }
 
-function statusLabel (p) {
+function statusLabel(p: Probe): string {
   if (p.last_status === 'up') return 'UP'
   if (p.last_status === 'down') return 'DOWN'
   return 'Inconnue'
 }
 
-async function fetchProbes () {
+async function fetchProbes(): Promise<void> {
   loading.value = true
   error.value = ''
   try {
     const { data } = await api.getUptimeProbes()
     probes.value = data?.probes || []
-  } catch (e) {
+  } catch (e: any) {
     error.value = e?.response?.data?.error || e?.message || 'Impossible de charger les sondes'
   } finally {
     loading.value = false
   }
 }
 
-function openCreate () {
+function openCreate(): void {
   form.value = emptyForm()
   formError.value = ''
   modalOpen.value = true
 }
 
-function openEdit (p) {
+function openEdit(p: Probe): void {
   form.value = {
     id: p.id,
     name: p.name,
@@ -395,17 +425,16 @@ function openEdit (p) {
   modalOpen.value = true
 }
 
-function closeModal () {
+function closeModal(): void {
   modalOpen.value = false
   saving.value = false
 }
 
-async function save () {
+async function save(): Promise<void> {
   saving.value = true
   formError.value = ''
   try {
-    const body = { ...form.value }
-    delete body.id
+    const { id: _id, ...body } = form.value
     if (form.value.id) {
       await api.updateUptimeProbe(form.value.id, body)
     } else {
@@ -413,26 +442,26 @@ async function save () {
     }
     closeModal()
     await fetchProbes()
-  } catch (e) {
+  } catch (e: any) {
     formError.value = e?.response?.data?.error || e?.message || 'Erreur lors de l\'enregistrement'
   } finally {
     saving.value = false
   }
 }
 
-async function checkNow (p) {
+async function checkNow(p: Probe): Promise<void> {
   checkingId.value = p.id
   try {
     await api.checkUptimeProbeNow(p.id)
     await fetchProbes()
-  } catch (e) {
+  } catch (e: any) {
     error.value = e?.response?.data?.error || e?.message || 'Échec de la vérification'
   } finally {
     checkingId.value = ''
   }
 }
 
-async function confirmDelete (p) {
+async function confirmDelete(p: Probe): Promise<void> {
   const ok = await dialog.confirm({
     title: 'Supprimer la sonde ?',
     message: `Cette action supprimera "${p.name}" et tout son historique.`,
@@ -443,12 +472,12 @@ async function confirmDelete (p) {
   try {
     await api.deleteUptimeProbe(p.id)
     await fetchProbes()
-  } catch (e) {
+  } catch (e: any) {
     error.value = e?.response?.data?.error || e?.message || 'Suppression impossible'
   }
 }
 
-let refreshTimer
+let refreshTimer: ReturnType<typeof setInterval> | undefined
 onMounted(() => {
   fetchProbes()
   refreshTimer = setInterval(fetchProbes, 15000)

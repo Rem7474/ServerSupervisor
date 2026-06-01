@@ -223,7 +223,7 @@
                   {{ command.host_name || command.host_id }}
                 </div>
                 <div class="d-flex align-items-center gap-2 mt-1 flex-wrap">
-                  <span :class="moduleClass(command.module)">{{ moduleLabel(command.module) }}</span>
+                  <span :class="moduleClass(command.module || '')">{{ moduleLabel(command.module || '') }}</span>
                   <code class="console-cmd-label">
                     {{ cmdLabel(command) }}
                   </code>
@@ -232,7 +232,7 @@
                   v-if="command.created_at"
                   class="text-secondary small mt-1"
                 >
-                  Exécutée {{ formatRelativeTime(command.created_at, '—', true) }}
+                  Exécutée {{ formatRelativeTime(command.created_at || '', '—', true) }}
                 </div>
               </div>
               <span
@@ -281,58 +281,62 @@
   </button>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import { copyConsoleOutput, downloadConsoleOutput } from '../../utils/consoleOutput'
 import { moduleLabel, moduleClass } from '../../utils/moduleMeta'
 import { useStatusBadge } from '../../composables/useStatusBadge'
 import { useDateFormatter } from '../../composables/useDateFormatter'
 
-const props = defineProps({
-  /** The command record: { host_name?, host_id?, module, action, target?, status, output? } */
-  command: {
-    type: Object,
-    default: null,
-  },
-  show: {
-    type: Boolean,
-    default: false,
-  },
-  title: {
-    type: String,
-    default: 'Logs',
-  },
-  emptyText: {
-    type: String,
-    default: 'Aucun log sélectionné',
-  },
-  wrapperClass: {
-    type: String,
-    default: '',
-  },
-  clearable: {
-    type: Boolean,
-    default: false,
-  },
+interface CommandRecord {
+  host_name?: string
+  host_id?: string
+  module?: string
+  action?: string
+  target?: string
+  status?: string
+  output?: string
+  created_at?: string
+  [key: string]: unknown
+}
+
+const props = withDefaults(defineProps<{
+  command?: CommandRecord | null
+  show?: boolean
+  title?: string
+  emptyText?: string
+  wrapperClass?: string
+  clearable?: boolean
+}>(), {
+  command: null,
+  show: false,
+  title: 'Logs',
+  emptyText: 'Aucun log sélectionné',
+  wrapperClass: '',
+  clearable: false,
 })
 
-const emit = defineEmits(['close', 'open', 'clear'])
+defineEmits<{
+  (e: 'close'): void
+  (e: 'open'): void
+  (e: 'clear'): void
+}>()
 
 const { getStatusBadgeClass } = useStatusBadge()
 const { formatRelativeTime } = useDateFormatter()
 
-const outputEl = ref(null)
+const outputEl = ref<HTMLElement | null>(null)
 const copied = ref(false)
 
-function cmdLabel(cmd) {
+function cmdLabel(cmd: CommandRecord): string {
   return [cmd.action, cmd.target].filter(Boolean).join(' ')
 }
 
-function statusClass(status) {
+function statusClass(status: string | undefined): string {
   return getStatusBadgeClass(status, 'badge bg-yellow-lt text-yellow')
 }
 
-function processCarriageReturns(text) {
+function processCarriageReturns(text: string): string {
   const lines = []
   let currentLine = ''
   for (let i = 0; i < text.length; i++) {
@@ -370,13 +374,13 @@ watch(outputText, () => {
   })
 })
 
-async function copy() {
+async function copy(): Promise<void> {
   await copyConsoleOutput(props.command?.output || '')
   copied.value = true
   setTimeout(() => { copied.value = false }, 2000)
 }
 
-function download() {
+function download(): void {
   const name = [props.command?.module, props.command?.action, props.command?.target]
     .filter(Boolean).join('-')
   downloadConsoleOutput(props.command?.output || '', `log-${name || 'command'}.txt`)

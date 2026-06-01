@@ -29,7 +29,7 @@
               {{ formatDate(cmd.created_at) }}
             </td>
             <td>
-              <span :class="cmdModuleClass(cmd.module)">{{ cmdModuleLabel(cmd.module) }}</span>
+              <span :class="cmdModuleClass(cmd.module || '')">{{ cmdModuleLabel(cmd.module || '') }}</span>
             </td>
             <td>
               <code class="small">{{ cmdLabel(cmd) }}</code>
@@ -86,20 +86,31 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useDateFormatter } from '../../composables/useDateFormatter'
 import { usePagination } from '../../composables/usePagination'
 import { useStatusBadge } from '../../composables/useStatusBadge'
 import { moduleLabel as cmdModuleLabel, moduleClass as cmdModuleClass } from '../../utils/moduleMeta'
 
-defineEmits(['watch-command'])
+interface Command {
+  id: string | number
+  created_at?: string
+  module?: string
+  action?: string
+  target?: string
+  status?: string
+  triggered_by?: string
+}
 
-const props = defineProps({
-  commands: {
-    type: Array,
-    default: () => [],
-  },
+defineEmits<{
+  (e: 'watch-command', cmd: Command): void
+}>()
+
+const props = withDefaults(defineProps<{
+  commands?: Command[]
+}>(), {
+  commands: () => [],
 })
 
 const { formatRelativeDate: formatDate } = useDateFormatter()
@@ -113,13 +124,13 @@ const { pagedItems: firstPageCommands } = usePagination({
 })
 const displayedCommands = computed(() => (showFullHistory.value ? props.commands : firstPageCommands.value))
 
-function cmdLabel(cmd) {
+function cmdLabel(cmd: Command): string {
   const parts = [cmd.action]
   if (cmd.target) parts.push(cmd.target)
-  return parts.join(' ')
+  return parts.filter(Boolean).join(' ')
 }
 
-function statusClass(status) {
+function statusClass(status: string | undefined): string {
   return getStatusBadgeClass(status, 'badge bg-yellow-lt text-yellow')
 }
 </script>

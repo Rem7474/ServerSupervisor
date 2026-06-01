@@ -3,7 +3,7 @@ package alerts
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"regexp"
 	"strings"
 	"time"
@@ -137,7 +137,7 @@ func countAuthFailuresForNode(ctx context.Context, db *database.DB, node models.
 	for _, service := range services {
 		lines, err := client.GetNodeSyslog(node.NodeName, limit, service)
 		if err != nil {
-			log.Printf("Alerts: syslog fetch failed [%s/%s %s]: %v", conn.Name, node.NodeName, service, err)
+			slog.ErrorContext(ctx, "alerts: syslog fetch failed", slog.String("connection", conn.Name), slog.String("node", node.NodeName), slog.String("service", service), slog.Any("err", err))
 			continue
 		}
 		count += countAuthFailuresInLines(lines, since)
@@ -163,7 +163,7 @@ func collectAuthFailureLogsForNode(ctx context.Context, db *database.DB, node mo
 	for _, service := range services {
 		lines, err := client.GetNodeSyslog(node.NodeName, limit, service)
 		if err != nil {
-			log.Printf("Alerts: syslog fetch failed [%s/%s %s]: %v", conn.Name, node.NodeName, service, err)
+			slog.ErrorContext(ctx, "alerts: syslog fetch failed", slog.String("connection", conn.Name), slog.String("node", node.NodeName), slog.String("service", service), slog.Any("err", err))
 			continue
 		}
 		out = append(out, authFailureLogLines(lines, since, node.NodeName)...)

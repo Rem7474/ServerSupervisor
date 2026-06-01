@@ -5,7 +5,7 @@
         :checked="enabled"
         class="form-check-input"
         type="checkbox"
-        @change="$emit('update:enabled', $event.target.checked)"
+        @change="emit('update:enabled', ($event.target as HTMLInputElement).checked)"
       >
       <span class="form-check-label fw-medium">Déclencher une commande à l'alerte</span>
     </label>
@@ -20,7 +20,7 @@
           <select
             :value="modelValue.module"
             class="form-select form-select-sm"
-            @change="onModuleChange($event.target.value)"
+            @change="onModuleChange(($event.target as HTMLSelectElement).value as CommandModule)"
           >
             <option value="processes">
               Processus (top)
@@ -42,7 +42,7 @@
           <select
             :value="modelValue.action"
             class="form-select form-select-sm"
-            @change="onActionChange($event.target.value)"
+            @change="onActionChange(($event.target as HTMLSelectElement).value)"
           >
             <option
               v-for="action in commandActions"
@@ -64,7 +64,7 @@
             class="form-control form-control-sm"
             :placeholder="commandTargetPlaceholder"
             aria-describedby="command-target-hint"
-            @input="onTargetChange($event.target.value)"
+            @input="onTargetChange(($event.target as HTMLInputElement).value)"
           >
         </div>
       </div>
@@ -76,23 +76,30 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
 
-const props = defineProps({
-  enabled: {
-    type: Boolean,
-    default: false,
-  },
-  modelValue: {
-    type: Object,
-    required: true,
-  },
+type CommandModule = 'processes' | 'journal' | 'systemd' | 'docker'
+
+interface CommandTrigger {
+  module: CommandModule | string
+  action: string
+  target: string
+}
+
+const props = withDefaults(defineProps<{
+  enabled?: boolean
+  modelValue: CommandTrigger
+}>(), {
+  enabled: false,
 })
 
-const emit = defineEmits(['update:enabled', 'update:modelValue'])
+const emit = defineEmits<{
+  (e: 'update:enabled', value: boolean): void
+  (e: 'update:modelValue', value: CommandTrigger): void
+}>()
 
-const commandModuleActions = {
+const commandModuleActions: Record<CommandModule, string[]> = {
   processes: ['list'],
   journal: ['read'],
   systemd: ['status', 'start', 'stop', 'restart'],
@@ -100,7 +107,7 @@ const commandModuleActions = {
 }
 
 const commandActions = computed(() => {
-  const moduleName = props.modelValue.module || 'processes'
+  const moduleName = (props.modelValue.module || 'processes') as CommandModule
   return commandModuleActions[moduleName] || ['list']
 })
 
@@ -116,23 +123,23 @@ const commandTargetPlaceholder = computed(() => {
   return ''
 })
 
-function onModuleChange(module) {
-  const nextActions = commandModuleActions[module] || ['list']
+function onModuleChange(mod: CommandModule): void {
+  const nextActions = commandModuleActions[mod] || ['list']
   emit('update:modelValue', {
-    module,
+    module: mod,
     action: nextActions[0],
     target: '',
   })
 }
 
-function onActionChange(action) {
+function onActionChange(action: string): void {
   emit('update:modelValue', {
     ...props.modelValue,
     action,
   })
 }
 
-function onTargetChange(target) {
+function onTargetChange(target: string): void {
   emit('update:modelValue', {
     ...props.modelValue,
     target,

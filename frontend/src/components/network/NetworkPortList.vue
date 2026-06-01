@@ -127,7 +127,7 @@
               </td>
               <td>
                 <span :class="row.state === 'running' ? 'badge bg-green-lt text-green' : 'badge bg-secondary-lt text-secondary'">
-                  {{ { running: 'En cours', exited: 'Arrêté', paused: 'En pause', created: 'Créé', restarting: 'Redémarrage', dead: 'Mort' }[row.state] || row.state || 'inconnu' }}
+                  {{ ({ running: 'En cours', exited: 'Arrêté', paused: 'En pause', created: 'Créé', restarting: 'Redémarrage', dead: 'Mort' } as Record<string, string>)[row.state || ''] || row.state || 'inconnu' }}
                 </span>
               </td>
             </tr>
@@ -257,7 +257,7 @@
                 {{ formatBytes(c.net_tx_bytes) }}
               </td>
               <td class="text-end font-monospace small fw-semibold">
-                {{ formatBytes(c.net_rx_bytes + c.net_tx_bytes) }}
+                {{ formatBytes((c.net_rx_bytes ?? 0) + (c.net_tx_bytes ?? 0)) }}
               </td>
             </tr>
           </tbody>
@@ -267,18 +267,60 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, ref } from 'vue'
 
-const props = defineProps({
-  hosts: {
-    type: Array,
-    default: () => [],
-  },
-  containers: {
-    type: Array,
-    default: () => [],
-  },
+interface PortMapping {
+  host_port?: number | string
+  container_port?: number | string
+  protocol?: string
+  host_ip?: string
+}
+
+interface Container {
+  id: string
+  host_id: string
+  hostname?: string
+  name?: string
+  image?: string
+  image_tag?: string
+  state?: string
+  net_rx_bytes?: number
+  net_tx_bytes?: number
+  port_mappings?: PortMapping[]
+}
+
+interface Host {
+  id: string
+  name?: string
+  hostname?: string
+  ip_address?: string
+  status?: string
+  network_rx_bytes?: number
+  network_tx_bytes?: number
+}
+
+interface PortRow {
+  key: string
+  host_id: string
+  host_name?: string
+  container_name?: string
+  image?: string
+  image_tag?: string
+  state?: string
+  host_port: number
+  container_port?: number | string
+  protocol?: string
+  ipv4: string | null
+  ipv6: string | null
+}
+
+const props = withDefaults(defineProps<{
+  hosts?: Host[]
+  containers?: Container[]
+}>(), {
+  hosts: () => [],
+  containers: () => [],
 })
 
 const search = ref('')
@@ -286,8 +328,8 @@ const protocolFilter = ref('')
 const hostFilter = ref('')
 const onlyPublished = ref(true)
 
-const portRows = computed(() => {
-  const grouped = new Map()
+const portRows = computed<PortRow[]>(() => {
+  const grouped = new Map<string, PortRow>()
 
   for (const container of props.containers) {
     const mappings = container.port_mappings || []
@@ -315,7 +357,7 @@ const portRows = computed(() => {
         })
       }
 
-      const row = grouped.get(groupKey)
+      const row = grouped.get(groupKey)!
       const ip = mapping.host_ip || ''
       if (ip.includes(':')) {
         row.ipv6 = ip
@@ -349,11 +391,11 @@ const portRows = computed(() => {
 
 const containersWithNetStats = computed(() =>
   [...props.containers]
-    .filter((c) => c.state === 'running' && (c.net_rx_bytes > 0 || c.net_tx_bytes > 0))
-    .sort((a, b) => (b.net_rx_bytes + b.net_tx_bytes) - (a.net_rx_bytes + a.net_tx_bytes))
+    .filter((c) => c.state === 'running' && ((c.net_rx_bytes ?? 0) > 0 || (c.net_tx_bytes ?? 0) > 0))
+    .sort((a, b) => ((b.net_rx_bytes ?? 0) + (b.net_tx_bytes ?? 0)) - ((a.net_rx_bytes ?? 0) + (a.net_tx_bytes ?? 0)))
 )
 
-function formatBytes(bytes) {
+function formatBytes(bytes: number | undefined): string {
   if (!bytes && bytes !== 0) return '-'
   if (bytes < 1024) return `${bytes} B`
   const units = ['KB', 'MB', 'GB', 'TB']

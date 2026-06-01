@@ -75,9 +75,9 @@
             </td>
             <td>
               <span
-                v-if="v.container_count > 0"
+                v-if="(v.container_count ?? 0) > 0"
                 class="badge bg-azure-lt text-azure"
-                :title="`${v.container_count} conteneur${v.container_count > 1 ? 's' : ''} utilisent cette image`"
+                :title="`${v.container_count} conteneur${(v.container_count ?? 0) > 1 ? 's' : ''} utilisent cette image`"
               >{{ v.container_count }}</span>
               <span
                 v-else
@@ -178,19 +178,35 @@
   </div>
 </template>
 
-<script setup>
-import { defineProps, ref, computed } from 'vue'
+<script setup lang="ts">
+import { ref, computed } from 'vue'
 import apiClient from '../../api'
 import { useAuthStore } from '../../stores/auth'
 
-const props = defineProps({
-  versions: { type: Array, default: () => [] },
+interface DockerVersion {
+  docker_image: string
+  host_id: string
+  hostname?: string
+  container_count?: number
+  running_version?: string
+  release_url?: string
+  latest_version?: string
+  is_up_to_date?: boolean
+  update_confirmed?: boolean
+  custom_task_id?: string
+  tracker_id?: string
+}
+
+const props = withDefaults(defineProps<{
+  versions?: DockerVersion[]
+}>(), {
+  versions: () => [],
 })
 
 const auth = useAuthStore()
 const isOpen = ref(false)
 const panelId = 'dashboard-docker-versions-panel'
-const runningIds = ref({})
+const runningIds = ref<Record<string, boolean>>({})
 const feedback = ref('')
 
 const outdatedCount = computed(() =>
@@ -203,33 +219,33 @@ function toggle() {
   isOpen.value = !isOpen.value
 }
 
-function hasManualData(v) {
+function hasManualData(v: DockerVersion): boolean {
   return !!(v.latest_version && String(v.latest_version).trim())
 }
 
-function isRunDisabled(v) {
+function isRunDisabled(v: DockerVersion): boolean {
   if (!canRunTracker.value) return true
   if (!v?.tracker_id) return true
   if (!hasManualData(v)) return true
   return !!runningIds.value[v.tracker_id]
 }
 
-function runTooltip(v) {
+function runTooltip(v: DockerVersion): string {
   if (!canRunTracker.value) return 'Action réservée admin/opérateur'
   if (!hasManualData(v)) return 'Attendez la première vérification automatique'
   return 'Déclencher la tâche du tracker maintenant'
 }
 
-async function runTracker(v) {
+async function runTracker(v: DockerVersion): Promise<void> {
   if (isRunDisabled(v)) return
-  const id = v.tracker_id
+  const id = v.tracker_id!
   runningIds.value = { ...runningIds.value, [id]: true }
   feedback.value = ''
   try {
     await apiClient.runReleaseTracker(id)
     feedback.value = `Déclenchement lancé pour ${v.docker_image}.`
-  } catch (e) {
-    feedback.value = e.response?.data?.error || 'Échec du déclenchement manuel.'
+  } catch (e: any) {
+    feedback.value = e?.response?.data?.error || 'Échec du déclenchement manuel.'
   } finally {
     const next = { ...runningIds.value }
     delete next[id]

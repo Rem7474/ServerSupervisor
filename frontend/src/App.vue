@@ -557,7 +557,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useAuthStore } from './stores/auth'
 import { useHostsStore } from './stores/hosts'
@@ -576,17 +576,17 @@ const router = useRouter()
 const route = useRoute()
 const navbarOpen = ref(false)
 const userMenuOpen = ref(false)
-const userMenuRef = ref(null)
+const userMenuRef = ref<HTMLElement | null>(null)
 const secondaryMenuOpen = ref(false)
 const adminMenuOpen = ref(false)
 const httpError = ref('')
-let unsubscribeHttpErrors = () => {}
-let resumeDebounceTimer = null
+let unsubscribeHttpErrors: () => void = () => {}
+let resumeDebounceTimer: ReturnType<typeof setTimeout> | null = null
 
 // Computed property: compter les hôtes hors ligne
 const hostsDownCount = computed(() => {
   return hostsStore.hosts.filter(
-    h => h.status === 'down' || h.status === 'offline'
+    (h: any) => h.status === 'down' || h.status === 'offline'
   ).length
 })
 
@@ -595,10 +595,10 @@ const hostsDownCount = computed(() => {
 // reachable on a local network even when this is false, but it's the best
 // signal available without polling.
 const isOnline = ref(navigator.onLine)
-function handleOnline() { isOnline.value = true }
-function handleOffline() { isOnline.value = false }
+function handleOnline(): void { isOnline.value = true }
+function handleOffline(): void { isOnline.value = false }
 
-function notifyAppResume() {
+function notifyAppResume(): void {
   if (resumeDebounceTimer) {
     clearTimeout(resumeDebounceTimer)
   }
@@ -607,13 +607,13 @@ function notifyAppResume() {
   }, 600)
 }
 
-function handleVisibilityResume() {
+function handleVisibilityResume(): void {
   if (document.visibilityState === 'visible') {
     notifyAppResume()
   }
 }
 
-function handlePageShow(event) {
+function handlePageShow(event: PageTransitionEvent): void {
   if (event.persisted || document.visibilityState === 'visible') {
     notifyAppResume()
   }
@@ -625,7 +625,7 @@ const adminRoutes = ['/git-webhooks', '/audit', '/users']
 const isSecondaryActive = computed(() => secondaryRoutes.some(r => route.path.startsWith(r)))
 const isAdminActive = computed(() => adminRoutes.some(r => route.path.startsWith(r)))
 
-async function handleLogout() {
+async function handleLogout(): Promise<void> {
   userMenuOpen.value = false
   // Remove push subscription before clearing auth token so the DELETE /push/subscribe call succeeds
   if ('serviceWorker' in navigator && 'PushManager' in window) {
@@ -651,41 +651,40 @@ async function handleLogout() {
   router.push('/login')
 }
 
-function toggleUserMenu() {
+function toggleUserMenu(): void {
   secondaryMenuOpen.value = false
   adminMenuOpen.value = false
   userMenuOpen.value = !userMenuOpen.value
 }
 
-function toggleSecondaryMenu() {
+function toggleSecondaryMenu(): void {
   userMenuOpen.value = false
   adminMenuOpen.value = false
   secondaryMenuOpen.value = !secondaryMenuOpen.value
 }
 
-function toggleAdminMenu() {
+function toggleAdminMenu(): void {
   userMenuOpen.value = false
   secondaryMenuOpen.value = false
   adminMenuOpen.value = !adminMenuOpen.value
 }
 
-function handleOutsideClick(event) {
+function handleOutsideClick(event: MouseEvent): void {
   if (!userMenuOpen.value && !secondaryMenuOpen.value && !adminMenuOpen.value) return
   const el = userMenuRef.value
-  // Close user menu if click is outside
-  if (userMenuOpen.value && el && !el.contains(event.target)) {
+  const target = event.target as Node
+  if (userMenuOpen.value && el && !el.contains(target)) {
     userMenuOpen.value = false
   }
-  // Close dropdowns if click is outside the navbar
   const navbar = document.getElementById('navbar-menu')
-  if (navbar && !navbar.contains(event.target)) {
+  if (navbar && !navbar.contains(target)) {
     secondaryMenuOpen.value = false
     adminMenuOpen.value = false
   }
 }
 
 onMounted(() => {
-  unsubscribeHttpErrors = subscribeHttpErrors((event) => {
+  unsubscribeHttpErrors = subscribeHttpErrors((event: any) => {
     httpError.value = event.message
   })
   window.addEventListener('online', handleOnline)

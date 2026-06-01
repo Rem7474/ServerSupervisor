@@ -106,15 +106,15 @@
   />
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, watch, nextTick } from 'vue'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
 import { useModalFocusTrap } from '../composables/useModalFocusTrap'
 
 const dialog = useConfirmDialog()
 const typedText = ref('')
-const inputRef = ref(null)
-const modalRef = ref(null)
+const inputRef = ref<HTMLInputElement | null>(null)
+const modalRef = ref<HTMLElement | null>(null)
 
 useModalFocusTrap(modalRef)
 
@@ -127,13 +127,13 @@ watch(dialog.isOpen, (val) => {
   }
 })
 
-function tryConfirm() {
+function tryConfirm(): void {
   if (dialog.requiredText.value && typedText.value !== dialog.requiredText.value) return
   typedText.value = ''
   dialog.onConfirm()
 }
 
-function handleCancel() {
+function handleCancel(): void {
   typedText.value = ''
   dialog.onCancel()
 }

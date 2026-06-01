@@ -454,8 +454,8 @@
   </div>
 </template>
 
-<script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+<script setup lang="ts">
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import apiClient from '../api'
@@ -468,7 +468,7 @@ import DataToolbar from '../components/common/DataToolbar.vue'
 import SortableHeader from '../components/common/SortableHeader.vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 
-const { formatLocaleDateTime: formatDate, formatRelativeTime } = useDateFormatter()
+const { formatLocaleDateTime: formatDate } = useDateFormatter()
 const { getStatusBadgeClass } = useStatusBadge()
 
 const route = useRoute()
@@ -478,7 +478,7 @@ const canViewCommands = computed(() => auth.role === 'admin' || auth.role === 'o
 const activeTab = ref('commandes')
 
 // ── Commands history ─────────────────────────────────────────────────────────
-const cmds = ref([])
+const cmds = ref<any[]>([])
 const cmdsPage = ref(1)
 const cmdsLimit = 50
 const cmdsTotal = ref(0)
@@ -514,7 +514,7 @@ const hasActiveCommands = computed(() =>
   cmds.value.some((c) => c.status === 'pending' || c.status === 'running')
 )
 
-function toggleCmdSort(key) {
+function toggleCmdSort(key: string): void {
   if (cmdSortBy.value === key) {
     cmdSortDir.value = cmdSortDir.value === 'asc' ? 'desc' : 'asc'
     return
@@ -523,36 +523,35 @@ function toggleCmdSort(key) {
   cmdSortDir.value = key === 'created_at' ? 'desc' : 'asc'
 }
 
-let searchDebounceTimer = null
-function onSearchUpdate(val) {
+let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
+function onSearchUpdate(val: string): void {
   cmdSearch.value = val
-  clearTimeout(searchDebounceTimer)
+  if (searchDebounceTimer) clearTimeout(searchDebounceTimer)
   searchDebounceTimer = setTimeout(() => {
     cmdsPage.value = 1
     fetchCmds()
   }, 350)
 }
 
-function onFilterChange() {
+function onFilterChange(): void {
   cmdsPage.value = 1
   fetchCmds()
 }
 
-// Log viewer
-const selectedCmd = ref(null)
+const selectedCmd = ref<any>(null)
 const showLogViewer = ref(false)
-let auditPollTimer = null
+let auditPollTimer: ReturnType<typeof setInterval> | null = null
 
 const { openCommandStream, closeStream } = useCommandStream()
 
 // ── Connexions (admin) ───────────────────────────────────────────────────────
-const connexions = ref([])
+const connexions = ref<any[]>([])
 const connexionsPage = ref(1)
 const connexionsLimit = 50
 const connexionsTotal = ref(0)
 const connexionsLoading = ref(false)
 const connexionsLoaded = ref(false)
-const security = ref({ stats: null, top_failed_ips: [] })
+const security = ref<{ stats: any; top_failed_ips: any[] }>({ stats: null, top_failed_ips: [] })
 const lastCmdFetchAt = ref(0)
 const lastConnFetchAt = ref(0)
 
@@ -561,7 +560,7 @@ const totalConnexionsPages = computed(() =>
 )
 
 // ── Module display helpers ────────────────────────────────────────────────────
-const MODULE_META = {
+const MODULE_META: Record<string, { label: string; cls: string }> = {
   apt:       { label: 'APT',        cls: 'badge bg-azure-lt text-azure' },
   docker:    { label: 'Docker',     cls: 'badge bg-blue-lt text-blue' },
   systemd:   { label: 'Systemd',    cls: 'badge bg-green-lt text-green' },
@@ -570,45 +569,44 @@ const MODULE_META = {
   custom:    { label: 'Custom',     cls: 'badge bg-teal-lt text-teal' },
 }
 
-const STATUS_LABELS = {
+const STATUS_LABELS: Record<string, string> = {
   pending:   'En attente',
   running:   'En cours',
   completed: 'Terminé',
   failed:    'Échoué',
 }
 
-function moduleLabel(module) {
+function moduleLabel(module: string): string {
   return MODULE_META[module]?.label ?? module
 }
 
-function moduleClass(module) {
+function moduleClass(module: string): string {
   return MODULE_META[module]?.cls ?? 'badge bg-secondary-lt text-secondary'
 }
 
-function statusLabel(status) {
+function statusLabel(status: string): string {
   return STATUS_LABELS[status] ?? status
 }
 
-function cmdLabel(cmd) {
+function cmdLabel(cmd: any): string {
   const parts = [cmd.action]
   if (cmd.target) parts.push(cmd.target)
-  return parts.join(' ')
+  return parts.filter(Boolean).join(' ')
 }
 
-function formatDuration(startedAt, endedAt) {
+function formatDuration(startedAt: string | undefined, endedAt: string | undefined): string {
   if (!startedAt || !endedAt) return '—'
-  const diff = Math.max(0, Math.round((new Date(endedAt) - new Date(startedAt)) / 1000))
+  const diff = Math.max(0, Math.round((new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 1000))
   if (diff < 60) return `${diff}s`
   const m = Math.floor(diff / 60), s = diff % 60
   return s > 0 ? `${m}m ${s}s` : `${m}m`
 }
 
-// ── Status / UA helpers ───────────────────────────────────────────────────────
-function statusClass(status) {
+function statusClass(status: string | undefined): string {
   return getStatusBadgeClass(status, 'badge bg-yellow-lt text-yellow')
 }
 
-function parseUA(ua) {
+function parseUA(ua: string | undefined): { browser: string; os: string } {
   if (!ua) return { browser: '—', os: '—' }
   const browser = ua.includes('Firefox/') ? 'Firefox'
     : ua.includes('Edg/') ? 'Edge'
@@ -622,13 +620,12 @@ function parseUA(ua) {
   return { browser, os }
 }
 
-function progressWidth(failCount) {
-  const max = Math.max(...(security.value.top_failed_ips?.map(i => i.fail_count) || [1]))
+function progressWidth(failCount: number): number {
+  const max = Math.max(...(security.value.top_failed_ips?.map((i: any) => i.fail_count) || [1]))
   return max > 0 ? Math.round((failCount / max) * 100) : 0
 }
 
-// ── Log viewer ────────────────────────────────────────────────────────────────
-function openLogViewer(cmd) {
+function openLogViewer(cmd: any): void {
   if (selectedCmd.value?.id === cmd.id) {
     showLogViewer.value = true
     return
@@ -642,15 +639,15 @@ function openLogViewer(cmd) {
   }
 }
 
-function closeLogViewer() {
+function closeLogViewer(): void {
   closeStream()
   selectedCmd.value = null
   showLogViewer.value = false
 }
 
-function connectStream(commandId) {
-  const syncCmdInList = (patch) => {
-    const idx = cmds.value.findIndex((c) => c.id === commandId)
+function connectStream(commandId: string): void {
+  const syncCmdInList = (patch: any): void => {
+    const idx = cmds.value.findIndex((c: any) => c.id === commandId)
     if (idx === -1) return
     const next = [...cmds.value]
     next[idx] = { ...next[idx], ...patch }
@@ -658,14 +655,14 @@ function connectStream(commandId) {
   }
 
   openCommandStream(commandId, {
-    onInit(p) {
+    onInit(p: any) {
       if (selectedCmd.value) { selectedCmd.value.status = p.status; selectedCmd.value.output = p.output || '' }
       syncCmdInList({ status: p.status, output: p.output || '' })
     },
-    onChunk(p) {
+    onChunk(p: any) {
       if (selectedCmd.value) selectedCmd.value.output = (selectedCmd.value.output || '') + p.chunk
     },
-    onStatus(p) {
+    onStatus(p: any) {
       if (selectedCmd.value) { selectedCmd.value.status = p.status; if (p.output) selectedCmd.value.output = p.output }
       syncCmdInList({ status: p.status, ...(p.output ? { output: p.output } : {}) })
     },
@@ -673,7 +670,7 @@ function connectStream(commandId) {
 }
 
 // ── Data fetching ─────────────────────────────────────────────────────────────
-async function fetchCmds() {
+async function fetchCmds(): Promise<void> {
   if (cmdsLoading.value) return
   cmdsLoading.value = true
   try {
@@ -692,8 +689,8 @@ async function fetchCmds() {
   } catch { cmds.value = [] } finally { cmdsLoading.value = false }
 }
 
-async function reconcileCommandStatuses(list) {
-  const ids = []
+async function reconcileCommandStatuses(list: any[]): Promise<void> {
+  const ids: string[] = []
   for (const c of list) {
     if (c.status === 'pending' || c.status === 'running') {
       ids.push(c.id)
@@ -707,8 +704,8 @@ async function reconcileCommandStatuses(list) {
   const snapshots = await Promise.allSettled(ids.map((id) => apiClient.getCommandStatus(id)))
   if (!snapshots.length) return
 
-  const patchById = {}
-  snapshots.forEach((result, idx) => {
+  const patchById: Record<string, any> = {}
+  snapshots.forEach((result: any, idx: number) => {
     if (result.status !== 'fulfilled') return
     const cmd = result.value?.data
     if (!cmd?.id) return
@@ -717,7 +714,7 @@ async function reconcileCommandStatuses(list) {
 
   if (!Object.keys(patchById).length) return
 
-  cmds.value = list.map((c) => {
+  cmds.value = list.map((c: any) => {
     const snap = patchById[c.id]
     if (!snap) return c
     const isActive = snap.status === 'running' || snap.status === 'pending'
@@ -743,7 +740,7 @@ async function reconcileCommandStatuses(list) {
   }
 }
 
-async function fetchConnexions() {
+async function fetchConnexions(): Promise<void> {
   if (connexionsLoading.value) return
   connexionsLoading.value = true
   try {
@@ -770,17 +767,17 @@ async function fetchConnexions() {
   } finally { connexionsLoading.value = false }
 }
 
-async function switchToCommandes() {
+async function switchToCommandes(): Promise<void> {
   activeTab.value = 'commandes'
   if (!cmdsLoaded.value) await fetchCmds()
 }
 
-async function switchToConnexions() {
+async function switchToConnexions(): Promise<void> {
   activeTab.value = 'connexions'
   if (!connexionsLoaded.value) await fetchConnexions()
 }
 
-function refresh() {
+function refresh(): void {
   if (activeTab.value === 'commandes') {
     cmdsLoaded.value = false
     fetchCmds()
@@ -791,26 +788,26 @@ function refresh() {
 }
 
 // ── Pagination ────────────────────────────────────────────────────────────────
-function selectCmdsPage(page) {
+function selectCmdsPage(page: number): void {
   if (page === cmdsPage.value) return
   cmdsPage.value = page
   closeLogViewer()
   fetchCmds()
 }
 
-function selectConnexionsPage(page) {
+function selectConnexionsPage(page: number): void {
   if (page === connexionsPage.value) return
   connexionsPage.value = page
   fetchConnexions()
 }
 
 onMounted(async () => {
-  if (route.query.module) cmdModuleFilter.value = route.query.module
+  if (route.query.module) cmdModuleFilter.value = String(route.query.module)
   await fetchCmds()
   const cmdId = route.query.command
   if (cmdId) {
     try {
-      const res = await apiClient.getCommandStatus(cmdId)
+      const res = await apiClient.getCommandStatus(String(cmdId))
       if (res.data?.id) openLogViewer(res.data)
     } catch { /* ignore — command may not exist */ }
   }
@@ -833,7 +830,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  clearTimeout(searchDebounceTimer)
+  if (searchDebounceTimer) clearTimeout(searchDebounceTimer)
   if (auditPollTimer) {
     clearInterval(auditPollTimer)
     auditPollTimer = null

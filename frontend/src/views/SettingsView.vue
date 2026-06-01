@@ -154,7 +154,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import apiClient, { getApiErrorMessage } from '../api'
@@ -239,12 +239,12 @@ const cleaningAuditLogs = ref(false)
 const auditCleanMessage = ref('')
 const auditCleanSuccess = ref(false)
 
-function formatNumber(n) {
+function formatNumber(n: number | undefined): string {
   if (!n) return '0'
   return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
 }
 
-async function fetchSettings() {
+async function fetchSettings(): Promise<void> {
   try {
     const res = await apiClient.getSettings()
     if (res.data) {
@@ -268,7 +268,7 @@ async function fetchSettings() {
   }
 }
 
-async function saveSmtp() {
+async function saveSmtp(): Promise<void> {
   savingSmtp.value = true
   smtpSaveMsg.value = ''
   try {
@@ -294,7 +294,7 @@ async function saveSmtp() {
   }
 }
 
-async function saveNotifications() {
+async function saveNotifications(): Promise<void> {
   savingNotif.value = true
   notifSaveMsg.value = ''
   try {
@@ -315,7 +315,7 @@ async function saveNotifications() {
   }
 }
 
-async function saveRetention() {
+async function saveRetention(): Promise<void> {
   savingRetention.value = true
   retentionSaveMsg.value = ''
   try {
@@ -336,7 +336,7 @@ async function saveRetention() {
   }
 }
 
-async function testSmtp() {
+async function testSmtp(): Promise<void> {
   testingSmtp.value = true
   smtpTestMessage.value = ''
   try {
@@ -353,7 +353,7 @@ async function testSmtp() {
   }
 }
 
-async function testNtfy() {
+async function testNtfy(): Promise<void> {
   testingNtfy.value = true
   ntfyTestMessage.value = ''
   try {
@@ -370,7 +370,7 @@ async function testNtfy() {
   }
 }
 
-async function cleanMetrics() {
+async function cleanMetrics(): Promise<void> {
   cleaningMetrics.value = true
   cleanMessage.value = ''
   try {
@@ -388,7 +388,7 @@ async function cleanMetrics() {
   }
 }
 
-async function cleanAuditLogs() {
+async function cleanAuditLogs(): Promise<void> {
   cleaningAuditLogs.value = true
   auditCleanMessage.value = ''
   try {

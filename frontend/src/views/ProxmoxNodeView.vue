@@ -428,7 +428,7 @@
                 :guest-networks-loading="guestNetworksLoading"
                 :links="guestLinks"
                 :peer-nodes="peerNodes"
-                :node-id="route.params.id"
+                :node-id="String(route.params.id)"
                 @confirm-link="confirmGuestLink"
                 @ignore-link="ignoreGuestLink"
                 @go-host="goToHost"
@@ -445,7 +445,7 @@
                 :guest-networks-loading="guestNetworksLoading"
                 :links="guestLinks"
                 :peer-nodes="peerNodes"
-                :node-id="route.params.id"
+                :node-id="String(route.params.id)"
                 @confirm-link="confirmGuestLink"
                 @ignore-link="ignoreGuestLink"
                 @go-host="goToHost"
@@ -503,7 +503,7 @@
             <!-- Security tab -->
             <div v-show="tab === 'security'">
               <ProxmoxNodeSecurityTab
-                :node-id="route.params.id"
+                :node-id="String(route.params.id)"
                 :active="tab === 'security'"
                 @count="securityEventsCount = $event"
               />
@@ -605,14 +605,12 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, shallowRef, onMounted, onUnmounted, defineAsyncComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 const CommandLogPanel = defineAsyncComponent(() => import('../components/host/CommandLogPanel.vue'))
 const ProxmoxNodeChartsPanel = defineAsyncComponent(() => import('../components/proxmox/ProxmoxNodeChartsPanel.vue'))
-import SortableHeader from '../components/common/SortableHeader.vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
-import GuestLinkCell from '../components/proxmox/GuestLinkCell.vue'
 import ProxmoxNodeDisksTab from '../components/proxmox/ProxmoxNodeDisksTab.vue'
 import ProxmoxNodeStorageTab from '../components/proxmox/ProxmoxNodeStorageTab.vue'
 import ProxmoxNodeTasksTab from '../components/proxmox/ProxmoxNodeTasksTab.vue'
@@ -624,18 +622,16 @@ import api from '../api'
 
 const route = useRoute()
 const router = useRouter()
-const node = ref(null)
+const node = ref<any>(null)
 const loading = ref(true)
 const error = ref('')
 const tab = ref('vms')
 
-
-// guest_id → link object (loaded after node data)
-const guestLinks = ref({})
+const guestLinks = ref<Record<string, any>>({})
 const linkMsg = ref('')
 const linkMsgOk = ref(false)
 
-const sensorSourceCandidates = ref([])
+const sensorSourceCandidates = ref<any[]>([])
 const sensorSourceHostId = ref('')
 const sensorSourceLoading = ref(false)
 const sensorSourceSaving = ref(false)
@@ -647,12 +643,12 @@ const sensorSourceHostName = computed(() =>
 
 const nodeTempLoading = ref(false)
 const nodeTempError = ref('')
-const nodeTempChart = shallowRef(null)
+const nodeTempChart = shallowRef<any>(null)
 const nodeCpuTempCurrent = ref(0)
 
 const nodeFanLoading = ref(false)
 const nodeFanError = ref('')
-const nodeFanChart = shallowRef(null)
+const nodeFanChart = shallowRef<any>(null)
 const nodeFanRPMCurrent = ref(0)
 
 // apt refresh
@@ -661,10 +657,9 @@ const aptRefreshMsg = ref('')
 const aptRefreshOk = ref(false)
 
 // peer nodes for migration target list
-const peerNodes = ref([])
+const peerNodes = ref<any[]>([])
 
-// migration modal state
-const migrateModal = ref({
+const migrateModal = ref<any>({
   open: false,
   guest: null,
   guestType: 'vm',
@@ -674,65 +669,61 @@ const migrateModal = ref({
   error: '',
 })
 
-// live status (iowait, swap, rootfs) — auto-loaded on mount
-const liveStatus = ref(null)
+const liveStatus = ref<any>(null)
 const liveStatusLoading = ref(false)
 const liveStatusTime = ref('')
 const liveStatusError = ref('')
 
 // RRD charts
 const rrdTimeframe = ref('hour')
-const rrdTimeframeToHours = {
+const rrdTimeframeToHours: Record<string, number> = {
   hour: 1,
   day: 24,
   week: 24 * 7,
   month: 24 * 30,
   year: 24 * 365,
 }
-const rrdCpuChart = shallowRef(null)
-const rrdRamChart = shallowRef(null)
-const rrdIowaitChart = shallowRef(null)
-const rrdNetChart = shallowRef(null)
+const rrdCpuChart = shallowRef<any>(null)
+const rrdRamChart = shallowRef<any>(null)
+const rrdIowaitChart = shallowRef<any>(null)
+const rrdNetChart = shallowRef<any>(null)
 const rrdLoading = ref(false)
 const rrdError = ref('')
 
-// PVE task console (side panel + polling)
 const showConsole = ref(false)
-const liveTask = ref(null)
-const activeUpid = ref(null)  // tracks which row is highlighted — separate from display target
-let pollTimer = null
-let liveStatusTimer = null
+const liveTask = ref<any>(null)
+const activeUpid = ref<string | null>(null)
+let pollTimer: ReturnType<typeof setInterval> | null = null
+let liveStatusTimer: ReturnType<typeof setInterval> | null = null
 
-// guest network interfaces (live)
-const guestNetworks = ref({})       // { [vmid]: [{name, mac, ips}] }
+const guestNetworks = ref<Record<string, any[]>>({})
 const guestNetworksLoading = ref(false)
 
-async function loadGuestNetworks() {
+async function loadGuestNetworks(): Promise<void> {
   if (guestNetworksLoading.value || Object.keys(guestNetworks.value).length > 0) return
   guestNetworksLoading.value = true
   try {
-    const res = await api.getProxmoxNodeGuestNetworks(route.params.id)
+    const res = await api.getProxmoxNodeGuestNetworks(String(route.params.id))
     guestNetworks.value = res.data ?? {}
   } catch { /* non-bloquant */ }
   finally { guestNetworksLoading.value = false }
 }
 
 // services
-const services = ref([])
+const services = ref<any[]>([])
 const servicesLoading = ref(false)
 const servicesError = ref('')
 const svcActionMsg = ref('')
 const svcActionOk = ref(false)
 
-// node syslog security events
 const securityEventsCount = ref(0)
 
-const vms = computed(() => node.value?.guests?.filter(g => g.guest_type === 'vm') ?? [])
-const lxcs = computed(() => node.value?.guests?.filter(g => g.guest_type === 'lxc') ?? [])
+const vms = computed(() => node.value?.guests?.filter((g: any) => g.guest_type === 'vm') ?? [])
+const lxcs = computed(() => node.value?.guests?.filter((g: any) => g.guest_type === 'lxc') ?? [])
 const failedTaskCount = computed(() =>
-  (node.value?.tasks ?? []).filter(t => t.status === 'stopped' && t.exit_status && t.exit_status !== 'OK').length
+  (node.value?.tasks ?? []).filter((t: any) => t.status === 'stopped' && t.exit_status && t.exit_status !== 'OK').length
 )
-async function load() {
+async function load(): Promise<void> {
   loading.value = true
   error.value = ''
   try {
@@ -740,7 +731,7 @@ async function load() {
     if (requestedTab === 'vms' || requestedTab === 'lxc' || requestedTab === 'storage' || requestedTab === 'disks' || requestedTab === 'tasks' || requestedTab === 'updates' || requestedTab === 'services' || requestedTab === 'security') {
       tab.value = requestedTab
     }
-    const res = await api.getProxmoxNode(route.params.id)
+    const res = await api.getProxmoxNode(String(route.params.id))
     node.value = res.data
     sensorSourceHostId.value = node.value?.cpu_temp_source_host_id || node.value?.fan_rpm_source_host_id || ''
     await loadSensorSourceCandidates()
@@ -749,14 +740,14 @@ async function load() {
     loadLiveStatus()
     loadRRD('hour')
     loadPeerNodes()
-  } catch (e) {
+  } catch (e: any) {
     error.value = e?.response?.data?.error || 'Erreur lors du chargement.'
   } finally {
     loading.value = false
   }
 }
 
-async function loadNodeCpuTempHistory(hours = rrdTimeframeToHours[rrdTimeframe.value] ?? 24) {
+async function loadNodeCpuTempHistory(hours: number = rrdTimeframeToHours[rrdTimeframe.value] ?? 24): Promise<void> {
   nodeTempLoading.value = true
   nodeTempError.value = ''
   nodeTempChart.value = null
@@ -768,20 +759,20 @@ async function loadNodeCpuTempHistory(hours = rrdTimeframeToHours[rrdTimeframe.v
       return
     }
 
-    const res = await api.getProxmoxNodeCpuTempHistory(route.params.id, hours)
-    const points = (Array.isArray(res.data) ? res.data : []).filter(p => Number(p?.cpu_temperature) > 0)
+    const res = await api.getProxmoxNodeCpuTempHistory(String(route.params.id), hours)
+    const points = (Array.isArray(res.data) ? res.data : []).filter((p: any) => Number(p?.cpu_temperature) > 0)
     if (!points.length) {
       return
     }
 
-    const labels = points.map(p => {
+    const labels = points.map((p: any) => {
       const d = new Date(p.timestamp)
       if (hours <= 24) {
         return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
       }
       return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })
     })
-    const data = points.map(p => Number(p.cpu_temperature))
+    const data = points.map((p: any) => Number(p.cpu_temperature))
     nodeCpuTempCurrent.value = data[data.length - 1] || 0
     nodeTempChart.value = {
       labels,
@@ -794,14 +785,14 @@ async function loadNodeCpuTempHistory(hours = rrdTimeframeToHours[rrdTimeframe.v
         spanGaps: true,
       }],
     }
-  } catch (e) {
+  } catch (e: any) {
     nodeTempError.value = e?.response?.data?.error || 'Erreur lors du chargement de la température CPU.'
   } finally {
     nodeTempLoading.value = false
   }
 }
 
-async function loadNodeFanRPMHistory(hours = rrdTimeframeToHours[rrdTimeframe.value] ?? 24) {
+async function loadNodeFanRPMHistory(hours: number = rrdTimeframeToHours[rrdTimeframe.value] ?? 24): Promise<void> {
   nodeFanLoading.value = true
   nodeFanError.value = ''
   nodeFanChart.value = null
@@ -813,20 +804,20 @@ async function loadNodeFanRPMHistory(hours = rrdTimeframeToHours[rrdTimeframe.va
       return
     }
 
-    const res = await api.getProxmoxNodeFanRPMHistory(route.params.id, hours)
-    const points = (Array.isArray(res.data) ? res.data : []).filter(p => Number(p?.fan_rpm) > 0)
+    const res = await api.getProxmoxNodeFanRPMHistory(String(route.params.id), hours)
+    const points = (Array.isArray(res.data) ? res.data : []).filter((p: any) => Number(p?.fan_rpm) > 0)
     if (!points.length) {
       return
     }
 
-    const labels = points.map(p => {
+    const labels = points.map((p: any) => {
       const d = new Date(p.timestamp)
       if (hours <= 24) {
         return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
       }
       return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })
     })
-    const data = points.map(p => Number(p.fan_rpm))
+    const data = points.map((p: any) => Number(p.fan_rpm))
     nodeFanRPMCurrent.value = data[data.length - 1] || 0
     nodeFanChart.value = {
       labels,
@@ -839,17 +830,17 @@ async function loadNodeFanRPMHistory(hours = rrdTimeframeToHours[rrdTimeframe.va
         spanGaps: true,
       }],
     }
-  } catch (e) {
+  } catch (e: any) {
     nodeFanError.value = e?.response?.data?.error || 'Erreur lors du chargement des RPM ventilateurs.'
   } finally {
     nodeFanLoading.value = false
   }
 }
 
-async function loadSensorSourceCandidates() {
+async function loadSensorSourceCandidates(): Promise<void> {
   sensorSourceLoading.value = true
   try {
-    const res = await api.getProxmoxNodeSensorSourceCandidates(route.params.id)
+    const res = await api.getProxmoxNodeSensorSourceCandidates(String(route.params.id))
     sensorSourceCandidates.value = Array.isArray(res.data) ? res.data : []
   } catch {
     sensorSourceCandidates.value = []
@@ -860,7 +851,7 @@ async function loadSensorSourceCandidates() {
 
 async function refreshNodeSensorSource() {
   try {
-    const res = await api.getProxmoxNode(route.params.id)
+    const res = await api.getProxmoxNode(String(route.params.id))
     const n = res.data || {}
     if (node.value) {
       node.value.cpu_temp_source_host_id = n.cpu_temp_source_host_id || ''
@@ -879,7 +870,7 @@ async function saveSensorSource() {
   sensorSourceMsg.value = ''
   try {
     const target = sensorSourceHostId.value || null
-    const res = await api.setProxmoxNodeSensorSource(route.params.id, target)
+    const res = await api.setProxmoxNodeSensorSource(String(route.params.id), target)
     if (node.value) {
       node.value.cpu_temp_source_host_id = res.data?.cpu_temp_source_host_id || ''
       node.value.cpu_temp_source_host_name = res.data?.cpu_temp_source_host_name || ''
@@ -892,7 +883,7 @@ async function saveSensorSource() {
     await loadNodeFanRPMHistory(rrdTimeframeToHours[rrdTimeframe.value] ?? 24)
     sensorSourceMsg.value = 'Source capteurs mise à jour (CPU + ventilateurs).'
     sensorSourceOk.value = true
-  } catch (e) {
+  } catch (e: any) {
     sensorSourceMsg.value = e?.response?.data?.error || 'Erreur lors de la mise à jour.'
     sensorSourceOk.value = false
   } finally {
@@ -901,14 +892,13 @@ async function saveSensorSource() {
   }
 }
 
-async function loadGuestLinks() {
+async function loadGuestLinks(): Promise<void> {
   const guests = node.value?.guests ?? []
   if (guests.length === 0) return
-  // One request for all links, then index by guest_id — avoids N individual requests.
   try {
     const res = await api.getProxmoxLinks()
-    const guestIds = new Set(guests.map(g => g.id))
-    const map = {}
+    const guestIds = new Set(guests.map((g: any) => g.id))
+    const map: Record<string, any> = {}
     for (const link of res.data ?? []) {
       if (guestIds.has(link.guest_id)) {
         map[link.guest_id] = link
@@ -920,11 +910,11 @@ async function loadGuestLinks() {
   }
 }
 
-function linkForGuest(g) {
+function linkForGuest(g: any): any {
   return guestLinks.value[g.id] ?? null
 }
 
-async function confirmGuestLink(g) {
+async function confirmGuestLink(g: any): Promise<void> {
   const link = linkForGuest(g)
   if (!link) return
   try {
@@ -933,12 +923,12 @@ async function confirmGuestLink(g) {
     await loadSensorSourceCandidates()
     await refreshNodeSensorSource()
     showMsg(`[${g.name}] Lien confirmé.`, true)
-  } catch (e) {
+  } catch (e: any) {
     showMsg(e?.response?.data?.error || 'Erreur.', false)
   }
 }
 
-async function ignoreGuestLink(g) {
+async function ignoreGuestLink(g: any): Promise<void> {
   const link = linkForGuest(g)
   if (!link) return
   try {
@@ -947,31 +937,31 @@ async function ignoreGuestLink(g) {
     delete m[g.id]
     guestLinks.value = m
     showMsg(`[${g.name}] Suggestion ignorée.`, true)
-  } catch (e) {
+  } catch (e: any) {
     showMsg(e?.response?.data?.error || 'Erreur.', false)
   }
 }
 
-function goToHost(link) {
+function goToHost(link: any): void {
   if (link?.host_id) router.push(`/hosts/${link.host_id}`)
 }
 
-function showMsg(msg, ok) {
+function showMsg(msg: string, ok: boolean): void {
   linkMsg.value = msg
   linkMsgOk.value = ok
   setTimeout(() => { linkMsg.value = '' }, 4000)
 }
 
-async function loadRRD(timeframe = rrdTimeframe.value) {
+async function loadRRD(timeframe: string = rrdTimeframe.value): Promise<void> {
   rrdTimeframe.value = timeframe
   void loadNodeCpuTempHistory(rrdTimeframeToHours[timeframe] ?? 24)
   void loadNodeFanRPMHistory(rrdTimeframeToHours[timeframe] ?? 24)
   rrdLoading.value = true
   rrdError.value = ''
   try {
-    const res = await api.getProxmoxNodeRRD(route.params.id, timeframe)
+    const res = await api.getProxmoxNodeRRD(String(route.params.id), timeframe)
     buildRRDCharts(res.data ?? [], timeframe)
-  } catch (e) {
+  } catch (e: any) {
     rrdError.value = e?.response?.data?.error || 'Erreur lors du chargement des métriques.'
     rrdCpuChart.value = null
     rrdRamChart.value = null
@@ -982,12 +972,12 @@ async function loadRRD(timeframe = rrdTimeframe.value) {
   }
 }
 
-function cssVar(name) {
+function cssVar(name: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
 }
 
-function buildRRDCharts(points, timeframe) {
-  const labels = points.map(p => {
+function buildRRDCharts(points: any[], timeframe: string): void {
+  const labels = points.map((p: any) => {
     const d = new Date(p.time * 1000)
     if (timeframe === 'hour' || timeframe === 'day')
       return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
@@ -999,19 +989,19 @@ function buildRRDCharts(points, timeframe) {
   rrdCpuChart.value = {
     labels,
     datasets: [{
-      data: points.map(p => p.cpu != null ? p.cpu * 100 : null),
+      data: points.map((p: any) => p.cpu != null ? p.cpu * 100 : null),
       borderColor: cssVar('--tblr-blue'), backgroundColor: `rgba(${cssVar('--tblr-blue-rgb')},0.1)`,
       fill: true, tension: 0.3, spanGaps: true,
     }],
   }
 
   // RAM: memused / memtotal are raw bytes from PVE RRD (JSON keys: memused, memtotal)
-  const ramData = points.map(p =>
+  const ramData = points.map((p: any) =>
     (p.memused != null && p.memtotal != null && p.memtotal > 0)
       ? (p.memused / p.memtotal) * 100
       : null
   )
-  rrdRamChart.value = ramData.some(v => v != null) ? {
+  rrdRamChart.value = ramData.some((v: any) => v != null) ? {
     labels,
     datasets: [{
       data: ramData,
@@ -1020,29 +1010,29 @@ function buildRRDCharts(points, timeframe) {
     }],
   } : null
 
-  const hasIowait = points.some(p => p.iowait != null)
+  const hasIowait = points.some((p: any) => p.iowait != null)
   rrdIowaitChart.value = hasIowait ? {
     labels,
     datasets: [{
-      data: points.map(p => p.iowait != null ? p.iowait * 100 : null),
+      data: points.map((p: any) => p.iowait != null ? p.iowait * 100 : null),
       borderColor: cssVar('--tblr-yellow'), backgroundColor: `rgba(${cssVar('--tblr-yellow-rgb')},0.1)`,
       fill: true, tension: 0.3, spanGaps: true,
     }],
   } : null
 
-  const hasNet = points.some(p => p.netin != null || p.netout != null)
+  const hasNet = points.some((p: any) => p.netin != null || p.netout != null)
   rrdNetChart.value = hasNet ? {
     labels,
     datasets: [
       {
         label: 'Entrante',
-        data: points.map(p => p.netin ?? null),
+        data: points.map((p: any) => p.netin ?? null),
         borderColor: cssVar('--tblr-indigo'), backgroundColor: `rgba(${cssVar('--tblr-indigo-rgb')},0.1)`,
         fill: true, tension: 0.3, spanGaps: true,
       },
       {
         label: 'Sortante',
-        data: points.map(p => p.netout ?? null),
+        data: points.map((p: any) => p.netout ?? null),
         borderColor: cssVar('--tblr-pink'), backgroundColor: `rgba(${cssVar('--tblr-pink-rgb')},0.05)`,
         fill: false, tension: 0.3, spanGaps: true,
       },
@@ -1050,14 +1040,14 @@ function buildRRDCharts(points, timeframe) {
   } : null
 }
 
-async function loadLiveStatus() {
+async function loadLiveStatus(): Promise<void> {
   liveStatusLoading.value = true
   liveStatusError.value = ''
   try {
-    const res = await api.getProxmoxNodeStatus(route.params.id)
+    const res = await api.getProxmoxNodeStatus(String(route.params.id))
     liveStatus.value = res.data
     liveStatusTime.value = new Date().toLocaleTimeString('fr-FR')
-  } catch (e) {
+  } catch (e: any) {
     liveStatusError.value = e?.response?.data?.error || `Erreur ${e?.response?.status ?? ''} — vérifiez la connectivité au nœud.`
   } finally {
     liveStatusLoading.value = false
@@ -1065,19 +1055,19 @@ async function loadLiveStatus() {
 }
 
 
-function stopPolling() {
+function stopPolling(): void {
   if (pollTimer) clearTimeout(pollTimer)
   pollTimer = null
 }
 
-function closeConsole() {
+function closeConsole(): void {
   stopPolling()
   showConsole.value = false
   liveTask.value = null
   activeUpid.value = null
 }
 
-async function startPollingTask(upid, { action = '', label = '' } = {}) {
+async function startPollingTask(upid: string, { action = '', label = '' }: { action?: string; label?: string } = {}): Promise<void> {
   stopPolling()
   activeUpid.value = upid
   liveTask.value = {
@@ -1090,10 +1080,10 @@ async function startPollingTask(upid, { action = '', label = '' } = {}) {
   }
   showConsole.value = true
 
-  const poll = async () => {
+  const poll = async (): Promise<void> => {
     try {
-      const res = await api.getProxmoxTaskLog(route.params.id, upid)
-      const lines = (res.data ?? []).map(l => l.t).join('\n')
+      const res = await api.getProxmoxTaskLog(String(route.params.id), upid)
+      const lines = (res.data ?? []).map((l: any) => l.t).join('\n')
       const lastLine = res.data?.[res.data.length - 1]?.t ?? ''
       const done = lastLine.startsWith('TASK OK') || lastLine.startsWith('TASK ERROR')
       const status = done
@@ -1108,16 +1098,16 @@ async function startPollingTask(upid, { action = '', label = '' } = {}) {
   await poll()
 }
 
-async function triggerAptRefresh() {
+async function triggerAptRefresh(): Promise<void> {
   aptRefreshing.value = true
   aptRefreshMsg.value = ''
   try {
-    const res = await api.refreshProxmoxNodeApt(route.params.id)
+    const res = await api.refreshProxmoxNodeApt(String(route.params.id))
     const upid = res.data?.upid
     aptRefreshMsg.value = upid ? 'Tâche lancée — logs en cours…' : (res.data?.message || 'Tâche lancée.')
     aptRefreshOk.value = true
     if (upid) startPollingTask(upid, { action: 'apt update' })
-  } catch (e) {
+  } catch (e: any) {
     aptRefreshMsg.value = e?.response?.data?.error || 'Erreur lors du lancement de apt update.'
     aptRefreshOk.value = false
   } finally {
@@ -1126,26 +1116,26 @@ async function triggerAptRefresh() {
   }
 }
 
-function memPct(n) {
+function memPct(n: any): string | number {
   if (!n.mem_total) return 0
   return ((n.mem_used / n.mem_total) * 100).toFixed(1)
 }
 
 
-function cpuColor(usage) {
+function cpuColor(usage: number): string {
   if (usage > 0.85) return 'bg-danger'
   if (usage > 0.6) return 'bg-warning'
   return 'bg-success'
 }
 
-function tempColor(temp) {
+function tempColor(temp: number | undefined): string {
   if (!temp) return 'text-secondary'
   if (temp >= 85) return 'text-danger'
   if (temp >= 70) return 'text-warning'
   return 'text-success'
 }
 
-function ramColor(used, total) {
+function ramColor(used: number, total: number): string {
   if (!total) return 'bg-secondary'
   const pct = used / total
   if (pct > 0.85) return 'bg-danger'
@@ -1153,7 +1143,7 @@ function ramColor(used, total) {
   return 'bg-success'
 }
 
-function storageColor(used, total) {
+function storageColor(used: number, total: number): string {
   if (!total) return 'bg-secondary'
   const pct = used / total
   if (pct > 0.85) return 'bg-danger'
@@ -1161,7 +1151,7 @@ function storageColor(used, total) {
   return 'bg-primary'
 }
 
-function formatBytes(bytes) {
+function formatBytes(bytes: number | undefined): string {
   if (!bytes) return '0 B'
   const units = ['B', 'Ko', 'Mo', 'Go', 'To']
   let i = 0, v = bytes
@@ -1169,7 +1159,7 @@ function formatBytes(bytes) {
   return `${v.toFixed(i === 0 ? 0 : 1)} ${units[i]}`
 }
 
-function formatUptime(seconds) {
+function formatUptime(seconds: number | undefined): string {
   if (!seconds) return '—'
   const d = Math.floor(seconds / 86400)
   const h = Math.floor((seconds % 86400) / 3600)
@@ -1179,52 +1169,52 @@ function formatUptime(seconds) {
   return `${m}m`
 }
 
-function formatDate(iso) {
+function formatDate(iso: string | undefined): string {
   if (!iso) return '—'
   return new Date(iso).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
 }
 
-async function loadServices() {
+async function loadServices(): Promise<void> {
   if (servicesLoading.value || services.value.length > 0) return
   servicesLoading.value = true
   servicesError.value = ''
   try {
-    const res = await api.getProxmoxNodeServices(route.params.id)
+    const res = await api.getProxmoxNodeServices(String(route.params.id))
     services.value = res.data ?? []
-  } catch (e) {
+  } catch (e: any) {
     servicesError.value = e?.response?.data?.error || 'Erreur lors du chargement des services.'
   } finally {
     servicesLoading.value = false
   }
 }
 
-async function svcAction(name, action) {
+async function svcAction(name: string, action: string): Promise<void> {
   svcActionMsg.value = ''
   try {
-    const res = await api.proxmoxNodeServiceAction(route.params.id, name, action)
+    const res = await api.proxmoxNodeServiceAction(String(route.params.id), name, action)
     const upid = res.data?.upid
     svcActionMsg.value = upid ? `${action} ${name} lancé — logs en cours…` : `${action} ${name} lancé.`
     svcActionOk.value = true
     if (upid) startPollingTask(upid, { action: `service ${action}`, label: name })
     else setTimeout(() => loadServices(), 2000)
-  } catch (e) {
+  } catch (e: any) {
     svcActionMsg.value = e?.response?.data?.error || `Erreur lors de ${action} ${name}.`
     svcActionOk.value = false
   }
   setTimeout(() => { svcActionMsg.value = '' }, 6000)
 }
 
-async function loadPeerNodes() {
+async function loadPeerNodes(): Promise<void> {
   if (!node.value?.connection_id) return
   try {
     const res = await api.getProxmoxNodes(node.value.connection_id)
-    peerNodes.value = (res.data ?? []).filter(n => n.node_name !== node.value?.node_name && n.status === 'online')
+    peerNodes.value = (res.data ?? []).filter((n: any) => n.node_name !== node.value?.node_name && n.status === 'online')
   } catch {
     peerNodes.value = []
   }
 }
 
-function openMigrateModal(guest, guestType = 'vm') {
+function openMigrateModal(guest: any, guestType: string = 'vm'): void {
   migrateModal.value = {
     open: true,
     guest,
@@ -1236,13 +1226,13 @@ function openMigrateModal(guest, guestType = 'vm') {
   }
 }
 
-async function submitMigration() {
+async function submitMigration(): Promise<void> {
   const m = migrateModal.value
   if (!m.target || !m.guest) return
   m.loading = true
   m.error = ''
   try {
-    const res = await api.migrateProxmoxGuest(route.params.id, m.guest.vmid, {
+    const res = await api.migrateProxmoxGuest(String(route.params.id), m.guest.vmid, {
       target: m.target,
       guest_type: m.guestType,
       online: m.online,
@@ -1252,7 +1242,7 @@ async function submitMigration() {
     if (upid) {
       startPollingTask(upid, { action: 'migrate', label: `${m.guest.name || m.guest.vmid} → ${m.target}` })
     }
-  } catch (e) {
+  } catch (e: any) {
     m.error = e?.response?.data?.error || 'Erreur lors du lancement de la migration.'
   } finally {
     m.loading = false

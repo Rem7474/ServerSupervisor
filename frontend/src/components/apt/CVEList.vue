@@ -80,42 +80,46 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed } from 'vue'
 import CVEBadge from './CVEBadge.vue'
 
-const props = defineProps({
-  cveList: {
-    type: [String, Array],
-    required: true
-  },
-  showMaxSeverity: {
-    type: Boolean,
-    default: true
-  },
-  alwaysExpanded: {
-    type: Boolean,
-    default: false
-  },
-  limit: {
-    type: Number,
-    default: 5
-  },
-  initiallyCollapsed: {
-    type: Boolean,
-    default: null
-  }
+interface CVE {
+  id?: string
+  severity?: string
+  package?: string
+  cvss_score?: number
+}
+
+interface CVEGroup {
+  id: string
+  severity: string
+  cvss_score: number
+  packages: string[]
+}
+
+const props = withDefaults(defineProps<{
+  cveList: string | CVE[]
+  showMaxSeverity?: boolean
+  alwaysExpanded?: boolean
+  limit?: number
+  initiallyCollapsed?: boolean | null
+}>(), {
+  showMaxSeverity: true,
+  alwaysExpanded: false,
+  limit: 5,
+  initiallyCollapsed: null,
 })
 
 const showAll = ref(false)
 
-const cves = computed(() => {
+const cves = computed<CVE[]>(() => {
   try {
     if (Array.isArray(props.cveList)) {
       return props.cveList
     }
     if (typeof props.cveList === 'string') {
-      return JSON.parse(props.cveList)
+      return JSON.parse(props.cveList) as CVE[]
     }
     return []
   } catch (e) {
@@ -124,7 +128,7 @@ const cves = computed(() => {
   }
 })
 
-const severityOrder = {
+const severityOrder: Record<string, number> = {
   'CRITICAL': 5,
   'HIGH': 4,
   'MEDIUM': 3,
@@ -133,8 +137,15 @@ const severityOrder = {
   'UNKNOWN': 0
 }
 
-const cveGroups = computed(() => {
-  const grouped = new Map()
+interface CVEGroupInternal {
+  id: string
+  severity: string
+  cvss_score: number
+  packages: Set<string>
+}
+
+const cveGroups = computed<CVEGroup[]>(() => {
+  const grouped = new Map<string, CVEGroupInternal>()
 
   for (const cve of cves.value) {
     const cveId = String(cve?.id || '').trim() || 'CVE-UNKNOWN'
@@ -144,10 +155,10 @@ const cveGroups = computed(() => {
         id: cveId,
         severity: cve?.severity || 'UNKNOWN',
         cvss_score: Number(cve?.cvss_score || 0),
-        packages: new Set(),
+        packages: new Set<string>(),
       })
     }
-    const entry = grouped.get(cveId)
+    const entry = grouped.get(cveId)!
     entry.packages.add(packageName)
 
     const currentRank = severityOrder[String(entry.severity || '').toUpperCase()] || 0
@@ -186,7 +197,7 @@ const displayedCveGroups = computed(() => {
 })
 
 const impactedPackageCount = computed(() => {
-  const uniquePackages = new Set()
+  const uniquePackages = new Set<string>()
   for (const group of cveGroups.value) {
     for (const pkg of group.packages) uniquePackages.add(pkg)
   }
@@ -215,13 +226,13 @@ const maxSeverityClass = computed(() => {
   return severityClass(maxSeverity.value)
 })
 
-function normalizeSeverity(severity) {
+function normalizeSeverity(severity: string | undefined): string {
   return severity?.toUpperCase() || 'UNKNOWN'
 }
 
-function severityClass(severity) {
+function severityClass(severity: string | undefined): string {
   const normalized = normalizeSeverity(severity)
-  const classes = {
+  const classes: Record<string, string> = {
     'CRITICAL': 'bg-red-lt text-red',
     'HIGH': 'bg-orange-lt text-orange',
     'MEDIUM': 'bg-yellow-lt text-yellow',

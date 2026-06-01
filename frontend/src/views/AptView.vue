@@ -695,7 +695,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onUnmounted, computed } from 'vue'
 import CVEList from '../components/apt/CVEList.vue'
 import apiClient, { getApiErrorMessage } from '../api'
@@ -713,30 +713,30 @@ import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import CronBuilder from '../components/CronBuilder.vue'
 import DataToolbar from '../components/common/DataToolbar.vue'
 
-const { dayjs, formatRelativeDate } = useDateFormatter()
+const { formatRelativeDate } = useDateFormatter()
 const { getStatusBadgeClass } = useStatusBadge()
 
 const PKG_PREVIEW_COUNT = 15
 
 // ── État hôtes / APT ─────────────────────────────────────────────────────────
-const hosts = ref([])
-const selectedHosts = ref([])
-const hostExpanded = ref({})
-const aptStatuses = ref({})
-const aptHistories = ref({})
-const pkgShowAll = ref({})
-const hostCmdLoading = ref({})
+const hosts = ref<any[]>([])
+const selectedHosts = ref<string[]>([])
+const hostExpanded = ref<Record<string, boolean>>({})
+const aptStatuses = ref<Record<string, any>>({})
+const aptHistories = ref<Record<string, any[]>>({})
+const pkgShowAll = ref<Record<string, boolean>>({})
+const hostCmdLoading = ref<Record<string, string | null>>({})
 const auth = useAuthStore()
 const dialog = useConfirmDialog()
 const canRunApt = computed(() => auth.role === 'admin' || auth.role === 'operator')
 
 const selectAll = computed({
   get() {
-    const ids = filteredHosts.value.map(h => h.id)
-    return ids.length > 0 && ids.every(id => selectedHosts.value.includes(id))
+    const ids = filteredHosts.value.map((h: any) => h.id)
+    return ids.length > 0 && ids.every((id: string) => selectedHosts.value.includes(id))
   },
-  set(val) {
-    selectedHosts.value = val ? filteredHosts.value.map(h => h.id) : []
+  set(val: boolean) {
+    selectedHosts.value = val ? filteredHosts.value.map((h: any) => h.id) : []
   },
 })
 
@@ -749,7 +749,7 @@ const scheduleModal = ref({
   manualOnly: false, enabled: true, saving: false, error: '',
 })
 
-function openScheduleModal(host) {
+function openScheduleModal(host: any): void {
   const hostLabel = host.name && host.hostname && host.name !== host.hostname
     ? `${host.name} (${host.hostname})`
     : (host.name || host.hostname)
@@ -768,7 +768,7 @@ function openScheduleModal(host) {
   }
 }
 
-async function saveSchedule() {
+async function saveSchedule(): Promise<void> {
   scheduleModal.value.error = ''
   scheduleModal.value.saving = true
   const cronExpr = scheduleModal.value.manualOnly ? MANUAL_SENTINEL : scheduleModal.value.cron_expression
@@ -783,8 +783,8 @@ async function saveSchedule() {
       enabled: scheduleModal.value.manualOnly ? false : scheduleModal.value.enabled,
     })
     scheduleModal.value.open = false
-  } catch (e) {
-    scheduleModal.value.error = e.response?.data?.error || 'Erreur lors de la création'
+  } catch (e: any) {
+    scheduleModal.value.error = e?.response?.data?.error || 'Erreur lors de la création'
   } finally {
     scheduleModal.value.saving = false
   }
@@ -792,16 +792,16 @@ async function saveSchedule() {
 
 // ── Console ───────────────────────────────────────────────────────────────────
 const showConsole = ref(false)
-const liveCommand = ref(null)
-const { value: bulkActionFeedback, showToast: showBulkActionFeedback } = useToast(null)
+const liveCommand = ref<any>(null)
+const { value: bulkActionFeedback, showToast: showBulkActionFeedback } = useToast<any>(null)
 const { openCommandStream, closeStream } = useCommandStream()
-const aptBulkLoading = ref(null)
+const aptBulkLoading = ref<string | null>(null)
 
 // ── Filtres / tri des hôtes ───────────────────────────────────────────────────
 const hostSearch = ref('')
 const hostQuickFilter = ref('all')
-const hostSortKey = ref('name')
-const hostSortDir = ref('asc')
+const hostSortKey = ref<'name' | 'pending' | 'security' | 'cve'>('name')
+const hostSortDir = ref<'asc' | 'desc'>('asc')
 
 const hostFilterOptions = [
   { value: 'all', label: 'Tous' },
@@ -814,7 +814,7 @@ const filteredHosts = computed(() => {
 
   const q = hostSearch.value.trim().toLowerCase()
   if (q) {
-    list = list.filter((h) => {
+    list = list.filter((h: any) => {
       const primary = (h.name || h.hostname || '').toLowerCase()
       const secondary = (h.hostname || '').toLowerCase()
       return primary.includes(q) || secondary.includes(q) || (h.ip_address || '').includes(q)
@@ -822,16 +822,16 @@ const filteredHosts = computed(() => {
   }
 
   if (hostQuickFilter.value === 'critical') {
-    list = list.filter(h => {
+    list = list.filter((h: any) => {
       const cves = aptStatuses.value[h.id]?.cve_list
-      return Array.isArray(cves) && cves.some(c => c.severity === 'CRITICAL')
+      return Array.isArray(cves) && cves.some((c: any) => c.severity === 'CRITICAL')
     })
   } else if (hostQuickFilter.value === 'security') {
-    list = list.filter(h => (aptStatuses.value[h.id]?.security_updates || 0) > 0)
+    list = list.filter((h: any) => (aptStatuses.value[h.id]?.security_updates || 0) > 0)
   }
 
-  list.sort((a, b) => {
-    let va, vb
+  list.sort((a: any, b: any) => {
+    let va: any, vb: any
     if (hostSortKey.value === 'pending') {
       va = aptStatuses.value[a.id]?.pending_packages || 0
       vb = aptStatuses.value[b.id]?.pending_packages || 0
@@ -854,7 +854,7 @@ const filteredHosts = computed(() => {
 })
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-function getPackages(aptStatus) {
+function getPackages(aptStatus: any): any[] {
   if (!aptStatus?.package_list) return []
   try {
     const parsed = typeof aptStatus.package_list === 'string'
@@ -866,7 +866,7 @@ function getPackages(aptStatus) {
   }
 }
 
-function getCveList(aptStatus) {
+function getCveList(aptStatus: any): any[] {
   if (!aptStatus?.cve_list) return []
   try {
     const parsed = typeof aptStatus.cve_list === 'string'
@@ -878,16 +878,16 @@ function getCveList(aptStatus) {
   }
 }
 
-function visiblePackages(hostId) {
+function visiblePackages(hostId: string): any[] {
   const pkgs = getPackages(aptStatuses.value[hostId])
   return pkgShowAll.value[hostId] ? pkgs : pkgs.slice(0, PKG_PREVIEW_COUNT)
 }
 
-function isHostCmdLoading(hostId) {
+function isHostCmdLoading(hostId: string): boolean {
   return !!hostCmdLoading.value[hostId]
 }
 
-function watchCommand(cmd, host) {
+function watchCommand(cmd: any, host: any): void {
   showConsole.value = true
   liveCommand.value = {
     id: cmd.id,
@@ -902,31 +902,31 @@ function watchCommand(cmd, host) {
   connectStreamWebSocket(cmd.id)
 }
 
-function closeLiveConsole() {
+function closeLiveConsole(): void {
   closeStream()
   liveCommand.value = null
   showConsole.value = false
 }
 
-function upsertAptHistory(hostId, nextCommand) {
+function upsertAptHistory(hostId: string, nextCommand: any): void {
   if (!hostId || !nextCommand?.id) return
   const currentHistory = Array.isArray(aptHistories.value[hostId]) ? [...aptHistories.value[hostId]] : []
-  const currentIndex = currentHistory.findIndex(cmd => cmd.id === nextCommand.id)
+  const currentIndex = currentHistory.findIndex((cmd: any) => cmd.id === nextCommand.id)
   if (currentIndex >= 0) {
     currentHistory[currentIndex] = { ...currentHistory[currentIndex], ...nextCommand }
   } else {
     currentHistory.unshift(nextCommand)
   }
-  currentHistory.sort((left, right) => new Date(right.created_at || 0) - new Date(left.created_at || 0))
+  currentHistory.sort((left: any, right: any) => new Date(right.created_at || 0).getTime() - new Date(left.created_at || 0).getTime())
   aptHistories.value = { ...aptHistories.value, [hostId]: currentHistory }
 }
 
-function syncLiveCommand(commandId, patch) {
+function syncLiveCommand(commandId: string, patch: any): void {
   if (!liveCommand.value || liveCommand.value.id !== commandId) return
   liveCommand.value = { ...liveCommand.value, ...patch }
 }
 
-function syncAptHistoryCommand(commandId, patch) {
+function syncAptHistoryCommand(commandId: string, patch: any): void {
   const hostId = liveCommand.value?.id === commandId ? liveCommand.value.hostId : null
   if (!hostId) return
   upsertAptHistory(hostId, {
@@ -937,20 +937,20 @@ function syncAptHistoryCommand(commandId, patch) {
   })
 }
 
-function connectStreamWebSocket(commandId) {
+function connectStreamWebSocket(commandId: string): void {
   closeStream()
   openCommandStream(commandId, {
     closeOnTerminalStatus: true,
-    onInit: (payload) => {
+    onInit: (payload: any) => {
       syncLiveCommand(commandId, { status: payload.status, output: payload.output || '' })
       syncAptHistoryCommand(commandId, { status: payload.status })
     },
-    onChunk: (payload) => {
+    onChunk: (payload: any) => {
       const nextOutput = `${liveCommand.value?.output || ''}${payload.chunk || ''}`
       syncLiveCommand(commandId, { output: nextOutput })
     },
-    onStatus: (payload) => {
-      const patch = { status: payload.status }
+    onStatus: (payload: any) => {
+      const patch: any = { status: payload.status }
       if (typeof payload.output === 'string') patch.output = payload.output
       syncLiveCommand(commandId, patch)
       syncAptHistoryCommand(commandId, patch)
@@ -958,7 +958,7 @@ function connectStreamWebSocket(commandId) {
   })
 }
 
-function buildBulkActionFeedback(command, launchedHosts, failedHosts) {
+function buildBulkActionFeedback(command: string, launchedHosts: string[], failedHosts: string[]): any {
   const hasFailures = failedHosts.length > 0
   const launchedLabel = launchedHosts.length === 1
     ? `lancée sur ${launchedHosts[0]}`
@@ -977,7 +977,7 @@ function buildBulkActionFeedback(command, launchedHosts, failedHosts) {
 }
 
 // ── Commandes par hôte ────────────────────────────────────────────────────────
-async function runAptCmdForHost(host, command) {
+async function runAptCmdForHost(host: any, command: string): Promise<void> {
   if (!canRunApt.value) return
 
   const confirmed = await confirmBulkAction(
@@ -992,12 +992,12 @@ async function runAptCmdForHost(host, command) {
   hostCmdLoading.value = { ...hostCmdLoading.value, [host.id]: command }
   try {
     const response = await apiClient.sendAptCommand([host.id], command)
-    const commandResults = Array.isArray(response.data?.commands) ? response.data.commands : []
-    const launched = commandResults.filter(item => item.command_id)
-    const failed = commandResults.filter(item => item.error)
+    const commandResults: any[] = Array.isArray(response.data?.commands) ? response.data.commands : []
+    const launched = commandResults.filter((item: any) => item.command_id)
+    const failed = commandResults.filter((item: any) => item.error)
     const createdAt = new Date().toISOString()
 
-    launched.forEach(item => {
+    launched.forEach((item: any) => {
       upsertAptHistory(host.id, {
         id: item.command_id,
         action: command,
@@ -1030,10 +1030,10 @@ async function runAptCmdForHost(host, command) {
 }
 
 // ── Commandes groupées ────────────────────────────────────────────────────────
-async function bulkAptCmd(command) {
+async function bulkAptCmd(command: string): Promise<void> {
   const hostnames = hosts.value
-    .filter(h => selectedHosts.value.includes(h.id))
-    .map(h => h.name || h.hostname)
+    .filter((h: any) => selectedHosts.value.includes(h.id))
+    .map((h: any) => h.name || h.hostname)
     .join(', ')
 
   const confirmed = await confirmBulkAction(
@@ -1048,13 +1048,13 @@ async function bulkAptCmd(command) {
   aptBulkLoading.value = command
   try {
     const response = await apiClient.sendAptCommand(selectedHosts.value, command)
-    const commandResults = Array.isArray(response.data?.commands) ? response.data.commands : []
-    const hostNameById = new Map(hosts.value.map(host => [host.id, host.name || host.hostname || host.id]))
-    const launchedCommands = commandResults.filter(item => item.command_id)
-    const failedCommands = commandResults.filter(item => item.error)
+    const commandResults: any[] = Array.isArray(response.data?.commands) ? response.data.commands : []
+    const hostNameById = new Map(hosts.value.map((host: any) => [host.id, host.name || host.hostname || host.id]))
+    const launchedCommands = commandResults.filter((item: any) => item.command_id)
+    const failedCommands = commandResults.filter((item: any) => item.error)
     const createdAt = new Date().toISOString()
 
-    launchedCommands.forEach((item) => {
+    launchedCommands.forEach((item: any) => {
       upsertAptHistory(item.host_id, {
         id: item.command_id,
         action: command,
@@ -1069,7 +1069,7 @@ async function bulkAptCmd(command) {
 
     if (selectedHosts.value.length === 1 && launchedCommands.length > 0) {
       const launchedCommand = launchedCommands[0]
-      const host = hosts.value.find(h => h.id === launchedCommand.host_id)
+      const host = hosts.value.find((h: any) => h.id === launchedCommand.host_id)
       if (host) {
         watchCommand({ id: launchedCommand.command_id, action: command, status: launchedCommand.status || 'pending', output: '' }, host)
       }
@@ -1079,8 +1079,8 @@ async function bulkAptCmd(command) {
       showBulkActionFeedback(
         buildBulkActionFeedback(
           command,
-          launchedCommands.map(item => hostNameById.get(item.host_id) || item.host_id),
-          failedCommands.map(item => hostNameById.get(item.host_id) || item.host_id),
+          launchedCommands.map((item: any) => hostNameById.get(item.host_id) || item.host_id),
+          failedCommands.map((item: any) => hostNameById.get(item.host_id) || item.host_id),
         ),
         7000,
       )
@@ -1097,27 +1097,26 @@ async function bulkAptCmd(command) {
 }
 
 // ── Formatage ─────────────────────────────────────────────────────────────────
-function formatDate(date) {
+function formatDate(date: string | undefined): string {
   return formatRelativeDate(date)
 }
 
-const STATUS_LABELS = {
+const STATUS_LABELS: Record<string, string> = {
   pending:   'En attente',
   running:   'En cours',
   completed: 'Terminé',
   failed:    'Échoué',
 }
 
-function statusLabel(status) {
+function statusLabel(status: string): string {
   return STATUS_LABELS[status] ?? status
 }
 
-function statusClass(status) {
+function statusClass(status: string | undefined): string {
   return getStatusBadgeClass(status, 'badge bg-yellow-lt text-yellow')
 }
 
-// ── WebSocket ─────────────────────────────────────────────────────────────────
-const { wsStatus, wsError, retryCount, dataStaleAlert, reconnect } = useWebSocket('/api/v1/ws/apt', (payload) => {
+const { wsStatus, wsError, retryCount, dataStaleAlert, reconnect } = useWebSocket('/api/v1/ws/apt', (payload: any) => {
   if (payload.type !== 'apt') return
   hosts.value = payload.hosts || []
   aptStatuses.value = payload.apt_statuses || {}

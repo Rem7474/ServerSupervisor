@@ -89,7 +89,7 @@
               </div>
               <div
                 class="h2 mb-0 mt-1"
-                :class="probe.consecutive_failures > 0 ? 'text-danger' : ''"
+                :class="(probe.consecutive_failures ?? 0) > 0 ? 'text-danger' : ''"
               >
                 {{ probe.consecutive_failures }}
               </div>
@@ -202,13 +202,28 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, defineAsyncComponent } from 'vue'
 import { useRoute } from 'vue-router'
 import api from '../api'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import { formatDateTime } from '../utils/formatters'
 import { getChartPalette } from '../utils/chartTheme'
+
+interface ProbeResult {
+  id: string | number
+  checked_at: string
+  success: boolean
+  status_code?: number | null
+  error?: string
+  latency_ms: number
+}
+
+interface Probe {
+  last_status?: string
+  consecutive_failures?: number
+  [key: string]: any
+}
 
 const Line = defineAsyncComponent(async () => {
   const [{ Line: LineComponent }, chart] = await Promise.all([
@@ -223,11 +238,11 @@ const Line = defineAsyncComponent(async () => {
 })
 
 const route = useRoute()
-const probeId = route.params.id
+const probeId = route.params.id as string
 
-const probe = ref(null)
-const results = ref([])
-const stats = ref(null)
+const probe = ref<Probe | null>(null)
+const results = ref<ProbeResult[]>([])
+const stats = ref<any>(null)
 const loading = ref(false)
 const error = ref('')
 const statsWindow = 24
@@ -249,7 +264,7 @@ const chartOptions = {
   },
   scales: {
     x: { grid: { color: palette.grid }, ticks: { color: palette.tickText, maxTicksLimit: 8 } },
-    y: { min: 0, grid: { color: palette.grid }, ticks: { color: palette.tickText, callback: (v) => `${v} ms` } },
+    y: { min: 0, grid: { color: palette.grid }, ticks: { color: palette.tickText, callback: (v: number | string) => `${v} ms` } },
   },
   elements: { point: { radius: 0, hitRadius: 8 }, line: { tension: 0.3 } },
 }
@@ -257,9 +272,24 @@ const chartOptions = {
 // Collapse consecutive results that share the same outcome (success +
 // status_code + error) into a single run so the table shows transitions and
 // failures clearly instead of hundreds of identical "OK 50ms" rows.
-const groupedResults = computed(() => {
+interface ResultGroup {
+  key: string | number
+  sigKey: string
+  success: boolean
+  statusCode?: number | null
+  error: string
+  count: number
+  from: string
+  to: string
+  minLatency: number
+  maxLatency: number
+  latencySum: number
+  avgLatency?: number
+}
+
+const groupedResults = computed<ResultGroup[]>(() => {
   if (!results.value.length) return []
-  const groups = []
+  const groups: ResultGroup[] = []
   // results.value is ordered newest-first; iterate as-is so the table reads
   // most-recent at the top.
   for (const r of results.value) {
@@ -324,7 +354,7 @@ const statusColor = computed(() => {
   return 'text-secondary'
 })
 
-async function fetchAll () {
+async function fetchAll(): Promise<void> {
   loading.value = true
   error.value = ''
   try {
@@ -336,14 +366,14 @@ async function fetchAll () {
     probe.value = pr.data
     results.value = hr.data?.results || []
     stats.value = sr.data
-  } catch (e) {
+  } catch (e: any) {
     error.value = e?.response?.data?.error || e?.message || 'Impossible de charger la sonde'
   } finally {
     loading.value = false
   }
 }
 
-let refresh
+let refresh: ReturnType<typeof setInterval> | undefined
 onMounted(() => {
   fetchAll()
   refresh = setInterval(fetchAll, 30000)

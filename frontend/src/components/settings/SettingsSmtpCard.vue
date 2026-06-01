@@ -115,45 +115,41 @@
   </div>
 </template>
 
-<script setup>
-defineProps({
-  form: {
-    type: Object,
-    required: true,
-  },
-  authIsAdmin: {
-    type: Boolean,
-    default: false,
-  },
-  showSmtpPass: {
-    type: Boolean,
-    default: false,
-  },
-  savingSmtp: {
-    type: Boolean,
-    default: false,
-  },
-  smtpSaveMsg: {
-    type: String,
-    default: '',
-  },
-  smtpSaveOk: {
-    type: Boolean,
-    default: false,
-  },
-  testingSmtp: {
-    type: Boolean,
-    default: false,
-  },
-  smtpTestMessage: {
-    type: String,
-    default: '',
-  },
-  smtpTestSuccess: {
-    type: Boolean,
-    default: false,
-  },
+<script setup lang="ts">
+interface SmtpForm {
+  smtpHost: string
+  smtpPort: number
+  smtpUser: string
+  smtpPass: string
+  smtpFrom: string
+  smtpTo: string
+  smtpTls: boolean
+}
+
+withDefaults(defineProps<{
+  form: SmtpForm
+  authIsAdmin?: boolean
+  showSmtpPass?: boolean
+  savingSmtp?: boolean
+  smtpSaveMsg?: string
+  smtpSaveOk?: boolean
+  testingSmtp?: boolean
+  smtpTestMessage?: string
+  smtpTestSuccess?: boolean
+}>(), {
+  authIsAdmin: false,
+  showSmtpPass: false,
+  savingSmtp: false,
+  smtpSaveMsg: '',
+  smtpSaveOk: false,
+  testingSmtp: false,
+  smtpTestMessage: '',
+  smtpTestSuccess: false,
 })
 
-defineEmits(['save', 'test', 'update:show-smtp-pass'])
+defineEmits<{
+  (e: 'save'): void
+  (e: 'test'): void
+  (e: 'update:show-smtp-pass', value: boolean): void
+}>()
 </script>

@@ -1,7 +1,8 @@
 package handlers
 
 import (
-	"log"
+	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -231,7 +232,7 @@ func (h *ProxmoxHandler) ListNodeServices(c *gin.Context) {
 	client := proxmoxclient.New(conn.APIURL, conn.TokenID, secret, conn.InsecureSkipVerify)
 	services, err := client.GetNodeServices(node.NodeName)
 	if err != nil {
-		log.Printf("proxmox services list [%s/%s]: %v", conn.Name, node.NodeName, err)
+		slog.ErrorContext(c.Request.Context(), fmt.Sprintf("proxmox services list [%s/%s]: %v", conn.Name, node.NodeName, err))
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 		return
 	}

@@ -67,7 +67,7 @@
           >
             <template v-if="kind === 'tracker'">
               <td class="text-muted small text-nowrap">
-                <RelativeTime :date="execution.triggered_at" />
+                <RelativeTime :date="execution.triggered_at || ''" />
               </td>
               <td class="small">
                 <div>
@@ -166,7 +166,7 @@
             </template>
             <template v-else>
               <td class="text-muted small text-nowrap">
-                <RelativeTime :date="execution.triggered_at" />
+                <RelativeTime :date="execution.triggered_at || ''" />
               </td>
               <td class="small">
                 <div
@@ -273,50 +273,58 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import RelativeTime from '../RelativeTime.vue'
 
-defineProps({
-  executions: {
-    type: Array,
-    default: () => [],
-  },
-  loading: {
-    type: Boolean,
-    default: false,
-  },
-  kind: {
-    type: String,
-    default: 'webhook',
-  },
-  title: {
-    type: String,
-    default: 'Historique des exécutions',
-  },
-  emptyText: {
-    type: String,
-    default: 'Aucune exécution enregistrée.',
-  },
-  showRefresh: {
-    type: Boolean,
-    default: false,
-  },
-  logsMode: {
-    type: String,
-    default: 'link',
-  },
+interface Execution {
+  id?: string | number
+  sourceId?: string | number
+  sourceName?: string
+  triggered_at?: string
+  tag_name?: string
+  release_url?: string
+  release_name?: string
+  host_id?: string
+  host_name?: string
+  repo_name?: string
+  branch?: string
+  commit_sha?: string
+  commit_message?: string
+  command_id?: string
+  status?: string
+}
+
+withDefaults(defineProps<{
+  executions?: Execution[]
+  loading?: boolean
+  kind?: string
+  title?: string
+  emptyText?: string
+  showRefresh?: boolean
+  logsMode?: string
+}>(), {
+  executions: () => [],
+  loading: false,
+  kind: 'webhook',
+  title: 'Historique des exécutions',
+  emptyText: 'Aucune exécution enregistrée.',
+  showRefresh: false,
+  logsMode: 'link',
 })
 
-defineEmits(['refresh', 'open-logs'])
+defineEmits<{
+  (e: 'refresh'): void
+  (e: 'open-logs', commandId: string): void
+}>()
 
-function execStatusBadge(status) {
-  const map = {
+function execStatusBadge(status: string | undefined): string {
+  const map: Record<string, string> = {
     pending: 'bg-yellow-lt text-yellow',
     running: 'bg-blue-lt text-blue',
     completed: 'bg-success-lt text-success',
     failed: 'bg-danger-lt text-danger',
     skipped: 'bg-secondary-lt text-secondary',
   }
-  return map[status] || 'bg-secondary-lt text-secondary'
+  return map[status || ''] || 'bg-secondary-lt text-secondary'
 }
 </script>

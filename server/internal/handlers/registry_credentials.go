@@ -1,7 +1,8 @@
 package handlers
 
 import (
-	"log"
+	"fmt"
+	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -37,7 +38,7 @@ func (h *ReleaseTrackerHandler) CreateRegistryCredential(c *gin.Context) {
 	}
 	created, err := h.db.CreateRegistryCredential(c.Request.Context(), req)
 	if err != nil {
-		log.Printf("CreateRegistryCredential: %v", err)
+		slog.ErrorContext(c.Request.Context(), fmt.Sprintf("CreateRegistryCredential: %v", err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create credential"})
 		return
 	}

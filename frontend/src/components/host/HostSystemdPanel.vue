@@ -127,24 +127,34 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed } from 'vue'
-import { useAuthStore } from '../../stores/auth'
 import apiClient, { getApiErrorMessage } from '../../api'
 import { useCommandStream } from '../../composables/useCommandStream'
 import { useLocalStorage } from '../../composables/useLocalStorage'
 import { useConfirmDialog } from '../../composables/useConfirmDialog'
 
-const props = defineProps({
-  hostId: { type: String, required: true },
-  canRun: { type: Boolean, default: false },
+interface SystemdService {
+  name: string
+  active_state?: string
+  sub_state?: string
+  description?: string
+}
+
+const props = withDefaults(defineProps<{
+  hostId: string
+  canRun?: boolean
+}>(), {
+  canRun: false,
 })
 
-const emit = defineEmits(['open-console', 'history-changed'])
+const emit = defineEmits<{
+  (e: 'open-console', payload: { commandId: string | number; prefix: string; command: string }): void
+  (e: 'history-changed'): void
+}>()
 
-const auth = useAuthStore()
 const dialog = useConfirmDialog()
-const services = ref([])
+const services = ref<SystemdService[]>([])
 const loading = ref(false)
 const error = ref('')
 const filter = useLocalStorage(`host-systemd-filter:${props.hostId}`, 'active')
@@ -153,31 +163,31 @@ const { collectCommandOutput } = useCommandStream()
 
 const filteredServices = computed(() => {
   if (filter.value === 'all') return services.value
-  return services.value.filter(s => s.active_state === 'active')
+  return services.value.filter((s) => s.active_state === 'active')
 })
 
-function stateClass(state) {
+function stateClass(state: string | undefined): string {
   if (state === 'active') return 'badge bg-green-lt text-green'
   if (state === 'failed') return 'badge bg-red-lt text-red'
   if (state === 'activating' || state === 'deactivating') return 'badge bg-yellow-lt text-yellow'
   return 'badge bg-secondary-lt text-secondary'
 }
 
-async function loadServices() {
+async function loadServices(): Promise<void> {
   loading.value = true
   error.value = ''
   try {
     const res = await apiClient.sendSystemdCommand(props.hostId, '', 'list')
     const cmdId = res.data.command_id
 
-    await collectCommandOutput(cmdId, { timeoutMs: STREAM_TIMEOUT_MS }).then(output => {
+    await collectCommandOutput(cmdId, { timeoutMs: STREAM_TIMEOUT_MS }).then((output: string) => {
       try {
         services.value = JSON.parse(output)
       } catch {
         error.value = 'Impossible de parser la liste des services'
       }
-    }).catch(e => {
-      error.value = e.message || 'Erreur lors du chargement des services'
+    }).catch((e: any) => {
+      error.value = e?.message || 'Erreur lors du chargement des services'
     }).finally(() => { emit('history-changed') })
   } catch (e) {
     error.value = getApiErrorMessage(e, "Impossible d'envoyer la commande")
@@ -186,7 +196,7 @@ async function loadServices() {
   }
 }
 
-async function runAction(serviceName, action) {
+async function runAction(serviceName: string, action: string): Promise<void> {
   error.value = ''
   if (action === 'stop' || action === 'restart') {
     const ok = await dialog.confirm({

@@ -66,7 +66,7 @@
             </div>
             <div
               class="h1 mb-0"
-              :class="proxmoxSummary?.nodes_down > 0 ? 'text-red' : 'text-green'"
+              :class="(proxmoxSummary?.nodes_down ?? 0) > 0 ? 'text-red' : 'text-green'"
             >
               {{ (proxmoxSummary?.node_count ?? 0) - (proxmoxSummary?.nodes_down ?? 0) }}
               <span class="text-secondary fs-4">/ {{ proxmoxSummary?.node_count ?? 0 }}</span>
@@ -125,20 +125,24 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { storeToRefs } from 'pinia'
 import { formatBytes } from '../../utils/formatters'
 import { useDashboardStore } from '../../stores/dashboard'
 
-defineProps({
-  cveSummary: {
-    type: Object,
-    default: null,
-  },
-  cveTimestampText: {
-    type: String,
-    default: '',
-  },
+interface CVESummary {
+  critical_count?: number
+  hosts_with_critical?: number
+  high_count?: number
+  hosts_with_high?: number
+}
+
+withDefaults(defineProps<{
+  cveSummary?: CVESummary | null
+  cveTimestampText?: string
+}>(), {
+  cveSummary: null,
+  cveTimestampText: '',
 })
 
 const dashboardStore = useDashboardStore()

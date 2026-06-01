@@ -367,8 +367,8 @@
   </div>
 </template>
 
-<script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+<script setup lang="ts">
+import { ref, computed, onMounted, watch } from 'vue'
 import { useWebSocket } from '../composables/useWebSocket'
 import WsStatusBar from '../components/WsStatusBar.vue'
 import NetworkGraph from '../components/network/NetworkGraph.vue'
@@ -377,9 +377,8 @@ import NetworkPortList from '../components/network/NetworkPortList.vue'
 import NetworkTopologyConfig from '../components/network/NetworkTopologyConfig.vue'
 import apiClient from '../api'
 
-// ─── State ────────────────────────────────────────────────────────────────
-const hosts = ref([])
-const containers = ref([])
+const hosts = ref<any[]>([])
+const containers = ref<any[]>([])
 const viewMode = ref(localStorage.getItem('networkViewMode') || 'graph')
 const networkTab = ref('topology')
 const rootNodeName = ref('Infrastructure')
@@ -388,19 +387,18 @@ const autheliaLabel = ref('Authelia')
 const autheliaIp = ref('')
 const internetLabel = ref('Internet')
 const internetIp = ref('')
-const networkServices = ref([])
-const hostPortConfig = ref([])
-const nodePositions = ref({})
+const networkServices = ref<any[]>([])
+const hostPortConfig = ref<any[]>([])
+const nodePositions = ref<Record<string, { x: number; y: number }>>({})
 const topologyConfigLoaded = ref(false)
-const saveStatus = ref('idle') // 'idle' | 'saving' | 'saved' | 'error'
-const selectedNode = ref(null)
-const networkGraphRef = ref(null)
+const saveStatus = ref<'idle' | 'saving' | 'saved' | 'error'>('idle')
+const selectedNode = ref<any>(null)
+const networkGraphRef = ref<any>(null)
 const rootHostId = ref('')
 const autheliaHostId = ref('')
 const rootPortId = ref('')
 const autheliaPortId = ref('')
 
-// Graph filters
 const filterInternetOnly = ref(false)
 const filterHideInternal = ref(false)
 
@@ -410,7 +408,7 @@ watch(viewMode, (newMode) => {
 })
 
 // ─── Debounced save ───────────────────────────────────────────────────────
-let saveTimeout = null
+let saveTimeout: ReturnType<typeof setTimeout> | null = null
 const debouncedSave = () => {
   if (saveTimeout) clearTimeout(saveTimeout)
   saveTimeout = setTimeout(async () => {
@@ -432,7 +430,7 @@ watch(rootPortId, () => debouncedSave())
 watch(autheliaPortId, () => debouncedSave())
 
 // ─── Topology config load/save ────────────────────────────────────────────
-async function loadTopologyConfig() {
+async function loadTopologyConfig(): Promise<void> {
   try {
     const res = await apiClient.getTopologyConfig()
     if (res.data) {
@@ -462,7 +460,7 @@ async function loadTopologyConfig() {
   }
 }
 
-async function saveTopologyConfig() {
+async function saveTopologyConfig(): Promise<void> {
   if (!topologyConfigLoaded.value) return
   try {
     saveStatus.value = 'saving'
@@ -494,15 +492,15 @@ async function saveTopologyConfig() {
 }
 
 // ─── Layout reset ─────────────────────────────────────────────────────────
-function handleResetLayout() {
+function handleResetLayout(): void {
   nodePositions.value = {}
   networkGraphRef.value?.resetLayout()
   debouncedSave()
 }
 
 // ─── Computed: port discovery ──────────────────────────────────────────────
-const discoveredPortsByHost = computed(() => {
-  const map = {}
+const discoveredPortsByHost = computed<Record<string, any[]>>(() => {
+  const map: Record<string, any[]> = {}
   for (const container of containers.value) {
     const mappings = container.port_mappings || []
     for (const mapping of mappings) {
@@ -515,7 +513,7 @@ const discoveredPortsByHost = computed(() => {
       const protocol = (mapping.protocol || 'tcp').toLowerCase()
       if (!map[hostId]) map[hostId] = []
       const key = `${portNumber}-${protocol}`
-      const existing = map[hostId].find(entry => entry.key === key)
+      const existing = map[hostId].find((entry: any) => entry.key === key)
       if (existing) {
         if (container.name && !existing.containers.includes(container.name)) existing.containers.push(container.name)
         continue
@@ -529,16 +527,16 @@ const discoveredPortsByHost = computed(() => {
   return map
 })
 
-const hostPortOverrides = computed(() => {
-  const overrides = {}
+const hostPortOverrides = computed<Record<string, any>>(() => {
+  const overrides: Record<string, any> = {}
   for (const entry of hostPortConfig.value) {
     if (!entry.hostId) continue
-    const excludedPortsList = []
-    const portMap = {}
-    const proxyPorts = new Set()
-    const autheliaPortNumbers = new Set()
-    const internetExposedPorts = {}
-    for (const [port, settings] of Object.entries(entry.ports || {})) {
+    const excludedPortsList: number[] = []
+    const portMap: Record<number, string> = {}
+    const proxyPorts = new Set<number>()
+    const autheliaPortNumbers = new Set<number>()
+    const internetExposedPorts: Record<number, number | null> = {}
+    for (const [port, settings] of Object.entries(entry.ports || {}) as [string, any][]) {
       const portNumber = Number(port)
       if (!settings?.enabled) excludedPortsList.push(portNumber)
       if (settings?.name) portMap[portNumber] = settings.name
@@ -551,11 +549,11 @@ const hostPortOverrides = computed(() => {
   return overrides
 })
 
-const combinedServices = computed(() => {
-  const linkedServices = []
+const combinedServices = computed<any[]>(() => {
+  const linkedServices: any[] = []
   for (const entry of hostPortConfig.value) {
     if (!entry.hostId) continue
-    for (const [port, settings] of Object.entries(entry.ports || {})) {
+    for (const [port, settings] of Object.entries(entry.ports || {}) as [string, any][]) {
       if (!settings?.linkToProxy) continue
       const portNumber = Number(port)
       if (!portNumber) continue
@@ -577,8 +575,8 @@ const combinedServices = computed(() => {
   return [...networkServices.value, ...linkedServices]
 })
 
-const graphHosts = computed(() => {
-  const portsByHost = new Map()
+const graphHosts = computed<any[]>(() => {
+  const portsByHost = new Map<string, Map<string, any>>()
   for (const container of containers.value) {
     const mappings = container.port_mappings || []
     for (const mapping of mappings) {
@@ -589,30 +587,30 @@ const graphHosts = computed(() => {
       const protocol = (mapping.protocol || 'tcp').toLowerCase()
       const key = `${portNumber}-${protocol}`
       if (!portsByHost.has(hostId)) portsByHost.set(hostId, new Map())
-      const hostPorts = portsByHost.get(hostId)
+      const hostPorts = portsByHost.get(hostId)!
       if (!hostPorts.has(key)) {
         hostPorts.set(key, { port: portNumber, protocol, containers: [] })
       }
-      hostPorts.get(key).containers.push(container.name)
+      hostPorts.get(key)!.containers.push(container.name)
     }
   }
-  return hosts.value.map((host) => ({
+  return hosts.value.map((host: any) => ({
     ...host,
-    ports: portsByHost.has(host.id) ? Array.from(portsByHost.get(host.id).values()) : [],
+    ports: portsByHost.has(host.id) ? Array.from(portsByHost.get(host.id)!.values()) : [],
   }))
 })
 
 const filteredGraphHosts = computed(() => {
   if (!filterInternetOnly.value && !filterHideInternal.value) return graphHosts.value
-  return graphHosts.value.map(host => {
+  return graphHosts.value.map((host: any) => {
     const override = hostPortOverrides.value[host.id] || {}
-    const proxyPorts = override.proxyPorts || new Set()
+    const proxyPorts = override.proxyPorts || new Set<number>()
     const internetPorts = override.internetExposedPorts || {}
     let ports = host.ports || []
     if (filterInternetOnly.value) {
-      ports = ports.filter(p => Number(p.port) in internetPorts)
+      ports = ports.filter((p: any) => Number(p.port) in internetPorts)
     } else if (filterHideInternal.value) {
-      ports = ports.filter(p => {
+      ports = ports.filter((p: any) => {
         const pn = Number(p.port)
         return proxyPorts.has(pn) || pn in internetPorts
       })
@@ -623,20 +621,18 @@ const filteredGraphHosts = computed(() => {
 
 const filteredServices = computed(() => {
   if (!filterInternetOnly.value) return combinedServices.value
-  return combinedServices.value.filter(s => s.exposedToInternet)
+  return combinedServices.value.filter((s: any) => s.exposedToInternet)
 })
 
-// ─── KPI computeds ────────────────────────────────────────────────────────
-const totalPorts = computed(() => graphHosts.value.reduce((sum, host) => sum + (host.ports?.length || 0), 0))
-const hostsOnline = computed(() => hosts.value.filter(h => h.status === 'online').length)
-const containersRunning = computed(() => containers.value.filter(c => c.state === 'running').length)
+const totalPorts = computed(() => graphHosts.value.reduce((sum, host: any) => sum + (host.ports?.length || 0), 0))
+const hostsOnline = computed(() => hosts.value.filter((h: any) => h.status === 'online').length)
+const containersRunning = computed(() => containers.value.filter((c: any) => c.state === 'running').length)
 
 const trafficDelta = ref({ rx: 0, tx: 0, intervalSec: 0 })
-const prevTrafficByHost = ref({})
-const prevTrafficTime = ref(null)
+const prevTrafficByHost = ref<Record<string, { rx: number; tx: number }>>({})
+const prevTrafficTime = ref<number | null>(null)
 
-// ─── Helpers ──────────────────────────────────────────────────────────────
-function formatBytes(bytes) {
+function formatBytes(bytes: number | undefined): string {
   if (!bytes && bytes !== 0) return '-'
   if (bytes < 1024) return `${bytes} B`
   const units = ['KB', 'MB', 'GB', 'TB']
@@ -646,7 +642,7 @@ function formatBytes(bytes) {
   return `${value.toFixed(1)} ${units[idx]}`
 }
 
-function ensureHostPortConfig() {
+function ensureHostPortConfig(): void {
   const known = new Set(hostPortConfig.value.map((item) => item.hostId))
   for (const host of hosts.value) {
     if (known.has(host.id)) continue
@@ -663,7 +659,7 @@ function ensureHostPortConfig() {
   }
 }
 
-function getHostPortEntry(hostId) {
+function getHostPortEntry(hostId: string): any {
   let entry = hostPortConfig.value.find((item) => item.hostId === hostId)
   if (!entry) {
     entry = { hostId, ports: {} }
@@ -673,13 +669,13 @@ function getHostPortEntry(hostId) {
   return entry
 }
 
-function onNodePositionsUpdate(positions) {
+function onNodePositionsUpdate(positions: Record<string, { x: number; y: number }>): void {
   nodePositions.value = positions
   debouncedSave()
 }
 
 // ─── Data fetch ───────────────────────────────────────────────────────────
-async function fetchSnapshot() {
+async function fetchSnapshot(): Promise<void> {
   try {
     const res = await apiClient.getNetworkSnapshot()
     hosts.value = res.data?.hosts || []
@@ -691,7 +687,7 @@ async function fetchSnapshot() {
 }
 
 // ─── WebSocket ────────────────────────────────────────────────────────────
-const { wsStatus, wsError, retryCount, reconnect } = useWebSocket('/api/v1/ws/network', (payload) => {
+const { wsStatus, wsError, retryCount, reconnect } = useWebSocket('/api/v1/ws/network', (payload: any) => {
   if (payload.type !== 'network') return
   const now = Date.now()
   const newHosts = payload.hosts || []
@@ -711,7 +707,7 @@ const { wsStatus, wsError, retryCount, reconnect } = useWebSocket('/api/v1/ws/ne
     trafficDelta.value = { rx: deltaRx, tx: deltaTx, intervalSec }
   }
 
-  const snap = {}
+  const snap: Record<string, { rx: number; tx: number }> = {}
   for (const h of newHosts) {
     snap[h.id] = { rx: h.network_rx_bytes || 0, tx: h.network_tx_bytes || 0 }
   }

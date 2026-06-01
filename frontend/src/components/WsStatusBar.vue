@@ -104,27 +104,22 @@
   </Transition>
 </template>
 
-<script setup>
-defineProps({
-  status: {
-    type: String,
-    required: true
-  },
-  error: {
-    type: String,
-    default: ''
-  },
-  retryCount: {
-    type: Number,
-    default: 0
-  },
-  dataStaleAlert: {
-    type: Boolean,
-    default: false
-  }
+<script setup lang="ts">
+withDefaults(defineProps<{
+  status: string
+  error?: string
+  retryCount?: number
+  dataStaleAlert?: boolean
+}>(), {
+  error: '',
+  retryCount: 0,
+  dataStaleAlert: false,
 })
 
-defineEmits(['reconnect', 'dismiss-stale-alert'])
+defineEmits<{
+  (e: 'reconnect'): void
+  (e: 'dismiss-stale-alert'): void
+}>()
 </script>
 
 <style scoped>

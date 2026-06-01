@@ -214,40 +214,63 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { useDateFormatter } from '../../composables/useDateFormatter'
 
-defineProps({
-  trackers: { type: Array, default: () => [] },
-  loading: { type: Boolean, default: false },
-  error: { type: String, default: '' },
+interface TrackerExecution {
+  status: string
+  tag_name?: string
+}
+
+interface Tracker {
+  id: string | number
+  name: string
+  enabled?: boolean
+  host_id?: string
+  host_name?: string
+  tracker_type?: string
+  last_release_tag?: string
+  last_release_detected_at?: string
+  last_checked_at?: string
+  last_error?: string
+  last_execution?: TrackerExecution | null
+}
+
+withDefaults(defineProps<{
+  trackers?: Tracker[]
+  loading?: boolean
+  error?: string
+}>(), {
+  trackers: () => [],
+  loading: false,
+  error: '',
 })
 
 const { formatLocaleDateTime } = useDateFormatter()
 
-function formatDate(dateStr) {
+function formatDate(dateStr: string | undefined): string {
   return formatLocaleDateTime(dateStr)
 }
 
-const EXECUTION_BADGE = {
+const EXECUTION_BADGE: Record<string, string> = {
   succeeded: 'bg-green-lt text-green',
   failed: 'bg-red-lt text-red',
   running: 'bg-blue-lt text-blue',
   pending: 'bg-yellow-lt text-yellow',
 }
 
-const EXECUTION_LABEL = {
+const EXECUTION_LABEL: Record<string, string> = {
   succeeded: 'Succès',
   failed: 'Échec',
   running: 'En cours',
   pending: 'En attente',
 }
 
-function executionBadgeClass(status) {
+function executionBadgeClass(status: string): string {
   return EXECUTION_BADGE[status] || 'bg-secondary-lt text-secondary'
 }
 
-function executionLabel(status) {
+function executionLabel(status: string): string {
   return EXECUTION_LABEL[status] || status
 }
 </script>

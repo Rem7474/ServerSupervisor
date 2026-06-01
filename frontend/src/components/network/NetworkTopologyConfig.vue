@@ -533,35 +533,89 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, watch } from 'vue'
 
-const rootNodeName    = defineModel('rootNodeName',    { type: String, default: 'Infrastructure' })
-const rootNodeIp      = defineModel('rootNodeIp',      { type: String, default: '' })
-const autheliaLabel   = defineModel('autheliaLabel',   { type: String, default: 'Authelia' })
-const autheliaIp      = defineModel('autheliaIp',      { type: String, default: '' })
-const internetLabel   = defineModel('internetLabel',   { type: String, default: 'Internet' })
-const internetIp      = defineModel('internetIp',      { type: String, default: '' })
-const networkServices = defineModel('networkServices', { type: Array, default: () => [] })
-const hostPortConfig  = defineModel('hostPortConfig',  { type: Array, default: () => [] })
-const rootHostId      = defineModel('rootHostId',      { type: String, default: '' })
-const autheliaHostId  = defineModel('autheliaHostId',  { type: String, default: '' })
-const rootPortId      = defineModel('rootPortId',      { type: String, default: '' })
-const autheliaPortId  = defineModel('autheliaPortId',  { type: String, default: '' })
+interface NetworkService {
+  id: string
+  name: string
+  domain: string
+  path: string
+  internalPort: number | null
+  externalPort: number | null
+  hostId: string
+  tags: string
+  linkToProxy: boolean
+  linkToAuthelia: boolean
+  exposedToInternet: boolean
+}
 
-const props = defineProps({
-  hosts: {
-    type: Array,
-    default: () => [],
-  },
-  containers: {
-    type: Array,
-    default: () => [],
-  },
+interface PortSetting {
+  name: string
+  domain: string
+  path: string
+  enabled: boolean
+  linkToProxy: boolean
+  linkToAuthelia: boolean
+  exposedToInternet: boolean
+  externalPort: number | null
+}
+
+interface HostPortEntry {
+  hostId: string
+  ports: Record<string, PortSetting>
+}
+
+interface DiscoveredPort {
+  key: string
+  port: number
+  protocol: string
+  internal: boolean
+  containers: string[]
+}
+
+interface PortMapping {
+  host_port?: number
+  container_port?: number
+  protocol?: string
+}
+
+interface Container {
+  host_id: string
+  name?: string
+  port_mappings?: PortMapping[]
+}
+
+interface Host {
+  id: string
+  name?: string
+  hostname?: string
+  ip_address?: string
+}
+
+const rootNodeName    = defineModel<string>('rootNodeName',    { default: 'Infrastructure' })
+const rootNodeIp      = defineModel<string>('rootNodeIp',      { default: '' })
+const autheliaLabel   = defineModel<string>('autheliaLabel',   { default: 'Authelia' })
+const autheliaIp      = defineModel<string>('autheliaIp',      { default: '' })
+const internetLabel   = defineModel<string>('internetLabel',   { default: 'Internet' })
+const internetIp      = defineModel<string>('internetIp',      { default: '' })
+const networkServices = defineModel<NetworkService[]>('networkServices', { default: () => [] })
+const hostPortConfig  = defineModel<HostPortEntry[]>('hostPortConfig',  { default: () => [] })
+const rootHostId      = defineModel<string>('rootHostId',      { default: '' })
+const autheliaHostId  = defineModel<string>('autheliaHostId',  { default: '' })
+const rootPortId      = defineModel<string>('rootPortId',      { default: '' })
+const autheliaPortId  = defineModel<string>('autheliaPortId',  { default: '' })
+
+const props = withDefaults(defineProps<{
+  hosts?: Host[]
+  containers?: Container[]
+}>(), {
+  hosts: () => [],
+  containers: () => [],
 })
 
-const discoveredPortsByHost = computed(() => {
-  const map = {}
+const discoveredPortsByHost = computed<Record<string, DiscoveredPort[]>>(() => {
+  const map: Record<string, DiscoveredPort[]> = {}
   for (const container of props.containers) {
     const mappings = container.port_mappings || []
     for (const mapping of mappings) {
@@ -616,21 +670,21 @@ watch(
   { deep: true, immediate: true }
 )
 
-function onEnabledChange(hostId, portNumber, event) {
+function onEnabledChange(hostId: string, portNumber: number, event: Event): void {
   const setting = getPortSetting(hostId, portNumber)
-  if (!event.target.checked) {
+  if (!(event.target as HTMLInputElement).checked) {
     setting.linkToProxy = false
     setting.linkToAuthelia = false
     setting.exposedToInternet = false
   }
 }
 
-function getPortProxyTooltip(hostId, portNumber) {
+function getPortProxyTooltip(hostId: string, portNumber: number): string {
   const setting = getPortSetting(hostId, portNumber)
   return !setting.enabled ? "Activez d'abord l'affichage du port" : ''
 }
 
-function portRowClass(hostId, portNumber) {
+function portRowClass(hostId: string, portNumber: number): Record<string, boolean> {
   const s = getPortSetting(hostId, portNumber)
   return {
     'opacity-50': !s.enabled,
@@ -639,7 +693,7 @@ function portRowClass(hostId, portNumber) {
   }
 }
 
-function countEnabled(hostId) {
+function countEnabled(hostId: string): number {
   const entry = hostPortConfig.value.find((e) => e.hostId === hostId)
   if (!entry) return (discoveredPortsByHost.value[hostId] || []).length
   const ports = discoveredPortsByHost.value[hostId] || []
@@ -649,35 +703,35 @@ function countEnabled(hostId) {
   }).length
 }
 
-function countProxyLinked(hostId) {
+function countProxyLinked(hostId: string): number {
   const entry = hostPortConfig.value.find((e) => e.hostId === hostId)
   if (!entry) return 0
   return Object.values(entry.ports || {}).filter((s) => s?.linkToProxy && s?.enabled).length
 }
 
-function countAutheliaLinked(hostId) {
+function countAutheliaLinked(hostId: string): number {
   const entry = hostPortConfig.value.find((e) => e.hostId === hostId)
   if (!entry) return 0
   return Object.values(entry.ports || {}).filter((s) => s?.linkToAuthelia && s?.enabled).length
 }
 
-function countInternetExposed(hostId) {
+function countInternetExposed(hostId: string): number {
   const entry = hostPortConfig.value.find((e) => e.hostId === hostId)
   if (!entry) return 0
   return Object.values(entry.ports || {}).filter((s) => s?.exposedToInternet && s?.enabled).length
 }
 
-function isPortModified(hostId, portNumber) {
+function isPortModified(hostId: string, portNumber: number): boolean {
   const s = getPortSetting(hostId, portNumber)
   return s.name !== '' || !s.enabled || s.linkToProxy || s.linkToAuthelia || s.exposedToInternet || s.domain !== '' || (s.path !== '/' && s.path !== '')
 }
 
-function resetPortSetting(hostId, portNumber) {
+function resetPortSetting(hostId: string, portNumber: number): void {
   const entry = getHostPortEntry(hostId)
   entry.ports[String(portNumber)] = createDefaultPortSetting()
 }
 
-function getPortSetting(hostId, portNumber) {
+function getPortSetting(hostId: string, portNumber: number): PortSetting {
   const entry = getHostPortEntry(hostId)
   const key = String(portNumber)
   if (!entry.ports[key]) {
@@ -686,7 +740,7 @@ function getPortSetting(hostId, portNumber) {
   return entry.ports[key]
 }
 
-function ensureHostPortConfig() {
+function ensureHostPortConfig(): void {
   const known = new Set(hostPortConfig.value.map((item) => item.hostId))
   for (const host of props.hosts) {
     if (known.has(host.id)) continue
@@ -703,7 +757,7 @@ function ensureHostPortConfig() {
   }
 }
 
-function getHostPortEntry(hostId) {
+function getHostPortEntry(hostId: string): HostPortEntry {
   let entry = hostPortConfig.value.find((item) => item.hostId === hostId)
   if (!entry) {
     entry = { hostId, ports: {} }
@@ -713,11 +767,11 @@ function getHostPortEntry(hostId) {
   return entry
 }
 
-function createDefaultPortSetting() {
+function createDefaultPortSetting(): PortSetting {
   return { name: '', domain: '', path: '/', enabled: true, linkToProxy: false, linkToAuthelia: false, exposedToInternet: false, externalPort: null }
 }
 
-function addServiceRow() {
+function addServiceRow(): void {
   networkServices.value.push({
     id: `svc-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
     name: '',
@@ -733,7 +787,7 @@ function addServiceRow() {
   })
 }
 
-function removeServiceRow(serviceId) {
+function removeServiceRow(serviceId: string): void {
   networkServices.value = networkServices.value.filter((service) => service.id !== serviceId)
 }
 </script>

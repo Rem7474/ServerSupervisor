@@ -76,20 +76,20 @@
       <div class="side-main">
         <DockerContainersTab
           v-if="activeTab === 'containers'"
-          :containers="containers"
-          :version-comparisons="versionComparisons"
+          :containers="(containers as any)"
+          :version-comparisons="(versionComparisons as any)"
           :can-run-docker="canRunDocker"
-          :action-loading="dockerActionLoading"
-          @container-action="handleContainerAction"
+          :action-loading="(dockerActionLoading as any)"
+          @container-action="(handleContainerAction as any)"
         />
         <ComposeProjectsTab
           v-if="activeTab === 'compose'"
-          :compose-projects="composeProjects"
-          :containers="containers"
-          :version-comparisons="versionComparisons"
+          :compose-projects="(composeProjects as any)"
+          :containers="(containers as any)"
+          :version-comparisons="(versionComparisons as any)"
           :can-run-docker="canRunDocker"
-          :action-loading="composeActionLoading"
-          @compose-action="handleComposeAction"
+          :action-loading="(composeActionLoading as any)"
+          @compose-action="(handleComposeAction as any)"
         />
       </div>
 
@@ -106,7 +106,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useWebSocket } from '../composables/useWebSocket'
 import { useAuthStore } from '../stores/auth'
@@ -123,32 +123,32 @@ import apiClient from '../api'
 const auth = useAuthStore()
 const dialog = useConfirmDialog()
 
-const containers = ref([])
-const composeProjects = ref([])
-const versionComparisons = ref([])
+const containers = ref<any[]>([])
+const composeProjects = ref<any[]>([])
+const versionComparisons = ref<any[]>([])
 const activeTab = useLocalStorage('dockerActiveTab', 'containers')
 const { value: actionError, showToast: showActionError } = useToast('')
 
 const canRunDocker = computed(() => auth.role === 'admin' || auth.role === 'operator')
-const runningCount = computed(() => containers.value.filter(c => c.state === 'running').length)
+const runningCount = computed(() => containers.value.filter((c: any) => c.state === 'running').length)
 
-const dockerActionLoading = ref({})
-const composeActionLoading = ref({})
+const dockerActionLoading = ref<Record<string, string | null>>({})
+const composeActionLoading = ref<Record<string, string | null>>({})
 
 // Docker console
 const showDockerConsole = ref(false)
-const dockerLiveCmd = ref(null)
+const dockerLiveCmd = ref<any>(null)
 
 const { openCommandStream, closeStream: closeDockerStream } = useCommandStream()
 
-const hostMap = computed(() => {
-  const map = {}
-  containers.value.forEach(c => { if (c.host_id) map[c.host_id] = c.hostname })
-  composeProjects.value.forEach(p => { if (p.host_id) map[p.host_id] = p.hostname })
+const hostMap = computed<Record<string, string>>(() => {
+  const map: Record<string, string> = {}
+  containers.value.forEach((c: any) => { if (c.host_id) map[c.host_id] = c.hostname })
+  composeProjects.value.forEach((p: any) => { if (p.host_id) map[p.host_id] = p.hostname })
   return map
 })
 
-async function handleContainerAction({ hostId, name, action }) {
+async function handleContainerAction({ hostId, name, action }: { hostId: string; name: string; action: string }): Promise<void> {
   if (dockerActionLoading.value[name]) return
 
   if (action === 'stop' || action === 'restart') {
@@ -165,14 +165,14 @@ async function handleContainerAction({ hostId, name, action }) {
   try {
     const res = await apiClient.sendDockerCommand(hostId, name, action)
     connectDockerStream(res.data.command_id, hostId, name, action)
-  } catch (err) {
-    showActionError(err.response?.data?.error || err.message, 6000)
+  } catch (err: any) {
+    showActionError(err?.response?.data?.error || err?.message, 6000)
   } finally {
     dockerActionLoading.value = { ...dockerActionLoading.value, [name]: null }
   }
 }
 
-async function handleComposeAction({ hostId, name, action, workingDir }) {
+async function handleComposeAction({ hostId, name, action, workingDir }: { hostId: string; name: string; action: string; workingDir?: string }): Promise<void> {
   if (composeActionLoading.value[name]) return
 
   if (action === 'compose_down' || action === 'compose_restart') {
@@ -189,40 +189,40 @@ async function handleComposeAction({ hostId, name, action, workingDir }) {
   try {
     const res = await apiClient.sendDockerCommand(hostId, name, action, workingDir)
     connectDockerStream(res.data.command_id, hostId, name, action)
-  } catch (err) {
-    showActionError(err.response?.data?.error || err.message, 6000)
+  } catch (err: any) {
+    showActionError(err?.response?.data?.error || err?.message, 6000)
   } finally {
     composeActionLoading.value = { ...composeActionLoading.value, [name]: null }
   }
 }
 
-function connectDockerStream(commandId, hostId, containerName, action) {
+function connectDockerStream(commandId: string, hostId: string, containerName: string, action: string): void {
   const hostName = hostMap.value[hostId] || containerName
   dockerLiveCmd.value = { id: commandId, host_name: hostName, module: 'docker', action, target: containerName, status: 'pending', output: '' }
   showDockerConsole.value = true
   openCommandStream(commandId, {
-    onInit: (p) => {
+    onInit: (p: any) => {
       if (dockerLiveCmd.value?.id !== commandId) return
       dockerLiveCmd.value = { ...dockerLiveCmd.value, status: p.status, output: p.output || '' }
     },
-    onChunk: (p) => {
+    onChunk: (p: any) => {
       if (dockerLiveCmd.value?.id !== commandId) return
       dockerLiveCmd.value = { ...dockerLiveCmd.value, output: (dockerLiveCmd.value.output || '') + (p.chunk || '') }
     },
-    onStatus: (p) => {
+    onStatus: (p: any) => {
       if (dockerLiveCmd.value?.id !== commandId) return
       dockerLiveCmd.value = { ...dockerLiveCmd.value, status: p.status }
     },
   })
 }
 
-function closeDockerConsole() {
+function closeDockerConsole(): void {
   closeDockerStream()
   dockerLiveCmd.value = null
   showDockerConsole.value = false
 }
 
-const { wsStatus, wsError, retryCount, dataStaleAlert, reconnect } = useWebSocket('/api/v1/ws/docker', (payload) => {
+const { wsStatus, wsError, retryCount, dataStaleAlert, reconnect } = useWebSocket('/api/v1/ws/docker', (payload: any) => {
   if (payload.type !== 'docker') return
   containers.value = payload.containers || []
   composeProjects.value = payload.compose_projects || []

@@ -1,7 +1,7 @@
 package handlers
 
 import (
-	"log"
+	"log/slog"
 	"strings"
 	"sync"
 	"time"
@@ -36,10 +36,10 @@ func resolveLatestAgentVersion(cfg *config.Config) string {
 	tag, _, _, err := client.FetchLatestRelease(agentReleaseOwner, agentReleaseRepo)
 	if err != nil {
 		if latestAgentVersionCache.version != "" {
-			log.Printf("agent version resolver: failed to refresh latest release (%v), using cached value %s", err, latestAgentVersionCache.version)
+			slog.Warn("agent version resolver: failed to refresh latest release, using cached value", slog.Any("err", err), slog.String("cached", latestAgentVersionCache.version))
 			return latestAgentVersionCache.version
 		}
-		log.Printf("agent version resolver: failed to refresh latest release (%v), using default %s", err, defaultLatestAgentVersion)
+		slog.Warn("agent version resolver: failed to refresh latest release, using default", slog.Any("err", err), slog.String("default", defaultLatestAgentVersion))
 		latestAgentVersionCache.version = defaultLatestAgentVersion
 		latestAgentVersionCache.refreshed = now
 		return latestAgentVersionCache.version
@@ -48,7 +48,7 @@ func resolveLatestAgentVersion(cfg *config.Config) string {
 	resolved := normalizeReleaseTag(tag)
 	if resolved == "" {
 		if latestAgentVersionCache.version != "" {
-			log.Printf("agent version resolver: empty tag from provider, using cached value %s", latestAgentVersionCache.version)
+			slog.Warn("agent version resolver: empty tag from provider, using cached value", slog.String("cached", latestAgentVersionCache.version))
 			return latestAgentVersionCache.version
 		}
 		latestAgentVersionCache.version = defaultLatestAgentVersion

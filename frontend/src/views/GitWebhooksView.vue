@@ -262,7 +262,7 @@
                     class="ms-1 badge"
                     :class="execStatusBadge(webhook.last_execution.status)"
                   >{{ webhook.last_execution.status }}</span>
-                  <span class="ms-1 text-muted">{{ formatRelative(webhook.last_execution.triggered_at) }}</span>
+                  <span class="ms-1 text-muted">{{ formatRelative(webhook.last_execution.triggered_at || '') }}</span>
                 </div>
                 <div
                   v-else
@@ -522,14 +522,14 @@
                       class="ms-1 badge"
                       :class="execStatusBadge(tracker.last_execution.status)"
                     >{{ tracker.last_execution.status }}</span>
-                    <span class="ms-1 text-muted">{{ formatRelative(tracker.last_execution.triggered_at) }}</span>
+                    <span class="ms-1 text-muted">{{ formatRelative(tracker.last_execution.triggered_at || '') }}</span>
                   </template>
                   <template v-else-if="tracker.last_checked_at">
                     <span class="text-muted">Dernière vérif : {{ formatRelative(tracker.last_checked_at) }}</span>
                     <span
                       v-if="tracker.last_error"
                       class="ms-1 badge bg-danger-lt text-danger"
-                      :title="tracker.last_error"
+                      :title="(tracker.last_error as string)"
                     >erreur</span>
                     <span
                       v-else-if="!tracker.last_release_tag && tracker.tracker_type !== 'docker'"
@@ -625,26 +625,26 @@
     <WebhookModal
       :visible="showWebhookModal"
       mode="webhook"
-      :item="editingWebhook"
-      :hosts="hosts"
+      :item="(editingWebhook as any)"
+      :hosts="(hosts as any)"
       :saving="saving"
       :error="modalError"
       @close="closeWebhookModal"
-      @submit="saveWebhook"
+      @submit="(saveWebhook as any)"
     />
 
     <WebhookModal
       :visible="showTrackerModal"
       mode="tracker"
-      :item="editingTracker"
-      :hosts="hosts"
+      :item="(editingTracker as any)"
+      :hosts="(hosts as any)"
       :saving="saving"
       :error="modalError"
       :prefill-docker-image="prefillDockerImage"
       :prefill-docker-tag="prefillDockerTag"
       :prefill-compose-project="prefillComposeProject"
       @close="closeTrackerModal"
-      @submit="saveTracker"
+      @submit="(saveTracker as any)"
     />
 
     <TrackableContainersModal
@@ -689,7 +689,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { useGitWebhooksPage } from '../composables/useGitWebhooksPage'
 import WebhookUrlCard from '../components/webhooks/WebhookUrlCard.vue'
 import WebhookExecutionList from '../components/webhooks/WebhookExecutionList.vue'
@@ -698,7 +698,6 @@ import TrackableContainersModal from '../components/webhooks/TrackableContainers
 import CommandLogPanel from '../components/host/CommandLogPanel.vue'
 import { ref } from 'vue'
 import api from '../api'
-import { useAuthStore } from '../stores/auth'
 import { useCommandStream } from '../composables/useCommandStream'
 const {
   activeTab,
@@ -746,25 +745,24 @@ const {
   cooldownEtaLabel,
 } = useGitWebhooksPage()
 
-const auth = useAuthStore()
 const { openCommandStream, closeStream } = useCommandStream()
-const selectedTrackerCmd = ref(null)
+const selectedTrackerCmd = ref<any>(null)
 const showTrackerConsole = ref(false)
 const showDiscoverModal = ref(false)
 
-async function onBulkCreated() {
+async function onBulkCreated(): Promise<void> {
   await loadTrackers()
 }
 
-function closeTrackerLogs() {
+function closeTrackerLogs(): void {
   closeStream()
   selectedTrackerCmd.value = null
   showTrackerConsole.value = false
 }
 
-function connectTrackerStream(commandId) {
+function connectTrackerStream(commandId: string): void {
   openCommandStream(commandId, {
-    onInit(payload) {
+    onInit(payload: any) {
       if (!selectedTrackerCmd.value || selectedTrackerCmd.value.id !== commandId) return
       selectedTrackerCmd.value = {
         ...selectedTrackerCmd.value,
@@ -772,14 +770,14 @@ function connectTrackerStream(commandId) {
         output: payload.output ?? selectedTrackerCmd.value.output,
       }
     },
-    onChunk(payload) {
+    onChunk(payload: any) {
       if (!selectedTrackerCmd.value || selectedTrackerCmd.value.id !== commandId) return
       selectedTrackerCmd.value = {
         ...selectedTrackerCmd.value,
         output: (selectedTrackerCmd.value.output || '') + (payload.chunk || ''),
       }
     },
-    onStatus(payload) {
+    onStatus(payload: any) {
       if (!selectedTrackerCmd.value || selectedTrackerCmd.value.id !== commandId) return
       selectedTrackerCmd.value = {
         ...selectedTrackerCmd.value,
@@ -790,7 +788,7 @@ function connectTrackerStream(commandId) {
   })
 }
 
-async function openTrackerLogs(commandId) {
+async function openTrackerLogs(commandId: string): Promise<void> {
   closeStream()
   try {
     const res = await api.getCommandStatus(commandId)

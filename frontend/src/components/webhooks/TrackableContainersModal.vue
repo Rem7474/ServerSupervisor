@@ -164,29 +164,45 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import api from '../../api'
 import { useModalFocusTrap } from '../../composables/useModalFocusTrap'
 
-const props = defineProps({
-  visible: {
-    type: Boolean,
-    default: false,
-  },
+interface Container {
+  host_id: string
+  host_name?: string
+  image: string
+  image_tag?: string
+  compose_project: string
+  compose_service?: string
+}
+
+interface BulkResult {
+  created?: boolean
+  name?: string
+}
+
+const props = withDefaults(defineProps<{
+  visible?: boolean
+}>(), {
+  visible: false,
 })
 
-const emit = defineEmits(['close', 'created'])
+const emit = defineEmits<{
+  (e: 'close'): void
+  (e: 'created'): void
+}>()
 
-const modalRef = ref(null)
+const modalRef = ref<HTMLElement | null>(null)
 useModalFocusTrap(modalRef)
 
 const loading = ref(false)
 const saving = ref(false)
 const errorMessage = ref('')
 const resultSummary = ref('')
-const containers = ref([])
-const selected = ref([])
+const containers = ref<Container[]>([])
+const selected = ref<number[]>([])
 const options = ref({
   healthcheck_timeout_sec: 0,
   rollback_on_failure: false,
@@ -196,7 +212,7 @@ const options = ref({
 const allSelected = computed(() => containers.value.length > 0 && selected.value.length === containers.value.length)
 const someSelected = computed(() => selected.value.length > 0 && selected.value.length < containers.value.length)
 
-function rowKey(c) {
+function rowKey(c: Container): string {
   return `${c.host_id}|${c.image}|${c.image_tag}|${c.compose_project}|${c.compose_service}`
 }
 
@@ -209,7 +225,7 @@ watch(
   { immediate: true }
 )
 
-async function loadContainers() {
+async function loadContainers(): Promise<void> {
   loading.value = true
   errorMessage.value = ''
   resultSummary.value = ''
@@ -217,7 +233,6 @@ async function loadContainers() {
   try {
     const response = await api.getTrackableContainers()
     containers.value = Array.isArray(response.data?.containers) ? response.data.containers : []
-    // Pre-select everything by default.
     selected.value = containers.value.map((_, idx) => idx)
   } catch {
     errorMessage.value = 'Impossible de charger les conteneurs détectés.'
@@ -227,11 +242,11 @@ async function loadContainers() {
   }
 }
 
-function toggleAll() {
+function toggleAll(): void {
   selected.value = allSelected.value ? [] : containers.value.map((_, idx) => idx)
 }
 
-async function submit() {
+async function submit(): Promise<void> {
   if (!selected.value.length) return
   saving.value = true
   errorMessage.value = ''
@@ -261,7 +276,7 @@ async function submit() {
   try {
     const response = await api.createReleaseTrackersBulk(trackers)
     const created = response.data?.created ?? 0
-    const failed = (response.data?.results || []).filter((r) => !r.created)
+    const failed = ((response.data?.results || []) as BulkResult[]).filter((r) => !r.created)
     emit('created')
     if (failed.length) {
       resultSummary.value = `${created} tracker(s) créé(s), ${failed.length} en échec : ${failed.map((r) => r.name || '?').join(', ')}`
@@ -276,7 +291,7 @@ async function submit() {
   }
 }
 
-function close() {
+function close(): void {
   emit('close')
 }
 </script>

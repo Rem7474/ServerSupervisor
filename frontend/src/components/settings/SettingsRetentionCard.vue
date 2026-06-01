@@ -60,30 +60,27 @@
   </div>
 </template>
 
-<script setup>
-defineProps({
-  form: {
-    type: Object,
-    required: true,
-  },
-  authIsAdmin: {
-    type: Boolean,
-    default: false,
-  },
-  savingRetention: {
-    type: Boolean,
-    default: false,
-  },
-  retentionSaveMsg: {
-    type: String,
-    default: '',
-  },
-  retentionSaveOk: {
-    type: Boolean,
-    default: false,
-  },
+<script setup lang="ts">
+interface RetentionForm {
+  metricsRetentionDays: number
+  auditRetentionDays: number
+}
+
+withDefaults(defineProps<{
+  form: RetentionForm
+  authIsAdmin?: boolean
+  savingRetention?: boolean
+  retentionSaveMsg?: string
+  retentionSaveOk?: boolean
+}>(), {
+  authIsAdmin: false,
+  savingRetention: false,
+  retentionSaveMsg: '',
+  retentionSaveOk: false,
 })
 
-defineEmits(['save'])
+defineEmits<{
+  (e: 'save'): void
+}>()
 </script>
 

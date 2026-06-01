@@ -42,12 +42,17 @@
   </div>
 </template>
 
-<script setup>
-defineProps({
-  settings: {
-    type: Object,
-    required: true,
-  },
-})
+<script setup lang="ts">
+interface SystemSettings {
+  baseUrl?: string
+  dbHost?: string
+  dbPort?: number | string
+  tlsEnabled?: boolean
+  latestAgentVersion?: string
+}
+
+defineProps<{
+  settings: SystemSettings
+}>()
 </script>
 

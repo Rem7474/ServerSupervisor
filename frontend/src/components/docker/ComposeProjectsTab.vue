@@ -422,66 +422,104 @@
   />
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import apiClient from '../../api'
 import DataToolbar from '../common/DataToolbar.vue'
 
-const props = defineProps({
-  composeProjects: { type: Array, default: () => [] },
-  containers: { type: Array, default: () => [] },
-  versionComparisons: { type: Array, default: () => [] },
-  canRunDocker: { type: Boolean, default: false },
-  actionLoading: { type: Object, default: () => ({}) },
+interface ComposeProject {
+  id: string | number
+  name: string
+  hostname?: string
+  host_id: string
+  config_file?: string
+  working_dir?: string
+  raw_config?: string
+  services?: string[]
+}
+
+interface Container {
+  id?: string
+  host_id: string
+  state?: string
+  image: string
+  image_tag?: string
+  labels?: Record<string, string>
+}
+
+interface VersionComparison {
+  tracker_id?: string
+  host_id: string
+  docker_image: string
+  running_version?: string
+  latest_version?: string
+  is_up_to_date?: boolean
+  update_confirmed?: boolean
+}
+
+const props = withDefaults(defineProps<{
+  composeProjects?: ComposeProject[]
+  containers?: Container[]
+  versionComparisons?: VersionComparison[]
+  canRunDocker?: boolean
+  actionLoading?: Record<string, string | boolean>
+}>(), {
+  composeProjects: () => [],
+  containers: () => [],
+  versionComparisons: () => [],
+  canRunDocker: false,
+  actionLoading: () => ({}),
 })
 
-defineEmits(['compose-action'])
+defineEmits<{
+  (e: 'compose-action', ...args: unknown[]): void
+}>()
 
 const composeSearchInput = ref('')
 const composeSearch = ref('')
-let composeSearchDebounce = null
-watch(composeSearchInput, val => {
-  clearTimeout(composeSearchDebounce)
+let composeSearchDebounce: ReturnType<typeof setTimeout> | null = null
+watch(composeSearchInput, (val) => {
+  if (composeSearchDebounce) clearTimeout(composeSearchDebounce)
   composeSearchDebounce = setTimeout(() => { composeSearch.value = val }, 300)
 })
 const composeHostFilter = ref('')
 const composeStateFilter = ref('')
-const selectedProject = ref(null)
+const selectedProject = ref<ComposeProject | null>(null)
 const copied = ref(false)
-const trackerRunLoading = ref({})
+const trackerRunLoading = ref<Record<string, boolean>>({})
 const trackerFeedback = ref('')
 
-const composeProjectStatus = computed(() => {
-  const statusMap = {}
+const composeProjectStatus = computed<Record<string, string>>(() => {
+  const statusMap: Record<string, string> = {}
   for (const project of props.composeProjects) {
     const projectContainers = props.containers.filter(
-      c => c.labels?.['com.docker.compose.project'] === project.name &&
+      (c) => c.labels?.['com.docker.compose.project'] === project.name &&
            c.host_id === project.host_id
     )
     statusMap[`${project.host_id}:${project.name}`] =
-      projectContainers.some(c => c.state === 'running') ? 'running' : 'stopped'
+      projectContainers.some((c) => c.state === 'running') ? 'running' : 'stopped'
   }
   return statusMap
 })
 
-function getComposeStatus(project) {
+function getComposeStatus(project: ComposeProject): string {
   return composeProjectStatus.value[`${project.host_id}:${project.name}`] || 'stopped'
 }
 
-const vcByImage = computed(() => {
-  const m = {}
+const vcByImage = computed<Record<string, VersionComparison>>(() => {
+  const m: Record<string, VersionComparison> = {}
   for (const vc of props.versionComparisons) {
     m[`${vc.host_id}|${vc.docker_image}`] = vc
   }
   return m
 })
 
-function getComposeUpdates(project) {
+function getComposeUpdates(project: ComposeProject): VersionComparison[] {
   const projectContainers = props.containers.filter(
-    c => c.labels?.['com.docker.compose.project'] === project.name && c.host_id === project.host_id
+    (c) => c.labels?.['com.docker.compose.project'] === project.name && c.host_id === project.host_id
   )
-  const updates = []
-  const seen = new Set()
+  const updates: VersionComparison[] = []
+  const seen = new Set<string>()
   for (const c of projectContainers) {
     const vc = vcByImage.value[`${c.host_id}|${c.image}`] ||
                vcByImage.value[`${c.host_id}|${c.image}:${c.image_tag}`]
@@ -497,15 +535,15 @@ function getComposeUpdates(project) {
 }
 
 const uniqueHosts = computed(() => {
-  const seen = new Set()
+  const seen = new Set<string>()
   return props.composeProjects
-    .filter(p => { if (seen.has(p.hostname)) return false; seen.add(p.hostname); return true })
-    .map(p => p.hostname)
+    .filter((p) => { if (!p.hostname || seen.has(p.hostname)) return false; seen.add(p.hostname); return true })
+    .map((p) => p.hostname!)
     .sort()
 })
 
 const filteredComposeProjects = computed(() => {
-  return props.composeProjects.filter(p => {
+  return props.composeProjects.filter((p) => {
     if (composeSearch.value) {
       const q = composeSearch.value.toLowerCase()
       const match = p.name?.toLowerCase().includes(q) ||
@@ -520,43 +558,43 @@ const filteredComposeProjects = computed(() => {
   })
 })
 
-async function copyConfig(text) {
+async function copyConfig(text: string | undefined): Promise<void> {
   if (!text) return
   await navigator.clipboard.writeText(text)
   copied.value = true
   setTimeout(() => { copied.value = false }, 2000)
 }
 
-function canRunTracker(vc) {
+function canRunTracker(vc: VersionComparison | undefined): boolean {
   return props.canRunDocker && !!vc?.tracker_id
 }
 
-function hasManualTrackerData(vc) {
+function hasManualTrackerData(vc: VersionComparison | undefined): boolean {
   return !!(vc?.latest_version && String(vc.latest_version).trim())
 }
 
-function isTrackerRunDisabled(vc) {
+function isTrackerRunDisabled(vc: VersionComparison): boolean {
   if (!canRunTracker(vc)) return true
   if (!hasManualTrackerData(vc)) return true
-  return !!trackerRunLoading.value[vc.tracker_id]
+  return !!trackerRunLoading.value[vc.tracker_id!]
 }
 
-function trackerRunTooltip(vc) {
+function trackerRunTooltip(vc: VersionComparison): string {
   if (!props.canRunDocker) return 'Action réservée admin/opérateur'
   if (!hasManualTrackerData(vc)) return 'Attendez la première vérification automatique'
   return 'Déclencher la tâche du tracker maintenant'
 }
 
-async function runTracker(vc, project) {
+async function runTracker(vc: VersionComparison, project?: ComposeProject): Promise<void> {
   if (isTrackerRunDisabled(vc)) return
-  const id = vc.tracker_id
+  const id = vc.tracker_id!
   trackerRunLoading.value = { ...trackerRunLoading.value, [id]: true }
   trackerFeedback.value = ''
   try {
     await apiClient.runReleaseTracker(id)
     trackerFeedback.value = `Déclenchement lancé pour ${project?.name || vc?.docker_image || 'le tracker'}.`
-  } catch (e) {
-    trackerFeedback.value = e.response?.data?.error || 'Échec du déclenchement manuel.'
+  } catch (e: any) {
+    trackerFeedback.value = e?.response?.data?.error || 'Échec du déclenchement manuel.'
   } finally {
     const next = { ...trackerRunLoading.value }
     delete next[id]

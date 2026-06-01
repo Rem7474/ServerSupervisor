@@ -9,7 +9,12 @@
       "Bash(node ./node_modules/vite/bin/vite.js build:*)",
       "Bash(go vet:*)",
       "Bash(npm run *)",
-      "Bash(npx eslint *)"
+      "Bash(npx eslint *)",
+      "Bash(py slogfix.py internal/handlers/proxmox_service.go)",
+      "Bash(echo \"exit=$?\")",
+      "Bash(py slogfile.py internal/handlers/agent.go 'c.Request.Context\\(\\)')",
+      "Bash(gofmt -w internal/handlers/agent.go)",
+      "Bash(go test *)"
     ]
   }
 }

@@ -179,7 +179,7 @@
             class="form-select form-select-sm"
             style="width:auto"
             :value="proxmoxLink.metrics_source"
-            @change="changeMetricsSource($event.target.value)"
+            @change="changeMetricsSource(($event.target as HTMLSelectElement).value as 'agent' | 'proxmox' | 'auto')"
           >
             <option value="auto">
               Automatique
@@ -311,7 +311,7 @@
           :host-id="hostId"
           :host="host"
           @close="isEditing = false"
-          @updated="host = $event"
+          @updated="host = ($event as any)"
         />
 
         <HostDetailTabs
@@ -367,26 +367,26 @@
           />
           <DiskMetricsCard
             :host-id="hostId"
-            :initial-metrics="diskMetrics"
+            :initial-metrics="(diskMetrics as any)"
             class="mb-4"
           />
           <DiskHistoryChart
             :host-id="hostId"
-            :mounts="diskMetrics?.map(d => d.mount_point) ?? []"
+            :mounts="(diskMetrics?.map((d: any) => d.mount_point) ?? [])"
             :refresh-tick="metricsUpdatedAt"
             class="mb-4"
           />
           <DiskHealthCard
             :host-id="hostId"
-            :initial-health="diskHealth"
+            :initial-health="(diskHealth as any)"
             class="mb-4"
           />
         </div>
 
         <div v-show="activeTab === 'docker'">
           <HostDockerTab
-            :containers="containers"
-            :version-comparisons="versionComparisons"
+            :containers="(containers as any)"
+            :version-comparisons="(versionComparisons as any)"
           />
         </div>
 
@@ -396,21 +396,21 @@
             :can-run-apt="canRunApt"
             :apt-cmd-loading="aptCmdLoading"
             :uu-status="uuStatus"
-            :uu-runs="uuRuns"
-            :uu-form="uuForm"
+            :uu-runs="(uuRuns as any)"
+            :uu-form="(uuForm as any)"
             :uu-loading="uuLoading"
             @run-apt-command="sendAptCmd"
             @uu-install="handleUUInstall"
             @uu-configure="handleUUConfigure"
             @uu-run-now="handleUURunNow"
-            @uu-log="openUULog"
+            @uu-log="(openUULog as any)"
           />
         </div>
 
         <div v-show="activeTab === 'commandes'">
           <HostCommandsTab
-            :commands="cmdHistory"
-            @watch-command="openCommand"
+            :commands="(cmdHistory as any)"
+            @watch-command="(openCommand as any)"
           />
         </div>
 
@@ -551,7 +551,7 @@
       </div>
 
       <CommandLogPanel
-        :command="liveCommand"
+        :command="(liveCommand as any)"
         :show="showConsole"
         title="Console Live"
         empty-text="Aucune console active"
@@ -650,7 +650,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { useHostDetail } from '../composables/useHostDetail'
 import RelativeTime from '../components/RelativeTime.vue'
 import DiskMetricsCard from '../components/disk/DiskMetricsCard.vue'

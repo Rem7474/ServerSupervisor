@@ -10,7 +10,7 @@
               type="text"
               class="form-control ui-toolbar-search"
               :placeholder="searchPlaceholder"
-              @input="$emit('update:search', $event.target.value)"
+              @input="emit('update:search', ($event.target as HTMLInputElement).value)"
             >
           </slot>
         </div>
@@ -28,14 +28,20 @@
   </div>
 </template>
 
-<script setup>
-defineProps({
-  searchable: { type: Boolean, default: false },
-  search: { type: String, default: '' },
-  searchPlaceholder: { type: String, default: 'Rechercher...' },
+<script setup lang="ts">
+withDefaults(defineProps<{
+  searchable?: boolean
+  search?: string
+  searchPlaceholder?: string
+}>(), {
+  searchable: false,
+  search: '',
+  searchPlaceholder: 'Rechercher...',
 })
 
-defineEmits(['update:search'])
+const emit = defineEmits<{
+  (e: 'update:search', value: string): void
+}>()
 </script>
 
 <style scoped>

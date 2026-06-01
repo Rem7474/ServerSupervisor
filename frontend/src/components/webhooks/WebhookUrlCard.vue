@@ -195,23 +195,30 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useConfirmDialog } from '../../composables/useConfirmDialog'
 import api from '../../api'
 
-const props = defineProps({
-  webhookId: { type: String, default: '' },
-  secret: { type: String, default: '' },    // Initial secret (shown after creation)
-  provider: { type: String, default: '' },
-  initialSecret: { type: Boolean, default: false }, // true = first-time display, no regenerate needed
+const props = withDefaults(defineProps<{
+  webhookId?: string
+  secret?: string
+  provider?: string
+  initialSecret?: boolean
+}>(), {
+  webhookId: '',
+  secret: '',
+  provider: '',
+  initialSecret: false,
 })
 
-const emit = defineEmits(['secret-regenerated'])
+const emit = defineEmits<{
+  (e: 'secret-regenerated', secret: string): void
+}>()
 const dialog = useConfirmDialog()
 
-const showSecret = ref(!!props.secret)
-const currentSecret = ref(props.secret)
+const showSecret = ref<boolean>(!!props.secret)
+const currentSecret = ref<string>(props.secret)
 const urlCopied = ref(false)
 const secretCopied = ref(false)
 const regenerating = ref(false)
@@ -229,24 +236,24 @@ const webhookUrl = computed(() => {
 })
 
 const providerLabel = computed(() => {
-  const map = { github: 'GitHub', gitlab: 'GitLab', gitea: 'Gitea', forgejo: 'Forgejo', custom: 'Custom' }
+  const map: Record<string, string> = { github: 'GitHub', gitlab: 'GitLab', gitea: 'Gitea', forgejo: 'Forgejo', custom: 'Custom' }
   return map[props.provider] || props.provider
 })
 
-function copyUrl() {
+function copyUrl(): void {
   navigator.clipboard.writeText(webhookUrl.value)
   urlCopied.value = true
   setTimeout(() => urlCopied.value = false, 2000)
 }
 
-function copySecret() {
+function copySecret(): void {
   if (!currentSecret.value) return
   navigator.clipboard.writeText(currentSecret.value)
   secretCopied.value = true
   setTimeout(() => secretCopied.value = false, 2000)
 }
 
-async function doRegenerate() {
+async function doRegenerate(): Promise<void> {
   const ok = await dialog.confirm({
     title: 'Régénérer le secret ?',
     message: 'L\'ancien secret sera invalidé immédiatement. Vous devrez mettre à jour la configuration dans votre provider Git.',
@@ -262,8 +269,8 @@ async function doRegenerate() {
     regenMsg.value = 'Secret régénéré — copiez-le maintenant.'
     regenOk.value = true
     emit('secret-regenerated', res.data.secret)
-  } catch (e) {
-    regenMsg.value = e.response?.data?.error || 'Erreur'
+  } catch (e: any) {
+    regenMsg.value = e?.response?.data?.error || 'Erreur'
     regenOk.value = false
   } finally {
     regenerating.value = false

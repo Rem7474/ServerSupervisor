@@ -677,58 +677,121 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from 'vue'
 import api from '../../api'
 import { useModalFocusTrap } from '../../composables/useModalFocusTrap'
 
-const props = defineProps({
-  visible: {
-    type: Boolean,
-    default: false,
-  },
-  mode: {
-    type: String,
-    default: 'webhook',
-  },
-  item: {
-    type: Object,
-    default: null,
-  },
-  hosts: {
-    type: Array,
-    default: () => [],
-  },
-  saving: {
-    type: Boolean,
-    default: false,
-  },
-  error: {
-    type: String,
-    default: '',
-  },
-  // Pre-fill for Docker tracker created from Docker page
-  prefillDockerImage: {
-    type: String,
-    default: '',
-  },
-  prefillDockerTag: {
-    type: String,
-    default: '',
-  },
-  prefillComposeProject: {
-    type: String,
-    default: '',
-  },
+interface Host {
+  id: string
+  name?: string
+}
+
+interface CustomTask {
+  id: string
+  name?: string
+  [key: string]: unknown
+}
+
+interface RegistryCredential {
+  id: string
+  name: string
+  registry_host?: string
+}
+
+interface WebhookItem {
+  name?: string
+  tracker_type?: string
+  provider?: string
+  event_filter?: string
+  repo_filter?: string
+  branch_filter?: string
+  repo_owner?: string
+  repo_name?: string
+  docker_image?: string
+  docker_tag?: string
+  host_id?: string
+  custom_task_id?: string
+  cooldown_hours?: number
+  notify_channels?: string[]
+  notify_on_release?: boolean
+  notify_on_success?: boolean
+  notify_on_failure?: boolean
+  enabled?: boolean
+  update_action?: string
+  compose_project?: string
+  compose_service?: string
+  pre_update_task_id?: string
+  post_update_task_id?: string
+  cleanup_after_update?: boolean
+  healthcheck_timeout_sec?: number
+  rollback_on_failure?: boolean
+  registry_credentials_id?: string
+}
+
+interface WebhookFormData {
+  name: string
+  provider?: string
+  event_filter?: string
+  repo_filter?: string
+  branch_filter?: string
+  tracker_type?: string
+  repo_owner?: string
+  repo_name?: string
+  docker_image?: string
+  docker_tag?: string
+  host_id?: string
+  custom_task_id?: string
+  cooldown_hours?: number
+  dispatch_task?: boolean
+  notify_channels: string[]
+  notify_on_release?: boolean
+  notify_on_success?: boolean
+  notify_on_failure?: boolean
+  enabled: boolean
+  update_action?: string
+  compose_project?: string
+  compose_service?: string
+  pre_update_task_id?: string
+  post_update_task_id?: string
+  cleanup_after_update?: boolean
+  healthcheck_timeout_sec?: number
+  rollback_on_failure?: boolean
+  registry_credentials_id?: string
+}
+
+const props = withDefaults(defineProps<{
+  visible?: boolean
+  mode?: string
+  item?: WebhookItem | null
+  hosts?: Host[]
+  saving?: boolean
+  error?: string
+  prefillDockerImage?: string
+  prefillDockerTag?: string
+  prefillComposeProject?: string
+}>(), {
+  visible: false,
+  mode: 'webhook',
+  item: null,
+  hosts: () => [],
+  saving: false,
+  error: '',
+  prefillDockerImage: '',
+  prefillDockerTag: '',
+  prefillComposeProject: '',
 })
 
-const emit = defineEmits(['close', 'submit'])
+const emit = defineEmits<{
+  (e: 'close'): void
+  (e: 'submit', payload: WebhookFormData): void
+}>()
 
-const modalRef = ref(null)
+const modalRef = ref<HTMLElement | null>(null)
 useModalFocusTrap(modalRef)
 
-const customTasks = ref([])
-const registryCredentials = ref([])
+const customTasks = ref<CustomTask[]>([])
+const registryCredentials = ref<RegistryCredential[]>([])
 const validationError = ref('')
 
 const gitEnvVars = [
@@ -759,7 +822,7 @@ const isComposeMode = computed(() =>
   form.value.update_action === 'compose'
 )
 
-const defaultWebhookForm = () => ({
+const defaultWebhookForm = (): WebhookFormData => ({
   name: '',
   provider: 'github',
   event_filter: 'push',
@@ -773,7 +836,7 @@ const defaultWebhookForm = () => ({
   enabled: true,
 })
 
-const defaultTrackerForm = () => ({
+const defaultTrackerForm = (): WebhookFormData => ({
   name: '',
   tracker_type: props.prefillDockerImage ? 'docker' : 'git',
   provider: 'github',
@@ -799,7 +862,7 @@ const defaultTrackerForm = () => ({
   registry_credentials_id: '',
 })
 
-const form = ref(defaultWebhookForm())
+const form = ref<WebhookFormData>(defaultWebhookForm())
 
 const title = computed(() => {
   if (props.mode === 'tracker') {
@@ -859,11 +922,11 @@ onUnmounted(() => {
   document.removeEventListener('keydown', onKeyDown)
 })
 
-function hydrateForm() {
+function hydrateForm(): void {
   if (props.mode === 'tracker') {
     form.value = props.item
       ? {
-          name: props.item.name,
+          name: props.item.name ?? '',
           tracker_type: props.item.tracker_type || 'git',
           provider: props.item.provider,
           repo_owner: props.item.repo_owner,
@@ -876,7 +939,7 @@ function hydrateForm() {
           dispatch_task: !!(props.item.host_id && (props.item.custom_task_id || props.item.compose_project)),
           notify_channels: [...(props.item.notify_channels || [])],
           notify_on_release: props.item.notify_on_release,
-          enabled: props.item.enabled,
+          enabled: props.item.enabled ?? true,
           update_action: props.item.update_action || 'custom',
           compose_project: props.item.compose_project || '',
           compose_service: props.item.compose_service || '',
@@ -893,7 +956,7 @@ function hydrateForm() {
 
   form.value = props.item
     ? {
-        name: props.item.name,
+        name: props.item.name ?? '',
         provider: props.item.provider,
         event_filter: props.item.event_filter,
         repo_filter: props.item.repo_filter,
@@ -903,12 +966,12 @@ function hydrateForm() {
         notify_channels: [...(props.item.notify_channels || [])],
         notify_on_success: props.item.notify_on_success,
         notify_on_failure: props.item.notify_on_failure,
-        enabled: props.item.enabled,
+        enabled: props.item.enabled ?? true,
       }
     : defaultWebhookForm()
 }
 
-async function loadCustomTasks(hostId) {
+async function loadCustomTasks(hostId: string | undefined): Promise<void> {
   if (!hostId) {
     customTasks.value = []
     return
@@ -921,7 +984,7 @@ async function loadCustomTasks(hostId) {
   }
 }
 
-async function loadRegistryCredentials() {
+async function loadRegistryCredentials(): Promise<void> {
   try {
     const response = await api.getRegistryCredentials()
     registryCredentials.value = Array.isArray(response.data?.credentials) ? response.data.credentials : []
@@ -930,7 +993,7 @@ async function loadRegistryCredentials() {
   }
 }
 
-function validate() {
+function validate(): string {
   if (props.mode === 'tracker') {
     if (!form.value.name) return 'Le nom est obligatoire.'
     if ((form.value.cooldown_hours ?? 0) < 0 || (form.value.cooldown_hours ?? 0) > 168) {
@@ -969,10 +1032,10 @@ function validate() {
   return ''
 }
 
-function submit() {
+function submit(): void {
   validationError.value = validate()
   if (validationError.value) return
-  const payload = { ...form.value }
+  const payload: WebhookFormData = { ...form.value }
   if (props.mode === 'tracker' && (!Array.isArray(payload.notify_channels) || payload.notify_channels.length === 0)) {
     payload.notify_on_release = false
   }
@@ -1005,12 +1068,12 @@ function submit() {
   emit('submit', payload)
 }
 
-function close() {
+function close(): void {
   validationError.value = ''
   emit('close')
 }
 
-function onKeyDown(event) {
+function onKeyDown(event: KeyboardEvent): void {
   if (event.key === 'Escape' && props.visible) close()
 }
 </script>

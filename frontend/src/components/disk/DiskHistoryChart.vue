@@ -51,8 +51,8 @@
     >
       <Line
         v-if="chartData"
-        :data="chartData"
-        :options="chartOptions"
+        :data="(chartData as any)"
+        :options="(chartOptions as any)"
         class="h-100"
       />
       <div
@@ -72,10 +72,17 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, shallowRef, watch, onMounted, computed, defineAsyncComponent } from 'vue'
 import apiClient from '../../api'
 import dayjs from '../../utils/dayjs'
+
+interface ChartPoint {
+  x: number
+  y: number
+  used_gb?: number
+  size_gb?: number
+}
 
 const Line = defineAsyncComponent(async () => {
   const [{ Line }, { Chart: ChartJS, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip }] = await Promise.all([
@@ -86,16 +93,19 @@ const Line = defineAsyncComponent(async () => {
   return Line
 })
 
-const props = defineProps({
-  hostId: { type: String, required: true },
-  mounts: { type: Array, default: () => [] },
-  refreshTick: { type: Number, default: 0 },
+const props = withDefaults(defineProps<{
+  hostId: string
+  mounts?: string[]
+  refreshTick?: number
+}>(), {
+  mounts: () => [],
+  refreshTick: 0,
 })
 
 const chartHours = ref(24)
-const selectedMount = ref(props.mounts[0] ?? '')
-const points = ref([])
-const chartData = shallowRef(null)
+const selectedMount = ref<string>(props.mounts[0] ?? '')
+const points = ref<ChartPoint[]>([])
+const chartData = shallowRef<any>(null)
 const loading = ref(false)
 
 const timeRangeOptions = [
@@ -128,7 +138,7 @@ const fillPrediction = computed(() => {
   return { days }
 })
 
-function formatChartTime(timestamp) {
+function formatChartTime(timestamp: number | string | undefined): string {
   if (!timestamp) return ''
   const d = dayjs(timestamp)
   if (!d.isValid()) return ''
@@ -137,13 +147,13 @@ function formatChartTime(timestamp) {
   return d.format('DD/MM')
 }
 
-function clampTimestamp(timestampMs) {
+function clampTimestamp(timestampMs: number): number {
   if (!Number.isFinite(timestampMs)) return NaN
   const now = Date.now()
   return Math.min(timestampMs, now)
 }
 
-function getMaxPointTimestamp(list) {
+function getMaxPointTimestamp(list: ChartPoint[]): number | undefined {
   let max = -Infinity
   for (const point of list || []) {
     if (Number.isFinite(point?.x) && point.x > max) max = point.x
@@ -152,7 +162,7 @@ function getMaxPointTimestamp(list) {
   return Math.min(Date.now(), max)
 }
 
-function getMinPointTimestamp(list) {
+function getMinPointTimestamp(list: ChartPoint[]): number | undefined {
   let min = Infinity
   for (const point of list || []) {
     if (Number.isFinite(point?.x) && point.x < min) min = point.x
@@ -178,8 +188,8 @@ const chartOptions = computed(() => ({
       padding: 10,
       displayColors: false,
       callbacks: {
-        title: (items) => formatChartTime(items[0]?.parsed?.x),
-        label: (ctx) => {
+        title: (items: any[]) => formatChartTime(items[0]?.parsed?.x),
+        label: (ctx: any) => {
           const p = points.value[ctx.dataIndex]
           if (p?.used_gb != null && p?.size_gb) {
             return `${ctx.parsed.y.toFixed(1)}%  (${p.used_gb.toFixed(1)} / ${p.size_gb.toFixed(1)} Go)`
@@ -196,38 +206,38 @@ const chartOptions = computed(() => ({
       grid: { color: 'rgba(255,255,255,0.05)' },
       min: getMinPointTimestamp(points.value),
       max: getMaxPointTimestamp(points.value),
-      ticks: { color: '#6b7280', maxTicksLimit: 8, callback: (v) => formatChartTime(Number(v)) },
+      ticks: { color: '#6b7280', maxTicksLimit: 8, callback: (v: number | string) => formatChartTime(Number(v)) },
     },
     y: {
       display: true,
       min: 0,
       max: 100,
       grid: { color: 'rgba(255,255,255,0.05)' },
-      ticks: { color: '#6b7280', callback: (v) => `${v}%` },
+      ticks: { color: '#6b7280', callback: (v: number | string) => `${v}%` },
     },
   },
   elements: { point: { radius: 0, hitRadius: 10, hoverRadius: 4 }, line: { tension: 0.3 } },
   interaction: { mode: 'nearest', axis: 'x', intersect: false },
 }))
 
-function cssVar(name) {
+function cssVar(name: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
 }
 
-async function loadHistory(hours) {
+async function loadHistory(hours: number): Promise<void> {
   if (!selectedMount.value) return
   chartHours.value = hours
   loading.value = true
   chartData.value = null
   try {
     const res = await apiClient.getDiskMetricsAggregated(props.hostId, selectedMount.value, hours)
-    const raw = Array.isArray(res.data?.points) ? res.data.points : []
-    points.value = raw.map(p => ({
+    const raw: any[] = Array.isArray(res.data?.points) ? res.data.points : []
+    points.value = raw.map((p: any) => ({
       x: clampTimestamp(dayjs(p.timestamp).valueOf()),
       y: p.used_percent,
       used_gb: p.used_gb,
       size_gb: p.size_gb,
-    })).filter(p => Number.isFinite(p.x) && p.y != null)
+    })).filter((p: ChartPoint) => Number.isFinite(p.x) && p.y != null)
 
     if (!points.value.length) { chartData.value = null; return }
 
@@ -241,8 +251,8 @@ async function loadHistory(hours) {
         spanGaps: false,
       }],
     }
-  } catch (e) {
-    console.error('Failed to load disk history:', e.response?.data || e.message)
+  } catch (e: any) {
+    console.error('Failed to load disk history:', e?.response?.data || e?.message)
     chartData.value = null
   } finally {
     loading.value = false
@@ -256,7 +266,7 @@ watch(() => props.mounts, (v) => {
   }
 }, { immediate: false })
 
-let refreshTimer = null
+let refreshTimer: ReturnType<typeof setTimeout> | null = null
 watch(() => props.refreshTick, () => {
   if (refreshTimer) clearTimeout(refreshTimer)
   refreshTimer = setTimeout(() => {

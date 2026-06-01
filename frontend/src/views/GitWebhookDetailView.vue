@@ -209,10 +209,9 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { useAuthStore } from '../stores/auth'
 import api from '../api'
 import { formatDateTime } from '../utils/formatters'
 import RelativeTime from '../components/RelativeTime.vue'
@@ -223,19 +222,17 @@ import CommandLogPanel from '../components/host/CommandLogPanel.vue'
 import { useCommandStream } from '../composables/useCommandStream'
 
 const route = useRoute()
-const auth = useAuthStore()
-const id = route.params.id
+const id = route.params.id as string
 
-const webhook = ref(null)
-const executions = ref([])
-const hosts = ref([])
+const webhook = ref<any>(null)
+const executions = ref<any[]>([])
+const hosts = ref<any[]>([])
 const loading = ref(false)
 const error = ref('')
 const revealedSecret = ref('')
-const selectedCmd = ref(null)
+const selectedCmd = ref<any>(null)
 const showConsole = ref(false)
 
-// Edit modal
 const showModal = ref(false)
 const saving = ref(false)
 const modalError = ref('')
@@ -251,7 +248,7 @@ const envVars = [
   { name: 'SS_EVENT_TYPE', desc: 'Type d\'événement (push, tag, release)' },
 ]
 
-async function load() {
+async function load(): Promise<void> {
   loading.value = true
   error.value = ''
   try {
@@ -259,29 +256,29 @@ async function load() {
     webhook.value = whRes.data.webhook
     executions.value = whRes.data.executions || []
     hosts.value = hostsRes.data || []
-  } catch (e) {
-    error.value = e.response?.data?.error || 'Erreur lors du chargement'
+  } catch (e: any) {
+    error.value = e?.response?.data?.error || 'Erreur lors du chargement'
   } finally {
     loading.value = false
   }
 }
 
-async function loadExecutions() {
+async function loadExecutions(): Promise<void> {
   try {
     const res = await api.getWebhookExecutions(id)
     executions.value = res.data.executions || []
   } catch { /* ignore */ }
 }
 
-function clearExecutionLogs() {
+function clearExecutionLogs(): void {
   closeStream()
   selectedCmd.value = null
   showConsole.value = false
 }
 
-function connectExecutionStream(commandId) {
+function connectExecutionStream(commandId: string): void {
   openCommandStream(commandId, {
-    onInit(payload) {
+    onInit(payload: any) {
       if (!selectedCmd.value || selectedCmd.value.id !== commandId) return
       selectedCmd.value = {
         ...selectedCmd.value,
@@ -289,14 +286,14 @@ function connectExecutionStream(commandId) {
         output: payload.output ?? selectedCmd.value.output,
       }
     },
-    onChunk(payload) {
+    onChunk(payload: any) {
       if (!selectedCmd.value || selectedCmd.value.id !== commandId) return
       selectedCmd.value = {
         ...selectedCmd.value,
         output: (selectedCmd.value.output || '') + (payload.chunk || ''),
       }
     },
-    onStatus(payload) {
+    onStatus(payload: any) {
       if (!selectedCmd.value || selectedCmd.value.id !== commandId) return
       selectedCmd.value = {
         ...selectedCmd.value,
@@ -304,7 +301,7 @@ function connectExecutionStream(commandId) {
         output: payload.output ?? selectedCmd.value.output,
       }
 
-      const idx = executions.value.findIndex((e) => e.command_id === commandId)
+      const idx = executions.value.findIndex((e: any) => e.command_id === commandId)
       if (idx !== -1) {
         const next = [...executions.value]
         next[idx] = { ...next[idx], status: payload.status || next[idx].status }
@@ -314,7 +311,7 @@ function connectExecutionStream(commandId) {
   })
 }
 
-async function openExecutionLogs(commandId) {
+async function openExecutionLogs(commandId: string): Promise<void> {
   closeStream()
   try {
     const res = await api.getCommandStatus(commandId)
@@ -329,36 +326,36 @@ async function openExecutionLogs(commandId) {
   }
 }
 
-function openEdit() {
+function openEdit(): void {
   modalError.value = ''
   showModal.value = true
 }
 
-async function saveEdit(payload) {
+async function saveEdit(payload: any): Promise<void> {
   saving.value = true
   modalError.value = ''
   try {
     await api.updateGitWebhook(id, payload)
     closeEdit()
     await load()
-  } catch (e) {
-    modalError.value = e.response?.data?.error || 'Erreur'
+  } catch (e: any) {
+    modalError.value = e?.response?.data?.error || 'Erreur'
   } finally {
     saving.value = false
   }
 }
 
-function closeEdit() {
+function closeEdit(): void {
   showModal.value = false
   modalError.value = ''
 }
 
-function onSecretRegenerated(secret) {
+function onSecretRegenerated(secret: string): void {
   revealedSecret.value = secret
 }
 
-function providerBadge(provider) {
-  const map = {
+function providerBadge(provider: string): string {
+  const map: Record<string, string> = {
     github:  'bg-blue-lt text-blue',
     gitlab:  'bg-orange-lt text-orange',
     gitea:   'bg-teal-lt text-teal',
@@ -368,8 +365,8 @@ function providerBadge(provider) {
   return map[provider] || 'bg-secondary-lt text-secondary'
 }
 
-function channelBadge(ch) {
-  const map = {
+function channelBadge(ch: string): string {
+  const map: Record<string, string> = {
     smtp:    'bg-blue-lt text-blue',
     ntfy:    'bg-orange-lt text-orange',
     browser: 'bg-purple-lt text-purple',
@@ -377,10 +374,6 @@ function channelBadge(ch) {
   return map[ch] || 'bg-secondary-lt text-secondary'
 }
 
-function execStatusBadge(status) {
-  const map = { pending: 'bg-yellow-lt text-yellow', running: 'bg-blue-lt text-blue', completed: 'bg-success-lt text-success', failed: 'bg-danger-lt text-danger', skipped: 'bg-secondary-lt text-secondary' }
-  return map[status] || 'bg-secondary-lt text-secondary'
-}
 
 onMounted(load)
 onUnmounted(() => {

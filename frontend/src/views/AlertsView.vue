@@ -99,22 +99,22 @@
 
     <div v-show="alertsTab === 'rules'">
       <AlertRuleList
-        :rules="rules"
-        :hosts="hosts"
+        :rules="(rules as any)"
+        :hosts="(hosts as any)"
         :loading="loading"
         :fetched="fetched"
         :error="saveError"
-        :format-date="formatDate"
+        :format-date="(formatDate as any)"
         @add="startAddAlert"
-        @edit="startEditAlert"
-        @toggle="toggleEnabled"
-        @delete="deleteAlert"
+        @edit="(startEditAlert as any)"
+        @toggle="(toggleEnabled as any)"
+        @delete="(deleteAlert as any)"
       />
     </div>
 
     <div v-show="alertsTab === 'releases'">
       <AlertReleaseSummary
-        :trackers="trackers"
+        :trackers="(trackers as any)"
         :loading="trackersLoading"
         :error="trackersError"
       />
@@ -122,7 +122,7 @@
 
     <div v-show="alertsTab === 'incidents'">
       <AlertIncidentList
-        :incidents="incidents"
+        :incidents="(incidents as any)"
         :loading="incidentsLoading"
         :error="incidentsError"
         :active-incident-count="activeIncidentCount"
@@ -132,20 +132,20 @@
 
     <AlertRuleModal
       :visible="showModal"
-      :rule="editingRule"
-      :hosts="hosts"
-      :capabilities="capabilities"
+      :rule="(editingRule as any)"
+      :hosts="(hosts as any)"
+      :capabilities="(capabilities as any)"
       :capabilities-loading="capabilitiesLoading"
       :capabilities-error="capabilitiesError"
       :saving="saving"
       :error="saveError"
       @close="closeModal"
-      @submit="saveAlert"
+      @submit="(saveAlert as any)"
     />
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import AlertIncidentList from '../components/alerts/AlertIncidentList.vue'
@@ -156,7 +156,7 @@ import AppIcon from '../components/AppIcon.vue'
 import { useAlertsPage } from '../composables/useAlertsPage'
 import { useWebSocket } from '../composables/useWebSocket'
 
-const TAB_TITLES = {
+const TAB_TITLES: Record<string, string> = {
   rules: 'Alertes',
   releases: 'Suivi de versions',
   incidents: 'Historique de notifications',
@@ -168,7 +168,6 @@ const {
   incidents,
   incidentsLoading,
   incidentsError,
-  incidentsLoaded,
   trackers,
   trackersLoading,
   trackersError,
@@ -199,7 +198,7 @@ const {
   onWebSocketAlert,
 } = useAlertsPage()
 
-let incidentsPollTimer = null
+let incidentsPollTimer: ReturnType<typeof setInterval> | null = null
 
 onMounted(async () => {
   await init()

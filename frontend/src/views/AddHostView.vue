@@ -180,10 +180,15 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import apiClient from '../api'
+
+interface HostResult {
+  id?: string
+  api_key?: string
+}
 
 const serverUrl =
   typeof window !== 'undefined' && window.location?.origin
@@ -199,17 +204,17 @@ const loading = ref(false)
 const touched = ref({ name: false, ip_address: false })
 
 const IP_RE = /^(\d{1,3}\.){3}\d{1,3}$/
-const isValidIp = computed(() => {
+const isValidIp = computed<boolean | null>(() => {
   const v = form.value.ip_address.trim()
   if (!v) return null
   if (!IP_RE.test(v)) return false
-  return v.split('.').every(n => Number(n) <= 255)
+  return v.split('.').every((n) => Number(n) <= 255)
 })
 const ipFeedback = computed(() => {
   if (!touched.value.ip_address || isValidIp.value === null) return ''
   return isValidIp.value ? '' : 'Adresse IPv4 invalide (ex: 192.168.1.100)'
 })
-const result = ref(null)
+const result = ref<HostResult | null>(null)
 const copiedApiKey = ref(false)
 const copiedConfig = ref(false)
 const copiedInstall = ref(false)
@@ -225,7 +230,7 @@ const agentConfig = computed(() => {
   return `server_url: "${serverUrl}"\napi_key: "${result.value.api_key}"\nreport_interval: 30\ncollect_docker: true\ncollect_apt: true`
 })
 
-async function handleSubmit() {
+async function handleSubmit(): Promise<void> {
   touched.value.name = true
   touched.value.ip_address = true
   if (!form.value.name.trim() || !isValidIp.value) return
@@ -234,35 +239,35 @@ async function handleSubmit() {
   try {
     const res = await apiClient.registerHost(form.value)
     result.value = res.data
-  } catch (e) {
-    error.value = e.response?.data?.error || 'Erreur lors de l\'enregistrement'
+  } catch (e: any) {
+    error.value = e?.response?.data?.error || 'Erreur lors de l\'enregistrement'
   } finally {
     loading.value = false
   }
 }
 
-async function copyApiKey() {
+async function copyApiKey(): Promise<void> {
   if (!result.value?.api_key) return
   await navigator.clipboard.writeText(result.value.api_key)
   copiedApiKey.value = true
   setTimeout(() => { copiedApiKey.value = false }, 1500)
 }
 
-async function copyAgentConfig() {
+async function copyAgentConfig(): Promise<void> {
   if (!agentConfig.value) return
   await navigator.clipboard.writeText(agentConfig.value)
   copiedConfig.value = true
   setTimeout(() => { copiedConfig.value = false }, 1500)
 }
 
-async function copyInstallCmd() {
+async function copyInstallCmd(): Promise<void> {
   if (!installCmd.value) return
   await navigator.clipboard.writeText(installCmd.value)
   copiedInstall.value = true
   setTimeout(() => { copiedInstall.value = false }, 1500)
 }
 
-function finishAdd() {
+function finishAdd(): void {
   if (result.value?.id) {
     router.push(`/hosts/${result.value.id}`)
   } else {

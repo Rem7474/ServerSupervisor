@@ -2,7 +2,8 @@ package handlers
 
 import (
 	"context"
-	"log"
+	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/serversupervisor/server/internal/config"
@@ -27,7 +28,7 @@ func newProxmoxService(db *database.DB, cfg *config.Config) *proxmoxService {
 func (s *proxmoxService) PollAll(ctx context.Context) {
 	conns, err := s.db.GetEnabledProxmoxConnections(ctx)
 	if err != nil {
-		log.Printf("proxmox poller: failed to fetch connections: %v", err)
+		slog.ErrorContext(ctx, fmt.Sprintf("proxmox poller: failed to fetch connections: %v", err))
 		return
 	}
 	for _, c := range conns {
@@ -54,7 +55,7 @@ func (s *proxmoxService) PollOne(ctx context.Context, conn database.ProxmoxConne
 
 	nodes, err := client.GetNodes()
 	if err != nil {
-		log.Printf("proxmox poller [%s]: failed to get nodes: %v", conn.Name, err)
+		slog.ErrorContext(ctx, fmt.Sprintf("proxmox poller [%s]: failed to get nodes: %v", conn.Name, err))
 		_ = s.db.UpdateProxmoxConnectionError(ctx, conn.ID, err.Error())
 		return
 	}
@@ -69,15 +70,15 @@ func (s *proxmoxService) PollOne(ctx context.Context, conn database.ProxmoxConne
 			}
 		}
 
-		if err := s.db.UpsertProxmoxNode(ctx, 
+		if err := s.db.UpsertProxmoxNode(ctx,
 			conn.ID, n.Node, n.Status, n.MaxCPU, n.CPU,
 			n.MaxMem, n.Mem, n.Uptime, pveVersion, clusterName, n.IP,
 		); err != nil {
-			log.Printf("proxmox poller [%s]: upsert node %s: %v", conn.Name, n.Node, err)
+			slog.ErrorContext(ctx, fmt.Sprintf("proxmox poller [%s]: upsert node %s: %v", conn.Name, n.Node, err))
 		} else if n.Status == "online" {
 			if nodeID, err := s.db.GetProxmoxNodeID(ctx, conn.ID, n.Node); err == nil {
 				if err := s.db.InsertProxmoxNodeMetric(ctx, nodeID, conn.ID, n.Node, n.CPU, n.MaxMem, n.Mem); err != nil {
-					log.Printf("proxmox poller [%s/%s]: insert node metric: %v", conn.Name, n.Node, err)
+					slog.ErrorContext(ctx, fmt.Sprintf("proxmox poller [%s/%s]: insert node metric: %v", conn.Name, n.Node, err))
 				}
 			}
 		}
@@ -88,21 +89,21 @@ func (s *proxmoxService) PollOne(ctx context.Context, conn database.ProxmoxConne
 
 		vms, err := client.GetNodeQemu(n.Node)
 		if err != nil {
-			log.Printf("proxmox poller [%s/%s]: get qemu: %v", conn.Name, n.Node, err)
+			slog.ErrorContext(ctx, fmt.Sprintf("proxmox poller [%s/%s]: get qemu: %v", conn.Name, n.Node, err))
 		} else {
 			for _, vm := range vms {
-				if err := s.db.UpsertProxmoxGuest(ctx, 
+				if err := s.db.UpsertProxmoxGuest(ctx,
 					conn.ID, n.Node, "vm", vm.VMID, vm.Name, vm.Status,
 					vm.CPUs, vm.CPU, vm.MaxMem, vm.Mem, vm.MaxDisk, vm.Uptime, vm.Tags,
 				); err != nil {
-					log.Printf("proxmox poller [%s/%s]: upsert vm %d: %v", conn.Name, n.Node, vm.VMID, err)
+					slog.ErrorContext(ctx, fmt.Sprintf("proxmox poller [%s/%s]: upsert vm %d: %v", conn.Name, n.Node, vm.VMID, err))
 					continue
 				}
 				if guestID, err := s.db.GetProxmoxGuestIDByVMID(ctx, conn.ID, n.Node, vm.VMID); err == nil && guestID != "" {
 					_ = s.db.AutoSuggestProxmoxLink(ctx, guestID, vm.Name)
 					if vm.Status == "running" {
 						if err := s.db.InsertProxmoxGuestMetric(ctx, guestID, vm.CPU, vm.MaxMem, vm.Mem); err != nil {
-							log.Printf("proxmox poller [%s/%s]: insert vm metric %d: %v", conn.Name, n.Node, vm.VMID, err)
+							slog.ErrorContext(ctx, fmt.Sprintf("proxmox poller [%s/%s]: insert vm metric %d: %v", conn.Name, n.Node, vm.VMID, err))
 						}
 					}
 				}
@@ -111,21 +112,21 @@ func (s *proxmoxService) PollOne(ctx context.Context, conn database.ProxmoxConne
 
 		lxcs, err := client.GetNodeLXC(n.Node)
 		if err != nil {
-			log.Printf("proxmox poller [%s/%s]: get lxc: %v", conn.Name, n.Node, err)
+			slog.ErrorContext(ctx, fmt.Sprintf("proxmox poller [%s/%s]: get lxc: %v", conn.Name, n.Node, err))
 		} else {
 			for _, lxc := range lxcs {
-				if err := s.db.UpsertProxmoxGuest(ctx, 
+				if err := s.db.UpsertProxmoxGuest(ctx,
 					conn.ID, n.Node, "lxc", lxc.VMID, lxc.Name, lxc.Status,
 					lxc.CPUs, lxc.CPU, lxc.MaxMem, lxc.Mem, lxc.MaxDisk, lxc.Uptime, lxc.Tags,
 				); err != nil {
-					log.Printf("proxmox poller [%s/%s]: upsert lxc %d: %v", conn.Name, n.Node, lxc.VMID, err)
+					slog.ErrorContext(ctx, fmt.Sprintf("proxmox poller [%s/%s]: upsert lxc %d: %v", conn.Name, n.Node, lxc.VMID, err))
 					continue
 				}
 				if guestID, err := s.db.GetProxmoxGuestIDByVMID(ctx, conn.ID, n.Node, lxc.VMID); err == nil && guestID != "" {
 					_ = s.db.AutoSuggestProxmoxLink(ctx, guestID, lxc.Name)
 					if lxc.Status == "running" {
 						if err := s.db.InsertProxmoxGuestMetric(ctx, guestID, lxc.CPU, lxc.MaxMem, lxc.Mem); err != nil {
-							log.Printf("proxmox poller [%s/%s]: insert lxc metric %d: %v", conn.Name, n.Node, lxc.VMID, err)
+							slog.ErrorContext(ctx, fmt.Sprintf("proxmox poller [%s/%s]: insert lxc metric %d: %v", conn.Name, n.Node, lxc.VMID, err))
 						}
 					}
 				}
@@ -134,22 +135,22 @@ func (s *proxmoxService) PollOne(ctx context.Context, conn database.ProxmoxConne
 
 		storages, err := client.GetNodeStorage(n.Node)
 		if err != nil {
-			log.Printf("proxmox poller [%s/%s]: get storage: %v", conn.Name, n.Node, err)
+			slog.ErrorContext(ctx, fmt.Sprintf("proxmox poller [%s/%s]: get storage: %v", conn.Name, n.Node, err))
 		} else {
 			for _, st := range storages {
-				if err := s.db.UpsertProxmoxStorage(ctx, 
+				if err := s.db.UpsertProxmoxStorage(ctx,
 					conn.ID, n.Node, st.Storage, st.Type,
 					st.Total, st.Used, st.Avail,
 					st.Enabled != 0, st.Active != 0, st.Shared != 0,
 				); err != nil {
-					log.Printf("proxmox poller [%s/%s]: upsert storage %s: %v", conn.Name, n.Node, st.Storage, err)
+					slog.ErrorContext(ctx, fmt.Sprintf("proxmox poller [%s/%s]: upsert storage %s: %v", conn.Name, n.Node, st.Storage, err))
 				}
 			}
 		}
 
 		tasks, err := client.GetNodeTasks(n.Node, taskLimit)
 		if err != nil {
-			log.Printf("proxmox poller [%s/%s]: get tasks: %v", conn.Name, n.Node, err)
+			slog.ErrorContext(ctx, fmt.Sprintf("proxmox poller [%s/%s]: get tasks: %v", conn.Name, n.Node, err))
 		} else {
 			for _, t := range tasks {
 				var startTime, endTime *time.Time
@@ -161,15 +162,15 @@ func (s *proxmoxService) PollOne(ctx context.Context, conn database.ProxmoxConne
 					v := time.Unix(t.EndTime, 0).UTC()
 					endTime = &v
 				}
-				if err := s.db.UpsertProxmoxTask(ctx, 
+				if err := s.db.UpsertProxmoxTask(ctx,
 					conn.ID, n.Node, t.UPID, t.Type, t.Status, t.User,
 					startTime, endTime, t.ExitStatus, t.ID,
 				); err != nil {
-					log.Printf("proxmox poller [%s/%s]: upsert task %s: %v", conn.Name, n.Node, t.UPID, err)
+					slog.ErrorContext(ctx, fmt.Sprintf("proxmox poller [%s/%s]: upsert task %s: %v", conn.Name, n.Node, t.UPID, err))
 				}
 				if t.Type == "vzdump" && t.Status == "stopped" && t.ID != "" {
 					if vmid := parseVMID(t.ID); vmid > 0 {
-						_ = s.db.UpsertProxmoxBackupRun(ctx, 
+						_ = s.db.UpsertProxmoxBackupRun(ctx,
 							conn.ID, n.Node, vmid, t.UPID, t.ExitStatus,
 							startTime, endTime, t.ExitStatus,
 						)
@@ -180,9 +181,9 @@ func (s *proxmoxService) PollOne(ctx context.Context, conn database.ProxmoxConne
 
 		disks, diskErr := client.GetNodeDisksList(n.Node)
 		if diskErr != nil {
-			log.Printf("proxmox poller [%s/%s]: get disks FAILED (check Sys.Audit privilege on API token): %v", conn.Name, n.Node, diskErr)
+			slog.ErrorContext(ctx, fmt.Sprintf("proxmox poller [%s/%s]: get disks FAILED (check Sys.Audit privilege on API token): %v", conn.Name, n.Node, diskErr))
 		} else {
-			log.Printf("proxmox poller [%s/%s]: got %d disk(s)", conn.Name, n.Node, len(disks))
+			slog.InfoContext(ctx, fmt.Sprintf("proxmox poller [%s/%s]: got %d disk(s)", conn.Name, n.Node, len(disks)))
 			for _, d := range disks {
 				health := d.Health
 				if health == "" {
@@ -192,40 +193,40 @@ func (s *proxmoxService) PollOne(ctx context.Context, conn database.ProxmoxConne
 				if d.Type != "ssd" && d.Type != "nvme" {
 					wearout = -1
 				}
-				if err := s.db.UpsertProxmoxDisk(ctx, 
+				if err := s.db.UpsertProxmoxDisk(ctx,
 					conn.ID, n.Node, d.DevPath, d.Model, d.Serial,
 					d.Size, d.Type, health, wearout,
 				); err != nil {
-					log.Printf("proxmox poller [%s/%s]: upsert disk %s: %v", conn.Name, n.Node, d.DevPath, err)
+					slog.ErrorContext(ctx, fmt.Sprintf("proxmox poller [%s/%s]: upsert disk %s: %v", conn.Name, n.Node, d.DevPath, err))
 				}
 			}
 		}
 
 		pkgs, aptErr := client.GetNodeAptUpdate(n.Node)
 		if aptErr != nil {
-			log.Printf("proxmox poller [%s/%s]: get apt/update FAILED (requires Sys.Modify — PVEAuditor is insufficient; create a custom role or add Sys.Modify to your token): %v", conn.Name, n.Node, aptErr)
+			slog.ErrorContext(ctx, fmt.Sprintf("proxmox poller [%s/%s]: get apt/update FAILED (requires Sys.Modify — PVEAuditor is insufficient; create a custom role or add Sys.Modify to your token): %v", conn.Name, n.Node, aptErr))
 		} else {
-			log.Printf("proxmox poller [%s/%s]: got %d pending apt package(s)", conn.Name, n.Node, len(pkgs))
+			slog.InfoContext(ctx, fmt.Sprintf("proxmox poller [%s/%s]: got %d pending apt package(s)", conn.Name, n.Node, len(pkgs)))
 		}
 		pending := 0
 		for range pkgs {
 			pending++
 		}
 		if err := s.db.UpdateProxmoxNodeUpdates(ctx, conn.ID, n.Node, pending, 0); err != nil {
-			log.Printf("proxmox poller [%s/%s]: update node updates: %v", conn.Name, n.Node, err)
+			slog.ErrorContext(ctx, fmt.Sprintf("proxmox poller [%s/%s]: update node updates: %v", conn.Name, n.Node, err))
 		}
 	}
 
 	backupJobs, err := client.GetClusterBackup()
 	if err != nil {
-		log.Printf("proxmox poller [%s]: get backup jobs: %v", conn.Name, err)
+		slog.ErrorContext(ctx, fmt.Sprintf("proxmox poller [%s]: get backup jobs: %v", conn.Name, err))
 	} else {
 		for _, j := range backupJobs {
-			if err := s.db.UpsertProxmoxBackupJob(ctx, 
+			if err := s.db.UpsertProxmoxBackupJob(ctx,
 				conn.ID, j.ID, j.Enabled != 0,
 				j.Schedule, j.Storage, j.Mode, j.Compress, j.VMIDs, j.MailTo,
 			); err != nil {
-				log.Printf("proxmox poller [%s]: upsert backup job %s: %v", conn.Name, j.ID, err)
+				slog.ErrorContext(ctx, fmt.Sprintf("proxmox poller [%s]: upsert backup job %s: %v", conn.Name, j.ID, err))
 			}
 		}
 		_ = s.db.DeleteStaleProxmoxBackupJobs(ctx, conn.ID, cutoff)
@@ -237,5 +238,5 @@ func (s *proxmoxService) PollOne(ctx context.Context, conn database.ProxmoxConne
 	_ = s.db.DeleteStaleProxmoxDisks(ctx, conn.ID, cutoff)
 
 	_ = s.db.UpdateProxmoxConnectionSuccess(ctx, conn.ID)
-	log.Printf("proxmox poller [%s]: poll complete (%d node(s))", conn.Name, len(nodes))
+	slog.InfoContext(ctx, fmt.Sprintf("proxmox poller [%s]: poll complete (%d node(s))", conn.Name, len(nodes)))
 }

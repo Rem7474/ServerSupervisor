@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/serversupervisor/server/internal/models"
@@ -56,7 +56,7 @@ func (h *AgentHandler) storeAgentMetrics(ctx context.Context, hostID string, rep
 		}
 		if update.Hostname != nil || update.OS != nil || update.AgentVersion != nil {
 			if err := h.db.UpdateHost(ctx, hostID, &update); err != nil {
-				log.Printf("Warning: failed to update host %s: %v", hostID, err)
+				slog.ErrorContext(ctx, fmt.Sprintf("Warning: failed to update host %s: %v", hostID, err))
 			}
 		}
 
@@ -80,7 +80,7 @@ func (h *AgentHandler) storeAgentMetrics(ctx context.Context, hostID string, rep
 	if report.AgentVersion != "" {
 		update := models.HostUpdate{AgentVersion: stringPtrIfNotEmpty(report.AgentVersion)}
 		if err := h.db.UpdateHost(ctx, hostID, &update); err != nil {
-			log.Printf("Warning: failed to update host %s: %v", hostID, err)
+			slog.ErrorContext(ctx, fmt.Sprintf("Warning: failed to update host %s: %v", hostID, err))
 		}
 	}
 	return nil
@@ -94,25 +94,25 @@ func (h *AgentHandler) storeContainersAndPackages(ctx context.Context, hostID, s
 			report.Docker.Containers[i].HostID = hostID
 		}
 		if err := h.db.UpsertDockerContainers(ctx, hostID, report.Docker.Containers); err != nil {
-			log.Printf("Warning: failed to store docker containers for host %s: %v", safeHostID, err)
+			slog.ErrorContext(ctx, fmt.Sprintf("Warning: failed to store docker containers for host %s: %v", safeHostID, err))
 		}
 	}
 
 	if report.AptStatus != nil {
 		report.AptStatus.HostID = hostID
 		if err := h.db.UpsertAptStatus(ctx, report.AptStatus); err != nil {
-			log.Printf("Warning: failed to store apt status for host %s: %v", safeHostID, err)
+			slog.ErrorContext(ctx, fmt.Sprintf("Warning: failed to store apt status for host %s: %v", safeHostID, err))
 		}
 	}
 
 	if report.UnattendedUpgrades != nil {
 		if err := h.db.UpsertUUStatus(ctx, hostID, *report.UnattendedUpgrades); err != nil {
-			log.Printf("Warning: failed to store UU status for host %s: %v", safeHostID, err)
+			slog.ErrorContext(ctx, fmt.Sprintf("Warning: failed to store UU status for host %s: %v", safeHostID, err))
 		}
 		for _, run := range report.UnattendedUpgrades.NewRuns {
 			isNew, err := h.db.InsertUURunIfNew(ctx, hostID, run)
 			if err != nil {
-				log.Printf("Warning: failed to insert UU run for host %s: %v", safeHostID, err)
+				slog.ErrorContext(ctx, fmt.Sprintf("Warning: failed to insert UU run for host %s: %v", safeHostID, err))
 				continue
 			}
 			if isNew {
@@ -145,13 +145,13 @@ func (h *AgentHandler) storeContainersAndPackages(ctx context.Context, hostID, s
 			})
 		}
 		if err := h.db.UpsertDockerNetworks(ctx, hostID, dbNetworks); err != nil {
-			log.Printf("Warning: failed to store docker networks for host %s: %v", safeHostID, err)
+			slog.ErrorContext(ctx, fmt.Sprintf("Warning: failed to store docker networks for host %s: %v", safeHostID, err))
 		}
 	}
 
 	if report.ComposeProjects != nil {
 		if err := h.db.UpsertComposeProjects(ctx, hostID, report.ComposeProjects); err != nil {
-			log.Printf("Warning: failed to store compose projects for host %s: %v", safeHostID, err)
+			slog.ErrorContext(ctx, fmt.Sprintf("Warning: failed to store compose projects for host %s: %v", safeHostID, err))
 		}
 	}
 }
@@ -167,7 +167,7 @@ func (h *AgentHandler) storeDiskAndMetadata(ctx context.Context, hostID, safeHos
 			report.DiskMetrics[i].Timestamp = batchTime
 		}
 		if err := h.db.InsertDiskMetrics(ctx, report.DiskMetrics); err != nil {
-			log.Printf("Warning: failed to store disk metrics for host %s: %v", safeHostID, err)
+			slog.ErrorContext(ctx, fmt.Sprintf("Warning: failed to store disk metrics for host %s: %v", safeHostID, err))
 		}
 	}
 
@@ -177,38 +177,38 @@ func (h *AgentHandler) storeDiskAndMetadata(ctx context.Context, hostID, safeHos
 			report.DiskHealth[i].CollectedAt = time.Now()
 		}
 		if err := h.db.InsertDiskHealth(ctx, report.DiskHealth); err != nil {
-			log.Printf("Warning: failed to store disk health for host %s: %v", safeHostID, err)
+			slog.ErrorContext(ctx, fmt.Sprintf("Warning: failed to store disk health for host %s: %v", safeHostID, err))
 		}
 	}
 
 	if report.CustomTasks != nil {
 		if b, err := json.Marshal(report.CustomTasks); err == nil {
 			if err := h.db.UpdateHostCustomTasks(ctx, hostID, string(b)); err != nil {
-				log.Printf("Warning: failed to store custom tasks for host %s: %v", safeHostID, err)
+				slog.ErrorContext(ctx, fmt.Sprintf("Warning: failed to store custom tasks for host %s: %v", safeHostID, err))
 			}
 		}
 	}
 
 	if report.TasksConfigYAML != "" {
 		if err := h.db.UpdateHostTasksConfigYAML(ctx, hostID, report.TasksConfigYAML); err != nil {
-			log.Printf("Warning: failed to store tasks config YAML for host %s: %v", safeHostID, err)
+			slog.ErrorContext(ctx, fmt.Sprintf("Warning: failed to store tasks config YAML for host %s: %v", safeHostID, err))
 		}
 	}
 
 	if report.Capabilities != nil {
 		if b, err := json.Marshal(report.Capabilities); err == nil {
 			if err := h.db.UpdateHostCollectors(ctx, hostID, string(b)); err != nil {
-				log.Printf("Warning: failed to store collectors for host %s: %v", safeHostID, err)
+				slog.ErrorContext(ctx, fmt.Sprintf("Warning: failed to store collectors for host %s: %v", safeHostID, err))
 			}
 		}
 	}
 
 	if report.WebLogs != nil {
 		if err := h.db.UpdateHostWebLogs(ctx, hostID, report.WebLogs); err != nil {
-			log.Printf("Warning: failed to update web logs cache for host %s: %v", safeHostID, err)
+			slog.ErrorContext(ctx, fmt.Sprintf("Warning: failed to update web logs cache for host %s: %v", safeHostID, err))
 		}
 		if err := h.db.InsertWebLogSnapshot(ctx, hostID, report.WebLogs); err != nil {
-			log.Printf("Warning: failed to insert web logs snapshot for host %s: %v", safeHostID, err)
+			slog.ErrorContext(ctx, fmt.Sprintf("Warning: failed to insert web logs snapshot for host %s: %v", safeHostID, err))
 		}
 	}
 }

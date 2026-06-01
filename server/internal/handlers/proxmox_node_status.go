@@ -1,8 +1,8 @@
 package handlers
 
 import (
-
-	"log"
+	"fmt"
+	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -73,7 +73,7 @@ func (h *ProxmoxHandler) GetNodeRRD(c *gin.Context) {
 	client := proxmoxclient.New(conn.APIURL, conn.TokenID, secret, conn.InsecureSkipVerify)
 	points, err := client.GetNodeRRDData(node.NodeName, timeframe)
 	if err != nil {
-		log.Printf("proxmox rrd [%s/%s] %s: %v", conn.Name, node.NodeName, timeframe, err)
+		slog.ErrorContext(c.Request.Context(), fmt.Sprintf("proxmox rrd [%s/%s] %s: %v", conn.Name, node.NodeName, timeframe, err))
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 		return
 	}

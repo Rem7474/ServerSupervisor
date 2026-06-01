@@ -10,7 +10,7 @@ import { translateError } from '../utils/translateError'
 import { formatRelativeTime } from './useDateFormatter'
 import dayjs from '../utils/dayjs'
 
-type AnyRecord = Record<string, unknown>
+type AnyRecord = Record<string, any>
 type SortDirection = 'asc' | 'desc'
 type HostStatus = 'online' | 'warning' | 'offline'
 
@@ -42,6 +42,8 @@ interface DashboardAgentMetric {
 
 interface DashboardProxmoxLinkRecord {
   host_id: string
+  guest_id?: string
+  status?: string
   metrics_source?: 'proxmox' | 'auto' | string
   cpu_usage?: number | null
   mem_alloc?: number

@@ -82,45 +82,36 @@
   </div>
 </template>
 
-<script setup>
-defineProps({
-  form: {
-    type: Object,
-    required: true,
-  },
-  authIsAdmin: {
-    type: Boolean,
-    default: false,
-  },
-  showGitHubToken: {
-    type: Boolean,
-    default: false,
-  },
-  savingNotif: {
-    type: Boolean,
-    default: false,
-  },
-  notifSaveMsg: {
-    type: String,
-    default: '',
-  },
-  notifSaveOk: {
-    type: Boolean,
-    default: false,
-  },
-  testingNtfy: {
-    type: Boolean,
-    default: false,
-  },
-  ntfyTestMessage: {
-    type: String,
-    default: '',
-  },
-  ntfyTestSuccess: {
-    type: Boolean,
-    default: false,
-  },
+<script setup lang="ts">
+interface NotifForm {
+  ntfyUrl: string
+  githubToken: string
+}
+
+withDefaults(defineProps<{
+  form: NotifForm
+  authIsAdmin?: boolean
+  showGitHubToken?: boolean
+  savingNotif?: boolean
+  notifSaveMsg?: string
+  notifSaveOk?: boolean
+  testingNtfy?: boolean
+  ntfyTestMessage?: string
+  ntfyTestSuccess?: boolean
+}>(), {
+  authIsAdmin: false,
+  showGitHubToken: false,
+  savingNotif: false,
+  notifSaveMsg: '',
+  notifSaveOk: false,
+  testingNtfy: false,
+  ntfyTestMessage: '',
+  ntfyTestSuccess: false,
 })
 
-defineEmits(['save', 'test', 'update:show-github-token'])
+defineEmits<{
+  (e: 'save'): void
+  (e: 'test'): void
+  (e: 'update:show-github-token', value: boolean): void
+}>()
 </script>

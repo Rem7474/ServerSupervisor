@@ -2,7 +2,8 @@ package handlers
 
 import (
 	"database/sql"
-	"log"
+	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -286,7 +287,7 @@ func (h *ScheduledTaskHandler) RunScheduledTask(c *gin.Context) {
 	}
 
 	if err := h.db.LinkCommandToScheduledTask(c.Request.Context(), result.Command.ID, task.ID); err != nil {
-		log.Printf("Failed to link command %s to scheduled task %s: %v", result.Command.ID, task.ID, err)
+		slog.ErrorContext(c.Request.Context(), fmt.Sprintf("Failed to link command %s to scheduled task %s: %v", result.Command.ID, task.ID, err))
 	}
 	_ = h.db.UpdateScheduledTaskStatus(c.Request.Context(), task.ID, "pending")
 

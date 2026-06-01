@@ -1,8 +1,10 @@
 package handlers
 
-import (	"context"
+import (
+	"context"
+	"fmt"
+	"log/slog"
 
-	"log"
 	"net/http"
 
 	webpush "github.com/SherClockHolmes/webpush-go"
@@ -37,7 +39,7 @@ func (h *PushHandler) ensureVapidKeys(ctx context.Context) (privateKey, publicKe
 	}
 	_ = h.db.SetSetting(ctx, "vapid_private_key", privateKey)
 	_ = h.db.SetSetting(ctx, "vapid_public_key", publicKey)
-	log.Println("Push: generated new VAPID key pair")
+	slog.InfoContext(ctx, "Push: generated new VAPID key pair")
 	return privateKey, publicKey, nil
 }
 
@@ -46,7 +48,7 @@ func (h *PushHandler) ensureVapidKeys(ctx context.Context) (privateKey, publicKe
 func (h *PushHandler) GetVapidPublicKey(c *gin.Context) {
 	_, publicKey, err := h.ensureVapidKeys(c.Request.Context())
 	if err != nil {
-		log.Printf("Push: failed to get/generate VAPID keys: %v", err)
+		slog.ErrorContext(c.Request.Context(), fmt.Sprintf("Push: failed to get/generate VAPID keys: %v", err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get VAPID key"})
 		return
 	}
@@ -74,7 +76,7 @@ func (h *PushHandler) Subscribe(c *gin.Context) {
 		userAgent = userAgent[:500]
 	}
 	if err := h.db.SavePushSubscription(c.Request.Context(), username, req.Endpoint, req.Keys.P256DH, req.Keys.Auth, userAgent); err != nil {
-		log.Printf("Push: failed to save subscription for %s: %v", username, err)
+		slog.ErrorContext(c.Request.Context(), fmt.Sprintf("Push: failed to save subscription for %s: %v", username, err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save subscription"})
 		return
 	}

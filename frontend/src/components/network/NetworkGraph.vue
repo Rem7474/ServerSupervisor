@@ -146,47 +146,103 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import cytoscape from 'cytoscape'
+// @ts-expect-error cytoscape-fcose lacks types
 import fcose from 'cytoscape-fcose'
 import { createCytoscapeInstance, bindCytoscapeResize, destroyCytoscapeInstance } from '../../composables/useCytoscape'
 
+interface HostPort {
+  port: number | string
+  protocol?: string
+  containers?: string[]
+}
+
+interface NetworkHost {
+  id: string
+  name?: string
+  hostname?: string
+  ip_address?: string
+  status?: string
+  ports?: HostPort[]
+}
+
+interface NetworkService {
+  id: string | number
+  hostId?: string
+  name?: string
+  domain?: string
+  path?: string
+  internalPort?: number | string
+  externalPort?: number | null
+  linkToProxy?: boolean
+  linkToAuthelia?: boolean
+  exposedToInternet?: boolean
+  tags?: string
+}
+
+interface HostPortOverride {
+  excludedPorts?: number[]
+  portMap?: Record<number, string>
+  proxyPorts?: Set<number>
+  autheliaPortNumbers?: Set<number>
+  internetExposedPorts?: Record<number, number | null>
+}
+
 cytoscape.use(fcose)
 
-const props = defineProps({
-  data: { type: Array, required: true },
-  rootLabel: { type: String, default: 'root' },
-  rootIp: { type: String, default: '' },
-  services: { type: Array, default: () => [] },
-  hostPortOverrides: { type: Object, default: () => ({}) },
-  autheliaLabel: { type: String, default: 'Authelia' },
-  autheliaIp: { type: String, default: '' },
-  internetLabel: { type: String, default: 'Internet' },
-  internetIp: { type: String, default: '' },
-  nodePositions:    { type: Object, default: () => ({}) },
-  rootHostId:       { type: String, default: '' },
-  autheliaHostId:   { type: String, default: '' },
-  rootPortId:       { type: String, default: '' },
-  autheliaPortId:   { type: String, default: '' },
+const props = withDefaults(defineProps<{
+  data: NetworkHost[]
+  rootLabel?: string
+  rootIp?: string
+  services?: NetworkService[]
+  hostPortOverrides?: Record<string, HostPortOverride>
+  autheliaLabel?: string
+  autheliaIp?: string
+  internetLabel?: string
+  internetIp?: string
+  nodePositions?: Record<string, { x: number; y: number }>
+  rootHostId?: string
+  autheliaHostId?: string
+  rootPortId?: string
+  autheliaPortId?: string
+}>(), {
+  rootLabel: 'root',
+  rootIp: '',
+  services: () => [],
+  hostPortOverrides: () => ({}),
+  autheliaLabel: 'Authelia',
+  autheliaIp: '',
+  internetLabel: 'Internet',
+  internetIp: '',
+  nodePositions: () => ({}),
+  rootHostId: '',
+  autheliaHostId: '',
+  rootPortId: '',
+  autheliaPortId: '',
 })
 
-const emit = defineEmits(['host-click', 'node-select', 'update:nodePositions'])
+const emit = defineEmits<{
+  (e: 'host-click', hostId: string): void
+  (e: 'node-select', data: Record<string, unknown>): void
+  (e: 'update:nodePositions', positions: Record<string, { x: number; y: number }>): void
+}>()
 
-const cyContainer = ref(null)
-const tooltipRef = ref(null)
-let cy = null
-let resizeBinding = null
+const cyContainer = ref<HTMLElement | null>(null)
+const tooltipRef = ref<HTMLElement | null>(null)
+let cy: any = null
+let resizeBinding: { disconnect: () => void } | null = null
 
 const hasData = computed(() => Array.isArray(props.data) && props.data.length > 0)
 
-const statusColors = { online: '#22c55e', warning: '#f59e0b', offline: '#ef4444', unknown: '#94a3b8' }
+const statusColors: Record<string, string> = { online: '#22c55e', warning: '#f59e0b', offline: '#ef4444', unknown: '#94a3b8' }
 
 // Computed: does the data contain authelia/internet targets?
 const hasAutheliaTargets = computed(() => props.services.some(s => s.linkToAuthelia))
 const hasInternetTargets = computed(() => props.services.some(s => s.exposedToInternet))
 
-function escapeHtml(str) {
+function escapeHtml(str: unknown): string {
   if (str == null) return ''
   return String(str)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -194,8 +250,8 @@ function escapeHtml(str) {
 }
 
 // Build Cytoscape elements from props
-function buildElements() {
-  const elements = []
+function buildElements(): any[] {
+  const elements: any[] = []
 
   // === Root node (abstract, only when not linked to a real host) ===
   const rootLabel = props.rootLabel || 'Infrastructure'
@@ -207,11 +263,11 @@ function buildElements() {
   }
 
   // === Services by host ===
-  const servicesByHost = new Map()
+  const servicesByHost = new Map<string, NetworkService[]>()
   for (const svc of props.services || []) {
     if (!svc?.hostId) continue
     if (!servicesByHost.has(svc.hostId)) servicesByHost.set(svc.hostId, [])
-    servicesByHost.get(svc.hostId).push(svc)
+    servicesByHost.get(svc.hostId)!.push(svc)
   }
 
   // Resolve effective node IDs: specific port > host > abstract node
@@ -223,7 +279,7 @@ function buildElements() {
     : 'authelia'
 
   // Collect external ports exposed via proxy (for the single aggregated internet→proxy edge)
-  const internetViaProxyPorts = []
+  const internetViaProxyPorts: number[] = []
 
   // === Host nodes (compound parents) ===
   for (const host of props.data) {
@@ -247,12 +303,12 @@ function buildElements() {
       }
     })
 
-    const override = props.hostPortOverrides?.[host.id] || {}
+    const override: HostPortOverride = props.hostPortOverrides?.[host.id] || {}
     const hostExcluded = new Set((override.excludedPorts || []).map(Number).filter(Boolean))
-    const portMap = override.portMap || {}
-    const proxyPorts = override.proxyPorts || new Set()
-    const autheliaPortNumbers = override.autheliaPortNumbers || new Set()
-    const internetExposedPorts = override.internetExposedPorts || {}
+    const portMap: Record<number, string> = override.portMap || {}
+    const proxyPorts: Set<number> = override.proxyPorts || new Set<number>()
+    const autheliaPortNumbers: Set<number> = override.autheliaPortNumbers || new Set<number>()
+    const internetExposedPorts: Record<number, number | null> = override.internetExposedPorts || {}
 
     // Port nodes
     const rawPorts = host.ports || []
@@ -405,7 +461,7 @@ function buildElements() {
   return elements
 }
 
-function getCyStyle() {
+function getCyStyle(): any[] {
   return [
     {
       selector: 'node',
@@ -649,7 +705,7 @@ function getCyStyle() {
   ]
 }
 
-function getLayoutOptions() {
+function getLayoutOptions(): Record<string, unknown> {
   return {
     name: 'fcose',
     animate: true,
@@ -669,7 +725,7 @@ function getLayoutOptions() {
   }
 }
 
-function showTooltip(event, lines) {
+function showTooltip(event: any, lines: string[]): void {
   if (!tooltipRef.value) return
   tooltipRef.value.innerHTML = lines.map(l => `<div>${escapeHtml(l)}</div>`).join('')
   tooltipRef.value.style.display = 'block'
@@ -677,23 +733,23 @@ function showTooltip(event, lines) {
   tooltipRef.value.style.top = `${event.originalEvent.pageY + 12}px`
 }
 
-function hideTooltip() {
+function hideTooltip(): void {
   if (tooltipRef.value) tooltipRef.value.style.display = 'none'
 }
 
-function moveTooltip(event) {
+function moveTooltip(event: any): void {
   if (!tooltipRef.value || tooltipRef.value.style.display !== 'block') return
   tooltipRef.value.style.left = `${event.originalEvent.pageX + 12}px`
   tooltipRef.value.style.top = `${event.originalEvent.pageY + 12}px`
 }
 
-let positionSaveTimeout = null
-function emitPositions() {
+let positionSaveTimeout: ReturnType<typeof setTimeout> | null = null
+function emitPositions(): void {
   if (!cy) return
   if (positionSaveTimeout) clearTimeout(positionSaveTimeout)
   positionSaveTimeout = setTimeout(() => {
-    const positions = {}
-    cy.nodes().forEach(n => {
+    const positions: Record<string, { x: number; y: number }> = {}
+    cy.nodes().forEach((n: any) => {
       const pos = n.position()
       positions[n.id()] = { x: Math.round(pos.x), y: Math.round(pos.y) }
     })
@@ -701,7 +757,7 @@ function emitPositions() {
   }, 600)
 }
 
-function initCytoscape() {
+function initCytoscape(): void {
   if (!cyContainer.value) return
   if (cy) cy.destroy()
 
@@ -712,7 +768,7 @@ function initCytoscape() {
     container: cyContainer.value,
     elements: buildElements(),
     style: getCyStyle(),
-    layout: hasPositions ? { name: 'preset', fit: true, padding: 48 } : getLayoutOptions(),
+    layout: hasPositions ? { name: 'preset', fit: true, padding: 48 } : (getLayoutOptions() as any),
     minZoom: 0.2,
     maxZoom: 3,
     wheelSensitivity: 0.3,
@@ -720,7 +776,7 @@ function initCytoscape() {
   })
 
   if (hasPositions) {
-    cy.nodes().forEach(n => {
+    cy.nodes().forEach((n: any) => {
       const pos = savedPositions[n.id()]
       if (pos) n.position(pos)
     })
@@ -729,20 +785,20 @@ function initCytoscape() {
 
   cy.on('dragfree', 'node', emitPositions)
 
-  cy.on('tap', 'node', (event) => {
+  cy.on('tap', 'node', (event: any) => {
     emit('node-select', { ...event.target.data() })
   })
 
   // Click on host → emit event
-  cy.on('tap', 'node[type="host"]', (event) => {
+  cy.on('tap', 'node[type="host"]', (event: any) => {
     const hostId = event.target.data('hostId')
     if (hostId) emit('host-click', hostId)
   })
 
   // Hover tooltips
-  cy.on('mouseover', 'node', (event) => {
+  cy.on('mouseover', 'node', (event: any) => {
     const d = event.target.data()
-    const lines = []
+    const lines: string[] = []
     if (d.type === 'host') {
       lines.push(d.label)
       if (d.sublabel) lines.push(`IP : ${d.sublabel}`)
@@ -769,12 +825,12 @@ function initCytoscape() {
   cy.on('mousemove', 'node', moveTooltip)
   cy.on('mouseout', 'node', hideTooltip)
 
-  cy.on('mouseover', 'edge', (event) => {
+  cy.on('mouseover', 'edge', (event: any) => {
     const d = event.target.data()
-    const lines = []
+    const lines: string[] = []
     if (d.edgeType === 'internet-proxy') {
       lines.push('Trafic Internet → Proxy')
-      if (d.ports?.length) lines.push(`Ports exposés : ${d.ports.map(p => `:${p}`).join(', ')}`)
+      if (d.ports?.length) lines.push(`Ports exposés : ${d.ports.map((p: number) => `:${p}`).join(', ')}`)
     } else if (d.edgeType === 'proxy-authelia') {
       lines.push('Proxy → Authelia')
       lines.push('Vérification d\'authentification avant routage')
@@ -863,8 +919,8 @@ watch(
     }
 
     // Snapshot current in-memory positions before rebuild
-    const currentPositions = {}
-    cy.nodes().forEach(n => {
+    const currentPositions: Record<string, { x: number; y: number }> = {}
+    cy.nodes().forEach((n: any) => {
       currentPositions[n.id()] = { x: n.position('x'), y: n.position('y') }
     })
 
@@ -874,7 +930,7 @@ watch(
 
     // Restore positions: use in-memory first, fallback to prop (DB-loaded)
     let hasNewNodes = false
-    cy.nodes().forEach(n => {
+    cy.nodes().forEach((n: any) => {
       const pos = currentPositions[n.id()] || (props.nodePositions || {})[n.id()]
       if (pos) {
         n.position(pos)

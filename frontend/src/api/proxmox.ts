@@ -5,6 +5,7 @@ export interface ProxmoxConnection {
   name: string
   api_url: string
   token_id: string
+  token_secret?: string
   insecure_skip_verify?: boolean
   enabled?: boolean
   poll_interval_sec?: number
@@ -19,7 +20,7 @@ export const proxmoxApi = {
   updateProxmoxInstance: (id: string, payload: Partial<ProxmoxConnection>) =>
     api.put(`/v1/proxmox/instances/${id}`, payload),
   deleteProxmoxInstance: (id: string) => api.delete(`/v1/proxmox/instances/${id}`),
-  testProxmoxConnection: (payload: Omit<ProxmoxConnection, 'id'>) =>
+  testProxmoxConnection: (payload: Partial<Omit<ProxmoxConnection, 'id'>>) =>
     api.post('/v1/proxmox/instances/test', payload),
   testProxmoxInstanceById: (id: string) => api.post(`/v1/proxmox/instances/${id}/test`),
   pollProxmoxNow: (id: string) => api.post(`/v1/proxmox/instances/${id}/poll-now`),

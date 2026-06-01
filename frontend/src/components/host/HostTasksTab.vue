@@ -266,12 +266,12 @@
                 <div class="col">
                   <label class="form-label">Action</label>
                   <select
-                    v-if="taskModuleActions[taskForm.module]"
+                    v-if="taskModuleActions[taskForm.module as TaskModule]"
                     v-model="taskForm.action"
                     class="form-select"
                   >
                     <option
-                      v-for="a in taskModuleActions[taskForm.module]"
+                      v-for="a in taskModuleActions[taskForm.module as TaskModule]"
                       :key="a"
                       :value="a"
                     >
@@ -416,7 +416,7 @@
   </Teleport>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, watch } from 'vue'
 import CronBuilder from '../CronBuilder.vue'
 import apiClient from '../../api'
@@ -425,7 +425,42 @@ import { useDateFormatter } from '../../composables/useDateFormatter'
 import { useToast } from '../../composables/useToast'
 import { MANUAL_SENTINEL, isManualOnly, describeCron } from '../../utils/cron'
 
-const taskModuleActions = {
+type TaskModule = 'apt' | 'docker' | 'systemd' | 'journal' | 'processes' | 'custom'
+
+interface Task {
+  id: string | number
+  name: string
+  module: string
+  action: string
+  target?: string
+  cron_expression: string
+  enabled: boolean
+  last_command_id?: string | number
+  last_run_status?: string
+  last_run_at?: string
+  next_run_at?: string
+}
+
+interface TaskForm {
+  name: string
+  module: string
+  action: string
+  target: string
+  cron_expression: string
+  enabled: boolean
+}
+
+interface CustomTaskOption {
+  id: string
+  name?: string
+}
+
+interface TaskRunResult {
+  id: string | number
+  name: string
+}
+
+const taskModuleActions: Record<TaskModule, string[] | null> = {
   apt: ['update', 'upgrade', 'dist-upgrade'],
   docker: ['start', 'stop', 'restart', 'logs', 'pull'],
   systemd: ['start', 'stop', 'restart', 'status', 'enable', 'disable'],
@@ -434,37 +469,35 @@ const taskModuleActions = {
   custom: null,
 }
 
-const emit = defineEmits(['open-command', 'tasks-count', 'history-changed'])
+const emit = defineEmits<{
+  (e: 'open-command', payload: Record<string, unknown>): void
+  (e: 'tasks-count', count: number): void
+  (e: 'history-changed'): void
+}>()
 
-const props = defineProps({
-  hostId: {
-    type: [String, Number],
-    required: true,
-  },
-  canRunApt: {
-    type: Boolean,
-    default: false,
-  },
-  active: {
-    type: Boolean,
-    default: false,
-  },
+const props = withDefaults(defineProps<{
+  hostId: string | number
+  canRunApt?: boolean
+  active?: boolean
+}>(), {
+  canRunApt: false,
+  active: false,
 })
 
 const dialog = useConfirmDialog()
 const { formatExactDate: formatTaskDate } = useDateFormatter()
-const tasks = ref([])
+const tasks = ref<Task[]>([])
 const tasksLoading = ref(false)
 const tasksError = ref('')
-const taskRunningId = ref(null)
-const { value: taskRunResult, showToast: showTaskRunResult } = useToast(null)
+const taskRunningId = ref<string | number | null>(null)
+const { value: taskRunResult, showToast: showTaskRunResult } = useToast<TaskRunResult | null>(null)
 const showTaskModal = ref(false)
-const editingTask = ref(null)
+const editingTask = ref<Task | null>(null)
 const taskSaving = ref(false)
 const taskModalError = ref('')
 const taskManualOnly = ref(false)
-const customTaskOptions = ref([])
-const taskForm = ref({ name: '', module: 'apt', action: 'update', target: '', cron_expression: '0 3 * * 0', enabled: true })
+const customTaskOptions = ref<CustomTaskOption[]>([])
+const taskForm = ref<TaskForm>({ name: '', module: 'apt', action: 'update', target: '', cron_expression: '0 3 * * 0', enabled: true })
 
 watch(
   tasks,
@@ -496,22 +529,22 @@ watch(taskManualOnly, (val) => {
   }
 })
 
-async function loadTasks() {
+async function loadTasks(): Promise<void> {
   tasksLoading.value = true
   tasksError.value = ''
   try {
-    const { data } = await apiClient.getScheduledTasks(props.hostId)
+    const { data } = await apiClient.getScheduledTasks(String(props.hostId))
     tasks.value = data
-  } catch (e) {
-    tasksError.value = e.response?.data?.error || 'Erreur de chargement'
+  } catch (e: any) {
+    tasksError.value = e?.response?.data?.error || 'Erreur de chargement'
   } finally {
     tasksLoading.value = false
   }
 }
 
-async function loadCustomTasks() {
+async function loadCustomTasks(): Promise<void> {
   try {
-    const { data } = await apiClient.getHostCustomTasks(props.hostId)
+    const { data } = await apiClient.getHostCustomTasks(String(props.hostId))
     customTaskOptions.value = Array.isArray(data) ? data : []
     if (customTaskOptions.value.length && !taskForm.value.target) {
       taskForm.value.target = customTaskOptions.value[0].id
@@ -521,13 +554,13 @@ async function loadCustomTasks() {
   }
 }
 
-async function onTaskModuleChange() {
-  const actions = taskModuleActions[taskForm.value.module]
+async function onTaskModuleChange(): Promise<void> {
+  const actions = taskModuleActions[taskForm.value.module as TaskModule]
   taskForm.value.action = actions ? actions[0] : 'run'
   if (taskForm.value.module === 'custom') await loadCustomTasks()
 }
 
-function openCreateTask() {
+function openCreateTask(): void {
   editingTask.value = null
   taskManualOnly.value = false
   customTaskOptions.value = []
@@ -536,21 +569,21 @@ function openCreateTask() {
   showTaskModal.value = true
 }
 
-async function openEditTask(task) {
+async function openEditTask(task: Task): Promise<void> {
   editingTask.value = task
   taskManualOnly.value = isManualOnly(task)
   customTaskOptions.value = []
-  taskForm.value = { name: task.name, module: task.module, action: task.action, target: task.target, cron_expression: task.cron_expression, enabled: task.enabled }
+  taskForm.value = { name: task.name, module: task.module, action: task.action, target: task.target || '', cron_expression: task.cron_expression, enabled: task.enabled }
   taskModalError.value = ''
   showTaskModal.value = true
   if (task.module === 'custom') await loadCustomTasks()
 }
 
-function closeTaskModal() {
+function closeTaskModal(): void {
   showTaskModal.value = false
 }
 
-async function saveTask() {
+async function saveTask(): Promise<void> {
   if (!taskForm.value.name || !taskForm.value.action) {
     taskModalError.value = 'Nom et action sont obligatoires.'
     return
@@ -563,32 +596,32 @@ async function saveTask() {
   taskModalError.value = ''
   try {
     if (editingTask.value) {
-      await apiClient.updateScheduledTask(editingTask.value.id, taskForm.value)
+      await apiClient.updateScheduledTask(String(editingTask.value.id), taskForm.value)
     } else {
-      await apiClient.createScheduledTask(props.hostId, taskForm.value)
+      await apiClient.createScheduledTask(String(props.hostId), taskForm.value)
     }
     closeTaskModal()
     await loadTasks()
-  } catch (e) {
-    taskModalError.value = e.response?.data?.error || e.response?.data?.warning || 'Erreur lors de la sauvegarde'
+  } catch (e: any) {
+    taskModalError.value = e?.response?.data?.error || e?.response?.data?.warning || 'Erreur lors de la sauvegarde'
   } finally {
     taskSaving.value = false
   }
 }
 
-async function toggleTask(task) {
+async function toggleTask(task: Task): Promise<void> {
   try {
-    await apiClient.updateScheduledTask(task.id, { ...task, enabled: !task.enabled })
+    await apiClient.updateScheduledTask(String(task.id), { ...task, enabled: !task.enabled })
     await loadTasks()
-  } catch (e) {
-    tasksError.value = e.response?.data?.error || 'Erreur'
+  } catch (e: any) {
+    tasksError.value = e?.response?.data?.error || 'Erreur'
   }
 }
 
-async function runTaskNow(task) {
+async function runTaskNow(task: Task): Promise<void> {
   taskRunningId.value = task.id
   try {
-    const { data } = await apiClient.runScheduledTask(task.id)
+    const { data } = await apiClient.runScheduledTask(String(task.id))
     showTaskRunResult({ id: data.command_id, name: task.name }, 5000)
     emit('open-command', {
       id: data.command_id,
@@ -600,14 +633,14 @@ async function runTaskNow(task) {
     })
     emit('history-changed')
     await loadTasks()
-  } catch (e) {
-    tasksError.value = e.response?.data?.error || 'Erreur'
+  } catch (e: any) {
+    tasksError.value = e?.response?.data?.error || 'Erreur'
   } finally {
     taskRunningId.value = null
   }
 }
 
-function openTaskLogs(task) {
+function openTaskLogs(task: Task): void {
   if (!task.last_command_id) return
   emit('open-command', {
     id: task.last_command_id,
@@ -619,7 +652,7 @@ function openTaskLogs(task) {
   })
 }
 
-async function confirmDeleteTask(task) {
+async function confirmDeleteTask(task: Task): Promise<void> {
   const confirmed = await dialog.confirm({
     title: 'Supprimer la tache',
     message: `Supprimer la tache "${task.name}" ?\nCette action est irreversible.`,
@@ -627,10 +660,10 @@ async function confirmDeleteTask(task) {
   })
   if (!confirmed) return
   try {
-    await apiClient.deleteScheduledTask(task.id)
+    await apiClient.deleteScheduledTask(String(task.id))
     await loadTasks()
-  } catch (e) {
-    tasksError.value = e.response?.data?.error || 'Erreur de suppression'
+  } catch (e: any) {
+    tasksError.value = e?.response?.data?.error || 'Erreur de suppression'
   }
 }
 </script>

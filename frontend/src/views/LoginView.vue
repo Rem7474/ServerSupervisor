@@ -89,7 +89,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, watch, nextTick, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
@@ -104,8 +104,8 @@ const error = ref('')
 const loading = ref(false)
 const needsMFA = ref(false)
 const totpCode = ref('')
-const usernameInput = ref(null)
-const totpInput = ref(null)
+const usernameInput = ref<HTMLInputElement | null>(null)
+const totpInput = ref<HTMLInputElement | null>(null)
 
 onMounted(() => {
   usernameInput.value?.focus()
@@ -118,7 +118,7 @@ watch(needsMFA, async (val) => {
   }
 })
 
-async function handleLogin() {
+async function handleLogin(): Promise<void> {
   loading.value = true
   error.value = ''
   try {
@@ -140,13 +140,13 @@ async function handleLogin() {
     } else {
       error.value = 'Réponse de connexion invalide.'
     }
-  } catch (e) {
+  } catch (e: any) {
     if (needsMFA.value) {
       totpCode.value = ''
       nextTick(() => totpInput.value?.focus())
-      error.value = e.response?.data?.error || 'Code invalide ou expiré — générez un nouveau code.'
+      error.value = e?.response?.data?.error || 'Code invalide ou expiré — générez un nouveau code.'
     } else {
-      error.value = e.response?.data?.error || 'Erreur de connexion'
+      error.value = e?.response?.data?.error || 'Erreur de connexion'
     }
   } finally {
     loading.value = false

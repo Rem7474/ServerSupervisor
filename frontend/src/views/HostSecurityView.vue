@@ -174,12 +174,23 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import apiClient from '../api'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import EmptyState from '../components/EmptyState.vue'
+
+interface FailedIP {
+  ip_address: string
+  fail_count: number
+}
+
+interface SecurityData {
+  stats: { total?: number; failures?: number; unique_ips?: number } | null
+  blocked_ips: string[]
+  top_failed_ips: FailedIP[]
+}
 
 const periodOptions = [
   { hours: 24, label: '24h' },
@@ -188,13 +199,13 @@ const periodOptions = [
 ]
 
 const dialog = useConfirmDialog()
-const security = ref({ stats: null, blocked_ips: [], top_failed_ips: [] })
+const security = ref<SecurityData>({ stats: null, blocked_ips: [], top_failed_ips: [] })
 const threatsLoading = ref(false)
 const unblockingIP = ref('')
 const threatsPeriod = ref(24)
 const periodLabel = computed(() => periodOptions.find(p => p.hours === threatsPeriod.value)?.label ?? '24h')
 
-async function loadSecurity() {
+async function loadSecurity(): Promise<void> {
   threatsLoading.value = true
   try {
     const res = await apiClient.getSecuritySummary(threatsPeriod.value)
@@ -206,12 +217,12 @@ async function loadSecurity() {
   }
 }
 
-function setThreatsPeriod(hours) {
+function setThreatsPeriod(hours: number): void {
   threatsPeriod.value = hours
   loadSecurity()
 }
 
-async function unblockIP(ip) {
+async function unblockIP(ip: string): Promise<void> {
   const confirmed = await dialog.confirm({
     title: 'Débloquer cette IP',
     message: `Retirer l'IP ${ip} de la liste noire ?`,
@@ -229,8 +240,8 @@ async function unblockIP(ip) {
   }
 }
 
-function progressWidth(failCount) {
-  const max = Math.max(...(security.value.top_failed_ips?.map(i => i.fail_count) || [1]))
+function progressWidth(failCount: number): number {
+  const max = Math.max(...(security.value.top_failed_ips?.map((i) => i.fail_count) || [1]))
   return max > 0 ? Math.round((failCount / max) * 100) : 0
 }
 

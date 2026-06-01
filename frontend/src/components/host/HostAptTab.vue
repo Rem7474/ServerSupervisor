@@ -57,7 +57,7 @@
             <div class="card-body text-center">
               <div
                 class="h2 mb-0"
-                :class="aptStatus.pending_packages > 0 ? 'text-yellow' : 'text-green'"
+                :class="(aptStatus.pending_packages ?? 0) > 0 ? 'text-yellow' : 'text-green'"
               >
                 {{ aptStatus.pending_packages }}
               </div>
@@ -104,7 +104,7 @@
         class="mt-3"
       >
         <CVEList
-          :cve-list="aptStatus.cve_list"
+          :cve-list="(aptStatus.cve_list as any)"
           :show-max-severity="true"
           :always-expanded="true"
         />
@@ -396,42 +396,68 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
 import dayjs from '../../utils/dayjs'
 import CVEList from '../apt/CVEList.vue'
 
-defineEmits(['run-apt-command', 'uu-install', 'uu-configure', 'uu-run-now', 'uu-log'])
+interface AptStatus {
+  last_upgrade?: string
+  pending_packages?: number
+  last_update?: string
+  cve_list?: string | unknown[]
+  [key: string]: unknown
+}
 
-const props = defineProps({
-  aptStatus: {
-    type: Object,
-    default: null,
-  },
-  canRunApt: {
-    type: Boolean,
-    default: false,
-  },
-  aptCmdLoading: {
-    type: String,
-    default: '',
-  },
-  uuStatus: {
-    type: Object,
-    default: null,
-  },
-  uuRuns: {
-    type: Array,
-    default: null,
-  },
-  uuForm: {
-    type: Object,
-    default: null,
-  },
-  uuLoading: {
-    type: String,
-    default: '',
-  },
+interface UUStatus {
+  last_run_at?: string
+  [key: string]: unknown
+}
+
+interface UURun {
+  run_at: string
+  packages?: string[]
+  had_error?: boolean
+  log_snippet?: string
+  [key: string]: unknown
+}
+
+interface UUConfig {
+  security_only?: boolean
+  remove_unused?: boolean
+  auto_reboot?: boolean
+  auto_reboot_time?: string
+}
+
+interface UUForm {
+  config: UUConfig
+  [key: string]: unknown
+}
+
+defineEmits<{
+  (e: 'run-apt-command', action: string): void
+  (e: 'uu-install'): void
+  (e: 'uu-configure', form: UUForm): void
+  (e: 'uu-run-now'): void
+  (e: 'uu-log', run: UURun): void
+}>()
+
+const props = withDefaults(defineProps<{
+  aptStatus?: AptStatus | null
+  canRunApt?: boolean
+  aptCmdLoading?: string
+  uuStatus?: UUStatus | null
+  uuRuns?: UURun[] | null
+  uuForm?: UUForm | null
+  uuLoading?: string
+}>(), {
+  aptStatus: null,
+  canRunApt: false,
+  aptCmdLoading: '',
+  uuStatus: null,
+  uuRuns: null,
+  uuForm: null,
+  uuLoading: '',
 })
 
 const lastUpgradeDate = computed(() => {
@@ -442,7 +468,7 @@ const lastUpgradeDate = computed(() => {
   return null
 })
 
-function formatDate(date) {
+function formatDate(date: string | null | undefined): string {
   if (!date || date === '0001-01-01T00:00:00Z') return 'Jamais'
   return dayjs.utc(date).local().fromNow()
 }

@@ -2,7 +2,7 @@ package handlers
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/serversupervisor/server/internal/models"
@@ -94,7 +94,7 @@ func (h *ReleaseTrackerHandler) NotifyComplete(commandID, status string) {
 				continue
 			}
 			if err := notifier.SendSMTP(h.cfg, h.cfg.SMTPFrom, to, subject, msg); err != nil {
-				log.Printf("Release tracker SMTP send: %v", err)
+				slog.ErrorContext(ctx, fmt.Sprintf("Release tracker SMTP send: %v", err))
 			}
 
 		case "ntfy":
@@ -103,7 +103,7 @@ func (h *ReleaseTrackerHandler) NotifyComplete(commandID, status string) {
 				continue
 			}
 			if err := notifier.SendNtfy(h.cfg, ntfyURL, subject, msg); err != nil {
-				log.Printf("Release tracker notify ntfy: %v", err)
+				slog.ErrorContext(ctx, fmt.Sprintf("Release tracker notify ntfy: %v", err))
 			}
 
 		case "browser":

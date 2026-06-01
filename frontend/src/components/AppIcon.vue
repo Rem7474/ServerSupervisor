@@ -19,16 +19,28 @@
   </svg>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
 
-const props = defineProps({
-  name: { type: String, required: true },
-  size: { type: [String, Number], default: 24 },
-  cssClass: { type: String, default: 'icon' },
+interface IconElement {
+  tag: string
+  attrs: Record<string, string>
+}
+
+interface IconDef {
+  elements: IconElement[]
+}
+
+const props = withDefaults(defineProps<{
+  name: string
+  size?: string | number
+  cssClass?: string
+}>(), {
+  size: 24,
+  cssClass: 'icon',
 })
 
-const ICONS = {
+const ICONS: Record<string, IconDef> = {
   brand: {
     elements: [
       { tag: 'path', attrs: { 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'stroke-width': '2', d: 'M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01' } },

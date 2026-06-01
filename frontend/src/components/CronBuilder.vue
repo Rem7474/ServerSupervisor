@@ -30,7 +30,7 @@
         class="form-control font-monospace"
         placeholder="0 3 * * 1"
         aria-describedby="cron-format-hint"
-        @input="$emit('update:modelValue', $event.target.value)"
+        @input="$emit('update:modelValue', ($event.target as HTMLInputElement).value)"
       >
       <div
         id="cron-format-hint"
@@ -51,7 +51,7 @@
             type="button"
             class="btn btn-sm"
             :class="frequency === f.key ? 'btn-primary' : 'btn-outline-secondary'"
-            @click="setFrequency(f.key)"
+            @click="setFrequency(f.key as 'daily' | 'weekly' | 'monthly' | 'custom')"
           >
             {{ f.label }}
           </button>
@@ -166,22 +166,23 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
 import { describeCron } from '../utils/cron'
 
-const props = defineProps({
-  modelValue: {
-    type: String,
-    default: ''
-  }
+const props = withDefaults(defineProps<{
+  modelValue?: string
+}>(), {
+  modelValue: '',
 })
 
-const emit = defineEmits(['update:modelValue'])
+const emit = defineEmits<{
+  (e: 'update:modelValue', value: string): void
+}>()
 
 const expertMode = ref(false)
-const frequency = ref('daily')
-const selectedDays = ref([1]) // monday by default
+const frequency = ref<'daily' | 'weekly' | 'monthly' | 'custom'>('daily')
+const selectedDays = ref<number[]>([1])
 const hour = ref(3)
 const minute = ref(0)
 const dayOfMonth = ref(1)
@@ -207,7 +208,7 @@ const minuteOptions = [0, 5, 10, 15, 20, 30, 45, 59]
 
 const preview = computed(() => describeCron(props.modelValue?.trim() ?? ''))
 
-function buildCron() {
+function buildCron(): void {
   const m = String(minute.value)
   const h = String(hour.value)
   let cron = ''
@@ -227,7 +228,7 @@ function buildCron() {
   emit('update:modelValue', cron)
 }
 
-function setFrequency(f) {
+function setFrequency(f: 'daily' | 'weekly' | 'monthly' | 'custom'): void {
   frequency.value = f
   if (f === 'weekly' && selectedDays.value.length === 0) {
     selectedDays.value = [1]
@@ -235,7 +236,7 @@ function setFrequency(f) {
   buildCron()
 }
 
-function toggleDay(d) {
+function toggleDay(d: number): void {
   const idx = selectedDays.value.indexOf(d)
   if (idx === -1) {
     selectedDays.value = [...selectedDays.value, d]
@@ -246,7 +247,7 @@ function toggleDay(d) {
 }
 
 // Parse incoming cron expression to populate the visual builder
-function parseCron(expr) {
+function parseCron(expr: string): void {
   if (!expr) return
   const presets = ['@daily', '@hourly', '@weekly', '@monthly', '@yearly']
   if (presets.includes(expr)) {
@@ -295,7 +296,7 @@ onMounted(() => {
   parseCron(props.modelValue)
 })
 
-watch(() => props.modelValue, (val) => {
+watch(() => props.modelValue, (_val) => {
   // Only re-parse when switching to visual from expert or on init
   // Don't re-parse on every emit to avoid infinite loop
 }, { immediate: false })

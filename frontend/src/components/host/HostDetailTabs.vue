@@ -21,44 +21,39 @@
   </ul>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
 
-const props = defineProps({
-  modelValue: {
-    type: String,
-    required: true,
-  },
-  canRunApt: {
-    type: Boolean,
-    default: false,
-  },
-  containersCount: {
-    type: Number,
-    default: 0,
-  },
-  pendingPackages: {
-    type: Number,
-    default: 0,
-  },
-  commandsCount: {
-    type: Number,
-    default: 0,
-  },
-  tasksCount: {
-    type: Number,
-    default: 0,
-  },
-  securityUpdates: {
-    type: Number,
-    default: 0,
-  },
+const props = withDefaults(defineProps<{
+  modelValue: string
+  canRunApt?: boolean
+  containersCount?: number
+  pendingPackages?: number
+  commandsCount?: number
+  tasksCount?: number
+  securityUpdates?: number
+}>(), {
+  canRunApt: false,
+  containersCount: 0,
+  pendingPackages: 0,
+  commandsCount: 0,
+  tasksCount: 0,
+  securityUpdates: 0,
 })
 
-defineEmits(['update:modelValue'])
+interface Tab {
+  key: string
+  label: string
+  badge?: number | null
+  badgeClass?: string
+}
 
-const visibleTabs = computed(() => {
-  const tabs = [
+defineEmits<{
+  (e: 'update:modelValue', value: string): void
+}>()
+
+const visibleTabs = computed<Tab[]>(() => {
+  const tabs: Tab[] = [
     { key: 'metrics', label: 'Métriques' },
     {
       key: 'docker',

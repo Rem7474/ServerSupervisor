@@ -381,7 +381,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import apiClient from '../api'
 import { formatDateTime } from '../utils/formatters'
@@ -391,7 +391,7 @@ const auth = useAuthStore()
 
 const mfaEnabled = ref(false)
 const setupVisible = ref(false)
-const setup = ref({ secret: '', qr_code: '', backup_codes: [] })
+const setup = ref<{ secret: string; qr_code: string; backup_codes: string[] }>({ secret: '', qr_code: '', backup_codes: [] })
 const verifyCode = ref('')
 const disablePassword = ref('')
 const showDisable = ref(false)
@@ -404,38 +404,37 @@ const copiedSecret = ref(false)
 // TOTP countdown
 const SETUP_TIMEOUT = 600
 const setupSecondsLeft = ref(0)
-let setupTimer = null
+let setupTimer: ReturnType<typeof setInterval> | undefined
 
 const setupProgressPct = computed(() =>
   Math.round((setupSecondsLeft.value / SETUP_TIMEOUT) * 100)
 )
 
-function formatCountdown(secs) {
+function formatCountdown(secs: number): string {
   const m = Math.floor(secs / 60)
   const s = secs % 60
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
-function startSetupTimer() {
-  clearInterval(setupTimer)
+function startSetupTimer(): void {
+  if (setupTimer) clearInterval(setupTimer)
   setupSecondsLeft.value = SETUP_TIMEOUT
   setupTimer = setInterval(() => {
     setupSecondsLeft.value = Math.max(0, setupSecondsLeft.value - 1)
     if (setupSecondsLeft.value === 0) {
-      clearInterval(setupTimer)
+      if (setupTimer) clearInterval(setupTimer)
       setupVisible.value = false
       error.value = 'Le délai de configuration a expiré. Veuillez cliquer sur "Activer MFA" pour recommencer.'
     }
   }, 1000)
 }
 
-function stopSetupTimer() {
-  clearInterval(setupTimer)
+function stopSetupTimer(): void {
+  if (setupTimer) clearInterval(setupTimer)
   setupSecondsLeft.value = 0
 }
 
-// Sessions
-const loginEvents = ref([])
+const loginEvents = ref<any[]>([])
 const sessionsLoading = ref(false)
 const revokeLoading = ref(false)
 const revokeError = ref('')
@@ -471,8 +470,8 @@ async function startSetup() {
     setup.value = res.data
     setupVisible.value = true
     startSetupTimer()
-  } catch (e) {
-    error.value = e.response?.data?.error || 'Erreur lors de la configuration MFA'
+  } catch (e: any) {
+    error.value = e?.response?.data?.error || 'Erreur lors de la configuration MFA'
   } finally {
     loading.value = false
   }
@@ -489,8 +488,8 @@ async function verifySetup() {
     verifyCode.value = ''
     stopSetupTimer()
     await loadStatus()
-  } catch (e) {
-    error.value = e.response?.data?.error || 'Code invalide'
+  } catch (e: any) {
+    error.value = e?.response?.data?.error || 'Code invalide'
   } finally {
     loading.value = false
   }
@@ -506,8 +505,8 @@ async function disableMFA() {
     showDisable.value = false
     disablePassword.value = ''
     await loadStatus()
-  } catch (e) {
-    error.value = e.response?.data?.error || 'Erreur lors de la désactivation'
+  } catch (e: any) {
+    error.value = e?.response?.data?.error || 'Erreur lors de la désactivation'
   } finally {
     loading.value = false
   }
@@ -522,8 +521,8 @@ async function revokeOtherSessions() {
     await apiClient.revokeAllSessions()
     revokeSuccess.value = 'Toutes les autres sessions ont été révoquées.'
     await loadLoginEvents()
-  } catch (e) {
-    revokeError.value = e.response?.data?.error || 'Erreur lors de la révocation des sessions.'
+  } catch (e: any) {
+    revokeError.value = e?.response?.data?.error || 'Erreur lors de la révocation des sessions.'
   } finally {
     revokeLoading.value = false
   }
@@ -542,7 +541,7 @@ async function copyBackupCodes() {
   setTimeout(() => { copiedBackup.value = false }, 1500)
 }
 
-function parseUA(ua) {
+function parseUA(ua: string | undefined): { browser: string; os: string } {
   if (!ua) return { browser: '—', os: '—' }
   const browser = ua.includes('Firefox/') ? 'Firefox'
     : ua.includes('Edg/') ? 'Edge'

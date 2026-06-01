@@ -44,7 +44,7 @@
     </div>
 
     <HostSystemdPanel
-      :host-id="hostId"
+      :host-id="String(hostId)"
       :can-run="canRunApt"
       @open-console="$emit('open-command', $event)"
       @history-changed="$emit('history-changed')"
@@ -52,37 +52,36 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref } from 'vue'
 import apiClient from '../../api'
 import HostSystemdPanel from './HostSystemdPanel.vue'
 
-const emit = defineEmits(['open-command', 'history-changed'])
+const emit = defineEmits<{
+  (e: 'open-command', payload: Record<string, unknown>): void
+  (e: 'history-changed'): void
+}>()
 
-const props = defineProps({
-  hostId: {
-    type: [String, Number],
-    required: true,
-  },
-  canRunApt: {
-    type: Boolean,
-    default: false,
-  },
+const props = withDefaults(defineProps<{
+  hostId: string | number
+  canRunApt?: boolean
+}>(), {
+  canRunApt: false,
 })
 
 const journalService = ref('')
 const journalLoading = ref(false)
 const journalError = ref('')
-const journalCmdId = ref(null)
+const journalCmdId = ref<string | number | null>(null)
 
-async function loadJournalLogs() {
+async function loadJournalLogs(): Promise<void> {
   const svc = journalService.value.trim()
   if (!svc) return
   journalLoading.value = true
   journalError.value = ''
   journalCmdId.value = null
   try {
-    const res = await apiClient.sendJournalCommand(props.hostId, svc)
+    const res = await apiClient.sendJournalCommand(String(props.hostId), svc)
     const cmdId = res.data.command_id
     journalCmdId.value = cmdId
     emit('open-command', {
@@ -96,8 +95,8 @@ async function loadJournalLogs() {
       output: '',
     })
     emit('history-changed')
-  } catch (e) {
-    journalError.value = e.response?.data?.error || "Impossible d'envoyer la commande"
+  } catch (e: any) {
+    journalError.value = e?.response?.data?.error || "Impossible d'envoyer la commande"
   } finally {
     journalLoading.value = false
   }

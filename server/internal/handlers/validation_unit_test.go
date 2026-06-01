@@ -63,13 +63,13 @@ func TestShouldResolveDockerTag(t *testing.T) {
 
 func TestParseVMID(t *testing.T) {
 	cases := map[string]int{
-		"100":  100,
-		"1":    1,
-		"0":    0,  // not positive
-		"-5":   0,  // negative
-		"abc":  0,  // non-numeric
-		"":     0,  // empty
-		"12x":  0,  // trailing garbage
+		"100": 100,
+		"1":   1,
+		"0":   0, // not positive
+		"-5":  0, // negative
+		"abc": 0, // non-numeric
+		"":    0, // empty
+		"12x": 0, // trailing garbage
 	}
 	for in, want := range cases {
 		if got := parseVMID(in); got != want {
