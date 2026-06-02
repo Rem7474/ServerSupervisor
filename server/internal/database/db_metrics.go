@@ -346,50 +346,91 @@ func (db *DB) GetMetricsAggregatesByType(ctx context.Context, hostID string, hou
 	return metrics, nil
 }
 
+// GetMetricsSummary returns the global CPU/RAM history used by the dashboard chart.
+// Short ranges scan raw system_metrics; longer ranges read the pre-aggregated
+// metrics_aggregates table (populated by the metrics-downsample job) to avoid
+// scanning millions of raw rows on every dashboard load. When aggregates are not
+// yet populated (e.g. fresh install before the first downsample pass) it falls
+// back to the raw query so the chart is never empty.
 func (db *DB) GetMetricsSummary(ctx context.Context, hours int, bucketMinutes int) ([]models.SystemMetricsSummary, error) {
 	if bucketMinutes <= 0 {
 		bucketMinutes = 5
 	}
 
-	var (
-		rows *sql.Rows
-		err  error
-	)
-
-	if db.hasTimescaleDB {
-		rows, err = db.conn.QueryContext(ctx, 
-			`SELECT
-				time_bucket($2 * '1 minute'::interval, timestamp) AS ts,
-				AVG(cpu_usage_percent) AS cpu_avg,
-				AVG(memory_percent) AS mem_avg,
-				COUNT(*) AS sample_count
-			 FROM system_metrics
-			 WHERE timestamp > NOW() - INTERVAL '1 hour' * $1
-			 GROUP BY ts
-			 ORDER BY ts ASC`,
-			hours, bucketMinutes,
-		)
-	} else {
-		rows, err = db.conn.QueryContext(ctx, 
-			`SELECT
-				to_timestamp(
-					floor(EXTRACT(EPOCH FROM timestamp) / ($2 * 60)) * ($2 * 60)
-				) AS ts,
-				AVG(cpu_usage_percent) AS cpu_avg,
-				AVG(memory_percent) AS mem_avg,
-				COUNT(*) AS sample_count
-			 FROM system_metrics
-			 WHERE timestamp > NOW() - INTERVAL '1 hour' * $1
-			 GROUP BY ts
-			 ORDER BY ts ASC`,
-			hours, bucketMinutes,
-		)
+	switch {
+	case hours > 168: // > 7 days → daily/hourly aggregates
+		if summary, err := db.metricsSummaryFromAggregates(ctx, hours, bucketMinutes, "hour"); err == nil && len(summary) > 0 {
+			return summary, nil
+		}
+	case hours > 24: // 1–7 days → 5-minute aggregates
+		if summary, err := db.metricsSummaryFromAggregates(ctx, hours, bucketMinutes, "5min"); err == nil && len(summary) > 0 {
+			return summary, nil
+		}
 	}
+
+	return db.metricsSummaryFromRaw(ctx, hours, bucketMinutes)
+}
+
+// metricsSummaryFromRaw aggregates the raw system_metrics table into time buckets.
+func (db *DB) metricsSummaryFromRaw(ctx context.Context, hours int, bucketMinutes int) ([]models.SystemMetricsSummary, error) {
+	var bucketExpr string
+	if db.hasTimescaleDB {
+		bucketExpr = `time_bucket($2 * '1 minute'::interval, timestamp)`
+	} else {
+		bucketExpr = `to_timestamp(floor(EXTRACT(EPOCH FROM timestamp) / ($2 * 60)) * ($2 * 60))`
+	}
+
+	rows, err := db.conn.QueryContext(ctx,
+		`SELECT `+bucketExpr+` AS ts,
+			AVG(cpu_usage_percent) AS cpu_avg,
+			AVG(memory_percent) AS mem_avg,
+			COUNT(*) AS sample_count
+		 FROM system_metrics
+		 WHERE timestamp > NOW() - INTERVAL '1 hour' * $1
+		 GROUP BY ts
+		 ORDER BY ts ASC`,
+		hours, bucketMinutes,
+	)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = rows.Close() }()
 
+	return scanMetricsSummary(rows)
+}
+
+// metricsSummaryFromAggregates re-buckets pre-aggregated rows of a given
+// aggregation_type ("5min" / "hour" / "day") into the requested bucket size and
+// averages across hosts.
+func (db *DB) metricsSummaryFromAggregates(ctx context.Context, hours int, bucketMinutes int, aggType string) ([]models.SystemMetricsSummary, error) {
+	var bucketExpr string
+	if db.hasTimescaleDB {
+		bucketExpr = `time_bucket($3 * '1 minute'::interval, timestamp)`
+	} else {
+		bucketExpr = `to_timestamp(floor(EXTRACT(EPOCH FROM timestamp) / ($3 * 60)) * ($3 * 60))`
+	}
+
+	rows, err := db.conn.QueryContext(ctx,
+		`SELECT `+bucketExpr+` AS ts,
+			AVG(cpu_usage_avg) AS cpu_avg,
+			AVG(memory_percent_avg) AS mem_avg,
+			SUM(sample_count) AS sample_count
+		 FROM metrics_aggregates
+		 WHERE aggregation_type = $1
+		   AND timestamp > NOW() - INTERVAL '1 hour' * $2
+		 GROUP BY ts
+		 ORDER BY ts ASC`,
+		aggType, hours, bucketMinutes,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	return scanMetricsSummary(rows)
+}
+
+func scanMetricsSummary(rows *sql.Rows) ([]models.SystemMetricsSummary, error) {
 	var summary []models.SystemMetricsSummary
 	for rows.Next() {
 		var s models.SystemMetricsSummary
@@ -398,7 +439,7 @@ func (db *DB) GetMetricsSummary(ctx context.Context, hours int, bucketMinutes in
 		}
 		summary = append(summary, s)
 	}
-	return summary, nil
+	return summary, rows.Err()
 }
 
 func (db *DB) CleanOldMetrics(ctx context.Context, retentionDays int) (int64, error) {

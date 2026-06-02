@@ -2,6 +2,8 @@ package ws
 
 import (
 	"context"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"github.com/serversupervisor/server/internal/models"
@@ -9,9 +11,45 @@ import (
 )
 
 func (h *WSHandler) sendDashboardSnapshot(ctx context.Context, conn *websocket.Conn, lastHash *string) error {
-	hosts, err := h.db.GetAllHosts(ctx)
+	payload, err := h.dashboardPayload(ctx)
 	if err != nil {
 		return err
+	}
+	if !snapshotChanged(payload, lastHash) {
+		return nil
+	}
+	return safeWriteJSON(conn, payload)
+}
+
+// dashboardPayload returns the shared dashboard snapshot, rebuilding it only when
+// the cached copy is older than dashboardCacheTTL. The build runs without holding
+// the lock so a slow DB doesn't serialize all clients; a brief concurrent
+// double-build during a cache miss is harmless (both produce the same result).
+func (h *WSHandler) dashboardPayload(ctx context.Context) (gin.H, error) {
+	h.dashCacheMu.Lock()
+	if h.dashCache != nil && time.Since(h.dashCacheAt) < dashboardCacheTTL {
+		cached := h.dashCache
+		h.dashCacheMu.Unlock()
+		return cached, nil
+	}
+	h.dashCacheMu.Unlock()
+
+	payload, err := h.buildDashboardPayload(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	h.dashCacheMu.Lock()
+	h.dashCache = payload
+	h.dashCacheAt = time.Now()
+	h.dashCacheMu.Unlock()
+	return payload, nil
+}
+
+func (h *WSHandler) buildDashboardPayload(ctx context.Context) (gin.H, error) {
+	hosts, err := h.db.GetAllHosts(ctx)
+	if err != nil {
+		return nil, err
 	}
 
 	hostMetrics, _ := h.db.GetLatestMetricsAll(ctx)
@@ -55,10 +93,7 @@ func (h *WSHandler) sendDashboardSnapshot(ctx context.Context, conn *websocket.C
 		"proxmox_nodes":       proxmoxNodes,
 		"proxmox_links":       proxmoxLinks,
 	}
-	if !snapshotChanged(payload, lastHash) {
-		return nil
-	}
-	return safeWriteJSON(conn, payload)
+	return payload, nil
 }
 
 func (h *WSHandler) sendHostSnapshot(ctx context.Context, conn *websocket.Conn, hostID string, lastHash *string) error {
