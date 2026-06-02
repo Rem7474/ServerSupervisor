@@ -3,6 +3,8 @@ node_modules/
 frontend/node_modules/
 frontend/dist/
 agent/build/
+agent/bin/
+server/bin/
 *.exe
 *.log
 postgres_data/
@@ -10,7 +12,12 @@ postgres_data/
 Thumbs.db
 agent/agent
 agent/agent.exe
+agent/test.exe
 server/server
+server/server.exe
+server/main
+server/main.exe
+server/test.exe
 
 # Frontend test artifacts (Vitest browser / Playwright)
 frontend/**/__screenshots__/
@@ -18,3 +25,8 @@ frontend/.vitest-attachments/
 frontend/test-results/
 frontend/playwright-report/
 frontend/.vitest-reports/
+
+# ESLint artifacts
+frontend/.eslint-global.json
+frontend/.eslint-tmp.json
+frontend/.eslint-scope.json
