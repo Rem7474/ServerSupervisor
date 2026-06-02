@@ -1,7 +1,11 @@
 services:
   # PostgreSQL Database
   postgres:
-    image: postgres:16-alpine
+    # TimescaleDB image (Alpine flavor, PostgreSQL 16) — drop-in replacement for
+    # postgres:16-alpine. Same PG major version, so the existing data volume is
+    # compatible. The entrypoint sets shared_preload_libraries=timescaledb
+    # automatically; migration 010 then runs CREATE EXTENSION + create_hypertable.
+    image: timescale/timescaledb:latest-pg16
     restart: unless-stopped
     environment:
       POSTGRES_USER: supervisor
