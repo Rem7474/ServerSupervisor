@@ -10,7 +10,25 @@ import { translateError } from '../utils/translateError'
 import { formatRelativeTime } from './useDateFormatter'
 import dayjs from '../utils/dayjs'
 
-type AnyRecord = Record<string, any>
+interface DashboardCveSummary {
+  critical_count?: number
+  high_count?: number
+  hosts_with_critical?: number
+  hosts_with_high?: number
+}
+
+interface DashboardProxmoxNode {
+  id: string
+  node_name: string
+  status: string
+  cluster_name?: string
+  cpu_usage?: number
+  cpu_count?: number
+  mem_used?: number
+  mem_total?: number
+  vm_count?: number
+  lxc_count?: number
+}
 type SortDirection = 'asc' | 'desc'
 type HostStatus = 'online' | 'warning' | 'offline'
 
@@ -63,7 +81,7 @@ interface DashboardWebSocketPayload {
   apt_pending?: number
   apt_pending_hosts?: Record<string, number>
   disk_usage?: Record<string, number>
-  proxmox_nodes?: AnyRecord[]
+  proxmox_nodes?: DashboardProxmoxNode[]
   proxmox_links?: DashboardProxmoxLinkRecord[]
 }
 
@@ -236,10 +254,10 @@ export function useDashboard() {
   } = storeToRefs(dashboardStore)
 
   const latestAgentVersion = ref('')
-  const cveSummary = ref<AnyRecord | null>(null)
+  const cveSummary = ref<DashboardCveSummary | null>(null)
   const cveLastUpdated = ref<Date | null>(null)
   const cveTimestampText = computed(() => formatRelativeTime(cveLastUpdated.value, 'Jamais mis à jour', true))
-  const proxmoxNodes = ref<AnyRecord[]>([])
+  const proxmoxNodes = ref<DashboardProxmoxNode[]>([])
   const proxmoxLinks = ref<DashboardProxmoxLinkRecord[]>([])
 
   const hostMetrics = ref<Record<string, DashboardAgentMetric>>({})

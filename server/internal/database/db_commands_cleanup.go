@@ -8,7 +8,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log"
+	"log/slog"
 	"strings"
 
 	"github.com/lib/pq"
@@ -51,14 +51,14 @@ func (db *DB) CleanupStalledCommands(ctx context.Context, timeoutMinutes int) er
 		return err
 	}
 	if count > 0 {
-		log.Printf("Cleaned up %d stalled remote commands", count)
+		slog.InfoContext(ctx, "Cleaned up stalled remote commands", slog.Int("count", count))
 		if len(auditIDs) > 0 {
 			if _, err := db.conn.ExecContext(ctx, `
 				UPDATE audit_logs SET status = 'failed',
 				    details = 'Command timed out - agent may have crashed or restarted'
 				WHERE id = ANY($1)`,
 				pq.Array(auditIDs)); err != nil {
-				log.Printf("Warning: failed to update %d audit logs during cleanup: %v", len(auditIDs), err)
+				slog.WarnContext(ctx, "failed to update audit logs during cleanup", slog.Int("count", len(auditIDs)), slog.Any("err", err))
 			}
 		}
 		if len(taskIDs) > 0 {
@@ -66,7 +66,7 @@ func (db *DB) CleanupStalledCommands(ctx context.Context, timeoutMinutes int) er
 				UPDATE scheduled_tasks SET last_run_status = 'failed', last_run_at = NOW()
 				WHERE id = ANY($1)`,
 				pq.Array(taskIDs)); err != nil {
-				log.Printf("Warning: failed to update %d scheduled tasks during cleanup: %v", len(taskIDs), err)
+				slog.WarnContext(ctx, "failed to update scheduled tasks during cleanup", slog.Int("count", len(taskIDs)), slog.Any("err", err))
 			}
 		}
 	}
@@ -111,14 +111,14 @@ func (db *DB) FailRunningCommandsOnAgentReconnect(ctx context.Context, hostID st
 	}
 	if count > 0 {
 		safeHostID := strings.ReplaceAll(strings.ReplaceAll(hostID, "\n", ""), "\r", "")
-		log.Printf("Agent reconnect: failed %d interrupted running commands for host %s", count, safeHostID)
+		slog.InfoContext(ctx, "Agent reconnect: failed interrupted running commands", slog.Int("count", count), slog.String("host", safeHostID))
 		if len(auditIDs) > 0 {
 			if _, err := db.conn.ExecContext(ctx, `
 				UPDATE audit_logs SET status = 'failed',
 				    details = 'Agent restarted — command was interrupted'
 				WHERE id = ANY($1)`,
 				pq.Array(auditIDs)); err != nil {
-				log.Printf("Warning: failed to update audit logs on reconnect for host %s: %v", safeHostID, err)
+				slog.WarnContext(ctx, "failed to update audit logs on reconnect", slog.String("host", safeHostID), slog.Any("err", err))
 			}
 		}
 		if len(taskIDs) > 0 {
@@ -126,7 +126,7 @@ func (db *DB) FailRunningCommandsOnAgentReconnect(ctx context.Context, hostID st
 				UPDATE scheduled_tasks SET last_run_status = 'failed', last_run_at = NOW()
 				WHERE id = ANY($1)`,
 				pq.Array(taskIDs)); err != nil {
-				log.Printf("Warning: failed to update scheduled tasks on reconnect for host %s: %v", safeHostID, err)
+				slog.WarnContext(ctx, "failed to update scheduled tasks on reconnect", slog.String("host", safeHostID), slog.Any("err", err))
 			}
 		}
 	}
@@ -172,14 +172,14 @@ func (db *DB) CleanupHostStalledCommands(ctx context.Context, hostID string, tim
 	if count > 0 {
 		safeHostID := strings.ReplaceAll(hostID, "\n", "")
 		safeHostID = strings.ReplaceAll(safeHostID, "\r", "")
-		log.Printf("Cleaned up %d stalled commands for host %s", count, safeHostID)
+		slog.InfoContext(ctx, "Cleaned up stalled commands for host", slog.Int("count", count), slog.String("host", safeHostID))
 		if len(auditIDs) > 0 {
 			if _, err := db.conn.ExecContext(ctx, `
 				UPDATE audit_logs SET status = 'failed',
 				    details = 'Command timed out - agent may have crashed or restarted'
 				WHERE id = ANY($1)`,
 				pq.Array(auditIDs)); err != nil {
-				log.Printf("Warning: failed to update %d audit logs for host %s during cleanup: %v", len(auditIDs), safeHostID, err)
+				slog.WarnContext(ctx, "failed to update audit logs for host during cleanup", slog.Int("count", len(auditIDs)), slog.String("host", safeHostID), slog.Any("err", err))
 			}
 		}
 		if len(taskIDs) > 0 {
@@ -187,7 +187,7 @@ func (db *DB) CleanupHostStalledCommands(ctx context.Context, hostID string, tim
 				UPDATE scheduled_tasks SET last_run_status = 'failed', last_run_at = NOW()
 				WHERE id = ANY($1)`,
 				pq.Array(taskIDs)); err != nil {
-				log.Printf("Warning: failed to update %d scheduled tasks for host %s during cleanup: %v", len(taskIDs), safeHostID, err)
+				slog.WarnContext(ctx, "failed to update scheduled tasks for host during cleanup", slog.Int("count", len(taskIDs)), slog.String("host", safeHostID), slog.Any("err", err))
 			}
 		}
 	}

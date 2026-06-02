@@ -6,7 +6,7 @@ import (
 	"embed"
 	"fmt"
 	"io/fs"
-	"log"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -54,7 +54,7 @@ func EnsureDatabaseExists(cfg *config.Config) error {
 		}
 	}
 
-	log.Printf("Database %s is ready", cfg.DBName)
+	slog.Info("Database is ready", slog.String("db", cfg.DBName))
 	return nil
 }
 
@@ -90,9 +90,9 @@ func New(cfg *config.Config) (*DB, error) {
 	_ = conn.QueryRow(`SELECT EXISTS(SELECT 1 FROM pg_extension WHERE extname = 'timescaledb')`).Scan(&hasTS)
 	db.hasTimescaleDB = hasTS
 	if hasTS {
-		log.Println("TimescaleDB extension detected - using time_bucket() for metric bucketing")
+		slog.Info("TimescaleDB extension detected - using time_bucket() for metric bucketing")
 	} else {
-		log.Println("TimescaleDB not found - using plain PostgreSQL bucketing")
+		slog.Info("TimescaleDB not found - using plain PostgreSQL bucketing")
 	}
 
 	return db, nil
@@ -166,7 +166,7 @@ WHERE table_schema = 'public' AND table_name = 'hosts'
 				}
 				applied[e.Name()] = struct{}{}
 			}
-			log.Printf("schema_migrations bootstrapped: %d existing migrations marked as applied", len(applied))
+			slog.Info("schema_migrations bootstrapped", slog.Int("existing_migrations", len(applied)))
 		}
 	}
 
@@ -195,7 +195,7 @@ WHERE table_schema = 'public' AND table_name = 'hosts'
 				if _, err := db.conn.ExecContext(context.Background(), `INSERT INTO schema_migrations (filename) VALUES ($1) ON CONFLICT DO NOTHING`, e.Name()); err != nil {
 					return fmt.Errorf("record migration %s: %w", e.Name(), err)
 				}
-				log.Printf("Migration skipped on existing schema: %s", e.Name())
+				slog.Info("Migration skipped on existing schema", slog.String("file", e.Name()))
 				continue
 			}
 
@@ -229,10 +229,10 @@ WHERE table_schema = 'public' AND table_name = 'hosts'
 		if _, err := db.conn.Exec(`INSERT INTO schema_migrations (filename) VALUES ($1)`, e.Name()); err != nil {
 			return fmt.Errorf("record migration %s: %w", e.Name(), err)
 		}
-		log.Printf("Migration applied: %s", e.Name())
+		slog.Info("Migration applied", slog.String("file", e.Name()))
 	}
 
-	log.Println("Database migrations completed")
+	slog.Info("Database migrations completed")
 	return nil
 }
 

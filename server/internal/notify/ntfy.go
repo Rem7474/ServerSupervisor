@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -37,7 +37,7 @@ func (n *notifier) SendNtfy(cfg *config.Config, url, title, msg string) error {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Printf("notify: ntfy failed: %v", err)
+		slog.Error("notify: ntfy failed", slog.Any("err", err))
 		return err
 	}
 	defer func() { _ = resp.Body.Close() }()

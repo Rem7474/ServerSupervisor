@@ -3,7 +3,7 @@ package database
 import (
 	"context"
 	"database/sql"
-	"log"
+	"log/slog"
 
 	"github.com/serversupervisor/server/internal/models"
 )
@@ -72,7 +72,7 @@ func (db *DB) GetLatestMetrics(ctx context.Context, hostID string) (*models.Syst
 		 FROM disk_info WHERE metrics_id = $1`, m.ID,
 	)
 	if err != nil {
-		log.Printf("Warning: failed to fetch disk_info for metrics %d (host %s): %v", m.ID, m.HostID, err)
+		slog.WarnContext(ctx, "failed to fetch disk_info for metrics", slog.Int64("metrics_id", m.ID), slog.String("host", m.HostID), slog.Any("err", err))
 		return &m, nil
 	}
 	defer func() { _ = rows.Close() }()

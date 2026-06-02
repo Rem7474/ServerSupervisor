@@ -10,21 +10,32 @@ interface ExecutionPayload {
   branch?: string
   tag_name?: string
   release_name?: string
+  release_url?: string
   command_id?: string
   host_name?: string
   host_id?: string
-  [key: string]: any
+  status?: string
+  version?: string
 }
 
 interface GitWebhook {
   id: string
   name: string
+  provider: string
   enabled: boolean
   secret?: string
   repo_filter?: string
   branch_filter?: string
+  event_filter?: string
+  host_id?: string
+  host_name?: string
+  custom_task_id?: string
+  notify_channels?: string[]
+  notify_on_success?: boolean
+  notify_on_failure?: boolean
   last_execution?: ExecutionPayload
-  [key: string]: any
+  last_triggered_at?: string
+  created_at?: string
 }
 
 interface ReleaseTracker {
@@ -34,17 +45,30 @@ interface ReleaseTracker {
   cooldown_hours?: number
   last_release_detected_at?: string
   last_triggered_at?: string
+  last_checked_at?: string
+  last_error?: string
   provider: string
   repo_owner: string
   repo_name: string
   last_release_tag?: string
   last_execution?: ExecutionPayload
-  [key: string]: any
+  tracker_type?: string
+  docker_image?: string
+  docker_tag?: string
+  host_id?: string
+  host_name?: string
+  custom_task_id?: string
+  update_action?: string
+  compose_project?: string
+  compose_service?: string
+  notify_channels?: string[]
+  created_at?: string
 }
 
 interface Host {
   id: string
-  [key: string]: any
+  name?: string
+  hostname?: string
 }
 
 interface RecentExecution extends ExecutionPayload {

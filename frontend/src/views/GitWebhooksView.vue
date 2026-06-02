@@ -260,7 +260,7 @@
                   <span class="text-muted">Dernière exécution :</span>
                   <span
                     class="ms-1 badge"
-                    :class="execStatusBadge(webhook.last_execution.status)"
+                    :class="execStatusBadge(webhook.last_execution.status || '')"
                   >{{ webhook.last_execution.status }}</span>
                   <span class="ms-1 text-muted">{{ formatRelative(webhook.last_execution.triggered_at || '') }}</span>
                 </div>
@@ -520,7 +520,7 @@
                     <span class="text-muted">Dernière exécution :</span>
                     <span
                       class="ms-1 badge"
-                      :class="execStatusBadge(tracker.last_execution.status)"
+                      :class="execStatusBadge(tracker.last_execution.status || '')"
                     >{{ tracker.last_execution.status }}</span>
                     <span class="ms-1 text-muted">{{ formatRelative(tracker.last_execution.triggered_at || '') }}</span>
                   </template>

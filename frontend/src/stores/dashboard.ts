@@ -10,16 +10,20 @@ interface HostSummary {
   status?: string
   last_seen?: string | number | Date | null
   agent_version?: string
-  [key: string]: any
 }
 
 interface VersionComparison {
   docker_image?: string
   host_id?: string
+  hostname?: string
+  container_count?: number
+  custom_task_id?: string
+  tracker_id?: string
   is_up_to_date?: boolean
   running_version?: string
+  latest_version?: string
+  release_url?: string
   update_confirmed?: boolean
-  [key: string]: any
 }
 
 interface ProxmoxSummary {
@@ -33,7 +37,6 @@ interface ProxmoxSummary {
   recent_failed_tasks?: number
   storage_near_full?: number
   storage_offline?: number
-  [key: string]: any
 }
 
 export const useDashboardStore = defineStore('dashboard', () => {

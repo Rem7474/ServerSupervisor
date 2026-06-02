@@ -3,7 +3,7 @@ package notify
 import (
 	"crypto/tls"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/smtp"
 	"strings"
 
@@ -34,7 +34,7 @@ func isHTMLContent(body string) bool {
 
 func (n *notifier) SendSMTP(cfg *config.Config, from, to, subject, body string) error {
 	if cfg.SMTPHost == "" || cfg.SMTPPort == 0 {
-		log.Printf("notify: SMTP host/port not configured")
+		slog.Error("notify: SMTP host/port not configured")
 		return fmt.Errorf("SMTP not configured")
 	}
 
@@ -62,34 +62,34 @@ func (n *notifier) SendSMTP(cfg *config.Config, from, to, subject, body string) 
 	auth := smtp.PlainAuth("", cfg.SMTPUser, cfg.SMTPPass, cfg.SMTPHost)
 	c, err := smtp.Dial(addr)
 	if err != nil {
-		log.Printf("notify: SMTP dial failed: %v", err)
+		slog.Error("notify: SMTP dial failed", slog.Any("err", err))
 		return err
 	}
 	defer func() { _ = c.Close() }()
 
 	if cfg.SMTPTLS {
 		if err := c.StartTLS(&tls.Config{ServerName: cfg.SMTPHost}); err != nil {
-			log.Printf("notify: SMTP StartTLS failed: %v", err)
+			slog.Error("notify: SMTP StartTLS failed", slog.Any("err", err))
 			return err
 		}
 	}
 	if cfg.SMTPUser != "" {
 		if err := c.Auth(auth); err != nil {
-			log.Printf("notify: SMTP auth failed: %v", err)
+			slog.Error("notify: SMTP auth failed", slog.Any("err", err))
 			return err
 		}
 	}
 	if err := c.Mail(from); err != nil {
-		log.Printf("notify: SMTP MAIL FROM failed: %v", err)
+		slog.Error("notify: SMTP MAIL FROM failed", slog.Any("err", err))
 		return err
 	}
 	if err := c.Rcpt(to); err != nil {
-		log.Printf("notify: SMTP RCPT TO failed: %v", err)
+		slog.Error("notify: SMTP RCPT TO failed", slog.Any("err", err))
 		return err
 	}
 	w, err := c.Data()
 	if err != nil {
-		log.Printf("notify: SMTP DATA failed: %v", err)
+		slog.Error("notify: SMTP DATA failed", slog.Any("err", err))
 		return err
 	}
 	_, _ = w.Write([]byte(msg))

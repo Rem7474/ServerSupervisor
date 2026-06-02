@@ -4,7 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -110,7 +110,7 @@ func isAllowedOrigin(origin string, baseURL string, extraOrigins []string) bool 
 
 	parsedOrigin, err := url.Parse(origin)
 	if err != nil {
-		log.Printf("[WS] rejected origin (parse error): %q", origin)
+		slog.Warn("[WS] rejected origin (parse error)", slog.String("origin", origin))
 		return false
 	}
 
@@ -125,7 +125,7 @@ func isAllowedOrigin(origin string, baseURL string, extraOrigins []string) bool 
 			return true
 		}
 		if parsedOrigin.Host == parsedBase.Host {
-			log.Printf("[WS] allowed origin with scheme mismatch: origin=%q base=%q (update BASE_URL scheme if needed)", origin, baseURL)
+			slog.Warn("[WS] allowed origin with scheme mismatch (update BASE_URL scheme if needed)", slog.String("origin", origin), slog.String("base_url", baseURL))
 			return true
 		}
 	}
@@ -143,12 +143,12 @@ func isAllowedOrigin(origin string, baseURL string, extraOrigins []string) bool 
 			return true
 		}
 		if parsedOrigin.Host == parsedAllowed.Host {
-			log.Printf("[WS] allowed origin with scheme mismatch: origin=%q allowed=%q", origin, allowed)
+			slog.Warn("[WS] allowed origin with scheme mismatch", slog.String("origin", origin), slog.String("allowed", allowed))
 			return true
 		}
 	}
 
-	log.Printf("[WS] rejected origin: %q (BASE_URL=%q) - set BASE_URL or ALLOWED_ORIGINS correctly", origin, baseURL)
+	slog.Warn("[WS] rejected origin (set BASE_URL or ALLOWED_ORIGINS correctly)", slog.String("origin", origin), slog.String("base_url", baseURL))
 	return false
 }
 

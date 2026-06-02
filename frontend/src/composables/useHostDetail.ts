@@ -7,6 +7,12 @@ import { useConfirmDialog } from './useConfirmDialog'
 import { useWebSocket } from './useWebSocket'
 import { useAuthStore } from '../stores/auth'
 
+// AnyRecord is the raw shape of an untyped JSON payload received over WebSocket
+// or HTTP. The composable keeps it loose because the consuming components
+// (HostDockerTab, HostAptTab, HostCommandsTab, …) narrow via their own typed
+// props (Container, VersionComparison, Command, UURun, UUForm) — bridged with
+// `as any` casts at template boundaries. Tightening here would require
+// matching every downstream prop shape; that's a follow-up refactor.
 type AnyRecord = Record<string, any>
 
 function asString(value: unknown, fallback = ''): string {
