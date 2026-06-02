@@ -234,7 +234,7 @@ onUnmounted(() => {
   background: var(--tblr-bg-surface);
   border: 1px solid var(--tblr-border-color);
   border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+  box-shadow: var(--ss-shadow-dropdown);
 }
 
 .notification-bell-btn {

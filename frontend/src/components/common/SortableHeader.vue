@@ -32,6 +32,6 @@ const indicator = computed(() => {
 }
 
 .ui-sortable-header:hover {
-  color: #2f6dd5;
+  color: var(--tblr-primary);
 }
 </style>

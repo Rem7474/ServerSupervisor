@@ -175,7 +175,7 @@ withDefaults(defineProps<Props>(), {
   padding: 1rem;
   border-radius: 0.5rem;
   background: linear-gradient(120deg, rgba(148, 163, 184, 0.12), rgba(148, 163, 184, 0.04));
-  border: 1px solid rgba(148, 163, 184, 0.2);
+  border: 1px solid var(--ss-border-default);
 }
 
 .loading-skeleton-card {
@@ -376,8 +376,8 @@ withDefaults(defineProps<Props>(), {
   position: absolute;
   inset: 28px;
   border-radius: 50%;
-  background: rgba(15, 23, 42, 0.5);
-  border: 1px solid rgba(148, 163, 184, 0.14);
+  background: var(--ss-panel-medium);
+  border: 1px solid var(--ss-border-soft);
 }
 
 .loading-skeleton-donut-legend {

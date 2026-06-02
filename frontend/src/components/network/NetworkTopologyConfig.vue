@@ -803,8 +803,8 @@ function removeServiceRow(serviceId: string): void {
 
 .network-config {
   padding: 16px 18px 24px;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
-  background: rgba(15, 23, 42, 0.45);
+  border-bottom: 1px solid var(--ss-border-default);
+  background: var(--ss-panel-medium);
   overflow-y: auto;
   max-height: calc(100vh - 260px);
 }
@@ -823,16 +823,16 @@ function removeServiceRow(serviceId: string): void {
 }
 
 .network-config-item input:not([type="checkbox"]):not([type="radio"]) {
-  background: rgba(15, 23, 42, 0.7);
-  border: 1px solid rgba(148, 163, 184, 0.4);
-  color: #e2e8f0;
+  background: var(--ss-panel-strong);
+  border: 1px solid var(--ss-border-strong);
+  color: var(--ss-text-on-dark);
 }
 
 .network-config-table {
-  border: 1px solid rgba(148, 163, 184, 0.2);
+  border: 1px solid var(--ss-border-default);
   border-radius: 12px;
   overflow: hidden;
-  background: rgba(15, 23, 42, 0.55);
+  background: var(--ss-panel-medium);
 }
 
 .network-config-table table {
@@ -843,21 +843,21 @@ function removeServiceRow(serviceId: string): void {
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.4px;
-  color: #94a3b8;
-  background: rgba(15, 23, 42, 0.7);
-  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+  color: var(--ss-text-muted-on-dark);
+  background: var(--ss-panel-strong);
+  border-bottom: 1px solid var(--ss-border-default);
 }
 
 .network-config-table tbody td {
-  border-top: 1px solid rgba(148, 163, 184, 0.1);
+  border-top: 1px solid var(--ss-border-soft);
   vertical-align: middle;
 }
 
 .network-config-table .form-control,
 .network-config-table .form-select {
-  background: rgba(15, 23, 42, 0.6);
-  border: 1px solid rgba(148, 163, 184, 0.3);
-  color: #e2e8f0;
+  background: var(--ss-panel-medium);
+  border: 1px solid var(--ss-border-default);
+  color: var(--ss-text-on-dark);
 }
 
 .network-host-header {

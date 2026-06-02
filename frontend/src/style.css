@@ -67,6 +67,61 @@ body {
   --z-index-modal-backdrop: 1040;
   --z-index-modal: 1050;
   --z-index-sticky: 20;
+
+  /* ── Design tokens (ss-* prefix) ──────────────────────────────────────
+   * Custom tokens for the slate-based dark surfaces that aren't in Tabler's
+   * default palette. Use these in scoped <style> blocks instead of inlining
+   * the slate-900 / slate-400 / slate-200 colors at varying opacities. */
+
+  /* Text on dark surfaces */
+  --ss-text-strong: #f8fafc;          /* slate-50 — emphasis */
+  --ss-text-on-dark: #e2e8f0;         /* slate-200 — body */
+  --ss-text-muted-on-dark: #94a3b8;   /* slate-400 — muted */
+  --ss-text-subtle-on-dark: #64748b;  /* slate-500 — subtle */
+
+  /* Slate translucent panels (built on slate-900 = 15,23,42) */
+  --ss-panel-strong: rgba(15, 23, 42, 0.9);
+  --ss-panel-medium: rgba(15, 23, 42, 0.6);
+  --ss-panel-soft:   rgba(15, 23, 42, 0.3);
+  --ss-panel-solid:  #1e293b;
+  --ss-panel-solid-darker: #0f172a;
+
+  /* Slate borders (built on slate-400 = 148,163,184) */
+  --ss-border-soft:    rgba(148, 163, 184, 0.15);
+  --ss-border-default: rgba(148, 163, 184, 0.25);
+  --ss-border-strong:  rgba(148, 163, 184, 0.4);
+
+  /* White overlay (for dark-on-dark separators / glass effects) */
+  --ss-overlay-light: rgba(255, 255, 255, 0.08);
+
+  /* Elevation shadows */
+  --ss-shadow-card:      0 12px 24px rgba(15, 23, 42, 0.25);
+  --ss-shadow-floating:  0 18px 40px rgba(15, 23, 42, 0.25);
+  --ss-shadow-dropdown:  0 8px 24px rgba(0, 0, 0, 0.15);
+
+  /* ── Status & accent harmonization ────────────────────────────────────
+   * Single source of truth for status hues used in custom dark surfaces
+   * (status dots, step chips, geo-markers). Replaces the multiple greens /
+   * blues / oranges that were drifting across components. */
+  --ss-status-online:  #2fb344;  /* aligned to --tblr-green */
+  --ss-status-offline: #d63939;  /* aligned to --tblr-red */
+  --ss-status-warning: #fb923c;  /* aligned to --tblr-orange */
+
+  /* "Done/success" accents (used by alert step chips & similar) */
+  --ss-success-border: #4fb37f;
+  --ss-success-text:   #63d39a;
+  --ss-success-bg:     rgba(61, 196, 126, 0.12);
+
+  /* "Active/selected" blue accent (step chips, hover states) */
+  --ss-accent-blue:        #4b9bff;
+  --ss-accent-blue-soft:   #89b8ff;
+  --ss-accent-blue-text:   #8ec2ff;
+  --ss-accent-blue-bg:     rgba(45, 140, 255, 0.14);
+
+  /* "Inactive/idle" panel bg + border (step chips not-yet-reached state) */
+  --ss-chip-idle-bg:     #1f2a3a;
+  --ss-chip-idle-border: #2f3f57;
+  --ss-chip-idle-text:   #c9d6ea;
 }
 
 .table td code,

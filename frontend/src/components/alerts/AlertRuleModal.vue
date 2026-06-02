@@ -631,15 +631,15 @@ const currentMetricUnit = computed(() => getMetricUnit(form.value.metric))
 }
 
 .step-chip.active {
-  background: rgba(45, 140, 255, 0.14);
-  border-color: #4b9bff;
-  color: #8ec2ff;
+  background: var(--ss-accent-blue-bg);
+  border-color: var(--ss-accent-blue);
+  color: var(--ss-accent-blue-text);
 }
 
 .step-chip.done {
-  background: rgba(61, 196, 126, 0.12);
-  border-color: #57c48b;
-  color: #63d39a;
+  background: var(--ss-success-bg);
+  border-color: var(--ss-success-border);
+  color: var(--ss-success-text);
 }
 
 .step-chip-index {
@@ -676,14 +676,14 @@ const currentMetricUnit = computed(() => getMetricUnit(form.value.metric))
 }
 
 .metric-card:hover {
-  border-color: #89b8ff;
+  border-color: var(--ss-accent-blue-soft);
   box-shadow: 0 2px 10px rgba(66, 132, 245, 0.18);
 }
 
 .metric-card.selected {
   background: linear-gradient(160deg, rgba(45, 140, 255, 0.14) 0%, rgba(45, 140, 255, 0.06) 100%);
-  border-color: #4b9bff;
-  box-shadow: inset 0 0 0 1px #4b9bff;
+  border-color: var(--ss-accent-blue);
+  box-shadow: inset 0 0 0 1px var(--ss-accent-blue);
 }
 
 .metric-icon {
@@ -698,20 +698,20 @@ const currentMetricUnit = computed(() => getMetricUnit(form.value.metric))
 }
 
 [data-bs-theme='dark'] .step-chip {
-  background: #1f2a3a;
-  border-color: #2f3f57;
-  color: #c9d6ea;
+  background: var(--ss-chip-idle-bg);
+  border-color: var(--ss-chip-idle-border);
+  color: var(--ss-chip-idle-text);
 }
 
 [data-bs-theme='dark'] .step-chip.active {
   background: rgba(33, 118, 210, 0.28);
-  border-color: #4b9bff;
+  border-color: var(--ss-accent-blue);
   color: #d2e6ff;
 }
 
 [data-bs-theme='dark'] .step-chip.done {
   background: rgba(56, 142, 99, 0.24);
-  border-color: #4fb37f;
+  border-color: var(--ss-success-border);
   color: #c7f2da;
 }
 
@@ -721,8 +721,8 @@ const currentMetricUnit = computed(() => getMetricUnit(form.value.metric))
 }
 
 [data-bs-theme='dark'] .metric-card {
-  background: #1f2a3a;
-  border-color: #2f3f57;
+  background: var(--ss-chip-idle-bg);
+  border-color: var(--ss-chip-idle-border);
 }
 
 [data-bs-theme='dark'] .metric-card.selected {

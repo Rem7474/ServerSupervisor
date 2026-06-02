@@ -783,8 +783,8 @@ onUnmounted(() => {
   min-width: 240px;
   padding: 8px 0;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.25);
+  border: 1px solid var(--ss-overlay-light);
+  box-shadow: var(--ss-shadow-floating);
   position: absolute;
   top: calc(100% + 10px);
   right: 0;
@@ -799,8 +799,8 @@ onUnmounted(() => {
   width: 12px;
   height: 12px;
   background: inherit;
-  border-left: 1px solid rgba(255, 255, 255, 0.08);
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-left: 1px solid var(--ss-overlay-light);
+  border-top: 1px solid var(--ss-overlay-light);
   transform: rotate(45deg);
 }
 

@@ -1030,13 +1030,13 @@ onBeforeUnmount(() => {
   width: 8px;
   height: 8px;
   border-radius: 999px;
-  background: #639922;
+  background: var(--ss-status-online);
   animation: pulse 1.6s infinite;
 }
 
 .live-dot.paused {
   animation: none;
-  background: #9ca3af;
+  background: var(--tblr-secondary);
 }
 
 @keyframes pulse {

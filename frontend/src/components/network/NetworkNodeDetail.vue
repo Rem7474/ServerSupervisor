@@ -437,7 +437,7 @@ function copyUrl(url: string): void {
 
 <style scoped>
 .network-node-detail {
-  border-top: 1px solid rgba(148, 163, 184, 0.2);
+  border-top: 1px solid var(--ss-border-default);
   background: rgba(10, 15, 30, 0.5);
 }
 
@@ -447,8 +447,8 @@ function copyUrl(url: string): void {
   align-items: center;
   justify-content: space-between;
   padding: 10px 16px;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
-  background: rgba(15, 23, 42, 0.5);
+  border-bottom: 1px solid var(--ss-border-soft);
+  background: var(--ss-panel-medium);
   gap: 8px;
 }
 
@@ -461,7 +461,7 @@ function copyUrl(url: string): void {
 
 .detail-section {
   padding: 12px 16px;
-  border-right: 1px solid rgba(148, 163, 184, 0.1);
+  border-right: 1px solid var(--ss-border-soft);
   min-width: 180px;
   flex: 0 0 auto;
 }
@@ -497,14 +497,14 @@ function copyUrl(url: string): void {
 }
 
 .detail-key {
-  color: #64748b;
+  color: var(--ss-text-subtle-on-dark);
   font-size: 12px;
   flex-shrink: 0;
   min-width: 80px;
 }
 
 .detail-val {
-  color: #e2e8f0;
+  color: var(--ss-text-on-dark);
   word-break: break-word;
 }
 
@@ -520,10 +520,10 @@ function copyUrl(url: string): void {
   align-items: center;
   padding: 3px 8px;
   border-radius: 6px;
-  background: rgba(15, 23, 42, 0.6);
-  border: 1px solid rgba(148, 163, 184, 0.15);
+  background: var(--ss-panel-medium);
+  border: 1px solid var(--ss-border-soft);
   font-size: 12px;
-  color: #e2e8f0;
+  color: var(--ss-text-on-dark);
 }
 
 .port-chip-service {
@@ -542,7 +542,7 @@ function copyUrl(url: string): void {
 
   .detail-section {
     border-right: none;
-    border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+    border-bottom: 1px solid var(--ss-border-soft);
   }
 
   .detail-actions {

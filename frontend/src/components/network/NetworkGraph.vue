@@ -236,7 +236,10 @@ let resizeBinding: { disconnect: () => void } | null = null
 
 const hasData = computed(() => Array.isArray(props.data) && props.data.length > 0)
 
-const statusColors: Record<string, string> = { online: '#22c55e', warning: '#f59e0b', offline: '#ef4444', unknown: '#94a3b8' }
+// Canvas (Cytoscape) status hues — kept in sync with the --ss-status-* CSS
+// tokens in style.css. Canvas can't read CSS vars, so the hex is duplicated;
+// update both when changing a status color.
+const statusColors: Record<string, string> = { online: '#2fb344', warning: '#fb923c', offline: '#d63939', unknown: '#94a3b8' }
 
 // Computed: does the data contain authelia/internet targets?
 const hasAutheliaTargets = computed(() => props.services.some(s => s.linkToAuthelia))
@@ -959,7 +962,7 @@ watch(
     radial-gradient(circle at 70% 0%, rgba(16,185,129,0.12), transparent 40%),
     radial-gradient(circle at 20% 80%, rgba(244,63,94,0.1), transparent 45%),
     #0b0f1a;
-  border: 1px solid rgba(148,163,184,0.25);
+  border: 1px solid var(--ss-border-default);
   border-radius: 16px;
   overflow: hidden;
 }
@@ -986,15 +989,15 @@ watch(
 .cy-tooltip {
   position: fixed;
   padding: 10px 12px;
-  background-color: rgba(15,23,42,0.94);
-  color: #e2e8f0;
+  background-color: var(--ss-panel-strong);
+  color: var(--ss-text-on-dark);
   border-radius: 8px;
   font-size: 12px;
   pointer-events: none;
   display: none;
   z-index: 1000;
   white-space: nowrap;
-  box-shadow: 0 12px 24px rgba(15,23,42,0.25);
+  box-shadow: var(--ss-shadow-card);
 }
 
 .graph-legend {
@@ -1002,13 +1005,13 @@ watch(
   top: 16px;
   left: 16px;
   padding: 12px 14px;
-  background: rgba(15,23,42,0.75);
-  border: 1px solid rgba(148,163,184,0.3);
+  background: var(--ss-panel-strong);
+  border: 1px solid var(--ss-border-default);
   border-radius: 12px;
   backdrop-filter: blur(10px);
   z-index: 2;
   font-size: 12px;
-  color: #e2e8f0;
+  color: var(--ss-text-on-dark);
   min-width: 160px;
 }
 
@@ -1021,21 +1024,21 @@ watch(
 }
 
 .host-box {
-  border: 1.5px solid rgba(148,163,184,0.4);
-  background: rgba(15,23,42,0.5);
+  border: 1.5px solid var(--ss-border-strong);
+  background: var(--ss-panel-medium);
 }
 
 .root-box {
   border: 1.5px solid #94a3b8;
-  background: rgba(15,23,42,0.78);
+  background: var(--ss-panel-strong);
 }
 
 .online-dot {
-  background: #22c55e;
+  background: var(--ss-status-online);
 }
 
 .offline-dot {
-  background: #ef4444;
+  background: var(--ss-status-offline);
 }
 
 .legend-dash {
@@ -1069,7 +1072,7 @@ watch(
   letter-spacing: 0.4px;
   text-transform: uppercase;
   font-size: 11px;
-  color: #94a3b8;
+  color: var(--ss-text-muted-on-dark);
 }
 
 .legend-item {
@@ -1107,18 +1110,18 @@ watch(
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(15,23,42,0.75);
-  border: 1px solid rgba(148,163,184,0.3);
+  background: var(--ss-panel-strong);
+  border: 1px solid var(--ss-border-default);
   border-radius: 8px;
-  color: #94a3b8;
+  color: var(--ss-text-muted-on-dark);
   cursor: pointer;
   backdrop-filter: blur(8px);
   transition: background 0.15s, color 0.15s;
 }
 
 .graph-btn:hover {
-  background: rgba(15,23,42,0.9);
-  color: #e2e8f0;
+  background: var(--ss-panel-strong);
+  color: var(--ss-text-on-dark);
 }
 
 .graph-empty {
@@ -1130,14 +1133,14 @@ watch(
   justify-content: center;
   z-index: 1;
   text-align: center;
-  color: #94a3b8;
+  color: var(--ss-text-muted-on-dark);
   padding: 24px;
 }
 
 .empty-title {
   font-size: 18px;
   font-weight: 600;
-  color: #f8fafc;
+  color: var(--ss-text-strong);
 }
 
 .empty-subtitle {

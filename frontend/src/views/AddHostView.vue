@@ -278,11 +278,11 @@ function finishAdd(): void {
 
 <style scoped>
 .host-success {
-  background: rgba(15, 23, 42, 0.6);
+  background: var(--ss-panel-medium);
   border: 1px solid rgba(56, 189, 248, 0.35);
   border-radius: 14px;
   padding: 20px;
-  color: #e2e8f0;
+  color: var(--ss-text-on-dark);
 }
 
 .host-success-header {
@@ -300,8 +300,8 @@ function finishAdd(): void {
 }
 
 .host-success-card {
-  background: rgba(15, 23, 42, 0.7);
-  border: 1px solid rgba(148, 163, 184, 0.25);
+  background: var(--ss-panel-strong);
+  border: 1px solid var(--ss-border-default);
   border-radius: 12px;
   padding: 14px;
 }
@@ -315,7 +315,7 @@ function finishAdd(): void {
 .host-success-key code {
   display: block;
   background: rgba(2, 6, 23, 0.6);
-  color: #f8fafc;
+  color: var(--ss-text-strong);
   padding: 8px 10px;
   border-radius: 8px;
   flex: 1;
@@ -324,7 +324,7 @@ function finishAdd(): void {
 
 .host-success-config {
   background: rgba(2, 6, 23, 0.6);
-  color: #e2e8f0;
+  color: var(--ss-text-on-dark);
   border-radius: 10px;
   padding: 10px;
   margin: 0;

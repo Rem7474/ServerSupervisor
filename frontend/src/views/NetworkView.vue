@@ -741,7 +741,7 @@ defineExpose({ handleResetLayout })
 
 /* Filter bar */
 .graph-filters {
-  background: rgba(15, 23, 42, 0.3);
+  background: var(--ss-panel-soft);
   font-size: 13px;
   flex-shrink: 0;
 }
@@ -764,7 +764,7 @@ defineExpose({ handleResetLayout })
   align-items: center;
   justify-content: center;
   font-size: 14px;
-  color: #64748b;
+  color: var(--ss-text-subtle-on-dark);
   z-index: 2;
 }
 
@@ -775,7 +775,7 @@ defineExpose({ handleResetLayout })
 }
 
 .graph-state-empty .fw-semibold {
-  color: #94a3b8;
+  color: var(--ss-text-muted-on-dark);
   font-size: 16px;
 }
 

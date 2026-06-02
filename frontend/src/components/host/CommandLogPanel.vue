@@ -397,12 +397,12 @@ function download(): void {
 }
 
 .console-empty {
-  background: #1e293b;
+  background: var(--ss-panel-solid);
   border-radius: 0 0 0.5rem 0.5rem;
 }
 
 .console-header {
-  background: #1e293b;
+  background: var(--ss-panel-solid);
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
@@ -410,12 +410,12 @@ function download(): void {
   background: rgba(0, 0, 0, 0.3);
   padding: 0.15rem 0.4rem;
   border-radius: 0.25rem;
-  color: #94a3b8;
+  color: var(--ss-text-muted-on-dark);
 }
 
 .console-output {
-  background: #0f172a;
-  color: #e2e8f0;
+  background: var(--ss-panel-solid-darker);
+  color: var(--ss-text-on-dark);
   padding: 1rem;
   margin: 0;
   overflow: auto;
