@@ -274,7 +274,6 @@
           >
             <tr
               v-if="item._showSeparator"
-              class="table-light"
             >
               <td
                 colspan="7"
