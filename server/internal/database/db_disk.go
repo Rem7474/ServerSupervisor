@@ -126,11 +126,11 @@ func (db *DB) GetDiskMetricsAggregated(ctx context.Context, hostID, mountPoint s
 		)
 	} else if hours <= 720 {
 		aggType = "hour"
-		rows, err = db.conn.QueryContext(ctx, 
+		rows, err = db.conn.QueryContext(ctx,
 			`SELECT
 				0 AS id,
 				$1 AS host_id,
-				date_trunc('hour', timestamp) AS timestamp,
+				time_bucket('1 hour', timestamp) AS timestamp,
 				mount_point,
 				'' AS filesystem,
 				AVG(size_gb) AS size_gb,
@@ -141,17 +141,17 @@ func (db *DB) GetDiskMetricsAggregated(ctx context.Context, hostID, mountPoint s
 			FROM disk_metrics
 			WHERE host_id = $1 AND mount_point = $2
 			  AND timestamp > NOW() - INTERVAL '1 hour' * $3
-			GROUP BY date_trunc('hour', timestamp), mount_point
+			GROUP BY time_bucket('1 hour', timestamp), mount_point
 			ORDER BY timestamp ASC`,
 			hostID, mountPoint, hours,
 		)
 	} else {
 		aggType = "day"
-		rows, err = db.conn.QueryContext(ctx, 
+		rows, err = db.conn.QueryContext(ctx,
 			`SELECT
 				0 AS id,
 				$1 AS host_id,
-				date_trunc('day', timestamp) AS timestamp,
+				time_bucket('1 day', timestamp) AS timestamp,
 				mount_point,
 				'' AS filesystem,
 				AVG(size_gb) AS size_gb,
@@ -162,7 +162,7 @@ func (db *DB) GetDiskMetricsAggregated(ctx context.Context, hostID, mountPoint s
 			FROM disk_metrics
 			WHERE host_id = $1 AND mount_point = $2
 			  AND timestamp > NOW() - INTERVAL '1 hour' * $3
-			GROUP BY date_trunc('day', timestamp), mount_point
+			GROUP BY time_bucket('1 day', timestamp), mount_point
 			ORDER BY timestamp ASC`,
 			hostID, mountPoint, hours,
 		)

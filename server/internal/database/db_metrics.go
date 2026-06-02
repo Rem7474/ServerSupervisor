@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log/slog"
 
 	"github.com/serversupervisor/server/internal/models"
@@ -168,12 +169,7 @@ func (db *DB) GetSystemCPUTemperatureHistoryByHost(ctx context.Context, hostID s
 		bucketMinutes = 24 * 60
 	}
 
-	bucketExpr := ""
-	if db.hasTimescaleDB {
-		bucketExpr = `time_bucket($2 * '1 minute'::interval, timestamp)`
-	} else {
-		bucketExpr = `to_timestamp(floor(EXTRACT(EPOCH FROM timestamp) / ($2 * 60)) * ($2 * 60))`
-	}
+	const bucketExpr = `time_bucket($2 * '1 minute'::interval, timestamp)`
 
 	query := `
 		SELECT
@@ -236,12 +232,7 @@ func (db *DB) GetSystemFanRPMHistoryByHost(ctx context.Context, hostID string, h
 		bucketMinutes = 24 * 60
 	}
 
-	bucketExpr := ""
-	if db.hasTimescaleDB {
-		bucketExpr = `time_bucket($2 * '1 minute'::interval, timestamp)`
-	} else {
-		bucketExpr = `to_timestamp(floor(EXTRACT(EPOCH FROM timestamp) / ($2 * 60)) * ($2 * 60))`
-	}
+	const bucketExpr = `time_bucket($2 * '1 minute'::interval, timestamp)`
 
 	query := `
 		SELECT
@@ -302,12 +293,7 @@ func (db *DB) GetMetricsAggregatesByType(ctx context.Context, hostID string, hou
 		bucketMinutes = 24 * 60
 	}
 
-	var bucketExpr string
-	if db.hasTimescaleDB {
-		bucketExpr = `time_bucket($3 * '1 minute'::interval, timestamp)`
-	} else {
-		bucketExpr = `to_timestamp(floor(EXTRACT(EPOCH FROM timestamp) / ($3 * 60)) * ($3 * 60))`
-	}
+	const bucketExpr = `time_bucket($3 * '1 minute'::interval, timestamp)`
 
 	rows, err := db.conn.QueryContext(ctx,
 		`SELECT 0 AS id, $1 AS host_id, `+bucketExpr+` AS timestamp,
@@ -352,7 +338,7 @@ func (db *DB) GetMetricsSummary(ctx context.Context, hours int, bucketMinutes in
 		bucketMinutes = 5
 	}
 
-	if bucketMinutes >= 5 && db.hasTimescaleDB {
+	if bucketMinutes >= 5 {
 		summary, err := db.metricsSummaryFromCAGG(ctx, hours, bucketMinutes)
 		switch {
 		case err == nil && len(summary) > 0:
@@ -371,13 +357,7 @@ func (db *DB) GetMetricsSummary(ctx context.Context, hours int, bucketMinutes in
 
 // metricsSummaryFromRaw aggregates the raw system_metrics table into time buckets.
 func (db *DB) metricsSummaryFromRaw(ctx context.Context, hours int, bucketMinutes int) ([]models.SystemMetricsSummary, error) {
-	var bucketExpr string
-	if db.hasTimescaleDB {
-		bucketExpr = `time_bucket($2 * '1 minute'::interval, timestamp)`
-	} else {
-		bucketExpr = `to_timestamp(floor(EXTRACT(EPOCH FROM timestamp) / ($2 * 60)) * ($2 * 60))`
-	}
-
+	const bucketExpr = `time_bucket($2 * '1 minute'::interval, timestamp)`
 	rows, err := db.conn.QueryContext(ctx,
 		`SELECT `+bucketExpr+` AS ts,
 			AVG(cpu_usage_percent) AS cpu_avg,
@@ -432,36 +412,22 @@ func scanMetricsSummary(rows *sql.Rows) ([]models.SystemMetricsSummary, error) {
 	return summary, rows.Err()
 }
 
-func (db *DB) CleanOldMetrics(ctx context.Context, retentionDays int) (int64, error) {
-	tx, err := db.conn.BeginTx(ctx, nil)
-	if err != nil {
-		return 0, err
+// UpdateMetricsRetentionPolicy updates the TimescaleDB retention policies for
+// system_metrics and disk_metrics to the given number of days. The existing
+// policy is replaced atomically so the change takes effect on the next
+// scheduled policy run.
+func (db *DB) UpdateMetricsRetentionPolicy(ctx context.Context, days int) error {
+	for _, table := range []string{"system_metrics", "disk_metrics"} {
+		if _, err := db.conn.ExecContext(ctx,
+			`SELECT remove_retention_policy($1, if_not_exists => true)`, table); err != nil {
+			return fmt.Errorf("remove retention policy for %s: %w", table, err)
+		}
+		if _, err := db.conn.ExecContext(ctx,
+			`SELECT add_retention_policy($1, make_interval(days => $2))`, table, days); err != nil {
+			return fmt.Errorf("add retention policy for %s: %w", table, err)
+		}
 	}
-	defer func() { _ = tx.Rollback() }()
-
-	rawResult, err := tx.ExecContext(ctx, 
-		`DELETE FROM system_metrics WHERE timestamp < NOW() - INTERVAL '1 day' * $1`,
-		retentionDays,
-	)
-	if err != nil {
-		return 0, err
-	}
-	rawDeleted, _ := rawResult.RowsAffected()
-
-	// metrics_aggregates was removed in V2 (replaced by the system_metrics_5min
-	// continuous aggregate, which Timescale retains via its own policy).
-	_, err = tx.ExecContext(ctx,
-		`DELETE FROM disk_metrics WHERE timestamp < NOW() - INTERVAL '1 day' * $1`,
-		retentionDays,
-	)
-	if err != nil {
-		return rawDeleted, err
-	}
-
-	if err := tx.Commit(); err != nil {
-		return 0, err
-	}
-	return rawDeleted, nil
+	return nil
 }
 
 // CountMetrics returns the total number of metrics records.

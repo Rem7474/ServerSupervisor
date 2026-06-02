@@ -12,7 +12,7 @@
             Nettoyage des métriques
           </h4>
           <p class="text-secondary small mb-3">
-            Supprime les métriques brutes + agrégats plus anciens que {{ settings.metricsRetentionDays }} jours
+            Met à jour la politique de rétention TimescaleDB à {{ settings.metricsRetentionDays }} jours (system_metrics, disk_metrics)
           </p>
           <button
             class="btn btn-warning btn-sm"
@@ -86,7 +86,7 @@
             /><path d="M12 9m-6 0a6 6 0 1 0 12 0a6 6 0 1 0 -12 0" /><path d="M12 7v5" /><path d="M12 13v.01" /></svg>
             <h3>Confirmer le nettoyage</h3>
             <div class="text-secondary mb-3">
-              Les métriques plus anciennes que {{ settings.metricsRetentionDays }} jours seront supprimées définitivement.
+              La politique de rétention TimescaleDB sera mise à jour à {{ settings.metricsRetentionDays }} jours. Le nettoyage sera appliqué automatiquement par TimescaleDB.
             </div>
           </div>
           <div class="modal-footer">

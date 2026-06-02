@@ -24,7 +24,8 @@ import (
 )
 
 const (
-	pgImage    = "postgres:16-alpine"
+	// TimescaleDB is a hard requirement (time_bucket, hypertables, retention policies).
+	pgImage    = "timescale/timescaledb:2.27.2-pg16"
 	pgUser     = "supervisor"
 	pgPassword = "supervisor-test"
 	pgDatabase = "serversupervisor_test"

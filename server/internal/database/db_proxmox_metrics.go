@@ -25,33 +25,18 @@ func (db *DB) GetProxmoxNodeMetricsSummary(ctx context.Context, hours, bucketMin
 		bucketMinutes = 5
 	}
 
-	var (
-		query string
-		args  []interface{}
-	)
-
 	// cpu_usage is stored as a 0‒1 ratio; multiply by 100 to get percentage.
 	// mem_avg is computed as (mem_used / mem_total) * 100 when mem_total > 0.
-	bucketExpr := ""
-	if db.hasTimescaleDB {
-		bucketExpr = `time_bucket($2 * '1 minute'::interval, timestamp)`
-	} else {
-		bucketExpr = `to_timestamp(floor(EXTRACT(EPOCH FROM timestamp) / ($2 * 60)) * ($2 * 60))`
-	}
-
-	query = `
+	rows, err := db.conn.QueryContext(ctx, `
 		SELECT
-			` + bucketExpr + ` AS ts,
+			time_bucket($2 * '1 minute'::interval, timestamp) AS ts,
 			AVG(cpu_usage * 100) AS cpu_avg,
 			AVG(CASE WHEN mem_total > 0 THEN mem_used::float / mem_total * 100 ELSE 0 END) AS mem_avg,
 			COUNT(*) AS sample_count
 		FROM proxmox_node_metrics
 		WHERE timestamp > NOW() - INTERVAL '1 hour' * $1
 		GROUP BY ts
-		ORDER BY ts ASC`
-	args = []interface{}{hours, bucketMinutes}
-
-	rows, err := db.conn.QueryContext(ctx, query, args...)
+		ORDER BY ts ASC`, hours, bucketMinutes)
 	if err != nil {
 		return nil, err
 	}
@@ -68,19 +53,6 @@ func (db *DB) GetProxmoxNodeMetricsSummary(ctx context.Context, hours, bucketMin
 	return summary, rows.Err()
 }
 
-// CleanOldProxmoxNodeMetrics removes snapshots older than retentionDays.
-// Mirrors CleanOldMetrics for host agent data.
-func (db *DB) CleanOldProxmoxNodeMetrics(ctx context.Context, retentionDays int) (int64, error) {
-	res, err := db.conn.ExecContext(ctx, 
-		`DELETE FROM proxmox_node_metrics WHERE timestamp < NOW() - INTERVAL '1 day' * $1`,
-		retentionDays,
-	)
-	if err != nil {
-		return 0, err
-	}
-	n, _ := res.RowsAffected()
-	return n, nil
-}
 
 // ─── Guest metrics ────────────────────────────────────────────────────────────
 
@@ -102,16 +74,9 @@ func (db *DB) GetProxmoxGuestMetricsSummary(ctx context.Context, guestID string,
 		bucketMinutes = 5
 	}
 
-	bucketExpr := ""
-	if db.hasTimescaleDB {
-		bucketExpr = `time_bucket($3 * '1 minute'::interval, timestamp)`
-	} else {
-		bucketExpr = `to_timestamp(floor(EXTRACT(EPOCH FROM timestamp) / ($3 * 60)) * ($3 * 60))`
-	}
-
-	query := `
+	rows, err := db.conn.QueryContext(ctx, `
 		SELECT
-			` + bucketExpr + ` AS ts,
+			time_bucket($3 * '1 minute'::interval, timestamp) AS ts,
 			AVG(cpu_usage * 100) AS cpu_avg,
 			AVG(CASE WHEN mem_total > 0 THEN mem_used::float / mem_total * 100 ELSE 0 END) AS mem_avg,
 			COUNT(*) AS sample_count
@@ -119,9 +84,7 @@ func (db *DB) GetProxmoxGuestMetricsSummary(ctx context.Context, guestID string,
 		WHERE guest_id = $1
 		  AND timestamp > NOW() - INTERVAL '1 hour' * $2
 		GROUP BY ts
-		ORDER BY ts ASC`
-
-	rows, err := db.conn.QueryContext(ctx, query, guestID, hours, bucketMinutes)
+		ORDER BY ts ASC`, guestID, hours, bucketMinutes)
 	if err != nil {
 		return nil, err
 	}
@@ -388,18 +351,6 @@ func (db *DB) queryProxmoxDiskMinWearout(ctx context.Context, whereClause string
 	return pct
 }
 
-// CleanOldProxmoxGuestMetrics removes guest snapshots older than retentionDays.
-func (db *DB) CleanOldProxmoxGuestMetrics(ctx context.Context, retentionDays int) (int64, error) {
-	res, err := db.conn.ExecContext(ctx, 
-		`DELETE FROM proxmox_guest_metrics WHERE timestamp < NOW() - INTERVAL '1 day' * $1`,
-		retentionDays,
-	)
-	if err != nil {
-		return 0, err
-	}
-	n, _ := res.RowsAffected()
-	return n, nil
-}
 
 // GetNodeIDByConnectionAndName resolves a proxmox_nodes UUID from its composite key.
 // Used by the poller so we can insert node metrics without an extra JOIN.
@@ -418,16 +369,9 @@ func (db *DB) GetProxmoxNodeMetricsSummaryByNode(ctx context.Context, nodeID str
 		bucketMinutes = 5
 	}
 
-	bucketExpr := ""
-	if db.hasTimescaleDB {
-		bucketExpr = `time_bucket($3 * '1 minute'::interval, timestamp)`
-	} else {
-		bucketExpr = `to_timestamp(floor(EXTRACT(EPOCH FROM timestamp) / ($3 * 60)) * ($3 * 60))`
-	}
-
-	query := `
+	rows, err := db.conn.QueryContext(ctx, `
 		SELECT
-			` + bucketExpr + ` AS ts,
+			time_bucket($3 * '1 minute'::interval, timestamp) AS ts,
 			AVG(cpu_usage * 100) AS cpu_avg,
 			AVG(CASE WHEN mem_total > 0 THEN mem_used::float / mem_total * 100 ELSE 0 END) AS mem_avg,
 			COUNT(*) AS sample_count
@@ -435,9 +379,7 @@ func (db *DB) GetProxmoxNodeMetricsSummaryByNode(ctx context.Context, nodeID str
 		WHERE node_id = $1
 		  AND timestamp > NOW() - INTERVAL '1 hour' * $2
 		GROUP BY ts
-		ORDER BY ts ASC`
-
-	rows, err := db.conn.QueryContext(ctx, query, nodeID, hours, bucketMinutes)
+		ORDER BY ts ASC`, nodeID, hours, bucketMinutes)
 	if err != nil {
 		return nil, err
 	}

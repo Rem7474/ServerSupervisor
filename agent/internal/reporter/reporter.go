@@ -216,7 +216,7 @@ func (r *Reporter) Send(ctx context.Context, s *sender.Sender, cmdQueue chan<- [
 		log.Printf("Report sent successfully (uptime: %ds — Proxmox source)", collectedMetrics.Uptime)
 	} else {
 		log.Printf("Report sent successfully (CPU: %.1f%%, RAM: %.1f%%, Disks: %d)",
-			collectedMetrics.CPUUsagePercent, collectedMetrics.MemoryPercent, len(collectedMetrics.Disks))
+			collectedMetrics.CPUUsagePercent, collectedMetrics.MemoryPercent, len(diskMetrics))
 	}
 
 	r.skipMetrics.Store(response.SkipMetrics)

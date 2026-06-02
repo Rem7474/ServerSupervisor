@@ -14,7 +14,6 @@ import (
 	"sync"
 	"time"
 
-	"golang.org/x/sys/unix"
 )
 
 type NetworkInterface struct {
@@ -38,7 +37,6 @@ type SystemMetrics struct {
 	MemoryPercent     float64            `json:"memory_percent"`
 	SwapTotal         uint64             `json:"swap_total"`
 	SwapUsed          uint64             `json:"swap_used"`
-	Disks             []DiskInfo         `json:"disks"`
 	NetworkRxBytes    uint64             `json:"network_rx_bytes"`
 	NetworkTxBytes    uint64             `json:"network_tx_bytes"`
 	NetworkInterfaces []NetworkInterface `json:"network_interfaces,omitempty"`
@@ -47,15 +45,6 @@ type SystemMetrics struct {
 	Hostname          string             `json:"hostname"`
 }
 
-type DiskInfo struct {
-	MountPoint  string  `json:"mount_point"`
-	Device      string  `json:"device"`
-	FSType      string  `json:"fs_type"`
-	TotalBytes  uint64  `json:"total_bytes"`
-	UsedBytes   uint64  `json:"used_bytes"`
-	FreeBytes   uint64  `json:"free_bytes"`
-	UsedPercent float64 `json:"used_percent"`
-}
 
 // CollectSystem gathers all system metrics using /proc and standard Linux tools.
 // CPU temperature collection can be disabled to avoid sensor probing overhead.
@@ -89,8 +78,6 @@ func CollectSystem(collectCPUTemperature bool) (*SystemMetrics, error) {
 	}
 	m.SwapTotal = memInfo.swapTotal
 	m.SwapUsed = m.SwapTotal - memInfo.swapFree
-
-	m.Disks = getDiskUsage()
 
 	rx, tx, ifaces := getNetworkBytes()
 	m.NetworkRxBytes = rx
@@ -543,55 +530,6 @@ func getMemInfo() memInfoFields {
 	return r
 }
 
-func getDiskUsage() []DiskInfo {
-	data, err := os.ReadFile("/proc/mounts")
-	if err != nil {
-		return nil
-	}
-
-	seen := make(map[string]bool)
-	var disks []DiskInfo
-	for _, line := range strings.Split(string(data), "\n") {
-		fields := strings.Fields(line)
-		if len(fields) < 3 {
-			continue
-		}
-		device, mountPoint, fsType := fields[0], fields[1], fields[2]
-		if pseudoFS[fsType] || seen[mountPoint] || shouldSkipFilesystem(fsType, device, mountPoint) {
-			continue
-		}
-		seen[mountPoint] = true
-
-		var stat unix.Statfs_t
-		if err := unix.Statfs(mountPoint, &stat); err != nil || stat.Blocks == 0 {
-			continue
-		}
-
-		bsize := uint64(stat.Bsize)
-		total := stat.Blocks * bsize
-		free := stat.Bavail * bsize
-		var used uint64
-		if stat.Blocks >= stat.Bfree {
-			used = (stat.Blocks - stat.Bfree) * bsize
-		}
-		// Compute used% the same way df does: used/(used+available).
-		var pct float64
-		if avail := (stat.Blocks - stat.Bfree) + stat.Bavail; avail > 0 {
-			pct = float64(stat.Blocks-stat.Bfree) / float64(avail) * 100
-		}
-
-		disks = append(disks, DiskInfo{
-			MountPoint:  mountPoint,
-			Device:      device,
-			FSType:      fsType,
-			TotalBytes:  total,
-			UsedBytes:   used,
-			FreeBytes:   free,
-			UsedPercent: pct,
-		})
-	}
-	return disks
-}
 
 func getNetworkBytes() (rx, tx uint64, ifaces []NetworkInterface) {
 	data, err := os.ReadFile("/proc/net/dev")

@@ -61,8 +61,7 @@ func EnsureDatabaseExists(cfg *config.Config) error {
 // DB wraps the underlying sql.DB connection and exposes domain-specific methods
 // split across db_*.go files in this package.
 type DB struct {
-	conn           *sql.DB
-	hasTimescaleDB bool
+	conn *sql.DB
 }
 
 // New opens a connection to the database, runs migrations, and returns a DB.
@@ -84,23 +83,13 @@ func New(cfg *config.Config) (*DB, error) {
 		return nil, fmt.Errorf("failed to run migrations: %w", err)
 	}
 
-	// Detect TimescaleDB availability once so callers never attempt time_bucket()
-	// on a plain PostgreSQL instance (avoids ERROR noise in the DB server log).
-	var hasTS bool
-	_ = conn.QueryRow(`SELECT EXISTS(SELECT 1 FROM pg_extension WHERE extname = 'timescaledb')`).Scan(&hasTS)
-	db.hasTimescaleDB = hasTS
-	if hasTS {
-		slog.Info("TimescaleDB extension detected - using time_bucket() for metric bucketing")
-		// Continuous aggregates cannot be created inside a transaction/DO block,
-		// so they live here (run as standalone statements) rather than in a SQL
-		// migration. Idempotent and gated on Timescale availability; a failure is
-		// logged but never blocks startup (GetMetricsSummary falls back to raw).
-		if err := db.ensureTimescaleObjects(context.Background()); err != nil {
-			slog.Error("failed to ensure TimescaleDB continuous aggregates", slog.Any("err", err))
-		}
-	} else {
-		slog.Info("TimescaleDB not found - using plain PostgreSQL bucketing")
+	// Continuous aggregates cannot be created inside a transaction/DO block,
+	// so they live here (run as standalone statements) rather than in a SQL migration.
+	// Startup fails if TimescaleDB is not installed — it is a hard requirement.
+	if err := db.ensureTimescaleObjects(context.Background()); err != nil {
+		return nil, fmt.Errorf("TimescaleDB setup failed (is the timescaledb extension installed?): %w", err)
 	}
+	slog.Info("TimescaleDB continuous aggregates ready")
 
 	return db, nil
 }

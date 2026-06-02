@@ -110,6 +110,9 @@ func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 	}
 	if req.MetricsRetentionDays > 0 {
 		save("metrics_retention_days", strconv.Itoa(req.MetricsRetentionDays))
+		if err := h.db.UpdateMetricsRetentionPolicy(c.Request.Context(), req.MetricsRetentionDays); err != nil {
+			slog.ErrorContext(c.Request.Context(), "failed to update metrics retention policy", slog.Any("err", err))
+		}
 	}
 	if req.AuditRetentionDays > 0 {
 		save("audit_retention_days", strconv.Itoa(req.AuditRetentionDays))
@@ -250,9 +253,8 @@ func (h *SettingsHandler) CleanupMetrics(c *gin.Context) {
 	user := c.GetString("username")
 	slog.InfoContext(c.Request.Context(), fmt.Sprintf("User %s triggered manual metrics cleanup", user))
 
-	deleted, err := h.db.CleanOldMetrics(c.Request.Context(), h.cfg.MetricsRetentionDays)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Cleanup failed: %v", err)})
+	if err := h.db.UpdateMetricsRetentionPolicy(c.Request.Context(), h.cfg.MetricsRetentionDays); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to update retention policy: %v", err)})
 		return
 	}
 
@@ -262,8 +264,8 @@ func (h *SettingsHandler) CleanupMetrics(c *gin.Context) {
 		slog.ErrorContext(c.Request.Context(), fmt.Sprintf("CleanupMetrics: failed to trim tracker tag digests: %v", digestErr))
 	}
 
-	message := fmt.Sprintf("Deleted %d old metrics records, %d old tracker tag digest entries", deleted, deletedDigests)
-	c.JSON(http.StatusOK, gin.H{"success": true, "message": message, "deleted": deleted, "deleted_digests": deletedDigests})
+	message := fmt.Sprintf("Politique de rétention mise à jour (%d jours). TimescaleDB appliquera le nettoyage automatiquement. %d anciennes entrées de suivi supprimées.", h.cfg.MetricsRetentionDays, deletedDigests)
+	c.JSON(http.StatusOK, gin.H{"success": true, "message": message, "deleted_digests": deletedDigests})
 
 	// Log the action
 	_, _ = h.db.CreateAuditLog(c.Request.Context(), user, "cleanup_metrics", "", c.ClientIP(), message, "success")

@@ -25,7 +25,6 @@ type SystemMetrics struct {
 	MemoryPercent     float64            `json:"memory_percent"`
 	SwapTotal         uint64             `json:"swap_total"`
 	SwapUsed          uint64             `json:"swap_used"`
-	Disks             []DiskInfo         `json:"disks"`
 	NetworkRxBytes    uint64             `json:"network_rx_bytes"`
 	NetworkTxBytes    uint64             `json:"network_tx_bytes"`
 	NetworkInterfaces []NetworkInterface `json:"network_interfaces,omitempty"`
@@ -34,15 +33,6 @@ type SystemMetrics struct {
 	Hostname          string             `json:"hostname"`
 }
 
-type DiskInfo struct {
-	MountPoint  string  `json:"mount_point"`
-	Device      string  `json:"device"`
-	FSType      string  `json:"fs_type"`
-	TotalBytes  uint64  `json:"total_bytes"`
-	UsedBytes   uint64  `json:"used_bytes"`
-	FreeBytes   uint64  `json:"free_bytes"`
-	UsedPercent float64 `json:"used_percent"`
-}
 
 // CollectSystem is Linux-only in production; this stub exists for non-Linux local builds.
 func CollectSystem(_ bool) (*SystemMetrics, error) {
