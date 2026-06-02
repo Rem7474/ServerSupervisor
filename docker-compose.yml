@@ -7,6 +7,13 @@ services:
     # automatically; migration 010 then runs CREATE EXTENSION + create_hypertable.
     image: timescale/timescaledb:latest-pg16
     restart: unless-stopped
+    # TimescaleDB must be preloaded at server start. The image only auto-configures
+    # this on a fresh initdb; an existing data volume keeps shared_preload_libraries
+    # empty, so we set it explicitly here (required before CREATE EXTENSION).
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_preload_libraries=timescaledb"
     environment:
       POSTGRES_USER: supervisor
       POSTGRES_PASSWORD: ${DB_PASSWORD:-supervisor}
