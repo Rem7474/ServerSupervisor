@@ -9,9 +9,12 @@ import (
 	"github.com/serversupervisor/server/internal/database"
 )
 
-// NewMetricsRetentionJob deletes raw metrics older than cfg.MetricsRetentionDays once per day,
-// and trims the release_tracker_tag_digests table to the 100 most recent entries per tracker.
+// NewMetricsRetentionJob trims the release_tracker_tag_digests table to the 100
+// most recent entries per tracker, once per day. Raw metric retention is now
+// owned by TimescaleDB retention policies (see migration 064 / the V2 baseline),
+// so this job no longer deletes metric rows.
 func NewMetricsRetentionJob(db *database.DB, cfg *config.Config) Job {
+	_ = cfg // retained for signature compatibility; metric retention is Timescale-managed
 	return Job{
 		Name: "metrics-retention",
 		Run: func(ctx context.Context) {
@@ -21,16 +24,6 @@ func NewMetricsRetentionJob(db *database.DB, cfg *config.Config) Job {
 			for {
 				select {
 				case <-timer.C:
-					days := cfg.MetricsRetentionDays
-					if days <= 0 {
-						days = 30
-					}
-					if deleted, err := db.CleanOldMetrics(ctx, days); err != nil {
-						slog.ErrorContext(ctx, "metrics retention failed", slog.String("job", "metrics-retention"), slog.Any("err", err))
-					} else if deleted > 0 {
-						slog.InfoContext(ctx, "deleted old metric rows", slog.String("job", "metrics-retention"), slog.Int64("deleted", deleted), slog.Int("retention_days", days))
-					}
-
 					if deleted, err := db.CleanupTrackerTagDigests(ctx, 100); err != nil {
 						slog.ErrorContext(ctx, "tracker tag digests cleanup failed", slog.String("job", "metrics-retention"), slog.Any("err", err))
 					} else if deleted > 0 {

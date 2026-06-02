@@ -69,9 +69,6 @@ type SystemMetrics struct {
 	SwapTotal     uint64  `json:"swap_total" db:"swap_total"`
 	SwapUsed      uint64  `json:"swap_used" db:"swap_used"`
 
-	// Disk
-	Disks []DiskInfo `json:"disks" db:"-"`
-
 	// Network
 	NetworkRxBytes uint64 `json:"network_rx_bytes" db:"network_rx_bytes"`
 	NetworkTxBytes uint64 `json:"network_tx_bytes" db:"network_tx_bytes"`
@@ -80,18 +77,6 @@ type SystemMetrics struct {
 	Uptime   uint64 `json:"uptime" db:"uptime"`
 	OS       string `json:"os" db:"-"`
 	Hostname string `json:"hostname" db:"hostname"`
-}
-
-type DiskInfo struct {
-	ID          int64   `json:"id" db:"id"`
-	MetricsID   int64   `json:"-" db:"metrics_id"`
-	MountPoint  string  `json:"mount_point" db:"mount_point"`
-	Device      string  `json:"device" db:"device"`
-	FSType      string  `json:"fs_type" db:"fs_type"`
-	TotalBytes  uint64  `json:"total_bytes" db:"total_bytes"`
-	UsedBytes   uint64  `json:"used_bytes" db:"used_bytes"`
-	FreeBytes   uint64  `json:"free_bytes" db:"free_bytes"`
-	UsedPercent float64 `json:"used_percent" db:"used_percent"`
 }
 
 // SystemMetricsSummary is a global aggregated view used for dashboard charts.
@@ -136,25 +121,6 @@ type DiskHealth struct {
 	PendingSectors int       `json:"pending_sectors" db:"pending_sectors"`
 }
 
-// ========== Metrics Aggregation (for downsampling) ==========
-
-// MetricsAggregate stores downsampled metrics (5-min, hourly, daily)
-type MetricsAggregate struct {
-	ID              int64     `json:"id" db:"id"`
-	HostID          string    `json:"host_id" db:"host_id"`
-	AggregationType string    `json:"aggregation_type" db:"aggregation_type"` // 5min, hour, day
-	Timestamp       time.Time `json:"timestamp" db:"timestamp"`               // Start of the interval
-
-	// Metrics (averages for the period)
-	CPUUsageAvg      float64 `json:"cpu_usage_avg" db:"cpu_usage_avg"`
-	CPUUsageMax      float64 `json:"cpu_usage_max" db:"cpu_usage_max"`
-	MemoryUsageAvg   uint64  `json:"memory_usage_avg" db:"memory_usage_avg"`
-	MemoryUsageMax   uint64  `json:"memory_usage_max" db:"memory_usage_max"`
-	MemoryPercentAvg float64 `json:"memory_percent_avg" db:"memory_percent_avg"`
-	DiskUsageAvg     float64 `json:"disk_usage_avg" db:"disk_usage_avg"`
-	NetworkRxBytes   uint64  `json:"network_rx_bytes" db:"network_rx_bytes"`
-	NetworkTxBytes   uint64  `json:"network_tx_bytes" db:"network_tx_bytes"`
-
-	SampleCount int       `json:"sample_count" db:"sample_count"` // How many raw samples in period
-	CreatedAt   time.Time `json:"created_at" db:"created_at"`
-}
+// Metric downsampling is now handled by the TimescaleDB continuous aggregate
+// system_metrics_5min (see migration 064 / the V2 baseline); the former
+// MetricsAggregate struct + metrics_aggregates table were removed in V2.

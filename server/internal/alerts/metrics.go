@@ -66,8 +66,14 @@ func GetMetricValue(ctx context.Context, db *database.DB, host models.Host, rule
 		case "memory":
 			return metrics.MemoryPercent, true
 		case "disk":
+			// Disk usage now lives in disk_metrics (the legacy disk_info table was
+			// removed in V2); take the worst mount point for the host.
+			disks, err := db.GetLatestDiskMetrics(ctx, host.ID)
+			if err != nil || len(disks) == 0 {
+				return 0, false
+			}
 			maxDisk := 0.0
-			for _, d := range metrics.Disks {
+			for _, d := range disks {
 				if d.UsedPercent > maxDisk {
 					maxDisk = d.UsedPercent
 				}

@@ -96,7 +96,9 @@ func main() {
 	bg.Add(background.NewAuditCleanupJob(db, cfg))
 	bg.Add(background.NewHostStatusJob(db))
 	bg.Add(background.NewAlertEvalJob(db, cfg, dispatcher, notifHub))
-	bg.Add(background.NewMetricsDownsampleJob(db))
+	// Metric downsampling is handled by the TimescaleDB continuous aggregate
+	// (system_metrics_5min); metric retention/compression by Timescale policies.
+	// The remaining job only trims release-tracker tag digests.
 	bg.Add(background.NewMetricsRetentionJob(db, cfg))
 	bg.Add(background.NewWebLogsRetentionJob(db, cfg))
 	bg.Add(background.NewUptimeWorkerJob(db))

@@ -91,11 +91,49 @@ func New(cfg *config.Config) (*DB, error) {
 	db.hasTimescaleDB = hasTS
 	if hasTS {
 		slog.Info("TimescaleDB extension detected - using time_bucket() for metric bucketing")
+		// Continuous aggregates cannot be created inside a transaction/DO block,
+		// so they live here (run as standalone statements) rather than in a SQL
+		// migration. Idempotent and gated on Timescale availability; a failure is
+		// logged but never blocks startup (GetMetricsSummary falls back to raw).
+		if err := db.ensureTimescaleObjects(context.Background()); err != nil {
+			slog.Error("failed to ensure TimescaleDB continuous aggregates", slog.Any("err", err))
+		}
 	} else {
 		slog.Info("TimescaleDB not found - using plain PostgreSQL bucketing")
 	}
 
 	return db, nil
+}
+
+// ensureTimescaleObjects creates the continuous aggregate (and its refresh
+// policy) that powers the dashboard metrics summary. It requires system_metrics
+// to already be a hypertable (done by migration 064 / the V2 baseline). Each
+// statement is idempotent so this is safe to run on every startup.
+func (db *DB) ensureTimescaleObjects(ctx context.Context) error {
+	if _, err := db.conn.ExecContext(ctx,
+		`CREATE MATERIALIZED VIEW IF NOT EXISTS system_metrics_5min
+		 WITH (timescaledb.continuous) AS
+		 SELECT time_bucket(INTERVAL '5 minutes', timestamp) AS bucket,
+		        host_id,
+		        AVG(cpu_usage_percent) AS cpu_avg,
+		        AVG(memory_percent)    AS mem_avg,
+		        COUNT(*)               AS sample_count
+		 FROM system_metrics
+		 GROUP BY bucket, host_id
+		 WITH NO DATA`); err != nil {
+		return fmt.Errorf("create system_metrics_5min: %w", err)
+	}
+
+	if _, err := db.conn.ExecContext(ctx,
+		`SELECT add_continuous_aggregate_policy('system_metrics_5min',
+		    start_offset      => INTERVAL '30 days',
+		    end_offset        => INTERVAL '5 minutes',
+		    schedule_interval => INTERVAL '5 minutes',
+		    if_not_exists     => true)`); err != nil {
+		return fmt.Errorf("add continuous aggregate policy: %w", err)
+	}
+
+	return nil
 }
 
 func (db *DB) Close() error { return db.conn.Close() }
