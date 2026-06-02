@@ -1,3 +1,0 @@
-ALTER TABLE network_topology_config
-  ADD COLUMN IF NOT EXISTS root_port_id     VARCHAR(20) NOT NULL DEFAULT '',
-  ADD COLUMN IF NOT EXISTS authelia_port_id VARCHAR(20) NOT NULL DEFAULT '';
