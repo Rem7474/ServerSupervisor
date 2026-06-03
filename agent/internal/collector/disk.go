@@ -2,6 +2,7 @@ package collector
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"os/exec"
 	"strconv"
@@ -422,6 +423,36 @@ func CollectDiskHealth() ([]DiskHealth, error) {
 	}
 
 	return healthData, nil
+}
+
+// CheckSMARTAvailability probes whether SMART collection can actually work on
+// this host. It is meant to be called once at startup when collect_smart is
+// enabled so the operator gets a clear warning when SMART is on but unusable —
+// e.g. inside an LXC/unprivileged container with no block-device access, or
+// when smartmontools is not installed. ok is true (with a short detail string)
+// only when at least one disk returns a real SMART status (PASSED/FAILED).
+func CheckSMARTAvailability() (ok bool, detail string) {
+	if _, err := exec.LookPath("smartctl"); err != nil {
+		return false, "smartctl not found — install smartmontools (e.g. apt install smartmontools) or set collect_smart: false"
+	}
+
+	devices, _ := findPhysicalDisks()
+	if len(devices) == 0 {
+		return false, "no physical block devices accessible — expected inside an LXC/unprivileged container; SMART needs bare-metal or a VM with disk passthrough"
+	}
+
+	readable := 0
+	for _, device := range devices {
+		h, err := collectSmartData(device)
+		if err == nil && (h.SMARTStatus == "PASSED" || h.SMARTStatus == "FAILED") {
+			readable++
+		}
+	}
+	if readable == 0 {
+		return false, fmt.Sprintf("smartctl found %d device(s) but could not read SMART data from any of them (insufficient privileges or virtualized disks?)", len(devices))
+	}
+
+	return true, fmt.Sprintf("%d disk(s) readable", readable)
 }
 
 // findPhysicalDisks trouve tous les disques physiques (sd*, nvme*, vd*)

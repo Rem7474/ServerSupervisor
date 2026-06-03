@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/serversupervisor/agent/internal/collector"
 	"github.com/serversupervisor/agent/internal/config"
 	"github.com/serversupervisor/agent/internal/dispatcher"
 	"github.com/serversupervisor/agent/internal/reporter"
@@ -103,6 +104,13 @@ func main() {
 	log.Printf("Docker monitoring: %v", cfg.CollectDocker)
 	log.Printf("APT monitoring: %v", cfg.CollectAPT)
 	log.Printf("SMART monitoring: %v", cfg.CollectSMART)
+	if cfg.CollectSMART {
+		if ok, detail := collector.CheckSMARTAvailability(); ok {
+			log.Printf("SMART check: OK (%s)", detail)
+		} else {
+			log.Printf("WARNING: SMART monitoring is enabled but unavailable: %s", detail)
+		}
+	}
 	log.Printf("CPU temperature monitoring: %v", cfg.CollectCPUTemperature)
 	log.Printf("Web logs analytics: %v (paths: %v)", cfg.CollectWebLogs, cfg.WebLogGlobs())
 	if cfg.MaxReportBodyBytes <= 0 {
