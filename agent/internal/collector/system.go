@@ -13,38 +13,29 @@ import (
 	"strings"
 	"sync"
 	"time"
-
 )
 
-type NetworkInterface struct {
-	Name    string `json:"name"`
-	RxBytes uint64 `json:"rx_bytes"`
-	TxBytes uint64 `json:"tx_bytes"`
-}
-
 type SystemMetrics struct {
-	CPUUsagePercent   float64            `json:"cpu_usage_percent"`
-	CPUCores          int                `json:"cpu_cores"`
-	CPUModel          string             `json:"cpu_model"`
-	CPUTemperature    float64            `json:"cpu_temperature"`
-	FanRPM            float64            `json:"fan_rpm"`
-	LoadAvg1          float64            `json:"load_avg_1"`
-	LoadAvg5          float64            `json:"load_avg_5"`
-	LoadAvg15         float64            `json:"load_avg_15"`
-	MemoryTotal       uint64             `json:"memory_total"`
-	MemoryUsed        uint64             `json:"memory_used"`
-	MemoryFree        uint64             `json:"memory_free"`
-	MemoryPercent     float64            `json:"memory_percent"`
-	SwapTotal         uint64             `json:"swap_total"`
-	SwapUsed          uint64             `json:"swap_used"`
-	NetworkRxBytes    uint64             `json:"network_rx_bytes"`
-	NetworkTxBytes    uint64             `json:"network_tx_bytes"`
-	NetworkInterfaces []NetworkInterface `json:"network_interfaces,omitempty"`
-	Uptime            uint64             `json:"uptime"`
-	OS                string             `json:"os"`
-	Hostname          string             `json:"hostname"`
+	CPUUsagePercent float64 `json:"cpu_usage_percent"`
+	CPUCores        int     `json:"cpu_cores"`
+	CPUModel        string  `json:"cpu_model"`
+	CPUTemperature  float64 `json:"cpu_temperature"`
+	FanRPM          float64 `json:"fan_rpm"`
+	LoadAvg1        float64 `json:"load_avg_1"`
+	LoadAvg5        float64 `json:"load_avg_5"`
+	LoadAvg15       float64 `json:"load_avg_15"`
+	MemoryTotal     uint64  `json:"memory_total"`
+	MemoryUsed      uint64  `json:"memory_used"`
+	MemoryFree      uint64  `json:"memory_free"`
+	MemoryPercent   float64 `json:"memory_percent"`
+	SwapTotal       uint64  `json:"swap_total"`
+	SwapUsed        uint64  `json:"swap_used"`
+	NetworkRxBytes  uint64  `json:"network_rx_bytes"`
+	NetworkTxBytes  uint64  `json:"network_tx_bytes"`
+	Uptime          uint64  `json:"uptime"`
+	OS              string  `json:"os"`
+	Hostname        string  `json:"hostname"`
 }
-
 
 // CollectSystem gathers all system metrics using /proc and standard Linux tools.
 // CPU temperature collection can be disabled to avoid sensor probing overhead.
@@ -79,10 +70,9 @@ func CollectSystem(collectCPUTemperature bool) (*SystemMetrics, error) {
 	m.SwapTotal = memInfo.swapTotal
 	m.SwapUsed = m.SwapTotal - memInfo.swapFree
 
-	rx, tx, ifaces := getNetworkBytes()
+	rx, tx := getNetworkBytes()
 	m.NetworkRxBytes = rx
 	m.NetworkTxBytes = tx
-	m.NetworkInterfaces = ifaces
 
 	m.Uptime = getUptime()
 
@@ -530,11 +520,10 @@ func getMemInfo() memInfoFields {
 	return r
 }
 
-
-func getNetworkBytes() (rx, tx uint64, ifaces []NetworkInterface) {
+func getNetworkBytes() (rx, tx uint64) {
 	data, err := os.ReadFile("/proc/net/dev")
 	if err != nil {
-		return 0, 0, nil
+		return 0, 0
 	}
 	for _, line := range strings.Split(string(data), "\n") {
 		line = strings.TrimSpace(line)
@@ -545,7 +534,6 @@ func getNetworkBytes() (rx, tx uint64, ifaces []NetworkInterface) {
 		if len(parts) != 2 {
 			continue
 		}
-		name := strings.TrimSpace(parts[0])
 		fields := strings.Fields(parts[1])
 		if len(fields) < 10 {
 			continue
@@ -554,9 +542,8 @@ func getNetworkBytes() (rx, tx uint64, ifaces []NetworkInterface) {
 		t, _ := strconv.ParseUint(fields[8], 10, 64)
 		rx += r
 		tx += t
-		ifaces = append(ifaces, NetworkInterface{Name: name, RxBytes: r, TxBytes: t})
 	}
-	return rx, tx, ifaces
+	return rx, tx
 }
 
 func getUptime() uint64 {

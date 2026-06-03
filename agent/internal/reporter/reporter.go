@@ -193,7 +193,6 @@ func (r *Reporter) Send(ctx context.Context, s *sender.Sender, cmdQueue chan<- [
 		Capabilities:       capabilities,
 		Metrics:            metricsPayload,
 		Docker:             dockerData,
-		AptStatus:          nil,
 		UnattendedUpgrades: uuData,
 		WebLogs:            webLogs,
 		DockerNetworks:     dockerNetworks,
@@ -272,7 +271,7 @@ func trimWebLogsForReportSize(report *sender.Report, maxBodyBytes int) {
 		web.Requests = nil
 	} else {
 		ratio := float64(budget) / float64(len(reqEncoded))
-		target := int(float64(original)*ratio*0.9) // 10 % safety margin
+		target := int(float64(original) * ratio * 0.9) // 10 % safety margin
 		if target < 0 {
 			target = 0
 		}

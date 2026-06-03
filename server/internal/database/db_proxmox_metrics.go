@@ -2,6 +2,8 @@ package database
 
 import (
 	"context"
+	"database/sql"
+	"log/slog"
 	"time"
 
 	"github.com/serversupervisor/server/internal/models"
@@ -18,13 +20,31 @@ func (db *DB) InsertProxmoxNodeMetric(ctx context.Context, nodeID, connectionID,
 	return err
 }
 
-// GetProxmoxNodeMetricsSummary returns time-bucketed avg CPU% and RAM% across all nodes,
-// using the same bucket logic as GetMetricsSummary for host agents.
+// GetProxmoxNodeMetricsSummary returns time-bucketed avg CPU% and RAM% across all nodes.
+// For buckets ≥ 5 minutes it reads the proxmox_node_metrics_5min continuous aggregate
+// instead of scanning raw rows; finer buckets fall back to the raw table, as does any
+// aggregate query failure (so the chart is never empty). Mirrors GetMetricsSummary.
 func (db *DB) GetProxmoxNodeMetricsSummary(ctx context.Context, hours, bucketMinutes int) ([]models.ProxmoxNodeMetricsSummary, error) {
 	if bucketMinutes <= 0 {
 		bucketMinutes = 5
 	}
 
+	if bucketMinutes >= 5 {
+		summary, err := db.proxmoxNodeSummaryFromCAGG(ctx, hours, bucketMinutes)
+		switch {
+		case err == nil && len(summary) > 0:
+			return summary, nil
+		case err != nil:
+			slog.WarnContext(ctx, "proxmox node metrics summary continuous aggregate query failed, falling back to raw",
+				slog.Int("hours", hours), slog.Int("bucket_minutes", bucketMinutes), slog.Any("err", err))
+		}
+	}
+
+	return db.proxmoxNodeSummaryFromRaw(ctx, hours, bucketMinutes)
+}
+
+// proxmoxNodeSummaryFromRaw aggregates the raw proxmox_node_metrics hypertable across nodes.
+func (db *DB) proxmoxNodeSummaryFromRaw(ctx context.Context, hours, bucketMinutes int) ([]models.ProxmoxNodeMetricsSummary, error) {
 	// cpu_usage is stored as a 0‒1 ratio; multiply by 100 to get percentage.
 	// mem_avg is computed as (mem_used / mem_total) * 100 when mem_total > 0.
 	rows, err := db.conn.QueryContext(ctx, `
@@ -42,6 +62,31 @@ func (db *DB) GetProxmoxNodeMetricsSummary(ctx context.Context, hours, bucketMin
 	}
 	defer func() { _ = rows.Close() }()
 
+	return scanProxmoxSummary(rows)
+}
+
+// proxmoxNodeSummaryFromCAGG re-buckets the proxmox_node_metrics_5min continuous aggregate
+// (one row per 5-minute bucket + node) into the requested bucket, averaging across nodes.
+func (db *DB) proxmoxNodeSummaryFromCAGG(ctx context.Context, hours, bucketMinutes int) ([]models.ProxmoxNodeMetricsSummary, error) {
+	rows, err := db.conn.QueryContext(ctx, `
+		SELECT
+			time_bucket($2 * '1 minute'::interval, bucket) AS ts,
+			AVG(cpu_avg) AS cpu_avg,
+			AVG(mem_avg) AS mem_avg,
+			SUM(sample_count) AS sample_count
+		FROM proxmox_node_metrics_5min
+		WHERE bucket > NOW() - INTERVAL '1 hour' * $1
+		GROUP BY ts
+		ORDER BY ts ASC`, hours, bucketMinutes)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	return scanProxmoxSummary(rows)
+}
+
+func scanProxmoxSummary(rows *sql.Rows) ([]models.ProxmoxNodeMetricsSummary, error) {
 	var summary []models.ProxmoxNodeMetricsSummary
 	for rows.Next() {
 		var s models.ProxmoxNodeMetricsSummary
@@ -52,7 +97,6 @@ func (db *DB) GetProxmoxNodeMetricsSummary(ctx context.Context, hours, bucketMin
 	}
 	return summary, rows.Err()
 }
-
 
 // ─── Guest metrics ────────────────────────────────────────────────────────────
 
@@ -69,11 +113,28 @@ func (db *DB) InsertProxmoxGuestMetric(ctx context.Context, guestID string, cpuU
 
 // GetProxmoxGuestMetricsSummary returns time-bucketed CPU% and RAM% for a single guest.
 // Same format as ProxmoxNodeMetricsSummary so the frontend can reuse the same chart logic.
+// Reads the proxmox_guest_metrics_5min continuous aggregate for buckets ≥ 5 minutes, with
+// a raw fallback for finer buckets or aggregate failure.
 func (db *DB) GetProxmoxGuestMetricsSummary(ctx context.Context, guestID string, hours, bucketMinutes int) ([]models.ProxmoxNodeMetricsSummary, error) {
 	if bucketMinutes <= 0 {
 		bucketMinutes = 5
 	}
 
+	if bucketMinutes >= 5 {
+		summary, err := db.proxmoxGuestSummaryFromCAGG(ctx, guestID, hours, bucketMinutes)
+		switch {
+		case err == nil && len(summary) > 0:
+			return summary, nil
+		case err != nil:
+			slog.WarnContext(ctx, "proxmox guest metrics summary continuous aggregate query failed, falling back to raw",
+				slog.String("guest_id", guestID), slog.Int("hours", hours), slog.Int("bucket_minutes", bucketMinutes), slog.Any("err", err))
+		}
+	}
+
+	return db.proxmoxGuestSummaryFromRaw(ctx, guestID, hours, bucketMinutes)
+}
+
+func (db *DB) proxmoxGuestSummaryFromRaw(ctx context.Context, guestID string, hours, bucketMinutes int) ([]models.ProxmoxNodeMetricsSummary, error) {
 	rows, err := db.conn.QueryContext(ctx, `
 		SELECT
 			time_bucket($3 * '1 minute'::interval, timestamp) AS ts,
@@ -90,15 +151,27 @@ func (db *DB) GetProxmoxGuestMetricsSummary(ctx context.Context, guestID string,
 	}
 	defer func() { _ = rows.Close() }()
 
-	var summary []models.ProxmoxNodeMetricsSummary
-	for rows.Next() {
-		var s models.ProxmoxNodeMetricsSummary
-		if err := rows.Scan(&s.Timestamp, &s.CPUAvg, &s.MemoryAvg, &s.SampleCount); err != nil {
-			continue
-		}
-		summary = append(summary, s)
+	return scanProxmoxSummary(rows)
+}
+
+func (db *DB) proxmoxGuestSummaryFromCAGG(ctx context.Context, guestID string, hours, bucketMinutes int) ([]models.ProxmoxNodeMetricsSummary, error) {
+	rows, err := db.conn.QueryContext(ctx, `
+		SELECT
+			time_bucket($3 * '1 minute'::interval, bucket) AS ts,
+			AVG(cpu_avg) AS cpu_avg,
+			AVG(mem_avg) AS mem_avg,
+			SUM(sample_count) AS sample_count
+		FROM proxmox_guest_metrics_5min
+		WHERE guest_id = $1
+		  AND bucket > NOW() - INTERVAL '1 hour' * $2
+		GROUP BY ts
+		ORDER BY ts ASC`, guestID, hours, bucketMinutes)
+	if err != nil {
+		return nil, err
 	}
-	return summary, rows.Err()
+	defer func() { _ = rows.Close() }()
+
+	return scanProxmoxSummary(rows)
 }
 
 // GetLatestProxmoxGuestMetricPercent returns the freshest guest CPU% and RAM% sample.
@@ -351,12 +424,11 @@ func (db *DB) queryProxmoxDiskMinWearout(ctx context.Context, whereClause string
 	return pct
 }
 
-
 // GetNodeIDByConnectionAndName resolves a proxmox_nodes UUID from its composite key.
 // Used by the poller so we can insert node metrics without an extra JOIN.
 func (db *DB) GetProxmoxNodeID(ctx context.Context, connectionID, nodeName string) (string, error) {
 	var id string
-	err := db.conn.QueryRowContext(ctx, 
+	err := db.conn.QueryRowContext(ctx,
 		`SELECT id FROM proxmox_nodes WHERE connection_id = $1 AND node_name = $2`,
 		connectionID, nodeName,
 	).Scan(&id)
@@ -364,11 +436,28 @@ func (db *DB) GetProxmoxNodeID(ctx context.Context, connectionID, nodeName strin
 }
 
 // GetProxmoxNodeMetricsSummaryByNode returns time-bucketed stats for a single node.
+// Reads the proxmox_node_metrics_5min continuous aggregate for buckets ≥ 5 minutes, with
+// a raw fallback for finer buckets or aggregate failure.
 func (db *DB) GetProxmoxNodeMetricsSummaryByNode(ctx context.Context, nodeID string, hours, bucketMinutes int) ([]models.ProxmoxNodeMetricsSummary, error) {
 	if bucketMinutes <= 0 {
 		bucketMinutes = 5
 	}
 
+	if bucketMinutes >= 5 {
+		summary, err := db.proxmoxNodeSummaryByNodeFromCAGG(ctx, nodeID, hours, bucketMinutes)
+		switch {
+		case err == nil && len(summary) > 0:
+			return summary, nil
+		case err != nil:
+			slog.WarnContext(ctx, "proxmox node-by-node metrics summary continuous aggregate query failed, falling back to raw",
+				slog.String("node_id", nodeID), slog.Int("hours", hours), slog.Int("bucket_minutes", bucketMinutes), slog.Any("err", err))
+		}
+	}
+
+	return db.proxmoxNodeSummaryByNodeFromRaw(ctx, nodeID, hours, bucketMinutes)
+}
+
+func (db *DB) proxmoxNodeSummaryByNodeFromRaw(ctx context.Context, nodeID string, hours, bucketMinutes int) ([]models.ProxmoxNodeMetricsSummary, error) {
 	rows, err := db.conn.QueryContext(ctx, `
 		SELECT
 			time_bucket($3 * '1 minute'::interval, timestamp) AS ts,
@@ -385,13 +474,25 @@ func (db *DB) GetProxmoxNodeMetricsSummaryByNode(ctx context.Context, nodeID str
 	}
 	defer func() { _ = rows.Close() }()
 
-	var summary []models.ProxmoxNodeMetricsSummary
-	for rows.Next() {
-		var s models.ProxmoxNodeMetricsSummary
-		if err := rows.Scan(&s.Timestamp, &s.CPUAvg, &s.MemoryAvg, &s.SampleCount); err != nil {
-			continue
-		}
-		summary = append(summary, s)
+	return scanProxmoxSummary(rows)
+}
+
+func (db *DB) proxmoxNodeSummaryByNodeFromCAGG(ctx context.Context, nodeID string, hours, bucketMinutes int) ([]models.ProxmoxNodeMetricsSummary, error) {
+	rows, err := db.conn.QueryContext(ctx, `
+		SELECT
+			time_bucket($3 * '1 minute'::interval, bucket) AS ts,
+			AVG(cpu_avg) AS cpu_avg,
+			AVG(mem_avg) AS mem_avg,
+			SUM(sample_count) AS sample_count
+		FROM proxmox_node_metrics_5min
+		WHERE node_id = $1
+		  AND bucket > NOW() - INTERVAL '1 hour' * $2
+		GROUP BY ts
+		ORDER BY ts ASC`, nodeID, hours, bucketMinutes)
+	if err != nil {
+		return nil, err
 	}
-	return summary, rows.Err()
+	defer func() { _ = rows.Close() }()
+
+	return scanProxmoxSummary(rows)
 }

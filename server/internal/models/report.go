@@ -19,19 +19,18 @@ type AgentCapabilities struct {
 
 // AgentReport is the full status report sent by the agent to the server
 type AgentReport struct {
-	HostID          string              `json:"host_id"`
-	AgentVersion    string              `json:"agent_version"`
-	Capabilities    *AgentCapabilities  `json:"capabilities,omitempty"` // Which collectors are enabled on this agent
-	Metrics         *SystemMetrics      `json:"metrics,omitempty"`
-	Docker          *DockerReport       `json:"docker,omitempty"`
-	AptStatus            *AptStatus                `json:"apt_status,omitempty"`
-	UnattendedUpgrades   *UnattendedUpgradesStatus `json:"unattended_upgrades,omitempty"`
-	WebLogs         *WebLogReport       `json:"web_logs,omitempty"`
-	DockerNetworks  []DockerNetwork     `json:"docker_networks,omitempty"`
-	ComposeProjects []ComposeProject    `json:"compose_projects,omitempty"`
-	DiskMetrics     []DiskMetrics       `json:"disk_metrics,omitempty"`
-	DiskHealth      []DiskHealth        `json:"disk_health,omitempty"`
-	CustomTasks     []CustomTaskSummary `json:"custom_tasks,omitempty"`
-	TasksConfigYAML string              `json:"tasks_config_yaml,omitempty"`
-	Timestamp       time.Time           `json:"timestamp"`
+	HostID             string                    `json:"host_id"`
+	AgentVersion       string                    `json:"agent_version"`
+	Capabilities       *AgentCapabilities        `json:"capabilities,omitempty"` // Which collectors are enabled on this agent
+	Metrics            *SystemMetrics            `json:"metrics,omitempty"`
+	Docker             *DockerReport             `json:"docker,omitempty"`
+	UnattendedUpgrades *UnattendedUpgradesStatus `json:"unattended_upgrades,omitempty"`
+	WebLogs            *WebLogReport             `json:"web_logs,omitempty"`
+	DockerNetworks     []DockerNetwork           `json:"docker_networks,omitempty"`
+	ComposeProjects    []ComposeProject          `json:"compose_projects,omitempty"`
+	DiskMetrics        []DiskMetrics             `json:"disk_metrics,omitempty"`
+	DiskHealth         []DiskHealth              `json:"disk_health,omitempty"`
+	CustomTasks        []CustomTaskSummary       `json:"custom_tasks,omitempty"`
+	TasksConfigYAML    string                    `json:"tasks_config_yaml,omitempty"`
+	Timestamp          time.Time                 `json:"timestamp"`
 }

@@ -134,6 +134,50 @@
                 {{ disk.pending_sectors }}
               </div>
             </div>
+            <div class="col-6 mt-2">
+              <div
+                class="text-muted small"
+              >
+                Secteurs incorrigibles
+              </div>
+              <div
+                class="fw-bold"
+                :class="{ 'text-danger': (disk.uncorrectable_sectors ?? 0) > 0 }"
+              >
+                {{ disk.uncorrectable_sectors ?? 0 }}
+              </div>
+            </div>
+            <div class="col-6 mt-2">
+              <div
+                class="text-muted small"
+              >
+                Cycles d'alimentation
+              </div>
+              <div class="fw-bold">
+                <span v-if="(disk.power_cycles ?? 0) > 0">{{ disk.power_cycles!.toLocaleString() }}</span>
+                <span
+                  v-else
+                  class="text-muted"
+                >N/A</span>
+              </div>
+            </div>
+            <div class="col-6 mt-2">
+              <div
+                class="text-muted small"
+              >
+                Usure SSD/NVMe
+              </div>
+              <div
+                class="fw-bold"
+                :class="{ 'text-danger': (disk.percentage_used ?? 0) >= 80, 'text-warning': (disk.percentage_used ?? 0) >= 50 && (disk.percentage_used ?? 0) < 80 }"
+              >
+                <span v-if="(disk.percentage_used ?? 0) > 0">{{ disk.percentage_used }}%</span>
+                <span
+                  v-else
+                  class="text-muted"
+                >N/A</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -154,8 +198,11 @@ interface DiskHealth {
   smart_status: string
   temperature: number
   power_on_hours: number
+  power_cycles?: number
   realloc_sectors: number
   pending_sectors: number
+  uncorrectable_sectors?: number
+  percentage_used?: number
 }
 
 const props = withDefaults(defineProps<{

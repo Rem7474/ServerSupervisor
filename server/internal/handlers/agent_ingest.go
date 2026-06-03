@@ -98,13 +98,6 @@ func (h *AgentHandler) storeContainersAndPackages(ctx context.Context, hostID, s
 		}
 	}
 
-	if report.AptStatus != nil {
-		report.AptStatus.HostID = hostID
-		if err := h.db.UpsertAptStatus(ctx, report.AptStatus); err != nil {
-			slog.ErrorContext(ctx, fmt.Sprintf("Warning: failed to store apt status for host %s: %v", safeHostID, err))
-		}
-	}
-
 	if report.UnattendedUpgrades != nil {
 		if err := h.db.UpsertUUStatus(ctx, hostID, *report.UnattendedUpgrades); err != nil {
 			slog.ErrorContext(ctx, fmt.Sprintf("Warning: failed to store UU status for host %s: %v", safeHostID, err))

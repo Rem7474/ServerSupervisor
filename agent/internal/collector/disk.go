@@ -65,7 +65,8 @@ type DiskHealth struct {
 	SMARTStatus          string `json:"smart_status"` // PASSED, FAILED, UNKNOWN
 	Temperature          int    `json:"temperature"`
 	PowerOnHours         int    `json:"power_on_hours"`
-	ReallocatedSectors   int    `json:"reallocated_sectors"`
+	PowerCycles          int    `json:"power_cycles"`
+	ReallocatedSectors   int    `json:"realloc_sectors"`
 	PendingSectors       int    `json:"pending_sectors"`
 	UncorrectableSectors int    `json:"uncorrectable_sectors"`
 	PercentageUsed       int    `json:"percentage_used"` // For SSDs
@@ -516,6 +517,8 @@ func collectSmartData(device string) (DiskHealth, error) {
 						health.ReallocatedSectors = int(rawValue)
 					case 9: // Power On Hours
 						health.PowerOnHours = int(rawValue)
+					case 12: // Power Cycle Count
+						health.PowerCycles = int(rawValue)
 					case 197: // Current Pending Sector Count
 						health.PendingSectors = int(rawValue)
 					case 198: // Offline Uncorrectable Sector Count
@@ -536,6 +539,9 @@ func collectSmartData(device string) (DiskHealth, error) {
 		}
 		if hours, ok := nvme["power_on_hours"].(float64); ok {
 			health.PowerOnHours = int(hours)
+		}
+		if cycles, ok := nvme["power_cycles"].(float64); ok {
+			health.PowerCycles = int(cycles)
 		}
 	}
 
@@ -591,6 +597,8 @@ func parseSmartText(device, output string) (DiskHealth, error) {
 				health.ReallocatedSectors = int(rawValue)
 			case 9:
 				health.PowerOnHours = int(rawValue)
+			case 12:
+				health.PowerCycles = int(rawValue)
 			case 197:
 				health.PendingSectors = int(rawValue)
 			case 198:

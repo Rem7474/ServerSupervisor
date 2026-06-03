@@ -107,18 +107,20 @@ type DiskMetrics struct {
 
 // DiskHealth for SMART monitoring (optional, collected if smartctl available)
 type DiskHealth struct {
-	ID             int64     `json:"id" db:"id"`
-	HostID         string    `json:"host_id" db:"host_id"`
-	CollectedAt    time.Time `json:"collected_at" db:"timestamp"`
-	Device         string    `json:"device" db:"device"` // /dev/sda, /dev/nvme0n1
-	Model          string    `json:"model" db:"model"`
-	SerialNumber   string    `json:"serial_number" db:"serial_number"`
-	SmartStatus    string    `json:"smart_status" db:"smart_status"` // PASSED, FAILED, UNKNOWN
-	Temperature    int       `json:"temperature" db:"temperature"`   // Celsius
-	PowerOnHours   int64     `json:"power_on_hours" db:"power_on_hours"`
-	PowerCycles    int64     `json:"power_cycles" db:"power_cycles"`
-	ReallocSectors int       `json:"realloc_sectors" db:"realloc_sectors"`
-	PendingSectors int       `json:"pending_sectors" db:"pending_sectors"`
+	ID                   int64     `json:"id" db:"id"`
+	HostID               string    `json:"host_id" db:"host_id"`
+	CollectedAt          time.Time `json:"collected_at" db:"timestamp"`
+	Device               string    `json:"device" db:"device"` // /dev/sda, /dev/nvme0n1
+	Model                string    `json:"model" db:"model"`
+	SerialNumber         string    `json:"serial_number" db:"serial_number"`
+	SmartStatus          string    `json:"smart_status" db:"smart_status"` // PASSED, FAILED, UNKNOWN
+	Temperature          int       `json:"temperature" db:"temperature"`   // Celsius
+	PowerOnHours         int64     `json:"power_on_hours" db:"power_on_hours"`
+	PowerCycles          int64     `json:"power_cycles" db:"power_cycles"`
+	ReallocSectors       int       `json:"realloc_sectors" db:"realloc_sectors"`
+	PendingSectors       int       `json:"pending_sectors" db:"pending_sectors"`
+	UncorrectableSectors int       `json:"uncorrectable_sectors" db:"uncorrectable_sectors"`
+	PercentageUsed       int       `json:"percentage_used" db:"percentage_used"` // SSD/NVMe wear indicator
 }
 
 // Metric downsampling is now handled by the TimescaleDB continuous aggregate
