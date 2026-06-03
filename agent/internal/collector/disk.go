@@ -2,6 +2,7 @@ package collector
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"os/exec"
 	"strconv"
@@ -65,7 +66,8 @@ type DiskHealth struct {
 	SMARTStatus          string `json:"smart_status"` // PASSED, FAILED, UNKNOWN
 	Temperature          int    `json:"temperature"`
 	PowerOnHours         int    `json:"power_on_hours"`
-	ReallocatedSectors   int    `json:"reallocated_sectors"`
+	PowerCycles          int    `json:"power_cycles"`
+	ReallocatedSectors   int    `json:"realloc_sectors"`
 	PendingSectors       int    `json:"pending_sectors"`
 	UncorrectableSectors int    `json:"uncorrectable_sectors"`
 	PercentageUsed       int    `json:"percentage_used"` // For SSDs
@@ -423,6 +425,36 @@ func CollectDiskHealth() ([]DiskHealth, error) {
 	return healthData, nil
 }
 
+// CheckSMARTAvailability probes whether SMART collection can actually work on
+// this host. It is meant to be called once at startup when collect_smart is
+// enabled so the operator gets a clear warning when SMART is on but unusable —
+// e.g. inside an LXC/unprivileged container with no block-device access, or
+// when smartmontools is not installed. ok is true (with a short detail string)
+// only when at least one disk returns a real SMART status (PASSED/FAILED).
+func CheckSMARTAvailability() (ok bool, detail string) {
+	if _, err := exec.LookPath("smartctl"); err != nil {
+		return false, "smartctl not found — install smartmontools (e.g. apt install smartmontools) or set collect_smart: false"
+	}
+
+	devices, _ := findPhysicalDisks()
+	if len(devices) == 0 {
+		return false, "no physical block devices accessible — expected inside an LXC/unprivileged container; SMART needs bare-metal or a VM with disk passthrough"
+	}
+
+	readable := 0
+	for _, device := range devices {
+		h, err := collectSmartData(device)
+		if err == nil && (h.SMARTStatus == "PASSED" || h.SMARTStatus == "FAILED") {
+			readable++
+		}
+	}
+	if readable == 0 {
+		return false, fmt.Sprintf("smartctl found %d device(s) but could not read SMART data from any of them (insufficient privileges or virtualized disks?)", len(devices))
+	}
+
+	return true, fmt.Sprintf("%d disk(s) readable", readable)
+}
+
 // findPhysicalDisks trouve tous les disques physiques (sd*, nvme*, vd*)
 func findPhysicalDisks() ([]string, error) {
 	cmd := exec.Command("sh", "-c", "ls /dev/sd[a-z] /dev/nvme[0-9]n[0-9] /dev/vd[a-z] 2>/dev/null | sort -u")
@@ -516,6 +548,8 @@ func collectSmartData(device string) (DiskHealth, error) {
 						health.ReallocatedSectors = int(rawValue)
 					case 9: // Power On Hours
 						health.PowerOnHours = int(rawValue)
+					case 12: // Power Cycle Count
+						health.PowerCycles = int(rawValue)
 					case 197: // Current Pending Sector Count
 						health.PendingSectors = int(rawValue)
 					case 198: // Offline Uncorrectable Sector Count
@@ -536,6 +570,9 @@ func collectSmartData(device string) (DiskHealth, error) {
 		}
 		if hours, ok := nvme["power_on_hours"].(float64); ok {
 			health.PowerOnHours = int(hours)
+		}
+		if cycles, ok := nvme["power_cycles"].(float64); ok {
+			health.PowerCycles = int(cycles)
 		}
 	}
 
@@ -591,6 +628,8 @@ func parseSmartText(device, output string) (DiskHealth, error) {
 				health.ReallocatedSectors = int(rawValue)
 			case 9:
 				health.PowerOnHours = int(rawValue)
+			case 12:
+				health.PowerCycles = int(rawValue)
 			case 197:
 				health.PendingSectors = int(rawValue)
 			case 198:

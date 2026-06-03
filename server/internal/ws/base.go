@@ -40,6 +40,11 @@ const wsMaxConnsPerIP = 20
 const (
 	wsPingInterval = 30 * time.Second
 	wsPongWait     = 60 * time.Second
+	// dashboardCacheTTL is how long a freshly built dashboard snapshot is reused
+	// across all connected clients before being recomputed. The data ticker fires
+	// every 10s, so this lets concurrent clients (and the initial connection burst)
+	// share one computation instead of each running the full ~10-query snapshot.
+	dashboardCacheTTL = 5 * time.Second
 )
 
 type WSHandler struct {
@@ -49,6 +54,13 @@ type WSHandler struct {
 	notifHub  *NotificationHub
 	ipConns   map[string]int
 	ipConnsMu sync.Mutex
+
+	// Shared, short-lived cache of the dashboard snapshot payload. The payload is
+	// identical for every client (no per-user filtering), so it is computed once
+	// per TTL window regardless of how many dashboards are open.
+	dashCacheMu sync.Mutex
+	dashCache   gin.H
+	dashCacheAt time.Time
 }
 
 type wsAuthMessage struct {

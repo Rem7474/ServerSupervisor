@@ -377,8 +377,15 @@
             class="mb-4"
           />
           <DiskHealthCard
+            v-if="hasLocalSmart || !isProxmoxLinked"
             :host-id="hostId"
             :initial-health="(diskHealth as any)"
+            class="mb-4"
+          />
+          <ProxmoxHostDiskHealthCard
+            v-else
+            :host-id="hostId"
+            :node-name="proxmoxLink?.node_name ?? null"
             class="mb-4"
           />
         </div>
@@ -651,10 +658,12 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useHostDetail } from '../composables/useHostDetail'
 import RelativeTime from '../components/RelativeTime.vue'
 import DiskMetricsCard from '../components/disk/DiskMetricsCard.vue'
 import DiskHealthCard from '../components/disk/DiskHealthCard.vue'
+import ProxmoxHostDiskHealthCard from '../components/proxmox/ProxmoxHostDiskHealthCard.vue'
 import DiskHistoryChart from '../components/disk/DiskHistoryChart.vue'
 import HostMetricsPanel from '../components/host/HostMetricsPanel.vue'
 import HostProcessesPanel from '../components/host/HostProcessesPanel.vue'
@@ -739,6 +748,12 @@ const {
   handleUURunNow,
   openUULog,
 } = useHostDetail()
+
+// Local SMART is unreadable inside an LXC/VM. When the host has no local disk
+// health but is linked to Proxmox, we surface the hosting node's disk health
+// instead of an empty SMART card.
+const hasLocalSmart = computed(() => ((diskHealth.value as unknown[] | null)?.length ?? 0) > 0)
+const isProxmoxLinked = computed(() => !!proxmoxLink.value && proxmoxLink.value.status !== 'ignored')
 </script>
 
 <style scoped>

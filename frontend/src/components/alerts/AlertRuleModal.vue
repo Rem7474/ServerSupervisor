@@ -108,7 +108,7 @@
           <div class="modal-footer">
             <button
               type="button"
-              class="btn btn-link"
+              class="btn btn-secondary"
               @click="close"
             >
               Annuler
@@ -654,48 +654,6 @@ const currentMetricUnit = computed(() => getMetricUnit(form.value.metric))
   width: 24px;
 }
 
-.metric-grid {
-  display: grid;
-  gap: 0.8rem;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.metric-card {
-  align-items: center;
-  background: var(--tblr-bg-surface, #ffffff);
-  border: 1px solid var(--tblr-border-color, #d9e2ee);
-  border-radius: 0.8rem;
-  cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  justify-content: center;
-  min-height: 90px;
-  padding: 0.8rem;
-  transition: all 0.15s ease;
-}
-
-.metric-card:hover {
-  border-color: var(--ss-accent-blue-soft);
-  box-shadow: 0 2px 10px rgba(66, 132, 245, 0.18);
-}
-
-.metric-card.selected {
-  background: linear-gradient(160deg, rgba(45, 140, 255, 0.14) 0%, rgba(45, 140, 255, 0.06) 100%);
-  border-color: var(--ss-accent-blue);
-  box-shadow: inset 0 0 0 1px var(--ss-accent-blue);
-}
-
-.metric-icon {
-  font-size: 1.2rem;
-  line-height: 1;
-}
-
-.metric-label {
-  color: var(--tblr-body-color, #1f2d3d);
-  font-size: 0.92rem;
-  font-weight: 600;
-}
 
 [data-bs-theme='dark'] .step-chip {
   background: var(--ss-chip-idle-bg);
@@ -720,22 +678,10 @@ const currentMetricUnit = computed(() => getMetricUnit(form.value.metric))
   color: #d6e4fb;
 }
 
-[data-bs-theme='dark'] .metric-card {
-  background: var(--ss-chip-idle-bg);
-  border-color: var(--ss-chip-idle-border);
-}
-
-[data-bs-theme='dark'] .metric-card.selected {
-  background: linear-gradient(160deg, rgba(33, 118, 210, 0.34) 0%, rgba(18, 79, 150, 0.2) 100%);
-}
 
 @media (max-width: 768px) {
   .alert-steps {
     grid-template-columns: 1fr;
-  }
-
-  .metric-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 </style>

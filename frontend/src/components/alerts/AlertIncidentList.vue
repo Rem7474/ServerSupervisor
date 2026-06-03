@@ -265,6 +265,7 @@
             <th>Détails</th>
             <th>Déclenché</th>
             <th>Terminé</th>
+            <th style="width: 60px;" />
           </tr>
         </thead>
         <tbody>
@@ -274,10 +275,9 @@
           >
             <tr
               v-if="item._showSeparator"
-              class="table-light"
             >
               <td
-                colspan="7"
+                colspan="8"
                 class="text-center text-muted small py-1 border-top"
               >
                 — Plus de 7 jours —
@@ -360,6 +360,17 @@
                 </template>
                 <template v-else>
                   <code>{{ incidentFormatValue(item.value, item.metric) }}</code>
+                  <div
+                    v-if="!isCompleted(item) && item.current_value != null"
+                    class="text-muted small mt-1"
+                  >
+                    Actuel :
+                    <span class="fw-medium">{{ incidentFormatValue(item.current_value, item.metric) }}</span>
+                    <span
+                      v-if="resolveHint(item)"
+                      class="ms-1"
+                    >· {{ resolveHint(item) }}</span>
+                  </div>
                 </template>
               </td>
               <td class="text-muted small">
@@ -371,6 +382,36 @@
                   v-else
                   class="text-secondary"
                 >-</span>
+              </td>
+              <td>
+                <button
+                  v-if="!isCompleted(item) && item.id"
+                  class="btn btn-sm btn-ghost-secondary"
+                  :disabled="resolvingId === item.id"
+                  title="Clôturer manuellement"
+                  @click="manualResolve(item)"
+                >
+                  <span
+                    v-if="resolvingId === item.id"
+                    class="spinner-border spinner-border-sm"
+                  />
+                  <svg
+                    v-else
+                    class="icon"
+                    width="14"
+                    height="14"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M5 13l4 4L19 7"
+                    />
+                  </svg>
+                </button>
               </td>
             </tr>
           </template>
@@ -473,6 +514,9 @@ interface Incident {
   status?: string
   version?: string
   value?: number | string
+  current_value?: number | null
+  clear_threshold?: number | null
+  operator?: string
   triggered_at?: string
   resolved_at?: string | null
   tracker_id?: string | number
@@ -512,7 +556,7 @@ const props = withDefaults(defineProps<{
   activeIncidentCount: 0,
 })
 
-defineEmits<{
+const emit = defineEmits<{
   (e: 'refresh'): void
 }>()
 
@@ -521,6 +565,7 @@ const filterStatus = ref('all')
 const searchQuery = ref('')
 const currentPage = ref(1)
 const markingRead = ref(false)
+const resolvingId = ref<string | number | null>(null)
 
 const filteredIncidents = computed(() => {
   const search = searchQuery.value.trim().toLowerCase()
@@ -636,6 +681,17 @@ async function markAllRead() {
   }
 }
 
+async function manualResolve(incident: Incident) {
+  if (!incident.id || resolvingId.value) return
+  resolvingId.value = incident.id
+  try {
+    await apiClient.resolveAlertIncident(incident.id)
+    emit('refresh')
+  } finally {
+    resolvingId.value = null
+  }
+}
+
 function notificationRoute(incident: Incident): string {
   if (incident?.type === 'release_tracker_detected' || incident?.type === 'release_tracker_execution') {
     if (incident?.tracker_id) return `/release-trackers/${encodeURIComponent(String(incident.tracker_id))}`
@@ -675,6 +731,18 @@ function incidentFormatValue(value: number | string | undefined, metric: string 
   if (metric === 'disk_smart_status') return Number(value) >= 1 ? 'FAILED' : 'OK'
   const unit = getAlertMetricMeta(metric || '').unit
   return `${Number(value).toFixed(2)}${unit}`
+}
+
+// resolveHint describes the threshold the live value must cross for the alert
+// to resolve, e.g. "repasse OK ≤ 70°C" for a ">" rule.
+function resolveHint(incident: Incident): string {
+  if (incident.clear_threshold == null) return ''
+  const formatted = incidentFormatValue(incident.clear_threshold, incident.metric)
+  const op = incident.operator || ''
+  // A ">"/">=" rule resolves when the value drops to/below the clear threshold.
+  if (op === '>' || op === '>=') return `repasse OK ≤ ${formatted}`
+  if (op === '<' || op === '<=') return `repasse OK ≥ ${formatted}`
+  return `seuil de résolution ${formatted}`
 }
 
 function formatDate(dateStr: string | undefined | null): string {

@@ -13,48 +13,28 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"golang.org/x/sys/unix"
 )
 
-type NetworkInterface struct {
-	Name    string `json:"name"`
-	RxBytes uint64 `json:"rx_bytes"`
-	TxBytes uint64 `json:"tx_bytes"`
-}
-
 type SystemMetrics struct {
-	CPUUsagePercent   float64            `json:"cpu_usage_percent"`
-	CPUCores          int                `json:"cpu_cores"`
-	CPUModel          string             `json:"cpu_model"`
-	CPUTemperature    float64            `json:"cpu_temperature"`
-	FanRPM            float64            `json:"fan_rpm"`
-	LoadAvg1          float64            `json:"load_avg_1"`
-	LoadAvg5          float64            `json:"load_avg_5"`
-	LoadAvg15         float64            `json:"load_avg_15"`
-	MemoryTotal       uint64             `json:"memory_total"`
-	MemoryUsed        uint64             `json:"memory_used"`
-	MemoryFree        uint64             `json:"memory_free"`
-	MemoryPercent     float64            `json:"memory_percent"`
-	SwapTotal         uint64             `json:"swap_total"`
-	SwapUsed          uint64             `json:"swap_used"`
-	Disks             []DiskInfo         `json:"disks"`
-	NetworkRxBytes    uint64             `json:"network_rx_bytes"`
-	NetworkTxBytes    uint64             `json:"network_tx_bytes"`
-	NetworkInterfaces []NetworkInterface `json:"network_interfaces,omitempty"`
-	Uptime            uint64             `json:"uptime"`
-	OS                string             `json:"os"`
-	Hostname          string             `json:"hostname"`
-}
-
-type DiskInfo struct {
-	MountPoint  string  `json:"mount_point"`
-	Device      string  `json:"device"`
-	FSType      string  `json:"fs_type"`
-	TotalBytes  uint64  `json:"total_bytes"`
-	UsedBytes   uint64  `json:"used_bytes"`
-	FreeBytes   uint64  `json:"free_bytes"`
-	UsedPercent float64 `json:"used_percent"`
+	CPUUsagePercent float64 `json:"cpu_usage_percent"`
+	CPUCores        int     `json:"cpu_cores"`
+	CPUModel        string  `json:"cpu_model"`
+	CPUTemperature  float64 `json:"cpu_temperature"`
+	FanRPM          float64 `json:"fan_rpm"`
+	LoadAvg1        float64 `json:"load_avg_1"`
+	LoadAvg5        float64 `json:"load_avg_5"`
+	LoadAvg15       float64 `json:"load_avg_15"`
+	MemoryTotal     uint64  `json:"memory_total"`
+	MemoryUsed      uint64  `json:"memory_used"`
+	MemoryFree      uint64  `json:"memory_free"`
+	MemoryPercent   float64 `json:"memory_percent"`
+	SwapTotal       uint64  `json:"swap_total"`
+	SwapUsed        uint64  `json:"swap_used"`
+	NetworkRxBytes  uint64  `json:"network_rx_bytes"`
+	NetworkTxBytes  uint64  `json:"network_tx_bytes"`
+	Uptime          uint64  `json:"uptime"`
+	OS              string  `json:"os"`
+	Hostname        string  `json:"hostname"`
 }
 
 // CollectSystem gathers all system metrics using /proc and standard Linux tools.
@@ -90,12 +70,9 @@ func CollectSystem(collectCPUTemperature bool) (*SystemMetrics, error) {
 	m.SwapTotal = memInfo.swapTotal
 	m.SwapUsed = m.SwapTotal - memInfo.swapFree
 
-	m.Disks = getDiskUsage()
-
-	rx, tx, ifaces := getNetworkBytes()
+	rx, tx := getNetworkBytes()
 	m.NetworkRxBytes = rx
 	m.NetworkTxBytes = tx
-	m.NetworkInterfaces = ifaces
 
 	m.Uptime = getUptime()
 
@@ -543,60 +520,10 @@ func getMemInfo() memInfoFields {
 	return r
 }
 
-func getDiskUsage() []DiskInfo {
-	data, err := os.ReadFile("/proc/mounts")
-	if err != nil {
-		return nil
-	}
-
-	seen := make(map[string]bool)
-	var disks []DiskInfo
-	for _, line := range strings.Split(string(data), "\n") {
-		fields := strings.Fields(line)
-		if len(fields) < 3 {
-			continue
-		}
-		device, mountPoint, fsType := fields[0], fields[1], fields[2]
-		if pseudoFS[fsType] || seen[mountPoint] || shouldSkipFilesystem(fsType, device, mountPoint) {
-			continue
-		}
-		seen[mountPoint] = true
-
-		var stat unix.Statfs_t
-		if err := unix.Statfs(mountPoint, &stat); err != nil || stat.Blocks == 0 {
-			continue
-		}
-
-		bsize := uint64(stat.Bsize)
-		total := stat.Blocks * bsize
-		free := stat.Bavail * bsize
-		var used uint64
-		if stat.Blocks >= stat.Bfree {
-			used = (stat.Blocks - stat.Bfree) * bsize
-		}
-		// Compute used% the same way df does: used/(used+available).
-		var pct float64
-		if avail := (stat.Blocks - stat.Bfree) + stat.Bavail; avail > 0 {
-			pct = float64(stat.Blocks-stat.Bfree) / float64(avail) * 100
-		}
-
-		disks = append(disks, DiskInfo{
-			MountPoint:  mountPoint,
-			Device:      device,
-			FSType:      fsType,
-			TotalBytes:  total,
-			UsedBytes:   used,
-			FreeBytes:   free,
-			UsedPercent: pct,
-		})
-	}
-	return disks
-}
-
-func getNetworkBytes() (rx, tx uint64, ifaces []NetworkInterface) {
+func getNetworkBytes() (rx, tx uint64) {
 	data, err := os.ReadFile("/proc/net/dev")
 	if err != nil {
-		return 0, 0, nil
+		return 0, 0
 	}
 	for _, line := range strings.Split(string(data), "\n") {
 		line = strings.TrimSpace(line)
@@ -607,7 +534,6 @@ func getNetworkBytes() (rx, tx uint64, ifaces []NetworkInterface) {
 		if len(parts) != 2 {
 			continue
 		}
-		name := strings.TrimSpace(parts[0])
 		fields := strings.Fields(parts[1])
 		if len(fields) < 10 {
 			continue
@@ -616,9 +542,8 @@ func getNetworkBytes() (rx, tx uint64, ifaces []NetworkInterface) {
 		t, _ := strconv.ParseUint(fields[8], 10, 64)
 		rx += r
 		tx += t
-		ifaces = append(ifaces, NetworkInterface{Name: name, RxBytes: r, TxBytes: t})
 	}
-	return rx, tx, ifaces
+	return rx, tx
 }
 
 func getUptime() uint64 {

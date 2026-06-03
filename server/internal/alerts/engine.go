@@ -21,6 +21,71 @@ type NotificationPusher interface {
 	Broadcast(payload interface{})
 }
 
+// CurrentIncidentValue returns the live metric value for an open incident,
+// reconstructing the evaluation target the same way the engine does (real agent
+// host, or synthetic Proxmox/synthetic target keyed by the incident's host_id).
+func CurrentIncidentValue(ctx context.Context, db *database.DB, rule models.AlertRule, hostID string) (float64, bool) {
+	var host models.Host
+	if strings.HasPrefix(hostID, "proxmox:") || strings.HasPrefix(hostID, "synthetic:") {
+		host = models.Host{ID: hostID, Status: "online", LastSeen: time.Now()}
+	} else {
+		h, err := db.GetHost(ctx, hostID)
+		if err != nil || h == nil {
+			return 0, false
+		}
+		host = *h
+	}
+	return GetMetricValue(ctx, db, host, rule)
+}
+
+// ResolveStaleIncidentsForRule immediately resolves any open incidents for a rule
+// that are no longer active under its current thresholds. Called after a rule
+// update so stuck incidents don't wait for the next engine tick.
+//
+// Unlike the periodic engine, this function fetches the actual current metric
+// value (not inc.Value, which is stale once the value drops below the trigger
+// and the engine stops updating it).
+func ResolveStaleIncidentsForRule(ctx context.Context, db *database.DB, rule models.AlertRule) {
+	incidents, err := db.ListOpenAlertIncidentsByRule(ctx, rule.ID)
+	if err != nil || len(incidents) == 0 {
+		return
+	}
+
+	// Build a host map so status_offline can read the real host status.
+	hostMap := map[string]models.Host{}
+	if hosts, err := db.GetAllHosts(ctx); err == nil {
+		for _, h := range hosts {
+			hostMap[h.ID] = h
+		}
+	}
+
+	for _, inc := range incidents {
+		host, ok := hostMap[inc.HostID]
+		if !ok {
+			// Synthetic host (Proxmox / synthetic metrics) — construct a minimal record.
+			host = models.Host{ID: inc.HostID, Status: "online", LastSeen: time.Now()}
+		}
+
+		// Fetch the actual current metric value, same as the engine does.
+		currentValue, ok := GetMetricValue(ctx, db, host, rule)
+		if !ok {
+			continue
+		}
+
+		// Still firing with the new thresholds → leave open.
+		if DetermineSeverity(rule, host, currentValue) != SeverityNone {
+			continue
+		}
+		// Resolution conditions met → close immediately.
+		if ShouldResolveAlertSeverity(rule, host, currentValue, AlertSeverity(inc.Severity)) {
+			if err := db.ResolveAlertIncident(ctx, inc.ID); err == nil {
+				slog.InfoContext(ctx, "alerts: stale incident resolved after rule update",
+					slog.Int64("incident_id", inc.ID), slog.Int64("rule_id", rule.ID))
+			}
+		}
+	}
+}
+
 func EvaluateAlerts(ctx context.Context, db *database.DB, cfg *config.Config, dispatcher *dispatch.Dispatcher, pusher NotificationPusher) {
 	rules, err := db.GetAlertRules(ctx)
 	if err != nil {

@@ -61,8 +61,7 @@ func EnsureDatabaseExists(cfg *config.Config) error {
 // DB wraps the underlying sql.DB connection and exposes domain-specific methods
 // split across db_*.go files in this package.
 type DB struct {
-	conn           *sql.DB
-	hasTimescaleDB bool
+	conn *sql.DB
 }
 
 // New opens a connection to the database, runs migrations, and returns a DB.
@@ -84,18 +83,125 @@ func New(cfg *config.Config) (*DB, error) {
 		return nil, fmt.Errorf("failed to run migrations: %w", err)
 	}
 
-	// Detect TimescaleDB availability once so callers never attempt time_bucket()
-	// on a plain PostgreSQL instance (avoids ERROR noise in the DB server log).
-	var hasTS bool
-	_ = conn.QueryRow(`SELECT EXISTS(SELECT 1 FROM pg_extension WHERE extname = 'timescaledb')`).Scan(&hasTS)
-	db.hasTimescaleDB = hasTS
-	if hasTS {
-		slog.Info("TimescaleDB extension detected - using time_bucket() for metric bucketing")
-	} else {
-		slog.Info("TimescaleDB not found - using plain PostgreSQL bucketing")
+	// Continuous aggregates cannot be created inside a transaction/DO block,
+	// so they live here (run as standalone statements) rather than in a SQL migration.
+	// Startup fails if TimescaleDB is not installed — it is a hard requirement.
+	if err := db.ensureTimescaleObjects(context.Background()); err != nil {
+		return nil, fmt.Errorf("TimescaleDB setup failed (is the timescaledb extension installed?): %w", err)
 	}
+	slog.Info("TimescaleDB continuous aggregates ready")
 
 	return db, nil
+}
+
+// ensureTimescaleObjects creates the continuous aggregates (and their refresh
+// policies) that power the dashboard metrics summaries. They require the source
+// tables (system_metrics, proxmox_node_metrics, proxmox_guest_metrics,
+// disk_metrics) to already be hypertables (done by migration 064 / the V2
+// baseline). Each statement is idempotent so this is safe to run on every
+// startup. Continuous aggregates cannot be created inside a transaction, which
+// is why they live here rather than in a SQL migration.
+func (db *DB) ensureTimescaleObjects(ctx context.Context) error {
+	if _, err := db.conn.ExecContext(ctx,
+		`CREATE MATERIALIZED VIEW IF NOT EXISTS system_metrics_5min
+		 WITH (timescaledb.continuous) AS
+		 SELECT time_bucket(INTERVAL '5 minutes', timestamp) AS bucket,
+		        host_id,
+		        AVG(cpu_usage_percent) AS cpu_avg,
+		        AVG(memory_percent)    AS mem_avg,
+		        COUNT(*)               AS sample_count
+		 FROM system_metrics
+		 GROUP BY bucket, host_id
+		 WITH NO DATA`); err != nil {
+		return fmt.Errorf("create system_metrics_5min: %w", err)
+	}
+
+	if _, err := db.conn.ExecContext(ctx,
+		`SELECT add_continuous_aggregate_policy('system_metrics_5min',
+		    start_offset      => INTERVAL '30 days',
+		    end_offset        => INTERVAL '5 minutes',
+		    schedule_interval => INTERVAL '5 minutes',
+		    if_not_exists     => true)`); err != nil {
+		return fmt.Errorf("add continuous aggregate policy: %w", err)
+	}
+
+	// Proxmox node metrics: cpu_usage is a 0‒1 ratio and mem_* are bytes, so the
+	// aggregate materializes the same percentages the raw summary computes.
+	if _, err := db.conn.ExecContext(ctx,
+		`CREATE MATERIALIZED VIEW IF NOT EXISTS proxmox_node_metrics_5min
+		 WITH (timescaledb.continuous) AS
+		 SELECT time_bucket(INTERVAL '5 minutes', timestamp) AS bucket,
+		        node_id,
+		        AVG(cpu_usage * 100) AS cpu_avg,
+		        AVG(CASE WHEN mem_total > 0 THEN mem_used::float / mem_total * 100 ELSE 0 END) AS mem_avg,
+		        COUNT(*) AS sample_count
+		 FROM proxmox_node_metrics
+		 GROUP BY bucket, node_id
+		 WITH NO DATA`); err != nil {
+		return fmt.Errorf("create proxmox_node_metrics_5min: %w", err)
+	}
+
+	if _, err := db.conn.ExecContext(ctx,
+		`SELECT add_continuous_aggregate_policy('proxmox_node_metrics_5min',
+		    start_offset      => INTERVAL '30 days',
+		    end_offset        => INTERVAL '5 minutes',
+		    schedule_interval => INTERVAL '5 minutes',
+		    if_not_exists     => true)`); err != nil {
+		return fmt.Errorf("add proxmox_node_metrics_5min policy: %w", err)
+	}
+
+	if _, err := db.conn.ExecContext(ctx,
+		`CREATE MATERIALIZED VIEW IF NOT EXISTS proxmox_guest_metrics_5min
+		 WITH (timescaledb.continuous) AS
+		 SELECT time_bucket(INTERVAL '5 minutes', timestamp) AS bucket,
+		        guest_id,
+		        AVG(cpu_usage * 100) AS cpu_avg,
+		        AVG(CASE WHEN mem_total > 0 THEN mem_used::float / mem_total * 100 ELSE 0 END) AS mem_avg,
+		        COUNT(*) AS sample_count
+		 FROM proxmox_guest_metrics
+		 GROUP BY bucket, guest_id
+		 WITH NO DATA`); err != nil {
+		return fmt.Errorf("create proxmox_guest_metrics_5min: %w", err)
+	}
+
+	if _, err := db.conn.ExecContext(ctx,
+		`SELECT add_continuous_aggregate_policy('proxmox_guest_metrics_5min',
+		    start_offset      => INTERVAL '30 days',
+		    end_offset        => INTERVAL '5 minutes',
+		    schedule_interval => INTERVAL '5 minutes',
+		    if_not_exists     => true)`); err != nil {
+		return fmt.Errorf("add proxmox_guest_metrics_5min policy: %w", err)
+	}
+
+	// Disk metrics: hourly rollup powering the disk-history hour/day views.
+	// start_offset matches the disk_metrics 30-day retention.
+	if _, err := db.conn.ExecContext(ctx,
+		`CREATE MATERIALIZED VIEW IF NOT EXISTS disk_metrics_1h
+		 WITH (timescaledb.continuous) AS
+		 SELECT time_bucket(INTERVAL '1 hour', timestamp) AS bucket,
+		        host_id,
+		        mount_point,
+		        AVG(size_gb)      AS size_gb,
+		        AVG(used_gb)      AS used_gb,
+		        AVG(avail_gb)     AS avail_gb,
+		        AVG(used_percent) AS used_percent,
+		        COUNT(*)          AS sample_count
+		 FROM disk_metrics
+		 GROUP BY bucket, host_id, mount_point
+		 WITH NO DATA`); err != nil {
+		return fmt.Errorf("create disk_metrics_1h: %w", err)
+	}
+
+	if _, err := db.conn.ExecContext(ctx,
+		`SELECT add_continuous_aggregate_policy('disk_metrics_1h',
+		    start_offset      => INTERVAL '30 days',
+		    end_offset        => INTERVAL '1 hour',
+		    schedule_interval => INTERVAL '1 hour',
+		    if_not_exists     => true)`); err != nil {
+		return fmt.Errorf("add disk_metrics_1h policy: %w", err)
+	}
+
+	return nil
 }
 
 func (db *DB) Close() error { return db.conn.Close() }

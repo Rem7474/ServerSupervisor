@@ -5,5 +5,4 @@ declare module '*.vue' {
   export default component
 }
 
-declare module 'geojson-world-map/src/world.js'
 declare module 'topojson-client'

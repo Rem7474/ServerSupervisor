@@ -1,1504 +1,2787 @@
--- BREAKING: Full database baseline consolidation
--- Fresh install: apply this baseline and mark prior migration files as applied.
--- Existing install: this file is skipped by migrate() when hosts table already exists.
+-- =====================================================================
+-- V2 CONSOLIDATED BASELINE (squash of migrations 001..063)
+-- =====================================================================
+-- Generated from `pg_dump --schema-only` of a database migrated through 064 on
+-- plain PostgreSQL (so disk_info / metrics_aggregates are already gone and no
+-- TimescaleDB objects are present). Creates the full relational schema for
+-- FRESH installs only.
+--
+-- TimescaleDB is NOT set up here: migration 064_v2_timescale_migrate.sql runs on
+-- every install (it is not subsumed by this baseline) and is the single source
+-- of truth for hypertable conversion / compression / retention. The continuous
+-- aggregate is created from Go (DB.ensureTimescaleObjects).
+--
+-- Runner behaviour (see db.go): on an EXISTING database (table `hosts` present)
+-- this baseline is recorded as applied WITHOUT executing; the INSERT at the end
+-- marks every squashed migration (001..063) as applied so they never re-run.
+-- =====================================================================
 
--- ===== BEGIN 001_core.sql =====
--- Core tables: users, refresh_tokens, hosts, system_metrics, disk_info,
--- audit_logs, alert_rules, alert_incidents
+--
+-- PostgreSQL database dump
+--
 
-CREATE TABLE IF NOT EXISTS users (
-    id SERIAL PRIMARY KEY,
-    username VARCHAR(255) UNIQUE NOT NULL,
-    password_hash TEXT NOT NULL,
-    role VARCHAR(50) NOT NULL DEFAULT 'viewer',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+
+-- Dumped from database version 16.14
+-- Dumped by pg_dump version 16.14
+
+
+
+
+--
+-- Name: alert_incidents; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.alert_incidents (
+    id bigint NOT NULL,
+    rule_id integer,
+    host_id character varying(64),
+    triggered_at timestamp with time zone DEFAULT now(),
+    resolved_at timestamp with time zone,
+    value double precision,
+    severity character varying(10) DEFAULT 'crit'::character varying,
+    CONSTRAINT alert_incidents_severity_check CHECK (((severity)::text = ANY ((ARRAY['warn'::character varying, 'crit'::character varying])::text[])))
 );
 
-CREATE TABLE IF NOT EXISTS refresh_tokens (
-    id BIGSERIAL PRIMARY KEY,
-    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
-    token_hash VARCHAR(64) UNIQUE NOT NULL,
-    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    revoked_at TIMESTAMP WITH TIME ZONE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+
+--
+-- Name: alert_incidents_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.alert_incidents_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: alert_incidents_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.alert_incidents_id_seq OWNED BY public.alert_incidents.id;
+
+
+--
+-- Name: alert_rules; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.alert_rules (
+    id integer NOT NULL,
+    name character varying(255),
+    source_type character varying(20) DEFAULT 'agent'::character varying NOT NULL,
+    host_id character varying(64),
+    proxmox_scope jsonb,
+    metric character varying(50) NOT NULL,
+    operator character varying(5) NOT NULL,
+    threshold_crit double precision,
+    duration_seconds integer DEFAULT 60,
+    actions jsonb DEFAULT '{}'::jsonb NOT NULL,
+    last_fired timestamp with time zone,
+    enabled boolean DEFAULT true,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    threshold_clear_crit double precision,
+    threshold_warn double precision,
+    threshold_clear_warn double precision,
+    CONSTRAINT chk_alert_rules_source_type CHECK (((source_type)::text = ANY ((ARRAY['agent'::character varying, 'proxmox'::character varying, 'synthetic'::character varying])::text[])))
 );
 
-CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens(user_id);
 
-CREATE TABLE IF NOT EXISTS hosts (
-    id VARCHAR(64) PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    hostname VARCHAR(255) NOT NULL DEFAULT '',
-    ip_address VARCHAR(45) NOT NULL,
-    os VARCHAR(255) NOT NULL DEFAULT '',
-    api_key VARCHAR(255) NOT NULL,
-    tags JSONB DEFAULT '[]',
-    status VARCHAR(20) NOT NULL DEFAULT 'offline',
-    last_seen TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+--
+-- Name: alert_rules_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.alert_rules_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: alert_rules_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.alert_rules_id_seq OWNED BY public.alert_rules.id;
+
+
+--
+-- Name: apt_status; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.apt_status (
+    id bigint NOT NULL,
+    host_id character varying(64),
+    last_update timestamp with time zone,
+    last_upgrade timestamp with time zone,
+    pending_packages integer DEFAULT 0,
+    package_list jsonb DEFAULT '[]'::jsonb,
+    security_updates integer DEFAULT 0,
+    cve_list jsonb DEFAULT '[]'::jsonb,
+    updated_at timestamp with time zone DEFAULT now()
 );
 
-CREATE TABLE IF NOT EXISTS system_metrics (
-    id BIGSERIAL PRIMARY KEY,
-    host_id VARCHAR(64) REFERENCES hosts(id) ON DELETE CASCADE,
-    timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    cpu_usage_percent DOUBLE PRECISION,
-    cpu_cores INTEGER,
-    cpu_model VARCHAR(255),
-    load_avg_1 DOUBLE PRECISION,
-    load_avg_5 DOUBLE PRECISION,
-    load_avg_15 DOUBLE PRECISION,
-    memory_total BIGINT,
-    memory_used BIGINT,
-    memory_free BIGINT,
-    memory_percent DOUBLE PRECISION,
-    swap_total BIGINT,
-    swap_used BIGINT,
-    network_rx_bytes BIGINT,
-    network_tx_bytes BIGINT,
-    uptime BIGINT,
-    hostname VARCHAR(255)
+
+--
+-- Name: apt_status_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.apt_status_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: apt_status_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.apt_status_id_seq OWNED BY public.apt_status.id;
+
+
+--
+-- Name: audit_logs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.audit_logs (
+    id bigint NOT NULL,
+    username character varying(255) NOT NULL,
+    action character varying(100) NOT NULL,
+    host_id character varying(64),
+    ip_address character varying(45),
+    details text,
+    status character varying(20) DEFAULT 'pending'::character varying,
+    created_at timestamp with time zone DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_system_metrics_host_time ON system_metrics(host_id, timestamp DESC);
 
-CREATE TABLE IF NOT EXISTS disk_info (
-    id BIGSERIAL PRIMARY KEY,
-    metrics_id BIGINT REFERENCES system_metrics(id) ON DELETE CASCADE,
-    mount_point VARCHAR(255),
-    device VARCHAR(255),
-    fs_type VARCHAR(50),
-    total_bytes BIGINT,
-    used_bytes BIGINT,
-    free_bytes BIGINT,
-    used_percent DOUBLE PRECISION
+--
+-- Name: audit_logs_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.audit_logs_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: audit_logs_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.audit_logs_id_seq OWNED BY public.audit_logs.id;
+
+
+--
+-- Name: compose_projects; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.compose_projects (
+    id character varying(255) NOT NULL,
+    host_id character varying(64) NOT NULL,
+    name character varying(255) NOT NULL,
+    working_dir text DEFAULT ''::text NOT NULL,
+    config_file text DEFAULT ''::text NOT NULL,
+    services jsonb DEFAULT '[]'::jsonb NOT NULL,
+    raw_config text DEFAULT ''::text NOT NULL,
+    updated_at timestamp with time zone DEFAULT now()
 );
 
-CREATE TABLE IF NOT EXISTS audit_logs (
-    id BIGSERIAL PRIMARY KEY,
-    username VARCHAR(255) NOT NULL,
-    action VARCHAR(100) NOT NULL,
-    host_id VARCHAR(64),
-    ip_address VARCHAR(45),
-    details TEXT,
-    status VARCHAR(20) DEFAULT 'pending',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+
+--
+-- Name: disk_health; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.disk_health (
+    id bigint NOT NULL,
+    host_id character varying(64),
+    "timestamp" timestamp with time zone DEFAULT now(),
+    device character varying(255) NOT NULL,
+    model character varying(255) DEFAULT ''::character varying NOT NULL,
+    serial_number character varying(255) DEFAULT ''::character varying NOT NULL,
+    smart_status character varying(50) DEFAULT 'UNKNOWN'::character varying NOT NULL,
+    temperature integer DEFAULT 0,
+    power_on_hours bigint DEFAULT 0,
+    power_cycles bigint DEFAULT 0,
+    realloc_sectors integer DEFAULT 0,
+    pending_sectors integer DEFAULT 0
 );
 
-CREATE INDEX IF NOT EXISTS idx_audit_logs_user_action ON audit_logs(username, action, created_at DESC);
 
-CREATE INDEX IF NOT EXISTS idx_audit_logs_host ON audit_logs(host_id, created_at DESC);
+--
+-- Name: disk_health_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
 
-CREATE TABLE IF NOT EXISTS alert_rules (
-    id SERIAL PRIMARY KEY,
-    host_id VARCHAR(64),
-    metric VARCHAR(50) NOT NULL,
-    operator VARCHAR(5) NOT NULL,
-    threshold DOUBLE PRECISION,
-    duration_seconds INTEGER DEFAULT 60,
-    channel VARCHAR(50) NOT NULL DEFAULT '',
-    channel_config JSONB NOT NULL DEFAULT '{}'::jsonb,
-    enabled BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+CREATE SEQUENCE public.disk_health_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: disk_health_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.disk_health_id_seq OWNED BY public.disk_health.id;
+
+
+--
+-- Name: disk_metrics; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.disk_metrics (
+    id bigint NOT NULL,
+    host_id character varying(64),
+    "timestamp" timestamp with time zone DEFAULT now(),
+    mount_point character varying(255) NOT NULL,
+    filesystem character varying(255) DEFAULT ''::character varying NOT NULL,
+    size_gb double precision DEFAULT 0,
+    used_gb double precision DEFAULT 0,
+    avail_gb double precision DEFAULT 0,
+    used_percent double precision DEFAULT 0,
+    inodes_total bigint DEFAULT 0,
+    inodes_used bigint DEFAULT 0,
+    inodes_free bigint DEFAULT 0,
+    inodes_percent double precision DEFAULT 0
 );
 
-CREATE TABLE IF NOT EXISTS alert_incidents (
-    id BIGSERIAL PRIMARY KEY,
-    rule_id INTEGER REFERENCES alert_rules(id) ON DELETE CASCADE,
-    host_id VARCHAR(64),
-    triggered_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    resolved_at TIMESTAMP WITH TIME ZONE,
-    value DOUBLE PRECISION
+
+--
+-- Name: disk_metrics_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.disk_metrics_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: disk_metrics_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.disk_metrics_id_seq OWNED BY public.disk_metrics.id;
+
+
+--
+-- Name: docker_containers; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.docker_containers (
+    id character varying(64) NOT NULL,
+    host_id character varying(64),
+    container_id character varying(64),
+    name character varying(255),
+    image character varying(512),
+    image_tag character varying(255),
+    image_id character varying(255),
+    state character varying(50),
+    status character varying(255),
+    created timestamp with time zone,
+    ports text,
+    labels jsonb DEFAULT '{}'::jsonb,
+    updated_at timestamp with time zone DEFAULT now(),
+    env_vars jsonb DEFAULT '{}'::jsonb,
+    volumes jsonb DEFAULT '[]'::jsonb,
+    networks jsonb DEFAULT '[]'::jsonb,
+    net_rx_bytes bigint DEFAULT 0,
+    net_tx_bytes bigint DEFAULT 0,
+    image_digest text DEFAULT ''::text NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_alert_incidents_rule ON alert_incidents(rule_id, triggered_at DESC);
 
--- ===== END 001_core.sql =====
+--
+-- Name: docker_networks; Type: TABLE; Schema: public; Owner: -
+--
 
--- ===== BEGIN 002_aggregates.sql =====
--- Metrics aggregates table for downsampling (5min, hourly, daily)
-
-CREATE TABLE IF NOT EXISTS metrics_aggregates (
-    id BIGSERIAL PRIMARY KEY,
-    host_id VARCHAR(64) REFERENCES hosts(id) ON DELETE CASCADE,
-    aggregation_type VARCHAR(20) NOT NULL,
-    timestamp TIMESTAMP WITH TIME ZONE NOT NULL,
-    cpu_usage_avg DOUBLE PRECISION,
-    cpu_usage_max DOUBLE PRECISION,
-    memory_usage_avg BIGINT,
-    memory_usage_max BIGINT,
-    disk_usage_avg DOUBLE PRECISION,
-    network_rx_bytes BIGINT,
-    network_tx_bytes BIGINT,
-    sample_count INTEGER DEFAULT 1,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+CREATE TABLE public.docker_networks (
+    id character varying(64) NOT NULL,
+    host_id character varying(64),
+    network_id character varying(64) NOT NULL,
+    name character varying(255) NOT NULL,
+    driver character varying(50) DEFAULT 'bridge'::character varying,
+    scope character varying(20) DEFAULT 'local'::character varying,
+    container_ids jsonb DEFAULT '[]'::jsonb,
+    updated_at timestamp with time zone DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_metrics_aggregates_host_time ON metrics_aggregates(host_id, aggregation_type, timestamp DESC);
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_metrics_aggregates_unique ON metrics_aggregates(host_id, aggregation_type, timestamp);
+--
+-- Name: git_webhook_executions; Type: TABLE; Schema: public; Owner: -
+--
 
--- ===== END 002_aggregates.sql =====
-
--- ===== BEGIN 003_docker.sql =====
--- Docker containers, apt_status, and apt_commands table
-
-CREATE TABLE IF NOT EXISTS docker_containers (
-    id VARCHAR(64) PRIMARY KEY,
-    host_id VARCHAR(64) REFERENCES hosts(id) ON DELETE CASCADE,
-    container_id VARCHAR(64),
-    name VARCHAR(255),
-    image VARCHAR(512),
-    image_tag VARCHAR(255),
-    image_id VARCHAR(255),
-    state VARCHAR(50),
-    status VARCHAR(255),
-    created TIMESTAMP WITH TIME ZONE,
-    ports TEXT,
-    labels JSONB DEFAULT '{}',
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+CREATE TABLE public.git_webhook_executions (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    webhook_id uuid NOT NULL,
+    command_id character varying(36),
+    provider text DEFAULT ''::text NOT NULL,
+    repo_name text DEFAULT ''::text NOT NULL,
+    branch text DEFAULT ''::text NOT NULL,
+    commit_sha text DEFAULT ''::text NOT NULL,
+    commit_message text DEFAULT ''::text NOT NULL,
+    pusher text DEFAULT ''::text NOT NULL,
+    status text DEFAULT 'pending'::text NOT NULL,
+    triggered_at timestamp with time zone DEFAULT now() NOT NULL,
+    completed_at timestamp with time zone
 );
 
-CREATE INDEX IF NOT EXISTS idx_docker_containers_host ON docker_containers(host_id);
 
-CREATE TABLE IF NOT EXISTS apt_status (
-    id BIGSERIAL PRIMARY KEY,
-    host_id VARCHAR(64) UNIQUE REFERENCES hosts(id) ON DELETE CASCADE,
-    last_update TIMESTAMP WITH TIME ZONE,
-    last_upgrade TIMESTAMP WITH TIME ZONE,
-    pending_packages INTEGER DEFAULT 0,
-    package_list JSONB DEFAULT '[]',
-    security_updates INTEGER DEFAULT 0,
-    cve_list JSONB DEFAULT '[]',
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+--
+-- Name: git_webhooks; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.git_webhooks (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    name text NOT NULL,
+    secret text NOT NULL,
+    provider text DEFAULT 'github'::text NOT NULL,
+    repo_filter text DEFAULT ''::text NOT NULL,
+    branch_filter text DEFAULT ''::text NOT NULL,
+    event_filter text DEFAULT 'push'::text NOT NULL,
+    host_id character varying(64) NOT NULL,
+    custom_task_id text NOT NULL,
+    notify_channels text[] DEFAULT '{}'::text[] NOT NULL,
+    notify_on_success boolean DEFAULT false NOT NULL,
+    notify_on_failure boolean DEFAULT true NOT NULL,
+    enabled boolean DEFAULT true NOT NULL,
+    last_triggered_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
--- Transitional table superseded by remote_commands in 008_remote_commands.sql
-CREATE TABLE IF NOT EXISTS apt_commands (
-    id BIGSERIAL PRIMARY KEY,
-    host_id VARCHAR(64) REFERENCES hosts(id) ON DELETE CASCADE,
-    command VARCHAR(50) NOT NULL,
-    status VARCHAR(20) NOT NULL DEFAULT 'pending',
-    output TEXT DEFAULT '',
-    audit_log_id BIGINT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    started_at TIMESTAMP WITH TIME ZONE,
-    ended_at TIMESTAMP WITH TIME ZONE
+
+--
+-- Name: host_permissions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.host_permissions (
+    username text NOT NULL,
+    host_id text NOT NULL,
+    level text DEFAULT 'viewer'::text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT host_permissions_level_check CHECK ((level = ANY (ARRAY['viewer'::text, 'operator'::text])))
 );
 
-CREATE INDEX IF NOT EXISTS idx_apt_commands_host_status ON apt_commands(host_id, status);
 
-CREATE TABLE IF NOT EXISTS tracked_repos (
-    id SERIAL PRIMARY KEY,
-    owner VARCHAR(255) NOT NULL,
-    repo VARCHAR(255) NOT NULL,
-    display_name VARCHAR(255),
-    latest_version VARCHAR(255) DEFAULT '',
-    latest_date TIMESTAMP WITH TIME ZONE,
-    release_url TEXT DEFAULT '',
-    docker_image VARCHAR(512) DEFAULT '',
-    checked_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    UNIQUE(owner, repo)
+--
+-- Name: hosts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.hosts (
+    id character varying(64) NOT NULL,
+    name character varying(255) NOT NULL,
+    hostname character varying(255) DEFAULT ''::character varying NOT NULL,
+    ip_address character varying(45) NOT NULL,
+    os character varying(255) DEFAULT ''::character varying NOT NULL,
+    api_key character varying(255) NOT NULL,
+    tags jsonb DEFAULT '[]'::jsonb,
+    status character varying(20) DEFAULT 'offline'::character varying NOT NULL,
+    last_seen timestamp with time zone DEFAULT now(),
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    agent_version character varying(20) DEFAULT ''::character varying,
+    custom_tasks jsonb DEFAULT '[]'::jsonb NOT NULL,
+    web_log_source text,
+    web_log_collected_at timestamp with time zone,
+    web_log_total_requests integer DEFAULT 0 NOT NULL,
+    web_log_total_bytes bigint DEFAULT 0 NOT NULL,
+    web_log_errors_4xx integer DEFAULT 0 NOT NULL,
+    web_log_errors_5xx integer DEFAULT 0 NOT NULL,
+    web_log_suspicious_requests integer DEFAULT 0 NOT NULL,
+    web_log_suspicious_ips integer DEFAULT 0 NOT NULL,
+    collectors jsonb DEFAULT '{"apt": false, "smart": false, "docker": false, "journal": false, "systemd": false, "cpu_temp": false, "web_logs": false}'::jsonb,
+    tasks_config_yaml text DEFAULT ''::text NOT NULL
 );
 
--- ===== END 003_docker.sql =====
 
--- ===== BEGIN 004_topology.sql =====
--- Docker networks, container envs, network topology config, compose projects,
--- and docker_commands table
+--
+-- Name: ip_block_overrides; Type: TABLE; Schema: public; Owner: -
+--
 
-CREATE TABLE IF NOT EXISTS docker_networks (
-    id VARCHAR(64) PRIMARY KEY,
-    host_id VARCHAR(64) REFERENCES hosts(id) ON DELETE CASCADE,
-    network_id VARCHAR(64) NOT NULL,
-    name VARCHAR(255) NOT NULL,
-    driver VARCHAR(50) DEFAULT 'bridge',
-    scope VARCHAR(20) DEFAULT 'local',
-    container_ids JSONB DEFAULT '[]'::jsonb,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+CREATE TABLE public.ip_block_overrides (
+    ip_address character varying(45) NOT NULL,
+    unblocked_at timestamp with time zone DEFAULT now() NOT NULL,
+    unblocked_by character varying(255) DEFAULT ''::character varying NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_docker_networks_host ON docker_networks(host_id);
 
-CREATE TABLE IF NOT EXISTS container_envs (
-    id BIGSERIAL PRIMARY KEY,
-    host_id VARCHAR(64) REFERENCES hosts(id) ON DELETE CASCADE,
-    container_name VARCHAR(255) NOT NULL,
-    env_vars JSONB DEFAULT '{}'::jsonb,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+--
+-- Name: login_events; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.login_events (
+    id bigint NOT NULL,
+    username character varying(255) NOT NULL,
+    ip_address character varying(45) DEFAULT ''::character varying NOT NULL,
+    success boolean NOT NULL,
+    user_agent character varying(500) DEFAULT ''::character varying,
+    created_at timestamp with time zone DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_container_envs_host ON container_envs(host_id);
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_container_envs_host_name ON container_envs(host_id, container_name);
+--
+-- Name: login_events_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
 
-CREATE TABLE IF NOT EXISTS network_topology_config (
-    id SERIAL PRIMARY KEY,
-    root_label VARCHAR(255) DEFAULT 'Infrastructure',
-    root_ip VARCHAR(45) DEFAULT '',
-    excluded_ports JSONB DEFAULT '[]'::jsonb,
-    service_map TEXT DEFAULT '{}',
-    show_proxy_links BOOLEAN DEFAULT TRUE,
-    host_overrides TEXT DEFAULT '{}',
-    manual_services TEXT DEFAULT '[]',
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+CREATE SEQUENCE public.login_events_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: login_events_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.login_events_id_seq OWNED BY public.login_events.id;
+
+
+--
+-- Name: network_topology_config; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.network_topology_config (
+    id integer NOT NULL,
+    root_label character varying(255) DEFAULT 'Infrastructure'::character varying,
+    root_ip character varying(45) DEFAULT ''::character varying,
+    excluded_ports jsonb DEFAULT '[]'::jsonb,
+    service_map jsonb DEFAULT '{}'::jsonb,
+    show_proxy_links boolean DEFAULT true,
+    host_overrides jsonb DEFAULT '{}'::jsonb,
+    manual_services jsonb DEFAULT '[]'::jsonb,
+    updated_at timestamp with time zone DEFAULT now(),
+    authelia_label character varying(255) DEFAULT 'Authelia'::character varying,
+    authelia_ip character varying(45) DEFAULT ''::character varying,
+    internet_label character varying(255) DEFAULT 'Internet'::character varying,
+    internet_ip character varying(45) DEFAULT ''::character varying,
+    node_positions jsonb DEFAULT '{}'::jsonb,
+    root_host_id character varying(255) DEFAULT ''::character varying NOT NULL,
+    authelia_host_id character varying(255) DEFAULT ''::character varying NOT NULL,
+    root_port_id character varying(20) DEFAULT ''::character varying NOT NULL,
+    authelia_port_id character varying(20) DEFAULT ''::character varying NOT NULL
 );
 
-INSERT INTO network_topology_config (id, root_label)
-SELECT 1, 'Infrastructure' WHERE NOT EXISTS (SELECT 1 FROM network_topology_config);
 
-CREATE UNIQUE INDEX IF NOT EXISTS network_topology_config_singleton ON network_topology_config (id) WHERE id = 1;
+--
+-- Name: network_topology_config_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
 
-CREATE TABLE IF NOT EXISTS compose_projects (
-    id VARCHAR(255) PRIMARY KEY,
-    host_id VARCHAR(64) NOT NULL REFERENCES hosts(id) ON DELETE CASCADE,
-    name VARCHAR(255) NOT NULL,
-    working_dir TEXT NOT NULL DEFAULT '',
-    config_file TEXT NOT NULL DEFAULT '',
-    services TEXT NOT NULL DEFAULT '[]',
-    raw_config TEXT NOT NULL DEFAULT '',
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+CREATE SEQUENCE public.network_topology_config_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: network_topology_config_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.network_topology_config_id_seq OWNED BY public.network_topology_config.id;
+
+
+--
+-- Name: notification_read_at; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.notification_read_at (
+    username text NOT NULL,
+    read_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_compose_projects_host_id ON compose_projects(host_id);
 
--- Transitional table superseded by remote_commands in 008_remote_commands.sql
-CREATE TABLE IF NOT EXISTS docker_commands (
-    id BIGSERIAL PRIMARY KEY,
-    host_id VARCHAR(64) REFERENCES hosts(id) ON DELETE CASCADE,
-    container_name VARCHAR(255) NOT NULL,
-    action VARCHAR(20) NOT NULL,
-    status VARCHAR(20) NOT NULL DEFAULT 'pending',
-    output TEXT DEFAULT '',
-    triggered_by VARCHAR(255) DEFAULT 'system',
-    audit_log_id BIGINT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    started_at TIMESTAMP WITH TIME ZONE,
-    ended_at TIMESTAMP WITH TIME ZONE
+--
+-- Name: proxmox_backup_jobs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.proxmox_backup_jobs (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    connection_id uuid NOT NULL,
+    job_id text NOT NULL,
+    enabled boolean DEFAULT true NOT NULL,
+    schedule text DEFAULT ''::text NOT NULL,
+    storage text DEFAULT ''::text NOT NULL,
+    mode text DEFAULT 'snapshot'::text NOT NULL,
+    compress text DEFAULT ''::text NOT NULL,
+    vmids text DEFAULT ''::text NOT NULL,
+    mail_to text DEFAULT ''::text NOT NULL,
+    last_seen_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_docker_commands_host_status ON docker_commands(host_id, status);
 
--- ===== END 004_topology.sql =====
+--
+-- Name: proxmox_backup_runs; Type: TABLE; Schema: public; Owner: -
+--
 
--- ===== BEGIN 005_disk.sql =====
--- Disk metrics (detailed usage per mount point with inodes) and disk health (SMART)
-
-CREATE TABLE IF NOT EXISTS disk_metrics (
-    id BIGSERIAL PRIMARY KEY,
-    host_id VARCHAR(64) REFERENCES hosts(id) ON DELETE CASCADE,
-    timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    mount_point VARCHAR(255) NOT NULL,
-    filesystem VARCHAR(255) NOT NULL DEFAULT '',
-    size_gb DOUBLE PRECISION DEFAULT 0,
-    used_gb DOUBLE PRECISION DEFAULT 0,
-    avail_gb DOUBLE PRECISION DEFAULT 0,
-    used_percent DOUBLE PRECISION DEFAULT 0,
-    inodes_total BIGINT DEFAULT 0,
-    inodes_used BIGINT DEFAULT 0,
-    inodes_free BIGINT DEFAULT 0,
-    inodes_percent DOUBLE PRECISION DEFAULT 0
+CREATE TABLE public.proxmox_backup_runs (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    connection_id uuid NOT NULL,
+    node_name text DEFAULT ''::text NOT NULL,
+    vmid integer NOT NULL,
+    task_upid text DEFAULT ''::text NOT NULL,
+    status text DEFAULT ''::text NOT NULL,
+    start_time timestamp with time zone,
+    end_time timestamp with time zone,
+    exit_status text DEFAULT ''::text NOT NULL,
+    last_seen_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_disk_metrics_host_time ON disk_metrics(host_id, timestamp DESC);
 
-CREATE INDEX IF NOT EXISTS idx_disk_metrics_host_mount ON disk_metrics(host_id, mount_point, timestamp DESC);
+--
+-- Name: proxmox_connections; Type: TABLE; Schema: public; Owner: -
+--
 
-CREATE TABLE IF NOT EXISTS disk_health (
-    id BIGSERIAL PRIMARY KEY,
-    host_id VARCHAR(64) REFERENCES hosts(id) ON DELETE CASCADE,
-    timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    device VARCHAR(255) NOT NULL,
-    model VARCHAR(255) NOT NULL DEFAULT '',
-    serial_number VARCHAR(255) NOT NULL DEFAULT '',
-    smart_status VARCHAR(50) NOT NULL DEFAULT 'UNKNOWN',
-    temperature INTEGER DEFAULT 0,
-    power_on_hours BIGINT DEFAULT 0,
-    power_cycles BIGINT DEFAULT 0,
-    realloc_sectors INTEGER DEFAULT 0,
-    pending_sectors INTEGER DEFAULT 0
+CREATE TABLE public.proxmox_connections (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    name text NOT NULL,
+    api_url text NOT NULL,
+    token_id text NOT NULL,
+    token_secret text NOT NULL,
+    insecure_skip_verify boolean DEFAULT false NOT NULL,
+    enabled boolean DEFAULT true NOT NULL,
+    poll_interval_sec integer DEFAULT 60 NOT NULL,
+    last_error text DEFAULT ''::text NOT NULL,
+    last_error_at timestamp with time zone,
+    last_success_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_disk_health_host_time ON disk_health(host_id, timestamp DESC);
 
--- ===== END 005_disk.sql =====
+--
+-- Name: proxmox_disks; Type: TABLE; Schema: public; Owner: -
+--
 
--- ===== BEGIN 006_settings.sql =====
--- Login events table for security auditing and brute-force detection,
--- and dynamic settings table (DB overrides env vars, no restart needed)
-
-CREATE TABLE IF NOT EXISTS login_events (
-    id BIGSERIAL PRIMARY KEY,
-    username VARCHAR(255) NOT NULL,
-    ip_address VARCHAR(45) NOT NULL DEFAULT '',
-    success BOOLEAN NOT NULL,
-    user_agent VARCHAR(500) DEFAULT '',
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+CREATE TABLE public.proxmox_disks (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    connection_id uuid NOT NULL,
+    node_name text NOT NULL,
+    dev_path text NOT NULL,
+    model text DEFAULT ''::text NOT NULL,
+    serial text DEFAULT ''::text NOT NULL,
+    size_bytes bigint DEFAULT 0 NOT NULL,
+    disk_type text DEFAULT ''::text NOT NULL,
+    health text DEFAULT 'UNKNOWN'::text NOT NULL,
+    wearout integer DEFAULT '-1'::integer NOT NULL,
+    last_seen_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_login_events_ip_time ON login_events(ip_address, created_at DESC);
 
-CREATE INDEX IF NOT EXISTS idx_login_events_user_time ON login_events(username, created_at DESC);
+--
+-- Name: proxmox_guest_links; Type: TABLE; Schema: public; Owner: -
+--
 
-CREATE TABLE IF NOT EXISTS settings (
-    key VARCHAR(100) PRIMARY KEY,
-    value TEXT NOT NULL DEFAULT '',
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+CREATE TABLE public.proxmox_guest_links (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    guest_id uuid NOT NULL,
+    host_id text NOT NULL,
+    status text DEFAULT 'suggested'::text NOT NULL,
+    metrics_source text DEFAULT 'auto'::text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT proxmox_guest_links_metrics_source_check CHECK ((metrics_source = ANY (ARRAY['auto'::text, 'agent'::text, 'proxmox'::text]))),
+    CONSTRAINT proxmox_guest_links_status_check CHECK ((status = ANY (ARRAY['suggested'::text, 'confirmed'::text, 'ignored'::text])))
 );
 
--- ===== END 006_settings.sql =====
 
--- ===== BEGIN 007_alter_columns.sql =====
--- Column additions via ALTER TABLE (applied after all base tables are created)
+--
+-- Name: proxmox_guest_metrics; Type: TABLE; Schema: public; Owner: -
+--
 
--- hosts: add missing columns for existing databases
-ALTER TABLE IF EXISTS hosts ADD COLUMN IF NOT EXISTS name VARCHAR(255) NOT NULL DEFAULT '';
-
-ALTER TABLE IF EXISTS hosts ADD COLUMN IF NOT EXISTS tags JSONB DEFAULT '[]'::jsonb;
-
-ALTER TABLE IF EXISTS hosts ADD COLUMN IF NOT EXISTS agent_version VARCHAR(20) DEFAULT '';
-
--- apt_status: convert package_list from TEXT to JSONB
-ALTER TABLE IF EXISTS apt_status ALTER COLUMN package_list DROP DEFAULT;
-
-ALTER TABLE IF EXISTS apt_status ALTER COLUMN package_list TYPE JSONB USING COALESCE(package_list::jsonb, '[]'::jsonb);
-
-ALTER TABLE IF EXISTS apt_status ALTER COLUMN package_list SET DEFAULT '[]'::jsonb;
-
--- apt_status: add CVE tracking column
-ALTER TABLE IF EXISTS apt_status ADD COLUMN IF NOT EXISTS cve_list JSONB DEFAULT '[]'::jsonb;
-
-ALTER TABLE IF EXISTS apt_status ALTER COLUMN cve_list DROP DEFAULT;
-
-ALTER TABLE IF EXISTS apt_status ALTER COLUMN cve_list TYPE JSONB USING COALESCE(cve_list::jsonb, '[]'::jsonb);
-
-ALTER TABLE IF EXISTS apt_status ALTER COLUMN cve_list SET DEFAULT '[]'::jsonb;
-
--- users: TOTP and RBAC fields
-ALTER TABLE IF EXISTS users ADD COLUMN IF NOT EXISTS totp_secret TEXT DEFAULT '';
-
-ALTER TABLE IF EXISTS users ADD COLUMN IF NOT EXISTS backup_codes TEXT DEFAULT '[]';
-
-ALTER TABLE IF EXISTS users ADD COLUMN IF NOT EXISTS mfa_enabled BOOLEAN DEFAULT FALSE;
-
--- users: convert backup_codes from TEXT to JSONB
-ALTER TABLE IF EXISTS users ALTER COLUMN backup_codes DROP DEFAULT;
-
-ALTER TABLE IF EXISTS users ALTER COLUMN backup_codes TYPE JSONB USING COALESCE(backup_codes::jsonb, '[]'::jsonb);
-
-ALTER TABLE IF EXISTS users ALTER COLUMN backup_codes SET DEFAULT '[]'::jsonb;
-
--- users: first-login password change enforcement
-ALTER TABLE IF EXISTS users ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN NOT NULL DEFAULT FALSE;
-
--- apt_commands: who launched it and link to audit_logs
-ALTER TABLE IF EXISTS apt_commands ADD COLUMN IF NOT EXISTS triggered_by VARCHAR(255) DEFAULT 'system';
-
-ALTER TABLE IF EXISTS apt_commands ADD COLUMN IF NOT EXISTS audit_log_id BIGINT;
-
--- alert_rules: extended notification config columns
-ALTER TABLE IF EXISTS alert_rules ADD COLUMN IF NOT EXISTS name VARCHAR(255);
-
-ALTER TABLE IF EXISTS alert_rules ADD COLUMN IF NOT EXISTS channels JSONB DEFAULT '[]'::jsonb;
-
-ALTER TABLE IF EXISTS alert_rules ADD COLUMN IF NOT EXISTS smtp_to VARCHAR(255);
-
-ALTER TABLE IF EXISTS alert_rules ADD COLUMN IF NOT EXISTS ntfy_topic VARCHAR(255);
-
-ALTER TABLE IF EXISTS alert_rules ADD COLUMN IF NOT EXISTS cooldown INTEGER;
-
-ALTER TABLE IF EXISTS alert_rules ADD COLUMN IF NOT EXISTS last_fired TIMESTAMP WITH TIME ZONE;
-
-ALTER TABLE IF EXISTS alert_rules ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
-
--- network_topology_config: Authelia/Internet topology node fields
-ALTER TABLE network_topology_config ADD COLUMN IF NOT EXISTS authelia_label VARCHAR(255) DEFAULT 'Authelia';
-
-ALTER TABLE network_topology_config ADD COLUMN IF NOT EXISTS authelia_ip VARCHAR(45) DEFAULT '';
-
-ALTER TABLE network_topology_config ADD COLUMN IF NOT EXISTS internet_label VARCHAR(255) DEFAULT 'Internet';
-
-ALTER TABLE network_topology_config ADD COLUMN IF NOT EXISTS internet_ip VARCHAR(45) DEFAULT '';
-
--- docker_containers: extended container metadata
-ALTER TABLE IF EXISTS docker_containers ADD COLUMN IF NOT EXISTS env_vars JSONB DEFAULT '{}'::jsonb;
-
-ALTER TABLE IF EXISTS docker_containers ADD COLUMN IF NOT EXISTS volumes JSONB DEFAULT '[]'::jsonb;
-
-ALTER TABLE IF EXISTS docker_containers ADD COLUMN IF NOT EXISTS networks JSONB DEFAULT '[]'::jsonb;
-
--- docker_commands: compose project working directory
-ALTER TABLE IF EXISTS docker_commands ADD COLUMN IF NOT EXISTS working_dir TEXT DEFAULT '';
-
--- ===== END 007_alter_columns.sql =====
-
--- ===== BEGIN 008_remote_commands.sql =====
--- Unified remote_commands table (supersedes docker_commands + apt_commands)
-
-CREATE TABLE IF NOT EXISTS remote_commands (
-    id           VARCHAR(36)  PRIMARY KEY,
-    host_id      VARCHAR(64)  REFERENCES hosts(id) ON DELETE CASCADE,
-    module       VARCHAR(50)  NOT NULL,
-    action       VARCHAR(100) NOT NULL,
-    target       VARCHAR(255) NOT NULL DEFAULT '',
-    payload      TEXT         NOT NULL DEFAULT '{}',
-    status       VARCHAR(20)  NOT NULL DEFAULT 'pending',
-    output       TEXT         NOT NULL DEFAULT '',
-    triggered_by VARCHAR(255) NOT NULL DEFAULT 'system',
-    audit_log_id BIGINT,
-    created_at   TIMESTAMPTZ  DEFAULT NOW(),
-    started_at   TIMESTAMPTZ,
-    ended_at     TIMESTAMPTZ
+CREATE TABLE public.proxmox_guest_metrics (
+    id bigint NOT NULL,
+    guest_id uuid NOT NULL,
+    cpu_usage double precision DEFAULT 0 NOT NULL,
+    mem_total bigint DEFAULT 0 NOT NULL,
+    mem_used bigint DEFAULT 0 NOT NULL,
+    "timestamp" timestamp with time zone DEFAULT now() NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_remote_commands_host_status ON remote_commands(host_id, status);
 
-DROP TABLE IF EXISTS docker_commands;
+--
+-- Name: proxmox_guest_metrics_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
 
-DROP TABLE IF EXISTS apt_commands;
+CREATE SEQUENCE public.proxmox_guest_metrics_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
 
--- ===== END 008_remote_commands.sql =====
 
--- ===== BEGIN 009_alert_actions.sql =====
--- Consolidate alert_rules notification config into a single actions JSONB column
--- (Sprint 3c: replaces channel, channel_config, channels, smtp_to, ntfy_topic, cooldown)
+--
+-- Name: proxmox_guest_metrics_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
 
-ALTER TABLE IF EXISTS alert_rules ADD COLUMN IF NOT EXISTS actions JSONB NOT NULL DEFAULT '{}'::jsonb;
+ALTER SEQUENCE public.proxmox_guest_metrics_id_seq OWNED BY public.proxmox_guest_metrics.id;
 
-UPDATE alert_rules SET actions = jsonb_build_object(
-    'channels', COALESCE(channels, '[]'::jsonb),
-    'smtp_to', COALESCE(smtp_to, ''),
-    'ntfy_topic', COALESCE(ntfy_topic, ''),
-    'cooldown', COALESCE(cooldown, 0)
-) WHERE actions = '{}'::jsonb OR actions IS NULL;
 
-ALTER TABLE IF EXISTS alert_rules DROP COLUMN IF EXISTS channel;
+--
+-- Name: proxmox_guests; Type: TABLE; Schema: public; Owner: -
+--
 
-ALTER TABLE IF EXISTS alert_rules DROP COLUMN IF EXISTS channel_config;
-
-ALTER TABLE IF EXISTS alert_rules DROP COLUMN IF EXISTS channels;
-
-ALTER TABLE IF EXISTS alert_rules DROP COLUMN IF EXISTS smtp_to;
-
-ALTER TABLE IF EXISTS alert_rules DROP COLUMN IF EXISTS ntfy_topic;
-
-ALTER TABLE IF EXISTS alert_rules DROP COLUMN IF EXISTS cooldown;
-
--- ===== END 009_alert_actions.sql =====
-
--- ===== BEGIN 010_timescaledb.sql =====
--- TimescaleDB activation: hypertables, compression, and retention policies.
--- Uses pg_available_extensions to check availability upfront rather than a
--- catch-all EXCEPTION, so real errors (e.g. bad ALTER TABLE) still propagate.
-
-DO $$
-DECLARE
-  tsdb_available BOOLEAN := FALSE;
-BEGIN
-
-  -- ── Availability check ─────────────────────────────────────────────────────
-  SELECT EXISTS(SELECT 1 FROM pg_available_extensions WHERE name = 'timescaledb')
-    INTO tsdb_available;
-
-  IF NOT tsdb_available THEN
-    RAISE NOTICE 'TimescaleDB extension package not found on this PostgreSQL installation. '
-                 'Install timescaledb-2-postgresql-XX (or equivalent) to enable time-series '
-                 'optimizations (hypertables, compression, retention policies).';
-    RETURN;
-  END IF;
-
-  -- ── Extension ─────────────────────────────────────────────────────────────
-  CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;
-
-  -- ── system_metrics ────────────────────────────────────────────────────────
-  -- TimescaleDB requires all unique constraints (incl. PK) to include the
-  -- partition column.  We drop the plain PK, add a composite PK (id, timestamp),
-  -- and keep a UNIQUE (id) so disk_info.metrics_id FK continues to work.
-  IF NOT EXISTS (
-    SELECT 1 FROM timescaledb_information.hypertables
-    WHERE hypertable_name = 'system_metrics'
-  ) THEN
-    ALTER TABLE system_metrics DROP CONSTRAINT system_metrics_pkey;
-    ALTER TABLE system_metrics ADD PRIMARY KEY (id, timestamp);
-    ALTER TABLE system_metrics ADD CONSTRAINT system_metrics_id_unique UNIQUE (id);
-    PERFORM create_hypertable('system_metrics', 'timestamp', migrate_data => true);
-
-    ALTER TABLE system_metrics SET (
-      timescaledb.compress,
-      timescaledb.compress_segmentby = 'host_id'
-    );
-    PERFORM add_compression_policy('system_metrics', INTERVAL '7 days');
-    PERFORM add_retention_policy('system_metrics', INTERVAL '30 days');
-  END IF;
-
-  -- ── disk_metrics ──────────────────────────────────────────────────────────
-  IF NOT EXISTS (
-    SELECT 1 FROM timescaledb_information.hypertables
-    WHERE hypertable_name = 'disk_metrics'
-  ) THEN
-    ALTER TABLE disk_metrics DROP CONSTRAINT disk_metrics_pkey;
-    ALTER TABLE disk_metrics ADD PRIMARY KEY (id, timestamp);
-    ALTER TABLE disk_metrics ADD CONSTRAINT disk_metrics_id_unique UNIQUE (id);
-    PERFORM create_hypertable('disk_metrics', 'timestamp', migrate_data => true);
-
-    ALTER TABLE disk_metrics SET (
-      timescaledb.compress,
-      timescaledb.compress_segmentby = 'host_id,mount_point'
-    );
-    PERFORM add_compression_policy('disk_metrics', INTERVAL '7 days');
-    PERFORM add_retention_policy('disk_metrics', INTERVAL '30 days');
-  END IF;
-
-  -- ── disk_health ───────────────────────────────────────────────────────────
-  IF NOT EXISTS (
-    SELECT 1 FROM timescaledb_information.hypertables
-    WHERE hypertable_name = 'disk_health'
-  ) THEN
-    ALTER TABLE disk_health DROP CONSTRAINT disk_health_pkey;
-    ALTER TABLE disk_health ADD PRIMARY KEY (id, timestamp);
-    ALTER TABLE disk_health ADD CONSTRAINT disk_health_id_unique UNIQUE (id);
-    PERFORM create_hypertable('disk_health', 'timestamp', migrate_data => true);
-
-    ALTER TABLE disk_health SET (
-      timescaledb.compress,
-      timescaledb.compress_segmentby = 'host_id,device'
-    );
-    PERFORM add_compression_policy('disk_health', INTERVAL '7 days');
-    PERFORM add_retention_policy('disk_health', INTERVAL '90 days');
-  END IF;
-
-  -- ── metrics_aggregates ───────────────────────────────────────────────────
-  -- The existing UNIQUE (host_id, aggregation_type, timestamp) already includes
-  -- timestamp, so it remains valid.  The serial PK gets the same treatment.
-  IF NOT EXISTS (
-    SELECT 1 FROM timescaledb_information.hypertables
-    WHERE hypertable_name = 'metrics_aggregates'
-  ) THEN
-    ALTER TABLE metrics_aggregates DROP CONSTRAINT metrics_aggregates_pkey;
-    ALTER TABLE metrics_aggregates ADD PRIMARY KEY (id, timestamp);
-    ALTER TABLE metrics_aggregates ADD CONSTRAINT metrics_aggregates_id_unique UNIQUE (id);
-    PERFORM create_hypertable('metrics_aggregates', 'timestamp', migrate_data => true);
-
-    ALTER TABLE metrics_aggregates SET (
-      timescaledb.compress,
-      timescaledb.compress_segmentby = 'host_id,aggregation_type'
-    );
-    PERFORM add_compression_policy('metrics_aggregates', INTERVAL '30 days');
-    PERFORM add_retention_policy('metrics_aggregates', INTERVAL '365 days');
-  END IF;
-
-  -- ── login_events ──────────────────────────────────────────────────────────
-  IF NOT EXISTS (
-    SELECT 1 FROM timescaledb_information.hypertables
-    WHERE hypertable_name = 'login_events'
-  ) THEN
-    ALTER TABLE login_events DROP CONSTRAINT login_events_pkey;
-    ALTER TABLE login_events ADD PRIMARY KEY (id, created_at);
-    ALTER TABLE login_events ADD CONSTRAINT login_events_id_unique UNIQUE (id);
-    PERFORM create_hypertable('login_events', 'created_at', migrate_data => true);
-    PERFORM add_retention_policy('login_events', INTERVAL '90 days');
-  END IF;
-
-END $$;
-
--- ===== END 010_timescaledb.sql =====
-
--- ===== BEGIN 011_refactor.sql =====
--- Refactor sprint: indexes, FK integrity, TEXT→JSONB conversions, container_envs cleanup.
--- All statements are idempotent (IF NOT EXISTS / DO blocks).
-
--- ── 1. Missing indexes ──────────────────────────────────────────────────────
-
-CREATE INDEX IF NOT EXISTS idx_remote_commands_created
-    ON remote_commands(created_at DESC);
-
-CREATE INDEX IF NOT EXISTS idx_remote_commands_triggered
-    ON remote_commands(triggered_by);
-
-CREATE INDEX IF NOT EXISTS idx_docker_containers_state
-    ON docker_containers(state);
-
-CREATE INDEX IF NOT EXISTS idx_audit_logs_created
-    ON audit_logs(created_at DESC);
-
--- ── 2. FK remote_commands.audit_log_id → audit_logs(id) ────────────────────
-
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM information_schema.table_constraints
-    WHERE constraint_name = 'fk_remote_commands_audit'
-      AND table_name = 'remote_commands'
-  ) THEN
-    -- Nullify any dangling references before adding the FK
-    UPDATE remote_commands
-    SET audit_log_id = NULL
-    WHERE audit_log_id IS NOT NULL
-      AND NOT EXISTS (SELECT 1 FROM audit_logs WHERE id = remote_commands.audit_log_id);
-
-    ALTER TABLE remote_commands
-      ADD CONSTRAINT fk_remote_commands_audit
-      FOREIGN KEY (audit_log_id) REFERENCES audit_logs(id) ON DELETE SET NULL;
-  END IF;
-END $$;
-
--- ── 3. network_topology_config: TEXT → JSONB ────────────────────────────────
-
-DO $$
-BEGIN
-  IF (
-    SELECT data_type FROM information_schema.columns
-    WHERE table_name = 'network_topology_config' AND column_name = 'service_map'
-  ) = 'text' THEN
-    -- Drop existing TEXT defaults first so PostgreSQL can change the column type
-    ALTER TABLE network_topology_config
-      ALTER COLUMN service_map     DROP DEFAULT,
-      ALTER COLUMN host_overrides  DROP DEFAULT,
-      ALTER COLUMN manual_services DROP DEFAULT;
-
-    ALTER TABLE network_topology_config
-      ALTER COLUMN service_map     TYPE JSONB USING COALESCE(NULLIF(service_map,    '')::jsonb, '{}'::jsonb),
-      ALTER COLUMN host_overrides  TYPE JSONB USING COALESCE(NULLIF(host_overrides, '')::jsonb, '{}'::jsonb),
-      ALTER COLUMN manual_services TYPE JSONB USING COALESCE(NULLIF(manual_services,'')::jsonb, '[]'::jsonb);
-
-    ALTER TABLE network_topology_config
-      ALTER COLUMN service_map     SET DEFAULT '{}'::jsonb,
-      ALTER COLUMN host_overrides  SET DEFAULT '{}'::jsonb,
-      ALTER COLUMN manual_services SET DEFAULT '[]'::jsonb;
-  END IF;
-END $$;
-
--- ── 4. compose_projects.services: TEXT → JSONB ──────────────────────────────
-
-DO $$
-BEGIN
-  IF (
-    SELECT data_type FROM information_schema.columns
-    WHERE table_name = 'compose_projects' AND column_name = 'services'
-  ) = 'text' THEN
-    ALTER TABLE compose_projects
-      ALTER COLUMN services DROP DEFAULT;
-
-    ALTER TABLE compose_projects
-      ALTER COLUMN services TYPE JSONB USING COALESCE(NULLIF(services,'')::jsonb, '[]'::jsonb);
-
-    ALTER TABLE compose_projects
-      ALTER COLUMN services SET DEFAULT '[]'::jsonb;
-  END IF;
-END $$;
-
--- ── 5. Drop container_envs (data lives in docker_containers.env_vars) ───────
--- Network topology inference is migrated to query docker_containers instead.
-
-DO $$
-BEGIN
-  IF EXISTS (
-    SELECT 1 FROM information_schema.tables
-    WHERE table_name = 'container_envs'
-  ) THEN
-    DROP TABLE container_envs;
-  END IF;
-END $$;
-
--- ===== END 011_refactor.sql =====
-
--- ===== BEGIN 012_container_netstats.sql =====
-ALTER TABLE docker_containers ADD COLUMN IF NOT EXISTS net_rx_bytes BIGINT DEFAULT 0;
-ALTER TABLE docker_containers ADD COLUMN IF NOT EXISTS net_tx_bytes BIGINT DEFAULT 0;
-
--- ===== END 012_container_netstats.sql =====
-
--- ===== BEGIN 013_alert_incidents_fk.sql =====
--- Change alert_incidents.rule_id FK from ON DELETE CASCADE to ON DELETE SET NULL.
--- This preserves historical incidents when an alert rule is deleted instead of
--- silently purging them (which caused {notifications: [], total: 0} in the UI).
-ALTER TABLE alert_incidents DROP CONSTRAINT IF EXISTS alert_incidents_rule_id_fkey;
-ALTER TABLE alert_incidents
-    ADD CONSTRAINT alert_incidents_rule_id_fkey
-    FOREIGN KEY (rule_id) REFERENCES alert_rules(id) ON DELETE SET NULL;
-
--- ===== END 013_alert_incidents_fk.sql =====
-
--- ===== BEGIN 014_scheduled_tasks.sql =====
--- Migration 014: Scheduled Tasks
--- Stores per-host cron-scheduled remote commands (apt, docker, systemd, custom, …)
-
-CREATE TABLE IF NOT EXISTS scheduled_tasks (
-    id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-    host_id         VARCHAR(64) NOT NULL REFERENCES hosts(id) ON DELETE CASCADE,
-    name            TEXT        NOT NULL,
-    module          TEXT        NOT NULL,
-    action          TEXT        NOT NULL,
-    target          TEXT        NOT NULL DEFAULT '',
-    payload         JSONB       NOT NULL DEFAULT '{}',
-    cron_expression TEXT        NOT NULL,
-    enabled         BOOLEAN     NOT NULL DEFAULT TRUE,
-    last_run_at     TIMESTAMPTZ,
-    next_run_at     TIMESTAMPTZ,
-    last_run_status TEXT,
-    created_by      TEXT        NOT NULL DEFAULT 'system',
-    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+CREATE TABLE public.proxmox_guests (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    connection_id uuid NOT NULL,
+    node_name text NOT NULL,
+    guest_type text NOT NULL,
+    vmid integer NOT NULL,
+    name text DEFAULT ''::text NOT NULL,
+    status text DEFAULT 'unknown'::text NOT NULL,
+    cpu_alloc double precision DEFAULT 0 NOT NULL,
+    cpu_usage double precision DEFAULT 0 NOT NULL,
+    mem_alloc bigint DEFAULT 0 NOT NULL,
+    mem_usage bigint DEFAULT 0 NOT NULL,
+    disk_alloc bigint DEFAULT 0 NOT NULL,
+    tags text DEFAULT ''::text NOT NULL,
+    uptime bigint DEFAULT 0 NOT NULL,
+    last_seen_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_scheduled_tasks_host    ON scheduled_tasks(host_id);
-CREATE INDEX IF NOT EXISTS idx_scheduled_tasks_enabled ON scheduled_tasks(enabled) WHERE enabled = TRUE;
 
--- ===== END 014_scheduled_tasks.sql =====
+--
+-- Name: proxmox_node_metrics; Type: TABLE; Schema: public; Owner: -
+--
 
--- ===== BEGIN 015_scheduled_task_link.sql =====
--- Migration 015: Link remote commands back to their originating scheduled task
--- Allows ReportCommandResult to propagate final status (completed/failed) to the task.
-
-ALTER TABLE remote_commands
-    ADD COLUMN IF NOT EXISTS scheduled_task_id UUID REFERENCES scheduled_tasks(id) ON DELETE SET NULL;
-
-CREATE INDEX IF NOT EXISTS idx_remote_commands_scheduled_task
-    ON remote_commands(scheduled_task_id) WHERE scheduled_task_id IS NOT NULL;
-
--- Cache the list of custom tasks declared in the agent's tasks.yaml
-ALTER TABLE hosts
-    ADD COLUMN IF NOT EXISTS custom_tasks JSONB NOT NULL DEFAULT '[]';
-
--- Clean up any stale scheduled tasks left in "pending" from before this fix.
--- A task stuck pending for more than 10 minutes is considered failed.
-UPDATE scheduled_tasks
-    SET last_run_status = 'failed', last_run_at = NOW()
-    WHERE last_run_status = 'pending'
-      AND last_run_at < NOW() - INTERVAL '10 minutes';
-
--- ===== END 015_scheduled_task_link.sql =====
-
--- ===== BEGIN 016_git_webhooks.sql =====
--- Git Webhooks: trigger custom tasks on VMs from GitHub/GitLab/Gitea/Forgejo push events
-CREATE TABLE IF NOT EXISTS git_webhooks (
-    id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name              TEXT NOT NULL,
-    secret            TEXT NOT NULL,
-    provider          TEXT NOT NULL DEFAULT 'github',
-    repo_filter       TEXT NOT NULL DEFAULT '',
-    branch_filter     TEXT NOT NULL DEFAULT '',
-    event_filter      TEXT NOT NULL DEFAULT 'push',
-    host_id           VARCHAR(64) NOT NULL REFERENCES hosts(id) ON DELETE CASCADE,
-    custom_task_id    TEXT NOT NULL,
-    notify_channels   TEXT[] NOT NULL DEFAULT '{}',
-    notify_on_success BOOLEAN NOT NULL DEFAULT FALSE,
-    notify_on_failure BOOLEAN NOT NULL DEFAULT TRUE,
-    enabled           BOOLEAN NOT NULL DEFAULT TRUE,
-    last_triggered_at TIMESTAMPTZ,
-    created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-CREATE INDEX IF NOT EXISTS idx_git_webhooks_host ON git_webhooks(host_id);
-CREATE INDEX IF NOT EXISTS idx_git_webhooks_enabled ON git_webhooks(enabled) WHERE enabled = TRUE;
-
-CREATE TABLE IF NOT EXISTS git_webhook_executions (
-    id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    webhook_id     UUID NOT NULL REFERENCES git_webhooks(id) ON DELETE CASCADE,
-    command_id     VARCHAR(36) REFERENCES remote_commands(id) ON DELETE SET NULL,
-    provider       TEXT NOT NULL DEFAULT '',
-    repo_name      TEXT NOT NULL DEFAULT '',
-    branch         TEXT NOT NULL DEFAULT '',
-    commit_sha     TEXT NOT NULL DEFAULT '',
-    commit_message TEXT NOT NULL DEFAULT '',
-    pusher         TEXT NOT NULL DEFAULT '',
-    status         TEXT NOT NULL DEFAULT 'pending',
-    triggered_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    completed_at   TIMESTAMPTZ
-);
-CREATE INDEX IF NOT EXISTS idx_git_webhook_executions_webhook ON git_webhook_executions(webhook_id);
-CREATE INDEX IF NOT EXISTS idx_git_webhook_executions_command ON git_webhook_executions(command_id);
-
--- ===== END 016_git_webhooks.sql =====
-
--- ===== BEGIN 017_release_trackers.sql =====
--- Release Trackers: poll external repos for new releases and trigger custom tasks on VMs
-CREATE TABLE IF NOT EXISTS release_trackers (
-    id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name              TEXT NOT NULL,
-    provider          TEXT NOT NULL DEFAULT 'github',
-    repo_owner        TEXT NOT NULL,
-    repo_name         TEXT NOT NULL,
-    host_id           VARCHAR(64) NOT NULL REFERENCES hosts(id) ON DELETE CASCADE,
-    custom_task_id    TEXT NOT NULL,
-    last_release_tag  TEXT NOT NULL DEFAULT '',
-    last_checked_at   TIMESTAMPTZ,
-    last_triggered_at TIMESTAMPTZ,
-    notify_channels   TEXT[] NOT NULL DEFAULT '{}',
-    notify_on_release BOOLEAN NOT NULL DEFAULT TRUE,
-    enabled           BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-CREATE INDEX IF NOT EXISTS idx_release_trackers_host    ON release_trackers(host_id);
-CREATE INDEX IF NOT EXISTS idx_release_trackers_enabled ON release_trackers(enabled) WHERE enabled = TRUE;
-
-CREATE TABLE IF NOT EXISTS release_tracker_executions (
-    id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    tracker_id   UUID NOT NULL REFERENCES release_trackers(id) ON DELETE CASCADE,
-    command_id   VARCHAR(36) REFERENCES remote_commands(id) ON DELETE SET NULL,
-    tag_name     TEXT NOT NULL DEFAULT '',
-    release_url  TEXT NOT NULL DEFAULT '',
-    release_name TEXT NOT NULL DEFAULT '',
-    status       TEXT NOT NULL DEFAULT 'pending',
-    triggered_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    completed_at TIMESTAMPTZ
-);
-CREATE INDEX IF NOT EXISTS idx_release_tracker_executions_tracker ON release_tracker_executions(tracker_id);
-CREATE INDEX IF NOT EXISTS idx_release_tracker_executions_command ON release_tracker_executions(command_id);
-
--- ===== END 017_release_trackers.sql =====
-
--- ===== BEGIN 018_release_tracker_error.sql =====
--- Add last_error to release_trackers to surface API/network errors
-ALTER TABLE release_trackers ADD COLUMN IF NOT EXISTS last_error TEXT NOT NULL DEFAULT '';
-
--- ===== END 018_release_tracker_error.sql =====
-
--- ===== BEGIN 019_release_tracker_docker_image.sql =====
--- Add optional docker_image field to release_trackers for dashboard version comparison
-ALTER TABLE release_trackers ADD COLUMN IF NOT EXISTS docker_image TEXT NOT NULL DEFAULT '';
-
--- ===== END 019_release_tracker_docker_image.sql =====
-
--- ===== BEGIN 020_image_digest.sql =====
--- Add image digest for running container (RepoDigest / manifest sha256)
-ALTER TABLE docker_containers ADD COLUMN IF NOT EXISTS image_digest TEXT NOT NULL DEFAULT '';
-
--- Add latest image digest for release tracker (manifest sha256 of latest release tag)
-ALTER TABLE release_trackers ADD COLUMN IF NOT EXISTS latest_image_digest TEXT NOT NULL DEFAULT '';
-
--- ===== END 020_image_digest.sql =====
-
--- ===== BEGIN 021_performance_indexes.sql =====
--- Performance indexes for common query patterns.
--- All statements are idempotent (IF NOT EXISTS).
-
--- system_metrics: composite index for latest-metrics-per-host queries
-CREATE INDEX IF NOT EXISTS idx_metrics_host_time
-    ON system_metrics(host_id, timestamp DESC);
-
--- remote_commands: pending-command lookup + history filtered by host/status
-CREATE INDEX IF NOT EXISTS idx_commands_host_status
-    ON remote_commands(host_id, status, created_at DESC);
-
--- audit_logs: time-ordered listing for dashboard and audit page
-CREATE INDEX IF NOT EXISTS idx_audit_timestamp
-    ON audit_logs(created_at DESC);
-
--- git_webhook_executions: latest executions per webhook
-CREATE INDEX IF NOT EXISTS idx_webhook_exec_webhook_time
-    ON git_webhook_executions(webhook_id, triggered_at DESC);
-
--- release_tracker_executions: latest executions per tracker
-CREATE INDEX IF NOT EXISTS idx_tracker_exec_tracker_time
-    ON release_tracker_executions(tracker_id, triggered_at DESC);
-
--- ===== END 021_performance_indexes.sql =====
-
--- ===== BEGIN 022_ip_block_overrides.sql =====
--- Persist manual IP unblocks so they survive server restarts.
--- When an admin unblocks an IP, we record the timestamp here.
--- isIPBlocked only counts login failures that occurred AFTER the last unblock.
-
-CREATE TABLE IF NOT EXISTS ip_block_overrides (
-    ip_address  VARCHAR(45) PRIMARY KEY,
-    unblocked_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    unblocked_by VARCHAR(255) NOT NULL DEFAULT ''
+CREATE TABLE public.proxmox_node_metrics (
+    id bigint NOT NULL,
+    node_id uuid NOT NULL,
+    connection_id uuid NOT NULL,
+    node_name text NOT NULL,
+    cpu_usage double precision DEFAULT 0 NOT NULL,
+    mem_total bigint DEFAULT 0 NOT NULL,
+    mem_used bigint DEFAULT 0 NOT NULL,
+    "timestamp" timestamp with time zone DEFAULT now() NOT NULL
 );
 
--- ===== END 022_ip_block_overrides.sql =====
 
--- ===== BEGIN 023_tracker_tag_digests.sql =====
--- Historical digest→tag mapping for release trackers.
--- Each time the poller detects a new release and fetches its manifest digest,
--- it stores the (tag, digest) pair here. This allows resolving the running
--- version of a container using :latest by matching its image digest.
-CREATE TABLE IF NOT EXISTS release_tracker_tag_digests (
-    tracker_id  UUID    NOT NULL REFERENCES release_trackers(id) ON DELETE CASCADE,
-    tag         TEXT    NOT NULL,
-    digest      TEXT    NOT NULL,
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    PRIMARY KEY (tracker_id, tag)
+--
+-- Name: proxmox_node_metrics_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.proxmox_node_metrics_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: proxmox_node_metrics_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.proxmox_node_metrics_id_seq OWNED BY public.proxmox_node_metrics.id;
+
+
+--
+-- Name: proxmox_nodes; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.proxmox_nodes (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    connection_id uuid NOT NULL,
+    node_name text NOT NULL,
+    status text DEFAULT 'unknown'::text NOT NULL,
+    cpu_count integer DEFAULT 0 NOT NULL,
+    cpu_usage double precision DEFAULT 0 NOT NULL,
+    mem_total bigint DEFAULT 0 NOT NULL,
+    mem_used bigint DEFAULT 0 NOT NULL,
+    uptime bigint DEFAULT 0 NOT NULL,
+    pve_version text DEFAULT ''::text NOT NULL,
+    cluster_name text DEFAULT ''::text NOT NULL,
+    ip_address text DEFAULT ''::text NOT NULL,
+    last_seen_at timestamp with time zone DEFAULT now() NOT NULL,
+    pending_updates integer DEFAULT 0 NOT NULL,
+    security_updates integer DEFAULT 0 NOT NULL,
+    last_update_check_at timestamp with time zone,
+    cpu_temp_source_host_id character varying(64),
+    fan_rpm_source_host_id character varying(64)
 );
 
-CREATE INDEX IF NOT EXISTS idx_rttd_tracker_digest ON release_tracker_tag_digests (tracker_id, digest);
 
--- ===== END 023_tracker_tag_digests.sql =====
+--
+-- Name: proxmox_storages; Type: TABLE; Schema: public; Owner: -
+--
 
--- ===== BEGIN 024_topology_positions.sql =====
--- Add node_positions to persist graph layout across sessions
-ALTER TABLE network_topology_config
-  ADD COLUMN IF NOT EXISTS node_positions JSONB DEFAULT '{}'::jsonb;
-
--- ===== END 024_topology_positions.sql =====
-
--- ===== BEGIN 025_push_notifications.sql =====
--- Web Push subscriptions: one row per browser/device per user.
--- endpoint is globally unique — each subscription identifies one browser install.
-CREATE TABLE IF NOT EXISTS push_subscriptions (
-    id          SERIAL PRIMARY KEY,
-    username    TEXT NOT NULL,
-    endpoint    TEXT NOT NULL,
-    p256dh_key  TEXT NOT NULL,
-    auth_key    TEXT NOT NULL,
-    user_agent  TEXT NOT NULL DEFAULT '',
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE(endpoint)
+CREATE TABLE public.proxmox_storages (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    connection_id uuid NOT NULL,
+    node_name text NOT NULL,
+    storage_name text NOT NULL,
+    storage_type text DEFAULT ''::text NOT NULL,
+    total bigint DEFAULT 0 NOT NULL,
+    used bigint DEFAULT 0 NOT NULL,
+    avail bigint DEFAULT 0 NOT NULL,
+    enabled boolean DEFAULT true NOT NULL,
+    active boolean DEFAULT true NOT NULL,
+    shared boolean DEFAULT false NOT NULL,
+    last_seen_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
--- Server-side "read up to" timestamp per user.
--- Replaces per-device localStorage so marking as read on PC1 syncs to PC2/mobile.
-CREATE TABLE IF NOT EXISTS notification_read_at (
-    username TEXT PRIMARY KEY,
-    read_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+
+--
+-- Name: proxmox_tasks; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.proxmox_tasks (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    connection_id uuid NOT NULL,
+    node_name text DEFAULT ''::text NOT NULL,
+    upid text NOT NULL,
+    task_type text DEFAULT ''::text NOT NULL,
+    status text DEFAULT 'stopped'::text NOT NULL,
+    user_name text DEFAULT ''::text NOT NULL,
+    start_time timestamp with time zone,
+    end_time timestamp with time zone,
+    exit_status text DEFAULT ''::text NOT NULL,
+    object_id text DEFAULT ''::text NOT NULL,
+    last_seen_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
--- ===== END 025_push_notifications.sql =====
 
--- ===== BEGIN 026_memory_percent_aggregate.sql =====
--- Add memory_percent_avg to metrics_aggregates for correct chart display beyond 24h
+--
+-- Name: push_subscriptions; Type: TABLE; Schema: public; Owner: -
+--
 
-ALTER TABLE metrics_aggregates
-    ADD COLUMN IF NOT EXISTS memory_percent_avg DOUBLE PRECISION NOT NULL DEFAULT 0;
-
--- ===== END 026_memory_percent_aggregate.sql =====
-
--- ===== BEGIN 027_proxmox.sql =====
--- Proxmox VE supervision: API-based polling without agent on the hypervisor.
--- Manages multiple Proxmox connections (clusters or standalone nodes).
-
-CREATE TABLE IF NOT EXISTS proxmox_connections (
-    id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name                 TEXT NOT NULL,
-    api_url              TEXT NOT NULL,
-    token_id             TEXT NOT NULL,
-    token_secret         TEXT NOT NULL,
-    insecure_skip_verify BOOLEAN NOT NULL DEFAULT FALSE,
-    enabled              BOOLEAN NOT NULL DEFAULT TRUE,
-    poll_interval_sec    INT NOT NULL DEFAULT 60,
-    last_error           TEXT NOT NULL DEFAULT '',
-    last_error_at        TIMESTAMPTZ,
-    last_success_at      TIMESTAMPTZ,
-    created_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at           TIMESTAMPTZ NOT NULL DEFAULT NOW()
+CREATE TABLE public.push_subscriptions (
+    id integer NOT NULL,
+    username text NOT NULL,
+    endpoint text NOT NULL,
+    p256dh_key text NOT NULL,
+    auth_key text NOT NULL,
+    user_agent text DEFAULT ''::text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS proxmox_nodes (
-    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    connection_id UUID NOT NULL REFERENCES proxmox_connections(id) ON DELETE CASCADE,
-    node_name     TEXT NOT NULL,
-    status        TEXT NOT NULL DEFAULT 'unknown',
-    cpu_count     INT NOT NULL DEFAULT 0,
-    cpu_usage     FLOAT NOT NULL DEFAULT 0,
-    mem_total     BIGINT NOT NULL DEFAULT 0,
-    mem_used      BIGINT NOT NULL DEFAULT 0,
-    uptime        BIGINT NOT NULL DEFAULT 0,
-    pve_version   TEXT NOT NULL DEFAULT '',
-    cluster_name  TEXT NOT NULL DEFAULT '',
-    ip_address    TEXT NOT NULL DEFAULT '',
-    last_seen_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE (connection_id, node_name)
+
+--
+-- Name: push_subscriptions_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.push_subscriptions_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: push_subscriptions_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.push_subscriptions_id_seq OWNED BY public.push_subscriptions.id;
+
+
+--
+-- Name: refresh_tokens; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.refresh_tokens (
+    id bigint NOT NULL,
+    user_id integer,
+    token_hash character varying(64) NOT NULL,
+    expires_at timestamp with time zone NOT NULL,
+    revoked_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now()
 );
 
-CREATE TABLE IF NOT EXISTS proxmox_guests (
-    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    connection_id UUID NOT NULL REFERENCES proxmox_connections(id) ON DELETE CASCADE,
-    node_name     TEXT NOT NULL,
-    guest_type    TEXT NOT NULL, -- vm | lxc
-    vmid          INT NOT NULL,
-    name          TEXT NOT NULL DEFAULT '',
-    status        TEXT NOT NULL DEFAULT 'unknown',
-    cpu_alloc     FLOAT NOT NULL DEFAULT 0,
-    cpu_usage     FLOAT NOT NULL DEFAULT 0,
-    mem_alloc     BIGINT NOT NULL DEFAULT 0,
-    mem_usage     BIGINT NOT NULL DEFAULT 0,
-    disk_alloc    BIGINT NOT NULL DEFAULT 0,
-    tags          TEXT NOT NULL DEFAULT '',
-    uptime        BIGINT NOT NULL DEFAULT 0,
-    last_seen_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE (connection_id, node_name, vmid)
+
+--
+-- Name: refresh_tokens_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.refresh_tokens_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: refresh_tokens_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.refresh_tokens_id_seq OWNED BY public.refresh_tokens.id;
+
+
+--
+-- Name: registry_credentials; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.registry_credentials (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    name character varying(100) NOT NULL,
+    registry_host character varying(255) NOT NULL,
+    username character varying(255) NOT NULL,
+    password text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS proxmox_storages (
-    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    connection_id UUID NOT NULL REFERENCES proxmox_connections(id) ON DELETE CASCADE,
-    node_name     TEXT NOT NULL,
-    storage_name  TEXT NOT NULL,
-    storage_type  TEXT NOT NULL DEFAULT '',
-    total         BIGINT NOT NULL DEFAULT 0,
-    used          BIGINT NOT NULL DEFAULT 0,
-    avail         BIGINT NOT NULL DEFAULT 0,
-    enabled       BOOLEAN NOT NULL DEFAULT TRUE,
-    active        BOOLEAN NOT NULL DEFAULT TRUE,
-    shared        BOOLEAN NOT NULL DEFAULT FALSE,
-    last_seen_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE (connection_id, node_name, storage_name)
+
+--
+-- Name: release_tracker_executions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.release_tracker_executions (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    tracker_id uuid NOT NULL,
+    command_id character varying(36),
+    tag_name text DEFAULT ''::text NOT NULL,
+    release_url text DEFAULT ''::text NOT NULL,
+    release_name text DEFAULT ''::text NOT NULL,
+    status text DEFAULT 'pending'::text NOT NULL,
+    triggered_at timestamp with time zone DEFAULT now() NOT NULL,
+    completed_at timestamp with time zone
 );
 
-CREATE INDEX IF NOT EXISTS idx_proxmox_nodes_conn     ON proxmox_nodes(connection_id);
-CREATE INDEX IF NOT EXISTS idx_proxmox_guests_conn    ON proxmox_guests(connection_id);
-CREATE INDEX IF NOT EXISTS idx_proxmox_guests_node    ON proxmox_guests(connection_id, node_name);
-CREATE INDEX IF NOT EXISTS idx_proxmox_storages_conn  ON proxmox_storages(connection_id);
-CREATE INDEX IF NOT EXISTS idx_proxmox_storages_node  ON proxmox_storages(connection_id, node_name);
 
--- ===== END 027_proxmox.sql =====
+--
+-- Name: release_tracker_tag_digests; Type: TABLE; Schema: public; Owner: -
+--
 
--- ===== BEGIN 028_proxmox_links.sql =====
--- Migration 028: Proxmox guest ↔ host links + metrics source selection
-
-CREATE TABLE IF NOT EXISTS proxmox_guest_links (
-    id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    -- Reference to the Proxmox guest (deleted automatically when the guest is cleaned up)
-    guest_id       UUID NOT NULL REFERENCES proxmox_guests(id) ON DELETE CASCADE,
-    -- Reference to the ServerSupervisor host (agent) — TEXT to match hosts.id (VARCHAR)
-    host_id        TEXT NOT NULL REFERENCES hosts(id) ON DELETE CASCADE,
-    -- Link lifecycle: suggested (auto-detected) | confirmed (user-validated) | ignored (user-dismissed)
-    status         TEXT NOT NULL DEFAULT 'suggested'
-                       CHECK (status IN ('suggested', 'confirmed', 'ignored')),
-    -- Which source to use for CPU/RAM/disk metrics in host views
-    -- auto: prefer proxmox when online, fallback to agent
-    -- agent: always use agent metrics
-    -- proxmox: always use proxmox metrics
-    metrics_source TEXT NOT NULL DEFAULT 'auto'
-                       CHECK (metrics_source IN ('auto', 'agent', 'proxmox')),
-    created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    -- One guest can only be linked to one host
-    UNIQUE (guest_id)
+CREATE TABLE public.release_tracker_tag_digests (
+    tracker_id uuid NOT NULL,
+    tag text NOT NULL,
+    digest text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_proxmox_guest_links_host_id  ON proxmox_guest_links(host_id);
-CREATE INDEX IF NOT EXISTS idx_proxmox_guest_links_status   ON proxmox_guest_links(status);
 
--- ===== END 028_proxmox_links.sql =====
+--
+-- Name: release_trackers; Type: TABLE; Schema: public; Owner: -
+--
 
--- ===== BEGIN 029_proxmox_extended.sql =====
--- Migration 029: Extended Proxmox monitoring
--- Adds tasks, backup jobs/runs, physical disks, and node update counters (read-only, PVEAuditor-aligned).
-
--- ─── Task history per node ────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS proxmox_tasks (
-    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    connection_id UUID NOT NULL REFERENCES proxmox_connections(id) ON DELETE CASCADE,
-    node_name     TEXT NOT NULL DEFAULT '',
-    upid          TEXT NOT NULL,
-    task_type     TEXT NOT NULL DEFAULT '',    -- vzdump | qmstart | qmstop | …
-    status        TEXT NOT NULL DEFAULT 'stopped', -- running | stopped
-    user_name     TEXT NOT NULL DEFAULT '',
-    start_time    TIMESTAMPTZ,
-    end_time      TIMESTAMPTZ,
-    exit_status   TEXT NOT NULL DEFAULT '',   -- OK | error message | '' while running
-    object_id     TEXT NOT NULL DEFAULT '',   -- vmid or other Proxmox object ID
-    last_seen_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE (connection_id, upid)
-);
-CREATE INDEX IF NOT EXISTS idx_proxmox_tasks_conn_node  ON proxmox_tasks(connection_id, node_name);
-CREATE INDEX IF NOT EXISTS idx_proxmox_tasks_start_time ON proxmox_tasks(start_time DESC);
-CREATE INDEX IF NOT EXISTS idx_proxmox_tasks_type       ON proxmox_tasks(task_type);
-
--- ─── Backup job configurations (GET /cluster/backup) ─────────────────────────
-CREATE TABLE IF NOT EXISTS proxmox_backup_jobs (
-    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    connection_id UUID NOT NULL REFERENCES proxmox_connections(id) ON DELETE CASCADE,
-    job_id        TEXT NOT NULL,
-    enabled       BOOLEAN NOT NULL DEFAULT TRUE,
-    schedule      TEXT NOT NULL DEFAULT '',
-    storage       TEXT NOT NULL DEFAULT '',
-    mode          TEXT NOT NULL DEFAULT 'snapshot', -- snapshot | suspend | stop
-    compress      TEXT NOT NULL DEFAULT '',
-    vmids         TEXT NOT NULL DEFAULT '',          -- comma-separated VMIDs or 'all'
-    mail_to       TEXT NOT NULL DEFAULT '',
-    last_seen_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE (connection_id, job_id)
-);
-CREATE INDEX IF NOT EXISTS idx_proxmox_backup_jobs_conn ON proxmox_backup_jobs(connection_id);
-
--- ─── Latest backup run per VM (derived from vzdump tasks) ────────────────────
-CREATE TABLE IF NOT EXISTS proxmox_backup_runs (
-    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    connection_id UUID NOT NULL REFERENCES proxmox_connections(id) ON DELETE CASCADE,
-    node_name     TEXT NOT NULL DEFAULT '',
-    vmid          INT  NOT NULL,
-    task_upid     TEXT NOT NULL DEFAULT '',
-    status        TEXT NOT NULL DEFAULT '',   -- OK | error | running
-    start_time    TIMESTAMPTZ,
-    end_time      TIMESTAMPTZ,
-    exit_status   TEXT NOT NULL DEFAULT '',
-    last_seen_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE (connection_id, vmid)
-);
-CREATE INDEX IF NOT EXISTS idx_proxmox_backup_runs_conn ON proxmox_backup_runs(connection_id);
-
--- ─── Physical disks per node (GET /nodes/{node}/disks/list) ──────────────────
-CREATE TABLE IF NOT EXISTS proxmox_disks (
-    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    connection_id UUID NOT NULL REFERENCES proxmox_connections(id) ON DELETE CASCADE,
-    node_name     TEXT NOT NULL,
-    dev_path      TEXT NOT NULL,
-    model         TEXT NOT NULL DEFAULT '',
-    serial        TEXT NOT NULL DEFAULT '',
-    size_bytes    BIGINT NOT NULL DEFAULT 0,
-    disk_type     TEXT NOT NULL DEFAULT '',   -- ssd | hdd | nvme | unknown
-    health        TEXT NOT NULL DEFAULT 'UNKNOWN', -- PASSED | FAILED | UNKNOWN
-    wearout       INT  NOT NULL DEFAULT -1,   -- SSD wear % (100=new, -1=N/A)
-    last_seen_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE (connection_id, node_name, dev_path)
-);
-CREATE INDEX IF NOT EXISTS idx_proxmox_disks_node ON proxmox_disks(connection_id, node_name);
-
--- ─── Enrich proxmox_nodes with pending update counters ───────────────────────
-ALTER TABLE proxmox_nodes ADD COLUMN IF NOT EXISTS pending_updates      INT NOT NULL DEFAULT 0;
-ALTER TABLE proxmox_nodes ADD COLUMN IF NOT EXISTS security_updates     INT NOT NULL DEFAULT 0;
-ALTER TABLE proxmox_nodes ADD COLUMN IF NOT EXISTS last_update_check_at TIMESTAMPTZ;
-
--- ===== END 029_proxmox_extended.sql =====
-
--- ===== BEGIN 030_repair_alert_rules.sql =====
--- Repair alert_rules table by rebuilding it to eliminate dead (dropped) columns
--- that accumulated from repeated migration runs, causing PostgreSQL's 1600-column limit.
--- This is safe to run on both fresh and existing databases.
-
-DO $$
-BEGIN
-  -- Only rebuild if the table exists and has dead columns
-  IF EXISTS (
-    SELECT 1 FROM information_schema.tables
-    WHERE table_schema = 'public' AND table_name = 'alert_rules'
-  ) THEN
-    -- Create clean replacement table
-    CREATE TABLE IF NOT EXISTS alert_rules_rebuilt (
-      id               SERIAL PRIMARY KEY,
-      host_id          VARCHAR(64),
-      metric           VARCHAR(50) NOT NULL,
-      operator         VARCHAR(5) NOT NULL,
-      threshold        DOUBLE PRECISION,
-      duration_seconds INTEGER DEFAULT 60,
-      enabled          BOOLEAN DEFAULT TRUE,
-      created_at       TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-      name             VARCHAR(255),
-      last_fired       TIMESTAMP WITH TIME ZONE,
-      updated_at       TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-      actions          JSONB NOT NULL DEFAULT '{}'::jsonb
-    );
-
-    -- Copy all live data
-    INSERT INTO alert_rules_rebuilt
-      (id, host_id, metric, operator, threshold, duration_seconds, enabled, created_at, name, last_fired, updated_at, actions)
-    SELECT
-      id,
-      host_id,
-      metric,
-      operator,
-      threshold,
-      duration_seconds,
-      enabled,
-      created_at,
-      name,
-      last_fired,
-      updated_at,
-      COALESCE(actions, '{}'::jsonb)
-    FROM alert_rules;
-
-    -- Swap tables
-    DROP TABLE alert_rules CASCADE;
-    ALTER TABLE alert_rules_rebuilt RENAME TO alert_rules;
-
-    -- Restore sequence ownership
-    ALTER SEQUENCE alert_rules_rebuilt_id_seq RENAME TO alert_rules_id_seq;
-    ALTER TABLE alert_rules ALTER COLUMN id SET DEFAULT nextval('alert_rules_id_seq');
-    ALTER SEQUENCE alert_rules_id_seq OWNED BY alert_rules.id;
-
-    -- Restore foreign key from alert_incidents
-    ALTER TABLE alert_incidents
-      ADD CONSTRAINT alert_incidents_rule_id_fkey
-      FOREIGN KEY (rule_id) REFERENCES alert_rules(id) ON DELETE SET NULL;
-  END IF;
-END $$;
-
-CREATE INDEX IF NOT EXISTS idx_alert_rules_host ON alert_rules(host_id);
-
-
--- ===== END 030_repair_alert_rules.sql =====
-
--- ===== BEGIN 031_tracker_type.sql =====
--- Add tracker_type to distinguish Git release trackers from Docker image trackers.
--- tracker_type: 'git' (default, existing rows) | 'docker'
--- docker_tag: the specific image tag to monitor for docker trackers (e.g., 'latest', 'stable')
-
-ALTER TABLE release_trackers
-    ADD COLUMN IF NOT EXISTS tracker_type TEXT NOT NULL DEFAULT 'git',
-    ADD COLUMN IF NOT EXISTS docker_tag TEXT NOT NULL DEFAULT '';
-
--- ===== END 031_tracker_type.sql =====
-
--- ===== BEGIN 032_proxmox_node_metrics.sql =====
--- Historical metrics snapshots for Proxmox nodes.
--- Stored at each poll cycle to power time-series charts in the dashboard.
-
-CREATE TABLE IF NOT EXISTS proxmox_node_metrics (
-    id            BIGSERIAL    PRIMARY KEY,
-    node_id       UUID         NOT NULL REFERENCES proxmox_nodes(id) ON DELETE CASCADE,
-    connection_id UUID         NOT NULL,
-    node_name     TEXT         NOT NULL,
-    cpu_usage     FLOAT        NOT NULL DEFAULT 0, -- ratio 0‒1 (raw Proxmox value)
-    mem_total     BIGINT       NOT NULL DEFAULT 0,
-    mem_used      BIGINT       NOT NULL DEFAULT 0,
-    timestamp     TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+CREATE TABLE public.release_trackers (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    name text NOT NULL,
+    provider text DEFAULT 'github'::text NOT NULL,
+    repo_owner text NOT NULL,
+    repo_name text NOT NULL,
+    host_id character varying(64),
+    custom_task_id text DEFAULT ''::text NOT NULL,
+    last_release_tag text DEFAULT ''::text NOT NULL,
+    last_checked_at timestamp with time zone,
+    last_triggered_at timestamp with time zone,
+    notify_channels text[] DEFAULT '{}'::text[] NOT NULL,
+    notify_on_release boolean DEFAULT true NOT NULL,
+    enabled boolean DEFAULT true NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    last_error text DEFAULT ''::text NOT NULL,
+    docker_image text DEFAULT ''::text NOT NULL,
+    latest_image_digest text DEFAULT ''::text NOT NULL,
+    tracker_type text DEFAULT 'git'::text NOT NULL,
+    docker_tag text DEFAULT ''::text NOT NULL,
+    cooldown_hours integer DEFAULT 0 NOT NULL,
+    last_release_detected_at timestamp with time zone,
+    update_action character varying(20) DEFAULT 'custom'::character varying NOT NULL,
+    compose_project character varying(100),
+    compose_service character varying(100),
+    pre_update_task_id character varying(64),
+    post_update_task_id character varying(64),
+    cleanup_after_update boolean DEFAULT false NOT NULL,
+    healthcheck_timeout_sec integer DEFAULT 0 NOT NULL,
+    rollback_on_failure boolean DEFAULT false NOT NULL,
+    registry_credentials_id uuid,
+    CONSTRAINT release_trackers_compose_target_check CHECK ((((update_action)::text <> 'compose'::text) OR ((host_id IS NOT NULL) AND ((host_id)::text <> ''::text) AND (compose_project IS NOT NULL) AND ((compose_project)::text <> ''::text))))
 );
 
-CREATE INDEX IF NOT EXISTS idx_proxmox_node_metrics_node_ts
-    ON proxmox_node_metrics(node_id, timestamp DESC);
 
-CREATE INDEX IF NOT EXISTS idx_proxmox_node_metrics_ts
-    ON proxmox_node_metrics(timestamp DESC);
+--
+-- Name: remote_commands; Type: TABLE; Schema: public; Owner: -
+--
 
--- ===== END 032_proxmox_node_metrics.sql =====
-
--- ===== BEGIN 033_proxmox_guest_metrics.sql =====
--- Per-guest CPU/RAM snapshots recorded at each Proxmox poll.
--- Used to serve historical charts in HostDetailView when metrics_source=proxmox.
-CREATE TABLE IF NOT EXISTS proxmox_guest_metrics (
-    id          BIGSERIAL   PRIMARY KEY,
-    guest_id    UUID        NOT NULL REFERENCES proxmox_guests(id) ON DELETE CASCADE,
-    cpu_usage   FLOAT       NOT NULL DEFAULT 0, -- ratio 0‒1 (raw Proxmox value)
-    mem_total   BIGINT      NOT NULL DEFAULT 0,
-    mem_used    BIGINT      NOT NULL DEFAULT 0,
-    timestamp   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+CREATE TABLE public.remote_commands (
+    id character varying(36) NOT NULL,
+    host_id character varying(64),
+    module character varying(50) NOT NULL,
+    action character varying(100) NOT NULL,
+    target character varying(255) DEFAULT ''::character varying NOT NULL,
+    payload text DEFAULT '{}'::text NOT NULL,
+    status character varying(20) DEFAULT 'pending'::character varying NOT NULL,
+    output text DEFAULT ''::text NOT NULL,
+    triggered_by character varying(255) DEFAULT 'system'::character varying NOT NULL,
+    audit_log_id bigint,
+    created_at timestamp with time zone DEFAULT now(),
+    started_at timestamp with time zone,
+    ended_at timestamp with time zone,
+    scheduled_task_id uuid
 );
 
-CREATE INDEX IF NOT EXISTS idx_proxmox_guest_metrics_guest_ts
-    ON proxmox_guest_metrics(guest_id, timestamp DESC);
 
--- ===== END 033_proxmox_guest_metrics.sql =====
+--
+-- Name: scheduled_tasks; Type: TABLE; Schema: public; Owner: -
+--
 
--- ===== BEGIN 034_tracker_monitor_only.sql =====
--- Allow Docker trackers to work in "monitor-only" mode without a linked host/task.
--- host_id becomes nullable and custom_task_id defaults to empty string.
-ALTER TABLE release_trackers
-    ALTER COLUMN host_id       DROP NOT NULL,
-    ALTER COLUMN custom_task_id SET DEFAULT '';
-
--- Drop the FK constraint on host_id so it can be NULL
-ALTER TABLE release_trackers
-    DROP CONSTRAINT IF EXISTS release_trackers_host_id_fkey;
-
--- Re-add the FK as nullable (ON DELETE SET NULL)
-ALTER TABLE release_trackers
-    ADD CONSTRAINT release_trackers_host_id_fkey
-        FOREIGN KEY (host_id) REFERENCES hosts(id) ON DELETE SET NULL;
-
--- ===== END 034_tracker_monitor_only.sql =====
-
--- ===== BEGIN 035_missing_indexes.sql =====
--- Migration 035: indexes manquants identifiés à l'audit
--- Tous les statements sont idempotents (IF NOT EXISTS).
-
--- remote_commands.audit_log_id : utilisé par CleanupStalledCommands et UpdateAuditLogStatus
--- Sans cet index, chaque suppression d'audit_logs provoque un full scan de remote_commands.
-CREATE INDEX IF NOT EXISTS idx_commands_audit_log_id
-    ON remote_commands(audit_log_id)
-    WHERE audit_log_id IS NOT NULL;
-
--- release_tracker_tag_digests: accès par (tracker_id, created_at) pour le cleanup keepPerTracker
-CREATE INDEX IF NOT EXISTS idx_rttd_tracker_created
-    ON release_tracker_tag_digests(tracker_id, created_at DESC);
-
--- ===== END 035_missing_indexes.sql =====
-
--- ===== BEGIN 036_host_permissions.sql =====
--- Per-host access control: allows admins to restrict or grant users
--- specific access to individual hosts. If a user has NO entries in this
--- table their global role applies to all hosts.
--- If they have ANY entries, they are restricted to only those hosts.
-CREATE TABLE IF NOT EXISTS host_permissions (
-    username   TEXT NOT NULL,
-    host_id    TEXT NOT NULL REFERENCES hosts(id) ON DELETE CASCADE,
-    level      TEXT NOT NULL DEFAULT 'viewer'
-                   CHECK (level IN ('viewer', 'operator')),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    PRIMARY KEY (username, host_id)
+CREATE TABLE public.scheduled_tasks (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    host_id character varying(64) NOT NULL,
+    name text NOT NULL,
+    module text NOT NULL,
+    action text NOT NULL,
+    target text DEFAULT ''::text NOT NULL,
+    payload jsonb DEFAULT '{}'::jsonb NOT NULL,
+    cron_expression text NOT NULL,
+    enabled boolean DEFAULT true NOT NULL,
+    last_run_at timestamp with time zone,
+    next_run_at timestamp with time zone,
+    last_run_status text,
+    created_by text DEFAULT 'system'::text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_host_permissions_username ON host_permissions(username);
-CREATE INDEX IF NOT EXISTS idx_host_permissions_host_id  ON host_permissions(host_id);
 
--- ===== END 036_host_permissions.sql =====
+--
+-- Name: schema_migrations; Type: TABLE; Schema: public; Owner: -
+--
 
--- ===== BEGIN 037_bot_detection.sql =====
--- Migration 037: Add bot_detection JSONB cache column to hosts
--- Created: 2026-03-27
 
-ALTER TABLE hosts
-ADD COLUMN IF NOT EXISTS bot_detection JSONB;
 
-CREATE INDEX IF NOT EXISTS idx_hosts_bot_detection
-ON hosts ((bot_detection IS NOT NULL));
+--
+-- Name: settings; Type: TABLE; Schema: public; Owner: -
+--
 
--- ===== END 037_bot_detection.sql =====
-
--- ===== BEGIN 038_npm_analytics.sql =====
--- Migration 038: Add npm_analytics JSONB cache column to hosts
--- Created: 2026-03-27
-
-ALTER TABLE hosts
-ADD COLUMN IF NOT EXISTS npm_analytics JSONB;
-
-CREATE INDEX IF NOT EXISTS idx_hosts_npm_analytics
-ON hosts ((npm_analytics IS NOT NULL));
-
--- ===== END 038_npm_analytics.sql =====
-
--- ===== BEGIN 039_web_logs.sql =====
--- Migration 039: Replace bot_detection/npm_analytics JSONB with relational web logs tables
--- Created: 2026-03-27
-
-ALTER TABLE hosts
-ADD COLUMN IF NOT EXISTS web_log_source TEXT,
-ADD COLUMN IF NOT EXISTS web_log_collected_at TIMESTAMPTZ,
-ADD COLUMN IF NOT EXISTS web_log_total_requests INTEGER NOT NULL DEFAULT 0,
-ADD COLUMN IF NOT EXISTS web_log_total_bytes BIGINT NOT NULL DEFAULT 0,
-ADD COLUMN IF NOT EXISTS web_log_errors_4xx INTEGER NOT NULL DEFAULT 0,
-ADD COLUMN IF NOT EXISTS web_log_errors_5xx INTEGER NOT NULL DEFAULT 0,
-ADD COLUMN IF NOT EXISTS web_log_suspicious_requests INTEGER NOT NULL DEFAULT 0,
-ADD COLUMN IF NOT EXISTS web_log_suspicious_ips INTEGER NOT NULL DEFAULT 0;
-
-DROP INDEX IF EXISTS idx_hosts_bot_detection;
-DROP INDEX IF EXISTS idx_hosts_npm_analytics;
-
-ALTER TABLE hosts DROP COLUMN IF EXISTS bot_detection;
-ALTER TABLE hosts DROP COLUMN IF EXISTS npm_analytics;
-
-CREATE TABLE IF NOT EXISTS web_log_snapshots (
-  id                  BIGSERIAL PRIMARY KEY,
-  host_id             VARCHAR(64) NOT NULL REFERENCES hosts(id) ON DELETE CASCADE,
-  captured_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  source              TEXT NOT NULL,
-  total_requests      INTEGER NOT NULL DEFAULT 0,
-  total_bytes         BIGINT NOT NULL DEFAULT 0,
-  errors_4xx          INTEGER NOT NULL DEFAULT 0,
-  errors_5xx          INTEGER NOT NULL DEFAULT 0,
-  suspicious_requests INTEGER NOT NULL DEFAULT 0,
-  suspicious_ips      INTEGER NOT NULL DEFAULT 0
+CREATE TABLE public.settings (
+    key character varying(100) NOT NULL,
+    value text DEFAULT ''::text NOT NULL,
+    updated_at timestamp with time zone DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_web_log_snapshots_host_captured
-ON web_log_snapshots (host_id, captured_at DESC);
 
-CREATE INDEX IF NOT EXISTS idx_web_log_snapshots_host_source_captured
-ON web_log_snapshots (host_id, source, captured_at DESC);
+--
+-- Name: ssl_certificates; Type: TABLE; Schema: public; Owner: -
+--
 
-CREATE TABLE IF NOT EXISTS web_log_requests (
-  id          BIGSERIAL PRIMARY KEY,
-  snapshot_id BIGINT NOT NULL REFERENCES web_log_snapshots(id) ON DELETE CASCADE,
-  host_id     VARCHAR(64) NOT NULL REFERENCES hosts(id) ON DELETE CASCADE,
-  captured_at TIMESTAMPTZ NOT NULL,
-  source      TEXT NOT NULL,
-  ip          TEXT NOT NULL,
-  method      TEXT NOT NULL,
-  path        TEXT NOT NULL,
-  status      INTEGER NOT NULL,
-  bytes       BIGINT NOT NULL DEFAULT 0,
-  user_agent  TEXT,
-  domain      TEXT,
-  category    TEXT,
-  suspicious  BOOLEAN NOT NULL DEFAULT FALSE,
-  fingerprint TEXT NOT NULL
+CREATE TABLE public.ssl_certificates (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    name text NOT NULL,
+    host text NOT NULL,
+    port integer DEFAULT 443 NOT NULL,
+    server_name text DEFAULT ''::text NOT NULL,
+    enabled boolean DEFAULT true NOT NULL,
+    last_checked_at timestamp with time zone,
+    valid_from timestamp with time zone,
+    valid_to timestamp with time zone,
+    issuer text DEFAULT ''::text NOT NULL,
+    subject text DEFAULT ''::text NOT NULL,
+    serial_number text DEFAULT ''::text NOT NULL,
+    dns_names text[] DEFAULT '{}'::text[] NOT NULL,
+    last_error text DEFAULT ''::text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_web_log_requests_host_captured
-ON web_log_requests (host_id, captured_at DESC);
 
-CREATE INDEX IF NOT EXISTS idx_web_log_requests_ip_captured
-ON web_log_requests (ip, captured_at DESC);
+--
+-- Name: system_metrics; Type: TABLE; Schema: public; Owner: -
+--
 
-CREATE INDEX IF NOT EXISTS idx_web_log_requests_source_captured
-ON web_log_requests (source, captured_at DESC);
+CREATE TABLE public.system_metrics (
+    id bigint NOT NULL,
+    host_id character varying(64),
+    "timestamp" timestamp with time zone DEFAULT now(),
+    cpu_usage_percent double precision,
+    cpu_cores integer,
+    cpu_model character varying(255),
+    load_avg_1 double precision,
+    load_avg_5 double precision,
+    load_avg_15 double precision,
+    memory_total bigint,
+    memory_used bigint,
+    memory_free bigint,
+    memory_percent double precision,
+    swap_total bigint,
+    swap_used bigint,
+    network_rx_bytes bigint,
+    network_tx_bytes bigint,
+    uptime bigint,
+    hostname character varying(255),
+    cpu_temperature double precision,
+    fan_rpm double precision DEFAULT 0 NOT NULL
+);
 
-CREATE INDEX IF NOT EXISTS idx_web_log_requests_suspicious_captured
-ON web_log_requests (suspicious, captured_at DESC);
 
-CREATE UNIQUE INDEX IF NOT EXISTS ux_web_log_requests_host_source_fingerprint
-ON web_log_requests (host_id, source, fingerprint);
+--
+-- Name: system_metrics_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
 
--- ===== END 039_web_logs.sql =====
+CREATE SEQUENCE public.system_metrics_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
 
--- ===== BEGIN 040_web_logs_dedup_fingerprint.sql =====
--- Migration 040: Add dedup fingerprint and unique key for web log requests
--- Goal: make ingestion idempotent across agent restarts and aggressive log rotation.
 
-ALTER TABLE web_log_requests
-ADD COLUMN IF NOT EXISTS fingerprint TEXT;
+--
+-- Name: system_metrics_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
 
-UPDATE web_log_requests
-SET fingerprint = md5(CONCAT_WS('|',
-  host_id::text,
-  source,
-  captured_at::text,
-  ip,
-  method,
-  path,
-  status::text,
-  bytes::text,
-  COALESCE(user_agent, ''),
-  COALESCE(domain, ''),
-  COALESCE(category, ''),
-  suspicious::text
-))
-WHERE fingerprint IS NULL;
+ALTER SEQUENCE public.system_metrics_id_seq OWNED BY public.system_metrics.id;
 
-WITH ranked AS (
-  SELECT
-    id,
-    ROW_NUMBER() OVER (
-      PARTITION BY host_id, source, fingerprint
-      ORDER BY id
-    ) AS rn
-  FROM web_log_requests
-)
-DELETE FROM web_log_requests w
-USING ranked r
-WHERE w.id = r.id
-  AND r.rn > 1;
 
-ALTER TABLE web_log_requests
-ALTER COLUMN fingerprint SET NOT NULL;
+--
+-- Name: unattended_upgrades_runs; Type: TABLE; Schema: public; Owner: -
+--
 
-CREATE UNIQUE INDEX IF NOT EXISTS ux_web_log_requests_host_source_fingerprint
-ON web_log_requests (host_id, source, fingerprint);
+CREATE TABLE public.unattended_upgrades_runs (
+    id bigint NOT NULL,
+    host_id character varying(64) NOT NULL,
+    run_at timestamp with time zone NOT NULL,
+    packages jsonb DEFAULT '[]'::jsonb NOT NULL,
+    had_error boolean DEFAULT false NOT NULL,
+    log_snippet text,
+    created_at timestamp with time zone DEFAULT now()
+);
 
--- ===== END 040_web_logs_dedup_fingerprint.sql =====
 
--- ===== BEGIN 041_cpu_temperature.sql =====
--- Add CPU temperature (Celsius) collected by the Linux agent when available.
-ALTER TABLE system_metrics
-ADD COLUMN IF NOT EXISTS cpu_temperature DOUBLE PRECISION;
+--
+-- Name: unattended_upgrades_runs_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
 
--- ===== END 041_cpu_temperature.sql =====
+CREATE SEQUENCE public.unattended_upgrades_runs_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
 
--- ===== BEGIN 042_proxmox_cpu_temp_source.sql =====
--- Per-Proxmox-node CPU temperature source host mapping.
-ALTER TABLE proxmox_nodes
-ADD COLUMN IF NOT EXISTS cpu_temp_source_host_id VARCHAR(64);
 
-DO $$
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1 FROM pg_constraint
-        WHERE conname = 'fk_proxmox_nodes_cpu_temp_source_host'
-    ) THEN
-        ALTER TABLE proxmox_nodes
-        ADD CONSTRAINT fk_proxmox_nodes_cpu_temp_source_host
-        FOREIGN KEY (cpu_temp_source_host_id) REFERENCES hosts(id)
-        ON DELETE SET NULL;
-    END IF;
-END $$;
+--
+-- Name: unattended_upgrades_runs_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
 
-CREATE INDEX IF NOT EXISTS idx_proxmox_nodes_cpu_temp_source_host
-ON proxmox_nodes(cpu_temp_source_host_id);
+ALTER SEQUENCE public.unattended_upgrades_runs_id_seq OWNED BY public.unattended_upgrades_runs.id;
 
--- ===== END 042_proxmox_cpu_temp_source.sql =====
 
--- Mark all prior migration files as applied so they are skipped after this baseline.
+--
+-- Name: unattended_upgrades_status; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.unattended_upgrades_status (
+    host_id character varying(64) NOT NULL,
+    installed boolean DEFAULT false NOT NULL,
+    enabled boolean DEFAULT false NOT NULL,
+    reboot_required boolean DEFAULT false NOT NULL,
+    last_run_at timestamp with time zone,
+    last_run_packages integer DEFAULT 0,
+    config jsonb DEFAULT '{}'::jsonb NOT NULL,
+    updated_at timestamp with time zone DEFAULT now()
+);
+
+
+--
+-- Name: uptime_probe_results; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.uptime_probe_results (
+    id bigint NOT NULL,
+    probe_id uuid NOT NULL,
+    checked_at timestamp with time zone DEFAULT now() NOT NULL,
+    success boolean NOT NULL,
+    status_code integer,
+    latency_ms integer DEFAULT 0 NOT NULL,
+    error text DEFAULT ''::text NOT NULL
+);
+
+
+--
+-- Name: uptime_probe_results_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.uptime_probe_results_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: uptime_probe_results_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.uptime_probe_results_id_seq OWNED BY public.uptime_probe_results.id;
+
+
+--
+-- Name: uptime_probes; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.uptime_probes (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    name text NOT NULL,
+    type text NOT NULL,
+    target text NOT NULL,
+    interval_sec integer DEFAULT 60 NOT NULL,
+    timeout_sec integer DEFAULT 10 NOT NULL,
+    expected_status integer DEFAULT 200 NOT NULL,
+    expected_body_regex text DEFAULT ''::text NOT NULL,
+    follow_redirects boolean DEFAULT true NOT NULL,
+    verify_tls boolean DEFAULT true NOT NULL,
+    enabled boolean DEFAULT true NOT NULL,
+    last_status text DEFAULT 'unknown'::text NOT NULL,
+    last_latency_ms integer,
+    last_status_code integer,
+    last_error text DEFAULT ''::text NOT NULL,
+    last_checked_at timestamp with time zone,
+    consecutive_failures integer DEFAULT 0 NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT uptime_probes_type_check CHECK ((type = ANY (ARRAY['http'::text, 'tcp'::text])))
+);
+
+
+--
+-- Name: users; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.users (
+    id integer NOT NULL,
+    username character varying(255) NOT NULL,
+    password_hash text NOT NULL,
+    role character varying(50) DEFAULT 'viewer'::character varying NOT NULL,
+    created_at timestamp with time zone DEFAULT now(),
+    totp_secret text DEFAULT ''::text,
+    backup_codes jsonb DEFAULT '[]'::jsonb,
+    mfa_enabled boolean DEFAULT false,
+    must_change_password boolean DEFAULT false NOT NULL
+);
+
+
+--
+-- Name: users_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.users_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: users_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.users_id_seq OWNED BY public.users.id;
+
+
+--
+-- Name: web_log_requests; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.web_log_requests (
+    id bigint NOT NULL,
+    snapshot_id bigint NOT NULL,
+    host_id character varying(64) NOT NULL,
+    captured_at timestamp with time zone NOT NULL,
+    source text NOT NULL,
+    ip text NOT NULL,
+    method text NOT NULL,
+    path text NOT NULL,
+    status integer NOT NULL,
+    bytes bigint DEFAULT 0 NOT NULL,
+    user_agent text,
+    domain text,
+    category text,
+    suspicious boolean DEFAULT false NOT NULL,
+    fingerprint text NOT NULL,
+    blocked boolean DEFAULT false NOT NULL,
+    blocked_source text,
+    blocked_reason text,
+    blocked_at timestamp with time zone,
+    blocked_until timestamp with time zone
+);
+
+
+--
+-- Name: web_log_requests_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.web_log_requests_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: web_log_requests_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.web_log_requests_id_seq OWNED BY public.web_log_requests.id;
+
+
+--
+-- Name: web_log_snapshots; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.web_log_snapshots (
+    id bigint NOT NULL,
+    host_id character varying(64) NOT NULL,
+    captured_at timestamp with time zone DEFAULT now() NOT NULL,
+    source text NOT NULL,
+    total_requests integer DEFAULT 0 NOT NULL,
+    total_bytes bigint DEFAULT 0 NOT NULL,
+    errors_4xx integer DEFAULT 0 NOT NULL,
+    errors_5xx integer DEFAULT 0 NOT NULL,
+    suspicious_requests integer DEFAULT 0 NOT NULL,
+    suspicious_ips integer DEFAULT 0 NOT NULL,
+    crowdsec_blocked_ips integer DEFAULT 0 NOT NULL,
+    crowdsec_top_blocked jsonb DEFAULT '[]'::jsonb NOT NULL
+);
+
+
+--
+-- Name: web_log_snapshots_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.web_log_snapshots_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: web_log_snapshots_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.web_log_snapshots_id_seq OWNED BY public.web_log_snapshots.id;
+
+
+--
+-- Name: alert_incidents id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.alert_incidents ALTER COLUMN id SET DEFAULT nextval('public.alert_incidents_id_seq'::regclass);
+
+
+--
+-- Name: alert_rules id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.alert_rules ALTER COLUMN id SET DEFAULT nextval('public.alert_rules_id_seq'::regclass);
+
+
+--
+-- Name: apt_status id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.apt_status ALTER COLUMN id SET DEFAULT nextval('public.apt_status_id_seq'::regclass);
+
+
+--
+-- Name: audit_logs id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.audit_logs ALTER COLUMN id SET DEFAULT nextval('public.audit_logs_id_seq'::regclass);
+
+
+--
+-- Name: disk_health id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.disk_health ALTER COLUMN id SET DEFAULT nextval('public.disk_health_id_seq'::regclass);
+
+
+--
+-- Name: disk_metrics id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.disk_metrics ALTER COLUMN id SET DEFAULT nextval('public.disk_metrics_id_seq'::regclass);
+
+
+--
+-- Name: login_events id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.login_events ALTER COLUMN id SET DEFAULT nextval('public.login_events_id_seq'::regclass);
+
+
+--
+-- Name: network_topology_config id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.network_topology_config ALTER COLUMN id SET DEFAULT nextval('public.network_topology_config_id_seq'::regclass);
+
+
+--
+-- Name: proxmox_guest_metrics id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.proxmox_guest_metrics ALTER COLUMN id SET DEFAULT nextval('public.proxmox_guest_metrics_id_seq'::regclass);
+
+
+--
+-- Name: proxmox_node_metrics id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.proxmox_node_metrics ALTER COLUMN id SET DEFAULT nextval('public.proxmox_node_metrics_id_seq'::regclass);
+
+
+--
+-- Name: push_subscriptions id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.push_subscriptions ALTER COLUMN id SET DEFAULT nextval('public.push_subscriptions_id_seq'::regclass);
+
+
+--
+-- Name: refresh_tokens id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.refresh_tokens ALTER COLUMN id SET DEFAULT nextval('public.refresh_tokens_id_seq'::regclass);
+
+
+--
+-- Name: system_metrics id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.system_metrics ALTER COLUMN id SET DEFAULT nextval('public.system_metrics_id_seq'::regclass);
+
+
+--
+-- Name: unattended_upgrades_runs id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.unattended_upgrades_runs ALTER COLUMN id SET DEFAULT nextval('public.unattended_upgrades_runs_id_seq'::regclass);
+
+
+--
+-- Name: uptime_probe_results id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.uptime_probe_results ALTER COLUMN id SET DEFAULT nextval('public.uptime_probe_results_id_seq'::regclass);
+
+
+--
+-- Name: users id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.users ALTER COLUMN id SET DEFAULT nextval('public.users_id_seq'::regclass);
+
+
+--
+-- Name: web_log_requests id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.web_log_requests ALTER COLUMN id SET DEFAULT nextval('public.web_log_requests_id_seq'::regclass);
+
+
+--
+-- Name: web_log_snapshots id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.web_log_snapshots ALTER COLUMN id SET DEFAULT nextval('public.web_log_snapshots_id_seq'::regclass);
+
+
+--
+-- Name: alert_incidents alert_incidents_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.alert_incidents
+    ADD CONSTRAINT alert_incidents_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: alert_rules alert_rules_rebuilt_pkey1; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.alert_rules
+    ADD CONSTRAINT alert_rules_rebuilt_pkey1 PRIMARY KEY (id);
+
+
+--
+-- Name: apt_status apt_status_host_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.apt_status
+    ADD CONSTRAINT apt_status_host_id_key UNIQUE (host_id);
+
+
+--
+-- Name: apt_status apt_status_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.apt_status
+    ADD CONSTRAINT apt_status_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: audit_logs audit_logs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.audit_logs
+    ADD CONSTRAINT audit_logs_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: compose_projects compose_projects_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.compose_projects
+    ADD CONSTRAINT compose_projects_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: disk_health disk_health_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.disk_health
+    ADD CONSTRAINT disk_health_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: disk_metrics disk_metrics_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.disk_metrics
+    ADD CONSTRAINT disk_metrics_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: docker_containers docker_containers_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.docker_containers
+    ADD CONSTRAINT docker_containers_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: docker_networks docker_networks_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.docker_networks
+    ADD CONSTRAINT docker_networks_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: git_webhook_executions git_webhook_executions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.git_webhook_executions
+    ADD CONSTRAINT git_webhook_executions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: git_webhooks git_webhooks_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.git_webhooks
+    ADD CONSTRAINT git_webhooks_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: host_permissions host_permissions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.host_permissions
+    ADD CONSTRAINT host_permissions_pkey PRIMARY KEY (username, host_id);
+
+
+--
+-- Name: hosts hosts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.hosts
+    ADD CONSTRAINT hosts_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ip_block_overrides ip_block_overrides_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ip_block_overrides
+    ADD CONSTRAINT ip_block_overrides_pkey PRIMARY KEY (ip_address);
+
+
+--
+-- Name: login_events login_events_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.login_events
+    ADD CONSTRAINT login_events_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: network_topology_config network_topology_config_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.network_topology_config
+    ADD CONSTRAINT network_topology_config_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: notification_read_at notification_read_at_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.notification_read_at
+    ADD CONSTRAINT notification_read_at_pkey PRIMARY KEY (username);
+
+
+--
+-- Name: proxmox_backup_jobs proxmox_backup_jobs_connection_id_job_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.proxmox_backup_jobs
+    ADD CONSTRAINT proxmox_backup_jobs_connection_id_job_id_key UNIQUE (connection_id, job_id);
+
+
+--
+-- Name: proxmox_backup_jobs proxmox_backup_jobs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.proxmox_backup_jobs
+    ADD CONSTRAINT proxmox_backup_jobs_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: proxmox_backup_runs proxmox_backup_runs_connection_id_vmid_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.proxmox_backup_runs
+    ADD CONSTRAINT proxmox_backup_runs_connection_id_vmid_key UNIQUE (connection_id, vmid);
+
+
+--
+-- Name: proxmox_backup_runs proxmox_backup_runs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.proxmox_backup_runs
+    ADD CONSTRAINT proxmox_backup_runs_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: proxmox_connections proxmox_connections_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.proxmox_connections
+    ADD CONSTRAINT proxmox_connections_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: proxmox_disks proxmox_disks_connection_id_node_name_dev_path_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.proxmox_disks
+    ADD CONSTRAINT proxmox_disks_connection_id_node_name_dev_path_key UNIQUE (connection_id, node_name, dev_path);
+
+
+--
+-- Name: proxmox_disks proxmox_disks_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.proxmox_disks
+    ADD CONSTRAINT proxmox_disks_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: proxmox_guest_links proxmox_guest_links_guest_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.proxmox_guest_links
+    ADD CONSTRAINT proxmox_guest_links_guest_id_key UNIQUE (guest_id);
+
+
+--
+-- Name: proxmox_guest_links proxmox_guest_links_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.proxmox_guest_links
+    ADD CONSTRAINT proxmox_guest_links_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: proxmox_guest_metrics proxmox_guest_metrics_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.proxmox_guest_metrics
+    ADD CONSTRAINT proxmox_guest_metrics_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: proxmox_guests proxmox_guests_connection_id_node_name_vmid_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.proxmox_guests
+    ADD CONSTRAINT proxmox_guests_connection_id_node_name_vmid_key UNIQUE (connection_id, node_name, vmid);
+
+
+--
+-- Name: proxmox_guests proxmox_guests_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.proxmox_guests
+    ADD CONSTRAINT proxmox_guests_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: proxmox_node_metrics proxmox_node_metrics_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.proxmox_node_metrics
+    ADD CONSTRAINT proxmox_node_metrics_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: proxmox_nodes proxmox_nodes_connection_id_node_name_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.proxmox_nodes
+    ADD CONSTRAINT proxmox_nodes_connection_id_node_name_key UNIQUE (connection_id, node_name);
+
+
+--
+-- Name: proxmox_nodes proxmox_nodes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.proxmox_nodes
+    ADD CONSTRAINT proxmox_nodes_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: proxmox_storages proxmox_storages_connection_id_node_name_storage_name_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.proxmox_storages
+    ADD CONSTRAINT proxmox_storages_connection_id_node_name_storage_name_key UNIQUE (connection_id, node_name, storage_name);
+
+
+--
+-- Name: proxmox_storages proxmox_storages_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.proxmox_storages
+    ADD CONSTRAINT proxmox_storages_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: proxmox_tasks proxmox_tasks_connection_id_upid_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.proxmox_tasks
+    ADD CONSTRAINT proxmox_tasks_connection_id_upid_key UNIQUE (connection_id, upid);
+
+
+--
+-- Name: proxmox_tasks proxmox_tasks_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.proxmox_tasks
+    ADD CONSTRAINT proxmox_tasks_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: push_subscriptions push_subscriptions_endpoint_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.push_subscriptions
+    ADD CONSTRAINT push_subscriptions_endpoint_key UNIQUE (endpoint);
+
+
+--
+-- Name: push_subscriptions push_subscriptions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.push_subscriptions
+    ADD CONSTRAINT push_subscriptions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: refresh_tokens refresh_tokens_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.refresh_tokens
+    ADD CONSTRAINT refresh_tokens_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: refresh_tokens refresh_tokens_token_hash_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.refresh_tokens
+    ADD CONSTRAINT refresh_tokens_token_hash_key UNIQUE (token_hash);
+
+
+--
+-- Name: registry_credentials registry_credentials_name_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.registry_credentials
+    ADD CONSTRAINT registry_credentials_name_key UNIQUE (name);
+
+
+--
+-- Name: registry_credentials registry_credentials_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.registry_credentials
+    ADD CONSTRAINT registry_credentials_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: release_tracker_executions release_tracker_executions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.release_tracker_executions
+    ADD CONSTRAINT release_tracker_executions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: release_tracker_tag_digests release_tracker_tag_digests_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.release_tracker_tag_digests
+    ADD CONSTRAINT release_tracker_tag_digests_pkey PRIMARY KEY (tracker_id, tag, digest);
+
+
+--
+-- Name: release_trackers release_trackers_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.release_trackers
+    ADD CONSTRAINT release_trackers_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: remote_commands remote_commands_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.remote_commands
+    ADD CONSTRAINT remote_commands_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: scheduled_tasks scheduled_tasks_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.scheduled_tasks
+    ADD CONSTRAINT scheduled_tasks_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: schema_migrations schema_migrations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+
+
+--
+-- Name: settings settings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.settings
+    ADD CONSTRAINT settings_pkey PRIMARY KEY (key);
+
+
+--
+-- Name: ssl_certificates ssl_certificates_host_port_server_name_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ssl_certificates
+    ADD CONSTRAINT ssl_certificates_host_port_server_name_key UNIQUE (host, port, server_name);
+
+
+--
+-- Name: ssl_certificates ssl_certificates_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.ssl_certificates
+    ADD CONSTRAINT ssl_certificates_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: system_metrics system_metrics_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.system_metrics
+    ADD CONSTRAINT system_metrics_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: unattended_upgrades_runs unattended_upgrades_runs_host_id_run_at_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.unattended_upgrades_runs
+    ADD CONSTRAINT unattended_upgrades_runs_host_id_run_at_key UNIQUE (host_id, run_at);
+
+
+--
+-- Name: unattended_upgrades_runs unattended_upgrades_runs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.unattended_upgrades_runs
+    ADD CONSTRAINT unattended_upgrades_runs_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: unattended_upgrades_status unattended_upgrades_status_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.unattended_upgrades_status
+    ADD CONSTRAINT unattended_upgrades_status_pkey PRIMARY KEY (host_id);
+
+
+--
+-- Name: uptime_probe_results uptime_probe_results_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.uptime_probe_results
+    ADD CONSTRAINT uptime_probe_results_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: uptime_probes uptime_probes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.uptime_probes
+    ADD CONSTRAINT uptime_probes_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: users users_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.users
+    ADD CONSTRAINT users_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: users users_username_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.users
+    ADD CONSTRAINT users_username_key UNIQUE (username);
+
+
+--
+-- Name: web_log_requests web_log_requests_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.web_log_requests
+    ADD CONSTRAINT web_log_requests_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: web_log_snapshots web_log_snapshots_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.web_log_snapshots
+    ADD CONSTRAINT web_log_snapshots_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: idx_alert_incidents_rule; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_alert_incidents_rule ON public.alert_incidents USING btree (rule_id, triggered_at DESC);
+
+
+--
+-- Name: idx_alert_rules_host; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_alert_rules_host ON public.alert_rules USING btree (host_id);
+
+
+--
+-- Name: idx_alert_rules_source_type; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_alert_rules_source_type ON public.alert_rules USING btree (source_type);
+
+
+--
+-- Name: idx_audit_logs_created; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_audit_logs_created ON public.audit_logs USING btree (created_at DESC);
+
+
+--
+-- Name: idx_audit_logs_host; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_audit_logs_host ON public.audit_logs USING btree (host_id, created_at DESC);
+
+
+--
+-- Name: idx_audit_logs_user_action; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_audit_logs_user_action ON public.audit_logs USING btree (username, action, created_at DESC);
+
+
+--
+-- Name: idx_audit_timestamp; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_audit_timestamp ON public.audit_logs USING btree (created_at DESC);
+
+
+--
+-- Name: idx_commands_audit_log_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_commands_audit_log_id ON public.remote_commands USING btree (audit_log_id) WHERE (audit_log_id IS NOT NULL);
+
+
+--
+-- Name: idx_commands_host_status; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_commands_host_status ON public.remote_commands USING btree (host_id, status, created_at DESC);
+
+
+--
+-- Name: idx_compose_projects_host_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_compose_projects_host_id ON public.compose_projects USING btree (host_id);
+
+
+--
+-- Name: idx_disk_health_host_time; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_disk_health_host_time ON public.disk_health USING btree (host_id, "timestamp" DESC);
+
+
+--
+-- Name: idx_disk_metrics_host_mount; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_disk_metrics_host_mount ON public.disk_metrics USING btree (host_id, mount_point, "timestamp" DESC);
+
+
+--
+-- Name: idx_disk_metrics_host_time; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_disk_metrics_host_time ON public.disk_metrics USING btree (host_id, "timestamp" DESC);
+
+
+--
+-- Name: idx_docker_containers_host; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_docker_containers_host ON public.docker_containers USING btree (host_id);
+
+
+--
+-- Name: idx_docker_containers_image_digest; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_docker_containers_image_digest ON public.docker_containers USING btree (image_digest) WHERE (image_digest <> ''::text);
+
+
+--
+-- Name: idx_docker_containers_state; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_docker_containers_state ON public.docker_containers USING btree (state);
+
+
+--
+-- Name: idx_docker_networks_host; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_docker_networks_host ON public.docker_networks USING btree (host_id);
+
+
+--
+-- Name: idx_git_webhook_executions_command; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_git_webhook_executions_command ON public.git_webhook_executions USING btree (command_id);
+
+
+--
+-- Name: idx_git_webhook_executions_webhook; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_git_webhook_executions_webhook ON public.git_webhook_executions USING btree (webhook_id);
+
+
+--
+-- Name: idx_git_webhooks_enabled; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_git_webhooks_enabled ON public.git_webhooks USING btree (enabled) WHERE (enabled = true);
+
+
+--
+-- Name: idx_git_webhooks_host; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_git_webhooks_host ON public.git_webhooks USING btree (host_id);
+
+
+--
+-- Name: idx_host_permissions_host_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_host_permissions_host_id ON public.host_permissions USING btree (host_id);
+
+
+--
+-- Name: idx_host_permissions_username; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_host_permissions_username ON public.host_permissions USING btree (username);
+
+
+--
+-- Name: idx_hosts_collectors; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_hosts_collectors ON public.hosts USING gin (collectors);
+
+
+--
+-- Name: idx_login_events_ip_time; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_login_events_ip_time ON public.login_events USING btree (ip_address, created_at DESC);
+
+
+--
+-- Name: idx_login_events_user_time; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_login_events_user_time ON public.login_events USING btree (username, created_at DESC);
+
+
+--
+-- Name: idx_metrics_host_time; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_metrics_host_time ON public.system_metrics USING btree (host_id, "timestamp" DESC);
+
+
+--
+-- Name: idx_proxmox_backup_jobs_conn; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_proxmox_backup_jobs_conn ON public.proxmox_backup_jobs USING btree (connection_id);
+
+
+--
+-- Name: idx_proxmox_backup_runs_conn; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_proxmox_backup_runs_conn ON public.proxmox_backup_runs USING btree (connection_id);
+
+
+--
+-- Name: idx_proxmox_disks_node; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_proxmox_disks_node ON public.proxmox_disks USING btree (connection_id, node_name);
+
+
+--
+-- Name: idx_proxmox_guest_links_host_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_proxmox_guest_links_host_id ON public.proxmox_guest_links USING btree (host_id);
+
+
+--
+-- Name: idx_proxmox_guest_links_status; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_proxmox_guest_links_status ON public.proxmox_guest_links USING btree (status);
+
+
+--
+-- Name: idx_proxmox_guest_metrics_guest_ts; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_proxmox_guest_metrics_guest_ts ON public.proxmox_guest_metrics USING btree (guest_id, "timestamp" DESC);
+
+
+--
+-- Name: idx_proxmox_guests_conn; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_proxmox_guests_conn ON public.proxmox_guests USING btree (connection_id);
+
+
+--
+-- Name: idx_proxmox_guests_node; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_proxmox_guests_node ON public.proxmox_guests USING btree (connection_id, node_name);
+
+
+--
+-- Name: idx_proxmox_node_metrics_node_ts; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_proxmox_node_metrics_node_ts ON public.proxmox_node_metrics USING btree (node_id, "timestamp" DESC);
+
+
+--
+-- Name: idx_proxmox_node_metrics_ts; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_proxmox_node_metrics_ts ON public.proxmox_node_metrics USING btree ("timestamp" DESC);
+
+
+--
+-- Name: idx_proxmox_nodes_conn; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_proxmox_nodes_conn ON public.proxmox_nodes USING btree (connection_id);
+
+
+--
+-- Name: idx_proxmox_nodes_cpu_temp_source_host; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_proxmox_nodes_cpu_temp_source_host ON public.proxmox_nodes USING btree (cpu_temp_source_host_id);
+
+
+--
+-- Name: idx_proxmox_nodes_fan_rpm_source_host; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_proxmox_nodes_fan_rpm_source_host ON public.proxmox_nodes USING btree (fan_rpm_source_host_id);
+
+
+--
+-- Name: idx_proxmox_storages_conn; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_proxmox_storages_conn ON public.proxmox_storages USING btree (connection_id);
+
+
+--
+-- Name: idx_proxmox_storages_node; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_proxmox_storages_node ON public.proxmox_storages USING btree (connection_id, node_name);
+
+
+--
+-- Name: idx_proxmox_tasks_conn_node; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_proxmox_tasks_conn_node ON public.proxmox_tasks USING btree (connection_id, node_name);
+
+
+--
+-- Name: idx_proxmox_tasks_start_time; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_proxmox_tasks_start_time ON public.proxmox_tasks USING btree (start_time DESC);
+
+
+--
+-- Name: idx_proxmox_tasks_type; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_proxmox_tasks_type ON public.proxmox_tasks USING btree (task_type);
+
+
+--
+-- Name: idx_refresh_tokens_user; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_refresh_tokens_user ON public.refresh_tokens USING btree (user_id);
+
+
+--
+-- Name: idx_release_tracker_executions_command; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_release_tracker_executions_command ON public.release_tracker_executions USING btree (command_id);
+
+
+--
+-- Name: idx_release_tracker_executions_tracker; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_release_tracker_executions_tracker ON public.release_tracker_executions USING btree (tracker_id);
+
+
+--
+-- Name: idx_release_trackers_enabled; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_release_trackers_enabled ON public.release_trackers USING btree (enabled) WHERE (enabled = true);
+
+
+--
+-- Name: idx_release_trackers_host; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_release_trackers_host ON public.release_trackers USING btree (host_id);
+
+
+--
+-- Name: idx_remote_commands_created; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_remote_commands_created ON public.remote_commands USING btree (created_at DESC);
+
+
+--
+-- Name: idx_remote_commands_host_status; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_remote_commands_host_status ON public.remote_commands USING btree (host_id, status);
+
+
+--
+-- Name: idx_remote_commands_scheduled_task; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_remote_commands_scheduled_task ON public.remote_commands USING btree (scheduled_task_id) WHERE (scheduled_task_id IS NOT NULL);
+
+
+--
+-- Name: idx_remote_commands_triggered; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_remote_commands_triggered ON public.remote_commands USING btree (triggered_by);
+
+
+--
+-- Name: idx_rttd_tracker_created; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_rttd_tracker_created ON public.release_tracker_tag_digests USING btree (tracker_id, created_at DESC);
+
+
+--
+-- Name: idx_rttd_tracker_digest; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_rttd_tracker_digest ON public.release_tracker_tag_digests USING btree (tracker_id, digest);
+
+
+--
+-- Name: idx_scheduled_tasks_enabled; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_scheduled_tasks_enabled ON public.scheduled_tasks USING btree (enabled) WHERE (enabled = true);
+
+
+--
+-- Name: idx_scheduled_tasks_host; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_scheduled_tasks_host ON public.scheduled_tasks USING btree (host_id);
+
+
+--
+-- Name: idx_ssl_certificates_enabled; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ssl_certificates_enabled ON public.ssl_certificates USING btree (enabled) WHERE (enabled = true);
+
+
+--
+-- Name: idx_ssl_certificates_valid_to; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_ssl_certificates_valid_to ON public.ssl_certificates USING btree (valid_to) WHERE (valid_to IS NOT NULL);
+
+
+--
+-- Name: idx_system_metrics_host_time; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_system_metrics_host_time ON public.system_metrics USING btree (host_id, "timestamp" DESC);
+
+
+--
+-- Name: idx_system_metrics_timestamp; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_system_metrics_timestamp ON public.system_metrics USING btree ("timestamp");
+
+
+--
+-- Name: idx_tracker_exec_tracker_time; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_tracker_exec_tracker_time ON public.release_tracker_executions USING btree (tracker_id, triggered_at DESC);
+
+
+--
+-- Name: idx_uptime_probe_results_probe_time; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_uptime_probe_results_probe_time ON public.uptime_probe_results USING btree (probe_id, checked_at DESC);
+
+
+--
+-- Name: idx_uptime_probes_enabled; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_uptime_probes_enabled ON public.uptime_probes USING btree (enabled) WHERE (enabled = true);
+
+
+--
+-- Name: idx_uu_runs_host_run; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_uu_runs_host_run ON public.unattended_upgrades_runs USING btree (host_id, run_at DESC);
+
+
+--
+-- Name: idx_web_log_requests_blocked_captured; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_web_log_requests_blocked_captured ON public.web_log_requests USING btree (blocked, captured_at DESC);
+
+
+--
+-- Name: idx_web_log_requests_host_captured; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_web_log_requests_host_captured ON public.web_log_requests USING btree (host_id, captured_at DESC);
+
+
+--
+-- Name: idx_web_log_requests_ip_blocked; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_web_log_requests_ip_blocked ON public.web_log_requests USING btree (ip, blocked, captured_at DESC);
+
+
+--
+-- Name: idx_web_log_requests_ip_captured; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_web_log_requests_ip_captured ON public.web_log_requests USING btree (ip, captured_at DESC);
+
+
+--
+-- Name: idx_web_log_requests_source_captured; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_web_log_requests_source_captured ON public.web_log_requests USING btree (source, captured_at DESC);
+
+
+--
+-- Name: idx_web_log_requests_suspicious_captured; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_web_log_requests_suspicious_captured ON public.web_log_requests USING btree (suspicious, captured_at DESC);
+
+
+--
+-- Name: idx_web_log_snapshots_host_captured; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_web_log_snapshots_host_captured ON public.web_log_snapshots USING btree (host_id, captured_at DESC);
+
+
+--
+-- Name: idx_web_log_snapshots_host_source_captured; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_web_log_snapshots_host_source_captured ON public.web_log_snapshots USING btree (host_id, source, captured_at DESC);
+
+
+--
+-- Name: idx_webhook_exec_webhook_time; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_webhook_exec_webhook_time ON public.git_webhook_executions USING btree (webhook_id, triggered_at DESC);
+
+
+--
+-- Name: idx_wlr_host_blocked_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_wlr_host_blocked_at ON public.web_log_requests USING btree (host_id, blocked, captured_at DESC);
+
+
+--
+-- Name: idx_wlr_host_suspicious_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_wlr_host_suspicious_at ON public.web_log_requests USING btree (host_id, suspicious, captured_at DESC);
+
+
+--
+-- Name: network_topology_config_singleton; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX network_topology_config_singleton ON public.network_topology_config USING btree (id) WHERE (id = 1);
+
+
+--
+-- Name: ux_web_log_requests_host_source_fingerprint; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX ux_web_log_requests_host_source_fingerprint ON public.web_log_requests USING btree (host_id, source, fingerprint);
+
+
+--
+-- Name: alert_incidents alert_incidents_rule_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.alert_incidents
+    ADD CONSTRAINT alert_incidents_rule_id_fkey FOREIGN KEY (rule_id) REFERENCES public.alert_rules(id) ON DELETE SET NULL;
+
+
+--
+-- Name: apt_status apt_status_host_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.apt_status
+    ADD CONSTRAINT apt_status_host_id_fkey FOREIGN KEY (host_id) REFERENCES public.hosts(id) ON DELETE CASCADE;
+
+
+--
+-- Name: compose_projects compose_projects_host_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.compose_projects
+    ADD CONSTRAINT compose_projects_host_id_fkey FOREIGN KEY (host_id) REFERENCES public.hosts(id) ON DELETE CASCADE;
+
+
+--
+-- Name: disk_health disk_health_host_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.disk_health
+    ADD CONSTRAINT disk_health_host_id_fkey FOREIGN KEY (host_id) REFERENCES public.hosts(id) ON DELETE CASCADE;
+
+
+--
+-- Name: disk_metrics disk_metrics_host_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.disk_metrics
+    ADD CONSTRAINT disk_metrics_host_id_fkey FOREIGN KEY (host_id) REFERENCES public.hosts(id) ON DELETE CASCADE;
+
+
+--
+-- Name: docker_containers docker_containers_host_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.docker_containers
+    ADD CONSTRAINT docker_containers_host_id_fkey FOREIGN KEY (host_id) REFERENCES public.hosts(id) ON DELETE CASCADE;
+
+
+--
+-- Name: docker_networks docker_networks_host_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.docker_networks
+    ADD CONSTRAINT docker_networks_host_id_fkey FOREIGN KEY (host_id) REFERENCES public.hosts(id) ON DELETE CASCADE;
+
+
+--
+-- Name: proxmox_nodes fk_proxmox_nodes_cpu_temp_source_host; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.proxmox_nodes
+    ADD CONSTRAINT fk_proxmox_nodes_cpu_temp_source_host FOREIGN KEY (cpu_temp_source_host_id) REFERENCES public.hosts(id) ON DELETE SET NULL;
+
+
+--
+-- Name: proxmox_nodes fk_proxmox_nodes_fan_rpm_source_host; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.proxmox_nodes
+    ADD CONSTRAINT fk_proxmox_nodes_fan_rpm_source_host FOREIGN KEY (fan_rpm_source_host_id) REFERENCES public.hosts(id) ON DELETE SET NULL;
+
+
+--
+-- Name: remote_commands fk_remote_commands_audit; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.remote_commands
+    ADD CONSTRAINT fk_remote_commands_audit FOREIGN KEY (audit_log_id) REFERENCES public.audit_logs(id) ON DELETE SET NULL;
+
+
+--
+-- Name: git_webhook_executions git_webhook_executions_command_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.git_webhook_executions
+    ADD CONSTRAINT git_webhook_executions_command_id_fkey FOREIGN KEY (command_id) REFERENCES public.remote_commands(id) ON DELETE SET NULL;
+
+
+--
+-- Name: git_webhook_executions git_webhook_executions_webhook_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.git_webhook_executions
+    ADD CONSTRAINT git_webhook_executions_webhook_id_fkey FOREIGN KEY (webhook_id) REFERENCES public.git_webhooks(id) ON DELETE CASCADE;
+
+
+--
+-- Name: git_webhooks git_webhooks_host_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.git_webhooks
+    ADD CONSTRAINT git_webhooks_host_id_fkey FOREIGN KEY (host_id) REFERENCES public.hosts(id) ON DELETE CASCADE;
+
+
+--
+-- Name: host_permissions host_permissions_host_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.host_permissions
+    ADD CONSTRAINT host_permissions_host_id_fkey FOREIGN KEY (host_id) REFERENCES public.hosts(id) ON DELETE CASCADE;
+
+
+--
+-- Name: proxmox_backup_jobs proxmox_backup_jobs_connection_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.proxmox_backup_jobs
+    ADD CONSTRAINT proxmox_backup_jobs_connection_id_fkey FOREIGN KEY (connection_id) REFERENCES public.proxmox_connections(id) ON DELETE CASCADE;
+
+
+--
+-- Name: proxmox_backup_runs proxmox_backup_runs_connection_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.proxmox_backup_runs
+    ADD CONSTRAINT proxmox_backup_runs_connection_id_fkey FOREIGN KEY (connection_id) REFERENCES public.proxmox_connections(id) ON DELETE CASCADE;
+
+
+--
+-- Name: proxmox_disks proxmox_disks_connection_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.proxmox_disks
+    ADD CONSTRAINT proxmox_disks_connection_id_fkey FOREIGN KEY (connection_id) REFERENCES public.proxmox_connections(id) ON DELETE CASCADE;
+
+
+--
+-- Name: proxmox_guest_links proxmox_guest_links_guest_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.proxmox_guest_links
+    ADD CONSTRAINT proxmox_guest_links_guest_id_fkey FOREIGN KEY (guest_id) REFERENCES public.proxmox_guests(id) ON DELETE CASCADE;
+
+
+--
+-- Name: proxmox_guest_links proxmox_guest_links_host_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.proxmox_guest_links
+    ADD CONSTRAINT proxmox_guest_links_host_id_fkey FOREIGN KEY (host_id) REFERENCES public.hosts(id) ON DELETE CASCADE;
+
+
+--
+-- Name: proxmox_guest_metrics proxmox_guest_metrics_guest_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.proxmox_guest_metrics
+    ADD CONSTRAINT proxmox_guest_metrics_guest_id_fkey FOREIGN KEY (guest_id) REFERENCES public.proxmox_guests(id) ON DELETE CASCADE;
+
+
+--
+-- Name: proxmox_guests proxmox_guests_connection_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.proxmox_guests
+    ADD CONSTRAINT proxmox_guests_connection_id_fkey FOREIGN KEY (connection_id) REFERENCES public.proxmox_connections(id) ON DELETE CASCADE;
+
+
+--
+-- Name: proxmox_node_metrics proxmox_node_metrics_node_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.proxmox_node_metrics
+    ADD CONSTRAINT proxmox_node_metrics_node_id_fkey FOREIGN KEY (node_id) REFERENCES public.proxmox_nodes(id) ON DELETE CASCADE;
+
+
+--
+-- Name: proxmox_nodes proxmox_nodes_connection_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.proxmox_nodes
+    ADD CONSTRAINT proxmox_nodes_connection_id_fkey FOREIGN KEY (connection_id) REFERENCES public.proxmox_connections(id) ON DELETE CASCADE;
+
+
+--
+-- Name: proxmox_storages proxmox_storages_connection_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.proxmox_storages
+    ADD CONSTRAINT proxmox_storages_connection_id_fkey FOREIGN KEY (connection_id) REFERENCES public.proxmox_connections(id) ON DELETE CASCADE;
+
+
+--
+-- Name: proxmox_tasks proxmox_tasks_connection_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.proxmox_tasks
+    ADD CONSTRAINT proxmox_tasks_connection_id_fkey FOREIGN KEY (connection_id) REFERENCES public.proxmox_connections(id) ON DELETE CASCADE;
+
+
+--
+-- Name: refresh_tokens refresh_tokens_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.refresh_tokens
+    ADD CONSTRAINT refresh_tokens_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: release_tracker_executions release_tracker_executions_command_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.release_tracker_executions
+    ADD CONSTRAINT release_tracker_executions_command_id_fkey FOREIGN KEY (command_id) REFERENCES public.remote_commands(id) ON DELETE SET NULL;
+
+
+--
+-- Name: release_tracker_executions release_tracker_executions_tracker_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.release_tracker_executions
+    ADD CONSTRAINT release_tracker_executions_tracker_id_fkey FOREIGN KEY (tracker_id) REFERENCES public.release_trackers(id) ON DELETE CASCADE;
+
+
+--
+-- Name: release_tracker_tag_digests release_tracker_tag_digests_tracker_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.release_tracker_tag_digests
+    ADD CONSTRAINT release_tracker_tag_digests_tracker_id_fkey FOREIGN KEY (tracker_id) REFERENCES public.release_trackers(id) ON DELETE CASCADE;
+
+
+--
+-- Name: release_trackers release_trackers_host_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.release_trackers
+    ADD CONSTRAINT release_trackers_host_id_fkey FOREIGN KEY (host_id) REFERENCES public.hosts(id) ON DELETE SET NULL;
+
+
+--
+-- Name: release_trackers release_trackers_registry_credentials_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.release_trackers
+    ADD CONSTRAINT release_trackers_registry_credentials_id_fkey FOREIGN KEY (registry_credentials_id) REFERENCES public.registry_credentials(id) ON DELETE SET NULL;
+
+
+--
+-- Name: remote_commands remote_commands_host_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.remote_commands
+    ADD CONSTRAINT remote_commands_host_id_fkey FOREIGN KEY (host_id) REFERENCES public.hosts(id) ON DELETE CASCADE;
+
+
+--
+-- Name: remote_commands remote_commands_scheduled_task_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.remote_commands
+    ADD CONSTRAINT remote_commands_scheduled_task_id_fkey FOREIGN KEY (scheduled_task_id) REFERENCES public.scheduled_tasks(id) ON DELETE SET NULL;
+
+
+--
+-- Name: scheduled_tasks scheduled_tasks_host_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.scheduled_tasks
+    ADD CONSTRAINT scheduled_tasks_host_id_fkey FOREIGN KEY (host_id) REFERENCES public.hosts(id) ON DELETE CASCADE;
+
+
+--
+-- Name: system_metrics system_metrics_host_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.system_metrics
+    ADD CONSTRAINT system_metrics_host_id_fkey FOREIGN KEY (host_id) REFERENCES public.hosts(id) ON DELETE CASCADE;
+
+
+--
+-- Name: unattended_upgrades_runs unattended_upgrades_runs_host_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.unattended_upgrades_runs
+    ADD CONSTRAINT unattended_upgrades_runs_host_id_fkey FOREIGN KEY (host_id) REFERENCES public.hosts(id) ON DELETE CASCADE;
+
+
+--
+-- Name: unattended_upgrades_status unattended_upgrades_status_host_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.unattended_upgrades_status
+    ADD CONSTRAINT unattended_upgrades_status_host_id_fkey FOREIGN KEY (host_id) REFERENCES public.hosts(id) ON DELETE CASCADE;
+
+
+--
+-- Name: uptime_probe_results uptime_probe_results_probe_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.uptime_probe_results
+    ADD CONSTRAINT uptime_probe_results_probe_id_fkey FOREIGN KEY (probe_id) REFERENCES public.uptime_probes(id) ON DELETE CASCADE;
+
+
+--
+-- Name: web_log_requests web_log_requests_host_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.web_log_requests
+    ADD CONSTRAINT web_log_requests_host_id_fkey FOREIGN KEY (host_id) REFERENCES public.hosts(id) ON DELETE CASCADE;
+
+
+--
+-- Name: web_log_requests web_log_requests_snapshot_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.web_log_requests
+    ADD CONSTRAINT web_log_requests_snapshot_id_fkey FOREIGN KEY (snapshot_id) REFERENCES public.web_log_snapshots(id) ON DELETE CASCADE;
+
+
+--
+-- Name: web_log_snapshots web_log_snapshots_host_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.web_log_snapshots
+    ADD CONSTRAINT web_log_snapshots_host_id_fkey FOREIGN KEY (host_id) REFERENCES public.hosts(id) ON DELETE CASCADE;
+
+
+--
+-- PostgreSQL database dump complete
+--
+
+
+
+-- Mark all squashed migration files as applied so they are skipped after this baseline.
 INSERT INTO schema_migrations (filename) VALUES
     ('001_core.sql'),
     ('002_aggregates.sql'),
@@ -1541,6 +2824,26 @@ INSERT INTO schema_migrations (filename) VALUES
     ('039_web_logs.sql'),
     ('040_web_logs_dedup_fingerprint.sql'),
     ('041_cpu_temperature.sql'),
-    ('042_proxmox_cpu_temp_source.sql')
-ON CONFLICT DO NOTHING;
-
+    ('041_web_logs_crowdsec.sql'),
+    ('042_proxmox_cpu_temp_source.sql'),
+    ('043_host_collectors.sql'),
+    ('044_alert_rules_legacy_cleanup.sql'),
+    ('045_system_metrics_fan_rpm.sql'),
+    ('046_proxmox_fan_rpm_source.sql'),
+    ('047_alert_rule_source_type.sql'),
+    ('048_alert_hysteresis.sql'),
+    ('049_alert_severity_levels.sql'),
+    ('050_tracker_history_cooldown.sql'),
+    ('051_unattended_upgrades.sql'),
+    ('052_crowdsec_blocked_ips.sql'),
+    ('053_crowdsec_top_blocked.sql'),
+    ('054_topology_host_links.sql'),
+    ('055_topology_port_links.sql'),
+    ('056_web_logs_indexes.sql'),
+    ('057_tasks_config_yaml.sql'),
+    ('058_uptime_probes.sql'),
+    ('059_ssl_certificates.sql'),
+    ('060_alert_rules_synthetic_source.sql'),
+    ('061_drop_tracked_repos.sql'),
+    ('062_compose_update_module.sql'),
+    ('063_system_metrics_timestamp_index.sql');

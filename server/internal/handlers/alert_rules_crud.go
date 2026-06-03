@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
+	"github.com/serversupervisor/server/internal/alerts"
 	"github.com/serversupervisor/server/internal/models"
 )
 
@@ -273,12 +275,10 @@ FROM alert_rules WHERE id = $1`, id)
 	if req.ThresholdCrit != nil {
 		next.ThresholdCrit = req.ThresholdCrit
 	}
-	if req.ThresholdClearWarn != nil {
-		next.ThresholdClearWarn = req.ThresholdClearWarn
-	}
-	if req.ThresholdClearCrit != nil {
-		next.ThresholdClearCrit = req.ThresholdClearCrit
-	}
+	// Hysteresis fields: nil means "clear" (set to NULL) — always apply
+	// so the frontend can explicitly remove them by sending null.
+	next.ThresholdClearWarn = req.ThresholdClearWarn
+	next.ThresholdClearCrit = req.ThresholdClearCrit
 	if req.Duration != nil {
 		next.DurationSeconds = *req.Duration
 	}
@@ -363,16 +363,12 @@ FROM alert_rules WHERE id = $1`, id)
 		args = append(args, *next.ThresholdCrit)
 		argCount++
 	}
-	if req.ThresholdClearWarn != nil {
-		updates = append(updates, "threshold_clear_warn = $"+strconv.Itoa(argCount))
-		args = append(args, *next.ThresholdClearWarn)
-		argCount++
-	}
-	if req.ThresholdClearCrit != nil {
-		updates = append(updates, "threshold_clear_crit = $"+strconv.Itoa(argCount))
-		args = append(args, *next.ThresholdClearCrit)
-		argCount++
-	}
+	updates = append(updates, "threshold_clear_warn = $"+strconv.Itoa(argCount))
+	args = append(args, next.ThresholdClearWarn) // nil → SQL NULL (clears hysteresis)
+	argCount++
+	updates = append(updates, "threshold_clear_crit = $"+strconv.Itoa(argCount))
+	args = append(args, next.ThresholdClearCrit) // nil → SQL NULL (clears hysteresis)
+	argCount++
 	if req.Duration != nil {
 		updates = append(updates, "duration_seconds = $"+strconv.Itoa(argCount))
 		args = append(args, next.DurationSeconds)
@@ -416,6 +412,10 @@ FROM alert_rules WHERE id = $1`, id)
 				return
 			}
 		}
+	} else {
+		// Thresholds or hysteresis may have changed: immediately resolve any open
+		// incidents whose stored value no longer meets the (new) firing condition.
+		go alerts.ResolveStaleIncidentsForRule(context.Background(), h.db, next)
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Alert rule updated"})
 }

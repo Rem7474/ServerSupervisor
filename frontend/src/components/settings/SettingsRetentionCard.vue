@@ -20,7 +20,7 @@
           id="metrics-retention-hint"
           class="form-hint"
         >
-          Métriques brutes et agrégats plus anciens que ce seuil sont supprimés
+          Politique de rétention TimescaleDB pour system_metrics et disk_metrics
         </div>
       </div>
       <div class="mb-0">

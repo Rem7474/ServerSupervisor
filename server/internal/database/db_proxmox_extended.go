@@ -313,6 +313,26 @@ func (db *DB) ListProxmoxDisksByNode(ctx context.Context, connectionID, nodeName
 	return scanDisks(rows)
 }
 
+// ListProxmoxDisksByHost returns the physical disks of the Proxmox node hosting
+// the guest linked to the given host. Used to surface node-level SMART health on
+// a host page when the host itself can't read SMART (e.g. an LXC/VM). Returns an
+// empty slice when the host has no (non-ignored) Proxmox link.
+func (db *DB) ListProxmoxDisksByHost(ctx context.Context, hostID string) ([]models.ProxmoxDisk, error) {
+	rows, err := db.conn.QueryContext(ctx, `
+		SELECT d.id, d.connection_id, d.node_name, d.dev_path, d.model, d.serial, d.size_bytes, d.disk_type, d.health, d.wearout, d.last_seen_at
+		FROM proxmox_disks d
+		JOIN proxmox_guests      g ON g.connection_id = d.connection_id AND g.node_name = d.node_name
+		JOIN proxmox_guest_links l ON l.guest_id = g.id
+		WHERE l.host_id = $1 AND l.status != 'ignored'
+		ORDER BY d.dev_path`,
+		hostID)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	return scanDisks(rows)
+}
+
 // DeleteStaleProxmoxDisks removes disks not seen since the cutoff for a connection + node.
 func (db *DB) DeleteStaleProxmoxDisks(ctx context.Context, connectionID string, cutoff time.Time) error {
 	_, err := db.conn.ExecContext(ctx, 

@@ -82,37 +82,51 @@
       class="row"
     >
       <div class="col-md-6 mb-3">
-        <label class="form-label">Désactivation warn (hystérésis)</label>
+        <label class="form-label">Seuil de résolution warn (hystérésis)</label>
         <input
           v-model.number="form.threshold_clear_warn"
           type="number"
           step="0.1"
           class="form-control"
-          placeholder="(Laisser vide pour auto)"
+          :class="{ 'is-invalid': clearWarnIncoherent }"
+          :placeholder="clearPlaceholder('warn')"
           :aria-describedby="`threshold-clear-warn-hint-${rule?.id || 'new'}`"
         >
+        <small
+          v-if="clearWarnIncoherent"
+          class="invalid-feedback d-block"
+        >
+          {{ incoherenceMessage('warn') }}
+        </small>
         <small
           :id="`threshold-clear-warn-hint-${rule?.id || 'new'}`"
           class="form-hint"
         >
-          Seuil pour résoudre l'alerte warn. Évite le fluttering.
+          Valeur <strong>exacte</strong> à laquelle l'alerte warn se résout (ex. {{ clearExample('warn') }}). Laisser vide = se résout dès que le seuil n'est plus dépassé.
         </small>
       </div>
       <div class="col-md-6 mb-3">
-        <label class="form-label">Désactivation crit (hystérésis)</label>
+        <label class="form-label">Seuil de résolution crit (hystérésis)</label>
         <input
           v-model.number="form.threshold_clear_crit"
           type="number"
           step="0.1"
           class="form-control"
-          placeholder="(Laisser vide pour auto)"
+          :class="{ 'is-invalid': clearCritIncoherent }"
+          :placeholder="clearPlaceholder('crit')"
           :aria-describedby="`threshold-clear-crit-hint-${rule?.id || 'new'}`"
         >
+        <small
+          v-if="clearCritIncoherent"
+          class="invalid-feedback d-block"
+        >
+          {{ incoherenceMessage('crit') }}
+        </small>
         <small
           :id="`threshold-clear-crit-hint-${rule?.id || 'new'}`"
           class="form-hint"
         >
-          Seuil pour résoudre l'alerte crit. Évite le fluttering.
+          Valeur <strong>exacte</strong> à laquelle l'alerte crit se résout (ex. {{ clearExample('crit') }}). Laisser vide = se résout dès que le seuil n'est plus dépassé.
         </small>
       </div>
     </div>
@@ -231,6 +245,7 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { AlertRuleFormData } from '../../composables/useAlertRuleForm'
 
 interface TestResultRow {
@@ -246,7 +261,7 @@ interface TestResults {
   results?: TestResultRow[]
 }
 
-defineProps<{
+const props = defineProps<{
   form: AlertRuleFormData
   rule?: { id?: number | string } | null
   testResults?: TestResults | null
@@ -257,6 +272,51 @@ defineProps<{
 }>()
 
 const emit = defineEmits<{ (e: 'download-logs'): void }>()
+
+type Severity = 'warn' | 'crit'
+
+const isDescending = computed(() => props.form.operator === '<' || props.form.operator === '<=')
+
+function triggerThreshold(sev: Severity): number | null {
+  const v = sev === 'warn' ? props.form.threshold_warn : props.form.threshold_crit
+  return Number.isFinite(Number(v)) ? Number(v) : null
+}
+
+function clearValue(sev: Severity): number | null {
+  const v = sev === 'warn' ? props.form.threshold_clear_warn : props.form.threshold_clear_crit
+  return Number.isFinite(Number(v)) ? Number(v) : null
+}
+
+// A clear threshold is incoherent when it sits on the "firing" side of the
+// trigger: for a ">" rule it must be ≤ trigger, for a "<" rule ≥ trigger.
+function isIncoherent(sev: Severity): boolean {
+  const trigger = triggerThreshold(sev)
+  const clear = clearValue(sev)
+  if (trigger === null || clear === null) return false
+  return isDescending.value ? clear < trigger : clear > trigger
+}
+
+const clearWarnIncoherent = computed(() => isIncoherent('warn'))
+const clearCritIncoherent = computed(() => isIncoherent('crit'))
+
+const unitLabel = computed(() => props.metricUnit || '')
+
+function clearExample(sev: Severity): string {
+  const trigger = triggerThreshold(sev)
+  if (trigger === null) return isDescending.value ? '72' : '68'
+  const suggestion = isDescending.value ? trigger + 2 : trigger - 2
+  return `${suggestion}${unitLabel.value}`
+}
+
+function clearPlaceholder(sev: Severity): string {
+  return `ex. ${clearExample(sev)} — vide = auto`
+}
+
+function incoherenceMessage(sev: Severity): string {
+  const trigger = triggerThreshold(sev)
+  const side = isDescending.value ? `≥ ${trigger}${unitLabel.value}` : `≤ ${trigger}${unitLabel.value}`
+  return `Incohérent : le seuil de résolution doit être ${side} (sinon l'alerte ne se résout jamais).`
+}
 
 function formatDate(dateStr?: string): string {
   if (!dateStr) return ''

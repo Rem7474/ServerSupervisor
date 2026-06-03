@@ -242,6 +242,7 @@ func registerAlertRoutes(g *gin.RouterGroup, rulesH *handlers.AlertRulesHandler)
 	admin := g.Group("")
 	admin.Use(AdminOnlyMiddleware())
 	admin.GET("/alerts/incidents", rulesH.ListIncidents)
+	admin.POST("/alerts/incidents/:id/resolve", rulesH.ResolveIncident)
 	admin.GET("/alert-rules/capabilities/agent", rulesH.GetAgentAlertRuleCapabilities)
 	admin.GET("/alert-rules/capabilities/proxmox", rulesH.GetProxmoxAlertRuleCapabilities)
 	admin.GET("/alert-rules/capabilities/synthetic", rulesH.GetSyntheticAlertRuleCapabilities)
@@ -349,6 +350,7 @@ func registerProxmoxRoutes(g *gin.RouterGroup, h *handlers.ProxmoxHandler) {
 	// Per-host Proxmox link lookup + candidate guests for manual linking
 	g.GET("/hosts/:id/proxmox-link", h.GetLinkByHost)
 	g.GET("/hosts/:id/proxmox-candidates", h.ListLinkCandidates)
+	g.GET("/hosts/:id/proxmox-disks", h.GetHostProxmoxDisks)
 
 	// Extended read-only data (tasks, backups, disks)
 	g.GET("/proxmox/tasks", h.ListTasks)

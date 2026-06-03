@@ -3,6 +3,7 @@ package database
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log/slog"
 
 	"github.com/serversupervisor/server/internal/models"
@@ -25,17 +26,8 @@ func (db *DB) InsertMetrics(ctx context.Context, m *models.SystemMetrics) (int64
 	if err != nil {
 		return 0, err
 	}
-
-	for _, d := range m.Disks {
-		_, err := db.conn.ExecContext(ctx, 
-			`INSERT INTO disk_info (metrics_id, mount_point, device, fs_type, total_bytes, used_bytes, free_bytes, used_percent)
-			 VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-			id, d.MountPoint, d.Device, d.FSType, d.TotalBytes, d.UsedBytes, d.FreeBytes, d.UsedPercent,
-		)
-		if err != nil {
-			return id, err
-		}
-	}
+	// Per-disk details are stored separately in disk_metrics (a hypertable) via
+	// InsertDiskMetrics; the legacy disk_info table was dropped in V2.
 	return id, nil
 }
 
@@ -66,24 +58,8 @@ func (db *DB) GetLatestMetrics(ctx context.Context, hostID string) (*models.Syst
 	if err != nil {
 		return nil, err
 	}
-
-	rows, err := db.conn.QueryContext(ctx, 
-		`SELECT id, mount_point, device, fs_type, total_bytes, used_bytes, free_bytes, used_percent
-		 FROM disk_info WHERE metrics_id = $1`, m.ID,
-	)
-	if err != nil {
-		slog.WarnContext(ctx, "failed to fetch disk_info for metrics", slog.Int64("metrics_id", m.ID), slog.String("host", m.HostID), slog.Any("err", err))
-		return &m, nil
-	}
-	defer func() { _ = rows.Close() }()
-
-	for rows.Next() {
-		var d models.DiskInfo
-		if err := rows.Scan(&d.ID, &d.MountPoint, &d.Device, &d.FSType, &d.TotalBytes, &d.UsedBytes, &d.FreeBytes, &d.UsedPercent); err != nil {
-			continue
-		}
-		m.Disks = append(m.Disks, d)
-	}
+	// Per-disk details now live in disk_metrics (hypertable); host views fetch
+	// them via GetLatestDiskMetrics. The legacy disk_info join was removed in V2.
 	return &m, nil
 }
 
@@ -193,12 +169,7 @@ func (db *DB) GetSystemCPUTemperatureHistoryByHost(ctx context.Context, hostID s
 		bucketMinutes = 24 * 60
 	}
 
-	bucketExpr := ""
-	if db.hasTimescaleDB {
-		bucketExpr = `time_bucket($2 * '1 minute'::interval, timestamp)`
-	} else {
-		bucketExpr = `to_timestamp(floor(EXTRACT(EPOCH FROM timestamp) / ($2 * 60)) * ($2 * 60))`
-	}
+	const bucketExpr = `time_bucket($2 * '1 minute'::interval, timestamp)`
 
 	query := `
 		SELECT
@@ -261,12 +232,7 @@ func (db *DB) GetSystemFanRPMHistoryByHost(ctx context.Context, hostID string, h
 		bucketMinutes = 24 * 60
 	}
 
-	bucketExpr := ""
-	if db.hasTimescaleDB {
-		bucketExpr = `time_bucket($2 * '1 minute'::interval, timestamp)`
-	} else {
-		bucketExpr = `to_timestamp(floor(EXTRACT(EPOCH FROM timestamp) / ($2 * 60)) * ($2 * 60))`
-	}
+	const bucketExpr = `time_bucket($2 * '1 minute'::interval, timestamp)`
 
 	query := `
 		SELECT
@@ -316,17 +282,32 @@ func (db *DB) GetSystemFanRPMHistoryByHost(ctx context.Context, hostID string, h
 	return metrics, rows.Err()
 }
 
-// GetMetricsAggregatesByType returns pre-aggregated metrics for long time ranges.
+// GetMetricsAggregatesByType returns per-host metrics bucketed for long time
+// ranges. It buckets the raw system_metrics hypertable on the fly (chunk + index
+// pruning keep this cheap for a single host), replacing the dropped
+// metrics_aggregates table. aggregationType selects the bucket size:
+// "hour" → 60-minute buckets, anything else ("day") → daily buckets.
 func (db *DB) GetMetricsAggregatesByType(ctx context.Context, hostID string, hours int, aggregationType string) ([]models.SystemMetrics, error) {
-	rows, err := db.conn.QueryContext(ctx, 
-		`SELECT id, host_id, timestamp, cpu_usage_avg as cpu_usage_percent, 0 as cpu_cores, 0 as cpu_temperature, 0 as fan_rpm,
-		 0 as load_avg_1, 0 as load_avg_5, 0 as load_avg_15,
-		 0 as memory_total, memory_usage_avg as memory_used, 0 as memory_free, memory_percent_avg as memory_percent,
-		 0 as swap_total, 0 as swap_used,
-		 network_rx_bytes, network_tx_bytes, 0 as uptime
-		 FROM metrics_aggregates
-		 WHERE host_id = $1 AND aggregation_type = $2 AND timestamp > NOW() - INTERVAL '1 hour' * $3
-		 ORDER BY timestamp ASC`, hostID, aggregationType, hours,
+	bucketMinutes := 60
+	if aggregationType == "day" {
+		bucketMinutes = 24 * 60
+	}
+
+	const bucketExpr = `time_bucket($3 * '1 minute'::interval, timestamp)`
+
+	rows, err := db.conn.QueryContext(ctx,
+		`SELECT 0 AS id, $1 AS host_id, `+bucketExpr+` AS timestamp,
+		 AVG(cpu_usage_percent) AS cpu_usage_percent, 0 AS cpu_cores, 0 AS cpu_temperature, 0 AS fan_rpm,
+		 0 AS load_avg_1, 0 AS load_avg_5, 0 AS load_avg_15,
+		 0 AS memory_total, COALESCE(AVG(memory_used), 0)::BIGINT AS memory_used, 0 AS memory_free, AVG(memory_percent) AS memory_percent,
+		 0 AS swap_total, 0 AS swap_used,
+		 COALESCE(MAX(network_rx_bytes) - MIN(network_rx_bytes), 0) AS network_rx_bytes,
+		 COALESCE(MAX(network_tx_bytes) - MIN(network_tx_bytes), 0) AS network_tx_bytes,
+		 0 AS uptime
+		 FROM system_metrics
+		 WHERE host_id = $1 AND timestamp > NOW() - INTERVAL '1 hour' * $2
+		 GROUP BY `+bucketExpr+`
+		 ORDER BY `+bucketExpr+` ASC`, hostID, hours, bucketMinutes,
 	)
 	if err != nil {
 		return nil, err
@@ -346,50 +327,80 @@ func (db *DB) GetMetricsAggregatesByType(ctx context.Context, hostID string, hou
 	return metrics, nil
 }
 
+// GetMetricsSummary returns the global CPU/RAM history used by the dashboard chart.
+// For buckets ≥ 5 minutes it reads the system_metrics_5min continuous aggregate
+// (materialized by TimescaleDB) instead of scanning raw rows across all hosts;
+// finer buckets (≤6h ranges) fall back to the raw table. If the aggregate is
+// unavailable (e.g. non-Timescale dev/test DB) it also falls back to raw so the
+// chart is never empty.
 func (db *DB) GetMetricsSummary(ctx context.Context, hours int, bucketMinutes int) ([]models.SystemMetricsSummary, error) {
 	if bucketMinutes <= 0 {
 		bucketMinutes = 5
 	}
 
-	var (
-		rows *sql.Rows
-		err  error
-	)
-
-	if db.hasTimescaleDB {
-		rows, err = db.conn.QueryContext(ctx, 
-			`SELECT
-				time_bucket($2 * '1 minute'::interval, timestamp) AS ts,
-				AVG(cpu_usage_percent) AS cpu_avg,
-				AVG(memory_percent) AS mem_avg,
-				COUNT(*) AS sample_count
-			 FROM system_metrics
-			 WHERE timestamp > NOW() - INTERVAL '1 hour' * $1
-			 GROUP BY ts
-			 ORDER BY ts ASC`,
-			hours, bucketMinutes,
-		)
-	} else {
-		rows, err = db.conn.QueryContext(ctx, 
-			`SELECT
-				to_timestamp(
-					floor(EXTRACT(EPOCH FROM timestamp) / ($2 * 60)) * ($2 * 60)
-				) AS ts,
-				AVG(cpu_usage_percent) AS cpu_avg,
-				AVG(memory_percent) AS mem_avg,
-				COUNT(*) AS sample_count
-			 FROM system_metrics
-			 WHERE timestamp > NOW() - INTERVAL '1 hour' * $1
-			 GROUP BY ts
-			 ORDER BY ts ASC`,
-			hours, bucketMinutes,
-		)
+	if bucketMinutes >= 5 {
+		summary, err := db.metricsSummaryFromCAGG(ctx, hours, bucketMinutes)
+		switch {
+		case err == nil && len(summary) > 0:
+			return summary, nil
+		case err != nil:
+			// The continuous aggregate is expected to be absent only on a
+			// non-Timescale DB (dev/test); any other failure is logged so a real
+			// error is never silently hidden before the raw fallback.
+			slog.WarnContext(ctx, "metrics summary continuous aggregate query failed, falling back to raw",
+				slog.Int("hours", hours), slog.Int("bucket_minutes", bucketMinutes), slog.Any("err", err))
+		}
 	}
+
+	return db.metricsSummaryFromRaw(ctx, hours, bucketMinutes)
+}
+
+// metricsSummaryFromRaw aggregates the raw system_metrics table into time buckets.
+func (db *DB) metricsSummaryFromRaw(ctx context.Context, hours int, bucketMinutes int) ([]models.SystemMetricsSummary, error) {
+	const bucketExpr = `time_bucket($2 * '1 minute'::interval, timestamp)`
+	rows, err := db.conn.QueryContext(ctx,
+		`SELECT `+bucketExpr+` AS ts,
+			AVG(cpu_usage_percent) AS cpu_avg,
+			AVG(memory_percent) AS mem_avg,
+			COUNT(*) AS sample_count
+		 FROM system_metrics
+		 WHERE timestamp > NOW() - INTERVAL '1 hour' * $1
+		 GROUP BY ts
+		 ORDER BY ts ASC`,
+		hours, bucketMinutes,
+	)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = rows.Close() }()
 
+	return scanMetricsSummary(rows)
+}
+
+// metricsSummaryFromCAGG re-buckets the system_metrics_5min continuous aggregate
+// into the requested bucket size and averages across hosts. The aggregate stores
+// one row per (5-minute bucket, host_id); coarser dashboard ranges roll those up.
+func (db *DB) metricsSummaryFromCAGG(ctx context.Context, hours int, bucketMinutes int) ([]models.SystemMetricsSummary, error) {
+	rows, err := db.conn.QueryContext(ctx,
+		`SELECT time_bucket($2 * '1 minute'::interval, bucket) AS ts,
+			AVG(cpu_avg) AS cpu_avg,
+			AVG(mem_avg) AS mem_avg,
+			SUM(sample_count) AS sample_count
+		 FROM system_metrics_5min
+		 WHERE bucket > NOW() - INTERVAL '1 hour' * $1
+		 GROUP BY ts
+		 ORDER BY ts ASC`,
+		hours, bucketMinutes,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	return scanMetricsSummary(rows)
+}
+
+func scanMetricsSummary(rows *sql.Rows) ([]models.SystemMetricsSummary, error) {
 	var summary []models.SystemMetricsSummary
 	for rows.Next() {
 		var s models.SystemMetricsSummary
@@ -398,45 +409,25 @@ func (db *DB) GetMetricsSummary(ctx context.Context, hours int, bucketMinutes in
 		}
 		summary = append(summary, s)
 	}
-	return summary, nil
+	return summary, rows.Err()
 }
 
-func (db *DB) CleanOldMetrics(ctx context.Context, retentionDays int) (int64, error) {
-	tx, err := db.conn.BeginTx(ctx, nil)
-	if err != nil {
-		return 0, err
+// UpdateMetricsRetentionPolicy updates the TimescaleDB retention policies for
+// system_metrics and disk_metrics to the given number of days. The existing
+// policy is replaced atomically so the change takes effect on the next
+// scheduled policy run.
+func (db *DB) UpdateMetricsRetentionPolicy(ctx context.Context, days int) error {
+	for _, table := range []string{"system_metrics", "disk_metrics"} {
+		if _, err := db.conn.ExecContext(ctx,
+			`SELECT remove_retention_policy($1, if_not_exists => true)`, table); err != nil {
+			return fmt.Errorf("remove retention policy for %s: %w", table, err)
+		}
+		if _, err := db.conn.ExecContext(ctx,
+			`SELECT add_retention_policy($1, make_interval(days => $2))`, table, days); err != nil {
+			return fmt.Errorf("add retention policy for %s: %w", table, err)
+		}
 	}
-	defer func() { _ = tx.Rollback() }()
-
-	rawResult, err := tx.ExecContext(ctx, 
-		`DELETE FROM system_metrics WHERE timestamp < NOW() - INTERVAL '1 day' * $1`,
-		retentionDays,
-	)
-	if err != nil {
-		return 0, err
-	}
-	rawDeleted, _ := rawResult.RowsAffected()
-
-	_, err = tx.ExecContext(ctx, 
-		`DELETE FROM metrics_aggregates WHERE timestamp < NOW() - INTERVAL '1 day' * $1`,
-		retentionDays,
-	)
-	if err != nil {
-		return rawDeleted, err
-	}
-
-	_, err = tx.ExecContext(ctx, 
-		`DELETE FROM disk_metrics WHERE timestamp < NOW() - INTERVAL '1 day' * $1`,
-		retentionDays,
-	)
-	if err != nil {
-		return rawDeleted, err
-	}
-
-	if err := tx.Commit(); err != nil {
-		return 0, err
-	}
-	return rawDeleted, nil
+	return nil
 }
 
 // CountMetrics returns the total number of metrics records.

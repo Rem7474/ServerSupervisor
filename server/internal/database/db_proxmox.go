@@ -184,6 +184,10 @@ func (db *DB) GetProxmoxNodeFanRPMByNode(ctx context.Context, nodeID string) flo
 // proxmox_nodes row, then returns the MAX of metricColumn for rows matching
 // whereClause. Used to compute aggregate sensor metrics for the dashboard.
 func (db *DB) queryProxmoxNodeSensorMetric(ctx context.Context, sourceColumn, metricColumn, whereClause string, args []interface{}) float64 {
+	// Freshness guard (10 min) mirrors GetEffectiveHostCPUTemperature: a source
+	// host that stopped reporting sensor data must NOT keep feeding a frozen value
+	// to the dashboard or the alert engine (which would otherwise leave a
+	// temperature/fan alert active indefinitely).
 	query := `
 		SELECT COALESCE(MAX(latest.metric_value), 0)
 		FROM proxmox_nodes n
@@ -191,6 +195,7 @@ func (db *DB) queryProxmoxNodeSensorMetric(ctx context.Context, sourceColumn, me
 			SELECT sm.` + metricColumn + ` AS metric_value
 			FROM system_metrics sm
 			WHERE sm.host_id = n.` + sourceColumn + `
+			  AND sm.timestamp > NOW() - INTERVAL '10 minutes'
 			ORDER BY sm.timestamp DESC
 			LIMIT 1
 		) latest ON TRUE

@@ -21,21 +21,20 @@ type Sender struct {
 }
 
 type Report struct {
-	HostID          string      `json:"host_id"`
-	AgentVersion    string      `json:"agent_version"`
-	Capabilities    interface{} `json:"capabilities"` // Agent collector status (docker, smart, cpu_temp, web_logs, etc.)
-	Metrics         interface{} `json:"metrics"`
-	Docker          interface{} `json:"docker"`
-	AptStatus            interface{} `json:"apt_status"`
-	UnattendedUpgrades   interface{} `json:"unattended_upgrades,omitempty"`
-	WebLogs         interface{} `json:"web_logs,omitempty"`
-	DockerNetworks  interface{} `json:"docker_networks,omitempty"`  // Network topology data
-	ComposeProjects interface{} `json:"compose_projects,omitempty"` // Docker Compose projects
-	DiskMetrics     interface{} `json:"disk_metrics,omitempty"`     // Detailed disk usage with inodes
-	DiskHealth      interface{} `json:"disk_health,omitempty"`      // SMART disk health data
-	CustomTasks     interface{} `json:"custom_tasks,omitempty"`      // Available custom tasks from tasks.yaml
-	TasksConfigYAML string      `json:"tasks_config_yaml,omitempty"` // Raw tasks.yaml content
-	Timestamp       time.Time   `json:"timestamp"`
+	HostID             string      `json:"host_id"`
+	AgentVersion       string      `json:"agent_version"`
+	Capabilities       interface{} `json:"capabilities"` // Agent collector status (docker, smart, cpu_temp, web_logs, etc.)
+	Metrics            interface{} `json:"metrics"`
+	Docker             interface{} `json:"docker"`
+	UnattendedUpgrades interface{} `json:"unattended_upgrades,omitempty"`
+	WebLogs            interface{} `json:"web_logs,omitempty"`
+	DockerNetworks     interface{} `json:"docker_networks,omitempty"`   // Network topology data
+	ComposeProjects    interface{} `json:"compose_projects,omitempty"`  // Docker Compose projects
+	DiskMetrics        interface{} `json:"disk_metrics,omitempty"`      // Detailed disk usage with inodes
+	DiskHealth         interface{} `json:"disk_health,omitempty"`       // SMART disk health data
+	CustomTasks        interface{} `json:"custom_tasks,omitempty"`      // Available custom tasks from tasks.yaml
+	TasksConfigYAML    string      `json:"tasks_config_yaml,omitempty"` // Raw tasks.yaml content
+	Timestamp          time.Time   `json:"timestamp"`
 }
 
 type ReportResponse struct {

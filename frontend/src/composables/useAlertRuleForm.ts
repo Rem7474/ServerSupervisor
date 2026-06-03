@@ -83,8 +83,10 @@ interface AlertRuleInput {
   }
 }
 
-interface AlertRulePayload extends Omit<AlertRuleFormData, 'proxmox_scope'> {
+interface AlertRulePayload extends Omit<AlertRuleFormData, 'proxmox_scope' | 'threshold_clear_warn' | 'threshold_clear_crit'> {
   proxmox_scope: ProxmoxScope | null
+  threshold_clear_warn: number | null
+  threshold_clear_crit: number | null
 }
 
 interface AlertRuleFormApi {
@@ -276,8 +278,8 @@ export function useAlertRuleForm(): AlertRuleFormApi {
       delete actions.command_trigger
     }
 
-    const thresholdClearWarn = normalizeOptionalNumber(form.value.threshold_clear_warn)
-    const thresholdClearCrit = normalizeOptionalNumber(form.value.threshold_clear_crit)
+    const thresholdClearWarn = normalizeOptionalNumber(form.value.threshold_clear_warn) ?? null
+    const thresholdClearCrit = normalizeOptionalNumber(form.value.threshold_clear_crit) ?? null
 
     return {
       ...form.value,

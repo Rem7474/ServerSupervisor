@@ -32,7 +32,7 @@ Système de supervision d'infrastructure : monitoring de VMs, conteneurs Docker,
 │  │ Task Scheduler (cron)    │ │ Proxmox Poller (HTTP API)│    │
 │  └──────────────────────────┘ └─────────────────────────┘    │
 ├────────────────────────────────────────────────────────────────┤
-│                         PostgreSQL                             │
+│                  TimescaleDB (PostgreSQL 16)                   │
 └────────────────────────────────────────────────────────────────┘
          ▲              ▲              ▲              ▲
     Push (30s)     Push (30s)     Push (30s)    Poll API PVE
@@ -687,7 +687,7 @@ Métriques additionnelles disponibles pour les règles d'alertes :
 ### Prérequis
 - Go 1.22+
 - Node.js 20+
-- PostgreSQL 16+ (ou Docker)
+- TimescaleDB 2.27.2 (PostgreSQL 16) — prérequis obligatoire (hypertables, time_bucket, retention policies)
 
 ### Développement local
 
@@ -745,7 +745,7 @@ ServerSupervisor/
 │       │   └── middleware.go       # JWT, API Key, CORS, rate limiter
 │       ├── alerts/engine.go        # Moteur d'évaluation des alertes
 │       ├── config/config.go        # Config + OverrideFromDB
-│       ├── database/               # Couche PostgreSQL (db_*.go)
+│       ├── database/               # Couche TimescaleDB/PostgreSQL (db_*.go)
 │       │   ├── db_proxmox.go       # CRUD + upsert Proxmox (connexions, nœuds, guests, storages)
 │       │   ├── db_scheduled_tasks.go
 │       │   ├── db_webhooks.go

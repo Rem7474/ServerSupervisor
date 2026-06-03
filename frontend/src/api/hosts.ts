@@ -17,6 +17,8 @@ export const hostsApi = {
   getDiskHealth: (hostId: string) => api.get(`/v1/hosts/${hostId}/disk/health`),
   getDiskMetricsAggregated: (hostId: string, mountPoint: string, hours?: number) =>
     api.get(`/v1/hosts/${hostId}/disk/metrics/aggregated`, { params: { mount_point: mountPoint, hours: hours ?? 24 } }),
+  // Physical disks (SMART health) of the Proxmox node hosting a linked host
+  getHostProxmoxDisks: (hostId: string) => api.get(`/v1/hosts/${hostId}/proxmox-disks`),
 
   // Metrics
   getMetricsHistory: (hostId: string, hours?: number) =>
