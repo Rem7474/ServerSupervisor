@@ -133,6 +133,18 @@ func (h *ProxmoxHandler) GetLinkByHost(c *gin.Context) {
 	c.JSON(http.StatusOK, link) // nil marshals to JSON null
 }
 
+// GetHostProxmoxDisks returns the physical disks (with SMART health/wearout) of
+// the Proxmox node hosting the guest linked to this host. Lets a host page show
+// disk health sourced from Proxmox when the host itself can't read SMART (LXC/VM).
+func (h *ProxmoxHandler) GetHostProxmoxDisks(c *gin.Context) {
+	disks, err := h.db.ListProxmoxDisksByHost(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, disks)
+}
+
 // ListLinkCandidates returns Proxmox guests that could be linked to a host,
 // ordered by name similarity. Used for the manual-link dropdown.
 func (h *ProxmoxHandler) ListLinkCandidates(c *gin.Context) {
