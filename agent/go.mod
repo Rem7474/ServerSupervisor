@@ -4,7 +4,6 @@ go 1.25.9
 
 require (
 	github.com/fsouza/go-dockerclient v1.13.2
-	golang.org/x/sys v0.45.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
@@ -28,4 +27,5 @@ require (
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/sirupsen/logrus v1.9.4 // indirect
 	github.com/stretchr/testify v1.11.1 // indirect
+	golang.org/x/sys v0.45.0 // indirect
 )
