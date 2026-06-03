@@ -360,6 +360,17 @@
                 </template>
                 <template v-else>
                   <code>{{ incidentFormatValue(item.value, item.metric) }}</code>
+                  <div
+                    v-if="!isCompleted(item) && item.current_value != null"
+                    class="text-muted small mt-1"
+                  >
+                    Actuel :
+                    <span class="fw-medium">{{ incidentFormatValue(item.current_value, item.metric) }}</span>
+                    <span
+                      v-if="resolveHint(item)"
+                      class="ms-1"
+                    >· {{ resolveHint(item) }}</span>
+                  </div>
                 </template>
               </td>
               <td class="text-muted small">
@@ -503,6 +514,9 @@ interface Incident {
   status?: string
   version?: string
   value?: number | string
+  current_value?: number | null
+  clear_threshold?: number | null
+  operator?: string
   triggered_at?: string
   resolved_at?: string | null
   tracker_id?: string | number
@@ -717,6 +731,18 @@ function incidentFormatValue(value: number | string | undefined, metric: string 
   if (metric === 'disk_smart_status') return Number(value) >= 1 ? 'FAILED' : 'OK'
   const unit = getAlertMetricMeta(metric || '').unit
   return `${Number(value).toFixed(2)}${unit}`
+}
+
+// resolveHint describes the threshold the live value must cross for the alert
+// to resolve, e.g. "repasse OK ≤ 70°C" for a ">" rule.
+function resolveHint(incident: Incident): string {
+  if (incident.clear_threshold == null) return ''
+  const formatted = incidentFormatValue(incident.clear_threshold, incident.metric)
+  const op = incident.operator || ''
+  // A ">"/">=" rule resolves when the value drops to/below the clear threshold.
+  if (op === '>' || op === '>=') return `repasse OK ≤ ${formatted}`
+  if (op === '<' || op === '<=') return `repasse OK ≥ ${formatted}`
+  return `seuil de résolution ${formatted}`
 }
 
 function formatDate(dateStr: string | undefined | null): string {

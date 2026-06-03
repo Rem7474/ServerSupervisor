@@ -97,6 +97,27 @@ func ShouldResolveAlertSeverity(rule models.AlertRule, host models.Host, value f
 	return false
 }
 
+// ResolveThresholdForSeverity returns the value the metric must cross for an
+// open incident of the given severity to resolve: the hysteresis clear
+// threshold when set, otherwise the trigger threshold. Returns nil when not
+// applicable (e.g. status_offline, or missing thresholds).
+func ResolveThresholdForSeverity(rule models.AlertRule, severity AlertSeverity) *float64 {
+	switch severity {
+	case SeverityCrit:
+		if rule.ThresholdClearCrit != nil {
+			return rule.ThresholdClearCrit
+		}
+		return rule.ThresholdCrit
+	case SeverityWarn:
+		if rule.ThresholdClearWarn != nil {
+			return rule.ThresholdClearWarn
+		}
+		return rule.ThresholdWarn
+	default:
+		return nil
+	}
+}
+
 // resolvesHysteresis checks if value has crossed the clear threshold based on operator
 func resolvesHysteresis(operator string, value float64, clearThreshold float64) bool {
 	switch operator {

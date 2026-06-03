@@ -21,6 +21,23 @@ type NotificationPusher interface {
 	Broadcast(payload interface{})
 }
 
+// CurrentIncidentValue returns the live metric value for an open incident,
+// reconstructing the evaluation target the same way the engine does (real agent
+// host, or synthetic Proxmox/synthetic target keyed by the incident's host_id).
+func CurrentIncidentValue(ctx context.Context, db *database.DB, rule models.AlertRule, hostID string) (float64, bool) {
+	var host models.Host
+	if strings.HasPrefix(hostID, "proxmox:") || strings.HasPrefix(hostID, "synthetic:") {
+		host = models.Host{ID: hostID, Status: "online", LastSeen: time.Now()}
+	} else {
+		h, err := db.GetHost(ctx, hostID)
+		if err != nil || h == nil {
+			return 0, false
+		}
+		host = *h
+	}
+	return GetMetricValue(ctx, db, host, rule)
+}
+
 // ResolveStaleIncidentsForRule immediately resolves any open incidents for a rule
 // that are no longer active under its current thresholds. Called after a rule
 // update so stuck incidents don't wait for the next engine tick.

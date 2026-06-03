@@ -96,6 +96,12 @@ type NotificationItem struct {
 	TriggeredAt   time.Time  `json:"triggered_at"`
 	ResolvedAt    *time.Time `json:"resolved_at"`
 	BrowserNotify bool       `json:"browser_notify"`
+	// CurrentValue / ClearThreshold are populated only for active alert
+	// incidents: the live metric value and the threshold it must cross to
+	// resolve (hysteresis clear threshold, or the trigger threshold otherwise).
+	CurrentValue   *float64 `json:"current_value,omitempty"`
+	ClearThreshold *float64 `json:"clear_threshold,omitempty"`
+	Operator       string   `json:"operator,omitempty"`
 }
 
 // PushSubscription represents a Web Push (VAPID) subscription for a user's browser/device.
