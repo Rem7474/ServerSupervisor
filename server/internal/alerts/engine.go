@@ -21,6 +21,45 @@ type NotificationPusher interface {
 	Broadcast(payload interface{})
 }
 
+// ResolveStaleIncidentsForRule immediately resolves any open incidents for a rule
+// that are no longer active under its current thresholds, using each incident's
+// stored value. Called after a rule update so stuck incidents don't wait for the
+// next engine tick.
+func ResolveStaleIncidentsForRule(ctx context.Context, db *database.DB, rule models.AlertRule) {
+	incidents, err := db.ListOpenAlertIncidentsByRule(ctx, rule.ID)
+	if err != nil || len(incidents) == 0 {
+		return
+	}
+
+	// Build a host map for status_offline lookups; ignore errors (degrade gracefully).
+	hostMap := map[string]models.Host{}
+	if rule.Metric == "status_offline" {
+		hosts, err := db.GetAllHosts(ctx)
+		if err == nil {
+			for _, h := range hosts {
+				hostMap[h.ID] = h
+			}
+		}
+	}
+
+	for _, inc := range incidents {
+		host := hostMap[inc.HostID] // zero-value Host is fine for non-status_offline rules
+		host.ID = inc.HostID
+
+		// If the stored value still fires the rule, leave the incident open.
+		if DetermineSeverity(rule, host, inc.Value) != SeverityNone {
+			continue
+		}
+		// If resolution conditions are met with the stored value, close it now.
+		if ShouldResolveAlertSeverity(rule, host, inc.Value, AlertSeverity(inc.Severity)) {
+			if err := db.ResolveAlertIncident(ctx, inc.ID); err == nil {
+				slog.InfoContext(ctx, "alerts: stale incident resolved after rule update",
+					slog.Int64("incident_id", inc.ID), slog.Int64("rule_id", rule.ID))
+			}
+		}
+	}
+}
+
 func EvaluateAlerts(ctx context.Context, db *database.DB, cfg *config.Config, dispatcher *dispatch.Dispatcher, pusher NotificationPusher) {
 	rules, err := db.GetAlertRules(ctx)
 	if err != nil {

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
+	"github.com/serversupervisor/server/internal/alerts"
 	"github.com/serversupervisor/server/internal/models"
 )
 
@@ -410,6 +412,10 @@ FROM alert_rules WHERE id = $1`, id)
 				return
 			}
 		}
+	} else {
+		// Thresholds or hysteresis may have changed: immediately resolve any open
+		// incidents whose stored value no longer meets the (new) firing condition.
+		go alerts.ResolveStaleIncidentsForRule(context.Background(), h.db, next)
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "Alert rule updated"})
 }
