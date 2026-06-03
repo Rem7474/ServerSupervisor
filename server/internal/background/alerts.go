@@ -16,6 +16,10 @@ func NewAlertEvalJob(db *database.DB, cfg *config.Config, dispatcher *dispatch.D
 	return Job{
 		Name: "alert-eval",
 		Run: func(ctx context.Context) {
+			// Evaluate immediately on startup so stale open incidents are
+			// resolved without waiting for the first 60-second tick.
+			alerts.EvaluateAlerts(ctx, db, cfg, dispatcher, pusher)
+
 			ticker := time.NewTicker(60 * time.Second)
 			defer ticker.Stop()
 			for {

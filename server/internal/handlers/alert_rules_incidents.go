@@ -8,6 +8,26 @@ import (
 	"github.com/serversupervisor/server/internal/models"
 )
 
+// ResolveIncident manually closes an open alert incident by ID.
+func (h *AlertRulesHandler) ResolveIncident(c *gin.Context) {
+	if c.GetString("role") != models.RoleAdmin {
+		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+		return
+	}
+
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid incident id"})
+		return
+	}
+
+	if err := h.db.ResolveAlertIncident(c.Request.Context(), id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "incident resolved"})
+}
+
 // ListIncidents returns all alert incidents with pagination
 func (h *AlertRulesHandler) ListIncidents(c *gin.Context) {
 	if c.GetString("role") != models.RoleAdmin {

@@ -265,6 +265,7 @@
             <th>Détails</th>
             <th>Déclenché</th>
             <th>Terminé</th>
+            <th style="width: 60px;" />
           </tr>
         </thead>
         <tbody>
@@ -276,7 +277,7 @@
               v-if="item._showSeparator"
             >
               <td
-                colspan="7"
+                colspan="8"
                 class="text-center text-muted small py-1 border-top"
               >
                 — Plus de 7 jours —
@@ -370,6 +371,36 @@
                   v-else
                   class="text-secondary"
                 >-</span>
+              </td>
+              <td>
+                <button
+                  v-if="!isCompleted(item) && item.id"
+                  class="btn btn-sm btn-ghost-secondary"
+                  :disabled="resolvingId === item.id"
+                  title="Clôturer manuellement"
+                  @click="manualResolve(item)"
+                >
+                  <span
+                    v-if="resolvingId === item.id"
+                    class="spinner-border spinner-border-sm"
+                  />
+                  <svg
+                    v-else
+                    class="icon"
+                    width="14"
+                    height="14"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M5 13l4 4L19 7"
+                    />
+                  </svg>
+                </button>
               </td>
             </tr>
           </template>
@@ -511,7 +542,7 @@ const props = withDefaults(defineProps<{
   activeIncidentCount: 0,
 })
 
-defineEmits<{
+const emit = defineEmits<{
   (e: 'refresh'): void
 }>()
 
@@ -520,6 +551,7 @@ const filterStatus = ref('all')
 const searchQuery = ref('')
 const currentPage = ref(1)
 const markingRead = ref(false)
+const resolvingId = ref<string | number | null>(null)
 
 const filteredIncidents = computed(() => {
   const search = searchQuery.value.trim().toLowerCase()
@@ -632,6 +664,17 @@ async function markAllRead() {
     await apiClient.markNotificationsRead()
   } finally {
     markingRead.value = false
+  }
+}
+
+async function manualResolve(incident: Incident) {
+  if (!incident.id || resolvingId.value) return
+  resolvingId.value = incident.id
+  try {
+    await apiClient.resolveAlertIncident(incident.id)
+    emit('refresh')
+  } finally {
+    resolvingId.value = null
   }
 }
 
