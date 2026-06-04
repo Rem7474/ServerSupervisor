@@ -60,6 +60,20 @@ func main() {
 	}
 	defer func() { _ = db.Close() }()
 
+	// Apply DB-persisted settings on top of env vars so admin changes made via the
+	// settings UI take effect immediately at boot (previously they were only loaded
+	// lazily when the settings page was opened). All downstream consumers (pollers,
+	// alert engine, notify, retention jobs) read the resulting config.
+	cfg.OverrideFromDB(db)
+
+	// Reconcile the TimescaleDB metric retention policy with the effective config
+	// so a retention value set via env or the settings table is honoured without a
+	// manual "cleanup metrics" click. Non-fatal: the migration baseline already
+	// installs a default policy.
+	if err := db.UpdateMetricsRetentionPolicy(rootCtx, cfg.MetricsRetentionDays); err != nil {
+		slog.WarnContext(rootCtx, "failed to reconcile metrics retention policy at startup", slog.Any("err", err), slog.Int("days", cfg.MetricsRetentionDays))
+	}
+
 	// Cleanup stalled commands at startup (commands older than 10 minutes)
 	if err := db.CleanupStalledCommands(rootCtx, 10); err != nil {
 		log.Printf("Warning: failed to cleanup stalled commands: %v", err)
