@@ -27,7 +27,7 @@
     "topojson-client": "^3.1.0",
     "vue": "^3.5.35",
     "vue-chartjs": "^5.3.0",
-    "vue-router": "^5.0.7",
+    "vue-router": "^5.1.0",
     "world-atlas": "^2.0.2"
   },
   "devDependencies": {
