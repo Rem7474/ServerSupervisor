@@ -106,268 +106,18 @@
 
       <!-- Left column: config -->
       <div class="col-lg-5">
-        <div class="card">
-          <div class="card-header d-flex align-items-center justify-content-between">
-            <h3 class="card-title">
-              Configuration
-            </h3>
-            <div class="d-flex gap-2">
-              <button
-                class="btn btn-sm btn-ghost-secondary"
-                :disabled="checking"
-                @click="triggerCheck"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="14"
-                  height="14"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  viewBox="0 0 24 24"
-                  class="me-1"
-                >
-                  <polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10" />
-                </svg>
-                {{ checking ? 'Vérification...' : 'Vérifier maintenant' }}
-              </button>
-              <button
-                class="btn btn-sm btn-primary"
-                :disabled="running || !canRunManually"
-                :title="runDisabledReason"
-                @click="runManually"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="14"
-                  height="14"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  viewBox="0 0 24 24"
-                  class="me-1"
-                >
-                  <polygon points="5 3 19 12 5 21 5 3" />
-                </svg>
-                {{ running ? 'Déclenchement...' : 'Exécuter' }}
-              </button>
-              <button
-                class="btn btn-sm btn-ghost-secondary"
-                @click="openEdit"
-              >
-                Modifier
-              </button>
-            </div>
-          </div>
-          <div class="card-body">
-            <dl class="row mb-0 small">
-              <dt class="col-5 text-muted">
-                Type
-              </dt>
-              <dd class="col-7">
-                <span
-                  v-if="tracker.tracker_type === 'docker'"
-                  class="badge bg-cyan-lt text-cyan"
-                >Image Docker</span>
-                <span
-                  v-else
-                  class="badge bg-blue-lt text-blue"
-                >Release Git</span>
-              </dd>
-
-              <!-- Git-specific -->
-              <template v-if="tracker.tracker_type !== 'docker'">
-                <dt class="col-5 text-muted">
-                  Provider
-                </dt>
-                <dd class="col-7">
-                  {{ tracker.provider }}
-                </dd>
-                <dt class="col-5 text-muted">
-                  Dépôt
-                </dt>
-                <dd class="col-7">
-                  <a
-                    :href="repoURL"
-                    target="_blank"
-                    class="link-primary"
-                  >
-                    {{ tracker.repo_owner }}/{{ tracker.repo_name }}
-                  </a>
-                </dd>
-                <dt class="col-5 text-muted">
-                  Dernière release
-                </dt>
-                <dd class="col-7">
-                  <span
-                    v-if="tracker.last_release_tag"
-                    class="badge bg-green-lt text-green"
-                  >{{ tracker.last_release_tag }}</span>
-                  <span
-                    v-else
-                    class="text-muted"
-                  >En attente...</span>
-                </dd>
-              </template>
-
-              <!-- Docker-specific -->
-              <template v-else>
-                <dt class="col-5 text-muted">
-                  Image
-                </dt>
-                <dd class="col-7">
-                  <code>{{ tracker.docker_image }}</code>
-                </dd>
-                <dt class="col-5 text-muted">
-                  Tag surveillé
-                </dt>
-                <dd class="col-7">
-                  <code>{{ tracker.docker_tag || 'latest' }}</code>
-                </dd>
-                <template v-if="tracker.latest_image_digest">
-                  <dt class="col-5 text-muted">
-                    Dernier digest
-                  </dt>
-                  <dd class="col-7">
-                    <code
-                      class="small text-muted"
-                      :title="tracker.latest_image_digest"
-                    >
-                      {{ tracker.latest_image_digest.slice(0, 19) }}…
-                    </code>
-                  </dd>
-                </template>
-                <dt class="col-5 text-muted">
-                  Dernier check
-                </dt>
-                <dd class="col-7">
-                  <span v-if="tracker.last_checked_at"><RelativeTime :date="tracker.last_checked_at" /></span>
-                  <span
-                    v-else
-                    class="text-muted"
-                  >Jamais</span>
-                </dd>
-
-                <template v-if="tracker.repo_owner && tracker.repo_name">
-                  <dt class="col-5 text-muted">
-                    Repo lié
-                  </dt>
-                  <dd class="col-7">
-                    <a
-                      :href="repoURL"
-                      target="_blank"
-                      class="link-primary"
-                    >
-                      {{ tracker.repo_owner }}/{{ tracker.repo_name }}
-                    </a>
-                    <div class="small mt-1">
-                      <a
-                        :href="releaseNotesURL"
-                        target="_blank"
-                        class="link-secondary"
-                      >Voir les release notes</a>
-                    </div>
-                  </dd>
-                </template>
-              </template>
-
-              <!-- Common fields -->
-              <template v-if="tracker.host_id && tracker.custom_task_id">
-                <dt class="col-5 text-muted">
-                  VM cible
-                </dt>
-                <dd class="col-7">
-                  {{ tracker.host_name || tracker.host_id }}
-                </dd>
-                <dt class="col-5 text-muted">
-                  Tâche
-                </dt>
-                <dd class="col-7">
-                  <code>{{ tracker.custom_task_id }}</code>
-                </dd>
-              </template>
-              <template v-else-if="!tracker.host_id || !tracker.custom_task_id">
-                <dt class="col-5 text-muted">
-                  Mode
-                </dt>
-                <dd class="col-7">
-                  <span class="badge bg-blue-lt text-blue">Surveillance seule</span>
-                </dd>
-              </template>
-              <dt
-                v-if="tracker.tracker_type !== 'docker' && tracker.last_checked_at"
-                class="col-5 text-muted"
-              >
-                Dernier check
-              </dt>
-              <dd
-                v-if="tracker.tracker_type !== 'docker' && tracker.last_checked_at"
-                class="col-7"
-              >
-                <RelativeTime :date="tracker.last_checked_at" />
-              </dd>
-              <template v-if="tracker.last_error">
-                <dt class="col-5 text-muted">
-                  Erreur
-                </dt>
-                <dd class="col-7 text-danger small">
-                  {{ tracker.last_error }}
-                </dd>
-              </template>
-              <dt
-                v-if="tracker.last_triggered_at"
-                class="col-5 text-muted"
-              >
-                Dernier déclench.
-              </dt>
-              <dd
-                v-if="tracker.last_triggered_at"
-                class="col-7"
-              >
-                <RelativeTime :date="tracker.last_triggered_at" />
-              </dd>
-              <dt
-                v-if="tracker.notify_channels?.length"
-                class="col-5 text-muted"
-              >
-                Notifications
-              </dt>
-              <dd
-                v-if="tracker.notify_channels?.length"
-                class="col-7"
-              >
-                <span
-                  v-for="ch in tracker.notify_channels"
-                  :key="ch"
-                  class="badge me-1"
-                  :class="channelBadge(ch)"
-                >{{ ch }}</span>
-              </dd>
-              <dt class="col-5 text-muted">
-                Créé le
-              </dt>
-              <dd class="col-7">
-                {{ formatDateTime(tracker.created_at) }}
-              </dd>
-              <template v-if="Number(tracker.cooldown_hours || 0) > 0">
-                <dt class="col-5 text-muted">
-                  Cooldown
-                </dt>
-                <dd class="col-7">
-                  {{ `${tracker.cooldown_hours}h` }}
-                </dd>
-              </template>
-              <template v-if="cooldownActive">
-                <dt class="col-5 text-muted">
-                  Déploiement prévu
-                </dt>
-                <dd class="col-7">
-                  {{ cooldownEtaText }}
-                </dd>
-              </template>
-            </dl>
-          </div>
-        </div>
+        <TrackerConfigCard
+          :tracker="tracker"
+          :checking="checking"
+          :running="running"
+          :can-run-manually="canRunManually"
+          :run-disabled-reason="runDisabledReason"
+          :cooldown-active="cooldownActive"
+          :cooldown-eta-text="cooldownEtaText"
+          @check="triggerCheck"
+          @run="runManually"
+          @edit="openEdit"
+        />
 
         <!-- Alert: No task configured -->
         <div
@@ -391,213 +141,19 @@
           </router-link>
         </div>
 
-        <!-- Env vars card -->
-        <div class="card mt-3">
-          <div class="card-header">
-            <h3 class="card-title">
-              Variables disponibles dans le script
-            </h3>
-          </div>
-          <div class="card-body p-0">
-            <div class="table-responsive">
-              <table class="table table-sm table-vcenter mb-0">
-                <tbody>
-                  <tr
-                    v-for="v in envVars"
-                    :key="v.name"
-                  >
-                    <td><code class="small">{{ v.name }}</code></td>
-                    <td class="text-muted small">
-                      {{ v.desc }}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
-        <!-- tasks.yaml snippet card -->
-        <div
-          v-if="tracker.host_id && !tracker.custom_task_id"
-          class="card mt-3"
-        >
-          <div class="card-header d-flex align-items-center justify-content-between">
-            <h3 class="card-title mb-0">
-              Exemple de script tasks.yaml
-            </h3>
-            <div class="d-flex align-items-center gap-2">
-              <span
-                v-if="detectedComposePath"
-                class="badge bg-green-lt text-green"
-                title="Chemin détecté depuis les projets Compose de l'hôte"
-              >
-                Chemin détecté automatiquement
-              </span>
-              <button
-                class="btn btn-sm btn-ghost-secondary"
-                :title="copied ? 'Copié !' : 'Copier'"
-                @click="copySnippet"
-              >
-                <svg
-                  v-if="!copied"
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="14"
-                  height="14"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  viewBox="0 0 24 24"
-                >
-                  <rect
-                    x="9"
-                    y="9"
-                    width="13"
-                    height="13"
-                    rx="2"
-                    ry="2"
-                  /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
-                </svg>
-                <svg
-                  v-else
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="14"
-                  height="14"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  viewBox="0 0 24 24"
-                >
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-              </button>
-            </div>
-          </div>
-          <div class="card-body p-0">
-            <div
-              v-if="loadingSnippet"
-              class="p-3"
-            >
-              <LoadingSkeleton
-                variant="list"
-                :lines="3"
-              />
-            </div>
-            <template v-else>
-              <div
-                v-if="tasksYaml"
-                class="px-3 pt-2 pb-0"
-              >
-                <p class="small text-muted mb-1">
-                  Contenu actuel de <code>tasks.yaml</code> sur l'hôte — ajoutez la tâche ci-dessous :
-                </p>
-                <pre
-                  class="bg-dark text-light rounded p-2 small"
-                  style="max-height:160px;overflow-y:auto;font-size:0.72rem;"
-                >{{ tasksYaml }}</pre>
-              </div>
-              <div class="px-3 pt-2 pb-3">
-                <p
-                  v-if="!tasksYaml"
-                  class="small text-muted mb-1"
-                >
-                  Ajoutez cette tâche dans <code>/etc/serversupervisor/tasks.yaml</code> sur l'hôte :
-                </p>
-                <p
-                  v-else
-                  class="small text-muted mb-1"
-                >
-                  Tâche à ajouter dans la section <code>tasks:</code> :
-                </p>
-                <pre
-                  class="bg-dark text-light rounded p-2 small mb-0"
-                  style="font-size:0.72rem;"
-                >{{ generatedSnippet }}</pre>
-              </div>
-            </template>
-          </div>
-        </div>
+        <TrackerScriptHelpCard
+          :tracker="tracker"
+          :compose-projects="composeProjects"
+          :tasks-yaml="tasksYaml"
+          :loading-snippet="loadingSnippet"
+        />
       </div>
 
       <div class="col-lg-7">
-        <div class="card mb-3">
-          <div class="card-header d-flex align-items-center justify-content-between">
-            <h3 class="card-title mb-0">
-              Historique des versions
-            </h3>
-            <small class="text-muted">Publication / détection</small>
-          </div>
-          <div class="card-body p-0">
-            <div
-              v-if="historyLoading"
-              class="p-3"
-            >
-              <LoadingSkeleton
-                variant="table"
-                :lines="4"
-              />
-            </div>
-            <div
-              v-else-if="!versionHistory.length"
-              class="p-3 text-muted"
-            >
-              Aucune version disponible.
-            </div>
-            <div
-              v-else
-              class="table-responsive"
-            >
-              <table class="table table-sm table-vcenter mb-0">
-                <thead>
-                  <tr>
-                    <th>Version</th>
-                    <th>Détails</th>
-                    <th class="text-end">
-                      Date de publication
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr
-                    v-for="entry in visibleVersionHistory"
-                    :key="`${entry.version}-${entry.published_at || 'n/a'}`"
-                  >
-                    <td>
-                      <span class="badge bg-green-lt text-green">{{ entry.version }}</span>
-                    </td>
-                    <td>
-                      <a
-                        v-if="entry.release_url"
-                        :href="entry.release_url"
-                        target="_blank"
-                        class="link-primary"
-                      >
-                        {{ entry.name || entry.release_url }}
-                      </a>
-                      <span v-else>{{ entry.name || '-' }}</span>
-                    </td>
-                    <td class="text-end text-muted">
-                      {{ entry.published_at ? formatDateTime(entry.published_at) : 'N/A' }}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <div
-              v-if="versionHistory.length > VERSION_HISTORY_PREVIEW_LIMIT"
-              class="p-2 border-top text-center"
-            >
-              <button
-                class="btn btn-outline-secondary btn-sm"
-                @click="showAllVersionHistory = !showAllVersionHistory"
-              >
-                {{ showAllVersionHistory
-                  ? 'Afficher moins'
-                  : `Afficher plus (${versionHistory.length - VERSION_HISTORY_PREVIEW_LIMIT})` }}
-              </button>
-            </div>
-          </div>
-        </div>
+        <TrackerVersionHistoryCard
+          :history="versionHistory"
+          :loading="historyLoading"
+        />
 
         <WebhookExecutionList
           :executions="executions"
@@ -641,11 +197,12 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import api from '../api'
 import { formatDateTime } from '../utils/formatters'
-import RelativeTime from '../components/RelativeTime.vue'
-import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import WebhookExecutionList from '../components/webhooks/WebhookExecutionList.vue'
 import WebhookModal from '../components/webhooks/WebhookModal.vue'
 import CommandLogPanel from '../components/host/CommandLogPanel.vue'
+import TrackerConfigCard from '../components/webhooks/TrackerConfigCard.vue'
+import TrackerScriptHelpCard from '../components/webhooks/TrackerScriptHelpCard.vue'
+import TrackerVersionHistoryCard from '../components/webhooks/TrackerVersionHistoryCard.vue'
 import { useCommandStream } from '../composables/useCommandStream'
 
 const route = useRoute()
@@ -654,7 +211,6 @@ const id = route.params.id as string
 const tracker = ref<any>(null)
 const executions = ref<any[]>([])
 const versionHistory = ref<any[]>([])
-const showAllVersionHistory = ref(false)
 const hosts = ref<any[]>([])
 const loading = ref(false)
 const error = ref('')
@@ -669,86 +225,12 @@ let cooldownTimer: number | null = null
 const composeProjects = ref<any[]>([])
 const tasksYaml = ref('')
 const loadingSnippet = ref(false)
-const copied = ref(false)
 
 const showModal = ref(false)
 const saving = ref(false)
 const modalError = ref('')
 
 const { openCommandStream, closeStream } = useCommandStream()
-
-const VERSION_HISTORY_PREVIEW_LIMIT = 5
-
-const visibleVersionHistory = computed(() => {
-  if (showAllVersionHistory.value) return versionHistory.value
-  return versionHistory.value.slice(0, VERSION_HISTORY_PREVIEW_LIMIT)
-})
-
-const gitEnvVars = [
-  { name: 'SS_REPO_NAME',    desc: 'owner/repo (ex: home-assistant/core)' },
-  { name: 'SS_TAG_NAME',     desc: 'Tag de la nouvelle release (ex: v1.2.3)' },
-  { name: 'SS_RELEASE_URL',  desc: 'URL de la release sur le provider' },
-  { name: 'SS_RELEASE_NAME', desc: 'Titre de la release' },
-  { name: 'SS_TRACKER_NAME', desc: 'Nom du tracker dans ServerSupervisor' },
-]
-
-const dockerEnvVars = [
-  { name: 'SS_IMAGE_NAME',   desc: 'image:tag surveille (ex: nginx:latest)' },
-  { name: 'SS_IMAGE_TAG',    desc: 'Tag surveille (ex: latest)' },
-  { name: 'SS_OLD_DIGEST',   desc: 'Digest manifest SHA256 precedent' },
-  { name: 'SS_NEW_DIGEST',   desc: 'Nouveau digest manifest SHA256' },
-  { name: 'SS_TRACKER_NAME', desc: 'Nom du tracker dans ServerSupervisor' },
-]
-
-const envVars = computed(() =>
-  tracker.value?.tracker_type === 'docker' ? dockerEnvVars : gitEnvVars
-)
-
-// Find the compose project whose raw_config references the tracked Docker image.
-const detectedComposePath = computed(() => {
-  const t = tracker.value
-  if (!t || t.tracker_type !== 'docker' || !t.docker_image) return null
-  const imageName = t.docker_image.split(':')[0].toLowerCase()
-  for (const p of composeProjects.value) {
-    const raw = (p.raw_config || '').toLowerCase()
-    if (raw.includes(imageName) && p.working_dir) {
-      return p.working_dir
-    }
-  }
-  return null
-})
-
-// Derive a safe task ID from the tracker name or image name.
-const snippetTaskId = computed(() => {
-  const t = tracker.value
-  if (!t) return 'update-service'
-  const base = (t.tracker_type === 'docker' ? t.docker_image?.split('/').pop()?.split(':')[0] : t.repo_name) || t.name
-  return 'update-' + base.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40)
-})
-
-// Build the YAML snippet tailored to the tracker type.
-const generatedSnippet = computed(() => {
-  const t = tracker.value
-  if (!t) return ''
-  const taskId = snippetTaskId.value
-
-  if (t.tracker_type === 'docker') {
-    const image = t.docker_image || 'mon-image'
-    const path = detectedComposePath.value || '/opt/mon-projet'
-    const name = t.name || image
-    return `  - id: ${taskId}
-    name: "Pull et redémarrage ${name}"
-    command: ["bash", "-c", "cd ${path} && docker compose pull && docker compose down && docker compose up -d"]
-    timeout: 3600`
-  } else {
-    const repo = t.repo_name || 'mon-app'
-    const name = t.name || repo
-    return `  - id: ${taskId}
-    name: "Déploiement ${name}"
-    command: ["bash", "-c", "echo 'Nouvelle release: $SS_TAG_NAME' && /opt/${repo}/deploy.sh"]
-    timeout: 3600`
-  }
-})
 
 const canRunManually = computed(() => {
   if (!tracker.value) return false
@@ -811,27 +293,6 @@ const cooldownEtaText = computed(() => {
   return formatDateTime(new Date(detectedAt + (hours * 60 * 60 * 1000)).toISOString())
 })
 
-const repoURL = computed(() => {
-  if (!tracker.value || !tracker.value.repo_owner || !tracker.value.repo_name) return '#'
-  switch (tracker.value.provider) {
-    case 'gitlab': return `https://gitlab.com/${tracker.value.repo_owner}/${tracker.value.repo_name}`
-    case 'gitea':  return `https://codeberg.org/${tracker.value.repo_owner}/${tracker.value.repo_name}`
-    default:       return `https://github.com/${tracker.value.repo_owner}/${tracker.value.repo_name}`
-  }
-})
-
-const releaseNotesURL = computed(() => {
-  if (!tracker.value || !tracker.value.repo_owner || !tracker.value.repo_name) return '#'
-  switch (tracker.value.provider) {
-    case 'gitlab': return `https://gitlab.com/${tracker.value.repo_owner}/${tracker.value.repo_name}/-/releases`
-    case 'gitea':
-    case 'forgejo':
-      return `https://codeberg.org/${tracker.value.repo_owner}/${tracker.value.repo_name}/releases`
-    default:
-      return `https://github.com/${tracker.value.repo_owner}/${tracker.value.repo_name}/releases`
-  }
-})
-
 async function load(): Promise<void> {
   loading.value = true
   error.value = ''
@@ -867,22 +328,13 @@ async function loadSnippetData(hostId: string): Promise<void> {
   }
 }
 
-function copySnippet(): void {
-  navigator.clipboard?.writeText(generatedSnippet.value).then(() => {
-    copied.value = true
-    setTimeout(() => { copied.value = false }, 2000)
-  })
-}
-
 async function loadVersionHistory(): Promise<void> {
   historyLoading.value = true
   try {
     const res = await api.getReleaseTrackerVersionHistory(id)
     versionHistory.value = res.data.history || []
-    showAllVersionHistory.value = false
   } catch {
     versionHistory.value = []
-    showAllVersionHistory.value = false
   } finally {
     historyLoading.value = false
   }
@@ -1009,22 +461,13 @@ function closeEdit(): void {
 
 function providerBadge(provider: string): string {
   const map: Record<string, string> = {
-    github:  'bg-blue-lt text-blue',
-    gitlab:  'bg-orange-lt text-orange',
-    gitea:   'bg-teal-lt text-teal',
+    github: 'bg-blue-lt text-blue',
+    gitlab: 'bg-orange-lt text-orange',
+    gitea: 'bg-teal-lt text-teal',
     forgejo: 'bg-purple-lt text-purple',
-    custom:  'bg-secondary-lt text-secondary',
+    custom: 'bg-secondary-lt text-secondary',
   }
   return map[provider] || 'bg-secondary-lt text-secondary'
-}
-
-function channelBadge(ch: string): string {
-  const map: Record<string, string> = {
-    smtp:    'bg-blue-lt text-blue',
-    ntfy:    'bg-orange-lt text-orange',
-    browser: 'bg-purple-lt text-purple',
-  }
-  return map[ch] || 'bg-secondary-lt text-secondary'
 }
 
 onMounted(() => {
@@ -1041,4 +484,3 @@ onUnmounted(() => {
   closeStream()
 })
 </script>
-
