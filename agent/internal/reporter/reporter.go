@@ -41,15 +41,14 @@ func New(cfg *config.Config, tasks *config.TasksConfig, verbose bool, skipMetric
 // stalled-command cleanup timeout.
 func (r *Reporter) Send(ctx context.Context, s *sender.Sender, cmdQueue chan<- []sender.PendingCommand) {
 	var (
-		metricsPayload   interface{}
 		collectedMetrics *collector.SystemMetrics
-		dockerData       interface{}
-		dockerNetworks   interface{}
-		composeProjects  interface{}
+		dockerData       *sender.DockerPayload
+		dockerNetworks   []collector.DockerNetwork
+		composeProjects  []collector.ComposeProject
 		diskMetrics      []collector.DiskMetrics
 		diskHealth       []collector.DiskHealth
 		uuData           *collector.UnattendedUpgradesStatus
-		webLogs          interface{}
+		webLogs          *collector.WebLogReport
 	)
 
 	var wg sync.WaitGroup
@@ -65,7 +64,6 @@ func (r *Reporter) Send(ctx context.Context, s *sender.Sender, cmdQueue chan<- [
 				return
 			}
 			collectedMetrics = m
-			metricsPayload = m
 		} else {
 			m, err := collector.CollectSystem(r.cfg.CollectCPUTemperature)
 			if err != nil {
@@ -73,7 +71,6 @@ func (r *Reporter) Send(ctx context.Context, s *sender.Sender, cmdQueue chan<- [
 				return
 			}
 			collectedMetrics = m
-			metricsPayload = m
 		}
 	}()
 
@@ -86,9 +83,7 @@ func (r *Reporter) Send(ctx context.Context, s *sender.Sender, cmdQueue chan<- [
 				log.Printf("Docker collection skipped: %v", err)
 				return
 			}
-			dockerData = struct {
-				Containers []collector.DockerContainer `json:"containers"`
-			}{Containers: containers}
+			dockerData = &sender.DockerPayload{Containers: containers}
 
 			if networks, err := collector.CollectDockerNetworks(); err == nil {
 				dockerNetworks = networks
@@ -101,9 +96,7 @@ func (r *Reporter) Send(ctx context.Context, s *sender.Sender, cmdQueue chan<- [
 			}
 		}()
 	} else {
-		dockerData = struct {
-			Containers []interface{} `json:"containers"`
-		}{Containers: []interface{}{}}
+		dockerData = &sender.DockerPayload{Containers: []collector.DockerContainer{}}
 	}
 
 	wg.Add(1)
@@ -173,25 +166,25 @@ func (r *Reporter) Send(ctx context.Context, s *sender.Sender, cmdQueue chan<- [
 		return
 	}
 
-	var customTasksList interface{}
+	var customTasksList []config.TaskSummary
 	if r.tasks != nil && len(r.tasks.Tasks) > 0 {
 		customTasksList = r.tasks.Summaries()
 	}
 
-	capabilities := map[string]bool{
-		"docker":   r.cfg.CollectDocker,
-		"apt":      r.cfg.CollectAPT,
-		"smart":    r.cfg.CollectSMART,
-		"cpu_temp": r.cfg.CollectCPUTemperature,
-		"web_logs": r.cfg.CollectWebLogs,
-		"systemd":  true,
-		"journal":  true,
+	capabilities := &sender.Capabilities{
+		Docker:  r.cfg.CollectDocker,
+		APT:     r.cfg.CollectAPT,
+		SMART:   r.cfg.CollectSMART,
+		CPUTemp: r.cfg.CollectCPUTemperature,
+		WebLogs: r.cfg.CollectWebLogs,
+		Systemd: true,
+		Journal: true,
 	}
 
 	report := &sender.Report{
 		AgentVersion:       r.version,
 		Capabilities:       capabilities,
-		Metrics:            metricsPayload,
+		Metrics:            collectedMetrics,
 		Docker:             dockerData,
 		UnattendedUpgrades: uuData,
 		WebLogs:            webLogs,
@@ -247,8 +240,8 @@ func trimWebLogsForReportSize(report *sender.Report, maxBodyBytes int) {
 	if report == nil || maxBodyBytes <= 0 {
 		return
 	}
-	web, ok := report.WebLogs.(*collector.WebLogReport)
-	if !ok || web == nil || len(web.Requests) == 0 {
+	web := report.WebLogs
+	if web == nil || len(web.Requests) == 0 {
 		return
 	}
 

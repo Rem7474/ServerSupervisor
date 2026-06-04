@@ -1,0 +1,256 @@
+{
+  "host_id": "contract",
+  "agent_version": "contract",
+  "capabilities": {
+    "docker": true,
+    "apt": true,
+    "smart": true,
+    "cpu_temp": true,
+    "web_logs": true,
+    "systemd": true,
+    "journal": true
+  },
+  "metrics": {
+    "cpu_usage_percent": 1.5,
+    "cpu_cores": 7,
+    "cpu_model": "contract",
+    "cpu_temperature": 1.5,
+    "fan_rpm": 1.5,
+    "load_avg_1": 1.5,
+    "load_avg_5": 1.5,
+    "load_avg_15": 1.5,
+    "memory_total": 7,
+    "memory_used": 7,
+    "memory_free": 7,
+    "memory_percent": 1.5,
+    "swap_total": 7,
+    "swap_used": 7,
+    "network_rx_bytes": 7,
+    "network_tx_bytes": 7,
+    "uptime": 7,
+    "os": "contract",
+    "hostname": "contract"
+  },
+  "docker": {
+    "containers": [
+      {
+        "id": "contract",
+        "container_id": "contract",
+        "name": "contract",
+        "image": "contract",
+        "image_tag": "contract",
+        "image_id": "contract",
+        "image_digest": "contract",
+        "state": "contract",
+        "status": "contract",
+        "created": "2024-01-02T03:04:05Z",
+        "ports": "contract",
+        "labels": {
+          "contract": "contract"
+        },
+        "env_vars": {
+          "contract": "contract"
+        },
+        "volumes": [
+          "contract"
+        ],
+        "networks": [
+          "contract"
+        ],
+        "net_rx_bytes": 7,
+        "net_tx_bytes": 7
+      }
+    ]
+  },
+  "unattended_upgrades": {
+    "installed": true,
+    "enabled": true,
+    "reboot_required": true,
+    "config": {
+      "security_only": true,
+      "auto_reboot": true,
+      "auto_reboot_time": "contract",
+      "remove_unused": true
+    },
+    "new_runs": [
+      {
+        "run_at": "2024-01-02T03:04:05Z",
+        "packages": [
+          "contract"
+        ],
+        "had_error": true,
+        "log_snippet": "contract"
+      }
+    ]
+  },
+  "web_logs": {
+    "source": "contract",
+    "traffic": {
+      "total_requests": 7,
+      "total_bytes": 7,
+      "errors_4xx": 7,
+      "errors_5xx": 7,
+      "top_domains": [
+        {
+          "domain": "contract",
+          "hits": 7,
+          "bytes": 7,
+          "errors_4xx": 7,
+          "errors_5xx": 7,
+          "methods": {
+            "contract": 7
+          },
+          "top_paths": [
+            {
+              "path": "contract",
+              "hits": 7
+            }
+          ]
+        }
+      ]
+    },
+    "threats": {
+      "suspicious_requests": 7,
+      "unique_suspicious_ips": 7,
+      "top_suspicious_ips": [
+        {
+          "ip": "contract",
+          "hits": 7,
+          "unique_paths": 7,
+          "first_seen": "contract",
+          "last_seen": "contract",
+          "category": "contract",
+          "user_agents": [
+            "contract"
+          ],
+          "requests": [
+            {
+              "timestamp": "contract",
+              "ip": "contract",
+              "method": "contract",
+              "path": "contract",
+              "status": 7,
+              "bytes": 7,
+              "user_agent": "contract",
+              "domain": "contract",
+              "category": "contract",
+              "blocked": true,
+              "blocked_source": "contract",
+              "blocked_reason": "contract",
+              "blocked_at": "2024-01-02T03:04:05Z",
+              "blocked_until": "2024-01-02T03:04:05Z"
+            }
+          ],
+          "blocked": true,
+          "blocked_source": "contract",
+          "blocked_type": "contract",
+          "blocked_reason": "contract",
+          "blocked_at": "2024-01-02T03:04:05Z",
+          "blocked_until": "2024-01-02T03:04:05Z"
+        }
+      ],
+      "top_suspicious_paths": [
+        {
+          "path": "contract",
+          "category": "contract",
+          "hits": 7
+        }
+      ],
+      "crowdsec_total_blocked": 7,
+      "crowdsec_top_blocked": [
+        {
+          "ip": "contract",
+          "type": "contract",
+          "reason": "contract",
+          "origin": "contract",
+          "country": "contract",
+          "as_name": "contract",
+          "blocked_until": "contract"
+        }
+      ]
+    },
+    "requests": [
+      {
+        "timestamp": "contract",
+        "ip": "contract",
+        "method": "contract",
+        "path": "contract",
+        "status": 7,
+        "bytes": 7,
+        "user_agent": "contract",
+        "domain": "contract",
+        "category": "contract",
+        "blocked": true,
+        "blocked_source": "contract",
+        "blocked_reason": "contract",
+        "blocked_at": "2024-01-02T03:04:05Z",
+        "blocked_until": "2024-01-02T03:04:05Z"
+      }
+    ],
+    "log_files_scanned": [
+      "contract"
+    ],
+    "tail_lines_per_file": 7,
+    "total_requests": 7,
+    "collected_at": "2024-01-02T03:04:05Z"
+  },
+  "docker_networks": [
+    {
+      "network_id": "contract",
+      "name": "contract",
+      "driver": "contract",
+      "scope": "contract",
+      "container_ids": [
+        "contract"
+      ]
+    }
+  ],
+  "compose_projects": [
+    {
+      "name": "contract",
+      "working_dir": "contract",
+      "config_file": "contract",
+      "services": [
+        "contract"
+      ],
+      "raw_config": "contract"
+    }
+  ],
+  "disk_metrics": [
+    {
+      "mount_point": "contract",
+      "filesystem": "contract",
+      "size_gb": 1.5,
+      "used_gb": 1.5,
+      "avail_gb": 1.5,
+      "used_percent": 1.5,
+      "inodes_total": 7,
+      "inodes_used": 7,
+      "inodes_free": 7,
+      "inodes_percent": 1.5
+    }
+  ],
+  "disk_health": [
+    {
+      "device": "contract",
+      "model": "contract",
+      "serial_number": "contract",
+      "smart_status": "contract",
+      "temperature": 7,
+      "power_on_hours": 7,
+      "power_cycles": 7,
+      "realloc_sectors": 7,
+      "pending_sectors": 7,
+      "uncorrectable_sectors": 7,
+      "percentage_used": 7
+    }
+  ],
+  "custom_tasks": [
+    {
+      "id": "contract",
+      "name": "contract"
+    }
+  ],
+  "tasks_config_yaml": "contract",
+  "timestamp": "2024-01-02T03:04:05Z"
+}

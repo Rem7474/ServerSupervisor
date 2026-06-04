@@ -53,6 +53,7 @@ type BotDetectionIP struct {
 	Requests      []WebRequest `json:"requests"`
 	Blocked       bool         `json:"blocked,omitempty"`
 	BlockedSource string       `json:"blocked_source,omitempty"`
+	BlockedType   string       `json:"blocked_type,omitempty"` // "ban", "captcha", "audit", etc. (CrowdSec decision type)
 	BlockedReason string       `json:"blocked_reason,omitempty"`
 	BlockedAt     *time.Time   `json:"blocked_at,omitempty"`
 	BlockedUntil  *time.Time   `json:"blocked_until,omitempty"`
@@ -66,6 +67,7 @@ type BotDetectionPath struct {
 
 type CrowdSecBlockedEntry struct {
 	IP           string `json:"ip"`
+	Type         string `json:"type,omitempty"` // "ban", "captcha", "audit", etc.
 	Reason       string `json:"reason"`
 	Origin       string `json:"origin"`
 	Country      string `json:"country,omitempty"`
