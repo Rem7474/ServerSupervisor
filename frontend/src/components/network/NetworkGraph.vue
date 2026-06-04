@@ -152,43 +152,8 @@ import cytoscape from 'cytoscape'
 // @ts-expect-error cytoscape-fcose lacks types
 import fcose from 'cytoscape-fcose'
 import { createCytoscapeInstance, bindCytoscapeResize, destroyCytoscapeInstance } from '../../composables/useCytoscape'
-
-interface HostPort {
-  port: number | string
-  protocol?: string
-  containers?: string[]
-}
-
-interface NetworkHost {
-  id: string
-  name?: string
-  hostname?: string
-  ip_address?: string
-  status?: string
-  ports?: HostPort[]
-}
-
-interface NetworkService {
-  id: string | number
-  hostId?: string
-  name?: string
-  domain?: string
-  path?: string
-  internalPort?: number | string
-  externalPort?: number | null
-  linkToProxy?: boolean
-  linkToAuthelia?: boolean
-  exposedToInternet?: boolean
-  tags?: string
-}
-
-interface HostPortOverride {
-  excludedPorts?: number[]
-  portMap?: Record<number, string>
-  proxyPorts?: Set<number>
-  autheliaPortNumbers?: Set<number>
-  internetExposedPorts?: Record<number, number | null>
-}
+import { buildNetworkElements, type NetworkHost, type NetworkService, type HostPortOverride } from './buildNetworkElements'
+import { getNetworkGraphStyle } from './networkGraphStyle'
 
 cytoscape.use(fcose)
 
@@ -231,7 +196,7 @@ const emit = defineEmits<{
 
 const cyContainer = ref<HTMLElement | null>(null)
 const tooltipRef = ref<HTMLElement | null>(null)
-let cy: any = null
+let cy: cytoscape.Core | null = null
 let resizeBinding: { disconnect: () => void } | null = null
 
 const hasData = computed(() => Array.isArray(props.data) && props.data.length > 0)
@@ -252,460 +217,24 @@ function escapeHtml(str: unknown): string {
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;')
 }
 
-// Build Cytoscape elements from props
-function buildElements(): any[] {
-  const elements: any[] = []
-
-  // === Root node (abstract, only when not linked to a real host) ===
-  const rootLabel = props.rootLabel || 'Infrastructure'
-  if (!props.rootHostId) {
-    elements.push({
-      group: 'nodes',
-      data: { id: 'root', label: rootLabel, sublabel: props.rootIp || '', type: 'root' }
-    })
-  }
-
-  // === Services by host ===
-  const servicesByHost = new Map<string, NetworkService[]>()
-  for (const svc of props.services || []) {
-    if (!svc?.hostId) continue
-    if (!servicesByHost.has(svc.hostId)) servicesByHost.set(svc.hostId, [])
-    servicesByHost.get(svc.hostId)!.push(svc)
-  }
-
-  // Resolve effective node IDs: specific port > host > abstract node
-  const proxyNodeId = props.rootHostId
-    ? (props.rootPortId ? `port-${props.rootHostId}-${props.rootPortId}` : `host-${props.rootHostId}`)
-    : 'root'
-  const autheliaNodeId = props.autheliaHostId
-    ? (props.autheliaPortId ? `port-${props.autheliaHostId}-${props.autheliaPortId}` : `host-${props.autheliaHostId}`)
-    : 'authelia'
-
-  // Collect external ports exposed via proxy (for the single aggregated internet→proxy edge)
-  const internetViaProxyPorts: number[] = []
-
-  // === Host nodes (compound parents) ===
-  for (const host of props.data) {
-    const hostStatus = host.status || 'unknown'
-    const statusColor = statusColors[hostStatus] || statusColors.unknown
-    // Role goes to the host node only when no specific port is pinned
-    const role = (host.id === props.rootHostId && !props.rootPortId)         ? 'proxy'
-               : (host.id === props.autheliaHostId && !props.autheliaPortId) ? 'authelia'
-               : null
-    elements.push({
-      group: 'nodes',
-      data: {
-        id: `host-${host.id}`,
-        label: host.name || host.hostname || host.id,
-        sublabel: host.ip_address || '',
-        type: 'host',
-        status: hostStatus,
-        statusColor,
-        hostId: host.id,
-        ...(role ? { role } : {})
-      }
-    })
-
-    const override: HostPortOverride = props.hostPortOverrides?.[host.id] || {}
-    const hostExcluded = new Set((override.excludedPorts || []).map(Number).filter(Boolean))
-    const portMap: Record<number, string> = override.portMap || {}
-    const proxyPorts: Set<number> = override.proxyPorts || new Set<number>()
-    const autheliaPortNumbers: Set<number> = override.autheliaPortNumbers || new Set<number>()
-    const internetExposedPorts: Record<number, number | null> = override.internetExposedPorts || {}
-
-    // Port nodes
-    const rawPorts = host.ports || []
-    for (const port of rawPorts) {
-      const portNumber = Number(port.port || 0)
-      if (!portNumber || hostExcluded.has(portNumber)) continue
-
-      // Skip if a service already covers this port
-      const hostServices = servicesByHost.get(host.id) || []
-      if (hostServices.some(s => Number(s.internalPort) === portNumber)) continue
-
-      const protocol = (port.protocol || 'tcp').toLowerCase()
-      const serviceName = portMap?.[portNumber]
-      const label = serviceName
-        ? `${serviceName}\n${portNumber}/${protocol.toUpperCase()}`
-        : `${portNumber}/${protocol.toUpperCase()}`
-
-      const isProxyLinked = proxyPorts.has(portNumber)
-      const isAutheliaLinked = autheliaPortNumbers.has(portNumber)
-      const isInternetExposed = portNumber in internetExposedPorts
-      const externalPort = internetExposedPorts[portNumber] || null
-
-      const nodeId = `port-${host.id}-${portNumber}-${protocol}`
-      const portKey = `${portNumber}-${protocol}`
-      const portRole = (host.id === props.rootHostId && portKey === props.rootPortId)     ? 'proxy'
-                     : (host.id === props.autheliaHostId && portKey === props.autheliaPortId) ? 'authelia'
-                     : null
-      elements.push({
-        group: 'nodes',
-        data: {
-          id: nodeId,
-          label,
-          type: 'port',
-          parent: `host-${host.id}`,
-          protocol,
-          portNumber,
-          hostId: host.id,
-          isProxyLinked,
-          isAutheliaLinked,
-          isInternetExposed,
-          externalPort,
-          containers: port.containers || [],
-          ...(portRole ? { role: portRole } : {})
-        }
-      })
-
-      // proxy → service (direct, only when not going through Authelia)
-      if (isProxyLinked && !isAutheliaLinked) {
-        elements.push({ group: 'edges', data: { id: `e-proxy-${nodeId}`, source: proxyNodeId, target: nodeId, edgeType: 'proxy' } })
-      }
-      // authelia → service (Authelia routes to the service)
-      if (isAutheliaLinked) {
-        elements.push({ group: 'edges', data: { id: `e-auth-${nodeId}`, source: autheliaNodeId, target: nodeId, edgeType: 'authelia' } })
-      }
-      // internet routing: via proxy (aggregated) or direct
-      if (isInternetExposed && isProxyLinked) {
-        internetViaProxyPorts.push(externalPort || portNumber)
-      } else if (isInternetExposed && !isProxyLinked) {
-        elements.push({ group: 'edges', data: { id: `e-inet-${nodeId}`, source: 'internet', target: nodeId, edgeType: 'internet', externalPort } })
-      }
-    }
-
-    // Service nodes
-    for (const svc of servicesByHost.get(host.id) || []) {
-      const internalPort = Number(svc.internalPort || 0)
-      const domain = svc.domain || ''
-      const path = svc.path || '/'
-      const sublabel = domain ? `${domain}${path}` : path
-
-      const nodeId = `svc-${host.id}-${svc.id}`
-      elements.push({
-        group: 'nodes',
-        data: {
-          id: nodeId,
-          label: svc.name || 'Service',
-          sublabel,
-          type: 'service',
-          parent: `host-${host.id}`,
-          hostId: host.id,
-          internalPort,
-          externalPort: svc.externalPort || null,
-          isProxyLinked: svc.linkToProxy || false,
-          isAutheliaLinked: svc.linkToAuthelia || false,
-          isInternetExposed: svc.exposedToInternet || false,
-          tags: svc.tags || ''
-        }
-      })
-
-      // proxy → service (direct, only when not going through Authelia)
-      if (svc.linkToProxy && !svc.linkToAuthelia) {
-        elements.push({ group: 'edges', data: { id: `e-proxy-${nodeId}`, source: proxyNodeId, target: nodeId, edgeType: 'proxy' } })
-      }
-      // authelia → service
-      if (svc.linkToAuthelia) {
-        elements.push({ group: 'edges', data: { id: `e-auth-${nodeId}`, source: autheliaNodeId, target: nodeId, edgeType: 'authelia' } })
-      }
-      // internet routing: via proxy (aggregated) or direct
-      if (svc.exposedToInternet && svc.linkToProxy) {
-        internetViaProxyPorts.push(svc.externalPort || 443)
-      } else if (svc.exposedToInternet && !svc.linkToProxy) {
-        elements.push({ group: 'edges', data: { id: `e-inet-${nodeId}`, source: 'internet', target: nodeId, edgeType: 'internet', externalPort: svc.externalPort } })
-      }
-    }
-  }
-
-  // === Authelia node (only if abstract, i.e. not linked to a real host) ===
-  const needsAuthelia = elements.some(e => e.group === 'edges' && (e.data.edgeType === 'authelia' || e.data.edgeType === 'proxy-authelia'))
-  if (needsAuthelia) {
-    if (!props.autheliaHostId && props.autheliaLabel) {
-      elements.push({
-        group: 'nodes',
-        data: { id: 'authelia', label: props.autheliaLabel || 'Authelia', sublabel: props.autheliaIp || '', type: 'authelia' }
-      })
-    }
-    // Single proxy→authelia edge (between the two real IDs, whatever they resolve to)
-    const autheliaEdgeExists = elements.some(e => e.data.id === 'e-proxy-to-authelia')
-    if (!autheliaEdgeExists) {
-      elements.push({
-        group: 'edges',
-        data: { id: 'e-proxy-to-authelia', source: proxyNodeId, target: autheliaNodeId, edgeType: 'proxy-authelia' }
-      })
-    }
-  } else if (!props.autheliaHostId) {
-    const toRemove = elements.filter(e => e.group === 'edges' && e.data.edgeType === 'authelia')
-    for (const e of toRemove) elements.splice(elements.indexOf(e), 1)
-  }
-
-  // === Internet node + aggregated internet→proxy edge ===
-  const hasDirectInternetEdges = elements.some(e => e.group === 'edges' && e.data.edgeType === 'internet')
-  const needsInternet = hasDirectInternetEdges || internetViaProxyPorts.length > 0
-  if (needsInternet) {
-    elements.push({
-      group: 'nodes',
-      data: { id: 'internet', label: props.internetLabel || 'Internet', sublabel: props.internetIp || '', type: 'internet' }
-    })
-    // Single aggregated internet→proxy edge
-    if (internetViaProxyPorts.length > 0) {
-      const uniquePorts = [...new Set(internetViaProxyPorts)].sort((a, b) => a - b)
-      const label = uniquePorts.map(p => `:${p}`).join('  ')
-      elements.push({
-        group: 'edges',
-        data: { id: 'e-inet-to-proxy', source: 'internet', target: proxyNodeId, edgeType: 'internet-proxy', label, ports: uniquePorts }
-      })
-    }
-  } else {
-    const toRemove = elements.filter(e => e.group === 'edges' && e.data.edgeType === 'internet')
-    for (const e of toRemove) elements.splice(elements.indexOf(e), 1)
-  }
-
-  return elements
-}
-
-function getCyStyle(): any[] {
-  return [
-    {
-      selector: 'node',
-      style: {
-        'font-family': 'system-ui, sans-serif',
-        'color': '#e2e8f0',
-        'text-wrap': 'wrap',
-        'text-max-width': '180px',
-        'text-valign': 'center',
-        'text-halign': 'center',
-        'overlay-padding': '4px'
-      }
-    },
-    {
-      selector: 'node[type="root"]',
-      style: {
-        'background-color': 'rgba(15,23,42,0.92)',
-        'border-color': '#94a3b8',
-        'border-width': 2,
-        'label': 'data(label)',
-        'font-size': '13px',
-        'font-weight': 'bold',
-        'width': 180,
-        'height': 52,
-        'shape': 'roundrectangle',
-        'color': '#e2e8f0'
-      }
-    },
-    {
-      selector: 'node[type="host"]',
-      style: {
-        'background-color': 'rgba(15,23,42,0.42)',
-        'border-color': 'rgba(148,163,184,0.35)',
-        'border-width': 1.5,
-        'label': 'data(label)',
-        'font-size': '12px',
-        'font-weight': 'bold',
-        'text-valign': 'top',
-        'text-halign': 'center',
-        'text-margin-y': '6px',
-        'padding': '22px',
-        'shape': 'roundrectangle',
-        'color': '#e2e8f0'
-      }
-    },
-    {
-      selector: 'node[type="service"]',
-      style: {
-        'background-color': 'rgba(15,23,42,0.88)',
-        'border-color': '#38bdf8',
-        'border-width': 1.4,
-        'label': 'data(label)',
-        'font-size': '11px',
-        'font-weight': '600',
-        'width': 200,
-        'height': 52,
-        'shape': 'roundrectangle',
-        'color': '#e2e8f0'
-      }
-    },
-    {
-      selector: 'node[type="port"][protocol="tcp"]',
-      style: {
-        'background-color': 'rgba(15,23,42,0.82)',
-        'border-color': '#60a5fa',
-        'border-width': 1.3,
-        'label': 'data(label)',
-        'font-size': '11px',
-        'width': 160,
-        'height': 38,
-        'shape': 'roundrectangle',
-        'color': '#e2e8f0'
-      }
-    },
-    {
-      selector: 'node[type="port"][protocol="udp"]',
-      style: {
-        'background-color': 'rgba(15,23,42,0.82)',
-        'border-color': '#fb923c',
-        'border-width': 1.3,
-        'label': 'data(label)',
-        'font-size': '11px',
-        'width': 160,
-        'height': 38,
-        'shape': 'roundrectangle',
-        'color': '#e2e8f0'
-      }
-    },
-    {
-      selector: 'node[type="port"]',
-      style: {
-        'background-color': 'rgba(15,23,42,0.82)',
-        'border-color': '#34d399',
-        'border-width': 1.3,
-        'label': 'data(label)',
-        'font-size': '11px',
-        'width': 160,
-        'height': 38,
-        'shape': 'roundrectangle',
-        'color': '#e2e8f0'
-      }
-    },
-    {
-      selector: 'node[type="authelia"]',
-      style: {
-        'background-color': 'rgba(139,92,246,0.15)',
-        'border-color': '#8b5cf6',
-        'border-width': 1.8,
-        'label': 'data(label)',
-        'font-size': '12px',
-        'font-weight': 'bold',
-        'width': 160,
-        'height': 44,
-        'shape': 'roundrectangle',
-        'color': '#c4b5fd'
-      }
-    },
-    {
-      selector: 'node[type="internet"]',
-      style: {
-        'background-color': 'rgba(251,146,60,0.12)',
-        'border-color': '#fb923c',
-        'border-width': 1.8,
-        'label': 'data(label)',
-        'font-size': '12px',
-        'font-weight': 'bold',
-        'width': 160,
-        'height': 44,
-        'shape': 'roundrectangle',
-        'color': '#fed7aa'
-      }
-    },
-    {
-      selector: 'node:selected',
-      style: {
-        'border-width': 2.5,
-        'border-color': '#f8fafc'
-      }
-    },
-    // Edges
-    {
-      selector: 'edge[edgeType="proxy"]',
-      style: {
-        'line-color': '#60a5fa',
-        'target-arrow-color': '#60a5fa',
-        'target-arrow-shape': 'triangle',
-        'arrow-scale': 0.8,
-        'width': 1.5,
-        'curve-style': 'bezier',
-        'opacity': 0.7
-      }
-    },
-    {
-      selector: 'edge[edgeType="authelia"]',
-      style: {
-        'line-color': '#8b5cf6',
-        'target-arrow-color': '#8b5cf6',
-        'target-arrow-shape': 'triangle',
-        'arrow-scale': 0.7,
-        'width': 1.5,
-        'line-style': 'dashed',
-        'line-dash-pattern': [6, 4],
-        'curve-style': 'bezier',
-        'opacity': 0.75
-      }
-    },
-    {
-      selector: 'edge[edgeType="internet"]',
-      style: {
-        'line-color': '#fb923c',
-        'target-arrow-color': '#fb923c',
-        'target-arrow-shape': 'triangle',
-        'arrow-scale': 0.7,
-        'width': 1.5,
-        'line-style': 'dashed',
-        'line-dash-pattern': [6, 4],
-        'curve-style': 'bezier',
-        'opacity': 0.75
-      }
-    },
-    // internet → proxy: arête agrégée, épaisse, avec label de ports
-    {
-      selector: 'edge[edgeType="internet-proxy"]',
-      style: {
-        'line-color': '#fb923c',
-        'target-arrow-color': '#fb923c',
-        'target-arrow-shape': 'triangle',
-        'arrow-scale': 1,
-        'width': 2.5,
-        'curve-style': 'bezier',
-        'opacity': 0.9,
-        'label': 'data(label)',
-        'font-size': '10px',
-        'font-family': 'ui-monospace, monospace',
-        'color': '#fb923c',
-        'text-background-color': '#0b0f1a',
-        'text-background-opacity': 0.85,
-        'text-background-padding': '3px',
-        'text-rotation': 'autorotate',
-        'text-margin-y': -8
-      }
-    },
-    // proxy → authelia: arête partagée, tiretée violette
-    {
-      selector: 'edge[edgeType="proxy-authelia"]',
-      style: {
-        'line-color': '#8b5cf6',
-        'target-arrow-color': '#8b5cf6',
-        'target-arrow-shape': 'triangle',
-        'arrow-scale': 0.85,
-        'width': 1.8,
-        'line-style': 'dashed',
-        'line-dash-pattern': [6, 3],
-        'curve-style': 'bezier',
-        'opacity': 0.85
-      }
-    },
-    // Host nodes acting as proxy or authelia (linked via rootHostId / autheliaHostId)
-    {
-      selector: 'node[role="proxy"]',
-      style: {
-        'border-color': '#94a3b8',
-        'border-width': 2.5,
-        'border-style': 'solid',
-        'background-color': 'rgba(15,23,42,0.65)',
-      }
-    },
-    {
-      selector: 'node[role="authelia"]',
-      style: {
-        'border-color': '#8b5cf6',
-        'border-width': 2.5,
-        'border-style': 'solid',
-        'background-color': 'rgba(139,92,246,0.10)',
-      }
-    },
-    {
-      selector: 'edge:selected',
-      style: { 'opacity': 1, 'width': 2.5 }
-    }
-  ]
+// Build Cytoscape elements from props (delegates to the pure builder).
+function buildElements() {
+  return buildNetworkElements({
+    data: props.data,
+    services: props.services,
+    hostPortOverrides: props.hostPortOverrides,
+    rootLabel: props.rootLabel,
+    rootIp: props.rootIp,
+    autheliaLabel: props.autheliaLabel,
+    autheliaIp: props.autheliaIp,
+    internetLabel: props.internetLabel,
+    internetIp: props.internetIp,
+    rootHostId: props.rootHostId,
+    autheliaHostId: props.autheliaHostId,
+    rootPortId: props.rootPortId,
+    autheliaPortId: props.autheliaPortId,
+    statusColors,
+  })
 }
 
 function getLayoutOptions(): Record<string, unknown> {
@@ -751,6 +280,7 @@ function emitPositions(): void {
   if (!cy) return
   if (positionSaveTimeout) clearTimeout(positionSaveTimeout)
   positionSaveTimeout = setTimeout(() => {
+    if (!cy) return
     const positions: Record<string, { x: number; y: number }> = {}
     cy.nodes().forEach((n: any) => {
       const pos = n.position()
@@ -770,7 +300,7 @@ function initCytoscape(): void {
   cy = createCytoscapeInstance({
     container: cyContainer.value,
     elements: buildElements(),
-    style: getCyStyle(),
+    style: getNetworkGraphStyle(),
     layout: hasPositions ? { name: 'preset', fit: true, padding: 48 } : (getLayoutOptions() as any),
     minZoom: 0.2,
     maxZoom: 3,
@@ -852,7 +382,8 @@ function initCytoscape(): void {
 
 function resetLayout() {
   if (!cy) return
-  cy.layout(getLayoutOptions()).run()
+  // fcose options aren't part of cytoscape's typed LayoutOptions union.
+  cy.layout(getLayoutOptions() as any).run()
 }
 
 function fitView() {
@@ -917,7 +448,7 @@ watch(
       const newElements = buildElements()
       cy.elements().remove()
       cy.add(newElements)
-      cy.layout(getLayoutOptions()).run()
+      cy.layout(getLayoutOptions() as any).run()
       return
     }
 
@@ -943,7 +474,7 @@ watch(
     })
 
     if (hasNewNodes) {
-      cy.layout({ ...getLayoutOptions(), randomize: false, fit: false }).run()
+      cy.layout({ ...getLayoutOptions(), randomize: false, fit: false } as any).run()
     }
   },
   { deep: true }
