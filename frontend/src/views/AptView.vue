@@ -50,125 +50,18 @@
       @dismiss-stale-alert="dataStaleAlert = false"
     />
 
-    <DataToolbar
-      searchable
-      :search="hostSearch"
-      search-placeholder="Rechercher un hôte..."
-      @update:search="hostSearch = $event"
-    >
-      <template #right>
-        <div class="btn-group">
-          <button
-            v-for="f in hostFilterOptions"
-            :key="f.value"
-            class="btn btn-sm"
-            :class="hostQuickFilter === f.value ? 'btn-primary' : 'btn-outline-secondary'"
-            @click="hostQuickFilter = f.value"
-          >
-            {{ f.label }}
-          </button>
-        </div>
-        <select
-          v-model="hostSortKey"
-          class="form-select form-select-sm sort-select"
-        >
-          <option value="name">
-            Trier par nom
-          </option>
-          <option value="pending">
-            Trier par paquets en attente
-          </option>
-          <option value="security">
-            Trier par mises à jour sécurité
-          </option>
-          <option value="cve">
-            Trier par CVE
-          </option>
-        </select>
-        <button
-          class="btn btn-sm btn-outline-secondary"
-          :title="hostSortDir === 'asc' ? 'Croissant' : 'Décroissant'"
-          @click="hostSortDir = hostSortDir === 'asc' ? 'desc' : 'asc'"
-        >
-          <svg
-            v-if="hostSortDir === 'asc'"
-            xmlns="http://www.w3.org/2000/svg"
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-          ><path d="M3 8l4-4 4 4M7 4v16M13 16l4 4 4-4M17 20V4" /></svg>
-          <svg
-            v-else
-            xmlns="http://www.w3.org/2000/svg"
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-          ><path d="M3 16l4 4 4-4M7 20V4M13 8l4-4 4 4M17 4v16" /></svg>
-        </button>
-      </template>
-      <template #bottom>
-        <div class="d-flex flex-wrap align-items-center gap-3">
-          <label class="form-check">
-            <input
-              v-model="selectAll"
-              type="checkbox"
-              class="form-check-input"
-            >
-            <span class="form-check-label">Sélectionner tous les hôtes</span>
-          </label>
-          <div class="ms-auto d-flex flex-wrap gap-2">
-            <template v-if="canRunApt && selectedHosts.length > 0">
-              <button
-                class="btn btn-outline-secondary btn-sm"
-                :disabled="!!aptBulkLoading"
-                @click="bulkAptCmd('update')"
-              >
-                <span
-                  v-if="aptBulkLoading === 'update'"
-                  class="spinner-border spinner-border-sm me-1"
-                  role="status"
-                />
-                apt update ({{ selectedHosts.length }})
-              </button>
-              <button
-                class="btn btn-primary btn-sm"
-                :disabled="!!aptBulkLoading"
-                @click="bulkAptCmd('upgrade')"
-              >
-                <span
-                  v-if="aptBulkLoading === 'upgrade'"
-                  class="spinner-border spinner-border-sm me-1"
-                  role="status"
-                />
-                apt upgrade ({{ selectedHosts.length }})
-              </button>
-              <button
-                class="btn btn-outline-danger btn-sm"
-                :disabled="!!aptBulkLoading"
-                @click="bulkAptCmd('dist-upgrade')"
-              >
-                <span
-                  v-if="aptBulkLoading === 'dist-upgrade'"
-                  class="spinner-border spinner-border-sm me-1"
-                  role="status"
-                />
-                apt dist-upgrade ({{ selectedHosts.length }})
-              </button>
-            </template>
-            <span
-              v-else-if="selectedHosts.length === 0"
-              class="text-secondary small align-self-center"
-            >Sélectionner des hôtes pour les actions groupées</span>
-          </div>
-        </div>
-      </template>
-    </DataToolbar>
+    <AptToolbar
+      v-model:search="hostSearch"
+      v-model:quick-filter="hostQuickFilter"
+      v-model:sort-key="hostSortKey"
+      v-model:sort-dir="hostSortDir"
+      v-model:all-selected="selectAll"
+      :filter-options="hostFilterOptions"
+      :can-run-apt="canRunApt"
+      :selected-count="selectedHosts.length"
+      :bulk-loading="aptBulkLoading"
+      @bulk-cmd="bulkAptCmd"
+    />
 
     <div class="side-layout">
       <div class="side-main">
@@ -201,342 +94,20 @@
             :key="host.id"
             class="col-12"
           >
-            <div class="card">
-              <!-- Header : identité + statut + actions par hôte -->
-              <div class="card-header">
-                <div class="d-flex align-items-center gap-3 flex-wrap w-100">
-                  <label class="form-check m-0">
-                    <input
-                      v-model="selectedHosts"
-                      type="checkbox"
-                      class="form-check-input"
-                      :value="host.id"
-                    >
-                    <span class="form-check-label" />
-                  </label>
-                  <div class="flex-fill min-w-0">
-                    <div class="d-flex align-items-center gap-2 flex-wrap">
-                      <router-link
-                        :to="`/hosts/${host.id}`"
-                        class="fw-semibold text-reset text-decoration-none"
-                      >
-                        {{ host.name || host.hostname }}
-                      </router-link>
-                      <span
-                        v-if="host.name && host.hostname && host.name !== host.hostname"
-                        class="text-secondary small"
-                      >
-                        {{ host.hostname }}
-                      </span>
-                      <span class="text-muted small">{{ host.ip_address }}</span>
-                    </div>
-                  </div>
-                  <span :class="host.status === 'online' ? 'status status-lime' : 'status status-red'">
-                    <span :class="['status-dot', host.status === 'online' ? 'status-dot-animated' : '']" />
-                    <span>{{ host.status === 'online' ? 'En ligne' : 'Hors ligne' }}</span>
-                  </span>
-                  <div
-                    v-if="canRunApt"
-                    class="d-flex gap-1 flex-shrink-0"
-                  >
-                    <div class="btn-group btn-group-sm">
-                      <button
-                        class="btn btn-outline-secondary"
-                        :disabled="isHostCmdLoading(host.id)"
-                        @click="runAptCmdForHost(host, 'update')"
-                      >
-                        <span
-                          v-if="hostCmdLoading[host.id] === 'update'"
-                          class="spinner-border spinner-border-sm me-1"
-                          role="status"
-                        />
-                        update
-                      </button>
-                      <button
-                        class="btn btn-primary"
-                        :disabled="isHostCmdLoading(host.id)"
-                        @click="runAptCmdForHost(host, 'upgrade')"
-                      >
-                        <span
-                          v-if="hostCmdLoading[host.id] === 'upgrade'"
-                          class="spinner-border spinner-border-sm me-1"
-                          role="status"
-                        />
-                        upgrade
-                      </button>
-                      <button
-                        class="btn btn-outline-danger"
-                        :disabled="isHostCmdLoading(host.id)"
-                        @click="runAptCmdForHost(host, 'dist-upgrade')"
-                      >
-                        <span
-                          v-if="hostCmdLoading[host.id] === 'dist-upgrade'"
-                          class="spinner-border spinner-border-sm me-1"
-                          role="status"
-                        />
-                        dist-upgrade
-                      </button>
-                    </div>
-                    <button
-                      class="btn btn-sm btn-outline-secondary"
-                      title="Planifier une commande APT"
-                      @click="openScheduleModal(host)"
-                    >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        class="icon icon-sm"
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                      >
-                        <rect
-                          x="3"
-                          y="4"
-                          width="18"
-                          height="18"
-                          rx="2"
-                          ry="2"
-                        /><line
-                          x1="16"
-                          y1="2"
-                          x2="16"
-                          y2="6"
-                        /><line
-                          x1="8"
-                          y1="2"
-                          x2="8"
-                          y2="6"
-                        /><line
-                          x1="3"
-                          y1="10"
-                          x2="21"
-                          y2="10"
-                        />
-                      </svg>
-                    </button>
-                  </div>
-                  <span
-                    v-else
-                    class="text-secondary small flex-shrink-0"
-                  >Mode lecture seule</span>
-                  <button
-                    class="btn btn-sm btn-ghost-secondary flex-shrink-0"
-                    :title="hostExpanded[host.id] ? 'Réduire' : 'Développer'"
-                    @click="hostExpanded[host.id] = !hostExpanded[host.id]"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      :style="{ transform: hostExpanded[host.id] ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }"
-                    >
-                      <polyline points="6 9 12 15 18 9" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-
-              <!-- Corps : KPI + CVE + paquets + historique -->
-              <div class="card-body">
-                <!-- Pas de données -->
-                <div
-                  v-if="!aptStatuses[host.id]"
-                  class="text-secondary small"
-                >
-                  Données APT non disponibles — lancez <strong>apt update</strong> pour initialiser.
-                </div>
-
-                <template v-else>
-                  <!-- KPI stats (toujours visibles) -->
-                  <div class="row g-2 mb-1">
-                    <div class="col-3">
-                      <div
-                        class="text-center p-2 rounded"
-                        :class="aptStatuses[host.id].pending_packages > 0 ? 'bg-yellow-lt' : 'bg-green-lt'"
-                      >
-                        <div
-                          class="fs-3 fw-bold lh-1 mb-1"
-                          :class="aptStatuses[host.id].pending_packages > 0 ? 'text-yellow' : 'text-green'"
-                        >
-                          {{ aptStatuses[host.id].pending_packages }}
-                        </div>
-                        <div class="text-secondary small">
-                          en attente
-                        </div>
-                      </div>
-                    </div>
-                    <div class="col-3">
-                      <div
-                        class="text-center p-2 rounded"
-                        :class="aptStatuses[host.id].security_updates > 0 ? 'bg-red-lt' : 'bg-secondary-lt'"
-                      >
-                        <div
-                          class="fs-3 fw-bold lh-1 mb-1"
-                          :class="aptStatuses[host.id].security_updates > 0 ? 'text-red' : 'text-secondary'"
-                        >
-                          {{ aptStatuses[host.id].security_updates }}
-                        </div>
-                        <div class="text-secondary small">
-                          sécurité
-                        </div>
-                      </div>
-                    </div>
-                    <div class="col-3">
-                      <div
-                        class="text-center p-2 rounded"
-                        :class="getCveList(aptStatuses[host.id]).length
-                          ? (getCveList(aptStatuses[host.id]).some(c => c.severity === 'CRITICAL') ? 'bg-red-lt' : 'bg-orange-lt')
-                          : 'bg-secondary-lt'"
-                      >
-                        <div
-                          class="fs-3 fw-bold lh-1 mb-1"
-                          :class="getCveList(aptStatuses[host.id]).length
-                            ? (getCveList(aptStatuses[host.id]).some(c => c.severity === 'CRITICAL') ? 'text-red' : 'text-orange')
-                            : 'text-secondary'"
-                        >
-                          {{ getCveList(aptStatuses[host.id]).length }}
-                        </div>
-                        <div class="text-secondary small">
-                          CVE
-                        </div>
-                      </div>
-                    </div>
-                    <div class="col-3">
-                      <div class="text-center p-2 rounded bg-secondary-lt">
-                        <div class="text-secondary small">
-                          Dernier apt update
-                        </div>
-                        <div class="fw-semibold small lh-1 mb-2 text-truncate">
-                          {{ aptStatuses[host.id].last_update
-                            ? formatDate(aptStatuses[host.id].last_update)
-                            : 'Jamais' }}
-                        </div>
-                        <div class="text-secondary small">
-                          Dernier upgrade
-                        </div>
-                        <div class="fw-semibold small lh-1 text-truncate">
-                          {{ aptStatuses[host.id].last_upgrade
-                            ? formatDate(aptStatuses[host.id].last_upgrade)
-                            : 'Jamais' }}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- Détail extensible -->
-                  <template v-if="hostExpanded[host.id]">
-                    <!-- CVE -->
-                    <div
-                      v-if="getCveList(aptStatuses[host.id]).length"
-                      class="mt-3 mb-3"
-                    >
-                      <CVEList
-                        :cve-list="getCveList(aptStatuses[host.id])"
-                        :show-max-severity="true"
-                        :always-expanded="false"
-                        :initially-collapsed="false"
-                        :limit="3"
-                      />
-                    </div>
-
-                    <!-- Paquets en attente -->
-                    <div
-                      v-if="getPackages(aptStatuses[host.id]).length > 0"
-                      class="mb-3"
-                    >
-                      <div class="d-flex align-items-center justify-content-between mb-2">
-                        <span class="small fw-semibold text-secondary">
-                          Paquets en attente
-                          <span class="badge bg-yellow-lt text-yellow ms-1">
-                            {{ getPackages(aptStatuses[host.id]).length }}
-                          </span>
-                        </span>
-                        <button
-                          v-if="getPackages(aptStatuses[host.id]).length > PKG_PREVIEW_COUNT"
-                          class="btn btn-link btn-sm p-0 small text-secondary"
-                          @click="pkgShowAll[host.id] = !pkgShowAll[host.id]"
-                        >
-                          {{ pkgShowAll[host.id]
-                            ? 'Réduire'
-                            : `Voir tout (${getPackages(aptStatuses[host.id]).length})` }}
-                        </button>
-                      </div>
-                      <div class="apt-packages-grid">
-                        <div
-                          v-for="pkg in visiblePackages(host.id)"
-                          :key="pkg"
-                        >
-                          <code
-                            class="small text-body apt-package-item"
-                            :title="pkg"
-                          >{{ pkg }}</code>
-                        </div>
-                      </div>
-                    </div>
-
-                    <!-- Historique (2 dernières commandes) -->
-                    <div
-                      v-if="aptHistories[host.id]?.length"
-                      class="border-top pt-2"
-                    >
-                      <div class="d-flex align-items-center justify-content-between mb-1">
-                        <span class="small fw-semibold text-secondary">Dernières commandes</span>
-                        <router-link
-                          to="/audit?module=apt"
-                          class="small text-secondary text-decoration-none"
-                        >
-                          Historique complet →
-                        </router-link>
-                      </div>
-                      <div
-                        v-for="cmd in aptHistories[host.id].slice(0, 2)"
-                        :key="cmd.id"
-                        class="d-flex align-items-center gap-2 py-1 flex-wrap"
-                      >
-                        <code class="small">apt {{ cmd.action }}</code>
-                        <span :class="statusClass(cmd.status)">{{ statusLabel(cmd.status) }}</span>
-                        <span class="text-secondary small flex-shrink-0">{{ formatDate(cmd.created_at) }}</span>
-                        <span
-                          v-if="cmd.triggered_by"
-                          class="text-muted small flex-shrink-0"
-                        >· {{ cmd.triggered_by }}</span>
-                        <button
-                          class="btn btn-sm btn-ghost-secondary ms-auto flex-shrink-0"
-                          title="Voir les logs"
-                          @click="watchCommand(cmd, host)"
-                        >
-                          <svg
-                            class="icon icon-sm"
-                            width="16"
-                            height="16"
-                            viewBox="0 0 24 24"
-                            stroke-width="2"
-                            stroke="currentColor"
-                            fill="none"
-                            xmlns="http://www.w3.org/2000/svg"
-                          ><path
-                            stroke="none"
-                            d="M0 0h24v24H0z"
-                            fill="none"
-                          /><path d="M4 6l16 0" /><path d="M4 12l16 0" /><path d="M4 18l12 0" /></svg>
-                        </button>
-                      </div>
-                    </div>
-                  </template>
-                </template>
-              </div>
-            </div>
+            <AptHostCard
+              :host="host"
+              :apt-status="aptStatuses[host.id]"
+              :history="aptHistories[host.id]"
+              :expanded="!!hostExpanded[host.id]"
+              :selected="selectedHosts.includes(host.id)"
+              :can-run-apt="canRunApt"
+              :cmd-loading="hostCmdLoading[host.id]"
+              @update:selected="val => toggleSelected(host.id, val)"
+              @update:expanded="val => hostExpanded[host.id] = val"
+              @run-cmd="cmd => runAptCmdForHost(host, cmd)"
+              @schedule="openScheduleModal(host)"
+              @watch-command="cmd => watchCommand(cmd, host)"
+            />
           </div>
         </div>
       </div>
@@ -552,117 +123,10 @@
       />
     </div>
 
-    <!-- Modal planification -->
-    <div
-      v-if="scheduleModal.open"
-      class="modal modal-blur show d-block modal-overlay"
-      tabindex="-1"
-      @click.self="scheduleModal.open = false"
-    >
-      <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-          <div class="modal-header">
-            <div>
-              <h5 class="modal-title">
-                Planifier une commande APT
-              </h5>
-              <div class="text-muted small mt-1">
-                {{ scheduleModal.hostname }}
-              </div>
-            </div>
-            <button
-              type="button"
-              class="btn-close"
-              @click="scheduleModal.open = false"
-            />
-          </div>
-          <div class="modal-body">
-            <div class="mb-3">
-              <label class="form-label">Nom de la tâche</label>
-              <input
-                v-model="scheduleModal.name"
-                type="text"
-                class="form-control"
-                placeholder="ex: apt upgrade hebdo"
-              >
-            </div>
-            <div class="mb-3">
-              <label class="form-label">Commande</label>
-              <select
-                v-model="scheduleModal.action"
-                class="form-select"
-              >
-                <option value="update">
-                  apt update
-                </option>
-                <option value="upgrade">
-                  apt upgrade
-                </option>
-                <option value="dist-upgrade">
-                  apt dist-upgrade
-                </option>
-              </select>
-            </div>
-            <div class="mb-3">
-              <label class="form-check form-switch">
-                <input
-                  v-model="scheduleModal.manualOnly"
-                  type="checkbox"
-                  class="form-check-input"
-                >
-                <span class="form-check-label">Exécution manuelle uniquement (pas de planification automatique)</span>
-              </label>
-            </div>
-            <div
-              v-if="!scheduleModal.manualOnly"
-              class="mb-3"
-            >
-              <CronBuilder v-model="scheduleModal.cron_expression" />
-            </div>
-            <div
-              v-if="!scheduleModal.manualOnly"
-              class="form-check form-switch mb-2"
-            >
-              <input
-                id="schedEnabled"
-                v-model="scheduleModal.enabled"
-                type="checkbox"
-                class="form-check-input"
-              >
-              <label
-                class="form-check-label"
-                for="schedEnabled"
-              >Activée</label>
-            </div>
-            <div
-              v-if="scheduleModal.error"
-              class="alert alert-danger py-2"
-            >
-              {{ scheduleModal.error }}
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button
-              class="btn btn-secondary"
-              @click="scheduleModal.open = false"
-            >
-              Annuler
-            </button>
-            <button
-              class="btn btn-primary"
-              :disabled="scheduleModal.saving"
-              @click="saveSchedule"
-            >
-              <span
-                v-if="scheduleModal.saving"
-                class="spinner-border spinner-border-sm me-1"
-              />
-              Créer la tâche
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+    <AptScheduleModal
+      :host="scheduleHost"
+      @close="scheduleHost = null"
+    />
 
     <!-- Toast feedback actions groupées -->
     <div
@@ -697,26 +161,19 @@
 
 <script setup lang="ts">
 import { ref, onUnmounted, computed } from 'vue'
-import CVEList from '../components/apt/CVEList.vue'
 import apiClient, { getApiErrorMessage } from '../api'
 import { useAuthStore } from '../stores/auth'
 import { useWebSocket } from '../composables/useWebSocket'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
 import { confirmBulkAction } from '../utils/bulkActionHelpers'
-import { useDateFormatter } from '../composables/useDateFormatter'
-import { useStatusBadge } from '../composables/useStatusBadge'
 import { useToast } from '../composables/useToast'
 import { useCommandStream } from '../composables/useCommandStream'
 import CommandLogPanel from '../components/host/CommandLogPanel.vue'
 import WsStatusBar from '../components/WsStatusBar.vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
-import CronBuilder from '../components/CronBuilder.vue'
-import DataToolbar from '../components/common/DataToolbar.vue'
-
-const { formatRelativeDate } = useDateFormatter()
-const { getStatusBadgeClass } = useStatusBadge()
-
-const PKG_PREVIEW_COUNT = 15
+import AptToolbar from '../components/apt/AptToolbar.vue'
+import AptHostCard from '../components/apt/AptHostCard.vue'
+import AptScheduleModal from '../components/apt/AptScheduleModal.vue'
 
 // ── État hôtes / APT ─────────────────────────────────────────────────────────
 const hosts = ref<any[]>([])
@@ -724,7 +181,6 @@ const selectedHosts = ref<string[]>([])
 const hostExpanded = ref<Record<string, boolean>>({})
 const aptStatuses = ref<Record<string, any>>({})
 const aptHistories = ref<Record<string, any[]>>({})
-const pkgShowAll = ref<Record<string, boolean>>({})
 const hostCmdLoading = ref<Record<string, string | null>>({})
 const auth = useAuthStore()
 const dialog = useConfirmDialog()
@@ -740,54 +196,19 @@ const selectAll = computed({
   },
 })
 
-// ── Modal planification ───────────────────────────────────────────────────────
-import { MANUAL_SENTINEL } from '../utils/cron'
-
-const scheduleModal = ref({
-  open: false, hostId: '', hostname: '', name: '',
-  action: 'update', cron_expression: '0 3 * * 0',
-  manualOnly: false, enabled: true, saving: false, error: '',
-})
-
-function openScheduleModal(host: any): void {
-  const hostLabel = host.name && host.hostname && host.name !== host.hostname
-    ? `${host.name} (${host.hostname})`
-    : (host.name || host.hostname)
-
-  scheduleModal.value = {
-    open: true,
-    hostId: host.id,
-    hostname: hostLabel,
-    name: '',
-    action: 'update',
-    cron_expression: '0 3 * * 0',
-    manualOnly: false,
-    enabled: true,
-    saving: false,
-    error: '',
+function toggleSelected(hostId: string, selected: boolean): void {
+  if (selected) {
+    if (!selectedHosts.value.includes(hostId)) selectedHosts.value = [...selectedHosts.value, hostId]
+  } else {
+    selectedHosts.value = selectedHosts.value.filter((id) => id !== hostId)
   }
 }
 
-async function saveSchedule(): Promise<void> {
-  scheduleModal.value.error = ''
-  scheduleModal.value.saving = true
-  const cronExpr = scheduleModal.value.manualOnly ? MANUAL_SENTINEL : scheduleModal.value.cron_expression
-  try {
-    await apiClient.createScheduledTask(scheduleModal.value.hostId, {
-      name: scheduleModal.value.name || `apt ${scheduleModal.value.action}`,
-      module: 'apt',
-      action: scheduleModal.value.action,
-      target: '',
-      payload: '{}',
-      cron_expression: cronExpr,
-      enabled: scheduleModal.value.manualOnly ? false : scheduleModal.value.enabled,
-    })
-    scheduleModal.value.open = false
-  } catch (e: any) {
-    scheduleModal.value.error = e?.response?.data?.error || 'Erreur lors de la création'
-  } finally {
-    scheduleModal.value.saving = false
-  }
+// ── Modal planification ───────────────────────────────────────────────────────
+const scheduleHost = ref<any | null>(null)
+
+function openScheduleModal(host: any): void {
+  scheduleHost.value = host
 }
 
 // ── Console ───────────────────────────────────────────────────────────────────
@@ -853,40 +274,7 @@ const filteredHosts = computed(() => {
   return list
 })
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-function getPackages(aptStatus: any): any[] {
-  if (!aptStatus?.package_list) return []
-  try {
-    const parsed = typeof aptStatus.package_list === 'string'
-      ? JSON.parse(aptStatus.package_list)
-      : aptStatus.package_list
-    return Array.isArray(parsed) ? parsed : []
-  } catch {
-    return []
-  }
-}
-
-function getCveList(aptStatus: any): any[] {
-  if (!aptStatus?.cve_list) return []
-  try {
-    const parsed = typeof aptStatus.cve_list === 'string'
-      ? JSON.parse(aptStatus.cve_list)
-      : aptStatus.cve_list
-    return Array.isArray(parsed) ? parsed : []
-  } catch {
-    return []
-  }
-}
-
-function visiblePackages(hostId: string): any[] {
-  const pkgs = getPackages(aptStatuses.value[hostId])
-  return pkgShowAll.value[hostId] ? pkgs : pkgs.slice(0, PKG_PREVIEW_COUNT)
-}
-
-function isHostCmdLoading(hostId: string): boolean {
-  return !!hostCmdLoading.value[hostId]
-}
-
+// ── Console / streaming ─────────────────────────────────────────────────────
 function watchCommand(cmd: any, host: any): void {
   showConsole.value = true
   liveCommand.value = {
@@ -1096,26 +484,6 @@ async function bulkAptCmd(command: string): Promise<void> {
   }
 }
 
-// ── Formatage ─────────────────────────────────────────────────────────────────
-function formatDate(date: string | undefined): string {
-  return formatRelativeDate(date)
-}
-
-const STATUS_LABELS: Record<string, string> = {
-  pending:   'En attente',
-  running:   'En cours',
-  completed: 'Terminé',
-  failed:    'Échoué',
-}
-
-function statusLabel(status: string): string {
-  return STATUS_LABELS[status] ?? status
-}
-
-function statusClass(status: string | undefined): string {
-  return getStatusBadgeClass(status, 'badge bg-yellow-lt text-yellow')
-}
-
 const { wsStatus, wsError, retryCount, dataStaleAlert, reconnect } = useWebSocket('/api/v1/ws/apt', (payload: any) => {
   if (payload.type !== 'apt') return
   hosts.value = payload.hosts || []
@@ -1129,26 +497,5 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.sort-select { width: auto; }
-.modal-overlay { background: rgba(0,0,0,.5); z-index: 1050; }
 .toast-overlay { z-index: 1100; }
-.apt-date-hint { font-size: 0.68rem; }
-.apt-packages-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 0.35rem 0.75rem;
-}
-.apt-package-item {
-  display: block;
-}
-@media (min-width: 768px) {
-  .apt-packages-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-@media (min-width: 1200px) {
-  .apt-packages-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
 </style>
