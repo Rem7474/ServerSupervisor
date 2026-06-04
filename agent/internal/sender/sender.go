@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/serversupervisor/agent/internal/collector"
 	"github.com/serversupervisor/agent/internal/config"
 )
 
@@ -20,21 +21,44 @@ type Sender struct {
 	commandClient *http.Client // 30min — long-running command results/streaming
 }
 
+// Capabilities reports which collectors are active on this agent. It mirrors the
+// server-side models.AgentCapabilities; the JSON tags MUST stay in sync — this is
+// enforced by the cross-module contract test (see protocol/agent_report.golden.json).
+type Capabilities struct {
+	Docker  bool `json:"docker"`
+	APT     bool `json:"apt"`
+	SMART   bool `json:"smart"`
+	CPUTemp bool `json:"cpu_temp"`
+	WebLogs bool `json:"web_logs"`
+	Systemd bool `json:"systemd"`
+	Journal bool `json:"journal"`
+}
+
+// DockerPayload is the "docker" section of a report. The server decodes it into
+// models.DockerReport, which adds server-only fields (host_id, timestamp).
+type DockerPayload struct {
+	Containers []collector.DockerContainer `json:"containers"`
+}
+
+// Report is the full status payload POSTed to /api/agent/report. Every field is
+// strongly typed (no interface{}) so the compiler catches shape mistakes on the
+// agent side; the cross-module contract test guarantees the JSON these types emit
+// decodes losslessly into the server's models.AgentReport.
 type Report struct {
-	HostID             string      `json:"host_id"`
-	AgentVersion       string      `json:"agent_version"`
-	Capabilities       interface{} `json:"capabilities"` // Agent collector status (docker, smart, cpu_temp, web_logs, etc.)
-	Metrics            interface{} `json:"metrics"`
-	Docker             interface{} `json:"docker"`
-	UnattendedUpgrades interface{} `json:"unattended_upgrades,omitempty"`
-	WebLogs            interface{} `json:"web_logs,omitempty"`
-	DockerNetworks     interface{} `json:"docker_networks,omitempty"`   // Network topology data
-	ComposeProjects    interface{} `json:"compose_projects,omitempty"`  // Docker Compose projects
-	DiskMetrics        interface{} `json:"disk_metrics,omitempty"`      // Detailed disk usage with inodes
-	DiskHealth         interface{} `json:"disk_health,omitempty"`       // SMART disk health data
-	CustomTasks        interface{} `json:"custom_tasks,omitempty"`      // Available custom tasks from tasks.yaml
-	TasksConfigYAML    string      `json:"tasks_config_yaml,omitempty"` // Raw tasks.yaml content
-	Timestamp          time.Time   `json:"timestamp"`
+	HostID             string                              `json:"host_id"`
+	AgentVersion       string                              `json:"agent_version"`
+	Capabilities       *Capabilities                       `json:"capabilities"` // Agent collector status (docker, smart, cpu_temp, web_logs, etc.)
+	Metrics            *collector.SystemMetrics            `json:"metrics"`
+	Docker             *DockerPayload                      `json:"docker"`
+	UnattendedUpgrades *collector.UnattendedUpgradesStatus `json:"unattended_upgrades,omitempty"`
+	WebLogs            *collector.WebLogReport             `json:"web_logs,omitempty"`
+	DockerNetworks     []collector.DockerNetwork           `json:"docker_networks,omitempty"`   // Network topology data
+	ComposeProjects    []collector.ComposeProject          `json:"compose_projects,omitempty"`  // Docker Compose projects
+	DiskMetrics        []collector.DiskMetrics             `json:"disk_metrics,omitempty"`      // Detailed disk usage with inodes
+	DiskHealth         []collector.DiskHealth              `json:"disk_health,omitempty"`       // SMART disk health data
+	CustomTasks        []config.TaskSummary                `json:"custom_tasks,omitempty"`      // Available custom tasks from tasks.yaml
+	TasksConfigYAML    string                              `json:"tasks_config_yaml,omitempty"` // Raw tasks.yaml content
+	Timestamp          time.Time                           `json:"timestamp"`
 }
 
 type ReportResponse struct {
