@@ -1,20 +1,23 @@
 import { api, type JsonObject } from './client'
+import type {
+  ProxmoxConnection,
+  ProxmoxNode,
+  ProxmoxGuest,
+  ProxmoxSummary,
+  ProxmoxTask,
+  ProxmoxDisk,
+  ProxmoxBackupJob,
+  ProxmoxBackupRun,
+} from '../types/proxmox'
 
-export interface ProxmoxConnection {
-  id: string
-  name: string
-  api_url: string
-  token_id: string
-  token_secret?: string
-  insecure_skip_verify?: boolean
-  enabled?: boolean
-  poll_interval_sec?: number
-}
+// Re-exported so existing `import { ProxmoxConnection } from '.../api/proxmox'`
+// sites keep working now that the type lives in the shared types layer.
+export type { ProxmoxConnection } from '../types/proxmox'
 
 export const proxmoxApi = {
-  getProxmoxSummary: () => api.get('/v1/proxmox/summary'),
-  getProxmoxInstances: () => api.get('/v1/proxmox/instances'),
-  getProxmoxInstance: (id: string) => api.get(`/v1/proxmox/instances/${id}`),
+  getProxmoxSummary: () => api.get<ProxmoxSummary>('/v1/proxmox/summary'),
+  getProxmoxInstances: () => api.get<ProxmoxConnection[]>('/v1/proxmox/instances'),
+  getProxmoxInstance: (id: string) => api.get<ProxmoxConnection>(`/v1/proxmox/instances/${id}`),
   createProxmoxInstance: (payload: Partial<ProxmoxConnection>) =>
     api.post('/v1/proxmox/instances', payload),
   updateProxmoxInstance: (id: string, payload: Partial<ProxmoxConnection>) =>
@@ -25,8 +28,8 @@ export const proxmoxApi = {
   testProxmoxInstanceById: (id: string) => api.post(`/v1/proxmox/instances/${id}/test`),
   pollProxmoxNow: (id: string) => api.post(`/v1/proxmox/instances/${id}/poll-now`),
   getProxmoxNodes: (connectionId?: string) =>
-    api.get('/v1/proxmox/nodes', { params: connectionId ? { connection_id: connectionId } : {} }),
-  getProxmoxNode: (id: string) => api.get(`/v1/proxmox/nodes/${id}`),
+    api.get<ProxmoxNode[]>('/v1/proxmox/nodes', { params: connectionId ? { connection_id: connectionId } : {} }),
+  getProxmoxNode: (id: string) => api.get<ProxmoxNode>(`/v1/proxmox/nodes/${id}`),
   getProxmoxNodeCpuTempHistory: (id: string, hours?: number) =>
     api.get(`/v1/proxmox/nodes/${id}/cpu-temp/history`, { params: { hours: hours ?? 24 } }),
   getProxmoxNodeFanRPMHistory: (id: string, hours?: number) =>
@@ -36,7 +39,7 @@ export const proxmoxApi = {
     api.put(`/v1/proxmox/nodes/${id}/sensor-source`, { host_id: hostId ?? '' }),
   getProxmoxNodeMetrics: (hours?: number, bucketMinutes?: number) =>
     api.get('/v1/proxmox/nodes/metrics', { params: { hours: hours ?? 24, bucket_minutes: bucketMinutes ?? 5 } }),
-  getProxmoxGuests: (params?: JsonObject) => api.get('/v1/proxmox/guests', { params: params ?? {} }),
+  getProxmoxGuests: (params?: JsonObject) => api.get<ProxmoxGuest[]>('/v1/proxmox/guests', { params: params ?? {} }),
   getProxmoxGuestMetrics: (guestId: string, hours?: number, bucketMinutes?: number) =>
     api.get(`/v1/proxmox/guests/${guestId}/metrics`, { params: { hours: hours ?? 24, bucket_minutes: bucketMinutes ?? 5 } }),
   getProxmoxGuestLink: (guestId: string) => api.get(`/v1/proxmox/guests/${guestId}/link`),
@@ -56,18 +59,18 @@ export const proxmoxApi = {
 
   // Extended: tasks
   getProxmoxTasks: (params?: JsonObject) =>
-    api.get('/v1/proxmox/tasks', { params: params ?? {} }),
+    api.get<ProxmoxTask[]>('/v1/proxmox/tasks', { params: params ?? {} }),
   getProxmoxNodeTasks: (nodeId: string, limit?: number) =>
-    api.get(`/v1/proxmox/nodes/${nodeId}/tasks`, { params: { limit: limit ?? 50 } }),
+    api.get<ProxmoxTask[]>(`/v1/proxmox/nodes/${nodeId}/tasks`, { params: { limit: limit ?? 50 } }),
 
   // Extended: disks
-  getProxmoxNodeDisks: (nodeId: string) => api.get(`/v1/proxmox/nodes/${nodeId}/disks`),
+  getProxmoxNodeDisks: (nodeId: string) => api.get<ProxmoxDisk[]>(`/v1/proxmox/nodes/${nodeId}/disks`),
 
   // Extended: backups
   getProxmoxBackupJobs: (connectionId?: string) =>
-    api.get('/v1/proxmox/backup-jobs', { params: connectionId ? { connection_id: connectionId } : {} }),
+    api.get<ProxmoxBackupJob[]>('/v1/proxmox/backup-jobs', { params: connectionId ? { connection_id: connectionId } : {} }),
   getProxmoxBackupRuns: (connectionId?: string) =>
-    api.get('/v1/proxmox/backup-runs', { params: connectionId ? { connection_id: connectionId } : {} }),
+    api.get<ProxmoxBackupRun[]>('/v1/proxmox/backup-runs', { params: connectionId ? { connection_id: connectionId } : {} }),
 
   // Node live data
   getProxmoxNodeStatus: (nodeId: string) => api.get(`/v1/proxmox/nodes/${nodeId}/status`),

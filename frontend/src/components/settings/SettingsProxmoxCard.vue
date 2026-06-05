@@ -265,20 +265,10 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import api from '../../api/index'
+import type { ProxmoxConnection } from '../../types/proxmox'
 
-interface ProxmoxInstance {
-  id: string
-  name: string
-  api_url: string
-  token_id: string
-  insecure_skip_verify?: boolean
-  enabled?: boolean
-  poll_interval_sec?: number
-  node_count?: number
-  guest_count?: number
-  last_error?: string
-  last_success_at?: string
-}
+// Use the shared domain type (the settings card only reads a subset of fields).
+type ProxmoxInstance = ProxmoxConnection
 
 interface ProxmoxForm {
   name: string
