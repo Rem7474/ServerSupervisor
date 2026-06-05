@@ -405,34 +405,13 @@ import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import SortableHeader from '../components/common/SortableHeader.vue'
 import api from '../api'
-
-interface ProxmoxSummary {
-  nodes_down?: number
-  storage_near_full?: number
-  storage_offline?: number
-  recent_failed_tasks?: number
-  [key: string]: any
-}
-
-interface ProxmoxNode {
-  id: string
-  node_name: string
-  cluster_name?: string
-  status?: string
-  connection_id?: string
-  cpu_usage?: number
-  cpu_count?: number
-  mem_used?: number
-  mem_total?: number
-  last_seen_at?: string
-  [key: string]: any
-}
+import type { ProxmoxSummary, ProxmoxNode, ProxmoxConnection } from '../types/proxmox'
 
 const auth = useAuthStore()
 
-const summary = ref<ProxmoxSummary>({})
+const summary = ref<Partial<ProxmoxSummary>>({})
 const nodes = ref<ProxmoxNode[]>([])
-const instances = ref<any[]>([])
+const instances = ref<ProxmoxConnection[]>([])
 const filterConnection = ref('')
 const loading = ref(true)
 const error = ref('')
@@ -463,8 +442,8 @@ const sortedNodes = computed(() => {
         bVal = b.last_seen_at ? new Date(b.last_seen_at).getTime() : 0
         break
       default:
-        aVal = Number(a[nodeSortKey.value] || 0)
-        bVal = Number(b[nodeSortKey.value] || 0)
+        aVal = Number((a as Record<string, unknown>)[nodeSortKey.value] || 0)
+        bVal = Number((b as Record<string, unknown>)[nodeSortKey.value] || 0)
         break
     }
     if (aVal < bVal) return -1 * dir
