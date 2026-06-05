@@ -6,6 +6,7 @@ import { useAlertRulesStore } from '../stores/alertRules'
 import apiClient, { getApiErrorMessage } from '../api'
 import { storeToRefs } from 'pinia'
 import type { Host } from '../types/host'
+import type { ReleaseTracker } from '../types/tracker'
 
 interface AlertRule {
   id: number
@@ -54,26 +55,6 @@ interface AlertRuleCapabilities {
 }
 
 type AlertRulePayload = Record<string, unknown>
-
-interface ReleaseTracker {
-  id: string
-  name: string
-  tracker_type: string
-  host_id?: string
-  host_name?: string
-  last_release_tag?: string
-  last_release_detected_at?: string
-  last_checked_at?: string
-  last_triggered_at?: string
-  last_error?: string
-  enabled: boolean
-  last_execution?: {
-    status: string
-    tag_name: string
-    triggered_at: string
-  }
-  [key: string]: unknown
-}
 
 interface UseAlertsPageApi {
   alertsTab: Ref<string>
@@ -214,7 +195,7 @@ export function useAlertsPage(): UseAlertsPageApi {
     trackersError.value = ''
     try {
       const response = await apiClient.getReleaseTrackers()
-      trackers.value = response.data?.trackers || response.data || []
+      trackers.value = response.data?.trackers || []
       trackersLoaded.value = true
     } catch {
       trackersError.value = 'Impossible de charger les trackers de versions'
