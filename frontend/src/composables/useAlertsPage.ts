@@ -5,11 +5,7 @@ import { useHostsStore } from '../stores/hosts'
 import { useAlertRulesStore } from '../stores/alertRules'
 import apiClient, { getApiErrorMessage } from '../api'
 import { storeToRefs } from 'pinia'
-
-interface Host {
-  id: string
-  [key: string]: unknown
-}
+import type { Host } from '../types/host'
 
 interface AlertRule {
   id: number
@@ -350,7 +346,7 @@ export function useAlertsPage(): UseAlertsPageApi {
     trackersLoading,
     trackersError,
     rules: rules as Ref<AlertRule[]>,
-    hosts: hosts as Ref<Host[]>,
+    hosts,
     loading: loading as Ref<boolean>,
     fetched: fetched as Ref<boolean>,
     fetchError: fetchError as Ref<string>,

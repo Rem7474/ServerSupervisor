@@ -1,9 +1,10 @@
 import { api, type JsonObject } from './client'
+import type { Host } from '../types/host'
 
 export const hostsApi = {
   // Hosts
-  getHosts: () => api.get('/v1/hosts'),
-  getHost: (id: string) => api.get(`/v1/hosts/${id}`),
+  getHosts: () => api.get<Host[]>('/v1/hosts'),
+  getHost: (id: string) => api.get<Host>(`/v1/hosts/${id}`),
   getHostComplete: (id: string) => api.get(`/v1/hosts/${id}/complete`),
   getHostDashboard: (id: string) => api.get(`/v1/hosts/${id}/dashboard`),
   registerHost: (data: JsonObject) => api.post('/v1/hosts', data),
