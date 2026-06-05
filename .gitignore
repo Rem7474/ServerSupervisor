@@ -10,6 +10,7 @@ server/bin/
 postgres_data/
 .DS_Store
 Thumbs.db
+.claude/settings.local.json
 agent/agent
 agent/agent.exe
 agent/test.exe
@@ -30,3 +31,5 @@ frontend/.vitest-reports/
 frontend/.eslint-global.json
 frontend/.eslint-tmp.json
 frontend/.eslint-scope.json
+frontend/eslint-report.json
+frontend/eslint-pass2.json
