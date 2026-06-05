@@ -1,9 +1,10 @@
 import { api } from './client'
+import type { DockerContainer, ComposeProject, DockerContainersPage } from '../types/docker'
 
 export const dockerApi = {
-  getContainers: (hostId: string) => api.get(`/v1/hosts/${hostId}/containers`),
-  getAllContainers: () => api.get('/v1/docker/containers'),
-  getComposeProjects: () => api.get('/v1/docker/compose'),
+  getContainers: (hostId: string) => api.get<DockerContainer[]>(`/v1/hosts/${hostId}/containers`),
+  getAllContainers: () => api.get<DockerContainersPage>('/v1/docker/containers'),
+  getComposeProjects: () => api.get<ComposeProject[]>('/v1/docker/compose'),
   sendDockerCommand: (hostId: string, containerName: string, action: string, workingDir?: string) =>
     api.post('/v1/docker/command', { host_id: hostId, container_name: containerName, action, working_dir: workingDir ?? '' }),
   sendJournalCommand: (hostId: string, serviceName: string) =>

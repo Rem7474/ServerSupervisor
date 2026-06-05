@@ -119,18 +119,19 @@ import ComposeProjectsTab from '../components/docker/ComposeProjectsTab.vue'
 import CommandLogPanel from '../components/host/CommandLogPanel.vue'
 import { useCommandStream } from '../composables/useCommandStream'
 import apiClient from '../api'
+import type { DockerContainer, ComposeProject } from '../types/docker'
 
 const auth = useAuthStore()
 const dialog = useConfirmDialog()
 
-const containers = ref<any[]>([])
-const composeProjects = ref<any[]>([])
+const containers = ref<DockerContainer[]>([])
+const composeProjects = ref<ComposeProject[]>([])
 const versionComparisons = ref<any[]>([])
 const activeTab = useLocalStorage('dockerActiveTab', 'containers')
 const { value: actionError, showToast: showActionError } = useToast('')
 
 const canRunDocker = computed(() => auth.role === 'admin' || auth.role === 'operator')
-const runningCount = computed(() => containers.value.filter((c: any) => c.state === 'running').length)
+const runningCount = computed(() => containers.value.filter((c) => c.state === 'running').length)
 
 const dockerActionLoading = ref<Record<string, string | null>>({})
 const composeActionLoading = ref<Record<string, string | null>>({})
@@ -143,8 +144,8 @@ const { openCommandStream, closeStream: closeDockerStream } = useCommandStream()
 
 const hostMap = computed<Record<string, string>>(() => {
   const map: Record<string, string> = {}
-  containers.value.forEach((c: any) => { if (c.host_id) map[c.host_id] = c.hostname })
-  composeProjects.value.forEach((p: any) => { if (p.host_id) map[p.host_id] = p.hostname })
+  containers.value.forEach((c) => { if (c.host_id) map[c.host_id] = c.hostname })
+  composeProjects.value.forEach((p) => { if (p.host_id) map[p.host_id] = p.hostname })
   return map
 })
 
