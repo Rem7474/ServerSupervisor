@@ -586,7 +586,7 @@ let resumeDebounceTimer: ReturnType<typeof setTimeout> | null = null
 // Computed property: compter les hôtes hors ligne
 const hostsDownCount = computed(() => {
   return hostsStore.hosts.filter(
-    (h: any) => h.status === 'down' || h.status === 'offline'
+    (h) => h.status === 'offline'
   ).length
 })
 

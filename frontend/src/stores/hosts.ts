@@ -1,13 +1,9 @@
 import { ref, Ref } from 'vue'
 import { defineStore } from 'pinia'
 import apiClient from '../api'
+import type { Host } from '../types/host'
 
 const TTL_MS = 60_000 // 1 minute
-
-interface Host {
-  id: string
-  [key: string]: unknown
-}
 
 export const useHostsStore = defineStore('hosts', () => {
   const hosts: Ref<Host[]> = ref([])
