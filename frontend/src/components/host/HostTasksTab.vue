@@ -436,9 +436,9 @@ interface Task {
   cron_expression: string
   enabled: boolean
   last_command_id?: string | number
-  last_run_status?: string
-  last_run_at?: string
-  next_run_at?: string
+  last_run_status?: string | null
+  last_run_at?: string | null
+  next_run_at?: string | null
 }
 
 interface TaskForm {
