@@ -628,11 +628,12 @@ import { isManualOnly, describeCron, nextCronRun, MANUAL_SENTINEL } from '../uti
 import { useConfirmDialog } from '../composables/useConfirmDialog'
 import DataToolbar from '../components/common/DataToolbar.vue'
 import SortableHeader from '../components/common/SortableHeader.vue'
+import type { ScheduledTaskWithHost } from '../types/task'
 
 const auth = useAuthStore()
 const dialog = useConfirmDialog()
 
-const tasks = ref<any[]>([])
+const tasks = ref<ScheduledTaskWithHost[]>([])
 const loading = ref(false)
 const error = ref('')
 const runningId = ref<string | number | null>(null)
@@ -690,8 +691,8 @@ const filteredTasks = computed(() => {
 
   return [...filtered].sort((a, b) => {
     const key = sortKey.value
-    const av = a[key] ?? ''
-    const bv = b[key] ?? ''
+    const av = (a as Record<string, unknown>)[key] ?? ''
+    const bv = (b as Record<string, unknown>)[key] ?? ''
     const cmp = String(av).localeCompare(String(bv), 'fr', { numeric: true })
     return sortDir.value === 'asc' ? cmp : -cmp
   })

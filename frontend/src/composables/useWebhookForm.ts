@@ -1,16 +1,14 @@
 import { computed, ref, watch, type Ref } from 'vue'
 import api from '../api'
+import type { CustomTaskSummary } from '../types/task'
 
 export interface Host {
   id: string
   name?: string
 }
 
-export interface CustomTask {
-  id: string
-  name?: string
-  [key: string]: unknown
-}
+// The webhook/tracker form only needs id + name; reuse the shared task type.
+export type CustomTask = CustomTaskSummary
 
 export interface RegistryCredential {
   id: string
