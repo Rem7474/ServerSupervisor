@@ -1,13 +1,9 @@
 import { ref, Ref } from 'vue'
 import { defineStore } from 'pinia'
 import apiClient from '../api'
+import type { AlertRule } from '../types/alert'
 
 const TTL_MS = 30_000 // 30 seconds
-
-interface AlertRule {
-  id?: number
-  [key: string]: unknown
-}
 
 function getErrorMessage(error: unknown): string {
   if (typeof error === 'object' && error !== null) {
