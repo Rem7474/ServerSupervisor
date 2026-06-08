@@ -1,5 +1,5 @@
-import { api, type JsonObject } from './client'
-import type { Host } from '../types/host'
+import { api } from './client'
+import type { Host, HostRegistration, HostUpdate } from '../types/host'
 
 export const hostsApi = {
   // Hosts
@@ -7,8 +7,8 @@ export const hostsApi = {
   getHost: (id: string) => api.get<Host>(`/v1/hosts/${id}`),
   getHostComplete: (id: string) => api.get(`/v1/hosts/${id}/complete`),
   getHostDashboard: (id: string) => api.get(`/v1/hosts/${id}/dashboard`),
-  registerHost: (data: JsonObject) => api.post('/v1/hosts', data),
-  updateHost: (id: string, data: JsonObject) => api.patch(`/v1/hosts/${id}`, data),
+  registerHost: (data: Partial<HostRegistration>) => api.post('/v1/hosts', data),
+  updateHost: (id: string, data: Partial<HostUpdate>) => api.patch(`/v1/hosts/${id}`, data),
   deleteHost: (id: string) => api.delete(`/v1/hosts/${id}`),
   rotateHostKey: (id: string) => api.post(`/v1/hosts/${id}/rotate-key`),
   updateHostAgent: (id: string) => api.post(`/v1/hosts/${id}/agent/update`),
