@@ -848,6 +848,28 @@ export interface AgentReport {
 }
 
 //////////
+// source: settings.go
+
+/**
+ * SettingsUpdateRequest is the admin body for PUT /settings. Every field is
+ * optional; only the ones provided (non-zero, or non-nil for SMTPTLS) are
+ * persisted to the settings table.
+ */
+export interface SettingsUpdateRequest {
+  smtp_host: string;
+  smtp_port: number /* int */;
+  smtp_user: string;
+  smtp_pass: string;
+  smtp_from: string;
+  smtp_to: string;
+  smtp_tls?: boolean;
+  ntfy_url: string;
+  github_token: string;
+  metrics_retention_days: number /* int */;
+  audit_retention_days: number /* int */;
+}
+
+//////////
 // source: synthetic.go
 
 /**
@@ -873,6 +895,22 @@ export interface UptimeProbe {
   consecutive_failures: number /* int */;
   created_at: string;
   updated_at: string;
+}
+/**
+ * UptimeProbeRequest is the create/update body for an uptime probe. The pointer
+ * fields default to true server-side when omitted (see uptimeProbeFromRequest).
+ */
+export interface UptimeProbeRequest {
+  name: string;
+  type: string;
+  target: string;
+  interval_sec: number /* int */;
+  timeout_sec: number /* int */;
+  expected_status: number /* int */;
+  expected_body_regex: string;
+  follow_redirects?: boolean;
+  verify_tls?: boolean;
+  enabled?: boolean;
 }
 /**
  * UptimeProbeResult is one historical execution sample for an UptimeProbe.
@@ -918,6 +956,17 @@ export interface SSLCertificate {
   last_error?: string;
   created_at: string;
   updated_at: string;
+}
+/**
+ * SSLCertificateRequest is the create/update body for a monitored TLS endpoint.
+ * Port defaults to 443 and Enabled to true when omitted (see sslCertFromRequest).
+ */
+export interface SSLCertificateRequest {
+  name: string;
+  host: string;
+  port: number /* int */;
+  server_name: string;
+  enabled?: boolean;
 }
 
 //////////

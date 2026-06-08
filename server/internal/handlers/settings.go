@@ -14,6 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/database"
+	"github.com/serversupervisor/server/internal/models"
 )
 
 type SettingsHandler struct {
@@ -56,21 +57,6 @@ func (h *SettingsHandler) GetSettings(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
-// UpdateSettingsRequest defines the body for PUT /settings.
-type UpdateSettingsRequest struct {
-	SMTPHost             string `json:"smtp_host"`
-	SMTPPort             int    `json:"smtp_port"`
-	SMTPUser             string `json:"smtp_user"`
-	SMTPPass             string `json:"smtp_pass"`
-	SMTPFrom             string `json:"smtp_from"`
-	SMTPTo               string `json:"smtp_to"`
-	SMTPTLS              *bool  `json:"smtp_tls"`
-	NtfyURL              string `json:"ntfy_url"`
-	GitHubToken          string `json:"github_token"`
-	MetricsRetentionDays int    `json:"metrics_retention_days"`
-	AuditRetentionDays   int    `json:"audit_retention_days"`
-}
-
 // UpdateSettings persists configuration changes to the database and applies them in memory.
 func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 	if c.GetString("role") != "admin" {
@@ -78,7 +64,7 @@ func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 		return
 	}
 
-	var req UpdateSettingsRequest
+	var req models.SettingsUpdateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
