@@ -7,13 +7,7 @@ import apiClient, { getApiErrorMessage } from '../api'
 import { storeToRefs } from 'pinia'
 import type { Host } from '../types/host'
 import type { ReleaseTracker } from '../types/tracker'
-
-interface AlertRule {
-  id: number
-  name: string
-  enabled: boolean
-  [key: string]: unknown
-}
+import type { AlertRule } from '../types/alert'
 
 interface Incident {
   id: string
@@ -326,7 +320,7 @@ export function useAlertsPage(): UseAlertsPageApi {
     trackers,
     trackersLoading,
     trackersError,
-    rules: rules as Ref<AlertRule[]>,
+    rules,
     hosts,
     loading: loading as Ref<boolean>,
     fetched: fetched as Ref<boolean>,
