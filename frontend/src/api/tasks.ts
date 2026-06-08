@@ -1,13 +1,13 @@
-import { api, type JsonObject } from './client'
-import type { ScheduledTask, ScheduledTaskWithHost, CustomTaskSummary } from '../types/task'
+import { api } from './client'
+import type { ScheduledTask, ScheduledTaskWithHost, CustomTaskSummary, ScheduledTaskRequest } from '../types/task'
 import type { ComposeProject } from '../types/docker'
 
 export const tasksApi = {
   getAllScheduledTasks: () => api.get<ScheduledTaskWithHost[]>('/v1/scheduled-tasks'),
   getScheduledTasks: (hostId: string) => api.get<ScheduledTask[]>(`/v1/hosts/${hostId}/scheduled-tasks`),
-  createScheduledTask: (hostId: string, payload: JsonObject) =>
+  createScheduledTask: (hostId: string, payload: Partial<ScheduledTaskRequest>) =>
     api.post(`/v1/hosts/${hostId}/scheduled-tasks`, payload),
-  updateScheduledTask: (id: string, payload: JsonObject) =>
+  updateScheduledTask: (id: string, payload: Partial<ScheduledTaskRequest>) =>
     api.put(`/v1/scheduled-tasks/${id}`, payload),
   deleteScheduledTask: (id: string) => api.delete(`/v1/scheduled-tasks/${id}`),
   runScheduledTask: (id: string) => api.post(`/v1/scheduled-tasks/${id}/run`),

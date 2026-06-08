@@ -7,3 +7,6 @@ export type HostStatus = 'online' | 'offline' | 'warning' | 'unknown'
 
 /** Host with the status field narrowed to the known set of values. */
 export type Host = Omit<GeneratedHost, 'status'> & { status: HostStatus }
+
+// Request bodies (generated from the Go request models).
+export type { HostRegistration, HostUpdate } from './generated'

@@ -9,6 +9,8 @@ import type {
   ProxmoxDisk,
   ProxmoxBackupJob,
   ProxmoxBackupRun,
+  ProxmoxGuestLinkRequest,
+  ProxmoxGuestLinkUpdate,
 } from '../types/proxmox'
 
 // Re-exported so existing `import { ProxmoxConnection } from '.../api/proxmox'`
@@ -49,8 +51,8 @@ export const proxmoxApi = {
   getProxmoxLinks: (status?: string) =>
     api.get('/v1/proxmox/links', { params: status ? { status } : {} }),
   getProxmoxLink: (id: string) => api.get(`/v1/proxmox/links/${id}`),
-  createProxmoxLink: (payload: JsonObject) => api.post('/v1/proxmox/links', payload),
-  updateProxmoxLink: (id: string, payload: JsonObject) =>
+  createProxmoxLink: (payload: Partial<ProxmoxGuestLinkRequest>) => api.post('/v1/proxmox/links', payload),
+  updateProxmoxLink: (id: string, payload: ProxmoxGuestLinkUpdate) =>
     api.put(`/v1/proxmox/links/${id}`, payload),
   deleteProxmoxLink: (id: string) => api.delete(`/v1/proxmox/links/${id}`),
 

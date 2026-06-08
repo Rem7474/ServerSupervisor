@@ -10,4 +10,6 @@ export type {
   ProxmoxBackupJob,
   ProxmoxBackupRun,
   ProxmoxSummary,
+  ProxmoxGuestLinkRequest,
+  ProxmoxGuestLinkUpdate,
 } from './generated'
