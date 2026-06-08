@@ -1,6 +1,7 @@
 import { api, type JsonObject } from './client'
 import type {
   ProxmoxConnection,
+  ProxmoxConnectionRequest,
   ProxmoxNode,
   ProxmoxGuest,
   ProxmoxSummary,
@@ -18,12 +19,12 @@ export const proxmoxApi = {
   getProxmoxSummary: () => api.get<ProxmoxSummary>('/v1/proxmox/summary'),
   getProxmoxInstances: () => api.get<ProxmoxConnection[]>('/v1/proxmox/instances'),
   getProxmoxInstance: (id: string) => api.get<ProxmoxConnection>(`/v1/proxmox/instances/${id}`),
-  createProxmoxInstance: (payload: Partial<ProxmoxConnection>) =>
+  createProxmoxInstance: (payload: Partial<ProxmoxConnectionRequest>) =>
     api.post('/v1/proxmox/instances', payload),
-  updateProxmoxInstance: (id: string, payload: Partial<ProxmoxConnection>) =>
+  updateProxmoxInstance: (id: string, payload: Partial<ProxmoxConnectionRequest>) =>
     api.put(`/v1/proxmox/instances/${id}`, payload),
   deleteProxmoxInstance: (id: string) => api.delete(`/v1/proxmox/instances/${id}`),
-  testProxmoxConnection: (payload: Partial<Omit<ProxmoxConnection, 'id'>>) =>
+  testProxmoxConnection: (payload: Partial<ProxmoxConnectionRequest>) =>
     api.post('/v1/proxmox/instances/test', payload),
   testProxmoxInstanceById: (id: string) => api.post(`/v1/proxmox/instances/${id}/test`),
   pollProxmoxNow: (id: string) => api.post(`/v1/proxmox/instances/${id}/poll-now`),
