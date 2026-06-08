@@ -75,7 +75,7 @@ func (h *GitWebhookHandler) CreateWebhook(c *gin.Context) {
 		return
 	}
 
-	var req models.GitWebhook
+	var req models.GitWebhookRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -96,14 +96,16 @@ func (h *GitWebhookHandler) CreateWebhook(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "custom_task_id is required"})
 		return
 	}
-	if req.EventFilter == "" {
-		req.EventFilter = "push"
+
+	wh := req.ToModel()
+	if wh.EventFilter == "" {
+		wh.EventFilter = "push"
 	}
-	if req.NotifyChannels == nil {
-		req.NotifyChannels = []string{}
+	if wh.NotifyChannels == nil {
+		wh.NotifyChannels = []string{}
 	}
 
-	created, err := h.db.CreateGitWebhook(c.Request.Context(), req)
+	created, err := h.db.CreateGitWebhook(c.Request.Context(), wh)
 	if err != nil {
 		slog.ErrorContext(c.Request.Context(), fmt.Sprintf("CreateWebhook: db error: %v", err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create webhook"})
@@ -135,7 +137,7 @@ func (h *GitWebhookHandler) UpdateWebhook(c *gin.Context) {
 	}
 	id := c.Param("id")
 
-	var req models.GitWebhook
+	var req models.GitWebhookRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -153,7 +155,7 @@ func (h *GitWebhookHandler) UpdateWebhook(c *gin.Context) {
 		return
 	}
 
-	if err := h.db.UpdateGitWebhook(c.Request.Context(), id, req); err != nil {
+	if err := h.db.UpdateGitWebhook(c.Request.Context(), id, req.ToModel()); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update webhook"})
 		return
 	}

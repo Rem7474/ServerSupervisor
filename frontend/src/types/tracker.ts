@@ -3,6 +3,7 @@ export type {
   ReleaseTracker,
   ReleaseTrackerExecution,
   RegistryCredential,
+  RegistryCredentialRequest,
   TrackableContainer,
   ReleaseVersionHistoryItem,
 } from './generated'

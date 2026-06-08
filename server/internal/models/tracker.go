@@ -67,6 +67,27 @@ type RegistryCredential struct {
 	UpdatedAt    time.Time `json:"updated_at"`
 }
 
+// RegistryCredentialRequest is the create/update body for a registry credential —
+// the writable subset of RegistryCredential (id, created_at, updated_at are
+// server-managed). Password is required on create; an empty value on update keeps
+// the stored secret.
+type RegistryCredentialRequest struct {
+	Name         string `json:"name"`
+	RegistryHost string `json:"registry_host"`
+	Username     string `json:"username"`
+	Password     string `json:"password,omitempty"`
+}
+
+// ToModel maps the request onto a RegistryCredential.
+func (r RegistryCredentialRequest) ToModel() RegistryCredential {
+	return RegistryCredential{
+		Name:         r.Name,
+		RegistryHost: r.RegistryHost,
+		Username:     r.Username,
+		Password:     r.Password,
+	}
+}
+
 // TrackableContainer is a compose-managed container discovered across hosts
 // that does not yet have a release tracker — used to pre-fill bulk creation.
 type TrackableContainer struct {

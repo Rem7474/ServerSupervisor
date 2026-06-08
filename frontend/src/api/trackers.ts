@@ -3,6 +3,7 @@ import type {
   ReleaseTracker,
   ReleaseTrackerExecution,
   RegistryCredential,
+  RegistryCredentialRequest,
   TrackableContainer,
   ReleaseVersionHistoryItem,
 } from '../types/tracker'
@@ -25,8 +26,8 @@ export const trackersApi = {
   getReleaseTrackerVersionHistory: (id: string, limit?: number) =>
     api.get<{ history: ReleaseVersionHistoryItem[] }>(`/v1/release-trackers/${id}/version-history`, { params: { limit: limit ?? 20 } }),
   getRegistryCredentials: () => api.get<{ credentials: RegistryCredential[] }>('/v1/registry-credentials'),
-  createRegistryCredential: (payload: JsonObject) => api.post('/v1/registry-credentials', payload),
-  updateRegistryCredential: (id: string, payload: JsonObject) =>
+  createRegistryCredential: (payload: Partial<RegistryCredentialRequest>) => api.post('/v1/registry-credentials', payload),
+  updateRegistryCredential: (id: string, payload: Partial<RegistryCredentialRequest>) =>
     api.put(`/v1/registry-credentials/${id}`, payload),
   deleteRegistryCredential: (id: string) => api.delete(`/v1/registry-credentials/${id}`),
 }

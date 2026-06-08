@@ -1081,6 +1081,18 @@ export interface RegistryCredential {
   updated_at: string;
 }
 /**
+ * RegistryCredentialRequest is the create/update body for a registry credential —
+ * the writable subset of RegistryCredential (id, created_at, updated_at are
+ * server-managed). Password is required on create; an empty value on update keeps
+ * the stored secret.
+ */
+export interface RegistryCredentialRequest {
+  name: string;
+  registry_host: string;
+  username: string;
+  password?: string;
+}
+/**
  * TrackableContainer is a compose-managed container discovered across hosts
  * that does not yet have a release tracker — used to pre-fill bulk creation.
  */
@@ -1292,6 +1304,24 @@ export interface GitWebhook {
   created_at: string;
   host_name?: string; // joined from hosts
   last_execution?: GitWebhookExecution; // most recent execution
+}
+/**
+ * GitWebhookRequest is the create/update body for a git webhook — the writable
+ * subset of GitWebhook. id, secret, last_triggered_at, created_at, host_name and
+ * last_execution are server-managed and never accepted from the client.
+ */
+export interface GitWebhookRequest {
+  name: string;
+  provider: string;
+  repo_filter: string;
+  branch_filter: string;
+  event_filter: string;
+  host_id: string;
+  custom_task_id: string;
+  notify_channels: string[];
+  notify_on_success: boolean;
+  notify_on_failure: boolean;
+  enabled: boolean;
 }
 export interface GitWebhookExecution {
   id: string;

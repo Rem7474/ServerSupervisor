@@ -24,6 +24,41 @@ type GitWebhook struct {
 	LastExecution   *GitWebhookExecution `json:"last_execution,omitempty"` // most recent execution
 }
 
+// GitWebhookRequest is the create/update body for a git webhook — the writable
+// subset of GitWebhook. id, secret, last_triggered_at, created_at, host_name and
+// last_execution are server-managed and never accepted from the client.
+type GitWebhookRequest struct {
+	Name            string   `json:"name"`
+	Provider        string   `json:"provider"`
+	RepoFilter      string   `json:"repo_filter"`
+	BranchFilter    string   `json:"branch_filter"`
+	EventFilter     string   `json:"event_filter"`
+	HostID          string   `json:"host_id"`
+	CustomTaskID    string   `json:"custom_task_id"`
+	NotifyChannels  []string `json:"notify_channels"`
+	NotifyOnSuccess bool     `json:"notify_on_success"`
+	NotifyOnFailure bool     `json:"notify_on_failure"`
+	Enabled         bool     `json:"enabled"`
+}
+
+// ToModel maps the request onto a GitWebhook (pure field copy; callers apply any
+// create-time defaults).
+func (r GitWebhookRequest) ToModel() GitWebhook {
+	return GitWebhook{
+		Name:            r.Name,
+		Provider:        r.Provider,
+		RepoFilter:      r.RepoFilter,
+		BranchFilter:    r.BranchFilter,
+		EventFilter:     r.EventFilter,
+		HostID:          r.HostID,
+		CustomTaskID:    r.CustomTaskID,
+		NotifyChannels:  r.NotifyChannels,
+		NotifyOnSuccess: r.NotifyOnSuccess,
+		NotifyOnFailure: r.NotifyOnFailure,
+		Enabled:         r.Enabled,
+	}
+}
+
 type GitWebhookExecution struct {
 	ID            string     `json:"id"`
 	WebhookID     string     `json:"webhook_id"`
