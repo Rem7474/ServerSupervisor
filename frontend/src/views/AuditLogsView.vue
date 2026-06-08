@@ -465,6 +465,7 @@ import { useCommandStream } from '../composables/useCommandStream'
 import PaginationNav from '../components/PaginationNav.vue'
 import CommandLogPanel from '../components/host/CommandLogPanel.vue'
 import DataToolbar from '../components/common/DataToolbar.vue'
+import type { RemoteCommandWithHost } from '../types/audit'
 import SortableHeader from '../components/common/SortableHeader.vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 
@@ -478,7 +479,7 @@ const canViewCommands = computed(() => auth.role === 'admin' || auth.role === 'o
 const activeTab = ref('commandes')
 
 // ── Commands history ─────────────────────────────────────────────────────────
-const cmds = ref<any[]>([])
+const cmds = ref<RemoteCommandWithHost[]>([])
 const cmdsPage = ref(1)
 const cmdsLimit = 50
 const cmdsTotal = ref(0)
@@ -503,8 +504,8 @@ const sortedCmds = computed(() => {
       const bv = new Date(b.created_at || 0).getTime()
       return (av < bv ? -1 : av > bv ? 1 : 0) * dir
     }
-    const av = key === 'command' ? cmdLabel(a) : (a[key] || '')
-    const bv = key === 'command' ? cmdLabel(b) : (b[key] || '')
+    const av = key === 'command' ? cmdLabel(a) : ((a as Record<string, unknown>)[key] || '')
+    const bv = key === 'command' ? cmdLabel(b) : ((b as Record<string, unknown>)[key] || '')
     return String(av).toLowerCase().localeCompare(String(bv).toLowerCase()) * dir
   })
   return arr
@@ -594,7 +595,7 @@ function cmdLabel(cmd: any): string {
   return parts.filter(Boolean).join(' ')
 }
 
-function formatDuration(startedAt: string | undefined, endedAt: string | undefined): string {
+function formatDuration(startedAt: string | null | undefined, endedAt: string | null | undefined): string {
   if (!startedAt || !endedAt) return '—'
   const diff = Math.max(0, Math.round((new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 1000))
   if (diff < 60) return `${diff}s`
