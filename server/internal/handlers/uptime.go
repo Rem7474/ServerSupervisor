@@ -23,20 +23,7 @@ func NewUptimeHandler(db *database.DB, cfg *config.Config) *UptimeHandler {
 	return &UptimeHandler{db: db, cfg: cfg}
 }
 
-type uptimeProbePayload struct {
-	Name              string `json:"name" binding:"required"`
-	Type              string `json:"type" binding:"required,oneof=http tcp"`
-	Target            string `json:"target" binding:"required"`
-	IntervalSec       int    `json:"interval_sec"`
-	TimeoutSec        int    `json:"timeout_sec"`
-	ExpectedStatus    int    `json:"expected_status"`
-	ExpectedBodyRegex string `json:"expected_body_regex"`
-	FollowRedirects   *bool  `json:"follow_redirects"`
-	VerifyTLS         *bool  `json:"verify_tls"`
-	Enabled           *bool  `json:"enabled"`
-}
-
-func (p uptimeProbePayload) toModel() models.UptimeProbe {
+func uptimeProbeFromRequest(p models.UptimeProbeRequest) models.UptimeProbe {
 	m := models.UptimeProbe{
 		Name:              strings.TrimSpace(p.Name),
 		Type:              p.Type,
@@ -97,12 +84,12 @@ func (h *UptimeHandler) Get(c *gin.Context) {
 }
 
 func (h *UptimeHandler) Create(c *gin.Context) {
-	var req uptimeProbePayload
+	var req models.UptimeProbeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	out, err := h.db.CreateUptimeProbe(c.Request.Context(), req.toModel())
+	out, err := h.db.CreateUptimeProbe(c.Request.Context(), uptimeProbeFromRequest(req))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -111,12 +98,12 @@ func (h *UptimeHandler) Create(c *gin.Context) {
 }
 
 func (h *UptimeHandler) Update(c *gin.Context) {
-	var req uptimeProbePayload
+	var req models.UptimeProbeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	m := req.toModel()
+	m := uptimeProbeFromRequest(req)
 	m.ID = c.Param("id")
 	if err := h.db.UpdateUptimeProbe(c.Request.Context(), m); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

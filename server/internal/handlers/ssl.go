@@ -22,15 +22,7 @@ func NewSSLHandler(db *database.DB, cfg *config.Config) *SSLHandler {
 	return &SSLHandler{db: db, cfg: cfg}
 }
 
-type sslCertPayload struct {
-	Name       string `json:"name" binding:"required"`
-	Host       string `json:"host" binding:"required"`
-	Port       int    `json:"port"`
-	ServerName string `json:"server_name"`
-	Enabled    *bool  `json:"enabled"`
-}
-
-func (p sslCertPayload) toModel() models.SSLCertificate {
+func sslCertFromRequest(p models.SSLCertificateRequest) models.SSLCertificate {
 	m := models.SSLCertificate{
 		Name:       strings.TrimSpace(p.Name),
 		Host:       strings.TrimSpace(p.Host),
@@ -73,12 +65,12 @@ func (h *SSLHandler) Get(c *gin.Context) {
 }
 
 func (h *SSLHandler) Create(c *gin.Context) {
-	var req sslCertPayload
+	var req models.SSLCertificateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	out, err := h.db.CreateSSLCertificate(c.Request.Context(), req.toModel())
+	out, err := h.db.CreateSSLCertificate(c.Request.Context(), sslCertFromRequest(req))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -87,12 +79,12 @@ func (h *SSLHandler) Create(c *gin.Context) {
 }
 
 func (h *SSLHandler) Update(c *gin.Context) {
-	var req sslCertPayload
+	var req models.SSLCertificateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	m := req.toModel()
+	m := sslCertFromRequest(req)
 	m.ID = c.Param("id")
 	if err := h.db.UpdateSSLCertificate(c.Request.Context(), m); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

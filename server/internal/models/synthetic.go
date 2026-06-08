@@ -27,6 +27,21 @@ type UptimeProbe struct {
 	UpdatedAt           time.Time  `json:"updated_at"`
 }
 
+// UptimeProbeRequest is the create/update body for an uptime probe. The pointer
+// fields default to true server-side when omitted (see uptimeProbeFromRequest).
+type UptimeProbeRequest struct {
+	Name              string `json:"name" binding:"required"`
+	Type              string `json:"type" binding:"required,oneof=http tcp"`
+	Target            string `json:"target" binding:"required"`
+	IntervalSec       int    `json:"interval_sec"`
+	TimeoutSec        int    `json:"timeout_sec"`
+	ExpectedStatus    int    `json:"expected_status"`
+	ExpectedBodyRegex string `json:"expected_body_regex"`
+	FollowRedirects   *bool  `json:"follow_redirects"`
+	VerifyTLS         *bool  `json:"verify_tls"`
+	Enabled           *bool  `json:"enabled"`
+}
+
 // UptimeProbeResult is one historical execution sample for an UptimeProbe.
 type UptimeProbeResult struct {
 	ID         int64     `json:"id"`
@@ -69,4 +84,14 @@ type SSLCertificate struct {
 	LastError     string     `json:"last_error,omitempty"`
 	CreatedAt     time.Time  `json:"created_at"`
 	UpdatedAt     time.Time  `json:"updated_at"`
+}
+
+// SSLCertificateRequest is the create/update body for a monitored TLS endpoint.
+// Port defaults to 443 and Enabled to true when omitted (see sslCertFromRequest).
+type SSLCertificateRequest struct {
+	Name       string `json:"name" binding:"required"`
+	Host       string `json:"host" binding:"required"`
+	Port       int    `json:"port"`
+	ServerName string `json:"server_name"`
+	Enabled    *bool  `json:"enabled"`
 }
