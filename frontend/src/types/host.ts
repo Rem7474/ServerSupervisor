@@ -1,26 +1,9 @@
-// Shared frontend domain types. Mirror the server's `models.*` JSON shapes so
-// API responses are typed end to end (catches backend↔frontend field drift at
-// compile time instead of at runtime). Keep in sync with server/internal/models.
+// Host domain types. The base shape is generated from the Go model
+// (see generated.ts); this file re-exports it and layers a refined status union.
+import type { Host as GeneratedHost } from './generated'
 
-/** Host lifecycle status (server: models.Host.Status). */
+/** Host lifecycle status (server stores it as a plain string). */
 export type HostStatus = 'online' | 'offline' | 'warning' | 'unknown'
 
-/**
- * A monitored host as returned by `GET /api/v1/hosts` and `GET /api/v1/hosts/:id`.
- * Mirrors server `models.Host` (the `api_key` field is never serialised).
- */
-export interface Host {
-  id: string
-  name: string
-  hostname: string
-  ip_address: string
-  os: string
-  agent_version: string
-  tags?: string[]
-  status: HostStatus
-  last_seen: string
-  created_at: string
-  updated_at: string
-  /** Active metric collectors, e.g. { docker: true, smart: false }. */
-  collectors?: Record<string, boolean>
-}
+/** Host with the status field narrowed to the known set of values. */
+export type Host = Omit<GeneratedHost, 'status'> & { status: HostStatus }
