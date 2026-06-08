@@ -1,4 +1,5 @@
 import { api } from './client'
+import type { IPTimelineResponse } from '../types/security'
 
 export const authApi = {
   login: (username: string, password: string, totpCode?: string) =>
@@ -24,7 +25,7 @@ export const authApi = {
       params: { host_id: hostId ?? '', source: source ?? '', limit },
     }),
   getIPTimeline: (ip: string, hostId?: string, period: string = '24h', limit: number = 500) =>
-    api.get(`/v1/security/web-logs/ip/${encodeURIComponent(ip)}`, {
+    api.get<IPTimelineResponse>(`/v1/security/web-logs/ip/${encodeURIComponent(ip)}`, {
       params: { host_id: hostId ?? '', period, limit },
     }),
   getDomainDetails: (domain: string, period: string = '24h', hostId?: string, source?: string, limit: number = 300) =>

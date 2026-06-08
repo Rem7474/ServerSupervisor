@@ -527,6 +527,7 @@ import apiClient, { getApiErrorMessage } from '../api'
 import { useToast } from '../composables/useToast'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import IPTimelineModal from '../components/security/IPTimelineModal.vue'
+import type { WebLogIPTimelineRow } from '../types/security'
 
 type AnyRecord = Record<string, any>
 
@@ -548,7 +549,7 @@ const timelineLoading = ref(false)
 const banState = ref<'idle' | 'loading' | 'error'>('idle')
 const selectedIP = ref('')
 const timelineHostId = ref('')
-const timeline = ref<AnyRecord[]>([])
+const timeline = ref<WebLogIPTimelineRow[]>([])
 
 const { value: actionFeedback, showToast: showActionFeedback } = useToast<{ message: string; type: 'success' | 'error' } | null>(null)
 
