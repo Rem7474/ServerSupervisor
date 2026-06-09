@@ -58,6 +58,32 @@ jobs:
           git commit -m "chore(server): auto-fix go mod tidy [skip ci]"
           git push
 
+      # AUTO-FIX : regenerate the frontend types from the Go models so the
+      # generated single-source-of-truth (frontend/src/types/generated.ts) can
+      # never silently drift when a model changes. Mirrors the go-mod auto-fix.
+      - name: Auto-regenerate frontend types
+        id: gentypes
+        run: |
+          go run github.com/gzuidhof/tygo@v0.2.21 generate
+          cd ..
+          if [[ -n $(git status --porcelain frontend/src/types/generated.ts) ]]; then
+            echo "changes=true" >> "$GITHUB_OUTPUT"
+            echo "⚠️ frontend/src/types/generated.ts was out of date — regenerated"
+          else
+            echo "changes=false" >> "$GITHUB_OUTPUT"
+            echo "✅ generated types already in sync with the Go models"
+          fi
+
+      - name: Commit regenerated types
+        if: steps.gentypes.outputs.changes == 'true' && github.event_name == 'push'
+        run: |
+          cd ..
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add frontend/src/types/generated.ts
+          git commit -m "chore(types): regenerate frontend types from Go models [skip ci]"
+          git push
+
       - name: Verify Go modules
         run: go mod verify
 
