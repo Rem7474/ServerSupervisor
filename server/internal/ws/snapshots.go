@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"github.com/serversupervisor/server/internal/models"
 	"github.com/serversupervisor/server/internal/networkview"
@@ -25,7 +24,7 @@ func (h *WSHandler) sendDashboardSnapshot(ctx context.Context, conn *websocket.C
 // the cached copy is older than dashboardCacheTTL. The build runs without holding
 // the lock so a slow DB doesn't serialize all clients; a brief concurrent
 // double-build during a cache miss is harmless (both produce the same result).
-func (h *WSHandler) dashboardPayload(ctx context.Context) (gin.H, error) {
+func (h *WSHandler) dashboardPayload(ctx context.Context) (*models.WSDashboardSnapshot, error) {
 	h.dashCacheMu.Lock()
 	if h.dashCache != nil && time.Since(h.dashCacheAt) < dashboardCacheTTL {
 		cached := h.dashCache
@@ -46,7 +45,7 @@ func (h *WSHandler) dashboardPayload(ctx context.Context) (gin.H, error) {
 	return payload, nil
 }
 
-func (h *WSHandler) buildDashboardPayload(ctx context.Context) (gin.H, error) {
+func (h *WSHandler) buildDashboardPayload(ctx context.Context) (*models.WSDashboardSnapshot, error) {
 	hosts, err := h.db.GetAllHosts(ctx)
 	if err != nil {
 		return nil, err
@@ -82,16 +81,16 @@ func (h *WSHandler) buildDashboardPayload(ctx context.Context) (gin.H, error) {
 		proxmoxLinks = []models.ProxmoxGuestLink{}
 	}
 
-	payload := gin.H{
-		"type":                "dashboard",
-		"hosts":               hosts,
-		"host_metrics":        hostMetrics,
-		"version_comparisons": comparisons,
-		"apt_pending":         h.db.GetTotalAptPending(ctx),
-		"apt_pending_hosts":   h.db.GetAptPendingAll(ctx),
-		"disk_usage":          h.db.GetRootDiskPercentAll(ctx),
-		"proxmox_nodes":       proxmoxNodes,
-		"proxmox_links":       proxmoxLinks,
+	payload := &models.WSDashboardSnapshot{
+		Type:               "dashboard",
+		Hosts:              hosts,
+		HostMetrics:        hostMetrics,
+		VersionComparisons: comparisons,
+		AptPending:         h.db.GetTotalAptPending(ctx),
+		AptPendingHosts:    h.db.GetAptPendingAll(ctx),
+		DiskUsage:          h.db.GetRootDiskPercentAll(ctx),
+		ProxmoxNodes:       proxmoxNodes,
+		ProxmoxLinks:       proxmoxLinks,
 	}
 	return payload, nil
 }
@@ -124,18 +123,18 @@ func (h *WSHandler) sendHostSnapshot(ctx context.Context, conn *websocket.Conn, 
 
 	proxmoxLink, _ := h.db.GetProxmoxGuestLinkByHost(ctx, hostID)
 
-	payload := gin.H{
-		"type":                "host_detail",
-		"host":                host,
-		"metrics":             metrics,
-		"containers":          containers,
-		"apt_status":          aptStatus,
-		"apt_history":         aptHistory,
-		"uu_status":           uuStatus,
-		"uu_runs":             uuRuns,
-		"audit_logs":          auditLogs,
-		"version_comparisons": comparisons,
-		"proxmox_link":        proxmoxLink,
+	payload := &models.WSHostSnapshot{
+		Type:               "host_detail",
+		Host:               host,
+		Metrics:            metrics,
+		Containers:         containers,
+		AptStatus:          aptStatus,
+		AptHistory:         aptHistory,
+		UUStatus:           uuStatus,
+		UURuns:             uuRuns,
+		AuditLogs:          auditLogs,
+		VersionComparisons: comparisons,
+		ProxmoxLink:        proxmoxLink,
 	}
 	if !snapshotChanged(payload, lastHash) {
 		return nil
@@ -159,11 +158,11 @@ func (h *WSHandler) sendDockerSnapshot(ctx context.Context, conn *websocket.Conn
 		comparisons = []models.VersionComparison{}
 	}
 
-	payload := gin.H{
-		"type":                "docker",
-		"containers":          containers,
-		"compose_projects":    composeProjects,
-		"version_comparisons": comparisons,
+	payload := &models.WSDockerSnapshot{
+		Type:               "docker",
+		Containers:         containers,
+		ComposeProjects:    composeProjects,
+		VersionComparisons: comparisons,
 	}
 	if !snapshotChanged(payload, lastHash) {
 		return nil
@@ -179,12 +178,12 @@ func (h *WSHandler) sendNetworkSnapshot(ctx context.Context, conn *websocket.Con
 
 	config, _ := h.db.GetNetworkTopologyConfig(ctx)
 
-	payload := gin.H{
-		"type":       "network",
-		"hosts":      snapshot.Hosts,
-		"containers": snapshot.Containers,
-		"config":     config,
-		"updated_at": snapshot.UpdatedAt,
+	payload := &models.WSNetworkSnapshot{
+		Type:       "network",
+		Hosts:      snapshot.Hosts,
+		Containers: snapshot.Containers,
+		Config:     config,
+		UpdatedAt:  snapshot.UpdatedAt,
 	}
 	if !snapshotChanged(payload, lastHash) {
 		return nil
@@ -212,11 +211,11 @@ func (h *WSHandler) sendAptSnapshot(ctx context.Context, conn *websocket.Conn, l
 		}
 	}
 
-	payload := gin.H{
-		"type":          "apt",
-		"hosts":         hosts,
-		"apt_statuses":  aptStatuses,
-		"apt_histories": aptHistories,
+	payload := &models.WSAptSnapshot{
+		Type:         "apt",
+		Hosts:        hosts,
+		AptStatuses:  aptStatuses,
+		AptHistories: aptHistories,
 	}
 	if !snapshotChanged(payload, lastHash) {
 		return nil

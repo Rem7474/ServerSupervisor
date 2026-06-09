@@ -17,11 +17,12 @@ import (
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/cookies"
 	"github.com/serversupervisor/server/internal/database"
+	"github.com/serversupervisor/server/internal/models"
 )
 
 // snapshotChanged returns true (and updates *lastHash) when payload differs from the
 // previously sent snapshot. It allows the caller to skip WriteJSON when nothing changed.
-func snapshotChanged(payload gin.H, lastHash *string) bool {
+func snapshotChanged(payload any, lastHash *string) bool {
 	raw, err := json.Marshal(payload)
 	if err != nil {
 		return true
@@ -59,7 +60,7 @@ type WSHandler struct {
 	// identical for every client (no per-user filtering), so it is computed once
 	// per TTL window regardless of how many dashboards are open.
 	dashCacheMu sync.Mutex
-	dashCache   gin.H
+	dashCache   *models.WSDashboardSnapshot
 	dashCacheAt time.Time
 }
 

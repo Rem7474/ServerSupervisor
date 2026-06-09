@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/gorilla/websocket"
+	"github.com/serversupervisor/server/internal/models"
 )
 
 // CommandStreamHub manages real-time streaming of remote command output.
@@ -94,13 +95,11 @@ func (h *CommandStreamHub) BroadcastStatus(commandID, status, output string) {
 	}
 	h.mu.RUnlock()
 
-	payload := map[string]interface{}{
-		"type":       "cmd_status_update",
-		"command_id": commandID,
-		"status":     status,
-	}
-	if output != "" {
-		payload["output"] = output
+	payload := models.WSCommandStatusUpdate{
+		Type:      "cmd_status_update",
+		CommandID: commandID,
+		Status:    status,
+		Output:    output, // omitempty drops it when empty
 	}
 	for _, conn := range conns {
 		if err := safeWriteJSON(conn, payload); err != nil {
@@ -131,10 +130,10 @@ func (h *CommandStreamHub) runBroadcast(commandID string) {
 		}
 		h.mu.RUnlock()
 
-		payload := map[string]interface{}{
-			"type":       "cmd_stream",
-			"command_id": commandID,
-			"chunk":      logChunk,
+		payload := models.WSCommandStreamChunk{
+			Type:      "cmd_stream",
+			CommandID: commandID,
+			Chunk:     logChunk,
 		}
 		for _, conn := range conns {
 			if err := safeWriteJSON(conn, payload); err != nil {
