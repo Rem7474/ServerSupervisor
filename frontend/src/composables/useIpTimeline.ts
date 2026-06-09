@@ -1,6 +1,5 @@
 import { ref, computed, watch, toValue, type MaybeRefOrGetter } from 'vue'
-
-type AnyRecord = Record<string, any>
+import type { WebLogIPTimelineRow } from '../types/security'
 
 export interface TimelineBucket {
   key: string
@@ -18,7 +17,7 @@ export interface TimelineStatusGroup {
   label: string
   badgeClass: string
   count: number
-  events: AnyRecord[]
+  events: WebLogIPTimelineRow[]
 }
 
 export interface TimelineGroup {
@@ -115,7 +114,7 @@ export function bucketToneClass(bucket: TimelineBucket): string {
  * @param show     reactive modal visibility — used to reset focus on open
  */
 export function useIpTimeline(
-  timeline: MaybeRefOrGetter<AnyRecord[]>,
+  timeline: MaybeRefOrGetter<WebLogIPTimelineRow[]>,
   show: MaybeRefOrGetter<boolean>,
 ) {
   const selectedBucketKey = ref('')
@@ -235,7 +234,7 @@ export function useIpTimeline(
 
   const groupedTimeline = computed<TimelineGroup[]>(() => {
     const bucketsByKey = new Map(timelineBuckets.value.map((b) => [b.key, b]))
-    const grouped = new Map<string, AnyRecord[]>()
+    const grouped = new Map<string, WebLogIPTimelineRow[]>()
     for (const row of timelineRows.value) {
       const ts = new Date(row.timestamp).getTime()
       if (!Number.isFinite(ts)) continue
@@ -255,7 +254,7 @@ export function useIpTimeline(
         const uniqueVhosts = new Set(groupRows.map((r) => String(r.domain || '(unknown)'))).size
         const start = Number(key)
         const end = start + timelineBucketMs.value
-        const byStatusFamily = new Map<string, AnyRecord[]>()
+        const byStatusFamily = new Map<string, WebLogIPTimelineRow[]>()
         for (const row of groupRows) {
           const family = statusFamilyKey(row.status)
           const existing = byStatusFamily.get(family)

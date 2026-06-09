@@ -461,7 +461,7 @@
                     class="text-secondary"
                   >—</span>
                 </td>
-                <td>{{ hostMetrics[host.id] ? formatUptime(hostMetrics[host.id].uptime) : '-' }}</td>
+                <td>{{ hostMetrics[host.id] ? formatUptime(hostMetrics[host.id]!.uptime) : '-' }}</td>
                 <td class="last-activity-col">
                   <RelativeTime :date="(host.last_seen as any) || ''" />
                 </td>

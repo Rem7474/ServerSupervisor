@@ -284,13 +284,12 @@
 import { ref } from 'vue'
 import { useConfirmDialog } from '../../composables/useConfirmDialog'
 import { useIpTimeline } from '../../composables/useIpTimeline'
-
-type AnyRecord = Record<string, any>
+import type { WebLogIPTimelineRow } from '../../types/security'
 
 const props = defineProps({
   show: { type: Boolean, default: false },
   ip: { type: String, default: '' },
-  timeline: { type: Array as () => AnyRecord[], default: () => [] },
+  timeline: { type: Array as () => WebLogIPTimelineRow[], default: () => [] },
   loading: { type: Boolean, default: false },
   blocked: { type: Boolean, default: false },
   banLoading: { type: Boolean, default: false },
