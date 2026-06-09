@@ -1459,3 +1459,101 @@ export interface WSCommandStatusUpdate {
   status: string;
   output?: string;
 }
+/**
+ * WSAlertIncidentNotification is the nested payload of a "new_alert" message.
+ */
+export interface WSAlertIncidentNotification {
+  id: string;
+  type: string; // "alert_incident"
+  rule_id: number /* int64 */;
+  host_id: string;
+  host_name: string;
+  rule_name: string;
+  metric: string;
+  value: number /* float64 */;
+  triggered_at: string;
+  resolved_at?: string;
+  browser_notify: boolean;
+}
+/**
+ * WSNewAlertMessage is pushed when an alert incident fires (type "new_alert").
+ */
+export interface WSNewAlertMessage {
+  type: string;
+  notification: WSAlertIncidentNotification;
+}
+/**
+ * WSAlertIncidentUpdate is a lightweight flat event (no nested notification) that
+ * lets the frontend refresh its incidents list without polling (type
+ * "alert_incident_update").
+ */
+export interface WSAlertIncidentUpdate {
+  type: string;
+  event: string; // "fired" | "resolved"
+  rule_id: number /* int64 */;
+  host_id: string;
+}
+/**
+ * WSWebhookNotification is the nested payload of a "webhook_execution" message.
+ */
+export interface WSWebhookNotification {
+  webhook_id: string;
+  webhook_name: string;
+  status: string;
+  triggered_at: string;
+}
+/**
+ * WSWebhookExecutionMessage is pushed when a git-webhook command completes
+ * (type "webhook_execution").
+ */
+export interface WSWebhookExecutionMessage {
+  type: string;
+  notification: WSWebhookNotification;
+}
+/**
+ * WSReleaseTrackerNotification is the nested payload of release-tracker messages.
+ * version/release_url/release_name/label are populated only for
+ * "release_tracker_detected".
+ */
+export interface WSReleaseTrackerNotification {
+  tracker_id: string;
+  tracker_name: string;
+  tracker_type: string;
+  version?: string;
+  release_url?: string;
+  release_name?: string;
+  status: string;
+  label?: string;
+  triggered_at: string;
+}
+/**
+ * WSReleaseTrackerMessage is pushed on release detection / execution completion
+ * (type "release_tracker_detected" | "release_tracker_execution").
+ */
+export interface WSReleaseTrackerMessage {
+  type: string;
+  notification: WSReleaseTrackerNotification;
+}
+/**
+ * WSUUNotification is the nested payload of an "unattended_upgrade" message.
+ */
+export interface WSUUNotification {
+  id: string;
+  type: string; // "unattended_upgrade"
+  host_id: string;
+  host_name: string;
+  packages: string[];
+  pkg_count: number /* int */;
+  run_at: string;
+  browser_notify: boolean;
+  title: string;
+  message: string;
+}
+/**
+ * WSUnattendedUpgradeMessage is pushed after an unattended-upgrades run
+ * (type "unattended_upgrade").
+ */
+export interface WSUnattendedUpgradeMessage {
+  type: string;
+  notification: WSUUNotification;
+}

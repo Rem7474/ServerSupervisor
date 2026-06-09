@@ -425,19 +425,19 @@ func (h *AgentHandler) pushUUNotification(hostname, hostID string, run models.UU
 
 	// Browser / WebSocket notification
 	if h.notifPusher != nil {
-		h.notifPusher.Broadcast(map[string]interface{}{
-			"type": "unattended_upgrade",
-			"notification": map[string]interface{}{
-				"id":             fmt.Sprintf("uu:%s:%d", hostID, run.RunAt.UnixNano()),
-				"type":           "unattended_upgrade",
-				"host_id":        hostID,
-				"host_name":      hostname,
-				"packages":       run.Packages,
-				"pkg_count":      pkgCount,
-				"run_at":         run.RunAt,
-				"browser_notify": true,
-				"title":          title,
-				"message":        msg,
+		h.notifPusher.Broadcast(models.WSUnattendedUpgradeMessage{
+			Type: "unattended_upgrade",
+			Notification: models.WSUUNotification{
+				ID:            fmt.Sprintf("uu:%s:%d", hostID, run.RunAt.UnixNano()),
+				Type:          "unattended_upgrade",
+				HostID:        hostID,
+				HostName:      hostname,
+				Packages:      run.Packages,
+				PkgCount:      pkgCount,
+				RunAt:         run.RunAt,
+				BrowserNotify: true,
+				Title:         title,
+				Message:       msg,
 			},
 		})
 	}

@@ -30,18 +30,18 @@ func (h *ReleaseTrackerHandler) notifyReleaseTrackerDetected(t models.ReleaseTra
 		label = "Docker"
 	}
 
-	h.notifHub.Broadcast(map[string]interface{}{
-		"type": "release_tracker_detected",
-		"notification": map[string]interface{}{
-			"tracker_id":   t.ID,
-			"tracker_name": t.Name,
-			"tracker_type": t.TrackerType,
-			"version":      version,
-			"release_url":  releaseURL,
-			"release_name": releaseName,
-			"status":       "detected",
-			"label":        label,
-			"triggered_at": time.Now().UTC(),
+	h.notifHub.Broadcast(models.WSReleaseTrackerMessage{
+		Type: "release_tracker_detected",
+		Notification: models.WSReleaseTrackerNotification{
+			TrackerID:   t.ID,
+			TrackerName: t.Name,
+			TrackerType: t.TrackerType,
+			Version:     version,
+			ReleaseURL:  releaseURL,
+			ReleaseName: releaseName,
+			Status:      "detected",
+			Label:       label,
+			TriggeredAt: time.Now().UTC(),
 		},
 	})
 }
@@ -110,14 +110,14 @@ func (h *ReleaseTrackerHandler) NotifyComplete(commandID, status string) {
 			if h.notifHub == nil {
 				continue
 			}
-			h.notifHub.Broadcast(map[string]interface{}{
-				"type": "release_tracker_execution",
-				"notification": map[string]interface{}{
-					"tracker_id":   tracker.ID,
-					"tracker_name": tracker.Name,
-					"tracker_type": tracker.TrackerType,
-					"status":       status,
-					"triggered_at": time.Now().UTC(),
+			h.notifHub.Broadcast(models.WSReleaseTrackerMessage{
+				Type: "release_tracker_execution",
+				Notification: models.WSReleaseTrackerNotification{
+					TrackerID:   tracker.ID,
+					TrackerName: tracker.Name,
+					TrackerType: tracker.TrackerType,
+					Status:      status,
+					TriggeredAt: time.Now().UTC(),
 				},
 			})
 		}

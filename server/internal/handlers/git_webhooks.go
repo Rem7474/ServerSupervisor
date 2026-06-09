@@ -437,13 +437,13 @@ func (h *GitWebhookHandler) NotifyWebhookExecutionComplete(commandID, status str
 			if h.notifHub == nil {
 				continue
 			}
-			h.notifHub.Broadcast(map[string]interface{}{
-				"type": "webhook_execution",
-				"notification": map[string]interface{}{
-					"webhook_id":   webhookID,
-					"webhook_name": wh.Name,
-					"status":       status,
-					"triggered_at": time.Now().UTC(),
+			h.notifHub.Broadcast(models.WSWebhookExecutionMessage{
+				Type: "webhook_execution",
+				Notification: models.WSWebhookNotification{
+					WebhookID:   webhookID,
+					WebhookName: wh.Name,
+					Status:      status,
+					TriggeredAt: time.Now().UTC(),
 				},
 			})
 		}
