@@ -164,6 +164,7 @@ import { ref, onUnmounted, computed } from 'vue'
 import apiClient, { getApiErrorMessage } from '../api'
 import { useAuthStore } from '../stores/auth'
 import { useWebSocket } from '../composables/useWebSocket'
+import type { WSAptSnapshot } from '../types/ws'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
 import { confirmBulkAction } from '../utils/bulkActionHelpers'
 import { useToast } from '../composables/useToast'
@@ -484,7 +485,7 @@ async function bulkAptCmd(command: string): Promise<void> {
   }
 }
 
-const { wsStatus, wsError, retryCount, dataStaleAlert, reconnect } = useWebSocket('/api/v1/ws/apt', (payload: any) => {
+const { wsStatus, wsError, retryCount, dataStaleAlert, reconnect } = useWebSocket<WSAptSnapshot>('/api/v1/ws/apt', (payload) => {
   if (payload.type !== 'apt') return
   hosts.value = payload.hosts || []
   aptStatuses.value = payload.apt_statuses || {}
