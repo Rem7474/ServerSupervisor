@@ -251,20 +251,20 @@ func pushBrowserNotification(pusher NotificationPusher, rule models.AlertRule, h
 		ruleName = fmt.Sprintf("%s %s %.2f (warn)", rule.Metric, rule.Operator, *rule.ThresholdWarn)
 	}
 
-	pusher.Broadcast(map[string]interface{}{
-		"type": "new_alert",
-		"notification": map[string]interface{}{
-			"id":             fmt.Sprintf("alert:%d", incID),
-			"type":           "alert_incident",
-			"rule_id":        rule.ID,
-			"host_id":        host.ID,
-			"host_name":      host.Name,
-			"rule_name":      ruleName,
-			"metric":         rule.Metric,
-			"value":          value,
-			"triggered_at":   time.Now().UTC(),
-			"resolved_at":    nil,
-			"browser_notify": true,
+	pusher.Broadcast(models.WSNewAlertMessage{
+		Type: "new_alert",
+		Notification: models.WSAlertIncidentNotification{
+			ID:            fmt.Sprintf("alert:%d", incID),
+			Type:          "alert_incident",
+			RuleID:        rule.ID,
+			HostID:        host.ID,
+			HostName:      host.Name,
+			RuleName:      ruleName,
+			Metric:        rule.Metric,
+			Value:         value,
+			TriggeredAt:   time.Now().UTC(),
+			ResolvedAt:    nil,
+			BrowserNotify: true,
 		},
 	})
 }
@@ -275,11 +275,11 @@ func broadcastIncidentUpdate(pusher NotificationPusher, event string, rule model
 	if pusher == nil {
 		return
 	}
-	pusher.Broadcast(map[string]interface{}{
-		"type":    "alert_incident_update",
-		"event":   event, // "fired" | "resolved"
-		"rule_id": rule.ID,
-		"host_id": hostID,
+	pusher.Broadcast(models.WSAlertIncidentUpdate{
+		Type:   "alert_incident_update",
+		Event:  event, // "fired" | "resolved"
+		RuleID: rule.ID,
+		HostID: hostID,
 	})
 }
 

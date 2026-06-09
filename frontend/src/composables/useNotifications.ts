@@ -2,6 +2,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import apiClient from '../api'
 import { useWebSocket } from './useWebSocket'
 import { resolveIncidentHostRoute } from '../utils/incidentRouting'
+import type { WSNotificationMessage } from '../types/ws'
 
 export interface NotificationItem {
   id: string | number
@@ -24,10 +25,6 @@ export interface NotificationItem {
   webhook_name?: string
 }
 
-interface WSPayload {
-  type?: string
-  notification?: NotificationItem
-}
 
 export function useNotifications() {
   const notifications = ref<NotificationItem[]>([])
@@ -232,8 +229,8 @@ export function useNotifications() {
     }
   }
 
-  useWebSocket<WSPayload>('/api/v1/ws/notifications', (payload) => {
-    if (!payload?.type || !payload.notification) return
+  useWebSocket<WSNotificationMessage>('/api/v1/ws/notifications', (payload) => {
+    if (!payload?.type) return
 
     if (payload.type === 'new_alert') {
       const item = payload.notification
