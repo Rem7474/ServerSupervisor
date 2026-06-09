@@ -27,7 +27,7 @@ func (h *ReleaseTrackerHandler) CreateRegistryCredential(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "admin role required"})
 		return
 	}
-	var req models.RegistryCredential
+	var req models.RegistryCredentialRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -36,7 +36,7 @@ func (h *ReleaseTrackerHandler) CreateRegistryCredential(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "name, registry_host, username and password are required"})
 		return
 	}
-	created, err := h.db.CreateRegistryCredential(c.Request.Context(), req)
+	created, err := h.db.CreateRegistryCredential(c.Request.Context(), req.ToModel())
 	if err != nil {
 		slog.ErrorContext(c.Request.Context(), fmt.Sprintf("CreateRegistryCredential: %v", err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create credential"})
@@ -52,7 +52,7 @@ func (h *ReleaseTrackerHandler) UpdateRegistryCredential(c *gin.Context) {
 		return
 	}
 	id := c.Param("id")
-	var req models.RegistryCredential
+	var req models.RegistryCredentialRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -61,7 +61,7 @@ func (h *ReleaseTrackerHandler) UpdateRegistryCredential(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "name, registry_host and username are required"})
 		return
 	}
-	if err := h.db.UpdateRegistryCredential(c.Request.Context(), id, req); err != nil {
+	if err := h.db.UpdateRegistryCredential(c.Request.Context(), id, req.ToModel()); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update credential"})
 		return
 	}

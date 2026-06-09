@@ -33,58 +33,59 @@ func (h *ReleaseTrackerHandler) Create(c *gin.Context) {
 		return
 	}
 
-	var req models.ReleaseTracker
+	var req models.ReleaseTrackerRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if req.TrackerType == "" {
-		req.TrackerType = "git"
+	m := req.ToModel()
+	if m.TrackerType == "" {
+		m.TrackerType = "git"
 	}
-	if req.TrackerType != "git" && req.TrackerType != "docker" {
+	if m.TrackerType != "git" && m.TrackerType != "docker" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "tracker_type must be 'git' or 'docker'"})
 		return
 	}
 
-	if req.Name == "" {
+	if m.Name == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "name is required"})
 		return
 	}
-	if req.CooldownHours < 0 || req.CooldownHours > 168 {
+	if m.CooldownHours < 0 || m.CooldownHours > 168 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "cooldown_hours must be between 0 and 168"})
 		return
 	}
 
-	if req.TrackerType == "git" {
+	if m.TrackerType == "git" {
 		// Git trackers can run in monitor-only mode (no host/task),
 		// but host/task must be provided together when dispatch is enabled.
-		if (req.HostID == "") != (req.CustomTaskID == "") {
+		if (m.HostID == "") != (m.CustomTaskID == "") {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "host_id and custom_task_id must be provided together for git trackers"})
 			return
 		}
-		if req.RepoOwner == "" || req.RepoName == "" {
+		if m.RepoOwner == "" || m.RepoName == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "repo_owner and repo_name are required for git trackers"})
 			return
 		}
-		if req.Provider == "" {
-			req.Provider = "github"
+		if m.Provider == "" {
+			m.Provider = "github"
 		}
-		if !validReleaseProviders[req.Provider] {
+		if !validReleaseProviders[m.Provider] {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid provider; must be github, gitlab, or gitea"})
 			return
 		}
 	} else { // docker
-		if status, msg := validateDockerTracker(&req); status != 0 {
+		if status, msg := validateDockerTracker(&m); status != 0 {
 			c.JSON(status, gin.H{"error": msg})
 			return
 		}
 	}
 
-	if req.NotifyChannels == nil {
-		req.NotifyChannels = []string{}
+	if m.NotifyChannels == nil {
+		m.NotifyChannels = []string{}
 	}
 
-	created, err := h.db.CreateReleaseTracker(c.Request.Context(), req)
+	created, err := h.db.CreateReleaseTracker(c.Request.Context(), m)
 	if err != nil {
 		slog.ErrorContext(c.Request.Context(), fmt.Sprintf("CreateReleaseTracker: %v", err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create tracker"})
@@ -116,7 +117,7 @@ func (h *ReleaseTrackerHandler) CreateBulk(c *gin.Context) {
 	}
 
 	var req struct {
-		Trackers []models.ReleaseTracker `json:"trackers"`
+		Trackers []models.ReleaseTrackerRequest `json:"trackers"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -139,30 +140,31 @@ func (h *ReleaseTrackerHandler) CreateBulk(c *gin.Context) {
 	results := make([]bulkResult, 0, len(req.Trackers))
 	createdCount := 0
 
-	for _, t := range req.Trackers {
-		t.TrackerType = "docker"
-		if t.Name == "" {
-			results = append(results, bulkResult{Name: t.Name, Error: "name is required"})
+	for _, reqT := range req.Trackers {
+		m := reqT.ToModel()
+		m.TrackerType = "docker"
+		if m.Name == "" {
+			results = append(results, bulkResult{Name: m.Name, Error: "name is required"})
 			continue
 		}
-		if t.CooldownHours < 0 || t.CooldownHours > 168 {
-			results = append(results, bulkResult{Name: t.Name, Error: "cooldown_hours must be between 0 and 168"})
+		if m.CooldownHours < 0 || m.CooldownHours > 168 {
+			results = append(results, bulkResult{Name: m.Name, Error: "cooldown_hours must be between 0 and 168"})
 			continue
 		}
-		if status, msg := validateDockerTracker(&t); status != 0 {
-			results = append(results, bulkResult{Name: t.Name, Error: msg})
+		if status, msg := validateDockerTracker(&m); status != 0 {
+			results = append(results, bulkResult{Name: m.Name, Error: msg})
 			continue
 		}
-		if t.NotifyChannels == nil {
-			t.NotifyChannels = []string{}
+		if m.NotifyChannels == nil {
+			m.NotifyChannels = []string{}
 		}
-		if _, err := h.db.CreateReleaseTracker(c.Request.Context(), t); err != nil {
-			slog.ErrorContext(c.Request.Context(), fmt.Sprintf("CreateBulk: failed to create %q: %v", t.Name, err))
-			results = append(results, bulkResult{Name: t.Name, Error: "failed to create"})
+		if _, err := h.db.CreateReleaseTracker(c.Request.Context(), m); err != nil {
+			slog.ErrorContext(c.Request.Context(), fmt.Sprintf("CreateBulk: failed to create %q: %v", m.Name, err))
+			results = append(results, bulkResult{Name: m.Name, Error: "failed to create"})
 			continue
 		}
 		createdCount++
-		results = append(results, bulkResult{Name: t.Name, Created: true})
+		results = append(results, bulkResult{Name: m.Name, Created: true})
 	}
 
 	c.JSON(http.StatusOK, gin.H{"created": createdCount, "results": results})
@@ -193,47 +195,48 @@ func (h *ReleaseTrackerHandler) Update(c *gin.Context) {
 	}
 	id := c.Param("id")
 
-	var req models.ReleaseTracker
+	var req models.ReleaseTrackerRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	if req.TrackerType == "" {
-		req.TrackerType = "git"
+	m := req.ToModel()
+	if m.TrackerType == "" {
+		m.TrackerType = "git"
 	}
-	if req.TrackerType != "git" && req.TrackerType != "docker" {
+	if m.TrackerType != "git" && m.TrackerType != "docker" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "tracker_type must be 'git' or 'docker'"})
 		return
 	}
-	if req.Name == "" {
+	if m.Name == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "name is required"})
 		return
 	}
-	if req.CooldownHours < 0 || req.CooldownHours > 168 {
+	if m.CooldownHours < 0 || m.CooldownHours > 168 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "cooldown_hours must be between 0 and 168"})
 		return
 	}
-	if req.TrackerType == "git" {
-		if (req.HostID == "") != (req.CustomTaskID == "") {
+	if m.TrackerType == "git" {
+		if (m.HostID == "") != (m.CustomTaskID == "") {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "host_id and custom_task_id must be provided together for git trackers"})
 			return
 		}
-		if req.RepoOwner == "" || req.RepoName == "" {
+		if m.RepoOwner == "" || m.RepoName == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "repo_owner and repo_name are required for git trackers"})
 			return
 		}
-		if !validReleaseProviders[req.Provider] {
+		if !validReleaseProviders[m.Provider] {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid provider"})
 			return
 		}
 	} else { // docker
-		if status, msg := validateDockerTracker(&req); status != 0 {
+		if status, msg := validateDockerTracker(&m); status != 0 {
 			c.JSON(status, gin.H{"error": msg})
 			return
 		}
 	}
 
-	if err := h.db.UpdateReleaseTracker(c.Request.Context(), id, req); err != nil {
+	if err := h.db.UpdateReleaseTracker(c.Request.Context(), id, m); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update tracker"})
 		return
 	}

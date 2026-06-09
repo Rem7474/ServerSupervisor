@@ -1056,6 +1056,37 @@ export interface ReleaseTracker {
   rollback_on_failure: boolean;
   registry_credentials_id?: string;
 }
+/**
+ * ReleaseTrackerRequest is the create/update body for a release tracker — the
+ * writable configuration subset of ReleaseTracker. The polling state
+ * (last_release_tag, latest_image_digest, last_*_at, last_error) and the joined
+ * fields (id, created_at, host_name, last_execution) are server-managed and never
+ * accepted from the client.
+ */
+export interface ReleaseTrackerRequest {
+  name: string;
+  tracker_type: string;
+  provider: string;
+  repo_owner: string;
+  repo_name: string;
+  docker_image: string;
+  docker_tag: string;
+  host_id: string;
+  custom_task_id: string;
+  cooldown_hours: number /* int */;
+  notify_channels: string[];
+  notify_on_release: boolean;
+  enabled: boolean;
+  update_action: string;
+  compose_project: string;
+  compose_service: string;
+  pre_update_task_id: string;
+  post_update_task_id: string;
+  cleanup_after_update: boolean;
+  healthcheck_timeout_sec: number /* int */;
+  rollback_on_failure: boolean;
+  registry_credentials_id: string;
+}
 export interface ReleaseTrackerExecution {
   id: string;
   tracker_id: string;
@@ -1079,6 +1110,18 @@ export interface RegistryCredential {
   password?: string;
   created_at: string;
   updated_at: string;
+}
+/**
+ * RegistryCredentialRequest is the create/update body for a registry credential —
+ * the writable subset of RegistryCredential (id, created_at, updated_at are
+ * server-managed). Password is required on create; an empty value on update keeps
+ * the stored secret.
+ */
+export interface RegistryCredentialRequest {
+  name: string;
+  registry_host: string;
+  username: string;
+  password?: string;
 }
 /**
  * TrackableContainer is a compose-managed container discovered across hosts
@@ -1292,6 +1335,24 @@ export interface GitWebhook {
   created_at: string;
   host_name?: string; // joined from hosts
   last_execution?: GitWebhookExecution; // most recent execution
+}
+/**
+ * GitWebhookRequest is the create/update body for a git webhook — the writable
+ * subset of GitWebhook. id, secret, last_triggered_at, created_at, host_name and
+ * last_execution are server-managed and never accepted from the client.
+ */
+export interface GitWebhookRequest {
+  name: string;
+  provider: string;
+  repo_filter: string;
+  branch_filter: string;
+  event_filter: string;
+  host_id: string;
+  custom_task_id: string;
+  notify_channels: string[];
+  notify_on_success: boolean;
+  notify_on_failure: boolean;
+  enabled: boolean;
 }
 export interface GitWebhookExecution {
   id: string;
