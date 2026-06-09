@@ -109,6 +109,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useWebSocket } from '../composables/useWebSocket'
+import type { WSDockerSnapshot } from '../types/ws'
 import { useAuthStore } from '../stores/auth'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
 import { useLocalStorage } from '../composables/useLocalStorage'
@@ -223,7 +224,7 @@ function closeDockerConsole(): void {
   showDockerConsole.value = false
 }
 
-const { wsStatus, wsError, retryCount, dataStaleAlert, reconnect } = useWebSocket('/api/v1/ws/docker', (payload: any) => {
+const { wsStatus, wsError, retryCount, dataStaleAlert, reconnect } = useWebSocket<WSDockerSnapshot>('/api/v1/ws/docker', (payload) => {
   if (payload.type !== 'docker') return
   containers.value = payload.containers || []
   composeProjects.value = payload.compose_projects || []

@@ -370,6 +370,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useWebSocket } from '../composables/useWebSocket'
+import type { WSNetworkSnapshot } from '../types/ws'
 import WsStatusBar from '../components/WsStatusBar.vue'
 import NetworkGraph from '../components/network/NetworkGraph.vue'
 import NetworkNodeDetail from '../components/network/NetworkNodeDetail.vue'
@@ -687,7 +688,7 @@ async function fetchSnapshot(): Promise<void> {
 }
 
 // ─── WebSocket ────────────────────────────────────────────────────────────
-const { wsStatus, wsError, retryCount, reconnect } = useWebSocket('/api/v1/ws/network', (payload: any) => {
+const { wsStatus, wsError, retryCount, reconnect } = useWebSocket<WSNetworkSnapshot>('/api/v1/ws/network', (payload) => {
   if (payload.type !== 'network') return
   const now = Date.now()
   const newHosts = payload.hosts || []

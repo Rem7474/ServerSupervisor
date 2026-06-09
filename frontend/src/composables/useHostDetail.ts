@@ -5,6 +5,7 @@ import { useHostCommandConsole } from './useHostCommandConsole'
 import { useCommandStream } from './useCommandStream'
 import { useConfirmDialog } from './useConfirmDialog'
 import { useWebSocket } from './useWebSocket'
+import type { WSHostSnapshot } from '../types/ws'
 import { useAuthStore } from '../stores/auth'
 
 // AnyRecord is the raw shape of an untyped JSON payload received over WebSocket
@@ -204,9 +205,9 @@ export function useHostDetail() {
     if (liveCommand.value) updateCommand({ ...liveCommand.value, output: '' })
   }
 
-  const { wsStatus, wsError, retryCount, reconnect } = useWebSocket(
+  const { wsStatus, wsError, retryCount, reconnect } = useWebSocket<WSHostSnapshot>(
     `/api/v1/ws/hosts/${hostId}`,
-    (payload: AnyRecord) => {
+    (payload) => {
       if (payload.type !== 'host_detail') return
       host.value = asRecord(payload.host)
       metrics.value = asRecord(payload.metrics)
