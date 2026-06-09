@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
+	"github.com/serversupervisor/server/internal/models"
 )
 
 func (h *WSHandler) Dashboard(c *gin.Context) {
@@ -165,12 +166,12 @@ func (h *WSHandler) CommandStream(c *gin.Context) {
 		}
 	}
 
-	_ = safeWriteJSON(conn, gin.H{
-		"type":       "cmd_stream_init",
-		"command_id": commandID,
-		"status":     cmd.Status,
-		"command":    cmd.Action,
-		"output":     initOutput,
+	_ = safeWriteJSON(conn, models.WSCommandStreamInit{
+		Type:      "cmd_stream_init",
+		CommandID: commandID,
+		Status:    cmd.Status,
+		Command:   cmd.Action,
+		Output:    initOutput,
 	})
 
 	done := make(chan struct{})

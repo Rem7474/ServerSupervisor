@@ -1368,3 +1368,94 @@ export interface GitWebhookExecution {
   triggered_at: string;
   completed_at?: string;
 }
+
+//////////
+// source: ws.go
+
+/**
+ * WSDashboardSnapshot is broadcast on the dashboard endpoint (type "dashboard").
+ */
+export interface WSDashboardSnapshot {
+  type: string;
+  hosts: Host[];
+  host_metrics: { [key: string]: SystemMetrics | undefined};
+  version_comparisons: VersionComparison[];
+  apt_pending: number /* int */;
+  apt_pending_hosts: { [key: string]: number /* int */};
+  disk_usage: { [key: string]: number /* float64 */};
+  proxmox_nodes: ProxmoxNode[];
+  proxmox_links: ProxmoxGuestLink[];
+}
+/**
+ * WSHostSnapshot is broadcast on the host-detail endpoint (type "host_detail").
+ */
+export interface WSHostSnapshot {
+  type: string;
+  host?: Host;
+  metrics?: SystemMetrics;
+  containers: DockerContainer[];
+  apt_status?: AptStatus;
+  apt_history: RemoteCommand[];
+  uu_status?: UnattendedUpgradesDB;
+  uu_runs: UURun[];
+  audit_logs: AuditLog[];
+  version_comparisons: VersionComparison[];
+  proxmox_link?: ProxmoxGuestLink;
+}
+/**
+ * WSDockerSnapshot is broadcast on the docker endpoint (type "docker").
+ */
+export interface WSDockerSnapshot {
+  type: string;
+  containers: DockerContainer[];
+  compose_projects: ComposeProject[];
+  version_comparisons: VersionComparison[];
+}
+/**
+ * WSNetworkSnapshot is broadcast on the network endpoint (type "network").
+ */
+export interface WSNetworkSnapshot {
+  type: string;
+  hosts: NetworkHost[];
+  containers: NetworkContainer[];
+  config?: NetworkTopologyConfig;
+  updated_at: string;
+}
+/**
+ * WSAptSnapshot is broadcast on the apt endpoint (type "apt").
+ */
+export interface WSAptSnapshot {
+  type: string;
+  hosts: Host[];
+  apt_statuses: { [key: string]: AptStatus | undefined};
+  apt_histories: { [key: string]: RemoteCommand[]};
+}
+/**
+ * WSCommandStreamInit is the first message sent on connect: the command's current
+ * status plus any output buffered so far (empty while still running).
+ */
+export interface WSCommandStreamInit {
+  type: string; // "cmd_stream_init"
+  command_id: string;
+  status: string;
+  command: string;
+  output: string;
+}
+/**
+ * WSCommandStreamChunk carries one chunk of live command output (type "cmd_stream").
+ */
+export interface WSCommandStreamChunk {
+  type: string;
+  command_id: string;
+  chunk: string;
+}
+/**
+ * WSCommandStatusUpdate signals a command status transition (type
+ * "cmd_status_update"); Output is set on terminal statuses (completed/failed).
+ */
+export interface WSCommandStatusUpdate {
+  type: string;
+  command_id: string;
+  status: string;
+  output?: string;
+}
