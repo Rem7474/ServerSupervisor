@@ -1,6 +1,7 @@
-import { api, type JsonObject } from './client'
+import { api } from './client'
 import type {
   ReleaseTracker,
+  ReleaseTrackerRequest,
   ReleaseTrackerExecution,
   RegistryCredential,
   RegistryCredentialRequest,
@@ -12,11 +13,11 @@ export const trackersApi = {
   getReleaseTrackers: () => api.get<{ trackers: ReleaseTracker[] }>('/v1/release-trackers'),
   getReleaseTracker: (id: string) =>
     api.get<{ tracker: ReleaseTracker, executions: ReleaseTrackerExecution[] }>(`/v1/release-trackers/${id}`),
-  createReleaseTracker: (payload: JsonObject) => api.post('/v1/release-trackers', payload),
-  createReleaseTrackersBulk: (trackers: JsonObject[]) =>
+  createReleaseTracker: (payload: Partial<ReleaseTrackerRequest>) => api.post('/v1/release-trackers', payload),
+  createReleaseTrackersBulk: (trackers: Partial<ReleaseTrackerRequest>[]) =>
     api.post('/v1/release-trackers/bulk', { trackers }),
   getTrackableContainers: () => api.get<{ containers: TrackableContainer[] }>('/v1/release-trackers/trackable-containers'),
-  updateReleaseTracker: (id: string, payload: JsonObject) =>
+  updateReleaseTracker: (id: string, payload: Partial<ReleaseTrackerRequest>) =>
     api.put(`/v1/release-trackers/${id}`, payload),
   deleteReleaseTracker: (id: string) => api.delete(`/v1/release-trackers/${id}`),
   checkReleaseTrackerNow: (id: string) => api.post(`/v1/release-trackers/${id}/check-now`),

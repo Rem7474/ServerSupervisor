@@ -1056,6 +1056,37 @@ export interface ReleaseTracker {
   rollback_on_failure: boolean;
   registry_credentials_id?: string;
 }
+/**
+ * ReleaseTrackerRequest is the create/update body for a release tracker — the
+ * writable configuration subset of ReleaseTracker. The polling state
+ * (last_release_tag, latest_image_digest, last_*_at, last_error) and the joined
+ * fields (id, created_at, host_name, last_execution) are server-managed and never
+ * accepted from the client.
+ */
+export interface ReleaseTrackerRequest {
+  name: string;
+  tracker_type: string;
+  provider: string;
+  repo_owner: string;
+  repo_name: string;
+  docker_image: string;
+  docker_tag: string;
+  host_id: string;
+  custom_task_id: string;
+  cooldown_hours: number /* int */;
+  notify_channels: string[];
+  notify_on_release: boolean;
+  enabled: boolean;
+  update_action: string;
+  compose_project: string;
+  compose_service: string;
+  pre_update_task_id: string;
+  post_update_task_id: string;
+  cleanup_after_update: boolean;
+  healthcheck_timeout_sec: number /* int */;
+  rollback_on_failure: boolean;
+  registry_credentials_id: string;
+}
 export interface ReleaseTrackerExecution {
   id: string;
   tracker_id: string;
