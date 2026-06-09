@@ -2,8 +2,11 @@ package uptime
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"testing"
 
+	"github.com/serversupervisor/server/internal/apperr"
 	"github.com/serversupervisor/server/internal/models"
 )
 
@@ -131,6 +134,21 @@ func TestCheckNow_RunsAndRecords(t *testing.T) {
 	}
 	if len(repo.recorded) != 1 || repo.recorded[0].ProbeID != "p1" {
 		t.Errorf("CheckNow must persist exactly one result for the probe, got %+v", repo.recorded)
+	}
+}
+
+// TestGetProbe_NotFoundMapsToAppErr verifies the service translates the storage
+// "no rows" signal into a typed apperr.NotFound (so the handler renders a 404
+// without knowing about sql).
+func TestGetProbe_NotFoundMapsToAppErr(t *testing.T) {
+	svc := NewService(&fakeRepo{getErr: sql.ErrNoRows})
+	_, err := svc.GetProbe(context.Background(), "missing")
+	var ae *apperr.Error
+	if !errors.As(err, &ae) {
+		t.Fatalf("expected *apperr.Error, got %T (%v)", err, err)
+	}
+	if ae.Code != "not_found" || ae.HTTPStatus != 404 {
+		t.Errorf("got %q/%d, want not_found/404", ae.Code, ae.HTTPStatus)
 	}
 }
 

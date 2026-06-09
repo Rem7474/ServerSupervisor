@@ -6,8 +6,11 @@ package uptime
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"strings"
 
+	"github.com/serversupervisor/server/internal/apperr"
 	"github.com/serversupervisor/server/internal/models"
 	"github.com/serversupervisor/server/internal/synthetic"
 )
@@ -88,9 +91,16 @@ func (s *Service) ListProbes(ctx context.Context) ([]models.UptimeProbe, error) 
 	return probes, nil
 }
 
-// GetProbe returns a single probe by id.
+// GetProbe returns a single probe by id, or apperr.NotFound when it is absent.
 func (s *Service) GetProbe(ctx context.Context, id string) (*models.UptimeProbe, error) {
-	return s.repo.GetUptimeProbe(ctx, id)
+	p, err := s.repo.GetUptimeProbe(ctx, id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, apperr.NotFound("probe not found")
+	}
+	if err != nil {
+		return nil, err
+	}
+	return p, nil
 }
 
 // CreateProbe validates+defaults the request and persists a new probe.
@@ -133,7 +143,7 @@ func (s *Service) Stats(ctx context.Context, id string, hours int) (*models.Upti
 
 // CheckNow runs the probe immediately, records the result and returns it.
 func (s *Service) CheckNow(ctx context.Context, id string) (*models.UptimeProbeResult, error) {
-	probe, err := s.repo.GetUptimeProbe(ctx, id)
+	probe, err := s.GetProbe(ctx, id)
 	if err != nil {
 		return nil, err
 	}
