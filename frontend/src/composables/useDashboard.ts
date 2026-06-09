@@ -4,6 +4,8 @@ import apiClient from '../api'
 import { useAuthStore } from '../stores/auth'
 import { useDashboardStore } from '../stores/dashboard'
 import { useWebSocket, wsEvents } from './useWebSocket'
+import type { WSDashboardSnapshot } from '../types/ws'
+import type { SystemMetrics } from '../types/generated'
 import { useConfirmDialog } from './useConfirmDialog'
 import { confirmBulkAction } from '../utils/bulkActionHelpers'
 import { translateError } from '../utils/translateError'
@@ -49,15 +51,6 @@ interface DashboardMetricPoint {
   memory_avg?: number | string | null
 }
 
-interface DashboardAgentMetric {
-  cpu_usage_percent?: number | null
-  memory_percent?: number | null
-  cpu_temperature?: number | null
-  fan_rpm?: number | null
-  uptime?: number | null
-  hostname?: string | null
-}
-
 interface DashboardProxmoxLinkRecord {
   host_id: string
   guest_id?: string
@@ -66,23 +59,6 @@ interface DashboardProxmoxLinkRecord {
   cpu_usage?: number | null
   mem_alloc?: number
   mem_usage?: number
-}
-
-interface DashboardWebSocketPayload {
-  type?: string
-  hosts?: DashboardHostRecord[]
-  host_metrics?: Record<string, DashboardAgentMetric>
-  version_comparisons?: Array<{
-    tracker_id?: string
-    is_up_to_date?: boolean
-    running_version?: string
-    update_confirmed?: boolean
-  }>
-  apt_pending?: number
-  apt_pending_hosts?: Record<string, number>
-  disk_usage?: Record<string, number>
-  proxmox_nodes?: DashboardProxmoxNode[]
-  proxmox_links?: DashboardProxmoxLinkRecord[]
 }
 
 interface TooltipContext {
@@ -260,7 +236,7 @@ export function useDashboard() {
   const proxmoxNodes = ref<DashboardProxmoxNode[]>([])
   const proxmoxLinks = ref<DashboardProxmoxLinkRecord[]>([])
 
-  const hostMetrics = ref<Record<string, DashboardAgentMetric>>({})
+  const hostMetrics = ref<Record<string, SystemMetrics | undefined>>({})
   const aptPendingHosts = ref<Record<string, number>>({})
   const diskUsage = ref<Record<string, number>>({})
   const loading = ref(true)
@@ -496,7 +472,7 @@ export function useDashboard() {
 
   const proxmoxAutoSwitched = ref(false)
 
-  const { wsStatus, wsError, retryCount, dataStaleAlert, reconnect } = useWebSocket<DashboardWebSocketPayload>('/api/v1/ws/dashboard', (payload) => {
+  const { wsStatus, wsError, retryCount, dataStaleAlert, reconnect } = useWebSocket<WSDashboardSnapshot>('/api/v1/ws/dashboard', (payload) => {
     if (payload.type !== 'dashboard') return
     dashboardStore.setHosts(payload.hosts || [])
     hostMetrics.value = payload.host_metrics || {}

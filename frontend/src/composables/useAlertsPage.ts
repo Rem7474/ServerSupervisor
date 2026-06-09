@@ -8,6 +8,7 @@ import { storeToRefs } from 'pinia'
 import type { Host } from '../types/host'
 import type { ReleaseTracker } from '../types/tracker'
 import type { AlertRule } from '../types/alert'
+import type { WSNotificationMessage } from '../types/ws'
 
 interface Incident {
   id: string
@@ -25,12 +26,6 @@ interface Incident {
   value?: number
   triggered_at?: string
   resolved_at?: string | null
-  [key: string]: unknown
-}
-
-interface Notification {
-  type: string
-  notification?: Incident
 }
 
 interface AlertRuleCapabilities {
@@ -84,7 +79,7 @@ interface UseAlertsPageApi {
   deleteAlert: (rule: AlertRule) => Promise<void>
   closeModal: () => void
   formatDate: (dateStr: string) => string
-  onWebSocketAlert: (payload: Notification) => void
+  onWebSocketAlert: (payload: WSNotificationMessage) => void
 }
 
 export function useAlertsPage(): UseAlertsPageApi {
@@ -277,7 +272,7 @@ export function useAlertsPage(): UseAlertsPageApi {
     return formatLocaleDateTime(dateStr)
   }
 
-  function onWebSocketAlert(payload: Notification): void {
+  function onWebSocketAlert(payload: WSNotificationMessage): void {
     // Incident created or resolved — refresh the list
     if (payload.type === 'alert_incident_update') {
       loadIncidents()
