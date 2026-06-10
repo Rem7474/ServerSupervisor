@@ -2,6 +2,7 @@ package ws
 
 import (
 	"context"
+	"sync"
 
 	"github.com/serversupervisor/server/internal/models"
 	"github.com/serversupervisor/server/internal/releasetracker"
@@ -12,19 +13,37 @@ import (
 // The pure version logic lives in the releasetracker package — this method
 // owns only the WS-handler-side DB orchestration.
 func (h *WSHandler) buildVersionComparisons(ctx context.Context) ([]models.VersionComparison, error) {
-	trackers, err := h.db.ListReleaseTrackers(ctx)
-	if err != nil {
-		return nil, err
-	}
+	// The three reads are independent — fetch them concurrently so the slowest
+	// (GetAllDockerContainers) dominates instead of the sum.
+	var (
+		trackers      []models.ReleaseTracker
+		trackersErr   error
+		containers    []models.DockerContainer
+		containersErr error
+		digestTagMap  map[string]string
+	)
+	var wg sync.WaitGroup
+	wg.Add(3)
+	go func() { defer wg.Done(); trackers, trackersErr = h.db.ListReleaseTrackers(ctx) }()
+	go func() { defer wg.Done(); containers, containersErr = h.db.GetAllDockerContainers(ctx) }()
+	go func() { defer wg.Done(); digestTagMap, _ = h.db.GetAllTrackerTagDigests(ctx) }()
+	wg.Wait()
 
-	containers, err := h.db.GetAllDockerContainers(ctx)
-	if err != nil {
-		return nil, err
+	if trackersErr != nil {
+		return nil, trackersErr
 	}
-
-	digestTagMap, _ := h.db.GetAllTrackerTagDigests(ctx)
+	if containersErr != nil {
+		return nil, containersErr
+	}
 	if digestTagMap == nil {
 		digestTagMap = make(map[string]string)
+	}
+
+	// Index containers by host so each tracker scans only its own host's
+	// containers (was O(trackers × all containers)).
+	containersByHost := make(map[string][]models.DockerContainer, len(containers))
+	for _, c := range containers {
+		containersByHost[c.HostID] = append(containersByHost[c.HostID], c)
 	}
 
 	var comparisons []models.VersionComparison
@@ -45,10 +64,7 @@ func (h *WSHandler) buildVersionComparisons(ctx context.Context) ([]models.Versi
 		aggIsUpToDate := true
 		aggUpdateConfirmed := false
 
-		for _, container := range containers {
-			if container.HostID != tracker.HostID {
-				continue
-			}
+		for _, container := range containersByHost[tracker.HostID] {
 			if container.Image != tracker.DockerImage && container.Image+":"+container.ImageTag != tracker.DockerImage {
 				continue
 			}
