@@ -1373,12 +1373,24 @@ export interface GitWebhookExecution {
 // source: ws.go
 
 /**
+ * DashboardHostMetrics is the lean per-host metric subset the dashboard actually
+ * renders (CPU %, memory %, uptime). The full SystemMetrics carries ~20 more
+ * fields (temperatures, load, swap, network, cpu model, …) consumed only by the
+ * host detail view, so the dashboard snapshot — re-pushed every 10s per client —
+ * ships this instead of the whole struct per host.
+ */
+export interface DashboardHostMetrics {
+  cpu_usage_percent: number /* float64 */;
+  memory_percent: number /* float64 */;
+  uptime: number /* uint64 */;
+}
+/**
  * WSDashboardSnapshot is broadcast on the dashboard endpoint (type "dashboard").
  */
 export interface WSDashboardSnapshot {
   type: string;
   hosts: Host[];
-  host_metrics: { [key: string]: SystemMetrics | undefined};
+  host_metrics: { [key: string]: DashboardHostMetrics | undefined};
   version_comparisons: VersionComparison[];
   apt_pending: number /* int */;
   apt_pending_hosts: { [key: string]: number /* int */};

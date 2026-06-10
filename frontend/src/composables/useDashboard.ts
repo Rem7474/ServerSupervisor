@@ -5,7 +5,7 @@ import { useAuthStore } from '../stores/auth'
 import { useDashboardStore } from '../stores/dashboard'
 import { useWebSocket, wsEvents } from './useWebSocket'
 import type { WSDashboardSnapshot } from '../types/ws'
-import type { SystemMetrics } from '../types/generated'
+import type { DashboardHostMetrics } from '../types/generated'
 import { useConfirmDialog } from './useConfirmDialog'
 import { confirmBulkAction } from '../utils/bulkActionHelpers'
 import { translateError } from '../utils/translateError'
@@ -236,7 +236,7 @@ export function useDashboard() {
   const proxmoxNodes = ref<DashboardProxmoxNode[]>([])
   const proxmoxLinks = ref<DashboardProxmoxLinkRecord[]>([])
 
-  const hostMetrics = ref<Record<string, SystemMetrics | undefined>>({})
+  const hostMetrics = ref<Record<string, DashboardHostMetrics | undefined>>({})
   const aptPendingHosts = ref<Record<string, number>>({})
   const diskUsage = ref<Record<string, number>>({})
   const loading = ref(true)

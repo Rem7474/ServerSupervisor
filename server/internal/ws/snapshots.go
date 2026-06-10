@@ -113,8 +113,19 @@ func (h *WSHandler) buildDashboardPayload(ctx context.Context) (*models.WSDashbo
 	if hostsErr != nil {
 		return nil, hostsErr
 	}
-	if hostMetrics == nil {
-		hostMetrics = map[string]*models.SystemMetrics{}
+	// Project the full per-host metrics onto the lean dashboard subset
+	// (CPU% / memory% / uptime) — the dashboard renders nothing else, so the rest
+	// of SystemMetrics never goes on the 10s-per-client wire.
+	leanMetrics := make(map[string]*models.DashboardHostMetrics, len(hostMetrics))
+	for id, m := range hostMetrics {
+		if m == nil {
+			continue
+		}
+		leanMetrics[id] = &models.DashboardHostMetrics{
+			CPUUsagePercent: m.CPUUsagePercent,
+			MemoryPercent:   m.MemoryPercent,
+			Uptime:          m.Uptime,
+		}
 	}
 	if comparisons == nil {
 		comparisons = []models.VersionComparison{}
@@ -138,7 +149,7 @@ func (h *WSHandler) buildDashboardPayload(ctx context.Context) (*models.WSDashbo
 	payload := &models.WSDashboardSnapshot{
 		Type:               "dashboard",
 		Hosts:              hosts,
-		HostMetrics:        hostMetrics,
+		HostMetrics:        leanMetrics,
 		VersionComparisons: comparisons,
 		AptPending:         aptPending,
 		AptPendingHosts:    aptPendingHosts,
