@@ -8,6 +8,7 @@ import (
 	"github.com/serversupervisor/server/internal/dispatch"
 	"github.com/serversupervisor/server/internal/handlers"
 	"github.com/serversupervisor/server/internal/scheduler"
+	scheduledtasksvc "github.com/serversupervisor/server/internal/services/scheduledtask"
 	sslsvc "github.com/serversupervisor/server/internal/services/ssl"
 	uptimesvc "github.com/serversupervisor/server/internal/services/uptime"
 	"github.com/serversupervisor/server/internal/ws"
@@ -46,7 +47,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	settingsH := handlers.NewSettingsHandler(db, cfg)
 	notifH := handlers.NewNotificationsHandler(db)
 	pushH := handlers.NewPushHandler(db, cfg)
-	scheduledTaskH := handlers.NewScheduledTaskHandler(db, cfg, dispatcher, sched)
+	scheduledTaskH := handlers.NewScheduledTaskHandler(scheduledtasksvc.NewService(db, sched, dispatcher), db)
 	gitWebhookH := handlers.NewGitWebhookHandler(db, cfg, dispatcher, notifHub)
 	releaseTrackerH := handlers.NewReleaseTrackerHandler(db, cfg, dispatcher, notifHub)
 	agentH.AddCompletionListener(gitWebhookH)

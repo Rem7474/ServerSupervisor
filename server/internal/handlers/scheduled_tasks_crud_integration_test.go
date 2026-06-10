@@ -10,15 +10,16 @@ import (
 	"github.com/serversupervisor/server/internal/dispatch"
 	"github.com/serversupervisor/server/internal/handlers"
 	"github.com/serversupervisor/server/internal/scheduler"
+	scheduledtasksvc "github.com/serversupervisor/server/internal/services/scheduledtask"
 	"github.com/serversupervisor/server/internal/testutil"
 )
 
 func newScheduledTasksRouter(t *testing.T) (*gin.Engine, *database.DB) {
 	t.Helper()
-	db, cfg := testutil.NewPostgresDBWithConfig(t)
+	db, _ := testutil.NewPostgresDBWithConfig(t)
 	disp := dispatch.New(db)
 	sched := scheduler.New(db, disp)
-	h := handlers.NewScheduledTaskHandler(db, cfg, disp, sched)
+	h := handlers.NewScheduledTaskHandler(scheduledtasksvc.NewService(db, sched, disp), db)
 
 	r := gin.New()
 	r.Use(withRole("admin"))
