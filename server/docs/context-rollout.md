@@ -26,7 +26,7 @@ A root `ctx` is now created in `cmd/server/main.go` via
 
 - `background.Runner.Start(ctx)` — every background job inherits it
 - `scheduler.TaskScheduler.Start(ctx)` — cron jobs' DB calls use it
-- `ProxmoxHandler.StartPoller(ctx)` / `ReleaseTrackerHandler.StartPoller(ctx)`
+- `poller.Every(ctx, …, proxmoxH.PollOnce)` / `poller.Every(ctx, …, releaseTrackerH.CheckAll)` — the scheduling loops (the handlers also receive it via `SetBackgroundContext`)
 - `alerts.EvaluateAlerts(ctx, ...)` and every helper in `alerts/engine.go`
 - `dispatch.Dispatcher.Create(ctx, req)` — all call sites updated
 - `networkview.BuildSnapshot(ctx, db)`
