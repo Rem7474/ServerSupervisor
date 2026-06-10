@@ -2,6 +2,7 @@ package ws
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -46,49 +47,102 @@ func (h *WSHandler) dashboardPayload(ctx context.Context) (*models.WSDashboardSn
 }
 
 func (h *WSHandler) buildDashboardPayload(ctx context.Context) (*models.WSDashboardSnapshot, error) {
-	hosts, err := h.db.GetAllHosts(ctx)
-	if err != nil {
-		return nil, err
-	}
+	var (
+		hosts       []models.Host
+		hostsErr    error
+		hostMetrics map[string]*models.SystemMetrics
 
-	hostMetrics, _ := h.db.GetLatestMetricsAll(ctx)
+		comparisons []models.VersionComparison
+
+		proxmoxNodes []models.ProxmoxNode
+		proxmoxLinks []models.ProxmoxGuestLink
+
+		aptPending      int
+		aptPendingHosts map[string]int
+		diskUsage       map[string]float64
+	)
+
+	var wg sync.WaitGroup
+	wg.Add(8)
+
+	go func() {
+		defer wg.Done()
+		hosts, hostsErr = h.db.GetAllHosts(ctx)
+	}()
+
+	go func() {
+		defer wg.Done()
+		hostMetrics, _ = h.db.GetLatestMetricsAll(ctx)
+	}()
+
+	go func() {
+		defer wg.Done()
+		c, err := h.buildVersionComparisons(ctx)
+		if err == nil {
+			comparisons = c
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		proxmoxNodes, _ = h.db.ListProxmoxNodes(ctx)
+	}()
+
+	go func() {
+		defer wg.Done()
+		proxmoxLinks, _ = h.db.ListProxmoxGuestLinks(ctx, "confirmed")
+	}()
+
+	go func() {
+		defer wg.Done()
+		aptPending = h.db.GetTotalAptPending(ctx)
+	}()
+
+	go func() {
+		defer wg.Done()
+		aptPendingHosts = h.db.GetAptPendingAll(ctx)
+	}()
+
+	go func() {
+		defer wg.Done()
+		diskUsage = h.db.GetRootDiskPercentAll(ctx)
+	}()
+
+	wg.Wait()
+
+	if hostsErr != nil {
+		return nil, hostsErr
+	}
 	if hostMetrics == nil {
 		hostMetrics = map[string]*models.SystemMetrics{}
 	}
-	for hostID, m := range hostMetrics {
-		if m == nil {
-			continue
-		}
-		if temp, ok := h.db.GetEffectiveHostCPUTemperature(ctx, hostID, m.CPUTemperature); ok {
-			m.CPUTemperature = temp
-		}
-	}
-
-	comparisons, err := h.buildVersionComparisons(ctx)
-	if err != nil {
+	if comparisons == nil {
 		comparisons = []models.VersionComparison{}
 	}
-
-	proxmoxNodes, _ := h.db.ListProxmoxNodes(ctx)
 	if proxmoxNodes == nil {
 		proxmoxNodes = []models.ProxmoxNode{}
 	}
-
-	// Confirmed guest-host links with live guest metrics (cpu_usage, mem_alloc, mem_usage).
-	// Used by the dashboard to override agent CPU/RAM when metrics_source=proxmox.
-	proxmoxLinks, _ := h.db.ListProxmoxGuestLinks(ctx, "confirmed")
 	if proxmoxLinks == nil {
 		proxmoxLinks = []models.ProxmoxGuestLink{}
 	}
+	if aptPendingHosts == nil {
+		aptPendingHosts = map[string]int{}
+	}
+	if diskUsage == nil {
+		diskUsage = map[string]float64{}
+	}
 
+	// Keep dashboard snapshot assembly strictly set-based: per-host effective
+	// sensor resolution triggers N+1 SQL queries and delays first paint.
+	// Host detail keeps the richer per-host resolution path.
 	payload := &models.WSDashboardSnapshot{
 		Type:               "dashboard",
 		Hosts:              hosts,
 		HostMetrics:        hostMetrics,
 		VersionComparisons: comparisons,
-		AptPending:         h.db.GetTotalAptPending(ctx),
-		AptPendingHosts:    h.db.GetAptPendingAll(ctx),
-		DiskUsage:          h.db.GetRootDiskPercentAll(ctx),
+		AptPending:         aptPending,
+		AptPendingHosts:    aptPendingHosts,
+		DiskUsage:          diskUsage,
 		ProxmoxNodes:       proxmoxNodes,
 		ProxmoxLinks:       proxmoxLinks,
 	}
