@@ -1388,6 +1388,9 @@ export interface WSDashboardSnapshot {
 }
 /**
  * WSHostSnapshot is broadcast on the host-detail endpoint (type "host_detail").
+ * apt command history and per-host audit logs are intentionally absent: the
+ * frontend host-detail WS consumer never read them (they live on the global Audit
+ * page via REST), so shipping 50+50 rows on every metric tick was dead payload.
  */
 export interface WSHostSnapshot {
   type: string;
@@ -1395,10 +1398,8 @@ export interface WSHostSnapshot {
   metrics?: SystemMetrics;
   containers: DockerContainer[];
   apt_status?: AptStatus;
-  apt_history: RemoteCommand[];
   uu_status?: UnattendedUpgradesDB;
   uu_runs: UURun[];
-  audit_logs: AuditLog[];
   version_comparisons: VersionComparison[];
   proxmox_link?: ProxmoxGuestLink;
 }

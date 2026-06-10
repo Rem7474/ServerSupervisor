@@ -21,16 +21,17 @@ type WSDashboardSnapshot struct {
 }
 
 // WSHostSnapshot is broadcast on the host-detail endpoint (type "host_detail").
+// apt command history and per-host audit logs are intentionally absent: the
+// frontend host-detail WS consumer never read them (they live on the global Audit
+// page via REST), so shipping 50+50 rows on every metric tick was dead payload.
 type WSHostSnapshot struct {
 	Type               string                `json:"type"`
 	Host               *Host                 `json:"host"`
 	Metrics            *SystemMetrics        `json:"metrics"`
 	Containers         []DockerContainer     `json:"containers"`
 	AptStatus          *AptStatus            `json:"apt_status"`
-	AptHistory         []RemoteCommand       `json:"apt_history"`
 	UUStatus           *UnattendedUpgradesDB `json:"uu_status"`
 	UURuns             []UURun               `json:"uu_runs"`
-	AuditLogs          []AuditLog            `json:"audit_logs"`
 	VersionComparisons []VersionComparison   `json:"version_comparisons"`
 	ProxmoxLink        *ProxmoxGuestLink     `json:"proxmox_link"`
 }
