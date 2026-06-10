@@ -7,17 +7,28 @@ import "time"
 // command-stream hub. Each snapshot mirrors the gin.H payload its WSHandler used
 // to build; the Type field is the discriminator the frontend switches on.
 
+// DashboardHostMetrics is the lean per-host metric subset the dashboard actually
+// renders (CPU %, memory %, uptime). The full SystemMetrics carries ~20 more
+// fields (temperatures, load, swap, network, cpu model, …) consumed only by the
+// host detail view, so the dashboard snapshot — re-pushed every 10s per client —
+// ships this instead of the whole struct per host.
+type DashboardHostMetrics struct {
+	CPUUsagePercent float64 `json:"cpu_usage_percent"`
+	MemoryPercent   float64 `json:"memory_percent"`
+	Uptime          uint64  `json:"uptime"`
+}
+
 // WSDashboardSnapshot is broadcast on the dashboard endpoint (type "dashboard").
 type WSDashboardSnapshot struct {
-	Type               string                    `json:"type"`
-	Hosts              []Host                    `json:"hosts"`
-	HostMetrics        map[string]*SystemMetrics `json:"host_metrics"`
-	VersionComparisons []VersionComparison       `json:"version_comparisons"`
-	AptPending         int                       `json:"apt_pending"`
-	AptPendingHosts    map[string]int            `json:"apt_pending_hosts"`
-	DiskUsage          map[string]float64        `json:"disk_usage"`
-	ProxmoxNodes       []ProxmoxNode             `json:"proxmox_nodes"`
-	ProxmoxLinks       []ProxmoxGuestLink        `json:"proxmox_links"`
+	Type               string                           `json:"type"`
+	Hosts              []Host                           `json:"hosts"`
+	HostMetrics        map[string]*DashboardHostMetrics `json:"host_metrics"`
+	VersionComparisons []VersionComparison              `json:"version_comparisons"`
+	AptPending         int                              `json:"apt_pending"`
+	AptPendingHosts    map[string]int                   `json:"apt_pending_hosts"`
+	DiskUsage          map[string]float64               `json:"disk_usage"`
+	ProxmoxNodes       []ProxmoxNode                    `json:"proxmox_nodes"`
+	ProxmoxLinks       []ProxmoxGuestLink               `json:"proxmox_links"`
 }
 
 // WSHostSnapshot is broadcast on the host-detail endpoint (type "host_detail").
