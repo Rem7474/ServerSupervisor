@@ -1,18 +1,18 @@
 package handlers
 
 import (
-	"database/sql"
-	"errors"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/serversupervisor/server/internal/apperr"
 	"github.com/serversupervisor/server/internal/models"
 	uptimesvc "github.com/serversupervisor/server/internal/services/uptime"
 )
 
 // UptimeHandler translates HTTP to the uptime service; all probe logic lives in
-// the service layer (internal/services/uptime).
+// the service layer (internal/services/uptime) and error semantics are carried by
+// typed apperr values rendered uniformly via respondError.
 type UptimeHandler struct {
 	svc *uptimesvc.Service
 }
@@ -25,7 +25,7 @@ func NewUptimeHandler(svc *uptimesvc.Service) *UptimeHandler {
 func (h *UptimeHandler) List(c *gin.Context) {
 	probes, err := h.svc.ListProbes(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"probes": probes})
@@ -33,12 +33,8 @@ func (h *UptimeHandler) List(c *gin.Context) {
 
 func (h *UptimeHandler) Get(c *gin.Context) {
 	p, err := h.svc.GetProbe(c.Request.Context(), c.Param("id"))
-	if errors.Is(err, sql.ErrNoRows) {
-		c.JSON(http.StatusNotFound, gin.H{"error": "probe not found"})
-		return
-	}
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, p)
@@ -47,12 +43,12 @@ func (h *UptimeHandler) Get(c *gin.Context) {
 func (h *UptimeHandler) Create(c *gin.Context) {
 	var req models.UptimeProbeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondError(c, apperr.Validation(err.Error()))
 		return
 	}
 	out, err := h.svc.CreateProbe(c.Request.Context(), req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusCreated, out)
@@ -61,12 +57,12 @@ func (h *UptimeHandler) Create(c *gin.Context) {
 func (h *UptimeHandler) Update(c *gin.Context) {
 	var req models.UptimeProbeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondError(c, apperr.Validation(err.Error()))
 		return
 	}
 	out, err := h.svc.UpdateProbe(c.Request.Context(), c.Param("id"), req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, out)
@@ -74,7 +70,7 @@ func (h *UptimeHandler) Update(c *gin.Context) {
 
 func (h *UptimeHandler) Delete(c *gin.Context) {
 	if err := h.svc.DeleteProbe(c.Request.Context(), c.Param("id")); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 	c.Status(http.StatusNoContent)
@@ -90,7 +86,7 @@ func (h *UptimeHandler) History(c *gin.Context) {
 	}
 	results, err := h.svc.History(c.Request.Context(), c.Param("id"), limit)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"results": results})
@@ -106,7 +102,7 @@ func (h *UptimeHandler) Stats(c *gin.Context) {
 	}
 	stats, err := h.svc.Stats(c.Request.Context(), c.Param("id"), hours)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, stats)
@@ -115,12 +111,8 @@ func (h *UptimeHandler) Stats(c *gin.Context) {
 // CheckNow runs a probe immediately and records the result.
 func (h *UptimeHandler) CheckNow(c *gin.Context) {
 	result, err := h.svc.CheckNow(c.Request.Context(), c.Param("id"))
-	if errors.Is(err, sql.ErrNoRows) {
-		c.JSON(http.StatusNotFound, gin.H{"error": "probe not found"})
-		return
-	}
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, result)

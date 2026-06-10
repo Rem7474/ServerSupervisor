@@ -2,8 +2,6 @@ package handlers
 
 import (
 	"context"
-	"fmt"
-	"log/slog"
 	"net/http"
 	"time"
 
@@ -52,8 +50,7 @@ type ReleaseTrackerHandler struct {
 	cfg        *config.Config
 	dispatcher *dispatch.Dispatcher
 	notifHub   *ws.NotificationHub
-	pollerCtx  context.Context // detached ctx for goroutines fired from handlers (check-now)
-	cancel     context.CancelFunc
+	pollerCtx  context.Context // detached ctx for fire-and-forget goroutines (check-now, NotifyComplete)
 }
 
 func NewReleaseTrackerHandler(db *database.DB, cfg *config.Config, dispatcher *dispatch.Dispatcher, notifHub *ws.NotificationHub) *ReleaseTrackerHandler {
@@ -62,42 +59,28 @@ func NewReleaseTrackerHandler(db *database.DB, cfg *config.Config, dispatcher *d
 		cfg:        cfg,
 		dispatcher: dispatcher,
 		notifHub:   notifHub,
-		pollerCtx:  context.Background(), // placeholder; real ctx is set in StartPoller
+		pollerCtx:  context.Background(), // placeholder; real ctx set via SetBackgroundContext
 	}
 }
 
-// StartPoller begins periodic polling of release trackers.
-// The provided parent ctx is propagated to every DB call; cancelling it (or
-// calling StopPoller) terminates the loop.
-func (h *ReleaseTrackerHandler) StartPoller(parent context.Context) {
-	interval := h.cfg.GitHubPollInterval
-	if interval == 0 {
-		interval = 15 * time.Minute
+// PollInterval returns the configured poll cadence (default 15m).
+func (h *ReleaseTrackerHandler) PollInterval() time.Duration {
+	if h.cfg.GitHubPollInterval == 0 {
+		return 15 * time.Minute
 	}
-	slog.InfoContext(parent, fmt.Sprintf("Release tracker poller started (interval: %v)", interval))
+	return h.cfg.GitHubPollInterval
+}
 
-	ctx, cancel := context.WithCancel(parent)
+// SetBackgroundContext threads a long-lived (SIGTERM-bound) ctx into the handler
+// for the fire-and-forget goroutines spawned from HTTP requests (check-now,
+// NotifyComplete). Called once from main.go; the periodic loop is owned by the
+// poller package.
+func (h *ReleaseTrackerHandler) SetBackgroundContext(ctx context.Context) {
 	h.pollerCtx = ctx
-	h.cancel = cancel
-
-	go h.checkAll(ctx)
-
-	ticker := time.NewTicker(interval)
-	go func() {
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ticker.C:
-				h.checkAll(ctx)
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
 }
 
-func (h *ReleaseTrackerHandler) StopPoller() {
-	if h.cancel != nil {
-		h.cancel()
-	}
+// CheckAll polls every enabled release tracker once. Scheduling is owned by the
+// poller package (poller.Every); this is the unit of work it ticks.
+func (h *ReleaseTrackerHandler) CheckAll(ctx context.Context) {
+	h.checkAll(ctx)
 }

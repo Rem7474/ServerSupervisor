@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"log/slog"
 	"net/http"
 	"time"
 
@@ -19,8 +18,7 @@ type ProxmoxHandler struct {
 	db        *database.DB
 	cfg       *config.Config
 	svc       *proxmoxService
-	pollerCtx context.Context // detached ctx for goroutines fired from handlers
-	cancel    context.CancelFunc
+	pollerCtx context.Context // detached ctx for fire-and-forget goroutines (PollNow)
 }
 
 func NewProxmoxHandler(db *database.DB, cfg *config.Config) *ProxmoxHandler {
@@ -32,38 +30,23 @@ func NewProxmoxHandler(db *database.DB, cfg *config.Config) *ProxmoxHandler {
 	}
 }
 
-// ─── Poller ───────────────────────────────────────────────────────────────────
+// ─── Background ───────────────────────────────────────────────────────────────
 
-// StartPoller begins periodic collection for all enabled Proxmox connections.
-// It runs an immediate first pass, then repeats at the minimum configured interval.
-// The provided parent ctx is propagated to every DB call; cancelling it (or
-// calling StopPoller) terminates the loop.
-func (h *ProxmoxHandler) StartPoller(parent context.Context) {
-	ctx, cancel := context.WithCancel(parent)
+// ProxmoxPollInterval is the collection tick (respects per-connection
+// poll_interval_sec inside PollAll).
+const ProxmoxPollInterval = 30 * time.Second
+
+// SetBackgroundContext threads a long-lived (SIGTERM-bound) ctx into the handler
+// for the fire-and-forget goroutines spawned from HTTP requests (e.g. PollNow).
+// Called once from main.go; the periodic loop is owned by the poller package.
+func (h *ProxmoxHandler) SetBackgroundContext(ctx context.Context) {
 	h.pollerCtx = ctx
-	h.cancel = cancel
-
-	go h.svc.PollAll(ctx) // immediate first pass
-
-	ticker := time.NewTicker(30 * time.Second)
-	go func() {
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ticker.C:
-				h.svc.PollAll(ctx)
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-	slog.InfoContext(ctx, "Proxmox poller started (tick: 30s, respects per-connection poll_interval_sec)")
 }
 
-func (h *ProxmoxHandler) StopPoller() {
-	if h.cancel != nil {
-		h.cancel()
-	}
+// PollOnce collects all enabled Proxmox connections once. Scheduling is owned by
+// the poller package (poller.Every); this is the unit of work it ticks.
+func (h *ProxmoxHandler) PollOnce(ctx context.Context) {
+	h.svc.PollAll(ctx)
 }
 
 // ─── CRUD: Connections ────────────────────────────────────────────────────────
