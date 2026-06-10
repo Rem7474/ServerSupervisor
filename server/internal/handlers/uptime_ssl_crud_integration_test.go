@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/handlers"
+	sslsvc "github.com/serversupervisor/server/internal/services/ssl"
 	uptimesvc "github.com/serversupervisor/server/internal/services/uptime"
 	"github.com/serversupervisor/server/internal/testutil"
 )
@@ -96,8 +97,8 @@ func TestUptimeProbeCreateValidation(t *testing.T) {
 
 func newSSLRouter(t *testing.T) (*gin.Engine, *database.DB) {
 	t.Helper()
-	db, cfg := testutil.NewPostgresDBWithConfig(t)
-	h := handlers.NewSSLHandler(db, cfg)
+	db, _ := testutil.NewPostgresDBWithConfig(t)
+	h := handlers.NewSSLHandler(sslsvc.NewService(db))
 	r := gin.New()
 	r.GET("/ssl/certificates", h.List)
 	r.POST("/ssl/certificates", h.Create)
