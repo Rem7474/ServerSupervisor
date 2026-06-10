@@ -1,64 +1,38 @@
 package handlers
 
 import (
-	"database/sql"
-	"errors"
 	"net/http"
-	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/serversupervisor/server/internal/config"
-	"github.com/serversupervisor/server/internal/database"
+	"github.com/serversupervisor/server/internal/apperr"
 	"github.com/serversupervisor/server/internal/models"
-	"github.com/serversupervisor/server/internal/synthetic"
+	sslsvc "github.com/serversupervisor/server/internal/services/ssl"
 )
 
+// SSLHandler translates HTTP to the SSL service; all certificate logic lives in
+// the service layer (internal/services/ssl) and error semantics are carried by
+// typed apperr values rendered uniformly via respondError.
 type SSLHandler struct {
-	db  *database.DB
-	cfg *config.Config
+	svc *sslsvc.Service
 }
 
-func NewSSLHandler(db *database.DB, cfg *config.Config) *SSLHandler {
-	return &SSLHandler{db: db, cfg: cfg}
-}
-
-func sslCertFromRequest(p models.SSLCertificateRequest) models.SSLCertificate {
-	m := models.SSLCertificate{
-		Name:       strings.TrimSpace(p.Name),
-		Host:       strings.TrimSpace(p.Host),
-		Port:       p.Port,
-		ServerName: strings.TrimSpace(p.ServerName),
-		Enabled:    true,
-	}
-	if m.Port == 0 {
-		m.Port = 443
-	}
-	if p.Enabled != nil {
-		m.Enabled = *p.Enabled
-	}
-	return m
+func NewSSLHandler(svc *sslsvc.Service) *SSLHandler {
+	return &SSLHandler{svc: svc}
 }
 
 func (h *SSLHandler) List(c *gin.Context) {
-	certs, err := h.db.ListSSLCertificates(c.Request.Context())
+	certs, err := h.svc.ListCerts(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
-	}
-	if certs == nil {
-		certs = []models.SSLCertificate{}
 	}
 	c.JSON(http.StatusOK, gin.H{"certificates": certs})
 }
 
 func (h *SSLHandler) Get(c *gin.Context) {
-	cert, err := h.db.GetSSLCertificate(c.Request.Context(), c.Param("id"))
-	if errors.Is(err, sql.ErrNoRows) {
-		c.JSON(http.StatusNotFound, gin.H{"error": "certificate not found"})
-		return
-	}
+	cert, err := h.svc.GetCert(c.Request.Context(), c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, cert)
@@ -67,12 +41,12 @@ func (h *SSLHandler) Get(c *gin.Context) {
 func (h *SSLHandler) Create(c *gin.Context) {
 	var req models.SSLCertificateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondError(c, apperr.Validation(err.Error()))
 		return
 	}
-	out, err := h.db.CreateSSLCertificate(c.Request.Context(), sslCertFromRequest(req))
+	out, err := h.svc.CreateCert(c.Request.Context(), req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusCreated, out)
@@ -81,26 +55,20 @@ func (h *SSLHandler) Create(c *gin.Context) {
 func (h *SSLHandler) Update(c *gin.Context) {
 	var req models.SSLCertificateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondError(c, apperr.Validation(err.Error()))
 		return
 	}
-	m := sslCertFromRequest(req)
-	m.ID = c.Param("id")
-	if err := h.db.UpdateSSLCertificate(c.Request.Context(), m); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	out, err := h.db.GetSSLCertificate(c.Request.Context(), m.ID)
+	out, err := h.svc.UpdateCert(c.Request.Context(), c.Param("id"), req)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, out)
 }
 
 func (h *SSLHandler) Delete(c *gin.Context) {
-	if err := h.db.DeleteSSLCertificate(c.Request.Context(), c.Param("id")); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	if err := h.svc.DeleteCert(c.Request.Context(), c.Param("id")); err != nil {
+		respondError(c, err)
 		return
 	}
 	c.Status(http.StatusNoContent)
@@ -108,23 +76,9 @@ func (h *SSLHandler) Delete(c *gin.Context) {
 
 // CheckNow runs a TLS handshake immediately, persists the result, returns the fresh record.
 func (h *SSLHandler) CheckNow(c *gin.Context) {
-	cert, err := h.db.GetSSLCertificate(c.Request.Context(), c.Param("id"))
-	if errors.Is(err, sql.ErrNoRows) {
-		c.JSON(http.StatusNotFound, gin.H{"error": "certificate not found"})
-		return
-	}
+	out, err := h.svc.CheckNow(c.Request.Context(), c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	updated := synthetic.CheckCertificate(c.Request.Context(), *cert)
-	if err := h.db.UpdateSSLCertificateCheckResult(c.Request.Context(), updated); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	out, err := h.db.GetSSLCertificate(c.Request.Context(), updated.ID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, out)

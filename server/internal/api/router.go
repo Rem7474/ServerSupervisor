@@ -8,6 +8,7 @@ import (
 	"github.com/serversupervisor/server/internal/dispatch"
 	"github.com/serversupervisor/server/internal/handlers"
 	"github.com/serversupervisor/server/internal/scheduler"
+	sslsvc "github.com/serversupervisor/server/internal/services/ssl"
 	uptimesvc "github.com/serversupervisor/server/internal/services/uptime"
 	"github.com/serversupervisor/server/internal/ws"
 )
@@ -54,7 +55,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	proxmoxH := handlers.NewProxmoxHandler(db, cfg)
 	hostPermH := handlers.NewHostPermissionHandler(db)
 	uptimeH := handlers.NewUptimeHandler(uptimesvc.NewService(db))
-	sslH := handlers.NewSSLHandler(db, cfg)
+	sslH := handlers.NewSSLHandler(sslsvc.NewService(db))
 	webLogsH := handlers.NewWebLogsHandler(db, dispatcher)
 
 	registerPublicRoutes(r, authH, db)
