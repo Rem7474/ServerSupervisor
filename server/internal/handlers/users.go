@@ -1,145 +1,101 @@
 package handlers
 
 import (
-	"database/sql"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/serversupervisor/server/internal/config"
-	"github.com/serversupervisor/server/internal/database"
+	"github.com/serversupervisor/server/internal/apperr"
 	"github.com/serversupervisor/server/internal/models"
+	usersvc "github.com/serversupervisor/server/internal/services/user"
 )
 
+// UserHandler translates HTTP to the user service. The admin-only authorization
+// stays here (it reads the role from the gin context and writes the 403); all
+// user business logic lives in internal/services/user.
 type UserHandler struct {
-	db  *database.DB
-	cfg *config.Config
+	svc *usersvc.Service
 }
 
-func NewUserHandler(db *database.DB, cfg *config.Config) *UserHandler {
-	return &UserHandler{db: db, cfg: cfg}
+func NewUserHandler(svc *usersvc.Service) *UserHandler {
+	return &UserHandler{svc: svc}
+}
+
+func (h *UserHandler) requireAdmin(c *gin.Context) bool {
+	if c.GetString("role") != models.RoleAdmin {
+		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+		return false
+	}
+	return true
 }
 
 func (h *UserHandler) ListUsers(c *gin.Context) {
-	if c.GetString("role") != models.RoleAdmin {
-		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+	if !h.requireAdmin(c) {
 		return
 	}
-
-	users, err := h.db.GetUsers(c.Request.Context())
+	users, err := h.svc.List(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch users"})
+		respondError(c, err)
 		return
-	}
-	if users == nil {
-		users = []models.User{}
 	}
 	c.JSON(http.StatusOK, users)
 }
 
 func (h *UserHandler) UpdateUserRole(c *gin.Context) {
-	if c.GetString("role") != models.RoleAdmin {
-		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+	if !h.requireAdmin(c) {
 		return
 	}
-
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user id"})
+		respondError(c, apperr.Validation("invalid user id"))
 		return
 	}
-
 	var req struct {
 		Role string `json:"role" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		respondError(c, apperr.Validation("invalid request"))
 		return
 	}
-
-	switch req.Role {
-	case models.RoleAdmin, models.RoleOperator, models.RoleViewer:
-	// ok
-	default:
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid role"})
+	if err := h.svc.UpdateRole(c.Request.Context(), id, req.Role); err != nil {
+		respondError(c, err)
 		return
 	}
-
-	if err := h.db.UpdateUserRole(c.Request.Context(), id, req.Role); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update user role"})
-		return
-	}
-
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
 
 func (h *UserHandler) CreateUser(c *gin.Context) {
-	if c.GetString("role") != models.RoleAdmin {
-		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+	if !h.requireAdmin(c) {
 		return
 	}
-
 	var req struct {
 		Username string `json:"username" binding:"required"`
 		Password string `json:"password" binding:"required"`
 		Role     string `json:"role" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		respondError(c, apperr.Validation("invalid request"))
 		return
 	}
-
-	if _, err := h.db.GetUserByUsername(c.Request.Context(), req.Username); err == nil {
-		c.JSON(http.StatusConflict, gin.H{"error": "username already exists"})
-		return
-	} else if err != sql.ErrNoRows {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to validate username"})
+	if err := h.svc.Create(c.Request.Context(), req.Username, req.Password, req.Role); err != nil {
+		respondError(c, err)
 		return
 	}
-
-	if len(req.Password) < 8 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "password must be at least 8 characters"})
-		return
-	}
-
-	switch req.Role {
-	case models.RoleAdmin, models.RoleOperator, models.RoleViewer:
-	// ok
-	default:
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid role"})
-		return
-	}
-
-	hash, err := HashPassword(req.Password)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to hash password"})
-		return
-	}
-
-	if err := h.db.CreateUser(c.Request.Context(), req.Username, hash, req.Role); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create user"})
-		return
-	}
-
 	c.JSON(http.StatusCreated, gin.H{"status": "ok"})
 }
 
 func (h *UserHandler) DeleteUser(c *gin.Context) {
-	if c.GetString("role") != models.RoleAdmin {
-		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+	if !h.requireAdmin(c) {
 		return
 	}
-
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user id"})
+		respondError(c, apperr.Validation("invalid user id"))
 		return
 	}
-
-	if err := h.db.DeleteUser(c.Request.Context(), id); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete user"})
+	if err := h.svc.Delete(c.Request.Context(), id); err != nil {
+		respondError(c, err)
 		return
 	}
-
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
