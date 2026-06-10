@@ -5,150 +5,97 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/serversupervisor/server/internal/config"
+	"github.com/serversupervisor/server/internal/apperr"
 	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/models"
+	auditsvc "github.com/serversupervisor/server/internal/services/audit"
 )
 
+// AuditHandler translates HTTP to the audit service. Role authorization, query
+// parsing / limit clamping and response envelopes stay here (HTTP concerns); the
+// read orchestration lives in internal/services/audit.
 type AuditHandler struct {
-	db  *database.DB
-	cfg *config.Config
+	svc *auditsvc.Service
 }
 
-func NewAuditHandler(db *database.DB, cfg *config.Config) *AuditHandler {
-	return &AuditHandler{db: db, cfg: cfg}
+func NewAuditHandler(svc *auditsvc.Service) *AuditHandler {
+	return &AuditHandler{svc: svc}
 }
 
-// GetAuditLogs returns paginated audit logs (admin only)
+// clampQueryInt reads a positive query int, applying a default and a max cap.
+func clampQueryInt(c *gin.Context, key string, def, max int) int {
+	v := def
+	if raw := c.Query(key); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 && parsed <= max {
+			v = parsed
+		}
+	}
+	return v
+}
+
+// GetAuditLogs returns paginated audit logs (admin only).
 func (h *AuditHandler) GetAuditLogs(c *gin.Context) {
-	// Check if user is admin
 	if c.GetString("role") != models.RoleAdmin {
 		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
 		return
 	}
-
-	// Get pagination params
-	page := 1
-	limit := 50
-	if p := c.Query("page"); p != "" {
-		if parsed, err := strconv.Atoi(p); err == nil && parsed > 0 {
-			page = parsed
-		}
-	}
-	if l := c.Query("limit"); l != "" {
-		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 && parsed <= 100 {
-			limit = parsed
-		}
-	}
-
-	offset := (page - 1) * limit
-
-	logs, err := h.db.GetAuditLogs(c.Request.Context(), limit, offset)
+	page := clampQueryInt(c, "page", 1, 1<<31-1)
+	limit := clampQueryInt(c, "limit", 50, 100)
+	logs, err := h.svc.Logs(c.Request.Context(), limit, (page-1)*limit)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch audit logs"})
+		respondError(c, err)
 		return
 	}
-
-	if logs == nil {
-		logs = []models.AuditLog{}
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"logs":  logs,
-		"page":  page,
-		"limit": limit,
-	})
+	c.JSON(http.StatusOK, gin.H{"logs": logs, "page": page, "limit": limit})
 }
 
-// GetAuditLogsByHost returns audit logs for a specific host
+// GetAuditLogsByHost returns audit logs for a specific host.
 func (h *AuditHandler) GetAuditLogsByHost(c *gin.Context) {
 	hostID := c.Param("host_id")
 	if hostID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "host_id required"})
+		respondError(c, apperr.Validation("host_id required"))
 		return
 	}
-
-	// Get limit param
-	limit := 100
-	if l := c.Query("limit"); l != "" {
-		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 && parsed <= 500 {
-			limit = parsed
-		}
-	}
-
-	logs, err := h.db.GetAuditLogsByHost(c.Request.Context(), hostID, limit)
+	logs, err := h.svc.LogsByHost(c.Request.Context(), hostID, clampQueryInt(c, "limit", 100, 500))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch audit logs"})
+		respondError(c, err)
 		return
 	}
-
-	if logs == nil {
-		logs = []models.AuditLog{}
-	}
-
 	c.JSON(http.StatusOK, logs)
 }
 
-// GetMyAuditLogs returns the current user's own audit logs
+// GetMyAuditLogs returns the current user's own audit logs.
 func (h *AuditHandler) GetMyAuditLogs(c *gin.Context) {
 	username := c.GetString("username")
 	if username == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		respondError(c, apperr.Unauthorized("unauthorized"))
 		return
 	}
-
-	limit := 10
-	if l := c.Query("limit"); l != "" {
-		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 && parsed <= 100 {
-			limit = parsed
-		}
-	}
-
-	logs, err := h.db.GetAuditLogsByUser(c.Request.Context(), username, limit)
+	logs, err := h.svc.LogsByUser(c.Request.Context(), username, clampQueryInt(c, "limit", 10, 100))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch logs"})
+		respondError(c, err)
 		return
 	}
-	if logs == nil {
-		logs = []models.AuditLog{}
-	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"user": username,
-		"logs": logs,
-	})
+	c.JSON(http.StatusOK, gin.H{"user": username, "logs": logs})
 }
 
 // GetCommandsHistory returns paginated remote commands for all hosts (admin and operator).
 func (h *AuditHandler) GetCommandsHistory(c *gin.Context) {
-	role := c.GetString("role")
-	if role != models.RoleAdmin && role != models.RoleOperator {
+	if role := c.GetString("role"); role != models.RoleAdmin && role != models.RoleOperator {
 		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
 		return
 	}
-
-	page, limit := 1, 50
-	if p := c.Query("page"); p != "" {
-		if parsed, err := strconv.Atoi(p); err == nil && parsed > 0 {
-			page = parsed
-		}
-	}
-	offset := (page - 1) * limit
-
+	page := clampQueryInt(c, "page", 1, 1<<31-1)
+	limit := 50
 	f := database.CommandFilter{
 		Search: c.Query("search"),
 		Module: c.Query("module"),
 		Status: c.Query("status"),
 	}
-
-	cmds, err := h.db.GetAllRemoteCommands(c.Request.Context(), limit, offset, f)
+	cmds, total, err := h.svc.Commands(c.Request.Context(), limit, (page-1)*limit, f)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch commands history"})
+		respondError(c, err)
 		return
-	}
-	total, _ := h.db.CountAllRemoteCommands(c.Request.Context(), f)
-	if cmds == nil {
-		cmds = []database.RemoteCommandWithHost{}
 	}
 	c.JSON(http.StatusOK, gin.H{"commands": cmds, "total": total, "page": page, "limit": limit})
 }
@@ -156,56 +103,38 @@ func (h *AuditHandler) GetCommandsHistory(c *gin.Context) {
 // GetCommandByID returns the status and output of a single remote command by UUID.
 // Requires admin or operator role to prevent cross-host information disclosure.
 func (h *AuditHandler) GetCommandByID(c *gin.Context) {
-	role := c.GetString("role")
-	if role != models.RoleAdmin && role != models.RoleOperator {
+	if role := c.GetString("role"); role != models.RoleAdmin && role != models.RoleOperator {
 		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
 		return
 	}
-
 	id := c.Param("id")
 	if id == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "id required"})
+		respondError(c, apperr.Validation("id required"))
 		return
 	}
-
-	cmd, err := h.db.GetRemoteCommandByID(c.Request.Context(), id)
+	cmd, err := h.svc.Command(c.Request.Context(), id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "command not found"})
+		respondError(c, err)
 		return
 	}
-
 	c.JSON(http.StatusOK, cmd)
 }
 
-// GetAuditLogsByUser returns audit logs for a specific user (admin only)
+// GetAuditLogsByUser returns audit logs for a specific user (admin only).
 func (h *AuditHandler) GetAuditLogsByUser(c *gin.Context) {
-	// Check if user is admin
 	if c.GetString("role") != models.RoleAdmin {
 		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
 		return
 	}
-
 	username := c.Param("username")
 	if username == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "username required"})
+		respondError(c, apperr.Validation("username required"))
 		return
 	}
-
-	limit := 100
-	if l := c.Query("limit"); l != "" {
-		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 && parsed <= 500 {
-			limit = parsed
-		}
-	}
-
-	logs, err := h.db.GetAuditLogsByUser(c.Request.Context(), username, limit)
+	logs, err := h.svc.LogsByUser(c.Request.Context(), username, clampQueryInt(c, "limit", 100, 500))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch logs"})
+		respondError(c, err)
 		return
 	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"user": username,
-		"logs": logs,
-	})
+	c.JSON(http.StatusOK, gin.H{"user": username, "logs": logs})
 }
