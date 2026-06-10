@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/handlers"
+	uptimesvc "github.com/serversupervisor/server/internal/services/uptime"
 	"github.com/serversupervisor/server/internal/testutil"
 )
 
@@ -18,8 +19,8 @@ type idOnly struct {
 
 func newUptimeRouter(t *testing.T) (*gin.Engine, *database.DB) {
 	t.Helper()
-	db, cfg := testutil.NewPostgresDBWithConfig(t)
-	h := handlers.NewUptimeHandler(db, cfg)
+	db, _ := testutil.NewPostgresDBWithConfig(t)
+	h := handlers.NewUptimeHandler(uptimesvc.NewService(db))
 	r := gin.New()
 	r.GET("/uptime/probes", h.List)
 	r.POST("/uptime/probes", h.Create)
