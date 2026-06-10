@@ -96,7 +96,29 @@ window.addEventListener('error', (event: ErrorEvent) => {
 
 // Errors expected during reconnect/wake: network failures, aborted fetches, WS close races.
 // These must NOT destroy the app — just log them.
+
+// Timestamp until which all unhandled rejections are treated as benign.
+// Set for 5 s after each ss:app-resume (device wake / tab resume) to absorb
+// the burst of transient failures that occur while the network is coming back.
+let reconnectWindowUntil = 0
+window.addEventListener('ss:app-resume', () => {
+  reconnectWindowUntil = Date.now() + 5000
+})
+
 function isBenignRejection(reason: unknown): boolean {
+  // Inside the reconnect window, all transient errors are expected.
+  if (Date.now() < reconnectWindowUntil) return true
+
+  // Check Axios-specific error codes (timeout / network / cancel).
+  if (reason !== null && typeof reason === 'object') {
+    const code = (reason as { code?: string }).code
+    if (
+      code === 'ECONNABORTED' ||  // Axios request timeout
+      code === 'ERR_NETWORK' ||   // Axios network failure
+      code === 'ERR_CANCELED'     // Axios AbortController cancel
+    ) return true
+  }
+
   const msg = reason instanceof Error
     ? reason.message.toLowerCase()
     : typeof reason === 'string' ? reason.toLowerCase() : ''
@@ -108,9 +130,12 @@ function isBenignRejection(reason: unknown): boolean {
     msg.includes('load failed') ||
     msg.includes('networkerror') ||
     msg.includes('network error') ||
+    msg.includes('network connection') ||           // Safari: "The network connection was lost."
     msg.includes('the internet connection appears to be offline') ||
+    msg.includes('timed out') ||                    // iOS Safari: "The request timed out."
+    msg.includes('timeout') ||                      // Axios: "timeout of 30000ms exceeded"
     msg.includes('websocket') ||
-    // axios cancel
+    // axios cancel / browser abort
     (reason instanceof Error && reason.name === 'CanceledError') ||
     (reason instanceof Error && reason.name === 'AbortError')
   )
