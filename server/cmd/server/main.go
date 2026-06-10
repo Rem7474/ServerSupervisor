@@ -16,6 +16,7 @@ import (
 	"github.com/serversupervisor/server/internal/dispatch"
 	"github.com/serversupervisor/server/internal/handlers"
 	"github.com/serversupervisor/server/internal/logging"
+	"github.com/serversupervisor/server/internal/poller"
 	"github.com/serversupervisor/server/internal/scheduler"
 	"github.com/serversupervisor/server/internal/ws"
 )
@@ -123,10 +124,13 @@ func main() {
 	// Setup router
 	router, releaseTrackerH, proxmoxH, cleanupRouter := api.SetupRouter(db, cfg, notifHub, sched, dispatcher)
 	defer cleanupRouter()
-	releaseTrackerH.StartPoller(rootCtx)
-	defer releaseTrackerH.StopPoller()
-	proxmoxH.StartPoller(rootCtx)
-	defer proxmoxH.StopPoller()
+	// Background pollers: the handlers expose the unit of work + a fire-and-forget
+	// ctx; the poller package owns the scheduling loop. rootCtx cancellation
+	// (SIGINT/SIGTERM) stops both loops, so no explicit Stop is needed.
+	releaseTrackerH.SetBackgroundContext(rootCtx)
+	poller.Every(rootCtx, releaseTrackerH.PollInterval(), true, "release-tracker", releaseTrackerH.CheckAll)
+	proxmoxH.SetBackgroundContext(rootCtx)
+	poller.Every(rootCtx, handlers.ProxmoxPollInterval, true, "proxmox", proxmoxH.PollOnce)
 
 	// Start server
 	srv := &http.Server{
