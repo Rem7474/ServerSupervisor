@@ -10,6 +10,7 @@ import (
 	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/dispatch"
 	"github.com/serversupervisor/server/internal/handlers"
+	usersvc "github.com/serversupervisor/server/internal/services/user"
 	"github.com/serversupervisor/server/internal/testutil"
 )
 
@@ -142,8 +143,8 @@ func TestHostsRegisterForbiddenForNonAdmin(t *testing.T) {
 
 func newUsersRouter(t *testing.T, role string) (*gin.Engine, *database.DB) {
 	t.Helper()
-	db, cfg := testutil.NewPostgresDBWithConfig(t)
-	h := handlers.NewUserHandler(db, cfg)
+	db, _ := testutil.NewPostgresDBWithConfig(t)
+	h := handlers.NewUserHandler(usersvc.NewService(db))
 
 	r := gin.New()
 	r.Use(withRole(role))

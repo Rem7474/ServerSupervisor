@@ -10,6 +10,7 @@ import (
 	"github.com/serversupervisor/server/internal/scheduler"
 	scheduledtasksvc "github.com/serversupervisor/server/internal/services/scheduledtask"
 	sslsvc "github.com/serversupervisor/server/internal/services/ssl"
+	usersvc "github.com/serversupervisor/server/internal/services/user"
 	uptimesvc "github.com/serversupervisor/server/internal/services/uptime"
 	"github.com/serversupervisor/server/internal/ws"
 )
@@ -42,7 +43,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	systemH := handlers.NewSystemHandler(db, cfg, dispatcher, wsH.GetStreamHub())
 	networkH := handlers.NewNetworkHandler(db)
 	auditH := handlers.NewAuditHandler(db, cfg)
-	userH := handlers.NewUserHandler(db, cfg)
+	userH := handlers.NewUserHandler(usersvc.NewService(db))
 	alertRulesH := handlers.NewAlertRulesHandler(db, cfg)
 	settingsH := handlers.NewSettingsHandler(db, cfg)
 	notifH := handlers.NewNotificationsHandler(db)
