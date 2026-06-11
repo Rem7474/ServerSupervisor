@@ -9,6 +9,7 @@ import (
 	"github.com/serversupervisor/server/internal/handlers"
 	"github.com/serversupervisor/server/internal/scheduler"
 	auditsvc "github.com/serversupervisor/server/internal/services/audit"
+	hostpermsvc "github.com/serversupervisor/server/internal/services/hostperm"
 	scheduledtasksvc "github.com/serversupervisor/server/internal/services/scheduledtask"
 	sslsvc "github.com/serversupervisor/server/internal/services/ssl"
 	usersvc "github.com/serversupervisor/server/internal/services/user"
@@ -56,7 +57,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	agentH.AddCompletionListener(releaseTrackerH)
 
 	proxmoxH := handlers.NewProxmoxHandler(db, cfg)
-	hostPermH := handlers.NewHostPermissionHandler(db)
+	hostPermH := handlers.NewHostPermissionHandler(hostpermsvc.NewService(db))
 	uptimeH := handlers.NewUptimeHandler(uptimesvc.NewService(db))
 	sslH := handlers.NewSSLHandler(sslsvc.NewService(db))
 	webLogsH := handlers.NewWebLogsHandler(db, dispatcher)
