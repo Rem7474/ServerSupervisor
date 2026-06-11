@@ -128,34 +128,6 @@
       @close="scheduleHost = null"
     />
 
-    <!-- Toast feedback actions groupées -->
-    <div
-      v-if="bulkActionFeedback"
-      class="position-fixed bottom-0 start-0 p-3 toast-overlay"
-    >
-      <div
-        class="toast show align-items-center border-0"
-        :class="bulkActionFeedback.variantClass"
-      >
-        <div class="d-flex">
-          <div class="toast-body">
-            <strong>apt {{ bulkActionFeedback.command }}</strong> {{ bulkActionFeedback.message }}
-            <div
-              v-if="bulkActionFeedback.details"
-              class="small mt-1"
-            >
-              {{ bulkActionFeedback.details }}
-            </div>
-          </div>
-          <button
-            type="button"
-            class="btn-close me-2 m-auto"
-            :class="bulkActionFeedback.closeClass"
-            @click="bulkActionFeedback = null"
-          />
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -167,7 +139,7 @@ import { useWebSocket } from '../composables/useWebSocket'
 import type { WSAptSnapshot } from '../types/ws'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
 import { confirmBulkAction } from '../utils/bulkActionHelpers'
-import { useToast } from '../composables/useToast'
+import { addToast } from '../composables/useGlobalToast'
 import { useCommandStream } from '../composables/useCommandStream'
 import CommandLogPanel from '../components/host/CommandLogPanel.vue'
 import WsStatusBar from '../components/WsStatusBar.vue'
@@ -215,7 +187,6 @@ function openScheduleModal(host: any): void {
 // ── Console ───────────────────────────────────────────────────────────────────
 const showConsole = ref(false)
 const liveCommand = ref<any>(null)
-const { value: bulkActionFeedback, showToast: showBulkActionFeedback } = useToast<any>(null)
 const { openCommandStream, closeStream } = useCommandStream()
 const aptBulkLoading = ref<string | null>(null)
 
@@ -347,23 +318,6 @@ function connectStreamWebSocket(commandId: string): void {
   })
 }
 
-function buildBulkActionFeedback(command: string, launchedHosts: string[], failedHosts: string[]): any {
-  const hasFailures = failedHosts.length > 0
-  const launchedLabel = launchedHosts.length === 1
-    ? `lancée sur ${launchedHosts[0]}`
-    : `lancée sur ${launchedHosts.length} hôtes`
-  const failedLabel = hasFailures
-    ? `Échec d'envoi sur ${failedHosts.join(', ')}.`
-    : 'Suivi disponible via l\'historique APT.'
-
-  return {
-    command,
-    message: launchedHosts.length > 0 ? `commande ${launchedLabel}.` : 'aucune commande n\'a été lancée.',
-    details: failedLabel,
-    variantClass: hasFailures ? 'text-bg-warning' : 'text-bg-success',
-    closeClass: hasFailures ? '' : 'btn-close-white',
-  }
-}
 
 // ── Commandes par hôte ────────────────────────────────────────────────────────
 async function runAptCmdForHost(host: any, command: string): Promise<void> {
@@ -465,14 +419,13 @@ async function bulkAptCmd(command: string): Promise<void> {
     }
 
     if (selectedHosts.value.length > 1 || failedCommands.length > 0) {
-      showBulkActionFeedback(
-        buildBulkActionFeedback(
-          command,
-          launchedCommands.map((item: any) => hostNameById.get(item.host_id) || item.host_id),
-          failedCommands.map((item: any) => hostNameById.get(item.host_id) || item.host_id),
-        ),
-        7000,
-      )
+      const launched = launchedCommands.map((item: any) => hostNameById.get(item.host_id) || item.host_id)
+      const failed = failedCommands.map((item: any) => hostNameById.get(item.host_id) || item.host_id)
+      const launchedLabel = launched.length === 1 ? `sur ${launched[0]}` : `sur ${launched.length} hôtes`
+      const msg = launched.length > 0
+        ? `apt ${command} lancée ${launchedLabel}${failed.length ? ` — échec sur : ${failed.join(', ')}` : ''}`
+        : `apt ${command} — aucune commande lancée`
+      addToast(msg, failed.length > 0 ? 'warning' : 'success', 7000)
     }
   } catch (e) {
     await dialog.confirm({
@@ -497,6 +450,3 @@ onUnmounted(() => {
 })
 </script>
 
-<style scoped>
-.toast-overlay { z-index: 1100; }
-</style>
