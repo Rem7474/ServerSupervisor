@@ -1,15 +1,20 @@
 package api
 
 import (
+	"context"
+
 	"github.com/gin-gonic/gin"
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/cookies"
 	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/dispatch"
 	"github.com/serversupervisor/server/internal/handlers"
+	"github.com/serversupervisor/server/internal/models"
+	"github.com/serversupervisor/server/internal/networkview"
 	"github.com/serversupervisor/server/internal/scheduler"
 	auditsvc "github.com/serversupervisor/server/internal/services/audit"
 	hostpermsvc "github.com/serversupervisor/server/internal/services/hostperm"
+	networksvc "github.com/serversupervisor/server/internal/services/network"
 	scheduledtasksvc "github.com/serversupervisor/server/internal/services/scheduledtask"
 	sslsvc "github.com/serversupervisor/server/internal/services/ssl"
 	usersvc "github.com/serversupervisor/server/internal/services/user"
@@ -43,7 +48,9 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	aptH := handlers.NewAptHandler(db, cfg, dispatcher)
 	dockerH := handlers.NewDockerHandler(db, cfg, dispatcher, wsH.GetStreamHub())
 	systemH := handlers.NewSystemHandler(db, cfg, dispatcher, wsH.GetStreamHub())
-	networkH := handlers.NewNetworkHandler(db)
+	networkH := handlers.NewNetworkHandler(networksvc.NewService(db, func(ctx context.Context) (*models.NetworkSnapshot, error) {
+		return networkview.BuildSnapshot(ctx, db)
+	}))
 	auditH := handlers.NewAuditHandler(auditsvc.NewService(db))
 	userH := handlers.NewUserHandler(usersvc.NewService(db))
 	alertRulesH := handlers.NewAlertRulesHandler(db, cfg)
