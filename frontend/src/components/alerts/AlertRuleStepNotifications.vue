@@ -129,6 +129,7 @@
     <AlertRuleCommandTrigger
       v-model:enabled="commandTriggerEnabled"
       :model-value="form.actions.command_trigger || { module: 'processes', action: 'list', target: '' }"
+      :docker-scope="form.source_type === 'docker' ? form.docker_scope : null"
       @update:model-value="form.actions.command_trigger = $event"
     />
 
