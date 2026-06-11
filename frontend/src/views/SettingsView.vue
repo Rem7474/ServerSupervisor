@@ -155,7 +155,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, watch, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import apiClient, { getApiErrorMessage } from '../api'
 import SettingsDatabaseCard from '../components/settings/SettingsDatabaseCard.vue'
@@ -167,9 +168,15 @@ import SettingsSystemInfoCard from '../components/settings/SettingsSystemInfoCar
 import SettingsProxmoxCard from '../components/settings/SettingsProxmoxCard.vue'
 import SettingsRegistryCredentialsCard from '../components/settings/SettingsRegistryCredentialsCard.vue'
 
+const route = useRoute()
+const router = useRouter()
 const auth = useAuthStore()
 
-const tab = ref('general')
+const tab = ref((route.query.tab as string) || 'general')
+
+watch(tab, (t) => {
+  router.replace({ query: { ...route.query, tab: t } })
+})
 
 const settings = ref({
   baseUrl: '',

@@ -66,13 +66,24 @@
           </select>
         </div>
         <div class="threats-filter-field">
-          <label class="form-label mb-1">Hôte technique (ID)</label>
-          <input
-            v-model.trim="hostId"
-            class="form-control form-control-sm"
-            placeholder="(optionnel)"
-            style="min-width: 14rem;"
+          <label class="form-label mb-1">Hôte</label>
+          <select
+            v-model="hostId"
+            class="form-select form-select-sm"
+            :disabled="loading"
+            style="min-width: 12rem;"
           >
+            <option value="">
+              Tous les hôtes
+            </option>
+            <option
+              v-for="h in hostsStore.hosts"
+              :key="h.id"
+              :value="h.id"
+            >
+              {{ h.name || h.hostname || h.ip_address }}
+            </option>
+          </select>
         </div>
         <button
           class="btn btn-primary btn-sm threats-refresh-btn"
@@ -86,22 +97,6 @@
           Rafraîchir
         </button>
       </div>
-    </div>
-
-    <!-- Toast feedback ban/unban -->
-    <div
-      v-if="actionFeedback"
-      class="alert alert-dismissible mb-3"
-      :class="actionFeedback.type === 'success' ? 'alert-success' : 'alert-danger'"
-      role="alert"
-    >
-      {{ actionFeedback.message }}
-      <button
-        type="button"
-        class="btn-close"
-        aria-label="Fermer"
-        @click="actionFeedback = null"
-      />
     </div>
 
     <!-- Squelette chargement -->
@@ -524,7 +519,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import apiClient, { getApiErrorMessage } from '../api'
-import { useToast } from '../composables/useToast'
+import { addToast } from '../composables/useGlobalToast'
+import { useHostsStore } from '../stores/hosts'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import IPTimelineModal from '../components/security/IPTimelineModal.vue'
 import type { WebLogIPTimelineRow } from '../types/security'
@@ -538,6 +534,8 @@ const periodOptions = [
   { value: '168h', label: '7j' },
   { value: '720h', label: '30j' },
 ]
+const hostsStore = useHostsStore()
+
 const source = ref('')
 const hostId = ref('')
 
@@ -550,8 +548,6 @@ const banState = ref<'idle' | 'loading' | 'error'>('idle')
 const selectedIP = ref('')
 const timelineHostId = ref('')
 const timeline = ref<WebLogIPTimelineRow[]>([])
-
-const { value: actionFeedback, showToast: showActionFeedback } = useToast<{ message: string; type: 'success' | 'error' } | null>(null)
 
 const threats = computed(() => summary.value.threats || {})
 const topPaths = computed(() => threats.value.top_paths || [])
@@ -730,16 +726,16 @@ async function handleBanFromModal(duration: string) {
       { ip, type: 'ban', reason: 'manual', origin: 'cscli', blocked_until: new Date(Date.now() + ms).toISOString() },
     ]
     banState.value = 'idle'
-    showActionFeedback({ message: `IP ${ip} bloquée par CrowdSec (${duration})`, type: 'success' })
+    addToast(`IP ${ip} bloquée par CrowdSec (${duration})`, 'success')
     closeTimeline()
     const { status, output } = await pollCommand(commandId)
     if (status === 'failed') {
       optimisticBans.value = optimisticBans.value.filter((e) => e.ip !== ip)
-      showActionFeedback({ message: `Échec blocage ${ip} : ${output}`, type: 'error' })
+      addToast(`Échec blocage ${ip} : ${output}`, 'error')
     }
   } catch (error) {
     banState.value = 'error'
-    showActionFeedback({ message: `Impossible de bloquer l'IP : ${getApiErrorMessage(error)}`, type: 'error' })
+    addToast(`Impossible de bloquer l'IP : ${getApiErrorMessage(error)}`, 'error')
   }
 }
 
@@ -762,7 +758,7 @@ async function unblockCrowdSecEntry(ip: string) {
   const matchedEntry = crowdSecIPs.value.find((entry: AnyRecord) => entry.ip === ip)
   const targetHost = hostId.value || (matchedEntry?.host_id as string) || crowdSecHostId.value
   if (!targetHost) {
-    showActionFeedback({ message: 'Impossible de déterminer l\'hôte cible — renseigne le filtre Hôte', type: 'error' })
+    addToast('Impossible de déterminer l\'hôte cible — renseigne le filtre Hôte', 'error')
     return
   }
   rowState.value = { ...rowState.value, [ip]: 'loading' }
@@ -776,18 +772,21 @@ async function unblockCrowdSecEntry(ip: string) {
       unblockedIPs.value = next
       const { [ip]: _, ...rest } = rowState.value
       rowState.value = rest
-      showActionFeedback({ message: `IP ${ip} débloquée`, type: 'success' })
+      addToast(`IP ${ip} débloquée`, 'success')
     } else {
       rowState.value = { ...rowState.value, [ip]: 'error' }
-      showActionFeedback({ message: `Échec déblocage ${ip} : ${output}`, type: 'error' })
+      addToast(`Échec déblocage ${ip} : ${output}`, 'error')
     }
   } catch (error) {
     rowState.value = { ...rowState.value, [ip]: 'error' }
-    showActionFeedback({ message: `Impossible de débloquer l'IP : ${getApiErrorMessage(error)}`, type: 'error' })
+    addToast(`Impossible de débloquer l'IP : ${getApiErrorMessage(error)}`, 'error')
   }
 }
 
-onMounted(loadThreats)
+onMounted(() => {
+  hostsStore.fetchHosts()
+  loadThreats()
+})
 </script>
 
 <style scoped>

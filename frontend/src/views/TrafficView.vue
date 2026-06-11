@@ -210,13 +210,24 @@
           </div>
 
           <div class="traffic-filter-field">
-            <label class="form-label mb-1">Hôte technique (ID)</label>
-            <input
-              v-model.trim="hostId"
-              class="form-control form-control-sm"
-              placeholder="(optionnel)"
-              style="min-width: 14rem;"
+            <label class="form-label mb-1">Hôte</label>
+            <select
+              v-model="hostId"
+              class="form-select form-select-sm"
+              :disabled="loading"
+              style="min-width: 12rem;"
             >
+              <option value="">
+                Tous les hôtes
+              </option>
+              <option
+                v-for="h in hostsStore.hosts"
+                :key="h.id"
+                :value="h.id"
+              >
+                {{ h.name || h.hostname || h.ip_address }}
+              </option>
+            </select>
           </div>
 
           <div class="form-check form-switch mb-1 ms-1">
@@ -837,6 +848,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
+import { useHostsStore } from '../stores/hosts'
 import TrafficKpiCards from '../components/security/TrafficKpiCards.vue'
 import TrafficWorldMap from '../components/security/TrafficWorldMap.vue'
 import TrafficRequestsChart from '../components/security/TrafficRequestsChart.vue'
@@ -853,6 +865,8 @@ const periodOptions = [
 ]
 
 const REFRESH_INTERVAL_MS = 8000
+
+const hostsStore = useHostsStore()
 
 const period = ref('24h')
 const source = ref('')
@@ -1008,6 +1022,7 @@ function closeDomainModal() {
 watch(autoRefresh, resetAutoRefresh)
 
 onMounted(async () => {
+  hostsStore.fetchHosts()
   await loadAll(true)
   resetAutoRefresh()
 })

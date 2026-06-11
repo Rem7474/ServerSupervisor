@@ -28,20 +28,6 @@
       @dismiss-stale-alert="dataStaleAlert = false"
     />
 
-    <div
-      v-if="actionError"
-      class="alert alert-danger alert-dismissible mb-3"
-      role="alert"
-    >
-      {{ actionError }}
-      <button
-        type="button"
-        class="btn-close"
-        aria-label="Fermer le message d'erreur"
-        @click="actionError = ''"
-      />
-    </div>
-
     <!-- Tabs -->
     <ul class="nav nav-tabs mb-4">
       <li class="nav-item">
@@ -113,7 +99,7 @@ import type { WSDockerSnapshot } from '../types/ws'
 import { useAuthStore } from '../stores/auth'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
 import { useLocalStorage } from '../composables/useLocalStorage'
-import { useToast } from '../composables/useToast'
+import { addToast } from '../composables/useGlobalToast'
 import WsStatusBar from '../components/WsStatusBar.vue'
 import DockerContainersTab from '../components/docker/DockerContainersTab.vue'
 import ComposeProjectsTab from '../components/docker/ComposeProjectsTab.vue'
@@ -129,7 +115,6 @@ const containers = ref<DockerContainer[]>([])
 const composeProjects = ref<ComposeProject[]>([])
 const versionComparisons = ref<any[]>([])
 const activeTab = useLocalStorage('dockerActiveTab', 'containers')
-const { value: actionError, showToast: showActionError } = useToast('')
 
 const canRunDocker = computed(() => auth.role === 'admin' || auth.role === 'operator')
 const runningCount = computed(() => containers.value.filter((c) => c.state === 'running').length)
@@ -168,7 +153,7 @@ async function handleContainerAction({ hostId, name, action }: { hostId: string;
     const res = await apiClient.sendDockerCommand(hostId, name, action)
     connectDockerStream(res.data.command_id, hostId, name, action)
   } catch (err: any) {
-    showActionError(err?.response?.data?.error || err?.message, 6000)
+    addToast(err?.response?.data?.error || err?.message || 'Erreur Docker', 'error', 6000)
   } finally {
     dockerActionLoading.value = { ...dockerActionLoading.value, [name]: null }
   }
@@ -192,7 +177,7 @@ async function handleComposeAction({ hostId, name, action, workingDir }: { hostI
     const res = await apiClient.sendDockerCommand(hostId, name, action, workingDir)
     connectDockerStream(res.data.command_id, hostId, name, action)
   } catch (err: any) {
-    showActionError(err?.response?.data?.error || err?.message, 6000)
+    addToast(err?.response?.data?.error || err?.message || 'Erreur Docker', 'error', 6000)
   } finally {
     composeActionLoading.value = { ...composeActionLoading.value, [name]: null }
   }

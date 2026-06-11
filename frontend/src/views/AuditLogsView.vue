@@ -455,8 +455,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import apiClient from '../api'
 import { useDateFormatter } from '../composables/useDateFormatter'
@@ -473,10 +473,15 @@ const { formatLocaleDateTime: formatDate } = useDateFormatter()
 const { getStatusBadgeClass } = useStatusBadge()
 
 const route = useRoute()
+const router = useRouter()
 const auth = useAuthStore()
 const canViewCommands = computed(() => auth.role === 'admin' || auth.role === 'operator')
 
-const activeTab = ref('commandes')
+const activeTab = ref((route.query.tab as string) || 'commandes')
+
+watch(activeTab, (tab) => {
+  router.replace({ query: { ...route.query, tab } })
+})
 
 // ── Commands history ─────────────────────────────────────────────────────────
 const cmds = ref<RemoteCommandWithHost[]>([])

@@ -1,5 +1,5 @@
-import { computed, onMounted, onUnmounted, ref, Ref, ComputedRef } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, watch, onMounted, onUnmounted, ref, Ref, ComputedRef } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import api, { getApiErrorMessage } from '../api'
 import { useConfirmDialog } from './useConfirmDialog'
 import { execBadgeColor } from '../utils/statusClasses'
@@ -133,8 +133,13 @@ interface UseGitWebhooksPageApi {
 export function useGitWebhooksPage(): UseGitWebhooksPageApi {
   const dialog = useConfirmDialog()
   const route = useRoute()
+  const router = useRouter()
 
-  const activeTab: Ref<string> = ref('webhooks')
+  const activeTab: Ref<string> = ref((route.query.tab as string) || 'webhooks')
+
+  watch(activeTab, (tab) => {
+    router.replace({ query: { ...route.query, tab } })
+  })
   const hosts: Ref<Host[]> = ref([])
   const error: Ref<string> = ref('')
   const saving: Ref<boolean> = ref(false)
@@ -209,9 +214,6 @@ export function useGitWebhooksPage(): UseGitWebhooksPageApi {
       nowTick.value = Date.now()
     }, 60000)
 
-    if (route.query.tab === 'trackers') {
-      activeTab.value = 'trackers'
-    }
     if (route.query.docker_image) {
       prefillDockerImage.value = String(route.query.docker_image)
       prefillDockerTag.value = String(route.query.docker_tag || 'latest')

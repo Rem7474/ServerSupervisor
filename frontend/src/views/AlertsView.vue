@@ -146,8 +146,8 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { watch, onMounted, onUnmounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import AlertIncidentList from '../components/alerts/AlertIncidentList.vue'
 import AlertReleaseSummary from '../components/alerts/AlertReleaseSummary.vue'
 import AlertRuleList from '../components/alerts/AlertRuleList.vue'
@@ -163,6 +163,7 @@ const TAB_TITLES: Record<string, string> = {
 }
 
 const route = useRoute()
+const router = useRouter()
 const {
   alertsTab,
   incidents,
@@ -200,11 +201,17 @@ const {
 
 let incidentsPollTimer: ReturnType<typeof setInterval> | null = null
 
+watch(alertsTab, (tab) => {
+  router.replace({ query: { ...route.query, tab } })
+})
+
 onMounted(async () => {
   await init()
 
   if (route.query.tab === 'incidents') {
     await switchToIncidents()
+  } else if (route.query.tab === 'releases') {
+    await switchToTrackers()
   }
 
   incidentsPollTimer = setInterval(loadIncidents, 300_000)

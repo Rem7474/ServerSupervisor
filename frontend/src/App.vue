@@ -184,6 +184,32 @@
                     Stats web
                   </router-link>
                   <router-link
+                    v-if="auth.isAdmin"
+                    to="/security"
+                    class="dropdown-item"
+                    role="menuitem"
+                    @click="secondaryMenuOpen = false"
+                  >
+                    <svg
+                      class="icon icon-sm me-2"
+                      width="16"
+                      height="16"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    ><path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"
+                    /></svg>
+                    Sécurité hôtes
+                  </router-link>
+                  <div
+                    v-if="auth.isAdmin"
+                    class="dropdown-divider"
+                  />
+                  <router-link
                     to="/scheduled-tasks"
                     class="dropdown-item"
                     role="menuitem"
@@ -550,6 +576,8 @@
 
       <!-- Global Confirm Dialog -->
       <ConfirmDialog />
+      <!-- Global Toast Notifications -->
+      <ToastContainer />
     </div>
 
     <!-- Login page (no sidebar) -->
@@ -563,6 +591,7 @@ import { useAuthStore } from './stores/auth'
 import { useHostsStore } from './stores/hosts'
 import { useRouter, useRoute } from 'vue-router'
 import ConfirmDialog from './components/ConfirmDialog.vue'
+import ToastContainer from './components/ToastContainer.vue'
 import NotificationBell from './components/NotificationBell.vue'
 import AppFooter from './components/AppFooter.vue'
 import AppIcon from './components/AppIcon.vue'

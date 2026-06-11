@@ -124,6 +124,36 @@
                 </button>
               </div>
 
+              <!-- Agent connection status -->
+              <div
+                class="agent-connection-status mb-3"
+                :class="agentConnected ? 'agent-connected' : 'agent-waiting'"
+              >
+                <template v-if="agentConnected">
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                    <polyline points="22 4 12 14.01 9 11.01" />
+                  </svg>
+                  Agent connecté — premier rapport reçu !
+                </template>
+                <template v-else>
+                  <span
+                    class="spinner-border spinner-border-sm"
+                    style="width:.8rem;height:.8rem;border-width:2px"
+                  />
+                  En attente du premier rapport agent…
+                </template>
+              </div>
+
               <div class="host-success-card mb-3">
                 <div class="d-flex align-items-center justify-content-between mb-2">
                   <div class="text-secondary small">
@@ -181,7 +211,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import apiClient from '../api'
 
@@ -218,7 +248,41 @@ const result = ref<HostResult | null>(null)
 const copiedApiKey = ref(false)
 const copiedConfig = ref(false)
 const copiedInstall = ref(false)
+const agentConnected = ref(false)
 const router = useRouter()
+
+const AGENT_POLL_INTERVAL_MS = 3000
+const AGENT_POLL_TIMEOUT_MS = 120_000
+let agentPollTimer: ReturnType<typeof setInterval> | null = null
+let agentPollStarted: number | null = null
+
+function startAgentPolling(hostId: string): void {
+  agentPollStarted = Date.now()
+  agentPollTimer = setInterval(async () => {
+    if (agentPollStarted !== null && Date.now() - agentPollStarted > AGENT_POLL_TIMEOUT_MS) {
+      stopAgentPolling()
+      return
+    }
+    try {
+      const res = await apiClient.getHost(hostId)
+      if (res.data?.status === 'online' || res.data?.status === 'warning') {
+        agentConnected.value = true
+        stopAgentPolling()
+      }
+    } catch {
+      // ignore transient errors, keep polling
+    }
+  }, AGENT_POLL_INTERVAL_MS)
+}
+
+function stopAgentPolling(): void {
+  if (agentPollTimer) {
+    clearInterval(agentPollTimer)
+    agentPollTimer = null
+  }
+}
+
+onUnmounted(stopAgentPolling)
 
 const installCmd = computed(() => {
   if (!result.value) return ''
@@ -239,6 +303,7 @@ async function handleSubmit(): Promise<void> {
   try {
     const res = await apiClient.registerHost(form.value)
     result.value = res.data
+    if (res.data?.id) startAgentPolling(res.data.id)
   } catch (e: any) {
     error.value = e?.response?.data?.error || 'Erreur lors de l\'enregistrement'
   } finally {
@@ -336,6 +401,28 @@ function finishAdd(): void {
 .host-success-install {
   border-left: 3px solid rgba(56, 189, 248, 0.6);
   color: #7dd3fc;
+}
+
+.agent-connection-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.agent-waiting {
+  background: rgba(99, 102, 241, 0.1);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  color: #a5b4fc;
+}
+
+.agent-connected {
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  color: #86efac;
 }
 
 @media (max-width: 991px) {
