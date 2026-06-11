@@ -316,7 +316,7 @@
         </div>
       </div>
       <div
-        v-if="form.metric !== 'docker_container_running_count'"
+        v-if="form.metric !== 'docker_container_running_count' && form.metric !== 'docker_compose_degraded_services'"
         class="col-md-4"
       >
         <label class="form-label">Scope</label>
@@ -386,6 +386,12 @@
         class="col-12"
       >
         <small class="form-hint">Un incident sera créé par container non-running sur cet hôte.</small>
+      </div>
+      <div
+        v-if="form.metric === 'docker_compose_degraded_services'"
+        class="col-12"
+      >
+        <small class="form-hint">Compare les services déclarés dans le compose.yml au nombre de services avec au moins un container running. La valeur est le nombre de services dégradés.</small>
       </div>
     </div>
 

@@ -166,7 +166,7 @@ type AlertRuleUpdate struct {
 
 func IsDockerMetric(metric string) bool {
 	switch metric {
-	case "docker_container_not_running", "docker_container_running_count":
+	case "docker_container_not_running", "docker_container_running_count", "docker_compose_degraded_services":
 		return true
 	default:
 		return false
@@ -282,13 +282,20 @@ func (ds *DockerMetricScope) Validate(metric string) error {
 		return fmt.Errorf("scope Docker invalide: %s", ds.ScopeMode)
 	}
 
+	switch metric {
+	case "docker_compose_degraded_services":
+		if ds.ScopeMode != "compose_project" {
+			return fmt.Errorf("docker_compose_degraded_services requiert le scope compose_project")
+		}
+	}
+
 	switch ds.ScopeMode {
 	case "container":
 		if ds.ContainerID == "" {
 			return fmt.Errorf("le scope container requiert un container Docker")
 		}
-		if metric == "docker_container_running_count" {
-			return fmt.Errorf("la métrique docker_container_running_count ne supporte pas le scope container")
+		if metric == "docker_container_running_count" || metric == "docker_compose_degraded_services" {
+			return fmt.Errorf("la métrique %s ne supporte pas le scope container", metric)
 		}
 	case "compose_project":
 		if ds.ProjectName == "" {

@@ -218,6 +218,64 @@ func (db *DB) CountRunningDockerContainersByHost(ctx context.Context, hostID str
 	return count, err
 }
 
+// ListDockerContainersByComposeProject returns containers belonging to a Compose project on a host.
+// Matches on the com.docker.compose.project label stored in the JSONB labels column.
+func (db *DB) ListDockerContainersByComposeProject(ctx context.Context, hostID, projectName string) ([]models.DockerContainer, error) {
+	rows, err := db.conn.QueryContext(ctx,
+		`SELECT id, host_id, container_id, name, image, image_tag, state
+		 FROM docker_containers
+		 WHERE host_id = $1
+		   AND labels->>'com.docker.compose.project' = $2
+		 ORDER BY name`,
+		hostID, projectName,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var containers []models.DockerContainer
+	for rows.Next() {
+		var c models.DockerContainer
+		if err := rows.Scan(&c.ID, &c.HostID, &c.ContainerID, &c.Name, &c.Image, &c.ImageTag, &c.State); err != nil {
+			continue
+		}
+		containers = append(containers, c)
+	}
+	return containers, nil
+}
+
+// GetDockerComposeServiceCounts returns the number of declared services in the compose project
+// and how many distinct services have at least one running container on the host.
+// The "degraded" count is declared - running.
+func (db *DB) GetDockerComposeServiceCounts(ctx context.Context, hostID, projectName string) (declared, running int, err error) {
+	var servicesJSON string
+	err = db.conn.QueryRowContext(ctx,
+		`SELECT COALESCE(services::text, '[]') FROM compose_projects WHERE host_id = $1 AND name = $2`,
+		hostID, projectName,
+	).Scan(&servicesJSON)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	var services []string
+	_ = json.Unmarshal([]byte(servicesJSON), &services)
+	declared = len(services)
+	if declared == 0 {
+		return 0, 0, nil
+	}
+
+	err = db.conn.QueryRowContext(ctx,
+		`SELECT COUNT(DISTINCT labels->>'com.docker.compose.service')
+		 FROM docker_containers
+		 WHERE host_id = $1
+		   AND labels->>'com.docker.compose.project' = $2
+		   AND state = 'running'`,
+		hostID, projectName,
+	).Scan(&running)
+	return declared, running, err
+}
+
 func (db *DB) GetAllDockerNetworks(ctx context.Context) ([]models.DockerNetwork, error) {
 	rows, err := db.conn.QueryContext(ctx, 
 		`SELECT id, host_id, network_id, name, driver, scope, container_ids, updated_at

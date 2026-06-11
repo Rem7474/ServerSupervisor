@@ -249,6 +249,18 @@ export function useAlertRuleForm(): AlertRuleFormApi {
       if (form.value.metric === 'docker_container_running_count') {
         form.value.docker_scope.scope_mode = 'host'
         form.value.docker_scope.container_id = ''
+        form.value.docker_scope.project_name = ''
+      } else if (form.value.metric === 'docker_compose_degraded_services') {
+        form.value.docker_scope.scope_mode = 'compose_project'
+        form.value.docker_scope.container_id = ''
+        form.value.operator = '>'
+        if (!form.value.threshold_warn || form.value.threshold_warn === 85) {
+          form.value.threshold_warn = 0.5
+        }
+        if (!form.value.threshold_crit || form.value.threshold_crit === 95) {
+          form.value.threshold_crit = 0.5
+        }
+        form.value.duration = 0
       }
     } else if (isProxmoxMetric(form.value.metric)) {
       form.value.source_type = 'proxmox'

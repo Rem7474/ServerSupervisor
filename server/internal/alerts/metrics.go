@@ -155,6 +155,23 @@ func GetMetricValue(ctx context.Context, db *database.DB, host models.Host, rule
 			return 0, false
 		}
 		return float64(count), true
+	case "docker_compose_degraded_services":
+		// host.ID is "docker:compose:<host-id>:<project-name>"; value = declared - running service count.
+		rest := strings.TrimPrefix(host.ID, "docker:compose:")
+		idx := strings.Index(rest, ":")
+		if idx < 0 {
+			return 0, false
+		}
+		hostID, projectName := rest[:idx], rest[idx+1:]
+		declared, running, err := db.GetDockerComposeServiceCounts(ctx, hostID, projectName)
+		if err != nil {
+			return 0, false
+		}
+		degraded := declared - running
+		if degraded < 0 {
+			degraded = 0
+		}
+		return float64(degraded), true
 	case "uptime_down_count":
 		// Global: how many enabled uptime probes are currently DOWN.
 		n, err := db.CountDownProbes(ctx)

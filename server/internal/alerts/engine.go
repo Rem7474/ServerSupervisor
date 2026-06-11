@@ -26,7 +26,8 @@ type NotificationPusher interface {
 // host, or synthetic Proxmox/synthetic target keyed by the incident's host_id).
 func CurrentIncidentValue(ctx context.Context, db *database.DB, rule models.AlertRule, hostID string) (float64, bool) {
 	var host models.Host
-	if strings.HasPrefix(hostID, "proxmox:") || strings.HasPrefix(hostID, "synthetic:") {
+	if strings.HasPrefix(hostID, "proxmox:") || strings.HasPrefix(hostID, "synthetic:") ||
+		strings.HasPrefix(hostID, "docker:") {
 		host = models.Host{ID: hostID, Status: "online", LastSeen: time.Now()}
 	} else {
 		h, err := db.GetHost(ctx, hostID)
@@ -396,11 +397,33 @@ func buildDockerEvaluationTargets(ctx context.Context, db *database.DB, rule mod
 				Status:   "online",
 				LastSeen: time.Now(),
 			}}
+		case "compose_project":
+			containers, err := db.ListDockerContainersByComposeProject(ctx, scope.HostID, scope.ProjectName)
+			if err != nil {
+				return nil
+			}
+			targets := make([]models.Host, 0, len(containers))
+			for _, c := range containers {
+				targets = append(targets, models.Host{
+					ID:       "docker:container:" + c.ID,
+					Name:     c.Name + " (" + scope.ProjectName + ")",
+					Status:   "online",
+					LastSeen: time.Now(),
+				})
+			}
+			return targets
 		}
 	case "docker_container_running_count":
 		return []models.Host{{
 			ID:       "docker:host:" + scope.HostID,
 			Name:     "Docker hôte " + scope.HostID,
+			Status:   "online",
+			LastSeen: time.Now(),
+		}}
+	case "docker_compose_degraded_services":
+		return []models.Host{{
+			ID:       "docker:compose:" + scope.HostID + ":" + scope.ProjectName,
+			Name:     "Compose " + scope.ProjectName,
 			Status:   "online",
 			LastSeen: time.Now(),
 		}}

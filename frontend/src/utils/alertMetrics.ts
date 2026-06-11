@@ -168,6 +168,13 @@ export const ALERT_METRICS: Record<string, AlertMetricMeta> = {
     badgeClass: 'bg-blue-lt text-blue',
     category: 'docker',
   },
+  docker_compose_degraded_services: {
+    label: 'Services Compose dégradés',
+    unit: '',
+    icon: '🐳',
+    badgeClass: 'bg-blue-lt text-blue',
+    category: 'docker',
+  },
   uptime_down_count: {
     label: 'Sondes uptime down',
     unit: '',
@@ -208,6 +215,7 @@ export const ALERT_METRIC_ORDER = [
   'proxmox_disk_min_wearout_percent',
   'docker_container_not_running',
   'docker_container_running_count',
+  'docker_compose_degraded_services',
   'uptime_down_count',
   'ssl_min_days_remaining',
 ]
