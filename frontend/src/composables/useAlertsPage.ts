@@ -33,6 +33,7 @@ interface AlertRuleCapabilities {
   agent_metrics?: unknown[]
   proxmox_metrics?: unknown[]
   synthetic_metrics?: unknown[]
+  docker_metrics?: unknown[]
   proxmox_scope: {
     modes: string[]
     connections: unknown[]
@@ -120,12 +121,13 @@ export function useAlertsPage(): UseAlertsPageApi {
     capabilitiesLoading.value = true
     capabilitiesError.value = ''
 
-    const [rulesResult, hostsResult, agentCapsResult, proxmoxCapsResult, syntheticCapsResult] = await Promise.allSettled([
+    const [rulesResult, hostsResult, agentCapsResult, proxmoxCapsResult, syntheticCapsResult, dockerCapsResult] = await Promise.allSettled([
       rulesStore.fetchRules(),
       hostsStore.fetchHosts(),
       apiClient.getAgentAlertRuleCapabilities(),
       apiClient.getProxmoxAlertRuleCapabilities(),
       apiClient.getSyntheticAlertRuleCapabilities(),
+      apiClient.getDockerAlertCapabilities(),
     ])
 
     if (agentCapsResult.status === 'fulfilled' && proxmoxCapsResult.status === 'fulfilled') {
@@ -134,6 +136,10 @@ export function useAlertsPage(): UseAlertsPageApi {
       const syntheticMetrics =
         syntheticCapsResult.status === 'fulfilled'
           ? syntheticCapsResult.value?.data?.metrics || []
+          : []
+      const dockerMetrics =
+        dockerCapsResult.status === 'fulfilled'
+          ? dockerCapsResult.value?.data?.metrics || []
           : []
       const proxmoxScope = proxmoxCapsResult.value?.data?.proxmox_scope || {
         modes: [],
@@ -144,10 +150,11 @@ export function useAlertsPage(): UseAlertsPageApi {
         disks: [],
       }
       capabilities.value = {
-        metrics: [...agentMetrics, ...proxmoxMetrics, ...syntheticMetrics],
+        metrics: [...agentMetrics, ...proxmoxMetrics, ...syntheticMetrics, ...dockerMetrics],
         agent_metrics: agentMetrics,
         proxmox_metrics: proxmoxMetrics,
         synthetic_metrics: syntheticMetrics,
+        docker_metrics: dockerMetrics,
         proxmox_scope: proxmoxScope,
       }
     } else {
