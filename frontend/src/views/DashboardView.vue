@@ -16,80 +16,27 @@
           Vue d'ensemble de l'infrastructure
         </div>
       </div>
-      <div class="d-flex flex-wrap align-items-center gap-2">
-        <template v-if="canRunApt">
-          <div class="d-flex flex-wrap gap-2">
-            <button
-              class="btn btn-outline-secondary btn-sm"
-              @click="selectAllFiltered"
-            >
-              Tout sélectionner
-            </button>
-            <button
-              class="btn btn-outline-secondary btn-sm"
-              :disabled="selectedCount === 0"
-              @click="clearSelection"
-            >
-              Vider
-            </button>
-            <button
-              class="btn btn-outline-secondary btn-sm"
-              :disabled="selectedCount === 0 || aptLoading !== ''"
-              @click="sendBulkApt('update')"
-            >
-              <span
-                v-if="aptLoading === 'update'"
-                class="spinner-border spinner-border-sm me-1"
-                role="status"
-              />
-              apt update ({{ selectedCount }})
-            </button>
-            <button
-              :class="selectedCount > 5 ? 'btn btn-danger btn-sm' : 'btn btn-primary btn-sm'"
-              :disabled="selectedCount === 0 || aptLoading !== ''"
-              @click="sendBulkApt('upgrade')"
-            >
-              <span
-                v-if="aptLoading === 'upgrade'"
-                class="spinner-border spinner-border-sm me-1"
-                role="status"
-              />
-              apt upgrade ({{ selectedCount }})
-              <span
-                v-if="selectedCount > 5"
-                class="badge bg-danger-lt text-danger ms-2"
-              >DANGER</span>
-            </button>
-          </div>
-        </template>
-        <div
-          v-else
-          class="text-secondary small"
+      <router-link
+        to="/hosts/new"
+        class="btn btn-primary btn-sm"
+      >
+        <svg
+          class="icon"
+          width="20"
+          height="20"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
         >
-          Mode lecture seule
-        </div>
-        <router-link
-          to="/hosts/new"
-          class="btn btn-primary btn-sm"
-        >
-          <svg
-            class="icon"
-            width="20"
-            height="20"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-            />
-          </svg>
-          <span class="d-none d-sm-inline ms-1">Ajouter un hôte</span>
-        </router-link>
-      </div>
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+          />
+        </svg>
+        <span class="d-none d-sm-inline ms-1">Ajouter un hôte</span>
+      </router-link>
     </div>
 
     <WsStatusBar
@@ -290,6 +237,17 @@
                 Warning
               </option>
             </select>
+          </div>
+          <div
+            v-if="canRunApt"
+            class="col-12 col-md-auto d-flex align-items-end"
+          >
+            <button
+              class="btn btn-outline-secondary btn-sm"
+              @click="selectAllFiltered"
+            >
+              Tout sélectionner
+            </button>
           </div>
         </div>
       </div>
@@ -515,6 +473,42 @@
 
     <!-- ─── Versions Docker (collapsible) ───────────────────────────────────── -->
     <DashboardDockerVersions :versions="(versionComparisons as any)" />
+
+    <!-- ─── Barre d'actions groupées ──────────────────────────────────────────── -->
+    <BulkActionBar
+      v-if="canRunApt"
+      :count="selectedCount"
+      @clear="clearSelection"
+    >
+      <button
+        class="btn btn-sm btn-outline-secondary"
+        :disabled="aptLoading !== ''"
+        @click="sendBulkApt('update')"
+      >
+        <span
+          v-if="aptLoading === 'update'"
+          class="spinner-border spinner-border-sm me-1"
+          role="status"
+        />
+        apt update
+      </button>
+      <button
+        :class="selectedCount > 5 ? 'btn btn-sm btn-danger' : 'btn btn-sm btn-primary'"
+        :disabled="aptLoading !== ''"
+        @click="sendBulkApt('upgrade')"
+      >
+        <span
+          v-if="aptLoading === 'upgrade'"
+          class="spinner-border spinner-border-sm me-1"
+          role="status"
+        />
+        apt upgrade
+        <span
+          v-if="selectedCount > 5"
+          class="badge bg-danger-lt text-danger ms-1"
+        >DANGER</span>
+      </button>
+    </BulkActionBar>
   </div>
 </template>
 
@@ -530,6 +524,7 @@ import PaginationNav from '../components/PaginationNav.vue'
 import SortableHeader from '../components/common/SortableHeader.vue'
 import EmptyState from '../components/EmptyState.vue'
 import AppIcon from '../components/AppIcon.vue'
+import BulkActionBar from '../components/BulkActionBar.vue'
 import { formatHostStatus, hostStatusClass } from '../utils/formatHostStatus'
 import { useDashboard } from '../composables/useDashboard'
 

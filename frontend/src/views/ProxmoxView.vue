@@ -1,5 +1,11 @@
 <template>
   <div>
+    <PageRefreshBar
+      v-model="autoRefresh"
+      label="Proxmox VE"
+      :interval-sec="PROXMOX_REFRESH_SEC"
+      :last-updated-at="lastUpdatedAt"
+    />
     <div class="page-header mb-4">
       <div class="page-pretitle">
         <router-link
@@ -178,7 +184,9 @@
             </option>
           </select>
           <button
-            class="btn btn-sm btn-outline-secondary proxmox-refresh-btn"
+            class="btn btn-sm btn-outline-secondary"
+            :disabled="loading"
+            title="Rafraîchir maintenant"
             @click="load"
           >
             <svg
@@ -401,9 +409,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import SortableHeader from '../components/common/SortableHeader.vue'
+import PageRefreshBar from '../components/PageRefreshBar.vue'
 import api from '../api'
 import type { ProxmoxSummary, ProxmoxNode, ProxmoxConnection } from '../types/proxmox'
 
@@ -415,6 +424,10 @@ const instances = ref<ProxmoxConnection[]>([])
 const filterConnection = ref('')
 const loading = ref(true)
 const error = ref('')
+const autoRefresh = ref(true)
+const lastUpdatedAt = ref<Date | null>(null)
+const PROXMOX_REFRESH_SEC = 30
+let refreshTimer: ReturnType<typeof setInterval> | null = null
 const nodeSortKey = ref<string>('node_name')
 const nodeSortDir = ref<'asc' | 'desc'>('asc')
 
@@ -493,7 +506,19 @@ async function load(): Promise<void> {
     }
   } finally {
     loading.value = false
+    lastUpdatedAt.value = new Date()
   }
+}
+
+function startRefreshTimer(): void {
+  stopRefreshTimer()
+  refreshTimer = setInterval(() => {
+    if (autoRefresh.value) load()
+  }, PROXMOX_REFRESH_SEC * 1000)
+}
+
+function stopRefreshTimer(): void {
+  if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null }
 }
 
 function memPct(node: ProxmoxNode): string | number {
@@ -529,7 +554,8 @@ function formatDate(iso: string | undefined): string {
   return new Date(iso).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
 }
 
-onMounted(load)
+onMounted(() => { load(); startRefreshTimer() })
+onUnmounted(stopRefreshTimer)
 </script>
 
 <style scoped>

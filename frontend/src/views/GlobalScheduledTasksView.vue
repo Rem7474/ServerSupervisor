@@ -17,27 +17,36 @@
             Tâches planifiées
           </h2>
         </div>
-        <button
-          class="btn btn-outline-secondary btn-sm"
-          @click="loadTasks"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="icon icon-sm"
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
+        <div class="d-flex gap-2">
+          <button
+            v-if="canManage"
+            class="btn btn-primary btn-sm"
+            @click="openCreate"
           >
-            <polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" />
-            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-          </svg>
-          Actualiser
-        </button>
+            + Nouvelle tâche
+          </button>
+          <button
+            class="btn btn-outline-secondary btn-sm"
+            @click="loadTasks"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="icon icon-sm"
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" />
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+            </svg>
+            Actualiser
+          </button>
+        </div>
       </div>
     </div>
 
@@ -160,7 +169,7 @@
           Aucune tâche trouvée
         </h3>
         <p class="text-secondary mb-0">
-          {{ tasks.length ? 'Modifiez vos filtres.' : 'Créez des tâches depuis la page d\'un hôte.' }}
+          {{ tasks.length ? 'Modifiez vos filtres.' : canManage ? 'Cliquez sur « Nouvelle tâche » pour commencer.' : 'Aucune tâche configurée.' }}
         </p>
       </div>
       <div
@@ -387,6 +396,204 @@
             class="btn-close btn-close-white me-2 m-auto"
             @click="runResult = null"
           />
+        </div>
+      </div>
+    </div>
+
+    <!-- Create task modal -->
+    <div
+      v-if="createModalOpen"
+      class="modal modal-blur show d-block"
+      tabindex="-1"
+      style="background:rgba(0,0,0,.5);z-index:1050"
+      @click.self="createModalOpen = false"
+    >
+      <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">
+              Nouvelle tâche planifiée
+            </h5>
+            <button
+              type="button"
+              class="btn-close"
+              @click="createModalOpen = false"
+            />
+          </div>
+          <form @submit.prevent="saveCreate">
+            <div class="modal-body">
+              <div
+                v-if="createError"
+                class="alert alert-danger py-2 mb-3"
+              >
+                {{ createError }}
+              </div>
+              <div class="row g-3">
+                <div class="col-12">
+                  <label class="form-label required">Hôte</label>
+                  <select
+                    v-model="createForm.host_id"
+                    class="form-select"
+                    required
+                  >
+                    <option value="">
+                      Sélectionner un hôte...
+                    </option>
+                    <option
+                      v-for="h in hostsStore.hosts"
+                      :key="h.id"
+                      :value="h.id"
+                    >
+                      {{ h.name || h.hostname || h.ip_address }}
+                    </option>
+                  </select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label required">Nom</label>
+                  <input
+                    v-model="createForm.name"
+                    type="text"
+                    class="form-control"
+                    placeholder="Ex: Mise à jour quotidienne"
+                    required
+                  >
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label required">Module</label>
+                  <select
+                    v-model="createForm.module"
+                    class="form-select"
+                    required
+                    @change="onModuleChange"
+                  >
+                    <option value="apt">
+                      apt
+                    </option>
+                    <option value="docker">
+                      docker
+                    </option>
+                    <option value="systemd">
+                      systemd
+                    </option>
+                    <option value="journal">
+                      journal
+                    </option>
+                    <option value="processes">
+                      processes
+                    </option>
+                    <option value="custom">
+                      custom
+                    </option>
+                  </select>
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label required">Action</label>
+                  <select
+                    v-if="moduleActions[createForm.module]"
+                    v-model="createForm.action"
+                    class="form-select"
+                    required
+                  >
+                    <option
+                      v-for="a in moduleActions[createForm.module]"
+                      :key="a"
+                      :value="a"
+                    >
+                      {{ a }}
+                    </option>
+                  </select>
+                  <input
+                    v-else
+                    v-model="createForm.action"
+                    type="text"
+                    class="form-control"
+                    required
+                  >
+                </div>
+                <div
+                  v-if="targetLabel(createForm.module)"
+                  class="col-12"
+                >
+                  <label class="form-label">{{ targetLabel(createForm.module) }}</label>
+                  <input
+                    v-model="createForm.target"
+                    type="text"
+                    class="form-control"
+                    :placeholder="targetPlaceholder(createForm.module)"
+                  >
+                </div>
+                <div class="col-12">
+                  <label class="form-label">
+                    Planification (cron)
+                    <span class="text-muted ms-1 small">— laisser vide pour manuel uniquement</span>
+                  </label>
+                  <input
+                    v-model="createForm.cron_expression"
+                    type="text"
+                    class="form-control font-monospace"
+                    placeholder="ex: 0 3 * * *"
+                  >
+                  <div
+                    v-if="createForm.cron_expression"
+                    class="form-hint"
+                  >
+                    <span v-if="createCronDesc">{{ createCronDesc }}</span>
+                    <span
+                      v-if="createNextRun"
+                      :class="createCronDesc ? 'ms-2 text-primary' : 'text-primary'"
+                    >→ prochain : {{ formatDate(createNextRun?.toISOString()) }}</span>
+                    <span
+                      v-else-if="!createCronDesc"
+                      class="text-warning"
+                    >Expression non reconnue</span>
+                  </div>
+                  <div class="mt-2 d-flex flex-wrap gap-2">
+                    <button
+                      v-for="preset in cronPresets"
+                      :key="preset.value"
+                      type="button"
+                      class="btn btn-sm btn-outline-secondary"
+                      @click="createForm.cron_expression = preset.value"
+                    >
+                      {{ preset.label }}
+                    </button>
+                  </div>
+                </div>
+                <div class="col-12">
+                  <label class="form-check">
+                    <input
+                      v-model="createForm.enabled"
+                      type="checkbox"
+                      class="form-check-input"
+                      :disabled="!createForm.cron_expression"
+                    >
+                    <span class="form-check-label">Activée (planifiée automatiquement)</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button
+                type="button"
+                class="btn link-secondary"
+                :disabled="createSaving"
+                @click="createModalOpen = false"
+              >
+                Annuler
+              </button>
+              <button
+                type="submit"
+                class="btn btn-primary"
+                :disabled="createSaving || !createForm.host_id"
+              >
+                <span
+                  v-if="createSaving"
+                  class="spinner-border spinner-border-sm me-1"
+                />
+                Créer la tâche
+              </button>
+            </div>
+          </form>
         </div>
       </div>
     </div>
@@ -623,6 +830,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
+import { useHostsStore } from '../stores/hosts'
 import api from '../api'
 import { isManualOnly, describeCron, nextCronRun, MANUAL_SENTINEL } from '../utils/cron'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
@@ -631,6 +839,7 @@ import SortableHeader from '../components/common/SortableHeader.vue'
 import type { ScheduledTaskWithHost } from '../types/task'
 
 const auth = useAuthStore()
+const hostsStore = useHostsStore()
 const dialog = useConfirmDialog()
 
 const tasks = ref<ScheduledTaskWithHost[]>([])
@@ -658,6 +867,89 @@ const historyError = ref('')
 const expandedId = ref<string | number | null>(null)
 
 const canManage = computed(() => auth.role === 'admin' || auth.role === 'operator')
+
+const moduleActions: Record<string, string[]> = {
+  apt: ['update', 'upgrade', 'install', 'remove'],
+  docker: ['start', 'stop', 'restart', 'pull', 'prune'],
+  systemd: ['restart', 'start', 'stop', 'enable', 'disable'],
+  journal: ['tail'],
+  processes: ['list'],
+}
+
+const cronPresets = [
+  { label: 'Toutes les heures', value: '@hourly' },
+  { label: 'Tous les jours à 3h', value: '0 3 * * *' },
+  { label: 'Dimanche minuit', value: '@weekly' },
+  { label: '1er du mois', value: '@monthly' },
+]
+
+function targetLabel(module: string): string {
+  if (module === 'docker') return 'Conteneur (nom ou ID)'
+  if (module === 'systemd') return 'Service systemd'
+  if (module === 'custom') return 'ID de tâche custom'
+  if (module === 'apt') return 'Paquet (optionnel pour install/remove)'
+  return ''
+}
+
+function targetPlaceholder(module: string): string {
+  if (module === 'docker') return 'nginx'
+  if (module === 'systemd') return 'nginx.service'
+  if (module === 'custom') return 'my-deploy-task'
+  if (module === 'apt') return 'nginx'
+  return ''
+}
+
+function emptyCreateForm() {
+  return { host_id: '', name: '', module: 'apt', action: 'update', target: '', cron_expression: '', enabled: false }
+}
+
+const createModalOpen = ref(false)
+const createForm = ref(emptyCreateForm())
+const createSaving = ref(false)
+const createError = ref('')
+
+const createCronDesc = computed(() => describeCron(createForm.value.cron_expression))
+const createNextRun = computed(() => {
+  const expr = createForm.value.cron_expression
+  if (!expr || expr === MANUAL_SENTINEL) return null
+  return nextCronRun(expr)
+})
+
+function onModuleChange(): void {
+  const actions = moduleActions[createForm.value.module]
+  createForm.value.action = actions ? actions[0] : ''
+  createForm.value.target = ''
+}
+
+function openCreate(): void {
+  createForm.value = emptyCreateForm()
+  createError.value = ''
+  createModalOpen.value = true
+}
+
+async function saveCreate(): Promise<void> {
+  createSaving.value = true
+  createError.value = ''
+  try {
+    const { host_id, ...body } = createForm.value
+    const cron = body.cron_expression.trim() || MANUAL_SENTINEL
+    await api.createScheduledTask(host_id, {
+      name: body.name,
+      module: body.module,
+      action: body.action,
+      target: body.target,
+      payload: '',
+      cron_expression: cron,
+      enabled: cron !== MANUAL_SENTINEL && body.enabled,
+    })
+    createModalOpen.value = false
+    await loadTasks()
+  } catch (e: any) {
+    createError.value = e?.response?.data?.error || 'Erreur lors de la création'
+  } finally {
+    createSaving.value = false
+  }
+}
 
 const hostList = computed(() => {
   const names = [...new Set(tasks.value.map((t: any) => t.host_name))]
@@ -834,7 +1126,10 @@ async function runNow(task: any): Promise<void> {
   }
 }
 
-onMounted(loadTasks)
+onMounted(() => {
+  hostsStore.fetchHosts()
+  loadTasks()
+})
 </script>
 
 <style scoped>

@@ -67,6 +67,16 @@
           Maintenance
         </button>
       </li>
+      <li class="nav-item">
+        <button
+          type="button"
+          class="nav-link"
+          :class="{ active: tab === 'security' }"
+          @click="tab = 'security'"
+        >
+          Sécurité
+        </button>
+      </li>
     </ul>
 
     <!-- Général -->
@@ -137,6 +147,11 @@
       />
     </div>
 
+    <!-- Sécurité -->
+    <div v-show="tab === 'security'">
+      <SettingsSecurityCard />
+    </div>
+
     <!-- Maintenance -->
     <div v-show="tab === 'maintenance'">
       <SettingsMaintenanceCard
@@ -167,6 +182,7 @@ import SettingsSmtpCard from '../components/settings/SettingsSmtpCard.vue'
 import SettingsSystemInfoCard from '../components/settings/SettingsSystemInfoCard.vue'
 import SettingsProxmoxCard from '../components/settings/SettingsProxmoxCard.vue'
 import SettingsRegistryCredentialsCard from '../components/settings/SettingsRegistryCredentialsCard.vue'
+import SettingsSecurityCard from '../components/settings/SettingsSecurityCard.vue'
 
 const route = useRoute()
 const router = useRouter()

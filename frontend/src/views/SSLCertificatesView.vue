@@ -1,5 +1,11 @@
 <template>
   <div>
+    <PageRefreshBar
+      v-model="autoRefresh"
+      label="Certificats SSL"
+      :interval-sec="SSL_REFRESH_SEC"
+      :last-updated-at="lastUpdatedAt"
+    />
     <div class="page-header mb-3">
       <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3">
         <div>
@@ -59,14 +65,20 @@
               <th>Endpoint</th>
               <th>Émetteur</th>
               <th>Expiration</th>
-              <th>Jours restants</th>
+              <th class="text-nowrap">
+                Jours restants
+                <span
+                  class="text-muted ms-1"
+                  title="Trié par expiration (croissant)"
+                >▲</span>
+              </th>
               <th>Dernière vérification</th>
               <th />
             </tr>
           </thead>
           <tbody>
             <tr
-              v-for="c in certs"
+              v-for="c in sortedCerts"
               :key="c.id"
             >
               <td class="fw-semibold">
@@ -250,13 +262,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import api from '../api'
 import { useAuthStore } from '../stores/auth'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
 import EmptyState from '../components/EmptyState.vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import RelativeTime from '../components/RelativeTime.vue'
+import PageRefreshBar from '../components/PageRefreshBar.vue'
 import dayjs from '../utils/dayjs'
 
 interface SSLCert {
@@ -282,9 +295,19 @@ const auth = useAuthStore()
 const dialog = useConfirmDialog()
 
 const certs = ref<SSLCert[]>([])
+const sortedCerts = computed(() =>
+  [...certs.value].sort((a, b) => {
+    const da = a.days_remaining ?? Infinity
+    const db = b.days_remaining ?? Infinity
+    return da - db
+  })
+)
 const loading = ref(false)
 const error = ref('')
 const checkingId = ref('')
+const autoRefresh = ref(true)
+const lastUpdatedAt = ref<Date | null>(null)
+const SSL_REFRESH_SEC = 60
 
 const modalOpen = ref(false)
 const saving = ref(false)
@@ -325,6 +348,7 @@ async function fetchCerts(): Promise<void> {
   try {
     const { data } = await api.getSSLCertificates()
     certs.value = data?.certificates || []
+    lastUpdatedAt.value = new Date()
   } catch (e: any) {
     error.value = e?.response?.data?.error || e?.message || 'Impossible de charger les certificats'
   } finally {
@@ -406,7 +430,7 @@ async function confirmDelete(c: SSLCert): Promise<void> {
 let refreshTimer: ReturnType<typeof setInterval> | undefined
 onMounted(() => {
   fetchCerts()
-  refreshTimer = setInterval(fetchCerts, 60000)
+  refreshTimer = setInterval(() => { if (autoRefresh.value) fetchCerts() }, SSL_REFRESH_SEC * 1000)
 })
 onUnmounted(() => {
   if (refreshTimer) clearInterval(refreshTimer)

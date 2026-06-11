@@ -1,49 +1,47 @@
 <template>
   <div>
-    <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
+    <div class="d-flex align-items-center justify-content-between mb-4">
       <div>
-        <div class="page-pretitle">
-          <router-link
-            to="/"
-            class="text-decoration-none"
+        <h3 class="mb-1">
+          Sécurité de l'application
+        </h3>
+        <div class="text-secondary small">
+          Connexions, échecs d'authentification et IPs bloquées sur ServerSupervisor
+        </div>
+      </div>
+      <div class="d-flex align-items-center gap-2">
+        <div class="btn-group btn-group-sm">
+          <button
+            v-for="p in periodOptions"
+            :key="p.hours"
+            type="button"
+            class="btn"
+            :class="period === p.hours ? 'btn-primary' : 'btn-outline-secondary'"
+            @click="setPeriod(p.hours)"
           >
-            Dashboard
-          </router-link>
-          <span class="text-muted mx-1">/</span>
-          <span>Sécurité hôtes</span>
+            {{ p.label }}
+          </button>
         </div>
-        <h2 class="page-title">
-          Sécurité infrastructure
-        </h2>
-        <div class="text-secondary">
-          Supervision des menaces et des activités suspectes sur les hôtes
-        </div>
+        <button
+          type="button"
+          class="btn btn-sm btn-outline-secondary"
+          :disabled="loading"
+          @click="load"
+        >
+          <span
+            v-if="loading"
+            class="spinner-border spinner-border-sm"
+          />
+          <span v-else>↻</span>
+        </button>
       </div>
     </div>
 
-    <div class="d-flex align-items-center justify-content-between mb-3">
-      <div class="btn-group btn-group-sm">
-        <button
-          v-for="p in periodOptions"
-          :key="p.hours"
-          class="btn"
-          :class="threatsPeriod === p.hours ? 'btn-primary' : 'btn-outline-secondary'"
-          @click="setThreatsPeriod(p.hours)"
-        >
-          {{ p.label }}
-        </button>
-      </div>
-      <button
-        class="btn btn-sm btn-outline-secondary"
-        :disabled="threatsLoading"
-        @click="loadSecurity"
-      >
-        <span
-          v-if="threatsLoading"
-          class="spinner-border spinner-border-sm"
-        />
-        <span v-else>↻</span>
-      </button>
+    <div
+      v-if="error"
+      class="alert alert-danger mb-4"
+    >
+      {{ error }}
     </div>
 
     <div class="row row-cards mb-4">
@@ -54,7 +52,7 @@
               Connexions ({{ periodLabel }})
             </div>
             <div class="h2 mb-0">
-              {{ security.stats?.total ?? '—' }}
+              {{ data.stats?.total ?? '—' }}
             </div>
           </div>
         </div>
@@ -66,7 +64,7 @@
               Échecs ({{ periodLabel }})
             </div>
             <div class="h2 mb-0 text-danger">
-              {{ security.stats?.failures ?? '—' }}
+              {{ data.stats?.failures ?? '—' }}
             </div>
           </div>
         </div>
@@ -78,7 +76,7 @@
               IPs uniques ({{ periodLabel }})
             </div>
             <div class="h2 mb-0">
-              {{ security.stats?.unique_ips ?? '—' }}
+              {{ data.stats?.unique_ips ?? '—' }}
             </div>
           </div>
         </div>
@@ -88,30 +86,33 @@
     <div class="row row-cards">
       <div class="col-lg-5">
         <div class="card h-100">
-          <div class="card-header d-flex align-items-center justify-content-between">
+          <div class="card-header">
             <h3 class="card-title">
               IPs bloquées
             </h3>
           </div>
           <div class="card-body p-0">
             <div
-              v-if="threatsLoading && !security.blocked_ips?.length"
+              v-if="loading && !data.blocked_ips?.length"
               class="p-3"
             >
-              <LoadingSkeleton
-                variant="list"
-                :lines="3"
-              />
+              <div
+                v-for="i in 3"
+                :key="i"
+                class="placeholder-glow mb-2"
+              >
+                <span class="placeholder col-8" />
+              </div>
             </div>
-            <EmptyState
-              v-else-if="!security.blocked_ips?.length"
-              title="Aucune IP bloquée"
-              subtitle="Aucune adresse n'est actuellement dans la liste noire"
-              :icon-size="36"
-            />
+            <div
+              v-else-if="!data.blocked_ips?.length"
+              class="text-center py-4 text-secondary small"
+            >
+              Aucune IP bloquée
+            </div>
             <div v-else>
               <div
-                v-for="ip in security.blocked_ips"
+                v-for="ip in data.blocked_ips"
                 :key="ip"
                 class="d-flex align-items-center justify-content-between px-3 py-2 border-bottom"
               >
@@ -120,6 +121,7 @@
                   <span class="font-monospace small">{{ ip }}</span>
                 </div>
                 <button
+                  type="button"
                   class="btn btn-sm btn-outline-success"
                   :disabled="unblockingIP === ip"
                   @click="unblockIP(ip)"
@@ -140,15 +142,15 @@
             </h3>
           </div>
           <div class="card-body p-0">
-            <EmptyState
-              v-if="!security.top_failed_ips?.length"
-              title="Aucun échec enregistré"
-              :subtitle="`Sur la période ${periodLabel}`"
-              :icon-size="36"
-            />
+            <div
+              v-if="!data.top_failed_ips?.length"
+              class="text-center py-4 text-secondary small"
+            >
+              Aucun échec enregistré sur cette période
+            </div>
             <div v-else>
               <div
-                v-for="item in security.top_failed_ips"
+                v-for="item in data.top_failed_ips"
                 :key="item.ip_address"
                 class="px-3 py-2 border-bottom"
               >
@@ -176,16 +178,10 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import apiClient from '../api'
-import { useConfirmDialog } from '../composables/useConfirmDialog'
-import LoadingSkeleton from '../components/LoadingSkeleton.vue'
-import EmptyState from '../components/EmptyState.vue'
+import api from '../../api'
+import { useConfirmDialog } from '../../composables/useConfirmDialog'
 
-interface FailedIP {
-  ip_address: string
-  fail_count: number
-}
-
+interface FailedIP { ip_address: string; fail_count: number }
 interface SecurityData {
   stats: { total?: number; failures?: number; unique_ips?: number } | null
   blocked_ips: string[]
@@ -199,52 +195,53 @@ const periodOptions = [
 ]
 
 const dialog = useConfirmDialog()
-const security = ref<SecurityData>({ stats: null, blocked_ips: [], top_failed_ips: [] })
-const threatsLoading = ref(false)
+const data = ref<SecurityData>({ stats: null, blocked_ips: [], top_failed_ips: [] })
+const loading = ref(false)
+const error = ref('')
 const unblockingIP = ref('')
-const threatsPeriod = ref(24)
-const periodLabel = computed(() => periodOptions.find(p => p.hours === threatsPeriod.value)?.label ?? '24h')
+const period = ref(24)
+const periodLabel = computed(() => periodOptions.find((p) => p.hours === period.value)?.label ?? '24h')
 
-async function loadSecurity(): Promise<void> {
-  threatsLoading.value = true
+async function load(): Promise<void> {
+  loading.value = true
+  error.value = ''
   try {
-    const res = await apiClient.getSecuritySummary(threatsPeriod.value)
-    security.value = res.data || { stats: null, blocked_ips: [], top_failed_ips: [] }
-  } catch (e) {
-    console.error('Failed to load security summary:', e)
+    const res = await api.getSecuritySummary(period.value)
+    data.value = res.data || { stats: null, blocked_ips: [], top_failed_ips: [] }
+  } catch (e: any) {
+    error.value = e?.response?.data?.error || e?.message || 'Impossible de charger les données de sécurité'
   } finally {
-    threatsLoading.value = false
+    loading.value = false
   }
 }
 
-function setThreatsPeriod(hours: number): void {
-  threatsPeriod.value = hours
-  loadSecurity()
+function setPeriod(hours: number): void {
+  period.value = hours
+  load()
 }
 
 async function unblockIP(ip: string): Promise<void> {
-  const confirmed = await dialog.confirm({
+  const ok = await dialog.confirm({
     title: 'Débloquer cette IP',
     message: `Retirer l'IP ${ip} de la liste noire ?`,
     variant: 'warning',
   })
-  if (!confirmed) return
+  if (!ok) return
   unblockingIP.value = ip
   try {
-    await apiClient.unblockIP(ip)
-    await loadSecurity()
-  } catch (e) {
-    console.error('Failed to unblock IP:', e)
+    await api.unblockIP(ip)
+    await load()
+  } catch (e: any) {
+    error.value = e?.response?.data?.error || 'Impossible de débloquer cette IP'
   } finally {
     unblockingIP.value = ''
   }
 }
 
 function progressWidth(failCount: number): number {
-  const max = Math.max(...(security.value.top_failed_ips?.map((i) => i.fail_count) || [1]))
+  const max = Math.max(...(data.value.top_failed_ips?.map((i) => i.fail_count) || [1]))
   return max > 0 ? Math.round((failCount / max) * 100) : 0
 }
 
-onMounted(loadSecurity)
+onMounted(load)
 </script>
-

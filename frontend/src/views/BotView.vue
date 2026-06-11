@@ -1,8 +1,25 @@
 <template>
   <div>
     <div class="threats-topbar mb-3">
-      <div class="d-flex align-items-center gap-2">
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <span
+          class="live-dot"
+          :class="{ paused: !autoRefresh }"
+        />
         <span class="fw-semibold">Menaces web</span>
+        <button
+          class="badge border-0 cursor-pointer"
+          :class="autoRefresh ? 'bg-green-lt text-green' : 'bg-secondary-lt text-secondary'"
+          type="button"
+          :title="autoRefresh ? 'Cliquer pour mettre en pause' : 'Cliquer pour reprendre'"
+          @click="autoRefresh = !autoRefresh"
+        >
+          {{ autoRefresh ? `Auto (${BOT_REFRESH_SEC}s)` : 'Pause' }}
+        </button>
+        <span
+          v-if="lastUpdatedAt"
+          class="text-secondary small"
+        >dernière MAJ {{ lastUpdatedAt.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) }}</span>
       </div>
       <div class="d-flex align-items-center gap-2 flex-wrap">
         <span class="small text-secondary">Période :</span>
@@ -517,7 +534,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import apiClient, { getApiErrorMessage } from '../api'
 import { addToast } from '../composables/useGlobalToast'
 import { useHostsStore } from '../stores/hosts'
@@ -541,6 +558,10 @@ const hostId = ref('')
 
 const loading = ref(false)
 const summary = ref<AnyRecord>({ threats: {} })
+const autoRefresh = ref(false)
+const lastUpdatedAt = ref<Date | null>(null)
+const BOT_REFRESH_SEC = 60
+let refreshTimer: ReturnType<typeof setInterval> | null = null
 
 const showTimeline = ref(false)
 const timelineLoading = ref(false)
@@ -674,6 +695,7 @@ async function loadThreats() {
     console.error('Failed to load threats summary', err)
   } finally {
     loading.value = false
+    lastUpdatedAt.value = new Date()
   }
 }
 
@@ -786,10 +808,32 @@ async function unblockCrowdSecEntry(ip: string) {
 onMounted(() => {
   hostsStore.fetchHosts()
   loadThreats()
+  refreshTimer = setInterval(() => { if (autoRefresh.value) loadThreats() }, BOT_REFRESH_SEC * 1000)
+})
+onUnmounted(() => {
+  if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null }
 })
 </script>
 
 <style scoped>
+.live-dot {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--ss-status-online, #22c55e);
+  animation: pulse-dot 1.6s infinite;
+}
+.live-dot.paused {
+  animation: none;
+  background: var(--tblr-secondary);
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+.cursor-pointer { cursor: pointer; }
+
 .threats-topbar {
   display: flex;
   align-items: center;

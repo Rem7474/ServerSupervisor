@@ -1,5 +1,11 @@
 <template>
   <div>
+    <PageRefreshBar
+      v-model="autoRefresh"
+      label="Uptime"
+      :interval-sec="UPTIME_REFRESH_SEC"
+      :last-updated-at="lastUpdatedAt"
+    />
     <div class="page-header mb-3">
       <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3">
         <div>
@@ -58,6 +64,7 @@
               <th>Sonde</th>
               <th>Cible</th>
               <th>Statut</th>
+              <th>Uptime 24h</th>
               <th>Latence</th>
               <th>Dernière vérification</th>
               <th />
@@ -65,7 +72,7 @@
           </thead>
           <tbody>
             <tr
-              v-for="p in probes"
+              v-for="p in sortedProbes"
               :key="p.id"
             >
               <td>
@@ -90,6 +97,17 @@
                   v-if="!p.enabled"
                   class="badge bg-secondary-lt text-secondary ms-1"
                 >désactivée</span>
+              </td>
+              <td>
+                <template v-if="probeStats[p.id]">
+                  <span :class="['badge', uptimeBadgeClass(probeStats[p.id].uptime_percent)]">
+                    {{ probeStats[p.id].uptime_percent.toFixed(1) }}%
+                  </span>
+                </template>
+                <span
+                  v-else
+                  class="text-secondary small"
+                >—</span>
               </td>
               <td>
                 <template v-if="p.last_latency_ms != null && p.last_status === 'up'">
@@ -308,13 +326,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import api from '../api'
 import { useAuthStore } from '../stores/auth'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
 import EmptyState from '../components/EmptyState.vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import RelativeTime from '../components/RelativeTime.vue'
+import PageRefreshBar from '../components/PageRefreshBar.vue'
 
 interface Probe {
   id: string
@@ -353,6 +372,24 @@ const probes = ref<Probe[]>([])
 const loading = ref(false)
 const error = ref('')
 const checkingId = ref('')
+const autoRefresh = ref(true)
+const lastUpdatedAt = ref<Date | null>(null)
+const UPTIME_REFRESH_SEC = 15
+const probeStats = ref<Record<string, { uptime_percent: number }>>({})
+
+function uptimeBadgeClass(pct: number): string {
+  if (pct >= 99) return 'bg-green-lt text-green'
+  if (pct >= 95) return 'bg-yellow-lt text-yellow'
+  return 'bg-red-lt text-red'
+}
+
+const sortedProbes = computed(() => {
+  return [...probes.value].sort((a, b) => {
+    if (a.last_status === 'down' && b.last_status !== 'down') return -1
+    if (b.last_status === 'down' && a.last_status !== 'down') return 1
+    return 0
+  })
+})
 
 const modalOpen = ref(false)
 const saving = ref(false)
@@ -394,11 +431,26 @@ async function fetchProbes(): Promise<void> {
   try {
     const { data } = await api.getUptimeProbes()
     probes.value = data?.probes || []
+    lastUpdatedAt.value = new Date()
+    fetchAllStats()
   } catch (e: any) {
     error.value = e?.response?.data?.error || e?.message || 'Impossible de charger les sondes'
   } finally {
     loading.value = false
   }
+}
+
+async function fetchAllStats(): Promise<void> {
+  const results = await Promise.allSettled(
+    probes.value.map((p) => api.getUptimeStats(p.id, 24).then((r) => ({ id: p.id, data: r.data })))
+  )
+  const map: Record<string, { uptime_percent: number }> = {}
+  for (const r of results) {
+    if (r.status === 'fulfilled') {
+      map[r.value.id] = { uptime_percent: r.value.data?.uptime_percent ?? 0 }
+    }
+  }
+  probeStats.value = map
 }
 
 function openCreate(): void {
@@ -480,7 +532,7 @@ async function confirmDelete(p: Probe): Promise<void> {
 let refreshTimer: ReturnType<typeof setInterval> | undefined
 onMounted(() => {
   fetchProbes()
-  refreshTimer = setInterval(fetchProbes, 15000)
+  refreshTimer = setInterval(() => { if (autoRefresh.value) fetchProbes() }, UPTIME_REFRESH_SEC * 1000)
 })
 onUnmounted(() => {
   if (refreshTimer) clearInterval(refreshTimer)
