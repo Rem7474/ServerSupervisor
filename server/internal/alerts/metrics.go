@@ -136,25 +136,30 @@ func GetMetricValue(ctx context.Context, db *database.DB, host models.Host, rule
 		return resolveProxmoxDiskFailedCount(ctx, db, rule), true
 	case "proxmox_disk_min_wearout_percent":
 		return resolveProxmoxDiskMinWearoutPercent(ctx, db, rule), true
-	case "docker_container_not_running":
-		// host.ID is "docker:container:<db-uuid>"; value 1 = not running, 0 = running.
+	case "docker_container_state":
+		// host.ID is "docker:container:<db-uuid>".
+		// Returns 0 (running/ok), 1.0 (warn state), 2.0 (crit state).
+		// threshold_warn=0.5, threshold_crit=1.5, operator='>' are always set by the form.
 		containerID := strings.TrimPrefix(host.ID, "docker:container:")
 		c, err := db.GetDockerContainerByID(ctx, containerID)
 		if err != nil || c == nil {
 			return 0, false
 		}
-		if c.State != "running" {
-			return 1, true
-		}
-		return 0, true
-	case "docker_container_running_count":
-		// host.ID is "docker:host:<host-id>"; value = count of running containers.
-		hostID := strings.TrimPrefix(host.ID, "docker:host:")
-		count, err := db.CountRunningDockerContainersByHost(ctx, hostID)
-		if err != nil {
+		scope := rule.DockerScope
+		if scope == nil {
 			return 0, false
 		}
-		return float64(count), true
+		for _, s := range scope.CritStates {
+			if c.State == s {
+				return 2.0, true
+			}
+		}
+		for _, s := range scope.WarnStates {
+			if c.State == s {
+				return 1.0, true
+			}
+		}
+		return 0.0, true
 	case "docker_compose_degraded_services":
 		// host.ID is "docker:compose:<host-id>:<project-name>"; value = declared - running service count.
 		rest := strings.TrimPrefix(host.ID, "docker:compose:")

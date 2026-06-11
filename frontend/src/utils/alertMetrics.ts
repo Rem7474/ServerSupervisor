@@ -154,15 +154,8 @@ export const ALERT_METRICS: Record<string, AlertMetricMeta> = {
     badgeClass: 'bg-cyan-lt text-cyan',
     category: 'proxmox',
   },
-  docker_container_not_running: {
-    label: 'Container non actif',
-    unit: '',
-    icon: '🐳',
-    badgeClass: 'bg-blue-lt text-blue',
-    category: 'docker',
-  },
-  docker_container_running_count: {
-    label: 'Containers actifs',
+  docker_container_state: {
+    label: 'État d\'un container',
     unit: '',
     icon: '🐳',
     badgeClass: 'bg-blue-lt text-blue',
@@ -213,8 +206,7 @@ export const ALERT_METRIC_ORDER = [
   'proxmox_auth_failures_recent',
   'proxmox_disk_failed_count',
   'proxmox_disk_min_wearout_percent',
-  'docker_container_not_running',
-  'docker_container_running_count',
+  'docker_container_state',
   'docker_compose_degraded_services',
   'uptime_down_count',
   'ssl_min_days_remaining',

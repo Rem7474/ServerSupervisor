@@ -369,7 +369,7 @@ func buildDockerEvaluationTargets(ctx context.Context, db *database.DB, rule mod
 	}
 
 	switch rule.Metric {
-	case "docker_container_not_running":
+	case "docker_container_state":
 		switch scope.ScopeMode {
 		case "host":
 			containers, err := db.ListDockerContainersForAlerts(ctx, scope.HostID)
@@ -397,29 +397,7 @@ func buildDockerEvaluationTargets(ctx context.Context, db *database.DB, rule mod
 				Status:   "online",
 				LastSeen: time.Now(),
 			}}
-		case "compose_project":
-			containers, err := db.ListDockerContainersByComposeProject(ctx, scope.HostID, scope.ProjectName)
-			if err != nil {
-				return nil
-			}
-			targets := make([]models.Host, 0, len(containers))
-			for _, c := range containers {
-				targets = append(targets, models.Host{
-					ID:       "docker:container:" + c.ID,
-					Name:     c.Name + " (" + scope.ProjectName + ")",
-					Status:   "online",
-					LastSeen: time.Now(),
-				})
-			}
-			return targets
 		}
-	case "docker_container_running_count":
-		return []models.Host{{
-			ID:       "docker:host:" + scope.HostID,
-			Name:     "Docker hôte " + scope.HostID,
-			Status:   "online",
-			LastSeen: time.Now(),
-		}}
 	case "docker_compose_degraded_services":
 		return []models.Host{{
 			ID:       "docker:compose:" + scope.HostID + ":" + scope.ProjectName,

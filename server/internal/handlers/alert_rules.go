@@ -67,7 +67,7 @@ var validAlertMetrics = map[string]bool{
 	"proxmox_recent_failed_tasks_24h": true,
 	"proxmox_auth_failures_recent":    true,
 	"proxmox_disk_failed_count": true, "proxmox_disk_min_wearout_percent": true,
-	"docker_container_not_running": true, "docker_container_running_count": true, "docker_compose_degraded_services": true,
+	"docker_container_state": true, "docker_compose_degraded_services": true,
 }
 
 type alertMetricCapability struct {

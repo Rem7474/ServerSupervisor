@@ -315,8 +315,9 @@
           Chargement...
         </div>
       </div>
+      <!-- Scope selector: shown for docker_container_state, hidden for docker_compose_degraded_services (forced compose_project) -->
       <div
-        v-if="form.metric !== 'docker_container_running_count' && form.metric !== 'docker_compose_degraded_services'"
+        v-if="form.metric !== 'docker_compose_degraded_services'"
         class="col-md-4"
       >
         <label class="form-label">Scope</label>
@@ -330,12 +331,6 @@
           </option>
           <option value="container">
             Container spécifique
-          </option>
-          <option
-            v-if="selectedDockerHost?.projects?.length"
-            value="compose_project"
-          >
-            Projet Compose
           </option>
         </select>
       </div>
@@ -361,7 +356,7 @@
         </select>
       </div>
       <div
-        v-if="form.docker_scope.scope_mode === 'compose_project' && form.docker_scope.host_id"
+        v-if="form.metric === 'docker_compose_degraded_services' && form.docker_scope.host_id"
         class="col-md-4"
       >
         <label class="form-label required">Projet Compose</label>
@@ -382,10 +377,10 @@
         </select>
       </div>
       <div
-        v-if="form.docker_scope.scope_mode === 'host'"
+        v-if="form.metric === 'docker_container_state' && form.docker_scope.scope_mode === 'host'"
         class="col-12"
       >
-        <small class="form-hint">Un incident sera créé par container non-running sur cet hôte.</small>
+        <small class="form-hint">Un incident sera créé par container dont l'état correspond à la condition définie à l'étape suivante.</small>
       </div>
       <div
         v-if="form.metric === 'docker_compose_degraded_services'"

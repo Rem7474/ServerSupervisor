@@ -54,6 +54,8 @@ export interface DockerScope {
   host_id: string
   container_id: string
   project_name: string
+  warn_states: string[]  // container states triggering warn alert (docker_container_state)
+  crit_states: string[]  // container states triggering crit alert (docker_container_state)
 }
 
 export interface AlertRuleFormData {
@@ -148,6 +150,8 @@ export function useAlertRuleForm(): AlertRuleFormApi {
       host_id: '',
       container_id: '',
       project_name: '',
+      warn_states: [],
+      crit_states: [],
     },
     operator: '>',
     threshold_warn: 70,
@@ -203,6 +207,8 @@ export function useAlertRuleForm(): AlertRuleFormApi {
         host_id: dscope.host_id || '',
         container_id: dscope.container_id || '',
         project_name: dscope.project_name || '',
+        warn_states: dscope.warn_states || [],
+        crit_states: dscope.crit_states || [],
       },
       operator: rule.operator ?? '>',
       threshold_warn: rule.threshold_warn ?? 70,
@@ -246,20 +252,26 @@ export function useAlertRuleForm(): AlertRuleFormApi {
     if (isDockerMetric(form.value.metric)) {
       form.value.source_type = 'docker'
       form.value.host_id = null
-      if (form.value.metric === 'docker_container_running_count') {
-        form.value.docker_scope.scope_mode = 'host'
-        form.value.docker_scope.container_id = ''
-        form.value.docker_scope.project_name = ''
+      if (form.value.metric === 'docker_container_state') {
+        // Thresholds are internal: 0.5 (warn fires at 1.0), 1.5 (crit fires at 2.0), always operator >
+        form.value.operator = '>'
+        form.value.threshold_warn = 0.5
+        form.value.threshold_crit = 1.5
+        form.value.threshold_clear_warn = undefined
+        form.value.threshold_clear_crit = undefined
+        form.value.duration = 0
+        if (form.value.docker_scope.warn_states.length === 0 && form.value.docker_scope.crit_states.length === 0) {
+          form.value.docker_scope.warn_states = ['paused', 'restarting']
+          form.value.docker_scope.crit_states = ['exited', 'dead']
+        }
       } else if (form.value.metric === 'docker_compose_degraded_services') {
         form.value.docker_scope.scope_mode = 'compose_project'
         form.value.docker_scope.container_id = ''
-        form.value.operator = '>'
-        if (!form.value.threshold_warn || form.value.threshold_warn === 85) {
-          form.value.threshold_warn = 0.5
-        }
-        if (!form.value.threshold_crit || form.value.threshold_crit === 95) {
-          form.value.threshold_crit = 0.5
-        }
+        form.value.operator = '>='
+        form.value.threshold_warn = 1
+        form.value.threshold_crit = 1
+        form.value.threshold_clear_warn = undefined
+        form.value.threshold_clear_crit = undefined
         form.value.duration = 0
       }
     } else if (isProxmoxMetric(form.value.metric)) {

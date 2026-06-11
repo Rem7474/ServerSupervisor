@@ -30,11 +30,14 @@ type ProxmoxMetricScope struct {
 // DockerMetricScope defines how a Docker metric should be evaluated.
 // ScopeMode can be one of: host, container, compose_project.
 // HostID is always required. ContainerID or ProjectName are required for their respective modes.
+// WarnStates and CritStates are used by docker_container_state to select which container states trigger each severity.
 type DockerMetricScope struct {
-	ScopeMode   string `json:"scope_mode"`
-	HostID      string `json:"host_id"`
-	ContainerID string `json:"container_id,omitempty"`  // DB UUID of docker_containers row
-	ProjectName string `json:"project_name,omitempty"` // compose project name
+	ScopeMode   string   `json:"scope_mode"`
+	HostID      string   `json:"host_id"`
+	ContainerID string   `json:"container_id,omitempty"` // DB UUID of docker_containers row
+	ProjectName string   `json:"project_name,omitempty"` // compose project name
+	WarnStates  []string `json:"warn_states,omitempty"`  // container states triggering warn
+	CritStates  []string `json:"crit_states,omitempty"`  // container states triggering crit
 }
 
 type AlertSourceType string
@@ -166,7 +169,7 @@ type AlertRuleUpdate struct {
 
 func IsDockerMetric(metric string) bool {
 	switch metric {
-	case "docker_container_not_running", "docker_container_running_count", "docker_compose_degraded_services":
+	case "docker_container_state", "docker_compose_degraded_services":
 		return true
 	default:
 		return false
@@ -283,6 +286,13 @@ func (ds *DockerMetricScope) Validate(metric string) error {
 	}
 
 	switch metric {
+	case "docker_container_state":
+		if ds.ScopeMode == "compose_project" {
+			return fmt.Errorf("docker_container_state ne supporte pas le scope compose_project")
+		}
+		if len(ds.WarnStates) == 0 && len(ds.CritStates) == 0 {
+			return fmt.Errorf("docker_container_state requiert au moins un état à surveiller")
+		}
 	case "docker_compose_degraded_services":
 		if ds.ScopeMode != "compose_project" {
 			return fmt.Errorf("docker_compose_degraded_services requiert le scope compose_project")
@@ -294,8 +304,8 @@ func (ds *DockerMetricScope) Validate(metric string) error {
 		if ds.ContainerID == "" {
 			return fmt.Errorf("le scope container requiert un container Docker")
 		}
-		if metric == "docker_container_running_count" || metric == "docker_compose_degraded_services" {
-			return fmt.Errorf("la métrique %s ne supporte pas le scope container", metric)
+		if metric == "docker_compose_degraded_services" {
+			return fmt.Errorf("docker_compose_degraded_services ne supporte pas le scope container")
 		}
 	case "compose_project":
 		if ds.ProjectName == "" {

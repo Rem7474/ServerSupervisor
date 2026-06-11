@@ -276,8 +276,7 @@ func (h *AlertRulesHandler) GetDockerAlertRuleCapabilities(c *gin.Context) {
 
 func allDockerAlertMetrics() []alertMetricCapability {
 	return []alertMetricCapability{
-		{Metric: "docker_container_not_running", Label: "Container non actif", Unit: "", Icon: "🐳", BadgeClass: "bg-blue-lt text-blue", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: false},
-		{Metric: "docker_container_running_count", Label: "Containers actifs", Unit: "", Icon: "🐳", BadgeClass: "bg-blue-lt text-blue", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: false},
+		{Metric: "docker_container_state", Label: "État d'un container", Unit: "", Icon: "🐳", BadgeClass: "bg-blue-lt text-blue", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: false},
 		{Metric: "docker_compose_degraded_services", Label: "Services Compose dégradés", Unit: "", Icon: "🐳", BadgeClass: "bg-blue-lt text-blue", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: false},
 	}
 }
