@@ -31,12 +31,15 @@ export interface ProxmoxMetricScope {
  * DockerMetricScope defines how a Docker metric should be evaluated.
  * ScopeMode can be one of: host, container, compose_project.
  * HostID is always required. ContainerID or ProjectName are required for their respective modes.
+ * WarnStates and CritStates are used by docker_container_state to select which container states trigger each severity.
  */
 export interface DockerMetricScope {
   scope_mode: string;
   host_id: string;
   container_id?: string; // DB UUID of docker_containers row
   project_name?: string; // compose project name
+  warn_states?: string[]; // container states triggering warn
+  crit_states?: string[]; // container states triggering crit
 }
 export type AlertSourceType = string;
 export const AlertSourceAgent: AlertSourceType = "agent";
