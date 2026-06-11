@@ -66,7 +66,8 @@ var validAlertMetrics = map[string]bool{
 	"proxmox_node_pending_updates":    true,
 	"proxmox_recent_failed_tasks_24h": true,
 	"proxmox_auth_failures_recent":    true,
-	"proxmox_disk_failed_count":       true, "proxmox_disk_min_wearout_percent": true,
+	"proxmox_disk_failed_count": true, "proxmox_disk_min_wearout_percent": true,
+	"docker_container_not_running": true, "docker_container_running_count": true,
 }
 
 type alertMetricCapability struct {
@@ -157,6 +158,27 @@ func validateAlertActions(actions *models.AlertActions) error {
 		}
 		if !commandModuleRequiresTarget[ct.Module] {
 			ct.Target = ""
+		}
+	}
+	return nil
+}
+
+func validateDockerScopeExists(ctx context.Context, db *database.DB, scope *models.DockerMetricScope) error {
+	if scope == nil {
+		return errors.New("Le scope Docker est requis.")
+	}
+	var exists bool
+	if err := db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM hosts WHERE id = $1)`, scope.HostID).Scan(&exists); err != nil || !exists {
+		return errors.New("Hôte introuvable pour ce scope Docker.")
+	}
+	if scope.ScopeMode == "container" && scope.ContainerID != "" {
+		if err := db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM docker_containers WHERE id = $1 AND host_id = $2)`, scope.ContainerID, scope.HostID).Scan(&exists); err != nil || !exists {
+			return errors.New("Container Docker introuvable pour ce scope.")
+		}
+	}
+	if scope.ScopeMode == "compose_project" && scope.ProjectName != "" {
+		if err := db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM compose_projects WHERE name = $1 AND host_id = $2)`, scope.ProjectName, scope.HostID).Scan(&exists); err != nil || !exists {
+			return errors.New("Projet Compose introuvable pour ce scope.")
 		}
 	}
 	return nil

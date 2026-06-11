@@ -66,6 +66,8 @@
                 :proxmox-storages="(proxmoxStorages as any)"
                 :proxmox-guests="(proxmoxGuests as any)"
                 :proxmox-disks="(proxmoxDisks as any)"
+                :docker-hosts="(dockerHosts as any)"
+                :docker-capabilities-loading="dockerCapabilitiesLoading"
                 @select-metric="selectMetric"
                 @set-source-type="setSourceType"
               />
@@ -296,6 +298,7 @@ const metricCards = computed(() => {
     const cat = getAlertMetricMeta(metricName).category
     if (metricSource === 'proxmox') return cat === 'proxmox'
     if (metricSource === 'synthetic') return cat === 'synthetic'
+    if (metricSource === 'docker') return cat === 'docker'
     return cat === 'host'
   }
 
@@ -321,6 +324,14 @@ const proxmoxNodes = computed(() => props.capabilities?.proxmox_scope?.nodes || 
 const proxmoxStorages = computed(() => props.capabilities?.proxmox_scope?.storages || [])
 const proxmoxGuests = computed(() => props.capabilities?.proxmox_scope?.guests || [])
 const proxmoxDisks = computed(() => props.capabilities?.proxmox_scope?.disks || [])
+
+interface DockerContainer { id: string; name: string; image: string; state: string }
+interface DockerProject { name: string; services: string[] }
+interface DockerHostOption { host_id: string; host_name: string; containers: DockerContainer[]; projects: DockerProject[] }
+
+const dockerCapabilities = ref<{ hosts: DockerHostOption[] } | null>(null)
+const dockerCapabilitiesLoading = ref(false)
+const dockerHosts = computed<DockerHostOption[]>(() => dockerCapabilities.value?.hosts || [])
 
 const metricMetaByKey = computed<Record<string, MetricMeta>>(() => {
   const items = props.capabilities?.metrics || []
@@ -365,6 +376,14 @@ const canProceedStep = computed(() => {
     // Synthetic rules are global by construction — no scope to validate.
     if (form.value.source_type === 'synthetic') return true
 
+    if (form.value.source_type === 'docker') {
+      const ds = form.value.docker_scope
+      if (!ds?.host_id) return false
+      if (ds.scope_mode === 'container') return !!ds.container_id
+      if (ds.scope_mode === 'compose_project') return !!ds.project_name
+      return true
+    }
+
     const scope = form.value.proxmox_scope || { scope_mode: 'global' }
     if (scope.scope_mode === 'connection') return !!scope.connection_id
     if (scope.scope_mode === 'node') return !!scope.node_id
@@ -401,6 +420,22 @@ watch(
     step.value = 1
   },
   { immediate: true, deep: true }
+)
+
+watch(
+  () => form.value.source_type,
+  async (sourceType) => {
+    if (sourceType !== 'docker' || dockerCapabilities.value) return
+    dockerCapabilitiesLoading.value = true
+    try {
+      const response = await apiClient.getDockerAlertCapabilities()
+      dockerCapabilities.value = response.data
+    } catch {
+      dockerCapabilities.value = { hosts: [] }
+    } finally {
+      dockerCapabilitiesLoading.value = false
+    }
+  }
 )
 
 watch(
@@ -446,6 +481,10 @@ watch(
     form.value.proxmox_scope?.guest_id,
     form.value.proxmox_scope?.storage_id,
     form.value.proxmox_scope?.disk_id,
+    form.value.docker_scope?.host_id,
+    form.value.docker_scope?.scope_mode,
+    form.value.docker_scope?.container_id,
+    form.value.docker_scope?.project_name,
   ],
   () => {
     if (!props.visible) return
@@ -580,9 +619,9 @@ function selectMetric(metric: string): void {
 }
 
 function setSourceType(sourceType: string): void {
-  form.value.source_type = sourceType as 'agent' | 'proxmox' | 'synthetic'
+  form.value.source_type = sourceType as 'agent' | 'proxmox' | 'synthetic' | 'docker'
   const currentCat = getAlertMetricMeta(form.value.metric).category
-  const wantedCat = sourceType === 'proxmox' ? 'proxmox' : sourceType === 'synthetic' ? 'synthetic' : 'host'
+  const wantedCat = sourceType === 'proxmox' ? 'proxmox' : sourceType === 'synthetic' ? 'synthetic' : sourceType === 'docker' ? 'docker' : 'host'
 
   // Host filter only applies to agent rules.
   if (sourceType !== 'agent') {
@@ -593,6 +632,7 @@ function setSourceType(sourceType: string): void {
     const first = metricCards.value[0]
     if (first?.value) {
       form.value.metric = first.value
+      onMetricChange()
     }
   }
 }

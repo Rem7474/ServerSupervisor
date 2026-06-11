@@ -300,6 +300,7 @@ func proxmoxScopeLabel(scope *models.ProxmoxMetricScope) string {
 // buildAlertEvaluationTargets creates the list of hosts/targets to evaluate for a rule.
 // For agent metrics, returns the provided hosts. For Proxmox metrics, returns a single
 // synthetic host record with ID from proxmoxScopeKey() to deduplicate incidents per scope.
+// For Docker metrics, returns synthetic targets per container or per host aggregate.
 func buildAlertEvaluationTargets(ctx context.Context, db *database.DB, rule models.AlertRule, hosts []models.Host) []models.Host {
 	if isSyntheticMetric(rule.Metric) {
 		// Synthetic metrics are global — evaluate once with a single synthetic target so
@@ -310,6 +311,9 @@ func buildAlertEvaluationTargets(ctx context.Context, db *database.DB, rule mode
 			Status:   "online",
 			LastSeen: time.Now(),
 		}}
+	}
+	if isDockerMetric(rule.Metric) {
+		return buildDockerEvaluationTargets(ctx, db, rule)
 	}
 	if !isProxmoxMetric(rule.Metric) {
 		// For agent metrics, filter by HostID if set
@@ -342,6 +346,66 @@ func buildAlertEvaluationTargets(ctx context.Context, db *database.DB, rule mode
 			LastSeen: time.Now(),
 		},
 	}
+}
+
+func isDockerMetric(metric string) bool {
+	return models.IsDockerMetric(metric)
+}
+
+// BuildDockerTestTargets is the exported entry point for the test-run handler.
+func BuildDockerTestTargets(ctx context.Context, db *database.DB, rule models.AlertRule) []models.Host {
+	return buildDockerEvaluationTargets(ctx, db, rule)
+}
+
+// buildDockerEvaluationTargets returns synthetic targets for Docker metrics.
+// For docker_container_not_running with scope=host: one target per container on the host.
+// For docker_container_not_running with scope=container: one target for the specific container.
+// For docker_container_running_count: one aggregate target for the host.
+func buildDockerEvaluationTargets(ctx context.Context, db *database.DB, rule models.AlertRule) []models.Host {
+	scope := rule.DockerScope
+	if scope == nil || scope.HostID == "" {
+		return nil
+	}
+
+	switch rule.Metric {
+	case "docker_container_not_running":
+		switch scope.ScopeMode {
+		case "host":
+			containers, err := db.ListDockerContainersForAlerts(ctx, scope.HostID)
+			if err != nil {
+				return nil
+			}
+			targets := make([]models.Host, 0, len(containers))
+			for _, c := range containers {
+				targets = append(targets, models.Host{
+					ID:       "docker:container:" + c.ID,
+					Name:     c.Name + " (" + c.Image + ":" + c.ImageTag + ")",
+					Status:   "online",
+					LastSeen: time.Now(),
+				})
+			}
+			return targets
+		case "container":
+			c, err := db.GetDockerContainerByID(ctx, scope.ContainerID)
+			if err != nil || c == nil {
+				return nil
+			}
+			return []models.Host{{
+				ID:       "docker:container:" + c.ID,
+				Name:     c.Name + " (" + c.Image + ":" + c.ImageTag + ")",
+				Status:   "online",
+				LastSeen: time.Now(),
+			}}
+		}
+	case "docker_container_running_count":
+		return []models.Host{{
+			ID:       "docker:host:" + scope.HostID,
+			Name:     "Docker hôte " + scope.HostID,
+			Status:   "online",
+			LastSeen: time.Now(),
+		}}
+	}
+	return nil
 }
 
 func buildGlobalProxmoxEntityTargets(ctx context.Context, db *database.DB, rule models.AlertRule) []models.Host {

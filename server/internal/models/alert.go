@@ -27,11 +27,22 @@ type ProxmoxMetricScope struct {
 	DiskID       string `json:"disk_id,omitempty"`
 }
 
+// DockerMetricScope defines how a Docker metric should be evaluated.
+// ScopeMode can be one of: host, container, compose_project.
+// HostID is always required. ContainerID or ProjectName are required for their respective modes.
+type DockerMetricScope struct {
+	ScopeMode   string `json:"scope_mode"`
+	HostID      string `json:"host_id"`
+	ContainerID string `json:"container_id,omitempty"`  // DB UUID of docker_containers row
+	ProjectName string `json:"project_name,omitempty"` // compose project name
+}
+
 type AlertSourceType string
 
 const (
 	AlertSourceAgent   AlertSourceType = "agent"
 	AlertSourceProxmox AlertSourceType = "proxmox"
+	AlertSourceDocker  AlertSourceType = "docker"
 )
 
 // AlertActions holds the consolidated notification configuration for an alert rule.
@@ -50,6 +61,7 @@ type AlertRule struct {
 	SourceType          AlertSourceType     `json:"source_type,omitempty" db:"source_type"`
 	HostID              *string             `json:"host_id" db:"host_id"`
 	ProxmoxScope        *ProxmoxMetricScope `json:"proxmox_scope,omitempty" db:"proxmox_scope"`
+	DockerScope         *DockerMetricScope  `json:"docker_scope,omitempty" db:"docker_scope"`
 	Metric              string              `json:"metric" db:"metric"`
 	Operator            string              `json:"operator" db:"operator"`
 	ThresholdWarn       *float64            `json:"threshold_warn" db:"threshold_warn"`
@@ -124,6 +136,7 @@ type AlertRuleCreate struct {
 	SourceType         AlertSourceType     `json:"source_type"`
 	HostID             *string             `json:"host_id"`
 	ProxmoxScope       *ProxmoxMetricScope `json:"proxmox_scope"`
+	DockerScope        *DockerMetricScope  `json:"docker_scope"`
 	Metric             string              `json:"metric" binding:"required"`
 	Operator           string              `json:"operator" binding:"required"`
 	ThresholdWarn      float64             `json:"threshold_warn" binding:"required"`
@@ -140,6 +153,7 @@ type AlertRuleUpdate struct {
 	SourceType         *AlertSourceType    `json:"source_type"`
 	HostID             *string             `json:"host_id"`
 	ProxmoxScope       *ProxmoxMetricScope `json:"proxmox_scope"`
+	DockerScope        *DockerMetricScope  `json:"docker_scope"`
 	Metric             *string             `json:"metric"`
 	Operator           *string             `json:"operator"`
 	ThresholdWarn      *float64            `json:"threshold_warn"`
@@ -148,6 +162,15 @@ type AlertRuleUpdate struct {
 	ThresholdClearCrit *float64            `json:"threshold_clear_crit"`
 	Duration           *int                `json:"duration"`
 	Actions            *AlertActions       `json:"actions"`
+}
+
+func IsDockerMetric(metric string) bool {
+	switch metric {
+	case "docker_container_not_running", "docker_container_running_count":
+		return true
+	default:
+		return false
+	}
 }
 
 func IsProxmoxMetric(metric string) bool {
@@ -166,6 +189,9 @@ func IsProxmoxMetric(metric string) bool {
 }
 
 func InferAlertSourceType(metric string) AlertSourceType {
+	if IsDockerMetric(metric) {
+		return AlertSourceDocker
+	}
 	if IsProxmoxMetric(metric) {
 		return AlertSourceProxmox
 	}
@@ -234,6 +260,45 @@ func (ps *ProxmoxMetricScope) Validate(metric string) error {
 	return nil
 }
 
+func (ds *DockerMetricScope) Validate(metric string) error {
+	if ds == nil {
+		return fmt.Errorf("le scope Docker est requis")
+	}
+
+	ds.ScopeMode = strings.TrimSpace(ds.ScopeMode)
+	ds.HostID = strings.TrimSpace(ds.HostID)
+	ds.ContainerID = strings.TrimSpace(ds.ContainerID)
+	ds.ProjectName = strings.TrimSpace(ds.ProjectName)
+
+	if ds.HostID == "" {
+		return fmt.Errorf("le scope Docker requiert un hôte")
+	}
+
+	validModes := map[string]bool{"host": true, "container": true, "compose_project": true}
+	if ds.ScopeMode == "" {
+		ds.ScopeMode = "host"
+	}
+	if !validModes[ds.ScopeMode] {
+		return fmt.Errorf("scope Docker invalide: %s", ds.ScopeMode)
+	}
+
+	switch ds.ScopeMode {
+	case "container":
+		if ds.ContainerID == "" {
+			return fmt.Errorf("le scope container requiert un container Docker")
+		}
+		if metric == "docker_container_running_count" {
+			return fmt.Errorf("la métrique docker_container_running_count ne supporte pas le scope container")
+		}
+	case "compose_project":
+		if ds.ProjectName == "" {
+			return fmt.Errorf("le scope compose_project requiert un nom de projet")
+		}
+	}
+
+	return nil
+}
+
 func (ar *AlertRule) NormalizeCompatibility() {
 	if ar.SourceType == "" {
 		ar.SourceType = InferAlertSourceType(ar.Metric)
@@ -251,13 +316,27 @@ func (ar *AlertRule) Validate() error {
 		if IsProxmoxMetric(ar.Metric) {
 			return fmt.Errorf("la metrique %s est reservee a la source Proxmox", ar.Metric)
 		}
+		if IsDockerMetric(ar.Metric) {
+			return fmt.Errorf("la metrique %s est reservee a la source Docker", ar.Metric)
+		}
 		ar.ProxmoxScope = nil
+		ar.DockerScope = nil
 	case AlertSourceProxmox:
 		if !IsProxmoxMetric(ar.Metric) {
 			return fmt.Errorf("la metrique %s est reservee a la source agent", ar.Metric)
 		}
 		ar.HostID = nil
+		ar.DockerScope = nil
 		if err := ar.ProxmoxScope.Validate(ar.Metric); err != nil {
+			return err
+		}
+	case AlertSourceDocker:
+		if !IsDockerMetric(ar.Metric) {
+			return fmt.Errorf("la metrique %s n'est pas une metrique Docker", ar.Metric)
+		}
+		ar.HostID = nil
+		ar.ProxmoxScope = nil
+		if err := ar.DockerScope.Validate(ar.Metric); err != nil {
 			return err
 		}
 	default:

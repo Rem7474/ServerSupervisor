@@ -17,6 +17,7 @@ func (h *AlertRulesHandler) TestAlertRule(c *gin.Context) {
 		SourceType         models.AlertSourceType     `json:"source_type"`
 		HostID             *string                    `json:"host_id"`
 		ProxmoxScope       *models.ProxmoxMetricScope `json:"proxmox_scope"`
+		DockerScope        *models.DockerMetricScope  `json:"docker_scope"`
 		Metric             string                     `json:"metric" binding:"required"`
 		Operator           string                     `json:"operator" binding:"required"`
 		ThresholdWarn      float64                    `json:"threshold_warn" binding:"required"`
@@ -47,6 +48,7 @@ func (h *AlertRulesHandler) TestAlertRule(c *gin.Context) {
 		SourceType:         req.SourceType,
 		HostID:             req.HostID,
 		ProxmoxScope:       req.ProxmoxScope,
+		DockerScope:        req.DockerScope,
 		Metric:             req.Metric,
 		Operator:           req.Operator,
 		ThresholdWarn:      &req.ThresholdWarn,
@@ -70,6 +72,12 @@ func (h *AlertRulesHandler) TestAlertRule(c *gin.Context) {
 	}
 	if rule.SourceType == models.AlertSourceProxmox {
 		if err := validateProxmoxScopeExists(c.Request.Context(), h.db, rule.ProxmoxScope); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+	}
+	if rule.SourceType == models.AlertSourceDocker {
+		if err := validateDockerScopeExists(c.Request.Context(), h.db, rule.DockerScope); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -107,6 +115,23 @@ func (h *AlertRulesHandler) TestAlertRule(c *gin.Context) {
 			WouldFire:    wouldFire,
 			HasData:      ok,
 		})
+	} else if rule.SourceType == models.AlertSourceDocker {
+		targets := alerts.BuildDockerTestTargets(c.Request.Context(), h.db, rule)
+		for _, target := range targets {
+			value, ok := alerts.GetMetricValue(c.Request.Context(), h.db, target, ruleNoStaleness)
+			_, freshOk := alerts.GetMetricValue(c.Request.Context(), h.db, target, rule)
+			wouldFire := ok && freshOk && alerts.MatchRule(rule, target, value)
+			if wouldFire {
+				anyFires = true
+			}
+			results = append(results, TestResult{
+				HostID:       target.ID,
+				HostName:     target.Name,
+				CurrentValue: value,
+				WouldFire:    wouldFire,
+				HasData:      ok,
+			})
+		}
 	} else {
 		hosts, err := h.db.GetAllHosts(c.Request.Context())
 		if err != nil {

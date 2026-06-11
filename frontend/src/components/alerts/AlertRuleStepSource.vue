@@ -41,6 +41,14 @@
         >
           Synthétique
         </button>
+        <button
+          type="button"
+          class="btn"
+          :class="form.source_type === 'docker' ? 'btn-primary' : 'btn-outline-primary'"
+          @click="emit('set-source-type', 'docker')"
+        >
+          🐳 Docker
+        </button>
       </div>
     </div>
 
@@ -279,6 +287,109 @@
       </div>
     </div>
     <div
+      v-if="isDockerMetric(form.metric)"
+      class="row g-2 mt-2"
+    >
+      <div class="col-md-4">
+        <label class="form-label required">Hôte</label>
+        <select
+          v-model="form.docker_scope.host_id"
+          class="form-select"
+          @change="onDockerHostChange"
+        >
+          <option value="">
+            Sélectionner un hôte...
+          </option>
+          <option
+            v-for="h in dockerHosts"
+            :key="h.host_id"
+            :value="h.host_id"
+          >
+            {{ h.host_name }}
+          </option>
+        </select>
+        <div
+          v-if="dockerCapabilitiesLoading"
+          class="form-hint"
+        >
+          Chargement...
+        </div>
+      </div>
+      <div
+        v-if="form.metric !== 'docker_container_running_count'"
+        class="col-md-4"
+      >
+        <label class="form-label">Scope</label>
+        <select
+          v-model="form.docker_scope.scope_mode"
+          class="form-select"
+          @change="onDockerScopeModeChange"
+        >
+          <option value="host">
+            Tous les containers
+          </option>
+          <option value="container">
+            Container spécifique
+          </option>
+          <option
+            v-if="selectedDockerHost?.projects?.length"
+            value="compose_project"
+          >
+            Projet Compose
+          </option>
+        </select>
+      </div>
+      <div
+        v-if="form.docker_scope.scope_mode === 'container' && form.docker_scope.host_id"
+        class="col-md-4"
+      >
+        <label class="form-label required">Container</label>
+        <select
+          v-model="form.docker_scope.container_id"
+          class="form-select"
+        >
+          <option value="">
+            Sélectionner...
+          </option>
+          <option
+            v-for="c in selectedDockerHost?.containers || []"
+            :key="c.id"
+            :value="c.id"
+          >
+            {{ c.name }} <template v-if="c.state !== 'running'">({{ c.state }})</template>
+          </option>
+        </select>
+      </div>
+      <div
+        v-if="form.docker_scope.scope_mode === 'compose_project' && form.docker_scope.host_id"
+        class="col-md-4"
+      >
+        <label class="form-label required">Projet Compose</label>
+        <select
+          v-model="form.docker_scope.project_name"
+          class="form-select"
+        >
+          <option value="">
+            Sélectionner...
+          </option>
+          <option
+            v-for="p in selectedDockerHost?.projects || []"
+            :key="p.name"
+            :value="p.name"
+          >
+            {{ p.name }} ({{ p.services.length }} service{{ p.services.length > 1 ? 's' : '' }})
+          </option>
+        </select>
+      </div>
+      <div
+        v-if="form.docker_scope.scope_mode === 'host'"
+        class="col-12"
+      >
+        <small class="form-hint">Un incident sera créé par container non-running sur cet hôte.</small>
+      </div>
+    </div>
+
+    <div
       v-if="form.metric === 'proxmox_storage_percent'"
       class="text-secondary small mt-2"
     >
@@ -290,10 +401,17 @@
     >
       Utilisez typiquement un seuil > 0.5 pour déclencher quand au moins un disque est en état SMART FAILED.
     </div>
+    <div
+      v-else-if="form.metric === 'docker_container_not_running'"
+      class="text-secondary small mt-2"
+    >
+      Valeur 1 = container non running, 0 = running. Utilisez &gt; 0.5 comme seuil d'alerte.
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { AlertRuleFormData } from '../../composables/useAlertRuleForm'
 import { getAlertMetricMeta } from '../../utils/alertMetrics'
 
@@ -303,7 +421,16 @@ interface HostOption { id: string; name: string }
 interface HostMetrics { metrics?: Array<{ metric: string; label: string; icon?: string }> }
 interface Capabilities { metrics?: Array<{ metric: string }> }
 
-defineProps<{
+interface DockerContainer { id: string; name: string; image: string; state: string }
+interface DockerProject { name: string; services: string[] }
+interface DockerHostOption {
+  host_id: string
+  host_name: string
+  containers: DockerContainer[]
+  projects: DockerProject[]
+}
+
+const props = defineProps<{
   form: AlertRuleFormData
   rule?: { id?: number | string } | null
   hosts: HostOption[]
@@ -323,15 +450,35 @@ defineProps<{
   proxmoxStorages: ScopeOption[]
   proxmoxGuests: ScopeOption[]
   proxmoxDisks: ScopeOption[]
+  dockerHosts: DockerHostOption[]
+  dockerCapabilitiesLoading?: boolean
 }>()
 
 const emit = defineEmits<{
   (e: 'select-metric', value: string): void
-  (e: 'set-source-type', value: 'agent' | 'proxmox' | 'synthetic'): void
+  (e: 'set-source-type', value: 'agent' | 'proxmox' | 'synthetic' | 'docker'): void
 }>()
 
 function isProxmoxMetric(metric: string): boolean {
   return getAlertMetricMeta(metric).category === 'proxmox'
+}
+
+function isDockerMetric(metric: string): boolean {
+  return getAlertMetricMeta(metric).category === 'docker'
+}
+
+const selectedDockerHost = computed(() =>
+  props.dockerHosts.find(h => h.host_id === props.form.docker_scope?.host_id) ?? null
+)
+
+function onDockerHostChange(): void {
+  props.form.docker_scope.container_id = ''
+  props.form.docker_scope.project_name = ''
+}
+
+function onDockerScopeModeChange(): void {
+  props.form.docker_scope.container_id = ''
+  props.form.docker_scope.project_name = ''
 }
 </script>
 
