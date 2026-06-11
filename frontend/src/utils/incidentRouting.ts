@@ -1,6 +1,10 @@
-export function resolveIncidentHostRoute(hostId?: string | null, metric?: string | null): string {
+export function resolveIncidentHostRoute(hostId?: string | null, metric?: string | null, linkHostId?: string | null): string {
   if (!hostId) {
     return '/alerts?tab=incidents'
+  }
+
+  if (hostId.startsWith('docker:')) {
+    return linkHostId ? `/hosts/${encodeURIComponent(linkHostId)}` : '/docker'
   }
 
   if (hostId.startsWith('proxmox:')) {

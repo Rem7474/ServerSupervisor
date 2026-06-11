@@ -88,6 +88,9 @@ type AlertIncident struct {
 	TriggeredAt time.Time  `json:"triggered_at" db:"triggered_at"`
 	ResolvedAt  *time.Time `json:"resolved_at" db:"resolved_at"`
 	Value       float64    `json:"value" db:"value"`
+	// Enriched post-fetch (not DB columns): Docker synthetic IDs resolution
+	ValueLabel string `json:"value_label,omitempty" db:"-"`
+	LinkHostID string `json:"link_host_id,omitempty" db:"-"`
 }
 
 type NotificationItem struct {
@@ -117,6 +120,9 @@ type NotificationItem struct {
 	CurrentValue   *float64 `json:"current_value,omitempty"`
 	ClearThreshold *float64 `json:"clear_threshold,omitempty"`
 	Operator       string   `json:"operator,omitempty"`
+	// Docker synthetic ID resolution: real host to navigate to, and human state label
+	LinkHostID string `json:"link_host_id,omitempty"`
+	ValueLabel string `json:"value_label,omitempty"`
 }
 
 // PushSubscription represents a Web Push (VAPID) subscription for a user's browser/device.

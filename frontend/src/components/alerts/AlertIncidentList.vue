@@ -359,13 +359,13 @@
                   </div>
                 </template>
                 <template v-else>
-                  <code>{{ incidentFormatValue(item.value, item.metric) }}</code>
+                  <code>{{ incidentFormatValue(item.value, item.metric, item.value_label) }}</code>
                   <div
                     v-if="!isCompleted(item) && item.current_value != null"
                     class="text-muted small mt-1"
                   >
                     Actuel :
-                    <span class="fw-medium">{{ incidentFormatValue(item.current_value, item.metric) }}</span>
+                    <span class="fw-medium">{{ incidentFormatValue(item.current_value, item.metric, item.value_label) }}</span>
                     <span
                       v-if="resolveHint(item)"
                       class="ms-1"
@@ -510,6 +510,8 @@ interface Incident {
   host_id?: string
   host_name?: string
   source_label?: string
+  link_host_id?: string
+  value_label?: string
   metric?: string
   status?: string
   version?: string
@@ -697,7 +699,7 @@ function notificationRoute(incident: Incident): string {
     if (incident?.tracker_id) return `/release-trackers/${encodeURIComponent(String(incident.tracker_id))}`
     return '/git-webhooks?tab=trackers'
   }
-  return resolveIncidentHostRoute(incident?.host_id, incident?.metric)
+  return resolveIncidentHostRoute(incident?.host_id, incident?.metric, incident?.link_host_id)
 }
 
 function trackerStatusLabel(status: string | undefined): string {
@@ -725,10 +727,21 @@ function defaultNotificationTitle(incident: Incident): string {
   return incident?.metric ? incidentMetricLabel(incident.metric) : 'Notification'
 }
 
-function incidentFormatValue(value: number | string | undefined, metric: string | undefined): string {
+function incidentFormatValue(value: number | string | undefined, metric: string | undefined, valueLabel?: string): string {
   if (metric === 'release_tracker') return '-'
   if (metric === 'status_offline') return value === 1 ? 'offline' : 'online'
   if (metric === 'disk_smart_status') return Number(value) >= 1 ? 'FAILED' : 'OK'
+  if (metric === 'docker_container_state') {
+    if (valueLabel) return valueLabel
+    const n = Number(value)
+    if (n < 0.5) return 'running'
+    if (n < 1.5) return 'dégradé'
+    return 'critique'
+  }
+  if (metric === 'docker_compose_degraded_services') {
+    const n = Number(value)
+    return n === 1 ? '1 service dégradé' : `${n} services dégradés`
+  }
   const unit = getAlertMetricMeta(metric || '').unit
   return `${Number(value).toFixed(2)}${unit}`
 }

@@ -121,6 +121,35 @@ func (db *DB) enrichNotificationSource(ctx context.Context, item *models.Notific
 		}
 		return
 	}
+	if strings.HasPrefix(item.HostID, "docker:container:") {
+		item.SourceType = "docker"
+		uuid := strings.TrimPrefix(item.HostID, "docker:container:")
+		var name, state, hostID string
+		if err := db.conn.QueryRowContext(ctx,
+			`SELECT name, state, host_id FROM docker_containers WHERE id = $1`, uuid,
+		).Scan(&name, &state, &hostID); err == nil {
+			item.HostName = name
+			item.SourceLabel = "Conteneur Docker"
+			item.LinkHostID = hostID
+			item.ValueLabel = state
+		} else {
+			item.HostName = "Conteneur " + uuid
+			item.SourceLabel = "Conteneur Docker"
+		}
+		return
+	}
+
+	if strings.HasPrefix(item.HostID, "docker:compose:") {
+		item.SourceType = "docker"
+		rest := strings.TrimPrefix(item.HostID, "docker:compose:")
+		if idx := strings.Index(rest, ":"); idx >= 0 {
+			item.LinkHostID = rest[:idx]
+			item.HostName = rest[idx+1:]
+		}
+		item.SourceLabel = "Compose Docker"
+		return
+	}
+
 	item.SourceType = "agent"
 	item.SourceLabel = item.HostName
 

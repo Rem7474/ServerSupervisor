@@ -231,7 +231,7 @@ RETURNING id, created_at, updated_at`,
 	).Scan(&rule.ID, &rule.CreatedAt, &rule.UpdatedAt)
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": alertRuleDBError(err)})
 		return
 	}
 	c.JSON(http.StatusCreated, rule)
@@ -422,7 +422,7 @@ FROM alert_rules WHERE id = $1`, id)
 
 	result, err := h.db.Exec(c.Request.Context(), query, args...)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": alertRuleDBError(err)})
 		return
 	}
 	rows, _ := result.RowsAffected()

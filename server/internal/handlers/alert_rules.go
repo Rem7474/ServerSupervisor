@@ -164,6 +164,23 @@ func validateAlertActions(actions *models.AlertActions) error {
 	return nil
 }
 
+// alertRuleDBError translates known PostgreSQL constraint violations on
+// alert_rules into user-readable messages. Raw DB errors should never reach
+// the frontend, so this is the last safety net.
+func alertRuleDBError(err error) string {
+	if err == nil {
+		return ""
+	}
+	msg := err.Error()
+	if strings.Contains(msg, "chk_alert_rules_source_type") {
+		return "Le type de source de cette règle n'est pas encore supporté par la base de données. Relancez le serveur pour appliquer les migrations en attente."
+	}
+	if strings.Contains(msg, "alert_rules_rebuilt_pkey") || strings.Contains(msg, "duplicate key") {
+		return "Une erreur de base de données s'est produite lors de la création. Veuillez réessayer."
+	}
+	return msg
+}
+
 func validateDockerScopeExists(ctx context.Context, db *database.DB, scope *models.DockerMetricScope) error {
 	if scope == nil {
 		return errors.New("Le scope Docker est requis.")

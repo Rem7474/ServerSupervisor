@@ -18,6 +18,8 @@ export interface NotificationItem {
   release_name?: string
   host_id?: string
   host_name?: string
+  link_host_id?: string
+  value_label?: string
   metric?: string
   value?: number
   browser_notify?: boolean
@@ -76,7 +78,7 @@ export function useNotifications() {
       if (item?.tracker_id) return `/release-trackers/${encodeURIComponent(String(item.tracker_id))}`
       return '/git-webhooks?tab=trackers'
     }
-    return resolveIncidentHostRoute(item?.host_id, item?.metric)
+    return resolveIncidentHostRoute(item?.host_id, item?.metric, item?.link_host_id)
   }
 
   async function markAllRead(): Promise<void> {

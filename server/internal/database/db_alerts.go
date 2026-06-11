@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"strings"
 
 	"github.com/serversupervisor/server/internal/models"
 )
@@ -244,7 +245,7 @@ func (db *DB) ResolveOpenAlertIncidentsByRule(ctx context.Context, ruleID int64)
 }
 
 func (db *DB) GetAlertIncidents(ctx context.Context, limit, offset int) ([]models.AlertIncident, error) {
-	rows, err := db.conn.QueryContext(ctx, 
+	rows, err := db.conn.QueryContext(ctx,
 		`SELECT id, rule_id, host_id, severity, triggered_at, resolved_at, value
  FROM alert_incidents ORDER BY triggered_at DESC LIMIT $1 OFFSET $2`,
 		limit, offset,
@@ -264,7 +265,30 @@ func (db *DB) GetAlertIncidents(ctx context.Context, limit, offset int) ([]model
 		if nullableRuleID.Valid {
 			inc.RuleID = &nullableRuleID.Int64
 		}
+		db.enrichDockerIncident(ctx, &inc)
 		incidents = append(incidents, inc)
 	}
 	return incidents, nil
+}
+
+// enrichDockerIncident fills LinkHostID and ValueLabel for incidents whose
+// host_id is a synthetic Docker identifier (docker:container: / docker:compose:).
+func (db *DB) enrichDockerIncident(ctx context.Context, inc *models.AlertIncident) {
+	if strings.HasPrefix(inc.HostID, "docker:container:") {
+		uuid := strings.TrimPrefix(inc.HostID, "docker:container:")
+		var name, state, hostID string
+		if err := db.conn.QueryRowContext(ctx,
+			`SELECT name, state, host_id FROM docker_containers WHERE id = $1`, uuid,
+		).Scan(&name, &state, &hostID); err == nil {
+			inc.LinkHostID = hostID
+			inc.ValueLabel = state
+		}
+		return
+	}
+	if strings.HasPrefix(inc.HostID, "docker:compose:") {
+		rest := strings.TrimPrefix(inc.HostID, "docker:compose:")
+		if idx := strings.Index(rest, ":"); idx >= 0 {
+			inc.LinkHostID = rest[:idx]
+		}
+	}
 }
