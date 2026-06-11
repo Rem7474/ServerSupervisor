@@ -27,9 +27,21 @@ export interface ProxmoxMetricScope {
   guest_id?: string;
   disk_id?: string;
 }
+/**
+ * DockerMetricScope defines how a Docker metric should be evaluated.
+ * ScopeMode can be one of: host, container, compose_project.
+ * HostID is always required. ContainerID or ProjectName are required for their respective modes.
+ */
+export interface DockerMetricScope {
+  scope_mode: string;
+  host_id: string;
+  container_id?: string; // DB UUID of docker_containers row
+  project_name?: string; // compose project name
+}
 export type AlertSourceType = string;
 export const AlertSourceAgent: AlertSourceType = "agent";
 export const AlertSourceProxmox: AlertSourceType = "proxmox";
+export const AlertSourceDocker: AlertSourceType = "docker";
 /**
  * AlertActions holds the consolidated notification configuration for an alert rule.
  * Stored as a single JSONB column in the database.
@@ -47,6 +59,7 @@ export interface AlertRule {
   source_type?: AlertSourceType;
   host_id?: string;
   proxmox_scope?: ProxmoxMetricScope;
+  docker_scope?: DockerMetricScope;
   metric: string;
   operator: string;
   threshold_warn?: number /* float64 */;
@@ -119,6 +132,7 @@ export interface AlertRuleCreate {
   source_type: AlertSourceType;
   host_id?: string;
   proxmox_scope?: ProxmoxMetricScope;
+  docker_scope?: DockerMetricScope;
   metric: string;
   operator: string;
   threshold_warn: number /* float64 */;
@@ -134,6 +148,7 @@ export interface AlertRuleUpdate {
   source_type?: AlertSourceType;
   host_id?: string;
   proxmox_scope?: ProxmoxMetricScope;
+  docker_scope?: DockerMetricScope;
   metric?: string;
   operator?: string;
   threshold_warn?: number /* float64 */;
