@@ -50,7 +50,8 @@ var commandModuleActions = map[string][]string{
 }
 
 var commandModuleRequiresTarget = map[string]bool{
-	"docker":  true,
+	// docker target is optional: for docker_container_state rules the engine auto-fills
+	// the container name from the incident at dispatch time (see alerts/notify.go).
 	"journal": true,
 	"systemd": true,
 	"custom":  true,

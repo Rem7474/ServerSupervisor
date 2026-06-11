@@ -302,6 +302,32 @@ func triggerAlertCommand(ctx context.Context, dispatcher *dispatch.Dispatcher, d
 
 	targetHostID := host.ID
 	targetLabel := host.Name
+	ctTarget := ct.Target
+
+	if strings.HasPrefix(host.ID, "docker:container:") {
+		// Resolve the real host and, if no explicit target, use the container name.
+		containerUUID := strings.TrimPrefix(host.ID, "docker:container:")
+		c, err := db.GetDockerContainerByID(ctx, containerUUID)
+		if err != nil || c == nil {
+			slog.WarnContext(ctx, "alerts: command_trigger skipped — docker container not found", slog.Int64("rule_id", rule.ID), slog.String("container_uuid", containerUUID))
+			return
+		}
+		targetHostID = c.HostID
+		targetLabel = c.Name
+		if ctTarget == "" {
+			ctTarget = c.Name
+		}
+	} else if strings.HasPrefix(host.ID, "docker:compose:") {
+		// Compose-level alerts: dispatch to the host embedded in the ID.
+		rest := strings.TrimPrefix(host.ID, "docker:compose:")
+		if idx := strings.Index(rest, ":"); idx >= 0 {
+			targetHostID = rest[:idx]
+		} else {
+			slog.WarnContext(ctx, "alerts: command_trigger skipped — malformed docker:compose host ID", slog.Int64("rule_id", rule.ID), slog.String("host_id", host.ID))
+			return
+		}
+	}
+
 	if strings.HasPrefix(host.ID, "proxmox:") {
 		parts := strings.SplitN(host.ID, ":", 3)
 		if len(parts) != 3 || parts[1] != "guest" || parts[2] == "" {
@@ -330,7 +356,7 @@ func triggerAlertCommand(ctx context.Context, dispatcher *dispatch.Dispatcher, d
 		HostID:      targetHostID,
 		Module:      ct.Module,
 		Action:      ct.Action,
-		Target:      ct.Target,
+		Target:      ctTarget,
 		Payload:     payload,
 		TriggeredBy: triggeredBy,
 	}); err != nil {
