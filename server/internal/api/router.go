@@ -10,6 +10,7 @@ import (
 	"github.com/serversupervisor/server/internal/scheduler"
 	auditsvc "github.com/serversupervisor/server/internal/services/audit"
 	hostpermsvc "github.com/serversupervisor/server/internal/services/hostperm"
+	pushsvc "github.com/serversupervisor/server/internal/services/push"
 	scheduledtasksvc "github.com/serversupervisor/server/internal/services/scheduledtask"
 	sslsvc "github.com/serversupervisor/server/internal/services/ssl"
 	usersvc "github.com/serversupervisor/server/internal/services/user"
@@ -49,7 +50,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	alertRulesH := handlers.NewAlertRulesHandler(db, cfg)
 	settingsH := handlers.NewSettingsHandler(db, cfg)
 	notifH := handlers.NewNotificationsHandler(db)
-	pushH := handlers.NewPushHandler(db, cfg)
+	pushH := handlers.NewPushHandler(pushsvc.NewService(db))
 	scheduledTaskH := handlers.NewScheduledTaskHandler(scheduledtasksvc.NewService(db, sched, dispatcher), db)
 	gitWebhookH := handlers.NewGitWebhookHandler(db, cfg, dispatcher, notifHub)
 	releaseTrackerH := handlers.NewReleaseTrackerHandler(db, cfg, dispatcher, notifHub)

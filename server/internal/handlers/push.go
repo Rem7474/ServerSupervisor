@@ -1,62 +1,36 @@
 package handlers
 
 import (
-	"context"
-	"fmt"
 	"log/slog"
-
 	"net/http"
 
-	webpush "github.com/SherClockHolmes/webpush-go"
 	"github.com/gin-gonic/gin"
-	"github.com/serversupervisor/server/internal/config"
-	"github.com/serversupervisor/server/internal/database"
+	"github.com/serversupervisor/server/internal/apperr"
+	pushsvc "github.com/serversupervisor/server/internal/services/push"
 )
 
 // PushHandler manages Web Push (VAPID) subscriptions and VAPID key provisioning.
 type PushHandler struct {
-	db  *database.DB
-	cfg *config.Config
+	svc *pushsvc.Service
 }
 
-func NewPushHandler(db *database.DB, cfg *config.Config) *PushHandler {
-	return &PushHandler{db: db, cfg: cfg}
+func NewPushHandler(svc *pushsvc.Service) *PushHandler {
+	return &PushHandler{svc: svc}
 }
 
-// ensureVapidKeys returns the stored VAPID key pair, generating and persisting a new one on first use.
-// Keys are stored as URL-safe base64 in the settings table under "vapid_private_key" / "vapid_public_key".
-func (h *PushHandler) ensureVapidKeys(ctx context.Context) (privateKey, publicKey string, err error) {
-	privateKey, err = h.db.GetSetting(ctx, "vapid_private_key")
-	if err == nil && privateKey != "" {
-		publicKey, err = h.db.GetSetting(ctx, "vapid_public_key")
-		if err == nil && publicKey != "" {
-			return privateKey, publicKey, nil
-		}
-	}
-	privateKey, publicKey, err = webpush.GenerateVAPIDKeys()
-	if err != nil {
-		return "", "", err
-	}
-	_ = h.db.SetSetting(ctx, "vapid_private_key", privateKey)
-	_ = h.db.SetSetting(ctx, "vapid_public_key", publicKey)
-	slog.InfoContext(ctx, "Push: generated new VAPID key pair")
-	return privateKey, publicKey, nil
-}
-
-// GetVapidPublicKey returns the VAPID public key that the frontend needs to subscribe.
+// GetVapidPublicKey returns the VAPID public key the frontend needs to subscribe.
 // GET /api/v1/push/vapid-public-key
 func (h *PushHandler) GetVapidPublicKey(c *gin.Context) {
-	_, publicKey, err := h.ensureVapidKeys(c.Request.Context())
+	publicKey, err := h.svc.PublicKey(c.Request.Context())
 	if err != nil {
-		slog.ErrorContext(c.Request.Context(), fmt.Sprintf("Push: failed to get/generate VAPID keys: %v", err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get VAPID key"})
+		slog.ErrorContext(c.Request.Context(), "Push: failed to get/generate VAPID keys", slog.Any("err", err))
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"public_key": publicKey})
 }
 
 // Subscribe saves a Web Push subscription for the authenticated user.
-// The browser provides endpoint + encrypted keys; we store them for later alert fan-out.
 // POST /api/v1/push/subscribe
 func (h *PushHandler) Subscribe(c *gin.Context) {
 	username := c.GetString("username")
@@ -68,34 +42,33 @@ func (h *PushHandler) Subscribe(c *gin.Context) {
 		} `json:"keys" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid subscription payload"})
+		respondError(c, apperr.Validation("invalid subscription payload"))
 		return
 	}
 	userAgent := c.GetHeader("User-Agent")
 	if len(userAgent) > 500 {
 		userAgent = userAgent[:500]
 	}
-	if err := h.db.SavePushSubscription(c.Request.Context(), username, req.Endpoint, req.Keys.P256DH, req.Keys.Auth, userAgent); err != nil {
-		slog.ErrorContext(c.Request.Context(), fmt.Sprintf("Push: failed to save subscription for %s: %v", username, err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save subscription"})
+	if err := h.svc.Subscribe(c.Request.Context(), username, req.Endpoint, req.Keys.P256DH, req.Keys.Auth, userAgent); err != nil {
+		slog.ErrorContext(c.Request.Context(), "Push: failed to save subscription", slog.String("user", username), slog.Any("err", err))
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 
 // Unsubscribe removes a Web Push subscription by its endpoint URL.
-// Called when the user explicitly revokes push permission in the UI.
 // DELETE /api/v1/push/subscribe
 func (h *PushHandler) Unsubscribe(c *gin.Context) {
 	var req struct {
 		Endpoint string `json:"endpoint" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		respondError(c, apperr.Validation("invalid request"))
 		return
 	}
-	if err := h.db.DeletePushSubscription(c.Request.Context(), req.Endpoint); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to remove subscription"})
+	if err := h.svc.Unsubscribe(c.Request.Context(), req.Endpoint); err != nil {
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"ok": true})
