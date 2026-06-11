@@ -85,6 +85,11 @@ export interface AlertIncident {
   triggered_at: string;
   resolved_at?: string;
   value: number /* float64 */;
+  /**
+   * Enriched post-fetch (not DB columns): Docker synthetic IDs resolution
+   */
+  value_label?: string;
+  link_host_id?: string;
 }
 export interface NotificationItem {
   id: string;
@@ -115,6 +120,11 @@ export interface NotificationItem {
   current_value?: number /* float64 */;
   clear_threshold?: number /* float64 */;
   operator?: string;
+  /**
+   * Docker synthetic ID resolution: real host to navigate to, and human state label
+   */
+  link_host_id?: string;
+  value_label?: string;
 }
 /**
  * PushSubscription represents a Web Push (VAPID) subscription for a user's browser/device.
