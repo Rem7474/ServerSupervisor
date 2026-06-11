@@ -291,13 +291,27 @@
 
     <!-- ── Connexions tab (admin only) ────────────────────────────────────── -->
     <div v-show="activeTab === 'connexions'">
-      <!-- Stats cards -->
+      <!-- Period selector + stats cards -->
+      <div class="d-flex align-items-center justify-content-between mb-3">
+        <div class="btn-group btn-group-sm">
+          <button
+            v-for="p in secPeriodOptions"
+            :key="p.hours"
+            type="button"
+            class="btn"
+            :class="securityPeriod === p.hours ? 'btn-primary' : 'btn-outline-secondary'"
+            @click="setSecurityPeriod(p.hours)"
+          >
+            {{ p.label }}
+          </button>
+        </div>
+      </div>
       <div class="row row-cards mb-4">
         <div class="col-sm-4">
           <div class="card card-sm h-100">
             <div class="card-body text-center">
               <div class="text-secondary small mb-1">
-                Connexions (24h)
+                Connexions ({{ securityPeriodLabel }})
               </div>
               <div class="h2 mb-0">
                 {{ security.stats?.total ?? '—' }}
@@ -309,7 +323,7 @@
           <div class="card card-sm h-100">
             <div class="card-body text-center">
               <div class="text-secondary small mb-1">
-                Échecs (24h)
+                Échecs ({{ securityPeriodLabel }})
               </div>
               <div class="h2 mb-0 text-danger">
                 {{ security.stats?.failures ?? '—' }}
@@ -321,7 +335,7 @@
           <div class="card card-sm h-100">
             <div class="card-body text-center">
               <div class="text-secondary small mb-1">
-                IPs uniques (24h)
+                IPs uniques ({{ securityPeriodLabel }})
               </div>
               <div class="h2 mb-0 text-azure">
                 {{ security.stats?.unique_ips ?? '—' }}
@@ -331,38 +345,79 @@
         </div>
       </div>
 
-      <!-- Top failed IPs -->
-      <div class="card mb-4">
-        <div class="card-header">
-          <h3 class="card-title">
-            Top IPs — échecs de connexion (24h)
-          </h3>
-        </div>
-        <div class="card-body p-0">
-          <div
-            v-if="!security.top_failed_ips?.length"
-            class="text-center py-4 text-secondary small"
-          >
-            Aucun échec enregistré sur cette période
-          </div>
-          <div v-else>
-            <div
-              v-for="item in security.top_failed_ips"
-              :key="item.ip_address"
-              class="px-3 py-2 border-bottom"
-            >
-              <div class="d-flex align-items-center justify-content-between mb-1">
-                <span class="font-monospace small">{{ item.ip_address }}</span>
-                <span class="badge bg-red-lt text-red">{{ item.fail_count }} échecs</span>
-              </div>
+      <!-- IPs bloquées + Top failed IPs -->
+      <div class="row row-cards mb-4">
+        <div class="col-lg-5">
+          <div class="card h-100">
+            <div class="card-header">
+              <h3 class="card-title">
+                IPs bloquées
+              </h3>
+            </div>
+            <div class="card-body p-0">
               <div
-                class="progress"
-                style="height: 4px;"
+                v-if="!security.blocked_ips?.length"
+                class="text-center py-4 text-secondary small"
               >
+                Aucune IP bloquée
+              </div>
+              <div v-else>
                 <div
-                  class="progress-bar bg-danger"
-                  :style="{ width: progressWidth(item.fail_count) + '%' }"
-                />
+                  v-for="ip in security.blocked_ips"
+                  :key="ip"
+                  class="d-flex align-items-center justify-content-between px-3 py-2 border-bottom"
+                >
+                  <div class="d-flex align-items-center gap-2">
+                    <span class="badge bg-red-lt text-red">Bloquée</span>
+                    <span class="font-monospace small">{{ ip }}</span>
+                  </div>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-success"
+                    :disabled="unblockingIP === ip"
+                    @click="unblockIP(ip)"
+                  >
+                    {{ unblockingIP === ip ? '…' : 'Débloquer' }}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-7">
+          <div class="card h-100">
+            <div class="card-header">
+              <h3 class="card-title">
+                Top IPs — échecs de connexion ({{ securityPeriodLabel }})
+              </h3>
+            </div>
+            <div class="card-body p-0">
+              <div
+                v-if="!security.top_failed_ips?.length"
+                class="text-center py-4 text-secondary small"
+              >
+                Aucun échec enregistré sur cette période
+              </div>
+              <div v-else>
+                <div
+                  v-for="item in security.top_failed_ips"
+                  :key="item.ip_address"
+                  class="px-3 py-2 border-bottom"
+                >
+                  <div class="d-flex align-items-center justify-content-between mb-1">
+                    <span class="font-monospace small">{{ item.ip_address }}</span>
+                    <span class="badge bg-red-lt text-red">{{ item.fail_count }} échecs</span>
+                  </div>
+                  <div
+                    class="progress"
+                    style="height: 4px;"
+                  >
+                    <div
+                      class="progress-bar bg-danger"
+                      :style="{ width: progressWidth(item.fail_count) + '%' }"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -458,6 +513,7 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import { useConfirmDialog } from '../composables/useConfirmDialog'
 import apiClient from '../api'
 import { useDateFormatter } from '../composables/useDateFormatter'
 import { useStatusBadge } from '../composables/useStatusBadge'
@@ -557,9 +613,19 @@ const connexionsLimit = 50
 const connexionsTotal = ref(0)
 const connexionsLoading = ref(false)
 const connexionsLoaded = ref(false)
-const security = ref<{ stats: any; top_failed_ips: any[] }>({ stats: null, top_failed_ips: [] })
+const security = ref<{ stats: any; blocked_ips: string[]; top_failed_ips: any[] }>({ stats: null, blocked_ips: [], top_failed_ips: [] })
 const lastCmdFetchAt = ref(0)
 const lastConnFetchAt = ref(0)
+
+const dialog = useConfirmDialog()
+const secPeriodOptions = [
+  { hours: 24, label: '24h' },
+  { hours: 168, label: '7j' },
+  { hours: 720, label: '30j' },
+]
+const securityPeriod = ref(24)
+const securityPeriodLabel = computed(() => secPeriodOptions.find((p) => p.hours === securityPeriod.value)?.label ?? '24h')
+const unblockingIP = ref('')
 
 const totalConnexionsPages = computed(() =>
   Math.max(1, Math.ceil(connexionsTotal.value / connexionsLimit))
@@ -752,7 +818,7 @@ async function fetchConnexions(): Promise<void> {
   try {
     const [evRes, secRes] = await Promise.allSettled([
       apiClient.getLoginEventsAdmin(connexionsPage.value, connexionsLimit),
-      apiClient.getSecuritySummary(),
+      apiClient.getSecuritySummary(securityPeriod.value),
     ])
 
     if (evRes.status === 'fulfilled') {
@@ -765,9 +831,9 @@ async function fetchConnexions(): Promise<void> {
     }
 
     if (secRes.status === 'fulfilled') {
-      security.value = secRes.value.data || { stats: null, top_failed_ips: [] }
+      security.value = secRes.value.data || { stats: null, blocked_ips: [], top_failed_ips: [] }
     } else {
-      security.value = { stats: null, top_failed_ips: [] }
+      security.value = { stats: null, blocked_ips: [], top_failed_ips: [] }
     }
     lastConnFetchAt.value = Date.now()
   } finally { connexionsLoading.value = false }
@@ -805,6 +871,31 @@ function selectConnexionsPage(page: number): void {
   if (page === connexionsPage.value) return
   connexionsPage.value = page
   fetchConnexions()
+}
+
+async function setSecurityPeriod(hours: number): Promise<void> {
+  securityPeriod.value = hours
+  try {
+    const res = await apiClient.getSecuritySummary(hours)
+    security.value = res.data || { stats: null, blocked_ips: [], top_failed_ips: [] }
+  } catch { /* keep stale data */ }
+}
+
+async function unblockIP(ip: string): Promise<void> {
+  const ok = await dialog.confirm({
+    title: 'Débloquer cette IP',
+    message: `Retirer l'IP ${ip} de la liste noire ?`,
+    variant: 'warning',
+  })
+  if (!ok) return
+  unblockingIP.value = ip
+  try {
+    await apiClient.unblockIP(ip)
+    const res = await apiClient.getSecuritySummary(securityPeriod.value)
+    security.value = res.data || { stats: null, blocked_ips: [], top_failed_ips: [] }
+  } catch { /* ignore */ } finally {
+    unblockingIP.value = ''
+  }
 }
 
 onMounted(async () => {
