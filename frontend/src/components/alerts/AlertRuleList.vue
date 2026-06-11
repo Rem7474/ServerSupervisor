@@ -95,6 +95,14 @@
                 class="badge bg-secondary-lt text-secondary"
               >Agent › {{ getHostName(rule.host_id) || 'Tous les hôtes' }}</span>
               <span
+                v-else-if="ruleSourceType(rule) === 'docker'"
+                class="badge bg-teal-lt text-teal"
+              >{{ dockerScopeLabel(rule) }}</span>
+              <span
+                v-else-if="ruleSourceType(rule) === 'synthetic'"
+                class="badge bg-purple-lt text-purple"
+              >Synthétique</span>
+              <span
                 v-else
                 class="badge bg-cyan-lt text-cyan"
               >{{ proxmoxScopeLabel(rule) }}</span>
@@ -231,6 +239,13 @@ interface AlertActions {
   command_trigger?: CommandTrigger | null
 }
 
+interface DockerScope {
+  scope_mode?: string
+  host_id?: string
+  container_id?: string
+  project_name?: string
+}
+
 interface AlertRule {
   id: string | number
   name?: string
@@ -248,6 +263,7 @@ interface AlertRule {
   last_fired?: string
   actions?: AlertActions
   proxmox_scope?: ProxmoxScope
+  docker_scope?: DockerScope
 }
 
 const CHANNEL_LABELS: Record<string, string> = { browser: 'Navigateur', smtp: 'Email', ntfy: 'Ntfy', notify: 'Système' }
@@ -331,6 +347,14 @@ function proxmoxScopeLabel(rule: AlertRule): string {
   if (scope.scope_mode === 'storage') return `Proxmox › Stockage ${scope.storage_id || ''}`.trim()
   if (scope.scope_mode === 'disk') return `Proxmox › Disque ${scope.disk_id || ''}`.trim()
   return 'Proxmox › Scope inconnu'
+}
+
+function dockerScopeLabel(rule: AlertRule): string {
+  const scope = rule?.docker_scope
+  if (!scope) return 'Docker'
+  if (scope.scope_mode === 'compose_project') return `Compose › ${scope.project_name || 'Projet inconnu'}`
+  if (scope.scope_mode === 'container') return `Docker › Conteneur`
+  return `Docker › Tous les conteneurs`
 }
 </script>
 
