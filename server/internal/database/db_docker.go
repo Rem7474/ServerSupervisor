@@ -165,6 +165,59 @@ func (db *DB) GetDockerNetworksByHost(ctx context.Context, hostID string) ([]mod
 	return networks, nil
 }
 
+// GetDockerContainerByID returns a single container by its DB UUID.
+func (db *DB) GetDockerContainerByID(ctx context.Context, id string) (*models.DockerContainer, error) {
+	var c models.DockerContainer
+	var labelsJSON, envVarsJSON, volumesJSON, networksJSON string
+	err := db.conn.QueryRowContext(ctx,
+		`SELECT id, host_id, container_id, name, image, image_tag, image_id, image_digest, state, status, created, ports, labels,
+		 COALESCE(env_vars::text, '{}'), COALESCE(volumes::text, '[]'), COALESCE(networks::text, '[]'),
+		 COALESCE(net_rx_bytes, 0), COALESCE(net_tx_bytes, 0), updated_at
+		 FROM docker_containers WHERE id = $1`, id,
+	).Scan(&c.ID, &c.HostID, &c.ContainerID, &c.Name, &c.Image, &c.ImageTag, &c.ImageID, &c.ImageDigest,
+		&c.State, &c.Status, &c.Created, &c.Ports, &labelsJSON, &envVarsJSON, &volumesJSON, &networksJSON,
+		&c.NetRxBytes, &c.NetTxBytes, &c.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	_ = json.Unmarshal([]byte(labelsJSON), &c.Labels)
+	_ = json.Unmarshal([]byte(envVarsJSON), &c.EnvVars)
+	_ = json.Unmarshal([]byte(volumesJSON), &c.Volumes)
+	_ = json.Unmarshal([]byte(networksJSON), &c.Networks)
+	return &c, nil
+}
+
+// ListDockerContainersForAlerts returns id, name, image, state for all containers on a host.
+// Lighter than GetDockerContainers — no JSONB deserialization needed for alert evaluation.
+func (db *DB) ListDockerContainersForAlerts(ctx context.Context, hostID string) ([]models.DockerContainer, error) {
+	rows, err := db.conn.QueryContext(ctx,
+		`SELECT id, host_id, container_id, name, image, image_tag, state FROM docker_containers WHERE host_id = $1 ORDER BY name`, hostID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var containers []models.DockerContainer
+	for rows.Next() {
+		var c models.DockerContainer
+		if err := rows.Scan(&c.ID, &c.HostID, &c.ContainerID, &c.Name, &c.Image, &c.ImageTag, &c.State); err != nil {
+			continue
+		}
+		containers = append(containers, c)
+	}
+	return containers, nil
+}
+
+// CountRunningDockerContainersByHost returns the number of running containers on a host.
+func (db *DB) CountRunningDockerContainersByHost(ctx context.Context, hostID string) (int, error) {
+	var count int
+	err := db.conn.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM docker_containers WHERE host_id = $1 AND state = 'running'`, hostID,
+	).Scan(&count)
+	return count, err
+}
+
 func (db *DB) GetAllDockerNetworks(ctx context.Context) ([]models.DockerNetwork, error) {
 	rows, err := db.conn.QueryContext(ctx, 
 		`SELECT id, host_id, network_id, name, driver, scope, container_ids, updated_at

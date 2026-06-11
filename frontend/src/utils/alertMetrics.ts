@@ -3,7 +3,7 @@ export interface AlertMetricMeta {
   unit: string
   icon: string
   badgeClass: string
-  category: 'host' | 'proxmox' | 'synthetic'
+  category: 'host' | 'proxmox' | 'synthetic' | 'docker'
 }
 
 export const ALERT_METRICS: Record<string, AlertMetricMeta> = {
@@ -154,6 +154,20 @@ export const ALERT_METRICS: Record<string, AlertMetricMeta> = {
     badgeClass: 'bg-cyan-lt text-cyan',
     category: 'proxmox',
   },
+  docker_container_not_running: {
+    label: 'Container non actif',
+    unit: '',
+    icon: '🐳',
+    badgeClass: 'bg-blue-lt text-blue',
+    category: 'docker',
+  },
+  docker_container_running_count: {
+    label: 'Containers actifs',
+    unit: '',
+    icon: '🐳',
+    badgeClass: 'bg-blue-lt text-blue',
+    category: 'docker',
+  },
   uptime_down_count: {
     label: 'Sondes uptime down',
     unit: '',
@@ -192,6 +206,8 @@ export const ALERT_METRIC_ORDER = [
   'proxmox_auth_failures_recent',
   'proxmox_disk_failed_count',
   'proxmox_disk_min_wearout_percent',
+  'docker_container_not_running',
+  'docker_container_running_count',
   'uptime_down_count',
   'ssl_min_days_remaining',
 ]

@@ -9,6 +9,10 @@ function isSyntheticMetric(metric: string): boolean {
   return getAlertMetricMeta(metric).category === 'synthetic'
 }
 
+function isDockerMetric(metric: string): boolean {
+  return getAlertMetricMeta(metric).category === 'docker'
+}
+
 function isProxmoxGuestMetric(metric: string): boolean {
   return metric === 'proxmox_guest_cpu_percent' || metric === 'proxmox_guest_memory_percent'
 }
@@ -45,12 +49,20 @@ interface ProxmoxScope {
   disk_id: string
 }
 
+export interface DockerScope {
+  scope_mode: string   // 'host' | 'container' | 'compose_project'
+  host_id: string
+  container_id: string
+  project_name: string
+}
+
 export interface AlertRuleFormData {
   name: string
   enabled: boolean
-  source_type: 'agent' | 'proxmox' | 'synthetic'
+  source_type: 'agent' | 'proxmox' | 'synthetic' | 'docker'
   host_id: string | null
   proxmox_scope: ProxmoxScope
+  docker_scope: DockerScope
   metric: string
   operator: string
   threshold_warn: number
@@ -64,10 +76,11 @@ export interface AlertRuleFormData {
 interface AlertRuleInput {
   name?: string
   enabled?: boolean
-  source_type?: 'agent' | 'proxmox' | 'synthetic'
+  source_type?: 'agent' | 'proxmox' | 'synthetic' | 'docker'
   host_id?: string | null
   metric?: string
   proxmox_scope?: Partial<ProxmoxScope>
+  docker_scope?: Partial<DockerScope>
   operator?: string
   threshold_warn?: number
   threshold_crit?: number
@@ -83,8 +96,9 @@ interface AlertRuleInput {
   }
 }
 
-interface AlertRulePayload extends Omit<AlertRuleFormData, 'proxmox_scope' | 'threshold_clear_warn' | 'threshold_clear_crit'> {
+interface AlertRulePayload extends Omit<AlertRuleFormData, 'proxmox_scope' | 'docker_scope' | 'threshold_clear_warn' | 'threshold_clear_crit'> {
   proxmox_scope: ProxmoxScope | null
+  docker_scope: DockerScope | null
   threshold_clear_warn: number | null
   threshold_clear_crit: number | null
 }
@@ -129,6 +143,12 @@ export function useAlertRuleForm(): AlertRuleFormApi {
       guest_id: '',
       disk_id: '',
     },
+    docker_scope: {
+      scope_mode: 'host',
+      host_id: '',
+      container_id: '',
+      project_name: '',
+    },
     operator: '>',
     threshold_warn: 70,
     threshold_crit: 85,
@@ -158,6 +178,7 @@ export function useAlertRuleForm(): AlertRuleFormApi {
 
     const actions = rule.actions || {}
     const scope = rule.proxmox_scope || {}
+    const dscope = rule.docker_scope || {}
     const commandTrigger = actions.command_trigger
     const metric = rule.metric ?? 'cpu'
 
@@ -166,7 +187,7 @@ export function useAlertRuleForm(): AlertRuleFormApi {
       enabled: rule.enabled ?? true,
       source_type:
         rule.source_type ||
-        (isProxmoxMetric(metric) ? 'proxmox' : isSyntheticMetric(metric) ? 'synthetic' : 'agent'),
+        (isDockerMetric(metric) ? 'docker' : isProxmoxMetric(metric) ? 'proxmox' : isSyntheticMetric(metric) ? 'synthetic' : 'agent'),
       host_id: rule.host_id ?? null,
       metric,
       proxmox_scope: {
@@ -176,6 +197,12 @@ export function useAlertRuleForm(): AlertRuleFormApi {
         storage_id: scope.storage_id || '',
         guest_id: scope.guest_id || '',
         disk_id: scope.disk_id || '',
+      },
+      docker_scope: {
+        scope_mode: dscope.scope_mode || 'host',
+        host_id: dscope.host_id || '',
+        container_id: dscope.container_id || '',
+        project_name: dscope.project_name || '',
       },
       operator: rule.operator ?? '>',
       threshold_warn: rule.threshold_warn ?? 70,
@@ -216,7 +243,14 @@ export function useAlertRuleForm(): AlertRuleFormApi {
       return
     }
 
-    if (isProxmoxMetric(form.value.metric)) {
+    if (isDockerMetric(form.value.metric)) {
+      form.value.source_type = 'docker'
+      form.value.host_id = null
+      if (form.value.metric === 'docker_container_running_count') {
+        form.value.docker_scope.scope_mode = 'host'
+        form.value.docker_scope.container_id = ''
+      }
+    } else if (isProxmoxMetric(form.value.metric)) {
       form.value.source_type = 'proxmox'
       form.value.host_id = null
 
@@ -287,6 +321,7 @@ export function useAlertRuleForm(): AlertRuleFormApi {
       threshold_clear_crit: thresholdClearCrit,
       source_type: form.value.source_type,
       proxmox_scope: isProxmoxMetric(form.value.metric) ? { ...form.value.proxmox_scope } : null,
+      docker_scope: isDockerMetric(form.value.metric) ? { ...form.value.docker_scope } : null,
       actions,
     }
   }

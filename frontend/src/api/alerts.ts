@@ -8,6 +8,7 @@ export const alertsApi = {
   getAgentAlertRuleCapabilities: () => api.get('/v1/alert-rules/capabilities/agent'),
   getProxmoxAlertRuleCapabilities: () => api.get('/v1/alert-rules/capabilities/proxmox'),
   getSyntheticAlertRuleCapabilities: () => api.get('/v1/alert-rules/capabilities/synthetic'),
+  getDockerAlertCapabilities: () => api.get('/v1/alert-rules/capabilities/docker'),
   getHostCapabilities: (hostId: string) => api.get(`/v1/hosts/${hostId}/capabilities`),
   getAlertRules: () => api.get<AlertRule[]>('/v1/alert-rules'),
   createAlertRule: (payload: AlertRulePayload) => api.post('/v1/alert-rules', payload),

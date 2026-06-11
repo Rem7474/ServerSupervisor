@@ -1,0 +1,1 @@
+ALTER TABLE alert_rules ADD COLUMN IF NOT EXISTS docker_scope JSONB;

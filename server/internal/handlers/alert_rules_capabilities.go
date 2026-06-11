@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -181,6 +182,103 @@ func (h *AlertRulesHandler) loadProxmoxScopeOptions(ctx context.Context) (modes 
 	}
 
 	return modes, connections, nodes, storages, guests, disks
+}
+
+type dockerScopeOptionContainer struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Image string `json:"image"`
+	State string `json:"state"`
+}
+
+type dockerScopeOptionProject struct {
+	Name     string   `json:"name"`
+	Services []string `json:"services"`
+}
+
+type dockerHostScopeOption struct {
+	HostID     string                       `json:"host_id"`
+	HostName   string                       `json:"host_name"`
+	Containers []dockerScopeOptionContainer `json:"containers"`
+	Projects   []dockerScopeOptionProject   `json:"projects"`
+}
+
+type alertDockerCapabilitiesResponse struct {
+	Metrics []alertMetricCapability `json:"metrics"`
+	Hosts   []dockerHostScopeOption `json:"hosts"`
+}
+
+func (h *AlertRulesHandler) GetDockerAlertRuleCapabilities(c *gin.Context) {
+	ctx := c.Request.Context()
+	hosts := []dockerHostScopeOption{}
+
+	rows, err := h.db.Query(ctx, `
+		SELECT DISTINCT dc.host_id, h.hostname
+		FROM docker_containers dc
+		JOIN hosts h ON h.id = dc.host_id
+		ORDER BY h.hostname`)
+	if err == nil {
+		defer func() { _ = rows.Close() }()
+		for rows.Next() {
+			var hostID, hostName string
+			if scanErr := rows.Scan(&hostID, &hostName); scanErr != nil {
+				continue
+			}
+			opt := dockerHostScopeOption{
+				HostID:     hostID,
+				HostName:   hostName,
+				Containers: []dockerScopeOptionContainer{},
+				Projects:   []dockerScopeOptionProject{},
+			}
+
+			if cRows, cErr := h.db.Query(ctx, `
+				SELECT id, name, image, image_tag, state FROM docker_containers
+				WHERE host_id = $1 ORDER BY name`, hostID); cErr == nil {
+				defer func() { _ = cRows.Close() }()
+				for cRows.Next() {
+					var id, name, image, imageTag, state string
+					if sErr := cRows.Scan(&id, &name, &image, &imageTag, &state); sErr == nil {
+						label := image
+						if imageTag != "" && imageTag != "latest" {
+							label = image + ":" + imageTag
+						}
+						opt.Containers = append(opt.Containers, dockerScopeOptionContainer{ID: id, Name: name, Image: label, State: state})
+					}
+				}
+			}
+
+			if pRows, pErr := h.db.Query(ctx, `
+				SELECT name, services FROM compose_projects
+				WHERE host_id = $1 ORDER BY name`, hostID); pErr == nil {
+				defer func() { _ = pRows.Close() }()
+				for pRows.Next() {
+					var name, servicesJSON string
+					if sErr := pRows.Scan(&name, &servicesJSON); sErr == nil {
+						var services []string
+						_ = json.Unmarshal([]byte(servicesJSON), &services)
+						if services == nil {
+							services = []string{}
+						}
+						opt.Projects = append(opt.Projects, dockerScopeOptionProject{Name: name, Services: services})
+					}
+				}
+			}
+
+			hosts = append(hosts, opt)
+		}
+	}
+
+	c.JSON(http.StatusOK, alertDockerCapabilitiesResponse{
+		Metrics: allDockerAlertMetrics(),
+		Hosts:   hosts,
+	})
+}
+
+func allDockerAlertMetrics() []alertMetricCapability {
+	return []alertMetricCapability{
+		{Metric: "docker_container_not_running", Label: "Container non actif", Unit: "", Icon: "🐳", BadgeClass: "bg-blue-lt text-blue", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: false},
+		{Metric: "docker_container_running_count", Label: "Containers actifs", Unit: "", Icon: "🐳", BadgeClass: "bg-blue-lt text-blue", SupportsThreshold: true, SupportsDuration: true, SupportsHostFilter: false},
+	}
 }
 
 func (h *AlertRulesHandler) GetAgentAlertRuleCapabilities(c *gin.Context) {

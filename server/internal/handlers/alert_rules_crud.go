@@ -62,11 +62,11 @@ func scanAlertRule(row interface {
 	var rule models.AlertRule
 	var name, hostID, sourceType sql.NullString
 	var thresholdWarn, thresholdCrit, thresholdClearWarn, thresholdClearCrit sql.NullFloat64
-	var actionsJSON, proxmoxScopeJSON []byte
+	var actionsJSON, proxmoxScopeJSON, dockerScopeJSON []byte
 	var lastFired, updatedAt sql.NullTime
 
 	err := row.Scan(
-		&rule.ID, &name, &rule.Enabled, &sourceType, &hostID, &proxmoxScopeJSON, &rule.Metric,
+		&rule.ID, &name, &rule.Enabled, &sourceType, &hostID, &proxmoxScopeJSON, &dockerScopeJSON, &rule.Metric,
 		&rule.Operator, &thresholdWarn, &thresholdCrit, &thresholdClearWarn, &thresholdClearCrit, &rule.DurationSeconds,
 		&actionsJSON, &lastFired, &rule.CreatedAt, &updatedAt,
 	)
@@ -107,6 +107,9 @@ func scanAlertRule(row interface {
 	if len(proxmoxScopeJSON) > 0 {
 		_ = json.Unmarshal(proxmoxScopeJSON, &rule.ProxmoxScope)
 	}
+	if len(dockerScopeJSON) > 0 {
+		_ = json.Unmarshal(dockerScopeJSON, &rule.DockerScope)
+	}
 	if rule.Actions.Channels == nil {
 		rule.Actions.Channels = []string{}
 	}
@@ -115,7 +118,7 @@ func scanAlertRule(row interface {
 }
 
 const alertRuleSelectCols = `
-id, name, enabled, source_type, host_id, proxmox_scope, metric, operator, threshold_warn, threshold_crit,
+id, name, enabled, source_type, host_id, proxmox_scope, docker_scope, metric, operator, threshold_warn, threshold_crit,
 threshold_clear_warn, threshold_clear_crit, duration_seconds, actions, last_fired, created_at, updated_at`
 
 // ListAlertRules returns all alert rules
@@ -188,6 +191,7 @@ func (h *AlertRulesHandler) CreateAlertRule(c *gin.Context) {
 	rule.SourceType = req.SourceType
 	rule.HostID = req.HostID
 	rule.ProxmoxScope = req.ProxmoxScope
+	rule.DockerScope = req.DockerScope
 	rule.Metric = req.Metric
 	rule.Operator = req.Operator
 	rule.ThresholdWarn = &req.ThresholdWarn
@@ -207,15 +211,22 @@ func (h *AlertRulesHandler) CreateAlertRule(c *gin.Context) {
 			return
 		}
 	}
+	if rule.SourceType == models.AlertSourceDocker {
+		if err := validateDockerScopeExists(c.Request.Context(), h.db, rule.DockerScope); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+	}
 
 	actionsJSON, _ := json.Marshal(rule.Actions)
 	proxmoxScopeJSON, _ := json.Marshal(rule.ProxmoxScope)
+	dockerScopeJSON, _ := json.Marshal(rule.DockerScope)
 
 	err := h.db.QueryRow(c.Request.Context(), `
-INSERT INTO alert_rules (name, enabled, source_type, host_id, proxmox_scope, metric, operator, threshold_warn, threshold_crit, threshold_clear_warn, threshold_clear_crit, duration_seconds, actions)
-VALUES ($1, $2, $3, $4, CAST($5 AS JSONB), $6, $7, $8, $9, $10, $11, $12, CAST($13 AS JSONB))
+INSERT INTO alert_rules (name, enabled, source_type, host_id, proxmox_scope, docker_scope, metric, operator, threshold_warn, threshold_crit, threshold_clear_warn, threshold_clear_crit, duration_seconds, actions)
+VALUES ($1, $2, $3, $4, CAST($5 AS JSONB), CAST($6 AS JSONB), $7, $8, $9, $10, $11, $12, $13, CAST($14 AS JSONB))
 RETURNING id, created_at, updated_at`,
-		req.Name, req.Enabled, rule.SourceType, rule.HostID, string(proxmoxScopeJSON), rule.Metric, rule.Operator,
+		req.Name, req.Enabled, rule.SourceType, rule.HostID, string(proxmoxScopeJSON), string(dockerScopeJSON), rule.Metric, rule.Operator,
 		req.ThresholdWarn, req.ThresholdCrit, req.ThresholdClearWarn, req.ThresholdClearCrit, req.Duration, string(actionsJSON),
 	).Scan(&rule.ID, &rule.CreatedAt, &rule.UpdatedAt)
 
@@ -288,6 +299,9 @@ FROM alert_rules WHERE id = $1`, id)
 	if req.ProxmoxScope != nil {
 		next.ProxmoxScope = req.ProxmoxScope
 	}
+	if req.DockerScope != nil {
+		next.DockerScope = req.DockerScope
+	}
 
 	if err := validateAlertRuleMetricOperator(next.Metric, next.Operator); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -307,9 +321,16 @@ FROM alert_rules WHERE id = $1`, id)
 			return
 		}
 	}
+	if next.SourceType == models.AlertSourceDocker {
+		if err := validateDockerScopeExists(c.Request.Context(), h.db, next.DockerScope); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+	}
 
 	actionsJSON, _ := json.Marshal(next.Actions)
 	proxmoxScopeJSON, _ := json.Marshal(next.ProxmoxScope)
+	dockerScopeJSON, _ := json.Marshal(next.DockerScope)
 
 	updates := []string{}
 	args := []interface{}{}
@@ -333,6 +354,11 @@ FROM alert_rules WHERE id = $1`, id)
 	if req.ProxmoxScope != nil {
 		updates = append(updates, "proxmox_scope = CAST($"+strconv.Itoa(argCount)+" AS JSONB)")
 		args = append(args, string(proxmoxScopeJSON))
+		argCount++
+	}
+	if req.DockerScope != nil {
+		updates = append(updates, "docker_scope = CAST($"+strconv.Itoa(argCount)+" AS JSONB)")
+		args = append(args, string(dockerScopeJSON))
 		argCount++
 	}
 	if req.Metric != nil {

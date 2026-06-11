@@ -2,6 +2,7 @@ package alerts
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/serversupervisor/server/internal/database"
@@ -135,6 +136,25 @@ func GetMetricValue(ctx context.Context, db *database.DB, host models.Host, rule
 		return resolveProxmoxDiskFailedCount(ctx, db, rule), true
 	case "proxmox_disk_min_wearout_percent":
 		return resolveProxmoxDiskMinWearoutPercent(ctx, db, rule), true
+	case "docker_container_not_running":
+		// host.ID is "docker:container:<db-uuid>"; value 1 = not running, 0 = running.
+		containerID := strings.TrimPrefix(host.ID, "docker:container:")
+		c, err := db.GetDockerContainerByID(ctx, containerID)
+		if err != nil || c == nil {
+			return 0, false
+		}
+		if c.State != "running" {
+			return 1, true
+		}
+		return 0, true
+	case "docker_container_running_count":
+		// host.ID is "docker:host:<host-id>"; value = count of running containers.
+		hostID := strings.TrimPrefix(host.ID, "docker:host:")
+		count, err := db.CountRunningDockerContainersByHost(ctx, hostID)
+		if err != nil {
+			return 0, false
+		}
+		return float64(count), true
 	case "uptime_down_count":
 		// Global: how many enabled uptime probes are currently DOWN.
 		n, err := db.CountDownProbes(ctx)
