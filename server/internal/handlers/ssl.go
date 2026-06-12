@@ -83,3 +83,13 @@ func (h *SSLHandler) CheckNow(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, out)
 }
+
+// History returns the renewal timeline for a certificate (newest first).
+func (h *SSLHandler) History(c *gin.Context) {
+	events, err := h.svc.History(c.Request.Context(), c.Param("id"), 50)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"events": events})
+}

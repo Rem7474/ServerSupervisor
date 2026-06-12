@@ -24,6 +24,8 @@ type Repository interface {
 	UpdateSSLCertificate(ctx context.Context, c models.SSLCertificate) error
 	DeleteSSLCertificate(ctx context.Context, id string) error
 	UpdateSSLCertificateCheckResult(ctx context.Context, c models.SSLCertificate) error
+	InsertSSLCertificateEventIfNew(ctx context.Context, ev models.SSLCertificateEvent) error
+	GetSSLCertificateEvents(ctx context.Context, certID string, limit int) ([]models.SSLCertificateEvent, error)
 }
 
 // CertChecker performs a TLS handshake and returns the certificate with its
@@ -107,7 +109,8 @@ func (s *Service) DeleteCert(ctx context.Context, id string) error {
 }
 
 // CheckNow runs a TLS handshake immediately, persists the observed result and
-// returns the refreshed record.
+// returns the refreshed record. When the check succeeds and returns a serial
+// number, a renewal event is recorded (silently ignored if already known).
 func (s *Service) CheckNow(ctx context.Context, id string) (*models.SSLCertificate, error) {
 	cert, err := s.GetCert(ctx, id)
 	if err != nil {
@@ -117,5 +120,24 @@ func (s *Service) CheckNow(ctx context.Context, id string) (*models.SSLCertifica
 	if err := s.repo.UpdateSSLCertificateCheckResult(ctx, updated); err != nil {
 		return nil, err
 	}
+	if updated.SerialNumber != "" {
+		ev := models.SSLCertificateEvent{
+			CertificateID: updated.ID,
+			SerialNumber:  updated.SerialNumber,
+			ValidFrom:     updated.ValidFrom,
+			ValidTo:       updated.ValidTo,
+			Issuer:        updated.Issuer,
+			Subject:       updated.Subject,
+		}
+		_ = s.repo.InsertSSLCertificateEventIfNew(ctx, ev)
+	}
 	return s.GetCert(ctx, updated.ID)
+}
+
+// History returns the renewal timeline for a certificate (newest first).
+func (s *Service) History(ctx context.Context, id string, limit int) ([]models.SSLCertificateEvent, error) {
+	if _, err := s.GetCert(ctx, id); err != nil {
+		return nil, err
+	}
+	return s.repo.GetSSLCertificateEvents(ctx, id, limit)
 }

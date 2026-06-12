@@ -9,10 +9,10 @@
     <div class="page-header mb-3">
       <div class="page-pretitle">
         <router-link
-          to="/uptime"
+          to="/monitoring"
           class="text-decoration-none"
         >
-          Uptime
+          Monitoring
         </router-link>
         <span class="text-muted mx-1">/</span>
         <span>{{ probe?.name || 'Sonde' }}</span>

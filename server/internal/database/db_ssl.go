@@ -174,6 +174,53 @@ func (db *DB) GetMinSSLDaysRemaining(ctx context.Context) (int, bool, error) {
 	return days, true, nil
 }
 
+// InsertSSLCertificateEventIfNew records a new certificate version when the
+// serial_number hasn't been seen before for this endpoint. Duplicate serials are
+// silently ignored (ON CONFLICT DO NOTHING) so the caller can always call this
+// after every successful check without extra checks.
+func (db *DB) InsertSSLCertificateEventIfNew(ctx context.Context, ev models.SSLCertificateEvent) error {
+	_, err := db.conn.ExecContext(ctx,
+		`INSERT INTO ssl_certificate_events
+		     (certificate_id, serial_number, valid_from, valid_to, issuer, subject, detected_at)
+		 VALUES ($1,$2,$3,$4,$5,$6,NOW())
+		 ON CONFLICT (certificate_id, serial_number) DO NOTHING`,
+		ev.CertificateID, ev.SerialNumber, ev.ValidFrom, ev.ValidTo, ev.Issuer, ev.Subject,
+	)
+	return err
+}
+
+// GetSSLCertificateEvents returns the renewal history for a certificate, newest
+// first. limit is capped at 100.
+func (db *DB) GetSSLCertificateEvents(ctx context.Context, certID string, limit int) ([]models.SSLCertificateEvent, error) {
+	if limit <= 0 || limit > 100 {
+		limit = 100
+	}
+	rows, err := db.conn.QueryContext(ctx,
+		`SELECT id, certificate_id, serial_number, valid_from, valid_to, issuer, subject, detected_at
+		 FROM ssl_certificate_events
+		 WHERE certificate_id = $1
+		 ORDER BY detected_at DESC
+		 LIMIT $2`, certID, limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var out []models.SSLCertificateEvent
+	for rows.Next() {
+		var e models.SSLCertificateEvent
+		if err := rows.Scan(&e.ID, &e.CertificateID, &e.SerialNumber, &e.ValidFrom, &e.ValidTo, &e.Issuer, &e.Subject, &e.DetectedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, e)
+	}
+	if out == nil {
+		out = []models.SSLCertificateEvent{}
+	}
+	return out, rows.Err()
+}
+
 // computeDaysRemaining returns the number of whole days until validTo, or nil if unknown.
 func computeDaysRemaining(validTo *time.Time) *int {
 	if validTo == nil || validTo.IsZero() {

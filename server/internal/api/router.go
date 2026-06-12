@@ -419,6 +419,7 @@ func registerUptimeRoutes(g *gin.RouterGroup, h *handlers.UptimeHandler) {
 func registerSSLRoutes(g *gin.RouterGroup, h *handlers.SSLHandler) {
 	g.GET("/ssl/certificates", h.List)
 	g.GET("/ssl/certificates/:id", h.Get)
+	g.GET("/ssl/certificates/:id/history", h.History)
 
 	admin := g.Group("")
 	admin.Use(AdminOnlyMiddleware())
