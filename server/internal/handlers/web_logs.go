@@ -1,308 +1,169 @@
 package handlers
 
 import (
-	"encoding/json"
-	"fmt"
 	"net/http"
-	"net/netip"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/serversupervisor/server/internal/database"
-	"github.com/serversupervisor/server/internal/dispatch"
+	"github.com/serversupervisor/server/internal/apperr"
+	weblogssvc "github.com/serversupervisor/server/internal/services/weblogs"
 )
 
-// WebLogsHandler serves the /security/web-logs/* endpoints. Previously these
-// methods were attached to AuthHandler for historical reasons; they only
-// need a DB and a dispatcher.
+// WebLogsHandler serves the /security/web-logs/* endpoints. It translates HTTP
+// (admin authz, query parsing/validation, response envelopes); the dispatch +
+// reads + summary enrichment live in internal/services/weblogs.
 type WebLogsHandler struct {
-	db         *database.DB
-	dispatcher *dispatch.Dispatcher
+	svc *weblogssvc.Service
 }
 
-func NewWebLogsHandler(db *database.DB, dispatcher *dispatch.Dispatcher) *WebLogsHandler {
-	return &WebLogsHandler{db: db, dispatcher: dispatcher}
+func NewWebLogsHandler(svc *weblogssvc.Service) *WebLogsHandler {
+	return &WebLogsHandler{svc: svc}
 }
 
-type ipCountryInfo struct {
-	Country     string
-	CountryCode string
-	UpdatedAt   time.Time
+// requireWebLogsAdmin returns false (and writes 403) when the caller is not admin.
+func (h *WebLogsHandler) requireWebLogsAdmin(c *gin.Context) bool {
+	if c.GetString("role") != "admin" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+		return false
+	}
+	return true
 }
 
-var (
-	ipCountryCache   = map[string]ipCountryInfo{}
-	ipCountryCacheMu sync.RWMutex
-)
+// validWebLogSource reports whether an (optional) source filter is acceptable.
+func validWebLogSource(source string) bool {
+	switch source {
+	case "", "npm", "nginx", "apache", "caddy":
+		return true
+	default:
+		return false
+	}
+}
+
+// parseWebLogsPeriod parses ?period (default 24h) into a since timestamp.
+func parseWebLogsPeriod(c *gin.Context) (period time.Duration, since time.Time, ok bool) {
+	raw := strings.TrimSpace(c.DefaultQuery("period", "24h"))
+	period, err := time.ParseDuration(raw)
+	if err != nil || period <= 0 {
+		respondError(c, apperr.Validation("invalid period (example: 24h, 168h)"))
+		return 0, time.Time{}, false
+	}
+	return period, time.Now().Add(-period), true
+}
+
+func webLogsLimit(c *gin.Context, def int) int {
+	if raw := strings.TrimSpace(c.Query("limit")); raw != "" {
+		if n, err := strconv.Atoi(raw); err == nil {
+			return n
+		}
+	}
+	return def
+}
 
 // BlockCrowdSecIP creates a command for the agent to ban an IP via CrowdSec.
 func (h *WebLogsHandler) BlockCrowdSecIP(c *gin.Context) {
-	if c.GetString("role") != "admin" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+	if !h.requireWebLogsAdmin(c) {
 		return
 	}
-
 	hostID := c.Query("host_id")
 	if hostID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "host_id is required"})
+		respondError(c, apperr.Validation("host_id is required"))
 		return
 	}
-
 	ip := strings.TrimSpace(c.Param("ip"))
 	if ip == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "IP is required"})
+		respondError(c, apperr.Validation("IP is required"))
 		return
 	}
-
-	if _, err := netip.ParseAddr(ip); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid IP address"})
-		return
-	}
-
 	duration := strings.TrimSpace(c.DefaultQuery("duration", "4h"))
 	if duration == "" {
 		duration = "4h"
 	}
-	if _, err := time.ParseDuration(duration); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid duration (exemples: 1h, 4h, 24h, 168h)"})
-		return
-	}
-
-	username := c.GetString("username")
-	payload := fmt.Sprintf(`{"duration":%q}`, duration)
-
-	result, err := h.dispatcher.Create(c.Request.Context(), dispatch.Request{
-		HostID:      hostID,
-		Module:      "crowdsec",
-		Action:      "ban",
-		Target:      ip,
-		Payload:     payload,
-		TriggeredBy: username,
-		Audit: &dispatch.AuditLogRequest{
-			Username:  username,
-			Action:    "crowdsec_ban",
-			HostID:    hostID,
-			IPAddress: c.ClientIP(),
-			Details:   fmt.Sprintf(`{"ip":%q,"duration":%q}`, ip, duration),
-		},
-	})
+	id, err := h.svc.BlockIP(c.Request.Context(), hostID, ip, duration, c.GetString("username"), c.ClientIP())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create ban command"})
+		respondError(c, err)
 		return
 	}
-
-	c.JSON(http.StatusOK, gin.H{"command_id": result.Command.ID, "status": "pending"})
+	c.JSON(http.StatusOK, gin.H{"command_id": id, "status": "pending"})
 }
 
 // UnblockCrowdSecIP creates a command for the agent to unban an IP via CrowdSec.
 func (h *WebLogsHandler) UnblockCrowdSecIP(c *gin.Context) {
-	if c.GetString("role") != "admin" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+	if !h.requireWebLogsAdmin(c) {
 		return
 	}
-
 	hostID := c.Query("host_id")
 	if hostID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "host_id is required"})
+		respondError(c, apperr.Validation("host_id is required"))
 		return
 	}
-
 	ip := strings.TrimSpace(c.Param("ip"))
 	if ip == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "IP is required"})
+		respondError(c, apperr.Validation("IP is required"))
 		return
 	}
-
-	// Validate it's a valid IP
-	if _, err := netip.ParseAddr(ip); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid IP address"})
-		return
-	}
-
-	username := c.GetString("username")
-
-	result, err := h.dispatcher.Create(c.Request.Context(), dispatch.Request{
-		HostID:      hostID,
-		Module:      "crowdsec",
-		Action:      "unban",
-		Target:      ip,
-		Payload:     "{}",
-		TriggeredBy: username,
-		Audit: &dispatch.AuditLogRequest{
-			Username:  username,
-			Action:    "crowdsec_unban",
-			HostID:    hostID,
-			IPAddress: c.ClientIP(),
-			Details:   fmt.Sprintf(`{"ip":"%s"}`, ip),
-		},
-	})
+	id, err := h.svc.UnblockIP(c.Request.Context(), hostID, ip, c.GetString("username"), c.ClientIP())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create unban command"})
+		respondError(c, err)
 		return
 	}
-
-	c.JSON(http.StatusOK, gin.H{"command_id": result.Command.ID, "status": "pending"})
+	c.JSON(http.StatusOK, gin.H{"command_id": id, "status": "pending"})
 }
 
 func (h *WebLogsHandler) GetWebLogsSummary(c *gin.Context) {
-	if c.GetString("role") != "admin" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+	if !h.requireWebLogsAdmin(c) {
 		return
 	}
-
-	periodRaw := strings.TrimSpace(c.DefaultQuery("period", "24h"))
-	period, err := time.ParseDuration(periodRaw)
-	if err != nil || period <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid period (example: 24h, 168h)"})
+	period, _, ok := parseWebLogsPeriod(c)
+	if !ok {
 		return
 	}
 	hostID := strings.TrimSpace(c.Query("host_id"))
 	source := strings.ToLower(strings.TrimSpace(c.Query("source")))
-	if source != "" {
-		switch source {
-		case "npm", "nginx", "apache", "caddy":
-		default:
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid source"})
-			return
-		}
-	}
-
-	since := time.Now().Add(-period)
-	summary, err := h.db.GetWebLogsSummary(c.Request.Context(), since, hostID, source)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to aggregate web logs"})
+	if !validWebLogSource(source) {
+		respondError(c, apperr.Validation("invalid source"))
 		return
 	}
-
-	if traffic, ok := summary["traffic"].(map[string]any); ok {
-		topIPs, err := h.db.GetWebLogsTopClientIPs(c.Request.Context(), since, hostID, source, 120)
-		if err == nil {
-			traffic["top_client_ips"] = topIPs
-
-			// Resolve IP geolocation with bounded concurrency to avoid blocking on slow external API.
-			countryHits, countryCodes := resolveIPsWithContext(topIPs)
-
-			dist := make([]map[string]any, 0, len(countryHits))
-			for country, hits := range countryHits {
-				dist = append(dist, map[string]any{
-					"country":      country,
-					"country_code": countryCodes[country],
-					"hits":         hits,
-				})
-			}
-			// Sort descending by hits.
-			for i := 0; i < len(dist); i++ {
-				for j := i + 1; j < len(dist); j++ {
-					if anyToInt64(dist[j]["hits"]) > anyToInt64(dist[i]["hits"]) {
-						dist[i], dist[j] = dist[j], dist[i]
-					}
-				}
-			}
-			traffic["country_distribution"] = dist
-		}
-	}
-
-	now := time.Now().UTC()
-	currentSince := now.Add(-period)
-	previousSince := currentSince.Add(-period)
-	currentKPI, err := h.db.GetWebLogsKPIWindow(c.Request.Context(), currentSince, now, hostID, source)
+	result, err := h.svc.Summary(c.Request.Context(), period, hostID, source)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to compute KPI comparison"})
+		respondError(c, err)
 		return
 	}
-	previousKPI, err := h.db.GetWebLogsKPIWindow(c.Request.Context(), previousSince, currentSince, hostID, source)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to compute KPI comparison"})
-		return
-	}
-	compare := map[string]any{
-		"current":  currentKPI,
-		"previous": previousKPI,
-		"delta_percent": map[string]any{
-			"total_requests": deltaPercent(toFloat(currentKPI["total_requests"]), toFloat(previousKPI["total_requests"])),
-			"total_bytes":    deltaPercent(toFloat(currentKPI["total_bytes"]), toFloat(previousKPI["total_bytes"])),
-			"ratio_5xx":      deltaPercent(toFloat(currentKPI["ratio_5xx"]), toFloat(previousKPI["ratio_5xx"])),
-			"suspicious_ips": deltaPercent(toFloat(currentKPI["suspicious_ips"]), toFloat(previousKPI["suspicious_ips"])),
-		},
-	}
-
-	// Promote blocked_ips/blocked_requests and crowdsec_blocked_ips into threats
-	// so BotView.vue can read them without loading the traffic section.
-	threats := summary["threats"]
-	if threatsMap, ok := threats.(map[string]any); ok {
-		if trafficMap, ok := summary["traffic"].(map[string]any); ok {
-			if v, exists := trafficMap["blocked_ips"]; exists {
-				threatsMap["blocked_ips"] = v
-			}
-			if v, exists := trafficMap["blocked_requests"]; exists {
-				threatsMap["blocked_requests"] = v
-			}
-			if v, exists := trafficMap["blocked_ratio"]; exists {
-				threatsMap["blocked_ratio"] = v
-			}
-		}
-		// crowdsec_blocked_ips is already in threats (set by GetWebLogsSummary),
-		// but promote it as blocked_ips if it's larger than the web-log count.
-		if csBlocked, ok := threatsMap["crowdsec_blocked_ips"].(int64); ok && csBlocked > 0 {
-			webBlocked := anyToInt64(threatsMap["blocked_ips"])
-			if csBlocked > webBlocked {
-				threatsMap["blocked_ips"] = csBlocked
-			}
-		}
-	}
-
 	c.JSON(http.StatusOK, gin.H{
-		"period":  periodRaw,
-		"since":   since,
+		"period":  strings.TrimSpace(c.DefaultQuery("period", "24h")),
+		"since":   result.Since,
 		"host_id": hostID,
 		"source":  source,
-		"traffic": summary["traffic"],
-		"threats": threats,
-		"compare": compare,
+		"traffic": result.Traffic,
+		"threats": result.Threats,
+		"compare": result.Compare,
 	})
 }
 
 func (h *WebLogsHandler) GetWebLogsIPTimeline(c *gin.Context) {
-	if c.GetString("role") != "admin" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+	if !h.requireWebLogsAdmin(c) {
 		return
 	}
-
 	ip := strings.TrimSpace(c.Param("ip"))
 	if ip == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ip is required"})
+		respondError(c, apperr.Validation("ip is required"))
 		return
 	}
-
+	_, since, ok := parseWebLogsPeriod(c)
+	if !ok {
+		return
+	}
 	hostID := strings.TrimSpace(c.Query("host_id"))
-	periodRaw := strings.TrimSpace(c.DefaultQuery("period", "24h"))
-	period, err := time.ParseDuration(periodRaw)
-	if err != nil || period <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid period (example: 24h, 168h)"})
-		return
-	}
-
-	limit := 500
-	if raw := strings.TrimSpace(c.Query("limit")); raw != "" {
-		if n, err := strconv.Atoi(raw); err == nil {
-			limit = n
-		}
-	}
-
-	since := time.Now().Add(-period)
-	rows, err := h.db.GetIPTimeline(c.Request.Context(), ip, since, hostID, limit)
+	rows, err := h.svc.IPTimeline(c.Request.Context(), ip, since, hostID, webLogsLimit(c, 500))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load IP timeline"})
+		respondError(c, err)
 		return
 	}
-
 	c.JSON(http.StatusOK, gin.H{
 		"ip":       ip,
 		"host_id":  hostID,
-		"period":   periodRaw,
+		"period":   strings.TrimSpace(c.DefaultQuery("period", "24h")),
 		"since":    since,
 		"count":    len(rows),
 		"requests": rows,
@@ -310,43 +171,28 @@ func (h *WebLogsHandler) GetWebLogsIPTimeline(c *gin.Context) {
 }
 
 func (h *WebLogsHandler) GetWebLogsDomainDetails(c *gin.Context) {
-	if c.GetString("role") != "admin" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+	if !h.requireWebLogsAdmin(c) {
 		return
 	}
-
 	domain := strings.TrimSpace(c.Param("domain"))
 	if domain == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "domain is required"})
+		respondError(c, apperr.Validation("domain is required"))
 		return
 	}
-
+	_, since, ok := parseWebLogsPeriod(c)
+	if !ok {
+		return
+	}
 	hostID := strings.TrimSpace(c.Query("host_id"))
 	source := strings.ToLower(strings.TrimSpace(c.Query("source")))
-	periodRaw := strings.TrimSpace(c.DefaultQuery("period", "24h"))
-	period, err := time.ParseDuration(periodRaw)
-	if err != nil || period <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid period (example: 24h, 168h)"})
-		return
-	}
-
-	limit := 300
-	if raw := strings.TrimSpace(c.Query("limit")); raw != "" {
-		if n, err := strconv.Atoi(raw); err == nil {
-			limit = n
-		}
-	}
-
-	since := time.Now().Add(-period)
-	data, err := h.db.GetDomainDetails(c.Request.Context(), domain, since, hostID, source, limit)
+	data, err := h.svc.DomainDetails(c.Request.Context(), domain, since, hostID, source, webLogsLimit(c, 300))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load domain details"})
+		respondError(c, err)
 		return
 	}
-
 	c.JSON(http.StatusOK, gin.H{
 		"domain":  domain,
-		"period":  periodRaw,
+		"period":  strings.TrimSpace(c.DefaultQuery("period", "24h")),
 		"since":   since,
 		"host_id": hostID,
 		"source":  source,
@@ -355,46 +201,31 @@ func (h *WebLogsHandler) GetWebLogsDomainDetails(c *gin.Context) {
 }
 
 func (h *WebLogsHandler) GetWebLogsTimeseries(c *gin.Context) {
-	if c.GetString("role") != "admin" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+	if !h.requireWebLogsAdmin(c) {
 		return
 	}
-
-	periodRaw := strings.TrimSpace(c.DefaultQuery("period", "24h"))
-	period, err := time.ParseDuration(periodRaw)
-	if err != nil || period <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid period (example: 24h, 168h)"})
+	_, since, ok := parseWebLogsPeriod(c)
+	if !ok {
 		return
 	}
-
 	bucket := strings.ToLower(strings.TrimSpace(c.DefaultQuery("bucket", "hour")))
-	switch bucket {
-	case "hour", "minute":
-	default:
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid bucket (hour|minute)"})
+	if bucket != "hour" && bucket != "minute" {
+		respondError(c, apperr.Validation("invalid bucket (hour|minute)"))
 		return
 	}
-
 	hostID := strings.TrimSpace(c.Query("host_id"))
 	source := strings.ToLower(strings.TrimSpace(c.Query("source")))
-	if source != "" {
-		switch source {
-		case "npm", "nginx", "apache", "caddy":
-		default:
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid source"})
-			return
-		}
-	}
-
-	since := time.Now().Add(-period)
-	points, err := h.db.GetWebLogsTimeseries(c.Request.Context(), since, hostID, source, bucket)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load web logs timeseries"})
+	if !validWebLogSource(source) {
+		respondError(c, apperr.Validation("invalid source"))
 		return
 	}
-
+	points, err := h.svc.Timeseries(c.Request.Context(), since, hostID, source, bucket)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{
-		"period":  periodRaw,
+		"period":  strings.TrimSpace(c.DefaultQuery("period", "24h")),
 		"bucket":  bucket,
 		"since":   since,
 		"host_id": hostID,
@@ -404,191 +235,24 @@ func (h *WebLogsHandler) GetWebLogsTimeseries(c *gin.Context) {
 }
 
 func (h *WebLogsHandler) GetWebLogsLive(c *gin.Context) {
-	if c.GetString("role") != "admin" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+	if !h.requireWebLogsAdmin(c) {
 		return
 	}
-
 	hostID := strings.TrimSpace(c.Query("host_id"))
 	source := strings.ToLower(strings.TrimSpace(c.Query("source")))
-	if source != "" {
-		switch source {
-		case "npm", "nginx", "apache", "caddy":
-		default:
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid source"})
-			return
-		}
-	}
-
-	limit := 100
-	if raw := strings.TrimSpace(c.Query("limit")); raw != "" {
-		if n, err := strconv.Atoi(raw); err == nil {
-			limit = n
-		}
-	}
-
-	rows, err := h.db.GetWebLogsLive(c.Request.Context(), hostID, source, limit)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load web logs live feed"})
+	if !validWebLogSource(source) {
+		respondError(c, apperr.Validation("invalid source"))
 		return
 	}
-
+	rows, err := h.svc.Live(c.Request.Context(), hostID, source, webLogsLimit(c, 100))
+	if err != nil {
+		respondError(c, err)
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{
 		"host_id":  hostID,
 		"source":   source,
 		"count":    len(rows),
 		"requests": rows,
 	})
-}
-
-func toFloat(v any) float64 {
-	switch x := v.(type) {
-	case float64:
-		return x
-	case int64:
-		return float64(x)
-	case int:
-		return float64(x)
-	default:
-		return 0
-	}
-}
-
-func deltaPercent(current float64, previous float64) any {
-	if previous == 0 {
-		if current == 0 {
-			return float64(0)
-		}
-		return nil
-	}
-	return ((current - previous) / previous) * 100
-}
-
-func anyToInt64(v any) int64 {
-	switch n := v.(type) {
-	case int64:
-		return n
-	case int:
-		return int64(n)
-	case float64:
-		return int64(n)
-	default:
-		return 0
-	}
-}
-
-func anyToString(v any) string {
-	if s, ok := v.(string); ok {
-		return s
-	}
-	return ""
-}
-
-func isPrivateOrLocalIP(ip string) bool {
-	addr, err := netip.ParseAddr(ip)
-	if err != nil {
-		return true
-	}
-	return addr.IsLoopback() || addr.IsPrivate() || addr.IsLinkLocalUnicast() || addr.IsUnspecified()
-}
-
-// resolveIPsWithContext resolves IPs to countries with bounded concurrency (4 workers).
-// Returns aggregated country hits and codes without blocking the request on slow external API calls.
-func resolveIPsWithContext(topIPs []map[string]any) (map[string]int64, map[string]string) {
-	countryHits := make(map[string]int64)
-	countryCodes := make(map[string]string)
-	var mu sync.Mutex
-
-	const concurrency = 4
-	jobs := make(chan map[string]any, concurrency)
-	var wg sync.WaitGroup
-
-	// Launch workers
-	for w := 0; w < concurrency; w++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for row := range jobs {
-				ip := strings.TrimSpace(anyToString(row["ip"]))
-				hits := anyToInt64(row["hits"])
-				if ip == "" || hits <= 0 {
-					continue
-				}
-				country, code := resolveCountryForIP(ip)
-				if country == "" {
-					country = "Unknown"
-				}
-				if code == "" {
-					code = "--"
-				}
-				mu.Lock()
-				countryHits[country] += hits
-				countryCodes[country] = code
-				mu.Unlock()
-			}
-		}()
-	}
-
-	// Send jobs
-	for _, row := range topIPs {
-		jobs <- row
-	}
-	close(jobs)
-	wg.Wait()
-
-	return countryHits, countryCodes
-}
-
-func resolveCountryForIP(ip string) (string, string) {
-	ip = strings.TrimSpace(ip)
-	if ip == "" {
-		return "Unknown", "--"
-	}
-	if isPrivateOrLocalIP(ip) {
-		return "Local / Private", "LAN"
-	}
-
-	now := time.Now().UTC()
-	ipCountryCacheMu.RLock()
-	if cached, ok := ipCountryCache[ip]; ok && now.Sub(cached.UpdatedAt) < 24*time.Hour {
-		ipCountryCacheMu.RUnlock()
-		return cached.Country, cached.CountryCode
-	}
-	ipCountryCacheMu.RUnlock()
-
-	client := &http.Client{Timeout: 2 * time.Second}
-	req, err := http.NewRequest(http.MethodGet, "https://ipwho.is/"+ip+"?fields=success,country,country_code", nil)
-	if err != nil {
-		return "Unknown", "--"
-	}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return "Unknown", "--"
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	var payload struct {
-		Success     bool   `json:"success"`
-		Country     string `json:"country"`
-		CountryCode string `json:"country_code"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil || !payload.Success {
-		return "Unknown", "--"
-	}
-
-	country := strings.TrimSpace(payload.Country)
-	if country == "" {
-		country = "Unknown"
-	}
-	code := strings.ToUpper(strings.TrimSpace(payload.CountryCode))
-	if code == "" {
-		code = "--"
-	}
-
-	ipCountryCacheMu.Lock()
-	ipCountryCache[ip] = ipCountryInfo{Country: country, CountryCode: code, UpdatedAt: now}
-	ipCountryCacheMu.Unlock()
-
-	return country, code
 }
