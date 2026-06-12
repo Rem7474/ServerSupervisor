@@ -1,0 +1,980 @@
+<template>
+  <div>
+    <PageRefreshBar
+      v-model="autoRefresh"
+      label="Monitoring"
+      :interval-sec="REFRESH_SEC"
+      :last-updated-at="lastUpdatedAt"
+    />
+
+    <div class="page-header mb-3">
+      <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3">
+        <div>
+          <h2 class="page-title">
+            Monitoring
+          </h2>
+          <div class="text-muted">
+            Sondes HTTP/TCP synthétiques et suivi des certificats SSL/TLS.
+          </div>
+        </div>
+        <button
+          v-if="auth.role === 'admin'"
+          class="btn btn-primary"
+          @click="tab === 'ssl' ? openCreateCert() : openCreateProbe()"
+        >
+          {{ tab === 'ssl' ? '+ Ajouter un certificat' : '+ Nouvelle sonde' }}
+        </button>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="mb-3">
+      <ul class="nav nav-tabs">
+        <li class="nav-item">
+          <button
+            :class="['nav-link', tab === 'uptime' ? 'active' : '']"
+            @click="setTab('uptime')"
+          >
+            <svg
+              class="icon icon-sm me-1"
+              width="16"
+              height="16"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            ><path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M3 12h3l3-7 4 14 3-7h5"
+            /></svg>
+            Sondes uptime
+            <span
+              v-if="downCount > 0"
+              class="badge bg-red text-white ms-1"
+            >{{ downCount }}</span>
+          </button>
+        </li>
+        <li class="nav-item">
+          <button
+            :class="['nav-link', tab === 'ssl' ? 'active' : '']"
+            @click="setTab('ssl')"
+          >
+            <svg
+              class="icon icon-sm me-1"
+              width="16"
+              height="16"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            ><rect
+              x="4"
+              y="11"
+              width="16"
+              height="9"
+              rx="2"
+              stroke-width="2"
+            /><path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M8 11V8a4 4 0 018 0v3"
+            /></svg>
+            Certificats SSL
+            <span
+              v-if="expiringCount > 0"
+              class="badge bg-yellow text-white ms-1"
+            >{{ expiringCount }}</span>
+          </button>
+        </li>
+      </ul>
+    </div>
+
+    <div
+      v-if="error"
+      class="alert alert-danger mb-3"
+    >
+      {{ error }}
+    </div>
+
+    <!-- ===== UPTIME TAB ===== -->
+    <template v-if="tab === 'uptime'">
+      <div
+        v-if="loadingProbes && !probes.length"
+        class="row row-cards"
+      >
+        <div class="col-12">
+          <LoadingSkeleton
+            variant="table"
+            :lines="5"
+          />
+        </div>
+      </div>
+
+      <EmptyState
+        v-else-if="!probes.length"
+        title="Aucune sonde configurée"
+        subtitle="Créez votre première sonde HTTP ou TCP pour surveiller un service."
+        :cta-label="auth.role === 'admin' ? 'Nouvelle sonde' : ''"
+        @cta="openCreateProbe"
+      />
+
+      <div
+        v-else
+        class="card"
+      >
+        <div class="table-responsive">
+          <table class="table table-vcenter card-table">
+            <thead>
+              <tr>
+                <th>Sonde</th>
+                <th>Cible</th>
+                <th>Statut</th>
+                <th>Uptime 24h</th>
+                <th>Latence</th>
+                <th>Dernière vérification</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="p in sortedProbes"
+                :key="p.id"
+              >
+                <td>
+                  <router-link
+                    :to="`/monitoring/probes/${p.id}`"
+                    class="fw-semibold text-decoration-none"
+                  >
+                    {{ p.name }}
+                  </router-link>
+                  <div class="text-secondary small">
+                    {{ p.type.toUpperCase() }} · {{ p.interval_sec }}s
+                  </div>
+                </td>
+                <td class="text-secondary">
+                  <code>{{ p.target }}</code>
+                </td>
+                <td>
+                  <span :class="['badge', probeBadge(p)]">
+                    {{ probeStatusLabel(p) }}
+                  </span>
+                  <span
+                    v-if="!p.enabled"
+                    class="badge bg-secondary-lt text-secondary ms-1"
+                  >désactivée</span>
+                </td>
+                <td>
+                  <template v-if="probeStats[p.id]">
+                    <span :class="['badge', uptimeBadgeClass(probeStats[p.id].uptime_percent)]">
+                      {{ probeStats[p.id].uptime_percent.toFixed(1) }}%
+                    </span>
+                  </template>
+                  <span
+                    v-else
+                    class="text-secondary small"
+                  >—</span>
+                </td>
+                <td>
+                  <template v-if="p.last_latency_ms != null && p.last_status === 'up'">
+                    {{ p.last_latency_ms }} ms
+                  </template>
+                  <span
+                    v-else
+                    class="text-secondary"
+                  >—</span>
+                </td>
+                <td class="text-secondary small">
+                  <RelativeTime
+                    v-if="p.last_checked_at"
+                    :date="p.last_checked_at"
+                  />
+                  <span
+                    v-else
+                    class="text-secondary"
+                  >Jamais</span>
+                </td>
+                <td class="text-end">
+                  <div class="btn-list">
+                    <button
+                      v-if="auth.role === 'admin'"
+                      class="btn btn-sm btn-outline-secondary"
+                      :disabled="checkingProbeId === p.id"
+                      @click="checkProbeNow(p)"
+                    >
+                      {{ checkingProbeId === p.id ? '...' : 'Vérifier' }}
+                    </button>
+                    <button
+                      v-if="auth.role === 'admin'"
+                      class="btn btn-sm btn-outline-secondary"
+                      @click="openEditProbe(p)"
+                    >
+                      Modifier
+                    </button>
+                    <button
+                      v-if="auth.role === 'admin'"
+                      class="btn btn-sm btn-outline-danger"
+                      @click="confirmDeleteProbe(p)"
+                    >
+                      Supprimer
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </template>
+
+    <!-- ===== SSL TAB ===== -->
+    <template v-if="tab === 'ssl'">
+      <div
+        v-if="loadingCerts && !certs.length"
+        class="row row-cards"
+      >
+        <div class="col-12">
+          <LoadingSkeleton
+            variant="table"
+            :lines="5"
+          />
+        </div>
+      </div>
+
+      <EmptyState
+        v-else-if="!certs.length"
+        title="Aucun certificat surveillé"
+        subtitle="Ajoutez un domaine pour suivre l'expiration de son certificat TLS."
+        :cta-label="auth.role === 'admin' ? 'Ajouter un certificat' : ''"
+        @cta="openCreateCert"
+      />
+
+      <div
+        v-else
+        class="card"
+      >
+        <div class="table-responsive">
+          <table class="table table-vcenter card-table">
+            <thead>
+              <tr>
+                <th>Nom</th>
+                <th>Endpoint</th>
+                <th>Émetteur</th>
+                <th>Expiration</th>
+                <th class="text-nowrap">
+                  Jours restants
+                  <span
+                    class="text-muted ms-1"
+                    title="Trié par expiration (croissant)"
+                  >▲</span>
+                </th>
+                <th>Dernière vérification</th>
+                <th />
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="c in sortedCerts"
+                :key="c.id"
+              >
+                <td>
+                  <router-link
+                    :to="`/monitoring/ssl/${c.id}`"
+                    class="fw-semibold text-decoration-none"
+                  >
+                    {{ c.name }}
+                  </router-link>
+                  <span
+                    v-if="!c.enabled"
+                    class="badge bg-secondary-lt text-secondary ms-1"
+                  >désactivé</span>
+                </td>
+                <td class="text-secondary">
+                  <code>{{ c.host }}:{{ c.port }}</code>
+                </td>
+                <td class="text-secondary small">
+                  {{ shortIssuer(c.issuer) || '—' }}
+                </td>
+                <td class="text-secondary small">
+                  {{ c.valid_to ? formatDate(c.valid_to) : '—' }}
+                </td>
+                <td>
+                  <span :class="['badge', daysBadge(c.days_remaining)]">
+                    {{ daysLabel(c.days_remaining) }}
+                  </span>
+                </td>
+                <td class="text-secondary small">
+                  <RelativeTime
+                    v-if="c.last_checked_at"
+                    :date="c.last_checked_at"
+                  />
+                  <span
+                    v-else
+                    class="text-secondary"
+                  >Jamais</span>
+                  <div
+                    v-if="c.last_error"
+                    class="text-danger small"
+                    :title="c.last_error"
+                  >
+                    {{ c.last_error.length > 40 ? c.last_error.slice(0, 40) + '...' : c.last_error }}
+                  </div>
+                </td>
+                <td class="text-end">
+                  <div class="btn-list">
+                    <button
+                      v-if="auth.role === 'admin'"
+                      class="btn btn-sm btn-outline-secondary"
+                      :disabled="checkingCertId === c.id"
+                      @click="checkCertNow(c)"
+                    >
+                      {{ checkingCertId === c.id ? '...' : 'Vérifier' }}
+                    </button>
+                    <button
+                      v-if="auth.role === 'admin'"
+                      class="btn btn-sm btn-outline-secondary"
+                      @click="openEditCert(c)"
+                    >
+                      Modifier
+                    </button>
+                    <button
+                      v-if="auth.role === 'admin'"
+                      class="btn btn-sm btn-outline-danger"
+                      @click="confirmDeleteCert(c)"
+                    >
+                      Supprimer
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </template>
+
+    <!-- ===== MODAL SONDE ===== -->
+    <div
+      v-if="probeModalOpen"
+      class="modal modal-blur fade show"
+      style="display:block"
+      tabindex="-1"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">
+              {{ probeForm.id ? 'Modifier la sonde' : 'Nouvelle sonde' }}
+            </h5>
+            <button
+              type="button"
+              class="btn-close"
+              :disabled="savingProbe"
+              @click="closeProbeModal"
+            />
+          </div>
+          <form @submit.prevent="saveProbe">
+            <div class="modal-body">
+              <div
+                v-if="probeFormError"
+                class="alert alert-danger"
+              >
+                {{ probeFormError }}
+              </div>
+              <div class="row g-3">
+                <div class="col-md-7">
+                  <label class="form-label required">Nom</label>
+                  <input
+                    v-model="probeForm.name"
+                    type="text"
+                    class="form-control"
+                    placeholder="Ex: API prod"
+                    required
+                  >
+                </div>
+                <div class="col-md-5">
+                  <label class="form-label required">Type</label>
+                  <select
+                    v-model="probeForm.type"
+                    class="form-select"
+                  >
+                    <option value="http">
+                      HTTP/HTTPS
+                    </option>
+                    <option value="tcp">
+                      TCP
+                    </option>
+                  </select>
+                </div>
+                <div class="col-12">
+                  <label class="form-label required">{{ probeForm.type === 'http' ? 'URL' : 'host:port' }}</label>
+                  <input
+                    v-model="probeForm.target"
+                    type="text"
+                    class="form-control"
+                    :placeholder="probeForm.type === 'http' ? 'https://example.com/health' : 'example.com:443'"
+                    required
+                  >
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Intervalle (sec)</label>
+                  <input
+                    v-model.number="probeForm.interval_sec"
+                    type="number"
+                    min="10"
+                    class="form-control"
+                  >
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Timeout (sec)</label>
+                  <input
+                    v-model.number="probeForm.timeout_sec"
+                    type="number"
+                    min="1"
+                    max="60"
+                    class="form-control"
+                  >
+                </div>
+                <template v-if="probeForm.type === 'http'">
+                  <div class="col-md-4">
+                    <label class="form-label">Statut HTTP attendu</label>
+                    <input
+                      v-model.number="probeForm.expected_status"
+                      type="number"
+                      min="100"
+                      max="599"
+                      class="form-control"
+                    >
+                  </div>
+                  <div class="col-12">
+                    <label class="form-label">Regex corps attendu (optionnel)</label>
+                    <input
+                      v-model="probeForm.expected_body_regex"
+                      type="text"
+                      class="form-control"
+                      placeholder='Ex: "status":\s*"ok"'
+                    >
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-check">
+                      <input
+                        v-model="probeForm.follow_redirects"
+                        type="checkbox"
+                        class="form-check-input"
+                      >
+                      <span class="form-check-label">Suivre les redirections</span>
+                    </label>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-check">
+                      <input
+                        v-model="probeForm.verify_tls"
+                        type="checkbox"
+                        class="form-check-input"
+                      >
+                      <span class="form-check-label">Vérifier le certificat TLS</span>
+                    </label>
+                  </div>
+                </template>
+                <div class="col-12">
+                  <label class="form-check">
+                    <input
+                      v-model="probeForm.enabled"
+                      type="checkbox"
+                      class="form-check-input"
+                    >
+                    <span class="form-check-label">Activée</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button
+                type="button"
+                class="btn link-secondary"
+                :disabled="savingProbe"
+                @click="closeProbeModal"
+              >
+                Annuler
+              </button>
+              <button
+                type="submit"
+                class="btn btn-primary"
+                :disabled="savingProbe"
+              >
+                {{ savingProbe ? 'Enregistrement...' : 'Enregistrer' }}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+    <div
+      v-if="probeModalOpen"
+      class="modal-backdrop fade show"
+    />
+
+    <!-- ===== MODAL CERTIFICAT ===== -->
+    <div
+      v-if="certModalOpen"
+      class="modal modal-blur fade show"
+      style="display:block"
+      tabindex="-1"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">
+              {{ certForm.id ? 'Modifier le certificat' : 'Nouveau certificat' }}
+            </h5>
+            <button
+              type="button"
+              class="btn-close"
+              :disabled="savingCert"
+              @click="closeCertModal"
+            />
+          </div>
+          <form @submit.prevent="saveCert">
+            <div class="modal-body">
+              <div
+                v-if="certFormError"
+                class="alert alert-danger"
+              >
+                {{ certFormError }}
+              </div>
+              <div class="mb-3">
+                <label class="form-label required">Nom</label>
+                <input
+                  v-model="certForm.name"
+                  type="text"
+                  class="form-control"
+                  placeholder="Ex: api.example.com"
+                  required
+                >
+              </div>
+              <div class="row g-3">
+                <div class="col-md-8">
+                  <label class="form-label required">Hôte</label>
+                  <input
+                    v-model="certForm.host"
+                    type="text"
+                    class="form-control"
+                    placeholder="api.example.com"
+                    required
+                  >
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label required">Port</label>
+                  <input
+                    v-model.number="certForm.port"
+                    type="number"
+                    min="1"
+                    max="65535"
+                    class="form-control"
+                  >
+                </div>
+                <div class="col-12">
+                  <label class="form-label">SNI (override, optionnel)</label>
+                  <input
+                    v-model="certForm.server_name"
+                    type="text"
+                    class="form-control"
+                    placeholder="Laisser vide pour utiliser l'hôte"
+                  >
+                </div>
+                <div class="col-12">
+                  <label class="form-check">
+                    <input
+                      v-model="certForm.enabled"
+                      type="checkbox"
+                      class="form-check-input"
+                    >
+                    <span class="form-check-label">Activé</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button
+                type="button"
+                class="btn link-secondary"
+                :disabled="savingCert"
+                @click="closeCertModal"
+              >
+                Annuler
+              </button>
+              <button
+                type="submit"
+                class="btn btn-primary"
+                :disabled="savingCert"
+              >
+                {{ savingCert ? 'Enregistrement...' : 'Enregistrer' }}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+    <div
+      v-if="certModalOpen"
+      class="modal-backdrop fade show"
+    />
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import api from '../api'
+import type { UptimeProbe } from '../types/uptime'
+import type { SSLCertificate } from '../types/ssl'
+import { useAuthStore } from '../stores/auth'
+import { useConfirmDialog } from '../composables/useConfirmDialog'
+import EmptyState from '../components/EmptyState.vue'
+import LoadingSkeleton from '../components/LoadingSkeleton.vue'
+import RelativeTime from '../components/RelativeTime.vue'
+import PageRefreshBar from '../components/PageRefreshBar.vue'
+import dayjs from '../utils/dayjs'
+
+type Probe = UptimeProbe
+type SSLCert = SSLCertificate
+
+interface ProbeForm {
+  id: string
+  name: string
+  type: string
+  target: string
+  interval_sec: number
+  timeout_sec: number
+  expected_status: number
+  expected_body_regex: string
+  follow_redirects: boolean
+  verify_tls: boolean
+  enabled: boolean
+}
+
+interface CertForm {
+  id: string
+  name: string
+  host: string
+  port: number
+  server_name: string
+  enabled: boolean
+}
+
+const auth = useAuthStore()
+const dialog = useConfirmDialog()
+const route = useRoute()
+const router = useRouter()
+
+const REFRESH_SEC = 30
+const autoRefresh = ref(true)
+const lastUpdatedAt = ref<Date | null>(null)
+const error = ref('')
+
+// ── tab ───────────────────────────────────────────────────────────────────────
+type Tab = 'uptime' | 'ssl'
+const tab = ref<Tab>((route.query.tab as Tab) === 'ssl' ? 'ssl' : 'uptime')
+
+function setTab(t: Tab) {
+  tab.value = t
+  router.replace({ query: t !== 'uptime' ? { tab: t } : {} })
+}
+
+watch(() => route.query.tab, (v) => {
+  tab.value = (v as Tab) === 'ssl' ? 'ssl' : 'uptime'
+})
+
+// ── Uptime ────────────────────────────────────────────────────────────────────
+const probes = ref<Probe[]>([])
+const loadingProbes = ref(false)
+const probeStats = ref<Record<string, { uptime_percent: number }>>({})
+const checkingProbeId = ref('')
+
+const downCount = computed(() => probes.value.filter((p) => p.last_status === 'down').length)
+
+const sortedProbes = computed(() =>
+  [...probes.value].sort((a, b) => {
+    if (a.last_status === 'down' && b.last_status !== 'down') return -1
+    if (b.last_status === 'down' && a.last_status !== 'down') return 1
+    return 0
+  })
+)
+
+function probeBadge(p: Probe): string {
+  if (!p.enabled) return 'bg-secondary-lt text-secondary'
+  if (p.last_status === 'up') return 'bg-green-lt text-green'
+  if (p.last_status === 'down') return 'bg-red-lt text-red'
+  return 'bg-secondary-lt text-secondary'
+}
+
+function probeStatusLabel(p: Probe): string {
+  if (p.last_status === 'up') return 'UP'
+  if (p.last_status === 'down') return 'DOWN'
+  return 'Inconnue'
+}
+
+function uptimeBadgeClass(pct: number): string {
+  if (pct >= 99) return 'bg-green-lt text-green'
+  if (pct >= 95) return 'bg-yellow-lt text-yellow'
+  return 'bg-red-lt text-red'
+}
+
+async function fetchProbes(): Promise<void> {
+  loadingProbes.value = true
+  try {
+    const { data } = await api.getUptimeProbes()
+    probes.value = data?.probes || []
+    lastUpdatedAt.value = new Date()
+    fetchAllProbeStats()
+  } catch (e: unknown) {
+    error.value = (e as { response?: { data?: { error?: string } }; message?: string })?.response?.data?.error
+      || (e as { message?: string })?.message || 'Impossible de charger les sondes'
+  } finally {
+    loadingProbes.value = false
+  }
+}
+
+async function fetchAllProbeStats(): Promise<void> {
+  const results = await Promise.allSettled(
+    probes.value.map((p) => api.getUptimeStats(p.id, 24).then((r) => ({ id: p.id, data: r.data })))
+  )
+  const map: Record<string, { uptime_percent: number }> = {}
+  for (const r of results) {
+    if (r.status === 'fulfilled') {
+      map[r.value.id] = { uptime_percent: r.value.data?.uptime_percent ?? 0 }
+    }
+  }
+  probeStats.value = map
+}
+
+async function checkProbeNow(p: Probe): Promise<void> {
+  checkingProbeId.value = p.id
+  try {
+    await api.checkUptimeProbeNow(p.id)
+    await fetchProbes()
+  } catch (e: unknown) {
+    error.value = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Échec de la vérification'
+  } finally {
+    checkingProbeId.value = ''
+  }
+}
+
+// probe form
+const probeModalOpen = ref(false)
+const savingProbe = ref(false)
+const probeFormError = ref('')
+const probeForm = ref<ProbeForm>(emptyProbeForm())
+
+function emptyProbeForm(): ProbeForm {
+  return { id: '', name: '', type: 'http', target: '', interval_sec: 60, timeout_sec: 10,
+    expected_status: 200, expected_body_regex: '', follow_redirects: true, verify_tls: true, enabled: true }
+}
+
+function openCreateProbe(): void {
+  probeForm.value = emptyProbeForm()
+  probeFormError.value = ''
+  probeModalOpen.value = true
+}
+
+function openEditProbe(p: Probe): void {
+  probeForm.value = {
+    id: p.id, name: p.name, type: p.type, target: p.target,
+    interval_sec: p.interval_sec, timeout_sec: p.timeout_sec,
+    expected_status: p.expected_status, expected_body_regex: p.expected_body_regex || '',
+    follow_redirects: p.follow_redirects, verify_tls: p.verify_tls, enabled: p.enabled,
+  }
+  probeFormError.value = ''
+  probeModalOpen.value = true
+}
+
+function closeProbeModal(): void {
+  probeModalOpen.value = false
+  savingProbe.value = false
+}
+
+async function saveProbe(): Promise<void> {
+  savingProbe.value = true
+  probeFormError.value = ''
+  try {
+    const { id: _id, ...body } = probeForm.value
+    if (probeForm.value.id) {
+      await api.updateUptimeProbe(probeForm.value.id, body)
+    } else {
+      await api.createUptimeProbe(body)
+    }
+    closeProbeModal()
+    await fetchProbes()
+  } catch (e: unknown) {
+    probeFormError.value = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Erreur lors de l\'enregistrement'
+  } finally {
+    savingProbe.value = false
+  }
+}
+
+async function confirmDeleteProbe(p: Probe): Promise<void> {
+  const ok = await dialog.confirm({
+    title: 'Supprimer la sonde ?',
+    message: `Cette action supprimera "${p.name}" et tout son historique.`,
+    okLabel: 'Supprimer',
+    destructive: true,
+  })
+  if (!ok) return
+  try {
+    await api.deleteUptimeProbe(p.id)
+    await fetchProbes()
+  } catch (e: unknown) {
+    error.value = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Suppression impossible'
+  }
+}
+
+// ── SSL ───────────────────────────────────────────────────────────────────────
+const certs = ref<SSLCert[]>([])
+const loadingCerts = ref(false)
+const checkingCertId = ref('')
+
+const expiringCount = computed(() => certs.value.filter((c) => {
+  const d = c.days_remaining
+  return d != null && d <= 30
+}).length)
+
+const sortedCerts = computed(() =>
+  [...certs.value].sort((a, b) => {
+    const da = a.days_remaining ?? Infinity
+    const db = b.days_remaining ?? Infinity
+    return da - db
+  })
+)
+
+function formatDate(ts: string | undefined | null): string {
+  return ts ? dayjs(ts).format('YYYY-MM-DD') : '—'
+}
+
+function shortIssuer(s: string | undefined): string {
+  if (!s) return ''
+  const cn = /CN=([^,]+)/.exec(s)
+  return cn ? cn[1] : s.split(',')[0]
+}
+
+function daysLabel(d: number | null | undefined): string {
+  if (d == null) return 'Inconnu'
+  if (d < 0) return `Expiré (${Math.abs(d)}j)`
+  return `${d}j`
+}
+
+function daysBadge(d: number | null | undefined): string {
+  if (d == null) return 'bg-secondary-lt text-secondary'
+  if (d < 0) return 'bg-red text-white'
+  if (d <= 7) return 'bg-red-lt text-red'
+  if (d <= 30) return 'bg-yellow-lt text-yellow'
+  return 'bg-green-lt text-green'
+}
+
+async function fetchCerts(): Promise<void> {
+  loadingCerts.value = true
+  try {
+    const { data } = await api.getSSLCertificates()
+    certs.value = data?.certificates || []
+    lastUpdatedAt.value = new Date()
+  } catch (e: unknown) {
+    error.value = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Impossible de charger les certificats'
+  } finally {
+    loadingCerts.value = false
+  }
+}
+
+async function checkCertNow(c: SSLCert): Promise<void> {
+  checkingCertId.value = c.id
+  try {
+    await api.checkSSLCertificateNow(c.id)
+    await fetchCerts()
+  } catch (e: unknown) {
+    error.value = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Échec de la vérification'
+  } finally {
+    checkingCertId.value = ''
+  }
+}
+
+// cert form
+const certModalOpen = ref(false)
+const savingCert = ref(false)
+const certFormError = ref('')
+const certForm = ref<CertForm>(emptyCertForm())
+
+function emptyCertForm(): CertForm {
+  return { id: '', name: '', host: '', port: 443, server_name: '', enabled: true }
+}
+
+function openCreateCert(): void {
+  certForm.value = emptyCertForm()
+  certFormError.value = ''
+  certModalOpen.value = true
+}
+
+function openEditCert(c: SSLCert): void {
+  certForm.value = { id: c.id, name: c.name, host: c.host, port: c.port,
+    server_name: c.server_name || '', enabled: c.enabled }
+  certFormError.value = ''
+  certModalOpen.value = true
+}
+
+function closeCertModal(): void {
+  certModalOpen.value = false
+  savingCert.value = false
+}
+
+async function saveCert(): Promise<void> {
+  savingCert.value = true
+  certFormError.value = ''
+  try {
+    const { id: _id, ...body } = certForm.value
+    if (certForm.value.id) {
+      await api.updateSSLCertificate(certForm.value.id, body)
+    } else {
+      await api.createSSLCertificate(body)
+    }
+    closeCertModal()
+    await fetchCerts()
+  } catch (e: unknown) {
+    certFormError.value = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Erreur lors de l\'enregistrement'
+  } finally {
+    savingCert.value = false
+  }
+}
+
+async function confirmDeleteCert(c: SSLCert): Promise<void> {
+  const ok = await dialog.confirm({
+    title: 'Supprimer le certificat ?',
+    message: `Cette action supprimera "${c.name}" du suivi.`,
+    okLabel: 'Supprimer',
+    destructive: true,
+  })
+  if (!ok) return
+  try {
+    await api.deleteSSLCertificate(c.id)
+    await fetchCerts()
+  } catch (e: unknown) {
+    error.value = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Suppression impossible'
+  }
+}
+
+// ── lifecycle ─────────────────────────────────────────────────────────────────
+let refreshTimer: ReturnType<typeof setInterval> | undefined
+
+function refreshAll() {
+  fetchProbes()
+  fetchCerts()
+}
+
+onMounted(() => {
+  refreshAll()
+  refreshTimer = setInterval(() => { if (autoRefresh.value) refreshAll() }, REFRESH_SEC * 1000)
+})
+onUnmounted(() => {
+  if (refreshTimer) clearInterval(refreshTimer)
+})
+</script>

@@ -16,6 +16,7 @@ import (
 type SSLDB interface {
 	ListEnabledSSLCertificates(ctx context.Context) ([]models.SSLCertificate, error)
 	UpdateSSLCertificateCheckResult(ctx context.Context, c models.SSLCertificate) error
+	InsertSSLCertificateEventIfNew(ctx context.Context, ev models.SSLCertificateEvent) error
 }
 
 const (
@@ -54,6 +55,17 @@ func checkAllCertificates(ctx context.Context, db SSLDB) {
 		}
 		result := checkCertificate(ctx, c)
 		_ = db.UpdateSSLCertificateCheckResult(ctx, result)
+		if result.SerialNumber != "" {
+			ev := models.SSLCertificateEvent{
+				CertificateID: result.ID,
+				SerialNumber:  result.SerialNumber,
+				ValidFrom:     result.ValidFrom,
+				ValidTo:       result.ValidTo,
+				Issuer:        result.Issuer,
+				Subject:       result.Subject,
+			}
+			_ = db.InsertSSLCertificateEventIfNew(ctx, ev)
+		}
 	}
 }
 

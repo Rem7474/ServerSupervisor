@@ -95,3 +95,17 @@ type SSLCertificateRequest struct {
 	ServerName string `json:"server_name"`
 	Enabled    *bool  `json:"enabled"`
 }
+
+// SSLCertificateEvent records one observed certificate version for a monitored
+// endpoint. A new row is written whenever the serial_number changes, giving a
+// full renewal timeline. detected_at is the first time this serial was seen.
+type SSLCertificateEvent struct {
+	ID            int64      `json:"id"`
+	CertificateID string     `json:"certificate_id"`
+	SerialNumber  string     `json:"serial_number"`
+	ValidFrom     *time.Time `json:"valid_from,omitempty"`
+	ValidTo       *time.Time `json:"valid_to,omitempty"`
+	Issuer        string     `json:"issuer,omitempty"`
+	Subject       string     `json:"subject,omitempty"`
+	DetectedAt    time.Time  `json:"detected_at"`
+}
