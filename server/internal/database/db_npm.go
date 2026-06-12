@@ -320,7 +320,7 @@ func (db *DB) ListAllNPMProxyHostsEnriched(ctx context.Context) ([]models.NPMPro
 		       c.name AS connection_name,
 		       COALESCE(u.last_status, '') AS uptime_status,
 		       u.last_latency_ms,
-		       s.days_remaining AS ssl_days_remaining
+		       CASE WHEN s.valid_to IS NOT NULL THEN EXTRACT(day FROM (s.valid_to - NOW()))::int END AS ssl_days_remaining
 		FROM npm_proxy_hosts p
 		JOIN npm_connections c ON c.id = p.connection_id
 		LEFT JOIN uptime_probes u ON u.id = p.uptime_probe_id
