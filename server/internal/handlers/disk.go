@@ -5,66 +5,45 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/serversupervisor/server/internal/models"
+	"github.com/serversupervisor/server/internal/apperr"
 )
 
-// GetDiskMetrics retourne les dernières métriques de disque pour un hôte
+// GetDiskMetrics retourne les dernières métriques de disque pour un hôte.
 func (h *HostHandler) GetDiskMetrics(c *gin.Context) {
-	hostID := c.Param("id")
-
-	metrics, err := h.db.GetLatestDiskMetrics(c.Request.Context(), hostID)
+	metrics, err := h.svc.DiskMetrics(c.Request.Context(), c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch disk metrics"})
+		respondError(c, err)
 		return
 	}
-
-	if metrics == nil {
-		c.JSON(http.StatusOK, []interface{}{})
-		return
-	}
-
 	c.JSON(http.StatusOK, metrics)
 }
 
-// GetDiskMetricsHistory retourne l'historique des métriques de disque pour un point de montage
+// GetDiskMetricsHistory retourne l'historique des métriques de disque pour un point de montage.
 func (h *HostHandler) GetDiskMetricsHistory(c *gin.Context) {
-	hostID := c.Param("id")
 	mountPoint := c.Query("mount_point")
-	limitStr := c.DefaultQuery("limit", "100")
-
-	limit, _ := strconv.Atoi(limitStr)
+	if mountPoint == "" {
+		respondError(c, apperr.Validation("mount_point query parameter required"))
+		return
+	}
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "100"))
 	if limit <= 0 || limit > 1000 {
 		limit = 100
 	}
-
-	if mountPoint == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "mount_point query parameter required"})
-		return
-	}
-
-	history, err := h.db.GetDiskMetricsHistory(c.Request.Context(), hostID, mountPoint, limit)
+	history, err := h.svc.DiskMetricsHistory(c.Request.Context(), c.Param("id"), mountPoint, limit)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch disk metrics history"})
+		respondError(c, err)
 		return
 	}
-
-	if history == nil {
-		c.JSON(http.StatusOK, []interface{}{})
-		return
-	}
-
 	c.JSON(http.StatusOK, history)
 }
 
-// GetDiskMetricsAggregated retourne l'historique agrégé d'un point de montage avec bucketing adaptatif
+// GetDiskMetricsAggregated retourne l'historique agrégé d'un point de montage avec bucketing adaptatif.
 func (h *HostHandler) GetDiskMetricsAggregated(c *gin.Context) {
-	hostID := c.Param("id")
 	mountPoint := c.Query("mount_point")
 	if mountPoint == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "mount_point query parameter required"})
+		respondError(c, apperr.Validation("mount_point query parameter required"))
 		return
 	}
-
 	hours, err := strconv.Atoi(c.DefaultQuery("hours", "24"))
 	if err != nil || hours <= 0 {
 		hours = 24
@@ -72,16 +51,11 @@ func (h *HostHandler) GetDiskMetricsAggregated(c *gin.Context) {
 	if hours > 8760 {
 		hours = 8760
 	}
-
-	points, aggType, err := h.db.GetDiskMetricsAggregated(c.Request.Context(), hostID, mountPoint, hours)
+	points, aggType, err := h.svc.DiskMetricsAggregated(c.Request.Context(), c.Param("id"), mountPoint, hours)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch disk metrics history"})
+		respondError(c, err)
 		return
 	}
-	if points == nil {
-		points = []models.DiskMetrics{}
-	}
-
 	c.JSON(http.StatusOK, gin.H{
 		"aggregation_type": aggType,
 		"hours":            hours,
@@ -90,20 +64,12 @@ func (h *HostHandler) GetDiskMetricsAggregated(c *gin.Context) {
 	})
 }
 
-// GetDiskHealth retourne l'état SMART de tous les disques d'un hôte
+// GetDiskHealth retourne l'état SMART de tous les disques d'un hôte.
 func (h *HostHandler) GetDiskHealth(c *gin.Context) {
-	hostID := c.Param("id")
-
-	health, err := h.db.GetLatestDiskHealth(c.Request.Context(), hostID)
+	health, err := h.svc.DiskHealth(c.Request.Context(), c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch disk health"})
+		respondError(c, err)
 		return
 	}
-
-	if health == nil {
-		c.JSON(http.StatusOK, []interface{}{})
-		return
-	}
-
 	c.JSON(http.StatusOK, health)
 }

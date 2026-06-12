@@ -9,6 +9,7 @@ import (
 	"github.com/serversupervisor/server/internal/handlers"
 	"github.com/serversupervisor/server/internal/scheduler"
 	auditsvc "github.com/serversupervisor/server/internal/services/audit"
+	hostsvc "github.com/serversupervisor/server/internal/services/host"
 	hostpermsvc "github.com/serversupervisor/server/internal/services/hostperm"
 	scheduledtasksvc "github.com/serversupervisor/server/internal/services/scheduledtask"
 	sslsvc "github.com/serversupervisor/server/internal/services/ssl"
@@ -37,7 +38,9 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 
 	// Instantiate handlers
 	authH := handlers.NewAuthHandler(db, cfg, dispatcher)
-	hostH := handlers.NewHostHandler(db, cfg, dispatcher)
+	hostH := handlers.NewHostHandler(hostsvc.NewService(db, dispatcher, func() string {
+		return handlers.ResolveLatestAgentVersion(cfg)
+	}))
 	wsH := ws.NewWSHandler(db, cfg, notifHub)
 	agentH := handlers.NewAgentHandler(db, cfg, wsH.GetStreamHub(), notifHub)
 	aptH := handlers.NewAptHandler(db, cfg, dispatcher)
