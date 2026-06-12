@@ -996,6 +996,21 @@ export interface SSLCertificateRequest {
   server_name: string;
   enabled?: boolean;
 }
+/**
+ * SSLCertificateEvent records one observed certificate version for a monitored
+ * endpoint. A new row is written whenever the serial_number changes, giving a
+ * full renewal timeline. detected_at is the first time this serial was seen.
+ */
+export interface SSLCertificateEvent {
+  id: number /* int64 */;
+  certificate_id: string;
+  serial_number: string;
+  valid_from?: string;
+  valid_to?: string;
+  issuer?: string;
+  subject?: string;
+  detected_at: string;
+}
 
 //////////
 // source: task.go
