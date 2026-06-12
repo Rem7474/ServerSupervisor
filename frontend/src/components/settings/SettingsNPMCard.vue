@@ -169,29 +169,6 @@
               class="text-end"
             >
               <div class="d-flex gap-1 justify-content-end">
-                <!-- Import -->
-                <button
-                  class="btn btn-sm btn-outline-primary"
-                  title="Importer des proxy hosts"
-                  @click="openImport(conn)"
-                >
-                  <svg
-                    class="icon icon-sm"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
-                    <polyline points="7 10 12 15 17 10" />
-                    <line
-                      x1="12"
-                      y1="15"
-                      x2="12"
-                      y2="3"
-                    />
-                  </svg>
-                </button>
                 <!-- Edit -->
                 <button
                   class="btn btn-sm btn-outline-secondary"
@@ -259,21 +236,12 @@
     </div>
   </div>
 
-  <!-- Import modal -->
-  <NPMImportModal
-    v-if="importConn"
-    :connection-id="importConn.id"
-    :connection-name="importConn.name"
-    @close="importConn = null"
-    @imported="onImported"
-  />
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { npmApi } from '../../api/npm'
 import type { NPMConnection } from '../../types/npm'
-import NPMImportModal from './NPMImportModal.vue'
 
 withDefaults(defineProps<{
   authIsAdmin?: boolean
@@ -299,7 +267,6 @@ const formMsg = ref('')
 const formOk = ref(false)
 const listMsg = ref('')
 const listOk = ref(false)
-const importConn = ref<NPMConnection | null>(null)
 
 const emptyForm = (): NPMForm => ({
   name: '',
@@ -423,7 +390,7 @@ async function refreshNow(conn: NPMConnection): Promise<void> {
 }
 
 async function remove(conn: NPMConnection): Promise<void> {
-  if (!confirm(`Supprimer la connexion NPM « ${conn.name} » ? Les proxy hosts importés (et leurs sondes uptime/SSL associées) ne seront PAS supprimés.`)) return
+  if (!confirm(`Supprimer la connexion NPM « ${conn.name} » ? Les proxy hosts et leurs sondes uptime/SSL associées ne seront PAS supprimés.`)) return
   try {
     await npmApi.deleteConnection(conn.id)
     await load()
@@ -433,16 +400,6 @@ async function remove(conn: NPMConnection): Promise<void> {
     listMsg.value = e?.response?.data?.error || 'Erreur lors de la suppression.'
     listOk.value = false
   }
-}
-
-function openImport(conn: NPMConnection): void {
-  importConn.value = conn
-}
-
-function onImported(count: number): void {
-  listMsg.value = `${count} proxy host${count !== 1 ? 's' : ''} importé${count !== 1 ? 's' : ''} depuis NPM.`
-  listOk.value = true
-  load()
 }
 
 function formatDate(iso: string | undefined): string {

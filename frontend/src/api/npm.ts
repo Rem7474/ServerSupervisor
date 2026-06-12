@@ -1,5 +1,5 @@
 import { api } from './client'
-import type { NPMConnection, NPMConnectionRequest, NPMProxyHost, NPMProxyHostEnriched, NPMProxyHostPreview, NPMProxyHostUpdateRequest } from '../types/npm'
+import type { NPMConnection, NPMConnectionRequest, NPMProxyHost, NPMProxyHostEnriched, NPMProxyHostUpdateRequest } from '../types/npm'
 
 export const npmApi = {
   listConnections: () =>
@@ -16,12 +16,6 @@ export const npmApi = {
 
   testConnection: (payload: { api_url: string; identity: string; secret: string }) =>
     api.post<{ success: boolean; error?: string }>('/v1/npm/connections/test', payload),
-
-  previewProxyHosts: (id: string) =>
-    api.get<{ proxy_hosts: NPMProxyHostPreview[] }>(`/v1/npm/connections/${id}/preview`),
-
-  importSelected: (id: string, npmIds: number[]) =>
-    api.post<{ imported: number }>(`/v1/npm/connections/${id}/import`, { npm_ids: npmIds }),
 
   listProxyHosts: (id: string) =>
     api.get<{ proxy_hosts: NPMProxyHost[] }>(`/v1/npm/connections/${id}/proxy-hosts`),

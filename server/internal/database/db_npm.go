@@ -220,6 +220,8 @@ func (db *DB) ListNPMProxyHosts(ctx context.Context, connectionID string) ([]mod
 }
 
 // UpsertNPMProxyHost inserts or updates a proxy host record (keyed on connection_id + npm_id).
+// New rows start with monitoring_enabled=false so the user must explicitly activate monitoring.
+// ON CONFLICT never touches monitoring flags — those are owned by UpdateNPMProxyHostSettings.
 func (db *DB) UpsertNPMProxyHost(ctx context.Context, h models.NPMProxyHost) (*models.NPMProxyHost, error) {
 	domains := h.DomainNames
 	if domains == nil {
@@ -228,11 +230,13 @@ func (db *DB) UpsertNPMProxyHost(ctx context.Context, h models.NPMProxyHost) (*m
 	var id string
 	err := db.conn.QueryRowContext(ctx,
 		`INSERT INTO npm_proxy_hosts
-		 (connection_id, npm_id, domain_names, forward_host, forward_port, ssl_enabled, npm_enabled, last_seen_at)
-		 VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())
+		 (connection_id, npm_id, domain_names, forward_host, forward_port, ssl_enabled, npm_enabled,
+		  monitoring_enabled, uptime_monitoring_enabled, ssl_monitoring_enabled, last_seen_at)
+		 VALUES ($1,$2,$3,$4,$5,$6,$7, false, false, false, NOW())
 		 ON CONFLICT (connection_id, npm_id) DO UPDATE
-		   SET domain_names=$3, forward_host=$4, forward_port=$5, ssl_enabled=$6,
-		       npm_enabled=$7, last_seen_at=NOW(), updated_at=NOW()
+		   SET domain_names=EXCLUDED.domain_names, forward_host=EXCLUDED.forward_host,
+		       forward_port=EXCLUDED.forward_port, ssl_enabled=EXCLUDED.ssl_enabled,
+		       npm_enabled=EXCLUDED.npm_enabled, last_seen_at=NOW(), updated_at=NOW()
 		 RETURNING id`,
 		h.ConnectionID, h.NPMID, pq.Array(domains), h.ForwardHost, h.ForwardPort, h.SSLEnabled, h.NPMEnabled,
 	).Scan(&id)

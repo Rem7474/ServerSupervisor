@@ -446,8 +446,6 @@ func registerNPMRoutes(g *gin.RouterGroup, h *handlers.NPMHandler) {
 	admin.PUT("/npm/connections/:id", h.UpdateConnection)
 	admin.DELETE("/npm/connections/:id", h.DeleteConnection)
 	admin.POST("/npm/connections/test", h.TestConnection)
-	admin.GET("/npm/connections/:id/preview", h.PreviewProxyHosts)
-	admin.POST("/npm/connections/:id/import", h.ImportSelected)
 	admin.POST("/npm/connections/:id/refresh-now", h.RefreshNow)
 	admin.PATCH("/npm/proxy-hosts/:id", h.UpdateProxyHost)
 }

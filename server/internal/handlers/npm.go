@@ -103,38 +103,6 @@ func (h *NPMHandler) TestConnection(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
-// ─── Preview & Import ─────────────────────────────────────────────────────────
-
-// PreviewProxyHosts fetches live proxy hosts from NPM and returns each with its
-// import status. Nothing is written to the DB.
-func (h *NPMHandler) PreviewProxyHosts(c *gin.Context) {
-	previews, err := h.svc.PreviewProxyHosts(c.Request.Context(), c.Param("id"))
-	if err != nil {
-		respondError(c, err)
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"proxy_hosts": previews})
-}
-
-// ImportSelected imports the proxy hosts selected by the user (identified by
-// their NPM IDs). For each host it creates an uptime probe and (if SSL) an SSL
-// certificate.
-func (h *NPMHandler) ImportSelected(c *gin.Context) {
-	var body struct {
-		NpmIDs []int `json:"npm_ids" binding:"required"`
-	}
-	if err := c.ShouldBindJSON(&body); err != nil {
-		respondError(c, apperr.Validation(err.Error()))
-		return
-	}
-	count, err := h.svc.ImportSelectedProxyHosts(c.Request.Context(), c.Param("id"), body.NpmIDs)
-	if err != nil {
-		respondError(c, err)
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"imported": count})
-}
-
 // ─── Proxy Host list & refresh ────────────────────────────────────────────────
 
 // ListProxyHosts returns proxy hosts already imported for a connection.

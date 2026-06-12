@@ -3,7 +3,6 @@ export type {
   NPMConnection,
   NPMConnectionRequest,
   NPMProxyHost,
-  NPMProxyHostPreview,
   NPMProxyHostUpdateRequest,
 } from './generated'
 

@@ -31,8 +31,9 @@
       </div>
 
       <div v-else-if="hosts.length === 0" class="card-body text-center text-muted py-5">
-        Aucun proxy host importé. Configurez une connexion NPM dans les
-        <router-link to="/settings?tab=integrations">Paramètres → Intégrations</router-link>.
+        Aucun proxy host trouvé. Configurez une connexion NPM dans les
+        <router-link to="/settings?tab=integrations">Paramètres → Intégrations</router-link>
+        — les hosts apparaîtront automatiquement après le premier sync.
       </div>
 
       <div v-else class="table-responsive">
@@ -88,7 +89,7 @@
                       class="form-check-input"
                       type="checkbox"
                       :checked="h.uptime_monitoring_enabled"
-                      :disabled="toggling[h.id] || !h.uptime_probe_id"
+                      :disabled="toggling[h.id]"
                       @change="toggle(h, 'uptime_monitoring_enabled', ($event.target as HTMLInputElement).checked)"
                     >
                   </label>
@@ -100,7 +101,7 @@
                     {{ h.uptime_status }}
                     <span v-if="h.uptime_last_latency_ms" class="ms-1 opacity-75">{{ h.uptime_last_latency_ms }}ms</span>
                   </span>
-                  <span v-else-if="!h.uptime_probe_id" class="text-muted small">—</span>
+                  <span v-else-if="!h.uptime_probe_id" class="text-muted small" style="font-size:0.7rem">inactif</span>
                 </div>
               </td>
 
@@ -112,7 +113,8 @@
                       class="form-check-input"
                       type="checkbox"
                       :checked="h.ssl_monitoring_enabled"
-                      :disabled="toggling[h.id] || !h.ssl_certificate_id"
+                      :disabled="toggling[h.id] || !h.ssl_enabled"
+                      :title="!h.ssl_enabled ? 'Ce proxy host n\'utilise pas SSL' : ''"
                       @change="toggle(h, 'ssl_monitoring_enabled', ($event.target as HTMLInputElement).checked)"
                     >
                   </label>
@@ -121,7 +123,8 @@
                     class="badge small"
                     :class="sslBadge(h.ssl_days_remaining)"
                   >{{ h.ssl_days_remaining }}j</span>
-                  <span v-else-if="!h.ssl_certificate_id" class="text-muted small">—</span>
+                  <span v-else-if="!h.ssl_enabled" class="text-muted small" style="font-size:0.7rem">HTTP</span>
+                  <span v-else-if="!h.ssl_certificate_id" class="text-muted small" style="font-size:0.7rem">inactif</span>
                 </div>
               </td>
             </tr>
