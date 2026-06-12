@@ -9,6 +9,7 @@ import (
 	"github.com/serversupervisor/server/internal/handlers"
 	"github.com/serversupervisor/server/internal/scheduler"
 	auditsvc "github.com/serversupervisor/server/internal/services/audit"
+	dockersvc "github.com/serversupervisor/server/internal/services/docker"
 	hostpermsvc "github.com/serversupervisor/server/internal/services/hostperm"
 	scheduledtasksvc "github.com/serversupervisor/server/internal/services/scheduledtask"
 	sslsvc "github.com/serversupervisor/server/internal/services/ssl"
@@ -41,7 +42,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	wsH := ws.NewWSHandler(db, cfg, notifHub)
 	agentH := handlers.NewAgentHandler(db, cfg, wsH.GetStreamHub(), notifHub)
 	aptH := handlers.NewAptHandler(db, cfg, dispatcher)
-	dockerH := handlers.NewDockerHandler(db, cfg, dispatcher, wsH.GetStreamHub())
+	dockerH := handlers.NewDockerHandler(dockersvc.NewService(db, dispatcher), db)
 	systemH := handlers.NewSystemHandler(db, cfg, dispatcher, wsH.GetStreamHub())
 	networkH := handlers.NewNetworkHandler(db)
 	auditH := handlers.NewAuditHandler(auditsvc.NewService(db))
