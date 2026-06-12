@@ -1,5 +1,5 @@
 import { api } from './client'
-import type { NPMConnection, NPMConnectionRequest, NPMProxyHost, NPMProxyHostPreview } from '../types/npm'
+import type { NPMConnection, NPMConnectionRequest, NPMProxyHost, NPMProxyHostEnriched, NPMProxyHostPreview, NPMProxyHostUpdateRequest } from '../types/npm'
 
 export const npmApi = {
   listConnections: () =>
@@ -28,4 +28,10 @@ export const npmApi = {
 
   refreshNow: (id: string) =>
     api.post(`/v1/npm/connections/${id}/refresh-now`),
+
+  listAllProxyHosts: () =>
+    api.get<{ proxy_hosts: NPMProxyHostEnriched[] }>('/v1/npm/proxy-hosts'),
+
+  updateProxyHost: (id: string, payload: NPMProxyHostUpdateRequest) =>
+    api.patch<NPMProxyHostEnriched>(`/v1/npm/proxy-hosts/${id}`, payload),
 }

@@ -285,6 +285,26 @@
                     /></svg>
                     Monitoring
                   </router-link>
+                  <router-link
+                    to="/npm"
+                    class="dropdown-item"
+                    role="menuitem"
+                    @click="secondaryMenuOpen = false"
+                  >
+                    <svg
+                      class="icon icon-sm me-2"
+                      width="16"
+                      height="16"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <polygon points="12 2 2 7 12 12 22 7 12 2" />
+                      <polyline points="2 17 12 22 22 17" />
+                      <polyline points="2 12 12 17 22 12" />
+                    </svg>
+                    NPM
+                  </router-link>
                 </div>
               </li>
 
@@ -599,7 +619,7 @@ function handlePageShow(event: PageTransitionEvent): void {
   }
 }
 
-const secondaryRoutes = ['/threats', '/traffic', '/scheduled-tasks', '/network', '/monitoring']
+const secondaryRoutes = ['/threats', '/traffic', '/scheduled-tasks', '/network', '/monitoring', '/npm']
 const adminRoutes = ['/git-webhooks', '/audit', '/users', '/settings']
 
 const isSecondaryActive = computed(() => secondaryRoutes.some(r => route.path.startsWith(r)))

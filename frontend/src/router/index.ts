@@ -152,6 +152,12 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../views/SSLCertificateDetailView.vue'),
     meta: { requiresAuth: true },
   },
+  {
+    path: '/npm',
+    name: 'NPM',
+    component: () => import('../views/NPMView.vue'),
+    meta: { requiresAuth: true },
+  },
   // Legacy redirects — keep old deep-links working
   { path: '/uptime', redirect: '/monitoring' },
   { path: '/uptime/probes/:id', redirect: (to) => `/monitoring/probes/${to.params.id}` },

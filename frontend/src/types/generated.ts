@@ -631,6 +631,7 @@ export interface NPMConnectionRequest {
  * NPMProxyHost is one proxy-host entry imported from NPM.
  * uptime_probe_id and ssl_certificate_id are SET NULL when the linked resource is
  * deleted, so the next import can recreate them.
+ * monitoring_enabled is the master switch; the sub-flags only take effect when it is true.
  */
 export interface NPMProxyHost {
   id: string;
@@ -641,11 +642,35 @@ export interface NPMProxyHost {
   forward_port: number /* int */;
   ssl_enabled: boolean;
   npm_enabled: boolean;
+  monitoring_enabled: boolean;
+  uptime_monitoring_enabled: boolean;
+  ssl_monitoring_enabled: boolean;
   uptime_probe_id?: string;
   ssl_certificate_id?: string;
   last_seen_at: string;
   created_at: string;
   updated_at: string;
+}
+/**
+ * NPMProxyHostEnriched is NPMProxyHost enriched with connection name and live
+ * status from the linked uptime probe and SSL certificate. Returned by the
+ * global proxy-host list endpoint.
+ */
+export interface NPMProxyHostEnriched {
+  NPMProxyHost: NPMProxyHost;
+  connection_name: string;
+  uptime_status?: string;
+  uptime_last_latency_ms?: number /* int */;
+  ssl_days_remaining?: number /* int */;
+}
+/**
+ * NPMProxyHostUpdateRequest is the PATCH body for toggling monitoring flags.
+ * All fields are optional; only the provided ones are applied.
+ */
+export interface NPMProxyHostUpdateRequest {
+  monitoring_enabled?: boolean;
+  uptime_monitoring_enabled?: boolean;
+  ssl_monitoring_enabled?: boolean;
 }
 /**
  * NPMProxyHostPreview combines live NPM proxy-host data with its import status

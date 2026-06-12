@@ -254,3 +254,10 @@ func (db *DB) CleanupOldUptimeResults(ctx context.Context, olderThan time.Durati
 	}
 	return res.RowsAffected()
 }
+
+// SetUptimeProbeEnabled toggles the enabled flag on a single uptime probe.
+func (db *DB) SetUptimeProbeEnabled(ctx context.Context, id string, enabled bool) error {
+	_, err := db.conn.ExecContext(ctx,
+		`UPDATE uptime_probes SET enabled=$2, updated_at=NOW() WHERE id=$1`, id, enabled)
+	return err
+}

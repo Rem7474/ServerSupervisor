@@ -229,3 +229,10 @@ func computeDaysRemaining(validTo *time.Time) *int {
 	days := int(time.Until(*validTo) / (24 * time.Hour))
 	return &days
 }
+
+// SetSSLCertificateEnabled toggles the enabled flag on a single SSL certificate.
+func (db *DB) SetSSLCertificateEnabled(ctx context.Context, id string, enabled bool) error {
+	_, err := db.conn.ExecContext(ctx,
+		`UPDATE ssl_certificates SET enabled=$2, updated_at=NOW() WHERE id=$1`, id, enabled)
+	return err
+}

@@ -185,6 +185,7 @@ func scanNPMProxyHost(rows interface {
 		&h.ID, &h.ConnectionID, &h.NPMID,
 		pq.Array(&h.DomainNames),
 		&h.ForwardHost, &h.ForwardPort, &h.SSLEnabled, &h.NPMEnabled,
+		&h.MonitoringEnabled, &h.UptimeMonitoringEnabled, &h.SSLMonitoringEnabled,
 		&h.UptimeProbeID, &h.SSLCertificateID,
 		&h.LastSeenAt, &h.CreatedAt, &h.UpdatedAt,
 	)
@@ -192,6 +193,7 @@ func scanNPMProxyHost(rows interface {
 
 const npmProxyHostColumns = `id, connection_id, npm_id, domain_names,
 	forward_host, forward_port, ssl_enabled, npm_enabled,
+	monitoring_enabled, uptime_monitoring_enabled, ssl_monitoring_enabled,
 	uptime_probe_id, ssl_certificate_id, last_seen_at, created_at, updated_at`
 
 func (db *DB) ListNPMProxyHosts(ctx context.Context, connectionID string) ([]models.NPMProxyHost, error) {
@@ -237,10 +239,10 @@ func (db *DB) UpsertNPMProxyHost(ctx context.Context, h models.NPMProxyHost) (*m
 	if err != nil {
 		return nil, err
 	}
-	return db.getNPMProxyHostByID(ctx, id)
+	return db.GetNPMProxyHostByID(ctx, id)
 }
 
-func (db *DB) getNPMProxyHostByID(ctx context.Context, id string) (*models.NPMProxyHost, error) {
+func (db *DB) GetNPMProxyHostByID(ctx context.Context, id string) (*models.NPMProxyHost, error) {
 	row := db.conn.QueryRowContext(ctx,
 		`SELECT `+npmProxyHostColumns+` FROM npm_proxy_hosts WHERE id = $1`, id)
 	h, err := scanNPMProxyHost(row)
@@ -294,4 +296,58 @@ func (db *DB) RefreshNPMProxyHostSeen(ctx context.Context, connectionID string, 
 		connectionID, npmID, npmEnabled, lastSeenAt,
 	)
 	return err
+}
+
+// UpdateNPMProxyHostSettings persists the three monitoring toggle columns.
+func (db *DB) UpdateNPMProxyHostSettings(ctx context.Context, id string, monitoring, uptime, ssl bool) error {
+	_, err := db.conn.ExecContext(ctx,
+		`UPDATE npm_proxy_hosts
+		 SET monitoring_enabled=$2, uptime_monitoring_enabled=$3, ssl_monitoring_enabled=$4, updated_at=NOW()
+		 WHERE id=$1`,
+		id, monitoring, uptime, ssl,
+	)
+	return err
+}
+
+// ListAllNPMProxyHostsEnriched returns every imported proxy host joined with its
+// connection name and live status from the linked uptime probe and SSL cert.
+func (db *DB) ListAllNPMProxyHostsEnriched(ctx context.Context) ([]models.NPMProxyHostEnriched, error) {
+	rows, err := db.conn.QueryContext(ctx, `
+		SELECT p.id, p.connection_id, p.npm_id, p.domain_names,
+		       p.forward_host, p.forward_port, p.ssl_enabled, p.npm_enabled,
+		       p.monitoring_enabled, p.uptime_monitoring_enabled, p.ssl_monitoring_enabled,
+		       p.uptime_probe_id, p.ssl_certificate_id, p.last_seen_at, p.created_at, p.updated_at,
+		       c.name AS connection_name,
+		       COALESCE(u.last_status, '') AS uptime_status,
+		       u.last_latency_ms,
+		       s.days_remaining AS ssl_days_remaining
+		FROM npm_proxy_hosts p
+		JOIN npm_connections c ON c.id = p.connection_id
+		LEFT JOIN uptime_probes u ON u.id = p.uptime_probe_id
+		LEFT JOIN ssl_certificates s ON s.id = p.ssl_certificate_id
+		ORDER BY c.name ASC, p.domain_names[1] ASC`)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	var out []models.NPMProxyHostEnriched
+	for rows.Next() {
+		var e models.NPMProxyHostEnriched
+		h := &e.NPMProxyHost
+		if err := rows.Scan(
+			&h.ID, &h.ConnectionID, &h.NPMID,
+			pq.Array(&h.DomainNames),
+			&h.ForwardHost, &h.ForwardPort, &h.SSLEnabled, &h.NPMEnabled,
+			&h.MonitoringEnabled, &h.UptimeMonitoringEnabled, &h.SSLMonitoringEnabled,
+			&h.UptimeProbeID, &h.SSLCertificateID, &h.LastSeenAt, &h.CreatedAt, &h.UpdatedAt,
+			&e.ConnectionName, &e.UptimeStatus, &e.UptimeLastLatencyMs, &e.SSLDaysRemaining,
+		); err != nil {
+			return nil, err
+		}
+		if h.DomainNames == nil {
+			h.DomainNames = []string{}
+		}
+		out = append(out, e)
+	}
+	return out, rows.Err()
 }

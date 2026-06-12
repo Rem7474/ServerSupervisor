@@ -147,6 +147,35 @@ func (h *NPMHandler) ListProxyHosts(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"proxy_hosts": hosts})
 }
 
+// ─── Global proxy host view ───────────────────────────────────────────────────
+
+// ListAllProxyHosts returns every imported proxy host across all connections,
+// enriched with connection name and live uptime/SSL status.
+func (h *NPMHandler) ListAllProxyHosts(c *gin.Context) {
+	hosts, err := h.svc.ListAllProxyHosts(c.Request.Context())
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"proxy_hosts": hosts})
+}
+
+// UpdateProxyHost applies monitoring toggle changes to a single proxy host and
+// propagates enable/disable to the linked uptime probe and SSL certificate.
+func (h *NPMHandler) UpdateProxyHost(c *gin.Context) {
+	var req models.NPMProxyHostUpdateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		respondError(c, apperr.Validation(err.Error()))
+		return
+	}
+	result, err := h.svc.UpdateProxyHostMonitoring(c.Request.Context(), c.Param("id"), req)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, result)
+}
+
 // RefreshNow triggers an immediate background refresh for one connection.
 func (h *NPMHandler) RefreshNow(c *gin.Context) {
 	id := c.Param("id")

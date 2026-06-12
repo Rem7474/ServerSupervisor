@@ -437,6 +437,7 @@ func registerNPMRoutes(g *gin.RouterGroup, h *handlers.NPMHandler) {
 	// Read endpoints: any authenticated user
 	g.GET("/npm/connections", h.ListConnections)
 	g.GET("/npm/connections/:id/proxy-hosts", h.ListProxyHosts)
+	g.GET("/npm/proxy-hosts", h.ListAllProxyHosts)
 
 	// Write endpoints: admin only
 	admin := g.Group("")
@@ -448,6 +449,7 @@ func registerNPMRoutes(g *gin.RouterGroup, h *handlers.NPMHandler) {
 	admin.GET("/npm/connections/:id/preview", h.PreviewProxyHosts)
 	admin.POST("/npm/connections/:id/import", h.ImportSelected)
 	admin.POST("/npm/connections/:id/refresh-now", h.RefreshNow)
+	admin.PATCH("/npm/proxy-hosts/:id", h.UpdateProxyHost)
 }
 
 func registerStaticFiles(r *gin.Engine) {

@@ -32,12 +32,17 @@ type Repository interface {
 
 	UpsertNPMProxyHost(ctx context.Context, h models.NPMProxyHost) (*models.NPMProxyHost, error)
 	ListNPMProxyHosts(ctx context.Context, connectionID string) ([]models.NPMProxyHost, error)
+	ListAllNPMProxyHostsEnriched(ctx context.Context) ([]models.NPMProxyHostEnriched, error)
+	GetNPMProxyHostByID(ctx context.Context, id string) (*models.NPMProxyHost, error)
 	UpdateNPMProxyHostLinks(ctx context.Context, id string, probeID, certID *string) error
+	UpdateNPMProxyHostSettings(ctx context.Context, id string, monitoring, uptime, ssl bool) error
 	GetNPMProxyHostsByConnectionNPMIDs(ctx context.Context, connectionID string) (map[int]models.NPMProxyHost, error)
 	RefreshNPMProxyHostSeen(ctx context.Context, connectionID string, npmID int, npmEnabled bool, lastSeenAt time.Time) error
 
 	CreateUptimeProbe(ctx context.Context, p models.UptimeProbe) (*models.UptimeProbe, error)
 	CreateSSLCertificate(ctx context.Context, c models.SSLCertificate) (*models.SSLCertificate, error)
+	SetUptimeProbeEnabled(ctx context.Context, id string, enabled bool) error
+	SetSSLCertificateEnabled(ctx context.Context, id string, enabled bool) error
 }
 
 // AuthFn authenticates against an NPM instance and returns a Bearer token.
@@ -282,9 +287,86 @@ func (s *Service) ImportSelectedProxyHosts(ctx context.Context, connectionID str
 	return imported, nil
 }
 
+// ─── Global proxy host list ──────────────────────────────────────────────────
+
+// ListAllProxyHosts returns every imported proxy host across all connections,
+// enriched with connection name and live uptime/SSL status.
+func (s *Service) ListAllProxyHosts(ctx context.Context) ([]models.NPMProxyHostEnriched, error) {
+	hosts, err := s.repo.ListAllNPMProxyHostsEnriched(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if hosts == nil {
+		hosts = []models.NPMProxyHostEnriched{}
+	}
+	return hosts, nil
+}
+
+// ─── Monitoring toggles ───────────────────────────────────────────────────────
+
+// UpdateProxyHostMonitoring applies the monitoring toggle changes from req to
+// the proxy host identified by id, then propagates enable/disable to the linked
+// uptime probe and SSL certificate.
+func (s *Service) UpdateProxyHostMonitoring(ctx context.Context, id string, req models.NPMProxyHostUpdateRequest) (*models.NPMProxyHostEnriched, error) {
+	host, err := s.repo.GetNPMProxyHostByID(ctx, id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, apperr.NotFound("npm proxy host not found")
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	monitoring := host.MonitoringEnabled
+	uptime := host.UptimeMonitoringEnabled
+	ssl := host.SSLMonitoringEnabled
+
+	if req.MonitoringEnabled != nil {
+		monitoring = *req.MonitoringEnabled
+		if !monitoring {
+			uptime = false
+			ssl = false
+		}
+	}
+	if req.UptimeMonitoringEnabled != nil {
+		uptime = *req.UptimeMonitoringEnabled
+	}
+	if req.SSLMonitoringEnabled != nil {
+		ssl = *req.SSLMonitoringEnabled
+	}
+	// Recalculate master flag: true when at least one sub-flag is active.
+	if req.MonitoringEnabled == nil {
+		monitoring = uptime || ssl
+	}
+
+	if err := s.repo.UpdateNPMProxyHostSettings(ctx, id, monitoring, uptime, ssl); err != nil {
+		return nil, err
+	}
+
+	if host.UptimeProbeID != nil {
+		_ = s.repo.SetUptimeProbeEnabled(ctx, *host.UptimeProbeID, monitoring && uptime)
+	}
+	if host.SSLCertificateID != nil {
+		_ = s.repo.SetSSLCertificateEnabled(ctx, *host.SSLCertificateID, monitoring && ssl)
+	}
+
+	hosts, err := s.repo.ListAllNPMProxyHostsEnriched(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, e := range hosts {
+		if e.ID == id {
+			return &e, nil
+		}
+	}
+	// Fallback — shouldn't happen, but return a minimal enriched result.
+	return &models.NPMProxyHostEnriched{NPMProxyHost: *host}, nil
+}
+
 // ─── Background refresh ───────────────────────────────────────────────────────
 
 // RefreshSync updates last_seen_at and npm_enabled for already-imported hosts.
+// When npm_enabled transitions to false for a monitoring-enabled host, it cascades
+// the disable to linked uptime probe and SSL certificate.
 // It never auto-imports new hosts; those appear in PreviewProxyHosts for manual selection.
 func (s *Service) RefreshSync(ctx context.Context, connectionID string) error {
 	conn, err := s.GetConnection(ctx, connectionID)
@@ -307,9 +389,20 @@ func (s *Service) RefreshSync(ctx context.Context, connectionID string) error {
 		return err
 	}
 
+	// Index existing DB state so we can detect npm_enabled transitions.
+	existing, _ := s.repo.GetNPMProxyHostsByConnectionNPMIDs(ctx, connectionID)
+
 	now := time.Now()
 	for _, h := range hosts {
 		_ = s.repo.RefreshNPMProxyHostSeen(ctx, connectionID, h.ID, h.Enabled, now)
+
+		// Auto-disable monitoring when NPM reports the proxy host as disabled.
+		if stored, ok := existing[h.ID]; ok && !h.Enabled && stored.MonitoringEnabled {
+			falseVal := false
+			_, _ = s.UpdateProxyHostMonitoring(ctx, stored.ID, models.NPMProxyHostUpdateRequest{
+				MonitoringEnabled: &falseVal,
+			})
+		}
 	}
 	return s.repo.UpdateNPMConnectionSuccess(ctx, connectionID)
 }
