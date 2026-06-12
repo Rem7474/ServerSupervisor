@@ -302,6 +302,13 @@ func (db *DB) RefreshNPMProxyHostSeen(ctx context.Context, connectionID string, 
 	return err
 }
 
+// UpdateNPMProxyHostNPMEnabled updates the npm_enabled flag after a remote toggle.
+func (db *DB) UpdateNPMProxyHostNPMEnabled(ctx context.Context, id string, enabled bool) error {
+	_, err := db.conn.ExecContext(ctx,
+		`UPDATE npm_proxy_hosts SET npm_enabled=$2, updated_at=NOW() WHERE id=$1`, id, enabled)
+	return err
+}
+
 // UpdateNPMProxyHostSettings persists the three monitoring toggle columns.
 func (db *DB) UpdateNPMProxyHostSettings(ctx context.Context, id string, monitoring, uptime, ssl bool) error {
 	_, err := db.conn.ExecContext(ctx,

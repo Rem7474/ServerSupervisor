@@ -128,6 +128,24 @@ func (h *NPMHandler) ListAllProxyHosts(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"proxy_hosts": hosts})
 }
 
+// SetNPMEnabled toggles a proxy host's enabled state directly in NPM.
+// On success the local DB is updated and monitoring is cascaded off when disabling.
+func (h *NPMHandler) SetNPMEnabled(c *gin.Context) {
+	var body struct {
+		Enabled bool `json:"enabled"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		respondError(c, apperr.Validation(err.Error()))
+		return
+	}
+	result, err := h.svc.SetNPMProxyHostEnabled(c.Request.Context(), c.Param("id"), body.Enabled)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, result)
+}
+
 // UpdateProxyHost applies monitoring toggle changes to a single proxy host and
 // propagates enable/disable to the linked uptime probe and SSL certificate.
 func (h *NPMHandler) UpdateProxyHost(c *gin.Context) {

@@ -28,4 +28,7 @@ export const npmApi = {
 
   updateProxyHost: (id: string, payload: NPMProxyHostUpdateRequest) =>
     api.patch<NPMProxyHostEnriched>(`/v1/npm/proxy-hosts/${id}`, payload),
+
+  setNPMEnabled: (id: string, enabled: boolean) =>
+    api.patch<NPMProxyHostEnriched>(`/v1/npm/proxy-hosts/${id}/npm-enabled`, { enabled }),
 }

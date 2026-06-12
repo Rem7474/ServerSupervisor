@@ -114,6 +114,35 @@ func GetProxyHosts(ctx context.Context, apiURL, token string) ([]ProxyHost, erro
 	return hosts, nil
 }
 
+// EnableProxyHost enables a proxy host in NPM.
+func EnableProxyHost(ctx context.Context, apiURL, token string, id int) error {
+	return npmToggle(ctx, apiURL, token, id, "enable")
+}
+
+// DisableProxyHost disables a proxy host in NPM.
+func DisableProxyHost(ctx context.Context, apiURL, token string, id int) error {
+	return npmToggle(ctx, apiURL, token, id, "disable")
+}
+
+func npmToggle(ctx context.Context, apiURL, token string, id int, action string) error {
+	url := fmt.Sprintf("%s/api/nginx/proxy-hosts/%d/%s", strings.TrimRight(apiURL, "/"), id, action)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode >= 300 {
+		b, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("NPM %s proxy-host %d failed (%d): %s", action, id, resp.StatusCode, strings.TrimSpace(string(b)))
+	}
+	return nil
+}
+
 // hasCertificate returns true when the raw proxy-host JSON has a non-zero certificate_id.
 func hasCertificate(raw json.RawMessage) bool {
 	var m map[string]json.RawMessage

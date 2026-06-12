@@ -7,6 +7,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -35,6 +36,7 @@ type Repository interface {
 	GetNPMProxyHostByID(ctx context.Context, id string) (*models.NPMProxyHost, error)
 	UpdateNPMProxyHostLinks(ctx context.Context, id string, probeID, certID *string) error
 	UpdateNPMProxyHostSettings(ctx context.Context, id string, monitoring, uptime, ssl bool) error
+	UpdateNPMProxyHostNPMEnabled(ctx context.Context, id string, enabled bool) error
 	GetNPMProxyHostsByConnectionNPMIDs(ctx context.Context, connectionID string) (map[int]models.NPMProxyHost, error)
 	RefreshNPMProxyHostSeen(ctx context.Context, connectionID string, npmID int, npmEnabled bool, lastSeenAt time.Time) error
 
@@ -205,6 +207,62 @@ func (s *Service) UpdateProxyHostMonitoring(ctx context.Context, id string, req 
 	}
 	for _, e := range all {
 		if e.ID == id {
+			return &e, nil
+		}
+	}
+	return &models.NPMProxyHostEnriched{NPMProxyHost: *host}, nil
+}
+
+// SetNPMProxyHostEnabled enables or disables a proxy host in NPM via its API,
+// then updates the local DB state. Disabling cascades monitoring off.
+func (s *Service) SetNPMProxyHostEnabled(ctx context.Context, proxyHostID string, enable bool) (*models.NPMProxyHostEnriched, error) {
+	host, err := s.repo.GetNPMProxyHostByID(ctx, proxyHostID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, apperr.NotFound("npm proxy host not found")
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	conn, err := s.GetConnection(ctx, host.ConnectionID)
+	if err != nil {
+		return nil, err
+	}
+	secret, err := s.repo.GetNPMConnectionSecret(ctx, host.ConnectionID)
+	if err != nil {
+		return nil, fmt.Errorf("retrieve npm secret: %w", err)
+	}
+	token, err := s.authFn(ctx, conn.APIURL, conn.Identity, secret)
+	if err != nil {
+		return nil, fmt.Errorf("NPM authenticate: %w", err)
+	}
+
+	if enable {
+		if err := npmclient.EnableProxyHost(ctx, conn.APIURL, token, host.NPMID); err != nil {
+			return nil, err
+		}
+	} else {
+		if err := npmclient.DisableProxyHost(ctx, conn.APIURL, token, host.NPMID); err != nil {
+			return nil, err
+		}
+	}
+
+	_ = s.repo.UpdateNPMProxyHostNPMEnabled(ctx, proxyHostID, enable)
+
+	// Disabling in NPM cascades monitoring off.
+	if !enable && host.MonitoringEnabled {
+		falseVal := false
+		_, _ = s.UpdateProxyHostMonitoring(ctx, proxyHostID, models.NPMProxyHostUpdateRequest{
+			MonitoringEnabled: &falseVal,
+		})
+	}
+
+	all, err := s.repo.ListAllNPMProxyHostsEnriched(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, e := range all {
+		if e.ID == proxyHostID {
 			return &e, nil
 		}
 	}

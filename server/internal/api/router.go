@@ -448,6 +448,7 @@ func registerNPMRoutes(g *gin.RouterGroup, h *handlers.NPMHandler) {
 	admin.POST("/npm/connections/test", h.TestConnection)
 	admin.POST("/npm/connections/:id/refresh-now", h.RefreshNow)
 	admin.PATCH("/npm/proxy-hosts/:id", h.UpdateProxyHost)
+	admin.PATCH("/npm/proxy-hosts/:id/npm-enabled", h.SetNPMEnabled)
 }
 
 func registerStaticFiles(r *gin.Engine) {
