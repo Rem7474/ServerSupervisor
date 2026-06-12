@@ -10,6 +10,7 @@ import (
 	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/dispatch"
 	"github.com/serversupervisor/server/internal/handlers"
+	hostsvc "github.com/serversupervisor/server/internal/services/host"
 	usersvc "github.com/serversupervisor/server/internal/services/user"
 	"github.com/serversupervisor/server/internal/testutil"
 )
@@ -26,8 +27,8 @@ func withRole(role string) gin.HandlerFunc {
 
 func newHostsRouter(t *testing.T, role string) (*gin.Engine, *database.DB) {
 	t.Helper()
-	db, cfg := testutil.NewPostgresDBWithConfig(t)
-	h := handlers.NewHostHandler(db, cfg, dispatch.New(db))
+	db, _ := testutil.NewPostgresDBWithConfig(t)
+	h := handlers.NewHostHandler(hostsvc.NewService(db, dispatch.New(db), func() string { return "" }))
 
 	r := gin.New()
 	r.Use(withRole(role))

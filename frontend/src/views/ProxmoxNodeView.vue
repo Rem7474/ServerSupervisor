@@ -606,7 +606,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, shallowRef, onMounted, onUnmounted, defineAsyncComponent } from 'vue'
+import { ref, computed, shallowRef, watch, onMounted, onUnmounted, defineAsyncComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 const CommandLogPanel = defineAsyncComponent(() => import('../components/host/CommandLogPanel.vue'))
 const ProxmoxNodeChartsPanel = defineAsyncComponent(() => import('../components/proxmox/ProxmoxNodeChartsPanel.vue'))
@@ -626,6 +626,7 @@ const node = ref<any>(null)
 const loading = ref(true)
 const error = ref('')
 const tab = ref('vms')
+watch(tab, (t) => { router.replace({ query: { ...route.query, tab: t } }) })
 
 const guestLinks = ref<Record<string, any>>({})
 const linkMsg = ref('')
