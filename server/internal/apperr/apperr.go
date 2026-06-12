@@ -32,7 +32,14 @@ func Conflict(msg string) *Error { return &Error{Code: "conflict", Message: msg,
 func Forbidden(msg string) *Error { return &Error{Code: "forbidden", Message: msg, HTTPStatus: 403} }
 
 // Unauthorized — authentication required or failed (401).
-func Unauthorized(msg string) *Error { return &Error{Code: "unauthorized", Message: msg, HTTPStatus: 401} }
+func Unauthorized(msg string) *Error {
+	return &Error{Code: "unauthorized", Message: msg, HTTPStatus: 401}
+}
+
+// Failed — the operation failed for a reason worth surfacing verbatim (500),
+// e.g. an external-dependency diagnostic (SMTP/ntfy connectivity test) where the
+// message itself is the useful result. Unlike Internal it keeps the human message.
+func Failed(msg string) *Error { return &Error{Code: "failed", Message: msg, HTTPStatus: 500} }
 
 // Internal wraps an unexpected error as a 500 with a generic message; the cause is
 // preserved via Unwrap for logging.

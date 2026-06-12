@@ -20,6 +20,7 @@ import (
 	hostpermsvc "github.com/serversupervisor/server/internal/services/hostperm"
 	pushsvc "github.com/serversupervisor/server/internal/services/push"
 	scheduledtasksvc "github.com/serversupervisor/server/internal/services/scheduledtask"
+	settingssvc "github.com/serversupervisor/server/internal/services/settings"
 	sslsvc "github.com/serversupervisor/server/internal/services/ssl"
 	usersvc "github.com/serversupervisor/server/internal/services/user"
 	uptimesvc "github.com/serversupervisor/server/internal/services/uptime"
@@ -61,7 +62,9 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	auditH := handlers.NewAuditHandler(auditsvc.NewService(db))
 	userH := handlers.NewUserHandler(usersvc.NewService(db))
 	alertRulesH := handlers.NewAlertRulesHandler(db, cfg)
-	settingsH := handlers.NewSettingsHandler(db, cfg)
+	settingsH := handlers.NewSettingsHandler(settingssvc.NewService(db, cfg, func() string {
+		return handlers.ResolveLatestAgentVersion(cfg)
+	}))
 	notifH := handlers.NewNotificationsHandler(db)
 	pushH := handlers.NewPushHandler(pushsvc.NewService(db))
 	scheduledTaskH := handlers.NewScheduledTaskHandler(scheduledtasksvc.NewService(db, sched, dispatcher), db)
