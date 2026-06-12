@@ -37,6 +37,12 @@ func (f *fakeRepo) UpdateSSLCertificateCheckResult(_ context.Context, c models.S
 	f.checkResult = &cp
 	return nil
 }
+func (f *fakeRepo) InsertSSLCertificateEventIfNew(context.Context, models.SSLCertificateEvent) error {
+	return nil
+}
+func (f *fakeRepo) GetSSLCertificateEvents(context.Context, string, int) ([]models.SSLCertificateEvent, error) {
+	return nil, nil
+}
 
 func boolPtr(b bool) *bool { return &b }
 
