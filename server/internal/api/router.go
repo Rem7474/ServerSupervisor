@@ -13,8 +13,9 @@ import (
 	"github.com/serversupervisor/server/internal/networkview"
 	"github.com/serversupervisor/server/internal/scheduler"
 	auditsvc "github.com/serversupervisor/server/internal/services/audit"
+	hostsvc "github.com/serversupervisor/server/internal/services/host"
 	hostpermsvc "github.com/serversupervisor/server/internal/services/hostperm"
-	networksvc "github.com/serversupervisor/server/internal/services/network"
+	pushsvc "github.com/serversupervisor/server/internal/services/push"
 	scheduledtasksvc "github.com/serversupervisor/server/internal/services/scheduledtask"
 	sslsvc "github.com/serversupervisor/server/internal/services/ssl"
 	usersvc "github.com/serversupervisor/server/internal/services/user"
@@ -42,7 +43,9 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 
 	// Instantiate handlers
 	authH := handlers.NewAuthHandler(db, cfg, dispatcher)
-	hostH := handlers.NewHostHandler(db, cfg, dispatcher)
+	hostH := handlers.NewHostHandler(hostsvc.NewService(db, dispatcher, func() string {
+		return handlers.ResolveLatestAgentVersion(cfg)
+	}))
 	wsH := ws.NewWSHandler(db, cfg, notifHub)
 	agentH := handlers.NewAgentHandler(db, cfg, wsH.GetStreamHub(), notifHub)
 	aptH := handlers.NewAptHandler(db, cfg, dispatcher)
@@ -56,7 +59,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	alertRulesH := handlers.NewAlertRulesHandler(db, cfg)
 	settingsH := handlers.NewSettingsHandler(db, cfg)
 	notifH := handlers.NewNotificationsHandler(db)
-	pushH := handlers.NewPushHandler(db, cfg)
+	pushH := handlers.NewPushHandler(pushsvc.NewService(db))
 	scheduledTaskH := handlers.NewScheduledTaskHandler(scheduledtasksvc.NewService(db, sched, dispatcher), db)
 	gitWebhookH := handlers.NewGitWebhookHandler(db, cfg, dispatcher, notifHub)
 	releaseTrackerH := handlers.NewReleaseTrackerHandler(db, cfg, dispatcher, notifHub)

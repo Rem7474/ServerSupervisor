@@ -380,25 +380,6 @@
       </div>
     </div>
 
-    <!-- Run result toast -->
-    <div
-      v-if="runResult"
-      class="position-fixed bottom-0 end-0 p-3"
-      style="z-index:1100"
-    >
-      <div class="toast show align-items-center text-bg-success border-0">
-        <div class="d-flex">
-          <div class="toast-body">
-            <strong>{{ runResult.name }}</strong> déclenchée — commande <code>{{ runResult.id }}</code>
-          </div>
-          <button
-            type="button"
-            class="btn-close btn-close-white me-2 m-auto"
-            @click="runResult = null"
-          />
-        </div>
-      </div>
-    </div>
 
     <!-- Create task modal -->
     <div
@@ -831,6 +812,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { useHostsStore } from '../stores/hosts'
+import { addToast } from '../composables/useGlobalToast'
 import api from '../api'
 import { isManualOnly, describeCron, nextCronRun, MANUAL_SENTINEL } from '../utils/cron'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
@@ -846,7 +828,6 @@ const tasks = ref<ScheduledTaskWithHost[]>([])
 const loading = ref(false)
 const error = ref('')
 const runningId = ref<string | number | null>(null)
-const runResult = ref<{ id: string; name: string } | null>(null)
 
 const filterText = ref('')
 const filterHost = ref('')
@@ -1116,8 +1097,7 @@ async function runNow(task: any): Promise<void> {
   runningId.value = task.id
   try {
     const { data } = await api.runScheduledTask(task.id)
-    runResult.value = { id: data.command_id, name: task.name }
-    setTimeout(() => { runResult.value = null }, 5000)
+    addToast(`${task.name} déclenchée — commande ${data.command_id}`, 'success')
     await loadTasks()
   } catch (e: any) {
     error.value = e?.response?.data?.error || 'Erreur'

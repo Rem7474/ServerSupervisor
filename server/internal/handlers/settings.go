@@ -29,7 +29,7 @@ func NewSettingsHandler(db *database.DB, cfg *config.Config) *SettingsHandler {
 // GetSettings returns system configuration and database status
 func (h *SettingsHandler) GetSettings(c *gin.Context) {
 	dbStatus := h.getDatabaseStatus(c.Request.Context())
-	latestAgentVersion := resolveLatestAgentVersion(h.cfg)
+	latestAgentVersion := ResolveLatestAgentVersion(h.cfg)
 
 	response := gin.H{
 		"settings": gin.H{

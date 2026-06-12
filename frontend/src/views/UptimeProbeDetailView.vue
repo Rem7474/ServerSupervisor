@@ -1,5 +1,11 @@
 <template>
   <div>
+    <PageRefreshBar
+      v-model="autoRefresh"
+      label="Sonde uptime"
+      :interval-sec="PROBE_REFRESH_SEC"
+      :last-updated-at="lastUpdatedAt"
+    />
     <div class="page-header mb-3">
       <div class="page-pretitle">
         <router-link
@@ -207,6 +213,7 @@ import { ref, computed, onMounted, onUnmounted, defineAsyncComponent } from 'vue
 import { useRoute } from 'vue-router'
 import api from '../api'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
+import PageRefreshBar from '../components/PageRefreshBar.vue'
 import { formatDateTime } from '../utils/formatters'
 import { getChartPalette } from '../utils/chartTheme'
 
@@ -354,6 +361,10 @@ const statusColor = computed(() => {
   return 'text-secondary'
 })
 
+const autoRefresh = ref(true)
+const lastUpdatedAt = ref<Date | null>(null)
+const PROBE_REFRESH_SEC = 30
+
 async function fetchAll(): Promise<void> {
   loading.value = true
   error.value = ''
@@ -366,6 +377,7 @@ async function fetchAll(): Promise<void> {
     probe.value = pr.data
     results.value = hr.data?.results || []
     stats.value = sr.data
+    lastUpdatedAt.value = new Date()
   } catch (e: any) {
     error.value = e?.response?.data?.error || e?.message || 'Impossible de charger la sonde'
   } finally {
@@ -376,7 +388,7 @@ async function fetchAll(): Promise<void> {
 let refresh: ReturnType<typeof setInterval> | undefined
 onMounted(() => {
   fetchAll()
-  refresh = setInterval(fetchAll, 30000)
+  refresh = setInterval(() => { if (autoRefresh.value) fetchAll() }, PROBE_REFRESH_SEC * 1000)
 })
 onUnmounted(() => {
   if (refresh) clearInterval(refresh)

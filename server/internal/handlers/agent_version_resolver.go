@@ -23,7 +23,7 @@ var latestAgentVersionCache struct {
 	refreshed time.Time
 }
 
-func resolveLatestAgentVersion(cfg *config.Config) string {
+func ResolveLatestAgentVersion(cfg *config.Config) string {
 	latestAgentVersionCache.mu.Lock()
 	defer latestAgentVersionCache.mu.Unlock()
 
