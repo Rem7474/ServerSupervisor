@@ -23,6 +23,7 @@ import (
 	sslsvc "github.com/serversupervisor/server/internal/services/ssl"
 	usersvc "github.com/serversupervisor/server/internal/services/user"
 	uptimesvc "github.com/serversupervisor/server/internal/services/uptime"
+	weblogssvc "github.com/serversupervisor/server/internal/services/weblogs"
 	"github.com/serversupervisor/server/internal/ws"
 )
 
@@ -73,7 +74,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	hostPermH := handlers.NewHostPermissionHandler(hostpermsvc.NewService(db))
 	uptimeH := handlers.NewUptimeHandler(uptimesvc.NewService(db))
 	sslH := handlers.NewSSLHandler(sslsvc.NewService(db))
-	webLogsH := handlers.NewWebLogsHandler(db, dispatcher)
+	webLogsH := handlers.NewWebLogsHandler(weblogssvc.NewService(db, dispatcher))
 
 	registerPublicRoutes(r, authH, db)
 	registerWSRoutes(r, wsH, cfg)
