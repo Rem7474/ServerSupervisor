@@ -17,6 +17,7 @@ import { sslApi } from './ssl'
 import { webhooksApi } from './webhooks'
 import { settingsApi } from './settings'
 import { proxmoxApi } from './proxmox'
+import { npmApi } from './npm'
 
 // Re-export shared helpers/types so `import api, { getApiErrorMessage } from '../api'`
 // and type imports keep resolving.
@@ -42,4 +43,5 @@ export default {
   ...webhooksApi,
   ...settingsApi,
   ...proxmoxApi,
+  ...npmApi,
 }

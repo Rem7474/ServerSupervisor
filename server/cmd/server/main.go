@@ -122,7 +122,7 @@ func main() {
 	defer bg.Stop()
 
 	// Setup router
-	router, releaseTrackerH, proxmoxH, cleanupRouter := api.SetupRouter(db, cfg, notifHub, sched, dispatcher)
+	router, releaseTrackerH, proxmoxH, npmH, cleanupRouter := api.SetupRouter(db, cfg, notifHub, sched, dispatcher)
 	defer cleanupRouter()
 	// Background pollers: the handlers expose the unit of work + a fire-and-forget
 	// ctx; the poller package owns the scheduling loop. rootCtx cancellation
@@ -131,6 +131,8 @@ func main() {
 	poller.Every(rootCtx, releaseTrackerH.PollInterval(), true, "release-tracker", releaseTrackerH.CheckAll)
 	proxmoxH.SetBackgroundContext(rootCtx)
 	poller.Every(rootCtx, handlers.ProxmoxPollInterval, true, "proxmox", proxmoxH.PollOnce)
+	npmH.SetBackgroundContext(rootCtx)
+	poller.Every(rootCtx, handlers.NPMPollInterval, false, "npm-sync", npmH.PollOnce)
 
 	// Start server
 	srv := &http.Server{

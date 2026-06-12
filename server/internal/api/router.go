@@ -18,6 +18,7 @@ import (
 	hostsvc "github.com/serversupervisor/server/internal/services/host"
 	networksvc "github.com/serversupervisor/server/internal/services/network"
 	hostpermsvc "github.com/serversupervisor/server/internal/services/hostperm"
+	npmsvc "github.com/serversupervisor/server/internal/services/npm"
 	pushsvc "github.com/serversupervisor/server/internal/services/push"
 	scheduledtasksvc "github.com/serversupervisor/server/internal/services/scheduledtask"
 	settingssvc "github.com/serversupervisor/server/internal/services/settings"
@@ -31,7 +32,7 @@ import (
 // SetupRouter wires all handlers and registers route groups.
 // The caller is responsible for starting long-running poller services after this function returns.
 // The returned cleanup func must be called on shutdown to stop background goroutines (rate limiters).
-func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationHub, sched *scheduler.TaskScheduler, dispatcher *dispatch.Dispatcher) (*gin.Engine, *handlers.ReleaseTrackerHandler, *handlers.ProxmoxHandler, func()) {
+func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationHub, sched *scheduler.TaskScheduler, dispatcher *dispatch.Dispatcher) (*gin.Engine, *handlers.ReleaseTrackerHandler, *handlers.ProxmoxHandler, *handlers.NPMHandler, func()) {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
 	r.Use(gin.Recovery())
@@ -78,6 +79,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	uptimeH := handlers.NewUptimeHandler(uptimesvc.NewService(db))
 	sslH := handlers.NewSSLHandler(sslsvc.NewService(db))
 	webLogsH := handlers.NewWebLogsHandler(weblogssvc.NewService(db, dispatcher))
+	npmH := handlers.NewNPMHandler(npmsvc.NewService(db))
 
 	registerPublicRoutes(r, authH, db)
 	registerWSRoutes(r, wsH, cfg)
@@ -104,6 +106,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	registerHostPermissionRoutes(v1, hostPermH)
 	registerUptimeRoutes(v1, uptimeH)
 	registerSSLRoutes(v1, sslH)
+	registerNPMRoutes(v1, npmH)
 
 	registerStaticFiles(r)
 
@@ -112,7 +115,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 		agentRateLimiter.Stop()
 		webhookRateLimiter.Stop()
 	}
-	return r, releaseTrackerH, proxmoxH, cleanup
+	return r, releaseTrackerH, proxmoxH, npmH, cleanup
 }
 
 func registerPublicRoutes(r *gin.Engine, h *handlers.AuthHandler, db *database.DB) {
@@ -428,6 +431,23 @@ func registerSSLRoutes(g *gin.RouterGroup, h *handlers.SSLHandler) {
 	admin.PUT("/ssl/certificates/:id", h.Update)
 	admin.DELETE("/ssl/certificates/:id", h.Delete)
 	admin.POST("/ssl/certificates/:id/check-now", h.CheckNow)
+}
+
+func registerNPMRoutes(g *gin.RouterGroup, h *handlers.NPMHandler) {
+	// Read endpoints: any authenticated user
+	g.GET("/npm/connections", h.ListConnections)
+	g.GET("/npm/connections/:id/proxy-hosts", h.ListProxyHosts)
+
+	// Write endpoints: admin only
+	admin := g.Group("")
+	admin.Use(AdminOnlyMiddleware())
+	admin.POST("/npm/connections", h.CreateConnection)
+	admin.PUT("/npm/connections/:id", h.UpdateConnection)
+	admin.DELETE("/npm/connections/:id", h.DeleteConnection)
+	admin.POST("/npm/connections/test", h.TestConnection)
+	admin.GET("/npm/connections/:id/preview", h.PreviewProxyHosts)
+	admin.POST("/npm/connections/:id/import", h.ImportSelected)
+	admin.POST("/npm/connections/:id/refresh-now", h.RefreshNow)
 }
 
 func registerStaticFiles(r *gin.Engine) {

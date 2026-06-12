@@ -592,6 +592,78 @@ export interface TopologySnapshot {
 }
 
 //////////
+// source: npm.go
+
+/**
+ * NPMConnection holds credentials and state for one Nginx Proxy Manager instance.
+ * secret is never serialised to JSON to avoid leaks; it is retrieved only by the
+ * poller and the test-connection endpoint.
+ */
+export interface NPMConnection {
+  id: string;
+  name: string;
+  api_url: string;
+  identity: string;
+  host_id?: string;
+  enabled: boolean;
+  poll_interval_sec: number /* int */;
+  last_error?: string;
+  last_error_at?: string;
+  last_success_at?: string;
+  proxy_host_count: number /* int */;
+  created_at: string;
+  updated_at: string;
+}
+/**
+ * NPMConnectionRequest is the create/update payload. Secret is optional on update
+ * (empty value = keep existing). HostID is optional (nullable).
+ */
+export interface NPMConnectionRequest {
+  name: string;
+  api_url: string;
+  identity: string;
+  secret: string;
+  host_id?: string;
+  enabled?: boolean;
+  poll_interval_sec: number /* int */;
+}
+/**
+ * NPMProxyHost is one proxy-host entry imported from NPM.
+ * uptime_probe_id and ssl_certificate_id are SET NULL when the linked resource is
+ * deleted, so the next import can recreate them.
+ */
+export interface NPMProxyHost {
+  id: string;
+  connection_id: string;
+  npm_id: number /* int */;
+  domain_names: string[];
+  forward_host: string;
+  forward_port: number /* int */;
+  ssl_enabled: boolean;
+  npm_enabled: boolean;
+  uptime_probe_id?: string;
+  ssl_certificate_id?: string;
+  last_seen_at: string;
+  created_at: string;
+  updated_at: string;
+}
+/**
+ * NPMProxyHostPreview combines live NPM proxy-host data with its import status
+ * in ServerSupervisor. Returned by the preview endpoint; nothing is written to DB.
+ */
+export interface NPMProxyHostPreview {
+  npm_id: number /* int */;
+  domain_names: string[];
+  forward_host: string;
+  forward_port: number /* int */;
+  ssl_enabled: boolean;
+  npm_enabled: boolean;
+  already_imported: boolean;
+  uptime_probe_id?: string;
+  ssl_certificate_id?: string;
+}
+
+//////////
 // source: proxmox.go
 
 /**
