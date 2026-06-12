@@ -127,12 +127,32 @@
           <table class="table table-vcenter card-table">
             <thead>
               <tr>
-                <th>Sonde</th>
+                <th>
+                  <button class="btn-sort" @click="toggleProbeSort('name')">
+                    Sonde <span class="sort-icon">{{ probeSortIcon('name') }}</span>
+                  </button>
+                </th>
                 <th>Cible</th>
-                <th>Statut</th>
-                <th>Uptime 24h</th>
-                <th>Latence</th>
-                <th>Dernière vérification</th>
+                <th>
+                  <button class="btn-sort" @click="toggleProbeSort('status')">
+                    Statut <span class="sort-icon">{{ probeSortIcon('status') }}</span>
+                  </button>
+                </th>
+                <th>
+                  <button class="btn-sort" @click="toggleProbeSort('uptime')">
+                    Uptime 24h <span class="sort-icon">{{ probeSortIcon('uptime') }}</span>
+                  </button>
+                </th>
+                <th>
+                  <button class="btn-sort" @click="toggleProbeSort('latency')">
+                    Latence <span class="sort-icon">{{ probeSortIcon('latency') }}</span>
+                  </button>
+                </th>
+                <th>
+                  <button class="btn-sort" @click="toggleProbeSort('last_checked')">
+                    Dernière vérification <span class="sort-icon">{{ probeSortIcon('last_checked') }}</span>
+                  </button>
+                </th>
                 <th />
               </tr>
             </thead>
@@ -257,18 +277,28 @@
           <table class="table table-vcenter card-table">
             <thead>
               <tr>
-                <th>Nom</th>
+                <th>
+                  <button class="btn-sort" @click="toggleCertSort('name')">
+                    Nom <span class="sort-icon">{{ certSortIcon('name') }}</span>
+                  </button>
+                </th>
                 <th>Endpoint</th>
                 <th>Émetteur</th>
-                <th>Expiration</th>
-                <th class="text-nowrap">
-                  Jours restants
-                  <span
-                    class="text-muted ms-1"
-                    title="Trié par expiration (croissant)"
-                  >▲</span>
+                <th>
+                  <button class="btn-sort" @click="toggleCertSort('expiration')">
+                    Expiration <span class="sort-icon">{{ certSortIcon('expiration') }}</span>
+                  </button>
                 </th>
-                <th>Dernière vérification</th>
+                <th class="text-nowrap">
+                  <button class="btn-sort" @click="toggleCertSort('days')">
+                    Jours restants <span class="sort-icon">{{ certSortIcon('days') }}</span>
+                  </button>
+                </th>
+                <th>
+                  <button class="btn-sort" @click="toggleCertSort('last_checked')">
+                    Dernière vérification <span class="sort-icon">{{ certSortIcon('last_checked') }}</span>
+                  </button>
+                </th>
                 <th />
               </tr>
             </thead>
@@ -697,13 +727,53 @@ const checkingProbeId = ref('')
 
 const downCount = computed(() => probes.value.filter((p) => p.last_status === 'down').length)
 
-const sortedProbes = computed(() =>
-  [...probes.value].sort((a, b) => {
-    if (a.last_status === 'down' && b.last_status !== 'down') return -1
-    if (b.last_status === 'down' && a.last_status !== 'down') return 1
+type ProbeCol = 'name' | 'status' | 'uptime' | 'latency' | 'last_checked'
+const probeSort = ref<{ col: ProbeCol; dir: 'asc' | 'desc' }>({ col: 'status', dir: 'asc' })
+
+function toggleProbeSort(col: ProbeCol): void {
+  if (probeSort.value.col === col) {
+    probeSort.value = { col, dir: probeSort.value.dir === 'asc' ? 'desc' : 'asc' }
+  } else {
+    probeSort.value = { col, dir: 'asc' }
+  }
+}
+
+function probeSortIcon(col: ProbeCol): string {
+  if (probeSort.value.col !== col) return '⇅'
+  return probeSort.value.dir === 'asc' ? '▲' : '▼'
+}
+
+const sortedProbes = computed(() => {
+  const arr = [...probes.value]
+  const { col, dir } = probeSort.value
+  const m = dir === 'asc' ? 1 : -1
+  arr.sort((a, b) => {
+    switch (col) {
+      case 'name': return m * a.name.localeCompare(b.name)
+      case 'status': {
+        const rank = (p: Probe) => p.last_status === 'down' ? 0 : p.last_status === 'up' ? 1 : 2
+        return m * (rank(a) - rank(b))
+      }
+      case 'uptime': {
+        const ua = probeStats.value[a.id]?.uptime_percent ?? -1
+        const ub = probeStats.value[b.id]?.uptime_percent ?? -1
+        return m * (ua - ub)
+      }
+      case 'latency': {
+        const la = a.last_status === 'up' && a.last_latency_ms != null ? a.last_latency_ms : Infinity
+        const lb = b.last_status === 'up' && b.last_latency_ms != null ? b.last_latency_ms : Infinity
+        return m * (la - lb)
+      }
+      case 'last_checked': {
+        const ta = a.last_checked_at ? new Date(a.last_checked_at).getTime() : 0
+        const tb = b.last_checked_at ? new Date(b.last_checked_at).getTime() : 0
+        return m * (ta - tb)
+      }
+    }
     return 0
   })
-)
+  return arr
+})
 
 function probeBadge(p: Probe): string {
   if (!p.enabled) return 'bg-secondary-lt text-secondary'
@@ -842,13 +912,49 @@ const expiringCount = computed(() => certs.value.filter((c) => {
   return d != null && d <= 30
 }).length)
 
-const sortedCerts = computed(() =>
-  [...certs.value].sort((a, b) => {
-    const da = a.days_remaining ?? Infinity
-    const db = b.days_remaining ?? Infinity
-    return da - db
+type CertCol = 'name' | 'expiration' | 'days' | 'last_checked'
+const certSort = ref<{ col: CertCol; dir: 'asc' | 'desc' }>({ col: 'days', dir: 'asc' })
+
+function toggleCertSort(col: CertCol): void {
+  if (certSort.value.col === col) {
+    certSort.value = { col, dir: certSort.value.dir === 'asc' ? 'desc' : 'asc' }
+  } else {
+    certSort.value = { col, dir: 'asc' }
+  }
+}
+
+function certSortIcon(col: CertCol): string {
+  if (certSort.value.col !== col) return '⇅'
+  return certSort.value.dir === 'asc' ? '▲' : '▼'
+}
+
+const sortedCerts = computed(() => {
+  const arr = [...certs.value]
+  const { col, dir } = certSort.value
+  const m = dir === 'asc' ? 1 : -1
+  arr.sort((a, b) => {
+    switch (col) {
+      case 'name': return m * a.name.localeCompare(b.name)
+      case 'days': {
+        const da = a.days_remaining ?? Infinity
+        const db = b.days_remaining ?? Infinity
+        return m * (da - db)
+      }
+      case 'expiration': {
+        const ta = a.valid_to ? new Date(a.valid_to).getTime() : Infinity
+        const tb = b.valid_to ? new Date(b.valid_to).getTime() : Infinity
+        return m * (ta - tb)
+      }
+      case 'last_checked': {
+        const ta = a.last_checked_at ? new Date(a.last_checked_at).getTime() : 0
+        const tb = b.last_checked_at ? new Date(b.last_checked_at).getTime() : 0
+        return m * (ta - tb)
+      }
+    }
+    return 0
   })
-)
+  return arr
+})
 
 function formatDate(ts: string | undefined | null): string {
   return ts ? dayjs(ts).format('YYYY-MM-DD') : '—'
@@ -978,3 +1084,28 @@ onUnmounted(() => {
   if (refreshTimer) clearInterval(refreshTimer)
 })
 </script>
+
+<style scoped>
+.btn-sort {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  font-weight: inherit;
+  text-align: left;
+  color: inherit;
+  white-space: nowrap;
+}
+.btn-sort:hover {
+  color: var(--tblr-primary);
+}
+.sort-icon {
+  font-size: 0.7em;
+  opacity: 0.5;
+  margin-left: 0.25rem;
+}
+.btn-sort:hover .sort-icon {
+  opacity: 0.9;
+}
+</style>
