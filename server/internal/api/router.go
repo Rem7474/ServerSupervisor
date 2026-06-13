@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/gin-gonic/gin"
+	"github.com/serversupervisor/server/internal/alerts"
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/cookies"
 	"github.com/serversupervisor/server/internal/database"
@@ -16,15 +17,16 @@ import (
 	auditsvc "github.com/serversupervisor/server/internal/services/audit"
 	dockersvc "github.com/serversupervisor/server/internal/services/docker"
 	hostsvc "github.com/serversupervisor/server/internal/services/host"
-	networksvc "github.com/serversupervisor/server/internal/services/network"
 	hostpermsvc "github.com/serversupervisor/server/internal/services/hostperm"
+	networksvc "github.com/serversupervisor/server/internal/services/network"
+	notifssvc "github.com/serversupervisor/server/internal/services/notifications"
 	npmsvc "github.com/serversupervisor/server/internal/services/npm"
 	pushsvc "github.com/serversupervisor/server/internal/services/push"
 	scheduledtasksvc "github.com/serversupervisor/server/internal/services/scheduledtask"
 	settingssvc "github.com/serversupervisor/server/internal/services/settings"
 	sslsvc "github.com/serversupervisor/server/internal/services/ssl"
-	usersvc "github.com/serversupervisor/server/internal/services/user"
 	uptimesvc "github.com/serversupervisor/server/internal/services/uptime"
+	usersvc "github.com/serversupervisor/server/internal/services/user"
 	weblogssvc "github.com/serversupervisor/server/internal/services/weblogs"
 	"github.com/serversupervisor/server/internal/ws"
 )
@@ -66,7 +68,9 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	settingsH := handlers.NewSettingsHandler(settingssvc.NewService(db, cfg, func() string {
 		return handlers.ResolveLatestAgentVersion(cfg)
 	}))
-	notifH := handlers.NewNotificationsHandler(db)
+	notifH := handlers.NewNotificationsHandler(notifssvc.NewService(db, func(ctx context.Context, rule models.AlertRule, hostID string) (float64, bool) {
+		return alerts.CurrentIncidentValue(ctx, db, rule, hostID)
+	}))
 	pushH := handlers.NewPushHandler(pushsvc.NewService(db))
 	scheduledTaskH := handlers.NewScheduledTaskHandler(scheduledtasksvc.NewService(db, sched, dispatcher), db)
 	gitWebhookH := handlers.NewGitWebhookHandler(db, cfg, dispatcher, notifHub)
