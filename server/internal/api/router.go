@@ -15,16 +15,17 @@ import (
 	aptsvc "github.com/serversupervisor/server/internal/services/apt"
 	auditsvc "github.com/serversupervisor/server/internal/services/audit"
 	dockersvc "github.com/serversupervisor/server/internal/services/docker"
+	gitwebhooksvc "github.com/serversupervisor/server/internal/services/gitwebhook"
 	hostsvc "github.com/serversupervisor/server/internal/services/host"
-	networksvc "github.com/serversupervisor/server/internal/services/network"
 	hostpermsvc "github.com/serversupervisor/server/internal/services/hostperm"
+	networksvc "github.com/serversupervisor/server/internal/services/network"
 	npmsvc "github.com/serversupervisor/server/internal/services/npm"
 	pushsvc "github.com/serversupervisor/server/internal/services/push"
 	scheduledtasksvc "github.com/serversupervisor/server/internal/services/scheduledtask"
 	settingssvc "github.com/serversupervisor/server/internal/services/settings"
 	sslsvc "github.com/serversupervisor/server/internal/services/ssl"
-	usersvc "github.com/serversupervisor/server/internal/services/user"
 	uptimesvc "github.com/serversupervisor/server/internal/services/uptime"
+	usersvc "github.com/serversupervisor/server/internal/services/user"
 	weblogssvc "github.com/serversupervisor/server/internal/services/weblogs"
 	"github.com/serversupervisor/server/internal/ws"
 )
@@ -69,7 +70,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	notifH := handlers.NewNotificationsHandler(db)
 	pushH := handlers.NewPushHandler(pushsvc.NewService(db))
 	scheduledTaskH := handlers.NewScheduledTaskHandler(scheduledtasksvc.NewService(db, sched, dispatcher), db)
-	gitWebhookH := handlers.NewGitWebhookHandler(db, cfg, dispatcher, notifHub)
+	gitWebhookH := handlers.NewGitWebhookHandler(gitwebhooksvc.NewService(db, cfg, dispatcher, notifHub))
 	releaseTrackerH := handlers.NewReleaseTrackerHandler(db, cfg, dispatcher, notifHub)
 	agentH.AddCompletionListener(gitWebhookH)
 	agentH.AddCompletionListener(releaseTrackerH)
