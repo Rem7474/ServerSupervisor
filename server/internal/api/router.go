@@ -14,17 +14,18 @@ import (
 	"github.com/serversupervisor/server/internal/scheduler"
 	aptsvc "github.com/serversupervisor/server/internal/services/apt"
 	auditsvc "github.com/serversupervisor/server/internal/services/audit"
+	authnsvc "github.com/serversupervisor/server/internal/services/authn"
 	dockersvc "github.com/serversupervisor/server/internal/services/docker"
 	hostsvc "github.com/serversupervisor/server/internal/services/host"
-	networksvc "github.com/serversupervisor/server/internal/services/network"
 	hostpermsvc "github.com/serversupervisor/server/internal/services/hostperm"
+	networksvc "github.com/serversupervisor/server/internal/services/network"
 	npmsvc "github.com/serversupervisor/server/internal/services/npm"
 	pushsvc "github.com/serversupervisor/server/internal/services/push"
 	scheduledtasksvc "github.com/serversupervisor/server/internal/services/scheduledtask"
 	settingssvc "github.com/serversupervisor/server/internal/services/settings"
 	sslsvc "github.com/serversupervisor/server/internal/services/ssl"
-	usersvc "github.com/serversupervisor/server/internal/services/user"
 	uptimesvc "github.com/serversupervisor/server/internal/services/uptime"
+	usersvc "github.com/serversupervisor/server/internal/services/user"
 	weblogssvc "github.com/serversupervisor/server/internal/services/weblogs"
 	"github.com/serversupervisor/server/internal/ws"
 )
@@ -48,7 +49,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	webhookRateLimiter := NewIPRateLimiter(5, 10, cfg.TrustedProxyCIDRs)
 
 	// Instantiate handlers
-	authH := handlers.NewAuthHandler(db, cfg, dispatcher)
+	authH := handlers.NewAuthHandler(authnsvc.NewService(db, cfg), cfg)
 	hostH := handlers.NewHostHandler(hostsvc.NewService(db, dispatcher, func() string {
 		return handlers.ResolveLatestAgentVersion(cfg)
 	}))
