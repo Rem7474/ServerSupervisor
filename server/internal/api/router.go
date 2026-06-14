@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/gin-gonic/gin"
+	"github.com/serversupervisor/server/internal/alerts"
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/cookies"
 	"github.com/serversupervisor/server/internal/database"
@@ -14,6 +15,7 @@ import (
 	"github.com/serversupervisor/server/internal/scheduler"
 	aptsvc "github.com/serversupervisor/server/internal/services/apt"
 	auditsvc "github.com/serversupervisor/server/internal/services/audit"
+	authnsvc "github.com/serversupervisor/server/internal/services/authn"
 	dockersvc "github.com/serversupervisor/server/internal/services/docker"
 	gitwebhooksvc "github.com/serversupervisor/server/internal/services/gitwebhook"
 	hostsvc "github.com/serversupervisor/server/internal/services/host"
@@ -49,7 +51,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	webhookRateLimiter := NewIPRateLimiter(5, 10, cfg.TrustedProxyCIDRs)
 
 	// Instantiate handlers
-	authH := handlers.NewAuthHandler(db, cfg, dispatcher)
+	authH := handlers.NewAuthHandler(authnsvc.NewService(db, cfg), cfg)
 	hostH := handlers.NewHostHandler(hostsvc.NewService(db, dispatcher, func() string {
 		return handlers.ResolveLatestAgentVersion(cfg)
 	}))
@@ -67,7 +69,9 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	settingsH := handlers.NewSettingsHandler(settingssvc.NewService(db, cfg, func() string {
 		return handlers.ResolveLatestAgentVersion(cfg)
 	}))
-	notifH := handlers.NewNotificationsHandler(db)
+	notifH := handlers.NewNotificationsHandler(notifssvc.NewService(db, func(ctx context.Context, rule models.AlertRule, hostID string) (float64, bool) {
+		return alerts.CurrentIncidentValue(ctx, db, rule, hostID)
+	}))
 	pushH := handlers.NewPushHandler(pushsvc.NewService(db))
 	scheduledTaskH := handlers.NewScheduledTaskHandler(scheduledtasksvc.NewService(db, sched, dispatcher), db)
 	gitWebhookH := handlers.NewGitWebhookHandler(gitwebhooksvc.NewService(db, cfg, dispatcher, notifHub))
