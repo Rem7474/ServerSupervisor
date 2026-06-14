@@ -17,6 +17,7 @@ import (
 	auditsvc "github.com/serversupervisor/server/internal/services/audit"
 	authnsvc "github.com/serversupervisor/server/internal/services/authn"
 	dockersvc "github.com/serversupervisor/server/internal/services/docker"
+	gitwebhooksvc "github.com/serversupervisor/server/internal/services/gitwebhook"
 	hostsvc "github.com/serversupervisor/server/internal/services/host"
 	hostpermsvc "github.com/serversupervisor/server/internal/services/hostperm"
 	networksvc "github.com/serversupervisor/server/internal/services/network"
@@ -74,7 +75,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	}))
 	pushH := handlers.NewPushHandler(pushsvc.NewService(db))
 	scheduledTaskH := handlers.NewScheduledTaskHandler(scheduledtasksvc.NewService(db, sched, dispatcher), db)
-	gitWebhookH := handlers.NewGitWebhookHandler(db, cfg, dispatcher, notifHub)
+	gitWebhookH := handlers.NewGitWebhookHandler(gitwebhooksvc.NewService(db, cfg, dispatcher, notifHub))
 	releaseTrackerH := handlers.NewReleaseTrackerHandler(db, cfg, dispatcher, notifHub)
 	agentH.AddCompletionListener(gitWebhookH)
 	agentH.AddCompletionListener(releaseTrackerH)

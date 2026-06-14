@@ -14,6 +14,7 @@ import (
 	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/dispatch"
 	"github.com/serversupervisor/server/internal/handlers"
+	gitwebhooksvc "github.com/serversupervisor/server/internal/services/gitwebhook"
 	"github.com/serversupervisor/server/internal/testutil"
 	"github.com/serversupervisor/server/internal/ws"
 )
@@ -21,7 +22,7 @@ import (
 func newGitWebhookRouter(t *testing.T, role string) (*gin.Engine, *database.DB) {
 	t.Helper()
 	db, cfg := testutil.NewPostgresDBWithConfig(t)
-	h := handlers.NewGitWebhookHandler(db, cfg, dispatch.New(db), ws.NewNotificationHub())
+	h := handlers.NewGitWebhookHandler(gitwebhooksvc.NewService(db, cfg, dispatch.New(db), ws.NewNotificationHub()))
 
 	r := gin.New()
 	r.Use(withRole(role))

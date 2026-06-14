@@ -2,210 +2,125 @@ package handlers
 
 import (
 	"context"
-	"crypto/hmac"
-	"crypto/sha256"
-	"database/sql"
-	"encoding/hex"
-	"encoding/json"
-	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
-	"path/filepath"
 	"strconv"
-	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/serversupervisor/server/internal/config"
-	"github.com/serversupervisor/server/internal/database"
-	"github.com/serversupervisor/server/internal/dispatch"
+	"github.com/serversupervisor/server/internal/apperr"
 	"github.com/serversupervisor/server/internal/models"
-	"github.com/serversupervisor/server/internal/notify"
-	"github.com/serversupervisor/server/internal/ws"
+	gitwebhooksvc "github.com/serversupervisor/server/internal/services/gitwebhook"
 )
 
-var validWebhookProviders = map[string]bool{
-	"github": true, "gitlab": true, "gitea": true, "forgejo": true, "custom": true,
-}
-
+// GitWebhookHandler translates HTTP to the git-webhook service. Admin authz and
+// the raw-body read for the public receiver stay here; CRUD, HMAC verification,
+// payload parsing, dispatch and completion notifications live in
+// internal/services/gitwebhook.
 type GitWebhookHandler struct {
-	db         *database.DB
-	cfg        *config.Config
-	dispatcher *dispatch.Dispatcher
-	notifHub   *ws.NotificationHub
-	// bgCtx is the long-lived ctx used by fire-and-forget completion callbacks
-	// (NotifyWebhookExecutionComplete). Defaults to context.Background(); replace
-	// it with a SIGTERM-bound ctx via SetBackgroundContext so completion writes
-	// are cancelled at shutdown rather than running uncancellable.
-	bgCtx context.Context
+	svc *gitwebhooksvc.Service
 }
 
-func NewGitWebhookHandler(db *database.DB, cfg *config.Config, dispatcher *dispatch.Dispatcher, notifHub *ws.NotificationHub) *GitWebhookHandler {
-	return &GitWebhookHandler{
-		db: db, cfg: cfg, dispatcher: dispatcher, notifHub: notifHub,
-		bgCtx: context.Background(),
-	}
+func NewGitWebhookHandler(svc *gitwebhooksvc.Service) *GitWebhookHandler {
+	return &GitWebhookHandler{svc: svc}
 }
 
-// SetBackgroundContext threads a long-lived (typically SIGTERM-bound) ctx into
-// the handler. Called once from main.go after construction.
+// SetBackgroundContext threads a long-lived ctx into the service for fire-and-forget
+// completion callbacks. Called once from main.go.
 func (h *GitWebhookHandler) SetBackgroundContext(ctx context.Context) {
-	h.bgCtx = ctx
+	h.svc.SetBackgroundContext(ctx)
 }
 
 // ========== CRUD (authenticated, admin only) ==========
 
 func (h *GitWebhookHandler) ListWebhooks(c *gin.Context) {
-	webhooks, err := h.db.ListGitWebhooks(c.Request.Context())
+	webhooks, err := h.svc.List(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list webhooks"})
+		respondError(c, err)
 		return
-	}
-	if webhooks == nil {
-		webhooks = []models.GitWebhook{}
 	}
 	c.JSON(http.StatusOK, gin.H{"webhooks": webhooks})
 }
 
 func (h *GitWebhookHandler) CreateWebhook(c *gin.Context) {
-	role := c.GetString("role")
-	if role != models.RoleAdmin {
+	if c.GetString("role") != models.RoleAdmin {
 		c.JSON(http.StatusForbidden, gin.H{"error": "admin role required"})
 		return
 	}
-
 	var req models.GitWebhookRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondError(c, apperr.Validation(err.Error()))
 		return
 	}
-	if req.Name == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "name is required"})
-		return
-	}
-	if !validWebhookProviders[req.Provider] {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid provider; must be github, gitlab, gitea, forgejo, or custom"})
-		return
-	}
-	if req.HostID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "host_id is required"})
-		return
-	}
-	if req.CustomTaskID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "custom_task_id is required"})
-		return
-	}
-
-	wh := req.ToModel()
-	if wh.EventFilter == "" {
-		wh.EventFilter = "push"
-	}
-	if wh.NotifyChannels == nil {
-		wh.NotifyChannels = []string{}
-	}
-
-	created, err := h.db.CreateGitWebhook(c.Request.Context(), wh)
+	created, err := h.svc.Create(c.Request.Context(), req)
 	if err != nil {
-		slog.ErrorContext(c.Request.Context(), fmt.Sprintf("CreateWebhook: db error: %v", err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create webhook"})
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"webhook": created})
 }
 
 func (h *GitWebhookHandler) GetWebhook(c *gin.Context) {
-	id := c.Param("id")
-	wh, err := h.db.GetGitWebhookByID(c.Request.Context(), id)
-	if err == sql.ErrNoRows {
-		c.JSON(http.StatusNotFound, gin.H{"error": "webhook not found"})
-		return
-	}
+	wh, execs, err := h.svc.Get(c.Request.Context(), c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get webhook"})
+		respondError(c, err)
 		return
 	}
-	execs, _ := h.db.ListWebhookExecutions(c.Request.Context(), id, 20)
 	c.JSON(http.StatusOK, gin.H{"webhook": wh, "executions": execs})
 }
 
 func (h *GitWebhookHandler) UpdateWebhook(c *gin.Context) {
-	role := c.GetString("role")
-	if role != models.RoleAdmin {
+	if c.GetString("role") != models.RoleAdmin {
 		c.JSON(http.StatusForbidden, gin.H{"error": "admin role required"})
 		return
 	}
-	id := c.Param("id")
-
 	var req models.GitWebhookRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondError(c, apperr.Validation(err.Error()))
 		return
 	}
-	if req.Name == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "name is required"})
-		return
-	}
-	if !validWebhookProviders[req.Provider] {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid provider"})
-		return
-	}
-	if req.HostID == "" || req.CustomTaskID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "host_id and custom_task_id are required"})
-		return
-	}
-
-	if err := h.db.UpdateGitWebhook(c.Request.Context(), id, req.ToModel()); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update webhook"})
+	if err := h.svc.Update(c.Request.Context(), c.Param("id"), req); err != nil {
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
 
 func (h *GitWebhookHandler) DeleteWebhook(c *gin.Context) {
-	role := c.GetString("role")
-	if role != models.RoleAdmin {
+	if c.GetString("role") != models.RoleAdmin {
 		c.JSON(http.StatusForbidden, gin.H{"error": "admin role required"})
 		return
 	}
-	id := c.Param("id")
-	if err := h.db.DeleteGitWebhook(c.Request.Context(), id); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete webhook"})
+	if err := h.svc.Delete(c.Request.Context(), c.Param("id")); err != nil {
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "deleted"})
 }
 
 func (h *GitWebhookHandler) RegenerateSecret(c *gin.Context) {
-	role := c.GetString("role")
-	if role != models.RoleAdmin {
+	if c.GetString("role") != models.RoleAdmin {
 		c.JSON(http.StatusForbidden, gin.H{"error": "admin role required"})
 		return
 	}
-	id := c.Param("id")
-	secret, err := h.db.RegenerateWebhookSecret(c.Request.Context(), id)
+	secret, err := h.svc.RegenerateSecret(c.Request.Context(), c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to regenerate secret"})
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"secret": secret})
 }
 
 func (h *GitWebhookHandler) GetWebhookExecutions(c *gin.Context) {
-	id := c.Param("id")
 	limit := 50
 	if l := c.Query("limit"); l != "" {
 		if v, err := strconv.Atoi(l); err == nil && v > 0 {
 			limit = v
 		}
 	}
-	execs, err := h.db.ListWebhookExecutions(c.Request.Context(), id, limit)
+	execs, err := h.svc.Executions(c.Request.Context(), c.Param("id"), limit)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list executions"})
+		respondError(c, err)
 		return
-	}
-	if execs == nil {
-		execs = []models.GitWebhookExecution{}
 	}
 	c.JSON(http.StatusOK, gin.H{"executions": execs})
 }
@@ -213,425 +128,32 @@ func (h *GitWebhookHandler) GetWebhookExecutions(c *gin.Context) {
 // ========== Public receiver ==========
 
 // ReceiveWebhook is the public endpoint called by Git providers.
-// It verifies the HMAC signature, applies filters, then dispatches a custom command to the agent.
 func (h *GitWebhookHandler) ReceiveWebhook(c *gin.Context) {
-	id := c.Param("id")
-
-	// Read body upfront (needed for HMAC computation)
 	body, err := io.ReadAll(io.LimitReader(c.Request.Body, 5<<20)) // 5MB limit
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to read body"})
+		respondError(c, apperr.Validation("failed to read body"))
 		return
 	}
-
-	wh, err := h.db.GetGitWebhookForReceive(c.Request.Context(), id)
-	if err == sql.ErrNoRows || (err == nil && !wh.Enabled) {
-		c.JSON(http.StatusNotFound, gin.H{"error": "webhook not found"})
-		return
-	}
+	res, err := h.svc.Receive(c.Request.Context(), c.Param("id"), body, c.Request.Header, c.ClientIP())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal error"})
+		respondError(c, err)
 		return
 	}
-
-	// Verify signature
-	if !verifyWebhookSignature(wh.Provider, wh.Secret, body, c.Request.Header) {
-		slog.ErrorContext(c.Request.Context(), fmt.Sprintf("Webhook %s: signature verification failed (IP: %s)", id, c.ClientIP()))
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid signature"})
-		return
+	resp := gin.H{"status": res.Status}
+	if res.Reason != "" {
+		resp["reason"] = res.Reason
 	}
-
-	// Parse payload
-	eventHeader := c.GetHeader("X-GitHub-Event")
-	if eventHeader == "" {
-		eventHeader = c.GetHeader("X-Gitea-Event")
+	if res.ExecutionID != "" {
+		resp["execution_id"] = res.ExecutionID
 	}
-	if eventHeader == "" {
-		eventHeader = c.GetHeader("X-Forgejo-Event")
+	if res.CommandID != "" {
+		resp["command_id"] = res.CommandID
 	}
-	if eventHeader == "" {
-		eventHeader = c.GetHeader("X-Gitlab-Event")
-	}
-	if eventHeader == "" {
-		eventHeader = "push"
-	}
-
-	parsed, err := parseGitPayload(wh.Provider, body, eventHeader)
-	if err != nil {
-		slog.ErrorContext(c.Request.Context(), fmt.Sprintf("Webhook %s: failed to parse payload: %v", id, err))
-		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to parse git payload"})
-		return
-	}
-	parsed.EventType = normalizeEvent(eventHeader)
-
-	// Apply event filter
-	if wh.EventFilter != "" && wh.EventFilter != "push" {
-		if parsed.EventType != wh.EventFilter {
-			c.JSON(http.StatusOK, gin.H{"status": "skipped", "reason": "event_filter"})
-			return
-		}
-	}
-
-	// Apply repo filter
-	if !matchFilter(wh.RepoFilter, parsed.RepoName) {
-		c.JSON(http.StatusOK, gin.H{"status": "skipped", "reason": "repo_filter"})
-		return
-	}
-
-	// Apply branch filter
-	if !matchFilter(wh.BranchFilter, parsed.Branch) {
-		c.JSON(http.StatusOK, gin.H{"status": "skipped", "reason": "branch_filter"})
-		return
-	}
-
-	// Check for already-running execution (skip to avoid concurrent conflicts)
-	running, _ := h.db.GetRunningExecutionForWebhook(c.Request.Context(), id)
-	if running {
-		exec := models.GitWebhookExecution{
-			WebhookID:     id,
-			Provider:      wh.Provider,
-			RepoName:      parsed.RepoName,
-			Branch:        parsed.Branch,
-			CommitSHA:     parsed.CommitSHA,
-			CommitMessage: parsed.CommitMessage,
-			Pusher:        parsed.Pusher,
-			Status:        "skipped",
-		}
-		created, _ := h.db.CreateWebhookExecution(c.Request.Context(), exec)
-		now := time.Now()
-		if created != nil {
-			_ = h.db.UpdateWebhookExecutionStatus(c.Request.Context(), created.ID, "skipped", &now)
-		}
-		c.JSON(http.StatusOK, gin.H{"status": "skipped", "reason": "already_running"})
-		return
-	}
-
-	// Create execution record
-	exec := models.GitWebhookExecution{
-		WebhookID:     id,
-		Provider:      wh.Provider,
-		RepoName:      parsed.RepoName,
-		Branch:        parsed.Branch,
-		CommitSHA:     parsed.CommitSHA,
-		CommitMessage: parsed.CommitMessage,
-		Pusher:        parsed.Pusher,
-		Status:        "pending",
-	}
-	createdExec, err := h.db.CreateWebhookExecution(c.Request.Context(), exec)
-	if err != nil {
-		slog.ErrorContext(c.Request.Context(), fmt.Sprintf("Webhook %s: failed to create execution record: %v", id, err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create execution"})
-		return
-	}
-
-	// Build env vars payload for the agent
-	envVars := map[string]string{
-		"SS_REPO_NAME":      parsed.RepoName,
-		"SS_BRANCH":         parsed.Branch,
-		"SS_COMMIT_SHA":     parsed.CommitSHA,
-		"SS_COMMIT_MESSAGE": parsed.CommitMessage,
-		"SS_PUSHER":         parsed.Pusher,
-		"SS_WEBHOOK_NAME":   wh.Name,
-		"SS_EVENT_TYPE":     parsed.EventType,
-	}
-	envPayload, _ := json.Marshal(map[string]interface{}{"env": envVars})
-
-	username := fmt.Sprintf("webhook:%s", wh.Name)
-	triggeredBy := fmt.Sprintf("webhook:%s", wh.Name)
-	result, err := h.dispatcher.Create(c.Request.Context(), dispatch.Request{
-		HostID:      wh.HostID,
-		Module:      "custom",
-		Action:      "run",
-		Target:      wh.CustomTaskID,
-		Payload:     string(envPayload),
-		TriggeredBy: triggeredBy,
-		Audit: &dispatch.AuditLogRequest{
-			Username:  username,
-			Action:    "webhook_trigger",
-			HostID:    wh.HostID,
-			IPAddress: c.ClientIP(),
-			Details: fmt.Sprintf(`{"webhook_id":%q,"repo":%q,"branch":%q,"commit":%q}`,
-				id, parsed.RepoName, parsed.Branch, parsed.CommitSHA),
-		},
-	})
-	if err != nil {
-		slog.ErrorContext(c.Request.Context(), fmt.Sprintf("Webhook %s: failed to create remote command: %v", id, err))
-		_ = h.db.UpdateWebhookExecutionStatus(c.Request.Context(), createdExec.ID, "failed", ptrNow())
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to dispatch command"})
-		return
-	}
-
-	// Link execution to command
-	_ = h.db.UpdateWebhookExecutionCommandID(c.Request.Context(), createdExec.ID, result.Command.ID)
-	_ = h.db.UpdateGitWebhookLastTriggered(c.Request.Context(), id)
-
-	slog.InfoContext(c.Request.Context(), fmt.Sprintf("Webhook %s: dispatched command %s → host %s task %s (repo=%s branch=%s)",
-		id, result.Command.ID, wh.HostID, wh.CustomTaskID, parsed.RepoName, parsed.Branch))
-
-	c.JSON(http.StatusOK, gin.H{
-		"status":       "dispatched",
-		"execution_id": createdExec.ID,
-		"command_id":   result.Command.ID,
-	})
+	c.JSON(http.StatusOK, resp)
 }
 
-func ptrNow() *time.Time {
-	t := time.Now()
-	return &t
-}
-
-// ========== Notification dispatch (called from agent result handler) ==========
-
-// NotifyWebhookExecutionComplete updates the execution status and sends notifications
-// when a webhook-triggered command completes or fails. Safe to call in a goroutine.
-func (h *GitWebhookHandler) NotifyWebhookExecutionComplete(commandID, status string) {
-	ctx := h.bgCtx
-	webhookID, notifyOnSuccess, notifyOnFailure, channels, err := h.db.UpdateWebhookExecutionByCommandID(ctx, commandID, status)
-	if err != nil {
-		// Not a webhook-triggered command — nothing to do
-		return
-	}
-
-	shouldNotify := (status == "completed" && notifyOnSuccess) ||
-		(status == "failed" && notifyOnFailure)
-	if !shouldNotify || len(channels) == 0 {
-		return
-	}
-
-	// Get webhook info for the notification message
-	wh, err := h.db.GetGitWebhookForReceive(ctx, webhookID)
-	if err != nil {
-		return
-	}
-
-	emoji := "✅"
-	if status == "failed" {
-		emoji = "❌"
-	}
-	subject := fmt.Sprintf("[ServerSupervisor] Webhook %s %s %s", wh.Name, emoji, status)
-	msg := fmt.Sprintf("Webhook '%s' execution %s on host %s (task: %s)",
-		wh.Name, status, wh.HostID, wh.CustomTaskID)
-
-	n := notify.New()
-	for _, ch := range channels {
-		switch ch {
-		case "smtp":
-			to := h.cfg.SMTPTo
-			if to == "" || h.cfg.SMTPFrom == "" {
-				continue
-			}
-			if err := n.SendSMTP(h.cfg, h.cfg.SMTPFrom, to, subject, msg); err != nil {
-				slog.ErrorContext(ctx, fmt.Sprintf("Webhook SMTP send: %v", err))
-			}
-
-		case "ntfy":
-			ntfyURL := h.cfg.NotifyURL
-			if ntfyURL == "" {
-				continue
-			}
-			if err := n.SendNtfy(h.cfg, ntfyURL, subject, msg); err != nil {
-				slog.ErrorContext(ctx, fmt.Sprintf("Webhook notify ntfy: %v", err))
-			}
-
-		case "browser":
-			if h.notifHub == nil {
-				continue
-			}
-			h.notifHub.Broadcast(models.WSWebhookExecutionMessage{
-				Type: "webhook_execution",
-				Notification: models.WSWebhookNotification{
-					WebhookID:   webhookID,
-					WebhookName: wh.Name,
-					Status:      status,
-					TriggeredAt: time.Now().UTC(),
-				},
-			})
-		}
-	}
-}
-
+// HandleCommandCompletion implements CommandCompletionListener: it notifies the
+// service when a webhook-triggered command reaches a terminal state.
 func (h *GitWebhookHandler) HandleCommandCompletion(commandID, status string) {
-	h.NotifyWebhookExecutionComplete(commandID, status)
-}
-
-// ========== Signature verification ==========
-
-func verifyWebhookSignature(provider, secret string, body []byte, headers http.Header) bool {
-	switch provider {
-	case "gitlab":
-		// GitLab uses a plain token (not HMAC)
-		return hmac.Equal([]byte(headers.Get("X-Gitlab-Token")), []byte(secret))
-
-	default:
-		// GitHub, Gitea, Forgejo, custom: X-Hub-Signature-256: sha256=<hex>
-		sigHeader := headers.Get("X-Hub-Signature-256")
-		if sigHeader == "" {
-			// Also check Gitea/Forgejo variant
-			sigHeader = headers.Get("X-Gitea-Signature")
-		}
-		if sigHeader == "" {
-			sigHeader = headers.Get("X-Forgejo-Signature")
-		}
-		if sigHeader == "" {
-			return false
-		}
-		const prefix = "sha256="
-		if !strings.HasPrefix(sigHeader, prefix) {
-			return false
-		}
-		gotHex := strings.TrimPrefix(sigHeader, prefix)
-		gotBytes, err := hex.DecodeString(gotHex)
-		if err != nil {
-			return false
-		}
-		mac := hmac.New(sha256.New, []byte(secret))
-		mac.Write(body)
-		expected := mac.Sum(nil)
-		return hmac.Equal(gotBytes, expected)
-	}
-}
-
-// ========== Payload parsing ==========
-
-type parsedGitPayload struct {
-	RepoName      string
-	Branch        string
-	CommitSHA     string
-	CommitMessage string
-	Pusher        string
-	EventType     string
-}
-
-func parseGitPayload(provider string, body []byte, eventHeader string) (*parsedGitPayload, error) {
-	switch provider {
-	case "gitlab":
-		return parseGitLabPayload(body)
-	default:
-		// GitHub, Gitea, Forgejo, custom all follow the GitHub payload format
-		return parseGitHubPayload(body, eventHeader)
-	}
-}
-
-func parseGitHubPayload(body []byte, eventHeader string) (*parsedGitPayload, error) {
-	var p struct {
-		Ref        string `json:"ref"`
-		After      string `json:"after"`
-		HeadCommit *struct {
-			ID      string `json:"id"`
-			Message string `json:"message"`
-		} `json:"head_commit"`
-		Repository *struct {
-			FullName string `json:"full_name"`
-		} `json:"repository"`
-		Pusher *struct {
-			Name string `json:"name"`
-		} `json:"pusher"`
-		Sender *struct {
-			Login string `json:"login"`
-		} `json:"sender"`
-	}
-	if err := json.Unmarshal(body, &p); err != nil {
-		return nil, err
-	}
-
-	result := &parsedGitPayload{}
-	if p.Repository != nil {
-		result.RepoName = p.Repository.FullName
-	}
-	result.Branch = refToBranch(p.Ref)
-	result.CommitSHA = p.After
-	if p.HeadCommit != nil {
-		result.CommitMessage = firstLine(p.HeadCommit.Message)
-		if result.CommitSHA == "" {
-			result.CommitSHA = p.HeadCommit.ID
-		}
-	}
-	if p.Pusher != nil {
-		result.Pusher = p.Pusher.Name
-	} else if p.Sender != nil {
-		result.Pusher = p.Sender.Login
-	}
-	return result, nil
-}
-
-func parseGitLabPayload(body []byte) (*parsedGitPayload, error) {
-	var p struct {
-		Ref      string `json:"ref"`
-		After    string `json:"after"`
-		UserName string `json:"user_name"`
-		Commits  []struct {
-			ID      string `json:"id"`
-			Message string `json:"message"`
-		} `json:"commits"`
-		Project *struct {
-			PathWithNamespace string `json:"path_with_namespace"`
-		} `json:"project"`
-	}
-	if err := json.Unmarshal(body, &p); err != nil {
-		return nil, err
-	}
-
-	result := &parsedGitPayload{}
-	if p.Project != nil {
-		result.RepoName = p.Project.PathWithNamespace
-	}
-	result.Branch = refToBranch(p.Ref)
-	result.CommitSHA = p.After
-	result.Pusher = p.UserName
-	if len(p.Commits) > 0 {
-		result.CommitMessage = firstLine(p.Commits[len(p.Commits)-1].Message)
-		if result.CommitSHA == "" {
-			result.CommitSHA = p.Commits[len(p.Commits)-1].ID
-		}
-	}
-	return result, nil
-}
-
-// ========== Helpers ==========
-
-func refToBranch(ref string) string {
-	if strings.HasPrefix(ref, "refs/heads/") {
-		return strings.TrimPrefix(ref, "refs/heads/")
-	}
-	if strings.HasPrefix(ref, "refs/tags/") {
-		return strings.TrimPrefix(ref, "refs/tags/")
-	}
-	return ref
-}
-
-func normalizeEvent(eventHeader string) string {
-	// Map provider-specific event names to our canonical set
-	lower := strings.ToLower(eventHeader)
-	switch {
-	case lower == "push":
-		return "push"
-	case lower == "create", lower == "tag_push", strings.Contains(lower, "tag"):
-		return "tag"
-	case lower == "release", lower == "releases":
-		return "release"
-	default:
-		return lower
-	}
-}
-
-func matchFilter(filter, value string) bool {
-	if filter == "" {
-		return true
-	}
-	// Exact match or wildcard via filepath.Match
-	if filter == value {
-		return true
-	}
-	matched, _ := filepath.Match(filter, value)
-	return matched
-}
-
-func firstLine(s string) string {
-	if idx := strings.Index(s, "\n"); idx >= 0 {
-		return s[:idx]
-	}
-	if len(s) > 200 {
-		return s[:200]
-	}
-	return s
+	h.svc.NotifyComplete(commandID, status)
 }
