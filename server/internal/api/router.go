@@ -20,6 +20,7 @@ import (
 	hostsvc "github.com/serversupervisor/server/internal/services/host"
 	hostpermsvc "github.com/serversupervisor/server/internal/services/hostperm"
 	networksvc "github.com/serversupervisor/server/internal/services/network"
+	notifssvc "github.com/serversupervisor/server/internal/services/notifications"
 	npmsvc "github.com/serversupervisor/server/internal/services/npm"
 	pushsvc "github.com/serversupervisor/server/internal/services/push"
 	scheduledtasksvc "github.com/serversupervisor/server/internal/services/scheduledtask"
