@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/gin-gonic/gin"
+	"github.com/serversupervisor/server/internal/alerts"
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/cookies"
 	"github.com/serversupervisor/server/internal/database"
@@ -67,7 +68,9 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	settingsH := handlers.NewSettingsHandler(settingssvc.NewService(db, cfg, func() string {
 		return handlers.ResolveLatestAgentVersion(cfg)
 	}))
-	notifH := handlers.NewNotificationsHandler(db)
+	notifH := handlers.NewNotificationsHandler(notifssvc.NewService(db, func(ctx context.Context, rule models.AlertRule, hostID string) (float64, bool) {
+		return alerts.CurrentIncidentValue(ctx, db, rule, hostID)
+	}))
 	pushH := handlers.NewPushHandler(pushsvc.NewService(db))
 	scheduledTaskH := handlers.NewScheduledTaskHandler(scheduledtasksvc.NewService(db, sched, dispatcher), db)
 	gitWebhookH := handlers.NewGitWebhookHandler(db, cfg, dispatcher, notifHub)
