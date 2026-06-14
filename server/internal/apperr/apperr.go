@@ -36,6 +36,11 @@ func Unauthorized(msg string) *Error {
 	return &Error{Code: "unauthorized", Message: msg, HTTPStatus: 401}
 }
 
+// TooManyRequests — the caller is rate-limited / brute-force-blocked (429).
+func TooManyRequests(msg string) *Error {
+	return &Error{Code: "too_many_requests", Message: msg, HTTPStatus: 429}
+}
+
 // Failed — the operation failed for a reason worth surfacing verbatim (500),
 // e.g. an external-dependency diagnostic (SMTP/ntfy connectivity test) where the
 // message itself is the useful result. Unlike Internal it keeps the human message.

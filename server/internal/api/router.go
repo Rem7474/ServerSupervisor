@@ -15,6 +15,7 @@ import (
 	"github.com/serversupervisor/server/internal/scheduler"
 	aptsvc "github.com/serversupervisor/server/internal/services/apt"
 	auditsvc "github.com/serversupervisor/server/internal/services/audit"
+	authnsvc "github.com/serversupervisor/server/internal/services/authn"
 	dockersvc "github.com/serversupervisor/server/internal/services/docker"
 	hostsvc "github.com/serversupervisor/server/internal/services/host"
 	hostpermsvc "github.com/serversupervisor/server/internal/services/hostperm"
@@ -50,7 +51,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	webhookRateLimiter := NewIPRateLimiter(5, 10, cfg.TrustedProxyCIDRs)
 
 	// Instantiate handlers
-	authH := handlers.NewAuthHandler(db, cfg, dispatcher)
+	authH := handlers.NewAuthHandler(authnsvc.NewService(db, cfg), cfg)
 	hostH := handlers.NewHostHandler(hostsvc.NewService(db, dispatcher, func() string {
 		return handlers.ResolveLatestAgentVersion(cfg)
 	}))

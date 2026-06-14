@@ -11,6 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/serversupervisor/server/internal/cookies"
 	"github.com/serversupervisor/server/internal/handlers"
+	authnsvc "github.com/serversupervisor/server/internal/services/authn"
 	"github.com/serversupervisor/server/internal/testutil"
 )
 
@@ -36,7 +37,7 @@ func seedUser(t *testing.T, db interface {
 func newAuthRouter(t *testing.T) (*gin.Engine, *handlers.AuthHandler) {
 	t.Helper()
 	db, cfg := testutil.NewPostgresDBWithConfig(t)
-	h := handlers.NewAuthHandler(db, cfg, nil)
+	h := handlers.NewAuthHandler(authnsvc.NewService(db, cfg), cfg)
 
 	r := gin.New()
 	r.POST("/api/auth/login", h.Login)
