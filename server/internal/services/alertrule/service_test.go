@@ -51,6 +51,44 @@ func (f *fakeRepo) ResolveAlertIncident(context.Context, int64) error { return n
 func (f *fakeRepo) GetAlertIncidents(context.Context, int, int) ([]models.AlertIncident, error) {
 	return nil, nil
 }
+func (f *fakeRepo) GetHost(context.Context, string) (*models.Host, error) { return &models.Host{}, nil }
+func (f *fakeRepo) GetDockerContainers(context.Context, string) ([]models.DockerContainer, error) {
+	return nil, nil
+}
+func (f *fakeRepo) GetComposeProjectsByHost(context.Context, string) ([]models.ComposeProject, error) {
+	return nil, nil
+}
+func (f *fakeRepo) ListAlertProxmoxConnections(context.Context) ([]models.AlertScopeOption, error) {
+	return nil, nil
+}
+func (f *fakeRepo) ListAlertProxmoxNodes(context.Context) ([]models.AlertScopeOption, error) {
+	return nil, nil
+}
+func (f *fakeRepo) ListAlertProxmoxStorages(context.Context) ([]models.AlertScopeOption, error) {
+	return nil, nil
+}
+func (f *fakeRepo) ListAlertProxmoxGuests(context.Context) ([]models.AlertScopeOption, error) {
+	return nil, nil
+}
+func (f *fakeRepo) ListAlertProxmoxDisks(context.Context) ([]models.AlertScopeOption, error) {
+	return nil, nil
+}
+func (f *fakeRepo) ListAlertDockerScopeHosts(context.Context) ([]models.AlertScopeOption, error) {
+	return nil, nil
+}
+func (f *fakeRepo) ProxmoxConnectionName(context.Context, string) (string, error) { return "", nil }
+func (f *fakeRepo) ProxmoxNodeLabelParts(context.Context, string) (string, string, error) {
+	return "", "", nil
+}
+func (f *fakeRepo) ProxmoxStorageLabelParts(context.Context, string) (string, string, string, error) {
+	return "", "", "", nil
+}
+func (f *fakeRepo) ProxmoxGuestLabelParts(context.Context, string) (string, string, string, string, int, error) {
+	return "", "", "", "", 0, nil
+}
+func (f *fakeRepo) ProxmoxDiskLabelParts(context.Context, string) (string, string, string, string, error) {
+	return "", "", "", "", nil
+}
 
 func newSvc(repo Repository) *Service { return NewService(repo, func(models.AlertRule) {}) }
 

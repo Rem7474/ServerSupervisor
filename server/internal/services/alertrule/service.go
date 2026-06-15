@@ -33,6 +33,22 @@ type Repository interface {
 	ResolveOpenAlertIncidentsByRule(ctx context.Context, ruleID int64) (int64, error)
 	ResolveAlertIncident(ctx context.Context, id int64) error
 	GetAlertIncidents(ctx context.Context, limit, offset int) ([]models.AlertIncident, error)
+
+	// capability discovery
+	GetHost(ctx context.Context, id string) (*models.Host, error)
+	GetDockerContainers(ctx context.Context, hostID string) ([]models.DockerContainer, error)
+	GetComposeProjectsByHost(ctx context.Context, hostID string) ([]models.ComposeProject, error)
+	ListAlertProxmoxConnections(ctx context.Context) ([]models.AlertScopeOption, error)
+	ListAlertProxmoxNodes(ctx context.Context) ([]models.AlertScopeOption, error)
+	ListAlertProxmoxStorages(ctx context.Context) ([]models.AlertScopeOption, error)
+	ListAlertProxmoxGuests(ctx context.Context) ([]models.AlertScopeOption, error)
+	ListAlertProxmoxDisks(ctx context.Context) ([]models.AlertScopeOption, error)
+	ListAlertDockerScopeHosts(ctx context.Context) ([]models.AlertScopeOption, error)
+	ProxmoxConnectionName(ctx context.Context, id string) (string, error)
+	ProxmoxNodeLabelParts(ctx context.Context, id string) (connName, nodeName string, err error)
+	ProxmoxStorageLabelParts(ctx context.Context, id string) (connName, nodeName, storageName string, err error)
+	ProxmoxGuestLabelParts(ctx context.Context, id string) (connName, nodeName, guestName, guestType string, vmid int, err error)
+	ProxmoxDiskLabelParts(ctx context.Context, id string) (connName, nodeName, devPath, model string, err error)
 }
 
 // Service holds the alert-rule use-cases.

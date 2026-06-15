@@ -69,7 +69,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	userH := handlers.NewUserHandler(usersvc.NewService(db))
 	alertRulesH := handlers.NewAlertRulesHandler(alertrulesvc.NewService(db, func(rule models.AlertRule) {
 		go alerts.ResolveStaleIncidentsForRule(context.Background(), db, rule)
-	}), db, cfg)
+	}), db)
 	settingsH := handlers.NewSettingsHandler(settingssvc.NewService(db, cfg, func() string {
 		return handlers.ResolveLatestAgentVersion(cfg)
 	}))

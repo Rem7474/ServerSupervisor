@@ -100,7 +100,7 @@ func (h *AlertRulesHandler) TestAlertRule(c *gin.Context) {
 	}
 
 	if rule.SourceType == models.AlertSourceProxmox {
-		targetID, targetLabel := h.proxmoxScopeTestTarget(c.Request.Context(), rule.ProxmoxScope)
+		targetID, targetLabel := h.svc.ProxmoxScopeTestTarget(c.Request.Context(), rule.ProxmoxScope)
 		target := models.Host{ID: targetID, Name: targetLabel, Status: "online", LastSeen: time.Now()}
 		value, ok := alerts.GetMetricValue(c.Request.Context(), h.db, target, ruleNoStaleness)
 		_, freshOk := alerts.GetMetricValue(c.Request.Context(), h.db, target, rule)
