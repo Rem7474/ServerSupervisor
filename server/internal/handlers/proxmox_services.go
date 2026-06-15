@@ -2,208 +2,63 @@ package handlers
 
 import (
 	"fmt"
-	"log/slog"
 	"net/http"
-	"sync"
 
 	"github.com/gin-gonic/gin"
-	"github.com/serversupervisor/server/internal/models"
-	"github.com/serversupervisor/server/internal/proxmoxclient"
+	"github.com/serversupervisor/server/internal/apperr"
 )
 
-// ─── Apt refresh ──────────────────────────────────────────────────────────────
-
 // RefreshNodeApt triggers `apt-get update` on a Proxmox node via the PVE API.
-// Requires Sys.Modify privilege on the token.
-// Returns the task UPID so the frontend can poll the task list for completion.
 func (h *ProxmoxHandler) RefreshNodeApt(c *gin.Context) {
-	node, err := h.db.GetProxmoxNode(c.Request.Context(), c.Param("id"))
+	upid, err := h.svc.RefreshNodeApt(c.Request.Context(), c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
-	if node == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "node not found"})
-		return
-	}
-
-	secret, conn, err := h.resolveSecret(c.Request.Context(), node.ConnectionID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	client := proxmoxclient.New(conn.APIURL, conn.TokenID, secret, conn.InsecureSkipVerify)
-	upid, err := client.TriggerNodeAptUpdate(node.NodeName)
-	if err != nil {
-		slog.ErrorContext(c.Request.Context(), fmt.Sprintf("proxmox apt-refresh [%s/%s]: %v", conn.Name, node.NodeName, err))
-		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
-		return
-	}
-
-	slog.InfoContext(c.Request.Context(), fmt.Sprintf("proxmox apt-refresh [%s/%s]: triggered, upid=%s", conn.Name, node.NodeName, upid))
 	c.JSON(http.StatusOK, gin.H{"upid": upid, "message": "apt update lancé sur le nœud"})
 }
 
-// ─── Guest network interfaces ─────────────────────────────────────────────────
-
-// GetNodeGuestNetworks returns a map of vmid → []GuestNetworkIface for all guests of a node.
-// VM interfaces are fetched via the QEMU guest agent (errors are silently skipped).
-// LXC interfaces are fetched natively (always available).
+// GetNodeGuestNetworks returns a map of vmid → []GuestNetworkIface for a node's guests.
 func (h *ProxmoxHandler) GetNodeGuestNetworks(c *gin.Context) {
-	node, err := h.db.GetProxmoxNode(c.Request.Context(), c.Param("id"))
+	result, err := h.svc.NodeGuestNetworks(c.Request.Context(), c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
-	if node == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "node not found"})
-		return
-	}
-
-	secret, conn, err := h.resolveSecret(c.Request.Context(), node.ConnectionID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	guests, err := h.db.ListProxmoxGuestsByNode(c.Request.Context(), node.ConnectionID, node.NodeName)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	client := proxmoxclient.New(conn.APIURL, conn.TokenID, secret, conn.InsecureSkipVerify)
-
-	result := make(map[int][]proxmoxclient.GuestNetworkIface)
-	var mu sync.Mutex
-	var wg sync.WaitGroup
-
-	for _, g := range guests {
-		if g.Status != "running" {
-			continue
-		}
-		wg.Add(1)
-		go func(guest models.ProxmoxGuest) {
-			defer wg.Done()
-			var ifaces []proxmoxclient.GuestNetworkIface
-			var ferr error
-			if guest.GuestType == "vm" {
-				ifaces, ferr = client.GetVMNetworkInterfaces(node.NodeName, guest.VMID)
-			} else {
-				ifaces, ferr = client.GetLXCInterfaces(node.NodeName, guest.VMID)
-			}
-			if ferr != nil {
-				return // agent not running or no permission — skip silently
-			}
-			if len(ifaces) > 0 {
-				mu.Lock()
-				result[guest.VMID] = ifaces
-				mu.Unlock()
-			}
-		}(g)
-	}
-
-	wg.Wait()
 	c.JSON(http.StatusOK, result)
 }
 
-// ─── Guest migration ──────────────────────────────────────────────────────────
-
-// MigrateGuest migrates a VM or LXC container to another node in the same cluster.
-// URL params: :id = DB node UUID, :vmid = PVE VMID (integer).
-// Body JSON: { target: "pve2", online: true, guest_type: "vm" }
+// MigrateGuest migrates a VM or LXC to another node in the same cluster.
+// URL params: :id = DB node UUID, :vmid = PVE VMID.
 func (h *ProxmoxHandler) MigrateGuest(c *gin.Context) {
-	node, err := h.db.GetProxmoxNode(c.Request.Context(), c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	if node == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "node not found"})
-		return
-	}
-
 	var body struct {
 		Target    string `json:"target" binding:"required"`
 		GuestType string `json:"guest_type"` // "vm" or "lxc"; defaults to "vm"
 		Online    bool   `json:"online"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "target requis"})
+		respondError(c, apperr.Validation("target requis"))
 		return
 	}
-	if body.GuestType == "" {
-		body.GuestType = "vm"
-	}
-
-	vmidParam := c.Param("vmid")
 	var vmid int
-	if _, err := fmt.Sscanf(vmidParam, "%d", &vmid); err != nil || vmid <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "vmid invalide"})
+	if _, err := fmt.Sscanf(c.Param("vmid"), "%d", &vmid); err != nil || vmid <= 0 {
+		respondError(c, apperr.Validation("vmid invalide"))
 		return
 	}
-
-	secret, conn, err := h.resolveSecret(c.Request.Context(), node.ConnectionID)
+	upid, err := h.svc.MigrateGuest(c.Request.Context(), c.Param("id"), vmid, body.GuestType, body.Target, body.Online)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
-
-	client := proxmoxclient.New(conn.APIURL, conn.TokenID, secret, conn.InsecureSkipVerify)
-	upid, err := client.MigrateGuest(node.NodeName, vmid, body.GuestType, body.Target, body.Online)
-	if err != nil {
-		slog.ErrorContext(c.Request.Context(), fmt.Sprintf("proxmox migrate [%s/%s] vmid=%d→%s: %v", conn.Name, node.NodeName, vmid, body.Target, err))
-		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
-		return
-	}
-
-	slog.InfoContext(c.Request.Context(), fmt.Sprintf("proxmox migrate [%s/%s] vmid=%d→%s: upid=%s", conn.Name, node.NodeName, vmid, body.Target, upid))
 	c.JSON(http.StatusOK, gin.H{"upid": upid, "message": fmt.Sprintf("Migration vers %s lancée", body.Target)})
 }
 
-// ─── Services (systemd) ────────────────────────────────────────────────────────
-
-// validServiceAction is the set of allowed service action verbs.
-var validServiceAction = map[string]bool{
-	"start": true, "stop": true, "restart": true, "reload": true,
-}
-
-// NodeServiceAction proxies a service action to PVE. Requires Sys.Modify.
-// Returns the task UPID so the frontend can poll for completion.
+// NodeServiceAction proxies a systemd service action to PVE (start/stop/restart/reload).
 func (h *ProxmoxHandler) NodeServiceAction(c *gin.Context) {
-	action := c.Param("action")
-	if !validServiceAction[action] {
-		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("invalid action %q; allowed: start stop restart reload", action)})
-		return
-	}
-
-	node, err := h.db.GetProxmoxNode(c.Request.Context(), c.Param("id"))
+	upid, err := h.svc.NodeServiceAction(c.Request.Context(), c.Param("id"), c.Param("service"), c.Param("action"))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
-	if node == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "node not found"})
-		return
-	}
-
-	service := c.Param("service")
-
-	secret, conn, err := h.resolveSecret(c.Request.Context(), node.ConnectionID)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	client := proxmoxclient.New(conn.APIURL, conn.TokenID, secret, conn.InsecureSkipVerify)
-	upid, err := client.NodeServiceAction(node.NodeName, service, action)
-	if err != nil {
-		slog.ErrorContext(c.Request.Context(), fmt.Sprintf("proxmox service-action [%s/%s] %s %s: %v", conn.Name, node.NodeName, action, service, err))
-		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
-		return
-	}
-
-	slog.InfoContext(c.Request.Context(), fmt.Sprintf("proxmox service-action [%s/%s] %s %s: upid=%s", conn.Name, node.NodeName, action, service, upid))
 	c.JSON(http.StatusOK, gin.H{"upid": upid})
 }

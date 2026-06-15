@@ -1,9 +1,15 @@
-package handlers
+// Package proxmox is the application/service layer for Proxmox VE supervision:
+// connection CRUD, the stored read models, the live PVE proxy endpoints and the
+// background polling loop. The HTTP use-cases sit behind a Repository port; the
+// poller is background sync and uses the concrete *database.DB (like the other
+// background jobs).
+package proxmox
 
 import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"time"
 
 	"github.com/serversupervisor/server/internal/config"
@@ -14,18 +20,29 @@ import (
 // taskLimit is the number of recent tasks fetched per node per poll cycle.
 const taskLimit = 50
 
-// proxmoxService contains Proxmox business logic independently from HTTP bindings.
-type proxmoxService struct {
+// parseVMID converts a Proxmox task object ID string to an integer VMID.
+// Returns 0 if the string is not a valid positive integer.
+func parseVMID(s string) int {
+	v, err := strconv.Atoi(s)
+	if err != nil || v <= 0 {
+		return 0
+	}
+	return v
+}
+
+// Poller runs the background Proxmox collection loop. It is background sync, so it
+// uses the concrete *database.DB directly (many write paths) rather than a port.
+type Poller struct {
 	db  *database.DB
 	cfg *config.Config
 }
 
-func newProxmoxService(db *database.DB, cfg *config.Config) *proxmoxService {
-	return &proxmoxService{db: db, cfg: cfg}
+func NewPoller(db *database.DB, cfg *config.Config) *Poller {
+	return &Poller{db: db, cfg: cfg}
 }
 
 // PollAll iterates all enabled connections and polls each one.
-func (s *proxmoxService) PollAll(ctx context.Context) {
+func (s *Poller) PollAll(ctx context.Context) {
 	conns, err := s.db.GetEnabledProxmoxConnections(ctx)
 	if err != nil {
 		slog.ErrorContext(ctx, fmt.Sprintf("proxmox poller: failed to fetch connections: %v", err))
@@ -39,7 +56,7 @@ func (s *proxmoxService) PollAll(ctx context.Context) {
 	}
 }
 
-func (s *proxmoxService) PollOne(ctx context.Context, conn database.ProxmoxConnectionFull) {
+func (s *Poller) PollOne(ctx context.Context, conn database.ProxmoxConnectionFull) {
 	interval := time.Duration(conn.PollIntervalSec) * time.Second
 	if interval <= 0 {
 		interval = 60 * time.Second

@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/handlers"
+	proxmoxsvc "github.com/serversupervisor/server/internal/services/proxmox"
 	"github.com/serversupervisor/server/internal/testutil"
 )
 
@@ -17,7 +18,7 @@ const proxmoxSecret = "p2x-secret-DO-NOT-LEAK-123"
 func newProxmoxRouter(t *testing.T) (*gin.Engine, *database.DB) {
 	t.Helper()
 	db, cfg := testutil.NewPostgresDBWithConfig(t)
-	h := handlers.NewProxmoxHandler(db, cfg)
+	h := handlers.NewProxmoxHandler(proxmoxsvc.NewService(db, cfg))
 
 	r := gin.New()
 	r.GET("/proxmox/instances", h.ListConnections)

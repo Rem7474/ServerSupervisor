@@ -1,174 +1,89 @@
 package handlers
 
 import (
-	"fmt"
-	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/serversupervisor/server/internal/errors"
-	"github.com/serversupervisor/server/internal/proxmoxclient"
 )
 
-// ─── Tasks ────────────────────────────────────────────────────────────────────
-
-// ListTasks returns recent tasks, optionally filtered by ?connection_id= and limited by ?limit=.
+// ListTasks returns recent tasks, optionally filtered by ?connection_id and ?limit.
 func (h *ProxmoxHandler) ListTasks(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "100"))
-	tasks, err := h.db.ListProxmoxTasks(c.Request.Context(), c.Query("connection_id"), limit)
+	tasks, err := h.svc.ListTasks(c.Request.Context(), c.Query("connection_id"), limit)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, tasks)
 }
 
-// ListNodeTasks returns recent tasks for a specific node, optionally limited by ?limit=.
+// ListNodeTasks returns recent tasks for a node, optionally limited by ?limit.
 func (h *ProxmoxHandler) ListNodeTasks(c *gin.Context) {
-	node, err := h.db.GetProxmoxNode(c.Request.Context(), c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	if node == nil {
-		lang := errors.GetLanguageFromAcceptLanguage(c.GetHeader("Accept-Language"))
-		c.JSON(http.StatusNotFound, errors.NewErrorResponse(errors.CodeNodeNotFound, lang))
-		return
-	}
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
-	tasks, err := h.db.ListProxmoxTasksByNode(c.Request.Context(), node.ConnectionID, node.NodeName, limit)
+	tasks, err := h.svc.ListNodeTasks(c.Request.Context(), c.Param("id"), limit)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		renderProxmoxErr(c, err, true) // localized CodeNodeNotFound on 404
 		return
 	}
 	c.JSON(http.StatusOK, tasks)
 }
 
-// ─── Backup jobs ──────────────────────────────────────────────────────────────
-
-// ListBackupJobs returns backup job configurations, optionally filtered by ?connection_id=.
+// ListBackupJobs returns backup job configs, optionally filtered by ?connection_id.
 func (h *ProxmoxHandler) ListBackupJobs(c *gin.Context) {
-	jobs, err := h.db.ListProxmoxBackupJobs(c.Request.Context(), c.Query("connection_id"))
+	jobs, err := h.svc.ListBackupJobs(c.Request.Context(), c.Query("connection_id"))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, jobs)
 }
 
-// ─── Backup runs ──────────────────────────────────────────────────────────────
-
-// ListBackupRuns returns the latest backup result per VM, optionally filtered by ?connection_id=.
+// ListBackupRuns returns the latest backup result per VM, optionally by ?connection_id.
 func (h *ProxmoxHandler) ListBackupRuns(c *gin.Context) {
-	runs, err := h.db.ListProxmoxBackupRuns(c.Request.Context(), c.Query("connection_id"))
+	runs, err := h.svc.ListBackupRuns(c.Request.Context(), c.Query("connection_id"))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, runs)
 }
 
-// ─── Task log viewer ──────────────────────────────────────────────────────────
-
 // GetTaskLog proxies GET /nodes/{node}/tasks/{upid}/log from PVE.
-// upid must be URL-encoded if it contains slashes (it typically doesn't).
 func (h *ProxmoxHandler) GetTaskLog(c *gin.Context) {
-	node, err := h.db.GetProxmoxNode(c.Request.Context(), c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	if node == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "node not found"})
-		return
-	}
-
 	upid := c.Param("upid")
 	if upid == "" {
 		lang := errors.GetLanguageFromAcceptLanguage(c.GetHeader("Accept-Language"))
 		c.JSON(http.StatusBadRequest, errors.NewErrorResponse(errors.CodeMissingParameter, lang))
 		return
 	}
-
-	secret, conn, err := h.resolveSecret(c.Request.Context(), node.ConnectionID)
+	lines, err := h.svc.TaskLog(c.Request.Context(), c.Param("id"), upid)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	client := proxmoxclient.New(conn.APIURL, conn.TokenID, secret, conn.InsecureSkipVerify)
-	lines, err := client.GetNodeTaskLog(node.NodeName, upid)
-	if err != nil {
-		slog.ErrorContext(c.Request.Context(), fmt.Sprintf("proxmox task-log [%s/%s/%s]: %v", conn.Name, node.NodeName, upid, err))
-		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, lines)
 }
 
 // GetNodeSyslog proxies GET /nodes/{node}/syslog from PVE.
-// Supports ?limit= (default 200) and optional case-insensitive ?search= filtering.
+// Supports ?limit (default 200), optional ?search filtering, ?service (default pveproxy).
 func (h *ProxmoxHandler) GetNodeSyslog(c *gin.Context) {
-	node, err := h.db.GetProxmoxNode(c.Request.Context(), c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	if node == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "node not found"})
-		return
-	}
-
 	limit := 200
-	if rawLimit := c.Query("limit"); rawLimit != "" {
-		if parsedLimit, parseErr := strconv.Atoi(rawLimit); parseErr == nil {
-			limit = parsedLimit
+	if raw := c.Query("limit"); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil {
+			limit = parsed
 		}
 	}
-	search := strings.TrimSpace(c.Query("search"))
-	service := ""
-	if rawService, ok := c.GetQuery("service"); ok {
-		// Explicit empty (?service=) means "all services".
-		service = strings.TrimSpace(rawService)
-	} else {
-		// Backward-compatible default when caller does not send service.
-		service = "pveproxy"
+	service := "pveproxy"
+	if raw, ok := c.GetQuery("service"); ok {
+		service = strings.TrimSpace(raw) // explicit empty means "all services"
 	}
-
-	secret, conn, err := h.resolveSecret(c.Request.Context(), node.ConnectionID)
+	lines, err := h.svc.NodeSyslog(c.Request.Context(), c.Param("id"), limit, service, strings.TrimSpace(c.Query("search")))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		respondError(c, err)
 		return
 	}
-
-	client := proxmoxclient.New(conn.APIURL, conn.TokenID, secret, conn.InsecureSkipVerify)
-	lines, err := client.GetNodeSyslog(node.NodeName, limit, service)
-	if err != nil {
-		slog.ErrorContext(c.Request.Context(), fmt.Sprintf("proxmox syslog [%s/%s]: %v", conn.Name, node.NodeName, err))
-		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
-		return
-	}
-
-	if search != "" {
-		needle := strings.ToLower(search)
-		filtered := make([]proxmoxclient.PVESyslogLine, 0, len(lines))
-		for _, line := range lines {
-			haystack := strings.ToLower(strings.Join([]string{
-				line.T,
-				line.Msg,
-				line.Tag,
-				line.Level,
-				line.Node,
-				line.PID,
-			}, " "))
-			if strings.Contains(haystack, needle) {
-				filtered = append(filtered, line)
-			}
-		}
-		lines = filtered
-	}
-
 	c.JSON(http.StatusOK, lines)
 }

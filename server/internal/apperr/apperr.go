@@ -41,6 +41,12 @@ func TooManyRequests(msg string) *Error {
 	return &Error{Code: "too_many_requests", Message: msg, HTTPStatus: 429}
 }
 
+// BadGateway — an upstream dependency (e.g. the Proxmox VE API) failed; the
+// message carries the upstream error (502).
+func BadGateway(msg string) *Error {
+	return &Error{Code: "bad_gateway", Message: msg, HTTPStatus: 502}
+}
+
 // Failed — the operation failed for a reason worth surfacing verbatim (500),
 // e.g. an external-dependency diagnostic (SMTP/ntfy connectivity test) where the
 // message itself is the useful result. Unlike Internal it keeps the human message.

@@ -24,6 +24,7 @@ import (
 	networksvc "github.com/serversupervisor/server/internal/services/network"
 	notifssvc "github.com/serversupervisor/server/internal/services/notifications"
 	npmsvc "github.com/serversupervisor/server/internal/services/npm"
+	proxmoxsvc "github.com/serversupervisor/server/internal/services/proxmox"
 	pushsvc "github.com/serversupervisor/server/internal/services/push"
 	scheduledtasksvc "github.com/serversupervisor/server/internal/services/scheduledtask"
 	settingssvc "github.com/serversupervisor/server/internal/services/settings"
@@ -83,7 +84,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	agentH.AddCompletionListener(gitWebhookH)
 	agentH.AddCompletionListener(releaseTrackerH)
 
-	proxmoxH := handlers.NewProxmoxHandler(db, cfg)
+	proxmoxH := handlers.NewProxmoxHandler(proxmoxsvc.NewService(db, cfg))
 	hostPermH := handlers.NewHostPermissionHandler(hostpermsvc.NewService(db))
 	uptimeH := handlers.NewUptimeHandler(uptimesvc.NewService(db))
 	sslH := handlers.NewSSLHandler(sslsvc.NewService(db))
