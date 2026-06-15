@@ -33,6 +33,7 @@ type Repository interface {
 	ResolveOpenAlertIncidentsByRule(ctx context.Context, ruleID int64) (int64, error)
 	ResolveAlertIncident(ctx context.Context, id int64) error
 	GetAlertIncidents(ctx context.Context, limit, offset int) ([]models.AlertIncident, error)
+	GetAllHosts(ctx context.Context) ([]models.Host, error)
 
 	// capability discovery
 	GetHost(ctx context.Context, id string) (*models.Host, error)
@@ -58,10 +59,12 @@ type Service struct {
 	// longer meets the (new) firing condition. Wired to
 	// alerts.ResolveStaleIncidentsForRule (launches its own goroutine).
 	resolveStale func(rule models.AlertRule)
+	// engine holds the alert-engine entry points used by the preview endpoints.
+	engine EngineFuncs
 }
 
-func NewService(repo Repository, resolveStale func(rule models.AlertRule)) *Service {
-	return &Service{repo: repo, resolveStale: resolveStale}
+func NewService(repo Repository, resolveStale func(rule models.AlertRule), engine EngineFuncs) *Service {
+	return &Service{repo: repo, resolveStale: resolveStale, engine: engine}
 }
 
 // ===== reads =====

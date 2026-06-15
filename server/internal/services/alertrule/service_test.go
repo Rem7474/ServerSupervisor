@@ -17,6 +17,7 @@ type fakeRepo struct {
 	updated    *models.AlertRule
 	deleted    bool
 	hostExists bool
+	allHosts   []models.Host
 }
 
 func (f *fakeRepo) ListAlertRulesAPI(context.Context) ([]models.AlertRule, error) { return nil, nil }
@@ -52,6 +53,7 @@ func (f *fakeRepo) GetAlertIncidents(context.Context, int, int) ([]models.AlertI
 	return nil, nil
 }
 func (f *fakeRepo) GetHost(context.Context, string) (*models.Host, error) { return &models.Host{}, nil }
+func (f *fakeRepo) GetAllHosts(context.Context) ([]models.Host, error)    { return f.allHosts, nil }
 func (f *fakeRepo) GetDockerContainers(context.Context, string) ([]models.DockerContainer, error) {
 	return nil, nil
 }
@@ -90,7 +92,9 @@ func (f *fakeRepo) ProxmoxDiskLabelParts(context.Context, string) (string, strin
 	return "", "", "", "", nil
 }
 
-func newSvc(repo Repository) *Service { return NewService(repo, func(models.AlertRule) {}) }
+func newSvc(repo Repository) *Service {
+	return NewService(repo, func(models.AlertRule) {}, EngineFuncs{})
+}
 
 func status(err error) int {
 	var ae *apperr.Error
