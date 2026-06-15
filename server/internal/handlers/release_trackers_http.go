@@ -1,347 +1,145 @@
 package handlers
 
 import (
-	"database/sql"
-	"fmt"
-	"log/slog"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
-	"github.com/serversupervisor/server/internal/gitprovider"
+	"github.com/serversupervisor/server/internal/apperr"
 	"github.com/serversupervisor/server/internal/models"
 )
 
-// ========== HTTP handlers ==========
-
 func (h *ReleaseTrackerHandler) List(c *gin.Context) {
-	trackers, err := h.db.ListReleaseTrackers(c.Request.Context())
+	trackers, err := h.svc.List(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list trackers"})
+		respondError(c, err)
 		return
-	}
-	if trackers == nil {
-		trackers = []models.ReleaseTracker{}
 	}
 	c.JSON(http.StatusOK, gin.H{"trackers": trackers})
 }
 
 func (h *ReleaseTrackerHandler) Create(c *gin.Context) {
-	role := c.GetString("role")
-	if role != models.RoleAdmin {
+	if c.GetString("role") != models.RoleAdmin {
 		c.JSON(http.StatusForbidden, gin.H{"error": "admin role required"})
 		return
 	}
-
 	var req models.ReleaseTrackerRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondError(c, apperr.Validation(err.Error()))
 		return
 	}
-	m := req.ToModel()
-	if m.TrackerType == "" {
-		m.TrackerType = "git"
-	}
-	if m.TrackerType != "git" && m.TrackerType != "docker" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "tracker_type must be 'git' or 'docker'"})
-		return
-	}
-
-	if m.Name == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "name is required"})
-		return
-	}
-	if m.CooldownHours < 0 || m.CooldownHours > 168 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "cooldown_hours must be between 0 and 168"})
-		return
-	}
-
-	if m.TrackerType == "git" {
-		// Git trackers can run in monitor-only mode (no host/task),
-		// but host/task must be provided together when dispatch is enabled.
-		if (m.HostID == "") != (m.CustomTaskID == "") {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "host_id and custom_task_id must be provided together for git trackers"})
-			return
-		}
-		if m.RepoOwner == "" || m.RepoName == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "repo_owner and repo_name are required for git trackers"})
-			return
-		}
-		if m.Provider == "" {
-			m.Provider = "github"
-		}
-		if !validReleaseProviders[m.Provider] {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid provider; must be github, gitlab, or gitea"})
-			return
-		}
-	} else { // docker
-		if status, msg := validateDockerTracker(&m); status != 0 {
-			c.JSON(status, gin.H{"error": msg})
-			return
-		}
-	}
-
-	if m.NotifyChannels == nil {
-		m.NotifyChannels = []string{}
-	}
-
-	created, err := h.db.CreateReleaseTracker(c.Request.Context(), m)
+	created, err := h.svc.Create(c.Request.Context(), req)
 	if err != nil {
-		slog.ErrorContext(c.Request.Context(), fmt.Sprintf("CreateReleaseTracker: %v", err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create tracker"})
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"tracker": created})
 }
 
-// ListTrackableContainers returns compose-managed containers without a tracker,
-// for the auto-discovery UI ("Conteneurs détectés").
+// ListTrackableContainers returns compose-managed containers without a tracker.
 func (h *ReleaseTrackerHandler) ListTrackableContainers(c *gin.Context) {
-	containers, err := h.db.ListTrackableContainers(c.Request.Context())
+	containers, err := h.svc.TrackableContainers(c.Request.Context())
 	if err != nil {
-		slog.ErrorContext(c.Request.Context(), fmt.Sprintf("ListTrackableContainers: %v", err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list trackable containers"})
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"containers": containers})
 }
 
 // CreateBulk creates multiple compose trackers in one call (auto-discovery).
-// Each entry is validated independently; the response reports per-entry results
-// so a few invalid rows do not abort the whole batch.
 func (h *ReleaseTrackerHandler) CreateBulk(c *gin.Context) {
-	role := c.GetString("role")
-	if role != models.RoleAdmin {
+	if c.GetString("role") != models.RoleAdmin {
 		c.JSON(http.StatusForbidden, gin.H{"error": "admin role required"})
 		return
 	}
-
 	var req struct {
 		Trackers []models.ReleaseTrackerRequest `json:"trackers"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondError(c, apperr.Validation(err.Error()))
 		return
 	}
-	if len(req.Trackers) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "trackers array is required"})
+	created, results, err := h.svc.CreateBulk(c.Request.Context(), req.Trackers)
+	if err != nil {
+		respondError(c, err)
 		return
 	}
-	if len(req.Trackers) > 100 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "too many trackers (max 100)"})
-		return
-	}
-
-	type bulkResult struct {
-		Name    string `json:"name"`
-		Created bool   `json:"created"`
-		Error   string `json:"error,omitempty"`
-	}
-	results := make([]bulkResult, 0, len(req.Trackers))
-	createdCount := 0
-
-	for _, reqT := range req.Trackers {
-		m := reqT.ToModel()
-		m.TrackerType = "docker"
-		if m.Name == "" {
-			results = append(results, bulkResult{Name: m.Name, Error: "name is required"})
-			continue
-		}
-		if m.CooldownHours < 0 || m.CooldownHours > 168 {
-			results = append(results, bulkResult{Name: m.Name, Error: "cooldown_hours must be between 0 and 168"})
-			continue
-		}
-		if status, msg := validateDockerTracker(&m); status != 0 {
-			results = append(results, bulkResult{Name: m.Name, Error: msg})
-			continue
-		}
-		if m.NotifyChannels == nil {
-			m.NotifyChannels = []string{}
-		}
-		if _, err := h.db.CreateReleaseTracker(c.Request.Context(), m); err != nil {
-			slog.ErrorContext(c.Request.Context(), fmt.Sprintf("CreateBulk: failed to create %q: %v", m.Name, err))
-			results = append(results, bulkResult{Name: m.Name, Error: "failed to create"})
-			continue
-		}
-		createdCount++
-		results = append(results, bulkResult{Name: m.Name, Created: true})
-	}
-
-	c.JSON(http.StatusOK, gin.H{"created": createdCount, "results": results})
+	c.JSON(http.StatusOK, gin.H{"created": created, "results": results})
 }
 
 func (h *ReleaseTrackerHandler) Get(c *gin.Context) {
-	id := c.Param("id")
-	t, err := h.db.GetReleaseTrackerByID(c.Request.Context(), id)
-	if err == sql.ErrNoRows {
-		slog.InfoContext(c.Request.Context(), fmt.Sprintf("Release tracker history: tracker not found (id=%s)", id))
-		c.JSON(http.StatusNotFound, gin.H{"error": "tracker not found"})
-		return
-	}
+	t, execs, err := h.svc.Get(c.Request.Context(), c.Param("id"))
 	if err != nil {
-		slog.ErrorContext(c.Request.Context(), fmt.Sprintf("Release tracker history: failed to load tracker (id=%s): %v", id, err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get tracker"})
+		respondError(c, err)
 		return
 	}
-	execs, _ := h.db.ListReleaseTrackerExecutions(c.Request.Context(), id, 20)
 	c.JSON(http.StatusOK, gin.H{"tracker": t, "executions": execs})
 }
 
 func (h *ReleaseTrackerHandler) Update(c *gin.Context) {
-	role := c.GetString("role")
-	if role != models.RoleAdmin {
+	if c.GetString("role") != models.RoleAdmin {
 		c.JSON(http.StatusForbidden, gin.H{"error": "admin role required"})
 		return
 	}
-	id := c.Param("id")
-
 	var req models.ReleaseTrackerRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondError(c, apperr.Validation(err.Error()))
 		return
 	}
-	m := req.ToModel()
-	if m.TrackerType == "" {
-		m.TrackerType = "git"
-	}
-	if m.TrackerType != "git" && m.TrackerType != "docker" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "tracker_type must be 'git' or 'docker'"})
-		return
-	}
-	if m.Name == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "name is required"})
-		return
-	}
-	if m.CooldownHours < 0 || m.CooldownHours > 168 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "cooldown_hours must be between 0 and 168"})
-		return
-	}
-	if m.TrackerType == "git" {
-		if (m.HostID == "") != (m.CustomTaskID == "") {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "host_id and custom_task_id must be provided together for git trackers"})
-			return
-		}
-		if m.RepoOwner == "" || m.RepoName == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "repo_owner and repo_name are required for git trackers"})
-			return
-		}
-		if !validReleaseProviders[m.Provider] {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid provider"})
-			return
-		}
-	} else { // docker
-		if status, msg := validateDockerTracker(&m); status != 0 {
-			c.JSON(status, gin.H{"error": msg})
-			return
-		}
-	}
-
-	if err := h.db.UpdateReleaseTracker(c.Request.Context(), id, m); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update tracker"})
+	if err := h.svc.Update(c.Request.Context(), c.Param("id"), req); err != nil {
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
 
 func (h *ReleaseTrackerHandler) Delete(c *gin.Context) {
-	role := c.GetString("role")
-	if role != models.RoleAdmin {
+	if c.GetString("role") != models.RoleAdmin {
 		c.JSON(http.StatusForbidden, gin.H{"error": "admin role required"})
 		return
 	}
-	id := c.Param("id")
-	if err := h.db.DeleteReleaseTracker(c.Request.Context(), id); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete tracker"})
+	if err := h.svc.Delete(c.Request.Context(), c.Param("id")); err != nil {
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "deleted"})
 }
 
 func (h *ReleaseTrackerHandler) TriggerCheck(c *gin.Context) {
-	role := c.GetString("role")
-	if role != models.RoleAdmin {
+	if c.GetString("role") != models.RoleAdmin {
 		c.JSON(http.StatusForbidden, gin.H{"error": "admin role required"})
 		return
 	}
-	id := c.Param("id")
-
-	t, err := h.db.GetReleaseTrackerByID(c.Request.Context(), id)
-	if err == sql.ErrNoRows {
-		c.JSON(http.StatusNotFound, gin.H{"error": "tracker not found"})
+	if err := h.svc.TriggerCheck(c.Request.Context(), h.pollerCtx, c.Param("id")); err != nil {
+		respondError(c, err)
 		return
 	}
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get tracker"})
-		return
-	}
-
-	go h.checkOne(h.pollerCtx, *t)
 	c.JSON(http.StatusOK, gin.H{"status": "check scheduled"})
 }
 
-// Run manually triggers the tracker's custom task with the last known release info.
+// Run manually triggers the tracker's task with the last known release info.
 func (h *ReleaseTrackerHandler) Run(c *gin.Context) {
-	role := c.GetString("role")
-	if role != models.RoleAdmin && role != models.RoleOperator {
+	if role := c.GetString("role"); role != models.RoleAdmin && role != models.RoleOperator {
 		c.JSON(http.StatusForbidden, gin.H{"error": "admin or operator role required"})
 		return
 	}
-	id := c.Param("id")
-
-	t, err := h.db.GetReleaseTrackerByID(c.Request.Context(), id)
-	if err == sql.ErrNoRows {
-		c.JSON(http.StatusNotFound, gin.H{"error": "tracker not found"})
+	if err := h.svc.Run(c.Request.Context(), h.pollerCtx, c.Param("id")); err != nil {
+		respondError(c, err)
 		return
-	}
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get tracker"})
-		return
-	}
-
-	if t.TrackerType == "docker" {
-		if t.UpdateAction == "compose" && !trackerHasDispatchTarget(*t) {
-			c.JSON(http.StatusConflict, gin.H{"error": "mode compose : configurez une VM cible et un projet compose pour déclencher manuellement"})
-			return
-		}
-		if t.LatestImageDigest == "" {
-			c.JSON(http.StatusConflict, gin.H{"error": "aucune vérification initiale effectuée — attendez le prochain cycle de polling avant de déclencher manuellement"})
-			return
-		}
-		tag := t.DockerTag
-		if tag == "" {
-			tag = "latest"
-		}
-		go h.dispatchDockerTracker(h.pollerCtx, *t, tag, t.LastReleaseTag, t.LatestImageDigest, t.LatestImageDigest)
-	} else {
-		if t.HostID == "" || t.CustomTaskID == "" {
-			c.JSON(http.StatusConflict, gin.H{"error": "tracker en mode surveillance seule — configurez une VM cible et une tâche pour déclencher manuellement"})
-			return
-		}
-		if t.LastReleaseTag == "" {
-			c.JSON(http.StatusConflict, gin.H{"error": "aucune release initiale enregistrée — attendez le prochain cycle de polling avant de déclencher manuellement"})
-			return
-		}
-		go h.dispatchGitRelease(h.pollerCtx, *t, t.LastReleaseTag, "", "")
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "execution scheduled"})
 }
 
 func (h *ReleaseTrackerHandler) GetExecutions(c *gin.Context) {
-	id := c.Param("id")
-	execs, err := h.db.ListReleaseTrackerExecutions(c.Request.Context(), id, 50)
+	execs, err := h.svc.Executions(c.Request.Context(), c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list executions"})
+		respondError(c, err)
 		return
-	}
-	if execs == nil {
-		execs = []models.ReleaseTrackerExecution{}
 	}
 	c.JSON(http.StatusOK, gin.H{"executions": execs})
 }
 
 func (h *ReleaseTrackerHandler) GetVersionHistory(c *gin.Context) {
-	id := c.Param("id")
-
 	limit := 20
 	if raw := c.Query("limit"); raw != "" {
 		if n, err := strconv.Atoi(raw); err == nil && n > 0 {
@@ -351,49 +149,10 @@ func (h *ReleaseTrackerHandler) GetVersionHistory(c *gin.Context) {
 			limit = n
 		}
 	}
-
-	t, err := h.db.GetReleaseTrackerByID(c.Request.Context(), id)
-	if err == sql.ErrNoRows {
-		c.JSON(http.StatusNotFound, gin.H{"error": "tracker not found"})
-		return
-	}
+	history, err := h.svc.VersionHistory(c.Request.Context(), c.Param("id"), limit)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to get tracker"})
+		respondError(c, err)
 		return
-	}
-
-	history := make([]models.ReleaseVersionHistoryItem, 0)
-	if t.TrackerType == "docker" {
-		history, err = h.db.ListTrackerTagDigests(c.Request.Context(), id, limit)
-		if err != nil {
-			slog.ErrorContext(c.Request.Context(), fmt.Sprintf("Release tracker history: docker history load error (tracker=%s id=%s image=%s tag=%s limit=%d): %v", t.Name, t.ID, t.DockerImage, t.DockerTag, limit, err))
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load docker version history"})
-			return
-		}
-	} else {
-		providerClient := gitprovider.NewClient(t.Provider, h.cfg.GitHubToken)
-		releases, ferr := providerClient.FetchReleaseHistory(t.RepoOwner, t.RepoName, limit)
-		if ferr != nil {
-			slog.ErrorContext(c.Request.Context(), fmt.Sprintf("Release tracker history: provider call failed (tracker=%s id=%s provider=%s repo=%s/%s limit=%d): %v", t.Name, t.ID, t.Provider, t.RepoOwner, t.RepoName, limit, ferr))
-			c.JSON(http.StatusBadGateway, gin.H{"error": ferr.Error()})
-			return
-		}
-		for _, r := range releases {
-			item := models.ReleaseVersionHistoryItem{
-				Version:    r.TagName,
-				Name:       r.Name,
-				ReleaseURL: r.HTMLURL,
-			}
-			if !r.PublishedAt.IsZero() {
-				published := r.PublishedAt
-				item.PublishedAt = &published
-			}
-			history = append(history, item)
-		}
-	}
-
-	if history == nil {
-		history = []models.ReleaseVersionHistoryItem{}
 	}
 	c.JSON(http.StatusOK, gin.H{"history": history})
 }

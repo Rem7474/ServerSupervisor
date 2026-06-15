@@ -1,11 +1,6 @@
-package handlers
+package releasetracker
 
-// Pure unit tests for security/parse helpers. These run everywhere (no Docker /
-// no DB needed), unlike the testcontainers-backed integration tests.
-
-import (
-	"testing"
-)
+import "testing"
 
 func TestShouldResolveDockerTag(t *testing.T) {
 	truthy := []string{"", "latest", "LATEST", "v4", "4", "v4.4", "4.4"}

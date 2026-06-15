@@ -1,22 +1,20 @@
 package handlers
 
 import (
-	"fmt"
-	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/serversupervisor/server/internal/apperr"
 	"github.com/serversupervisor/server/internal/models"
 )
 
 // Registry credentials are managed by admins and consumed only by the release
-// tracker poller for private-image manifest polling. Passwords are write-only:
-// never returned in list/get responses.
+// tracker poller for private-image manifest polling. Passwords are write-only.
 
 func (h *ReleaseTrackerHandler) ListRegistryCredentials(c *gin.Context) {
-	creds, err := h.db.ListRegistryCredentials(c.Request.Context())
+	creds, err := h.svc.ListRegistryCredentials(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to list credentials"})
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"credentials": creds})
@@ -29,20 +27,14 @@ func (h *ReleaseTrackerHandler) CreateRegistryCredential(c *gin.Context) {
 	}
 	var req models.RegistryCredentialRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondError(c, apperr.Validation(err.Error()))
 		return
 	}
-	if req.Name == "" || req.RegistryHost == "" || req.Username == "" || req.Password == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "name, registry_host, username and password are required"})
-		return
-	}
-	created, err := h.db.CreateRegistryCredential(c.Request.Context(), req.ToModel())
+	created, err := h.svc.CreateRegistryCredential(c.Request.Context(), req)
 	if err != nil {
-		slog.ErrorContext(c.Request.Context(), fmt.Sprintf("CreateRegistryCredential: %v", err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create credential"})
+		respondError(c, err)
 		return
 	}
-	created.Password = "" // never echo the secret
 	c.JSON(http.StatusCreated, gin.H{"credential": created})
 }
 
@@ -51,18 +43,13 @@ func (h *ReleaseTrackerHandler) UpdateRegistryCredential(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "admin role required"})
 		return
 	}
-	id := c.Param("id")
 	var req models.RegistryCredentialRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondError(c, apperr.Validation(err.Error()))
 		return
 	}
-	if req.Name == "" || req.RegistryHost == "" || req.Username == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "name, registry_host and username are required"})
-		return
-	}
-	if err := h.db.UpdateRegistryCredential(c.Request.Context(), id, req.ToModel()); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update credential"})
+	if err := h.svc.UpdateRegistryCredential(c.Request.Context(), c.Param("id"), req); err != nil {
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
@@ -73,8 +60,8 @@ func (h *ReleaseTrackerHandler) DeleteRegistryCredential(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "admin role required"})
 		return
 	}
-	if err := h.db.DeleteRegistryCredential(c.Request.Context(), c.Param("id")); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete credential"})
+	if err := h.svc.DeleteRegistryCredential(c.Request.Context(), c.Param("id")); err != nil {
+		respondError(c, err)
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "deleted"})
