@@ -12,13 +12,14 @@ import (
 	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/handlers"
 	"github.com/serversupervisor/server/internal/models"
+	alertrulesvc "github.com/serversupervisor/server/internal/services/alertrule"
 	"github.com/serversupervisor/server/internal/testutil"
 )
 
 func newAlertRulesRouter(t *testing.T) (*gin.Engine, *database.DB) {
 	t.Helper()
 	db, cfg := testutil.NewPostgresDBWithConfig(t)
-	h := handlers.NewAlertRulesHandler(db, cfg)
+	h := handlers.NewAlertRulesHandler(alertrulesvc.NewService(db, func(models.AlertRule) {}), db, cfg)
 
 	r := gin.New()
 	r.GET("/alert-rules", h.ListAlertRules)

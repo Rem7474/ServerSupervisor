@@ -13,6 +13,7 @@ import (
 	"github.com/serversupervisor/server/internal/models"
 	"github.com/serversupervisor/server/internal/networkview"
 	"github.com/serversupervisor/server/internal/scheduler"
+	alertrulesvc "github.com/serversupervisor/server/internal/services/alertrule"
 	aptsvc "github.com/serversupervisor/server/internal/services/apt"
 	auditsvc "github.com/serversupervisor/server/internal/services/audit"
 	authnsvc "github.com/serversupervisor/server/internal/services/authn"
@@ -66,7 +67,9 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	}))
 	auditH := handlers.NewAuditHandler(auditsvc.NewService(db))
 	userH := handlers.NewUserHandler(usersvc.NewService(db))
-	alertRulesH := handlers.NewAlertRulesHandler(db, cfg)
+	alertRulesH := handlers.NewAlertRulesHandler(alertrulesvc.NewService(db, func(rule models.AlertRule) {
+		go alerts.ResolveStaleIncidentsForRule(context.Background(), db, rule)
+	}), db, cfg)
 	settingsH := handlers.NewSettingsHandler(settingssvc.NewService(db, cfg, func() string {
 		return handlers.ResolveLatestAgentVersion(cfg)
 	}))

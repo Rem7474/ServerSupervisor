@@ -31,16 +31,16 @@ func (h *AlertRulesHandler) TestAlertRule(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": humanizeValidationError(err)})
 		return
 	}
-	if err := validateAlertRuleMetricOperator(req.Metric, req.Operator); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	if err := h.svc.ValidateMetricOperator(req.Metric, req.Operator); err != nil {
+		respondError(c, err)
 		return
 	}
 	if req.SourceType == "" {
 		req.SourceType = models.InferAlertSourceType(req.Metric)
 	}
 
-	if err := validateAlertActions(&req.Actions); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	if err := h.svc.ValidateActions(&req.Actions); err != nil {
+		respondError(c, err)
 		return
 	}
 
@@ -71,14 +71,14 @@ func (h *AlertRulesHandler) TestAlertRule(c *gin.Context) {
 		return
 	}
 	if rule.SourceType == models.AlertSourceProxmox {
-		if err := validateProxmoxScopeExists(c.Request.Context(), h.db, rule.ProxmoxScope); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		if err := h.svc.ValidateProxmoxScope(c.Request.Context(), rule.ProxmoxScope); err != nil {
+			respondError(c, err)
 			return
 		}
 	}
 	if rule.SourceType == models.AlertSourceDocker {
-		if err := validateDockerScopeExists(c.Request.Context(), h.db, rule.DockerScope); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		if err := h.svc.ValidateDockerScope(c.Request.Context(), rule.DockerScope); err != nil {
+			respondError(c, err)
 			return
 		}
 	}
@@ -215,8 +215,8 @@ func (h *AlertRulesHandler) TestAlertRuleLogs(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "La metrique requiert une source Proxmox."})
 		return
 	}
-	if err := validateProxmoxScopeExists(c.Request.Context(), h.db, rule.ProxmoxScope); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	if err := h.svc.ValidateProxmoxScope(c.Request.Context(), rule.ProxmoxScope); err != nil {
+		respondError(c, err)
 		return
 	}
 
