@@ -46,6 +46,86 @@ export const AlertSourceAgent: AlertSourceType = "agent";
 export const AlertSourceProxmox: AlertSourceType = "proxmox";
 export const AlertSourceDocker: AlertSourceType = "docker";
 /**
+ * AlertMetricCapability describes a metric the UI can build a rule on.
+ */
+export interface AlertMetricCapability {
+  metric: string;
+  label: string;
+  unit: string;
+  icon: string;
+  badge_class: string;
+  supports_threshold: boolean;
+  supports_duration: boolean;
+  supports_host_filter: boolean;
+}
+/**
+ * AlertScopeOption is a selectable {id,label} scope entry (Proxmox connection,
+ * node, storage, guest, disk, or a Docker host).
+ */
+export interface AlertScopeOption {
+  id: string;
+  label: string;
+}
+/**
+ * AlertHostCapabilities is the per-host metric availability response.
+ */
+export interface AlertHostCapabilities {
+  host_id: string;
+  host_name: string;
+  metrics: AlertMetricCapability[];
+}
+/**
+ * AlertProxmoxScope groups the Proxmox scope options by kind.
+ */
+export interface AlertProxmoxScope {
+  modes: string[];
+  connections: AlertScopeOption[];
+  nodes: AlertScopeOption[];
+  storages: AlertScopeOption[];
+  guests: AlertScopeOption[];
+  disks: AlertScopeOption[];
+}
+/**
+ * AlertSplitCapabilities is the Proxmox capabilities response (metrics + scope).
+ */
+export interface AlertSplitCapabilities {
+  agent_metrics: AlertMetricCapability[];
+  proxmox_metrics: AlertMetricCapability[];
+  proxmox_scope: AlertProxmoxScope;
+}
+/**
+ * AlertDockerScopeContainer is a container option for a Docker alert scope.
+ */
+export interface AlertDockerScopeContainer {
+  id: string;
+  name: string;
+  image: string;
+  state: string;
+}
+/**
+ * AlertDockerScopeProject is a compose-project option for a Docker alert scope.
+ */
+export interface AlertDockerScopeProject {
+  name: string;
+  services: string[];
+}
+/**
+ * AlertDockerHostScope groups a host's container + compose-project scope options.
+ */
+export interface AlertDockerHostScope {
+  host_id: string;
+  host_name: string;
+  containers: AlertDockerScopeContainer[];
+  projects: AlertDockerScopeProject[];
+}
+/**
+ * AlertDockerCapabilities is the Docker capabilities response (metrics + hosts).
+ */
+export interface AlertDockerCapabilities {
+  metrics: AlertMetricCapability[];
+  hosts: AlertDockerHostScope[];
+}
+/**
  * AlertActions holds the consolidated notification configuration for an alert rule.
  * Stored as a single JSONB column in the database.
  */

@@ -48,6 +48,79 @@ const (
 	AlertSourceDocker  AlertSourceType = "docker"
 )
 
+// ===== Alert capability discovery (metric catalogs + scope options) =====
+
+// AlertMetricCapability describes a metric the UI can build a rule on.
+type AlertMetricCapability struct {
+	Metric             string `json:"metric"`
+	Label              string `json:"label"`
+	Unit               string `json:"unit"`
+	Icon               string `json:"icon"`
+	BadgeClass         string `json:"badge_class"`
+	SupportsThreshold  bool   `json:"supports_threshold"`
+	SupportsDuration   bool   `json:"supports_duration"`
+	SupportsHostFilter bool   `json:"supports_host_filter"`
+}
+
+// AlertScopeOption is a selectable {id,label} scope entry (Proxmox connection,
+// node, storage, guest, disk, or a Docker host).
+type AlertScopeOption struct {
+	ID    string `json:"id"`
+	Label string `json:"label"`
+}
+
+// AlertHostCapabilities is the per-host metric availability response.
+type AlertHostCapabilities struct {
+	HostID   string                  `json:"host_id"`
+	HostName string                  `json:"host_name"`
+	Metrics  []AlertMetricCapability `json:"metrics"`
+}
+
+// AlertProxmoxScope groups the Proxmox scope options by kind.
+type AlertProxmoxScope struct {
+	Modes       []string           `json:"modes"`
+	Connections []AlertScopeOption `json:"connections"`
+	Nodes       []AlertScopeOption `json:"nodes"`
+	Storages    []AlertScopeOption `json:"storages"`
+	Guests      []AlertScopeOption `json:"guests"`
+	Disks       []AlertScopeOption `json:"disks"`
+}
+
+// AlertSplitCapabilities is the Proxmox capabilities response (metrics + scope).
+type AlertSplitCapabilities struct {
+	AgentMetrics   []AlertMetricCapability `json:"agent_metrics"`
+	ProxmoxMetrics []AlertMetricCapability `json:"proxmox_metrics"`
+	ProxmoxScope   AlertProxmoxScope       `json:"proxmox_scope"`
+}
+
+// AlertDockerScopeContainer is a container option for a Docker alert scope.
+type AlertDockerScopeContainer struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Image string `json:"image"`
+	State string `json:"state"`
+}
+
+// AlertDockerScopeProject is a compose-project option for a Docker alert scope.
+type AlertDockerScopeProject struct {
+	Name     string   `json:"name"`
+	Services []string `json:"services"`
+}
+
+// AlertDockerHostScope groups a host's container + compose-project scope options.
+type AlertDockerHostScope struct {
+	HostID     string                      `json:"host_id"`
+	HostName   string                      `json:"host_name"`
+	Containers []AlertDockerScopeContainer `json:"containers"`
+	Projects   []AlertDockerScopeProject   `json:"projects"`
+}
+
+// AlertDockerCapabilities is the Docker capabilities response (metrics + hosts).
+type AlertDockerCapabilities struct {
+	Metrics []AlertMetricCapability `json:"metrics"`
+	Hosts   []AlertDockerHostScope  `json:"hosts"`
+}
+
 // AlertActions holds the consolidated notification configuration for an alert rule.
 // Stored as a single JSONB column in the database.
 type AlertActions struct {

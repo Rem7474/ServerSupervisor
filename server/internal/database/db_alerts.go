@@ -17,11 +17,11 @@ func (db *DB) CreateAlertRule(ctx context.Context, rule *models.AlertRule) error
 	proxmoxScopeJSON, _ := json.Marshal(rule.ProxmoxScope)
 	dockerScopeJSON, _ := json.Marshal(rule.DockerScope)
 	return db.conn.QueryRowContext(ctx,
-		`INSERT INTO alert_rules (source_type, host_id, proxmox_scope, docker_scope, metric, operator, threshold_warn, threshold_crit, threshold_clear_warn, threshold_clear_crit, duration_seconds, actions, enabled)
- VALUES ($1,$2,CAST($3 AS JSONB),CAST($4 AS JSONB),$5,$6,$7,$8,$9,$10,$11,CAST($12 AS JSONB),$13)
- RETURNING id`,
-		rule.SourceType, rule.HostID, string(proxmoxScopeJSON), string(dockerScopeJSON), rule.Metric, rule.Operator, rule.ThresholdWarn, rule.ThresholdCrit, rule.ThresholdClearWarn, rule.ThresholdClearCrit, rule.DurationSeconds, string(actionsJSON), rule.Enabled,
-	).Scan(&rule.ID)
+		`INSERT INTO alert_rules (name, source_type, host_id, proxmox_scope, docker_scope, metric, operator, threshold_warn, threshold_crit, threshold_clear_warn, threshold_clear_crit, duration_seconds, actions, enabled)
+ VALUES ($1,$2,$3,CAST($4 AS JSONB),CAST($5 AS JSONB),$6,$7,$8,$9,$10,$11,$12,CAST($13 AS JSONB),$14)
+ RETURNING id, created_at, updated_at`,
+		rule.Name, rule.SourceType, rule.HostID, string(proxmoxScopeJSON), string(dockerScopeJSON), rule.Metric, rule.Operator, rule.ThresholdWarn, rule.ThresholdCrit, rule.ThresholdClearWarn, rule.ThresholdClearCrit, rule.DurationSeconds, string(actionsJSON), rule.Enabled,
+	).Scan(&rule.ID, &rule.CreatedAt, &rule.UpdatedAt)
 }
 
 func (db *DB) UpdateAlertRule(ctx context.Context, rule *models.AlertRule) error {
@@ -31,22 +31,23 @@ func (db *DB) UpdateAlertRule(ctx context.Context, rule *models.AlertRule) error
 	dockerScopeJSON, _ := json.Marshal(rule.DockerScope)
 	_, err := db.conn.ExecContext(ctx,
 		`UPDATE alert_rules SET
-source_type = $1,
-host_id = $2,
-proxmox_scope = CAST($3 AS JSONB),
-docker_scope = CAST($4 AS JSONB),
-metric = $5,
-operator = $6,
-threshold_warn = $7,
-threshold_crit = $8,
-threshold_clear_warn = $9,
-threshold_clear_crit = $10,
-duration_seconds = $11,
-actions = CAST($12 AS JSONB),
-enabled = $13,
+name = $1,
+source_type = $2,
+host_id = $3,
+proxmox_scope = CAST($4 AS JSONB),
+docker_scope = CAST($5 AS JSONB),
+metric = $6,
+operator = $7,
+threshold_warn = $8,
+threshold_crit = $9,
+threshold_clear_warn = $10,
+threshold_clear_crit = $11,
+duration_seconds = $12,
+actions = CAST($13 AS JSONB),
+enabled = $14,
 updated_at = NOW()
- WHERE id = $14`,
-		rule.SourceType, rule.HostID, string(proxmoxScopeJSON), string(dockerScopeJSON), rule.Metric, rule.Operator, rule.ThresholdWarn, rule.ThresholdCrit, rule.ThresholdClearWarn, rule.ThresholdClearCrit, rule.DurationSeconds, string(actionsJSON), rule.Enabled, rule.ID,
+ WHERE id = $15`,
+		rule.Name, rule.SourceType, rule.HostID, string(proxmoxScopeJSON), string(dockerScopeJSON), rule.Metric, rule.Operator, rule.ThresholdWarn, rule.ThresholdCrit, rule.ThresholdClearWarn, rule.ThresholdClearCrit, rule.DurationSeconds, string(actionsJSON), rule.Enabled, rule.ID,
 	)
 	return err
 }
@@ -144,7 +145,7 @@ func (db *DB) GetAlertRules(ctx context.Context) ([]models.AlertRule, error) {
 func (db *DB) GetOpenAlertIncident(ctx context.Context, ruleID int64, hostID string) (*models.AlertIncident, error) {
 	var inc models.AlertIncident
 	var nullableRuleID sql.NullInt64
-	err := db.conn.QueryRowContext(ctx, 
+	err := db.conn.QueryRowContext(ctx,
 		`SELECT id, rule_id, host_id, severity, triggered_at, resolved_at, value
  FROM alert_incidents
  WHERE rule_id = $1 AND host_id = $2 AND resolved_at IS NULL
@@ -162,7 +163,7 @@ func (db *DB) GetOpenAlertIncident(ctx context.Context, ruleID int64, hostID str
 
 // ListOpenAlertIncidentsByRule returns all unresolved incidents for a rule.
 func (db *DB) ListOpenAlertIncidentsByRule(ctx context.Context, ruleID int64) ([]models.AlertIncident, error) {
-	rows, err := db.conn.QueryContext(ctx, 
+	rows, err := db.conn.QueryContext(ctx,
 		`SELECT id, rule_id, host_id, severity, triggered_at, resolved_at, value
 		 FROM alert_incidents
 		 WHERE rule_id = $1 AND resolved_at IS NULL
@@ -195,7 +196,7 @@ func (db *DB) CreateAlertIncident(ctx context.Context, ruleID int64, hostID stri
 	if severity == "" {
 		severity = "crit"
 	}
-	err := db.conn.QueryRowContext(ctx, 
+	err := db.conn.QueryRowContext(ctx,
 		`INSERT INTO alert_incidents (rule_id, host_id, value, severity) VALUES ($1, $2, $3, $4) RETURNING id`,
 		ruleID, hostID, value, severity,
 	).Scan(&id)
@@ -203,7 +204,7 @@ func (db *DB) CreateAlertIncident(ctx context.Context, ruleID int64, hostID stri
 }
 
 func (db *DB) ResolveAlertIncident(ctx context.Context, id int64) error {
-	_, err := db.conn.ExecContext(ctx, 
+	_, err := db.conn.ExecContext(ctx,
 		`UPDATE alert_incidents SET resolved_at = NOW() WHERE id = $1 AND resolved_at IS NULL`,
 		id,
 	)
@@ -216,7 +217,7 @@ func (db *DB) UpdateAlertIncidentContext(ctx context.Context, id int64, hostID s
 	if severity == "" {
 		severity = "crit"
 	}
-	_, err := db.conn.ExecContext(ctx, 
+	_, err := db.conn.ExecContext(ctx,
 		`UPDATE alert_incidents
 		 SET host_id = $2,
 		     value = $3,
@@ -230,7 +231,7 @@ func (db *DB) UpdateAlertIncidentContext(ctx context.Context, id int64, hostID s
 // ResolveOpenAlertIncidentsByRule marks all open incidents for a rule as resolved.
 // It returns the number of incidents that were updated.
 func (db *DB) ResolveOpenAlertIncidentsByRule(ctx context.Context, ruleID int64) (int64, error) {
-	result, err := db.conn.ExecContext(ctx, 
+	result, err := db.conn.ExecContext(ctx,
 		`UPDATE alert_incidents SET resolved_at = NOW() WHERE rule_id = $1 AND resolved_at IS NULL`,
 		ruleID,
 	)
