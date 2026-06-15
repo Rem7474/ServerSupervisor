@@ -1,66 +1,42 @@
 package handlers
 
 import (
-	"fmt"
-	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
-	"sync"
 
 	"github.com/gin-gonic/gin"
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/models"
-	"github.com/serversupervisor/server/internal/notify"
+	agentsvc "github.com/serversupervisor/server/internal/services/agent"
 	"github.com/serversupervisor/server/internal/ws"
 )
 
-// CommandCompletionListener reacts to a remote command terminal state update.
-type CommandCompletionListener interface {
-	HandleCommandCompletion(commandID, status string)
-}
-
-// NotificationPusher broadcasts real-time events to connected frontend clients.
-type NotificationPusher interface {
-	Broadcast(payload interface{})
-}
-
+// AgentHandler is the thin HTTP layer over the agent protocol service: it extracts
+// request data, binds payloads and renders responses. All ingest/result/stream/
+// audit logic and the host metric reads live in internal/services/agent.
 type AgentHandler struct {
-	db                  *database.DB
-	cfg                 *config.Config
-	streamHub           *ws.CommandStreamHub
-	notifPusher         NotificationPusher
-	completionListeners []CommandCompletionListener
-	completionMu        sync.RWMutex
+	svc *agentsvc.Service
 }
 
-func NewAgentHandler(db *database.DB, cfg *config.Config, streamHub *ws.CommandStreamHub, notifPusher NotificationPusher) *AgentHandler {
-	return &AgentHandler{
-		db:          db,
-		cfg:         cfg,
-		streamHub:   streamHub,
-		notifPusher: notifPusher,
-	}
+func NewAgentHandler(db *database.DB, cfg *config.Config, streamHub *ws.CommandStreamHub, notifPusher agentsvc.NotificationPusher) *AgentHandler {
+	return &AgentHandler{svc: agentsvc.NewService(db, cfg, streamHub, notifPusher)}
 }
 
-func (h *AgentHandler) AddCompletionListener(listener CommandCompletionListener) {
-	if listener == nil {
-		return
-	}
-	h.completionMu.Lock()
-	defer h.completionMu.Unlock()
-	h.completionListeners = append(h.completionListeners, listener)
+// AddCompletionListener registers a listener notified on terminal command states.
+func (h *AgentHandler) AddCompletionListener(listener agentsvc.CommandCompletionListener) {
+	h.svc.AddCompletionListener(listener)
 }
 
-// ReceiveReport processes a full agent report (metrics + docker + apt)
+// ReceiveReport processes a full agent report (metrics + docker + apt).
 func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 	hostID := c.GetString("host_id")
 	if hostID == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "host not identified"})
 		return
 	}
-	// Sanitize hostID for safe logging (prevent log forging via newlines)
+	// Sanitize hostID for safe logging (prevent log forging via newlines).
 	safeHostID := strings.ReplaceAll(strings.ReplaceAll(hostID, "\n", ""), "\r", "")
 
 	const maxReportSize = 5 * 1024 * 1024 // 5 MB — prevent oversized payloads from a rogue agent
@@ -72,57 +48,20 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 		return
 	}
 
-	// Detect reconnect: read previous status before marking online.
-	prevStatus := h.db.GetHostStatus(c.Request.Context(), hostID)
-
-	// Update host status
-	if err := h.db.UpdateHostStatus(c.Request.Context(), hostID, "online"); err != nil {
-		slog.ErrorContext(c.Request.Context(), fmt.Sprintf("Warning: failed to update host %s status to online: %v", safeHostID, err))
-	}
-
-	// On reconnect, immediately fail any 'running' commands from the previous dead session.
-	// These will never complete — the agent that started them has gone away.
-	if prevStatus == "offline" {
-		if err := h.db.FailRunningCommandsOnAgentReconnect(c.Request.Context(), hostID); err != nil {
-			slog.ErrorContext(c.Request.Context(), fmt.Sprintf("Warning: failed to cleanup running commands on reconnect for host %s: %v", safeHostID, err))
-		}
-	}
-
-	// Cleanup stalled commands older than 10 minutes (pending commands left from extended downtime).
-	if err := h.db.CleanupHostStalledCommands(c.Request.Context(), hostID, 10); err != nil {
-		slog.ErrorContext(c.Request.Context(), fmt.Sprintf("Warning: failed to cleanup stalled commands for host %s: %v", safeHostID, err))
-	}
-
-	// Determine whether Proxmox is the exclusive metrics source for this host.
-	proxmoxIsMetricsSource := h.reportProxmoxIsMetricsSource(c.Request.Context(), hostID)
-
-	// Persist host info + metrics (only fatal storage failures abort with 500).
-	if err := h.storeAgentMetrics(c.Request.Context(), hostID, &report, proxmoxIsMetricsSource); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	// Persist the remaining report sections (all best-effort, failures logged).
-	h.storeContainersAndPackages(c.Request.Context(), hostID, safeHostID, &report)
-	h.storeDiskAndMetadata(c.Request.Context(), hostID, safeHostID, &report)
-
-	// Return pending commands for this host (unified remote_commands table)
-	commands, err := h.db.ClaimPendingRemoteCommands(c.Request.Context(), hostID)
+	res, err := h.svc.ReceiveReport(c.Request.Context(), hostID, safeHostID, &report)
 	if err != nil {
-		slog.ErrorContext(c.Request.Context(), fmt.Sprintf("Warning: failed to get pending commands for host %s: %v", safeHostID, err))
-	}
-	if commands == nil {
-		commands = []models.PendingCommand{}
+		respondError(c, err)
+		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"status":       "ok",
-		"commands":     commands,
-		"skip_metrics": proxmoxIsMetricsSource,
+		"commands":     res.Commands,
+		"skip_metrics": res.SkipMetrics,
 	})
 }
 
-// ReportCommandResult receives command execution results from agents
+// ReportCommandResult receives command execution results from agents.
 func (h *AgentHandler) ReportCommandResult(c *gin.Context) {
 	hostID := c.GetString("host_id")
 	if hostID == "" {
@@ -136,65 +75,14 @@ func (h *AgentHandler) ReportCommandResult(c *gin.Context) {
 		return
 	}
 
-	// Lookup command by UUID — ownership verified via host_id
-	cmd, cmdErr := h.db.GetRemoteCommandByID(c.Request.Context(), result.CommandID)
-	if cmdErr != nil || cmd.HostID != hostID {
-		c.JSON(http.StatusForbidden, gin.H{"error": "command does not belong to host"})
+	if err := h.svc.ReportCommandResult(c.Request.Context(), hostID, result); err != nil {
+		respondError(c, err)
 		return
 	}
-
-	if err := h.db.UpdateRemoteCommandStatus(c.Request.Context(), result.CommandID, result.Status, result.Output); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update command"})
-		return
-	}
-
-	// Update linked audit log
-	if cmd.AuditLogID != nil {
-		details := ""
-		if result.Status == "failed" {
-			details = truncateOutput(result.Output, 2000)
-		}
-		if err := h.db.UpdateAuditLogStatus(c.Request.Context(), *cmd.AuditLogID, result.Status, details); err != nil {
-			slog.ErrorContext(c.Request.Context(), fmt.Sprintf("Warning: failed to update audit log %d for command %s: %v", *cmd.AuditLogID, result.CommandID, err))
-		}
-	}
-
-	// Broadcast status to WebSocket clients (UUID string, no conversion needed)
-	h.streamHub.BroadcastStatus(result.CommandID, result.Status, result.Output)
-
-	// Update linked scheduled task with final status
-	if cmd.ScheduledTaskID != nil && (result.Status == "completed" || result.Status == "failed") {
-		if err := h.db.UpdateScheduledTaskStatus(c.Request.Context(), *cmd.ScheduledTaskID, result.Status); err != nil {
-			slog.ErrorContext(c.Request.Context(), fmt.Sprintf("Failed to update scheduled task %s status: %v", *cmd.ScheduledTaskID, err))
-		}
-	}
-
-	// Notify any registered listeners about terminal command states.
-	if result.Status == "completed" || result.Status == "failed" {
-		h.completionMu.RLock()
-		listeners := make([]CommandCompletionListener, len(h.completionListeners))
-		copy(listeners, h.completionListeners)
-		h.completionMu.RUnlock()
-		for _, listener := range listeners {
-			go listener.HandleCommandCompletion(result.CommandID, result.Status)
-		}
-	}
-
-	// APT post-processing
-	if cmd.Module == "apt" && result.Status == "completed" {
-		_ = h.db.TouchAptLastAction(c.Request.Context(), cmd.HostID, cmd.Action)
-		if result.AptStatus != nil {
-			result.AptStatus.HostID = cmd.HostID
-			if err := h.db.UpsertAptStatus(c.Request.Context(), result.AptStatus); err != nil {
-				slog.ErrorContext(c.Request.Context(), fmt.Sprintf("Failed to update APT status: %v", err))
-			}
-		}
-	}
-
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
 
-// StreamCommandOutput receives streaming output chunks from agents
+// StreamCommandOutput receives streaming output chunks from agents.
 func (h *AgentHandler) StreamCommandOutput(c *gin.Context) {
 	hostID := c.GetString("host_id")
 	if hostID == "" {
@@ -211,16 +99,10 @@ func (h *AgentHandler) StreamCommandOutput(c *gin.Context) {
 		return
 	}
 
-	// Verify ownership via unified remote_commands table
-	cmd, err := h.db.GetRemoteCommandByID(c.Request.Context(), chunk.CommandID)
-	if err != nil || cmd.HostID != hostID {
-		c.JSON(http.StatusForbidden, gin.H{"error": "command does not belong to host"})
+	if err := h.svc.StreamCommandOutput(c.Request.Context(), hostID, chunk.CommandID, chunk.Chunk); err != nil {
+		respondError(c, err)
 		return
 	}
-
-	// Broadcast chunk to all connected WebSocket clients
-	h.streamHub.Broadcast(chunk.CommandID, chunk.Chunk)
-
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
 
@@ -231,91 +113,38 @@ func (h *AgentHandler) GetHostCommandHistory(c *gin.Context) {
 	if limit <= 0 || limit > 200 {
 		limit = 50
 	}
-	cmds, err := h.db.GetRecentCommandsByHost(c.Request.Context(), hostID, limit)
+	cmds, err := h.svc.HostCommandHistory(c.Request.Context(), hostID, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch command history"})
 		return
 	}
-	if cmds == nil {
-		cmds = []models.RemoteCommand{}
-	}
 	c.JSON(http.StatusOK, gin.H{"commands": cmds})
 }
 
-func truncateOutput(s string, max int) string {
-	if max <= 0 || len(s) <= max {
-		return s
-	}
-	return s[:max] + "..."
-}
-
-// GetMetricsHistory returns historical metrics for charts
+// GetMetricsHistory returns historical metrics for charts.
 func (h *AgentHandler) GetMetricsHistory(c *gin.Context) {
 	hostID := c.Param("id")
-	hours, _ := strconv.Atoi(c.DefaultQuery("hours", "24"))
+	hours := clampHours(c.DefaultQuery("hours", "24"))
 
-	// Validate hours parameter
-	if hours <= 0 {
-		hours = 24
-	}
-	if hours > 8760 { // max 1 year
-		hours = 8760
-	}
-
-	metrics, err := h.db.GetMetricsHistory(c.Request.Context(), hostID, hours)
+	metrics, err := h.svc.MetricsHistory(c.Request.Context(), hostID, hours)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch metrics"})
 		return
 	}
-	if metrics == nil {
-		metrics = []models.SystemMetrics{}
-	}
 	c.JSON(http.StatusOK, metrics)
 }
 
-// GetMetricsAggregated returns metrics with intelligent aggregation based on time range
-// - 0-24h: raw 5min metrics
-// - 24-720h (30d): hourly aggregates
-// - 720h+ (>30d): daily aggregates
+// GetMetricsAggregated returns metrics with intelligent aggregation based on time
+// range: 0-24h raw 5min, 24-720h hourly, 720h+ daily.
 func (h *AgentHandler) GetMetricsAggregated(c *gin.Context) {
 	hostID := c.Param("id")
-	hours, _ := strconv.Atoi(c.DefaultQuery("hours", "24"))
+	hours := clampHours(c.DefaultQuery("hours", "24"))
 
-	// Validate hours parameter
-	if hours <= 0 {
-		hours = 24
-	}
-	if hours > 8760 { // max 1 year
-		hours = 8760
-	}
-
-	var metrics interface{}
-	var err error
-	var aggregationType string
-
-	// Determine which aggregation to use based on time range
-	if hours <= 24 {
-		// Raw metrics (5-minute intervals)
-		metrics, err = h.db.GetMetricsHistory(c.Request.Context(), hostID, hours)
-		aggregationType = "raw"
-	} else if hours <= 720 { // 30 days
-		// Hourly aggregates
-		metrics, err = h.db.GetMetricsAggregatesByType(c.Request.Context(), hostID, hours, "hour")
-		aggregationType = "hour"
-	} else {
-		// Daily aggregates
-		metrics, err = h.db.GetMetricsAggregatesByType(c.Request.Context(), hostID, hours, "day")
-		aggregationType = "day"
-	}
-
+	metrics, aggregationType, err := h.svc.MetricsAggregated(c.Request.Context(), hostID, hours)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch aggregated metrics"})
 		return
 	}
-	if metrics == nil {
-		metrics = []interface{}{}
-	}
-
 	c.JSON(http.StatusOK, gin.H{
 		"aggregation_type": aggregationType,
 		"hours":            hours,
@@ -323,35 +152,25 @@ func (h *AgentHandler) GetMetricsAggregated(c *gin.Context) {
 	})
 }
 
-// GetMetricsSummary returns global metrics summary for dashboard charts
+// GetMetricsSummary returns the global metrics summary for dashboard charts.
 func (h *AgentHandler) GetMetricsSummary(c *gin.Context) {
-	hours, _ := strconv.Atoi(c.DefaultQuery("hours", "24"))
+	hours := clampHours(c.DefaultQuery("hours", "24"))
 	bucketMinutes, _ := strconv.Atoi(c.DefaultQuery("bucket_minutes", "5"))
-
-	if hours <= 0 {
-		hours = 24
-	}
-	if hours > 8760 {
-		hours = 8760
-	}
 	if bucketMinutes <= 0 {
 		bucketMinutes = 5
 	}
 
-	summary, err := h.db.GetMetricsSummary(c.Request.Context(), hours, bucketMinutes)
+	summary, err := h.svc.MetricsSummary(c.Request.Context(), hours, bucketMinutes)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch metrics summary"})
 		return
 	}
-	if summary == nil {
-		summary = []models.SystemMetricsSummary{}
-	}
 	c.JSON(http.StatusOK, summary)
 }
 
-// LogAuditAction records an audit log entry from the agent (e.g., startup apt update).
-// When the optional "module" field is provided, a completed remote_command entry is also
-// created so the action appears in the unified commands history (Audit → Commandes tab).
+// LogAuditAction records an audit log entry from the agent (e.g. startup apt
+// update). When "module" is provided, a completed remote_command is also created
+// so the action appears in the unified commands history.
 func (h *AgentHandler) LogAuditAction(c *gin.Context) {
 	hostID := c.GetString("host_id")
 	if hostID == "" {
@@ -365,88 +184,26 @@ func (h *AgentHandler) LogAuditAction(c *gin.Context) {
 		Status  string `json:"status" binding:"required"`
 		Details string `json:"details"`
 	}
-
 	if err := c.ShouldBindJSON(&audit); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	// Build audit action label: "apt_update", "apt_upgrade", etc.
-	auditAction := audit.Action
-	if audit.Module != "" {
-		auditAction = audit.Module + "_" + audit.Action
-	}
-
-	// Create audit log entry with "agent" as the username
-	auditLogID, err := h.db.CreateAuditLog(c.Request.Context(), "agent", auditAction, hostID, c.ClientIP(), audit.Details, audit.Status)
-	if err != nil {
-		slog.ErrorContext(c.Request.Context(), fmt.Sprintf("Failed to log audit action: %v", err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to record audit log"})
+	if err := h.svc.LogAuditAction(c.Request.Context(), hostID, audit.Module, audit.Action, audit.Status, audit.Details, c.ClientIP()); err != nil {
+		respondError(c, err)
 		return
 	}
-
-	// Also create a completed remote_command so the action appears in the
-	// Commandes history tab alongside server-dispatched commands.
-	if audit.Module != "" {
-		var auditIDPtr *int64
-		if auditLogID != 0 {
-			auditIDPtr = &auditLogID
-		}
-		if cerr := h.db.CreateCompletedRemoteCommand(c.Request.Context(),
-			hostID, audit.Module, audit.Action, "", audit.Details, "agent", audit.Status, auditIDPtr,
-		); cerr != nil {
-			slog.ErrorContext(c.Request.Context(), fmt.Sprintf("Warning: failed to create self-reported command record: %v", cerr))
-		}
-	}
-
-	// If this is an apt update action, also update the last_update timestamp
-	if audit.Action == "update" && audit.Status == "completed" {
-		_ = h.db.TouchAptLastAction(c.Request.Context(), hostID, "update")
-	}
-
 	c.JSON(http.StatusOK, gin.H{"success": true, "message": "Audit log recorded"})
 }
 
-func stringPtrIfNotEmpty(value string) *string {
-	if strings.TrimSpace(value) == "" {
-		return nil
+// clampHours parses an hours query value and clamps it to [1, 8760] (max 1 year).
+func clampHours(raw string) int {
+	hours, _ := strconv.Atoi(raw)
+	if hours <= 0 {
+		hours = 24
 	}
-	return &value
-}
-
-// pushUUNotification sends a browser + ntfy notification when unattended-upgrades installs packages.
-func (h *AgentHandler) pushUUNotification(hostname, hostID string, run models.UURun) {
-	pkgCount := len(run.Packages)
-	title := fmt.Sprintf("Mises à jour auto — %s", hostname)
-	msg := fmt.Sprintf("%d paquet(s) installé(s) : %s", pkgCount, strings.Join(run.Packages, ", "))
-	if len(msg) > 200 {
-		msg = msg[:197] + "..."
+	if hours > 8760 {
+		hours = 8760
 	}
-
-	// Browser / WebSocket notification
-	if h.notifPusher != nil {
-		h.notifPusher.Broadcast(models.WSUnattendedUpgradeMessage{
-			Type: "unattended_upgrade",
-			Notification: models.WSUUNotification{
-				ID:            fmt.Sprintf("uu:%s:%d", hostID, run.RunAt.UnixNano()),
-				Type:          "unattended_upgrade",
-				HostID:        hostID,
-				HostName:      hostname,
-				Packages:      run.Packages,
-				PkgCount:      pkgCount,
-				RunAt:         run.RunAt,
-				BrowserNotify: true,
-				Title:         title,
-				Message:       msg,
-			},
-		})
-	}
-
-	// ntfy notification
-	if h.cfg.NotifyURL != "" {
-		n := notify.New()
-		if err := n.SendNtfy(h.cfg, h.cfg.NotifyURL, title, msg); err != nil {
-			slog.Error("UU ntfy notification failed", slog.String("host_id", hostID), slog.Any("err", err))
-		}
-	}
+	return hours
 }
