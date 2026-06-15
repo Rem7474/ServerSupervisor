@@ -26,6 +26,7 @@ import (
 	npmsvc "github.com/serversupervisor/server/internal/services/npm"
 	proxmoxsvc "github.com/serversupervisor/server/internal/services/proxmox"
 	pushsvc "github.com/serversupervisor/server/internal/services/push"
+	releasetrackersvc "github.com/serversupervisor/server/internal/services/releasetracker"
 	scheduledtasksvc "github.com/serversupervisor/server/internal/services/scheduledtask"
 	settingssvc "github.com/serversupervisor/server/internal/services/settings"
 	sslsvc "github.com/serversupervisor/server/internal/services/ssl"
@@ -80,7 +81,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	pushH := handlers.NewPushHandler(pushsvc.NewService(db))
 	scheduledTaskH := handlers.NewScheduledTaskHandler(scheduledtasksvc.NewService(db, sched, dispatcher), db)
 	gitWebhookH := handlers.NewGitWebhookHandler(gitwebhooksvc.NewService(db, cfg, dispatcher, notifHub))
-	releaseTrackerH := handlers.NewReleaseTrackerHandler(db, cfg, dispatcher, notifHub)
+	releaseTrackerH := handlers.NewReleaseTrackerHandler(releasetrackersvc.NewService(db, cfg, dispatcher, notifHub))
 	agentH.AddCompletionListener(gitWebhookH)
 	agentH.AddCompletionListener(releaseTrackerH)
 

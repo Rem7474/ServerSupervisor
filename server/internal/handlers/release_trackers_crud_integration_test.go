@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/serversupervisor/server/internal/dispatch"
 	"github.com/serversupervisor/server/internal/handlers"
+	releasetrackersvc "github.com/serversupervisor/server/internal/services/releasetracker"
 	"github.com/serversupervisor/server/internal/testutil"
 	"github.com/serversupervisor/server/internal/ws"
 )
@@ -18,7 +19,7 @@ import (
 func newReleaseTrackerCRUDRouter(t *testing.T) *gin.Engine {
 	t.Helper()
 	db, cfg := testutil.NewPostgresDBWithConfig(t)
-	h := handlers.NewReleaseTrackerHandler(db, cfg, dispatch.New(db), ws.NewNotificationHub())
+	h := handlers.NewReleaseTrackerHandler(releasetrackersvc.NewService(db, cfg, dispatch.New(db), ws.NewNotificationHub()))
 
 	r := gin.New()
 	r.Use(withRole("admin"))
