@@ -1,21 +1,18 @@
 package handlers
 
 import (
-	"github.com/serversupervisor/server/internal/database"
 	alertrulesvc "github.com/serversupervisor/server/internal/services/alertrule"
 )
 
 // AlertRulesHandler translates HTTP to the alert-rule service. CRUD, incidents,
-// validation and capability discovery all go through the service; db is retained
-// only for the engine-preview test endpoints (_testrun.go) which drive the alerts
-// engine over the concrete *DB.
+// validation, capability discovery and the engine-preview test endpoints all go
+// through the service — the handler holds no database reference.
 type AlertRulesHandler struct {
 	svc *alertrulesvc.Service
-	db  *database.DB
 }
 
-func NewAlertRulesHandler(svc *alertrulesvc.Service, db *database.DB) *AlertRulesHandler {
-	return &AlertRulesHandler{svc: svc, db: db}
+func NewAlertRulesHandler(svc *alertrulesvc.Service) *AlertRulesHandler {
+	return &AlertRulesHandler{svc: svc}
 }
 
 // alertRuleFieldLabel maps Go struct field names to human-readable French labels

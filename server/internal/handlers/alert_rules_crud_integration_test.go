@@ -19,7 +19,7 @@ import (
 func newAlertRulesRouter(t *testing.T) (*gin.Engine, *database.DB) {
 	t.Helper()
 	db, _ := testutil.NewPostgresDBWithConfig(t)
-	h := handlers.NewAlertRulesHandler(alertrulesvc.NewService(db, func(models.AlertRule) {}), db)
+	h := handlers.NewAlertRulesHandler(alertrulesvc.NewService(db, func(models.AlertRule) {}, alertrulesvc.EngineFuncs{}))
 
 	r := gin.New()
 	r.GET("/alert-rules", h.ListAlertRules)

@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/serversupervisor/server/internal/alerts"
@@ -71,7 +72,18 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	userH := handlers.NewUserHandler(usersvc.NewService(db))
 	alertRulesH := handlers.NewAlertRulesHandler(alertrulesvc.NewService(db, func(rule models.AlertRule) {
 		go alerts.ResolveStaleIncidentsForRule(context.Background(), db, rule)
-	}), db)
+	}, alertrulesvc.EngineFuncs{
+		MetricValue: func(ctx context.Context, host models.Host, rule models.AlertRule) (float64, bool) {
+			return alerts.GetMetricValue(ctx, db, host, rule)
+		},
+		MatchRule: alerts.MatchRule,
+		BuildDockerTargets: func(ctx context.Context, rule models.AlertRule) []models.Host {
+			return alerts.BuildDockerTestTargets(ctx, db, rule)
+		},
+		FetchProxmoxLogs: func(ctx context.Context, rule models.AlertRule) ([]string, time.Time) {
+			return alerts.FetchProxmoxAuthFailureLogs(ctx, db, rule)
+		},
+	}))
 	settingsH := handlers.NewSettingsHandler(settingssvc.NewService(db, cfg, func() string {
 		return handlers.ResolveLatestAgentVersion(cfg)
 	}))
