@@ -14,6 +14,7 @@
 
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import type { Chart, ChartEvent, LegendItem, LegendElement } from 'chart.js'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 
 type StatusDistribution = Record<string, number>
@@ -25,8 +26,8 @@ const props = defineProps<{
 }>()
 
 const canvasEl = ref<HTMLCanvasElement | null>(null)
-let chart: any = null
-let chartLib: any = null
+let chart: Chart | null = null
+let chartLib: typeof Chart | null = null
 
 async function ensureChartLib() {
   if (chartLib) return chartLib
@@ -44,7 +45,7 @@ async function render() {
     chart = null
   }
   const d = props.statusDistribution || {}
-  chart = new Chart(canvasEl.value.getContext('2d'), {
+  chart = new Chart(canvasEl.value, {
     type: 'doughnut',
     data: {
       labels: ['2xx', '3xx', '4xx', '5xx'],
@@ -66,10 +67,10 @@ async function render() {
       plugins: {
         legend: {
           position: 'bottom',
-          onHover: (_e: any, _item: any, legend: any) => {
+          onHover: (_e: ChartEvent, _item: LegendItem, legend: LegendElement<'doughnut'>) => {
             legend.chart.canvas.style.cursor = 'pointer'
           },
-          onLeave: (_e: any, _item: any, legend: any) => {
+          onLeave: (_e: ChartEvent, _item: LegendItem, legend: LegendElement<'doughnut'>) => {
             legend.chart.canvas.style.cursor = 'default'
           },
         },

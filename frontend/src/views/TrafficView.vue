@@ -859,7 +859,15 @@ import TrafficRequestsChart from '../components/security/TrafficRequestsChart.vu
 import TrafficStatusChart from '../components/security/TrafficStatusChart.vue'
 import apiClient from '../api'
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- display-layer shim; full web-logs typing handled in the Phase 7 split
 type AnyRecord = Record<string, any>
+
+interface TimeseriesPoint {
+  timestamp: string
+  human?: number | string
+  bot?: number | string
+  [key: string]: unknown
+}
 
 const periodOptions = [
   { value: '1h', label: '1h' },
@@ -880,7 +888,7 @@ const autoRefresh = ref(true)
 const loading = ref(false)
 const summary = ref<AnyRecord>({ traffic: {}, threats: {} })
 const compare = ref<AnyRecord>({ delta_percent: {} })
-const timeseries = ref<AnyRecord[]>([])
+const timeseries = ref<TimeseriesPoint[]>([])
 const liveRequests = ref<AnyRecord[]>([])
 const lastUpdatedAt = ref<Date | null>(null)
 

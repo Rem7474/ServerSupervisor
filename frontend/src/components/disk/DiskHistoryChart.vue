@@ -52,8 +52,8 @@
     >
       <Line
         v-if="chartData"
-        :data="(chartData as any)"
-        :options="(chartOptions as any)"
+        :data="chartData"
+        :options="chartOptions"
         class="h-100"
       />
       <div
@@ -75,6 +75,7 @@
 
 <script setup lang="ts">
 import { ref, shallowRef, watch, onMounted, computed, defineAsyncComponent } from 'vue'
+import type { ChartData, ChartOptions, TooltipItem } from 'chart.js'
 import { fetchDiskMetricsHistory } from '../../composables/useDiskMetricsHistory'
 import dayjs from '../../utils/dayjs'
 import { getApiErrorMessage } from '../../api/client'
@@ -107,7 +108,7 @@ const props = withDefaults(defineProps<{
 const chartHours = ref(24)
 const selectedMount = ref<string>(props.mounts[0] ?? '')
 const points = ref<ChartPoint[]>([])
-const chartData = shallowRef<any>(null)
+const chartData = shallowRef<ChartData<'line'> | null>(null)
 const loading = ref(false)
 
 const timeRangeOptions = [
@@ -173,7 +174,7 @@ function getMinPointTimestamp(list: ChartPoint[]): number | undefined {
   return min
 }
 
-const chartOptions = computed(() => ({
+const chartOptions = computed((): ChartOptions<'line'> => ({
   responsive: true,
   maintainAspectRatio: false,
   plugins: {
@@ -190,13 +191,14 @@ const chartOptions = computed(() => ({
       padding: 10,
       displayColors: false,
       callbacks: {
-        title: (items: any[]) => formatChartTime(items[0]?.parsed?.x),
-        label: (ctx: any) => {
+        title: (items: TooltipItem<'line'>[]) => formatChartTime(items[0]?.parsed?.x ?? undefined),
+        label: (ctx: TooltipItem<'line'>) => {
           const p = points.value[ctx.dataIndex]
+          const y = ctx.parsed.y ?? 0
           if (p?.used_gb != null && p?.size_gb) {
-            return `${ctx.parsed.y.toFixed(1)}%  (${p.used_gb.toFixed(1)} / ${p.size_gb.toFixed(1)} Go)`
+            return `${y.toFixed(1)}%  (${p.used_gb.toFixed(1)} / ${p.size_gb.toFixed(1)} Go)`
           }
-          return `${ctx.parsed.y.toFixed(1)}%`
+          return `${y.toFixed(1)}%`
         },
       },
     },

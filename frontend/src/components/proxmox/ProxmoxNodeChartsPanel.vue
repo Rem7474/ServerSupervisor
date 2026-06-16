@@ -78,6 +78,7 @@
 </template>
 
 <script setup lang="ts">
+import type { TooltipItem } from 'chart.js'
 import RRDChartCard from './RRDChartCard.vue'
 import { getChartPalette } from '../../utils/chartTheme'
 
@@ -144,7 +145,7 @@ const pctOptions = {
     tooltip: {
       ...tooltipBase,
       displayColors: false,
-      callbacks: { label: (ctx: any) => `${ctx.parsed.y != null ? ctx.parsed.y.toFixed(1) : '—'}%` },
+      callbacks: { label: (ctx: TooltipItem<'line'>) => `${ctx.parsed.y != null ? ctx.parsed.y.toFixed(1) : '—'}%` },
     },
   },
   scales: {
@@ -162,7 +163,7 @@ const ramOptions = {
     tooltip: {
       ...pctOptions.plugins.tooltip,
       callbacks: {
-        label: (ctx: any) => {
+        label: (ctx: TooltipItem<'line'>) => {
           const pct = ctx.parsed.y != null ? ctx.parsed.y.toFixed(1) : '—'
           return `${pct}%`
         },
@@ -177,7 +178,7 @@ const netOptions = {
     legend: { display: true, position: 'top', labels: { color: palette.legendText, boxWidth: 10, padding: 8 } },
     tooltip: {
       ...tooltipBase,
-      callbacks: { label: (ctx: any) => `${ctx.dataset.label}: ${formatBytesPerSec(ctx.parsed.y)}` },
+      callbacks: { label: (ctx: TooltipItem<'line'>) => `${ctx.dataset.label}: ${formatBytesPerSec(ctx.parsed.y)}` },
     },
   },
   scales: {
@@ -194,7 +195,7 @@ const tempOptions = {
     legend: { display: false },
     tooltip: {
       ...tooltipBase,
-      callbacks: { label: (ctx: any) => `${ctx.parsed.y != null ? ctx.parsed.y.toFixed(1) : '—'}°C` },
+      callbacks: { label: (ctx: TooltipItem<'line'>) => `${ctx.parsed.y != null ? ctx.parsed.y.toFixed(1) : '—'}°C` },
     },
   },
   scales: {
@@ -211,7 +212,7 @@ const fanOptions = {
     legend: { display: false },
     tooltip: {
       ...tooltipBase,
-      callbacks: { label: (ctx: any) => `${ctx.parsed.y != null ? Math.round(ctx.parsed.y) : '—'} RPM` },
+      callbacks: { label: (ctx: TooltipItem<'line'>) => `${ctx.parsed.y != null ? Math.round(ctx.parsed.y) : '—'} RPM` },
     },
   },
   scales: {
