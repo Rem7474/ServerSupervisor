@@ -317,6 +317,20 @@ export interface CommandResult {
   output: string;
   apt_status?: AptStatus; // Full APT status after update/upgrade
 }
+/**
+ * HostTimelineEvent is a single merged event in a host's activity timeline.
+ * Type is one of "audit" | "command" | "incident".
+ */
+export interface HostTimelineEvent {
+  id: string;
+  type: string;
+  timestamp: string;
+  title: string;
+  detail?: string;
+  status?: string;
+  severity?: string;
+  module?: string;
+}
 export interface AuditLog {
   id: number /* int64 */;
   username: string; // Who
