@@ -66,7 +66,7 @@ func (f *fakeDispatcher) Create(_ context.Context, req dispatch.Request) (*dispa
 }
 
 func newSvc(repo Repository, disp Dispatcher) *Service {
-	return NewService(repo, disp, func() string { return "v2.0.0" })
+	return NewService(repo, disp, func() string { return "v2.0.0" }, nil)
 }
 
 func TestRegister_InvalidIP(t *testing.T) {

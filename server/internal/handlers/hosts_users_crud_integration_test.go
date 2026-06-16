@@ -28,7 +28,7 @@ func withRole(role string) gin.HandlerFunc {
 func newHostsRouter(t *testing.T, role string) (*gin.Engine, *database.DB) {
 	t.Helper()
 	db, _ := testutil.NewPostgresDBWithConfig(t)
-	h := handlers.NewHostHandler(hostsvc.NewService(db, dispatch.New(db), func() string { return "" }))
+	h := handlers.NewHostHandler(hostsvc.NewService(db, dispatch.New(db), func() string { return "" }, nil))
 
 	r := gin.New()
 	r.Use(withRole(role))

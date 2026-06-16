@@ -14,6 +14,7 @@ import (
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/dispatch"
+	"github.com/serversupervisor/server/internal/events"
 	"github.com/serversupervisor/server/internal/handlers"
 	"github.com/serversupervisor/server/internal/logging"
 	"github.com/serversupervisor/server/internal/poller"
@@ -106,10 +107,14 @@ func main() {
 	// Notification hub — shared between alert engine (push on fire) and WS handler
 	notifHub := ws.NewNotificationHub()
 
+	// Event bus — writers publish topics; WS snapshot endpoints subscribe and push
+	// on change instead of polling the DB on a fixed timer.
+	eventBus := events.NewBus()
+
 	// Start background jobs (each runs in its own goroutine with panic recovery)
 	bg := background.New()
 	bg.Add(background.NewAuditCleanupJob(db, cfg))
-	bg.Add(background.NewHostStatusJob(db))
+	bg.Add(background.NewHostStatusJob(db, eventBus))
 	bg.Add(background.NewAlertEvalJob(db, cfg, dispatcher, notifHub))
 	// Metric downsampling is handled by the TimescaleDB continuous aggregate
 	// (system_metrics_5min); metric retention/compression by Timescale policies.
@@ -122,7 +127,7 @@ func main() {
 	defer bg.Stop()
 
 	// Setup router
-	router, releaseTrackerH, proxmoxH, npmH, cleanupRouter := api.SetupRouter(db, cfg, notifHub, sched, dispatcher)
+	router, releaseTrackerH, proxmoxH, npmH, cleanupRouter := api.SetupRouter(db, cfg, notifHub, eventBus, sched, dispatcher)
 	defer cleanupRouter()
 	// Background pollers: the handlers expose the unit of work + a fire-and-forget
 	// ctx; the poller package owns the scheduling loop. rootCtx cancellation

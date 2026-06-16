@@ -9,6 +9,7 @@ import (
 	"github.com/serversupervisor/server/internal/apperr"
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/database"
+	"github.com/serversupervisor/server/internal/events"
 	"github.com/serversupervisor/server/internal/models"
 	"github.com/serversupervisor/server/internal/proxmoxclient"
 )
@@ -64,15 +65,21 @@ type Service struct {
 	repo   Repository
 	cfg    *config.Config
 	poller *Poller
+	bus    *events.Bus
 }
 
-func NewService(db *database.DB, cfg *config.Config) *Service {
-	return &Service{repo: db, cfg: cfg, poller: NewPoller(db, cfg)}
+func NewService(db *database.DB, cfg *config.Config, bus *events.Bus) *Service {
+	return &Service{repo: db, cfg: cfg, poller: NewPoller(db, cfg), bus: bus}
 }
 
 // ===== background poll =====
 
-func (s *Service) PollAll(ctx context.Context) { s.poller.PollAll(ctx) }
+// PollAll refreshes all connections then wakes the dashboard subscribers (the
+// dashboard renders Proxmox nodes/links). Nil-safe when no bus is wired.
+func (s *Service) PollAll(ctx context.Context) {
+	s.poller.PollAll(ctx)
+	s.bus.Publish(events.TopicDashboard)
+}
 
 // TriggerPollByID launches an immediate poll of one enabled connection on the
 // supplied (long-lived) ctx. Returns apperr.NotFound when the id is not enabled.
@@ -196,7 +203,20 @@ func (s *Service) CreateLink(ctx context.Context, req models.ProxmoxGuestLinkReq
 	if req.MetricsSource == "" {
 		req.MetricsSource = "auto"
 	}
-	return s.repo.UpsertProxmoxGuestLink(ctx, req.GuestID, req.HostID, req.Status, req.MetricsSource)
+	link, err := s.repo.UpsertProxmoxGuestLink(ctx, req.GuestID, req.HostID, req.Status, req.MetricsSource)
+	if err == nil {
+		s.publishLink(req.HostID)
+	}
+	return link, err
+}
+
+// publishLink wakes the dashboard + the affected host-detail subscribers after a
+// guest↔host link change (both views render the link). Nil-safe.
+func (s *Service) publishLink(hostID string) {
+	s.bus.Publish(events.TopicDashboard)
+	if hostID != "" {
+		s.bus.Publish(events.HostTopic(hostID))
+	}
 }
 
 func (s *Service) GetLink(ctx context.Context, id string) (*models.ProxmoxGuestLink, error) {
@@ -222,14 +242,23 @@ func (s *Service) UpdateLink(ctx context.Context, id string, req models.ProxmoxG
 	if req.MetricsSource != nil && !validMetricsSources[*req.MetricsSource] {
 		return nil, apperr.Validation("metrics_source invalide : doit être auto, agent ou proxmox")
 	}
-	return s.repo.UpdateProxmoxGuestLink(ctx, id, req.Status, req.MetricsSource)
+	link, err := s.repo.UpdateProxmoxGuestLink(ctx, id, req.Status, req.MetricsSource)
+	if err == nil && link != nil {
+		s.publishLink(link.HostID)
+	}
+	return link, err
 }
 
 func (s *Service) DeleteLink(ctx context.Context, id string) error {
-	if _, err := s.GetLink(ctx, id); err != nil {
+	link, err := s.GetLink(ctx, id)
+	if err != nil {
 		return err
 	}
-	return s.repo.DeleteProxmoxGuestLink(ctx, id)
+	if err := s.repo.DeleteProxmoxGuestLink(ctx, id); err != nil {
+		return err
+	}
+	s.publishLink(link.HostID)
+	return nil
 }
 
 func (s *Service) LinkByGuest(ctx context.Context, guestID string) (*models.ProxmoxGuestLink, error) {

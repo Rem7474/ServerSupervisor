@@ -10,6 +10,7 @@ import (
 	"github.com/serversupervisor/server/internal/cookies"
 	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/dispatch"
+	"github.com/serversupervisor/server/internal/events"
 	"github.com/serversupervisor/server/internal/handlers"
 	"github.com/serversupervisor/server/internal/models"
 	"github.com/serversupervisor/server/internal/networkview"
@@ -40,7 +41,7 @@ import (
 // SetupRouter wires all handlers and registers route groups.
 // The caller is responsible for starting long-running poller services after this function returns.
 // The returned cleanup func must be called on shutdown to stop background goroutines (rate limiters).
-func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationHub, sched *scheduler.TaskScheduler, dispatcher *dispatch.Dispatcher) (*gin.Engine, *handlers.ReleaseTrackerHandler, *handlers.ProxmoxHandler, *handlers.NPMHandler, func()) {
+func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationHub, bus *events.Bus, sched *scheduler.TaskScheduler, dispatcher *dispatch.Dispatcher) (*gin.Engine, *handlers.ReleaseTrackerHandler, *handlers.ProxmoxHandler, *handlers.NPMHandler, func()) {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
 	r.Use(gin.Recovery())
@@ -59,15 +60,15 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	authH := handlers.NewAuthHandler(authnsvc.NewService(db, cfg), cfg)
 	hostH := handlers.NewHostHandler(hostsvc.NewService(db, dispatcher, func() string {
 		return handlers.ResolveLatestAgentVersion(cfg)
-	}))
-	wsH := ws.NewWSHandler(db, cfg, notifHub)
-	agentH := handlers.NewAgentHandler(db, cfg, wsH.GetStreamHub(), notifHub)
+	}, bus))
+	wsH := ws.NewWSHandler(db, cfg, notifHub, bus)
+	agentH := handlers.NewAgentHandler(db, cfg, wsH.GetStreamHub(), notifHub, bus)
 	aptH := handlers.NewAptHandler(aptsvc.NewService(db, dispatcher), db)
 	dockerH := handlers.NewDockerHandler(dockersvc.NewService(db, dispatcher), db)
 	systemH := handlers.NewSystemHandler(db, cfg, dispatcher, wsH.GetStreamHub())
 	networkH := handlers.NewNetworkHandler(networksvc.NewService(db, func(ctx context.Context) (*models.NetworkSnapshot, error) {
 		return networkview.BuildSnapshot(ctx, db)
-	}))
+	}, bus))
 	auditH := handlers.NewAuditHandler(auditsvc.NewService(db))
 	userH := handlers.NewUserHandler(usersvc.NewService(db))
 	alertRulesH := handlers.NewAlertRulesHandler(alertrulesvc.NewService(db, func(rule models.AlertRule) {
@@ -97,7 +98,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	agentH.AddCompletionListener(gitWebhookH)
 	agentH.AddCompletionListener(releaseTrackerH)
 
-	proxmoxH := handlers.NewProxmoxHandler(proxmoxsvc.NewService(db, cfg))
+	proxmoxH := handlers.NewProxmoxHandler(proxmoxsvc.NewService(db, cfg, bus))
 	hostPermH := handlers.NewHostPermissionHandler(hostpermsvc.NewService(db))
 	uptimeH := handlers.NewUptimeHandler(uptimesvc.NewService(db))
 	sslH := handlers.NewSSLHandler(sslsvc.NewService(db))

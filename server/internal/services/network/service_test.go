@@ -30,7 +30,7 @@ func TestTopologySnapshot_MergesBaseAndConfig(t *testing.T) {
 			Containers: []models.NetworkContainer{{}, {}},
 		}, nil
 	}
-	snap, err := NewService(repo, build).TopologySnapshot(context.Background())
+	snap, err := NewService(repo, build, nil).TopologySnapshot(context.Background())
 	if err != nil {
 		t.Fatalf("TopologySnapshot: %v", err)
 	}
@@ -49,7 +49,7 @@ func TestTopologySnapshot_PropagatesBuildError(t *testing.T) {
 	build := func(context.Context) (*models.NetworkSnapshot, error) {
 		return nil, errors.New("boom")
 	}
-	if _, err := NewService(&fakeRepo{}, build).TopologySnapshot(context.Background()); err == nil {
+	if _, err := NewService(&fakeRepo{}, build, nil).TopologySnapshot(context.Background()); err == nil {
 		t.Error("expected the builder error to propagate")
 	}
 }
@@ -57,7 +57,7 @@ func TestTopologySnapshot_PropagatesBuildError(t *testing.T) {
 func TestSaveTopologyConfig(t *testing.T) {
 	repo := &fakeRepo{}
 	cfg := &models.NetworkTopologyConfig{}
-	if err := NewService(repo, nil).SaveTopologyConfig(context.Background(), cfg); err != nil {
+	if err := NewService(repo, nil, nil).SaveTopologyConfig(context.Background(), cfg); err != nil {
 		t.Fatalf("SaveTopologyConfig: %v", err)
 	}
 	if repo.saved != cfg {

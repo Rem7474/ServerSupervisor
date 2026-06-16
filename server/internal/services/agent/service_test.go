@@ -9,6 +9,7 @@ import (
 
 	"github.com/serversupervisor/server/internal/apperr"
 	"github.com/serversupervisor/server/internal/config"
+	"github.com/serversupervisor/server/internal/events"
 	"github.com/serversupervisor/server/internal/models"
 )
 
@@ -136,7 +137,7 @@ func (r *recordingStreamHub) Broadcast(string, string)               { r.chunkBr
 func (r *recordingStreamHub) BroadcastStatus(string, string, string) { r.statusBroadcasts++ }
 
 func newSvc(repo Repository, hub StreamHub) *Service {
-	return NewService(repo, &config.Config{}, hub, nil)
+	return NewService(repo, &config.Config{}, hub, nil, nil)
 }
 
 func TestProxmoxIsMetricsSource(t *testing.T) {
@@ -180,6 +181,30 @@ func TestMetricsAggregated_SelectsAggregationType(t *testing.T) {
 		if agg != tc.want {
 			t.Errorf("hours=%d agg=%q want %q", tc.hours, agg, tc.want)
 		}
+	}
+}
+
+func TestReceiveReport_PublishesSnapshotTopics(t *testing.T) {
+	bus := events.NewBus()
+	dash, unsubDash := bus.Subscribe(events.TopicDashboard)
+	defer unsubDash()
+	host, unsubHost := bus.Subscribe(events.HostTopic("h1"))
+	defer unsubHost()
+
+	s := NewService(&fakeRepo{}, &config.Config{}, &recordingStreamHub{}, nil, bus)
+	if _, err := s.ReceiveReport(context.Background(), "h1", "h1", &models.AgentReport{}); err != nil {
+		t.Fatalf("ReceiveReport: %v", err)
+	}
+
+	select {
+	case <-dash:
+	case <-time.After(time.Second):
+		t.Fatal("an agent report must wake dashboard subscribers")
+	}
+	select {
+	case <-host:
+	case <-time.After(time.Second):
+		t.Fatal("an agent report must wake the reporting host's subscribers")
 	}
 }
 

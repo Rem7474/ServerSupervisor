@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/database"
+	"github.com/serversupervisor/server/internal/events"
 	"github.com/serversupervisor/server/internal/models"
 	agentsvc "github.com/serversupervisor/server/internal/services/agent"
 	"github.com/serversupervisor/server/internal/ws"
@@ -20,8 +21,8 @@ type AgentHandler struct {
 	svc *agentsvc.Service
 }
 
-func NewAgentHandler(db *database.DB, cfg *config.Config, streamHub *ws.CommandStreamHub, notifPusher agentsvc.NotificationPusher) *AgentHandler {
-	return &AgentHandler{svc: agentsvc.NewService(db, cfg, streamHub, notifPusher)}
+func NewAgentHandler(db *database.DB, cfg *config.Config, streamHub *ws.CommandStreamHub, notifPusher agentsvc.NotificationPusher, bus *events.Bus) *AgentHandler {
+	return &AgentHandler{svc: agentsvc.NewService(db, cfg, streamHub, notifPusher, bus)}
 }
 
 // AddCompletionListener registers a listener notified on terminal command states.
