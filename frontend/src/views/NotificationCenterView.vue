@@ -147,9 +147,23 @@
                     :class="resolvedBadge(item)"
                   >{{ notificationResolved(item) ? 'Résolu' : 'Actif' }}</span>
                 </div>
-                <span class="text-muted small flex-shrink-0">
-                  <RelativeTime :date="item.triggered_at || ''" />
-                </span>
+                <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                  <button
+                    v-if="auth.isAdmin && item.type === 'alert_incident' && !notificationResolved(item)"
+                    class="btn btn-sm btn-outline-success py-0 px-2"
+                    :disabled="resolvingId === item.id"
+                    @click.stop="resolveIncident(item)"
+                  >
+                    <span
+                      v-if="resolvingId === item.id"
+                      class="spinner-border spinner-border-sm me-1"
+                    />
+                    Résoudre
+                  </button>
+                  <span class="text-muted small">
+                    <RelativeTime :date="item.triggered_at || ''" />
+                  </span>
+                </div>
               </div>
 
               <div class="text-muted small mt-1">
@@ -196,6 +210,9 @@ import type { NotificationItem } from '../types/generated'
 import { addToast } from '../composables/useGlobalToast'
 import RelativeTime from '../components/RelativeTime.vue'
 import { resolveIncidentHostRoute } from '../utils/incidentRouting'
+import { useAuthStore } from '../stores/auth'
+
+const auth = useAuthStore()
 
 const SEVERITY_FILTERS = [
   { value: '', label: 'Toute sévérité' },
@@ -222,6 +239,7 @@ const error = ref('')
 const markingRead = ref(false)
 const readAt = ref<string | null>(null)
 const currentLimit = ref(50)
+const resolvingId = ref<string | null>(null)
 
 const severityFilter = ref<'warn' | 'crit' | ''>('')
 const typeFilter = ref<'alert_incident' | 'release_tracker' | ''>('')
@@ -278,6 +296,26 @@ function severityBadge(severity: string): string {
 
 function resolvedBadge(item: NotificationItem): string {
   return notificationResolved(item) ? 'bg-green-lt text-green' : 'bg-red-lt text-red'
+}
+
+function incidentNumericId(item: NotificationItem): string {
+  // item.id is formatted as "alert:123" for alert incidents
+  return item.id.replace(/^alert:/, '')
+}
+
+async function resolveIncident(item: NotificationItem): Promise<void> {
+  resolvingId.value = item.id
+  try {
+    await api.resolveAlertIncident(incidentNumericId(item))
+    items.value = items.value.map((n) =>
+      n.id === item.id ? { ...n, resolved_at: new Date().toISOString() } : n
+    )
+    addToast('Incident résolu', 'success')
+  } catch (err: any) {
+    addToast(err?.response?.data?.error || 'Impossible de résoudre', 'error')
+  } finally {
+    resolvingId.value = null
+  }
 }
 
 async function load(limit = currentLimit.value): Promise<void> {
