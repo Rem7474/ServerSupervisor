@@ -451,6 +451,10 @@
           />
         </div>
 
+        <div v-show="activeTab === 'timeline'">
+          <HostTimelineTab :host-id="hostId" />
+        </div>
+
         <!-- Security tab: Per-host permissions (admin only) -->
         <div v-show="activeTab === 'securite'">
           <div
@@ -675,6 +679,7 @@ import HostDockerTab from '../components/host/HostDockerTab.vue'
 import HostEditForm from '../components/host/HostEditForm.vue'
 import HostSystemTab from '../components/host/HostSystemTab.vue'
 import HostTasksTab from '../components/host/HostTasksTab.vue'
+import HostTimelineTab from '../components/host/HostTimelineTab.vue'
 import CommandLogPanel from '../components/host/CommandLogPanel.vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import BadgePill from '../components/common/BadgePill.vue'

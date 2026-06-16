@@ -153,6 +153,18 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true },
   },
   {
+    path: '/commands',
+    name: 'ActiveCommands',
+    component: () => import('../views/ActiveCommandsView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/notifications',
+    name: 'NotificationCenter',
+    component: () => import('../views/NotificationCenterView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
     path: '/npm',
     name: 'NPM',
     component: () => import('../views/NPMView.vue'),

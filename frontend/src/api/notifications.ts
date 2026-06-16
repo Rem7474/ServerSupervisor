@@ -1,8 +1,19 @@
 import { api } from './client'
+import type { NotificationItem } from '../types/generated'
+
+export interface NotificationFilter {
+  limit?: number
+  severity?: 'warn' | 'crit' | ''
+  type?: 'alert_incident' | 'release_tracker' | ''
+  status?: 'active' | 'resolved' | ''
+}
 
 export const notificationsApi = {
   // Notifications
-  getNotifications: () => api.get('/v1/notifications'),
+  getNotifications: (filter?: NotificationFilter) =>
+    api.get<{ notifications: NotificationItem[], total: number, read_at: string | null }>('/v1/notifications', {
+      params: filter ? Object.fromEntries(Object.entries(filter).filter(([, v]) => v !== '' && v !== undefined)) : undefined,
+    }),
   markNotificationsRead: () => api.post('/v1/notifications/mark-read'),
 
   // Push (Web Push / VAPID)

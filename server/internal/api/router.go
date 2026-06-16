@@ -275,6 +275,8 @@ func registerAuditRoutes(g *gin.RouterGroup, h *handlers.AuditHandler) {
 	g.GET("/audit/logs/user/:username", h.GetAuditLogsByUser)
 	g.GET("/audit/commands", h.GetCommandsHistory)
 	g.GET("/commands/:id", h.GetCommandByID)
+	g.POST("/commands/:id/cancel", h.CancelCommand)
+	g.GET("/hosts/:id/timeline", h.GetHostTimeline)
 }
 
 func registerNotifRoutes(g *gin.RouterGroup, h *handlers.NotificationsHandler) {

@@ -272,6 +272,45 @@ func (db *DB) GetAlertIncidents(ctx context.Context, limit, offset int) ([]model
 	return incidents, nil
 }
 
+// AlertIncidentWithRule embeds AlertIncident and adds the associated rule name for display.
+type AlertIncidentWithRule struct {
+	models.AlertIncident
+	RuleName string `json:"rule_name"`
+	Metric   string `json:"metric"`
+}
+
+// GetAlertIncidentsByHost returns the most recent alert incidents for a host,
+// joined with the rule name for display in timelines and history.
+func (db *DB) GetAlertIncidentsByHost(ctx context.Context, hostID string, limit int) ([]AlertIncidentWithRule, error) {
+	rows, err := db.conn.QueryContext(ctx,
+		`SELECT ai.id, ai.rule_id, ai.host_id, ai.severity, ai.triggered_at, ai.resolved_at, ai.value,
+		        COALESCE(ar.name, '') AS rule_name, COALESCE(ar.metric, '') AS metric
+		 FROM alert_incidents ai
+		 LEFT JOIN alert_rules ar ON ar.id = ai.rule_id
+		 WHERE ai.host_id = $1
+		 ORDER BY ai.triggered_at DESC
+		 LIMIT $2`, hostID, limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var result []AlertIncidentWithRule
+	for rows.Next() {
+		var inc AlertIncidentWithRule
+		var nullableRuleID sql.NullInt64
+		if err := rows.Scan(&inc.ID, &nullableRuleID, &inc.HostID, &inc.Severity, &inc.TriggeredAt, &inc.ResolvedAt, &inc.Value, &inc.RuleName, &inc.Metric); err != nil {
+			continue
+		}
+		if nullableRuleID.Valid {
+			inc.RuleID = &nullableRuleID.Int64
+		}
+		result = append(result, inc)
+	}
+	return result, nil
+}
+
 // enrichDockerIncident fills LinkHostID and ValueLabel for incidents whose
 // host_id is a synthetic Docker identifier (docker:container: / docker:compose:).
 func (db *DB) enrichDockerIncident(ctx context.Context, inc *models.AlertIncident) {

@@ -332,6 +332,20 @@ func (db *DB) CreateCompletedRemoteCommand(ctx context.Context, hostID, module, 
 	return err
 }
 
+// CancelRemoteCommand sets a command's status to 'cancelled' when it is still
+// pending or running. Returns true if a row was updated.
+func (db *DB) CancelRemoteCommand(ctx context.Context, id string) (bool, error) {
+	res, err := db.conn.ExecContext(ctx,
+		`UPDATE remote_commands SET status = 'cancelled' WHERE id = $1 AND status IN ('pending', 'running')`,
+		id,
+	)
+	if err != nil {
+		return false, err
+	}
+	n, _ := res.RowsAffected()
+	return n > 0, nil
+}
+
 // CountAllRemoteCommands returns the total number of remote commands matching the filter.
 func (db *DB) CountAllRemoteCommands(ctx context.Context, f CommandFilter) (int64, error) {
 	where, args := buildCommandCountWhere(f)

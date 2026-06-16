@@ -120,6 +120,40 @@ func (h *AuditHandler) GetCommandByID(c *gin.Context) {
 	c.JSON(http.StatusOK, cmd)
 }
 
+// CancelCommand cancels a pending or running command by UUID.
+func (h *AuditHandler) CancelCommand(c *gin.Context) {
+	if role := c.GetString("role"); role != models.RoleAdmin && role != models.RoleOperator {
+		respondError(c, apperr.Forbidden("insufficient permissions"))
+		return
+	}
+	id := c.Param("id")
+	if id == "" {
+		respondError(c, apperr.Validation("id required"))
+		return
+	}
+	if err := h.svc.Cancel(c.Request.Context(), id); err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "cancelled"})
+}
+
+// GetHostTimeline returns a merged chronological activity feed for a host.
+func (h *AuditHandler) GetHostTimeline(c *gin.Context) {
+	hostID := c.Param("id")
+	if hostID == "" {
+		respondError(c, apperr.Validation("id required"))
+		return
+	}
+	limit := clampQueryInt(c, "limit", 50, 200)
+	events, err := h.svc.HostTimeline(c.Request.Context(), hostID, limit)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"events": events})
+}
+
 // GetAuditLogsByUser returns audit logs for a specific user (admin only).
 func (h *AuditHandler) GetAuditLogsByUser(c *gin.Context) {
 	if c.GetString("role") != models.RoleAdmin {

@@ -94,6 +94,8 @@ const visibleTabs = computed<Tab[]>(() => {
     badgeClass: 'badge bg-secondary-lt text-secondary ms-1',
   })
 
+  tabs.push({ key: 'timeline', label: 'Timeline' })
+
   return tabs
 })
 </script>
