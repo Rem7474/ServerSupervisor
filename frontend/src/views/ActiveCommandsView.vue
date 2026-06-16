@@ -196,7 +196,7 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import api from '../api'
 import { addToast } from '../composables/useGlobalToast'
-import PaginationNav from '../components/common/PaginationNav.vue'
+import PaginationNav from '../components/PaginationNav.vue'
 import RelativeTime from '../components/RelativeTime.vue'
 import type { RemoteCommandWithHost } from '../types/audit'
 
