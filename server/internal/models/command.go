@@ -47,6 +47,21 @@ type CommandResult struct {
 	AptStatus *AptStatus `json:"apt_status,omitempty"` // Full APT status after update/upgrade
 }
 
+// ========== Host Timeline ==========
+
+// HostTimelineEvent is a single merged event in a host's activity timeline.
+// Type is one of "audit" | "command" | "incident".
+type HostTimelineEvent struct {
+	ID        string    `json:"id"`
+	Type      string    `json:"type"`
+	Timestamp time.Time `json:"timestamp"`
+	Title     string    `json:"title"`
+	Detail    string    `json:"detail,omitempty"`
+	Status    string    `json:"status,omitempty"`
+	Severity  string    `json:"severity,omitempty"`
+	Module    string    `json:"module,omitempty"`
+}
+
 // ========== Audit Log (APT & Admin Actions) ==========
 
 type AuditLog struct {

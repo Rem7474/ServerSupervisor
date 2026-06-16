@@ -170,11 +170,11 @@
       <!-- Footer -->
       <div class="px-3 py-2 text-center border-top">
         <router-link
-          to="/alerts?tab=incidents"
+          to="/notifications"
           class="text-secondary small"
           @click="isOpen = false"
         >
-          Voir l'historique des notifications →
+          Voir toutes les notifications →
         </router-link>
       </div>
     </div>

@@ -34,6 +34,13 @@ func (f *fakeRepo) CountAllRemoteCommands(context.Context, database.CommandFilte
 func (f *fakeRepo) GetRemoteCommandByID(context.Context, string) (*models.RemoteCommand, error) {
 	return f.cmd, f.cmdErr
 }
+func (f *fakeRepo) CancelRemoteCommand(context.Context, string) (bool, error) { return true, nil }
+func (f *fakeRepo) GetRecentCommandsByHost(context.Context, string, int) ([]models.RemoteCommand, error) {
+	return nil, nil
+}
+func (f *fakeRepo) GetAlertIncidentsByHost(context.Context, string, int) ([]database.AlertIncidentWithRule, error) {
+	return nil, nil
+}
 
 func TestCommand_NotFoundMapsToAppErr(t *testing.T) {
 	svc := NewService(&fakeRepo{cmdErr: errors.New("no rows")})

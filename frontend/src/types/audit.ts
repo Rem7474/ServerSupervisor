@@ -8,3 +8,15 @@ export type { RemoteCommand, AuditLog } from './generated'
 export interface RemoteCommandWithHost extends RemoteCommand {
   host_name: string
 }
+
+/** Merged chronological event for the host timeline feed. */
+export interface HostTimelineEvent {
+  id: string
+  type: 'audit' | 'command' | 'incident'
+  timestamp: string
+  title: string
+  detail?: string
+  status?: string
+  severity?: string
+  module?: string
+}
