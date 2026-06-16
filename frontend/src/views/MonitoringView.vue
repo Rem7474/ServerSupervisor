@@ -123,6 +123,15 @@
         v-else
         class="card"
       >
+        <div
+          v-if="loadingProbes && probes.length > 0"
+          class="card-header py-2"
+        >
+          <div class="d-flex align-items-center gap-2 text-secondary small">
+            <div class="spinner-border spinner-border-sm" />
+            Actualisation…
+          </div>
+        </div>
         <div class="table-responsive">
           <table class="table table-vcenter card-table">
             <thead>
@@ -158,7 +167,7 @@
             </thead>
             <tbody>
               <tr
-                v-for="p in sortedProbes"
+                v-for="p in pagedProbes"
                 :key="p.id"
               >
                 <td>
@@ -244,6 +253,19 @@
             </tbody>
           </table>
         </div>
+        <div
+          v-if="probeTotalPages > 1"
+          class="card-footer d-flex align-items-center justify-content-between"
+        >
+          <div class="text-secondary small">
+            {{ (probePage - 1) * PAGE_SIZE + 1 }}–{{ Math.min(probePage * PAGE_SIZE, probes.length) }} sur {{ probes.length }} sondes
+          </div>
+          <PaginationNav
+            :current-page="probePage"
+            :total-pages="probeTotalPages"
+            @select="setProbesPage"
+          />
+        </div>
       </div>
     </template>
 
@@ -273,6 +295,15 @@
         v-else
         class="card"
       >
+        <div
+          v-if="loadingCerts && certs.length > 0"
+          class="card-header py-2"
+        >
+          <div class="d-flex align-items-center gap-2 text-secondary small">
+            <div class="spinner-border spinner-border-sm" />
+            Actualisation…
+          </div>
+        </div>
         <div class="table-responsive">
           <table class="table table-vcenter card-table">
             <thead>
@@ -304,7 +335,7 @@
             </thead>
             <tbody>
               <tr
-                v-for="c in sortedCerts"
+                v-for="c in pagedCerts"
                 :key="c.id"
               >
                 <td>
@@ -379,6 +410,19 @@
               </tr>
             </tbody>
           </table>
+        </div>
+        <div
+          v-if="certTotalPages > 1"
+          class="card-footer d-flex align-items-center justify-content-between"
+        >
+          <div class="text-secondary small">
+            {{ (certPage - 1) * PAGE_SIZE + 1 }}–{{ Math.min(certPage * PAGE_SIZE, certs.length) }} sur {{ certs.length }} certificats
+          </div>
+          <PaginationNav
+            :current-page="certPage"
+            :total-pages="certTotalPages"
+            @select="setCertPage"
+          />
         </div>
       </div>
     </template>
@@ -668,7 +712,9 @@ import EmptyState from '../components/EmptyState.vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import RelativeTime from '../components/RelativeTime.vue'
 import PageRefreshBar from '../components/PageRefreshBar.vue'
+import PaginationNav from '../components/PaginationNav.vue'
 import dayjs from '../utils/dayjs'
+import { usePagination } from '../composables/usePagination'
 
 type Probe = UptimeProbe
 type SSLCert = SSLCertificate
@@ -955,6 +1001,27 @@ const sortedCerts = computed(() => {
   })
   return arr
 })
+
+const PAGE_SIZE = 25
+
+const {
+  currentPage: probePage,
+  totalPages: probeTotalPages,
+  pagedItems: pagedProbes,
+  resetPage: resetProbePage,
+  setPage: setProbesPage,
+} = usePagination({ items: sortedProbes, pageSize: PAGE_SIZE })
+
+const {
+  currentPage: certPage,
+  totalPages: certTotalPages,
+  pagedItems: pagedCerts,
+  resetPage: resetCertPage,
+  setPage: setCertPage,
+} = usePagination({ items: sortedCerts, pageSize: PAGE_SIZE })
+
+watch(probeSort, resetProbePage, { deep: true })
+watch(certSort, resetCertPage, { deep: true })
 
 function formatDate(ts: string | undefined | null): string {
   return ts ? dayjs(ts).format('YYYY-MM-DD') : '—'

@@ -60,14 +60,18 @@
 
     <div class="side-layout">
       <div class="side-main">
-        <DockerContainersTab
+        <ErrorBoundary
           v-if="activeTab === 'containers'"
-          :containers="(containers as any)"
-          :version-comparisons="(versionComparisons as any)"
-          :can-run-docker="canRunDocker"
-          :action-loading="(dockerActionLoading as any)"
-          @container-action="(handleContainerAction as any)"
-        />
+          title="Erreur lors du rendu des conteneurs"
+        >
+          <DockerContainersTab
+            :containers="(containers as any)"
+            :version-comparisons="(versionComparisons as any)"
+            :can-run-docker="canRunDocker"
+            :action-loading="(dockerActionLoading as any)"
+            @container-action="(handleContainerAction as any)"
+          />
+        </ErrorBoundary>
         <ComposeProjectsTab
           v-if="activeTab === 'compose'"
           :compose-projects="(composeProjects as any)"
@@ -101,6 +105,7 @@ import { useConfirmDialog } from '../composables/useConfirmDialog'
 import { useLocalStorage } from '../composables/useLocalStorage'
 import { addToast } from '../composables/useGlobalToast'
 import WsStatusBar from '../components/WsStatusBar.vue'
+import ErrorBoundary from '../components/common/ErrorBoundary.vue'
 import DockerContainersTab from '../components/docker/DockerContainersTab.vue'
 import ComposeProjectsTab from '../components/docker/ComposeProjectsTab.vue'
 import CommandLogPanel from '../components/host/CommandLogPanel.vue'
@@ -149,10 +154,25 @@ async function handleContainerAction({ hostId, name, action }: { hostId: string;
 
   dockerActionLoading.value = { ...dockerActionLoading.value, [name]: action }
 
+  const optimisticStates: Record<string, string> = { stop: 'stopping', start: 'starting', restart: 'restarting' }
+  const originalContainer = containers.value.find((c) => c.name === name && c.host_id === hostId)
+  const nextState = optimisticStates[action]
+  if (originalContainer && nextState) {
+    containers.value = containers.value.map((c) =>
+      c.name === name && c.host_id === hostId ? { ...c, state: nextState } : c
+    )
+  }
+
   try {
     const res = await apiClient.sendDockerCommand(hostId, name, action)
     connectDockerStream(res.data.command_id, hostId, name, action)
   } catch (err: any) {
+    if (originalContainer) {
+      const prevState = originalContainer.state
+      containers.value = containers.value.map((c) =>
+        c.name === name && c.host_id === hostId ? { ...c, state: prevState } : c
+      )
+    }
     addToast(err?.response?.data?.error || err?.message || 'Erreur Docker', 'error', 6000)
   } finally {
     dockerActionLoading.value = { ...dockerActionLoading.value, [name]: null }
@@ -214,5 +234,5 @@ const { wsStatus, wsError, retryCount, dataStaleAlert, reconnect } = useWebSocke
   containers.value = payload.containers || []
   composeProjects.value = payload.compose_projects || []
   versionComparisons.value = payload.version_comparisons || []
-})
+}, { debounceMs: 750 })
 </script>

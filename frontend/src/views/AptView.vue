@@ -443,7 +443,7 @@ const { wsStatus, wsError, retryCount, dataStaleAlert, reconnect } = useWebSocke
   hosts.value = payload.hosts || []
   aptStatuses.value = payload.apt_statuses || {}
   aptHistories.value = payload.apt_histories || {}
-})
+}, { debounceMs: 750 })
 
 onUnmounted(() => {
   closeStream()

@@ -74,7 +74,7 @@
 
 <script setup lang="ts">
 import { ref, shallowRef, watch, onMounted, computed, defineAsyncComponent } from 'vue'
-import apiClient from '../../api'
+import { fetchDiskMetricsHistory } from '../../composables/useDiskMetricsHistory'
 import dayjs from '../../utils/dayjs'
 
 interface ChartPoint {
@@ -230,9 +230,8 @@ async function loadHistory(hours: number): Promise<void> {
   loading.value = true
   chartData.value = null
   try {
-    const res = await apiClient.getDiskMetricsAggregated(props.hostId, selectedMount.value, hours)
-    const raw: any[] = Array.isArray(res.data?.points) ? res.data.points : []
-    points.value = raw.map((p: any) => ({
+    const raw = await fetchDiskMetricsHistory(props.hostId, selectedMount.value, hours)
+    points.value = raw.map((p) => ({
       x: clampTimestamp(dayjs(p.timestamp).valueOf()),
       y: p.used_percent,
       used_gb: p.used_gb,

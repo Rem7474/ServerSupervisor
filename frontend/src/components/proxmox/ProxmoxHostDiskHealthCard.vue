@@ -99,44 +99,19 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import apiClient from '../../api'
+import { onMounted } from 'vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 import BadgePill from '../common/BadgePill.vue'
-
-interface ProxmoxDisk {
-  id: string
-  node_name: string
-  dev_path: string
-  model?: string
-  serial?: string
-  size_bytes: number
-  disk_type?: string
-  health: string
-  wearout: number
-}
+import { useProxmoxHostDisks } from '../../composables/useProxmoxHostDisks'
 
 const props = defineProps<{
   hostId: string
   nodeName?: string | null
 }>()
 
-const disks = ref<ProxmoxDisk[]>([])
-const loading = ref(true)
+const { disks, loading, load } = useProxmoxHostDisks(props.hostId)
 
-onMounted(loadDisks)
-
-async function loadDisks(): Promise<void> {
-  try {
-    loading.value = true
-    const res = await apiClient.getHostProxmoxDisks(props.hostId)
-    disks.value = res.data || []
-  } catch (err) {
-    console.error('Failed to load Proxmox node disks:', err)
-  } finally {
-    loading.value = false
-  }
-}
+onMounted(load)
 
 function formatBytes(bytes: number): string {
   if (!bytes || bytes <= 0) return 'N/A'

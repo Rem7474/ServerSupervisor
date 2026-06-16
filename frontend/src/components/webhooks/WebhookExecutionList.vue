@@ -62,7 +62,7 @@
         </thead>
         <tbody>
           <tr
-            v-for="execution in executions"
+            v-for="execution in pagedExecutions"
             :key="execution.id || execution.sourceId"
           >
             <template v-if="kind === 'tracker'">
@@ -270,11 +270,27 @@
         </tbody>
       </table>
     </div>
+    <div
+      v-if="totalPages > 1"
+      class="card-footer d-flex align-items-center justify-content-between"
+    >
+      <div class="text-secondary small">
+        {{ (currentPage - 1) * PAGE_SIZE + 1 }}–{{ Math.min(currentPage * PAGE_SIZE, props.executions.length) }} sur {{ props.executions.length }}
+      </div>
+      <PaginationNav
+        :current-page="currentPage"
+        :total-pages="totalPages"
+        @select="setPage"
+      />
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import RelativeTime from '../RelativeTime.vue'
+import PaginationNav from '../PaginationNav.vue'
+import { usePagination } from '../../composables/usePagination'
 
 interface Execution {
   id?: string | number
@@ -294,7 +310,7 @@ interface Execution {
   status?: string
 }
 
-withDefaults(defineProps<{
+const props = withDefaults(defineProps<{
   executions?: Execution[]
   loading?: boolean
   kind?: string
@@ -311,6 +327,17 @@ withDefaults(defineProps<{
   showRefresh: false,
   logsMode: 'link',
 })
+
+const PAGE_SIZE = 20
+
+const allExecutions = computed(() => props.executions)
+
+const {
+  currentPage,
+  totalPages,
+  pagedItems: pagedExecutions,
+  setPage,
+} = usePagination({ items: allExecutions, pageSize: PAGE_SIZE })
 
 defineEmits<{
   (e: 'refresh'): void

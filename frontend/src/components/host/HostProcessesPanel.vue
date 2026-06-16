@@ -152,21 +152,10 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import apiClient, { getApiErrorMessage } from '../../api'
-import { useCommandStream } from '../../composables/useCommandStream'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
+import { useHostProcesses, type HostProcess } from '../../composables/useHostProcesses'
 
-interface Process {
-  pid: number
-  name: string
-  user: string
-  cpu_pct: number
-  mem_pct: number
-  mem_rss_kb: number
-  state: string
-}
-
-type SortKey = keyof Process
+type SortKey = keyof HostProcess
 
 const props = withDefaults(defineProps<{
   hostId: string
@@ -179,14 +168,10 @@ const emit = defineEmits<{
   (e: 'history-changed'): void
 }>()
 
-const processes = ref<Process[]>([])
-const loading = ref(false)
-const error = ref('')
+const { processes, loading, error, load } = useHostProcesses(props.hostId)
 const processFilter = ref('')
 const sortKey = ref<SortKey>('cpu_pct')
 const sortDir = ref(-1)
-const STREAM_TIMEOUT_MS = 60000
-const { collectCommandOutput } = useCommandStream()
 
 const filteredProcesses = computed(() => {
   let list = processes.value
@@ -217,25 +202,7 @@ function sortIcon(key: SortKey): string {
 }
 
 async function loadProcesses(): Promise<void> {
-  loading.value = true
-  error.value = ''
-  try {
-    const res = await apiClient.sendProcessesCommand(props.hostId)
-    const cmdId = res.data.command_id
-
-    await collectCommandOutput(cmdId, { timeoutMs: STREAM_TIMEOUT_MS }).then((output: string) => {
-      try {
-        processes.value = JSON.parse(output)
-      } catch {
-        error.value = 'Impossible de parser la liste des processus'
-      }
-    }).catch((e: any) => {
-      error.value = e?.message || 'Erreur lors du chargement des processus'
-    }).finally(() => { emit('history-changed') })
-  } catch (e) {
-    error.value = getApiErrorMessage(e, "Impossible d'envoyer la commande")
-  } finally {
-    loading.value = false
-  }
+  await load()
+  emit('history-changed')
 }
 </script>

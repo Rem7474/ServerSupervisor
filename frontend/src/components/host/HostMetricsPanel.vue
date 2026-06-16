@@ -158,8 +158,8 @@
 
 <script setup lang="ts">
 import { computed, ref, shallowRef, defineAsyncComponent, onMounted, watch, toRef } from 'vue'
-import apiClient from '../../api'
 import MetricsSourceBadge from '../common/MetricsSourceBadge.vue'
+import { fetchMetricsHistory, type MetricsHistoryPoint } from '../../composables/useHostMetricsHistory'
 import dayjs from '../../utils/dayjs'
 import { getChartPalette } from '../../utils/chartTheme'
 
@@ -177,13 +177,7 @@ interface MetricsData {
   load_avg_15?: number
 }
 
-interface HistoryPoint {
-  timestamp: string
-  cpu_usage_percent?: number
-  memory_percent?: number
-  memory_used?: number
-  memory_total?: number
-}
+type HistoryPoint = MetricsHistoryPoint
 
 const palette = getChartPalette()
 
@@ -376,30 +370,13 @@ watch(() => props.refreshTick, () => {
 async function loadHistory(hours: number): Promise<void> {
   chartHours.value = hours
   try {
-    let history
-    if (props.metricsSource === 'proxmox' && props.proxmoxGuestId) {
-      // Proxmox-sourced: fetch per-guest time-series from the Proxmox poller snapshots.
-      // Response shape: [{timestamp, cpu_avg, memory_avg}] — remap to chart field names.
-      const bucketMinutes = hours <= 1 ? 1 : hours <= 6 ? 2 : hours <= 24 ? 5 : hours <= 168 ? 30 : 60
-      const res = await apiClient.getProxmoxGuestMetrics(props.proxmoxGuestId, hours, bucketMinutes)
-      const raw: any[] = Array.isArray(res.data) ? res.data : []
-      history = raw.map((p: any) => ({
-        timestamp: p.timestamp,
-        cpu_usage_percent: p.cpu_avg,
-        memory_percent: p.memory_avg,
-      }))
-    } else if (hours > 24) {
-      const res = await apiClient.getMetricsAggregated(props.hostId, hours)
-      history = Array.isArray(res.data?.metrics) ? res.data.metrics : []
-    } else {
-      const res = await apiClient.getMetricsHistory(props.hostId, hours)
-      history = Array.isArray(res.data) ? res.data : []
-    }
+    const history = await fetchMetricsHistory(props.hostId, hours, props.metricsSource, props.proxmoxGuestId)
     metricsHistory.value = history
     if (!history.length) { cpuChartData.value = null; memChartData.value = null; return }
     buildCharts()
-  } catch (e: any) {
-    console.error(`Failed to fetch metrics history (${hours}h):`, e?.response?.data || e?.message)
+  } catch (e: unknown) {
+    const err = e as { response?: { data?: unknown }; message?: string }
+    console.error(`Failed to fetch metrics history (${hours}h):`, err?.response?.data || err?.message)
   }
 }
 
