@@ -235,6 +235,7 @@
 import { ref, onMounted } from 'vue'
 import { npmApi } from '../api/npm'
 import type { NPMProxyHostEnriched } from '../types/npm'
+import { getApiErrorMessage } from '../api/client'
 
 const hosts = ref<NPMProxyHostEnriched[]>([])
 const loading = ref(true)
@@ -249,8 +250,8 @@ async function load(): Promise<void> {
   try {
     const res = await npmApi.listAllProxyHosts()
     hosts.value = res.data.proxy_hosts ?? []
-  } catch (e: any) {
-    loadError.value = e?.response?.data?.error || 'Impossible de charger les proxy hosts.'
+  } catch (e: unknown) {
+    loadError.value = getApiErrorMessage(e, 'Impossible de charger les proxy hosts.')
   } finally {
     loading.value = false
   }
@@ -273,7 +274,7 @@ async function toggleNPM(host: NPMProxyHostEnriched, value: boolean): Promise<vo
     const res = await npmApi.setNPMEnabled(host.id, value)
     const idx = hosts.value.findIndex(h => h.id === host.id)
     if (idx !== -1) hosts.value[idx] = res.data
-  } catch (e: any) {
+  } catch (e: unknown) {
     // Rollback
     host.npm_enabled = prev
     if (!value) {
@@ -281,7 +282,7 @@ async function toggleNPM(host: NPMProxyHostEnriched, value: boolean): Promise<vo
       host.uptime_monitoring_enabled = prev
       host.ssl_monitoring_enabled = prev
     }
-    actionError.value = e?.response?.data?.error || `Impossible de ${value ? 'activer' : 'désactiver'} le proxy host dans NPM.`
+    actionError.value = getApiErrorMessage(e, `Impossible de ${value ? 'activer' : 'désactiver'} le proxy host dans NPM.`)
     setTimeout(() => { actionError.value = '' }, 5000)
   } finally {
     togglingNPM.value[host.id] = false
@@ -307,13 +308,13 @@ async function toggle(
     const res = await npmApi.updateProxyHost(host.id, { [field]: value })
     const idx = hosts.value.findIndex(h => h.id === host.id)
     if (idx !== -1) hosts.value[idx] = res.data
-  } catch (e: any) {
+  } catch (e: unknown) {
     host[field] = prev
     if (field === 'monitoring_enabled' && !value) {
       host.uptime_monitoring_enabled = host.monitoring_enabled
       host.ssl_monitoring_enabled = host.monitoring_enabled
     }
-    actionError.value = e?.response?.data?.error || 'Erreur lors de la mise à jour du monitoring.'
+    actionError.value = getApiErrorMessage(e, 'Erreur lors de la mise à jour du monitoring.')
     setTimeout(() => { actionError.value = '' }, 5000)
   } finally {
     toggling.value[host.id] = false

@@ -193,8 +193,8 @@ async function loadServices(): Promise<void> {
       } catch {
         error.value = 'Impossible de parser la liste des services'
       }
-    }).catch((e: any) => {
-      error.value = e?.message || 'Erreur lors du chargement des services'
+    }).catch((e: unknown) => {
+      error.value = getApiErrorMessage(e, 'Erreur lors du chargement des services')
     }).finally(() => { emit('history-changed') })
   } catch (e) {
     error.value = getApiErrorMessage(e, "Impossible d'envoyer la commande")

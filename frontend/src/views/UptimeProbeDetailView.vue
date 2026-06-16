@@ -216,6 +216,7 @@ import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import PageRefreshBar from '../components/PageRefreshBar.vue'
 import { formatDateTime } from '../utils/formatters'
 import { getChartPalette } from '../utils/chartTheme'
+import { getApiErrorMessage } from '../api/client'
 
 interface ProbeResult {
   id: string | number
@@ -378,8 +379,8 @@ async function fetchAll(): Promise<void> {
     results.value = hr.data?.results || []
     stats.value = sr.data
     lastUpdatedAt.value = new Date()
-  } catch (e: any) {
-    error.value = e?.response?.data?.error || e?.message || 'Impossible de charger la sonde'
+  } catch (e: unknown) {
+    error.value = getApiErrorMessage(e, 'Impossible de charger la sonde')
   } finally {
     loading.value = false
   }

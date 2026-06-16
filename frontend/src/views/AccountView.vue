@@ -568,6 +568,7 @@ import { useCommandStream } from '../composables/useCommandStream'
 import CommandLogPanel from '../components/host/CommandLogPanel.vue'
 import { moduleLabel, moduleClass } from '../utils/moduleMeta'
 import { useStatusBadge } from '../composables/useStatusBadge'
+import { getApiErrorMessage } from '../api/client'
 
 const auth = useAuthStore()
 
@@ -732,8 +733,8 @@ async function submitChangePassword(): Promise<void> {
     pwSuccess.value = 'Mot de passe mis à jour avec succès.'
     pwForm.value = { current: '', next: '', confirm: '' }
     auth.clearMustChangePassword()
-  } catch (e: any) {
-    pwError.value = e?.response?.data?.error || 'Erreur lors de la mise à jour du mot de passe.'
+  } catch (e: unknown) {
+    pwError.value = getApiErrorMessage(e, 'Erreur lors de la mise à jour du mot de passe.')
   } finally {
     pwLoading.value = false
   }

@@ -103,6 +103,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import api from '../../api'
+import { getApiErrorMessage } from '../../api/client'
 
 type SyslogItem = Record<string, any>
 
@@ -264,8 +265,8 @@ async function loadEvents() {
       })
       events.value = mergeAndRankSyslogLines([Array.isArray(res.data) ? res.data : []], 200)
     }
-  } catch (e: any) {
-    error.value = e?.response?.data?.error || 'Erreur lors du chargement des événements de sécurité.'
+  } catch (e: unknown) {
+    error.value = getApiErrorMessage(e, 'Erreur lors du chargement des événements de sécurité.')
     events.value = []
   } finally {
     loading.value = false

@@ -204,6 +204,7 @@ import TrackerConfigCard from '../components/webhooks/TrackerConfigCard.vue'
 import TrackerScriptHelpCard from '../components/webhooks/TrackerScriptHelpCard.vue'
 import TrackerVersionHistoryCard from '../components/webhooks/TrackerVersionHistoryCard.vue'
 import { useCommandStream } from '../composables/useCommandStream'
+import { getApiErrorMessage } from '../api/client'
 
 const route = useRoute()
 const id = route.params.id as string
@@ -301,8 +302,8 @@ async function load(): Promise<void> {
     tracker.value = res.data.tracker
     executions.value = res.data.executions || []
     hosts.value = hostsRes.data || []
-  } catch (e: any) {
-    error.value = e?.response?.data?.error || 'Erreur lors du chargement'
+  } catch (e: unknown) {
+    error.value = getApiErrorMessage(e, 'Erreur lors du chargement')
   } finally {
     loading.value = false
   }
@@ -415,8 +416,8 @@ async function runManually(): Promise<void> {
       await load()
       running.value = false
     }, 2000)
-  } catch (e: any) {
-    error.value = e?.response?.data?.error || 'Erreur lors du déclenchement'
+  } catch (e: unknown) {
+    error.value = getApiErrorMessage(e, 'Erreur lors du déclenchement')
     running.value = false
   }
 }
@@ -429,8 +430,8 @@ async function triggerCheck(): Promise<void> {
       await load()
       checking.value = false
     }, 2000)
-  } catch (e: any) {
-    error.value = e?.response?.data?.error || 'Erreur'
+  } catch (e: unknown) {
+    error.value = getApiErrorMessage(e, 'Erreur')
     checking.value = false
   }
 }
@@ -447,8 +448,8 @@ async function saveEdit(payload: any): Promise<void> {
     await api.updateReleaseTracker(id, payload)
     closeEdit()
     await load()
-  } catch (e: any) {
-    modalError.value = e?.response?.data?.error || 'Erreur'
+  } catch (e: unknown) {
+    modalError.value = getApiErrorMessage(e, 'Erreur')
   } finally {
     saving.value = false
   }

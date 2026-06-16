@@ -180,6 +180,7 @@ import dayjs from '../utils/dayjs'
 import api from '../api'
 import MetricsSourceBadge from '../components/common/MetricsSourceBadge.vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
+import { getApiErrorMessage } from '../api/client'
 
 interface ProxmoxGuest {
   id: string
@@ -265,8 +266,8 @@ async function loadGuest(): Promise<void> {
     guest.value = found
     const linkRes = await api.getProxmoxGuestLink(found.id)
     guestLink.value = linkRes.data
-  } catch (e: any) {
-    error.value = e?.response?.data?.error || 'Erreur lors du chargement du guest Proxmox.'
+  } catch (e: unknown) {
+    error.value = getApiErrorMessage(e, 'Erreur lors du chargement du guest Proxmox.')
   } finally {
     loading.value = false
   }

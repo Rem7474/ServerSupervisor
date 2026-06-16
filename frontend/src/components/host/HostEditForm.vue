@@ -138,6 +138,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import apiClient from '../../api'
+import { getApiErrorMessage } from '../../api/client'
 
 interface Host {
   name?: string
@@ -208,8 +209,8 @@ async function saveEdit(): Promise<void> {
     const res = await apiClient.updateHost(String(props.hostId), editForm.value)
     emit('updated', res.data)
     emit('close')
-  } catch (e: any) {
-    editError.value = e?.response?.data?.error || e?.message
+  } catch (e: unknown) {
+    editError.value = getApiErrorMessage(e)
   } finally {
     saving.value = false
   }
@@ -221,8 +222,8 @@ async function rotateHostKey(): Promise<void> {
   try {
     const res = await apiClient.rotateHostKey(String(props.hostId))
     rotateKeyResult.value = res.data
-  } catch (e: any) {
-    console.error('Failed to rotate API key:', e?.response?.data || e?.message)
+  } catch (e: unknown) {
+    console.error('Failed to rotate API key:', getApiErrorMessage(e))
   } finally {
     rotateKeyLoading.value = false
   }

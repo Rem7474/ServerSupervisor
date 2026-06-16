@@ -432,6 +432,7 @@
 import { ref, computed, watch } from 'vue'
 import apiClient from '../../api'
 import DataToolbar from '../common/DataToolbar.vue'
+import { getApiErrorMessage } from '../../api/client'
 
 interface ComposeProject {
   id: string | number
@@ -599,8 +600,8 @@ async function runTracker(vc: VersionComparison, project?: ComposeProject): Prom
   try {
     await apiClient.runReleaseTracker(id)
     trackerFeedback.value = `Déclenchement lancé pour ${project?.name || vc?.docker_image || 'le tracker'}.`
-  } catch (e: any) {
-    trackerFeedback.value = e?.response?.data?.error || 'Échec du déclenchement manuel.'
+  } catch (e: unknown) {
+    trackerFeedback.value = getApiErrorMessage(e, 'Échec du déclenchement manuel.')
   } finally {
     const next = { ...trackerRunLoading.value }
     delete next[id]

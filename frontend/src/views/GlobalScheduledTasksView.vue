@@ -830,6 +830,7 @@ import { useConfirmDialog } from '../composables/useConfirmDialog'
 import DataToolbar from '../components/common/DataToolbar.vue'
 import SortableHeader from '../components/common/SortableHeader.vue'
 import type { ScheduledTaskWithHost } from '../types/task'
+import { getApiErrorMessage } from '../api/client'
 
 const auth = useAuthStore()
 const hostsStore = useHostsStore()
@@ -936,8 +937,8 @@ async function saveCreate(): Promise<void> {
     })
     createModalOpen.value = false
     await loadTasks()
-  } catch (e: any) {
-    createError.value = e?.response?.data?.error || 'Erreur lors de la création'
+  } catch (e: unknown) {
+    createError.value = getApiErrorMessage(e, 'Erreur lors de la création')
   } finally {
     createSaving.value = false
   }
@@ -1033,8 +1034,8 @@ async function saveEdit(): Promise<void> {
     })
     editTask.value = null
     await loadTasks()
-  } catch (e: any) {
-    editError.value = e?.response?.data?.error || 'Erreur lors de la sauvegarde'
+  } catch (e: unknown) {
+    editError.value = getApiErrorMessage(e, 'Erreur lors de la sauvegarde')
   } finally {
     editSaving.value = false
   }
@@ -1050,8 +1051,8 @@ async function confirmDelete(task: any): Promise<void> {
   try {
     await api.deleteScheduledTask(task.id)
     await loadTasks()
-  } catch (e: any) {
-    error.value = e?.response?.data?.error || 'Erreur lors de la suppression'
+  } catch (e: unknown) {
+    error.value = getApiErrorMessage(e, 'Erreur lors de la suppression')
   }
 }
 
@@ -1064,8 +1065,8 @@ async function openHistory(task: any): Promise<void> {
   try {
     const { data } = await api.getScheduledTaskExecutions(task.id, 20)
     executions.value = data
-  } catch (e: any) {
-    historyError.value = e?.response?.data?.error || 'Erreur de chargement'
+  } catch (e: unknown) {
+    historyError.value = getApiErrorMessage(e, 'Erreur de chargement')
   } finally {
     historyLoading.value = false
   }
@@ -1077,8 +1078,8 @@ async function loadTasks(): Promise<void> {
   try {
     const { data } = await api.getAllScheduledTasks()
     tasks.value = data
-  } catch (e: any) {
-    error.value = e?.response?.data?.error || 'Erreur de chargement'
+  } catch (e: unknown) {
+    error.value = getApiErrorMessage(e, 'Erreur de chargement')
   } finally {
     loading.value = false
   }
@@ -1099,8 +1100,8 @@ async function toggleTask(task: any): Promise<void> {
       cron_expression: task.cron_expression, enabled: enabling,
     })
     await loadTasks()
-  } catch (e: any) {
-    error.value = e?.response?.data?.error || 'Erreur'
+  } catch (e: unknown) {
+    error.value = getApiErrorMessage(e, 'Erreur')
   }
 }
 
@@ -1110,8 +1111,8 @@ async function runNow(task: any): Promise<void> {
     const { data } = await api.runScheduledTask(task.id)
     addToast(`${task.name} déclenchée — commande ${data.command_id}`, 'success')
     await loadTasks()
-  } catch (e: any) {
-    error.value = e?.response?.data?.error || 'Erreur'
+  } catch (e: unknown) {
+    error.value = getApiErrorMessage(e, 'Erreur')
   } finally {
     runningId.value = null
   }

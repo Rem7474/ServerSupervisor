@@ -394,6 +394,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import apiClient from '../api'
 import { formatDateTime } from '../utils/formatters'
 import { useAuthStore } from '../stores/auth'
+import { getApiErrorMessage } from '../api/client'
 
 const auth = useAuthStore()
 
@@ -478,8 +479,8 @@ async function startSetup() {
     setup.value = res.data
     setupVisible.value = true
     startSetupTimer()
-  } catch (e: any) {
-    error.value = e?.response?.data?.error || 'Erreur lors de la configuration MFA'
+  } catch (e: unknown) {
+    error.value = getApiErrorMessage(e, 'Erreur lors de la configuration MFA')
   } finally {
     loading.value = false
   }
@@ -496,8 +497,8 @@ async function verifySetup() {
     verifyCode.value = ''
     stopSetupTimer()
     await loadStatus()
-  } catch (e: any) {
-    error.value = e?.response?.data?.error || 'Code invalide'
+  } catch (e: unknown) {
+    error.value = getApiErrorMessage(e, 'Code invalide')
   } finally {
     loading.value = false
   }
@@ -513,8 +514,8 @@ async function disableMFA() {
     showDisable.value = false
     disablePassword.value = ''
     await loadStatus()
-  } catch (e: any) {
-    error.value = e?.response?.data?.error || 'Erreur lors de la désactivation'
+  } catch (e: unknown) {
+    error.value = getApiErrorMessage(e, 'Erreur lors de la désactivation')
   } finally {
     loading.value = false
   }
@@ -529,8 +530,8 @@ async function revokeOtherSessions() {
     await apiClient.revokeAllSessions()
     revokeSuccess.value = 'Toutes les autres sessions ont été révoquées.'
     await loadLoginEvents()
-  } catch (e: any) {
-    revokeError.value = e?.response?.data?.error || 'Erreur lors de la révocation des sessions.'
+  } catch (e: unknown) {
+    revokeError.value = getApiErrorMessage(e, 'Erreur lors de la révocation des sessions.')
   } finally {
     revokeLoading.value = false
   }

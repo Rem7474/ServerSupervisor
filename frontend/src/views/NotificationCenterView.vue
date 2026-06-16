@@ -217,6 +217,7 @@ import { addToast } from '../composables/useGlobalToast'
 import RelativeTime from '../components/RelativeTime.vue'
 import { resolveIncidentHostRoute } from '../utils/incidentRouting'
 import { useAuthStore } from '../stores/auth'
+import { getApiErrorMessage } from '../api/client'
 
 const auth = useAuthStore()
 
@@ -317,8 +318,8 @@ async function resolveIncident(item: NotificationItem): Promise<void> {
       n.id === item.id ? { ...n, resolved_at: new Date().toISOString() } : n
     )
     addToast('Incident résolu', 'success')
-  } catch (err: any) {
-    addToast(err?.response?.data?.error || 'Impossible de résoudre', 'error')
+  } catch (err: unknown) {
+    addToast(getApiErrorMessage(err, 'Impossible de résoudre'), 'error')
   } finally {
     resolvingId.value = null
   }
@@ -337,8 +338,8 @@ async function load(limit = currentLimit.value): Promise<void> {
     items.value = res.data.notifications || []
     total.value = res.data.total || 0
     if (res.data.read_at !== undefined) readAt.value = res.data.read_at
-  } catch (err: any) {
-    error.value = err?.response?.data?.error || err?.message || 'Erreur de chargement'
+  } catch (err: unknown) {
+    error.value = getApiErrorMessage(err, 'Erreur de chargement')
   } finally {
     loading.value = false
   }

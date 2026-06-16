@@ -202,6 +202,7 @@ import { useConfirmDialog } from '../composables/useConfirmDialog'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import apiClient from '../api'
 import dayjs from '../utils/dayjs'
+import { getApiErrorMessage } from '../api/client'
 
 interface User {
   id: string
@@ -282,9 +283,9 @@ async function createUser(): Promise<void> {
     createMessage.value = 'Utilisateur créé avec succès'
     newUserForm.value = { username: '', password: '', role: 'viewer' }
     await fetchUsers()
-  } catch (e: any) {
+  } catch (e: unknown) {
     createSuccess.value = false
-    createMessage.value = e?.response?.data?.error || 'Erreur lors de la création'
+    createMessage.value = getApiErrorMessage(e, 'Erreur lors de la création')
   } finally {
     creatingUser.value = false
   }

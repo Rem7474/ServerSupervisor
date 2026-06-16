@@ -130,6 +130,7 @@ import { ref, computed, onMounted } from 'vue'
 import api from '../../api'
 import type { HostTimelineEvent } from '../../types/audit'
 import RelativeTime from '../RelativeTime.vue'
+import { getApiErrorMessage } from '../../api/client'
 
 const props = defineProps<{ hostId: string }>()
 
@@ -155,8 +156,8 @@ async function load(): Promise<void> {
   try {
     const res = await api.getHostTimeline(props.hostId, 100)
     events.value = res.data.events || []
-  } catch (err: any) {
-    error.value = err?.response?.data?.error || err?.message || 'Erreur de chargement'
+  } catch (err: unknown) {
+    error.value = getApiErrorMessage(err, 'Erreur de chargement')
   } finally {
     loading.value = false
   }

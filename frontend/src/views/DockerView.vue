@@ -112,6 +112,7 @@ import CommandLogPanel from '../components/host/CommandLogPanel.vue'
 import { useCommandStream } from '../composables/useCommandStream'
 import apiClient from '../api'
 import type { DockerContainer, ComposeProject } from '../types/docker'
+import { getApiErrorMessage } from '../api/client'
 
 const auth = useAuthStore()
 const dialog = useConfirmDialog()
@@ -166,14 +167,14 @@ async function handleContainerAction({ hostId, name, action }: { hostId: string;
   try {
     const res = await apiClient.sendDockerCommand(hostId, name, action)
     connectDockerStream(res.data.command_id, hostId, name, action)
-  } catch (err: any) {
+  } catch (err: unknown) {
     if (originalContainer) {
       const prevState = originalContainer.state
       containers.value = containers.value.map((c) =>
         c.name === name && c.host_id === hostId ? { ...c, state: prevState } : c
       )
     }
-    addToast(err?.response?.data?.error || err?.message || 'Erreur Docker', 'error', 6000)
+    addToast(getApiErrorMessage(err, 'Erreur Docker'), 'error', 6000)
   } finally {
     dockerActionLoading.value = { ...dockerActionLoading.value, [name]: null }
   }
@@ -196,8 +197,8 @@ async function handleComposeAction({ hostId, name, action, workingDir }: { hostI
   try {
     const res = await apiClient.sendDockerCommand(hostId, name, action, workingDir)
     connectDockerStream(res.data.command_id, hostId, name, action)
-  } catch (err: any) {
-    addToast(err?.response?.data?.error || err?.message || 'Erreur Docker', 'error', 6000)
+  } catch (err: unknown) {
+    addToast(getApiErrorMessage(err, 'Erreur Docker'), 'error', 6000)
   } finally {
     composeActionLoading.value = { ...composeActionLoading.value, [name]: null }
   }

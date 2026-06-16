@@ -182,6 +182,7 @@
 import { ref, computed } from 'vue'
 import apiClient from '../../api'
 import { useAuthStore } from '../../stores/auth'
+import { getApiErrorMessage } from '../../api/client'
 
 interface DockerVersion {
   docker_image: string
@@ -244,8 +245,8 @@ async function runTracker(v: DockerVersion): Promise<void> {
   try {
     await apiClient.runReleaseTracker(id)
     feedback.value = `Déclenchement lancé pour ${v.docker_image}.`
-  } catch (e: any) {
-    feedback.value = e?.response?.data?.error || 'Échec du déclenchement manuel.'
+  } catch (e: unknown) {
+    feedback.value = getApiErrorMessage(e, 'Échec du déclenchement manuel.')
   } finally {
     const next = { ...runningIds.value }
     delete next[id]

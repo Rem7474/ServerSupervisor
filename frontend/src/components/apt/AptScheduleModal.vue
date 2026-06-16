@@ -118,6 +118,7 @@ import { reactive, computed, watch } from 'vue'
 import apiClient from '../../api'
 import CronBuilder from '../CronBuilder.vue'
 import { MANUAL_SENTINEL } from '../../utils/cron'
+import { getApiErrorMessage } from '../../api/client'
 
 const props = defineProps<{
   host: any | null
@@ -175,8 +176,8 @@ async function saveSchedule(): Promise<void> {
     })
     emit('created')
     emit('close')
-  } catch (e: any) {
-    form.error = e?.response?.data?.error || 'Erreur lors de la création'
+  } catch (e: unknown) {
+    form.error = getApiErrorMessage(e, 'Erreur lors de la création')
   } finally {
     form.saving = false
   }

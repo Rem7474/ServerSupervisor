@@ -68,12 +68,16 @@ export default [
     },
   },
   {
-    files: ['**/*.{ts,tsx}'],
+    // Apply the TS plugin to .vue files too: their <script setup lang="ts"> is
+    // parsed by the TS parser (configured above), so no-explicit-any etc. work
+    // without type information. Without this, the bulk of the code (views +
+    // components) escaped the any check entirely.
+    files: ['**/*.{ts,tsx,vue}'],
     plugins: {
       '@typescript-eslint': pluginTypeScript,
     },
     rules: {
-      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/no-unused-vars': ['error', {
         argsIgnorePattern: '^_',
         varsIgnorePattern: '^_',

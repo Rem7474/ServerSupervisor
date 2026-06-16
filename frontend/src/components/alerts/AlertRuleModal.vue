@@ -195,6 +195,7 @@ import AlertRuleStepNotifications from './AlertRuleStepNotifications.vue'
 import { useAlertRuleForm } from '../../composables/useAlertRuleForm'
 import { useModalFocusTrap } from '../../composables/useModalFocusTrap'
 import { ALERT_METRIC_ORDER, getAlertMetricMeta } from '../../utils/alertMetrics'
+import { getApiErrorMessage } from '../../api/client'
 
 interface Host {
   id: string
@@ -573,9 +574,9 @@ async function testAlert(): Promise<void> {
   try {
     const response = await apiClient.testAlertRule(buildPayload() as any)
     testResults.value = response.data
-  } catch (err: any) {
+  } catch (err: unknown) {
     testResults.value = null
-    testError.value = err?.response?.data?.error || 'Échec du test de la règle.'
+    testError.value = getApiErrorMessage(err, 'Échec du test de la règle.')
   } finally {
     testing.value = false
   }
@@ -598,8 +599,8 @@ async function downloadTestLogs(): Promise<void> {
     link.download = `proxmox-auth-failures-${formatDownloadTimestamp(new Date())}.log`
     link.click()
     setTimeout(() => URL.revokeObjectURL(url), 1000)
-  } catch (err: any) {
-    testError.value = err?.response?.data?.error || 'Échec du téléchargement des logs.'
+  } catch (err: unknown) {
+    testError.value = getApiErrorMessage(err, 'Échec du téléchargement des logs.')
   } finally {
     downloadingLogs.value = false
   }

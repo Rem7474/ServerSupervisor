@@ -787,6 +787,7 @@ import EmptyState from '../EmptyState.vue'
 import PaginationNav from '../PaginationNav.vue'
 import { useDockerContainerPorts } from '../../composables/useDockerContainerPorts'
 import { usePagination } from '../../composables/usePagination'
+import { getApiErrorMessage } from '../../api/client'
 
 interface Container {
   id: string
@@ -975,8 +976,8 @@ async function runTracker(vc: VersionComparison | null | undefined, container?: 
   try {
     await apiClient.runReleaseTracker(id)
     trackerFeedback.value = `Déclenchement lancé pour ${container?.image || 'le tracker'}.`
-  } catch (e: any) {
-    trackerFeedback.value = e?.response?.data?.error || 'Échec du déclenchement manuel.'
+  } catch (e: unknown) {
+    trackerFeedback.value = getApiErrorMessage(e, 'Échec du déclenchement manuel.')
   } finally {
     const next = { ...trackerRunLoading.value }
     delete next[id]

@@ -77,6 +77,7 @@
 import { ref, shallowRef, watch, onMounted, computed, defineAsyncComponent } from 'vue'
 import { fetchDiskMetricsHistory } from '../../composables/useDiskMetricsHistory'
 import dayjs from '../../utils/dayjs'
+import { getApiErrorMessage } from '../../api/client'
 
 interface ChartPoint {
   x: number
@@ -251,8 +252,8 @@ async function loadHistory(hours: number): Promise<void> {
         spanGaps: false,
       }],
     }
-  } catch (e: any) {
-    console.error('Failed to load disk history:', e?.response?.data || e?.message)
+  } catch (e: unknown) {
+    console.error('Failed to load disk history:', getApiErrorMessage(e))
     chartData.value = null
   } finally {
     loading.value = false

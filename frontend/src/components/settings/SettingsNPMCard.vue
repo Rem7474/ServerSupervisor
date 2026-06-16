@@ -248,6 +248,7 @@
 import { ref, onMounted } from 'vue'
 import { npmApi } from '../../api/npm'
 import type { NPMConnection } from '../../types/npm'
+import { getApiErrorMessage } from '../../api/client'
 
 withDefaults(defineProps<{
   authIsAdmin?: boolean
@@ -346,8 +347,8 @@ async function save(): Promise<void> {
     await load()
     showForm.value = false
     editingId.value = null
-  } catch (e: any) {
-    formMsg.value = e?.response?.data?.error || 'Erreur lors de l\'enregistrement.'
+  } catch (e: unknown) {
+    formMsg.value = getApiErrorMessage(e, 'Erreur lors de l\'enregistrement.')
     formOk.value = false
   } finally {
     saving.value = false
@@ -375,8 +376,8 @@ async function testForm(): Promise<void> {
       formMsg.value = res.data.error || 'Échec de connexion.'
       formOk.value = false
     }
-  } catch (e: any) {
-    formMsg.value = e?.response?.data?.error || 'Erreur réseau.'
+  } catch (e: unknown) {
+    formMsg.value = getApiErrorMessage(e, 'Erreur réseau.')
     formOk.value = false
   } finally {
     testing.value = false
@@ -389,8 +390,8 @@ async function refreshNow(conn: NPMConnection): Promise<void> {
     listMsg.value = `[${conn.name}] Rafraîchissement déclenché.`
     listOk.value = true
     setTimeout(load, 3000)
-  } catch (e: any) {
-    listMsg.value = e?.response?.data?.error || 'Erreur.'
+  } catch (e: unknown) {
+    listMsg.value = getApiErrorMessage(e, 'Erreur.')
     listOk.value = false
   }
 }
@@ -402,8 +403,8 @@ async function remove(conn: NPMConnection): Promise<void> {
     await load()
     listMsg.value = 'Connexion supprimée.'
     listOk.value = true
-  } catch (e: any) {
-    listMsg.value = e?.response?.data?.error || 'Erreur lors de la suppression.'
+  } catch (e: unknown) {
+    listMsg.value = getApiErrorMessage(e, 'Erreur lors de la suppression.')
     listOk.value = false
   }
 }

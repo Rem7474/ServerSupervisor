@@ -57,6 +57,7 @@
 import { ref } from 'vue'
 import apiClient from '../../api'
 import HostSystemdPanel from './HostSystemdPanel.vue'
+import { getApiErrorMessage } from '../../api/client'
 
 const emit = defineEmits<{
   (e: 'open-command', payload: Record<string, unknown>): void
@@ -96,8 +97,8 @@ async function loadJournalLogs(): Promise<void> {
       output: '',
     })
     emit('history-changed')
-  } catch (e: any) {
-    journalError.value = e?.response?.data?.error || "Impossible d'envoyer la commande"
+  } catch (e: unknown) {
+    journalError.value = getApiErrorMessage(e, "Impossible d'envoyer la commande")
   } finally {
     journalLoading.value = false
   }

@@ -94,6 +94,7 @@ import { ref, watch, nextTick, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import api from '../api'
+import { getApiErrorMessage } from '../api/client'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -140,13 +141,13 @@ async function handleLogin(): Promise<void> {
     } else {
       error.value = 'Réponse de connexion invalide.'
     }
-  } catch (e: any) {
+  } catch (e: unknown) {
     if (needsMFA.value) {
       totpCode.value = ''
       nextTick(() => totpInput.value?.focus())
-      error.value = e?.response?.data?.error || 'Code invalide ou expiré — générez un nouveau code.'
+      error.value = getApiErrorMessage(e, 'Code invalide ou expiré — générez un nouveau code.')
     } else {
-      error.value = e?.response?.data?.error || 'Erreur de connexion'
+      error.value = getApiErrorMessage(e, 'Erreur de connexion')
     }
   } finally {
     loading.value = false

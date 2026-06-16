@@ -201,6 +201,7 @@ import { addToast } from '../composables/useGlobalToast'
 import PaginationNav from '../components/PaginationNav.vue'
 import RelativeTime from '../components/RelativeTime.vue'
 import type { RemoteCommandWithHost } from '../types/audit'
+import { getApiErrorMessage } from '../api/client'
 
 const PAGE_SIZE = 50
 const POLL_INTERVAL = 10_000
@@ -228,8 +229,8 @@ async function load(): Promise<void> {
     })
     commands.value = res.data.commands || []
     total.value = res.data.total || 0
-  } catch (err: any) {
-    error.value = err?.response?.data?.error || err?.message || 'Erreur de chargement'
+  } catch (err: unknown) {
+    error.value = getApiErrorMessage(err, 'Erreur de chargement')
   } finally {
     loading.value = false
   }
@@ -243,8 +244,8 @@ async function cancelCmd(id: string): Promise<void> {
       c.id === id ? { ...c, status: 'cancelled' } : c
     )
     addToast('Commande annulée', 'success')
-  } catch (err: any) {
-    addToast(err?.response?.data?.error || 'Impossible d\'annuler', 'error')
+  } catch (err: unknown) {
+    addToast(getApiErrorMessage(err, 'Impossible d\'annuler'), 'error')
   } finally {
     cancellingId.value = null
   }

@@ -654,6 +654,7 @@ import ProxmoxNodeServicesTab from '../components/proxmox/ProxmoxNodeServicesTab
 import ProxmoxNodeSecurityTab from '../components/proxmox/ProxmoxNodeSecurityTab.vue'
 import ProxmoxNodeGuestsTab from '../components/proxmox/ProxmoxNodeGuestsTab.vue'
 import api from '../api'
+import { getApiErrorMessage } from '../api/client'
 
 const route = useRoute()
 const router = useRouter()
@@ -787,8 +788,8 @@ async function load(): Promise<void> {
     loadLiveStatus()
     loadRRD('hour')
     loadPeerNodes()
-  } catch (e: any) {
-    error.value = e?.response?.data?.error || 'Erreur lors du chargement.'
+  } catch (e: unknown) {
+    error.value = getApiErrorMessage(e, 'Erreur lors du chargement.')
   } finally {
     loading.value = false
   }
@@ -832,8 +833,8 @@ async function loadNodeCpuTempHistory(hours: number = rrdTimeframeToHours[rrdTim
         spanGaps: true,
       }],
     }
-  } catch (e: any) {
-    nodeTempError.value = e?.response?.data?.error || 'Erreur lors du chargement de la température CPU.'
+  } catch (e: unknown) {
+    nodeTempError.value = getApiErrorMessage(e, 'Erreur lors du chargement de la température CPU.')
   } finally {
     nodeTempLoading.value = false
   }
@@ -877,8 +878,8 @@ async function loadNodeFanRPMHistory(hours: number = rrdTimeframeToHours[rrdTime
         spanGaps: true,
       }],
     }
-  } catch (e: any) {
-    nodeFanError.value = e?.response?.data?.error || 'Erreur lors du chargement des RPM ventilateurs.'
+  } catch (e: unknown) {
+    nodeFanError.value = getApiErrorMessage(e, 'Erreur lors du chargement des RPM ventilateurs.')
   } finally {
     nodeFanLoading.value = false
   }
@@ -930,8 +931,8 @@ async function saveSensorSource() {
     await loadNodeFanRPMHistory(rrdTimeframeToHours[rrdTimeframe.value] ?? 24)
     sensorSourceMsg.value = 'Source capteurs mise à jour (CPU + ventilateurs).'
     sensorSourceOk.value = true
-  } catch (e: any) {
-    sensorSourceMsg.value = e?.response?.data?.error || 'Erreur lors de la mise à jour.'
+  } catch (e: unknown) {
+    sensorSourceMsg.value = getApiErrorMessage(e, 'Erreur lors de la mise à jour.')
     sensorSourceOk.value = false
   } finally {
     sensorSourceSaving.value = false
@@ -970,8 +971,8 @@ async function confirmGuestLink(g: any): Promise<void> {
     await loadSensorSourceCandidates()
     await refreshNodeSensorSource()
     showMsg(`[${g.name}] Lien confirmé.`, true)
-  } catch (e: any) {
-    showMsg(e?.response?.data?.error || 'Erreur.', false)
+  } catch (e: unknown) {
+    showMsg(getApiErrorMessage(e, 'Erreur.'), false)
   }
 }
 
@@ -984,8 +985,8 @@ async function ignoreGuestLink(g: any): Promise<void> {
     delete m[g.id]
     guestLinks.value = m
     showMsg(`[${g.name}] Suggestion ignorée.`, true)
-  } catch (e: any) {
-    showMsg(e?.response?.data?.error || 'Erreur.', false)
+  } catch (e: unknown) {
+    showMsg(getApiErrorMessage(e, 'Erreur.'), false)
   }
 }
 
@@ -1008,8 +1009,8 @@ async function loadRRD(timeframe: string = rrdTimeframe.value): Promise<void> {
   try {
     const res = await api.getProxmoxNodeRRD(String(route.params.id), timeframe)
     buildRRDCharts(res.data ?? [], timeframe)
-  } catch (e: any) {
-    rrdError.value = e?.response?.data?.error || 'Erreur lors du chargement des métriques.'
+  } catch (e: unknown) {
+    rrdError.value = getApiErrorMessage(e, 'Erreur lors du chargement des métriques.')
     rrdCpuChart.value = null
     rrdRamChart.value = null
     rrdIowaitChart.value = null
@@ -1094,8 +1095,9 @@ async function loadLiveStatus(): Promise<void> {
     const res = await api.getProxmoxNodeStatus(String(route.params.id))
     liveStatus.value = res.data
     liveStatusTime.value = new Date().toLocaleTimeString('fr-FR')
-  } catch (e: any) {
-    liveStatusError.value = e?.response?.data?.error || `Erreur ${e?.response?.status ?? ''} — vérifiez la connectivité au nœud.`
+  } catch (e: unknown) {
+    const ax = e as { response?: { data?: { error?: string }; status?: number } }
+    liveStatusError.value = ax.response?.data?.error || `Erreur ${ax.response?.status ?? ''} — vérifiez la connectivité au nœud.`
   } finally {
     liveStatusLoading.value = false
   }
@@ -1154,8 +1156,8 @@ async function triggerAptRefresh(): Promise<void> {
     aptRefreshMsg.value = upid ? 'Tâche lancée — logs en cours…' : (res.data?.message || 'Tâche lancée.')
     aptRefreshOk.value = true
     if (upid) startPollingTask(upid, { action: 'apt update' })
-  } catch (e: any) {
-    aptRefreshMsg.value = e?.response?.data?.error || 'Erreur lors du lancement de apt update.'
+  } catch (e: unknown) {
+    aptRefreshMsg.value = getApiErrorMessage(e, 'Erreur lors du lancement de apt update.')
     aptRefreshOk.value = false
   } finally {
     aptRefreshing.value = false
@@ -1228,8 +1230,8 @@ async function loadServices(): Promise<void> {
   try {
     const res = await api.getProxmoxNodeServices(String(route.params.id))
     services.value = res.data ?? []
-  } catch (e: any) {
-    servicesError.value = e?.response?.data?.error || 'Erreur lors du chargement des services.'
+  } catch (e: unknown) {
+    servicesError.value = getApiErrorMessage(e, 'Erreur lors du chargement des services.')
   } finally {
     servicesLoading.value = false
   }
@@ -1244,8 +1246,8 @@ async function svcAction(name: string, action: string): Promise<void> {
     svcActionOk.value = true
     if (upid) startPollingTask(upid, { action: `service ${action}`, label: name })
     else setTimeout(() => loadServices(), 2000)
-  } catch (e: any) {
-    svcActionMsg.value = e?.response?.data?.error || `Erreur lors de ${action} ${name}.`
+  } catch (e: unknown) {
+    svcActionMsg.value = getApiErrorMessage(e, `Erreur lors de ${action} ${name}.`)
     svcActionOk.value = false
   }
   setTimeout(() => { svcActionMsg.value = '' }, 6000)
@@ -1289,8 +1291,8 @@ async function submitMigration(): Promise<void> {
     if (upid) {
       startPollingTask(upid, { action: 'migrate', label: `${m.guest.name || m.guest.vmid} → ${m.target}` })
     }
-  } catch (e: any) {
-    m.error = e?.response?.data?.error || 'Erreur lors du lancement de la migration.'
+  } catch (e: unknown) {
+    m.error = getApiErrorMessage(e, 'Erreur lors du lancement de la migration.')
   } finally {
     m.loading = false
   }

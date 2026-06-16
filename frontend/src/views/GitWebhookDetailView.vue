@@ -220,6 +220,7 @@ import WebhookExecutionList from '../components/webhooks/WebhookExecutionList.vu
 import WebhookModal from '../components/webhooks/WebhookModal.vue'
 import CommandLogPanel from '../components/host/CommandLogPanel.vue'
 import { useCommandStream } from '../composables/useCommandStream'
+import { getApiErrorMessage } from '../api/client'
 
 const route = useRoute()
 const id = route.params.id as string
@@ -256,8 +257,8 @@ async function load(): Promise<void> {
     webhook.value = whRes.data.webhook
     executions.value = whRes.data.executions || []
     hosts.value = hostsRes.data || []
-  } catch (e: any) {
-    error.value = e?.response?.data?.error || 'Erreur lors du chargement'
+  } catch (e: unknown) {
+    error.value = getApiErrorMessage(e, 'Erreur lors du chargement')
   } finally {
     loading.value = false
   }
@@ -338,8 +339,8 @@ async function saveEdit(payload: any): Promise<void> {
     await api.updateGitWebhook(id, payload)
     closeEdit()
     await load()
-  } catch (e: any) {
-    modalError.value = e?.response?.data?.error || 'Erreur'
+  } catch (e: unknown) {
+    modalError.value = getApiErrorMessage(e, 'Erreur')
   } finally {
     saving.value = false
   }

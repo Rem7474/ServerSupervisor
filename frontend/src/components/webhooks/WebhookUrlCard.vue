@@ -199,6 +199,7 @@
 import { ref, computed, watch } from 'vue'
 import { useConfirmDialog } from '../../composables/useConfirmDialog'
 import api from '../../api'
+import { getApiErrorMessage } from '../../api/client'
 
 const props = withDefaults(defineProps<{
   webhookId?: string
@@ -269,8 +270,8 @@ async function doRegenerate(): Promise<void> {
     regenMsg.value = 'Secret régénéré — copiez-le maintenant.'
     regenOk.value = true
     emit('secret-regenerated', res.data.secret)
-  } catch (e: any) {
-    regenMsg.value = e?.response?.data?.error || 'Erreur'
+  } catch (e: unknown) {
+    regenMsg.value = getApiErrorMessage(e, 'Erreur')
     regenOk.value = false
   } finally {
     regenerating.value = false
