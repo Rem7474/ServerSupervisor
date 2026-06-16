@@ -1,9 +1,8 @@
 package handlers
 
 import (
-	"net/http"
-
 	"github.com/gin-gonic/gin"
+	"github.com/serversupervisor/server/internal/apperr"
 	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/models"
 )
@@ -17,14 +16,14 @@ func requireHostAccess(c *gin.Context, db *database.DB, hostID string, requiredL
 	}
 
 	if hostID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "host_id required"})
+		respondError(c, apperr.Validation("host_id required"))
 		return false
 	}
 
 	username := c.GetString("username")
 	restricted, level, err := db.GetHostAccess(c.Request.Context(), username, hostID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to validate host permissions"})
+		respondError(c, apperr.Failed("failed to validate host permissions"))
 		return false
 	}
 
@@ -34,12 +33,12 @@ func requireHostAccess(c *gin.Context, db *database.DB, hostID string, requiredL
 	}
 
 	if level == "" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "host access denied"})
+		respondError(c, apperr.Forbidden("host access denied"))
 		return false
 	}
 
 	if requiredLevel == "operator" && level != "operator" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "operator host permission required"})
+		respondError(c, apperr.Forbidden("operator host permission required"))
 		return false
 	}
 

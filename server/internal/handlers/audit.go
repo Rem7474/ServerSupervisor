@@ -36,7 +36,7 @@ func clampQueryInt(c *gin.Context, key string, def, max int) int {
 // GetAuditLogs returns paginated audit logs (admin only).
 func (h *AuditHandler) GetAuditLogs(c *gin.Context) {
 	if c.GetString("role") != models.RoleAdmin {
-		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+		respondError(c, apperr.Forbidden("insufficient permissions"))
 		return
 	}
 	page := clampQueryInt(c, "page", 1, 1<<31-1)
@@ -82,7 +82,7 @@ func (h *AuditHandler) GetMyAuditLogs(c *gin.Context) {
 // GetCommandsHistory returns paginated remote commands for all hosts (admin and operator).
 func (h *AuditHandler) GetCommandsHistory(c *gin.Context) {
 	if role := c.GetString("role"); role != models.RoleAdmin && role != models.RoleOperator {
-		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+		respondError(c, apperr.Forbidden("insufficient permissions"))
 		return
 	}
 	page := clampQueryInt(c, "page", 1, 1<<31-1)
@@ -104,7 +104,7 @@ func (h *AuditHandler) GetCommandsHistory(c *gin.Context) {
 // Requires admin or operator role to prevent cross-host information disclosure.
 func (h *AuditHandler) GetCommandByID(c *gin.Context) {
 	if role := c.GetString("role"); role != models.RoleAdmin && role != models.RoleOperator {
-		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+		respondError(c, apperr.Forbidden("insufficient permissions"))
 		return
 	}
 	id := c.Param("id")
@@ -123,7 +123,7 @@ func (h *AuditHandler) GetCommandByID(c *gin.Context) {
 // GetAuditLogsByUser returns audit logs for a specific user (admin only).
 func (h *AuditHandler) GetAuditLogsByUser(c *gin.Context) {
 	if c.GetString("role") != models.RoleAdmin {
-		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+		respondError(c, apperr.Forbidden("insufficient permissions"))
 		return
 	}
 	username := c.Param("username")

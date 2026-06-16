@@ -23,7 +23,7 @@ func NewUserHandler(svc *usersvc.Service) *UserHandler {
 
 func (h *UserHandler) requireAdmin(c *gin.Context) bool {
 	if c.GetString("role") != models.RoleAdmin {
-		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+		respondError(c, apperr.Forbidden("insufficient permissions"))
 		return false
 	}
 	return true

@@ -22,7 +22,7 @@ func NewNotificationsHandler(svc *notifssvc.Service) *NotificationsHandler {
 // server-side read_at timestamp for cross-device unread-count sync.
 func (h *NotificationsHandler) GetNotifications(c *gin.Context) {
 	if c.GetString("role") != models.RoleAdmin {
-		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+		respondError(c, apperr.Forbidden("insufficient permissions"))
 		return
 	}
 	items, readAt, err := h.svc.Recent(c.Request.Context(), c.GetString("username"), 30)
@@ -36,7 +36,7 @@ func (h *NotificationsHandler) GetNotifications(c *gin.Context) {
 // MarkRead persists the current UTC timestamp as the user's "read up to" marker.
 func (h *NotificationsHandler) MarkRead(c *gin.Context) {
 	if c.GetString("role") != models.RoleAdmin {
-		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+		respondError(c, apperr.Forbidden("insufficient permissions"))
 		return
 	}
 	username := c.GetString("username")

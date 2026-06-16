@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/serversupervisor/server/internal/apperr"
 	alertrulesvc "github.com/serversupervisor/server/internal/services/alertrule"
 )
 
@@ -14,7 +15,7 @@ import (
 func (h *AlertRulesHandler) TestAlertRule(c *gin.Context) {
 	var in alertrulesvc.TestRunInput
 	if err := c.ShouldBindJSON(&in); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": humanizeValidationError(err)})
+		respondError(c, apperr.Validation(humanizeValidationError(err)))
 		return
 	}
 
@@ -35,7 +36,7 @@ func (h *AlertRulesHandler) TestAlertRule(c *gin.Context) {
 func (h *AlertRulesHandler) TestAlertRuleLogs(c *gin.Context) {
 	var in alertrulesvc.TestRunInput
 	if err := c.ShouldBindJSON(&in); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": humanizeValidationError(err)})
+		respondError(c, apperr.Validation(humanizeValidationError(err)))
 		return
 	}
 

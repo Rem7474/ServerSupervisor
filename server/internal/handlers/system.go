@@ -6,6 +6,7 @@ import (
 	"regexp"
 
 	"github.com/gin-gonic/gin"
+	"github.com/serversupervisor/server/internal/apperr"
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/dispatch"
@@ -33,7 +34,7 @@ func (h *SystemHandler) SendJournalCommand(c *gin.Context) {
 	username := c.GetString("username")
 	role := c.GetString("role")
 	if role != models.RoleAdmin && role != models.RoleOperator {
-		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+		respondError(c, apperr.Forbidden("insufficient permissions"))
 		return
 	}
 
@@ -42,12 +43,12 @@ func (h *SystemHandler) SendJournalCommand(c *gin.Context) {
 		ServiceName string `json:"service_name" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondError(c, apperr.Validation(err.Error()))
 		return
 	}
 
 	if !validServiceName.MatchString(req.ServiceName) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid service name"})
+		respondError(c, apperr.Validation("invalid service name"))
 		return
 	}
 	if !requireHostAccess(c, h.db, req.HostID, "operator") {
@@ -70,7 +71,7 @@ func (h *SystemHandler) SendJournalCommand(c *gin.Context) {
 		},
 	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create command"})
+		respondError(c, apperr.Failed("failed to create command"))
 		return
 	}
 
@@ -82,7 +83,7 @@ func (h *SystemHandler) SendProcessesCommand(c *gin.Context) {
 	username := c.GetString("username")
 	role := c.GetString("role")
 	if role != models.RoleAdmin && role != models.RoleOperator {
-		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+		respondError(c, apperr.Forbidden("insufficient permissions"))
 		return
 	}
 
@@ -90,7 +91,7 @@ func (h *SystemHandler) SendProcessesCommand(c *gin.Context) {
 		HostID string `json:"host_id" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondError(c, apperr.Validation(err.Error()))
 		return
 	}
 	if !requireHostAccess(c, h.db, req.HostID, "operator") {
@@ -112,7 +113,7 @@ func (h *SystemHandler) SendProcessesCommand(c *gin.Context) {
 		},
 	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create command"})
+		respondError(c, apperr.Failed("failed to create command"))
 		return
 	}
 
@@ -124,7 +125,7 @@ func (h *SystemHandler) SendSystemdCommand(c *gin.Context) {
 	username := c.GetString("username")
 	role := c.GetString("role")
 	if role != models.RoleAdmin && role != models.RoleOperator {
-		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+		respondError(c, apperr.Forbidden("insufficient permissions"))
 		return
 	}
 
@@ -134,12 +135,12 @@ func (h *SystemHandler) SendSystemdCommand(c *gin.Context) {
 		Action      string `json:"action" binding:"required,oneof=list start stop restart enable disable status"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondError(c, apperr.Validation(err.Error()))
 		return
 	}
 
 	if req.Action != "list" && !validServiceName.MatchString(req.ServiceName) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid service name"})
+		respondError(c, apperr.Validation("invalid service name"))
 		return
 	}
 	if !requireHostAccess(c, h.db, req.HostID, "operator") {
@@ -162,7 +163,7 @@ func (h *SystemHandler) SendSystemdCommand(c *gin.Context) {
 		},
 	})
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create command"})
+		respondError(c, apperr.Failed("failed to create command"))
 		return
 	}
 

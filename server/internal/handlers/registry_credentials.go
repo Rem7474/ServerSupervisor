@@ -22,7 +22,7 @@ func (h *ReleaseTrackerHandler) ListRegistryCredentials(c *gin.Context) {
 
 func (h *ReleaseTrackerHandler) CreateRegistryCredential(c *gin.Context) {
 	if c.GetString("role") != models.RoleAdmin {
-		c.JSON(http.StatusForbidden, gin.H{"error": "admin role required"})
+		respondError(c, apperr.Forbidden("admin role required"))
 		return
 	}
 	var req models.RegistryCredentialRequest
@@ -40,7 +40,7 @@ func (h *ReleaseTrackerHandler) CreateRegistryCredential(c *gin.Context) {
 
 func (h *ReleaseTrackerHandler) UpdateRegistryCredential(c *gin.Context) {
 	if c.GetString("role") != models.RoleAdmin {
-		c.JSON(http.StatusForbidden, gin.H{"error": "admin role required"})
+		respondError(c, apperr.Forbidden("admin role required"))
 		return
 	}
 	var req models.RegistryCredentialRequest
@@ -57,7 +57,7 @@ func (h *ReleaseTrackerHandler) UpdateRegistryCredential(c *gin.Context) {
 
 func (h *ReleaseTrackerHandler) DeleteRegistryCredential(c *gin.Context) {
 	if c.GetString("role") != models.RoleAdmin {
-		c.JSON(http.StatusForbidden, gin.H{"error": "admin role required"})
+		respondError(c, apperr.Forbidden("admin role required"))
 		return
 	}
 	if err := h.svc.DeleteRegistryCredential(c.Request.Context(), c.Param("id")); err != nil {
