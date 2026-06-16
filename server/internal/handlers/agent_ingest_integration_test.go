@@ -23,7 +23,7 @@ import (
 func newAgentReportRouter(t *testing.T, hostID string) (*gin.Engine, *database.DB) {
 	t.Helper()
 	db := testutil.NewPostgresDB(t)
-	h := handlers.NewAgentHandler(db, &config.Config{APIKeyHeader: "X-API-Key"}, nil, nil)
+	h := handlers.NewAgentHandler(db, &config.Config{APIKeyHeader: "X-API-Key"}, nil, nil, nil)
 
 	r := gin.New()
 	r.POST("/report", func(c *gin.Context) {

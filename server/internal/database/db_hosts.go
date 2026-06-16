@@ -41,7 +41,7 @@ func (db *DB) RegisterHost(ctx context.Context, host *models.Host) error {
 		lastSeen = time.Now()
 	}
 	tagsJSON := marshalTags(host.Tags)
-	_, err := db.conn.ExecContext(ctx, 
+	_, err := db.conn.ExecContext(ctx,
 		`INSERT INTO hosts (id, name, hostname, ip_address, os, api_key, tags, status, last_seen)
 		 VALUES ($1, $2, $3, $4, $5, $6, CAST($7 AS JSONB), $8, $9)`,
 		host.ID, host.Name, host.Hostname, host.IPAddress, host.OS, host.APIKey, tagsJSON, host.Status, lastSeen,
@@ -52,7 +52,7 @@ func (db *DB) RegisterHost(ctx context.Context, host *models.Host) error {
 func (db *DB) GetHost(ctx context.Context, id string) (*models.Host, error) {
 	var h models.Host
 	var tagsJSON string
-	err := db.conn.QueryRowContext(ctx, 
+	err := db.conn.QueryRowContext(ctx,
 		`SELECT id, name, hostname, ip_address, os, agent_version, api_key, tags, status, last_seen, created_at, updated_at
 		 FROM hosts WHERE id = $1`, id,
 	).Scan(&h.ID, &h.Name, &h.Hostname, &h.IPAddress, &h.OS, &h.AgentVersion, &h.APIKey, &tagsJSON, &h.Status, &h.LastSeen, &h.CreatedAt, &h.UpdatedAt)
@@ -90,7 +90,7 @@ func (db *DB) GetHostByAPIKey(ctx context.Context, apiKey string) (*models.Host,
 }
 
 func (db *DB) GetAllHosts(ctx context.Context) ([]models.Host, error) {
-	rows, err := db.conn.QueryContext(ctx, 
+	rows, err := db.conn.QueryContext(ctx,
 		`SELECT id, name, hostname, ip_address, os, agent_version, tags, status, last_seen, created_at, updated_at
 		 FROM hosts ORDER BY name`,
 	)
@@ -115,7 +115,7 @@ func (db *DB) GetAllHosts(ctx context.Context) ([]models.Host, error) {
 // UpdateHostCustomTasks stores the list of available custom tasks for a host.
 // tasksJSON must be a valid JSON array (e.g. `[{"id":"x","name":"y"}]`).
 func (db *DB) UpdateHostCustomTasks(ctx context.Context, hostID, tasksJSON string) error {
-	_, err := db.conn.ExecContext(ctx, 
+	_, err := db.conn.ExecContext(ctx,
 		`UPDATE hosts SET custom_tasks = $1::jsonb WHERE id = $2`,
 		tasksJSON, hostID)
 	return err
@@ -124,14 +124,14 @@ func (db *DB) UpdateHostCustomTasks(ctx context.Context, hostID, tasksJSON strin
 // GetHostCustomTasks returns the cached custom task list for a host as a JSON string.
 func (db *DB) GetHostCustomTasks(ctx context.Context, hostID string) (string, error) {
 	var tasks string
-	err := db.conn.QueryRowContext(ctx, 
+	err := db.conn.QueryRowContext(ctx,
 		`SELECT custom_tasks::text FROM hosts WHERE id = $1`, hostID).Scan(&tasks)
 	return tasks, err
 }
 
 // UpdateHostTasksConfigYAML stores the raw tasks.yaml content for a host.
 func (db *DB) UpdateHostTasksConfigYAML(ctx context.Context, hostID, yaml string) error {
-	_, err := db.conn.ExecContext(ctx, 
+	_, err := db.conn.ExecContext(ctx,
 		`UPDATE hosts SET tasks_config_yaml = $1 WHERE id = $2`,
 		yaml, hostID)
 	return err
@@ -140,13 +140,13 @@ func (db *DB) UpdateHostTasksConfigYAML(ctx context.Context, hostID, yaml string
 // GetHostTasksConfigYAML returns the cached tasks.yaml content for a host.
 func (db *DB) GetHostTasksConfigYAML(ctx context.Context, hostID string) (string, error) {
 	var yaml string
-	err := db.conn.QueryRowContext(ctx, 
+	err := db.conn.QueryRowContext(ctx,
 		`SELECT tasks_config_yaml FROM hosts WHERE id = $1`, hostID).Scan(&yaml)
 	return yaml, err
 }
 
 func (db *DB) UpdateHostStatus(ctx context.Context, id, status string) error {
-	_, err := db.conn.ExecContext(ctx, 
+	_, err := db.conn.ExecContext(ctx,
 		`UPDATE hosts SET status = $1, last_seen = NOW(), updated_at = NOW() WHERE id = $2`,
 		status, id,
 	)
@@ -166,7 +166,7 @@ func (db *DB) UpdateHost(ctx context.Context, id string, update *models.HostUpda
 		value := marshalTags(*update.Tags)
 		tagsJSON = &value
 	}
-	_, err := db.conn.ExecContext(ctx, 
+	_, err := db.conn.ExecContext(ctx,
 		`UPDATE hosts SET
 			name = COALESCE($1, name),
 			hostname = COALESCE($2, hostname),
@@ -187,27 +187,33 @@ func (db *DB) DeleteHost(ctx context.Context, id string) error {
 }
 
 func (db *DB) UpdateHostAPIKey(ctx context.Context, id string, apiKeyHash string) error {
-	_, err := db.conn.ExecContext(ctx, 
+	_, err := db.conn.ExecContext(ctx,
 		`UPDATE hosts SET api_key = $1, updated_at = NOW() WHERE id = $2`,
 		apiKeyHash, id,
 	)
 	return err
 }
 
-// UpdateHostStatusBasedOnLastSeen sets status to 'offline' for hosts not seen recently.
-func (db *DB) UpdateHostStatusBasedOnLastSeen(ctx context.Context, maxOfflineMinutes int) error {
+// UpdateHostStatusBasedOnLastSeen sets status to 'offline' for hosts not seen
+// recently and returns how many rows flipped (so callers can skip work when
+// nothing changed).
+func (db *DB) UpdateHostStatusBasedOnLastSeen(ctx context.Context, maxOfflineMinutes int) (int64, error) {
 	cutoffTime := time.Now().Add(time.Duration(-maxOfflineMinutes) * time.Minute)
-	_, err := db.conn.ExecContext(ctx, 
+	res, err := db.conn.ExecContext(ctx,
 		`UPDATE hosts SET status = 'offline' WHERE status != 'offline' AND last_seen < $1`,
 		cutoffTime,
 	)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	n, _ := res.RowsAffected()
+	return n, nil
 }
 
 // UpdateHostCollectors updates which collectors/metrics are available on a host.
 // collectorsJSON must be a valid JSON object (e.g. `{"docker":true,"smart":false,"cpu_temp":true}`).
 func (db *DB) UpdateHostCollectors(ctx context.Context, hostID, collectorsJSON string) error {
-	_, err := db.conn.ExecContext(ctx, 
+	_, err := db.conn.ExecContext(ctx,
 		`UPDATE hosts SET collectors = $1::jsonb, updated_at = NOW() WHERE id = $2`,
 		collectorsJSON, hostID)
 	return err
@@ -215,7 +221,7 @@ func (db *DB) UpdateHostCollectors(ctx context.Context, hostID, collectorsJSON s
 
 // GetHostHealthStatus returns status and last_seen for a single host.
 func (db *DB) GetHostHealthStatus(ctx context.Context, hostID string) (status string, lastSeen time.Time, err error) {
-	err = db.conn.QueryRowContext(ctx, 
+	err = db.conn.QueryRowContext(ctx,
 		`SELECT status, last_seen FROM hosts WHERE id = $1`,
 		hostID,
 	).Scan(&status, &lastSeen)

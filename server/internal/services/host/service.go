@@ -16,6 +16,7 @@ import (
 	"github.com/serversupervisor/server/internal/apperr"
 	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/dispatch"
+	"github.com/serversupervisor/server/internal/events"
 	"github.com/serversupervisor/server/internal/models"
 )
 
@@ -49,12 +50,19 @@ type Service struct {
 	repo          Repository
 	dispatcher    Dispatcher
 	latestVersion func() string
+	bus           *events.Bus
 }
 
 // NewService wires the service. latestVersion resolves the latest agent release
-// (injected so the service stays decoupled from the gitprovider/cache).
-func NewService(repo Repository, dispatcher Dispatcher, latestVersion func() string) *Service {
-	return &Service{repo: repo, dispatcher: dispatcher, latestVersion: latestVersion}
+// (injected so the service stays decoupled from the gitprovider/cache). bus is the
+// event bus used to wake live snapshots after host changes (nil-safe).
+func NewService(repo Repository, dispatcher Dispatcher, latestVersion func() string, bus *events.Bus) *Service {
+	return &Service{repo: repo, dispatcher: dispatcher, latestVersion: latestVersion, bus: bus}
+}
+
+// publishHostList wakes the snapshots whose host lists change on register/delete.
+func (s *Service) publishHostList() {
+	s.bus.PublishAll(events.TopicDashboard, events.TopicNetwork, events.TopicApt)
 }
 
 // generateAPIKey creates a new API key pair for a host. The plain key (returned
@@ -90,6 +98,7 @@ func (s *Service) Register(ctx context.Context, req models.HostRegistration) (id
 	if err := s.repo.RegisterHost(ctx, host); err != nil {
 		return "", "", err
 	}
+	s.publishHostList()
 	return hostID, plain, nil
 }
 
@@ -122,12 +131,19 @@ func (s *Service) Update(ctx context.Context, id string, req models.HostUpdate) 
 	if err := s.repo.UpdateHost(ctx, id, &req); err != nil {
 		return nil, err
 	}
+	s.bus.PublishAll(events.TopicDashboard, events.TopicNetwork, events.TopicApt)
+	s.bus.Publish(events.HostTopic(id))
 	return s.repo.GetHost(ctx, id)
 }
 
 // Delete removes a host.
 func (s *Service) Delete(ctx context.Context, id string) error {
-	return s.repo.DeleteHost(ctx, id)
+	if err := s.repo.DeleteHost(ctx, id); err != nil {
+		return err
+	}
+	s.publishHostList()
+	s.bus.Publish(events.HostTopic(id))
+	return nil
 }
 
 // RotateKey regenerates the host's API key and returns the new plain key.

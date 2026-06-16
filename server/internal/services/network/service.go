@@ -8,6 +8,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/serversupervisor/server/internal/events"
 	"github.com/serversupervisor/server/internal/models"
 )
 
@@ -25,10 +26,11 @@ type SnapshotBuilder func(ctx context.Context) (*models.NetworkSnapshot, error)
 type Service struct {
 	repo  Repository
 	build SnapshotBuilder
+	bus   *events.Bus
 }
 
-func NewService(repo Repository, build SnapshotBuilder) *Service {
-	return &Service{repo: repo, build: build}
+func NewService(repo Repository, build SnapshotBuilder, bus *events.Bus) *Service {
+	return &Service{repo: repo, build: build, bus: bus}
 }
 
 // Snapshot returns the live network snapshot.
@@ -41,9 +43,14 @@ func (s *Service) TopologyConfig(ctx context.Context) (*models.NetworkTopologyCo
 	return s.repo.GetNetworkTopologyConfig(ctx)
 }
 
-// SaveTopologyConfig persists the topology configuration.
+// SaveTopologyConfig persists the topology configuration then wakes the network
+// view subscribers (nil-safe when no bus is wired).
 func (s *Service) SaveTopologyConfig(ctx context.Context, cfg *models.NetworkTopologyConfig) error {
-	return s.repo.SaveNetworkTopologyConfig(ctx, cfg)
+	if err := s.repo.SaveNetworkTopologyConfig(ctx, cfg); err != nil {
+		return err
+	}
+	s.bus.Publish(events.TopicNetwork)
+	return nil
 }
 
 // TopologySnapshot returns the live snapshot merged with the persisted config.

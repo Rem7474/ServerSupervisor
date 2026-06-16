@@ -17,6 +17,7 @@ import (
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/cookies"
 	"github.com/serversupervisor/server/internal/database"
+	"github.com/serversupervisor/server/internal/events"
 	"github.com/serversupervisor/server/internal/models"
 )
 
@@ -42,10 +43,21 @@ const (
 	wsPingInterval = 30 * time.Second
 	wsPongWait     = 60 * time.Second
 	// dashboardCacheTTL is how long a freshly built dashboard snapshot is reused
-	// across all connected clients before being recomputed. The data ticker fires
-	// every 10s, so this lets concurrent clients (and the initial connection burst)
-	// share one computation instead of each running the full ~10-query snapshot.
-	dashboardCacheTTL = 5 * time.Second
+	// across all connected clients before being recomputed. It exists to collapse
+	// the N concurrent rebuilds that happen when many dashboards react to the same
+	// write event (or connect at once) into a single ~8-query build. It is kept
+	// short so an event-driven refresh stays effectively instant.
+	dashboardCacheTTL = 1 * time.Second
+	// snapshotDebounce coalesces a burst of write events (e.g. one agent report
+	// fans out to several topics, or several agents report at once) into a single
+	// snapshot rebuild per connection.
+	snapshotDebounce = 750 * time.Millisecond
+	// snapshotSafetyInterval is the slow backstop poll. Updates are normally pushed
+	// the instant a writer publishes the relevant topic; this periodic rebuild only
+	// exists to self-heal any write path that forgot to publish and to refresh
+	// values that change without a write event. It is deliberately long because the
+	// event bus carries the common case.
+	snapshotSafetyInterval = 60 * time.Second
 )
 
 type WSHandler struct {
@@ -53,6 +65,7 @@ type WSHandler struct {
 	cfg       *config.Config
 	streamHub *CommandStreamHub
 	notifHub  *NotificationHub
+	events    *events.Bus
 	ipConns   map[string]int
 	ipConnsMu sync.Mutex
 
@@ -69,12 +82,13 @@ type wsAuthMessage struct {
 	Token string `json:"token"`
 }
 
-func NewWSHandler(db *database.DB, cfg *config.Config, notifHub *NotificationHub) *WSHandler {
+func NewWSHandler(db *database.DB, cfg *config.Config, notifHub *NotificationHub, bus *events.Bus) *WSHandler {
 	return &WSHandler{
 		db:        db,
 		cfg:       cfg,
 		streamHub: NewCommandStreamHub(),
 		notifHub:  notifHub,
+		events:    bus,
 		ipConns:   make(map[string]int),
 	}
 }

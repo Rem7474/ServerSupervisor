@@ -18,7 +18,7 @@ const proxmoxSecret = "p2x-secret-DO-NOT-LEAK-123"
 func newProxmoxRouter(t *testing.T) (*gin.Engine, *database.DB) {
 	t.Helper()
 	db, cfg := testutil.NewPostgresDBWithConfig(t)
-	h := handlers.NewProxmoxHandler(proxmoxsvc.NewService(db, cfg))
+	h := handlers.NewProxmoxHandler(proxmoxsvc.NewService(db, cfg, nil))
 
 	r := gin.New()
 	r.GET("/proxmox/instances", h.ListConnections)

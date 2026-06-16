@@ -6,12 +6,13 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
+	"github.com/serversupervisor/server/internal/events"
 	"github.com/serversupervisor/server/internal/models"
 )
 
 func (h *WSHandler) Dashboard(c *gin.Context) {
 	ctx := c.Request.Context()
-	h.servePollingSnapshot(c, true, func(conn *websocket.Conn, lastHash *string) error {
+	h.serveSnapshot(c, true, []string{events.TopicDashboard}, func(conn *websocket.Conn, lastHash *string) error {
 		return h.sendDashboardSnapshot(ctx, conn, lastHash)
 	})
 }
@@ -24,33 +25,37 @@ func (h *WSHandler) HostDetail(c *gin.Context) {
 	}
 
 	ctx := c.Request.Context()
-	h.servePollingSnapshot(c, false, func(conn *websocket.Conn, lastHash *string) error {
+	h.serveSnapshot(c, false, []string{events.HostTopic(hostID)}, func(conn *websocket.Conn, lastHash *string) error {
 		return h.sendHostSnapshot(ctx, conn, hostID, lastHash)
 	})
 }
 
 func (h *WSHandler) Docker(c *gin.Context) {
 	ctx := c.Request.Context()
-	h.servePollingSnapshot(c, false, func(conn *websocket.Conn, lastHash *string) error {
+	h.serveSnapshot(c, false, []string{events.TopicDocker}, func(conn *websocket.Conn, lastHash *string) error {
 		return h.sendDockerSnapshot(ctx, conn, lastHash)
 	})
 }
 
 func (h *WSHandler) Network(c *gin.Context) {
 	ctx := c.Request.Context()
-	h.servePollingSnapshot(c, false, func(conn *websocket.Conn, lastHash *string) error {
+	h.serveSnapshot(c, false, []string{events.TopicNetwork}, func(conn *websocket.Conn, lastHash *string) error {
 		return h.sendNetworkSnapshot(ctx, conn, lastHash)
 	})
 }
 
 func (h *WSHandler) Apt(c *gin.Context) {
 	ctx := c.Request.Context()
-	h.servePollingSnapshot(c, false, func(conn *websocket.Conn, lastHash *string) error {
+	h.serveSnapshot(c, false, []string{events.TopicApt}, func(conn *websocket.Conn, lastHash *string) error {
 		return h.sendAptSnapshot(ctx, conn, lastHash)
 	})
 }
 
-func (h *WSHandler) servePollingSnapshot(c *gin.Context, enforceIPLimit bool, sendSnapshot func(*websocket.Conn, *string) error) {
+// serveSnapshot upgrades the connection then pushes the snapshot event-driven:
+// it rebuilds and sends whenever a writer publishes one of `topics` (debounced to
+// coalesce bursts), with a slow safety-net rebuild as a backstop. The diff-hash in
+// each sendSnapshot still suppresses redundant writes when nothing actually changed.
+func (h *WSHandler) serveSnapshot(c *gin.Context, enforceIPLimit bool, topics []string, sendSnapshot func(*websocket.Conn, *string) error) {
 	if enforceIPLimit {
 		ip := c.ClientIP()
 		if !h.acquireConn(ip) {
@@ -78,9 +83,12 @@ func (h *WSHandler) servePollingSnapshot(c *gin.Context, enforceIPLimit bool, se
 		return conn.SetReadDeadline(time.Now().Add(wsPongWait))
 	})
 
-	dataTicker := time.NewTicker(10 * time.Second)
+	signal, unsubscribe := h.events.Subscribe(topics...)
+	defer unsubscribe()
+
+	safetyTicker := time.NewTicker(snapshotSafetyInterval)
 	pingTicker := time.NewTicker(wsPingInterval)
-	defer dataTicker.Stop()
+	defer safetyTicker.Stop()
 	defer pingTicker.Stop()
 
 	var lastHash string
@@ -91,11 +99,36 @@ func (h *WSHandler) servePollingSnapshot(c *gin.Context, enforceIPLimit bool, se
 	done := make(chan struct{})
 	go h.readLoop(conn, done)
 
+	// debounce coalesces a burst of signals into one rebuild. It is armed on the
+	// first signal and disarmed when it fires; debounceC is nil while disarmed so
+	// the select arm stays dormant.
+	var debounce *time.Timer
+	var debounceC <-chan time.Time
+	arm := func() {
+		if debounce == nil {
+			debounce = time.NewTimer(snapshotDebounce)
+			debounceC = debounce.C
+		}
+	}
+	defer func() {
+		if debounce != nil {
+			debounce.Stop()
+		}
+	}()
+
 	for {
 		select {
 		case <-done:
 			return
-		case <-dataTicker.C:
+		case <-signal:
+			arm()
+		case <-debounceC:
+			debounce = nil
+			debounceC = nil
+			if err := sendSnapshot(conn, &lastHash); err != nil {
+				return
+			}
+		case <-safetyTicker.C:
 			if err := sendSnapshot(conn, &lastHash); err != nil {
 				return
 			}

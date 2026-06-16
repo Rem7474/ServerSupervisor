@@ -16,6 +16,7 @@ import (
 
 	"github.com/serversupervisor/server/internal/apperr"
 	"github.com/serversupervisor/server/internal/config"
+	"github.com/serversupervisor/server/internal/events"
 	"github.com/serversupervisor/server/internal/models"
 	"github.com/serversupervisor/server/internal/notify"
 )
@@ -86,12 +87,13 @@ type Service struct {
 	cfg                 *config.Config
 	streamHub           StreamHub
 	notifPusher         NotificationPusher
+	bus                 *events.Bus
 	completionListeners []CommandCompletionListener
 	completionMu        sync.RWMutex
 }
 
-func NewService(repo Repository, cfg *config.Config, streamHub StreamHub, notifPusher NotificationPusher) *Service {
-	return &Service{repo: repo, cfg: cfg, streamHub: streamHub, notifPusher: notifPusher}
+func NewService(repo Repository, cfg *config.Config, streamHub StreamHub, notifPusher NotificationPusher, bus *events.Bus) *Service {
+	return &Service{repo: repo, cfg: cfg, streamHub: streamHub, notifPusher: notifPusher, bus: bus}
 }
 
 func (s *Service) AddCompletionListener(listener CommandCompletionListener) {
@@ -145,6 +147,12 @@ func (s *Service) ReceiveReport(ctx context.Context, hostID, safeHostID string, 
 	if commands == nil {
 		commands = []models.PendingCommand{}
 	}
+
+	// A report refreshes everything the live views render for this host, so wake
+	// the relevant snapshot subscribers (nil-safe when no bus is wired).
+	s.bus.PublishAll(events.TopicDashboard, events.TopicDocker, events.TopicNetwork, events.TopicApt)
+	s.bus.Publish(events.HostTopic(hostID))
+
 	return &ReportResult{Commands: commands, SkipMetrics: proxmoxIsMetricsSource}, nil
 }
 
@@ -195,6 +203,8 @@ func (s *Service) ReportCommandResult(ctx context.Context, hostID string, result
 				slog.ErrorContext(ctx, fmt.Sprintf("Failed to update APT status: %v", err))
 			}
 		}
+		s.bus.Publish(events.TopicApt)
+		s.bus.Publish(events.HostTopic(cmd.HostID))
 	}
 	return nil
 }
@@ -294,6 +304,11 @@ func (s *Service) LogAuditAction(ctx context.Context, hostID, module, action, st
 	}
 	if action == "update" && status == "completed" {
 		_ = s.repo.TouchAptLastAction(ctx, hostID, "update")
+	}
+	// A self-reported command shows up in the apt history + host views.
+	if module != "" {
+		s.bus.Publish(events.TopicApt)
+		s.bus.Publish(events.HostTopic(hostID))
 	}
 	return nil
 }
