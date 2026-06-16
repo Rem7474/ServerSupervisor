@@ -21,6 +21,7 @@
           style="width: 160px;"
         >
         <button
+          type="button"
           class="btn btn-sm btn-outline-secondary"
           :disabled="loading"
           @click="loadProcesses"

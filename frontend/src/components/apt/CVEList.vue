@@ -66,6 +66,7 @@
 
     <button
       v-if="cveGroups.length > limit && !alwaysExpanded"
+      type="button"
       class="btn btn-link btn-sm p-0 small text-secondary mt-1"
       @click="showAll = !showAll"
     >

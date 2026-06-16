@@ -17,6 +17,7 @@
             @keyup.enter="loadJournalLogs"
           >
           <button
+            type="button"
             class="btn btn-primary"
             :disabled="!journalService.trim() || journalLoading"
             @click="loadJournalLogs"

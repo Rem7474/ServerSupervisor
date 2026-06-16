@@ -5,6 +5,7 @@
         <button
           v-for="f in TYPE_FILTERS"
           :key="f.value"
+          type="button"
           class="btn btn-sm"
           :class="typeFilter === f.value ? 'btn-primary' : 'btn-outline-secondary'"
           @click="typeFilter = f.value"
@@ -13,6 +14,7 @@
         </button>
       </div>
       <button
+        type="button"
         class="btn btn-sm btn-outline-secondary ms-auto"
         :disabled="loading"
         @click="load"

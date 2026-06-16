@@ -12,6 +12,7 @@
         class="btn-group btn-group-sm"
       >
         <button
+          type="button"
           class="btn btn-outline-secondary"
           :disabled="!!aptCmdLoading"
           @click="$emit('run-apt-command', 'update')"
@@ -23,6 +24,7 @@
           apt update
         </button>
         <button
+          type="button"
           class="btn btn-primary"
           :disabled="!!aptCmdLoading"
           @click="$emit('run-apt-command', 'upgrade')"
@@ -34,6 +36,7 @@
           apt upgrade
         </button>
         <button
+          type="button"
           class="btn btn-outline-danger"
           :disabled="!!aptCmdLoading"
           @click="$emit('run-apt-command', 'dist-upgrade')"
@@ -124,6 +127,7 @@
         class="btn-group btn-group-sm"
       >
         <button
+          type="button"
           class="btn btn-outline-secondary"
           :disabled="!!aptCmdLoading"
           @click="$emit('run-apt-command', 'update')"
@@ -180,6 +184,7 @@
         <span class="text-secondary">unattended-upgrades n'est pas installé sur cet hôte.</span>
         <button
           v-if="canRunApt"
+          type="button"
           class="btn btn-sm btn-primary"
           :disabled="uuLoading === 'install'"
           @click="$emit('uu-install')"
@@ -271,6 +276,7 @@
           <!-- Actions -->
           <div class="col-12 d-flex gap-2">
             <button
+              type="button"
               class="btn btn-sm btn-primary"
               :disabled="uuLoading === 'configure'"
               @click="$emit('uu-configure', uuForm)"
@@ -282,6 +288,7 @@
               Enregistrer
             </button>
             <button
+              type="button"
               class="btn btn-sm btn-outline-secondary"
               :disabled="!!uuLoading"
               @click="$emit('uu-run-now')"
@@ -339,6 +346,7 @@
                   </td>
                   <td>
                     <button
+                      type="button"
                       class="btn btn-sm btn-ghost-secondary"
                       title="Voir les logs"
                       :disabled="!run.log_snippet"
@@ -381,6 +389,7 @@
         <span>En attente des données de l'agent…</span>
         <button
           v-if="canRunApt"
+          type="button"
           class="btn btn-sm btn-outline-primary"
           :disabled="uuLoading === 'install'"
           @click="$emit('uu-install')"

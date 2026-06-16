@@ -89,12 +89,14 @@
         </div>
         <div class="modal-footer">
           <button
+            type="button"
             class="btn btn-secondary"
             @click="$emit('close')"
           >
             Annuler
           </button>
           <button
+            type="button"
             class="btn btn-primary"
             :disabled="form.saving"
             @click="saveSchedule"

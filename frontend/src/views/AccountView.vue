@@ -53,6 +53,7 @@
     <ul class="nav nav-tabs mb-4">
       <li class="nav-item">
         <button
+          type="button"
           class="nav-link"
           :class="{ active: activeTab === 'profil' }"
           @click="activeTab = 'profil'"
@@ -62,6 +63,7 @@
       </li>
       <li class="nav-item">
         <button
+          type="button"
           class="nav-link"
           :class="{ active: activeTab === 'historique' }"
           @click="switchToHistorique"
@@ -75,6 +77,7 @@
       </li>
       <li class="nav-item">
         <button
+          type="button"
           class="nav-link"
           :class="{ active: activeTab === 'connexions' }"
           @click="switchToConnexions"
@@ -421,6 +424,7 @@
                   </td>
                   <td>
                     <button
+                      type="button"
                       class="btn btn-sm btn-ghost-secondary"
                       :disabled="!cmd.output && cmd.status === 'pending'"
                       title="Voir les logs"

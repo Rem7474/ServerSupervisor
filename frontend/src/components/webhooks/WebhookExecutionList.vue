@@ -6,6 +6,7 @@
       </h3>
       <button
         v-if="showRefresh"
+        type="button"
         class="btn btn-sm btn-ghost-secondary"
         @click="$emit('refresh')"
       >
@@ -102,6 +103,7 @@
               <td>
                 <button
                   v-if="execution.command_id && logsMode === 'inline'"
+                  type="button"
                   class="btn btn-sm btn-ghost-secondary"
                   title="Voir les logs"
                   @click="$emit('open-logs', execution.command_id)"
@@ -204,6 +206,7 @@
               <td>
                 <button
                   v-if="execution.command_id && logsMode === 'inline'"
+                  type="button"
                   class="btn btn-sm btn-ghost-secondary"
                   title="Voir les logs"
                   @click="$emit('open-logs', execution.command_id)"

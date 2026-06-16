@@ -20,6 +20,7 @@
         </div>
       </div>
       <button
+        type="button"
         class="btn btn-outline-secondary"
         :disabled="loading"
         @click="fetchUsers"
@@ -168,7 +169,8 @@
                 {{ formatDate(user.created_at) }}
               </td>
               <td class="text-end">
-                <button 
+                <button
+                  type="button" 
                   class="btn btn-sm btn-danger"
                   :disabled="saving || user.username === auth.username || (isLastAdmin(user.id) && user.role === 'admin')"
                   :title="getDeleteButtonTitle(user)"

@@ -20,12 +20,14 @@
         <div class="d-flex gap-2">
           <button
             v-if="canManage"
+            type="button"
             class="btn btn-primary btn-sm"
             @click="openCreate"
           >
             + Nouvelle tâche
           </button>
           <button
+            type="button"
             class="btn btn-outline-secondary btn-sm"
             @click="loadTasks"
           >
@@ -295,6 +297,7 @@
               <td class="text-end">
                 <div class="d-flex gap-1 justify-content-end">
                   <button
+                    type="button"
                     class="btn btn-sm btn-outline-secondary"
                     title="Historique d'exécutions"
                     @click="openHistory(task)"
@@ -320,6 +323,7 @@
                   </button>
                   <button
                     v-if="canManage"
+                    type="button"
                     class="btn btn-sm btn-outline-primary"
                     :disabled="runningId === task.id"
                     @click="runNow(task)"
@@ -332,6 +336,7 @@
                   </button>
                   <button
                     v-if="canManage"
+                    type="button"
                     class="btn btn-sm btn-outline-secondary"
                     title="Modifier"
                     @click="openEdit(task)"
@@ -353,6 +358,7 @@
                   </button>
                   <button
                     v-if="canManage"
+                    type="button"
                     class="btn btn-sm btn-outline-danger"
                     title="Supprimer"
                     @click="confirmDelete(task)"
@@ -653,12 +659,14 @@
           </div>
           <div class="modal-footer">
             <button
+              type="button"
               class="btn btn-secondary"
               @click="editTask = null"
             >
               Annuler
             </button>
             <button
+              type="button"
               class="btn btn-primary"
               :disabled="editSaving"
               @click="saveEdit"
@@ -768,6 +776,7 @@
                             style="max-width:300px"
                           >{{ firstLine(ex.output) }}</span>
                           <button
+                            type="button"
                             class="btn btn-xs btn-ghost-secondary ms-auto flex-shrink-0"
                             @click="expandedId = ex.id"
                           >
@@ -780,6 +789,7 @@
                             style="max-height:300px;overflow-y:auto;white-space:pre-wrap;word-break:break-all"
                           >{{ ex.output }}</pre>
                           <button
+                            type="button"
                             class="btn btn-xs btn-ghost-secondary"
                             @click="expandedId = null"
                           >
@@ -796,6 +806,7 @@
           <div class="modal-footer">
             <span class="text-muted small me-auto">{{ executions.length }} exécution{{ executions.length !== 1 ? 's' : '' }} (20 dernières)</span>
             <button
+              type="button"
               class="btn btn-secondary"
               @click="historyTask = null"
             >

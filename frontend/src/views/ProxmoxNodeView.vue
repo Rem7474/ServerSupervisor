@@ -83,6 +83,7 @@
             </option>
           </select>
           <button
+            type="button"
             class="btn btn-sm btn-primary"
             :disabled="sensorSourceSaving || sensorSourceLoading"
             @click="saveSensorSource"
@@ -336,6 +337,7 @@
               <ul class="nav nav-tabs card-header-tabs proxmox-node-tabs">
                 <li class="nav-item">
                   <button
+                    type="button"
                     class="nav-link"
                     :class="{ active: tab === 'vms' }"
                     @click="tab = 'vms'; loadGuestNetworks()"
@@ -345,6 +347,7 @@
                 </li>
                 <li class="nav-item">
                   <button
+                    type="button"
                     class="nav-link"
                     :class="{ active: tab === 'lxc' }"
                     @click="tab = 'lxc'; loadGuestNetworks()"
@@ -354,6 +357,7 @@
                 </li>
                 <li class="nav-item">
                   <button
+                    type="button"
                     class="nav-link"
                     :class="{ active: tab === 'storage' }"
                     @click="tab = 'storage'"
@@ -363,6 +367,7 @@
                 </li>
                 <li class="nav-item">
                   <button
+                    type="button"
                     class="nav-link"
                     :class="{ active: tab === 'disks' }"
                     @click="tab = 'disks'"
@@ -372,6 +377,7 @@
                 </li>
                 <li class="nav-item">
                   <button
+                    type="button"
                     class="nav-link"
                     :class="{ active: tab === 'tasks' }"
                     @click="tab = 'tasks'"
@@ -385,6 +391,7 @@
                 </li>
                 <li class="nav-item">
                   <button
+                    type="button"
                     class="nav-link"
                     :class="{ active: tab === 'updates' }"
                     @click="tab = 'updates'"
@@ -400,6 +407,7 @@
                 </li>
                 <li class="nav-item">
                   <button
+                    type="button"
                     class="nav-link"
                     :class="{ active: tab === 'services' }"
                     @click="tab = 'services'; loadServices()"
@@ -409,6 +417,7 @@
                 </li>
                 <li class="nav-item">
                   <button
+                    type="button"
                     class="nav-link"
                     :class="{ active: tab === 'security' }"
                     @click="tab = 'security'"
@@ -606,12 +615,14 @@
           </div>
           <div class="modal-footer">
             <button
+              type="button"
               class="btn btn-secondary"
               @click="migrateModal.open = false"
             >
               Annuler
             </button>
             <button
+              type="button"
               class="btn btn-primary"
               :disabled="migrateModal.loading || !migrateModal.target"
               @click="submitMigration"

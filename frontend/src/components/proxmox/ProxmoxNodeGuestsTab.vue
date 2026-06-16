@@ -176,6 +176,7 @@
           <td v-if="showMigrate">
             <button
               v-if="peerNodes.length > 0"
+              type="button"
               class="btn btn-sm btn-ghost-secondary"
               title="Migrer vers un autre nœud"
               @click="emit('migrate', g)"

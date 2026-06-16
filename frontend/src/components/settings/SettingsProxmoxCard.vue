@@ -6,6 +6,7 @@
       </h3>
       <button
         v-if="authIsAdmin && !showForm"
+        type="button"
         class="btn btn-sm btn-primary"
         @click="openAddForm"
       >
@@ -87,6 +88,7 @@
       </div>
       <div class="mt-3 d-flex align-items-center gap-2">
         <button
+          type="button"
           class="btn btn-primary"
           :disabled="saving"
           @click="save"
@@ -94,12 +96,14 @@
           {{ saving ? 'Enregistrement...' : (editingId ? 'Mettre à jour' : 'Créer') }}
         </button>
         <button
+          type="button"
           class="btn btn-outline-secondary"
           @click="cancelForm"
         >
           Annuler
         </button>
         <button
+          type="button"
           class="btn btn-outline-info ms-2"
           :disabled="testing"
           @click="testForm"
@@ -181,6 +185,7 @@
             >
               <div class="d-flex gap-1 justify-content-end">
                 <button
+                  type="button"
                   class="btn btn-sm btn-outline-secondary"
                   title="Modifier"
                   @click="openEditForm(inst)"
@@ -197,6 +202,7 @@
                   </svg>
                 </button>
                 <button
+                  type="button"
                   class="btn btn-sm btn-outline-info"
                   title="Tester"
                   @click="testById(inst)"
@@ -216,6 +222,7 @@
                   </svg>
                 </button>
                 <button
+                  type="button"
                   class="btn btn-sm btn-outline-primary"
                   title="Collecter maintenant"
                   @click="pollNow(inst)"
@@ -231,6 +238,7 @@
                   </svg>
                 </button>
                 <button
+                  type="button"
                   class="btn btn-sm btn-outline-danger"
                   title="Supprimer"
                   @click="remove(inst)"

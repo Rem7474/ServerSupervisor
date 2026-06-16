@@ -138,6 +138,7 @@
                 <template v-if="canRunDocker">
                   <button
                     v-if="getComposeStatus(p) === 'stopped'"
+                    type="button"
                     :disabled="!!actionLoading[p.name]"
                     class="btn btn-sm btn-success"
                     title="Start (up -d)"
@@ -166,6 +167,7 @@
                   </button>
                   <template v-if="getComposeStatus(p) === 'running'">
                     <button
+                      type="button"
                       :disabled="!!actionLoading[p.name]"
                       class="btn btn-sm btn-outline-danger"
                       title="Stop (down)"
@@ -199,6 +201,7 @@
                       /></svg>
                     </button>
                     <button
+                      type="button"
                       :disabled="!!actionLoading[p.name]"
                       class="btn btn-sm btn-outline-warning"
                       title="Redémarrer"
@@ -227,6 +230,7 @@
                     </button>
                   </template>
                   <button
+                    type="button"
                     :disabled="!!actionLoading[p.name]"
                     class="btn btn-sm btn-ghost-secondary"
                     title="Voir les logs"
@@ -255,6 +259,7 @@
                   </button>
                 </template>
                 <button
+                  type="button"
                   class="btn btn-sm btn-ghost-secondary"
                   title="Config"
                   @click="selectedProject = p"
@@ -384,6 +389,7 @@
               <div class="d-flex align-items-center justify-content-between px-3 pt-3 pb-2 border-bottom">
                 <span class="text-secondary small fw-semibold">docker compose config (résolu)</span>
                 <button
+                  type="button"
                   :class="['btn', 'btn-sm', copied ? 'btn-success' : 'btn-ghost-secondary']"
                   @click="copyConfig(selectedProject.raw_config)"
                 >

@@ -83,12 +83,14 @@
         <div class="modal-footer">
           <div class="w-100 d-flex gap-2">
             <button
+              type="button"
               class="btn link-secondary w-100"
               @click="handleCancel"
             >
               {{ dialog.cancelLabel.value }}
             </button>
             <button
+              type="button"
               :disabled="!!dialog.requiredText.value && typedText !== dialog.requiredText.value"
               :class="['btn', 'w-100', dialog.destructive.value || dialog.variant.value === 'danger' ? 'btn-danger' : 'btn-warning']"
               @click="tryConfirm"

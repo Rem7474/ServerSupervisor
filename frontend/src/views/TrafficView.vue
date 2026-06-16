@@ -115,6 +115,7 @@
           <button
             v-for="p in periodOptions"
             :key="p.value"
+            type="button"
             class="btn btn-sm"
             :class="period === p.value ? 'btn-primary' : 'btn-outline-secondary'"
             @click="setPeriod(p.value)"
@@ -244,6 +245,7 @@
           </div>
 
           <button
+            type="button"
             class="btn btn-primary btn-sm traffic-refresh-btn"
             :disabled="loading"
             @click="loadAll(true)"
@@ -554,6 +556,7 @@
                     </td>
                     <td class="text-end">
                       <button
+                        type="button"
                         class="btn btn-sm btn-outline-primary"
                         @click="openDomain(item.domain)"
                       >
@@ -649,6 +652,7 @@
               </div>
             </div>
             <button
+              type="button"
               class="btn btn-sm btn-outline-secondary"
               @click="closeDomainModal"
             >

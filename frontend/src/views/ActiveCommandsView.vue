@@ -72,6 +72,7 @@
             </option>
           </select>
           <button
+            type="button"
             class="btn btn-sm btn-outline-secondary"
             :disabled="loading"
             @click="load"
@@ -161,6 +162,7 @@
               <td class="text-end">
                 <button
                   v-if="cmd.status === 'pending' || cmd.status === 'running'"
+                  type="button"
                   class="btn btn-sm btn-outline-danger"
                   :disabled="cancellingId === cmd.id"
                   @click="cancelCmd(cmd.id)"

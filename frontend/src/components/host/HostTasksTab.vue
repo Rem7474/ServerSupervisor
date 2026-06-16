@@ -13,6 +13,7 @@
       />
       <button
         v-if="canRunApt"
+        type="button"
         class="btn btn-primary"
         @click="openCreateTask"
       >
@@ -56,6 +57,7 @@
         </p>
         <button
           v-if="canRunApt"
+          type="button"
           class="btn btn-primary"
           @click="openCreateTask"
         >
@@ -146,6 +148,7 @@
                 <div class="d-flex gap-1 justify-content-end">
                   <button
                     v-if="task.last_command_id"
+                    type="button"
                     class="btn btn-sm btn-ghost-secondary"
                     title="Voir les logs"
                     @click="openTaskLogs(task)"
@@ -166,6 +169,7 @@
                   </button>
                   <button
                     v-if="canRunApt"
+                    type="button"
                     class="btn btn-sm btn-outline-primary"
                     :disabled="taskRunningId === task.id"
                     @click="runTaskNow(task)"
@@ -178,6 +182,7 @@
                   </button>
                   <button
                     v-if="canRunApt"
+                    type="button"
                     class="btn btn-sm btn-outline-secondary"
                     @click="openEditTask(task)"
                   >
@@ -185,6 +190,7 @@
                   </button>
                   <button
                     v-if="canRunApt"
+                    type="button"
                     class="btn btn-sm btn-outline-danger"
                     @click="confirmDeleteTask(task)"
                   >

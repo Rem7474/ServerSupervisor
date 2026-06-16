@@ -6,6 +6,7 @@
       </h3>
       <button
         v-if="authIsAdmin && !showForm"
+        type="button"
         class="btn btn-sm btn-primary"
         @click="openAddForm"
       >
@@ -78,6 +79,7 @@
       </div>
       <div class="mt-3 d-flex align-items-center gap-2">
         <button
+          type="button"
           class="btn btn-primary"
           :disabled="saving"
           @click="save"
@@ -85,12 +87,14 @@
           {{ saving ? 'Enregistrement…' : (editingId ? 'Mettre à jour' : 'Créer') }}
         </button>
         <button
+          type="button"
           class="btn btn-outline-secondary"
           @click="cancelForm"
         >
           Annuler
         </button>
         <button
+          type="button"
           class="btn btn-outline-info ms-2"
           :disabled="testing"
           @click="testForm"
@@ -171,6 +175,7 @@
               <div class="d-flex gap-1 justify-content-end">
                 <!-- Edit -->
                 <button
+                  type="button"
                   class="btn btn-sm btn-outline-secondary"
                   title="Modifier"
                   @click="openEditForm(conn)"
@@ -188,6 +193,7 @@
                 </button>
                 <!-- Refresh -->
                 <button
+                  type="button"
                   class="btn btn-sm btn-outline-info"
                   title="Rafraîchir maintenant"
                   @click="refreshNow(conn)"
@@ -205,6 +211,7 @@
                 </button>
                 <!-- Delete -->
                 <button
+                  type="button"
                   class="btn btn-sm btn-outline-danger"
                   title="Supprimer"
                   @click="remove(conn)"
@@ -235,7 +242,6 @@
       <span :class="['small', listOk ? 'text-success' : 'text-danger']">{{ listMsg }}</span>
     </div>
   </div>
-
 </template>
 
 <script setup lang="ts">

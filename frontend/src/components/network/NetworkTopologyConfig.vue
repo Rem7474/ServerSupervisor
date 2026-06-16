@@ -86,6 +86,7 @@
           </div>
         </div>
         <button
+          type="button"
           class="btn btn-outline-light btn-sm ms-2"
           @click="addServiceRow"
         >
@@ -192,6 +193,7 @@
               </td>
               <td class="text-end">
                 <button
+                  type="button"
                   class="btn btn-sm btn-outline-danger"
                   @click="removeServiceRow(service.id)"
                 >
@@ -482,6 +484,7 @@
                   <td class="text-end">
                     <button
                       v-if="isPortModified(host.id, port.port)"
+                      type="button"
                       class="btn btn-sm btn-ghost-secondary"
                       title="Reinitialiser ce port"
                       aria-label="Reinitialiser ce port"

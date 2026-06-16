@@ -134,6 +134,7 @@
             <button
               v-for="h in [1, 6, 24, 168, 720]"
               :key="h"
+              type="button"
               :class="hours === h ? 'btn btn-primary' : 'btn btn-outline-secondary'"
               @click="changeRange(h)"
             >

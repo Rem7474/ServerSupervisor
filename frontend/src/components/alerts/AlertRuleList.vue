@@ -159,6 +159,7 @@
             <td>
               <div class="btn-group">
                 <button
+                  type="button"
                   class="btn btn-sm btn-ghost-secondary"
                   title="Modifier"
                   @click="$emit('edit', rule)"
@@ -180,6 +181,7 @@
                   </svg>
                 </button>
                 <button
+                  type="button"
                   class="btn btn-sm btn-ghost-danger"
                   title="Supprimer"
                   @click="$emit('delete', rule)"

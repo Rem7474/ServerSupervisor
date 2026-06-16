@@ -38,6 +38,7 @@
         {{ message }}
       </div>
       <button
+        type="button"
         class="btn btn-sm btn-outline-danger"
         @click="reset"
       >

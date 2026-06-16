@@ -93,6 +93,7 @@
           </td>
           <td>
             <button
+              type="button"
               class="btn btn-sm btn-ghost-secondary"
               title="Voir les logs"
               @click="emit('view-logs', { upid: t.upid, action: t.task_type, label: t.object_id })"

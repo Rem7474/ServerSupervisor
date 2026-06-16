@@ -37,6 +37,7 @@
           <button
             v-for="opt in timeRangeOptions"
             :key="opt.hours"
+            type="button"
             :class="chartHours === opt.hours ? 'btn btn-primary' : 'btn btn-outline-secondary'"
             @click="loadHistory(opt.hours)"
           >

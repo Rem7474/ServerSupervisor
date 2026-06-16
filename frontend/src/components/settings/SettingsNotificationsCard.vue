@@ -53,6 +53,7 @@
     <div class="card-footer d-flex align-items-center gap-2">
       <button
         v-if="authIsAdmin"
+        type="button"
         class="btn btn-primary"
         :disabled="savingNotif"
         @click="$emit('save')"
@@ -60,6 +61,7 @@
         {{ savingNotif ? 'Enregistrement...' : 'Enregistrer' }}
       </button>
       <button
+        type="button"
         class="btn btn-outline-secondary"
         :disabled="testingNtfy || !form.ntfyUrl"
         @click="$emit('test')"

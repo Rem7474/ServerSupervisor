@@ -11,6 +11,7 @@
         <button
           v-for="opt in timeframeOptions"
           :key="opt.value"
+          type="button"
           :class="timeframe === opt.value ? 'btn btn-primary' : 'btn btn-outline-secondary'"
           @click="$emit('timeframe-changed', opt.value)"
         >

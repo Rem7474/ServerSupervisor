@@ -460,12 +460,14 @@
         </div>
         <div class="modal-footer">
           <button
+            type="button"
             class="btn btn-secondary"
             @click="close"
           >
             Annuler
           </button>
           <button
+            type="button"
             class="btn btn-primary"
             :disabled="saving"
             @click="submit"

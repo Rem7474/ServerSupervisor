@@ -28,6 +28,7 @@
         placeholder="Filtre syslog (ex: failed, denied, apparmor)"
       >
       <button
+        type="button"
         class="btn btn-sm btn-outline-secondary"
         :disabled="loading"
         @click="loadEvents"

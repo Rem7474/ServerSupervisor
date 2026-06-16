@@ -39,6 +39,7 @@
         >
           <div class="btn-group btn-group-sm">
             <button
+              type="button"
               class="btn btn-outline-secondary"
               :disabled="isCmdLoading"
               @click="$emit('run-cmd', 'update')"
@@ -51,6 +52,7 @@
               update
             </button>
             <button
+              type="button"
               class="btn btn-primary"
               :disabled="isCmdLoading"
               @click="$emit('run-cmd', 'upgrade')"
@@ -63,6 +65,7 @@
               upgrade
             </button>
             <button
+              type="button"
               class="btn btn-outline-danger"
               :disabled="isCmdLoading"
               @click="$emit('run-cmd', 'dist-upgrade')"
@@ -76,6 +79,7 @@
             </button>
           </div>
           <button
+            type="button"
             class="btn btn-sm btn-outline-secondary"
             title="Planifier une commande APT"
             @click="$emit('schedule')"
@@ -123,6 +127,7 @@
           class="text-secondary small flex-shrink-0"
         >Mode lecture seule</span>
         <button
+          type="button"
           class="btn btn-sm btn-ghost-secondary flex-shrink-0"
           :title="expanded ? 'Réduire' : 'Développer'"
           @click="$emit('update:expanded', !expanded)"
@@ -258,6 +263,7 @@
               </span>
               <button
                 v-if="packages.length > PKG_PREVIEW_COUNT"
+                type="button"
                 class="btn btn-link btn-sm p-0 small text-secondary"
                 @click="pkgShowAll = !pkgShowAll"
               >
@@ -304,6 +310,7 @@
                 class="text-muted small flex-shrink-0"
               >· {{ cmd.triggered_by }}</span>
               <button
+                type="button"
                 class="btn btn-sm btn-ghost-secondary ms-auto flex-shrink-0"
                 title="Voir les logs"
                 @click="$emit('watch-command', cmd)"

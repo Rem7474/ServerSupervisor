@@ -67,6 +67,7 @@
         class="p-2 border-top text-center"
       >
         <button
+          type="button"
           class="btn btn-outline-secondary btn-sm"
           @click="showAll = !showAll"
         >

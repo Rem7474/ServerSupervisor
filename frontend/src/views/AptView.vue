@@ -127,7 +127,6 @@
       :host="scheduleHost"
       @close="scheduleHost = null"
     />
-
   </div>
 </template>
 

@@ -15,6 +15,7 @@
             Met à jour la politique de rétention TimescaleDB à {{ settings.metricsRetentionDays }} jours (system_metrics, disk_metrics)
           </p>
           <button
+            type="button"
             class="btn btn-warning btn-sm"
             :disabled="cleaningMetrics"
             @click="showCleanMetricsModal = true"
@@ -37,6 +38,7 @@
             Supprime les entrées audit plus anciennes que {{ settings.auditRetentionDays }} jours
           </p>
           <button
+            type="button"
             class="btn btn-warning btn-sm"
             :disabled="cleaningAuditLogs"
             @click="showCleanAuditModal = true"

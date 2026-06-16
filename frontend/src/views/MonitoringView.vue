@@ -19,6 +19,7 @@
         </div>
         <button
           v-if="auth.role === 'admin'"
+          type="button"
           class="btn btn-primary"
           @click="tab === 'ssl' ? openCreateCert() : openCreateProbe()"
         >
@@ -32,6 +33,7 @@
       <ul class="nav nav-tabs">
         <li class="nav-item">
           <button
+            type="button"
             :class="['nav-link', tab === 'uptime' ? 'active' : '']"
             @click="setTab('uptime')"
           >
@@ -57,6 +59,7 @@
         </li>
         <li class="nav-item">
           <button
+            type="button"
             :class="['nav-link', tab === 'ssl' ? 'active' : '']"
             @click="setTab('ssl')"
           >
@@ -137,28 +140,48 @@
             <thead>
               <tr>
                 <th>
-                  <button class="btn-sort" @click="toggleProbeSort('name')">
+                  <button
+                    type="button"
+                    class="btn-sort"
+                    @click="toggleProbeSort('name')"
+                  >
                     Sonde <span class="sort-icon">{{ probeSortIcon('name') }}</span>
                   </button>
                 </th>
                 <th>Cible</th>
                 <th>
-                  <button class="btn-sort" @click="toggleProbeSort('status')">
+                  <button
+                    type="button"
+                    class="btn-sort"
+                    @click="toggleProbeSort('status')"
+                  >
                     Statut <span class="sort-icon">{{ probeSortIcon('status') }}</span>
                   </button>
                 </th>
                 <th>
-                  <button class="btn-sort" @click="toggleProbeSort('uptime')">
+                  <button
+                    type="button"
+                    class="btn-sort"
+                    @click="toggleProbeSort('uptime')"
+                  >
                     Uptime 24h <span class="sort-icon">{{ probeSortIcon('uptime') }}</span>
                   </button>
                 </th>
                 <th>
-                  <button class="btn-sort" @click="toggleProbeSort('latency')">
+                  <button
+                    type="button"
+                    class="btn-sort"
+                    @click="toggleProbeSort('latency')"
+                  >
                     Latence <span class="sort-icon">{{ probeSortIcon('latency') }}</span>
                   </button>
                 </th>
                 <th>
-                  <button class="btn-sort" @click="toggleProbeSort('last_checked')">
+                  <button
+                    type="button"
+                    class="btn-sort"
+                    @click="toggleProbeSort('last_checked')"
+                  >
                     Dernière vérification <span class="sort-icon">{{ probeSortIcon('last_checked') }}</span>
                   </button>
                 </th>
@@ -227,6 +250,7 @@
                   <div class="btn-list">
                     <button
                       v-if="auth.role === 'admin'"
+                      type="button"
                       class="btn btn-sm btn-outline-secondary"
                       :disabled="checkingProbeId === p.id"
                       @click="checkProbeNow(p)"
@@ -235,6 +259,7 @@
                     </button>
                     <button
                       v-if="auth.role === 'admin'"
+                      type="button"
                       class="btn btn-sm btn-outline-secondary"
                       @click="openEditProbe(p)"
                     >
@@ -242,6 +267,7 @@
                     </button>
                     <button
                       v-if="auth.role === 'admin'"
+                      type="button"
                       class="btn btn-sm btn-outline-danger"
                       @click="confirmDeleteProbe(p)"
                     >
@@ -309,24 +335,40 @@
             <thead>
               <tr>
                 <th>
-                  <button class="btn-sort" @click="toggleCertSort('name')">
+                  <button
+                    type="button"
+                    class="btn-sort"
+                    @click="toggleCertSort('name')"
+                  >
                     Nom <span class="sort-icon">{{ certSortIcon('name') }}</span>
                   </button>
                 </th>
                 <th>Endpoint</th>
                 <th>Émetteur</th>
                 <th>
-                  <button class="btn-sort" @click="toggleCertSort('expiration')">
+                  <button
+                    type="button"
+                    class="btn-sort"
+                    @click="toggleCertSort('expiration')"
+                  >
                     Expiration <span class="sort-icon">{{ certSortIcon('expiration') }}</span>
                   </button>
                 </th>
                 <th class="text-nowrap">
-                  <button class="btn-sort" @click="toggleCertSort('days')">
+                  <button
+                    type="button"
+                    class="btn-sort"
+                    @click="toggleCertSort('days')"
+                  >
                     Jours restants <span class="sort-icon">{{ certSortIcon('days') }}</span>
                   </button>
                 </th>
                 <th>
-                  <button class="btn-sort" @click="toggleCertSort('last_checked')">
+                  <button
+                    type="button"
+                    class="btn-sort"
+                    @click="toggleCertSort('last_checked')"
+                  >
                     Dernière vérification <span class="sort-icon">{{ certSortIcon('last_checked') }}</span>
                   </button>
                 </th>
@@ -385,6 +427,7 @@
                   <div class="btn-list">
                     <button
                       v-if="auth.role === 'admin'"
+                      type="button"
                       class="btn btn-sm btn-outline-secondary"
                       :disabled="checkingCertId === c.id"
                       @click="checkCertNow(c)"
@@ -393,6 +436,7 @@
                     </button>
                     <button
                       v-if="auth.role === 'admin'"
+                      type="button"
                       class="btn btn-sm btn-outline-secondary"
                       @click="openEditCert(c)"
                     >
@@ -400,6 +444,7 @@
                     </button>
                     <button
                       v-if="auth.role === 'admin'"
+                      type="button"
                       class="btn btn-sm btn-outline-danger"
                       @click="confirmDeleteCert(c)"
                     >
@@ -528,7 +573,7 @@
                       v-model="probeForm.expected_body_regex"
                       type="text"
                       class="form-control"
-                      placeholder='Ex: "status":\s*"ok"'
+                      placeholder="Ex: &quot;status&quot;:\s*&quot;ok&quot;"
                     >
                   </div>
                   <div class="col-md-6">

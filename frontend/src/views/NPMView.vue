@@ -2,18 +2,38 @@
   <div>
     <div class="page-header mb-4">
       <div class="page-pretitle">
-        <router-link to="/" class="text-decoration-none">Dashboard</router-link>
+        <router-link
+          to="/"
+          class="text-decoration-none"
+        >
+          Dashboard
+        </router-link>
         <span class="text-muted mx-1">/</span>
         <span>Nginx Proxy Manager</span>
       </div>
-      <h2 class="page-title">Proxy Hosts NPM</h2>
+      <h2 class="page-title">
+        Proxy Hosts NPM
+      </h2>
     </div>
 
     <div class="card">
       <div class="card-header d-flex align-items-center justify-content-between">
-        <h3 class="card-title mb-0">Tous les proxy hosts</h3>
-        <button class="btn btn-sm btn-outline-secondary" :disabled="loading" @click="load">
-          <svg class="icon icon-sm me-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <h3 class="card-title mb-0">
+          Tous les proxy hosts
+        </h3>
+        <button
+          type="button"
+          class="btn btn-sm btn-outline-secondary"
+          :disabled="loading"
+          @click="load"
+        >
+          <svg
+            class="icon icon-sm me-1"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
             <polyline points="1 4 1 10 7 10" />
             <path d="M3.51 15a9 9 0 1 0 .49-3.86" />
           </svg>
@@ -21,40 +41,81 @@
         </button>
       </div>
 
-      <div v-if="loading" class="card-body text-center text-muted py-5">
+      <div
+        v-if="loading"
+        class="card-body text-center text-muted py-5"
+      >
         <div class="spinner-border spinner-border-sm me-2" />
         Chargement…
       </div>
 
-      <div v-else-if="loadError" class="card-body">
-        <div class="alert alert-danger mb-0">{{ loadError }}</div>
+      <div
+        v-else-if="loadError"
+        class="card-body"
+      >
+        <div class="alert alert-danger mb-0">
+          {{ loadError }}
+        </div>
       </div>
 
-      <div v-else-if="hosts.length === 0" class="card-body text-center text-muted py-5">
+      <div
+        v-else-if="hosts.length === 0"
+        class="card-body text-center text-muted py-5"
+      >
         Aucun proxy host trouvé. Configurez une connexion NPM dans les
-        <router-link to="/settings?tab=integrations">Paramètres → Intégrations</router-link>
+        <router-link to="/settings?tab=integrations">
+          Paramètres → Intégrations
+        </router-link>
         — les hosts apparaîtront automatiquement après le premier sync.
       </div>
 
-      <div v-else class="table-responsive">
+      <div
+        v-else
+        class="table-responsive"
+      >
         <table class="table table-vcenter card-table">
           <thead>
             <tr>
               <th>Connexion</th>
               <th>Domaine</th>
               <th>Forward</th>
-              <th class="text-center" title="Activer/désactiver le proxy host dans NPM">Actif NPM</th>
-              <th class="text-center" title="Activer/désactiver tout le monitoring (uptime + SSL)">Monitoring</th>
-              <th class="text-center">Uptime</th>
-              <th class="text-center">SSL</th>
+              <th
+                class="text-center"
+                title="Activer/désactiver le proxy host dans NPM"
+              >
+                Actif NPM
+              </th>
+              <th
+                class="text-center"
+                title="Activer/désactiver tout le monitoring (uptime + SSL)"
+              >
+                Monitoring
+              </th>
+              <th class="text-center">
+                Uptime
+              </th>
+              <th class="text-center">
+                SSL
+              </th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="h in hosts" :key="h.id" :class="{ 'opacity-60': !h.npm_enabled }">
-              <td class="text-muted small">{{ h.connection_name }}</td>
+            <tr
+              v-for="h in hosts"
+              :key="h.id"
+              :class="{ 'opacity-60': !h.npm_enabled }"
+            >
+              <td class="text-muted small">
+                {{ h.connection_name }}
+              </td>
               <td>
-                <div class="fw-medium">{{ h.domain_names[0] }}</div>
-                <div v-if="h.domain_names.length > 1" class="d-flex flex-wrap gap-1 mt-1">
+                <div class="fw-medium">
+                  {{ h.domain_names[0] }}
+                </div>
+                <div
+                  v-if="h.domain_names.length > 1"
+                  class="d-flex flex-wrap gap-1 mt-1"
+                >
                   <span
                     v-for="d in h.domain_names.slice(1)"
                     :key="d"
@@ -62,7 +123,9 @@
                   >{{ d }}</span>
                 </div>
               </td>
-              <td class="text-muted small">{{ h.forward_host }}:{{ h.forward_port }}</td>
+              <td class="text-muted small">
+                {{ h.forward_host }}:{{ h.forward_port }}
+              </td>
 
               <!-- Actif NPM — appel direct à l'API NPM -->
               <td class="text-center">
@@ -110,9 +173,16 @@
                     :class="uptimeBadge(h.uptime_status)"
                   >
                     {{ h.uptime_status }}
-                    <span v-if="h.uptime_last_latency_ms" class="ms-1 opacity-75">{{ h.uptime_last_latency_ms }}ms</span>
+                    <span
+                      v-if="h.uptime_last_latency_ms"
+                      class="ms-1 opacity-75"
+                    >{{ h.uptime_last_latency_ms }}ms</span>
                   </span>
-                  <span v-else-if="!h.uptime_probe_id" class="text-muted" style="font-size:0.7rem">—</span>
+                  <span
+                    v-else-if="!h.uptime_probe_id"
+                    class="text-muted"
+                    style="font-size:0.7rem"
+                  >—</span>
                 </div>
               </td>
 
@@ -134,8 +204,16 @@
                     class="badge small"
                     :class="sslBadge(h.ssl_days_remaining)"
                   >{{ h.ssl_days_remaining }}j</span>
-                  <span v-else-if="!h.ssl_enabled" class="text-muted" style="font-size:0.7rem">HTTP</span>
-                  <span v-else-if="!h.ssl_certificate_id" class="text-muted" style="font-size:0.7rem">—</span>
+                  <span
+                    v-else-if="!h.ssl_enabled"
+                    class="text-muted"
+                    style="font-size:0.7rem"
+                  >HTTP</span>
+                  <span
+                    v-else-if="!h.ssl_certificate_id"
+                    class="text-muted"
+                    style="font-size:0.7rem"
+                  >—</span>
                 </div>
               </td>
             </tr>
@@ -143,7 +221,10 @@
         </table>
       </div>
 
-      <div v-if="actionError" class="card-footer">
+      <div
+        v-if="actionError"
+        class="card-footer"
+      >
         <span class="small text-danger">{{ actionError }}</span>
       </div>
     </div>

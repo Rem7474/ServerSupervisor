@@ -5,6 +5,7 @@
   >
     <!-- Bell button -->
     <button
+      type="button"
       class="btn btn-ghost-secondary d-flex align-items-center justify-content-center position-relative notification-bell-btn"
       :title="unreadCount > 0 ? `${unreadCount} notification(s) non lue(s)` : 'Notifications'"
       :aria-label="unreadCount > 0 ? `${unreadCount} notification(s) non lue(s)` : 'Notifications'"
@@ -48,6 +49,7 @@
         </div>
         <button
           v-if="unreadCount > 0"
+          type="button"
           class="btn btn-sm btn-ghost-secondary"
           @click.stop="markAllRead"
         >

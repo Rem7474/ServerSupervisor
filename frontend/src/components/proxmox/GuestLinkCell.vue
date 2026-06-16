@@ -10,12 +10,14 @@
     <span class="badge bg-warning-lt text-warning">Suggéré</span>
     <span class="text-muted small">{{ link.host_hostname || link.host_name }}</span>
     <button
+      type="button"
       class="btn btn-xs btn-success ms-1"
       @click="emit('confirm')"
     >
       ✓
     </button>
     <button
+      type="button"
       class="btn btn-xs btn-outline-secondary"
       @click="emit('ignore')"
     >
@@ -28,6 +30,7 @@
   >
     <span class="badge bg-success-lt text-success">Lié</span>
     <button
+      type="button"
       class="btn btn-xs btn-outline-primary ms-1"
       title="Voir la fiche hôte"
       @click="emit('go')"

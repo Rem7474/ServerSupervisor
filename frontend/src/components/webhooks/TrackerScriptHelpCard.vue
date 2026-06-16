@@ -43,6 +43,7 @@
           Chemin détecté automatiquement
         </span>
         <button
+          type="button"
           class="btn btn-sm btn-ghost-secondary"
           :title="copied ? 'Copié !' : 'Copier'"
           @click="copySnippet"

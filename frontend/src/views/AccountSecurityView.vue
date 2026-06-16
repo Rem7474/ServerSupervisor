@@ -48,6 +48,7 @@
             Activez le MFA pour renforcer la sécurité du compte.
           </p>
           <button
+            type="button"
             class="btn btn-primary"
             :disabled="loading"
             @click="startSetup"
@@ -61,6 +62,7 @@
             Le MFA est actif. Vous pouvez le désactiver si besoin.
           </p>
           <button
+            type="button"
             class="btn btn-outline-danger"
             @click="showDisable = true"
           >
@@ -131,6 +133,7 @@
                 <div class="bg-dark text-light rounded p-2 mb-3 d-flex align-items-center justify-content-between gap-2">
                   <code class="small">{{ setup.secret }}</code>
                   <button
+                    type="button"
                     class="btn btn-sm btn-ghost-light py-0"
                     title="Copier"
                     @click="copySecret"
@@ -169,6 +172,7 @@
                   >
                 </div>
                 <button
+                  type="button"
                   class="btn btn-success"
                   :disabled="loading || verifyCode.length !== 6"
                   @click="verifySetup"
@@ -187,6 +191,7 @@
               </div>
               <pre class="bg-dark text-light rounded p-2 small">{{ setup.backup_codes.join('\n') }}</pre>
               <button
+                type="button"
                 class="btn btn-outline-light btn-sm"
                 @click="copyBackupCodes"
               >
@@ -215,6 +220,7 @@
               >
             </div>
             <button
+              type="button"
               class="btn btn-danger"
               :disabled="loading || !disablePassword"
               @click="disableMFA"
@@ -222,6 +228,7 @@
               {{ loading ? 'Désactivation...' : 'Confirmer la désactivation' }}
             </button>
             <button
+              type="button"
               class="btn btn-outline-secondary ms-2"
               :disabled="loading"
               @click="showDisable = false"
@@ -274,6 +281,7 @@
         </h3>
         <button
           v-if="auth.isAuthenticated"
+          type="button"
           class="btn btn-sm btn-outline-danger"
           :disabled="revokeLoading"
           @click="revokeOtherSessions"

@@ -86,6 +86,7 @@
               <button
                 v-for="opt in TYPE_FILTERS"
                 :key="opt.value"
+                type="button"
                 class="btn btn-sm rounded-pill"
                 :class="filterType === opt.value ? opt.activeClass : 'btn-ghost-secondary'"
                 @click="setTypeFilter(opt.value)"
@@ -102,6 +103,7 @@
               <button
                 v-for="opt in STATUS_FILTERS"
                 :key="opt.value"
+                type="button"
                 class="btn btn-sm rounded-pill"
                 :class="filterStatus === opt.value ? opt.activeClass : 'btn-ghost-secondary'"
                 @click="setStatusFilter(opt.value)"
@@ -116,6 +118,7 @@
             Actions rapides
           </span>
           <button
+            type="button"
             class="btn btn-sm btn-ghost-secondary"
             :disabled="markingRead"
             @click="markAllRead"
@@ -138,6 +141,7 @@
             Tout marquer lu
           </button>
           <button
+            type="button"
             class="btn btn-sm btn-ghost-secondary"
             @click="$emit('refresh')"
           >
@@ -386,6 +390,7 @@
               <td>
                 <button
                   v-if="!isCompleted(item) && item.id"
+                  type="button"
                   class="btn btn-sm btn-ghost-secondary"
                   :disabled="resolvingId === item.id"
                   title="Clôturer manuellement"
@@ -432,6 +437,7 @@
           :class="{ disabled: currentPage === 1 }"
         >
           <button
+            type="button"
             class="page-link"
             @click="currentPage--"
           >
@@ -459,6 +465,7 @@
           :class="{ active: page === currentPage, disabled: page === '…' }"
         >
           <button
+            type="button"
             class="page-link"
             @click="typeof page === 'number' && (currentPage = page)"
           >
@@ -470,6 +477,7 @@
           :class="{ disabled: currentPage === totalPages }"
         >
           <button
+            type="button"
             class="page-link"
             @click="currentPage++"
           >
