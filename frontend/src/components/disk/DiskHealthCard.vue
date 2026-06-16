@@ -186,24 +186,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import apiClient from '../../api'
+import { onMounted } from 'vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 import BadgePill from '../common/BadgePill.vue'
-
-interface DiskHealth {
-  device: string
-  model?: string
-  serial_number?: string
-  smart_status: string
-  temperature: number
-  power_on_hours: number
-  power_cycles?: number
-  realloc_sectors: number
-  pending_sectors: number
-  uncorrectable_sectors?: number
-  percentage_used?: number
-}
+import { useDiskHealth, type DiskHealth } from '../../composables/useDiskHealth'
 
 const props = withDefaults(defineProps<{
   hostId: string
@@ -212,25 +198,12 @@ const props = withDefaults(defineProps<{
   initialHealth: null,
 })
 
-const health = ref<DiskHealth[]>(props.initialHealth || [])
-const loading = ref(!props.initialHealth)
+const { health, loading, load } = useDiskHealth(props.hostId, props.initialHealth)
 
 onMounted(async () => {
   if (props.initialHealth) return
-  await loadDiskHealth()
+  await load()
 })
-
-async function loadDiskHealth(): Promise<void> {
-  try {
-    loading.value = true
-    const res = await apiClient.getDiskHealth(props.hostId)
-    health.value = res.data || []
-  } catch (err) {
-    console.error('Failed to load disk health:', err)
-  } finally {
-    loading.value = false
-  }
-}
 
 type Tone = 'success' | 'danger' | 'warning' | 'secondary'
 

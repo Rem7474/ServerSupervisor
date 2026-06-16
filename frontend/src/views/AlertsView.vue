@@ -72,7 +72,7 @@
           class="nav-link"
           :class="{ active: alertsTab === 'releases' }"
           href="#"
-          @click.prevent="switchToTrackers"
+          @click.prevent="onClickReleases"
         >
           Suivi de versions
           <span
@@ -86,7 +86,7 @@
           class="nav-link"
           :class="{ active: alertsTab === 'incidents' }"
           href="#"
-          @click.prevent="switchToIncidents"
+          @click.prevent="onClickIncidents"
         >
           Historique notifications
           <span
@@ -97,7 +97,10 @@
       </li>
     </ul>
 
-    <div v-show="alertsTab === 'rules'">
+    <div
+      v-if="isTabMounted('rules')"
+      v-show="alertsTab === 'rules'"
+    >
       <AlertRuleList
         :rules="(rules as any)"
         :hosts="(hosts as any)"
@@ -112,7 +115,10 @@
       />
     </div>
 
-    <div v-show="alertsTab === 'releases'">
+    <div
+      v-if="isTabMounted('releases')"
+      v-show="alertsTab === 'releases'"
+    >
       <AlertReleaseSummary
         :trackers="(trackers as any)"
         :loading="trackersLoading"
@@ -120,7 +126,10 @@
       />
     </div>
 
-    <div v-show="alertsTab === 'incidents'">
+    <div
+      v-if="isTabMounted('incidents')"
+      v-show="alertsTab === 'incidents'"
+    >
       <AlertIncidentList
         :incidents="(incidents as any)"
         :loading="incidentsLoading"
@@ -130,28 +139,31 @@
       />
     </div>
 
-    <AlertRuleModal
-      :visible="showModal"
-      :rule="(editingRule as any)"
-      :hosts="(hosts as any)"
-      :capabilities="(capabilities as any)"
-      :capabilities-loading="capabilitiesLoading"
-      :capabilities-error="capabilitiesError"
-      :saving="saving"
-      :error="saveError"
-      @close="closeModal"
-      @submit="(saveAlert as any)"
-    />
+    <ErrorBoundary title="Erreur lors du chargement du formulaire de règle d'alerte">
+      <AlertRuleModal
+        :visible="showModal"
+        :rule="(editingRule as any)"
+        :hosts="(hosts as any)"
+        :capabilities="(capabilities as any)"
+        :capabilities-loading="capabilitiesLoading"
+        :capabilities-error="capabilitiesError"
+        :saving="saving"
+        :error="saveError"
+        @close="closeModal"
+        @submit="(saveAlert as any)"
+      />
+    </ErrorBoundary>
   </div>
 </template>
 
 <script setup lang="ts">
-import { watch, onMounted, onUnmounted } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AlertIncidentList from '../components/alerts/AlertIncidentList.vue'
 import AlertReleaseSummary from '../components/alerts/AlertReleaseSummary.vue'
 import AlertRuleList from '../components/alerts/AlertRuleList.vue'
 import AlertRuleModal from '../components/alerts/AlertRuleModal.vue'
+import ErrorBoundary from '../components/common/ErrorBoundary.vue'
 import AppIcon from '../components/AppIcon.vue'
 import { useAlertsPage } from '../composables/useAlertsPage'
 import { useWebSocket } from '../composables/useWebSocket'
@@ -199,6 +211,22 @@ const {
   onWebSocketAlert,
 } = useAlertsPage()
 
+const mountedTabs = ref(new Set<string>(['rules']))
+
+function isTabMounted(t: string): boolean {
+  return mountedTabs.value.has(t)
+}
+
+function onClickReleases(): void {
+  mountedTabs.value.add('releases')
+  switchToTrackers()
+}
+
+function onClickIncidents(): void {
+  mountedTabs.value.add('incidents')
+  switchToIncidents()
+}
+
 let incidentsPollTimer: ReturnType<typeof setInterval> | null = null
 
 watch(alertsTab, (tab) => {
@@ -209,8 +237,10 @@ onMounted(async () => {
   await init()
 
   if (route.query.tab === 'incidents') {
+    mountedTabs.value.add('incidents')
     await switchToIncidents()
   } else if (route.query.tab === 'releases') {
+    mountedTabs.value.add('releases')
     await switchToTrackers()
   }
 

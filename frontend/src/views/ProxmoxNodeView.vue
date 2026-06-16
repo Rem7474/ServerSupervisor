@@ -420,7 +420,10 @@
             </div>
 
             <!-- VMs tab -->
-            <div v-show="tab === 'vms'">
+            <div
+              v-if="isTabMounted('vms')"
+              v-show="tab === 'vms'"
+            >
               <ProxmoxNodeGuestsTab
                 kind="vm"
                 :guests="vms"
@@ -437,7 +440,10 @@
             </div>
 
             <!-- LXC tab -->
-            <div v-show="tab === 'lxc'">
+            <div
+              v-if="isTabMounted('lxc')"
+              v-show="tab === 'lxc'"
+            >
               <ProxmoxNodeGuestsTab
                 kind="lxc"
                 :guests="lxcs"
@@ -462,12 +468,18 @@
             </div>
 
             <!-- Disks tab -->
-            <div v-show="tab === 'disks'">
+            <div
+              v-if="isTabMounted('disks')"
+              v-show="tab === 'disks'"
+            >
               <ProxmoxNodeDisksTab :disks="node.disks || []" />
             </div>
 
             <!-- Tasks tab -->
-            <div v-show="tab === 'tasks'">
+            <div
+              v-if="isTabMounted('tasks')"
+              v-show="tab === 'tasks'"
+            >
               <ProxmoxNodeTasksTab
                 :tasks="node.tasks || []"
                 :active-upid="activeUpid"
@@ -476,7 +488,10 @@
             </div>
 
             <!-- Updates tab -->
-            <div v-show="tab === 'updates'">
+            <div
+              v-if="isTabMounted('updates')"
+              v-show="tab === 'updates'"
+            >
               <ProxmoxNodeUpdatesTab
                 :pending-updates="node.pending_updates"
                 :last-update-check-at="node.last_update_check_at"
@@ -488,7 +503,10 @@
             </div>
 
             <!-- Services tab -->
-            <div v-show="tab === 'services'">
+            <div
+              v-if="isTabMounted('services')"
+              v-show="tab === 'services'"
+            >
               <ProxmoxNodeServicesTab
                 :services="services"
                 :loading="servicesLoading"
@@ -501,7 +519,10 @@
             </div>
 
             <!-- Security tab -->
-            <div v-show="tab === 'security'">
+            <div
+              v-if="isTabMounted('security')"
+              v-show="tab === 'security'"
+            >
               <ProxmoxNodeSecurityTab
                 :node-id="String(route.params.id)"
                 :active="tab === 'security'"
@@ -510,7 +531,10 @@
             </div>
 
             <!-- Storage tab -->
-            <div v-show="tab === 'storage'">
+            <div
+              v-if="isTabMounted('storage')"
+              v-show="tab === 'storage'"
+            >
               <ProxmoxNodeStorageTab :storages="node.storages || []" />
             </div>
           </div>
@@ -626,7 +650,16 @@ const node = ref<any>(null)
 const loading = ref(true)
 const error = ref('')
 const tab = ref('vms')
-watch(tab, (t) => { router.replace({ query: { ...route.query, tab: t } }) })
+watch(tab, (t) => {
+  router.replace({ query: { ...route.query, tab: t } })
+  mountedTabs.value.add(t)
+})
+
+const mountedTabs = ref(new Set<string>(['vms']))
+
+function isTabMounted(t: string): boolean {
+  return mountedTabs.value.has(t)
+}
 
 const guestLinks = ref<Record<string, any>>({})
 const linkMsg = ref('')
@@ -729,8 +762,10 @@ async function load(): Promise<void> {
   error.value = ''
   try {
     const requestedTab = String(route.query.tab || '')
-    if (requestedTab === 'vms' || requestedTab === 'lxc' || requestedTab === 'storage' || requestedTab === 'disks' || requestedTab === 'tasks' || requestedTab === 'updates' || requestedTab === 'services' || requestedTab === 'security') {
+    const validTabs = ['vms', 'lxc', 'storage', 'disks', 'tasks', 'updates', 'services', 'security']
+    if (validTabs.includes(requestedTab)) {
       tab.value = requestedTab
+      mountedTabs.value.add(requestedTab)
     }
     const res = await api.getProxmoxNode(String(route.params.id))
     node.value = res.data

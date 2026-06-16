@@ -129,7 +129,7 @@
         </thead>
         <tbody>
           <tr
-            v-for="c in sortedContainers"
+            v-for="c in pagedContainers"
             :key="c.id"
           >
             <td class="fw-semibold">
@@ -457,6 +457,20 @@
         </tbody>
       </table>
     </div>
+    <div
+      v-if="totalPages > 1"
+      class="card-footer d-flex align-items-center"
+    >
+      <p class="m-0 text-muted small">
+        {{ (currentPage - 1) * PAGE_SIZE + 1 }}–{{ Math.min(currentPage * PAGE_SIZE, sortedContainers.length) }} sur {{ sortedContainers.length }} conteneur{{ sortedContainers.length > 1 ? 's' : '' }}
+      </p>
+      <PaginationNav
+        class="ms-auto"
+        :current-page="currentPage"
+        :total-pages="totalPages"
+        @select="setPage"
+      />
+    </div>
   </div>
 
   <EmptyState
@@ -761,7 +775,9 @@ import DataToolbar from '../common/DataToolbar.vue'
 import SortableHeader from '../common/SortableHeader.vue'
 import DockerPortBadges from '../common/DockerPortBadges.vue'
 import EmptyState from '../EmptyState.vue'
+import PaginationNav from '../PaginationNav.vue'
 import { useDockerContainerPorts } from '../../composables/useDockerContainerPorts'
+import { usePagination } from '../../composables/usePagination'
 
 interface Container {
   id: string
@@ -1000,6 +1016,14 @@ const uniqueHosts = computed(() => {
     .map((c) => c.hostname!)
     .sort()
 })
+
+const PAGE_SIZE = 25
+const { currentPage, totalPages, pagedItems: pagedContainers, resetPage, setPage } = usePagination({
+  items: sortedContainers,
+  pageSize: PAGE_SIZE,
+})
+
+watch([search, stateFilter, hostFilter, composeFilter], resetPage)
 </script>
 
 

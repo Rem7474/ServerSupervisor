@@ -116,20 +116,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import apiClient from '../../api'
+import { onMounted } from 'vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
-
-interface DiskMetric {
-  mount_point: string
-  filesystem?: string
-  used_gb: number
-  size_gb: number
-  used_percent: number
-  inodes_total: number
-  inodes_used: number
-  inodes_percent: number
-}
+import { useDiskMetrics, type DiskMetric } from '../../composables/useDiskMetrics'
 
 const props = withDefaults(defineProps<{
   hostId: string
@@ -138,25 +127,12 @@ const props = withDefaults(defineProps<{
   initialMetrics: null,
 })
 
-const metrics = ref<DiskMetric[]>(props.initialMetrics || [])
-const loading = ref(!props.initialMetrics)
+const { metrics, loading, load } = useDiskMetrics(props.hostId, props.initialMetrics)
 
 onMounted(async () => {
   if (props.initialMetrics) return
-  await loadDiskMetrics()
+  await load()
 })
-
-async function loadDiskMetrics(): Promise<void> {
-  try {
-    loading.value = true
-    const res = await apiClient.getDiskMetrics(props.hostId)
-    metrics.value = res.data || []
-  } catch (err) {
-    console.error('Failed to load disk metrics:', err)
-  } finally {
-    loading.value = false
-  }
-}
 
 function formatGB(bytes: number): string {
   return `${bytes.toFixed(1)}G`

@@ -314,26 +314,30 @@
                   Ajoute des hôtes ou configure ta topologie pour voir le diagramme.
                 </div>
               </div>
-              <NetworkGraph
+              <ErrorBoundary
                 v-else
-                ref="networkGraphRef"
-                :data="filteredGraphHosts"
-                :root-label="rootNodeName"
-                :root-ip="rootNodeIp"
-                :services="filteredServices"
-                :host-port-overrides="hostPortOverrides"
-                :authelia-label="autheliaLabel"
-                :authelia-ip="autheliaIp"
-                :internet-label="internetLabel"
-                :internet-ip="internetIp"
-                :node-positions="nodePositions"
-                :root-host-id="rootHostId"
-                :authelia-host-id="autheliaHostId"
-                :root-port-id="rootPortId"
-                :authelia-port-id="autheliaPortId"
-                @node-select="selectedNode = $event"
-                @update:node-positions="onNodePositionsUpdate"
-              />
+                title="Erreur lors du rendu du graphe réseau"
+              >
+                <NetworkGraph
+                  ref="networkGraphRef"
+                  :data="filteredGraphHosts"
+                  :root-label="rootNodeName"
+                  :root-ip="rootNodeIp"
+                  :services="filteredServices"
+                  :host-port-overrides="hostPortOverrides"
+                  :authelia-label="autheliaLabel"
+                  :authelia-ip="autheliaIp"
+                  :internet-label="internetLabel"
+                  :internet-ip="internetIp"
+                  :node-positions="nodePositions"
+                  :root-host-id="rootHostId"
+                  :authelia-host-id="autheliaHostId"
+                  :root-port-id="rootPortId"
+                  :authelia-port-id="autheliaPortId"
+                  @node-select="selectedNode = $event"
+                  @update:node-positions="onNodePositionsUpdate"
+                />
+              </ErrorBoundary>
             </div>
 
             <!-- Detail panel: full width, below graph, dismissible -->
@@ -373,6 +377,7 @@ import { useWebSocket } from '../composables/useWebSocket'
 import type { WSNetworkSnapshot } from '../types/ws'
 import WsStatusBar from '../components/WsStatusBar.vue'
 import NetworkGraph from '../components/network/NetworkGraph.vue'
+import ErrorBoundary from '../components/common/ErrorBoundary.vue'
 import NetworkNodeDetail from '../components/network/NetworkNodeDetail.vue'
 import NetworkPortList from '../components/network/NetworkPortList.vue'
 import NetworkTopologyConfig from '../components/network/NetworkTopologyConfig.vue'
