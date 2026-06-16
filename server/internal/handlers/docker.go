@@ -55,7 +55,7 @@ func (h *DockerHandler) ListAllContainers(c *gin.Context) {
 // SendDockerCommand creates a pending docker command for an agent to execute.
 func (h *DockerHandler) SendDockerCommand(c *gin.Context) {
 	if role := c.GetString("role"); role != models.RoleAdmin && role != models.RoleOperator {
-		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+		respondError(c, apperr.Forbidden("insufficient permissions"))
 		return
 	}
 	var req models.DockerCommandRequest

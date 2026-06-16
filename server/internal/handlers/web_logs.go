@@ -25,7 +25,7 @@ func NewWebLogsHandler(svc *weblogssvc.Service) *WebLogsHandler {
 // requireWebLogsAdmin returns false (and writes 403) when the caller is not admin.
 func (h *WebLogsHandler) requireWebLogsAdmin(c *gin.Context) bool {
 	if c.GetString("role") != "admin" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+		respondError(c, apperr.Forbidden("insufficient permissions"))
 		return false
 	}
 	return true

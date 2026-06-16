@@ -39,7 +39,7 @@ func (h *AptHandler) SendCommand(c *gin.Context) {
 		return
 	}
 	if role := c.GetString("role"); role != models.RoleAdmin && role != models.RoleOperator {
-		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+		respondError(c, apperr.Forbidden("insufficient permissions"))
 		return
 	}
 	username := aptActor(c)

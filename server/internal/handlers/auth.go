@@ -122,7 +122,7 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 func (h *AuthHandler) ChangePassword(c *gin.Context) {
 	username := c.GetString("username")
 	if username == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		respondError(c, apperr.Unauthorized("unauthorized"))
 		return
 	}
 	var req struct {
@@ -144,7 +144,7 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 func (h *AuthHandler) SetupMFA(c *gin.Context) {
 	username := c.GetString("username")
 	if username == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		respondError(c, apperr.Unauthorized("unauthorized"))
 		return
 	}
 	secret, qrCodeURL, backupCodes, err := h.svc.SetupMFA(username)
@@ -159,7 +159,7 @@ func (h *AuthHandler) SetupMFA(c *gin.Context) {
 func (h *AuthHandler) VerifyMFA(c *gin.Context) {
 	username := c.GetString("username")
 	if username == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		respondError(c, apperr.Unauthorized("unauthorized"))
 		return
 	}
 	var req struct {
@@ -182,7 +182,7 @@ func (h *AuthHandler) VerifyMFA(c *gin.Context) {
 func (h *AuthHandler) DisableMFA(c *gin.Context) {
 	username := c.GetString("username")
 	if username == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		respondError(c, apperr.Unauthorized("unauthorized"))
 		return
 	}
 	var req struct {
@@ -203,7 +203,7 @@ func (h *AuthHandler) DisableMFA(c *gin.Context) {
 func (h *AuthHandler) GetMFAStatus(c *gin.Context) {
 	username := c.GetString("username")
 	if username == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		respondError(c, apperr.Unauthorized("unauthorized"))
 		return
 	}
 	user, err := h.svc.User(c.Request.Context(), username)
@@ -218,7 +218,7 @@ func (h *AuthHandler) GetMFAStatus(c *gin.Context) {
 func (h *AuthHandler) GetProfile(c *gin.Context) {
 	username := c.GetString("username")
 	if username == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		respondError(c, apperr.Unauthorized("unauthorized"))
 		return
 	}
 	user, err := h.svc.User(c.Request.Context(), username)
@@ -239,7 +239,7 @@ func (h *AuthHandler) GetProfile(c *gin.Context) {
 // GetSecuritySummary returns login stats, blocked IPs and top failed IPs (admin only).
 func (h *AuthHandler) GetSecuritySummary(c *gin.Context) {
 	if c.GetString("role") != "admin" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+		respondError(c, apperr.Forbidden("insufficient permissions"))
 		return
 	}
 	hours := 24
@@ -259,7 +259,7 @@ func (h *AuthHandler) GetSecuritySummary(c *gin.Context) {
 // UnblockIP persists an IP unblock (admin only).
 func (h *AuthHandler) UnblockIP(c *gin.Context) {
 	if c.GetString("role") != "admin" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+		respondError(c, apperr.Forbidden("insufficient permissions"))
 		return
 	}
 	ip := c.Param("ip")
@@ -278,7 +278,7 @@ func (h *AuthHandler) UnblockIP(c *gin.Context) {
 func (h *AuthHandler) GetLoginEvents(c *gin.Context) {
 	username := c.GetString("username")
 	if username == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		respondError(c, apperr.Unauthorized("unauthorized"))
 		return
 	}
 	limit := 50
@@ -305,7 +305,7 @@ func (h *AuthHandler) GetLoginEvents(c *gin.Context) {
 func (h *AuthHandler) RevokeAllSessions(c *gin.Context) {
 	username := c.GetString("username")
 	if username == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		respondError(c, apperr.Unauthorized("unauthorized"))
 		return
 	}
 	if err := h.svc.RevokeAllSessions(c.Request.Context(), username, readRefreshToken(c)); err != nil {
@@ -318,7 +318,7 @@ func (h *AuthHandler) RevokeAllSessions(c *gin.Context) {
 // GetAllLoginEventsAdmin returns paginated login events for all users (admin only).
 func (h *AuthHandler) GetAllLoginEventsAdmin(c *gin.Context) {
 	if c.GetString("role") != "admin" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+		respondError(c, apperr.Forbidden("forbidden"))
 		return
 	}
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))

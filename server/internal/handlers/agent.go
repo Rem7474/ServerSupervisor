@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/serversupervisor/server/internal/apperr"
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/events"
@@ -34,7 +35,7 @@ func (h *AgentHandler) AddCompletionListener(listener agentsvc.CommandCompletion
 func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 	hostID := c.GetString("host_id")
 	if hostID == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "host not identified"})
+		respondError(c, apperr.Unauthorized("host not identified"))
 		return
 	}
 	// Sanitize hostID for safe logging (prevent log forging via newlines).
@@ -45,7 +46,7 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 
 	var report models.AgentReport
 	if err := c.ShouldBindJSON(&report); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondError(c, apperr.Validation(err.Error()))
 		return
 	}
 
@@ -66,13 +67,13 @@ func (h *AgentHandler) ReceiveReport(c *gin.Context) {
 func (h *AgentHandler) ReportCommandResult(c *gin.Context) {
 	hostID := c.GetString("host_id")
 	if hostID == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "host not identified"})
+		respondError(c, apperr.Unauthorized("host not identified"))
 		return
 	}
 
 	var result models.CommandResult
 	if err := c.ShouldBindJSON(&result); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondError(c, apperr.Validation(err.Error()))
 		return
 	}
 
@@ -87,7 +88,7 @@ func (h *AgentHandler) ReportCommandResult(c *gin.Context) {
 func (h *AgentHandler) StreamCommandOutput(c *gin.Context) {
 	hostID := c.GetString("host_id")
 	if hostID == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "host not identified"})
+		respondError(c, apperr.Unauthorized("host not identified"))
 		return
 	}
 
@@ -96,7 +97,7 @@ func (h *AgentHandler) StreamCommandOutput(c *gin.Context) {
 		Chunk     string `json:"chunk" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&chunk); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondError(c, apperr.Validation(err.Error()))
 		return
 	}
 
@@ -116,7 +117,7 @@ func (h *AgentHandler) GetHostCommandHistory(c *gin.Context) {
 	}
 	cmds, err := h.svc.HostCommandHistory(c.Request.Context(), hostID, limit)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch command history"})
+		respondError(c, apperr.Failed("failed to fetch command history"))
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"commands": cmds})
@@ -129,7 +130,7 @@ func (h *AgentHandler) GetMetricsHistory(c *gin.Context) {
 
 	metrics, err := h.svc.MetricsHistory(c.Request.Context(), hostID, hours)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch metrics"})
+		respondError(c, apperr.Failed("failed to fetch metrics"))
 		return
 	}
 	c.JSON(http.StatusOK, metrics)
@@ -143,7 +144,7 @@ func (h *AgentHandler) GetMetricsAggregated(c *gin.Context) {
 
 	metrics, aggregationType, err := h.svc.MetricsAggregated(c.Request.Context(), hostID, hours)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch aggregated metrics"})
+		respondError(c, apperr.Failed("failed to fetch aggregated metrics"))
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
@@ -163,7 +164,7 @@ func (h *AgentHandler) GetMetricsSummary(c *gin.Context) {
 
 	summary, err := h.svc.MetricsSummary(c.Request.Context(), hours, bucketMinutes)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch metrics summary"})
+		respondError(c, apperr.Failed("failed to fetch metrics summary"))
 		return
 	}
 	c.JSON(http.StatusOK, summary)
@@ -175,7 +176,7 @@ func (h *AgentHandler) GetMetricsSummary(c *gin.Context) {
 func (h *AgentHandler) LogAuditAction(c *gin.Context) {
 	hostID := c.GetString("host_id")
 	if hostID == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "host not identified"})
+		respondError(c, apperr.Unauthorized("host not identified"))
 		return
 	}
 
@@ -186,7 +187,7 @@ func (h *AgentHandler) LogAuditAction(c *gin.Context) {
 		Details string `json:"details"`
 	}
 	if err := c.ShouldBindJSON(&audit); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondError(c, apperr.Validation(err.Error()))
 		return
 	}
 

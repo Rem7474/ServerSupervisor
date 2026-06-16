@@ -20,7 +20,7 @@ func (h *ReleaseTrackerHandler) List(c *gin.Context) {
 
 func (h *ReleaseTrackerHandler) Create(c *gin.Context) {
 	if c.GetString("role") != models.RoleAdmin {
-		c.JSON(http.StatusForbidden, gin.H{"error": "admin role required"})
+		respondError(c, apperr.Forbidden("admin role required"))
 		return
 	}
 	var req models.ReleaseTrackerRequest
@@ -49,7 +49,7 @@ func (h *ReleaseTrackerHandler) ListTrackableContainers(c *gin.Context) {
 // CreateBulk creates multiple compose trackers in one call (auto-discovery).
 func (h *ReleaseTrackerHandler) CreateBulk(c *gin.Context) {
 	if c.GetString("role") != models.RoleAdmin {
-		c.JSON(http.StatusForbidden, gin.H{"error": "admin role required"})
+		respondError(c, apperr.Forbidden("admin role required"))
 		return
 	}
 	var req struct {
@@ -78,7 +78,7 @@ func (h *ReleaseTrackerHandler) Get(c *gin.Context) {
 
 func (h *ReleaseTrackerHandler) Update(c *gin.Context) {
 	if c.GetString("role") != models.RoleAdmin {
-		c.JSON(http.StatusForbidden, gin.H{"error": "admin role required"})
+		respondError(c, apperr.Forbidden("admin role required"))
 		return
 	}
 	var req models.ReleaseTrackerRequest
@@ -95,7 +95,7 @@ func (h *ReleaseTrackerHandler) Update(c *gin.Context) {
 
 func (h *ReleaseTrackerHandler) Delete(c *gin.Context) {
 	if c.GetString("role") != models.RoleAdmin {
-		c.JSON(http.StatusForbidden, gin.H{"error": "admin role required"})
+		respondError(c, apperr.Forbidden("admin role required"))
 		return
 	}
 	if err := h.svc.Delete(c.Request.Context(), c.Param("id")); err != nil {
@@ -107,7 +107,7 @@ func (h *ReleaseTrackerHandler) Delete(c *gin.Context) {
 
 func (h *ReleaseTrackerHandler) TriggerCheck(c *gin.Context) {
 	if c.GetString("role") != models.RoleAdmin {
-		c.JSON(http.StatusForbidden, gin.H{"error": "admin role required"})
+		respondError(c, apperr.Forbidden("admin role required"))
 		return
 	}
 	if err := h.svc.TriggerCheck(c.Request.Context(), h.pollerCtx, c.Param("id")); err != nil {
@@ -120,7 +120,7 @@ func (h *ReleaseTrackerHandler) TriggerCheck(c *gin.Context) {
 // Run manually triggers the tracker's task with the last known release info.
 func (h *ReleaseTrackerHandler) Run(c *gin.Context) {
 	if role := c.GetString("role"); role != models.RoleAdmin && role != models.RoleOperator {
-		c.JSON(http.StatusForbidden, gin.H{"error": "admin or operator role required"})
+		respondError(c, apperr.Forbidden("admin or operator role required"))
 		return
 	}
 	if err := h.svc.Run(c.Request.Context(), h.pollerCtx, c.Param("id")); err != nil {

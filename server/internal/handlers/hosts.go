@@ -22,7 +22,7 @@ func NewHostHandler(svc *hostsvc.Service) *HostHandler {
 // RegisterHost creates a new host and returns its API key (admin only).
 func (h *HostHandler) RegisterHost(c *gin.Context) {
 	if c.GetString("role") != models.RoleAdmin {
-		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+		respondError(c, apperr.Forbidden("insufficient permissions"))
 		return
 	}
 	var req models.HostRegistration
@@ -65,7 +65,7 @@ func (h *HostHandler) GetHost(c *gin.Context) {
 // UpdateHost updates editable host fields.
 func (h *HostHandler) UpdateHost(c *gin.Context) {
 	if c.GetString("role") != models.RoleAdmin {
-		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+		respondError(c, apperr.Forbidden("insufficient permissions"))
 		return
 	}
 	var req models.HostUpdate
@@ -84,7 +84,7 @@ func (h *HostHandler) UpdateHost(c *gin.Context) {
 // TriggerAgentUpdate queues an agent self-update command for the host.
 func (h *HostHandler) TriggerAgentUpdate(c *gin.Context) {
 	if role := c.GetString("role"); role != models.RoleAdmin && role != models.RoleOperator {
-		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+		respondError(c, apperr.Forbidden("insufficient permissions"))
 		return
 	}
 	username := c.GetString("username")
@@ -102,7 +102,7 @@ func (h *HostHandler) TriggerAgentUpdate(c *gin.Context) {
 // DeleteHost removes a host.
 func (h *HostHandler) DeleteHost(c *gin.Context) {
 	if c.GetString("role") != models.RoleAdmin {
-		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+		respondError(c, apperr.Forbidden("insufficient permissions"))
 		return
 	}
 	if err := h.svc.Delete(c.Request.Context(), c.Param("id")); err != nil {
@@ -125,7 +125,7 @@ func (h *HostHandler) GetHostComplete(c *gin.Context) {
 // RotateAPIKey regenerates an API key for a host (admin only).
 func (h *HostHandler) RotateAPIKey(c *gin.Context) {
 	if c.GetString("role") != models.RoleAdmin {
-		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+		respondError(c, apperr.Forbidden("insufficient permissions"))
 		return
 	}
 	apiKey, err := h.svc.RotateKey(c.Request.Context(), c.Param("id"))

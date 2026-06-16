@@ -29,7 +29,7 @@ func (h *SettingsHandler) GetSettings(c *gin.Context) {
 // UpdateSettings persists configuration changes and applies them in memory.
 func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 	if c.GetString("role") != "admin" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+		respondError(c, apperr.Forbidden("insufficient permissions"))
 		return
 	}
 	var req models.SettingsUpdateRequest
@@ -44,7 +44,7 @@ func (h *SettingsHandler) UpdateSettings(c *gin.Context) {
 // TestSmtp tests SMTP connectivity with full TLS/auth/envelope validation.
 func (h *SettingsHandler) TestSmtp(c *gin.Context) {
 	if c.GetString("role") != "admin" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+		respondError(c, apperr.Forbidden("insufficient permissions"))
 		return
 	}
 	message, err := h.svc.TestSMTP(c.Request.Context())
@@ -58,7 +58,7 @@ func (h *SettingsHandler) TestSmtp(c *gin.Context) {
 // TestNtfy sends a test notification to ntfy.sh.
 func (h *SettingsHandler) TestNtfy(c *gin.Context) {
 	if c.GetString("role") != "admin" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+		respondError(c, apperr.Forbidden("insufficient permissions"))
 		return
 	}
 	message, err := h.svc.TestNtfy(c.Request.Context())
@@ -72,7 +72,7 @@ func (h *SettingsHandler) TestNtfy(c *gin.Context) {
 // CleanupMetrics triggers manual cleanup of old metrics.
 func (h *SettingsHandler) CleanupMetrics(c *gin.Context) {
 	if c.GetString("role") != "admin" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+		respondError(c, apperr.Forbidden("insufficient permissions"))
 		return
 	}
 	user := c.GetString("username")
@@ -88,7 +88,7 @@ func (h *SettingsHandler) CleanupMetrics(c *gin.Context) {
 // CleanupAuditLogs triggers manual cleanup of old audit logs.
 func (h *SettingsHandler) CleanupAuditLogs(c *gin.Context) {
 	if c.GetString("role") != "admin" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+		respondError(c, apperr.Forbidden("insufficient permissions"))
 		return
 	}
 	user := c.GetString("username")

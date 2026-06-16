@@ -12,7 +12,7 @@ import (
 // ResolveIncident manually closes an open alert incident by ID.
 func (h *AlertRulesHandler) ResolveIncident(c *gin.Context) {
 	if c.GetString("role") != models.RoleAdmin {
-		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+		respondError(c, apperr.Forbidden("insufficient permissions"))
 		return
 	}
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
@@ -30,7 +30,7 @@ func (h *AlertRulesHandler) ResolveIncident(c *gin.Context) {
 // ListIncidents returns all alert incidents with pagination.
 func (h *AlertRulesHandler) ListIncidents(c *gin.Context) {
 	if c.GetString("role") != models.RoleAdmin {
-		c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+		respondError(c, apperr.Forbidden("insufficient permissions"))
 		return
 	}
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))

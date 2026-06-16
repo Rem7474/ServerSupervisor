@@ -43,7 +43,7 @@ func (h *GitWebhookHandler) ListWebhooks(c *gin.Context) {
 
 func (h *GitWebhookHandler) CreateWebhook(c *gin.Context) {
 	if c.GetString("role") != models.RoleAdmin {
-		c.JSON(http.StatusForbidden, gin.H{"error": "admin role required"})
+		respondError(c, apperr.Forbidden("admin role required"))
 		return
 	}
 	var req models.GitWebhookRequest
@@ -70,7 +70,7 @@ func (h *GitWebhookHandler) GetWebhook(c *gin.Context) {
 
 func (h *GitWebhookHandler) UpdateWebhook(c *gin.Context) {
 	if c.GetString("role") != models.RoleAdmin {
-		c.JSON(http.StatusForbidden, gin.H{"error": "admin role required"})
+		respondError(c, apperr.Forbidden("admin role required"))
 		return
 	}
 	var req models.GitWebhookRequest
@@ -87,7 +87,7 @@ func (h *GitWebhookHandler) UpdateWebhook(c *gin.Context) {
 
 func (h *GitWebhookHandler) DeleteWebhook(c *gin.Context) {
 	if c.GetString("role") != models.RoleAdmin {
-		c.JSON(http.StatusForbidden, gin.H{"error": "admin role required"})
+		respondError(c, apperr.Forbidden("admin role required"))
 		return
 	}
 	if err := h.svc.Delete(c.Request.Context(), c.Param("id")); err != nil {
@@ -99,7 +99,7 @@ func (h *GitWebhookHandler) DeleteWebhook(c *gin.Context) {
 
 func (h *GitWebhookHandler) RegenerateSecret(c *gin.Context) {
 	if c.GetString("role") != models.RoleAdmin {
-		c.JSON(http.StatusForbidden, gin.H{"error": "admin role required"})
+		respondError(c, apperr.Forbidden("admin role required"))
 		return
 	}
 	secret, err := h.svc.RegenerateSecret(c.Request.Context(), c.Param("id"))
