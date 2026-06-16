@@ -38,7 +38,7 @@ vi.mock('../api', () => {
 
 vi.mock('vue-router', () => ({
   useRoute: () => ({ params: { id: 'node-1' }, query: {} }),
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
 }))
 
 // Async children pull in Chart.js / chartTheme; replace them with trivial stubs
