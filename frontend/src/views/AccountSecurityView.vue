@@ -393,6 +393,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import apiClient from '../api'
 import { formatDateTime } from '../utils/formatters'
+import type { LoginEvent } from '../types/generated'
 import { useAuthStore } from '../stores/auth'
 import { getApiErrorMessage } from '../api/client'
 
@@ -443,7 +444,7 @@ function stopSetupTimer(): void {
   setupSecondsLeft.value = 0
 }
 
-const loginEvents = ref<any[]>([])
+const loginEvents = ref<LoginEvent[]>([])
 const sessionsLoading = ref(false)
 const revokeLoading = ref(false)
 const revokeError = ref('')

@@ -547,6 +547,7 @@ import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import IPTimelineModal from '../components/security/IPTimelineModal.vue'
 import type { WebLogIPTimelineRow } from '../types/security'
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- display-layer shim for aggregate web-logs data (no Go model)
 type AnyRecord = Record<string, any>
 
 const period = ref('24h')

@@ -121,7 +121,7 @@ import { MANUAL_SENTINEL } from '../../utils/cron'
 import { getApiErrorMessage } from '../../api/client'
 
 const props = defineProps<{
-  host: any | null
+  host: { id: string; name?: string; hostname?: string } | null
 }>()
 
 const emit = defineEmits<{

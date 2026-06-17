@@ -76,6 +76,7 @@
 </template>
 
 <script setup lang="ts">
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- display-layer shim for aggregate web-logs data (no Go model); typed in the Phase 7 split
 type AnyRecord = Record<string, any>
 
 const props = defineProps<{
