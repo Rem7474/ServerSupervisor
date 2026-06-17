@@ -231,8 +231,10 @@ function cssVar(name: string): string {
 async function loadHistory(hours: number): Promise<void> {
   if (!selectedMount.value) return
   chartHours.value = hours
-  loading.value = true
-  chartData.value = null
+  // Only show the spinner on the very first load; on subsequent refreshes (each
+  // WS tick) keep the existing chart visible and swap the data in place, so the
+  // graph updates silently like HostMetricsPanel instead of blanking + re-animating.
+  if (!chartData.value) loading.value = true
   try {
     const raw = await fetchDiskMetricsHistory(props.hostId, selectedMount.value, hours)
     points.value = raw.map((p) => ({
