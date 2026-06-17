@@ -160,7 +160,9 @@ func EvaluateAlerts(ctx context.Context, db *database.DB, cfg *config.Config, di
 					}
 					slog.InfoContext(ctx, "alerts: incident FIRED", slog.String("rule", ruleName), slog.String("host", host.Name), slog.Float64("value", value), slog.String("severity", string(currentSeveration)), slog.Int64("incident_id", incID))
 					details := fmt.Sprintf(`{"rule_id":%d,"metric":"%s","operator":"%s","value":%.4f,"severity":"%s"}`, rule.ID, rule.Metric, rule.Operator, value, currentSeveration)
-					_, _ = db.CreateAuditLog(ctx, "alert-engine", "alert_fired", host.ID, "", details, "success")
+					if _, auditErr := db.CreateAuditLog(ctx, "alert-engine", "alert_fired", host.ID, "", details, "success"); auditErr != nil {
+						slog.WarnContext(ctx, "alerts: failed to write alert_fired audit log", slog.Int64("incident_id", incID), slog.Any("err", auditErr))
+					}
 					sendAlertNotifications(n, cfg, rule, host, value)
 					triggerAlertCommand(ctx, dispatcher, db, rule, host)
 					pushBrowserNotification(pusher, rule, host, value, incID)
@@ -182,10 +184,15 @@ func EvaluateAlerts(ctx context.Context, db *database.DB, cfg *config.Config, di
 			} else if inc != nil {
 				// No alert triggered - resolve if one exists
 				if ShouldResolveAlertSeverity(rule, host, value, AlertSeverity(inc.Severity)) {
-					_ = db.ResolveAlertIncident(ctx, inc.ID)
+					if err := db.ResolveAlertIncident(ctx, inc.ID); err != nil {
+						slog.ErrorContext(ctx, "alerts: failed to resolve incident", slog.Int64("incident_id", inc.ID), slog.Any("err", err))
+						continue
+					}
 					slog.InfoContext(ctx, "alerts: incident resolved", slog.String("rule", ruleName), slog.String("host", host.Name), slog.String("severity", inc.Severity), slog.Int64("incident_id", inc.ID))
 					details := fmt.Sprintf(`{"rule_id":%d,"incident_id":%d,"severity":"%s"}`, rule.ID, inc.ID, inc.Severity)
-					_, _ = db.CreateAuditLog(ctx, "alert-engine", "alert_resolved", host.ID, "", details, "success")
+					if _, auditErr := db.CreateAuditLog(ctx, "alert-engine", "alert_resolved", host.ID, "", details, "success"); auditErr != nil {
+						slog.WarnContext(ctx, "alerts: failed to write alert_resolved audit log", slog.Int64("incident_id", inc.ID), slog.Any("err", auditErr))
+					}
 					broadcastIncidentUpdate(pusher, "resolved", rule, host.ID)
 				}
 			}

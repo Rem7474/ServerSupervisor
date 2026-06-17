@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 
 	"github.com/serversupervisor/agent/internal/collector"
 	"github.com/serversupervisor/agent/internal/sender"
@@ -56,7 +56,7 @@ func handleCrowdSec(ctx context.Context, d *Dispatcher, s *sender.Sender, cmd se
 	if execErr != nil {
 		status = "failed"
 		output = fmt.Sprintf("ERROR: %v", execErr)
-		log.Printf("crowdsec %s %s failed: %v", cmd.Action, cmd.Target, execErr)
+		slog.Error("crowdsec command failed", "action", cmd.Action, "target", cmd.Target, "err", execErr)
 	} else {
 		switch cmd.Action {
 		case "ban":
@@ -64,7 +64,7 @@ func handleCrowdSec(ctx context.Context, d *Dispatcher, s *sender.Sender, cmd se
 		default:
 			output = fmt.Sprintf("Successfully unbanned IP: %s", cmd.Target)
 		}
-		log.Printf("crowdsec %s %s completed", cmd.Action, cmd.Target)
+		slog.Info("crowdsec command completed", "action", cmd.Action, "target", cmd.Target)
 	}
 	reportTerminal(ctx, s, cmd, status, output)
 }

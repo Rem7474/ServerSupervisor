@@ -209,7 +209,9 @@ func pushWebNotifications(ctx context.Context, db *database.DB, cfg *config.Conf
 		if sendErr != nil {
 			slog.ErrorContext(ctx, "push: delivery failed", slog.String("endpoint", truncateStr(sub.Endpoint, 40)), slog.Any("err", sendErr))
 			if resp != nil && resp.StatusCode == http.StatusGone {
-				_ = db.DeletePushSubscription(ctx, sub.Endpoint)
+				if delErr := db.DeletePushSubscription(ctx, sub.Endpoint); delErr != nil {
+					slog.DebugContext(ctx, "push: failed to prune gone subscription", slog.String("endpoint", truncateStr(sub.Endpoint, 40)), slog.Any("err", delErr))
+				}
 			}
 			continue
 		}

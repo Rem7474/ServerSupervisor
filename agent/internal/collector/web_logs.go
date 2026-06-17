@@ -5,7 +5,7 @@ import (
 	"compress/gzip"
 	"encoding/json"
 	"io"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -152,7 +152,7 @@ var suspiciousUANeedles = []string{
 	"masscan", "nmap", "zgrab", "sqlmap", "nikto", "dirbuster", "gobuster", "wpscan", "acunetix", "nessus",
 }
 
-func CollectWebLogs(logPathGlobs []string, tailLines int, topN int, requestLimit int, cursorFile string, verbose bool, crowdSecConnectionString string, crowdSecAPIKey string, crowdSecAlertsMachineID string, crowdSecAlertsPassword string, crowdSecEnabled bool) (*WebLogReport, error) {
+func CollectWebLogs(logPathGlobs []string, tailLines int, topN int, requestLimit int, cursorFile string, crowdSecConnectionString string, crowdSecAPIKey string, crowdSecAlertsMachineID string, crowdSecAlertsPassword string, crowdSecEnabled bool) (*WebLogReport, error) {
 	if tailLines <= 0 {
 		tailLines = 5000
 	}
@@ -198,7 +198,7 @@ func CollectWebLogs(logPathGlobs []string, tailLines int, topN int, requestLimit
 	for _, file := range files {
 		seenFiles[file] = struct{}{}
 		entry, hasEntry := cursor.Files[file]
-		lines, nextEntry, err := readLinesForFile(file, tailLines, entry, hasEntry, verbose)
+		lines, nextEntry, err := readLinesForFile(file, tailLines, entry, hasEntry)
 		if err != nil {
 			continue
 		}
@@ -352,9 +352,9 @@ func CollectWebLogs(logPathGlobs []string, tailLines int, topN int, requestLimit
 
 	// Correlate with CrowdSec decisions if enabled
 	if crowdSecEnabled {
-		crowdSecDecisions, err := CollectCrowdSecDecisions(crowdSecConnectionString, crowdSecAPIKey, crowdSecAlertsMachineID, crowdSecAlertsPassword, verbose)
+		crowdSecDecisions, err := CollectCrowdSecDecisions(crowdSecConnectionString, crowdSecAPIKey, crowdSecAlertsMachineID, crowdSecAlertsPassword)
 		if err != nil {
-			log.Printf("[web_logs] CrowdSec correlation error (non-fatal): %v", err)
+			slog.Warn("web_logs crowdsec correlation error (non-fatal)", "err", err)
 		}
 
 		// Enrich individual requests with CrowdSec data
@@ -423,7 +423,7 @@ func CollectWebLogs(logPathGlobs []string, tailLines int, topN int, requestLimit
 		}
 		report.Threats.CrowdSecTopBlocked = topBlocked
 
-		log.Printf("[web_logs] CrowdSec: %d active decisions, enriched %d suspicious IPs", len(crowdSecDecisions), blockedCount)
+		slog.Debug("web_logs crowdsec correlation applied", "active_decisions", len(crowdSecDecisions), "enriched_ips", blockedCount)
 	}
 
 	return report, nil
@@ -607,14 +607,14 @@ func expandGlobs(globs []string) []string {
 	return out
 }
 
-func readLinesForFile(path string, maxLines int, prev webLogCursorEntry, hasPrev bool, verbose bool) ([]string, webLogCursorEntry, error) {
+func readLinesForFile(path string, maxLines int, prev webLogCursorEntry, hasPrev bool) ([]string, webLogCursorEntry, error) {
 	if strings.HasSuffix(strings.ToLower(path), ".gz") {
-		return readCompressedLines(path, prev, hasPrev, verbose)
+		return readCompressedLines(path, prev, hasPrev)
 	}
-	return readIncrementalLines(path, maxLines, prev, hasPrev, verbose)
+	return readIncrementalLines(path, maxLines, prev, hasPrev)
 }
 
-func readCompressedLines(path string, prev webLogCursorEntry, hasPrev bool, verbose bool) ([]string, webLogCursorEntry, error) {
+func readCompressedLines(path string, prev webLogCursorEntry, hasPrev bool) ([]string, webLogCursorEntry, error) {
 	info, err := os.Stat(path)
 	if err != nil {
 		return nil, prev, err
@@ -656,14 +656,14 @@ func readCompressedLines(path string, prev webLogCursorEntry, hasPrev bool, verb
 		return nil, next, err
 	}
 
-	if verbose && len(lines) > 0 {
-		log.Printf("Web logs collect file=%s mode=gz decompressed_lines=%d", path, len(lines))
+	if len(lines) > 0 {
+		slog.Debug("web logs collect", "file", path, "mode", "gz", "decompressed_lines", len(lines))
 	}
 
 	return lines, next, nil
 }
 
-func readIncrementalLines(path string, maxLines int, prev webLogCursorEntry, hasPrev bool, verbose bool) ([]string, webLogCursorEntry, error) {
+func readIncrementalLines(path string, maxLines int, prev webLogCursorEntry, hasPrev bool) ([]string, webLogCursorEntry, error) {
 	info, err := os.Stat(path)
 	if err != nil {
 		return nil, prev, err
@@ -701,9 +701,10 @@ func readIncrementalLines(path string, maxLines int, prev webLogCursorEntry, has
 			}
 		}
 
-		if verbose && (len(tailLines) > 0 || headCount > 0) {
-			log.Printf("Web logs collect file=%s mode=bootstrap tail=%d head=%d live=0 total=%d backfill_done=%t",
-				path, len(tailLines)-headCount, headCount, len(tailLines), next.BackfillDone)
+		if len(tailLines) > 0 || headCount > 0 {
+			slog.Debug("web logs collect", "file", path, "mode", "bootstrap",
+				"tail", len(tailLines)-headCount, "head", headCount, "live", 0,
+				"total", len(tailLines), "backfill_done", next.BackfillDone)
 		}
 
 		return tailLines, next, nil
@@ -749,9 +750,10 @@ func readIncrementalLines(path string, maxLines int, prev webLogCursorEntry, has
 		}
 	}
 
-	if verbose && len(out) > 0 {
-		log.Printf("Web logs collect file=%s mode=incremental tail=0 head=%d live=%d total=%d backfill_done=%t",
-			path, headCount, liveCount, len(out), next.BackfillDone)
+	if len(out) > 0 {
+		slog.Debug("web logs collect", "file", path, "mode", "incremental",
+			"tail", 0, "head", headCount, "live", liveCount,
+			"total", len(out), "backfill_done", next.BackfillDone)
 	}
 
 	return out, next, nil

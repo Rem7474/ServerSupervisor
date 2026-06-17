@@ -3,7 +3,7 @@ package dispatcher
 import (
 	"context"
 	"encoding/json"
-	"log"
+	"log/slog"
 	"strings"
 
 	"github.com/serversupervisor/agent/internal/collector"
@@ -32,9 +32,9 @@ func handleDocker(ctx context.Context, _ *Dispatcher, s *sender.Sender, cmd send
 	if execErr != nil {
 		status = "failed"
 		output = decorateErrorOutput(execErr, output)
-		log.Printf("Docker %s %s failed: %v", cmd.Action, cmd.Target, execErr)
+		slog.Error("docker command failed", "action", cmd.Action, "target", cmd.Target, "err", execErr)
 	} else {
-		log.Printf("Docker %s %s completed", cmd.Action, cmd.Target)
+		slog.Info("docker command completed", "action", cmd.Action, "target", cmd.Target)
 	}
 	reportTerminal(ctx, s, cmd, status, output)
 }

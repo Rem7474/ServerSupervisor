@@ -4,7 +4,7 @@ package reporter
 import (
 	"context"
 	"encoding/json"
-	"log"
+	"log/slog"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -18,18 +18,16 @@ import (
 type Reporter struct {
 	cfg         *config.Config
 	tasks       *config.TasksConfig
-	verbose     bool
 	skipMetrics *atomic.Bool
 	version     string
 }
 
 // New returns a ready Reporter. skipMetrics is shared with the caller — the
 // reporter updates it after each successful send based on the server directive.
-func New(cfg *config.Config, tasks *config.TasksConfig, verbose bool, skipMetrics *atomic.Bool, version string) *Reporter {
+func New(cfg *config.Config, tasks *config.TasksConfig, skipMetrics *atomic.Bool, version string) *Reporter {
 	return &Reporter{
 		cfg:         cfg,
 		tasks:       tasks,
-		verbose:     verbose,
 		skipMetrics: skipMetrics,
 		version:     version,
 	}
@@ -57,17 +55,17 @@ func (r *Reporter) Send(ctx context.Context, s *sender.Sender, cmdQueue chan<- [
 	go func() {
 		defer wg.Done()
 		if r.skipMetrics.Load() {
-			log.Printf("System metrics collection skipped (Proxmox is the designated metrics source)")
+			slog.Debug("system metrics collection skipped (Proxmox is the designated metrics source)")
 			m, err := collector.CollectMinimalMetrics()
 			if err != nil {
-				log.Printf("Failed to collect minimal metrics: %v", err)
+				slog.Error("failed to collect minimal metrics", "err", err)
 				return
 			}
 			collectedMetrics = m
 		} else {
 			m, err := collector.CollectSystem(r.cfg.CollectCPUTemperature)
 			if err != nil {
-				log.Printf("Failed to collect system metrics: %v", err)
+				slog.Error("failed to collect system metrics", "err", err)
 				return
 			}
 			collectedMetrics = m
@@ -80,7 +78,7 @@ func (r *Reporter) Send(ctx context.Context, s *sender.Sender, cmdQueue chan<- [
 			defer wg.Done()
 			containers, err := collector.CollectDocker()
 			if err != nil {
-				log.Printf("Docker collection skipped: %v", err)
+				slog.Warn("docker collection skipped", "err", err)
 				return
 			}
 			dockerData = &sender.DockerPayload{Containers: containers}
@@ -92,7 +90,7 @@ func (r *Reporter) Send(ctx context.Context, s *sender.Sender, cmdQueue chan<- [
 			if projects, err := collector.CollectComposeProjects(); err == nil {
 				composeProjects = projects
 			} else {
-				log.Printf("Compose projects collection skipped: %v", err)
+				slog.Warn("compose projects collection skipped", "err", err)
 			}
 		}()
 	} else {
@@ -111,7 +109,7 @@ func (r *Reporter) Send(ctx context.Context, s *sender.Sender, cmdQueue chan<- [
 		var err error
 		diskMetrics, err = collector.CollectDiskMetrics()
 		if err != nil {
-			log.Printf("Failed to collect disk metrics: %v", err)
+			slog.Error("failed to collect disk metrics", "err", err)
 		}
 	}()
 
@@ -122,7 +120,7 @@ func (r *Reporter) Send(ctx context.Context, s *sender.Sender, cmdQueue chan<- [
 			var err error
 			diskHealth, err = collector.CollectDiskHealth()
 			if err != nil {
-				log.Printf("Failed to collect disk health (smartctl may not be installed): %v", err)
+				slog.Warn("failed to collect disk health (smartctl may not be installed)", "err", err)
 			}
 		}()
 	}
@@ -132,14 +130,13 @@ func (r *Reporter) Send(ctx context.Context, s *sender.Sender, cmdQueue chan<- [
 		go func() {
 			defer wg.Done()
 			globs := r.cfg.WebLogGlobs()
-			log.Printf("Web logs: scanning globs %v (crowdsec=%v)", globs, r.cfg.CollectCrowdSecCorrelation)
+			slog.Debug("web logs scan starting", "globs", globs, "crowdsec", r.cfg.CollectCrowdSecCorrelation)
 			report, err := collector.CollectWebLogs(
 				globs,
 				r.cfg.WebLogsTailLines,
 				r.cfg.WebLogsTopN,
 				r.cfg.WebLogsRequestsLimit,
 				r.cfg.WebLogsCursorFile,
-				r.verbose,
 				r.cfg.CrowdSecConnectionString,
 				r.cfg.CrowdSecAPIKey,
 				r.cfg.CrowdSecAlertsMachineID,
@@ -147,15 +144,16 @@ func (r *Reporter) Send(ctx context.Context, s *sender.Sender, cmdQueue chan<- [
 				r.cfg.CollectCrowdSecCorrelation,
 			)
 			if err != nil {
-				log.Printf("Web logs collection skipped: %v", err)
+				slog.Warn("web logs collection skipped", "err", err)
 				return
 			}
 			suspicious := 0
 			if report.Threats != nil {
 				suspicious = report.Threats.SuspiciousRequests
 			}
-			log.Printf("Web logs: source=%s files=%d requests=%d suspicious=%d",
-				report.Source, len(report.LogFilesScanned), report.TotalRequests, suspicious)
+			slog.Debug("web logs scan complete",
+				"source", report.Source, "files", len(report.LogFilesScanned),
+				"requests", report.TotalRequests, "suspicious", suspicious)
 			webLogs = report
 		}()
 	}
@@ -200,15 +198,17 @@ func (r *Reporter) Send(ctx context.Context, s *sender.Sender, cmdQueue chan<- [
 
 	response, err := s.SendReportWithRetry(ctx, report)
 	if err != nil {
-		log.Printf("Failed to send report: %v", err)
+		slog.Error("failed to send report", "err", err)
 		return
 	}
 
 	if r.skipMetrics.Load() {
-		log.Printf("Report sent successfully (uptime: %ds — Proxmox source)", collectedMetrics.Uptime)
+		slog.Info("report sent", "source", "proxmox", "uptime_s", collectedMetrics.Uptime)
 	} else {
-		log.Printf("Report sent successfully (CPU: %.1f%%, RAM: %.1f%%, Disks: %d)",
-			collectedMetrics.CPUUsagePercent, collectedMetrics.MemoryPercent, len(diskMetrics))
+		slog.Info("report sent",
+			"cpu_pct", collectedMetrics.CPUUsagePercent,
+			"ram_pct", collectedMetrics.MemoryPercent,
+			"disks", len(diskMetrics))
 	}
 
 	r.skipMetrics.Store(response.SkipMetrics)
@@ -219,15 +219,15 @@ func (r *Reporter) Send(ctx context.Context, s *sender.Sender, cmdQueue chan<- [
 	select {
 	case cmdQueue <- response.Commands:
 	default:
-		log.Printf("Command queue full (%d batches pending), reporting %d commands as failed",
-			len(cmdQueue), len(response.Commands))
+		slog.Warn("command queue full, reporting commands as failed",
+			"pending_batches", len(cmdQueue), "dropped_commands", len(response.Commands))
 		for _, cmd := range response.Commands {
 			if err := s.ReportCommandResult(ctx, &sender.CommandResult{
 				CommandID: cmd.ID,
 				Status:    "failed",
 				Output:    "command dropped: agent command queue was full — try again",
 			}); err != nil {
-				log.Printf("Failed to report dropped command %s as failed: %v", cmd.ID, err)
+				slog.Error("failed to report dropped command as failed", "command_id", cmd.ID, "err", err)
 			}
 		}
 	}
@@ -280,6 +280,6 @@ func trimWebLogsForReportSize(report *sender.Report, maxBodyBytes int) {
 		web.Requests = web.Requests[:len(web.Requests)/2]
 	}
 
-	log.Printf("Web logs payload trimmed: requests %d -> %d to fit max_report_body_bytes=%d",
-		original, len(web.Requests), maxBodyBytes)
+	slog.Debug("web logs payload trimmed to fit report size",
+		"requests_from", original, "requests_to", len(web.Requests), "max_report_body_bytes", maxBodyBytes)
 }

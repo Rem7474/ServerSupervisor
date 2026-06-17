@@ -3,7 +3,7 @@ package collector
 import (
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -486,7 +486,7 @@ func collectSmartData(device string) (DiskHealth, error) {
 	cmd := exec.Command("smartctl", "-A", "-i", "-H", "-j", device)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		log.Printf("smartctl warning for %s: %v", device, err)
+		slog.Warn("smartctl warning", "device", device, "err", err)
 		// Continue attempting to parse output (smartctl may still produce valid JSON)
 	}
 

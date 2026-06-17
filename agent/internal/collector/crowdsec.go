@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -68,13 +68,11 @@ type crowdSecAPIAlert struct {
 // CollectCrowdSecDecisions queries the CrowdSec Local API and returns a map of IP -> decision.
 // Auth priority: bouncer X-API-Key → watcher JWT (fallback when no bouncer key configured).
 // Also enriches decisions with country/ASN data from the alerts endpoint.
-func CollectCrowdSecDecisions(connectionString, apiKey, alertsMachineID, alertsPassword string, verbose bool) (map[string]CrowdSecDecision, error) {
+func CollectCrowdSecDecisions(connectionString, apiKey, alertsMachineID, alertsPassword string) (map[string]CrowdSecDecision, error) {
 	result := make(map[string]CrowdSecDecision)
 
 	if connectionString == "" {
-		if verbose {
-			log.Println("[crowdsec] connection string is empty, skipping collection")
-		}
+		slog.Debug("crowdsec connection string is empty, skipping collection")
 		return result, nil
 	}
 
@@ -91,7 +89,7 @@ func CollectCrowdSecDecisions(connectionString, apiKey, alertsMachineID, alertsP
 	} else if alertsMachineID != "" && alertsPassword != "" {
 		token, err := loginCrowdSecAlertsToken(connectionString, alertsMachineID, alertsPassword, client)
 		if err != nil {
-			log.Printf("[crowdsec] watcher fallback auth failed: %v", err)
+			slog.Warn("crowdsec watcher fallback auth failed", "err", err)
 		} else {
 			watcherToken = token
 			authHeader = "Bearer " + token
@@ -101,7 +99,7 @@ func CollectCrowdSecDecisions(connectionString, apiKey, alertsMachineID, alertsP
 	apiURL := fmt.Sprintf("%s/v1/decisions", baseURL)
 	req, err := http.NewRequest("GET", apiURL, nil)
 	if err != nil {
-		log.Printf("[crowdsec] failed to create request: %v", err)
+		slog.Error("crowdsec failed to create request", "err", err)
 		return result, nil
 	}
 	if authHeader != "" {
@@ -114,17 +112,17 @@ func CollectCrowdSecDecisions(connectionString, apiKey, alertsMachineID, alertsP
 
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Printf("[crowdsec] failed to query CrowdSec API: %v", err)
+		slog.Warn("crowdsec failed to query API", "err", err)
 	} else {
 		defer func() { _ = resp.Body.Close() }()
 
 		if resp.StatusCode != http.StatusOK {
 			body, _ := io.ReadAll(resp.Body)
-			log.Printf("[crowdsec] API returned status %d: %s", resp.StatusCode, string(body))
+			slog.Warn("crowdsec API returned non-OK status", "status", resp.StatusCode, "body", string(body))
 		} else {
 			var decisions []crowdSecAPIDecision
 			if err := json.NewDecoder(resp.Body).Decode(&decisions); err != nil {
-				log.Printf("[crowdsec] failed to decode decisions: %v", err)
+				slog.Warn("crowdsec failed to decode decisions", "err", err)
 			} else {
 				now := time.Now()
 				for _, d := range decisions {
@@ -156,7 +154,7 @@ func CollectCrowdSecDecisions(connectionString, apiKey, alertsMachineID, alertsP
 		}
 	}
 
-	log.Printf("[crowdsec] collected %d active IP decisions", len(result))
+	slog.Debug("crowdsec collected active IP decisions", "count", len(result))
 
 	// Enrich decisions (or populate fallback) with data from the alerts endpoint.
 	// Pass watcherToken so enrichment reuses it and skips a second login call.
@@ -392,7 +390,7 @@ func enrichDecisionsWithAlerts(decisions map[string]CrowdSecDecision, connection
 		var err error
 		token, err = loginCrowdSecAlertsToken(connectionString, alertsMachineID, alertsPassword, client)
 		if err != nil {
-			log.Printf("[crowdsec] unable to obtain alerts token: %v", err)
+			slog.Warn("crowdsec unable to obtain alerts token", "err", err)
 			return
 		}
 	}
@@ -401,27 +399,27 @@ func enrichDecisionsWithAlerts(decisions map[string]CrowdSecDecision, connection
 	alertURL := fmt.Sprintf("%s/v1/alerts?has_active_decision=true&limit=5000", baseURL)
 	req, err := http.NewRequest("GET", alertURL, nil)
 	if err != nil {
-		log.Printf("[crowdsec] failed to create alerts request: %v", err)
+		slog.Error("crowdsec failed to create alerts request", "err", err)
 		return
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 
 	resp, err := client.Do(req)
 	if err != nil {
-		log.Printf("[crowdsec] failed to query CrowdSec alerts API: %v", err)
+		slog.Warn("crowdsec failed to query alerts API", "err", err)
 		return
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		log.Printf("[crowdsec] alerts API returned status %d: %s", resp.StatusCode, string(body))
+		slog.Warn("crowdsec alerts API returned non-OK status", "status", resp.StatusCode, "body", string(body))
 		return
 	}
 
 	var alerts []crowdSecAPIAlert
 	if err := json.NewDecoder(resp.Body).Decode(&alerts); err != nil {
-		log.Printf("[crowdsec] failed to decode alerts: %v", err)
+		slog.Warn("crowdsec failed to decode alerts", "err", err)
 		return
 	}
 
