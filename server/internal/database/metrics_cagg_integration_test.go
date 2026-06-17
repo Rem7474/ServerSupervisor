@@ -3,6 +3,7 @@ package database_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/models"
@@ -99,6 +100,50 @@ func TestProxmoxGuestMetricsSummary_CAGG(t *testing.T) {
 		if s.MemoryAvg < 24 || s.MemoryAvg > 26 { // 500/2000 → 25%
 			t.Errorf("guest mem_avg = %.2f, want ~25", s.MemoryAvg)
 		}
+	}
+}
+
+// TestMetricsSummary_RealTimeFreshness guards against the dashboard charts
+// lagging behind the host-detail panel. A sample inserted < 5 min ago falls
+// inside the CAGG end_offset window and is NOT materialized by a refresh, so it
+// only surfaces in the summary if real-time aggregation is enabled on
+// system_metrics_5min (materialized_only = false). Without it the dashboard
+// would stop ~10-18 min short of "now" while the raw host panel stays current.
+func TestMetricsSummary_RealTimeFreshness(t *testing.T) {
+	db := testutil.NewPostgresDB(t)
+	ctx := context.Background()
+
+	const hostID = "host-fresh-cagg"
+	if err := db.RegisterHost(ctx, &models.Host{ID: hostID, Name: "fresh", Hostname: "fresh.local", Status: "online"}); err != nil {
+		t.Fatalf("register host: %v", err)
+	}
+
+	// Old sample (materialized on refresh) + a fresh one inside the end_offset.
+	testutil.MustQuery(t, db,
+		`INSERT INTO system_metrics (host_id, timestamp, cpu_usage_percent, memory_percent)
+		 VALUES ($1, NOW() - INTERVAL '20 minutes', 50, 50)`, hostID)
+	testutil.MustQuery(t, db, `CALL refresh_continuous_aggregate('system_metrics_5min', NULL, NULL)`)
+	testutil.MustQuery(t, db,
+		`INSERT INTO system_metrics (host_id, timestamp, cpu_usage_percent, memory_percent)
+		 VALUES ($1, NOW() - INTERVAL '1 minute', 50, 50)`, hostID)
+
+	// CAGG path (bucket 5min). The fresh, non-materialized sample must appear.
+	summary, err := db.GetMetricsSummary(ctx, 1, 5)
+	if err != nil {
+		t.Fatalf("metrics summary: %v", err)
+	}
+	if len(summary) == 0 {
+		t.Fatal("metrics summary is empty")
+	}
+
+	var latest time.Time
+	for _, s := range summary {
+		if s.Timestamp.After(latest) {
+			latest = s.Timestamp
+		}
+	}
+	if age := time.Since(latest); age > 6*time.Minute {
+		t.Errorf("latest summary bucket is %s old, want < 6m — real-time aggregation not active", age)
 	}
 }
 
