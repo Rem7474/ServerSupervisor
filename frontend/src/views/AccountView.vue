@@ -569,13 +569,25 @@ import CommandLogPanel from '../components/host/CommandLogPanel.vue'
 import { moduleLabel, moduleClass } from '../utils/moduleMeta'
 import { useStatusBadge } from '../composables/useStatusBadge'
 import { getApiErrorMessage } from '../api/client'
+import type { RemoteCommand, LoginEvent } from '../types/generated'
+
+// The audit/commands endpoint enriches RemoteCommand with the resolved host name.
+type CommandRow = RemoteCommand & { host_name?: string }
+
+interface Profile {
+  username?: string
+  role?: string
+  created_at?: string
+  mfa_enabled?: boolean
+  [key: string]: unknown
+}
 
 const auth = useAuthStore()
 
 const activeTab = ref('profil')
 const showConsole = ref(false)
 
-const profile = ref<any>(null)
+const profile = ref<Profile | null>(null)
 
 const pwForm = ref({ current: '', next: '', confirm: '' })
 const pwErrors = ref({ current: '', next: '', confirm: '' })
@@ -626,29 +638,29 @@ watch(() => pwForm.value.confirm, (val) => {
 })
 
 // Commands history
-const allCommands = ref<any[]>([])
+const allCommands = ref<CommandRow[]>([])
 const cmdsLoading = ref(false)
 const myCommands = computed(() =>
-  allCommands.value.filter((c: any) => c.triggered_by === auth.username).slice(0, 50)
+  allCommands.value.filter((c: CommandRow) => c.triggered_by === auth.username).slice(0, 50)
 )
 
-const loginEvents = ref<any[]>([])
+const loginEvents = ref<LoginEvent[]>([])
 const loginEventsLoading = ref(false)
 const loginEventsLoaded = ref(false)
 
-const selectedCmd = ref<any>(null)
+const selectedCmd = ref<CommandRow | null>(null)
 
 const { openCommandStream, closeStream } = useCommandStream()
 const { getStatusBadgeClass } = useStatusBadge()
 
 const roleBadgeClass = computed(() => {
   const map: Record<string, string> = { admin: 'bg-danger-lt text-danger', operator: 'bg-warning-lt text-warning', viewer: 'bg-secondary-lt text-secondary' }
-  return map[profile.value?.role] || 'bg-secondary-lt text-secondary'
+  return map[profile.value?.role ?? ""] || 'bg-secondary-lt text-secondary'
 })
 
 const roleLabel = computed(() => {
   const map: Record<string, string> = { admin: 'Administrateur', operator: 'Opérateur', viewer: 'Lecteur' }
-  return map[profile.value?.role] || profile.value?.role || auth.role
+  return map[profile.value?.role ?? ""] || profile.value?.role || auth.role
 })
 
 function formatDuration(startedAt: string | undefined, endedAt: string | undefined): string {
@@ -659,7 +671,7 @@ function formatDuration(startedAt: string | undefined, endedAt: string | undefin
   return s > 0 ? `${m}m ${s}s` : `${m}m`
 }
 
-function cmdLabel(cmd: any): string {
+function cmdLabel(cmd: CommandRow): string {
   return [cmd?.action, cmd?.target].filter(Boolean).join(' ')
 }
 
@@ -681,7 +693,7 @@ function parseUA(ua: string | undefined): { browser: string; os: string } {
   return { browser, os }
 }
 
-function openLogViewer(cmd: any): void {
+function openLogViewer(cmd: CommandRow): void {
   if (selectedCmd.value?.id === cmd.id) { closeLogViewer(); return }
   closeLogViewer()
   selectedCmd.value = { ...cmd }
@@ -697,13 +709,13 @@ function closeLogViewer(): void {
 
 function connectStream(commandId: string): void {
   openCommandStream(commandId, {
-    onInit(p: any) {
+    onInit(p) {
       if (selectedCmd.value) { selectedCmd.value.status = p.status; selectedCmd.value.output = p.output || '' }
     },
-    onChunk(p: any) {
+    onChunk(p) {
       if (selectedCmd.value) selectedCmd.value.output = (selectedCmd.value.output || '') + p.chunk
     },
-    onStatus(p: any) {
+    onStatus(p) {
       if (selectedCmd.value) { selectedCmd.value.status = p.status; if (p.output) selectedCmd.value.output = p.output }
     },
   })
