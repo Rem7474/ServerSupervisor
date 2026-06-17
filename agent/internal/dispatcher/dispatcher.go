@@ -9,7 +9,7 @@ package dispatcher
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -88,6 +88,6 @@ func (d *Dispatcher) execute(s *sender.Sender, cmd sender.PendingCommand) {
 	ctx, cancel := context.WithTimeout(context.Background(), maxCmdDuration)
 	defer cancel()
 
-	log.Printf("Processing command %s: module=%s action=%s target=%s", cmd.ID, cmd.Module, cmd.Action, cmd.Target)
+	slog.Info("processing command", "command_id", cmd.ID, "module", cmd.Module, "action", cmd.Action, "target", cmd.Target)
 	dispatch(ctx, d, s, cmd)
 }

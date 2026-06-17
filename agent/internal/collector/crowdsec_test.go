@@ -49,7 +49,7 @@ func TestCollectCrowdSecDecisionsUsesWatcherLoginForAlerts(t *testing.T) {
 	}))
 	defer server.Close()
 
-	decisions, err := CollectCrowdSecDecisions(server.URL, decisionsKey, alertsMachineID, alertsPassword, false)
+	decisions, err := CollectCrowdSecDecisions(server.URL, decisionsKey, alertsMachineID, alertsPassword)
 	if err != nil {
 		t.Fatalf("collect crowdsec decisions failed: %v", err)
 	}

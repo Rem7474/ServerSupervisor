@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"os/exec"
 	"strings"
@@ -21,7 +21,7 @@ import (
 func handleCustom(ctx context.Context, d *Dispatcher, s *sender.Sender, cmd sender.PendingCommand) {
 	task := d.tasks.FindTask(cmd.Target)
 	if task == nil {
-		log.Printf("Custom task %q not found in local tasks config", cmd.Target)
+		slog.Warn("custom task not found in local tasks config", "task", cmd.Target)
 		reportTerminal(ctx, s, cmd, "failed",
 			fmt.Sprintf("task %q not found in local tasks config (tasks.yaml)", cmd.Target))
 		return
@@ -40,9 +40,9 @@ func handleCustom(ctx context.Context, d *Dispatcher, s *sender.Sender, cmd send
 	if err != nil {
 		status = "failed"
 		output += "\nERROR: " + err.Error()
-		log.Printf("Custom task %q failed: %v", task.ID, err)
+		slog.Error("custom task failed", "task", task.ID, "err", err)
 	} else {
-		log.Printf("Custom task %q completed", task.ID)
+		slog.Info("custom task completed", "task", task.ID)
 	}
 	reportTerminal(ctx, s, cmd, status, output)
 }

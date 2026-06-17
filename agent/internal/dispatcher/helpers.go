@@ -3,7 +3,7 @@ package dispatcher
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 
 	"github.com/serversupervisor/agent/internal/sender"
 )
@@ -16,7 +16,7 @@ func reportRunning(ctx context.Context, s *sender.Sender, cmd sender.PendingComm
 		CommandID: cmd.ID,
 		Status:    "running",
 	}); err != nil {
-		log.Printf("Failed to report running status for %s: %v", cmd.ID, err)
+		slog.Warn("failed to report running status", "command_id", cmd.ID, "err", err)
 	}
 }
 
@@ -29,7 +29,7 @@ func reportTerminal(ctx context.Context, s *sender.Sender, cmd sender.PendingCom
 		Status:    status,
 		Output:    output,
 	}); err != nil {
-		log.Printf("Failed to report terminal status for %s: %v", cmd.ID, err)
+		slog.Warn("failed to report terminal status", "command_id", cmd.ID, "err", err)
 	}
 }
 
@@ -37,7 +37,7 @@ func reportTerminal(ctx context.Context, s *sender.Sender, cmd sender.PendingCom
 // WebSocket buffer. Errors are logged and dropped — the chunk is best-effort.
 func streamChunk(ctx context.Context, s *sender.Sender, commandID, chunk string) {
 	if err := s.StreamCommandChunk(ctx, commandID, chunk); err != nil {
-		log.Printf("Failed to stream chunk for %s: %v", commandID, err)
+		slog.Warn("failed to stream chunk", "command_id", commandID, "err", err)
 	}
 }
 
@@ -52,5 +52,5 @@ func decorateErrorOutput(err error, existingOutput string) string {
 
 // logUnknownModule is kept separate so registry.go does not need a log import.
 func logUnknownModule(cmd sender.PendingCommand, err error) {
-	log.Printf("Failed to report 'unknown module' result for %s (%s): %v", cmd.ID, cmd.Module, err)
+	slog.Warn("failed to report 'unknown module' result", "command_id", cmd.ID, "module", cmd.Module, "err", err)
 }

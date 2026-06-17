@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 
 	"github.com/serversupervisor/agent/internal/collector"
 	"github.com/serversupervisor/agent/internal/sender"
@@ -62,22 +62,22 @@ func handleApt(ctx context.Context, _ *Dispatcher, s *sender.Sender, cmd sender.
 	if err != nil {
 		status = "failed"
 		output = decorateErrorOutput(err, output)
-		log.Printf("APT %s failed: %v", cmd.Action, err)
+		slog.Error("apt command failed", "action", cmd.Action, "err", err)
 	} else {
-		log.Printf("APT %s completed", cmd.Action)
+		slog.Info("apt command completed", "action", cmd.Action)
 	}
 
 	// After every apt mutation we resnapshot the package list + CVEs so the
 	// server can refresh its tile immediately — without waiting for the next
 	// periodic report.
 	var aptStatus interface{}
-	log.Printf("Collecting APT status with CVE extraction after %s...", cmd.Action)
+	slog.Debug("collecting apt status with CVE extraction", "action", cmd.Action)
 	apt, aptErr := collector.CollectAPT(true)
 	if aptErr != nil {
-		log.Printf("Failed to collect APT status after %s: %v", cmd.Action, aptErr)
+		slog.Warn("failed to collect apt status", "action", cmd.Action, "err", aptErr)
 	} else {
 		aptStatus = apt
-		log.Printf("APT status collected: %d packages, %d security", apt.PendingPackages, apt.SecurityUpdates)
+		slog.Debug("apt status collected", "packages", apt.PendingPackages, "security", apt.SecurityUpdates)
 	}
 
 	if err := s.ReportCommandResult(ctx, &sender.CommandResult{
@@ -86,7 +86,7 @@ func handleApt(ctx context.Context, _ *Dispatcher, s *sender.Sender, cmd sender.
 		Output:    output,
 		AptStatus: aptStatus,
 	}); err != nil {
-		log.Printf("Failed to report apt command result: %v", err)
+		slog.Warn("failed to report apt command result", "err", err)
 	}
 }
 

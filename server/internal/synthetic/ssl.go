@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"log/slog"
 	"net"
 	"strconv"
 	"time"
@@ -45,6 +46,7 @@ func RunSSLWorker(ctx context.Context, db SSLDB) {
 func checkAllCertificates(ctx context.Context, db SSLDB) {
 	certs, err := db.ListEnabledSSLCertificates(ctx)
 	if err != nil {
+		slog.WarnContext(ctx, "ssl: failed to list enabled certificates", slog.Any("err", err))
 		return
 	}
 	for _, c := range certs {
@@ -54,7 +56,10 @@ func checkAllCertificates(ctx context.Context, db SSLDB) {
 		default:
 		}
 		result := checkCertificate(ctx, c)
-		_ = db.UpdateSSLCertificateCheckResult(ctx, result)
+		if err := db.UpdateSSLCertificateCheckResult(ctx, result); err != nil {
+			slog.WarnContext(ctx, "ssl: failed to update certificate check result",
+				slog.String("cert_id", result.ID), slog.Any("err", err))
+		}
 		if result.SerialNumber != "" {
 			ev := models.SSLCertificateEvent{
 				CertificateID: result.ID,
@@ -64,7 +69,10 @@ func checkAllCertificates(ctx context.Context, db SSLDB) {
 				Issuer:        result.Issuer,
 				Subject:       result.Subject,
 			}
-			_ = db.InsertSSLCertificateEventIfNew(ctx, ev)
+			if err := db.InsertSSLCertificateEventIfNew(ctx, ev); err != nil {
+				slog.WarnContext(ctx, "ssl: failed to insert certificate event",
+					slog.String("cert_id", result.ID), slog.Any("err", err))
+			}
 		}
 	}
 }

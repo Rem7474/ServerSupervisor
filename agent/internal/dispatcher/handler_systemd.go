@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 
 	"github.com/serversupervisor/agent/internal/collector"
 	"github.com/serversupervisor/agent/internal/sender"
@@ -20,7 +20,7 @@ func handleSystemd(ctx context.Context, _ *Dispatcher, s *sender.Sender, cmd sen
 		if listErr != nil {
 			status = "failed"
 			output = fmt.Sprintf("ERROR: %v", listErr)
-			log.Printf("systemctl list-units failed: %v", listErr)
+			slog.Error("systemctl list-units failed", "err", listErr)
 		} else {
 			jsonBytes, jsonErr := json.Marshal(services)
 			if jsonErr != nil {
@@ -28,7 +28,7 @@ func handleSystemd(ctx context.Context, _ *Dispatcher, s *sender.Sender, cmd sen
 				output = fmt.Sprintf("ERROR marshaling services: %v", jsonErr)
 			} else {
 				output = string(jsonBytes)
-				log.Printf("systemctl list: %d services returned", len(services))
+				slog.Debug("systemd services listed", "count", len(services))
 			}
 		}
 		reportTerminal(ctx, s, cmd, status, output)
@@ -42,9 +42,9 @@ func handleSystemd(ctx context.Context, _ *Dispatcher, s *sender.Sender, cmd sen
 	if err != nil {
 		status = "failed"
 		output = decorateErrorOutput(err, output)
-		log.Printf("systemctl %s %s failed: %v", cmd.Action, cmd.Target, err)
+		slog.Error("systemctl command failed", "action", cmd.Action, "target", cmd.Target, "err", err)
 	} else {
-		log.Printf("systemctl %s %s completed", cmd.Action, cmd.Target)
+		slog.Info("systemctl command completed", "action", cmd.Action, "target", cmd.Target)
 	}
 	reportTerminal(ctx, s, cmd, status, output)
 }

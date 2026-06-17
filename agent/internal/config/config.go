@@ -39,6 +39,10 @@ type Config struct {
 
 	// TLS
 	InsecureSkipVerify bool `yaml:"insecure_skip_verify"`
+
+	// Logging
+	LogLevel  string `yaml:"log_level"`  // debug|info|warn|error (default info; --verbose forces debug)
+	LogFormat string `yaml:"log_format"` // text|json (default text)
 }
 
 // WebLogGlobs returns configured web access log globs.
@@ -157,6 +161,12 @@ func Load(path string) (*Config, error) {
 	if env := os.Getenv("SUPERVISOR_INSECURE_SKIP_VERIFY"); env != "" {
 		cfg.InsecureSkipVerify = env == "true" || env == "1"
 	}
+	if env := os.Getenv("SUPERVISOR_LOG_LEVEL"); env != "" {
+		cfg.LogLevel = strings.TrimSpace(env)
+	}
+	if env := os.Getenv("SUPERVISOR_LOG_FORMAT"); env != "" {
+		cfg.LogFormat = strings.TrimSpace(env)
+	}
 	if env := os.Getenv("SUPERVISOR_COLLECT_CROWDSEC_CORRELATION"); env != "" {
 		cfg.CollectCrowdSecCorrelation = env == "true" || env == "1"
 	}
@@ -205,6 +215,8 @@ func defaultConfig() *Config {
 		CrowdSecAPIKey:             "",
 		CrowdSecAlertsMachineID:    "",
 		CrowdSecAlertsPassword:     "",
+		LogLevel:                   "info",
+		LogFormat:                  "text",
 	}
 }
 
@@ -258,6 +270,12 @@ web_logs_requests_limit: 200
 
 # Incremental cursor state file used to avoid re-reading already processed lines.
 web_logs_cursor_file: "/var/lib/serversupervisor/web_logs_cursor.json"
+
+# Logging
+# log_level: debug|info|warn|error (default info). The --verbose flag forces debug.
+# log_format: text|json (default text — switch to json for centralized ingestion).
+log_level: "info"
+log_format: "text"
 
 # Skip TLS verification (for self-signed certs)
 insecure_skip_verify: false

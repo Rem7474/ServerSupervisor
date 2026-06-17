@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"regexp"
 	"strings"
 	"time"
@@ -173,7 +173,7 @@ func handleCompose(ctx context.Context, d *Dispatcher, s *sender.Sender, cmd sen
 		}
 	}
 
-	log.Printf("Compose update %q completed (status=%s)", project, status)
+	slog.Info("compose update completed", "project", project, "status", status)
 	reportTerminal(ctx, s, cmd, status, out.String())
 }
 

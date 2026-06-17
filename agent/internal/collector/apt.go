@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/exec"
@@ -63,7 +63,7 @@ func CollectAPT(extractCVE bool) (*AptStatus, error) {
 	// List upgradable packages using dry-run simulation
 	out, err := exec.CommandContext(ctx, "apt-get", "upgrade", "--simulate").Output()
 	if err != nil {
-		log.Printf("apt-get upgrade --simulate failed: %v", err)
+		slog.Warn("apt-get upgrade --simulate failed", "err", err)
 		return status, nil
 	}
 
@@ -125,9 +125,9 @@ func CollectAPT(extractCVE bool) (*AptStatus, error) {
 	}
 
 	if extractCVE {
-		log.Printf("APT: %d upgradable packages (%d security, %d CVEs)", status.PendingPackages, status.SecurityUpdates, len(cveInfos))
+		slog.Debug("apt status collected", "upgradable", status.PendingPackages, "security", status.SecurityUpdates, "cves", len(cveInfos))
 	} else {
-		log.Printf("APT: %d upgradable packages (%d security)", status.PendingPackages, status.SecurityUpdates)
+		slog.Debug("apt status collected", "upgradable", status.PendingPackages, "security", status.SecurityUpdates)
 	}
 	return status, nil
 }
@@ -161,11 +161,11 @@ func ExecuteAptCommandWithStreaming(command string, streamCallback func(chunk st
 		return "", err
 	}
 
-	log.Printf("Executing: apt-get %s -y", command)
+	slog.Info("executing apt-get command", "command", command)
 
 	output, runErr := runCommandWithStreaming(cmd, streamCallback, aptCommandIdleTimeout)
 	if runErr != nil && isDpkgInterruptedError(output, runErr) {
-		log.Printf("apt-get %s reported interrupted dpkg state, running dpkg --configure -a before retrying", command)
+		slog.Warn("apt-get reported interrupted dpkg state, running dpkg --configure -a before retrying", "command", command)
 		repairOutput, repairErr := runDpkgConfigureAll(streamCallback)
 		if repairErr != nil {
 			return output, fmt.Errorf("apt-get %s failed: %w\nOutput: %s\nRecovery dpkg --configure -a failed: %v\nRecovery output: %s", command, runErr, output, repairErr, repairOutput)
@@ -182,7 +182,7 @@ func ExecuteAptCommandWithStreaming(command string, streamCallback func(chunk st
 		return output, fmt.Errorf("apt-get %s failed: %w\nOutput: %s", command, runErr, output)
 	}
 
-	log.Printf("apt-get %s completed successfully", command)
+	slog.Info("apt-get command completed", "command", command)
 	return output, nil
 }
 
@@ -197,7 +197,7 @@ func isDpkgInterruptedError(output string, err error) bool {
 func runDpkgConfigureAll(streamCallback func(chunk string)) (string, error) {
 	cmd := exec.Command("dpkg", "--configure", "-a")
 	cmd.Env = append(os.Environ(), "DEBIAN_FRONTEND=noninteractive")
-	log.Printf("Executing: dpkg --configure -a")
+	slog.Info("executing dpkg --configure -a")
 	return runCommandWithStreaming(cmd, streamCallback, aptCommandIdleTimeout)
 }
 
@@ -525,7 +525,7 @@ func enrichCVEsWithUbuntuData(cves []CVEInfo) []CVEInfo {
 
 			data, err := fetchUbuntuCVE(cves[idx].ID)
 			if err != nil {
-				log.Printf("CVE API: could not fetch %s: %v", cves[idx].ID, err)
+				slog.Debug("CVE API fetch failed", "cve", cves[idx].ID, "err", err)
 				return
 			}
 
@@ -1053,7 +1053,7 @@ func ConfigureUnattendedUpgrades(cfg UUConfig) error {
 func RunUnattendedUpgrades(streamCallback func(string)) (string, error) {
 	cmd := exec.Command("unattended-upgrade", "--verbose")
 	cmd.Env = append(os.Environ(), "DEBIAN_FRONTEND=noninteractive")
-	log.Printf("Executing: unattended-upgrade --verbose")
+	slog.Info("executing unattended-upgrade --verbose")
 	return runCommandWithStreaming(cmd, streamCallback, aptCommandIdleTimeout)
 }
 
@@ -1061,6 +1061,6 @@ func RunUnattendedUpgrades(streamCallback func(string)) (string, error) {
 func InstallUnattendedUpgrades(streamCallback func(string)) (string, error) {
 	cmd := exec.Command("apt-get", "install", "-y", "-q", "unattended-upgrades")
 	cmd.Env = append(os.Environ(), "DEBIAN_FRONTEND=noninteractive")
-	log.Printf("Executing: apt-get install -y unattended-upgrades")
+	slog.Info("executing apt-get install -y unattended-upgrades")
 	return runCommandWithStreaming(cmd, streamCallback, aptCommandIdleTimeout)
 }

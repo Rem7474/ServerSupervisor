@@ -4,7 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -16,6 +16,7 @@ import (
 	"github.com/serversupervisor/agent/internal/collector"
 	"github.com/serversupervisor/agent/internal/config"
 	"github.com/serversupervisor/agent/internal/dispatcher"
+	"github.com/serversupervisor/agent/internal/logging"
 	"github.com/serversupervisor/agent/internal/reporter"
 	"github.com/serversupervisor/agent/internal/sender"
 )
@@ -35,8 +36,6 @@ var commandQueue = make(chan []sender.PendingCommand, 10)
 var agentConfigPath = "/etc/serversupervisor/agent.yaml"
 
 func main() {
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
-
 	configPath := flag.String("config", "/etc/serversupervisor/agent.yaml", "Path to config file")
 	initConfig := flag.Bool("init", false, "Generate and write a default config file")
 	initForce := flag.Bool("init-force", false, "Allow overwriting existing config file when used with --init")
@@ -56,9 +55,18 @@ func main() {
 		return
 	}
 
+	// Bootstrap logger for the pre-config code paths (--init / --internal-update).
+	// Format defaults to text here; once the config is loaded it is re-initialised
+	// with the operator-chosen level/format.
+	bootstrapLevel := ""
+	if *verbose {
+		bootstrapLevel = "debug"
+	}
+	logging.Init(bootstrapLevel, "text")
+
 	if *internalUpdate {
 		if err := runInternalUpdate(*configPath, *updateCommandID, *updateVersion); err != nil {
-			log.Printf("Internal update failed: %v", err)
+			slog.Error("internal update failed", "err", err)
 			os.Exit(1)
 		}
 		return
@@ -73,63 +81,83 @@ func main() {
 		}
 
 		if _, err := os.Stat(*configPath); err == nil && !*initForce {
-			log.Fatalf("Config file already exists at %s (use --init-force to overwrite)", *configPath)
+			slog.Error("config file already exists (use --init-force to overwrite)", "path", *configPath)
+			os.Exit(1)
 		} else if err != nil && !os.IsNotExist(err) {
-			log.Fatalf("Unable to check config file %s: %v", *configPath, err)
+			slog.Error("unable to check config file", "path", *configPath, "err", err)
+			os.Exit(1)
 		}
 
 		parentDir := filepath.Dir(*configPath)
 		if parentDir != "." && parentDir != "" {
 			if err := os.MkdirAll(parentDir, 0o700); err != nil {
-				log.Fatalf("Failed to create config directory %s: %v", parentDir, err)
+				slog.Error("failed to create config directory", "dir", parentDir, "err", err)
+				os.Exit(1)
 			}
 		}
 
 		if err := os.WriteFile(*configPath, []byte(content), 0o600); err != nil {
-			log.Fatalf("Failed to write config file %s: %v", *configPath, err)
+			slog.Error("failed to write config file", "path", *configPath, "err", err)
+			os.Exit(1)
 		}
 
-		log.Printf("Default config written to %s", *configPath)
+		slog.Info("default config written", "path", *configPath)
 		return
 	}
 
 	cfg, err := config.Load(*configPath)
 	if err != nil {
-		log.Fatalf("Failed to load config: %v", err)
+		slog.Error("failed to load config", "err", err)
+		os.Exit(1)
 	}
 
-	log.Printf("ServerSupervisor Agent starting (version: %s)", Version)
-	log.Printf("Server: %s", cfg.ServerURL)
-	log.Printf("Report interval: %ds", cfg.ReportInterval)
-	log.Printf("Docker monitoring: %v", cfg.CollectDocker)
-	log.Printf("APT monitoring: %v", cfg.CollectAPT)
-	log.Printf("SMART monitoring: %v", cfg.CollectSMART)
-	if cfg.CollectSMART {
-		if ok, detail := collector.CheckSMARTAvailability(); ok {
-			log.Printf("SMART check: OK (%s)", detail)
-		} else {
-			log.Printf("WARNING: SMART monitoring is enabled but unavailable: %s", detail)
-		}
+	// Re-initialise logging with the operator-chosen level/format now that config
+	// is loaded. --verbose still forces debug regardless of config.
+	logLevel := cfg.LogLevel
+	if *verbose {
+		logLevel = "debug"
 	}
-	log.Printf("CPU temperature monitoring: %v", cfg.CollectCPUTemperature)
-	log.Printf("Web logs analytics: %v (paths: %v)", cfg.CollectWebLogs, cfg.WebLogGlobs())
+	logging.Init(logLevel, cfg.LogFormat)
+
 	if cfg.MaxReportBodyBytes <= 0 {
 		cfg.MaxReportBodyBytes = 3 * 1024 * 1024
 	}
-	log.Printf("Max report body size: %d bytes", cfg.MaxReportBodyBytes)
+
+	smartAvailable, smartDetail := false, ""
+	if cfg.CollectSMART {
+		smartAvailable, smartDetail = collector.CheckSMARTAvailability()
+	}
+	slog.Info("agent starting",
+		"version", Version,
+		"server", cfg.ServerURL,
+		"report_interval_s", cfg.ReportInterval,
+		"collect_docker", cfg.CollectDocker,
+		"collect_apt", cfg.CollectAPT,
+		"collect_smart", cfg.CollectSMART,
+		"collect_cpu_temperature", cfg.CollectCPUTemperature,
+		"collect_web_logs", cfg.CollectWebLogs,
+		"web_log_paths", cfg.WebLogGlobs(),
+		"max_report_body_bytes", cfg.MaxReportBodyBytes)
+	if cfg.CollectSMART {
+		if smartAvailable {
+			slog.Info("SMART monitoring available", "detail", smartDetail)
+		} else {
+			slog.Warn("SMART monitoring enabled but unavailable", "detail", smartDetail)
+		}
+	}
 
 	tc, err := config.LoadTasksConfig()
 	if err != nil {
-		log.Printf("Warning: failed to load tasks config: %v", err)
+		slog.Warn("failed to load tasks config", "err", err)
 		tc = &config.TasksConfig{}
 	} else {
-		log.Printf("Loaded %d custom task(s) from tasks config", len(tc.Tasks))
+		slog.Info("loaded custom tasks", "count", len(tc.Tasks))
 	}
 
 	s := sender.New(cfg)
 
 	var skipMetrics atomic.Bool
-	rep := reporter.New(cfg, tc, *verbose, &skipMetrics, Version)
+	rep := reporter.New(cfg, tc, &skipMetrics, Version)
 	disp := dispatcher.New(cfg, *configPath, tc, startDetachedAgentUpdate)
 
 	// ctx is cancelled on SIGINT/SIGTERM — stops the periodic report loop.
@@ -157,7 +185,7 @@ func main() {
 		case <-ticker.C:
 			rep.Send(ctx, s, commandQueue)
 		case <-ctx.Done():
-			log.Println("Agent shutting down...")
+			slog.Info("agent shutting down")
 			close(commandQueue)
 			workerWg.Wait()
 			return

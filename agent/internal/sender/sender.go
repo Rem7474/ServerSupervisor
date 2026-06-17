@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -87,7 +87,7 @@ type CommandResult struct {
 
 func New(cfg *config.Config) *Sender {
 	if cfg.InsecureSkipVerify {
-		log.Println("WARNING: TLS certificate verification is disabled. Not suitable for production.")
+		slog.Warn("TLS certificate verification is disabled — not suitable for production")
 	}
 
 	transport := &http.Transport{
@@ -152,8 +152,8 @@ func (s *Sender) SendReportWithRetry(ctx context.Context, report *Report) (*Repo
 	delays := []time.Duration{5 * time.Second, 15 * time.Second}
 	for attempt := 0; attempt <= len(delays); attempt++ {
 		if attempt > 0 {
-			log.Printf("Retrying report (attempt %d/%d) after %v: %v",
-				attempt+1, len(delays)+1, delays[attempt-1], lastErr)
+			slog.Warn("retrying report",
+				"attempt", attempt+1, "max_attempts", len(delays)+1, "delay", delays[attempt-1], "err", lastErr)
 			select {
 			case <-time.After(delays[attempt-1]):
 			case <-ctx.Done():
@@ -200,7 +200,7 @@ func (s *Sender) ReportCommandResult(ctx context.Context, result *CommandResult)
 		return fmt.Errorf("server returned status %d: %s", resp.StatusCode, string(body))
 	}
 
-	log.Printf("Command result for #%s reported successfully (status: %s)", result.CommandID, result.Status)
+	slog.Debug("command result reported", "command_id", result.CommandID, "status", result.Status)
 	return nil
 }
 
@@ -231,13 +231,13 @@ func (s *Sender) StreamCommandChunk(ctx context.Context, commandID string, chunk
 	resp, err := s.commandClient.Do(req)
 	if err != nil {
 		// Don't fail the command if streaming fails, just log it
-		log.Printf("Failed to stream chunk for command #%s: %v", commandID, err)
+		slog.Warn("failed to stream command chunk", "command_id", commandID, "err", err)
 		return nil
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		log.Printf("Server returned status %d when streaming chunk", resp.StatusCode)
+		slog.Warn("server returned non-OK status when streaming chunk", "status", resp.StatusCode)
 	}
 
 	return nil
@@ -275,7 +275,7 @@ func (s *Sender) SendAuditLog(ctx context.Context, module, action, status, detai
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
 		// Log but don't fail - audit logging is best-effort
-		log.Printf("Warning: Server returned status %d when recording audit log", resp.StatusCode)
+		slog.Warn("server returned non-OK status when recording audit log", "status", resp.StatusCode)
 	}
 
 	return nil

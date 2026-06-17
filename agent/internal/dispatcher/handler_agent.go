@@ -3,7 +3,7 @@ package dispatcher
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 
 	"github.com/serversupervisor/agent/internal/sender"
 )
@@ -19,7 +19,7 @@ func handleAgent(ctx context.Context, d *Dispatcher, s *sender.Sender, cmd sende
 		Status:    "running",
 		Output:    "Launching detached update helper...",
 	}); err != nil {
-		log.Printf("Failed to report agent update running status: %v", err)
+		slog.Warn("failed to report agent update running status", "err", err)
 	}
 
 	if err := d.updater(s, cmd, d.cfgPath); err != nil {

@@ -2,7 +2,7 @@ package dispatcher
 
 import (
 	"context"
-	"log"
+	"log/slog"
 
 	"github.com/serversupervisor/agent/internal/collector"
 	"github.com/serversupervisor/agent/internal/sender"
@@ -18,9 +18,9 @@ func handleJournal(ctx context.Context, _ *Dispatcher, s *sender.Sender, cmd sen
 	if err != nil {
 		status = "failed"
 		output = decorateErrorOutput(err, output)
-		log.Printf("journalctl %s failed: %v", cmd.Target, err)
+		slog.Error("journalctl failed", "target", cmd.Target, "err", err)
 	} else {
-		log.Printf("journalctl %s completed", cmd.Target)
+		slog.Info("journalctl completed", "target", cmd.Target)
 	}
 	reportTerminal(ctx, s, cmd, status, output)
 }

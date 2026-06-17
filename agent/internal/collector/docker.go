@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -86,7 +86,7 @@ func newDockerClient() (*docker.Client, error) {
 
 	c, err := docker.NewClientFromEnv()
 	if err != nil {
-		log.Printf("Docker client init failed (will retry on next collection): %v", err)
+		slog.Warn("docker client init failed (will retry on next collection)", "err", err)
 		return nil, err
 	}
 	dockerSingle = c
@@ -111,7 +111,7 @@ func CollectDocker() ([]DockerContainer, error) {
 	}
 
 	if len(apiContainers) == 0 {
-		log.Printf("No Docker containers found")
+		slog.Debug("no docker containers found")
 		return []DockerContainer{}, nil
 	}
 
@@ -133,7 +133,7 @@ func CollectDocker() ([]DockerContainer, error) {
 
 			container, err := client.InspectContainerWithOptions(docker.InspectContainerOptions{ID: id, Context: ctx})
 			if err != nil {
-				log.Printf("Failed to inspect container %s: %v", id[:12], err)
+				slog.Warn("failed to inspect container", "container", id[:12], "err", err)
 				return
 			}
 
@@ -265,7 +265,7 @@ func CollectDocker() ([]DockerContainer, error) {
 	}
 	wg.Wait()
 
-	log.Printf("Collected %d Docker containers", len(containers))
+	slog.Debug("docker containers collected", "count", len(containers))
 	return containers, nil
 }
 
@@ -297,13 +297,13 @@ func collectContainerNetStats(client *docker.Client, containerID string) (rx, tx
 		select {
 		case err := <-errC:
 			if err != nil {
-				log.Printf("Failed to get stats for container %s: %v", containerID, err)
+				slog.Debug("failed to get container stats", "container", containerID, "err", err)
 			}
 		default:
 		}
 	case err := <-errC:
 		if err != nil {
-			log.Printf("Failed to get stats for container %s: %v", containerID, err)
+			slog.Debug("failed to get container stats", "container", containerID, "err", err)
 		}
 	case <-time.After(5 * time.Second):
 		close(done)
@@ -443,7 +443,7 @@ func CollectComposeProjects() ([]ComposeProject, error) {
 	}
 
 	if len(apiContainers) == 0 {
-		log.Printf("No Docker Compose containers found")
+		slog.Debug("no docker compose containers found")
 		return []ComposeProject{}, nil
 	}
 
@@ -506,7 +506,7 @@ func CollectComposeProjects() ([]ComposeProject, error) {
 		result = append(result, *p)
 	}
 
-	log.Printf("Collected %d Docker Compose projects", len(result))
+	slog.Debug("docker compose projects collected", "count", len(result))
 	return result, nil
 }
 

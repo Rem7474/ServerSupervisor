@@ -8,9 +8,11 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"regexp"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
@@ -59,6 +61,7 @@ func RunUptimeWorker(ctx context.Context, db UptimeDB) {
 func runDueProbes(ctx context.Context, db UptimeDB) {
 	probes, err := db.ListEnabledUptimeProbesDue(ctx)
 	if err != nil {
+		slog.WarnContext(ctx, "uptime: failed to list due probes", slog.Any("err", err))
 		return
 	}
 	var wg sync.WaitGroup
@@ -70,9 +73,19 @@ func runDueProbes(ctx context.Context, db UptimeDB) {
 		go func(probe models.UptimeProbe) {
 			defer wg.Done()
 			defer func() { <-sem }()
-			defer func() { recover() }() //nolint:errcheck
+			defer func() {
+				if rec := recover(); rec != nil {
+					slog.ErrorContext(ctx, "uptime: probe panicked",
+						slog.String("probe_id", probe.ID),
+						slog.Any("panic", rec),
+						slog.String("stack", string(debug.Stack())))
+				}
+			}()
 			result := executeProbe(ctx, probe)
-			_ = db.RecordUptimeProbeResult(ctx, result)
+			if err := db.RecordUptimeProbeResult(ctx, result); err != nil {
+				slog.WarnContext(ctx, "uptime: failed to record probe result",
+					slog.String("probe_id", probe.ID), slog.Any("err", err))
+			}
 		}(p)
 	}
 	wg.Wait()
