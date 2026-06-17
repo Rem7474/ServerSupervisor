@@ -111,15 +111,25 @@ import ComposeProjectsTab from '../components/docker/ComposeProjectsTab.vue'
 import CommandLogPanel from '../components/host/CommandLogPanel.vue'
 import { useCommandStream } from '../composables/useCommandStream'
 import apiClient from '../api'
-import type { DockerContainer, ComposeProject } from '../types/docker'
+import type { DockerContainer, ComposeProject, VersionComparison } from '../types/docker'
 import { getApiErrorMessage } from '../api/client'
+
+interface DockerLiveCmd {
+  id: string
+  host_name?: string
+  module?: string
+  action?: string
+  target?: string
+  status?: string
+  output?: string
+}
 
 const auth = useAuthStore()
 const dialog = useConfirmDialog()
 
 const containers = ref<DockerContainer[]>([])
 const composeProjects = ref<ComposeProject[]>([])
-const versionComparisons = ref<any[]>([])
+const versionComparisons = ref<VersionComparison[]>([])
 const activeTab = useLocalStorage('dockerActiveTab', 'containers')
 
 const canRunDocker = computed(() => auth.role === 'admin' || auth.role === 'operator')
@@ -130,7 +140,7 @@ const composeActionLoading = ref<Record<string, string | null>>({})
 
 // Docker console
 const showDockerConsole = ref(false)
-const dockerLiveCmd = ref<any>(null)
+const dockerLiveCmd = ref<DockerLiveCmd | null>(null)
 
 const { openCommandStream, closeStream: closeDockerStream } = useCommandStream()
 
@@ -209,15 +219,15 @@ function connectDockerStream(commandId: string, hostId: string, containerName: s
   dockerLiveCmd.value = { id: commandId, host_name: hostName, module: 'docker', action, target: containerName, status: 'pending', output: '' }
   showDockerConsole.value = true
   openCommandStream(commandId, {
-    onInit: (p: any) => {
+    onInit: (p) => {
       if (dockerLiveCmd.value?.id !== commandId) return
       dockerLiveCmd.value = { ...dockerLiveCmd.value, status: p.status, output: p.output || '' }
     },
-    onChunk: (p: any) => {
+    onChunk: (p) => {
       if (dockerLiveCmd.value?.id !== commandId) return
       dockerLiveCmd.value = { ...dockerLiveCmd.value, output: (dockerLiveCmd.value.output || '') + (p.chunk || '') }
     },
-    onStatus: (p: any) => {
+    onStatus: (p) => {
       if (dockerLiveCmd.value?.id !== commandId) return
       dockerLiveCmd.value = { ...dockerLiveCmd.value, status: p.status }
     },

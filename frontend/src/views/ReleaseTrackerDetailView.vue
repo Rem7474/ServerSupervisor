@@ -205,25 +205,33 @@ import TrackerScriptHelpCard from '../components/webhooks/TrackerScriptHelpCard.
 import TrackerVersionHistoryCard from '../components/webhooks/TrackerVersionHistoryCard.vue'
 import { useCommandStream } from '../composables/useCommandStream'
 import { getApiErrorMessage } from '../api/client'
+import type { ReleaseTracker, ReleaseTrackerExecution, ReleaseTrackerRequest, ReleaseVersionHistoryItem } from '../types/tracker'
+import type { ComposeProject } from '../types/docker'
+import type { Host } from '../types/host'
+import type { WebhookFormData } from '../composables/useWebhookForm'
+
+interface CmdRow { id: string; status?: string; output?: string; [key: string]: unknown }
+// The API enriches the tracker with the resolved release URL (not in the Go model).
+type TrackerView = ReleaseTracker & { release_url?: string }
 
 const route = useRoute()
 const id = route.params.id as string
 
-const tracker = ref<any>(null)
-const executions = ref<any[]>([])
-const versionHistory = ref<any[]>([])
-const hosts = ref<any[]>([])
+const tracker = ref<TrackerView | null>(null)
+const executions = ref<ReleaseTrackerExecution[]>([])
+const versionHistory = ref<ReleaseVersionHistoryItem[]>([])
+const hosts = ref<Host[]>([])
 const loading = ref(false)
 const error = ref('')
 const historyLoading = ref(false)
 const checking = ref(false)
 const running = ref(false)
-const selectedCmd = ref<any>(null)
+const selectedCmd = ref<CmdRow | null>(null)
 const showConsole = ref(false)
 const nowTick = ref(Date.now())
 let cooldownTimer: number | null = null
 
-const composeProjects = ref<any[]>([])
+const composeProjects = ref<ComposeProject[]>([])
 const tasksYaml = ref('')
 const loadingSnippet = ref(false)
 
@@ -356,7 +364,7 @@ function clearExecutionLogs(): void {
 
 function connectExecutionStream(commandId: string): void {
   openCommandStream(commandId, {
-    onInit(payload: any) {
+    onInit(payload) {
       if (!selectedCmd.value || selectedCmd.value.id !== commandId) return
       selectedCmd.value = {
         ...selectedCmd.value,
@@ -364,14 +372,14 @@ function connectExecutionStream(commandId: string): void {
         output: payload.output ?? selectedCmd.value.output,
       }
     },
-    onChunk(payload: any) {
+    onChunk(payload) {
       if (!selectedCmd.value || selectedCmd.value.id !== commandId) return
       selectedCmd.value = {
         ...selectedCmd.value,
         output: (selectedCmd.value.output || '') + (payload.chunk || ''),
       }
     },
-    onStatus(payload: any) {
+    onStatus(payload) {
       if (!selectedCmd.value || selectedCmd.value.id !== commandId) return
       selectedCmd.value = {
         ...selectedCmd.value,
@@ -379,7 +387,7 @@ function connectExecutionStream(commandId: string): void {
         output: payload.output ?? selectedCmd.value.output,
       }
 
-      const idx = executions.value.findIndex((e: any) => e.command_id === commandId)
+      const idx = executions.value.findIndex((e: ReleaseTrackerExecution) => e.command_id === commandId)
       if (idx !== -1) {
         const next = [...executions.value]
         next[idx] = { ...next[idx], status: payload.status || next[idx].status }
@@ -394,7 +402,7 @@ async function openExecutionLogs(commandId: string): Promise<void> {
   try {
     const res = await api.getCommandStatus(commandId)
     const cmd = res.data
-    selectedCmd.value = cmd
+    selectedCmd.value = cmd as unknown as CmdRow
     showConsole.value = true
     if (cmd?.status === 'pending' || cmd?.status === 'running') {
       connectExecutionStream(commandId)
@@ -441,11 +449,11 @@ function openEdit(): void {
   showModal.value = true
 }
 
-async function saveEdit(payload: any): Promise<void> {
+async function saveEdit(payload: WebhookFormData): Promise<void> {
   saving.value = true
   modalError.value = ''
   try {
-    await api.updateReleaseTracker(id, payload)
+    await api.updateReleaseTracker(id, payload as unknown as ReleaseTrackerRequest)
     closeEdit()
     await load()
   } catch (e: unknown) {

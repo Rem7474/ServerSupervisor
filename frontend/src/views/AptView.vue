@@ -266,7 +266,7 @@ const filteredHosts = computed(() => {
   }
 
   list.sort((a: Host, b: Host) => {
-    let va: number | string = 0, vb: number | string = 0
+    let va: number | string, vb: number | string
     if (hostSortKey.value === 'pending') {
       va = aptStatuses.value[a.id]?.pending_packages || 0
       vb = aptStatuses.value[b.id]?.pending_packages || 0

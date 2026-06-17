@@ -166,13 +166,13 @@
           <div class="col-3">
             <div
               class="text-center p-2 rounded"
-              :class="aptStatus.pending_packages > 0 ? 'bg-yellow-lt' : 'bg-green-lt'"
+              :class="(aptStatus.pending_packages ?? 0) > 0 ? 'bg-yellow-lt' : 'bg-green-lt'"
             >
               <div
                 class="fs-3 fw-bold lh-1 mb-1"
-                :class="aptStatus.pending_packages > 0 ? 'text-yellow' : 'text-green'"
+                :class="(aptStatus.pending_packages ?? 0) > 0 ? 'text-yellow' : 'text-green'"
               >
-                {{ aptStatus.pending_packages }}
+                {{ aptStatus.pending_packages ?? 0 }}
               </div>
               <div class="text-secondary small">
                 en attente
@@ -182,13 +182,13 @@
           <div class="col-3">
             <div
               class="text-center p-2 rounded"
-              :class="aptStatus.security_updates > 0 ? 'bg-red-lt' : 'bg-secondary-lt'"
+              :class="(aptStatus.security_updates ?? 0) > 0 ? 'bg-red-lt' : 'bg-secondary-lt'"
             >
               <div
                 class="fs-3 fw-bold lh-1 mb-1"
-                :class="aptStatus.security_updates > 0 ? 'text-red' : 'text-secondary'"
+                :class="(aptStatus.security_updates ?? 0) > 0 ? 'text-red' : 'text-secondary'"
               >
-                {{ aptStatus.security_updates }}
+                {{ aptStatus.security_updates ?? 0 }}
               </div>
               <div class="text-secondary small">
                 sécurité
@@ -304,7 +304,7 @@
             >
               <code class="small">apt {{ cmd.action }}</code>
               <span :class="statusClass(cmd.status)">{{ statusLabel(cmd.status) }}</span>
-              <span class="text-secondary small flex-shrink-0">{{ formatDate(cmd.created_at) }}</span>
+              <span class="text-secondary small flex-shrink-0">{{ formatDate(cmd.created_at ?? "") }}</span>
               <span
                 v-if="cmd.triggered_by"
                 class="text-muted small flex-shrink-0"
@@ -343,11 +343,31 @@ import { ref, computed } from 'vue'
 import CVEList from './CVEList.vue'
 import { useDateFormatter } from '../../composables/useDateFormatter'
 import { useStatusBadge } from '../../composables/useStatusBadge'
+import type { Host } from '../../types/host'
+
+interface CveInfo { severity?: string; [key: string]: unknown }
+interface AptStatusView {
+  pending_packages?: number
+  security_updates?: number
+  last_update?: string
+  last_upgrade?: string
+  cve_list?: unknown
+  package_list?: unknown
+  [key: string]: unknown
+}
+interface AptCommandRow {
+  id: string
+  action?: string
+  status?: string
+  created_at?: string
+  triggered_by?: string
+  [key: string]: unknown
+}
 
 const props = defineProps<{
-  host: any
-  aptStatus: any
-  history: any[] | undefined
+  host: Host
+  aptStatus: AptStatusView | undefined
+  history: AptCommandRow[] | undefined
   expanded: boolean
   selected: boolean
   canRunApt: boolean
@@ -359,7 +379,7 @@ defineEmits<{
   (e: 'update:expanded', value: boolean): void
   (e: 'run-cmd', command: string): void
   (e: 'schedule'): void
-  (e: 'watch-command', cmd: any): void
+  (e: 'watch-command', cmd: AptCommandRow): void
 }>()
 
 const { formatRelativeDate } = useDateFormatter()
@@ -370,18 +390,18 @@ const pkgShowAll = ref(false)
 
 const isCmdLoading = computed(() => !!props.cmdLoading)
 
-function parseJsonArray(value: any): any[] {
+function parseJsonArray<T = unknown>(value: unknown): T[] {
   if (!value) return []
   try {
     const parsed = typeof value === 'string' ? JSON.parse(value) : value
-    return Array.isArray(parsed) ? parsed : []
+    return Array.isArray(parsed) ? (parsed as T[]) : []
   } catch {
     return []
   }
 }
 
-const cveList = computed(() => parseJsonArray(props.aptStatus?.cve_list))
-const packages = computed(() => parseJsonArray(props.aptStatus?.package_list))
+const cveList = computed(() => parseJsonArray<CveInfo>(props.aptStatus?.cve_list))
+const packages = computed(() => parseJsonArray<string>(props.aptStatus?.package_list))
 const visiblePackages = computed(() =>
   pkgShowAll.value ? packages.value : packages.value.slice(0, PKG_PREVIEW_COUNT),
 )
@@ -397,8 +417,8 @@ const STATUS_LABELS: Record<string, string> = {
   failed: 'Échoué',
 }
 
-function statusLabel(status: string): string {
-  return STATUS_LABELS[status] ?? status
+function statusLabel(status?: string): string {
+  return (status && STATUS_LABELS[status]) ?? status ?? ''
 }
 
 function statusClass(status: string | undefined): string {

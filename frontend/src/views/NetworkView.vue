@@ -691,7 +691,7 @@ async function fetchSnapshot(): Promise<void> {
     hosts.value = res.data?.hosts || []
     containers.value = res.data?.containers || []
     ensureHostPortConfig()
-  } catch (e) {
+  } catch {
     // ignore
   }
 }

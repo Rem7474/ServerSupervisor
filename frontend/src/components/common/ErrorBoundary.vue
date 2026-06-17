@@ -51,7 +51,7 @@
 <script setup lang="ts">
 import { ref, onErrorCaptured } from 'vue'
 
-const props = withDefaults(defineProps<{
+withDefaults(defineProps<{
   title?: string
 }>(), {
   title: 'Une erreur inattendue s\'est produite',

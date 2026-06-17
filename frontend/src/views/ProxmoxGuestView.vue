@@ -181,6 +181,10 @@ import api from '../api'
 import MetricsSourceBadge from '../components/common/MetricsSourceBadge.vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import { getApiErrorMessage } from '../api/client'
+import type { ChartData, ChartOptions, TooltipItem } from 'chart.js'
+import type { ProxmoxGuestLink } from '../types/generated'
+
+interface GuestMetricPoint { timestamp: string; cpu_avg?: number; memory_avg?: number; [key: string]: unknown }
 
 interface ProxmoxGuest {
   id: string
@@ -199,12 +203,12 @@ interface ProxmoxGuest {
 
 const route = useRoute()
 const guest = ref<ProxmoxGuest | null>(null)
-const guestLink = ref<any>(null)
+const guestLink = ref<ProxmoxGuestLink | null>(null)
 const loading = ref(true)
 const summaryLoading = ref(false)
 const error = ref('')
 const hours = ref(24)
-const chartData = ref<any>(null)
+const chartData = ref<ChartData<'line'> | null>(null)
 
 const Line = defineAsyncComponent(async () => {
   const [{ Line }, { Chart: ChartJS, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip, Legend }] = await Promise.all([
@@ -215,7 +219,7 @@ const Line = defineAsyncComponent(async () => {
   return Line
 })
 
-const chartOptions: any = computed(() => ({
+const chartOptions = computed((): ChartOptions<'line'> => ({
   responsive: true,
   maintainAspectRatio: false,
   plugins: {
@@ -231,7 +235,7 @@ const chartOptions: any = computed(() => ({
       borderWidth: 1,
       padding: 10,
       callbacks: {
-        label: (ctx: any) => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1)}%`,
+        label: (ctx: TooltipItem<'line'>) => `${ctx.dataset.label}: ${(ctx.parsed.y ?? 0).toFixed(1)}%`,
       },
     },
   },
@@ -288,7 +292,7 @@ async function loadGuestSummary(): Promise<void> {
       chartData.value = null
       return
     }
-    const labels = points.map((p: any) =>
+    const labels = points.map((p: GuestMetricPoint) =>
       hours.value >= 24 ? dayjs(p.timestamp).format('DD/MM HH:mm') : dayjs(p.timestamp).format('HH:mm')
     )
     chartData.value = {
@@ -296,14 +300,14 @@ async function loadGuestSummary(): Promise<void> {
       datasets: [
         {
           label: 'CPU %',
-          data: points.map((p: any) => Number(p.cpu_avg ?? 0)),
+          data: points.map((p: GuestMetricPoint) => Number(p.cpu_avg ?? 0)),
           borderColor: cssVar('--tblr-blue'),
           backgroundColor: `rgba(${cssVar('--tblr-blue-rgb')},0.10)`,
           fill: true,
         },
         {
           label: 'RAM %',
-          data: points.map((p: any) => Number(p.memory_avg ?? 0)),
+          data: points.map((p: GuestMetricPoint) => Number(p.memory_avg ?? 0)),
           borderColor: cssVar('--tblr-green'),
           backgroundColor: `rgba(${cssVar('--tblr-green-rgb')},0.10)`,
           fill: true,

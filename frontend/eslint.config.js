@@ -81,6 +81,7 @@ export default [
       '@typescript-eslint/no-unused-vars': ['error', {
         argsIgnorePattern: '^_',
         varsIgnorePattern: '^_',
+        caughtErrorsIgnorePattern: '^_',
       }],
       '@typescript-eslint/strict-boolean-expressions': 'off', // Too strict for Vue
     },
@@ -111,6 +112,12 @@ export default [
       // Proxmox node view is decomposed in Phase 7.
       '**/components/proxmox/ProxmoxNodeGuestsTab.vue',
       '**/components/proxmox/ProxmoxNodeSecurityTab.vue',
+      // Visualisation components driven by cytoscape / d3 — their `any` are tied
+      // to the graph/geo library callbacks and element shapes; typed with the
+      // cytoscape/d3 type packages in a dedicated follow-up.
+      '**/views/NetworkView.vue',
+      '**/components/network/NetworkGraph.vue',
+      '**/components/security/TrafficWorldMap.vue',
     ],
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
