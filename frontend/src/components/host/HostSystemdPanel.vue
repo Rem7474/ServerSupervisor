@@ -10,12 +10,14 @@
       <div class="d-flex align-items-center gap-2">
         <div class="btn-group btn-group-sm">
           <button
+            type="button"
             :class="filter === 'active' ? 'btn btn-primary' : 'btn btn-outline-secondary'"
             @click="filter = 'active'"
           >
             Actifs
           </button>
           <button
+            type="button"
             :class="filter === 'all' ? 'btn btn-primary' : 'btn btn-outline-secondary'"
             @click="filter = 'all'"
           >
@@ -23,6 +25,7 @@
           </button>
         </div>
         <button
+          type="button"
           class="btn btn-sm btn-outline-secondary"
           :disabled="loading"
           @click="loadServices"
@@ -90,6 +93,7 @@
               <div class="btn-group btn-group-sm">
                 <button
                   v-if="svc.active_state !== 'active'"
+                  type="button"
                   class="btn btn-outline-success"
                   title="Démarrer"
                   @click="runAction(svc.name, 'start')"
@@ -98,6 +102,7 @@
                 </button>
                 <button
                   v-if="svc.active_state === 'active'"
+                  type="button"
                   class="btn btn-outline-danger"
                   title="Arrêter"
                   @click="runAction(svc.name, 'stop')"
@@ -105,6 +110,7 @@
                   Stop
                 </button>
                 <button
+                  type="button"
                   class="btn btn-outline-secondary"
                   title="Redémarrer"
                   @click="runAction(svc.name, 'restart')"
@@ -112,6 +118,7 @@
                   Restart
                 </button>
                 <button
+                  type="button"
                   class="btn btn-outline-secondary"
                   title="Statut"
                   @click="runAction(svc.name, 'status')"
@@ -186,8 +193,8 @@ async function loadServices(): Promise<void> {
       } catch {
         error.value = 'Impossible de parser la liste des services'
       }
-    }).catch((e: any) => {
-      error.value = e?.message || 'Erreur lors du chargement des services'
+    }).catch((e: unknown) => {
+      error.value = getApiErrorMessage(e, 'Erreur lors du chargement des services')
     }).finally(() => { emit('history-changed') })
   } catch (e) {
     error.value = getApiErrorMessage(e, "Impossible d'envoyer la commande")

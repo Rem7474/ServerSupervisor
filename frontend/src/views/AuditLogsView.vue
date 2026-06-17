@@ -21,6 +21,7 @@
       </div>
       <div class="d-flex align-items-center gap-2">
         <button
+          type="button"
           class="btn btn-outline-secondary"
           :disabled="connexionsLoading || cmdsLoading"
           @click="refresh"
@@ -240,6 +241,7 @@
                   </td>
                   <td>
                     <button
+                      type="button"
                       class="btn btn-sm btn-ghost-secondary"
                       :disabled="!cmd.output && cmd.status === 'pending'"
                       title="Voir les logs"

@@ -10,6 +10,7 @@
       class="nav-item"
     >
       <button
+        type="button"
         role="tab"
         class="nav-link"
         :class="{ active: modelValue === tab.key }"

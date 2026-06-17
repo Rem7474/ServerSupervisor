@@ -3,12 +3,14 @@
     <div class="card-header d-flex align-items-center gap-2 flex-wrap">
       <div class="btn-group btn-group-sm">
         <button
+          type="button"
           :class="filter === 'active' ? 'btn btn-primary' : 'btn btn-outline-secondary'"
           @click="filter = 'active'"
         >
           Actifs
         </button>
         <button
+          type="button"
           :class="filter === 'all' ? 'btn btn-primary' : 'btn btn-outline-secondary'"
           @click="filter = 'all'"
         >
@@ -16,6 +18,7 @@
         </button>
       </div>
       <button
+        type="button"
         class="btn btn-sm btn-outline-secondary ms-2"
         :disabled="loading"
         @click="emit('refresh')"
@@ -87,6 +90,7 @@
               <div class="btn-group btn-group-sm">
                 <button
                   v-if="svc['active-state'] !== 'active'"
+                  type="button"
                   class="btn btn-outline-success"
                   title="Démarrer"
                   @click="emit('action', { name: svc.name, action: 'start' })"
@@ -95,6 +99,7 @@
                 </button>
                 <button
                   v-if="svc['active-state'] === 'active'"
+                  type="button"
                   class="btn btn-outline-danger"
                   title="Arrêter"
                   @click="emit('action', { name: svc.name, action: 'stop' })"
@@ -102,6 +107,7 @@
                   Stop
                 </button>
                 <button
+                  type="button"
                   class="btn btn-outline-secondary"
                   title="Redémarrer"
                   @click="emit('action', { name: svc.name, action: 'restart' })"
@@ -109,6 +115,7 @@
                   Restart
                 </button>
                 <button
+                  type="button"
                   class="btn btn-outline-secondary"
                   title="Recharger"
                   @click="emit('action', { name: svc.name, action: 'reload' })"
@@ -133,7 +140,13 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 
-type Service = Record<string, any>
+interface Service {
+  name: string
+  state?: string
+  'active-state'?: string
+  desc?: string
+  [key: string]: unknown
+}
 
 const props = defineProps<{
   services: Service[]
@@ -155,7 +168,7 @@ const filteredServices = computed(() => {
   return props.services.filter((s) => s['active-state'] === 'active' || s.state === 'running')
 })
 
-function svcStateClass(state: string): string {
+function svcStateClass(state?: string): string {
   if (state === 'active') return 'badge bg-green-lt text-green'
   if (state === 'failed') return 'badge bg-red-lt text-red'
   if (state === 'activating' || state === 'deactivating') return 'badge bg-yellow-lt text-yellow'

@@ -55,3 +55,12 @@ export function formatBytes(bytes: NumberInput): string {
   const i = Math.floor(Math.log(bytes) / Math.log(1024))
   return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`
 }
+
+/**
+ * Return the French plural suffix for a count.
+ * e.g. pluralize(2) → "s", pluralize(1) → "", pluralize(0) → ""
+ * Use a custom suffix for irregulars: pluralize(2, 'x') → "x".
+ */
+export function pluralize(count: NumberInput, plural = 's', singular = ''): string {
+  return (count ?? 0) > 1 ? plural : singular
+}

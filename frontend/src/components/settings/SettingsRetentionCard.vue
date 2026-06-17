@@ -44,6 +44,7 @@
     <div class="card-footer d-flex align-items-center gap-2">
       <button
         v-if="authIsAdmin"
+        type="button"
         class="btn btn-primary"
         :disabled="savingRetention"
         @click="$emit('save')"

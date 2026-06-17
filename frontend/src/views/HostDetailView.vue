@@ -41,6 +41,7 @@
         </div>
         <div class="d-flex flex-wrap align-items-center justify-content-lg-end gap-2">
           <button
+            type="button"
             class="btn btn-outline-secondary"
             @click="isEditing = true"
           >
@@ -62,6 +63,7 @@
           </button>
           <button
             v-if="canUpdateAgent"
+            type="button"
             class="btn btn-outline-primary"
             :disabled="agentUpdateLoading"
             @click="sendAgentUpdate"
@@ -84,6 +86,7 @@
           </button>
           <button
             v-if="auth.isAdmin"
+            type="button"
             class="btn btn-outline-danger"
             @click="deleteHost"
           >
@@ -153,6 +156,7 @@
           />
           <template v-if="proxmoxLink.status === 'suggested'">
             <button
+              type="button"
               class="btn btn-sm btn-success"
               :disabled="linkSaving"
               @click="confirmLink"
@@ -160,6 +164,7 @@
               Confirmer
             </button>
             <button
+              type="button"
               class="btn btn-sm btn-outline-secondary"
               :disabled="linkSaving"
               @click="ignoreLink"
@@ -192,6 +197,7 @@
             </option>
           </select>
           <button
+            type="button"
             class="btn btn-sm btn-outline-danger"
             :disabled="linkSaving"
             title="Supprimer le lien"
@@ -230,6 +236,7 @@
       class="d-flex align-items-center gap-2 mb-3"
     >
       <button
+        type="button"
         class="btn btn-sm btn-outline-orange"
         @click="openLinkForm"
       >
@@ -288,6 +295,7 @@
             </option>
           </select>
           <button
+            type="button"
             class="btn btn-sm btn-primary"
             :disabled="!selectedCandidate || linkSaving"
             @click="createManualLink"
@@ -295,6 +303,7 @@
             Lier
           </button>
           <button
+            type="button"
             class="btn btn-sm btn-outline-secondary"
             @click="showLinkForm = false; selectedCandidate = ''"
           >
@@ -525,6 +534,7 @@
                     </td>
                     <td class="text-end">
                       <button
+                        type="button"
                         class="btn btn-sm btn-ghost-danger"
                         title="Révoquer"
                         @click="revokePermission(p.username)"
@@ -551,6 +561,7 @@
             </div>
             <div class="card-footer d-flex justify-content-end">
               <button
+                type="button"
                 class="btn btn-sm btn-outline-primary"
                 @click="openAddPermission"
               >
@@ -638,12 +649,14 @@
           </div>
           <div class="modal-footer">
             <button
+              type="button"
               class="btn btn-secondary"
               @click="addPermModal = false"
             >
               Annuler
             </button>
             <button
+              type="button"
               class="btn btn-primary"
               :disabled="!newPermUsername || permSaving"
               @click="savePermission"

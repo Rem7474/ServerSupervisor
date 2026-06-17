@@ -41,6 +41,7 @@
       </router-link>
       <button
         v-else
+        type="button"
         class="btn btn-primary btn-sm"
         @click="$emit('cta')"
       >

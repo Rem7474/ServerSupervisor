@@ -13,6 +13,7 @@
         <div class="btn-list">
           <button
             v-if="activeTab === 'trackers'"
+            type="button"
             class="btn btn-outline-primary"
             @click="showDiscoverModal = true"
           >
@@ -36,6 +37,7 @@
             Découvrir
           </button>
           <button
+            type="button"
             class="btn btn-primary"
             @click="activeTab === 'webhooks' ? openCreateWebhook() : openCreateTracker()"
           >
@@ -188,6 +190,7 @@
             Recevez des événements depuis GitHub, GitLab, Gitea ou Forgejo pour déclencher des scripts sur vos VMs.
           </p>
           <button
+            type="button"
             class="btn btn-sm btn-primary"
             @click="openCreateWebhook"
           >
@@ -279,12 +282,14 @@
                   Détails
                 </router-link>
                 <button
+                  type="button"
                   class="btn btn-sm btn-outline-secondary"
                   @click="openEditWebhook(webhook)"
                 >
                   Modifier
                 </button>
                 <button
+                  type="button"
                   class="btn btn-sm"
                   :class="webhook.enabled ? 'btn-outline-warning' : 'btn-outline-success'"
                   @click="toggleWebhook(webhook)"
@@ -292,6 +297,7 @@
                   {{ webhook.enabled ? 'Désactiver' : 'Activer' }}
                 </button>
                 <button
+                  type="button"
                   class="btn btn-sm btn-outline-danger ms-auto"
                   @click="confirmDeleteWebhook(webhook)"
                 >
@@ -357,6 +363,7 @@
             Surveillez les releases Git ou les images Docker et déclenchez automatiquement un script sur une VM lors d'une mise à jour.
           </p>
           <button
+            type="button"
             class="btn btn-sm btn-primary"
             @click="openCreateTracker"
           >
@@ -549,12 +556,14 @@
                   Détails
                 </router-link>
                 <button
+                  type="button"
                   class="btn btn-sm btn-outline-secondary"
                   @click="openEditTracker(tracker)"
                 >
                   Modifier
                 </button>
                 <button
+                  type="button"
                   class="btn btn-sm btn-outline-info"
                   title="Verifier maintenant"
                   @click="checkNow(tracker)"
@@ -572,6 +581,7 @@
                   </svg>
                 </button>
                 <button
+                  type="button"
                   class="btn btn-sm"
                   :class="tracker.enabled ? 'btn-outline-warning' : 'btn-outline-success'"
                   @click="toggleTracker(tracker)"
@@ -579,6 +589,7 @@
                   {{ tracker.enabled ? 'Désactiver' : 'Activer' }}
                 </button>
                 <button
+                  type="button"
                   class="btn btn-sm btn-outline-danger ms-auto"
                   @click="confirmDeleteTracker(tracker)"
                 >
@@ -677,6 +688,7 @@
           </div>
           <div class="modal-footer">
             <button
+              type="button"
               class="btn btn-primary"
               @click="closeSecretModal"
             >
@@ -746,7 +758,8 @@ const {
 } = useGitWebhooksPage()
 
 const { openCommandStream, closeStream } = useCommandStream()
-const selectedTrackerCmd = ref<any>(null)
+interface TrackerCmd { id: string; status?: string; output?: string; [key: string]: unknown }
+const selectedTrackerCmd = ref<TrackerCmd | null>(null)
 const showTrackerConsole = ref(false)
 const showDiscoverModal = ref(false)
 
@@ -762,7 +775,7 @@ function closeTrackerLogs(): void {
 
 function connectTrackerStream(commandId: string): void {
   openCommandStream(commandId, {
-    onInit(payload: any) {
+    onInit(payload) {
       if (!selectedTrackerCmd.value || selectedTrackerCmd.value.id !== commandId) return
       selectedTrackerCmd.value = {
         ...selectedTrackerCmd.value,
@@ -770,14 +783,14 @@ function connectTrackerStream(commandId: string): void {
         output: payload.output ?? selectedTrackerCmd.value.output,
       }
     },
-    onChunk(payload: any) {
+    onChunk(payload) {
       if (!selectedTrackerCmd.value || selectedTrackerCmd.value.id !== commandId) return
       selectedTrackerCmd.value = {
         ...selectedTrackerCmd.value,
         output: (selectedTrackerCmd.value.output || '') + (payload.chunk || ''),
       }
     },
-    onStatus(payload: any) {
+    onStatus(payload) {
       if (!selectedTrackerCmd.value || selectedTrackerCmd.value.id !== commandId) return
       selectedTrackerCmd.value = {
         ...selectedTrackerCmd.value,
@@ -792,7 +805,7 @@ async function openTrackerLogs(commandId: string): Promise<void> {
   closeStream()
   try {
     const res = await api.getCommandStatus(commandId)
-    selectedTrackerCmd.value = res.data
+    selectedTrackerCmd.value = res.data as unknown as TrackerCmd
     showTrackerConsole.value = true
     if (res.data?.status === 'pending' || res.data?.status === 'running') {
       connectTrackerStream(commandId)

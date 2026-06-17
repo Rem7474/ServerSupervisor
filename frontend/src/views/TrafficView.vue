@@ -115,6 +115,7 @@
           <button
             v-for="p in periodOptions"
             :key="p.value"
+            type="button"
             class="btn btn-sm"
             :class="period === p.value ? 'btn-primary' : 'btn-outline-secondary'"
             @click="setPeriod(p.value)"
@@ -244,6 +245,7 @@
           </div>
 
           <button
+            type="button"
             class="btn btn-primary btn-sm traffic-refresh-btn"
             :disabled="loading"
             @click="loadAll(true)"
@@ -554,6 +556,7 @@
                     </td>
                     <td class="text-end">
                       <button
+                        type="button"
                         class="btn btn-sm btn-outline-primary"
                         @click="openDomain(item.domain)"
                       >
@@ -649,6 +652,7 @@
               </div>
             </div>
             <button
+              type="button"
               class="btn btn-sm btn-outline-secondary"
               @click="closeDomainModal"
             >
@@ -857,6 +861,13 @@ import apiClient from '../api'
 
 type AnyRecord = Record<string, any>
 
+interface TimeseriesPoint {
+  timestamp: string
+  human?: number | string
+  bot?: number | string
+  [key: string]: unknown
+}
+
 const periodOptions = [
   { value: '1h', label: '1h' },
   { value: '24h', label: '24h' },
@@ -876,7 +887,7 @@ const autoRefresh = ref(true)
 const loading = ref(false)
 const summary = ref<AnyRecord>({ traffic: {}, threats: {} })
 const compare = ref<AnyRecord>({ delta_percent: {} })
-const timeseries = ref<AnyRecord[]>([])
+const timeseries = ref<TimeseriesPoint[]>([])
 const liveRequests = ref<AnyRecord[]>([])
 const lastUpdatedAt = ref<Date | null>(null)
 

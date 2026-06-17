@@ -20,6 +20,7 @@
         <div class="col-auto ms-auto d-flex gap-2">
           <button
             v-if="alertsTab === 'rules'"
+            type="button"
             class="btn btn-primary"
             @click="startAddAlert"
           >

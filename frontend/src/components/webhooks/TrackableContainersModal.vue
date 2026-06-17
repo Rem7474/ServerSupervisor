@@ -146,12 +146,14 @@
         </div>
         <div class="modal-footer">
           <button
+            type="button"
             class="btn btn-secondary"
             @click="close"
           >
             Fermer
           </button>
           <button
+            type="button"
             class="btn btn-primary"
             :disabled="saving || !selected.length"
             @click="submit"

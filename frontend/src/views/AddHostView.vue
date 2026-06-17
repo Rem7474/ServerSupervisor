@@ -214,6 +214,7 @@
 import { ref, computed, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import apiClient from '../api'
+import { getApiErrorMessage } from '../api/client'
 
 interface HostResult {
   id?: string
@@ -304,8 +305,8 @@ async function handleSubmit(): Promise<void> {
     const res = await apiClient.registerHost(form.value)
     result.value = res.data
     if (res.data?.id) startAgentPolling(res.data.id)
-  } catch (e: any) {
-    error.value = e?.response?.data?.error || 'Erreur lors de l\'enregistrement'
+  } catch (e: unknown) {
+    error.value = getApiErrorMessage(e, 'Erreur lors de l\'enregistrement')
   } finally {
     loading.value = false
   }

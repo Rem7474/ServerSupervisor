@@ -111,7 +111,7 @@ interface Container {
   image_tag?: string
   state?: string
   status?: string
-  [key: string]: any
+  [key: string]: unknown
 }
 
 interface VersionComparison {
@@ -131,7 +131,7 @@ const props = withDefaults(defineProps<{
   versionComparisons: () => [],
 })
 
-const { normalizedPortsForContainer } = useDockerContainerPorts(toRef(props, 'containers') as any)
+const { normalizedPortsForContainer } = useDockerContainerPorts(toRef(props, 'containers'))
 
 const versionMap = computed<Record<string, VersionComparison>>(() => {
   const map: Record<string, VersionComparison> = {}

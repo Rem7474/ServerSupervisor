@@ -68,15 +68,20 @@ export default [
     },
   },
   {
-    files: ['**/*.{ts,tsx}'],
+    // Apply the TS plugin to .vue files too: their <script setup lang="ts"> is
+    // parsed by the TS parser (configured above), so no-explicit-any etc. work
+    // without type information. Without this, the bulk of the code (views +
+    // components) escaped the any check entirely.
+    files: ['**/*.{ts,tsx,vue}'],
     plugins: {
       '@typescript-eslint': pluginTypeScript,
     },
     rules: {
-      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/no-unused-vars': ['error', {
         argsIgnorePattern: '^_',
         varsIgnorePattern: '^_',
+        caughtErrorsIgnorePattern: '^_',
       }],
       '@typescript-eslint/strict-boolean-expressions': 'off', // Too strict for Vue
     },
@@ -87,6 +92,35 @@ export default [
       'vue/multi-word-component-names': 'off',
       'vue/no-unused-components': 'warn',
       'vue/no-mutating-props': 'off',
+    },
+  },
+  {
+    // TEMP: these large views/components are scheduled for decomposition in the
+    // Phase 7 split (see the frontend audit plan). Their display-layer `any`
+    // will be eliminated as each is broken into typed sub-components/composables,
+    // rather than typing the monolith and re-touching every line during the
+    // split. Remove these entries (and the residual any) as each file is split.
+    files: [
+      '**/views/ProxmoxNodeView.vue',
+      '**/views/TrafficView.vue',
+      '**/views/AuditLogsView.vue',
+      '**/views/GlobalScheduledTasksView.vue',
+      '**/views/MonitoringView.vue',
+      '**/components/docker/DockerContainersTab.vue',
+      // Child of the ProxmoxNodeView monolith; guest/link/network rows carry
+      // runtime fields beyond the generated ProxmoxGuest model. Typed when the
+      // Proxmox node view is decomposed in Phase 7.
+      '**/components/proxmox/ProxmoxNodeGuestsTab.vue',
+      '**/components/proxmox/ProxmoxNodeSecurityTab.vue',
+      // Visualisation components driven by cytoscape / d3 — their `any` are tied
+      // to the graph/geo library callbacks and element shapes; typed with the
+      // cytoscape/d3 type packages in a dedicated follow-up.
+      '**/views/NetworkView.vue',
+      '**/components/network/NetworkGraph.vue',
+      '**/components/security/TrafficWorldMap.vue',
+    ],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
     },
   },
   {

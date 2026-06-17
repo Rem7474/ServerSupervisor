@@ -6,6 +6,7 @@
       </h3>
       <button
         v-if="authIsAdmin && !showForm"
+        type="button"
         class="btn btn-sm btn-primary"
         @click="openAddForm"
       >
@@ -66,6 +67,7 @@
       </div>
       <div class="mt-3 d-flex align-items-center gap-2">
         <button
+          type="button"
           class="btn btn-primary"
           :disabled="saving"
           @click="save"
@@ -73,6 +75,7 @@
           {{ saving ? 'Enregistrement...' : (editingId ? 'Mettre à jour' : 'Créer') }}
         </button>
         <button
+          type="button"
           class="btn btn-outline-secondary"
           @click="cancelForm"
         >
@@ -124,6 +127,7 @@
             >
               <div class="d-flex gap-1 justify-content-end">
                 <button
+                  type="button"
                   class="btn btn-sm btn-outline-secondary"
                   title="Modifier"
                   @click="openEditForm(cred)"
@@ -131,6 +135,7 @@
                   Modifier
                 </button>
                 <button
+                  type="button"
                   class="btn btn-sm btn-outline-danger"
                   title="Supprimer"
                   @click="remove(cred)"
@@ -156,6 +161,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import api from '../../api/index'
+import { getApiErrorMessage } from '../../api/client'
 
 interface Credential {
   id: string
@@ -253,8 +259,8 @@ async function save(): Promise<void> {
     await load()
     showForm.value = false
     editingId.value = null
-  } catch (e: any) {
-    formMsg.value = e?.response?.data?.error || "Erreur lors de l'enregistrement."
+  } catch (e: unknown) {
+    formMsg.value = getApiErrorMessage(e, "Erreur lors de l'enregistrement.")
     formOk.value = false
   } finally {
     saving.value = false
@@ -268,8 +274,8 @@ async function remove(cred: Credential): Promise<void> {
     await load()
     listMsg.value = 'Identifiant supprimé.'
     listOk.value = true
-  } catch (e: any) {
-    listMsg.value = e?.response?.data?.error || 'Erreur lors de la suppression.'
+  } catch (e: unknown) {
+    listMsg.value = getApiErrorMessage(e, 'Erreur lors de la suppression.')
     listOk.value = false
   }
 }

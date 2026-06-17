@@ -40,6 +40,7 @@
             </td>
             <td>
               <button
+                type="button"
                 class="btn btn-sm btn-ghost-secondary"
                 title="Voir les logs"
                 @click="$emit('watch-command', cmd)"
@@ -69,6 +70,7 @@
       class="card-footer text-center"
     >
       <button
+        type="button"
         class="btn btn-outline-secondary btn-sm"
         @click="showFullHistory = true"
       >

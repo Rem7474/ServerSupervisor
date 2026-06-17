@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatBytes, formatDurationSecs, formatUptime } from './formatters'
+import { formatBytes, formatDurationSecs, formatUptime, pluralize } from './formatters'
 
 describe('formatters', () => {
   it('formatBytes', () => {
@@ -18,5 +18,14 @@ describe('formatters', () => {
   it('formatUptime', () => {
     expect(formatUptime(null)).toBe('N/A')
     expect(formatUptime(90061)).toBe('1j 1h')
+  })
+
+  it('pluralize', () => {
+    expect(pluralize(0)).toBe('')
+    expect(pluralize(1)).toBe('')
+    expect(pluralize(2)).toBe('s')
+    expect(pluralize(null)).toBe('')
+    expect(pluralize(3, 'x')).toBe('x')
+    expect(pluralize(1, 'aux', 'al')).toBe('al')
   })
 })

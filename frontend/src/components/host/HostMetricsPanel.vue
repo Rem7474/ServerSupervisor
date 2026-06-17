@@ -101,6 +101,7 @@
             <button
               v-for="opt in timeRangeOptions"
               :key="opt.hours"
+              type="button"
               :class="chartHours === opt.hours ? 'btn btn-primary' : 'btn btn-outline-secondary'"
               @click="loadHistory(opt.hours)"
             >
@@ -114,8 +115,8 @@
         >
           <Line
             v-if="cpuChartData"
-            :data="(cpuChartData as any)"
-            :options="(chartOptions as any)"
+            :data="cpuChartData"
+            :options="chartOptions"
             class="h-100"
           />
           <div
@@ -140,8 +141,8 @@
         >
           <Line
             v-if="memChartData"
-            :data="(memChartData as any)"
-            :options="(memChartOptions as any)"
+            :data="memChartData"
+            :options="memChartOptions"
             class="h-100"
           />
           <div
@@ -158,6 +159,7 @@
 
 <script setup lang="ts">
 import { computed, ref, shallowRef, defineAsyncComponent, onMounted, watch, toRef } from 'vue'
+import type { ChartData, ChartOptions, TooltipItem } from 'chart.js'
 import MetricsSourceBadge from '../common/MetricsSourceBadge.vue'
 import { fetchMetricsHistory, type MetricsHistoryPoint } from '../../composables/useHostMetricsHistory'
 import dayjs from '../../utils/dayjs'
@@ -205,8 +207,8 @@ const props = withDefaults(defineProps<{
 
 const chartHours = ref(24)
 const metricsHistory = ref<HistoryPoint[]>([])
-const cpuChartData = shallowRef<any>(null)
-const memChartData = shallowRef<any>(null)
+const cpuChartData = shallowRef<ChartData<'line'> | null>(null)
+const memChartData = shallowRef<ChartData<'line'> | null>(null)
 
 const hasCpuTemp = computed(() => Number(props.metrics?.cpu_temperature) > 0)
 
@@ -240,7 +242,7 @@ function getMinHistoryTimestamp(list: HistoryPoint[]): number | undefined {
   return min
 }
 
-const chartOptions = computed(() => ({
+const chartOptions = computed((): ChartOptions<'line'> => ({
   responsive: true,
   maintainAspectRatio: false,
   plugins: {
@@ -253,8 +255,8 @@ const chartOptions = computed(() => ({
       borderColor: palette.tooltipBorder,
       borderWidth: 1, padding: 10, displayColors: false,
       callbacks: {
-        title: (items: any[]) => formatChartTime(items[0]?.parsed?.x),
-        label: (ctx: any) => `${ctx.parsed.y.toFixed(1)}%`,
+        title: (items: TooltipItem<'line'>[]) => formatChartTime(items[0]?.parsed?.x ?? undefined),
+        label: (ctx: TooltipItem<'line'>) => `${(ctx.parsed.y ?? 0).toFixed(1)}%`,
       },
     },
   },
@@ -277,16 +279,16 @@ const chartOptions = computed(() => ({
   interaction: { mode: 'nearest', axis: 'x', intersect: false },
 }))
 
-const memChartOptions = computed(() => ({
+const memChartOptions = computed((): ChartOptions<'line'> => ({
   ...chartOptions.value,
   plugins: {
     ...chartOptions.value.plugins,
     tooltip: {
-      ...chartOptions.value.plugins.tooltip,
+      ...chartOptions.value.plugins?.tooltip,
       callbacks: {
-        title: (items: any[]) => formatChartTime(items[0]?.parsed?.x),
-        label: (ctx: any) => {
-          const pct = ctx.parsed.y.toFixed(1)
+        title: (items: TooltipItem<'line'>[]) => formatChartTime(items[0]?.parsed?.x ?? undefined),
+        label: (ctx: TooltipItem<'line'>) => {
+          const pct = (ctx.parsed.y ?? 0).toFixed(1)
           const m = metricsHistory.value[ctx.dataIndex]
           if (m?.memory_used && m?.memory_total) {
             return `${pct}%  (${formatBytes(m.memory_used)} / ${formatBytes(m.memory_total)})`

@@ -67,6 +67,7 @@
         class="p-2 border-top text-center"
       >
         <button
+          type="button"
           class="btn btn-outline-secondary btn-sm"
           @click="showAll = !showAll"
         >
@@ -83,9 +84,10 @@
 import { ref, computed, watch } from 'vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 import { formatDateTime } from '../../utils/formatters'
+import type { ReleaseVersionHistoryItem } from '../../types/tracker'
 
 const props = defineProps<{
-  history: any[]
+  history: ReleaseVersionHistoryItem[]
   loading: boolean
 }>()
 

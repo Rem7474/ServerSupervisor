@@ -351,7 +351,9 @@
             :key="c.id"
             :value="c.id"
           >
-            {{ c.name }} <template v-if="c.state !== 'running'">({{ c.state }})</template>
+            {{ c.name }} <template v-if="c.state !== 'running'">
+              ({{ c.state }})
+            </template>
           </option>
         </select>
       </div>

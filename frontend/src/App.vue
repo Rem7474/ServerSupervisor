@@ -587,7 +587,7 @@ import ToastContainer from './components/ToastContainer.vue'
 import NotificationBell from './components/NotificationBell.vue'
 import AppFooter from './components/AppFooter.vue'
 import AppIcon from './components/AppIcon.vue'
-import ErrorBoundary from './components/ErrorBoundary.vue'
+import ErrorBoundary from './components/common/ErrorBoundary.vue'
 import { subscribeHttpErrors } from './utils/httpErrorBus'
 import apiClient from './api'
 
@@ -705,7 +705,7 @@ function handleOutsideClick(event: MouseEvent): void {
 }
 
 onMounted(() => {
-  unsubscribeHttpErrors = subscribeHttpErrors((event: any) => {
+  unsubscribeHttpErrors = subscribeHttpErrors((event) => {
     httpError.value = event.message
   })
   window.addEventListener('online', handleOnline)

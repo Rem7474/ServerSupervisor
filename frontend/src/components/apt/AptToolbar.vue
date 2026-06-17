@@ -10,6 +10,7 @@
         <button
           v-for="f in filterOptions"
           :key="f.value"
+          type="button"
           class="btn btn-sm"
           :class="quickFilter === f.value ? 'btn-primary' : 'btn-outline-secondary'"
           @click="quickFilter = f.value"
@@ -35,6 +36,7 @@
         </option>
       </select>
       <button
+        type="button"
         class="btn btn-sm btn-outline-secondary"
         :title="sortDir === 'asc' ? 'Croissant' : 'Décroissant'"
         @click="sortDir = sortDir === 'asc' ? 'desc' : 'asc'"
@@ -74,6 +76,7 @@
         <div class="ms-auto d-flex flex-wrap gap-2">
           <template v-if="canRunApt && selectedCount > 0">
             <button
+              type="button"
               class="btn btn-outline-secondary btn-sm"
               :disabled="!!bulkLoading"
               @click="$emit('bulk-cmd', 'update')"
@@ -86,6 +89,7 @@
               apt update ({{ selectedCount }})
             </button>
             <button
+              type="button"
               class="btn btn-primary btn-sm"
               :disabled="!!bulkLoading"
               @click="$emit('bulk-cmd', 'upgrade')"
@@ -98,6 +102,7 @@
               apt upgrade ({{ selectedCount }})
             </button>
             <button
+              type="button"
               class="btn btn-outline-danger btn-sm"
               :disabled="!!bulkLoading"
               @click="$emit('bulk-cmd', 'dist-upgrade')"

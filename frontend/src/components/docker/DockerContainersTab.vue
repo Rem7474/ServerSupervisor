@@ -213,6 +213,7 @@
                 <template v-if="canRunDocker">
                   <button
                     v-if="['exited', 'dead', 'created', 'paused'].includes(c.state)"
+                    type="button"
                     :disabled="!!actionLoading[c.name]"
                     class="btn btn-sm btn-success"
                     title="Démarrer"
@@ -241,6 +242,7 @@
                   </button>
                   <button
                     v-if="c.state === 'running'"
+                    type="button"
                     :disabled="!!actionLoading[c.name]"
                     class="btn btn-sm btn-outline-danger"
                     title="Arrêter"
@@ -275,6 +277,7 @@
                   </button>
                   <button
                     v-if="c.state === 'running'"
+                    type="button"
                     :disabled="!!actionLoading[c.name]"
                     class="btn btn-sm btn-outline-warning"
                     title="Redémarrer"
@@ -302,6 +305,7 @@
                     /><path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4" /><path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4" /></svg>
                   </button>
                   <button
+                    type="button"
                     :disabled="!!actionLoading[c.name]"
                     class="btn btn-sm btn-ghost-secondary"
                     title="Voir les logs"
@@ -330,6 +334,7 @@
                   </button>
                 </template>
                 <button
+                  type="button"
                   class="btn btn-sm btn-ghost-secondary"
                   title="Inspecter"
                   aria-label="Inspecter le conteneur"
@@ -356,6 +361,7 @@
                 </button>
                 <button
                   v-if="containerVersion(c)?.tracker_id"
+                  type="button"
                   class="btn btn-sm btn-ghost-secondary"
                   title="Voir le suivi de version"
                   aria-label="Voir le suivi de version"
@@ -378,6 +384,7 @@
                 </button>
                 <button
                   v-if="containerVersion(c)?.tracker_id"
+                  type="button"
                   :disabled="isTrackerRunDisabled(containerVersion(c))"
                   class="btn btn-sm btn-ghost-primary"
                   :title="trackerRunTooltip(containerVersion(c))"
@@ -405,6 +412,7 @@
                   /><path d="M7 4v16l13 -8z" /></svg>
                 </button>
                 <button
+                  type="button"
                   class="btn btn-sm btn-ghost-secondary"
                   title="Suivre les mises à jour de cette image"
                   aria-label="Créer un tracker de mise à jour"
@@ -427,6 +435,7 @@
                 </button>
                 <button
                   v-if="getComposeInfo(c).project || Object.keys(c.labels || {}).length > 0"
+                  type="button"
                   class="btn btn-sm btn-ghost-secondary"
                   :title="getComposeInfo(c).project ? 'Infos Compose + Labels' : 'Labels'"
                   @click="selectedContainer = c"
@@ -778,6 +787,7 @@ import EmptyState from '../EmptyState.vue'
 import PaginationNav from '../PaginationNav.vue'
 import { useDockerContainerPorts } from '../../composables/useDockerContainerPorts'
 import { usePagination } from '../../composables/usePagination'
+import { getApiErrorMessage } from '../../api/client'
 
 interface Container {
   id: string
@@ -966,8 +976,8 @@ async function runTracker(vc: VersionComparison | null | undefined, container?: 
   try {
     await apiClient.runReleaseTracker(id)
     trackerFeedback.value = `Déclenchement lancé pour ${container?.image || 'le tracker'}.`
-  } catch (e: any) {
-    trackerFeedback.value = e?.response?.data?.error || 'Échec du déclenchement manuel.'
+  } catch (e: unknown) {
+    trackerFeedback.value = getApiErrorMessage(e, 'Échec du déclenchement manuel.')
   } finally {
     const next = { ...trackerRunLoading.value }
     delete next[id]

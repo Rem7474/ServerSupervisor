@@ -86,6 +86,7 @@
     <div class="card-footer d-flex align-items-center gap-2">
       <button
         v-if="authIsAdmin"
+        type="button"
         class="btn btn-primary"
         :disabled="savingSmtp"
         @click="$emit('save')"
@@ -93,6 +94,7 @@
         {{ savingSmtp ? 'Enregistrement...' : 'Enregistrer SMTP' }}
       </button>
       <button
+        type="button"
         class="btn btn-outline-secondary"
         :disabled="testingSmtp || !form.smtpHost"
         @click="$emit('test')"

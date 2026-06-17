@@ -2,18 +2,38 @@
   <div>
     <div class="page-header mb-4">
       <div class="page-pretitle">
-        <router-link to="/" class="text-decoration-none">Dashboard</router-link>
+        <router-link
+          to="/"
+          class="text-decoration-none"
+        >
+          Dashboard
+        </router-link>
         <span class="text-muted mx-1">/</span>
         <span>Nginx Proxy Manager</span>
       </div>
-      <h2 class="page-title">Proxy Hosts NPM</h2>
+      <h2 class="page-title">
+        Proxy Hosts NPM
+      </h2>
     </div>
 
     <div class="card">
       <div class="card-header d-flex align-items-center justify-content-between">
-        <h3 class="card-title mb-0">Tous les proxy hosts</h3>
-        <button class="btn btn-sm btn-outline-secondary" :disabled="loading" @click="load">
-          <svg class="icon icon-sm me-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <h3 class="card-title mb-0">
+          Tous les proxy hosts
+        </h3>
+        <button
+          type="button"
+          class="btn btn-sm btn-outline-secondary"
+          :disabled="loading"
+          @click="load"
+        >
+          <svg
+            class="icon icon-sm me-1"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
             <polyline points="1 4 1 10 7 10" />
             <path d="M3.51 15a9 9 0 1 0 .49-3.86" />
           </svg>
@@ -21,40 +41,81 @@
         </button>
       </div>
 
-      <div v-if="loading" class="card-body text-center text-muted py-5">
+      <div
+        v-if="loading"
+        class="card-body text-center text-muted py-5"
+      >
         <div class="spinner-border spinner-border-sm me-2" />
         Chargement…
       </div>
 
-      <div v-else-if="loadError" class="card-body">
-        <div class="alert alert-danger mb-0">{{ loadError }}</div>
+      <div
+        v-else-if="loadError"
+        class="card-body"
+      >
+        <div class="alert alert-danger mb-0">
+          {{ loadError }}
+        </div>
       </div>
 
-      <div v-else-if="hosts.length === 0" class="card-body text-center text-muted py-5">
+      <div
+        v-else-if="hosts.length === 0"
+        class="card-body text-center text-muted py-5"
+      >
         Aucun proxy host trouvé. Configurez une connexion NPM dans les
-        <router-link to="/settings?tab=integrations">Paramètres → Intégrations</router-link>
+        <router-link to="/settings?tab=integrations">
+          Paramètres → Intégrations
+        </router-link>
         — les hosts apparaîtront automatiquement après le premier sync.
       </div>
 
-      <div v-else class="table-responsive">
+      <div
+        v-else
+        class="table-responsive"
+      >
         <table class="table table-vcenter card-table">
           <thead>
             <tr>
               <th>Connexion</th>
               <th>Domaine</th>
               <th>Forward</th>
-              <th class="text-center" title="Activer/désactiver le proxy host dans NPM">Actif NPM</th>
-              <th class="text-center" title="Activer/désactiver tout le monitoring (uptime + SSL)">Monitoring</th>
-              <th class="text-center">Uptime</th>
-              <th class="text-center">SSL</th>
+              <th
+                class="text-center"
+                title="Activer/désactiver le proxy host dans NPM"
+              >
+                Actif NPM
+              </th>
+              <th
+                class="text-center"
+                title="Activer/désactiver tout le monitoring (uptime + SSL)"
+              >
+                Monitoring
+              </th>
+              <th class="text-center">
+                Uptime
+              </th>
+              <th class="text-center">
+                SSL
+              </th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="h in hosts" :key="h.id" :class="{ 'opacity-60': !h.npm_enabled }">
-              <td class="text-muted small">{{ h.connection_name }}</td>
+            <tr
+              v-for="h in hosts"
+              :key="h.id"
+              :class="{ 'opacity-60': !h.npm_enabled }"
+            >
+              <td class="text-muted small">
+                {{ h.connection_name }}
+              </td>
               <td>
-                <div class="fw-medium">{{ h.domain_names[0] }}</div>
-                <div v-if="h.domain_names.length > 1" class="d-flex flex-wrap gap-1 mt-1">
+                <div class="fw-medium">
+                  {{ h.domain_names[0] }}
+                </div>
+                <div
+                  v-if="h.domain_names.length > 1"
+                  class="d-flex flex-wrap gap-1 mt-1"
+                >
                   <span
                     v-for="d in h.domain_names.slice(1)"
                     :key="d"
@@ -62,7 +123,9 @@
                   >{{ d }}</span>
                 </div>
               </td>
-              <td class="text-muted small">{{ h.forward_host }}:{{ h.forward_port }}</td>
+              <td class="text-muted small">
+                {{ h.forward_host }}:{{ h.forward_port }}
+              </td>
 
               <!-- Actif NPM — appel direct à l'API NPM -->
               <td class="text-center">
@@ -110,9 +173,16 @@
                     :class="uptimeBadge(h.uptime_status)"
                   >
                     {{ h.uptime_status }}
-                    <span v-if="h.uptime_last_latency_ms" class="ms-1 opacity-75">{{ h.uptime_last_latency_ms }}ms</span>
+                    <span
+                      v-if="h.uptime_last_latency_ms"
+                      class="ms-1 opacity-75"
+                    >{{ h.uptime_last_latency_ms }}ms</span>
                   </span>
-                  <span v-else-if="!h.uptime_probe_id" class="text-muted" style="font-size:0.7rem">—</span>
+                  <span
+                    v-else-if="!h.uptime_probe_id"
+                    class="text-muted"
+                    style="font-size:0.7rem"
+                  >—</span>
                 </div>
               </td>
 
@@ -134,8 +204,16 @@
                     class="badge small"
                     :class="sslBadge(h.ssl_days_remaining)"
                   >{{ h.ssl_days_remaining }}j</span>
-                  <span v-else-if="!h.ssl_enabled" class="text-muted" style="font-size:0.7rem">HTTP</span>
-                  <span v-else-if="!h.ssl_certificate_id" class="text-muted" style="font-size:0.7rem">—</span>
+                  <span
+                    v-else-if="!h.ssl_enabled"
+                    class="text-muted"
+                    style="font-size:0.7rem"
+                  >HTTP</span>
+                  <span
+                    v-else-if="!h.ssl_certificate_id"
+                    class="text-muted"
+                    style="font-size:0.7rem"
+                  >—</span>
                 </div>
               </td>
             </tr>
@@ -143,7 +221,10 @@
         </table>
       </div>
 
-      <div v-if="actionError" class="card-footer">
+      <div
+        v-if="actionError"
+        class="card-footer"
+      >
         <span class="small text-danger">{{ actionError }}</span>
       </div>
     </div>
@@ -154,6 +235,7 @@
 import { ref, onMounted } from 'vue'
 import { npmApi } from '../api/npm'
 import type { NPMProxyHostEnriched } from '../types/npm'
+import { getApiErrorMessage } from '../api/client'
 
 const hosts = ref<NPMProxyHostEnriched[]>([])
 const loading = ref(true)
@@ -168,8 +250,8 @@ async function load(): Promise<void> {
   try {
     const res = await npmApi.listAllProxyHosts()
     hosts.value = res.data.proxy_hosts ?? []
-  } catch (e: any) {
-    loadError.value = e?.response?.data?.error || 'Impossible de charger les proxy hosts.'
+  } catch (e: unknown) {
+    loadError.value = getApiErrorMessage(e, 'Impossible de charger les proxy hosts.')
   } finally {
     loading.value = false
   }
@@ -192,7 +274,7 @@ async function toggleNPM(host: NPMProxyHostEnriched, value: boolean): Promise<vo
     const res = await npmApi.setNPMEnabled(host.id, value)
     const idx = hosts.value.findIndex(h => h.id === host.id)
     if (idx !== -1) hosts.value[idx] = res.data
-  } catch (e: any) {
+  } catch (e: unknown) {
     // Rollback
     host.npm_enabled = prev
     if (!value) {
@@ -200,7 +282,7 @@ async function toggleNPM(host: NPMProxyHostEnriched, value: boolean): Promise<vo
       host.uptime_monitoring_enabled = prev
       host.ssl_monitoring_enabled = prev
     }
-    actionError.value = e?.response?.data?.error || `Impossible de ${value ? 'activer' : 'désactiver'} le proxy host dans NPM.`
+    actionError.value = getApiErrorMessage(e, `Impossible de ${value ? 'activer' : 'désactiver'} le proxy host dans NPM.`)
     setTimeout(() => { actionError.value = '' }, 5000)
   } finally {
     togglingNPM.value[host.id] = false
@@ -226,13 +308,13 @@ async function toggle(
     const res = await npmApi.updateProxyHost(host.id, { [field]: value })
     const idx = hosts.value.findIndex(h => h.id === host.id)
     if (idx !== -1) hosts.value[idx] = res.data
-  } catch (e: any) {
+  } catch (e: unknown) {
     host[field] = prev
     if (field === 'monitoring_enabled' && !value) {
       host.uptime_monitoring_enabled = host.monitoring_enabled
       host.ssl_monitoring_enabled = host.monitoring_enabled
     }
-    actionError.value = e?.response?.data?.error || 'Erreur lors de la mise à jour du monitoring.'
+    actionError.value = getApiErrorMessage(e, 'Erreur lors de la mise à jour du monitoring.')
     setTimeout(() => { actionError.value = '' }, 5000)
   } finally {
     toggling.value[host.id] = false

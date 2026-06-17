@@ -38,6 +38,7 @@
         {{ message }}
       </div>
       <button
+        type="button"
         class="btn btn-sm btn-outline-danger"
         @click="reset"
       >
@@ -50,7 +51,7 @@
 <script setup lang="ts">
 import { ref, onErrorCaptured } from 'vue'
 
-const props = withDefaults(defineProps<{
+withDefaults(defineProps<{
   title?: string
 }>(), {
   title: 'Une erreur inattendue s\'est produite',

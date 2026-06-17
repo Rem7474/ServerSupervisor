@@ -75,7 +75,7 @@ export interface AlertRuleFormData {
   actions: AlertRuleFormActions
 }
 
-interface AlertRuleInput {
+export interface AlertRuleInput {
   name?: string
   enabled?: boolean
   source_type?: 'agent' | 'proxmox' | 'synthetic' | 'docker'

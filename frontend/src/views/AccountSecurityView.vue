@@ -48,6 +48,7 @@
             Activez le MFA pour renforcer la sécurité du compte.
           </p>
           <button
+            type="button"
             class="btn btn-primary"
             :disabled="loading"
             @click="startSetup"
@@ -61,6 +62,7 @@
             Le MFA est actif. Vous pouvez le désactiver si besoin.
           </p>
           <button
+            type="button"
             class="btn btn-outline-danger"
             @click="showDisable = true"
           >
@@ -131,6 +133,7 @@
                 <div class="bg-dark text-light rounded p-2 mb-3 d-flex align-items-center justify-content-between gap-2">
                   <code class="small">{{ setup.secret }}</code>
                   <button
+                    type="button"
                     class="btn btn-sm btn-ghost-light py-0"
                     title="Copier"
                     @click="copySecret"
@@ -169,6 +172,7 @@
                   >
                 </div>
                 <button
+                  type="button"
                   class="btn btn-success"
                   :disabled="loading || verifyCode.length !== 6"
                   @click="verifySetup"
@@ -187,6 +191,7 @@
               </div>
               <pre class="bg-dark text-light rounded p-2 small">{{ setup.backup_codes.join('\n') }}</pre>
               <button
+                type="button"
                 class="btn btn-outline-light btn-sm"
                 @click="copyBackupCodes"
               >
@@ -215,6 +220,7 @@
               >
             </div>
             <button
+              type="button"
               class="btn btn-danger"
               :disabled="loading || !disablePassword"
               @click="disableMFA"
@@ -222,6 +228,7 @@
               {{ loading ? 'Désactivation...' : 'Confirmer la désactivation' }}
             </button>
             <button
+              type="button"
               class="btn btn-outline-secondary ms-2"
               :disabled="loading"
               @click="showDisable = false"
@@ -274,6 +281,7 @@
         </h3>
         <button
           v-if="auth.isAuthenticated"
+          type="button"
           class="btn btn-sm btn-outline-danger"
           :disabled="revokeLoading"
           @click="revokeOtherSessions"
@@ -385,7 +393,9 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import apiClient from '../api'
 import { formatDateTime } from '../utils/formatters'
+import type { LoginEvent } from '../types/generated'
 import { useAuthStore } from '../stores/auth'
+import { getApiErrorMessage } from '../api/client'
 
 const auth = useAuthStore()
 
@@ -434,7 +444,7 @@ function stopSetupTimer(): void {
   setupSecondsLeft.value = 0
 }
 
-const loginEvents = ref<any[]>([])
+const loginEvents = ref<LoginEvent[]>([])
 const sessionsLoading = ref(false)
 const revokeLoading = ref(false)
 const revokeError = ref('')
@@ -470,8 +480,8 @@ async function startSetup() {
     setup.value = res.data
     setupVisible.value = true
     startSetupTimer()
-  } catch (e: any) {
-    error.value = e?.response?.data?.error || 'Erreur lors de la configuration MFA'
+  } catch (e: unknown) {
+    error.value = getApiErrorMessage(e, 'Erreur lors de la configuration MFA')
   } finally {
     loading.value = false
   }
@@ -488,8 +498,8 @@ async function verifySetup() {
     verifyCode.value = ''
     stopSetupTimer()
     await loadStatus()
-  } catch (e: any) {
-    error.value = e?.response?.data?.error || 'Code invalide'
+  } catch (e: unknown) {
+    error.value = getApiErrorMessage(e, 'Code invalide')
   } finally {
     loading.value = false
   }
@@ -505,8 +515,8 @@ async function disableMFA() {
     showDisable.value = false
     disablePassword.value = ''
     await loadStatus()
-  } catch (e: any) {
-    error.value = e?.response?.data?.error || 'Erreur lors de la désactivation'
+  } catch (e: unknown) {
+    error.value = getApiErrorMessage(e, 'Erreur lors de la désactivation')
   } finally {
     loading.value = false
   }
@@ -521,8 +531,8 @@ async function revokeOtherSessions() {
     await apiClient.revokeAllSessions()
     revokeSuccess.value = 'Toutes les autres sessions ont été révoquées.'
     await loadLoginEvents()
-  } catch (e: any) {
-    revokeError.value = e?.response?.data?.error || 'Erreur lors de la révocation des sessions.'
+  } catch (e: unknown) {
+    revokeError.value = getApiErrorMessage(e, 'Erreur lors de la révocation des sessions.')
   } finally {
     revokeLoading.value = false
   }

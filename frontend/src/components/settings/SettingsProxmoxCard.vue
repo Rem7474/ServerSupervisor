@@ -6,6 +6,7 @@
       </h3>
       <button
         v-if="authIsAdmin && !showForm"
+        type="button"
         class="btn btn-sm btn-primary"
         @click="openAddForm"
       >
@@ -87,6 +88,7 @@
       </div>
       <div class="mt-3 d-flex align-items-center gap-2">
         <button
+          type="button"
           class="btn btn-primary"
           :disabled="saving"
           @click="save"
@@ -94,12 +96,14 @@
           {{ saving ? 'Enregistrement...' : (editingId ? 'Mettre à jour' : 'Créer') }}
         </button>
         <button
+          type="button"
           class="btn btn-outline-secondary"
           @click="cancelForm"
         >
           Annuler
         </button>
         <button
+          type="button"
           class="btn btn-outline-info ms-2"
           :disabled="testing"
           @click="testForm"
@@ -181,6 +185,7 @@
             >
               <div class="d-flex gap-1 justify-content-end">
                 <button
+                  type="button"
                   class="btn btn-sm btn-outline-secondary"
                   title="Modifier"
                   @click="openEditForm(inst)"
@@ -197,6 +202,7 @@
                   </svg>
                 </button>
                 <button
+                  type="button"
                   class="btn btn-sm btn-outline-info"
                   title="Tester"
                   @click="testById(inst)"
@@ -216,6 +222,7 @@
                   </svg>
                 </button>
                 <button
+                  type="button"
                   class="btn btn-sm btn-outline-primary"
                   title="Collecter maintenant"
                   @click="pollNow(inst)"
@@ -231,6 +238,7 @@
                   </svg>
                 </button>
                 <button
+                  type="button"
                   class="btn btn-sm btn-outline-danger"
                   title="Supprimer"
                   @click="remove(inst)"
@@ -266,6 +274,7 @@
 import { ref, onMounted } from 'vue'
 import api from '../../api/index'
 import type { ProxmoxConnection } from '../../types/proxmox'
+import { getApiErrorMessage } from '../../api/client'
 
 // Use the shared domain type (the settings card only reads a subset of fields).
 type ProxmoxInstance = ProxmoxConnection
@@ -370,8 +379,8 @@ async function save(): Promise<void> {
     await load()
     showForm.value = false
     editingId.value = null
-  } catch (e: any) {
-    formMsg.value = e?.response?.data?.error || 'Erreur lors de l\'enregistrement.'
+  } catch (e: unknown) {
+    formMsg.value = getApiErrorMessage(e, 'Erreur lors de l\'enregistrement.')
     formOk.value = false
   } finally {
     saving.value = false
@@ -400,8 +409,8 @@ async function testForm(): Promise<void> {
       formMsg.value = res.data.error || 'Échec de connexion.'
       formOk.value = false
     }
-  } catch (e: any) {
-    formMsg.value = e?.response?.data?.error || 'Erreur réseau.'
+  } catch (e: unknown) {
+    formMsg.value = getApiErrorMessage(e, 'Erreur réseau.')
     formOk.value = false
   } finally {
     testing.value = false
@@ -419,8 +428,8 @@ async function testById(inst: ProxmoxInstance): Promise<void> {
       listMsg.value = `[${inst.name}] ${res.data.error}`
       listOk.value = false
     }
-  } catch (e: any) {
-    listMsg.value = e?.response?.data?.error || 'Erreur réseau.'
+  } catch (e: unknown) {
+    listMsg.value = getApiErrorMessage(e, 'Erreur réseau.')
     listOk.value = false
   }
 }
@@ -431,8 +440,8 @@ async function pollNow(inst: ProxmoxInstance): Promise<void> {
     listMsg.value = `[${inst.name}] Collecte déclenchée.`
     listOk.value = true
     setTimeout(load, 3000)
-  } catch (e: any) {
-    listMsg.value = e?.response?.data?.error || 'Erreur.'
+  } catch (e: unknown) {
+    listMsg.value = getApiErrorMessage(e, 'Erreur.')
     listOk.value = false
   }
 }
@@ -444,8 +453,8 @@ async function remove(inst: ProxmoxInstance): Promise<void> {
     await load()
     listMsg.value = 'Connexion supprimée.'
     listOk.value = true
-  } catch (e: any) {
-    listMsg.value = e?.response?.data?.error || 'Erreur lors de la suppression.'
+  } catch (e: unknown) {
+    listMsg.value = getApiErrorMessage(e, 'Erreur lors de la suppression.')
     listOk.value = false
   }
 }

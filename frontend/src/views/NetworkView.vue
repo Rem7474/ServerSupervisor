@@ -148,6 +148,7 @@
             role="group"
           >
             <button
+              type="button"
               class="btn"
               :class="viewMode === 'graph' ? 'btn-primary' : 'btn-outline-secondary'"
               @click="viewMode = 'graph'"
@@ -164,6 +165,7 @@
               Graphe
             </button>
             <button
+              type="button"
               class="btn"
               :class="viewMode === 'cards' ? 'btn-primary' : 'btn-outline-secondary'"
               @click="viewMode = 'cards'"
@@ -190,6 +192,7 @@
       >
         <li class="nav-item">
           <button
+            type="button"
             class="nav-link"
             :class="{ active: networkTab === 'topology' }"
             @click="networkTab = 'topology'"
@@ -208,6 +211,7 @@
         </li>
         <li class="nav-item">
           <button
+            type="button"
             class="nav-link"
             :class="{ active: networkTab === 'config' }"
             @click="networkTab = 'config'"
@@ -687,7 +691,7 @@ async function fetchSnapshot(): Promise<void> {
     hosts.value = res.data?.hosts || []
     containers.value = res.data?.containers || []
     ensureHostPortConfig()
-  } catch (e) {
+  } catch {
     // ignore
   }
 }

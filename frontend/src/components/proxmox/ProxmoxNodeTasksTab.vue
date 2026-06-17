@@ -93,6 +93,7 @@
           </td>
           <td>
             <button
+              type="button"
               class="btn btn-sm btn-ghost-secondary"
               title="Voir les logs"
               @click="emit('view-logs', { upid: t.upid, action: t.task_type, label: t.object_id })"
@@ -122,11 +123,10 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import SortableHeader from '../common/SortableHeader.vue'
-
-type Task = Record<string, any>
+import type { ProxmoxTask } from '../../types/proxmox'
 
 const props = defineProps<{
-  tasks: Task[]
+  tasks: ProxmoxTask[]
   activeUpid?: string | null
 }>()
 
@@ -159,7 +159,7 @@ function compareValues(a: unknown, b: unknown, direction: 'asc' | 'desc' = 'asc'
   return 0
 }
 
-function taskDurationSeconds(task: Task): number | null {
+function taskDurationSeconds(task: ProxmoxTask): number | null {
   if (!task?.start_time) return null
   const startMs = new Date(task.start_time).getTime()
   if (!Number.isFinite(startMs)) return null
@@ -176,17 +176,21 @@ const sortedTasks = computed(() => {
     if (sortKey.value === 'duration') {
       return compareValues(taskDurationSeconds(a), taskDurationSeconds(b), sortDir.value)
     }
-    return compareValues(a?.[sortKey.value], b?.[sortKey.value], sortDir.value)
+    return compareValues(
+      (a as unknown as Record<string, unknown>)?.[sortKey.value],
+      (b as unknown as Record<string, unknown>)?.[sortKey.value],
+      sortDir.value,
+    )
   })
   return list
 })
 
-function formatDate(iso: string): string {
+function formatDate(iso?: string): string {
   if (!iso) return '—'
   return new Date(iso).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
 }
 
-function taskDuration(t: Task): string {
+function taskDuration(t: ProxmoxTask): string {
   if (!t.start_time) return '—'
   const end = t.end_time ? new Date(t.end_time) : (t.status === 'running' ? new Date() : null)
   if (!end) return '—'
@@ -199,14 +203,14 @@ function taskDuration(t: Task): string {
   return `${h}h ${m % 60}m`
 }
 
-function taskStatusLabel(t: Task): string {
+function taskStatusLabel(t: ProxmoxTask): string {
   if (t.status === 'running') return 'En cours'
   if (t.exit_status === 'OK' || t.status === 'OK') return 'OK'
   if (t.exit_status) return String(t.exit_status)
   return String(t.status || '—')
 }
 
-function taskStatusBadgeClass(t: Task): string {
+function taskStatusBadgeClass(t: ProxmoxTask): string {
   if (t.status === 'running') return 'bg-blue-lt text-blue'
   if (t.exit_status === 'OK' || t.status === 'OK') return 'bg-success-lt text-success'
   if (t.exit_status) return 'bg-danger-lt text-danger'

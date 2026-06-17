@@ -14,9 +14,15 @@
 
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import type { Chart, ChartEvent, LegendItem, LegendElement } from 'chart.js'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 
-type Point = Record<string, any>
+interface Point {
+  timestamp: string
+  human?: number | string
+  bot?: number | string
+  [key: string]: unknown
+}
 
 const props = defineProps<{
   timeseries: Point[]
@@ -26,8 +32,8 @@ const props = defineProps<{
 }>()
 
 const canvasEl = ref<HTMLCanvasElement | null>(null)
-let chart: any = null
-let chartLib: any = null
+let chart: Chart | null = null
+let chartLib: typeof Chart | null = null
 
 async function ensureChartLib() {
   if (chartLib) return chartLib
@@ -55,7 +61,7 @@ async function render() {
   const labels = props.timeseries.map((p) => bucketLabel(p.timestamp))
   const human = props.timeseries.map((p) => Number(p.human) || 0)
   const bot = props.timeseries.map((p) => Number(p.bot) || 0)
-  chart = new Chart(canvasEl.value.getContext('2d'), {
+  chart = new Chart(canvasEl.value, {
     type: 'bar',
     data: {
       labels,
@@ -70,10 +76,10 @@ async function render() {
       plugins: {
         legend: {
           position: 'bottom',
-          onHover: (_e: any, _item: any, legend: any) => {
+          onHover: (_e: ChartEvent, _item: LegendItem, legend: LegendElement<'bar'>) => {
             legend.chart.canvas.style.cursor = 'pointer'
           },
-          onLeave: (_e: any, _item: any, legend: any) => {
+          onLeave: (_e: ChartEvent, _item: LegendItem, legend: LegendElement<'bar'>) => {
             legend.chart.canvas.style.cursor = 'default'
           },
         },

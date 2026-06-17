@@ -38,6 +38,7 @@
               </option>
             </select>
             <button
+              type="button"
               class="btn btn-sm"
               :class="banError ? 'btn-danger' : 'btn-outline-danger'"
               :disabled="banLoading || !hostId"
@@ -60,6 +61,7 @@
             IP bloquée par CrowdSec
           </span>
           <button
+            type="button"
             class="btn btn-sm btn-outline-secondary"
             @click="$emit('close')"
           >
@@ -95,6 +97,7 @@
                   <button
                     v-for="opt in timelineIntervalOptions"
                     :key="opt.value"
+                    type="button"
                     class="timeline-interval-chip btn btn-sm"
                     :class="selectedInterval === opt.value ? 'btn-primary' : 'btn-outline-secondary'"
                     @click="setTimelineInterval(opt.value)"
@@ -113,6 +116,7 @@
                 </span>
               </div>
               <button
+                type="button"
                 class="btn btn-sm btn-outline-secondary"
                 @click="toggleBucketFilter"
               >
@@ -164,6 +168,7 @@
                 <button
                   v-for="bucket in timelineBuckets"
                   :key="bucket.key"
+                  type="button"
                   class="timeline-frieze-item"
                   :class="{ active: selectedBucketKey === bucket.key }"
                   :title="bucket.title"

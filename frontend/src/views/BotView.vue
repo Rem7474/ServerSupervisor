@@ -26,6 +26,7 @@
         <button
           v-for="p in periodOptions"
           :key="p.value"
+          type="button"
           class="btn btn-sm"
           :class="period === p.value ? 'btn-primary' : 'btn-outline-secondary'"
           @click="setPeriod(p.value)"
@@ -103,6 +104,7 @@
           </select>
         </div>
         <button
+          type="button"
           class="btn btn-primary btn-sm threats-refresh-btn"
           :disabled="loading"
           @click="loadThreats"
@@ -277,6 +279,7 @@
                     </td>
                     <td class="text-end">
                       <button
+                        type="button"
                         class="btn btn-sm btn-outline-primary"
                         @click="openTimeline(ip.ip)"
                       >
@@ -482,6 +485,7 @@
                     <td class="text-end">
                       <div class="d-flex gap-1 justify-content-end">
                         <button
+                          type="button"
                           class="btn btn-sm"
                           :class="rowState[entry.ip] === 'error' ? 'btn-danger' : 'btn-outline-success'"
                           :disabled="rowState[entry.ip] === 'loading'"
@@ -496,6 +500,7 @@
                           <span v-else>Débloquer</span>
                         </button>
                         <button
+                          type="button"
                           class="btn btn-sm btn-outline-primary"
                           @click="openTimeline(entry.ip)"
                         >
@@ -542,6 +547,7 @@ import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import IPTimelineModal from '../components/security/IPTimelineModal.vue'
 import type { WebLogIPTimelineRow } from '../types/security'
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- display-layer shim for aggregate web-logs data (no Go model)
 type AnyRecord = Record<string, any>
 
 const period = ref('24h')

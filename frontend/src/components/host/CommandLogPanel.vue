@@ -33,6 +33,7 @@
         <div class="d-flex gap-1">
           <!-- Copy -->
           <button
+            type="button"
             class="btn btn-sm btn-ghost-secondary"
             :title="copied ? 'Copié !' : 'Copier la sortie'"
             :disabled="!command"
@@ -82,6 +83,7 @@
           </button>
           <!-- Download -->
           <button
+            type="button"
             class="btn btn-sm btn-ghost-secondary"
             title="Télécharger (.txt)"
             :disabled="!command"
@@ -112,6 +114,7 @@
           <!-- Clear (optional) -->
           <button
             v-if="clearable"
+            type="button"
             class="btn btn-sm btn-ghost-secondary"
             title="Vider la console"
             :disabled="!command"
@@ -140,6 +143,7 @@
           </button>
           <!-- Close -->
           <button
+            type="button"
             class="btn btn-sm btn-ghost-secondary"
             title="Fermer"
             @click="$emit('close')"
@@ -253,6 +257,7 @@
   <!-- Floating reopen button -->
   <button
     v-show="!show"
+    type="button"
     class="btn btn-primary console-fab"
     @click="$emit('open')"
   >

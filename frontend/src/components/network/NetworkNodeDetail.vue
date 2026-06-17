@@ -11,6 +11,7 @@
         >{{ selectedNode.sublabel }}</span>
       </div>
       <button
+        type="button"
         class="btn-close btn-close-white btn-close-sm"
         aria-label="Fermer"
         @click="$emit('close')"
@@ -243,6 +244,7 @@
             class="btn btn-sm btn-outline-primary"
           >Ouvrir dans le navigateur</a>
           <button
+            type="button"
             class="btn btn-sm btn-outline-secondary"
             @click="copyUrl(serviceUrl)"
           >
@@ -270,7 +272,7 @@ interface SelectedNode {
   isProxyLinked?: boolean
   isAutheliaLinked?: boolean
   isInternetExposed?: boolean
-  [key: string]: any
+  [key: string]: unknown
 }
 
 interface Host {
@@ -278,13 +280,13 @@ interface Host {
   status?: string
   network_rx_bytes?: number
   network_tx_bytes?: number
-  [key: string]: any
+  [key: string]: unknown
 }
 
 interface Container {
   host_id: string
   state?: string
-  [key: string]: any
+  [key: string]: unknown
 }
 
 interface ServicePort {

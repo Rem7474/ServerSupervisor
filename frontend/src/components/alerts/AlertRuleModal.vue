@@ -192,9 +192,11 @@ import apiClient from '../../api'
 import AlertRuleStepSource from './AlertRuleStepSource.vue'
 import AlertRuleStepConditions from './AlertRuleStepConditions.vue'
 import AlertRuleStepNotifications from './AlertRuleStepNotifications.vue'
-import { useAlertRuleForm } from '../../composables/useAlertRuleForm'
+import { useAlertRuleForm, type AlertRuleInput } from '../../composables/useAlertRuleForm'
+import type { AlertRulePayload as ApiAlertRulePayload } from '../../types/alert'
 import { useModalFocusTrap } from '../../composables/useModalFocusTrap'
 import { ALERT_METRIC_ORDER, getAlertMetricMeta } from '../../utils/alertMetrics'
+import { getApiErrorMessage } from '../../api/client'
 
 interface Host {
   id: string
@@ -416,7 +418,7 @@ watch(
     }
     testResults.value = null
     testError.value = ''
-    hydrateFormFromRule(props.rule as any)
+    hydrateFormFromRule(props.rule as unknown as AlertRuleInput | null)
     step.value = 1
   },
   { immediate: true, deep: true }
@@ -571,11 +573,11 @@ async function testAlert(): Promise<void> {
   testResults.value = null
   testError.value = ''
   try {
-    const response = await apiClient.testAlertRule(buildPayload() as any)
+    const response = await apiClient.testAlertRule(buildPayload() as unknown as ApiAlertRulePayload)
     testResults.value = response.data
-  } catch (err: any) {
+  } catch (err: unknown) {
     testResults.value = null
-    testError.value = err?.response?.data?.error || 'Échec du test de la règle.'
+    testError.value = getApiErrorMessage(err, 'Échec du test de la règle.')
   } finally {
     testing.value = false
   }
@@ -590,7 +592,7 @@ async function downloadTestLogs(): Promise<void> {
   if (downloadingLogs.value || !canDownloadTestLogs.value) return
   downloadingLogs.value = true
   try {
-    const response = await apiClient.downloadAlertRuleTestLogs(buildPayload() as any)
+    const response = await apiClient.downloadAlertRuleTestLogs(buildPayload() as unknown as ApiAlertRulePayload)
     const blob = response.data instanceof Blob ? response.data : new Blob([response.data], { type: 'text/plain' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
@@ -598,8 +600,8 @@ async function downloadTestLogs(): Promise<void> {
     link.download = `proxmox-auth-failures-${formatDownloadTimestamp(new Date())}.log`
     link.click()
     setTimeout(() => URL.revokeObjectURL(url), 1000)
-  } catch (err: any) {
-    testError.value = err?.response?.data?.error || 'Échec du téléchargement des logs.'
+  } catch (err: unknown) {
+    testError.value = getApiErrorMessage(err, 'Échec du téléchargement des logs.')
   } finally {
     downloadingLogs.value = false
   }

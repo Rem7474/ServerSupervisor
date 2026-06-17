@@ -59,6 +59,7 @@
     <!-- Controls -->
     <div class="graph-controls">
       <button
+        type="button"
         class="btn btn-sm btn-outline-secondary graph-btn"
         title="Zoom +"
         @click="zoomIn"
@@ -74,6 +75,7 @@
         </svg>
       </button>
       <button
+        type="button"
         class="btn btn-sm btn-outline-secondary graph-btn"
         title="Zoom −"
         @click="zoomOut"
@@ -89,6 +91,7 @@
         </svg>
       </button>
       <button
+        type="button"
         class="btn btn-sm btn-outline-secondary graph-btn"
         title="Ajuster à l'écran"
         @click="fitView"
@@ -105,6 +108,7 @@
         </svg>
       </button>
       <button
+        type="button"
         class="btn btn-sm btn-outline-secondary graph-btn"
         title="Réinitialiser la disposition"
         @click="resetLayout"

@@ -13,6 +13,7 @@
       />
       <button
         v-if="canRunApt"
+        type="button"
         class="btn btn-primary"
         @click="openCreateTask"
       >
@@ -56,6 +57,7 @@
         </p>
         <button
           v-if="canRunApt"
+          type="button"
           class="btn btn-primary"
           @click="openCreateTask"
         >
@@ -146,6 +148,7 @@
                 <div class="d-flex gap-1 justify-content-end">
                   <button
                     v-if="task.last_command_id"
+                    type="button"
                     class="btn btn-sm btn-ghost-secondary"
                     title="Voir les logs"
                     @click="openTaskLogs(task)"
@@ -166,6 +169,7 @@
                   </button>
                   <button
                     v-if="canRunApt"
+                    type="button"
                     class="btn btn-sm btn-outline-primary"
                     :disabled="taskRunningId === task.id"
                     @click="runTaskNow(task)"
@@ -178,6 +182,7 @@
                   </button>
                   <button
                     v-if="canRunApt"
+                    type="button"
                     class="btn btn-sm btn-outline-secondary"
                     @click="openEditTask(task)"
                   >
@@ -185,6 +190,7 @@
                   </button>
                   <button
                     v-if="canRunApt"
+                    type="button"
                     class="btn btn-sm btn-outline-danger"
                     @click="confirmDeleteTask(task)"
                   >
@@ -424,6 +430,7 @@ import { useConfirmDialog } from '../../composables/useConfirmDialog'
 import { useDateFormatter } from '../../composables/useDateFormatter'
 import { useToast } from '../../composables/useToast'
 import { MANUAL_SENTINEL, isManualOnly, describeCron } from '../../utils/cron'
+import { getApiErrorMessage } from '../../api/client'
 
 type TaskModule = 'apt' | 'docker' | 'systemd' | 'journal' | 'processes' | 'custom'
 
@@ -535,8 +542,8 @@ async function loadTasks(): Promise<void> {
   try {
     const { data } = await apiClient.getScheduledTasks(String(props.hostId))
     tasks.value = data
-  } catch (e: any) {
-    tasksError.value = e?.response?.data?.error || 'Erreur de chargement'
+  } catch (e: unknown) {
+    tasksError.value = getApiErrorMessage(e, 'Erreur de chargement')
   } finally {
     tasksLoading.value = false
   }
@@ -602,8 +609,9 @@ async function saveTask(): Promise<void> {
     }
     closeTaskModal()
     await loadTasks()
-  } catch (e: any) {
-    taskModalError.value = e?.response?.data?.error || e?.response?.data?.warning || 'Erreur lors de la sauvegarde'
+  } catch (e: unknown) {
+    const data = (e as { response?: { data?: { error?: string; warning?: string } } }).response?.data
+    taskModalError.value = data?.error || data?.warning || 'Erreur lors de la sauvegarde'
   } finally {
     taskSaving.value = false
   }
@@ -613,8 +621,8 @@ async function toggleTask(task: Task): Promise<void> {
   try {
     await apiClient.updateScheduledTask(String(task.id), { ...task, enabled: !task.enabled })
     await loadTasks()
-  } catch (e: any) {
-    tasksError.value = e?.response?.data?.error || 'Erreur'
+  } catch (e: unknown) {
+    tasksError.value = getApiErrorMessage(e, 'Erreur')
   }
 }
 
@@ -633,8 +641,8 @@ async function runTaskNow(task: Task): Promise<void> {
     })
     emit('history-changed')
     await loadTasks()
-  } catch (e: any) {
-    tasksError.value = e?.response?.data?.error || 'Erreur'
+  } catch (e: unknown) {
+    tasksError.value = getApiErrorMessage(e, 'Erreur')
   } finally {
     taskRunningId.value = null
   }
@@ -662,8 +670,8 @@ async function confirmDeleteTask(task: Task): Promise<void> {
   try {
     await apiClient.deleteScheduledTask(String(task.id))
     await loadTasks()
-  } catch (e: any) {
-    tasksError.value = e?.response?.data?.error || 'Erreur de suppression'
+  } catch (e: unknown) {
+    tasksError.value = getApiErrorMessage(e, 'Erreur de suppression')
   }
 }
 </script>

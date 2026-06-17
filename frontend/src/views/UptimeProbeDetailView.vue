@@ -216,6 +216,8 @@ import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import PageRefreshBar from '../components/PageRefreshBar.vue'
 import { formatDateTime } from '../utils/formatters'
 import { getChartPalette } from '../utils/chartTheme'
+import { getApiErrorMessage } from '../api/client'
+import type { UptimeProbe, UptimeStats } from '../types/generated'
 
 interface ProbeResult {
   id: string | number
@@ -224,12 +226,6 @@ interface ProbeResult {
   status_code?: number | null
   error?: string
   latency_ms: number
-}
-
-interface Probe {
-  last_status?: string
-  consecutive_failures?: number
-  [key: string]: any
 }
 
 const Line = defineAsyncComponent(async () => {
@@ -247,9 +243,9 @@ const Line = defineAsyncComponent(async () => {
 const route = useRoute()
 const probeId = route.params.id as string
 
-const probe = ref<Probe | null>(null)
+const probe = ref<UptimeProbe | null>(null)
 const results = ref<ProbeResult[]>([])
-const stats = ref<any>(null)
+const stats = ref<UptimeStats | null>(null)
 const loading = ref(false)
 const error = ref('')
 const statsWindow = 24
@@ -378,8 +374,8 @@ async function fetchAll(): Promise<void> {
     results.value = hr.data?.results || []
     stats.value = sr.data
     lastUpdatedAt.value = new Date()
-  } catch (e: any) {
-    error.value = e?.response?.data?.error || e?.message || 'Impossible de charger la sonde'
+  } catch (e: unknown) {
+    error.value = getApiErrorMessage(e, 'Impossible de charger la sonde')
   } finally {
     loading.value = false
   }

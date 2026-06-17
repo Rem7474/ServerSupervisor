@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
 
 const summaryData = {
   data: {
@@ -46,6 +47,9 @@ import TrafficView from './TrafficView.vue'
 describe('TrafficView (characterization)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // TrafficView calls useHostsStore() in setup; install a fresh Pinia so the
+    // store resolves without the app having to register the plugin.
+    setActivePinia(createPinia())
   })
 
   // Charts + world map render imperatively (Chart.js / D3) and are verified in

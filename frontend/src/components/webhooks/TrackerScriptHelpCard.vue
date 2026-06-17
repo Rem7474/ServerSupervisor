@@ -43,6 +43,7 @@
           Chemin détecté automatiquement
         </span>
         <button
+          type="button"
           class="btn btn-sm btn-ghost-secondary"
           :title="copied ? 'Copié !' : 'Copier'"
           @click="copySnippet"
@@ -130,10 +131,12 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
+import type { ReleaseTracker } from '../../types/tracker'
+import type { ComposeProject } from '../../types/docker'
 
 const props = defineProps<{
-  tracker: any
-  composeProjects: any[]
+  tracker: ReleaseTracker
+  composeProjects: ComposeProject[]
   tasksYaml: string
   loadingSnippet: boolean
 }>()

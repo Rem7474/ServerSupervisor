@@ -21,6 +21,7 @@
         </h2>
         <button
           v-if="unreadCount > 0"
+          type="button"
           class="btn btn-sm btn-outline-secondary"
           :disabled="markingRead"
           @click="handleMarkRead"
@@ -40,6 +41,7 @@
         <button
           v-for="f in SEVERITY_FILTERS"
           :key="f.value"
+          type="button"
           class="btn btn-sm"
           :class="severityFilter === f.value ? 'btn-primary' : 'btn-outline-secondary'"
           @click="severityFilter = f.value"
@@ -51,6 +53,7 @@
         <button
           v-for="f in TYPE_FILTERS"
           :key="f.value"
+          type="button"
           class="btn btn-sm"
           :class="typeFilter === f.value ? 'btn-secondary' : 'btn-outline-secondary'"
           @click="typeFilter = f.value"
@@ -62,6 +65,7 @@
         <button
           v-for="f in STATUS_FILTERS"
           :key="f.value"
+          type="button"
           class="btn btn-sm"
           :class="statusFilter === f.value ? 'btn-secondary' : 'btn-outline-secondary'"
           @click="statusFilter = f.value"
@@ -150,6 +154,7 @@
                 <div class="d-flex align-items-center gap-2 flex-shrink-0">
                   <button
                     v-if="auth.isAdmin && item.type === 'alert_incident' && !notificationResolved(item)"
+                    type="button"
                     class="btn btn-sm btn-outline-success py-0 px-2"
                     :disabled="resolvingId === item.id"
                     @click.stop="resolveIncident(item)"
@@ -193,6 +198,7 @@
       >
         Affichage de {{ items.length }} / {{ total }} notifications.
         <button
+          type="button"
           class="btn btn-sm btn-link p-0 ms-1"
           @click="loadMore"
         >
@@ -211,6 +217,7 @@ import { addToast } from '../composables/useGlobalToast'
 import RelativeTime from '../components/RelativeTime.vue'
 import { resolveIncidentHostRoute } from '../utils/incidentRouting'
 import { useAuthStore } from '../stores/auth'
+import { getApiErrorMessage } from '../api/client'
 
 const auth = useAuthStore()
 
@@ -311,8 +318,8 @@ async function resolveIncident(item: NotificationItem): Promise<void> {
       n.id === item.id ? { ...n, resolved_at: new Date().toISOString() } : n
     )
     addToast('Incident résolu', 'success')
-  } catch (err: any) {
-    addToast(err?.response?.data?.error || 'Impossible de résoudre', 'error')
+  } catch (err: unknown) {
+    addToast(getApiErrorMessage(err, 'Impossible de résoudre'), 'error')
   } finally {
     resolvingId.value = null
   }
@@ -331,8 +338,8 @@ async function load(limit = currentLimit.value): Promise<void> {
     items.value = res.data.notifications || []
     total.value = res.data.total || 0
     if (res.data.read_at !== undefined) readAt.value = res.data.read_at
-  } catch (err: any) {
-    error.value = err?.response?.data?.error || err?.message || 'Erreur de chargement'
+  } catch (err: unknown) {
+    error.value = getApiErrorMessage(err, 'Erreur de chargement')
   } finally {
     loading.value = false
   }

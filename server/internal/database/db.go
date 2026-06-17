@@ -201,6 +201,28 @@ func (db *DB) ensureTimescaleObjects(ctx context.Context) error {
 		return fmt.Errorf("add disk_metrics_1h policy: %w", err)
 	}
 
+	// Enable real-time aggregation on every continuous aggregate so reads union
+	// the not-yet-materialized recent rows from the raw hypertable at query time.
+	// Without this the views only return data up to (now - end_offset), so the
+	// dashboard/Proxmox charts (which read these CAGGs) lagged ~10-18 min behind
+	// the host-detail panel (which reads raw system_metrics) — see the freshness
+	// audit. TimescaleDB ≥ 2.13 defaults materialized_only to true, so the option
+	// must be set explicitly. This ALTER is idempotent and repairs CAGGs created
+	// by earlier server versions (CREATE IF NOT EXISTS above is a no-op for them).
+	// The old materialized portion is still served from the aggregate, so reads
+	// stay cheap; only the short recent tail is computed live.
+	for _, cagg := range []string{
+		"system_metrics_5min",
+		"proxmox_node_metrics_5min",
+		"proxmox_guest_metrics_5min",
+		"disk_metrics_1h",
+	} {
+		if _, err := db.conn.ExecContext(ctx,
+			fmt.Sprintf(`ALTER MATERIALIZED VIEW %s SET (timescaledb.materialized_only = false)`, cagg)); err != nil {
+			return fmt.Errorf("enable real-time aggregation on %s: %w", cagg, err)
+		}
+	}
+
 	return nil
 }
 

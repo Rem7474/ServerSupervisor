@@ -66,7 +66,7 @@
         <div class="text-secondary small">
           <span class="badge bg-red-lt text-red me-1">CRITICAL</span>
           {{ cveSummary.critical_count || 0 }} CVE
-          <span v-if="(cveSummary.hosts_with_critical || 0) > 0"> sur {{ cveSummary.hosts_with_critical || 0 }} hôte{{ (cveSummary.hosts_with_critical || 0) > 1 ? 's' : '' }}</span>
+          <span v-if="(cveSummary.hosts_with_critical || 0) > 0"> sur {{ cveSummary.hosts_with_critical || 0 }} hôte{{ pluralize(cveSummary.hosts_with_critical) }}</span>
         </div>
       </div>
       <router-link
@@ -91,10 +91,10 @@
           Alertes Proxmox
         </div>
         <div class="text-secondary small d-flex flex-wrap gap-2">
-          <span v-if="(proxmoxSummary.nodes_down ?? 0) > 0">{{ proxmoxSummary.nodes_down }} nœud{{ (proxmoxSummary.nodes_down ?? 0) > 1 ? 's' : '' }} hors ligne</span>
-          <span v-if="(proxmoxSummary.storage_near_full ?? 0) > 0">{{ proxmoxSummary.storage_near_full }} stockage{{ (proxmoxSummary.storage_near_full ?? 0) > 1 ? 's' : '' }} presque plein{{ (proxmoxSummary.storage_near_full ?? 0) > 1 ? 's' : '' }}</span>
-          <span v-if="(proxmoxSummary.storage_offline ?? 0) > 0">{{ proxmoxSummary.storage_offline }} stockage{{ (proxmoxSummary.storage_offline ?? 0) > 1 ? 's' : '' }} hors ligne</span>
-          <span v-if="(proxmoxSummary.recent_failed_tasks ?? 0) > 0">{{ proxmoxSummary.recent_failed_tasks }} tâche{{ (proxmoxSummary.recent_failed_tasks ?? 0) > 1 ? 's' : '' }} échouée{{ (proxmoxSummary.recent_failed_tasks ?? 0) > 1 ? 's' : '' }} (24h)</span>
+          <span v-if="(proxmoxSummary.nodes_down ?? 0) > 0">{{ proxmoxSummary.nodes_down }} nœud{{ pluralize(proxmoxSummary.nodes_down) }} hors ligne</span>
+          <span v-if="(proxmoxSummary.storage_near_full ?? 0) > 0">{{ proxmoxSummary.storage_near_full }} stockage{{ pluralize(proxmoxSummary.storage_near_full) }} presque plein{{ pluralize(proxmoxSummary.storage_near_full) }}</span>
+          <span v-if="(proxmoxSummary.storage_offline ?? 0) > 0">{{ proxmoxSummary.storage_offline }} stockage{{ pluralize(proxmoxSummary.storage_offline) }} hors ligne</span>
+          <span v-if="(proxmoxSummary.recent_failed_tasks ?? 0) > 0">{{ proxmoxSummary.recent_failed_tasks }} tâche{{ pluralize(proxmoxSummary.recent_failed_tasks) }} échouée{{ pluralize(proxmoxSummary.recent_failed_tasks) }} (24h)</span>
         </div>
       </div>
       <router-link
@@ -162,6 +162,7 @@
           <button
             v-for="h in [1, 6, 24, 168, 720]"
             :key="h"
+            type="button"
             :class="summaryHours === h ? 'btn btn-primary' : 'btn btn-outline-secondary'"
             @click="changeSummaryRange(h)"
           >
@@ -243,6 +244,7 @@
             class="col-12 col-md-auto d-flex align-items-end"
           >
             <button
+              type="button"
               class="btn btn-outline-secondary btn-sm"
               @click="selectAllFiltered"
             >
@@ -481,6 +483,7 @@
       @clear="clearSelection"
     >
       <button
+        type="button"
         class="btn btn-sm btn-outline-secondary"
         :disabled="aptLoading !== ''"
         @click="sendBulkApt('update')"
@@ -493,6 +496,7 @@
         apt update
       </button>
       <button
+        type="button"
         :class="selectedCount > 5 ? 'btn btn-sm btn-danger' : 'btn btn-sm btn-primary'"
         :disabled="aptLoading !== ''"
         @click="sendBulkApt('upgrade')"
@@ -526,7 +530,8 @@ import EmptyState from '../components/EmptyState.vue'
 import AppIcon from '../components/AppIcon.vue'
 import BulkActionBar from '../components/BulkActionBar.vue'
 import { formatHostStatus, hostStatusClass } from '../utils/formatHostStatus'
-import { useDashboard } from '../composables/useDashboard'
+import { pluralize } from '../utils/formatters'
+import { useDashboard, type DashboardProxmoxLinkRecord } from '../composables/useDashboard'
 
 const Line = defineAsyncComponent(async () => {
   const [{ Line }, { Chart: ChartJS, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip, Legend }] = await Promise.all([
@@ -581,8 +586,8 @@ const {
   diskColor,
 } = useDashboard()
 
-const proxmoxLinkByHostId = computed<Record<string, any>>(() => {
-  const map: Record<string, any> = {}
+const proxmoxLinkByHostId = computed<Record<string, DashboardProxmoxLinkRecord>>(() => {
+  const map: Record<string, DashboardProxmoxLinkRecord> = {}
   for (const link of proxmoxLinks.value || []) {
     if (!link?.host_id || !link?.guest_id) continue
     map[link.host_id] = link

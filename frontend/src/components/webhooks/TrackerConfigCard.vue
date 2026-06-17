@@ -6,6 +6,7 @@
       </h3>
       <div class="d-flex gap-2">
         <button
+          type="button"
           class="btn btn-sm btn-ghost-secondary"
           :disabled="checking"
           @click="$emit('check')"
@@ -25,6 +26,7 @@
           {{ checking ? 'Vérification...' : 'Vérifier maintenant' }}
         </button>
         <button
+          type="button"
           class="btn btn-sm btn-primary"
           :disabled="running || !canRunManually"
           :title="runDisabledReason"
@@ -45,6 +47,7 @@
           {{ running ? 'Déclenchement...' : 'Exécuter' }}
         </button>
         <button
+          type="button"
           class="btn btn-sm btn-ghost-secondary"
           @click="$emit('edit')"
         >
@@ -267,9 +270,10 @@
 import { computed } from 'vue'
 import RelativeTime from '../RelativeTime.vue'
 import { formatDateTime } from '../../utils/formatters'
+import type { ReleaseTracker } from '../../types/tracker'
 
 const props = defineProps<{
-  tracker: any
+  tracker: ReleaseTracker
   checking: boolean
   running: boolean
   canRunManually: boolean

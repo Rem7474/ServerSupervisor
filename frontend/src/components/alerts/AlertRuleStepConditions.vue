@@ -294,6 +294,7 @@
         <div class="d-flex align-items-center gap-2">
           <button
             v-if="canDownloadTestLogs"
+            type="button"
             class="btn btn-sm btn-outline-secondary"
             :disabled="downloadingLogs"
             @click="emit('download-logs')"
