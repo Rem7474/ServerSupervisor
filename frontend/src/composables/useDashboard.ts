@@ -51,7 +51,7 @@ interface DashboardMetricPoint {
   memory_avg?: number | string | null
 }
 
-interface DashboardProxmoxLinkRecord {
+export interface DashboardProxmoxLinkRecord {
   host_id: string
   guest_id?: string
   status?: string

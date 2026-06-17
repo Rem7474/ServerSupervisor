@@ -531,7 +531,7 @@ import AppIcon from '../components/AppIcon.vue'
 import BulkActionBar from '../components/BulkActionBar.vue'
 import { formatHostStatus, hostStatusClass } from '../utils/formatHostStatus'
 import { pluralize } from '../utils/formatters'
-import { useDashboard } from '../composables/useDashboard'
+import { useDashboard, type DashboardProxmoxLinkRecord } from '../composables/useDashboard'
 
 const Line = defineAsyncComponent(async () => {
   const [{ Line }, { Chart: ChartJS, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip, Legend }] = await Promise.all([
@@ -586,8 +586,8 @@ const {
   diskColor,
 } = useDashboard()
 
-const proxmoxLinkByHostId = computed<Record<string, any>>(() => {
-  const map: Record<string, any> = {}
+const proxmoxLinkByHostId = computed<Record<string, DashboardProxmoxLinkRecord>>(() => {
+  const map: Record<string, DashboardProxmoxLinkRecord> = {}
   for (const link of proxmoxLinks.value || []) {
     if (!link?.host_id || !link?.guest_id) continue
     map[link.host_id] = link

@@ -106,6 +106,11 @@ export default [
       '**/views/GlobalScheduledTasksView.vue',
       '**/views/MonitoringView.vue',
       '**/components/docker/DockerContainersTab.vue',
+      // Child of the ProxmoxNodeView monolith; guest/link/network rows carry
+      // runtime fields beyond the generated ProxmoxGuest model. Typed when the
+      // Proxmox node view is decomposed in Phase 7.
+      '**/components/proxmox/ProxmoxNodeGuestsTab.vue',
+      '**/components/proxmox/ProxmoxNodeSecurityTab.vue',
     ],
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',

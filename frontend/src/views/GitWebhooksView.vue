@@ -758,7 +758,8 @@ const {
 } = useGitWebhooksPage()
 
 const { openCommandStream, closeStream } = useCommandStream()
-const selectedTrackerCmd = ref<any>(null)
+interface TrackerCmd { id: string; status?: string; output?: string; [key: string]: unknown }
+const selectedTrackerCmd = ref<TrackerCmd | null>(null)
 const showTrackerConsole = ref(false)
 const showDiscoverModal = ref(false)
 
@@ -774,7 +775,7 @@ function closeTrackerLogs(): void {
 
 function connectTrackerStream(commandId: string): void {
   openCommandStream(commandId, {
-    onInit(payload: any) {
+    onInit(payload) {
       if (!selectedTrackerCmd.value || selectedTrackerCmd.value.id !== commandId) return
       selectedTrackerCmd.value = {
         ...selectedTrackerCmd.value,
@@ -782,14 +783,14 @@ function connectTrackerStream(commandId: string): void {
         output: payload.output ?? selectedTrackerCmd.value.output,
       }
     },
-    onChunk(payload: any) {
+    onChunk(payload) {
       if (!selectedTrackerCmd.value || selectedTrackerCmd.value.id !== commandId) return
       selectedTrackerCmd.value = {
         ...selectedTrackerCmd.value,
         output: (selectedTrackerCmd.value.output || '') + (payload.chunk || ''),
       }
     },
-    onStatus(payload: any) {
+    onStatus(payload) {
       if (!selectedTrackerCmd.value || selectedTrackerCmd.value.id !== commandId) return
       selectedTrackerCmd.value = {
         ...selectedTrackerCmd.value,
@@ -804,7 +805,7 @@ async function openTrackerLogs(commandId: string): Promise<void> {
   closeStream()
   try {
     const res = await api.getCommandStatus(commandId)
-    selectedTrackerCmd.value = res.data
+    selectedTrackerCmd.value = res.data as unknown as TrackerCmd
     showTrackerConsole.value = true
     if (res.data?.status === 'pending' || res.data?.status === 'running') {
       connectTrackerStream(commandId)
