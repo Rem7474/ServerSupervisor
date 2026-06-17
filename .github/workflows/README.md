@@ -41,11 +41,11 @@ lint bloquant (`agent/.golangci.yml`).
 
 - Job `quality` : `npm ci` → lint → typecheck → **tests unitaires/composants
   (`npm run test`, Vitest)** → build de production
-- Job `browser-tests` : installe Chromium via Playwright puis exécute les tests
-  navigateur (`npm run test:browser`, rendu Chart.js / D3). **Non bloquant**
-  pour l'instant — bug amont de l'optimiseur de deps Vite 8 (rolldown) en mode
-  browser Vitest 4 (voir `vitest.browser.config.ts`) ; repasser bloquant une
-  fois le correctif amont disponible.
+- Les tests navigateur (`npm run test:browser`, Playwright/Chromium, rendu
+  Chart.js / D3) **ne sont pas exécutés en CI** pour l'instant : bug amont de
+  l'optimiseur de deps Vite 8 (rolldown) en mode browser Vitest 4 (voir
+  `vitest.browser.config.ts`). À lancer en local ; rajouter un job
+  `browser-tests` une fois le correctif amont disponible.
 
 ### Security (`security.yml`) — lundi 6h UTC + push sur les manifests + manuel
 
