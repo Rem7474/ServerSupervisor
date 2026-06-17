@@ -146,13 +146,56 @@ import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import AptToolbar from '../components/apt/AptToolbar.vue'
 import AptHostCard from '../components/apt/AptHostCard.vue'
 import AptScheduleModal from '../components/apt/AptScheduleModal.vue'
+import type { Host } from '../types/host'
+
+// API-facing shapes (the server transforms the Go AptStatus.cve_list JSON
+// string into a parsed array, so the generated model doesn't apply here).
+interface CveInfo { severity?: string; [key: string]: unknown }
+interface AptStatusView {
+  pending_packages?: number
+  security_updates?: number
+  cve_list?: CveInfo[]
+  [key: string]: unknown
+}
+interface AptCommand {
+  id: string
+  host_id?: string
+  hostId?: string
+  action?: string
+  command?: string
+  status?: string
+  output?: string
+  created_at?: string
+  started_at?: string | null
+  ended_at?: string | null
+  triggered_by?: string
+  [key: string]: unknown
+}
+interface AptCommandResult {
+  command_id?: string
+  host_id?: string
+  status?: string
+  error?: string
+  [key: string]: unknown
+}
+interface LiveCommand {
+  id: string
+  hostId: string | null
+  host_name: string
+  module: string
+  action: string
+  target: string
+  status?: string
+  output?: string
+}
+interface CommandPatch { status?: string; output?: string; action?: string }
 
 // ── État hôtes / APT ─────────────────────────────────────────────────────────
-const hosts = ref<any[]>([])
+const hosts = ref<Host[]>([])
 const selectedHosts = ref<string[]>([])
 const hostExpanded = ref<Record<string, boolean>>({})
-const aptStatuses = ref<Record<string, any>>({})
-const aptHistories = ref<Record<string, any[]>>({})
+const aptStatuses = ref<Record<string, AptStatusView>>({})
+const aptHistories = ref<Record<string, AptCommand[]>>({})
 const hostCmdLoading = ref<Record<string, string | null>>({})
 const auth = useAuthStore()
 const dialog = useConfirmDialog()
@@ -160,11 +203,11 @@ const canRunApt = computed(() => auth.role === 'admin' || auth.role === 'operato
 
 const selectAll = computed({
   get() {
-    const ids = filteredHosts.value.map((h: any) => h.id)
+    const ids = filteredHosts.value.map((h: Host) => h.id)
     return ids.length > 0 && ids.every((id: string) => selectedHosts.value.includes(id))
   },
   set(val: boolean) {
-    selectedHosts.value = val ? filteredHosts.value.map((h: any) => h.id) : []
+    selectedHosts.value = val ? filteredHosts.value.map((h: Host) => h.id) : []
   },
 })
 
@@ -177,15 +220,15 @@ function toggleSelected(hostId: string, selected: boolean): void {
 }
 
 // ── Modal planification ───────────────────────────────────────────────────────
-const scheduleHost = ref<any | null>(null)
+const scheduleHost = ref<Host | null>(null)
 
-function openScheduleModal(host: any): void {
+function openScheduleModal(host: Host): void {
   scheduleHost.value = host
 }
 
 // ── Console ───────────────────────────────────────────────────────────────────
 const showConsole = ref(false)
-const liveCommand = ref<any>(null)
+const liveCommand = ref<LiveCommand | null>(null)
 const { openCommandStream, closeStream } = useCommandStream()
 const aptBulkLoading = ref<string | null>(null)
 
@@ -206,7 +249,7 @@ const filteredHosts = computed(() => {
 
   const q = hostSearch.value.trim().toLowerCase()
   if (q) {
-    list = list.filter((h: any) => {
+    list = list.filter((h: Host) => {
       const primary = (h.name || h.hostname || '').toLowerCase()
       const secondary = (h.hostname || '').toLowerCase()
       return primary.includes(q) || secondary.includes(q) || (h.ip_address || '').includes(q)
@@ -214,16 +257,16 @@ const filteredHosts = computed(() => {
   }
 
   if (hostQuickFilter.value === 'critical') {
-    list = list.filter((h: any) => {
+    list = list.filter((h: Host) => {
       const cves = aptStatuses.value[h.id]?.cve_list
-      return Array.isArray(cves) && cves.some((c: any) => c.severity === 'CRITICAL')
+      return Array.isArray(cves) && cves.some((c: CveInfo) => c.severity === 'CRITICAL')
     })
   } else if (hostQuickFilter.value === 'security') {
-    list = list.filter((h: any) => (aptStatuses.value[h.id]?.security_updates || 0) > 0)
+    list = list.filter((h: Host) => (aptStatuses.value[h.id]?.security_updates || 0) > 0)
   }
 
-  list.sort((a: any, b: any) => {
-    let va: any, vb: any
+  list.sort((a: Host, b: Host) => {
+    let va: number | string = 0, vb: number | string = 0
     if (hostSortKey.value === 'pending') {
       va = aptStatuses.value[a.id]?.pending_packages || 0
       vb = aptStatuses.value[b.id]?.pending_packages || 0
@@ -246,7 +289,7 @@ const filteredHosts = computed(() => {
 })
 
 // ── Console / streaming ─────────────────────────────────────────────────────
-function watchCommand(cmd: any, host: any): void {
+function watchCommand(cmd: AptCommand, host: Host | null): void {
   showConsole.value = true
   liveCommand.value = {
     id: cmd.id,
@@ -267,25 +310,25 @@ function closeLiveConsole(): void {
   showConsole.value = false
 }
 
-function upsertAptHistory(hostId: string, nextCommand: any): void {
+function upsertAptHistory(hostId: string, nextCommand: AptCommand): void {
   if (!hostId || !nextCommand?.id) return
   const currentHistory = Array.isArray(aptHistories.value[hostId]) ? [...aptHistories.value[hostId]] : []
-  const currentIndex = currentHistory.findIndex((cmd: any) => cmd.id === nextCommand.id)
+  const currentIndex = currentHistory.findIndex((cmd: AptCommand) => cmd.id === nextCommand.id)
   if (currentIndex >= 0) {
     currentHistory[currentIndex] = { ...currentHistory[currentIndex], ...nextCommand }
   } else {
     currentHistory.unshift(nextCommand)
   }
-  currentHistory.sort((left: any, right: any) => new Date(right.created_at || 0).getTime() - new Date(left.created_at || 0).getTime())
+  currentHistory.sort((left: AptCommand, right: AptCommand) => new Date(right.created_at || 0).getTime() - new Date(left.created_at || 0).getTime())
   aptHistories.value = { ...aptHistories.value, [hostId]: currentHistory }
 }
 
-function syncLiveCommand(commandId: string, patch: any): void {
+function syncLiveCommand(commandId: string, patch: CommandPatch): void {
   if (!liveCommand.value || liveCommand.value.id !== commandId) return
   liveCommand.value = { ...liveCommand.value, ...patch }
 }
 
-function syncAptHistoryCommand(commandId: string, patch: any): void {
+function syncAptHistoryCommand(commandId: string, patch: CommandPatch): void {
   const hostId = liveCommand.value?.id === commandId ? liveCommand.value.hostId : null
   if (!hostId) return
   upsertAptHistory(hostId, {
@@ -300,16 +343,16 @@ function connectStreamWebSocket(commandId: string): void {
   closeStream()
   openCommandStream(commandId, {
     closeOnTerminalStatus: true,
-    onInit: (payload: any) => {
+    onInit: (payload) => {
       syncLiveCommand(commandId, { status: payload.status, output: payload.output || '' })
       syncAptHistoryCommand(commandId, { status: payload.status })
     },
-    onChunk: (payload: any) => {
+    onChunk: (payload) => {
       const nextOutput = `${liveCommand.value?.output || ''}${payload.chunk || ''}`
       syncLiveCommand(commandId, { output: nextOutput })
     },
-    onStatus: (payload: any) => {
-      const patch: any = { status: payload.status }
+    onStatus: (payload) => {
+      const patch: CommandPatch = { status: payload.status }
       if (typeof payload.output === 'string') patch.output = payload.output
       syncLiveCommand(commandId, patch)
       syncAptHistoryCommand(commandId, patch)
@@ -319,7 +362,7 @@ function connectStreamWebSocket(commandId: string): void {
 
 
 // ── Commandes par hôte ────────────────────────────────────────────────────────
-async function runAptCmdForHost(host: any, command: string): Promise<void> {
+async function runAptCmdForHost(host: Host, command: string): Promise<void> {
   if (!canRunApt.value) return
 
   const confirmed = await confirmBulkAction(
@@ -334,14 +377,14 @@ async function runAptCmdForHost(host: any, command: string): Promise<void> {
   hostCmdLoading.value = { ...hostCmdLoading.value, [host.id]: command }
   try {
     const response = await apiClient.sendAptCommand([host.id], command)
-    const commandResults: any[] = Array.isArray(response.data?.commands) ? response.data.commands : []
-    const launched = commandResults.filter((item: any) => item.command_id)
-    const failed = commandResults.filter((item: any) => item.error)
+    const commandResults: AptCommandResult[] = Array.isArray(response.data?.commands) ? response.data.commands : []
+    const launched = commandResults.filter((item: AptCommandResult) => item.command_id)
+    const failed = commandResults.filter((item: AptCommandResult) => item.error)
     const createdAt = new Date().toISOString()
 
-    launched.forEach((item: any) => {
+    launched.forEach((item: AptCommandResult) => {
       upsertAptHistory(host.id, {
-        id: item.command_id,
+        id: item.command_id!,
         action: command,
         status: item.status || 'pending',
         output: '',
@@ -352,7 +395,7 @@ async function runAptCmdForHost(host: any, command: string): Promise<void> {
 
     if (launched.length > 0) {
       watchCommand(
-        { id: launched[0].command_id, action: command, status: launched[0].status || 'pending', output: '' },
+        { id: launched[0].command_id!, action: command, status: launched[0].status || 'pending', output: '' },
         host
       )
     } else if (failed.length > 0) {
@@ -374,8 +417,8 @@ async function runAptCmdForHost(host: any, command: string): Promise<void> {
 // ── Commandes groupées ────────────────────────────────────────────────────────
 async function bulkAptCmd(command: string): Promise<void> {
   const hostnames = hosts.value
-    .filter((h: any) => selectedHosts.value.includes(h.id))
-    .map((h: any) => h.name || h.hostname)
+    .filter((h: Host) => selectedHosts.value.includes(h.id))
+    .map((h: Host) => h.name || h.hostname)
     .join(', ')
 
   const confirmed = await confirmBulkAction(
@@ -390,15 +433,15 @@ async function bulkAptCmd(command: string): Promise<void> {
   aptBulkLoading.value = command
   try {
     const response = await apiClient.sendAptCommand(selectedHosts.value, command)
-    const commandResults: any[] = Array.isArray(response.data?.commands) ? response.data.commands : []
-    const hostNameById = new Map(hosts.value.map((host: any) => [host.id, host.name || host.hostname || host.id]))
-    const launchedCommands = commandResults.filter((item: any) => item.command_id)
-    const failedCommands = commandResults.filter((item: any) => item.error)
+    const commandResults: AptCommandResult[] = Array.isArray(response.data?.commands) ? response.data.commands : []
+    const hostNameById = new Map(hosts.value.map((host: Host) => [host.id, host.name || host.hostname || host.id]))
+    const launchedCommands = commandResults.filter((item: AptCommandResult) => item.command_id)
+    const failedCommands = commandResults.filter((item: AptCommandResult) => item.error)
     const createdAt = new Date().toISOString()
 
-    launchedCommands.forEach((item: any) => {
-      upsertAptHistory(item.host_id, {
-        id: item.command_id,
+    launchedCommands.forEach((item: AptCommandResult) => {
+      upsertAptHistory(item.host_id ?? '', {
+        id: item.command_id!,
         action: command,
         status: item.status || 'pending',
         output: '',
@@ -411,15 +454,15 @@ async function bulkAptCmd(command: string): Promise<void> {
 
     if (selectedHosts.value.length === 1 && launchedCommands.length > 0) {
       const launchedCommand = launchedCommands[0]
-      const host = hosts.value.find((h: any) => h.id === launchedCommand.host_id)
+      const host = hosts.value.find((h: Host) => h.id === launchedCommand.host_id)
       if (host) {
-        watchCommand({ id: launchedCommand.command_id, action: command, status: launchedCommand.status || 'pending', output: '' }, host)
+        watchCommand({ id: launchedCommand.command_id!, action: command, status: launchedCommand.status || 'pending', output: '' }, host)
       }
     }
 
     if (selectedHosts.value.length > 1 || failedCommands.length > 0) {
-      const launched = launchedCommands.map((item: any) => hostNameById.get(item.host_id) || item.host_id)
-      const failed = failedCommands.map((item: any) => hostNameById.get(item.host_id) || item.host_id)
+      const launched = launchedCommands.map((item: AptCommandResult) => hostNameById.get(item.host_id ?? "") || (item.host_id ?? ""))
+      const failed = failedCommands.map((item: AptCommandResult) => hostNameById.get(item.host_id ?? "") || (item.host_id ?? ""))
       const launchedLabel = launched.length === 1 ? `sur ${launched[0]}` : `sur ${launched.length} hôtes`
       const msg = launched.length > 0
         ? `apt ${command} lancée ${launchedLabel}${failed.length ? ` — échec sur : ${failed.join(', ')}` : ''}`
@@ -439,9 +482,11 @@ async function bulkAptCmd(command: string): Promise<void> {
 
 const { wsStatus, wsError, retryCount, dataStaleAlert, reconnect } = useWebSocket<WSAptSnapshot>('/api/v1/ws/apt', (payload) => {
   if (payload.type !== 'apt') return
-  hosts.value = payload.hosts || []
-  aptStatuses.value = payload.apt_statuses || {}
-  aptHistories.value = payload.apt_histories || {}
+  // The generated WSAptSnapshot models cve_list as a JSON string, but the
+  // server sends it pre-parsed; cast at this single boundary to the real shapes.
+  hosts.value = (payload.hosts || []) as Host[]
+  aptStatuses.value = (payload.apt_statuses || {}) as unknown as Record<string, AptStatusView>
+  aptHistories.value = (payload.apt_histories || {}) as unknown as Record<string, AptCommand[]>
 }, { debounceMs: 750 })
 
 onUnmounted(() => {
