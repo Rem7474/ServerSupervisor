@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
 
 // Real-browser test: Chart.js + the D3/topojson world map actually render here
 // (Chromium provides a real 2D canvas context + layout), unlike happy-dom.
@@ -44,6 +45,9 @@ import TrafficView from './TrafficView.vue'
 describe('TrafficView (browser / real render)', () => {
   beforeEach(() => {
     document.body.innerHTML = ''
+    // TrafficView calls useHostsStore() in setup; install a fresh Pinia so the
+    // store resolves without the app having to register the plugin.
+    setActivePinia(createPinia())
   })
 
   it('renders chart canvases and the SVG world map for real', async () => {
