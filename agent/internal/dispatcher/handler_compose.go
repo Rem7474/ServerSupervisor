@@ -124,7 +124,7 @@ func handleCompose(ctx context.Context, d *Dispatcher, s *sender.Sender, cmd sen
 	// 4. Recreate/start containers.
 	section("Applying (up -d)")
 	if _, uerr := collector.ComposeUp(ctx, project, proj.WorkingDir, p.Service, stream); uerr != nil {
-		out.WriteString(fmt.Sprintf("\nERROR: up failed: %v", uerr))
+		fmt.Fprintf(&out, "\nERROR: up failed: %v", uerr)
 		if rolledBack := tryRollback(ctx, project, proj.WorkingDir, p, snapshot, stream); rolledBack {
 			out.WriteString("\nRolled back to previous images.")
 		}
@@ -155,11 +155,11 @@ func handleCompose(ctx context.Context, d *Dispatcher, s *sender.Sender, cmd sen
 		section("Post-update hook: " + p.PostTaskID)
 		if task := d.tasks.FindTask(p.PostTaskID); task != nil {
 			if _, herr := executeTask(ctx, task, p.Env, stream); herr != nil {
-				out.WriteString(fmt.Sprintf("\nWARNING: post-update hook failed: %v", herr))
+				fmt.Fprintf(&out, "\nWARNING: post-update hook failed: %v", herr)
 				status = "failed"
 			}
 		} else {
-			out.WriteString(fmt.Sprintf("\nWARNING: post-update task %q not found in tasks.yaml", p.PostTaskID))
+			fmt.Fprintf(&out, "\nWARNING: post-update task %q not found in tasks.yaml", p.PostTaskID)
 			status = "failed"
 		}
 	}
@@ -169,7 +169,7 @@ func handleCompose(ctx context.Context, d *Dispatcher, s *sender.Sender, cmd sen
 	if p.Cleanup {
 		section("Pruning dangling images")
 		if _, cerr := collector.PruneImages(ctx, stream); cerr != nil {
-			out.WriteString(fmt.Sprintf("\nWARNING: image prune failed: %v", cerr))
+			fmt.Fprintf(&out, "\nWARNING: image prune failed: %v", cerr)
 		}
 	}
 

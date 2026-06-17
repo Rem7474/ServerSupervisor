@@ -153,7 +153,7 @@ func (s *Service) UpdateProxyHostMonitoring(ctx context.Context, id string, req 
 		return nil, err
 	}
 
-	monitoring := host.MonitoringEnabled
+	var monitoring bool
 	uptime := host.UptimeMonitoringEnabled
 	ssl := host.SSLMonitoringEnabled
 

@@ -9,9 +9,14 @@ on:
   pull_request:
     paths:
       - 'frontend/**'
+      - '.github/workflows/ci-frontend.yml'
 
 permissions:
   contents: read
+
+concurrency:
+  group: ci-frontend-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   quality:
@@ -40,7 +45,37 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Unit & component tests
+        run: npm run test
+
       - name: Build
         run: npm run build
         env:
           NODE_ENV: production
+
+  # Real-browser tests (Chart.js / D3 rendering) run in Chromium via Playwright.
+  browser-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./frontend
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --no-audit
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Browser tests
+        run: npm run test:browser
