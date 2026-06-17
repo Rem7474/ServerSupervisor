@@ -84,9 +84,10 @@
 import { ref, computed, watch } from 'vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 import { formatDateTime } from '../../utils/formatters'
+import type { ReleaseVersionHistoryItem } from '../../types/tracker'
 
 const props = defineProps<{
-  history: any[]
+  history: ReleaseVersionHistoryItem[]
   loading: boolean
 }>()
 

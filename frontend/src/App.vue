@@ -705,7 +705,7 @@ function handleOutsideClick(event: MouseEvent): void {
 }
 
 onMounted(() => {
-  unsubscribeHttpErrors = subscribeHttpErrors((event: any) => {
+  unsubscribeHttpErrors = subscribeHttpErrors((event) => {
     httpError.value = event.message
   })
   window.addEventListener('online', handleOnline)

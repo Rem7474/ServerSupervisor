@@ -272,7 +272,7 @@ interface SelectedNode {
   isProxyLinked?: boolean
   isAutheliaLinked?: boolean
   isInternetExposed?: boolean
-  [key: string]: any
+  [key: string]: unknown
 }
 
 interface Host {
@@ -280,13 +280,13 @@ interface Host {
   status?: string
   network_rx_bytes?: number
   network_tx_bytes?: number
-  [key: string]: any
+  [key: string]: unknown
 }
 
 interface Container {
   host_id: string
   state?: string
-  [key: string]: any
+  [key: string]: unknown
 }
 
 interface ServicePort {

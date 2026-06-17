@@ -270,9 +270,10 @@
 import { computed } from 'vue'
 import RelativeTime from '../RelativeTime.vue'
 import { formatDateTime } from '../../utils/formatters'
+import type { ReleaseTracker } from '../../types/tracker'
 
 const props = defineProps<{
-  tracker: any
+  tracker: ReleaseTracker
   checking: boolean
   running: boolean
   canRunManually: boolean
