@@ -191,8 +191,15 @@ jobs:
 
     strategy:
       fail-fast: false
+      # build-mode: none analyse la source directement. Pour Go, cela couvre les
+      # DEUX modules (server/ + agent/) en une seule passe — ce que autobuild
+      # manquait faute de go.work à la racine (l'agent échappait au scan).
       matrix:
-        language: [go, javascript]
+        include:
+          - language: go
+            build-mode: none
+          - language: javascript
+            build-mode: none
 
     steps:
       - uses: actions/checkout@v6
@@ -201,17 +208,9 @@ jobs:
         uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
           # Règles supplémentaires pour la sécurité web
           queries: security-extended
-
-      - name: Setup Go (pour analyse Go)
-        if: matrix.language == 'go'
-        uses: actions/setup-go@v6
-        with:
-          go-version-file: server/go.mod
-
-      - name: Autobuild
-        uses: github/codeql-action/autobuild@v4
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
