@@ -1,301 +1,109 @@
-# 🤖 GitHub Actions Workflows - ServerSupervisor
+# GitHub Actions Workflows — ServerSupervisor
 
-Ce dossier contient les workflows CI/CD automatisés pour ServerSupervisor avec **auto-fix intégré**.
+CI/CD automatisé pour les trois modules (server, agent, frontend) plus la
+sécurité et les releases.
 
-## 📚 Table des matières
+## Principe
 
-- [Vue d'ensemble](#vue-densemble)
-- [Workflows disponibles](#workflows-disponibles)
-- [Fonctionnalités auto-fix](#fonctionnalités-auto-fix)
-- [Configuration](#configuration)
-- [Déclenchement](#déclenchement)
-- [Dépannage](#dépannage)
-
----
-
-## 🎯 Vue d'ensemble
-
-Les workflows GitHub Actions de ce projet :
-
-✅ **Corrigent automatiquement** les problèmes courants  
-✅ **Commitent les corrections** avec `[skip ci]` pour éviter les boucles  
-✅ **Exécutent tests et linting** sur chaque push/PR  
-✅ **Utilisent le cache** pour accélérer les builds  
+- **Vérifier, pas réparer en douce.** Les workflows ne committent plus
+  automatiquement sur la branche. Quand une dérive est détectée (go.mod non
+  tidy, types générés obsolètes), le job **échoue** et l'auteur committe le
+  correctif. L'arbre committé reste la seule source de vérité — y compris sur
+  les pull requests.
+- **Bloquant par défaut.** Lint, tests et vérifications font échouer le CI.
+- **Reproductible.** Les versions d'outils (golangci-lint, govulncheck) sont
+  épinglées ; rien ne dépend de `latest`.
+- **Économe.** Chaque workflow a un `concurrency:` qui annule les runs
+  superflus sur la même réf (sauf les releases, jamais annulées).
 
 ---
 
-## 🛠️ Workflows disponibles
+## Workflows
 
-### 1. **CI Agent** (`.github/workflows/ci-agent.yml`)
+### CI Server (`ci-server.yml`) — push/PR sur `server/**`
 
-**Déclenchement** : Push/PR sur `agent/**`
+1. Setup Go (version lue depuis `server/go.mod`) + cache
+2. **Vérifie** `go mod tidy` (échoue si dérive)
+3. **Vérifie** la synchro des types frontend générés (`tygo`) avec les modèles Go
+4. `go mod verify`
+5. Build : `go build ./...`
+6. Tests : `go test -race -coverprofile=coverage.out ./...` (inclut les tests
+   d'intégration testcontainers + Postgres/TimescaleDB)
+7. Upload coverage → Codecov (`server`)
+8. Lint **bloquant** : `golangci-lint` épinglé, config `server/.golangci.yml`
 
-**Étapes** :
-1. ✅ Checkout du code
-2. ⚙️ Setup Go 1.22 avec cache
-3. 🔧 **Auto-fix** : `go mod tidy`
-4. 💾 Commit auto si `go.mod`/`go.sum` modifiés
-5. 🛠️ Build : `go build ./...`
-6. 🧪 Tests : `go test -race -coverprofile=coverage.out`
-7. 🔍 Lint : `golangci-lint run --fix`
-8. 💾 Commit auto des corrections linter
-9. 📈 Upload coverage vers Codecov
+### CI Agent (`ci-agent.yml`) — push/PR sur `agent/**`
 
-**Corrections automatiques** :
-- Synchronisation `go.mod` et `go.sum`
-- Ajout vérifications erreurs (`errcheck`)
-- Suppression variables inutiles (`ineffassign`)
-- Correction blocs vides (`staticcheck`)
+Identique au server (sans la régén de types) : tidy, build, tests + coverage,
+lint bloquant (`agent/.golangci.yml`).
+
+### CI Frontend (`ci-frontend.yml`) — push/PR sur `frontend/**`
+
+- Job `quality` : `npm ci` → lint → typecheck → **tests unitaires/composants
+  (`npm run test`, Vitest)** → build de production
+- Les tests navigateur (`npm run test:browser`, Playwright/Chromium, rendu
+  Chart.js / D3) **ne sont pas exécutés en CI** pour l'instant : bug amont de
+  l'optimiseur de deps Vite 8 (rolldown) en mode browser Vitest 4 (voir
+  `vitest.browser.config.ts`). À lancer en local ; rajouter un job
+  `browser-tests` une fois le correctif amont disponible.
+
+### Security (`security.yml`) — lundi 6h UTC + push sur les manifests + manuel
+
+- `govulncheck` (server + agent), version épinglée — **bloquant**
+- `nancy` (CVE des deps Go, server + agent) — **bloquant**
+- `npm audit --audit-level=moderate` (frontend) — **bloquant**
+- Trivy sur l'image server (SARIF → onglet Security) — informatif
+- CodeQL (`go`, `javascript`, `security-extended`)
+
+### Release (`release.yml`) — tags `vX.Y.Z[-pre]`
+
+- Métadonnées de version + changelog généré depuis les commits
+- Binaires agent multi-arch (amd64 / arm64 / armv7 / armv6) + sha256
+- Image Docker server multi-arch (amd64 / arm64) → GHCR, avec **attestations
+  SBOM + provenance**
+- GitHub Release avec tous les assets
+
+### PR checks (`pr-checks.yml`) — sur chaque PR
+
+- Titre au format Conventional Commits (bloquant)
+- Auto-labeling selon les fichiers modifiés
+- Avertissement si la PR dépasse 1000 lignes
+
+### Stale (`stale.yml`) — mercredi 8h UTC
+
+Marque/ferme les issues et PRs inactives (exemptions : `pinned`, `security`, …).
 
 ---
 
-### 2. **CI Server** (`.github/workflows/ci-server.yml`)
+## Configuration
 
-**Déclenchement** : Push/PR sur `server/**`
+| Outil | Fichier |
+|-------|---------|
+| golangci-lint (server) | `server/.golangci.yml` |
+| golangci-lint (agent)  | `agent/.golangci.yml` |
+| ESLint (frontend)      | `frontend/eslint.config.js` (flat config, ESLint 10) |
+| Dependabot             | `.github/dependabot.yml` |
 
-**Étapes** : Identiques à CI Agent
+Les configs golangci partent du jeu `standard` (errcheck, govet, ineffassign,
+staticcheck, unused) + `bodyclose` et `unconvert`, avec les presets d'exclusion
+`std-error-handling` et `common-false-positives`.
 
-**Corrections automatiques** : Mêmes que CI Agent
+### Versions runtime (alignées)
 
----
-
-### 3. **CI Frontend** (`.github/workflows/ci-frontend.yml`)
-
-**Déclenchement** : Push/PR sur `frontend/**`
-
-**Étapes** :
-1. ✅ Checkout du code
-2. ⚙️ Setup Node.js 20 avec cache npm
-3. 🔧 **Auto-fix** : Régénération `package-lock.json` si corrompu
-4. 💾 Commit auto si `package-lock.json` régénéré
-5. 📦 Install : `npm ci --prefer-offline`
-6. 🔍 Lint : `npm run lint -- --fix`
-7. 💾 Commit auto des corrections ESLint
-8. 🛠️ Build : `npm run build`
-9. 🧪 Tests : `npm test` (si présents)
-
-**Corrections automatiques** :
-- Régénération `package-lock.json`
-- Fixes ESLint (indentation, quotes, etc.)
-- Ajout semicolons, suppression imports inutilisés
+- **Go** : `1.25` (go.mod, Dockerfile, CI)
+- **Node** : `22` (Dockerfile, CI, audit)
 
 ---
 
-## ✨ Fonctionnalités auto-fix
-
-### 🐛 Problèmes corrigés automatiquement
-
-| Composant | Problème | Solution auto |
-|-----------|----------|---------------|
-| **Agent/Server** | `go.mod` désynchronisé | `go mod tidy` + commit |
-| **Agent/Server** | Erreurs non vérifiées | `golangci-lint --fix` |
-| **Agent/Server** | Variables inutiles | Suppression auto |
-| **Frontend** | `package-lock.json` corrompu | Régénération + commit |
-| **Frontend** | Style code inconsistant | `eslint --fix` |
-
-### 🔒 Sécurité : `[skip ci]`
-
-Tous les commits automatiques incluent `[skip ci]` pour **éviter les boucles infinies** :
+## Reproduire en local
 
 ```bash
-# Exemple de commit auto
-git commit -m "chore(agent): auto-fix go mod tidy [skip ci]"
+# Server / Agent
+cd server   && go build ./... && go test -race ./...
+cd agent    && go build ./... && go test -race ./...
+golangci-lint run            # depuis server/ ou agent/
+
+# Frontend
+cd frontend && npm ci && npm run lint && npm run typecheck && npm run test && npm run build
+npm run test:browser         # nécessite: npx playwright install --with-deps chromium
 ```
-
-➡️ Ce commit **ne déclenchera pas** un nouveau workflow.
-
----
-
-## ⚙️ Configuration
-
-### Linters Go
-
-Fichiers de configuration :
-- `agent/.golangci.yml`
-- `server/.golangci.yml`
-
-**Linters activés** :
-```yaml
-linters:
-  enable:
-    - errcheck       # Vérifie gestion erreurs
-    - ineffassign    # Détecte assignments inutiles
-    - staticcheck    # Analyse statique approfondie
-    - govet          # Outil officiel Go
-    - unused         # Code non utilisé
-    - gosimple       # Simplifications possibles
-```
-
-**Auto-fix activé** :
-```yaml
-issues:
-  fix: true  # Corrige automatiquement ce qui peut l'être
-```
-
-### Linter JavaScript/Vue
-
-Fichier de configuration : `frontend/.eslintrc.cjs`
-
-**Configuration** :
-```javascript
-module.exports = {
-  extends: [
-    'plugin:vue/vue3-essential',
-    'eslint:recommended'
-  ],
-  rules: {
-    'no-unused-vars': 'warn',
-    'no-console': 'off',
-    'vue/multi-word-component-names': 'off'
-  }
-}
-```
-
-**Scripts disponibles** :
-```bash
-npm run lint       # Vérifie le code
-npm run lint:fix   # Corrige automatiquement
-```
-
----
-
-## 🚀 Déclenchement
-
-### Push sur `main` ou `develop`
-
-```bash
-# Modification dans agent/
-cd agent
-echo "// test" >> main.go
-git add main.go
-git commit -m "feat: add feature"
-git push origin main
-```
-
-➡️ Déclenche **CI Agent** uniquement
-
-### Pull Request
-
-```bash
-git checkout -b feature/ma-feature
-# ... modifications ...
-git push origin feature/ma-feature
-# Créer PR sur GitHub
-```
-
-➡️ Déclenche workflows selon fichiers modifiés  
-⚠️ **Pas de commit auto sur PR** (pour éviter modifications non sollicitées)
-
-### Déclenchement manuel
-
-Via l'interface GitHub :
-1. Aller dans **Actions**
-2. Sélectionner un workflow
-3. Cliquer **Run workflow**
-4. Choisir la branche
-5. Cliquer **Run workflow**
-
----
-
-## 🔍 Surveillance
-
-### Visualiser les exécutions
-
-1. Aller sur [github.com/Rem7474/ServerSupervisor/actions](https://github.com/Rem7474/ServerSupervisor/actions)
-2. Sélectionner un workflow
-3. Voir l'historique et les logs
-
-### Badges de statut
-
-Ajouter dans le `README.md` principal :
-
-```markdown
-![CI Agent](https://github.com/Rem7474/ServerSupervisor/workflows/CI%20Agent/badge.svg)
-![CI Server](https://github.com/Rem7474/ServerSupervisor/workflows/CI%20Server/badge.svg)
-![CI Frontend](https://github.com/Rem7474/ServerSupervisor/workflows/CI%20Frontend/badge.svg)
-```
-
----
-
-## 🚫 Dépannage
-
-### Problème : Workflow ne se déclenche pas
-
-**Cause** : Fichiers modifiés hors du scope
-
-**Solution** : Vérifier les `paths` dans le workflow
-
-```yaml
-on:
-  push:
-    paths:
-      - 'agent/**'  # Ne se déclenche que si agent/ modifié
-```
-
-### Problème : Commit auto échoue
-
-**Erreur** : `Permission denied`
-
-**Solution** : Vérifier que `permissions: contents: write` est présent
-
-```yaml
-permissions:
-  contents: write  # Nécessaire pour push auto
-```
-
-### Problème : Boucle infinie de commits
-
-**Cause** : `[skip ci]` manquant dans le message de commit
-
-**Solution** : Vérifier tous les commits auto incluent `[skip ci]` :
-
-```bash
-git commit -m "chore: auto-fix [skip ci]"  # ✅ Correct
-git commit -m "chore: auto-fix"            # ❌ Boucle infinie
-```
-
-### Problème : Linter échoue malgré auto-fix
-
-**Cause** : Certains problèmes ne peuvent pas être corrigés automatiquement
-
-**Solution** : Corriger manuellement et commit
-
-**Exemple** : Logique métier incorrecte détectée par `staticcheck`
-
-```bash
-# Voir les erreurs dans les logs Actions
-# Corriger localement
-npm run lint:fix  # ou golangci-lint run --fix
-git add .
-git commit -m "fix: correct linter issues"
-git push
-```
-
-### Problème : Cache ne fonctionne pas
-
-**Cause** : `go.sum` ou `package-lock.json` modifié
-
-**Solution** : Le cache sera automatiquement recréé au prochain run
-
----
-
-## 📚 Ressources
-
-- [GitHub Actions Documentation](https://docs.github.com/en/actions)
-- [golangci-lint](https://golangci-lint.run/)
-- [ESLint](https://eslint.org/)
-- [Vue ESLint Plugin](https://eslint.vuejs.org/)
-
----
-
-## ✅ Checklist maintenance
-
-- [ ] Vérifier workflows s'exécutent correctement chaque semaine
-- [ ] Mettre à jour versions actions (setup-go, setup-node) tous les 3 mois
-- [ ] Revoir règles linter tous les 6 mois
-- [ ] Ajouter nouveaux tests au fur et à mesure
-- [ ] Documenter nouvelles règles ajoutées
-
----
-
-**🚀 Happy coding with auto-fix CI !**

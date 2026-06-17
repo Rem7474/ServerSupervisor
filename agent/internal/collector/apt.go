@@ -997,20 +997,20 @@ func writeUUConfig(cfg UUConfig) error {
 	if cfg.AutoReboot {
 		autoReboot = "true"
 	}
-	b.WriteString(fmt.Sprintf("Unattended-Upgrade::Automatic-Reboot \"%s\";\n", autoReboot))
+	fmt.Fprintf(&b, "Unattended-Upgrade::Automatic-Reboot \"%s\";\n", autoReboot)
 
 	rebootTime := cfg.AutoRebootTime
 	if rebootTime == "" {
 		rebootTime = "02:00"
 	}
-	b.WriteString(fmt.Sprintf("Unattended-Upgrade::Automatic-Reboot-Time \"%s\";\n", rebootTime))
+	fmt.Fprintf(&b, "Unattended-Upgrade::Automatic-Reboot-Time \"%s\";\n", rebootTime)
 
 	removeUnused := "false"
 	if cfg.RemoveUnused {
 		removeUnused = "true"
 	}
-	b.WriteString(fmt.Sprintf("Unattended-Upgrade::Remove-Unused-Dependencies \"%s\";\n", removeUnused))
-	b.WriteString(fmt.Sprintf("Unattended-Upgrade::Remove-Unused-Kernel-Packages \"%s\";\n", removeUnused))
+	fmt.Fprintf(&b, "Unattended-Upgrade::Remove-Unused-Dependencies \"%s\";\n", removeUnused)
+	fmt.Fprintf(&b, "Unattended-Upgrade::Remove-Unused-Kernel-Packages \"%s\";\n", removeUnused)
 
 	if err := os.WriteFile(uuMainConf, []byte(b.String()), 0644); err != nil {
 		return fmt.Errorf("writing %s: %w", uuMainConf, err)

@@ -230,11 +230,6 @@ func (h *WSHandler) authenticateWSClaims(c *gin.Context, conn *websocket.Conn) (
 	return claims, true
 }
 
-func (h *WSHandler) validateToken(tokenString string) bool {
-	_, ok := h.parseTokenClaims(tokenString)
-	return ok
-}
-
 func (h *WSHandler) parseTokenClaims(tokenString string) (jwt.MapClaims, bool) {
 	if tokenString == "" {
 		return nil, false

@@ -70,7 +70,7 @@ func (c *giteaClient) FetchReleaseHistory(owner, repo string, limit int) ([]Rele
 		return c.fetchGiteaTagHistory(owner, repo, limit)
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Gitea API returned status %d", resp.StatusCode)
+		return nil, fmt.Errorf("gitea API returned status %d", resp.StatusCode)
 	}
 
 	var releases []models.GitHubRelease
@@ -135,7 +135,7 @@ func (c *giteaClient) fetchGiteaRelease(owner, repo string) (*models.GitHubRelea
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Gitea API returned status %d", resp.StatusCode)
+		return nil, fmt.Errorf("gitea API returned status %d", resp.StatusCode)
 	}
 
 	var release models.GitHubRelease
@@ -166,7 +166,7 @@ func (c *giteaClient) fetchGiteaTag(owner, repo string) (*models.GitHubRelease, 
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Gitea API returned status %d", resp.StatusCode)
+		return nil, fmt.Errorf("gitea API returned status %d", resp.StatusCode)
 	}
 
 	var tags []struct {
@@ -205,7 +205,7 @@ func (c *giteaClient) fetchGiteaTagHistory(owner, repo string, limit int) ([]Rel
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Gitea API returned status %d", resp.StatusCode)
+		return nil, fmt.Errorf("gitea API returned status %d", resp.StatusCode)
 	}
 
 	var tags []struct {

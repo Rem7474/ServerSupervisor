@@ -9,9 +9,14 @@ on:
   pull_request:
     paths:
       - 'frontend/**'
+      - '.github/workflows/ci-frontend.yml'
 
 permissions:
   contents: read
+
+concurrency:
+  group: ci-frontend-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   quality:
@@ -40,7 +45,18 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      - name: Unit & component tests
+        run: npm run test
+
       - name: Build
         run: npm run build
         env:
           NODE_ENV: production
+
+  # NOTE: the real-browser tests (`npm run test:browser`, Playwright/Chromium) are
+  # intentionally NOT run in CI yet. An upstream Vite 8 (rolldown) + Vitest 4
+  # browser-mode dep-optimizer bug breaks them (`init_shared_esm_bundler is not
+  # defined` at import; or a double Vue instance when worked around). See
+  # vitest.browser.config.ts for the full diagnosis. Run them locally with:
+  #   cd frontend && npx playwright install --with-deps chromium && npm run test:browser
+  # Re-add a `browser-tests` job here once the upstream optimizer bug is fixed.

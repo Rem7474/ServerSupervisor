@@ -2,8 +2,6 @@ package gitprovider
 
 import (
 	"time"
-
-	"github.com/serversupervisor/server/internal/models"
 )
 
 // Client is the unified interface for all Git providers
@@ -45,20 +43,5 @@ func NewClient(provider, authToken string) Client {
 		return newGiteaClient(authToken)
 	default:
 		return newGitHubClient(authToken)
-	}
-}
-
-// Helper to convert models.GitHubRelease to Release
-func toRelease(gh *models.GitHubRelease) *Release {
-	if gh == nil {
-		return nil
-	}
-	return &Release{
-		TagName:     gh.TagName,
-		Name:        gh.Name,
-		PublishedAt: gh.PublishedAt,
-		HTMLURL:     gh.HTMLURL,
-		Prerelease:  gh.Prerelease,
-		Draft:       gh.Draft,
 	}
 }

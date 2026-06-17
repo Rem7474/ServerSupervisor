@@ -19,6 +19,10 @@ permissions:
   contents: read
   security-events: write    # upload SARIF vers GitHub Security tab
 
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   # ─────────────────────────────────────────
   # Vulnérabilités Go - govulncheck (officiel Google)
@@ -37,10 +41,8 @@ jobs:
           cache-dependency-path: server/go.sum
 
       - name: Install govulncheck
-        run: go install golang.org/x/vuln/cmd/govulncheck@latest
-      - name: Tidy Go modules
-        working-directory: server
-        run: go mod tidy 
+        run: go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
+
       - name: Run govulncheck
         working-directory: server
         run: govulncheck ./...
@@ -59,7 +61,7 @@ jobs:
           cache-dependency-path: agent/go.sum
 
       - name: Install govulncheck
-        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+        run: go install golang.org/x/vuln/cmd/govulncheck@v1.1.4
 
       - name: Run govulncheck
         working-directory: agent
@@ -123,7 +125,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 

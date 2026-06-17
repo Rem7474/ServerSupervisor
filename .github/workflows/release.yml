@@ -10,6 +10,11 @@ permissions:
   contents: write       # créer la GitHub Release et uploader les assets
   packages: write       # pousser sur ghcr.io
 
+# Ne jamais annuler une release en cours (cancel-in-progress: false).
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 env:
   REGISTRY: ghcr.io
   SERVER_IMAGE: ghcr.io/${{ github.repository_owner }}/serversupervisor
@@ -199,6 +204,9 @@ jobs:
             VERSION=${{ needs.meta.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          # Supply-chain attestations pushed alongside the image to GHCR.
+          provenance: mode=max
+          sbom: true
 
   # ─────────────────────────────────────────
   # GitHub Release avec tous les assets

@@ -9,9 +9,14 @@ on:
   pull_request:
     paths:
       - 'agent/**'
+      - '.github/workflows/ci-agent.yml'
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: ci-agent-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -19,13 +24,10 @@ jobs:
     defaults:
       run:
         working-directory: ./agent
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          fetch-depth: 0
 
       - name: Set up Go
         uses: actions/setup-go@v6
@@ -34,31 +36,17 @@ jobs:
           cache: true
           cache-dependency-path: agent/go.sum
 
-      # AUTO-FIX : Go mod tidy automatique
-      - name: Auto-fix Go modules
-        id: gomod
+      # Verify (do NOT auto-commit) that go.mod/go.sum are tidy. Failing here
+      # forces the author to commit the fix, so the committed tree is always the
+      # source of truth — including on pull requests.
+      - name: Verify go.mod is tidy
         run: |
-          echo "Running go mod tidy..."
           go mod tidy
-          
-          # Vérifier s'il y a des changements
-          if [[ -n $(git status --porcelain) ]]; then
-            echo "changes=true" >> $GITHUB_OUTPUT
-            echo "✅ go.mod/go.sum updated"
-          else
-            echo "changes=false" >> $GITHUB_OUTPUT
-            echo "✅ go.mod/go.sum already up to date"
+          if [[ -n $(git status --porcelain go.mod go.sum) ]]; then
+            echo "::error::go.mod/go.sum are not tidy. Run 'go mod tidy' in agent/ and commit the result."
+            git --no-pager diff go.mod go.sum
+            exit 1
           fi
-
-      # AUTO-COMMIT des corrections go mod
-      - name: Commit go mod changes
-        if: steps.gomod.outputs.changes == 'true' && github.event_name == 'push'
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add go.mod go.sum
-          git commit -m "chore(agent): auto-fix go mod tidy [skip ci]"
-          git push
 
       - name: Verify Go modules
         run: go mod verify
@@ -72,20 +60,20 @@ jobs:
       - name: Run tests
         run: go test -v -race -coverprofile=coverage.out ./...
 
-      # Linter avec warnings uniquement (ne bloque pas le build)
-      - name: Run linter (warnings only)
-        uses: golangci/golangci-lint-action@v9
-        with:
-          version: latest
-          working-directory: agent
-          args: --timeout=5m --issues-exit-code=0 --path-mode=abs
-        continue-on-error: true
-
       - name: Upload coverage
         uses: codecov/codecov-action@v7
         if: always()
         with:
-          file: ./agent/coverage.out
+          files: ./agent/coverage.out
           flags: agent
           token: ${{ secrets.CODECOV_TOKEN }}
         continue-on-error: true
+
+      # Blocking lint with a pinned version and a curated, reproducible config
+      # (agent/.golangci.yml). A regression in code quality now fails CI.
+      - name: Run linter
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.12.2
+          working-directory: agent
+          args: --timeout=5m --path-mode=abs

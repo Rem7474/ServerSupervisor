@@ -6,7 +6,7 @@ import vueParser from 'vue-eslint-parser'
 
 export default [
   {
-    ignores: ['dist/**', 'node_modules/**', '.git/**', '.eslintrc.cjs', 'src/types/generated.ts'],
+    ignores: ['dist/**', 'node_modules/**', '.git/**', 'src/types/generated.ts'],
   },
   {
     files: ['**/*.{js,mjs,cjs,jsx,ts,tsx,vue}'],

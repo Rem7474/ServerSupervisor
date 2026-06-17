@@ -1,0 +1,22 @@
+# golangci-lint v2 configuration — agent module.
+# Curated, reproducible linter set. The version is pinned in CI
+# (.github/workflows/ci-agent.yml) so results never drift with `latest`.
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  # Conservative standard set (errcheck, govet, ineffassign, staticcheck,
+  # unused) plus two high-signal, low-noise additions.
+  default: standard
+  enable:
+    - bodyclose      # HTTP response bodies must be closed
+    - unconvert      # redundant type conversions
+  exclusions:
+    generated: lax
+    # Ship golangci-lint's curated exclusion presets so idiomatic Go
+    # (e.g. deferred *.Close()) does not produce noise.
+    presets:
+      - std-error-handling
+      - common-false-positives

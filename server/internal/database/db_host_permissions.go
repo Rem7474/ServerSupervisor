@@ -51,7 +51,7 @@ func (db *DB) ListHostPermissions(ctx context.Context, hostID string) ([]models.
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []models.HostPermission
 	for rows.Next() {
 		var p models.HostPermission
@@ -74,7 +74,7 @@ func (db *DB) ListUserHostPermissions(ctx context.Context, username string) ([]m
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []models.HostPermission
 	for rows.Next() {
 		var p models.HostPermission

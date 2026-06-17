@@ -267,12 +267,12 @@ applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 	for rows.Next() {
 		var name string
 		if err := rows.Scan(&name); err != nil {
-			rows.Close()
+			_ = rows.Close()
 			return fmt.Errorf("scan schema_migrations: %w", err)
 		}
 		applied[name] = struct{}{}
 	}
-	rows.Close()
+	_ = rows.Close()
 
 	if len(applied) == 0 {
 		var exists bool

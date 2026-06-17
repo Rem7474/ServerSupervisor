@@ -76,7 +76,7 @@ func fillValue(v reflect.Value) {
 	}
 
 	switch v.Kind() {
-	case reflect.Ptr:
+	case reflect.Pointer:
 		p := reflect.New(v.Type().Elem())
 		fillValue(p.Elem())
 		v.Set(p)

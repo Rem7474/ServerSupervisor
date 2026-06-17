@@ -107,13 +107,6 @@ func (s *Service) Cancel(ctx context.Context, id string) error {
 // HostTimeline returns an aggregate activity feed for a host, merging audit logs,
 // remote commands and alert incidents sorted newest-first.
 func (s *Service) HostTimeline(ctx context.Context, hostID string, limit int) ([]models.HostTimelineEvent, error) {
-	type result struct {
-		logs      []models.AuditLog
-		cmds      []models.RemoteCommand
-		incidents []database.AlertIncidentWithRule
-		err       error
-	}
-
 	logsCh := make(chan []models.AuditLog, 1)
 	cmdsCh := make(chan []models.RemoteCommand, 1)
 	incCh := make(chan []database.AlertIncidentWithRule, 1)

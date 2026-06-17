@@ -9,9 +9,15 @@ on:
   pull_request:
     paths:
       - 'server/**'
+      - '.github/workflows/ci-server.yml'
 
 permissions:
-  contents: write
+  contents: read
+
+# Cancel superseded runs on the same ref to save CI minutes.
+concurrency:
+  group: ci-server-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -19,13 +25,10 @@ jobs:
     defaults:
       run:
         working-directory: ./server
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          fetch-depth: 0
 
       - name: Set up Go
         uses: actions/setup-go@v6
@@ -34,55 +37,29 @@ jobs:
           cache: true
           cache-dependency-path: server/go.sum
 
-      # AUTO-FIX : Go mod tidy
-      - name: Auto-fix Go modules
-        id: gomod
+      # Verify (do NOT auto-commit) that go.mod/go.sum are tidy. Failing here
+      # forces the author to commit the fix, so the committed tree is always the
+      # source of truth — including on pull requests.
+      - name: Verify go.mod is tidy
         run: |
-          echo "Running go mod tidy..."
           go mod tidy
-          
-          if [[ -n $(git status --porcelain) ]]; then
-            echo "changes=true" >> $GITHUB_OUTPUT
-            echo "✅ go.mod/go.sum updated"
-          else
-            echo "changes=false" >> $GITHUB_OUTPUT
-            echo "✅ go.mod/go.sum already up to date"
+          if [[ -n $(git status --porcelain go.mod go.sum) ]]; then
+            echo "::error::go.mod/go.sum are not tidy. Run 'go mod tidy' in server/ and commit the result."
+            git --no-pager diff go.mod go.sum
+            exit 1
           fi
 
-      - name: Commit go mod changes
-        if: steps.gomod.outputs.changes == 'true' && github.event_name == 'push'
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add go.mod go.sum
-          git commit -m "chore(server): auto-fix go mod tidy [skip ci]"
-          git push
-
-      # AUTO-FIX : regenerate the frontend types from the Go models so the
-      # generated single-source-of-truth (frontend/src/types/generated.ts) can
-      # never silently drift when a model changes. Mirrors the go-mod auto-fix.
-      - name: Auto-regenerate frontend types
-        id: gentypes
+      # Verify the generated frontend types are in sync with the Go models so the
+      # single source of truth (frontend/src/types/generated.ts) can never drift.
+      - name: Verify generated frontend types are in sync
         run: |
           go run github.com/gzuidhof/tygo@v0.2.21 generate
           cd ..
           if [[ -n $(git status --porcelain frontend/src/types/generated.ts) ]]; then
-            echo "changes=true" >> "$GITHUB_OUTPUT"
-            echo "⚠️ frontend/src/types/generated.ts was out of date — regenerated"
-          else
-            echo "changes=false" >> "$GITHUB_OUTPUT"
-            echo "✅ generated types already in sync with the Go models"
+            echo "::error::frontend/src/types/generated.ts is out of date. Run 'npm run gen:types' and commit the result."
+            git --no-pager diff frontend/src/types/generated.ts
+            exit 1
           fi
-
-      - name: Commit regenerated types
-        if: steps.gentypes.outputs.changes == 'true' && github.event_name == 'push'
-        run: |
-          cd ..
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add frontend/src/types/generated.ts
-          git commit -m "chore(types): regenerate frontend types from Go models [skip ci]"
-          git push
 
       - name: Verify Go modules
         run: go mod verify
@@ -91,13 +68,22 @@ jobs:
         run: go build -v ./...
 
       - name: Run tests
-        run: go test -v -race ./...
+        run: go test -v -race -coverprofile=coverage.out ./...
 
-      # Linter avec warnings uniquement (ne bloque pas le build)
-      - name: Run linter (warnings only)
+      - name: Upload coverage
+        uses: codecov/codecov-action@v7
+        if: always()
+        with:
+          files: ./server/coverage.out
+          flags: server
+          token: ${{ secrets.CODECOV_TOKEN }}
+        continue-on-error: true
+
+      # Blocking lint with a pinned version and a curated, reproducible config
+      # (server/.golangci.yml). A regression in code quality now fails CI.
+      - name: Run linter
         uses: golangci/golangci-lint-action@v9
         with:
-          version: latest
+          version: v2.12.2
           working-directory: server
-          args: --timeout=5m --issues-exit-code=0
-        continue-on-error: true
+          args: --timeout=5m

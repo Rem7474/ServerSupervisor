@@ -32,9 +32,6 @@ var Version = "dev"
 // Capacity 10 lets up to 10 pending batches queue up before we start dropping.
 var commandQueue = make(chan []sender.PendingCommand, 10)
 
-// agentConfigPath stores the active configuration path for helper commands.
-var agentConfigPath = "/etc/serversupervisor/agent.yaml"
-
 func main() {
 	configPath := flag.String("config", "/etc/serversupervisor/agent.yaml", "Path to config file")
 	initConfig := flag.Bool("init", false, "Generate and write a default config file")
@@ -47,8 +44,6 @@ func main() {
 	updateVersion := flag.String("update-version", "", "Target version for internal update helper")
 	verbose := flag.Bool("verbose", false, "Enable verbose/debug logging output")
 	flag.Parse()
-
-	agentConfigPath = *configPath
 
 	if *showVersion {
 		fmt.Println(Version)
