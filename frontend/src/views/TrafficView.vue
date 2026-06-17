@@ -859,7 +859,6 @@ import TrafficRequestsChart from '../components/security/TrafficRequestsChart.vu
 import TrafficStatusChart from '../components/security/TrafficStatusChart.vue'
 import apiClient from '../api'
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- display-layer shim; full web-logs typing handled in the Phase 7 split
 type AnyRecord = Record<string, any>
 
 interface TimeseriesPoint {

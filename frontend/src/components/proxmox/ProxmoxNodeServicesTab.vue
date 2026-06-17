@@ -140,7 +140,13 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 
-type Service = Record<string, any>
+interface Service {
+  name: string
+  state?: string
+  'active-state'?: string
+  desc?: string
+  [key: string]: unknown
+}
 
 const props = defineProps<{
   services: Service[]
@@ -162,7 +168,7 @@ const filteredServices = computed(() => {
   return props.services.filter((s) => s['active-state'] === 'active' || s.state === 'running')
 })
 
-function svcStateClass(state: string): string {
+function svcStateClass(state?: string): string {
   if (state === 'active') return 'badge bg-green-lt text-green'
   if (state === 'failed') return 'badge bg-red-lt text-red'
   if (state === 'activating' || state === 'deactivating') return 'badge bg-yellow-lt text-yellow'

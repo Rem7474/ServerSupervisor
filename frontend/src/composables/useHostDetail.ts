@@ -14,6 +14,7 @@ import { useAuthStore } from '../stores/auth'
 // props (Container, VersionComparison, Command, UURun, UUForm) — bridged with
 // `as any` casts at template boundaries. Tightening here would require
 // matching every downstream prop shape; that's a follow-up refactor.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- intentional, documented display-layer shim (see comment above)
 type AnyRecord = Record<string, any>
 
 function asString(value: unknown, fallback = ''): string {

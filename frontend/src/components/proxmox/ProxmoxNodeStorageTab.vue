@@ -72,9 +72,9 @@
 </template>
 
 <script setup lang="ts">
-type Storage = Record<string, any>
+import type { ProxmoxStorage } from '../../types/proxmox'
 
-defineProps<{ storages: Storage[] }>()
+defineProps<{ storages: ProxmoxStorage[] }>()
 
 function formatBytes(bytes: number): string {
   if (!bytes) return '0 B'
@@ -88,7 +88,7 @@ function formatBytes(bytes: number): string {
   return `${v.toFixed(i === 0 ? 0 : 1)} ${units[i]}`
 }
 
-function storagePct(s: Storage): string {
+function storagePct(s: ProxmoxStorage): string {
   if (!s.total) return '0'
   return ((s.used / s.total) * 100).toFixed(1)
 }

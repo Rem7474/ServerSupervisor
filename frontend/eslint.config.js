@@ -94,6 +94,24 @@ export default [
     },
   },
   {
+    // TEMP: these large views/components are scheduled for decomposition in the
+    // Phase 7 split (see the frontend audit plan). Their display-layer `any`
+    // will be eliminated as each is broken into typed sub-components/composables,
+    // rather than typing the monolith and re-touching every line during the
+    // split. Remove these entries (and the residual any) as each file is split.
+    files: [
+      '**/views/ProxmoxNodeView.vue',
+      '**/views/TrafficView.vue',
+      '**/views/AuditLogsView.vue',
+      '**/views/GlobalScheduledTasksView.vue',
+      '**/views/MonitoringView.vue',
+      '**/components/docker/DockerContainersTab.vue',
+    ],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+    },
+  },
+  {
     rules: {
       'no-unused-vars': 'off', // Handled by TS
       'no-undef': 'off',

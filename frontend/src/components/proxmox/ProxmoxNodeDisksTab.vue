@@ -117,10 +117,9 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import SortableHeader from '../common/SortableHeader.vue'
+import type { ProxmoxDisk } from '../../types/proxmox'
 
-type Disk = Record<string, any>
-
-const props = defineProps<{ disks: Disk[] }>()
+const props = defineProps<{ disks: ProxmoxDisk[] }>()
 
 const sortKey = ref('dev_path')
 const sortDir = ref<'asc' | 'desc'>('asc')
@@ -149,7 +148,11 @@ function compareValues(a: unknown, b: unknown, direction: 'asc' | 'desc' = 'asc'
 
 const sortedDisks = computed(() => {
   const list = [...(props.disks ?? [])]
-  list.sort((a, b) => compareValues(a?.[sortKey.value], b?.[sortKey.value], sortDir.value))
+  list.sort((a, b) => compareValues(
+    (a as unknown as Record<string, unknown>)?.[sortKey.value],
+    (b as unknown as Record<string, unknown>)?.[sortKey.value],
+    sortDir.value,
+  ))
   return list
 })
 
