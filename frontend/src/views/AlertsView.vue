@@ -49,10 +49,7 @@
       v-if="fetchError"
       class="alert alert-danger mb-3"
     >
-      <AppIcon
-        name="warning"
-        css-class="icon alert-icon me-2"
-      />
+      <IconAlertTriangle class="icon alert-icon me-2" />
       Erreur de chargement des règles : {{ fetchError }}
     </div>
 
@@ -165,7 +162,7 @@ import AlertReleaseSummary from '../components/alerts/AlertReleaseSummary.vue'
 import AlertRuleList from '../components/alerts/AlertRuleList.vue'
 import AlertRuleModal from '../components/alerts/AlertRuleModal.vue'
 import ErrorBoundary from '../components/common/ErrorBoundary.vue'
-import AppIcon from '../components/AppIcon.vue'
+import { IconAlertTriangle } from '@tabler/icons-vue'
 import { useAlertsPage } from '../composables/useAlertsPage'
 import { useWebSocket } from '../composables/useWebSocket'
 

@@ -54,10 +54,9 @@
       v-if="cveSummary && ((cveSummary.critical_count || 0) > 0 || (cveSummary.hosts_with_critical || 0) > 0)"
       class="alert alert-danger mb-3 d-flex align-items-center gap-3"
     >
-      <AppIcon
-        name="warning"
+      <IconAlertTriangle
         :size="24"
-        css-class="icon icon-lg icon-responsive-lg flex-shrink-0"
+        class="icon icon-lg icon-responsive-lg flex-shrink-0"
       />
       <div class="flex-grow-1">
         <div class="fw-semibold">
@@ -81,10 +80,9 @@
       v-if="proxmoxSummary && ((proxmoxSummary.nodes_down ?? 0) > 0 || (proxmoxSummary.recent_failed_tasks ?? 0) > 0 || (proxmoxSummary.storage_near_full ?? 0) > 0 || (proxmoxSummary.storage_offline ?? 0) > 0)"
       class="alert alert-warning mb-3 d-flex align-items-center gap-3"
     >
-      <AppIcon
-        name="warning"
+      <IconAlertTriangle
         :size="24"
-        css-class="icon icon-lg icon-responsive-lg flex-shrink-0"
+        class="icon icon-lg icon-responsive-lg flex-shrink-0"
       />
       <div class="flex-grow-1">
         <div class="fw-semibold">
@@ -527,7 +525,7 @@ import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import PaginationNav from '../components/PaginationNav.vue'
 import SortableHeader from '../components/common/SortableHeader.vue'
 import EmptyState from '../components/EmptyState.vue'
-import AppIcon from '../components/AppIcon.vue'
+import { IconAlertTriangle } from '@tabler/icons-vue'
 import BulkActionBar from '../components/BulkActionBar.vue'
 import { formatHostStatus, hostStatusClass } from '../utils/formatHostStatus'
 import { pluralize } from '../utils/formatters'

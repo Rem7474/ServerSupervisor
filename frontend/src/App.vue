@@ -24,10 +24,7 @@
             to="/"
             class="navbar-brand navbar-brand-autodark"
           >
-            <AppIcon
-              name="brand"
-              css-class="icon me-2"
-            />
+            <IconServer class="icon me-2" />
             ServerSupervisor
           </router-link>
 
@@ -42,10 +39,7 @@
                   v-if="hostsDownCount > 0"
                   class="badge bg-red-lt text-red ms-2 py-2 hosts-down-badge"
                 >
-                  <AppIcon
-                    name="alert"
-                    css-class="icon icon-sm me-1"
-                  />
+                  <IconAlertTriangle class="icon icon-sm me-1" />
                   {{ hostsDownCount }} HORS LIGNE
                 </span>
               </li>
@@ -57,7 +51,7 @@
                   active-class="active"
                 >
                   <span class="nav-link-icon">
-                    <AppIcon name="dashboard" />
+                    <IconLayoutDashboard class="icon" />
                   </span>
                   <span class="nav-link-title">Dashboard</span>
                 </router-link>
@@ -69,7 +63,7 @@
                   active-class="active"
                 >
                   <span class="nav-link-icon">
-                    <AppIcon name="docker" />
+                    <IconBrandDocker class="icon" />
                   </span>
                   <span class="nav-link-title">Docker</span>
                 </router-link>
@@ -81,7 +75,7 @@
                   active-class="active"
                 >
                   <span class="nav-link-icon">
-                    <AppIcon name="updates" />
+                    <IconRefresh class="icon" />
                   </span>
                   <span class="nav-link-title">Mises à jour</span>
                 </router-link>
@@ -93,7 +87,7 @@
                   active-class="active"
                 >
                   <span class="nav-link-icon">
-                    <AppIcon name="proxmox" />
+                    <IconServer2 class="icon" />
                   </span>
                   <span class="nav-link-title">Proxmox</span>
                 </router-link>
@@ -105,7 +99,7 @@
                   active-class="active"
                 >
                   <span class="nav-link-icon">
-                    <AppIcon name="alerts" />
+                    <IconBell class="icon" />
                   </span>
                   <span class="nav-link-title">Alertes</span>
                 </router-link>
@@ -125,7 +119,7 @@
                   @click="toggleSecondaryMenu"
                 >
                   <span class="nav-link-icon">
-                    <AppIcon name="more" />
+                    <IconDots class="icon" />
                   </span>
                   <span class="nav-link-title">Plus</span>
                 </button>
@@ -141,24 +135,10 @@
                     role="menuitem"
                     @click="secondaryMenuOpen = false"
                   >
-                    <svg
+                    <IconShieldCheck
+                      :size="16"
                       class="icon icon-sm me-2"
-                      width="16"
-                      height="16"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    ><path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M12 3l7 4v5c0 5-3.5 8.5-7 9-3.5-.5-7-4-7-9V7l7-4z"
-                    /><path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M9.5 12.5l2 2 3-3"
-                    /></svg>
+                    />
                     Menaces web
                   </router-link>
                   <router-link
@@ -168,19 +148,10 @@
                     role="menuitem"
                     @click="secondaryMenuOpen = false"
                   >
-                    <svg
+                    <IconChartLine
+                      :size="16"
                       class="icon icon-sm me-2"
-                      width="16"
-                      height="16"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    ><path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M4 19V5m0 14h16M8 16l3-4 3 2 4-6"
-                    /></svg>
+                    />
                     Stats web
                   </router-link>
                   <div
@@ -193,18 +164,10 @@
                     role="menuitem"
                     @click="secondaryMenuOpen = false"
                   >
-                    <svg
+                    <IconClock
+                      :size="16"
                       class="icon icon-sm me-2"
-                      width="16"
-                      height="16"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    ><circle
-                      cx="12"
-                      cy="12"
-                      r="10"
-                    /><polyline points="12 6 12 12 16 14" /></svg>
+                    />
                     Tâches planifiées
                   </router-link>
                   <router-link
@@ -213,19 +176,10 @@
                     role="menuitem"
                     @click="secondaryMenuOpen = false"
                   >
-                    <svg
+                    <IconTerminal2
+                      :size="16"
                       class="icon icon-sm me-2"
-                      width="16"
-                      height="16"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    ><path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                    /></svg>
+                    />
                     Commandes en cours
                   </router-link>
                   <router-link
@@ -234,55 +188,10 @@
                     role="menuitem"
                     @click="secondaryMenuOpen = false"
                   >
-                    <svg
+                    <IconTopologyStar3
+                      :size="16"
                       class="icon icon-sm me-2"
-                      width="16"
-                      height="16"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    ><circle
-                      cx="12"
-                      cy="12"
-                      r="2.5"
-                      stroke-width="2"
-                    /><circle
-                      cx="5"
-                      cy="5"
-                      r="2"
-                      stroke-width="2"
-                    /><circle
-                      cx="19"
-                      cy="5"
-                      r="2"
-                      stroke-width="2"
-                    /><circle
-                      cx="12"
-                      cy="20"
-                      r="2"
-                      stroke-width="2"
-                    /><line
-                      x1="6.5"
-                      y1="6.5"
-                      x2="10.5"
-                      y2="10.5"
-                      stroke-width="1.8"
-                      stroke-linecap="round"
-                    /><line
-                      x1="17.5"
-                      y1="6.5"
-                      x2="13.5"
-                      y2="10.5"
-                      stroke-width="1.8"
-                      stroke-linecap="round"
-                    /><line
-                      x1="12"
-                      y1="14.5"
-                      x2="12"
-                      y2="18"
-                      stroke-width="1.8"
-                      stroke-linecap="round"
-                    /></svg>
+                    />
                     Réseau
                   </router-link>
                   <router-link
@@ -291,19 +200,10 @@
                     role="menuitem"
                     @click="secondaryMenuOpen = false"
                   >
-                    <svg
+                    <IconActivity
+                      :size="16"
                       class="icon icon-sm me-2"
-                      width="16"
-                      height="16"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    ><path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M3 12h3l3-7 4 14 3-7h5"
-                    /></svg>
+                    />
                     Monitoring
                   </router-link>
                   <router-link
@@ -312,18 +212,10 @@
                     role="menuitem"
                     @click="secondaryMenuOpen = false"
                   >
-                    <svg
+                    <IconBox
+                      :size="16"
                       class="icon icon-sm me-2"
-                      width="16"
-                      height="16"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <polygon points="12 2 2 7 12 12 22 7 12 2" />
-                      <polyline points="2 17 12 22 22 17" />
-                      <polyline points="2 12 12 17 22 12" />
-                    </svg>
+                    />
                     NPM
                   </router-link>
                 </div>
@@ -344,7 +236,7 @@
                   @click="toggleAdminMenu"
                 >
                   <span class="nav-link-icon">
-                    <AppIcon name="admin" />
+                    <IconShieldLock class="icon" />
                   </span>
                   <span class="nav-link-title">Admin</span>
                 </button>
@@ -359,31 +251,10 @@
                     role="menuitem"
                     @click="adminMenuOpen = false"
                   >
-                    <svg
+                    <IconGitBranch
+                      :size="16"
                       class="icon icon-sm me-2"
-                      width="16"
-                      height="16"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    ><circle
-                      cx="12"
-                      cy="5"
-                      r="3"
-                    /><circle
-                      cx="5"
-                      cy="19"
-                      r="3"
-                    /><circle
-                      cx="19"
-                      cy="19"
-                      r="3"
-                    /><path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M12 8v3m0 0l-4.5 5.5M12 11l4.5 5.5"
-                    /></svg>
+                    />
                     Git / Automatisation
                   </router-link>
                   <router-link
@@ -392,19 +263,10 @@
                     role="menuitem"
                     @click="adminMenuOpen = false"
                   >
-                    <svg
+                    <IconClipboardList
+                      :size="16"
                       class="icon icon-sm me-2"
-                      width="16"
-                      height="16"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    ><path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M9 12h6m-6 4h6M5 7h14a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V9a2 2 0 012-2z"
-                    /></svg>
+                    />
                     Audit
                   </router-link>
                   <router-link
@@ -413,32 +275,10 @@
                     role="menuitem"
                     @click="adminMenuOpen = false"
                   >
-                    <svg
+                    <IconUsers
+                      :size="16"
                       class="icon icon-sm me-2"
-                      width="16"
-                      height="16"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    ><path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M17 20h5v-2a4 4 0 00-4-4h-1"
-                    /><path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M9 20H4v-2a4 4 0 014-4h1"
-                    /><circle
-                      cx="9"
-                      cy="7"
-                      r="4"
-                    /><circle
-                      cx="17"
-                      cy="9"
-                      r="3"
-                    /></svg>
+                    />
                     Utilisateurs
                   </router-link>
                   <div class="dropdown-divider" />
@@ -448,24 +288,10 @@
                     role="menuitem"
                     @click="adminMenuOpen = false"
                   >
-                    <svg
+                    <IconSettings
+                      :size="16"
                       class="icon icon-sm me-2"
-                      width="16"
-                      height="16"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    ><path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-                    /><path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                    /></svg>
+                    />
                     Paramètres
                   </router-link>
                 </div>
@@ -527,10 +353,9 @@
         role="alert"
       >
         <div class="container-xl d-flex align-items-center gap-2">
-          <AppIcon
-            name="warning"
+          <IconAlertTriangle
             :size="20"
-            css-class="icon flex-shrink-0"
+            class="icon flex-shrink-0"
           />
           <span>Connexion au serveur perdue — les données affichées peuvent être obsolètes.</span>
         </div>
@@ -586,7 +411,12 @@ import ConfirmDialog from './components/ConfirmDialog.vue'
 import ToastContainer from './components/ToastContainer.vue'
 import NotificationBell from './components/NotificationBell.vue'
 import AppFooter from './components/AppFooter.vue'
-import AppIcon from './components/AppIcon.vue'
+import {
+  IconAlertTriangle, IconLayoutDashboard, IconBrandDocker, IconRefresh,
+  IconServer2, IconBell, IconDots, IconShieldLock, IconShieldCheck,
+  IconChartLine, IconClock, IconTerminal2, IconTopologyStar3, IconActivity,
+  IconBox, IconGitBranch, IconClipboardList, IconUsers, IconSettings, IconServer,
+} from '@tabler/icons-vue'
 import ErrorBoundary from './components/common/ErrorBoundary.vue'
 import { subscribeHttpErrors } from './utils/httpErrorBus'
 import apiClient from './api'
