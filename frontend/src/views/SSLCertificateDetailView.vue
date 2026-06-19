@@ -269,6 +269,8 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import api from '../api'
+import { isApiAbort } from '../api/client'
+import { useAbortSignal } from '../composables/useAbortSignal'
 import type { SSLCertificate, SSLCertificateEvent } from '../types/ssl'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import RelativeTime from '../components/RelativeTime.vue'
@@ -279,6 +281,7 @@ type SSLCert = SSLCertificate
 
 const route = useRoute()
 const certId = route.params.id as string
+const signal = useAbortSignal()
 
 const cert = ref<SSLCert | null>(null)
 const events = ref<SSLCertificateEvent[]>([])
@@ -340,10 +343,11 @@ async function fetchCert(): Promise<void> {
   loading.value = true
   error.value = ''
   try {
-    const { data } = await api.getSSLCertificate(certId)
+    const { data } = await api.getSSLCertificate(certId, signal)
     cert.value = data
     lastUpdatedAt.value = new Date()
   } catch (e: unknown) {
+    if (isApiAbort(e)) return
     error.value = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Impossible de charger le certificat'
   } finally {
     loading.value = false
@@ -353,7 +357,7 @@ async function fetchCert(): Promise<void> {
 async function fetchEvents(): Promise<void> {
   loadingEvents.value = true
   try {
-    const { data } = await api.getSSLCertificateHistory(certId)
+    const { data } = await api.getSSLCertificateHistory(certId, signal)
     events.value = data?.events || []
   } catch {
     // non-fatal — history may be empty
