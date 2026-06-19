@@ -16,6 +16,9 @@ type fakeRepo struct{}
 func (fakeRepo) GetWebLogsSummary(context.Context, time.Time, string, string) (map[string]any, error) {
 	return nil, nil
 }
+func (fakeRepo) GetWebLogsThreats(context.Context, time.Time, string, string) (map[string]any, error) {
+	return nil, nil
+}
 func (fakeRepo) GetWebLogsTopClientIPs(context.Context, time.Time, string, string, int) ([]map[string]any, error) {
 	return nil, nil
 }
