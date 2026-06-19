@@ -20,14 +20,13 @@
     </div>
     <div
       v-else-if="disks.length === 0"
-      class="card-body text-center text-muted py-5"
+      class="card-body"
     >
-      <div class="small fw-medium">
-        Aucune donnée disque côté nœud Proxmox
-      </div>
-      <div class="mt-1 opacity-75 small">
-        Le poller Proxmox n'a pas encore remonté de disque pour ce nœud (rôle PVEAuditor requis).
-      </div>
+      <EmptyState
+        :icon="IconDisc"
+        title="Aucune donnée disque côté nœud Proxmox"
+        subtitle="Le poller Proxmox n'a pas encore remonté de disque pour ce nœud (rôle PVEAuditor requis)."
+      />
     </div>
     <div
       v-else
@@ -102,6 +101,8 @@
 import { onMounted } from 'vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 import BadgePill from '../common/BadgePill.vue'
+import EmptyState from '../EmptyState.vue'
+import { IconDisc } from '@tabler/icons-vue'
 import { useProxmoxHostDisks } from '../../composables/useProxmoxHostDisks'
 
 const props = defineProps<{

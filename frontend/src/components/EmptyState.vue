@@ -1,7 +1,8 @@
 <template>
   <div class="text-center py-5 text-muted">
     <slot name="icon">
-      <IconPhoto
+      <component
+        :is="icon"
         :size="iconSize"
         class="mb-3"
         :stroke-width="1.5"
@@ -41,7 +42,8 @@
 </template>
 
 <script setup lang="ts">
-import { IconPhoto } from '@tabler/icons-vue'
+import type { Component } from 'vue'
+import { IconInbox } from '@tabler/icons-vue'
 
 withDefaults(defineProps<{
   title: string
@@ -49,7 +51,9 @@ withDefaults(defineProps<{
   ctaLabel?: string
   ctaTo?: string
   iconSize?: number
+  icon?: Component
 }>(), {
+  icon: IconInbox,
   subtitle: '',
   ctaLabel: '',
   ctaTo: '',
