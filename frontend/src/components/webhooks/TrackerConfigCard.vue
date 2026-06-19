@@ -11,18 +11,10 @@
           :disabled="checking"
           @click="$emit('check')"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="14"
-            height="14"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            viewBox="0 0 24 24"
+          <IconRefresh
+            :size="14"
             class="me-1"
-          >
-            <polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10" />
-          </svg>
+          />
           {{ checking ? 'Vérification...' : 'Vérifier maintenant' }}
         </button>
         <button
@@ -32,18 +24,10 @@
           :title="runDisabledReason"
           @click="$emit('run')"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="14"
-            height="14"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            viewBox="0 0 24 24"
+          <IconPlayerPlay
+            :size="14"
             class="me-1"
-          >
-            <polygon points="5 3 19 12 5 21 5 3" />
-          </svg>
+          />
           {{ running ? 'Déclenchement...' : 'Exécuter' }}
         </button>
         <button
@@ -268,6 +252,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { IconPlayerPlay, IconRefresh } from '@tabler/icons-vue'
 import RelativeTime from '../RelativeTime.vue'
 import { formatDateTime } from '../../utils/formatters'
 import type { ReleaseTracker } from '../../types/tracker'

@@ -247,20 +247,10 @@
                       title="Voir les logs"
                       @click="openLogViewer(cmd)"
                     >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
+                      <IconList
+                        :size="16"
                         class="icon icon-sm"
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        stroke-width="2"
-                        stroke="currentColor"
-                        fill="none"
-                      ><path
-                        stroke="none"
-                        d="M0 0h24v24H0z"
-                        fill="none"
-                      /><path d="M4 6l16 0" /><path d="M4 12l16 0" /><path d="M4 18l12 0" /></svg>
+                      />
                     </button>
                   </td>
                 </tr>
@@ -513,6 +503,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { IconList } from '@tabler/icons-vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useConfirmDialog } from '../composables/useConfirmDialog'

@@ -115,24 +115,10 @@
                 class="avatar avatar-sm rounded"
                 :class="iconBg(item)"
               >
-                <svg
+                <IconCode
+                  :size="16"
                   class="icon"
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                >
-                  <path
-                    v-if="isTrackerType(item)"
-                    d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"
-                  />
-                  <path
-                    v-else
-                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                  />
-                </svg>
+                />
               </span>
             </div>
 
@@ -211,6 +197,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
+import { IconCode } from '@tabler/icons-vue'
 import api from '../api'
 import type { NotificationItem } from '../types/generated'
 import { addToast } from '../composables/useGlobalToast'

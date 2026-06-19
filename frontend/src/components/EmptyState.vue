@@ -1,23 +1,12 @@
 <template>
   <div class="text-center py-5 text-muted">
     <slot name="icon">
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
+      <IconPhoto
+        :size="iconSize"
         class="mb-3"
-        :width="iconSize"
-        :height="iconSize"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
+        :stroke-width="1.5"
         style="opacity:.35"
-      >
-        <path
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-width="1.5"
-          d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
-        />
-      </svg>
+      />
     </slot>
     <p class="h5 mt-2 mb-1">
       {{ title }}
@@ -52,6 +41,8 @@
 </template>
 
 <script setup lang="ts">
+import { IconPhoto } from '@tabler/icons-vue'
+
 withDefaults(defineProps<{
   title: string
   subtitle?: string

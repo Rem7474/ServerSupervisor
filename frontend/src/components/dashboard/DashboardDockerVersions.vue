@@ -16,22 +16,10 @@
           v-if="outdatedCount > 0"
           class="badge bg-yellow-lt text-yellow"
         >{{ outdatedCount }} en retard</span>
-        <svg
+        <IconChevronDown
+          :size="16"
           class="ms-auto docker-chevron"
-          :class="{ 'is-open': isOpen }"
-          width="16"
-          height="16"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M19 9l-7 7-7-7"
-          />
-        </svg>
+        />
       </h3>
       <div class="card-options text-secondary small">
         Suivi via <router-link
@@ -180,6 +168,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { IconChevronDown } from '@tabler/icons-vue'
 import apiClient from '../../api'
 import { useAuthStore } from '../../stores/auth'
 import { getApiErrorMessage } from '../../api/client'

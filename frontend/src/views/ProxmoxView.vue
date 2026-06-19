@@ -190,15 +190,10 @@
             title="Rafraîchir maintenant"
             @click="load"
           >
-            <svg
+            <IconRefresh
+              :size="2"
               class="icon icon-sm"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 .49-3.86" />
-            </svg>
+            />
           </button>
         </div>
       </div>
@@ -411,6 +406,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { IconRefresh } from '@tabler/icons-vue'
 import { useAuthStore } from '../stores/auth'
 import SortableHeader from '../components/common/SortableHeader.vue'
 import PageRefreshBar from '../components/PageRefreshBar.vue'

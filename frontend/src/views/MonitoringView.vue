@@ -37,19 +37,10 @@
             :class="['nav-link', tab === 'uptime' ? 'active' : '']"
             @click="setTab('uptime')"
           >
-            <svg
+            <IconActivity
+              :size="16"
               class="icon icon-sm me-1"
-              width="16"
-              height="16"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            ><path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M3 12h3l3-7 4 14 3-7h5"
-            /></svg>
+            />
             Sondes uptime
             <span
               v-if="downCount > 0"
@@ -63,26 +54,10 @@
             :class="['nav-link', tab === 'ssl' ? 'active' : '']"
             @click="setTab('ssl')"
           >
-            <svg
+            <IconLock
+              :size="16"
               class="icon icon-sm me-1"
-              width="16"
-              height="16"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            ><rect
-              x="4"
-              y="11"
-              width="16"
-              height="9"
-              rx="2"
-              stroke-width="2"
-            /><path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M8 11V8a4 4 0 018 0v3"
-            /></svg>
+            />
             Certificats SSL
             <span
               v-if="expiringCount > 0"
@@ -747,6 +722,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { IconActivity, IconLock } from '@tabler/icons-vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '../api'
 import type { UptimeProbe } from '../types/uptime'

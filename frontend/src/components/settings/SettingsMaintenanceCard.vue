@@ -70,22 +70,10 @@
           />
           <div class="modal-status bg-warning" />
           <div class="modal-body text-center py-4">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
+            <IconCircle
+              :size="24"
               class="icon mb-2 text-warning icon-lg"
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              stroke-width="2"
-              stroke="currentColor"
-              fill="none"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            ><path
-              stroke="none"
-              d="M0 0h24v24H0z"
-              fill="none"
-            /><path d="M12 9m-6 0a6 6 0 1 0 12 0a6 6 0 1 0 -12 0" /><path d="M12 7v5" /><path d="M12 13v.01" /></svg>
+            />
             <h3>Confirmer le nettoyage</h3>
             <div class="text-secondary mb-3">
               La politique de rétention TimescaleDB sera mise à jour à {{ settings.metricsRetentionDays }} jours. Le nettoyage sera appliqué automatiquement par TimescaleDB.
@@ -128,22 +116,10 @@
           />
           <div class="modal-status bg-warning" />
           <div class="modal-body text-center py-4">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
+            <IconCircle
+              :size="24"
               class="icon mb-2 text-warning icon-lg"
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              stroke-width="2"
-              stroke="currentColor"
-              fill="none"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            ><path
-              stroke="none"
-              d="M0 0h24v24H0z"
-              fill="none"
-            /><path d="M12 9m-6 0a6 6 0 1 0 12 0a6 6 0 1 0 -12 0" /><path d="M12 7v5" /><path d="M12 13v.01" /></svg>
+            />
             <h3>Confirmer le nettoyage</h3>
             <div class="text-secondary mb-3">
               Les entrées audit plus anciennes que {{ settings.auditRetentionDays }} jours seront supprimées. Cette action est irréversible.
@@ -175,6 +151,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { IconCircle } from '@tabler/icons-vue'
 
 interface Settings {
   metricsRetentionDays: number

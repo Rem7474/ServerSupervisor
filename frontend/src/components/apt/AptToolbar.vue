@@ -41,26 +41,8 @@
         :title="sortDir === 'asc' ? 'Croissant' : 'Décroissant'"
         @click="sortDir = sortDir === 'asc' ? 'desc' : 'asc'"
       >
-        <svg
-          v-if="sortDir === 'asc'"
-          xmlns="http://www.w3.org/2000/svg"
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-        ><path d="M3 8l4-4 4 4M7 4v16M13 16l4 4 4-4M17 20V4" /></svg>
-        <svg
-          v-else
-          xmlns="http://www.w3.org/2000/svg"
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-        ><path d="M3 16l4 4 4-4M7 20V4M13 8l4-4 4 4M17 4v16" /></svg>
+        <IconArrowsSort :size="16" />
+        <IconArrowsSort :size="16" />
       </button>
     </template>
     <template #bottom>
@@ -127,6 +109,7 @@
 
 <script setup lang="ts">
 import DataToolbar from '../common/DataToolbar.vue'
+import { IconArrowsSort } from '@tabler/icons-vue'
 
 defineProps<{
   filterOptions: { value: string, label: string }[]

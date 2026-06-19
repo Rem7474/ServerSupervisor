@@ -32,21 +32,10 @@
           </label>
           <div class="input-icon">
             <span class="input-icon-addon">
-              <svg
+              <IconSearch
+                :size="16"
                 class="icon"
-                width="16"
-                height="16"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <circle
-                  cx="11"
-                  cy="11"
-                  r="8"
-                />
-                <path d="M21 21l-4.35-4.35" />
-              </svg>
+              />
             </span>
             <input
               v-model="searchQuery"
@@ -61,21 +50,10 @@
               aria-label="Effacer la recherche"
               @click="clearSearch"
             >
-              <svg
+              <IconX
+                :size="16"
                 class="icon"
-                width="16"
-                height="16"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M18 6L6 18M6 6l12 12"
-                />
-              </svg>
+              />
             </button>
           </div>
         </div>
@@ -123,21 +101,10 @@
             :disabled="markingRead"
             @click="markAllRead"
           >
-            <svg
+            <IconCheck
+              :size="16"
               class="icon me-1"
-              width="16"
-              height="16"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M5 13l4 4L19 7"
-              />
-            </svg>
+            />
             Tout marquer lu
           </button>
           <button
@@ -145,21 +112,10 @@
             class="btn btn-sm btn-ghost-secondary"
             @click="$emit('refresh')"
           >
-            <svg
+            <IconRefresh
+              :size="16"
               class="icon me-1"
-              width="16"
-              height="16"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-              />
-            </svg>
+            />
             Actualiser
           </button>
           <button
@@ -199,21 +155,11 @@
       v-else-if="incidents.length === 0"
       class="card-body text-center py-5 text-muted"
     >
-      <svg
+      <IconBell
+        :size="48"
         class="icon icon-lg mb-3"
-        width="48"
-        height="48"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-width="1.5"
-          d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-        />
-      </svg>
+        :stroke-width="1.5"
+      />
       <div>Aucune notification enregistrée</div>
       <div class="text-muted small mt-1">
         Les alertes et les notifications du release tracker apparaîtront ici
@@ -223,21 +169,11 @@
       v-else-if="filteredIncidents.length === 0"
       class="card-body text-center py-5 text-muted"
     >
-      <svg
+      <IconBell
+        :size="48"
         class="icon icon-lg mb-3"
-        width="48"
-        height="48"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-width="1.5"
-          d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-        />
-      </svg>
+        :stroke-width="1.5"
+      />
       <div class="fw-semibold text-body">
         Aucune notification ne correspond à cette recherche.
       </div>
@@ -400,22 +336,10 @@
                     v-if="resolvingId === item.id"
                     class="spinner-border spinner-border-sm"
                   />
-                  <svg
-                    v-else
+                  <IconCheck
+                    :size="14"
                     class="icon"
-                    width="14"
-                    height="14"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                      stroke-width="2"
-                      d="M5 13l4 4L19 7"
-                    />
-                  </svg>
+                  />
                 </button>
               </td>
             </tr>
@@ -441,21 +365,10 @@
             class="page-link"
             @click="currentPage--"
           >
-            <svg
+            <IconChevronLeft
+              :size="16"
               class="icon"
-              width="16"
-              height="16"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M15 19l-7-7 7-7"
-              />
-            </svg>
+            />
           </button>
         </li>
         <li
@@ -481,21 +394,10 @@
             class="page-link"
             @click="currentPage++"
           >
-            <svg
+            <IconChevronRight
+              :size="16"
               class="icon"
-              width="16"
-              height="16"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M9 5l7 7-7 7"
-              />
-            </svg>
+            />
           </button>
         </li>
       </ul>
@@ -505,6 +407,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { IconBell, IconCheck, IconChevronLeft, IconChevronRight, IconRefresh, IconSearch, IconX } from '@tabler/icons-vue'
 import apiClient from '../../api'
 import BadgePill from '../common/BadgePill.vue'
 import { getAlertMetricMeta } from '../../utils/alertMetrics'

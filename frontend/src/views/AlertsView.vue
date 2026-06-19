@@ -24,21 +24,10 @@
             class="btn btn-primary"
             @click="startAddAlert"
           >
-            <svg
+            <IconPlus
+              :size="24"
               class="icon me-1"
-              width="24"
-              height="24"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M12 4v16m8-8H4"
-              />
-            </svg>
+            />
             Nouvelle alerte
           </button>
         </div>
@@ -49,10 +38,7 @@
       v-if="fetchError"
       class="alert alert-danger mb-3"
     >
-      <AppIcon
-        name="warning"
-        css-class="icon alert-icon me-2"
-      />
+      <IconAlertTriangle class="icon alert-icon me-2" />
       Erreur de chargement des règles : {{ fetchError }}
     </div>
 
@@ -165,7 +151,7 @@ import AlertReleaseSummary from '../components/alerts/AlertReleaseSummary.vue'
 import AlertRuleList from '../components/alerts/AlertRuleList.vue'
 import AlertRuleModal from '../components/alerts/AlertRuleModal.vue'
 import ErrorBoundary from '../components/common/ErrorBoundary.vue'
-import AppIcon from '../components/AppIcon.vue'
+import { IconAlertTriangle, IconPlus } from '@tabler/icons-vue'
 import { useAlertsPage } from '../composables/useAlertsPage'
 import { useWebSocket } from '../composables/useWebSocket'
 

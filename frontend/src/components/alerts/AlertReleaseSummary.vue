@@ -9,21 +9,10 @@
         class="btn btn-sm btn-ghost-secondary"
       >
         Gérer
-        <svg
+        <IconCopy
+          :size="14"
           class="icon icon-sm ms-1"
-          width="14"
-          height="14"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-          />
-        </svg>
+        />
       </router-link>
     </div>
 
@@ -51,21 +40,11 @@
       v-else-if="trackers.length === 0"
       class="card-body text-center py-5 text-muted"
     >
-      <svg
+      <IconActivity
+        :size="48"
         class="icon icon-lg mb-3 d-block mx-auto opacity-50"
-        width="48"
-        height="48"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-width="1.5"
-          d="M22 12h-4l-3 9L9 3l-3 9H2"
-        />
-      </svg>
+        :stroke-width="1.5"
+      />
       <div>Aucun tracker configuré</div>
       <router-link
         to="/git-webhooks"
@@ -114,21 +93,10 @@
                 class="text-danger small mt-1"
                 :title="tracker.last_error"
               >
-                <svg
+                <IconAlertTriangle
+                  :size="14"
                   class="icon icon-sm me-1"
-                  width="14"
-                  height="14"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
-                  />
-                </svg>
+                />
                 Erreur lors de la vérification
               </div>
             </td>
@@ -190,21 +158,10 @@
                 class="btn btn-sm btn-ghost-secondary"
                 title="Voir le détail"
               >
-                <svg
+                <IconChevronRight
+                  :size="16"
                   class="icon"
-                  width="16"
-                  height="16"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M9 5l7 7-7 7"
-                  />
-                </svg>
+                />
               </router-link>
             </td>
           </tr>
@@ -216,6 +173,7 @@
 
 <script setup lang="ts">
 import { useDateFormatter } from '../../composables/useDateFormatter'
+import { IconActivity, IconAlertTriangle, IconChevronRight, IconCopy } from '@tabler/icons-vue'
 
 interface TrackerExecution {
   status: string

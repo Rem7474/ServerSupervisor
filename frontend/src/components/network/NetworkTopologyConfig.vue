@@ -490,24 +490,10 @@
                       aria-label="Reinitialiser ce port"
                       @click="resetPortSetting(host.id, port.port)"
                     >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
+                      <IconRefresh
+                        :size="16"
                         class="icon icon-sm"
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        stroke-width="2"
-                        stroke="currentColor"
-                        fill="none"
-                      >
-                        <path
-                          stroke="none"
-                          d="M0 0h24v24H0z"
-                          fill="none"
-                        />
-                        <path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4" />
-                        <path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4" />
-                      </svg>
+                      />
                     </button>
                   </td>
                 </tr>
@@ -538,6 +524,7 @@
 
 <script setup lang="ts">
 import { computed, watch } from 'vue'
+import { IconRefresh } from '@tabler/icons-vue'
 
 interface NetworkService {
   id: string

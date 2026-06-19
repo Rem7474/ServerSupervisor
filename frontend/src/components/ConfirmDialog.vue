@@ -12,48 +12,14 @@
       <div class="modal-content">
         <div :class="['modal-status', dialog.destructive.value || dialog.variant.value === 'danger' ? 'bg-danger' : 'bg-warning']" />
         <div class="modal-body text-center py-4">
-          <svg
-            v-if="dialog.destructive.value || dialog.variant.value === 'danger'"
+          <IconAlertTriangle
+            :size="24"
             class="icon mb-2 text-danger icon-lg"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            stroke-width="2"
-            stroke="currentColor"
-            fill="none"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <path
-              stroke="none"
-              d="M0 0h24v24H0z"
-              fill="none"
-            />
-            <path d="M10.24 3.957l-8.422 14.06a1.989 1.989 0 0 0 1.7 2.983h16.845a1.989 1.989 0 0 0 1.7 -2.983l-8.423 -14.06a1.989 1.989 0 0 0 -3.4 0z" />
-            <path d="M12 9v4" />
-            <path d="M12 17h.01" />
-          </svg>
-          <svg
-            v-else
+          />
+          <IconAlertTriangle
+            :size="24"
             class="icon mb-2 text-warning icon-lg"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            stroke-width="2"
-            stroke="currentColor"
-            fill="none"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <path
-              stroke="none"
-              d="M0 0h24v24H0z"
-              fill="none"
-            />
-            <path d="M10.24 3.957l-8.422 14.06a1.989 1.989 0 0 0 1.7 2.983h16.845a1.989 1.989 0 0 0 1.7 -2.983l-8.423 -14.06a1.989 1.989 0 0 0 -3.4 0z" />
-            <path d="M12 9v4" />
-            <path d="M12 17h.01" />
-          </svg>
+          />
           <h3>{{ dialog.title.value }}</h3>
           <div
             class="text-secondary"
@@ -110,6 +76,7 @@
 
 <script setup lang="ts">
 import { ref, watch, nextTick } from 'vue'
+import { IconAlertTriangle } from '@tabler/icons-vue'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
 import { useModalFocusTrap } from '../composables/useModalFocusTrap'
 
