@@ -26,3 +26,21 @@ export function emitHttpError(status: number | null, message: string): void {
     listener(event)
   }
 }
+
+// Connectivity recovery channel: emitted on any successful API response so the
+// "server unreachable" banner can auto-clear once the backend answers again.
+type NetworkOkListener = () => void
+const networkOkListeners = new Set<NetworkOkListener>()
+
+export function subscribeNetworkOk(listener: NetworkOkListener): () => void {
+  networkOkListeners.add(listener)
+  return () => {
+    networkOkListeners.delete(listener)
+  }
+}
+
+export function emitNetworkOk(): void {
+  for (const listener of networkOkListeners) {
+    listener()
+  }
+}
