@@ -348,7 +348,7 @@
 
       <!-- Offline / server-unreachable banner -->
       <div
-        v-if="!isOnline"
+        v-if="!isOnline || serverUnreachable"
         class="alert alert-warning alert-dismissible mb-0 rounded-0 border-0 border-bottom app-network-alert"
         role="alert"
       >
@@ -357,7 +357,8 @@
             :size="20"
             class="icon flex-shrink-0"
           />
-          <span>Connexion au serveur perdue — les données affichées peuvent être obsolètes.</span>
+          <span v-if="!isOnline">Pas de connexion réseau — les données affichées peuvent être obsolètes.</span>
+          <span v-else>Serveur injoignable — reconnexion en cours, les données affichées peuvent être obsolètes.</span>
         </div>
       </div>
 
@@ -418,7 +419,7 @@ import {
   IconBox, IconGitBranch, IconClipboardList, IconUsers, IconSettings, IconServer,
 } from '@tabler/icons-vue'
 import ErrorBoundary from './components/common/ErrorBoundary.vue'
-import { subscribeHttpErrors } from './utils/httpErrorBus'
+import { subscribeHttpErrors, subscribeNetworkOk } from './utils/httpErrorBus'
 import apiClient from './api'
 
 const auth = useAuthStore()
@@ -431,7 +432,11 @@ const userMenuRef = ref<HTMLElement | null>(null)
 const secondaryMenuOpen = ref(false)
 const adminMenuOpen = ref(false)
 const httpError = ref('')
+// True when the backend is unreachable (network error) even though the browser
+// reports it is online — drives the connectivity banner, auto-clears on recovery.
+const serverUnreachable = ref(false)
 let unsubscribeHttpErrors: () => void = () => {}
+let unsubscribeNetworkOk: () => void = () => {}
 let resumeDebounceTimer: ReturnType<typeof setTimeout> | null = null
 
 // Computed property: compter les hôtes hors ligne
@@ -536,7 +541,16 @@ function handleOutsideClick(event: MouseEvent): void {
 
 onMounted(() => {
   unsubscribeHttpErrors = subscribeHttpErrors((event) => {
-    httpError.value = event.message
+    // Network failures (no HTTP status) surface as the connectivity banner;
+    // actionable HTTP errors (403/5xx) keep their own dismissible banner.
+    if (event.status === null) {
+      serverUnreachable.value = true
+    } else {
+      httpError.value = event.message
+    }
+  })
+  unsubscribeNetworkOk = subscribeNetworkOk(() => {
+    serverUnreachable.value = false
   })
   window.addEventListener('online', handleOnline)
   window.addEventListener('offline', handleOffline)
@@ -555,6 +569,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   unsubscribeHttpErrors()
+  unsubscribeNetworkOk()
   window.removeEventListener('online', handleOnline)
   window.removeEventListener('offline', handleOffline)
   document.removeEventListener('visibilitychange', handleVisibilityResume)

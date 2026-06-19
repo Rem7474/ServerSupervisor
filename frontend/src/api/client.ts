@@ -1,6 +1,6 @@
 import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios'
 import { useAuthStore } from '../stores/auth'
-import { emitHttpError } from '../utils/httpErrorBus'
+import { emitHttpError, emitNetworkOk } from '../utils/httpErrorBus'
 
 export type JsonObject = Record<string, unknown>
 
@@ -103,8 +103,17 @@ api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
  * Handle 401 (unauthorized) by logging out and redirecting to login.
  * Silently ignore aborted requests (AbortController / component unmount).
  */
+let lastNetworkOkAt = 0
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // Signal connectivity recovery (throttled) so the offline banner can clear.
+    const now = Date.now()
+    if (now - lastNetworkOkAt > 3000) {
+      lastNetworkOkAt = now
+      emitNetworkOk()
+    }
+    return response
+  },
   (error: AxiosError) => {
     if (axios.isCancel(error)) {
       return Promise.reject(error)
