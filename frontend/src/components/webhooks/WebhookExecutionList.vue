@@ -10,17 +10,7 @@
         class="btn btn-sm btn-ghost-secondary"
         @click="$emit('refresh')"
       >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="14"
-          height="14"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          viewBox="0 0 24 24"
-        >
-          <polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10" />
-        </svg>
+        <IconRefresh :size="14" />
         Actualiser
       </button>
     </div>
@@ -108,28 +98,7 @@
                   title="Voir les logs"
                   @click="$emit('open-logs', execution.command_id)"
                 >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="14"
-                    height="14"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    viewBox="0 0 24 24"
-                  >
-                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" />
-                    <line
-                      x1="16"
-                      y1="13"
-                      x2="8"
-                      y2="13"
-                    /><line
-                      x1="16"
-                      y1="17"
-                      x2="8"
-                      y2="17"
-                    />
-                  </svg>
+                  <IconFileText :size="14" />
                 </button>
                 <router-link
                   v-else-if="execution.command_id"
@@ -137,28 +106,7 @@
                   class="btn btn-sm btn-ghost-secondary"
                   title="Voir les logs"
                 >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="14"
-                    height="14"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    viewBox="0 0 24 24"
-                  >
-                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" />
-                    <line
-                      x1="16"
-                      y1="13"
-                      x2="8"
-                      y2="13"
-                    /><line
-                      x1="16"
-                      y1="17"
-                      x2="8"
-                      y2="17"
-                    />
-                  </svg>
+                  <IconFileText :size="14" />
                 </router-link>
                 <span
                   v-else
@@ -211,28 +159,7 @@
                   title="Voir les logs"
                   @click="$emit('open-logs', execution.command_id)"
                 >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="14"
-                    height="14"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    viewBox="0 0 24 24"
-                  >
-                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" />
-                    <line
-                      x1="16"
-                      y1="13"
-                      x2="8"
-                      y2="13"
-                    /><line
-                      x1="16"
-                      y1="17"
-                      x2="8"
-                      y2="17"
-                    /><polyline points="10 9 9 9 8 9" />
-                  </svg>
+                  <IconFileText :size="14" />
                 </button>
                 <router-link
                   v-else-if="execution.command_id"
@@ -240,28 +167,7 @@
                   class="btn btn-sm btn-ghost-secondary"
                   title="Voir les logs"
                 >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="14"
-                    height="14"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    viewBox="0 0 24 24"
-                  >
-                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" />
-                    <line
-                      x1="16"
-                      y1="13"
-                      x2="8"
-                      y2="13"
-                    /><line
-                      x1="16"
-                      y1="17"
-                      x2="8"
-                      y2="17"
-                    /><polyline points="10 9 9 9 8 9" />
-                  </svg>
+                  <IconFileText :size="14" />
                 </router-link>
                 <span
                   v-else
@@ -291,6 +197,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { IconFileText, IconRefresh } from '@tabler/icons-vue'
 import RelativeTime from '../RelativeTime.vue'
 import PaginationNav from '../PaginationNav.vue'
 import { usePagination } from '../../composables/usePagination'

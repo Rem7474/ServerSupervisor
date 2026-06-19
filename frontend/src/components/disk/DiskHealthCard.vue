@@ -18,29 +18,11 @@
       v-else-if="health.length === 0"
       class="card-body text-center text-muted py-5"
     >
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
+      <IconClock
+        :size="36"
         class="mb-2 icon icon-md icon-responsive-lg"
-        width="36"
-        height="36"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-        style="opacity:.35"
-      >
-        <path
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-width="1.5"
-          d="M5 12a7 7 0 1014 0A7 7 0 005 12zm7-3v3l2 2"
-        />
-        <path
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-width="1.5"
-          d="M3 6h18M3 18h18"
-        />
-      </svg>
+        :stroke-width="1.5"
+      />
       <div class="small fw-medium">
         Aucune donnée SMART disponible
       </div>
@@ -187,6 +169,7 @@
 
 <script setup lang="ts">
 import { onMounted } from 'vue'
+import { IconClock } from '@tabler/icons-vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 import BadgePill from '../common/BadgePill.vue'
 import { useDiskHealth, type DiskHealth } from '../../composables/useDiskHealth'

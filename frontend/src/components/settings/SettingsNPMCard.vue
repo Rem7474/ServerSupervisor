@@ -180,16 +180,10 @@
                   title="Modifier"
                   @click="openEditForm(conn)"
                 >
-                  <svg
+                  <IconPencil
+                    :size="2"
                     class="icon icon-sm"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
-                    <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
-                  </svg>
+                  />
                 </button>
                 <!-- Refresh -->
                 <button
@@ -198,16 +192,10 @@
                   title="Rafraîchir maintenant"
                   @click="refreshNow(conn)"
                 >
-                  <svg
+                  <IconRefresh
+                    :size="2"
                     class="icon icon-sm"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <polyline points="1 4 1 10 7 10" />
-                    <path d="M3.51 15a9 9 0 1 0 .49-3.86" />
-                  </svg>
+                  />
                 </button>
                 <!-- Delete -->
                 <button
@@ -216,17 +204,10 @@
                   title="Supprimer"
                   @click="remove(conn)"
                 >
-                  <svg
+                  <IconTrash
+                    :size="2"
                     class="icon icon-sm"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <polyline points="3 6 5 6 21 6" />
-                    <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
-                    <path d="M10 11v6M14 11v6M9 6V4h6v2" />
-                  </svg>
+                  />
                 </button>
               </div>
             </td>
@@ -246,6 +227,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { IconPencil, IconRefresh, IconTrash } from '@tabler/icons-vue'
 import { npmApi } from '../../api/npm'
 import type { NPMConnection } from '../../types/npm'
 import { getApiErrorMessage } from '../../api/client'

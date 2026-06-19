@@ -19,20 +19,10 @@
           to="/audit?module=apt"
           class="btn btn-sm btn-outline-secondary"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
+          <IconList
+            :size="16"
             class="icon icon-sm me-1"
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-          ><path
-            stroke="none"
-            d="M0 0h24v24H0z"
-            fill="none"
-          /><path d="M4 6l16 0" /><path d="M4 12l16 0" /><path d="M4 18l12 0" /></svg>
+          />
           Historique des commandes
         </router-link>
       </div>
@@ -132,6 +122,7 @@
 
 <script setup lang="ts">
 import { ref, onUnmounted, computed } from 'vue'
+import { IconList } from '@tabler/icons-vue'
 import apiClient, { getApiErrorMessage } from '../api'
 import { useAuthStore } from '../stores/auth'
 import { useWebSocket } from '../composables/useWebSocket'

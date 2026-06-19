@@ -3,25 +3,10 @@
     <div class="card-header d-flex align-items-center justify-content-between">
       <div class="d-flex align-items-center gap-2">
         <!-- Proxmox logo-style icon -->
-        <svg
-          width="20"
-          height="20"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
+        <IconDeviceDesktop
+          :size="20"
           class="text-orange"
-        >
-          <rect
-            x="2"
-            y="3"
-            width="20"
-            height="14"
-            rx="2"
-          /><path d="M8 21h8M12 17v4" />
-        </svg>
+        />
         <h3 class="card-title mb-0">
           Cluster Proxmox
         </h3>
@@ -157,6 +142,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { IconDeviceDesktop } from '@tabler/icons-vue'
 
 interface ClusterNode {
   id: string | number

@@ -7,21 +7,10 @@
       role="alert"
     >
       <div class="d-flex align-items-center">
-        <svg
+        <IconAlertTriangle
+          :size="24"
           class="icon alert-icon me-2"
-          width="24"
-          height="24"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"
-          />
-        </svg>
+        />
         <strong>Changement de mot de passe requis.</strong>&nbsp;Pour des raisons de sécurité, veuillez définir un nouveau mot de passe avant de continuer.
       </div>
     </div>
@@ -149,21 +138,10 @@
           <div class="card mt-4">
             <div class="card-header">
               <h3 class="card-title">
-                <svg
+                <IconLock
+                  :size="20"
                   class="icon me-2"
-                  width="20"
-                  height="20"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                  />
-                </svg>
+                />
                 Authentification à deux facteurs
               </h3>
             </div>
@@ -199,21 +177,10 @@
           <div class="card">
             <div class="card-header">
               <h3 class="card-title">
-                <svg
+                <IconKey
+                  :size="20"
                   class="icon me-2"
-                  width="20"
-                  height="20"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
-                  />
-                </svg>
+                />
                 Changer le mot de passe
               </h3>
             </div>
@@ -348,21 +315,10 @@
         <div class="card">
           <div class="card-header d-flex align-items-center justify-content-between">
             <h3 class="card-title mb-0">
-              <svg
+              <IconClock
+                :size="20"
                 class="icon me-2"
-                width="20"
-                height="20"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
+              />
               Activité récente
             </h3>
             <span
@@ -430,27 +386,7 @@
                       title="Voir les logs"
                       @click="openLogViewer(cmd)"
                     >
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="14"
-                        height="14"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        viewBox="0 0 24 24"
-                      >
-                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /><line
-                          x1="16"
-                          y1="13"
-                          x2="8"
-                          y2="13"
-                        /><line
-                          x1="16"
-                          y1="17"
-                          x2="8"
-                          y2="17"
-                        /><polyline points="10 9 9 9 8 9" />
-                      </svg>
+                      <IconFileText :size="14" />
                     </button>
                   </td>
                 </tr>
@@ -476,21 +412,10 @@
       <div class="card">
         <div class="card-header d-flex align-items-center justify-content-between">
           <h3 class="card-title mb-0">
-            <svg
+            <IconLogout
+              :size="20"
               class="icon me-2"
-              width="20"
-              height="20"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"
-              />
-            </svg>
+            />
             Activité de connexion
           </h3>
           <span
@@ -561,6 +486,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { IconAlertTriangle, IconClock, IconFileText, IconKey, IconLock, IconLogout } from '@tabler/icons-vue'
 import { useAuthStore } from '../stores/auth'
 import apiClient from '../api'
 import { formatDateLong as formatDate, formatDateTime } from '../utils/formatters'

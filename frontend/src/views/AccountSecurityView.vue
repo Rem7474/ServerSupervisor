@@ -82,22 +82,10 @@
 
             <!-- Countdown bar -->
             <div class="d-flex align-items-center gap-2 mb-3">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="14"
-                height="14"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                viewBox="0 0 24 24"
-                :class="setupSecondsLeft < 120 ? 'text-danger' : 'text-secondary'"
-              >
-                <circle
-                  cx="12"
-                  cy="12"
-                  r="10"
-                /><polyline points="12 6 12 12 16 14" />
-              </svg>
+              <IconClock
+                :size="14"
+                class="setupSecondsLeft < 120 ? 'text-danger' : 'text-secondary'"
+              />
               <span
                 class="small fw-semibold"
                 :class="setupSecondsLeft < 120 ? 'text-danger' : 'text-secondary'"
@@ -138,24 +126,7 @@
                     title="Copier"
                     @click="copySecret"
                   >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="14"
-                      height="14"
-                      fill="none"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      viewBox="0 0 24 24"
-                    >
-                      <rect
-                        x="9"
-                        y="9"
-                        width="13"
-                        height="13"
-                        rx="2"
-                        ry="2"
-                      /><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
-                    </svg>
+                    <IconCopy :size="14" />
                     {{ copiedSecret ? '✓' : '' }}
                   </button>
                 </div>
@@ -262,21 +233,10 @@
     >
       <div class="card-header d-flex align-items-center justify-content-between">
         <h3 class="card-title mb-0">
-          <svg
+          <IconDeviceDesktop
+            :size="18"
             class="icon me-2"
-            width="18"
-            height="18"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-            />
-          </svg>
+          />
           Sessions actives
         </h3>
         <button
@@ -286,18 +246,10 @@
           :disabled="revokeLoading"
           @click="revokeOtherSessions"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="14"
-            height="14"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            viewBox="0 0 24 24"
+          <IconX
+            :size="14"
             class="me-1"
-          >
-            <path d="M18 6L6 18M6 6l12 12" />
-          </svg>
+          />
           {{ revokeLoading ? 'Révocation...' : 'Révoquer les autres sessions' }}
         </button>
       </div>
@@ -391,6 +343,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { IconClock, IconCopy, IconDeviceDesktop, IconX } from '@tabler/icons-vue'
 import apiClient from '../api'
 import { formatDateTime } from '../utils/formatters'
 import type { LoginEvent } from '../types/generated'

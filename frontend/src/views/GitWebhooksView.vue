@@ -17,23 +17,10 @@
             class="btn btn-outline-primary"
             @click="showDiscoverModal = true"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
+            <IconSearch
+              :size="16"
               class="icon me-1"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <circle
-                cx="10"
-                cy="10"
-                r="7"
-              />
-              <path d="M21 21l-6-6" />
-            </svg>
+            />
             Découvrir
           </button>
           <button
@@ -41,18 +28,10 @@
             class="btn btn-primary"
             @click="activeTab === 'webhooks' ? openCreateWebhook() : openCreateTracker()"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
+            <IconPlus
+              :size="16"
               class="icon me-1"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path d="M12 5v14M5 12h14" />
-            </svg>
+            />
             {{ activeTab === 'webhooks' ? 'Nouveau webhook' : 'Nouveau tracker' }}
           </button>
         </div>
@@ -67,35 +46,10 @@
           href="#"
           @click.prevent="activeTab = 'webhooks'"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
+          <IconGitBranch
+            :size="16"
             class="icon me-1"
-            width="16"
-            height="16"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            viewBox="0 0 24 24"
-          >
-            <circle
-              cx="12"
-              cy="5"
-              r="3"
-            /><circle
-              cx="5"
-              cy="19"
-              r="3"
-            /><circle
-              cx="19"
-              cy="19"
-              r="3"
-            />
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              d="M12 8v3m0 0l-4.5 5.5M12 11l4.5 5.5"
-            />
-          </svg>
+          />
           Webhooks entrants
           <span
             v-if="webhooks.length"
@@ -110,18 +64,10 @@
           href="#"
           @click.prevent="activeTab = 'trackers'"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
+          <IconActivity
+            :size="16"
             class="icon me-1"
-            width="16"
-            height="16"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            viewBox="0 0 24 24"
-          >
-            <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
-          </svg>
+          />
           Suivi de versions
           <span
             v-if="trackers.length"
@@ -154,35 +100,11 @@
         class="card"
       >
         <div class="card-body text-center py-5 text-muted">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="48"
-            height="48"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.5"
-            viewBox="0 0 24 24"
+          <IconGitBranch
+            :size="48"
             class="mb-3 d-block mx-auto opacity-50"
-          >
-            <circle
-              cx="12"
-              cy="5"
-              r="3"
-            /><circle
-              cx="5"
-              cy="19"
-              r="3"
-            /><circle
-              cx="19"
-              cy="19"
-              r="3"
-            />
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              d="M12 8v3m0 0l-4.5 5.5M12 11l4.5 5.5"
-            />
-          </svg>
+            :stroke-width="1.5"
+          />
           <p class="mb-2">
             Aucun webhook configuré.
           </p>
@@ -301,17 +223,7 @@
                   class="btn btn-sm btn-outline-danger ms-auto"
                   @click="confirmDeleteWebhook(webhook)"
                 >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="14"
-                    height="14"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    viewBox="0 0 24 24"
-                  >
-                    <polyline points="3,6 5,6 21,6" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6M14 11v6" /><path d="M9 6V4h6v2" />
-                  </svg>
+                  <IconTrash :size="14" />
                 </button>
               </div>
             </div>
@@ -344,18 +256,11 @@
         class="card"
       >
         <div class="card-body text-center py-5 text-muted">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="48"
-            height="48"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.5"
-            viewBox="0 0 24 24"
+          <IconActivity
+            :size="48"
             class="mb-3 d-block mx-auto opacity-50"
-          >
-            <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
-          </svg>
+            :stroke-width="1.5"
+          />
           <p class="mb-2">
             Aucun tracker configuré.
           </p>
@@ -568,17 +473,7 @@
                   title="Verifier maintenant"
                   @click="checkNow(tracker)"
                 >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="14"
-                    height="14"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    viewBox="0 0 24 24"
-                  >
-                    <polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10" />
-                  </svg>
+                  <IconRefresh :size="14" />
                 </button>
                 <button
                   type="button"
@@ -593,17 +488,7 @@
                   class="btn btn-sm btn-outline-danger ms-auto"
                   @click="confirmDeleteTracker(tracker)"
                 >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="14"
-                    height="14"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    viewBox="0 0 24 24"
-                  >
-                    <polyline points="3,6 5,6 21,6" /><path d="M19 6l-1 14H6L5 6" /><path d="M10 11v6M14 11v6" /><path d="M9 6V4h6v2" />
-                  </svg>
+                  <IconTrash :size="14" />
                 </button>
               </div>
             </div>
@@ -703,6 +588,7 @@
 
 <script setup lang="ts">
 import { useGitWebhooksPage } from '../composables/useGitWebhooksPage'
+import { IconActivity, IconGitBranch, IconPlus, IconRefresh, IconSearch, IconTrash } from '@tabler/icons-vue'
 import WebhookUrlCard from '../components/webhooks/WebhookUrlCard.vue'
 import WebhookExecutionList from '../components/webhooks/WebhookExecutionList.vue'
 import WebhookModal from '../components/webhooks/WebhookModal.vue'

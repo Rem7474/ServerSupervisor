@@ -7,27 +7,10 @@
     <div class="card d-flex flex-column h-100">
       <div class="card-header d-flex align-items-center justify-content-between">
         <h3 class="card-title">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
+          <IconChevronRight
+            :size="24"
             class="icon icon-tabler me-1"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            stroke-width="2"
-            stroke="currentColor"
-            fill="none"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <path
-              stroke="none"
-              d="M0 0h24v24H0z"
-              fill="none"
-            />
-            <path d="M8 9l3 3l-3 3" />
-            <path d="M13 15l3 0" />
-            <path d="M3 4m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z" />
-          </svg>
+          />
           {{ title }}
         </h3>
         <div class="d-flex gap-1">
@@ -39,47 +22,14 @@
             :disabled="!command"
             @click="copy"
           >
-            <svg
-              v-if="!copied"
-              xmlns="http://www.w3.org/2000/svg"
+            <IconCopy
+              :size="18"
               class="icon"
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              stroke-width="2"
-              stroke="currentColor"
-              fill="none"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path
-                stroke="none"
-                d="M0 0h24v24H0z"
-                fill="none"
-              />
-              <path d="M8 8m0 2a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2z" />
-              <path d="M16 8v-2a2 2 0 0 0 -2 -2h-8a2 2 0 0 0 -2 2v8a2 2 0 0 0 2 2h2" />
-            </svg>
-            <svg
-              v-else
-              xmlns="http://www.w3.org/2000/svg"
+            />
+            <IconCheck
+              :size="18"
               class="icon text-success"
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              stroke-width="2"
-              stroke="currentColor"
-              fill="none"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path
-                stroke="none"
-                d="M0 0h24v24H0z"
-                fill="none"
-              />
-              <path d="M5 12l5 5l10 -10" />
-            </svg>
+            />
           </button>
           <!-- Download -->
           <button
@@ -89,27 +39,10 @@
             :disabled="!command"
             @click="download"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
+            <IconDownload
+              :size="18"
               class="icon"
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              stroke-width="2"
-              stroke="currentColor"
-              fill="none"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path
-                stroke="none"
-                d="M0 0h24v24H0z"
-                fill="none"
-              />
-              <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2" />
-              <path d="M7 11l5 5l5 -5" />
-              <path d="M12 4l0 12" />
-            </svg>
+            />
           </button>
           <!-- Clear (optional) -->
           <button
@@ -120,26 +53,10 @@
             :disabled="!command"
             @click="$emit('clear')"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
+            <IconTrash
+              :size="18"
               class="icon"
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              stroke-width="2"
-              stroke="currentColor"
-              fill="none"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path
-                stroke="none"
-                d="M0 0h24v24H0z"
-                fill="none"
-              />
-              <path d="M4 7h16" /><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12" />
-              <path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3" />
-            </svg>
+            />
           </button>
           <!-- Close -->
           <button
@@ -148,26 +65,10 @@
             title="Fermer"
             @click="$emit('close')"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
+            <IconX
+              :size="24"
               class="icon"
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              stroke-width="2"
-              stroke="currentColor"
-              fill="none"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path
-                stroke="none"
-                d="M0 0h24v24H0z"
-                fill="none"
-              />
-              <path d="M18 6l-12 12" />
-              <path d="M6 6l12 12" />
-            </svg>
+            />
           </button>
         </div>
       </div>
@@ -179,27 +80,11 @@
           class="d-flex align-items-center justify-content-center flex-fill text-secondary console-empty"
         >
           <div class="text-center p-4">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
+            <IconChevronRight
+              :size="48"
               class="icon icon-tabler mb-2 opacity-50"
-              width="48"
-              height="48"
-              viewBox="0 0 24 24"
-              stroke-width="1.5"
-              stroke="currentColor"
-              fill="none"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path
-                stroke="none"
-                d="M0 0h24v24H0z"
-                fill="none"
-              />
-              <path d="M8 9l3 3l-3 3" />
-              <path d="M13 15l3 0" />
-              <path d="M3 4m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z" />
-            </svg>
+              :stroke-width="1.5"
+            />
             <div class="opacity-75">
               {{ emptyText }}
             </div>
@@ -261,33 +146,17 @@
     class="btn btn-primary console-fab"
     @click="$emit('open')"
   >
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
+    <IconChevronRight
+      :size="24"
       class="icon me-1"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      stroke-width="2"
-      stroke="currentColor"
-      fill="none"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-    >
-      <path
-        stroke="none"
-        d="M0 0h24v24H0z"
-        fill="none"
-      />
-      <path d="M8 9l3 3l-3 3" />
-      <path d="M13 15l3 0" />
-      <path d="M3 4m0 2a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2z" />
-    </svg>
+    />
     {{ title }}
   </button>
 </template>
 
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
+import { IconCheck, IconChevronRight, IconCopy, IconDownload, IconTrash, IconX } from '@tabler/icons-vue'
 import { copyConsoleOutput, downloadConsoleOutput } from '../../utils/consoleOutput'
 import { moduleLabel, moduleClass } from '../../utils/moduleMeta'
 import { useStatusBadge } from '../../composables/useStatusBadge'

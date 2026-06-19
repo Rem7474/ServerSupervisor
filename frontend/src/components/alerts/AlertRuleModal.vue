@@ -144,22 +144,10 @@
                 v-if="testing"
                 class="spinner-border spinner-border-sm me-2"
               />
-              <svg
-                v-else
+              <IconCircleCheck
+                :size="16"
                 class="icon me-1"
-                width="16"
-                height="16"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
+              />
               {{ testing ? 'Test en cours...' : 'Tester' }}
             </button>
             <button
@@ -188,6 +176,7 @@
 
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from 'vue'
+import { IconCircleCheck } from '@tabler/icons-vue'
 import apiClient from '../../api'
 import AlertRuleStepSource from './AlertRuleStepSource.vue'
 import AlertRuleStepConditions from './AlertRuleStepConditions.vue'

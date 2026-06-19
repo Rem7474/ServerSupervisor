@@ -224,21 +224,10 @@
                       v-if="actionLoading[c.name] === 'start'"
                       class="spinner-border spinner-border-sm"
                     />
-                    <svg
-                      v-else
-                      xmlns="http://www.w3.org/2000/svg"
+                    <IconPlayerPlay
+                      :size="16"
                       class="icon icon-sm"
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      stroke-width="2"
-                      stroke="currentColor"
-                      fill="none"
-                    ><path
-                      stroke="none"
-                      d="M0 0h24v24H0z"
-                      fill="none"
-                    /><path d="M7 4v16l13 -8z" /></svg>
+                    />
                   </button>
                   <button
                     v-if="c.state === 'running'"
@@ -253,27 +242,11 @@
                       v-if="actionLoading[c.name] === 'stop'"
                       class="spinner-border spinner-border-sm"
                     />
-                    <svg
+                    <IconPlayerStop
                       v-else
-                      xmlns="http://www.w3.org/2000/svg"
+                      :size="16"
                       class="icon icon-sm"
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      stroke-width="2"
-                      stroke="currentColor"
-                      fill="none"
-                    ><path
-                      stroke="none"
-                      d="M0 0h24v24H0z"
-                      fill="none"
-                    /><rect
-                      x="4"
-                      y="4"
-                      width="16"
-                      height="16"
-                      rx="2"
-                    /></svg>
+                    />
                   </button>
                   <button
                     v-if="c.state === 'running'"
@@ -288,21 +261,10 @@
                       v-if="actionLoading[c.name] === 'restart'"
                       class="spinner-border spinner-border-sm"
                     />
-                    <svg
-                      v-else
-                      xmlns="http://www.w3.org/2000/svg"
+                    <IconRefresh
+                      :size="16"
                       class="icon icon-sm"
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      stroke-width="2"
-                      stroke="currentColor"
-                      fill="none"
-                    ><path
-                      stroke="none"
-                      d="M0 0h24v24H0z"
-                      fill="none"
-                    /><path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4" /><path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4" /></svg>
+                    />
                   </button>
                   <button
                     type="button"
@@ -316,21 +278,10 @@
                       v-if="actionLoading[c.name] === 'logs'"
                       class="spinner-border spinner-border-sm"
                     />
-                    <svg
-                      v-else
-                      xmlns="http://www.w3.org/2000/svg"
+                    <IconList
+                      :size="16"
                       class="icon icon-sm"
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      stroke-width="2"
-                      stroke="currentColor"
-                      fill="none"
-                    ><path
-                      stroke="none"
-                      d="M0 0h24v24H0z"
-                      fill="none"
-                    /><path d="M4 6l16 0" /><path d="M4 12l16 0" /><path d="M4 18l12 0" /></svg>
+                    />
                   </button>
                 </template>
                 <button
@@ -340,24 +291,10 @@
                   aria-label="Inspecter le conteneur"
                   @click="inspectTarget = c; inspectTab = 'env'"
                 >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
+                  <IconSearch
+                    :size="16"
                     class="icon icon-sm"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    stroke-width="2"
-                    stroke="currentColor"
-                    fill="none"
-                  ><path
-                    stroke="none"
-                    d="M0 0h24v24H0z"
-                    fill="none"
-                  /><circle
-                    cx="10"
-                    cy="10"
-                    r="7"
-                  /><path d="M21 21l-6 -6" /></svg>
+                  />
                 </button>
                 <button
                   v-if="containerVersion(c)?.tracker_id"
@@ -367,20 +304,10 @@
                   aria-label="Voir le suivi de version"
                   @click="openTracker(containerVersion(c)?.tracker_id)"
                 >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
+                  <IconChevronRight
+                    :size="16"
                     class="icon icon-sm"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    stroke-width="2"
-                    stroke="currentColor"
-                    fill="none"
-                  ><path
-                    stroke="none"
-                    d="M0 0h24v24H0z"
-                    fill="none"
-                  /><path d="M12 5l7 7l-7 7" /><path d="M5 12h14" /></svg>
+                  />
                 </button>
                 <button
                   v-if="containerVersion(c)?.tracker_id"
@@ -395,21 +322,10 @@
                     v-if="trackerRunLoading[containerVersion(c)?.tracker_id || '']"
                     class="spinner-border spinner-border-sm"
                   />
-                  <svg
-                    v-else
-                    xmlns="http://www.w3.org/2000/svg"
+                  <IconPlayerPlay
+                    :size="16"
                     class="icon icon-sm"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    stroke-width="2"
-                    stroke="currentColor"
-                    fill="none"
-                  ><path
-                    stroke="none"
-                    d="M0 0h24v24H0z"
-                    fill="none"
-                  /><path d="M7 4v16l13 -8z" /></svg>
+                  />
                 </button>
                 <button
                   type="button"
@@ -418,20 +334,10 @@
                   aria-label="Créer un tracker de mise à jour"
                   @click="trackImage(c)"
                 >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
+                  <IconActivity
+                    :size="16"
                     class="icon icon-sm"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    stroke-width="2"
-                    stroke="currentColor"
-                    fill="none"
-                  ><path
-                    stroke="none"
-                    d="M0 0h24v24H0z"
-                    fill="none"
-                  /><path d="M22 12h-4l-3 9L9 3l-3 9H2" /></svg>
+                  />
                 </button>
                 <button
                   v-if="getComposeInfo(c).project || Object.keys(c.labels || {}).length > 0"
@@ -440,25 +346,10 @@
                   :title="getComposeInfo(c).project ? 'Infos Compose + Labels' : 'Labels'"
                   @click="selectedContainer = c"
                 >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
+                  <IconClipboard
+                    :size="16"
                     class="icon icon-sm"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    stroke-width="2"
-                    stroke="currentColor"
-                    fill="none"
-                  >
-                    <path
-                      stroke="none"
-                      d="M0 0h24v24H0z"
-                      fill="none"
-                    />
-                    <path d="M9 5H7a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2V7a2 2 0 0 0 -2 -2h-2" />
-                    <path d="M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2 -2a2 2 0 0 0 -2 -2h-2a2 2 0 0 0 -2 2z" />
-                    <path d="M9 12l.01 0" /><path d="M13 12l2 0" /><path d="M9 16l.01 0" /><path d="M13 16l2 0" />
-                  </svg>
+                  />
                 </button>
               </div>
             </td>
@@ -490,23 +381,11 @@
     cta-to="/hosts/new"
   >
     <template #icon>
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
+      <IconBox
+        :size="48"
         class="mb-3"
-        width="48"
-        height="48"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-        style="opacity:.35"
-      >
-        <path
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-width="1.5"
-          d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-        />
-      </svg>
+        :stroke-width="1.5"
+      />
     </template>
   </EmptyState>
 
@@ -778,6 +657,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, toRef } from 'vue'
+import { IconActivity, IconBox, IconChevronRight, IconClipboard, IconList, IconPlayerPlay, IconRefresh, IconSearch, IconPlayerStop } from '@tabler/icons-vue'
 import { useRouter } from 'vue-router'
 import apiClient from '../../api'
 import DataToolbar from '../common/DataToolbar.vue'

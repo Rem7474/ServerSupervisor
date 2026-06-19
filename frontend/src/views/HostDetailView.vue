@@ -45,20 +45,10 @@
             class="btn btn-outline-secondary"
             @click="isEditing = true"
           >
-            <svg
+            <IconPencil
+              :size="16"
               class="icon me-1"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              fill="none"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
-              <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
-            </svg>
+            />
             Modifier
           </button>
           <button
@@ -68,20 +58,10 @@
             :disabled="agentUpdateLoading"
             @click="sendAgentUpdate"
           >
-            <svg
+            <IconRefresh
+              :size="16"
               class="icon me-1"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              fill="none"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path d="M21 12a9 9 0 1 1-3.3-6.9" />
-              <path d="M21 3v6h-6" />
-            </svg>
+            />
             Mettre à jour l'agent
           </button>
           <button
@@ -90,19 +70,10 @@
             class="btn btn-outline-danger"
             @click="deleteHost"
           >
-            <svg
+            <IconTrash
+              :size="16"
               class="icon me-1"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              fill="none"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
-            </svg>
+            />
             Supprimer
           </button>
         </div>
@@ -203,16 +174,10 @@
             title="Supprimer le lien"
             @click="deleteLink"
           >
-            <svg
+            <IconTrash
+              :size="2"
               class="icon icon-sm"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
-              <path d="M10 11v6M14 11v6M9 6V4h6v2" />
-            </svg>
+            />
           </button>
         </div>
 
@@ -240,16 +205,10 @@
         class="btn btn-sm btn-outline-orange"
         @click="openLinkForm"
       >
-        <svg
+        <IconLink
+          :size="2"
           class="icon icon-sm me-1"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-        >
-          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-        </svg>
+        />
         Lier à Proxmox
       </button>
     </div>
@@ -338,33 +297,10 @@
             v-if="host && host.status !== 'online'"
             class="alert alert-warning mb-3"
           >
-            <svg
+            <IconAlertCircle
+              :size="16"
               class="icon me-2"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <circle
-                cx="12"
-                cy="12"
-                r="10"
-              /><line
-                x1="12"
-                y1="8"
-                x2="12"
-                y2="12"
-              /><line
-                x1="12"
-                y1="16"
-                x2="12.01"
-                y2="16"
-              />
-            </svg>
+            />
             Agent hors ligne — les données affichées peuvent être obsolètes ou indisponibles.
           </div>
           <HostMetricsPanel
@@ -472,27 +408,10 @@
           >
             <div class="card-header d-flex align-items-center justify-content-between">
               <h3 class="card-title mb-0 d-flex align-items-center gap-2">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
+                <IconLock
+                  :size="16"
                   class="icon icon-sm text-warning"
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <rect
-                    x="3"
-                    y="11"
-                    width="18"
-                    height="11"
-                    rx="2"
-                    ry="2"
-                  /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                </svg>
+                />
                 Permissions par hôte
               </h3>
               <span class="badge badge-sm bg-danger text-white">Admin only</span>
@@ -539,20 +458,10 @@
                         title="Révoquer"
                         @click="revokePermission(p.username)"
                       >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
+                        <IconX
+                          :size="16"
                           class="icon icon-sm"
-                          width="16"
-                          height="16"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          stroke-width="2"
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                        >
-                          <path d="M18 6l-12 12" /><path d="M6 6l12 12" />
-                        </svg>
+                        />
                       </button>
                     </td>
                   </tr>
@@ -676,6 +585,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { IconLink, IconLock, IconPencil, IconRefresh, IconTrash, IconX, IconAlertCircle } from '@tabler/icons-vue'
 import { useHostDetail } from '../composables/useHostDetail'
 import RelativeTime from '../components/RelativeTime.vue'
 import DiskMetricsCard from '../components/disk/DiskMetricsCard.vue'

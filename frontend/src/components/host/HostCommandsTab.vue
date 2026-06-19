@@ -45,20 +45,10 @@
                 title="Voir les logs"
                 @click="$emit('watch-command', cmd)"
               >
-                <svg
+                <IconList
+                  :size="16"
                   class="icon icon-sm"
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  stroke-width="2"
-                  stroke="currentColor"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                ><path
-                  stroke="none"
-                  d="M0 0h24v24H0z"
-                  fill="none"
-                /><path d="M4 6l16 0" /><path d="M4 12l16 0" /><path d="M4 18l12 0" /></svg>
+                />
               </button>
             </td>
           </tr>
@@ -90,6 +80,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { IconList } from '@tabler/icons-vue'
 import { useDateFormatter } from '../../composables/useDateFormatter'
 import { usePagination } from '../../composables/usePagination'
 import { useStatusBadge } from '../../composables/useStatusBadge'

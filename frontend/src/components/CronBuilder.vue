@@ -143,22 +143,10 @@
         v-if="preview"
         class="form-hint text-primary"
       >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="12"
-          height="12"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
+        <IconClock
+          :size="12"
           class="me-1"
-        >
-          <circle
-            cx="12"
-            cy="12"
-            r="10"
-          /><polyline points="12 6 12 12 16 14" />
-        </svg>
+        />
         {{ preview }}
         <code class="ms-2 text-muted small">{{ modelValue }}</code>
       </div>
@@ -168,6 +156,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
+import { IconClock } from '@tabler/icons-vue'
 import { describeCron } from '../utils/cron'
 
 const props = withDefaults(defineProps<{

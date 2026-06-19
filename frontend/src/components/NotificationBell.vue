@@ -13,20 +13,7 @@
       :aria-expanded="isOpen"
       @click.stop="toggleOpen"
     >
-      <svg
-        width="20"
-        height="20"
-        fill="none"
-        stroke="currentColor"
-        viewBox="0 0 24 24"
-      >
-        <path
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-width="2"
-          d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-        />
-      </svg>
+      <IconBell :size="20" />
       <span
         v-if="unreadCount > 0"
         class="badge bg-red text-white position-absolute notification-bell-counter"
@@ -72,22 +59,11 @@
           v-else-if="!notifications.length"
           class="text-center text-secondary py-4 small"
         >
-          <svg
+          <IconBell
+            :size="32"
             class="mb-2"
-            width="32"
-            height="32"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-            style="opacity:.4"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="1.5"
-              d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5"
-            />
-          </svg>
+            :stroke-width="1.5"
+          />
           <div>Aucune notification</div>
         </div>
 
@@ -130,21 +106,10 @@
                 class="text-truncate text-secondary text-decoration-none notification-host-link notification-host"
                 @click="isOpen = false"
               >
-                <svg
+                <IconServer
+                  :size="12"
                   class="me-1"
-                  width="12"
-                  height="12"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"
-                  />
-                </svg>
+                />
                 {{ item.host_name }}
               </router-link>
               <span class="flex-shrink-0 ms-2">
@@ -185,6 +150,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
+import { IconBell, IconServer } from '@tabler/icons-vue'
 import RelativeTime from './RelativeTime.vue'
 import { useNotifications } from '../composables/useNotifications'
 

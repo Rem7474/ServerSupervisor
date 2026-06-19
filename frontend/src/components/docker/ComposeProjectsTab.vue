@@ -149,21 +149,10 @@
                       v-if="actionLoading[p.name] === 'compose_up'"
                       class="spinner-border spinner-border-sm"
                     />
-                    <svg
-                      v-else
-                      xmlns="http://www.w3.org/2000/svg"
+                    <IconPlayerPlay
+                      :size="16"
                       class="icon icon-sm"
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      stroke-width="2"
-                      stroke="currentColor"
-                      fill="none"
-                    ><path
-                      stroke="none"
-                      d="M0 0h24v24H0z"
-                      fill="none"
-                    /><path d="M7 4v16l13 -8z" /></svg>
+                    />
                   </button>
                   <template v-if="getComposeStatus(p) === 'running'">
                     <button
@@ -178,27 +167,11 @@
                         v-if="actionLoading[p.name] === 'compose_down'"
                         class="spinner-border spinner-border-sm"
                       />
-                      <svg
+                      <IconPlayerStop
                         v-else
-                        xmlns="http://www.w3.org/2000/svg"
+                        :size="16"
                         class="icon icon-sm"
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        stroke-width="2"
-                        stroke="currentColor"
-                        fill="none"
-                      ><path
-                        stroke="none"
-                        d="M0 0h24v24H0z"
-                        fill="none"
-                      /><rect
-                        x="4"
-                        y="4"
-                        width="16"
-                        height="16"
-                        rx="2"
-                      /></svg>
+                      />
                     </button>
                     <button
                       type="button"
@@ -212,21 +185,10 @@
                         v-if="actionLoading[p.name] === 'compose_restart'"
                         class="spinner-border spinner-border-sm"
                       />
-                      <svg
-                        v-else
-                        xmlns="http://www.w3.org/2000/svg"
+                      <IconRefresh
+                        :size="16"
                         class="icon icon-sm"
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        stroke-width="2"
-                        stroke="currentColor"
-                        fill="none"
-                      ><path
-                        stroke="none"
-                        d="M0 0h24v24H0z"
-                        fill="none"
-                      /><path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4" /><path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4" /></svg>
+                      />
                     </button>
                   </template>
                   <button
@@ -241,21 +203,10 @@
                       v-if="actionLoading[p.name] === 'compose_logs'"
                       class="spinner-border spinner-border-sm"
                     />
-                    <svg
-                      v-else
-                      xmlns="http://www.w3.org/2000/svg"
+                    <IconList
+                      :size="16"
                       class="icon icon-sm"
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      stroke-width="2"
-                      stroke="currentColor"
-                      fill="none"
-                    ><path
-                      stroke="none"
-                      d="M0 0h24v24H0z"
-                      fill="none"
-                    /><path d="M4 6l16 0" /><path d="M4 12l16 0" /><path d="M4 18l12 0" /></svg>
+                    />
                   </button>
                 </template>
                 <button
@@ -264,27 +215,10 @@
                   title="Config"
                   @click="selectedProject = p"
                 >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
+                  <IconFile
+                    :size="16"
                     class="icon icon-sm"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    stroke-width="2"
-                    stroke="currentColor"
-                    fill="none"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  >
-                    <path
-                      stroke="none"
-                      d="M0 0h24v24H0z"
-                      fill="none"
-                    />
-                    <path d="M14 3v4a1 1 0 0 0 1 1h4" />
-                    <path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" />
-                    <path d="M9 9l1 0" /><path d="M9 13l6 0" /><path d="M9 17l6 0" />
-                  </svg>
+                  />
                 </button>
               </div>
             </td>
@@ -430,6 +364,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { IconFile, IconList, IconPlayerPlay, IconRefresh, IconPlayerStop } from '@tabler/icons-vue'
 import apiClient from '../../api'
 import DataToolbar from '../common/DataToolbar.vue'
 import { getApiErrorMessage } from '../../api/client'

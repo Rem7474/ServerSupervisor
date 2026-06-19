@@ -63,28 +63,10 @@
             class="avatar avatar-sm rounded"
             :class="iconBg(ev)"
           >
-            <svg
+            <IconClipboard
+              :size="16"
               class="icon"
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path
-                v-if="ev.type === 'audit'"
-                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-              />
-              <path
-                v-else-if="ev.type === 'command'"
-                d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-              />
-              <path
-                v-else
-                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-              />
-            </svg>
+            />
           </span>
         </div>
         <div class="flex-grow-1 min-w-0">
@@ -127,6 +109,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { IconClipboard } from '@tabler/icons-vue'
 import api from '../../api'
 import type { HostTimelineEvent } from '../../types/audit'
 import RelativeTime from '../RelativeTime.vue'

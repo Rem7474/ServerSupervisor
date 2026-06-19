@@ -20,21 +20,10 @@
         to="/hosts/new"
         class="btn btn-primary btn-sm"
       >
-        <svg
+        <IconPlus
+          :size="20"
           class="icon"
-          width="20"
-          height="20"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-          />
-        </svg>
+        />
         <span class="d-none d-sm-inline ms-1">Ajouter un hôte</span>
       </router-link>
     </div>
@@ -525,7 +514,7 @@ import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import PaginationNav from '../components/PaginationNav.vue'
 import SortableHeader from '../components/common/SortableHeader.vue'
 import EmptyState from '../components/EmptyState.vue'
-import { IconAlertTriangle } from '@tabler/icons-vue'
+import { IconAlertTriangle, IconPlus } from '@tabler/icons-vue'
 import BulkActionBar from '../components/BulkActionBar.vue'
 import { formatHostStatus, hostStatusClass } from '../utils/formatHostStatus'
 import { pluralize } from '../utils/formatters'

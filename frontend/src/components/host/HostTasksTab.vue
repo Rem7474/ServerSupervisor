@@ -31,24 +31,11 @@
         v-else-if="!tasks.length"
         class="card-body text-center py-5"
       >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
+        <IconClock
+          :size="40"
           class="icon mb-3 text-muted"
-          width="40"
-          height="40"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.5"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        >
-          <circle
-            cx="12"
-            cy="12"
-            r="10"
-          /><polyline points="12 6 12 12 16 14" />
-        </svg>
+          :stroke-width="1.5"
+        />
         <h3 class="mb-1">
           Aucune tache planifiee
         </h3>
@@ -153,19 +140,10 @@
                     title="Voir les logs"
                     @click="openTaskLogs(task)"
                   >
-                    <svg
+                    <IconList
+                      :size="16"
                       class="icon icon-sm"
-                      width="16"
-                      height="16"
-                      viewBox="0 0 24 24"
-                      stroke-width="2"
-                      stroke="currentColor"
-                      fill="none"
-                    ><path
-                      stroke="none"
-                      d="M0 0h24v24H0z"
-                      fill="none"
-                    /><path d="M4 6l16 0" /><path d="M4 12l16 0" /><path d="M4 18l12 0" /></svg>
+                    />
                   </button>
                   <button
                     v-if="canRunApt"
@@ -424,6 +402,7 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { IconClock, IconList } from '@tabler/icons-vue'
 import CronBuilder from '../CronBuilder.vue'
 import apiClient from '../../api'
 import { useConfirmDialog } from '../../composables/useConfirmDialog'
