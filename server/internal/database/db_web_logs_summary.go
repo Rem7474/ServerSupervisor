@@ -7,10 +7,11 @@ import (
 	"time"
 )
 
-// GetWebLogsSummary aggregates traffic + threats statistics across all
-// captured web requests in the requested window. The shape of the returned
-// map matches what the SecurityView/TrafficView frontends expect.
-func (db *DB) GetWebLogsSummary(ctx context.Context, since time.Time, hostID string, source string) (map[string]any, error) {
+// buildWebLogsWhere builds the shared WHERE clause + positional args used by
+// every web-logs aggregate query (filtering by window, optional host, optional
+// source). The same clause applies to both web_log_requests and
+// web_log_snapshots since both carry captured_at / host_id / source columns.
+func buildWebLogsWhere(since time.Time, hostID, source string) (string, []any) {
 	args := []any{since}
 	where := "captured_at >= $1"
 	if hostID != "" {
@@ -21,6 +22,14 @@ func (db *DB) GetWebLogsSummary(ctx context.Context, since time.Time, hostID str
 		args = append(args, source)
 		where += fmt.Sprintf(" AND source = $%d", len(args))
 	}
+	return where, args
+}
+
+// GetWebLogsSummary aggregates traffic + threats statistics across all
+// captured web requests in the requested window. The shape of the returned
+// map matches what the SecurityView/TrafficView frontends expect.
+func (db *DB) GetWebLogsSummary(ctx context.Context, since time.Time, hostID string, source string) (map[string]any, error) {
+	where, args := buildWebLogsWhere(since, hostID, source)
 
 	traffic := map[string]any{}
 	var totalRequests int64
@@ -226,6 +235,55 @@ func (db *DB) GetWebLogsSummary(ctx context.Context, since time.Time, hostID str
 	traffic["top_hosts"] = topHosts
 
 	threats := map[string]any{}
+	if err := db.fillWebLogsThreats(ctx, threats, where, args); err != nil {
+		return nil, err
+	}
+	if err := db.fillWebLogsCrowdSec(ctx, threats, where, args, hostID); err != nil {
+		return nil, err
+	}
+
+	return map[string]any{
+		"traffic": traffic,
+		"threats": threats,
+	}, nil
+}
+
+// GetWebLogsThreats computes only the threats portion of the summary (suspicious
+// activity + CrowdSec decisions + a blocked-IP count). It deliberately skips the
+// traffic aggregates — which are unindexed full-table scans over the window —
+// and the geolocation/compare enrichment, so the threats-only BotView stays fast
+// even on large windows. Every query here is served by an index leading with
+// `suspicious`, `blocked` or the snapshot indexes.
+func (db *DB) GetWebLogsThreats(ctx context.Context, since time.Time, hostID string, source string) (map[string]any, error) {
+	where, args := buildWebLogsWhere(since, hostID, source)
+
+	threats := map[string]any{}
+
+	// blocked_ips: the only blocked statistic the BotView displays. Indexed by
+	// idx_web_log_requests_blocked_captured / idx_web_log_requests_ip_blocked.
+	var blockedIPs int64
+	if err := db.conn.QueryRowContext(ctx,
+		fmt.Sprintf(`SELECT COALESCE(COUNT(DISTINCT ip),0)
+		FROM web_log_requests WHERE %s AND blocked = TRUE`, where),
+		args...,
+	).Scan(&blockedIPs); err == nil {
+		threats["blocked_ips"] = blockedIPs
+	}
+
+	if err := db.fillWebLogsThreats(ctx, threats, where, args); err != nil {
+		return nil, err
+	}
+	if err := db.fillWebLogsCrowdSec(ctx, threats, where, args, hostID); err != nil {
+		return nil, err
+	}
+	return threats, nil
+}
+
+// fillWebLogsThreats populates the suspicious-activity threat signals (counts,
+// top IPs, top scanned paths, most-targeted domains, IP×domain scan matrix)
+// into the provided threats map. All queries filter on `suspicious = TRUE` and
+// are served by idx_web_log_requests_suspicious_captured.
+func (db *DB) fillWebLogsThreats(ctx context.Context, threats map[string]any, where string, args []any) error {
 	var suspiciousRequests int64
 	var suspiciousIPs int64
 	var targetedHosts int64
@@ -235,7 +293,7 @@ func (db *DB) GetWebLogsSummary(ctx context.Context, since time.Time, hostID str
 		WHERE %s AND suspicious = TRUE`, where),
 		args...,
 	).Scan(&suspiciousRequests, &suspiciousIPs, &targetedHosts); err != nil {
-		return nil, err
+		return err
 	}
 	threats["suspicious_requests"] = suspiciousRequests
 	threats["suspicious_ips"] = suspiciousIPs
@@ -261,7 +319,7 @@ func (db *DB) GetWebLogsSummary(ctx context.Context, since time.Time, hostID str
 		args...,
 	)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer func() { _ = ipRows.Close() }()
 	topIPs := make([]map[string]any, 0)
@@ -278,7 +336,7 @@ func (db *DB) GetWebLogsSummary(ctx context.Context, since time.Time, hostID str
 		var blockedUntil sql.NullTime
 		var isBlocked int
 		if err := ipRows.Scan(&ip, &hits, &uniquePaths, &hostCount, &firstSeen, &lastSeen, &blockedSource, &blockedReason, &blockedAt, &blockedUntil, &isBlocked); err != nil {
-			return nil, err
+			return err
 		}
 		score := hits * uniquePaths
 		level := "LOW"
@@ -332,7 +390,7 @@ func (db *DB) GetWebLogsSummary(ctx context.Context, since time.Time, hostID str
 		args...,
 	)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer func() { _ = pathsRows.Close() }()
 	topPaths := make([]map[string]any, 0)
@@ -340,7 +398,7 @@ func (db *DB) GetWebLogsSummary(ctx context.Context, since time.Time, hostID str
 		var path, category string
 		var hits int64
 		if err := pathsRows.Scan(&path, &category, &hits); err != nil {
-			return nil, err
+			return err
 		}
 		topPaths = append(topPaths, map[string]any{"path": path, "category": category, "hits": hits})
 	}
@@ -356,7 +414,7 @@ func (db *DB) GetWebLogsSummary(ctx context.Context, since time.Time, hostID str
 		args...,
 	)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer func() { _ = hostRows.Close() }()
 	mostTargetedHosts := make([]map[string]any, 0)
@@ -364,7 +422,7 @@ func (db *DB) GetWebLogsSummary(ctx context.Context, since time.Time, hostID str
 		var vhost string
 		var hits int64
 		if err := hostRows.Scan(&vhost, &hits); err != nil {
-			return nil, err
+			return err
 		}
 		mostTargetedHosts = append(mostTargetedHosts, map[string]any{"host_id": vhost, "host_name": vhost, "hits": hits})
 	}
@@ -381,7 +439,7 @@ func (db *DB) GetWebLogsSummary(ctx context.Context, since time.Time, hostID str
 		args...,
 	)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer func() { _ = matrixRows.Close() }()
 	ipHostMatrix := make([]map[string]any, 0)
@@ -390,25 +448,22 @@ func (db *DB) GetWebLogsSummary(ctx context.Context, since time.Time, hostID str
 		var hostCount int64
 		var hits int64
 		if err := matrixRows.Scan(&ip, &hostCount, &hits); err != nil {
-			return nil, err
+			return err
 		}
 		ipHostMatrix = append(ipHostMatrix, map[string]any{"ip": ip, "host_count": hostCount, "hits": hits})
 	}
 	threats["ip_host_matrix"] = ipHostMatrix
 
-	// CrowdSec: return count + top blocked IPs from the most recent snapshot.
+	return nil
+}
+
+// fillWebLogsCrowdSec populates the CrowdSec decision signals (active blocked-IP
+// count + the most recent per-IP decisions) into the provided threats map from
+// the latest web_log_snapshots. The same window/host/source WHERE clause applies
+// to web_log_snapshots, which carries captured_at / host_id / source columns.
+func (db *DB) fillWebLogsCrowdSec(ctx context.Context, threats map[string]any, where string, args []any, hostID string) error {
 	var crowdSecBlocked int64
 	var crowdSecHostCount int64
-	csArgs := []any{since}
-	csWhere := "captured_at >= $1"
-	if hostID != "" {
-		csArgs = append(csArgs, hostID)
-		csWhere += fmt.Sprintf(" AND host_id = $%d", len(csArgs))
-	}
-	if source != "" {
-		csArgs = append(csArgs, source)
-		csWhere += fmt.Sprintf(" AND source = $%d", len(csArgs))
-	}
 	countQuery := fmt.Sprintf(`
 		WITH snapshots AS (
 			SELECT captured_at, host_id, COALESCE(crowdsec_top_blocked, '[]'::jsonb) AS top_blocked
@@ -425,9 +480,9 @@ func (db *DB) GetWebLogsSummary(ctx context.Context, since time.Time, hostID str
 		)
 		SELECT COALESCE(COUNT(DISTINCT ip), 0), COALESCE(COUNT(DISTINCT host_id), 0)
 		FROM expanded
-		WHERE ip IS NOT NULL AND ip <> ''`, csWhere)
-	if err := db.conn.QueryRowContext(ctx, countQuery, csArgs...).Scan(&crowdSecBlocked, &crowdSecHostCount); err != nil {
-		return nil, err
+		WHERE ip IS NOT NULL AND ip <> ''`, where)
+	if err := db.conn.QueryRowContext(ctx, countQuery, args...).Scan(&crowdSecBlocked, &crowdSecHostCount); err != nil {
+		return err
 	}
 	threats["crowdsec_blocked_ips"] = crowdSecBlocked
 
@@ -463,10 +518,10 @@ func (db *DB) GetWebLogsSummary(ctx context.Context, since time.Time, hostID str
 			SELECT ip, type, reason, origin, country, as_name, blocked_until, captured_at, host_id
 			FROM dedup
 			ORDER BY captured_at DESC, ip
-			LIMIT %d`, csWhere, crowdSecTopBlockedLimit)
-		rows, err := db.conn.QueryContext(ctx, listQuery, csArgs...)
+			LIMIT %d`, where, crowdSecTopBlockedLimit)
+		rows, err := db.conn.QueryContext(ctx, listQuery, args...)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		defer func() { _ = rows.Close() }()
 
@@ -482,7 +537,7 @@ func (db *DB) GetWebLogsSummary(ctx context.Context, since time.Time, hostID str
 			var capturedAt time.Time
 			var rowHostID string
 			if err := rows.Scan(&ip, &decisionType, &reason, &origin, &country, &asName, &blockedUntil, &capturedAt, &rowHostID); err != nil {
-				return nil, err
+				return err
 			}
 			entry := map[string]any{"ip": ip}
 			typeStr := "ban"
@@ -510,7 +565,7 @@ func (db *DB) GetWebLogsSummary(ctx context.Context, since time.Time, hostID str
 			csEntries = append(csEntries, entry)
 		}
 		if err := rows.Err(); err != nil {
-			return nil, err
+			return err
 		}
 		threats["crowdsec_top_blocked"] = csEntries
 	}
@@ -520,17 +575,14 @@ func (db *DB) GetWebLogsSummary(ctx context.Context, since time.Time, hostID str
 	} else if crowdSecHostCount == 1 {
 		var singleHostID string
 		if err := db.conn.QueryRowContext(ctx,
-			fmt.Sprintf(`SELECT MAX(host_id) FROM web_log_snapshots WHERE %s`, csWhere),
-			csArgs...,
+			fmt.Sprintf(`SELECT MAX(host_id) FROM web_log_snapshots WHERE %s`, where),
+			args...,
 		).Scan(&singleHostID); err == nil && singleHostID != "" {
 			threats["crowdsec_host_id"] = singleHostID
 		}
 	}
 
-	return map[string]any{
-		"traffic": traffic,
-		"threats": threats,
-	}, nil
+	return nil
 }
 
 // GetWebLogsKPIWindow returns the small KPI tile values shown on the security

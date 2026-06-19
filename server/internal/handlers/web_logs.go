@@ -125,7 +125,12 @@ func (h *WebLogsHandler) GetWebLogsSummary(c *gin.Context) {
 		respondError(c, apperr.Validation("invalid source"))
 		return
 	}
-	result, err := h.svc.Summary(c.Request.Context(), period, hostID, source)
+	scope := strings.ToLower(strings.TrimSpace(c.Query("scope")))
+	if scope != "" && scope != "threats" && scope != "full" {
+		respondError(c, apperr.Validation("invalid scope (threats|full)"))
+		return
+	}
+	result, err := h.svc.Summary(c.Request.Context(), period, hostID, source, scope)
 	if err != nil {
 		respondError(c, err)
 		return

@@ -23,6 +23,7 @@ import (
 // Repository is the data-access port. *database.DB satisfies it structurally.
 type Repository interface {
 	GetWebLogsSummary(ctx context.Context, since time.Time, hostID, source string) (map[string]any, error)
+	GetWebLogsThreats(ctx context.Context, since time.Time, hostID, source string) (map[string]any, error)
 	GetWebLogsTopClientIPs(ctx context.Context, since time.Time, hostID, source string, limit int) ([]map[string]any, error)
 	GetWebLogsKPIWindow(ctx context.Context, since, until time.Time, hostID, source string) (map[string]any, error)
 	GetIPTimeline(ctx context.Context, ip string, since time.Time, hostID string, limit int) ([]models.WebLogIPTimelineRow, error)
@@ -112,8 +113,25 @@ type SummaryResult struct {
 
 // Summary aggregates the web-logs summary over a period and enriches it with
 // top-IP geolocation and a current-vs-previous KPI comparison.
-func (s *Service) Summary(ctx context.Context, period time.Duration, hostID, source string) (*SummaryResult, error) {
+//
+// scope == "threats" returns only the threats block: it skips the unindexed
+// traffic aggregates, the top-IP geolocation HTTP fan-out and the compare KPI
+// windows. The threats-only consumer (BotView) reads only summary.threats, so
+// this keeps that page responsive on large windows where the full summary would
+// otherwise time out.
+func (s *Service) Summary(ctx context.Context, period time.Duration, hostID, source, scope string) (*SummaryResult, error) {
 	since := time.Now().Add(-period)
+
+	if scope == "threats" {
+		threats, err := s.repo.GetWebLogsThreats(ctx, since, hostID, source)
+		if err != nil {
+			return nil, err
+		}
+		// No traffic block in this scope; promote only applies the crowdsec bump.
+		promoteBlockedIntoThreats(map[string]any{"threats": threats}, threats)
+		return &SummaryResult{Since: since, Threats: threats}, nil
+	}
+
 	summary, err := s.repo.GetWebLogsSummary(ctx, since, hostID, source)
 	if err != nil {
 		return nil, err

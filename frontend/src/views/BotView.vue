@@ -692,7 +692,10 @@ function formatBlockedUntil(blockedUntil?: string): string {
 async function loadThreats() {
   loading.value = true
   try {
-    const res = await apiClient.getWebLogsSummary(period.value, hostId.value || undefined, source.value || undefined)
+    // BotView reads only `threats`; request the threats-only scope so the server
+    // skips the heavy (unindexed) traffic aggregates + geolocation that would
+    // otherwise time the request out on long windows.
+    const res = await apiClient.getWebLogsSummary(period.value, hostId.value || undefined, source.value || undefined, 'threats')
     summary.value = { threats: res.data?.threats || {} }
     // Purger les bans optimistes dont le snapshot réel prend le relais
     const snapshotIPs = new Set((res.data?.threats?.crowdsec_top_blocked || []).map((e: AnyRecord) => e.ip as string))

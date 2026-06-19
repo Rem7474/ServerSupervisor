@@ -14,8 +14,8 @@ export const authApi = {
   logout: () => api.post('/auth/logout', {}),
   refreshSession: () => api.post('/auth/refresh', {}),
   getSecuritySummary: (hours?: number) => api.get('/v1/auth/security', { params: { hours: hours ?? 24 } }),
-  getWebLogsSummary: (period: string = '24h', hostId?: string, source?: string) =>
-    api.get('/v1/security/web-logs', { params: { period, host_id: hostId ?? '', source: source ?? '' } }),
+  getWebLogsSummary: (period: string = '24h', hostId?: string, source?: string, scope?: 'threats' | 'full') =>
+    api.get('/v1/security/web-logs', { params: { period, host_id: hostId ?? '', source: source ?? '', scope: scope ?? '' } }),
   getWebLogsTimeseries: (period: string = '24h', bucket: 'hour' | 'minute' = 'hour', hostId?: string, source?: string) =>
     api.get('/v1/security/web-logs/timeseries', {
       params: { period, bucket, host_id: hostId ?? '', source: source ?? '' },
