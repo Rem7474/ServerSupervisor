@@ -105,9 +105,12 @@
 
       <div
         v-else-if="commands.length === 0"
-        class="card-body text-center text-muted py-5"
+        class="card-body"
       >
-        Aucune commande trouvée.
+        <EmptyState
+          :icon="IconTerminal2"
+          title="Aucune commande trouvée."
+        />
       </div>
 
       <div
@@ -200,6 +203,8 @@ import api from '../api'
 import { addToast } from '../composables/useGlobalToast'
 import PaginationNav from '../components/PaginationNav.vue'
 import RelativeTime from '../components/RelativeTime.vue'
+import EmptyState from '../components/EmptyState.vue'
+import { IconTerminal2 } from '@tabler/icons-vue'
 import type { RemoteCommandWithHost } from '../types/audit'
 import { getApiErrorMessage } from '../api/client'
 

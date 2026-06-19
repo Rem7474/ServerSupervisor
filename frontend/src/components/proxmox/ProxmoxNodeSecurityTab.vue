@@ -93,9 +93,12 @@
     </div>
     <div
       v-else
-      class="card-body text-center text-muted py-4"
+      class="card-body"
     >
-      Aucun événement de sécurité trouvé pour ce filtre.
+      <EmptyState
+        :icon="IconShieldCheck"
+        title="Aucun événement de sécurité trouvé pour ce filtre."
+      />
     </div>
   </div>
 </template>
@@ -104,6 +107,8 @@
 import { ref, watch } from 'vue'
 import api from '../../api'
 import { getApiErrorMessage } from '../../api/client'
+import EmptyState from '../EmptyState.vue'
+import { IconShieldCheck } from '@tabler/icons-vue'
 
 type SyslogItem = Record<string, any>
 
