@@ -67,26 +67,29 @@ func handleApt(ctx context.Context, _ *Dispatcher, s *sender.Sender, cmd sender.
 		slog.Info("apt command completed", "action", cmd.Action)
 	}
 
-	// After every apt mutation we resnapshot the package list + CVEs so the
-	// server can refresh its tile immediately — without waiting for the next
-	// periodic report.
-	var aptStatus interface{}
-	slog.Debug("collecting apt status with CVE extraction", "action", cmd.Action)
-	apt, aptErr := collector.CollectAPT(true)
-	if aptErr != nil {
-		slog.Warn("failed to collect apt status", "action", cmd.Action, "err", aptErr)
-	} else {
-		aptStatus = apt
-		slog.Debug("apt status collected", "packages", apt.PendingPackages, "security", apt.SecurityUpdates)
-	}
-
+	// Report the terminal status first, before the (slow, network-bound) CVE
+	// enrichment below. The package list + CVEs are pushed separately via
+	// /api/agent/apt-status, so the command's completion is never delayed by — nor
+	// falsely timed-out because of — the Ubuntu CVE API round-trips on a fresh host.
 	if err := s.ReportCommandResult(ctx, &sender.CommandResult{
 		CommandID: cmd.ID,
 		Status:    status,
 		Output:    output,
-		AptStatus: aptStatus,
 	}); err != nil {
 		slog.Warn("failed to report apt command result", "err", err)
+	}
+
+	// After every apt mutation we resnapshot the package list + CVEs so the server can
+	// refresh its tile immediately — without waiting for the next periodic report.
+	slog.Debug("collecting apt status with CVE extraction", "action", cmd.Action)
+	apt, aptErr := collector.CollectAPT(true)
+	if aptErr != nil {
+		slog.Warn("failed to collect apt status", "action", cmd.Action, "err", aptErr)
+		return
+	}
+	slog.Debug("apt status collected", "packages", apt.PendingPackages, "security", apt.SecurityUpdates)
+	if err := s.SendAptStatus(ctx, apt); err != nil {
+		slog.Warn("failed to push apt status", "action", cmd.Action, "err", err)
 	}
 }
 

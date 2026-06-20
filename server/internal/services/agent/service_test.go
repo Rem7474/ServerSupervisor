@@ -33,6 +33,7 @@ type fakeRepo struct {
 func (f *fakeRepo) GetHostStatus(context.Context, string) string                      { return "online" }
 func (f *fakeRepo) UpdateHostStatus(context.Context, string, string) error            { return nil }
 func (f *fakeRepo) FailRunningCommandsOnAgentReconnect(context.Context, string) error { return nil }
+func (f *fakeRepo) TouchRunningCommandsActivity(context.Context, string) error        { return nil }
 func (f *fakeRepo) CleanupHostStalledCommands(context.Context, string, int) error     { return nil }
 func (f *fakeRepo) ClaimPendingRemoteCommands(context.Context, string) ([]models.PendingCommand, error) {
 	return nil, nil

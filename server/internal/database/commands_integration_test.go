@@ -183,6 +183,60 @@ func TestCleanupStalledCommands_FailsOldPendingAndCascadesToAudit(t *testing.T) 
 	_ = time.Now() // keeps the time import used (we may add timed assertions later).
 }
 
+// TestCleanupStalledCommands_ActivityHeartbeatPreventsReap guards the activity-based
+// reaping: a running command whose row is older than the threshold must NOT be failed
+// as long as its activity was refreshed recently (the per-report heartbeat). Without a
+// recent heartbeat the same row is reaped — proving the COALESCE keys off activity.
+func TestCleanupStalledCommands_ActivityHeartbeatPreventsReap(t *testing.T) {
+	db := testutil.NewPostgresDB(t)
+	seedTestHost(t, db)
+	ctx := context.Background()
+
+	cmd, err := db.CreateRemoteCommand(ctx, testHostID, "apt", "update", "", "{}", "tester", nil)
+	if err != nil {
+		t.Fatalf("create cmd: %v", err)
+	}
+	if _, err := db.ClaimPendingRemoteCommands(ctx, testHostID); err != nil {
+		t.Fatalf("claim: %v", err)
+	}
+
+	// Simulate a command that started 20 minutes ago and has been streaming output:
+	// created/started are old, but the heartbeat bumped activity to NOW().
+	testutil.MustQuery(t, db,
+		`UPDATE remote_commands
+		 SET created_at = NOW() - INTERVAL '20 minutes',
+		     started_at = NOW() - INTERVAL '20 minutes'
+		 WHERE id = $1`, cmd.ID)
+	if err := db.TouchRunningCommandsActivity(ctx, testHostID); err != nil {
+		t.Fatalf("touch activity: %v", err)
+	}
+
+	if err := db.CleanupHostStalledCommands(ctx, testHostID, 10); err != nil {
+		t.Fatalf("cleanup (active): %v", err)
+	}
+	got, err := db.GetRemoteCommandByID(ctx, cmd.ID)
+	if err != nil {
+		t.Fatalf("fetch cmd: %v", err)
+	}
+	if got.Status != "running" {
+		t.Fatalf("recently-active command must survive cleanup, got %q", got.Status)
+	}
+
+	// Now let the heartbeat go stale (last activity 20 minutes ago) → must be reaped.
+	testutil.MustQuery(t, db,
+		`UPDATE remote_commands SET last_activity_at = NOW() - INTERVAL '20 minutes' WHERE id = $1`, cmd.ID)
+	if err := db.CleanupHostStalledCommands(ctx, testHostID, 10); err != nil {
+		t.Fatalf("cleanup (stale): %v", err)
+	}
+	got, err = db.GetRemoteCommandByID(ctx, cmd.ID)
+	if err != nil {
+		t.Fatalf("fetch cmd: %v", err)
+	}
+	if got.Status != "failed" {
+		t.Errorf("inactive command must be reaped, got %q", got.Status)
+	}
+}
+
 func TestFailRunningCommandsOnAgentReconnect_OnlyTouchesGivenHost(t *testing.T) {
 	db := testutil.NewPostgresDB(t)
 	seedTestHost(t, db) // host-cmd-test

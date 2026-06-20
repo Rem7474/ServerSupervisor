@@ -89,6 +89,19 @@ RETURNING rc.id, rc.module, rc.action, rc.target, rc.payload`,
 	return cmds, nil
 }
 
+// TouchRunningCommandsActivity bumps last_activity_at for all of a host's running
+// commands. Called on every agent report: a report proves the agent is alive, so
+// its in-flight commands must not be reaped by the stalled-command cleanup even if
+// they run long or stay silent (e.g. a first apt update + CVE enrichment). When the
+// agent stops reporting, the bump stops and the reaper eventually fails the rows.
+func (db *DB) TouchRunningCommandsActivity(ctx context.Context, hostID string) error {
+	_, err := db.conn.ExecContext(ctx,
+		`UPDATE remote_commands SET last_activity_at = NOW()
+		 WHERE host_id = $1 AND status = 'running'`,
+		hostID)
+	return err
+}
+
 func (db *DB) UpdateRemoteCommandStatus(ctx context.Context, id, status, output string) error {
 	switch status {
 	case "running":

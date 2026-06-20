@@ -23,7 +23,7 @@ func (db *DB) CleanupStalledCommands(ctx context.Context, timeoutMinutes int) er
 		    output = 'Command timed out - agent may have crashed or restarted',
 		    ended_at = NOW()
 		WHERE status IN ('pending', 'running')
-		  AND created_at < NOW() - INTERVAL '1 minute' * $1
+		  AND COALESCE(last_activity_at, started_at, created_at) < NOW() - INTERVAL '1 minute' * $1
 		RETURNING audit_log_id, scheduled_task_id`,
 		timeoutMinutes)
 	if err != nil {
@@ -142,7 +142,7 @@ func (db *DB) CleanupHostStalledCommands(ctx context.Context, hostID string, tim
 		    ended_at = NOW()
 		WHERE host_id = $1
 		  AND status IN ('pending', 'running')
-		  AND created_at < NOW() - INTERVAL '1 minute' * $2
+		  AND COALESCE(last_activity_at, started_at, created_at) < NOW() - INTERVAL '1 minute' * $2
 		RETURNING audit_log_id, scheduled_task_id`,
 		hostID, timeoutMinutes)
 	if err != nil {

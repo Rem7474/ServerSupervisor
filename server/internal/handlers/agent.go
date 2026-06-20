@@ -108,6 +108,28 @@ func (h *AgentHandler) StreamCommandOutput(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
 
+// ReceiveAptStatus upserts an APT status snapshot pushed by the agent out-of-band
+// (decoupled from the apt command result so CVE enrichment never delays completion).
+func (h *AgentHandler) ReceiveAptStatus(c *gin.Context) {
+	hostID := c.GetString("host_id")
+	if hostID == "" {
+		respondError(c, apperr.Unauthorized("host not identified"))
+		return
+	}
+
+	var status models.AptStatus
+	if err := c.ShouldBindJSON(&status); err != nil {
+		respondError(c, apperr.Validation(err.Error()))
+		return
+	}
+
+	if err := h.svc.UpdateAptStatus(c.Request.Context(), hostID, &status); err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "ok"})
+}
+
 // GetHostCommandHistory returns all recent commands for a host across all modules.
 func (h *AgentHandler) GetHostCommandHistory(c *gin.Context) {
 	hostID := c.Param("id")

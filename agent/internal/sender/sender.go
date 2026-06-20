@@ -243,6 +243,37 @@ func (s *Sender) StreamCommandChunk(ctx context.Context, commandID string, chunk
 	return nil
 }
 
+// SendAptStatus pushes a fresh APT status snapshot to the server out-of-band, after
+// an apt command has already reported its terminal status. This decouples command
+// completion from the slow, network-bound CVE enrichment in CollectAPT(true).
+// Best-effort: the periodic command flow remains the source of truth for the command.
+func (s *Sender) SendAptStatus(ctx context.Context, status interface{}) error {
+	data, err := json.Marshal(status)
+	if err != nil {
+		return fmt.Errorf("failed to marshal apt status: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", s.cfg.ServerURL+"/api/agent/apt-status", bytes.NewReader(data))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-API-Key", s.cfg.APIKey)
+
+	resp, err := s.commandClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to send apt status: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode != http.StatusOK {
+		slog.Warn("server returned non-OK status when pushing apt status", "status", resp.StatusCode)
+	}
+
+	return nil
+}
+
 // SendAuditLog sends an audit log entry for agent actions.
 // module identifies the command type (e.g. "apt") and, when non-empty, causes the
 // server to also create a completed remote_command entry in the commands history.

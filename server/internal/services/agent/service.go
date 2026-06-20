@@ -43,6 +43,7 @@ type Repository interface {
 	GetHostStatus(ctx context.Context, id string) string
 	UpdateHostStatus(ctx context.Context, id, status string) error
 	FailRunningCommandsOnAgentReconnect(ctx context.Context, hostID string) error
+	TouchRunningCommandsActivity(ctx context.Context, hostID string) error
 	CleanupHostStalledCommands(ctx context.Context, hostID string, timeoutMinutes int) error
 	ClaimPendingRemoteCommands(ctx context.Context, hostID string) ([]models.PendingCommand, error)
 	GetProxmoxGuestLinkByHost(ctx context.Context, hostID string) (*models.ProxmoxGuestLink, error)
@@ -126,6 +127,14 @@ func (s *Service) ReceiveReport(ctx context.Context, hostID, safeHostID string, 
 		if err := s.repo.FailRunningCommandsOnAgentReconnect(ctx, hostID); err != nil {
 			slog.ErrorContext(ctx, fmt.Sprintf("Warning: failed to cleanup running commands on reconnect for host %s: %v", safeHostID, err))
 		}
+	}
+
+	// This report proves the agent is alive: keep its in-flight commands fresh so the
+	// stalled-command reaper below never fails a long-running command (e.g. a first
+	// apt update + CVE enrichment) out from under a working agent. Must run before the
+	// cleanup so a just-bumped command is not reaped in the same cycle.
+	if err := s.repo.TouchRunningCommandsActivity(ctx, hostID); err != nil {
+		slog.ErrorContext(ctx, fmt.Sprintf("Warning: failed to refresh running command activity for host %s: %v", safeHostID, err))
 	}
 
 	if err := s.repo.CleanupHostStalledCommands(ctx, hostID, 10); err != nil {
@@ -216,6 +225,24 @@ func (s *Service) StreamCommandOutput(ctx context.Context, hostID, commandID, ch
 		return apperr.Forbidden("command does not belong to host")
 	}
 	s.streamHub.Broadcast(commandID, chunk)
+	return nil
+}
+
+// UpdateAptStatus upserts a host's APT status pushed out-of-band by the agent.
+// The agent reports an apt command's terminal status immediately, then pushes the
+// CVE-enriched APT snapshot here once the (slow, network-bound) enrichment finishes,
+// so command completion is never blocked on it. Publishes the apt topic so the
+// event-driven snapshots refresh.
+func (s *Service) UpdateAptStatus(ctx context.Context, hostID string, status *models.AptStatus) error {
+	if status == nil {
+		return apperr.Validation("apt status is required")
+	}
+	status.HostID = hostID
+	if err := s.repo.UpsertAptStatus(ctx, status); err != nil {
+		return apperr.Failed("failed to update apt status")
+	}
+	s.bus.Publish(events.TopicApt)
+	s.bus.Publish(events.HostTopic(hostID))
 	return nil
 }
 

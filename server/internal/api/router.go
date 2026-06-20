@@ -174,6 +174,7 @@ func registerAgentRoutes(r *gin.Engine, db *database.DB, cfg *config.Config, h *
 	g.POST("/report", h.ReceiveReport)
 	g.POST("/command/result", h.ReportCommandResult)
 	g.POST("/command/stream", h.StreamCommandOutput)
+	g.POST("/apt-status", h.ReceiveAptStatus)
 	g.POST("/audit", h.LogAuditAction)
 }
 
