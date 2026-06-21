@@ -9,8 +9,8 @@ export const auditApi = {
     api.get<AuditLog[]>(`/v1/audit/logs/host/${hostId}`, { params: { limit: limit ?? 100 } }),
   getAuditLogsByUser: (username: string, limit?: number) =>
     api.get<{ user: string, logs: AuditLog[] }>(`/v1/audit/logs/user/${username}`, { params: { limit: limit ?? 100 } }),
-  getCommandsHistory: (page?: number, limit?: number, filters?: { search?: string; module?: string; status?: string }) =>
-    api.get<{ commands: RemoteCommandWithHost[], total: number, page: number, limit: number }>('/v1/audit/commands', { params: { page: page ?? 1, limit: limit ?? 50, ...filters } }),
+  getCommandsHistory: (page?: number, limit?: number, filters?: { search?: string; module?: string; status?: string }, signal?: AbortSignal) =>
+    api.get<{ commands: RemoteCommandWithHost[], total: number, page: number, limit: number }>('/v1/audit/commands', { params: { page: page ?? 1, limit: limit ?? 50, ...filters }, signal }),
   getCommandStatus: (id: string) => api.get<RemoteCommand>(`/v1/commands/${id}`),
   cancelCommand: (id: string) => api.post<{ status: string }>(`/v1/commands/${id}/cancel`),
   getHostTimeline: (hostId: string, limit?: number) =>

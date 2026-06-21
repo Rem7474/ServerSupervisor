@@ -202,7 +202,8 @@ import { useConfirmDialog } from '../composables/useConfirmDialog'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import apiClient from '../api'
 import dayjs from '../utils/dayjs'
-import { getApiErrorMessage } from '../api/client'
+import { getApiErrorMessage, isApiAbort } from '../api/client'
+import { useAbortSignal } from '../composables/useAbortSignal'
 
 interface User {
   id: string
@@ -212,6 +213,7 @@ interface User {
 }
 
 const auth = useAuthStore()
+const signal = useAbortSignal()
 const dialog = useConfirmDialog()
 const users = ref<User[]>([])
 const loading = ref(false)
@@ -248,10 +250,11 @@ function getDeleteButtonTitle(user: User): string {
 async function fetchUsers(): Promise<void> {
   loading.value = true
   try {
-    const res = await apiClient.getUsers()
+    const res = await apiClient.getUsers(signal)
     users.value = res.data || []
   } catch (e) {
-    console.error('Erreur lors du chargement des utilisateurs:', e)
+    if (isApiAbort(e)) return
+    console.error('Erreur lors du chargement des utilisateurs:', getApiErrorMessage(e))
     users.value = []
   } finally {
     loading.value = false

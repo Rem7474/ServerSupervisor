@@ -411,10 +411,13 @@ import { useAuthStore } from '../stores/auth'
 import SortableHeader from '../components/common/SortableHeader.vue'
 import PageRefreshBar from '../components/PageRefreshBar.vue'
 import api from '../api'
+import { isApiAbort } from '../api/client'
+import { useAbortSignal } from '../composables/useAbortSignal'
 import type { ProxmoxSummary, ProxmoxNode, ProxmoxConnection } from '../types/proxmox'
 
 const auth = useAuthStore()
 
+const signal = useAbortSignal()
 const summary = ref<Partial<ProxmoxSummary>>({})
 const nodes = ref<ProxmoxNode[]>([])
 const instances = ref<ProxmoxConnection[]>([])
@@ -484,10 +487,12 @@ async function load(): Promise<void> {
   error.value = ''
   try {
     const [sumRes, nodesRes, instRes] = await Promise.allSettled([
-      api.getProxmoxSummary(),
-      api.getProxmoxNodes(),
-      api.getProxmoxInstances(),
+      api.getProxmoxSummary(signal),
+      api.getProxmoxNodes(undefined, signal),
+      api.getProxmoxInstances(signal),
     ])
+    // Component unmounted mid-flight: bail without touching reactive state.
+    if ([sumRes, nodesRes, instRes].some(r => r.status === 'rejected' && isApiAbort(r.reason))) return
     if (sumRes.status === 'fulfilled') summary.value = sumRes.value.data
     if (nodesRes.status === 'fulfilled') nodes.value = nodesRes.value.data
     if (instRes.status === 'fulfilled') {

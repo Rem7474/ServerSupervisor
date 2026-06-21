@@ -210,9 +210,11 @@ import { addToast } from '../composables/useGlobalToast'
 import RelativeTime from '../components/RelativeTime.vue'
 import { resolveIncidentHostRoute } from '../utils/incidentRouting'
 import { useAuthStore } from '../stores/auth'
-import { getApiErrorMessage } from '../api/client'
+import { getApiErrorMessage, isApiAbort } from '../api/client'
+import { useAbortSignal } from '../composables/useAbortSignal'
 
 const auth = useAuthStore()
+const signal = useAbortSignal()
 
 const SEVERITY_FILTERS = [
   { value: '', label: 'Toute sévérité' },
@@ -327,11 +329,12 @@ async function load(limit = currentLimit.value): Promise<void> {
       severity: severityFilter.value || undefined,
       type: typeFilter.value || undefined,
       status: statusFilter.value || undefined,
-    })
+    }, signal)
     items.value = res.data.notifications || []
     total.value = res.data.total || 0
     if (res.data.read_at !== undefined) readAt.value = res.data.read_at
   } catch (err: unknown) {
+    if (isApiAbort(err)) return
     error.value = getApiErrorMessage(err, 'Erreur de chargement')
   } finally {
     loading.value = false
