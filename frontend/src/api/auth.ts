@@ -4,10 +4,10 @@ import type { IPTimelineResponse } from '../types/security'
 export const authApi = {
   login: (username: string, password: string, totpCode?: string) =>
     api.post('/auth/login', { username, password, ...(totpCode ? { totp_code: totpCode } : {}) }),
-  getProfile: () => api.get('/v1/auth/profile'),
+  getProfile: (signal?: AbortSignal) => api.get('/v1/auth/profile', { signal }),
   changePassword: (currentPassword: string, newPassword: string) =>
     api.post('/v1/auth/change-password', { current_password: currentPassword, new_password: newPassword }),
-  getLoginEvents: () => api.get('/v1/auth/login-events'),
+  getLoginEvents: (signal?: AbortSignal) => api.get('/v1/auth/login-events', { signal }),
   getLoginEventsAdmin: (page?: number, limit?: number) =>
     api.get('/v1/auth/login-events/admin', { params: { page: page ?? 1, limit: limit ?? 50 } }),
   revokeAllSessions: () => api.post('/v1/auth/revoke-all-sessions', {}),
@@ -42,7 +42,7 @@ export const authApi = {
       params: { host_id: hostId },
     }),
   unblockIP: (ip: string) => api.delete(`/v1/auth/blocked-ips/${ip}`),
-  getMFAStatus: () => api.get('/v1/auth/mfa/status'),
+  getMFAStatus: (signal?: AbortSignal) => api.get('/v1/auth/mfa/status', { signal }),
   setupMFA: () => api.post('/v1/auth/mfa/setup'),
   verifyMFA: (secret: string, totpCode: string, backupCodes: string[]) =>
     api.post('/v1/auth/mfa/verify', { secret, totp_code: totpCode, backup_codes: backupCodes }),

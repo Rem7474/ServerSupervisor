@@ -206,9 +206,11 @@ import RelativeTime from '../components/RelativeTime.vue'
 import EmptyState from '../components/EmptyState.vue'
 import { IconTerminal2 } from '@tabler/icons-vue'
 import type { RemoteCommandWithHost } from '../types/audit'
-import { getApiErrorMessage } from '../api/client'
+import { getApiErrorMessage, isApiAbort } from '../api/client'
+import { useAbortSignal } from '../composables/useAbortSignal'
 
 const PAGE_SIZE = 50
+const signal = useAbortSignal()
 const POLL_INTERVAL = 10_000
 
 const commands = ref<RemoteCommandWithHost[]>([])
@@ -231,10 +233,11 @@ async function load(): Promise<void> {
     const res = await api.getCommandsHistory(page.value, PAGE_SIZE, {
       status: statusFilter.value || undefined,
       module: moduleFilter.value || undefined,
-    })
+    }, signal)
     commands.value = res.data.commands || []
     total.value = res.data.total || 0
   } catch (err: unknown) {
+    if (isApiAbort(err)) return
     error.value = getApiErrorMessage(err, 'Erreur de chargement')
   } finally {
     loading.value = false

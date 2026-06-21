@@ -204,7 +204,8 @@ import TrackerConfigCard from '../components/webhooks/TrackerConfigCard.vue'
 import TrackerScriptHelpCard from '../components/webhooks/TrackerScriptHelpCard.vue'
 import TrackerVersionHistoryCard from '../components/webhooks/TrackerVersionHistoryCard.vue'
 import { useCommandStream } from '../composables/useCommandStream'
-import { getApiErrorMessage } from '../api/client'
+import { getApiErrorMessage, isApiAbort } from '../api/client'
+import { useAbortSignal } from '../composables/useAbortSignal'
 import type { ReleaseTracker, ReleaseTrackerExecution, ReleaseTrackerRequest, ReleaseVersionHistoryItem } from '../types/tracker'
 import type { ComposeProject } from '../types/docker'
 import type { Host } from '../types/host'
@@ -216,6 +217,7 @@ type TrackerView = ReleaseTracker & { release_url?: string }
 
 const route = useRoute()
 const id = route.params.id as string
+const signal = useAbortSignal()
 
 const tracker = ref<TrackerView | null>(null)
 const executions = ref<ReleaseTrackerExecution[]>([])
@@ -306,11 +308,12 @@ async function load(): Promise<void> {
   loading.value = true
   error.value = ''
   try {
-    const [res, hostsRes] = await Promise.all([api.getReleaseTracker(id), api.getHosts()])
+    const [res, hostsRes] = await Promise.all([api.getReleaseTracker(id, signal), api.getHosts(signal)])
     tracker.value = res.data.tracker
     executions.value = res.data.executions || []
     hosts.value = hostsRes.data || []
   } catch (e: unknown) {
+    if (isApiAbort(e)) return
     error.value = getApiErrorMessage(e, 'Erreur lors du chargement')
   } finally {
     loading.value = false

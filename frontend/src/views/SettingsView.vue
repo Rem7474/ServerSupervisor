@@ -160,6 +160,8 @@ import { ref, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import apiClient, { getApiErrorMessage } from '../api'
+import { isApiAbort } from '../api/client'
+import { useAbortSignal } from '../composables/useAbortSignal'
 import SettingsDatabaseCard from '../components/settings/SettingsDatabaseCard.vue'
 import SettingsMaintenanceCard from '../components/settings/SettingsMaintenanceCard.vue'
 import SettingsNotificationsCard from '../components/settings/SettingsNotificationsCard.vue'
@@ -173,6 +175,7 @@ import SettingsRegistryCredentialsCard from '../components/settings/SettingsRegi
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
+const signal = useAbortSignal()
 
 const tab = ref((route.query.tab as string) || 'general')
 
@@ -255,7 +258,7 @@ function formatNumber(n: number | undefined): string {
 
 async function fetchSettings(): Promise<void> {
   try {
-    const res = await apiClient.getSettings()
+    const res = await apiClient.getSettings(signal)
     if (res.data) {
       settings.value = res.data.settings || {}
       dbStatus.value = res.data.dbStatus || {}
@@ -273,7 +276,8 @@ async function fetchSettings(): Promise<void> {
       form.value.auditRetentionDays = s.auditRetentionDays || 90
     }
   } catch (e) {
-    console.error('Erreur chargement paramètres:', e)
+    if (isApiAbort(e)) return
+    console.error('Erreur chargement paramètres:', getApiErrorMessage(e))
   }
 }
 

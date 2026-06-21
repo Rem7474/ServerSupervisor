@@ -10,9 +10,10 @@ export interface NotificationFilter {
 
 export const notificationsApi = {
   // Notifications
-  getNotifications: (filter?: NotificationFilter) =>
+  getNotifications: (filter?: NotificationFilter, signal?: AbortSignal) =>
     api.get<{ notifications: NotificationItem[], total: number, read_at: string | null }>('/v1/notifications', {
       params: filter ? Object.fromEntries(Object.entries(filter).filter(([, v]) => v !== '' && v !== undefined)) : undefined,
+      signal,
     }),
   markNotificationsRead: () => api.post('/v1/notifications/mark-read'),
 

@@ -11,8 +11,8 @@ import type {
 
 export const trackersApi = {
   getReleaseTrackers: () => api.get<{ trackers: ReleaseTracker[] }>('/v1/release-trackers'),
-  getReleaseTracker: (id: string) =>
-    api.get<{ tracker: ReleaseTracker, executions: ReleaseTrackerExecution[] }>(`/v1/release-trackers/${id}`),
+  getReleaseTracker: (id: string, signal?: AbortSignal) =>
+    api.get<{ tracker: ReleaseTracker, executions: ReleaseTrackerExecution[] }>(`/v1/release-trackers/${id}`, { signal }),
   createReleaseTracker: (payload: Partial<ReleaseTrackerRequest>) => api.post('/v1/release-trackers', payload),
   createReleaseTrackersBulk: (trackers: Partial<ReleaseTrackerRequest>[]) =>
     api.post('/v1/release-trackers/bulk', { trackers }),

@@ -220,7 +220,8 @@ import WebhookExecutionList from '../components/webhooks/WebhookExecutionList.vu
 import WebhookModal from '../components/webhooks/WebhookModal.vue'
 import CommandLogPanel from '../components/host/CommandLogPanel.vue'
 import { useCommandStream } from '../composables/useCommandStream'
-import { getApiErrorMessage } from '../api/client'
+import { getApiErrorMessage, isApiAbort } from '../api/client'
+import { useAbortSignal } from '../composables/useAbortSignal'
 import type { GitWebhook, GitWebhookExecution, GitWebhookRequest } from '../types/webhook'
 import type { Host } from '../types/host'
 import type { WebhookFormData } from '../composables/useWebhookForm'
@@ -229,6 +230,7 @@ interface CmdRow { id: string; status?: string; output?: string; [key: string]: 
 
 const route = useRoute()
 const id = route.params.id as string
+const signal = useAbortSignal()
 
 const webhook = ref<GitWebhook | null>(null)
 const executions = ref<GitWebhookExecution[]>([])
@@ -258,11 +260,12 @@ async function load(): Promise<void> {
   loading.value = true
   error.value = ''
   try {
-    const [whRes, hostsRes] = await Promise.all([api.getGitWebhook(id), api.getHosts()])
+    const [whRes, hostsRes] = await Promise.all([api.getGitWebhook(id, signal), api.getHosts(signal)])
     webhook.value = whRes.data.webhook
     executions.value = whRes.data.executions || []
     hosts.value = hostsRes.data || []
   } catch (e: unknown) {
+    if (isApiAbort(e)) return
     error.value = getApiErrorMessage(e, 'Erreur lors du chargement')
   } finally {
     loading.value = false

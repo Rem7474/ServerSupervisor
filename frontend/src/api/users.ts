@@ -2,7 +2,7 @@ import { api } from './client'
 
 export const usersApi = {
   // Users
-  getUsers: () => api.get('/v1/users'),
+  getUsers: (signal?: AbortSignal) => api.get('/v1/users', { signal }),
   createUser: (username: string, password: string, role: string) =>
     api.post('/v1/users', { username, password, role }),
   updateUserRole: (id: string, role: string) => api.patch(`/v1/users/${id}/role`, { role }),

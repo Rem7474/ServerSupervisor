@@ -180,7 +180,8 @@ import dayjs from '../utils/dayjs'
 import api from '../api'
 import MetricsSourceBadge from '../components/common/MetricsSourceBadge.vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
-import { getApiErrorMessage } from '../api/client'
+import { getApiErrorMessage, isApiAbort } from '../api/client'
+import { useAbortSignal } from '../composables/useAbortSignal'
 import type { ChartData, ChartOptions, TooltipItem } from 'chart.js'
 import type { ProxmoxGuestLink } from '../types/generated'
 
@@ -202,6 +203,7 @@ interface ProxmoxGuest {
 }
 
 const route = useRoute()
+const signal = useAbortSignal()
 const guest = ref<ProxmoxGuest | null>(null)
 const guestLink = ref<ProxmoxGuestLink | null>(null)
 const loading = ref(true)
@@ -260,7 +262,7 @@ async function loadGuest(): Promise<void> {
   loading.value = true
   error.value = ''
   try {
-    const res = await api.getProxmoxGuests()
+    const res = await api.getProxmoxGuests(undefined, signal)
     const list = Array.isArray(res.data) ? res.data : []
     const found = list.find((g: ProxmoxGuest) => g.id === route.params.id)
     if (!found) {
@@ -268,9 +270,10 @@ async function loadGuest(): Promise<void> {
       return
     }
     guest.value = found
-    const linkRes = await api.getProxmoxGuestLink(found.id)
+    const linkRes = await api.getProxmoxGuestLink(found.id, signal)
     guestLink.value = linkRes.data
   } catch (e: unknown) {
+    if (isApiAbort(e)) return
     error.value = getApiErrorMessage(e, 'Erreur lors du chargement du guest Proxmox.')
   } finally {
     loading.value = false
@@ -286,7 +289,7 @@ async function loadGuestSummary(): Promise<void> {
   summaryLoading.value = true
   try {
     const bucketMinutes = bucketMinutesFor(hours.value)
-    const res = await api.getProxmoxGuestMetrics(guest.value.id, hours.value, bucketMinutes)
+    const res = await api.getProxmoxGuestMetrics(guest.value.id, hours.value, bucketMinutes, signal)
     const points = Array.isArray(res.data) ? res.data : []
     if (!points.length) {
       chartData.value = null

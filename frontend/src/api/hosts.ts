@@ -3,7 +3,7 @@ import type { Host, HostRegistration, HostUpdate } from '../types/host'
 
 export const hostsApi = {
   // Hosts
-  getHosts: () => api.get<Host[]>('/v1/hosts'),
+  getHosts: (signal?: AbortSignal) => api.get<Host[]>('/v1/hosts', { signal }),
   getHost: (id: string) => api.get<Host>(`/v1/hosts/${id}`),
   getHostComplete: (id: string) => api.get(`/v1/hosts/${id}/complete`),
   getHostDashboard: (id: string) => api.get(`/v1/hosts/${id}/dashboard`),

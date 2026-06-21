@@ -216,7 +216,8 @@ import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import PageRefreshBar from '../components/PageRefreshBar.vue'
 import { formatDateTime } from '../utils/formatters'
 import { getChartPalette } from '../utils/chartTheme'
-import { getApiErrorMessage } from '../api/client'
+import { getApiErrorMessage, isApiAbort } from '../api/client'
+import { useAbortSignal } from '../composables/useAbortSignal'
 import type { UptimeProbe, UptimeStats } from '../types/generated'
 
 interface ProbeResult {
@@ -242,6 +243,7 @@ const Line = defineAsyncComponent(async () => {
 
 const route = useRoute()
 const probeId = route.params.id as string
+const signal = useAbortSignal()
 
 const probe = ref<UptimeProbe | null>(null)
 const results = ref<ProbeResult[]>([])
@@ -366,15 +368,16 @@ async function fetchAll(): Promise<void> {
   error.value = ''
   try {
     const [pr, hr, sr] = await Promise.all([
-      api.getUptimeProbe(probeId),
-      api.getUptimeHistory(probeId, 200),
-      api.getUptimeStats(probeId, statsWindow),
+      api.getUptimeProbe(probeId, signal),
+      api.getUptimeHistory(probeId, 200, signal),
+      api.getUptimeStats(probeId, statsWindow, signal),
     ])
     probe.value = pr.data
     results.value = hr.data?.results || []
     stats.value = sr.data
     lastUpdatedAt.value = new Date()
   } catch (e: unknown) {
+    if (isApiAbort(e)) return
     error.value = getApiErrorMessage(e, 'Impossible de charger la sonde')
   } finally {
     loading.value = false
