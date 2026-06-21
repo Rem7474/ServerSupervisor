@@ -48,8 +48,14 @@
           :title="copied ? 'Copié !' : 'Copier'"
           @click="copySnippet"
         >
-          <IconCopy :size="14" />
-          <IconCheck :size="14" />
+          <IconCopy
+            v-if="!copied"
+            :size="14"
+          />
+          <IconCheck
+            v-else
+            :size="14"
+          />
         </button>
       </div>
     </div>

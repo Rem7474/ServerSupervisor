@@ -336,7 +336,7 @@
                     v-if="resolvingId === item.id"
                     class="spinner-border spinner-border-sm"
                   />
-                  <IconCheck
+                  <IconCheck v-else
                     :size="14"
                     class="icon"
                   />

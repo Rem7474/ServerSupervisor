@@ -144,7 +144,7 @@
                 v-if="testing"
                 class="spinner-border spinner-border-sm me-2"
               />
-              <IconCircleCheck
+              <IconCircleCheck v-else
                 :size="16"
                 class="icon me-1"
               />

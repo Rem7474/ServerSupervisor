@@ -41,8 +41,14 @@
         :title="sortDir === 'asc' ? 'Croissant' : 'Décroissant'"
         @click="sortDir = sortDir === 'asc' ? 'desc' : 'asc'"
       >
-        <IconArrowsSort :size="16" />
-        <IconArrowsSort :size="16" />
+        <IconSortAscending
+          v-if="sortDir === 'asc'"
+          :size="16"
+        />
+        <IconSortDescending
+          v-else
+          :size="16"
+        />
       </button>
     </template>
     <template #bottom>
@@ -109,7 +115,7 @@
 
 <script setup lang="ts">
 import DataToolbar from '../common/DataToolbar.vue'
-import { IconArrowsSort } from '@tabler/icons-vue'
+import { IconSortAscending, IconSortDescending } from '@tabler/icons-vue'
 
 defineProps<{
   filterOptions: { value: string, label: string }[]

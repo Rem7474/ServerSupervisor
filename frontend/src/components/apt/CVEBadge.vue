@@ -8,7 +8,8 @@
     :title="cveTitle"
   >
     {{ cve.id }}
-    <IconPencil
+    <IconExternalLink
+      v-if="showIcon"
       :size="14"
       class="icon icon-tabler ms-1"
     />
@@ -17,7 +18,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { IconPencil } from '@tabler/icons-vue'
+import { IconExternalLink } from '@tabler/icons-vue'
 
 interface CVE {
   id: string

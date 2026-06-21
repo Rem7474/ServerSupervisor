@@ -116,6 +116,12 @@
                 :class="iconBg(item)"
               >
                 <IconCode
+                  v-if="isTrackerType(item)"
+                  :size="16"
+                  class="icon"
+                />
+                <IconAlertTriangle
+                  v-else
                   :size="16"
                   class="icon"
                 />
@@ -197,7 +203,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
-import { IconCode } from '@tabler/icons-vue'
+import { IconCode, IconAlertTriangle } from '@tabler/icons-vue'
 import api from '../api'
 import type { NotificationItem } from '../types/generated'
 import { addToast } from '../composables/useGlobalToast'
