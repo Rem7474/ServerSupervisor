@@ -348,9 +348,11 @@ import apiClient from '../api'
 import { formatDateTime } from '../utils/formatters'
 import type { LoginEvent } from '../types/generated'
 import { useAuthStore } from '../stores/auth'
-import { getApiErrorMessage } from '../api/client'
+import { getApiErrorMessage, isApiAbort } from '../api/client'
+import { useAbortSignal } from '../composables/useAbortSignal'
 
 const auth = useAuthStore()
+const signal = useAbortSignal()
 
 const mfaEnabled = ref(false)
 const setupVisible = ref(false)
@@ -405,9 +407,10 @@ const revokeSuccess = ref('')
 
 async function loadStatus() {
   try {
-    const res = await apiClient.getMFAStatus()
+    const res = await apiClient.getMFAStatus(signal)
     mfaEnabled.value = !!res.data?.mfa_enabled
-  } catch {
+  } catch (e) {
+    if (isApiAbort(e)) return
     mfaEnabled.value = false
   }
 }
@@ -415,9 +418,10 @@ async function loadStatus() {
 async function loadLoginEvents() {
   sessionsLoading.value = true
   try {
-    const res = await apiClient.getLoginEvents()
+    const res = await apiClient.getLoginEvents(signal)
     loginEvents.value = (res.data?.events || []).slice(0, 15)
-  } catch {
+  } catch (e) {
+    if (isApiAbort(e)) return
     loginEvents.value = []
   } finally {
     sessionsLoading.value = false

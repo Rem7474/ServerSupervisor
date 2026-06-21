@@ -494,7 +494,8 @@ import { useCommandStream } from '../composables/useCommandStream'
 import CommandLogPanel from '../components/host/CommandLogPanel.vue'
 import { moduleLabel, moduleClass } from '../utils/moduleMeta'
 import { useStatusBadge } from '../composables/useStatusBadge'
-import { getApiErrorMessage } from '../api/client'
+import { getApiErrorMessage, isApiAbort } from '../api/client'
+import { useAbortSignal } from '../composables/useAbortSignal'
 import type { RemoteCommand, LoginEvent } from '../types/generated'
 
 // The audit/commands endpoint enriches RemoteCommand with the resolved host name.
@@ -510,6 +511,7 @@ interface Profile {
 
 const auth = useAuthStore()
 
+const signal = useAbortSignal()
 const activeTab = ref('profil')
 const showConsole = ref(false)
 
@@ -680,7 +682,7 @@ async function submitChangePassword(): Promise<void> {
 
 async function loadProfile(): Promise<void> {
   try {
-    const { data } = await apiClient.getProfile()
+    const { data } = await apiClient.getProfile(signal)
     profile.value = data
   } catch { /* fallback to store data */ }
 }
@@ -688,9 +690,10 @@ async function loadProfile(): Promise<void> {
 async function loadMyCommands(): Promise<void> {
   cmdsLoading.value = true
   try {
-    const res = await apiClient.getCommandsHistory(1, 100)
+    const res = await apiClient.getCommandsHistory(1, 100, undefined, signal)
     allCommands.value = res.data?.commands || []
-  } catch {
+  } catch (e) {
+    if (isApiAbort(e)) return
     allCommands.value = []
   } finally {
     cmdsLoading.value = false
@@ -705,10 +708,11 @@ function switchToHistorique() {
 async function loadLoginEvents(): Promise<void> {
   loginEventsLoading.value = true
   try {
-    const res = await apiClient.getLoginEvents()
+    const res = await apiClient.getLoginEvents(signal)
     loginEvents.value = res.data?.events || []
     loginEventsLoaded.value = true
-  } catch {
+  } catch (e) {
+    if (isApiAbort(e)) return
     loginEvents.value = []
   } finally {
     loginEventsLoading.value = false
