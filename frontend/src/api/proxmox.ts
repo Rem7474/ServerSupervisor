@@ -42,10 +42,10 @@ export const proxmoxApi = {
     api.put(`/v1/proxmox/nodes/${id}/sensor-source`, { host_id: hostId ?? '' }),
   getProxmoxNodeMetrics: (hours?: number, bucketMinutes?: number) =>
     api.get('/v1/proxmox/nodes/metrics', { params: { hours: hours ?? 24, bucket_minutes: bucketMinutes ?? 5 } }),
-  getProxmoxGuests: (params?: JsonObject) => api.get<ProxmoxGuest[]>('/v1/proxmox/guests', { params: params ?? {} }),
-  getProxmoxGuestMetrics: (guestId: string, hours?: number, bucketMinutes?: number) =>
-    api.get(`/v1/proxmox/guests/${guestId}/metrics`, { params: { hours: hours ?? 24, bucket_minutes: bucketMinutes ?? 5 } }),
-  getProxmoxGuestLink: (guestId: string) => api.get(`/v1/proxmox/guests/${guestId}/link`),
+  getProxmoxGuests: (params?: JsonObject, signal?: AbortSignal) => api.get<ProxmoxGuest[]>('/v1/proxmox/guests', { params: params ?? {}, signal }),
+  getProxmoxGuestMetrics: (guestId: string, hours?: number, bucketMinutes?: number, signal?: AbortSignal) =>
+    api.get(`/v1/proxmox/guests/${guestId}/metrics`, { params: { hours: hours ?? 24, bucket_minutes: bucketMinutes ?? 5 }, signal }),
+  getProxmoxGuestLink: (guestId: string, signal?: AbortSignal) => api.get(`/v1/proxmox/guests/${guestId}/link`, { signal }),
 
   // Guest ↔ host links
   getProxmoxLinks: (status?: string) =>
