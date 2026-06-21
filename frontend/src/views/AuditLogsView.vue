@@ -283,138 +283,15 @@
 
     <!-- ── Connexions tab (admin only) ────────────────────────────────────── -->
     <div v-show="activeTab === 'connexions'">
-      <!-- Period selector + stats cards -->
-      <div class="d-flex align-items-center justify-content-between mb-3">
-        <div class="btn-group btn-group-sm">
-          <button
-            v-for="p in secPeriodOptions"
-            :key="p.hours"
-            type="button"
-            class="btn"
-            :class="securityPeriod === p.hours ? 'btn-primary' : 'btn-outline-secondary'"
-            @click="setSecurityPeriod(p.hours)"
-          >
-            {{ p.label }}
-          </button>
-        </div>
-      </div>
-      <div class="row row-cards mb-4">
-        <div class="col-sm-4">
-          <div class="card card-sm h-100">
-            <div class="card-body text-center">
-              <div class="text-secondary small mb-1">
-                Connexions ({{ securityPeriodLabel }})
-              </div>
-              <div class="h2 mb-0">
-                {{ security.stats?.total ?? '—' }}
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="col-sm-4">
-          <div class="card card-sm h-100">
-            <div class="card-body text-center">
-              <div class="text-secondary small mb-1">
-                Échecs ({{ securityPeriodLabel }})
-              </div>
-              <div class="h2 mb-0 text-danger">
-                {{ security.stats?.failures ?? '—' }}
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="col-sm-4">
-          <div class="card card-sm h-100">
-            <div class="card-body text-center">
-              <div class="text-secondary small mb-1">
-                IPs uniques ({{ securityPeriodLabel }})
-              </div>
-              <div class="h2 mb-0 text-azure">
-                {{ security.stats?.unique_ips ?? '—' }}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- IPs bloquées + Top failed IPs -->
-      <div class="row row-cards mb-4">
-        <div class="col-lg-5">
-          <div class="card h-100">
-            <div class="card-header">
-              <h3 class="card-title">
-                IPs bloquées
-              </h3>
-            </div>
-            <div class="card-body p-0">
-              <div
-                v-if="!security.blocked_ips?.length"
-                class="text-center py-4 text-secondary small"
-              >
-                Aucune IP bloquée
-              </div>
-              <div v-else>
-                <div
-                  v-for="ip in security.blocked_ips"
-                  :key="ip"
-                  class="d-flex align-items-center justify-content-between px-3 py-2 border-bottom"
-                >
-                  <div class="d-flex align-items-center gap-2">
-                    <span class="badge bg-red-lt text-red">Bloquée</span>
-                    <span class="font-monospace small">{{ ip }}</span>
-                  </div>
-                  <button
-                    type="button"
-                    class="btn btn-sm btn-outline-success"
-                    :disabled="unblockingIP === ip"
-                    @click="unblockIP(ip)"
-                  >
-                    {{ unblockingIP === ip ? '…' : 'Débloquer' }}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="col-lg-7">
-          <div class="card h-100">
-            <div class="card-header">
-              <h3 class="card-title">
-                Top IPs — échecs de connexion ({{ securityPeriodLabel }})
-              </h3>
-            </div>
-            <div class="card-body p-0">
-              <div
-                v-if="!security.top_failed_ips?.length"
-                class="text-center py-4 text-secondary small"
-              >
-                Aucun échec enregistré sur cette période
-              </div>
-              <div v-else>
-                <div
-                  v-for="item in security.top_failed_ips"
-                  :key="item.ip_address"
-                  class="px-3 py-2 border-bottom"
-                >
-                  <div class="d-flex align-items-center justify-content-between mb-1">
-                    <span class="font-monospace small">{{ item.ip_address }}</span>
-                    <span class="badge bg-red-lt text-red">{{ item.fail_count }} échecs</span>
-                  </div>
-                  <div
-                    class="progress"
-                    style="height: 4px;"
-                  >
-                    <div
-                      class="progress-bar bg-danger"
-                      :style="{ width: progressWidth(item.fail_count) + '%' }"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <AuditSecurityPanel
+        :security="security"
+        :period="securityPeriod"
+        :period-label="securityPeriodLabel"
+        :period-options="secPeriodOptions"
+        :unblocking-ip="unblockingIP"
+        @set-period="setSecurityPeriod"
+        @unblock="unblockIP"
+      />
 
       <!-- All login events -->
       <div class="card">
@@ -517,6 +394,7 @@ import DataToolbar from '../components/common/DataToolbar.vue'
 import type { RemoteCommandWithHost } from '../types/audit'
 import SortableHeader from '../components/common/SortableHeader.vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
+import AuditSecurityPanel, { type SecurityData } from '../components/security/AuditSecurityPanel.vue'
 
 const { formatLocaleDateTime: formatDate } = useDateFormatter()
 const { getStatusBadgeClass } = useStatusBadge()
@@ -606,7 +484,7 @@ const connexionsLimit = 50
 const connexionsTotal = ref(0)
 const connexionsLoading = ref(false)
 const connexionsLoaded = ref(false)
-const security = ref<{ stats: any; blocked_ips: string[]; top_failed_ips: any[] }>({ stats: null, blocked_ips: [], top_failed_ips: [] })
+const security = ref<SecurityData>({ stats: null, blocked_ips: [], top_failed_ips: [] })
 const lastCmdFetchAt = ref(0)
 const lastConnFetchAt = ref(0)
 
@@ -685,10 +563,6 @@ function parseUA(ua: string | undefined): { browser: string; os: string } {
   return { browser, os }
 }
 
-function progressWidth(failCount: number): number {
-  const max = Math.max(...(security.value.top_failed_ips?.map((i: any) => i.fail_count) || [1]))
-  return max > 0 ? Math.round((failCount / max) * 100) : 0
-}
 
 function openLogViewer(cmd: any): void {
   if (selectedCmd.value?.id === cmd.id) {
