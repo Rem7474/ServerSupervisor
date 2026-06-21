@@ -60,18 +60,14 @@
 
     <div class="side-layout">
       <div class="side-main">
-        <ErrorBoundary
+        <DockerContainersTab
           v-if="activeTab === 'containers'"
-          title="Erreur lors du rendu des conteneurs"
-        >
-          <DockerContainersTab
-            :containers="(containers as any)"
-            :version-comparisons="(versionComparisons as any)"
-            :can-run-docker="canRunDocker"
-            :action-loading="(dockerActionLoading as any)"
-            @container-action="(handleContainerAction as any)"
-          />
-        </ErrorBoundary>
+          :containers="(containers as any)"
+          :version-comparisons="(versionComparisons as any)"
+          :can-run-docker="canRunDocker"
+          :action-loading="(dockerActionLoading as any)"
+          @container-action="(handleContainerAction as any)"
+        />
         <ComposeProjectsTab
           v-if="activeTab === 'compose'"
           :compose-projects="(composeProjects as any)"
@@ -105,7 +101,6 @@ import { useConfirmDialog } from '../composables/useConfirmDialog'
 import { useLocalStorage } from '../composables/useLocalStorage'
 import { addToast } from '../composables/useGlobalToast'
 import WsStatusBar from '../components/WsStatusBar.vue'
-import ErrorBoundary from '../components/common/ErrorBoundary.vue'
 import DockerContainersTab from '../components/docker/DockerContainersTab.vue'
 import ComposeProjectsTab from '../components/docker/ComposeProjectsTab.vue'
 import CommandLogPanel from '../components/host/CommandLogPanel.vue'

@@ -208,6 +208,9 @@ func (h *WSHandler) sendDockerSnapshot(ctx context.Context, conn *websocket.Conn
 	if err != nil {
 		return err
 	}
+	if containers == nil {
+		containers = []models.DockerContainer{}
+	}
 
 	composeProjects, _ := h.db.GetAllComposeProjects(ctx)
 	if composeProjects == nil {
