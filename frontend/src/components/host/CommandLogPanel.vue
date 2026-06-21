@@ -23,10 +23,12 @@
             @click="copy"
           >
             <IconCopy
+              v-if="!copied"
               :size="18"
               class="icon"
             />
             <IconCheck
+              v-else
               :size="18"
               class="icon text-success"
             />

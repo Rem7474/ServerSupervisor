@@ -64,6 +64,17 @@
             :class="iconBg(ev)"
           >
             <IconClipboard
+              v-if="ev.type === 'audit'"
+              :size="16"
+              class="icon"
+            />
+            <IconTerminal2
+              v-else-if="ev.type === 'command'"
+              :size="16"
+              class="icon"
+            />
+            <IconAlertTriangle
+              v-else
               :size="16"
               class="icon"
             />
@@ -109,7 +120,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { IconClipboard } from '@tabler/icons-vue'
+import { IconClipboard, IconTerminal2, IconAlertTriangle } from '@tabler/icons-vue'
 import api from '../../api'
 import type { HostTimelineEvent } from '../../types/audit'
 import RelativeTime from '../RelativeTime.vue'

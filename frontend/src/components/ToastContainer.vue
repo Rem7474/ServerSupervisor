@@ -14,6 +14,22 @@
           role="alert"
         >
           <IconCircleCheck
+            v-if="toast.type === 'success'"
+            :size="18"
+            class="ss-toast-icon"
+          />
+          <IconCircleX
+            v-else-if="toast.type === 'error'"
+            :size="18"
+            class="ss-toast-icon"
+          />
+          <IconAlertTriangle
+            v-else-if="toast.type === 'warning'"
+            :size="18"
+            class="ss-toast-icon"
+          />
+          <IconInfoCircle
+            v-else
             :size="18"
             class="ss-toast-icon"
           />
@@ -37,7 +53,7 @@
 
 <script setup lang="ts">
 import { useGlobalToast } from '../composables/useGlobalToast'
-import { IconCircleCheck, IconX } from '@tabler/icons-vue'
+import { IconCircleCheck, IconCircleX, IconAlertTriangle, IconInfoCircle, IconX } from '@tabler/icons-vue'
 
 const { toasts, removeToast } = useGlobalToast()
 </script>

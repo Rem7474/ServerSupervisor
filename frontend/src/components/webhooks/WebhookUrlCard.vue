@@ -17,8 +17,12 @@
             :title="urlCopied ? 'Copié !' : 'Copier'"
             @click="copyUrl"
           >
-            <IconCopy :size="16" />
+            <IconCopy
+              v-if="!urlCopied"
+              :size="16"
+            />
             <IconCheck
+              v-else
               :size="16"
               class="text-success"
             />
@@ -42,8 +46,14 @@
             type="button"
             @click="showSecret = !showSecret"
           >
-            <IconEye :size="16" />
-            <IconEyeOff :size="16" />
+            <IconEye
+              v-if="!showSecret"
+              :size="16"
+            />
+            <IconEyeOff
+              v-else
+              :size="16"
+            />
           </button>
           <button
             v-if="currentSecret"
@@ -52,8 +62,12 @@
             :title="secretCopied ? 'Copié !' : 'Copier'"
             @click="copySecret"
           >
-            <IconCopy :size="16" />
+            <IconCopy
+              v-if="!secretCopied"
+              :size="16"
+            />
             <IconCheck
+              v-else
               :size="16"
               class="text-success"
             />

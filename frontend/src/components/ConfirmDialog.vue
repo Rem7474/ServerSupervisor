@@ -13,10 +13,12 @@
         <div :class="['modal-status', dialog.destructive.value || dialog.variant.value === 'danger' ? 'bg-danger' : 'bg-warning']" />
         <div class="modal-body text-center py-4">
           <IconAlertTriangle
+            v-if="dialog.destructive.value || dialog.variant.value === 'danger'"
             :size="24"
             class="icon mb-2 text-danger icon-lg"
           />
           <IconAlertTriangle
+            v-else
             :size="24"
             class="icon mb-2 text-warning icon-lg"
           />

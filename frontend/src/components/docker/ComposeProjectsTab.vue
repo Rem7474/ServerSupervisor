@@ -149,7 +149,7 @@
                       v-if="actionLoading[p.name] === 'compose_up'"
                       class="spinner-border spinner-border-sm"
                     />
-                    <IconPlayerPlay
+                    <IconPlayerPlay v-else
                       :size="16"
                       class="icon icon-sm"
                     />
@@ -185,7 +185,7 @@
                         v-if="actionLoading[p.name] === 'compose_restart'"
                         class="spinner-border spinner-border-sm"
                       />
-                      <IconRefresh
+                      <IconRefresh v-else
                         :size="16"
                         class="icon icon-sm"
                       />
@@ -203,7 +203,7 @@
                       v-if="actionLoading[p.name] === 'compose_logs'"
                       class="spinner-border spinner-border-sm"
                     />
-                    <IconList
+                    <IconList v-else
                       :size="16"
                       class="icon icon-sm"
                     />
