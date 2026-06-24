@@ -17,7 +17,7 @@ RUN --mount=type=cache,target=/app/frontend/node_modules/.vite \
     npm run build
 
 # ==== Stage 2: Build Go Server ====
-FROM golang:1.25-alpine AS server-builder
+FROM golang:1.26-alpine AS server-builder
 RUN apk add --no-cache git
 WORKDIR /app
 
