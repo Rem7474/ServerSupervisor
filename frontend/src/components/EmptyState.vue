@@ -2,7 +2,7 @@
   <div class="text-center py-5 text-muted">
     <slot name="icon">
       <component
-        :is="icon"
+        :is="icon || IconInbox"
         :size="iconSize"
         class="mb-3"
         :stroke-width="1.5"
@@ -45,6 +45,11 @@
 import type { Component } from 'vue'
 import { IconInbox } from '@tabler/icons-vue'
 
+// NOTE: `icon` must NOT default to a component here. A bare function default
+// (Tabler icons are functional components) is treated by Vue as a *factory* and
+// invoked with no setup context (resolvePropValue), throwing
+// `Cannot destructure property 'attrs' of 'undefined'`. We default to undefined
+// and fall back to IconInbox in the template instead.
 withDefaults(defineProps<{
   title: string
   subtitle?: string
@@ -53,7 +58,6 @@ withDefaults(defineProps<{
   iconSize?: number
   icon?: Component
 }>(), {
-  icon: IconInbox,
   subtitle: '',
   ctaLabel: '',
   ctaTo: '',
