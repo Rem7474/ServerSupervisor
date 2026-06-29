@@ -32,7 +32,7 @@ jobs:
       changelog: ${{ steps.changelog.outputs.changelog }}
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0   # nécessaire pour git log
 
@@ -117,7 +117,7 @@ jobs:
             suffix: linux-armv6
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Setup Go
         uses: actions/setup-go@v6
@@ -163,7 +163,7 @@ jobs:
     needs: meta
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
