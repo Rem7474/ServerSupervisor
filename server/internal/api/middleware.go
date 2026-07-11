@@ -292,16 +292,12 @@ func SecurityHeadersMiddleware() gin.HandlerFunc {
 }
 
 // WSTokenMiddleware performs optional pre-upgrade JWT validation for WebSocket
-// routes. The JWT is read from the session cookie (preferred) or from the
-// legacy ?token= query parameter. An invalid token aborts the upgrade with
-// 401. When neither is present the request passes through and the post-upgrade
-// message-based handshake remains the authoritative gate.
+// routes. The JWT is read from the session cookie. An invalid token aborts the
+// upgrade with 401. When no cookie is present the request passes through and
+// the post-upgrade message-based handshake remains the authoritative gate.
 func WSTokenMiddleware(cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token := cookies.ReadAccessToken(c.Request)
-		if token == "" {
-			token = c.Query("token")
-		}
 		if token == "" {
 			c.Next()
 			return

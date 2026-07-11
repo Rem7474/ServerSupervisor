@@ -392,6 +392,54 @@ docker compose start server
 > vérifiée. Les noms de fichiers exacts (sous-dossier `daily/weekly/monthly`)
 > sont listés par `docker compose exec postgres-backup ls -la /backups`.
 
+### Revenir en arrière après une mise à jour ratée (rollback manuel de migration)
+
+Les migrations SQL (`server/internal/database/migrations/`) s'appliquent
+automatiquement au démarrage et sont **forward-only** — il n'existe pas de
+mécanisme de "migration down" intégré. Avant de mettre à jour vers une
+version qui embarque de nouvelles migrations, prenez un instantané ad-hoc et
+gardez cette procédure à portée de main.
+
+**Avant la mise à jour :**
+
+```bash
+docker compose exec postgres pg_dump -Fc -U supervisor serversupervisor -f /tmp/pre-upgrade.dump
+docker compose cp postgres:/tmp/pre-upgrade.dump ./pre-upgrade.dump
+```
+
+**Si la nouvelle version pose problème :**
+
+```bash
+# 1. Revenir à l'image/tag précédent dans docker-compose.yml, puis arrêter le serveur
+docker compose stop server
+
+# 2. Recréer une base vide
+docker compose cp ./pre-upgrade.dump postgres:/tmp/pre-upgrade.dump
+docker compose exec postgres psql -U supervisor -d postgres -c \
+  "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='serversupervisor' AND pid <> pg_backend_pid();"
+docker compose exec postgres psql -U supervisor -d postgres -c "DROP DATABASE serversupervisor;"
+docker compose exec postgres psql -U supervisor -d postgres -c "CREATE DATABASE serversupervisor OWNER supervisor;"
+
+# 3. Restaurer l'instantané pré-mise à jour
+docker compose exec postgres pg_restore -U supervisor -d serversupervisor /tmp/pre-upgrade.dump
+
+# 4. Redémarrer sur l'ancienne image
+docker compose up -d server
+```
+
+> **Cette procédure a été testée de bout en bout** (pas seulement rédigée en
+> théorie) : schéma complet migré (baseline + les 71 migrations), une
+> migration destructrice simulée (colonne supprimée, lignes effacées), puis
+> `DROP DATABASE` / `CREATE DATABASE` / `pg_restore` depuis l'instantané —
+> l'état obtenu (schéma, `schema_migrations`, données) est identique bit à
+> bit à celui du moment de l'instantané. Cette validation a été faite sur un
+> PostgreSQL 16 nu (hors conteneur, sans l'extension TimescaleDB
+> disponible dans cet environnement de test) : le mécanisme `pg_dump`/
+> `pg_restore` lui-même est donc vérifié, mais les commandes `docker compose
+> exec` ci-dessus n'ont pas pu être rejouées telles quelles faute de démon
+> Docker disponible pendant cette validation. Testez-la une fois sur votre
+> propre stack avant d'en dépendre en production.
+
 ---
 
 ### Configuration agent (`agent.yaml`)

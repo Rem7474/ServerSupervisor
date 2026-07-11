@@ -3,9 +3,11 @@ import { storeToRefs } from 'pinia'
 import apiClient from '../api'
 import { useAuthStore } from '../stores/auth'
 import { useDashboardStore } from '../stores/dashboard'
+import { useHostsStore } from '../stores/hosts'
 import { useWebSocket, wsEvents } from './useWebSocket'
 import type { WSDashboardSnapshot } from '../types/ws'
 import type { DashboardHostMetrics } from '../types/generated'
+import type { Host } from '../types/host'
 import { useConfirmDialog } from './useConfirmDialog'
 import { confirmBulkAction } from '../utils/bulkActionHelpers'
 import { translateError } from '../utils/translateError'
@@ -220,6 +222,7 @@ function getDashboardChartPalette(): DashboardChartPalette {
 
 export function useDashboard() {
   const dashboardStore = useDashboardStore()
+  const hostsStore = useHostsStore()
   const {
     hosts,
     aptPending,
@@ -474,7 +477,7 @@ export function useDashboard() {
 
   const { wsStatus, wsError, retryCount, dataStaleAlert, reconnect } = useWebSocket<WSDashboardSnapshot>('/api/v1/ws/dashboard', (payload) => {
     if (payload.type !== 'dashboard') return
-    dashboardStore.setHosts(payload.hosts || [])
+    hostsStore.setHosts((payload.hosts || []) as Host[])
     hostMetrics.value = payload.host_metrics || {}
     dashboardStore.setVersionComparisons(payload.version_comparisons || [])
     dashboardStore.setAptPending(payload.apt_pending ?? 0)

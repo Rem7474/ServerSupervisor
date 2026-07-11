@@ -97,6 +97,9 @@ jobs:
     name: Agent binaries
     runs-on: ubuntu-latest
     needs: meta
+    permissions:
+      contents: read
+      id-token: write   # required for keyless cosign signing (Sigstore/GitHub OIDC)
 
     strategy:
       matrix:
@@ -145,6 +148,23 @@ jobs:
           gzip -k "agent-${{ matrix.suffix }}"
           sha256sum "agent-${{ matrix.suffix }}.gz" > "agent-${{ matrix.suffix }}.gz.sha256"
 
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+
+      # Keyless signing: cosign requests a short-lived certificate from Sigstore's
+      # Fulcio CA using this job's GitHub OIDC token (no signing key to provision or
+      # leak). The sha256 sidecar above already guards against download corruption;
+      # this additionally proves the blob came from this exact repo + workflow.
+      - name: Sign agent binary (keyless, Sigstore)
+        working-directory: agent
+        env:
+          COSIGN_YES: "true"
+        run: |
+          cosign sign-blob \
+            --output-signature "agent-${{ matrix.suffix }}.gz.sig" \
+            --output-certificate "agent-${{ matrix.suffix }}.gz.pem" \
+            "agent-${{ matrix.suffix }}.gz"
+
       - name: Upload binary artifact
         uses: actions/upload-artifact@v7
         with:
@@ -152,6 +172,8 @@ jobs:
           path: |
             agent/agent-${{ matrix.suffix }}.gz
             agent/agent-${{ matrix.suffix }}.gz.sha256
+            agent/agent-${{ matrix.suffix }}.gz.sig
+            agent/agent-${{ matrix.suffix }}.gz.pem
           retention-days: 1
 
   # ─────────────────────────────────────────
@@ -161,6 +183,10 @@ jobs:
     name: Docker server image
     runs-on: ubuntu-latest
     needs: meta
+    permissions:
+      contents: read
+      packages: write    # push to GHCR
+      id-token: write    # required for keyless cosign signing (Sigstore/GitHub OIDC)
 
     steps:
       - uses: actions/checkout@v7
@@ -192,6 +218,7 @@ jobs:
             type=raw,value=latest,enable=${{ needs.meta.outputs.is_prerelease == 'false' }}
 
       - name: Build and push server image
+        id: build
         uses: docker/build-push-action@v7
         with:
           context: .
@@ -207,6 +234,18 @@ jobs:
           # Supply-chain attestations pushed alongside the image to GHCR.
           provenance: mode=max
           sbom: true
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+
+      # Keyless signing via Sigstore/Fulcio using this job's GitHub OIDC token — no
+      # signing key to provision or leak. Signs the immutable digest (not a mutable
+      # tag), matching provenance/SBOM already attached above.
+      - name: Sign server image (keyless, Sigstore)
+        env:
+          COSIGN_YES: "true"
+        run: |
+          cosign sign "${{ env.SERVER_IMAGE }}@${{ steps.build.outputs.digest }}"
 
   # ─────────────────────────────────────────
   # GitHub Release avec tous les assets
@@ -267,9 +306,35 @@ jobs:
             sha256sum -c agent-linux-ARCH.gz.sha256
             ```
 
+            ### 🔏 Vérifier la provenance (binaires + image Docker)
+
+            Les binaires et l'image Docker sont signés de façon "keyless" via
+            [Sigstore](https://www.sigstore.dev/) (certificat éphémère émis par le
+            fournisseur d'identité OIDC de GitHub Actions pour ce dépôt/workflow
+            précis — pas de clé de signature à gérer). Nécessite
+            [cosign](https://docs.sigstore.dev/cosign/installation/).
+
+            ```bash
+            # Binaire agent (remplacer ARCH par: amd64, arm64, armv7, armv6)
+            cosign verify-blob \
+              --certificate agent-linux-ARCH.gz.pem \
+              --signature agent-linux-ARCH.gz.sig \
+              --certificate-identity-regexp "^https://github.com/${{ github.repository }}/.github/workflows/release.yml@.*" \
+              --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+              agent-linux-ARCH.gz
+
+            # Image Docker serveur
+            cosign verify \
+              --certificate-identity-regexp "^https://github.com/${{ github.repository }}/.github/workflows/release.yml@.*" \
+              --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+              ${{ env.SERVER_IMAGE }}:${{ needs.meta.outputs.version }}
+            ```
+
             ### 📝 Changelog
 
             ${{ needs.meta.outputs.changelog }}
           files: |
             ./release-assets/*.gz
             ./release-assets/*.sha256
+            ./release-assets/*.sig
+            ./release-assets/*.pem

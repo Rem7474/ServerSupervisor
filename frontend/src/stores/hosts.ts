@@ -24,6 +24,18 @@ export const useHostsStore = defineStore('hosts', () => {
     }
   }
 
+  // Bulk-replaces the host list from a source at least as fresh as a REST
+  // fetch (namely the dashboard WebSocket snapshot — see useDashboard.ts).
+  // Marks the data fresh so fetchHosts() doesn't immediately re-fetch over
+  // REST right after a live push. This store is the single source of truth
+  // for host status app-wide; stores/dashboard.ts reads through it instead
+  // of keeping its own independent copy, so the navbar badge and the
+  // dashboard KPIs can never disagree about which hosts are online.
+  function setHosts(nextHosts: Host[]): void {
+    hosts.value = nextHosts
+    fetchedAt.value = Date.now()
+  }
+
   function invalidate(): void {
     fetchedAt.value = null
   }
@@ -41,5 +53,5 @@ export const useHostsStore = defineStore('hosts', () => {
     hosts.value = hosts.value.filter((h) => h.id !== hostId)
   }
 
-  return { hosts, loading, fetchHosts, invalidate, upsert, remove }
+  return { hosts, loading, fetchHosts, setHosts, invalidate, upsert, remove }
 })

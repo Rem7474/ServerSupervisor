@@ -197,16 +197,11 @@ func (h *WSHandler) authenticateWSWithRole(c *gin.Context, conn *websocket.Conn)
 
 // authenticateWSClaims authorises the connection. It prefers the session
 // cookie (sent automatically by the browser on the upgrade request) and falls
-// back to the legacy in-band {"type":"auth","token":"…"} handshake for older
-// clients. Returns the JWT claims on success.
+// back to the in-band {"type":"auth","token":"…"} handshake for clients that
+// cannot rely on cookies. Returns the JWT claims on success.
 func (h *WSHandler) authenticateWSClaims(c *gin.Context, conn *websocket.Conn) (jwt.MapClaims, bool) {
 	if c != nil && c.Request != nil {
 		if tok := cookies.ReadAccessToken(c.Request); tok != "" {
-			if claims, ok := h.parseTokenClaims(tok); ok {
-				return claims, true
-			}
-		}
-		if tok := c.Query("token"); tok != "" {
 			if claims, ok := h.parseTokenClaims(tok); ok {
 				return claims, true
 			}

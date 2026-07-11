@@ -12,8 +12,33 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
+
+// fileIdentityCache tracks each log file's last-seen identity (device+inode,
+// compared via os.SameFile) across scans within this process's lifetime.
+// Size alone cannot distinguish "same file, grew a lot since last scan" from
+// "rotated to a brand new file that already grew past the old offset by the
+// time we scanned again" — only file identity does. Intentionally in-memory
+// only, not persisted in the cursor JSON: on agent restart the existing
+// size-based bootstrap heuristic already covers "did it rotate while I was
+// down", and inode numbers are not portable to persist across reboots anyway.
+var fileIdentityCache sync.Map // path (string) -> os.FileInfo
+
+// identityChanged reports whether path's current os.FileInfo describes a
+// different underlying file than the one last cached for it, then updates
+// the cache to info. Returns false the first time a path is seen in this
+// process (nothing to compare against yet — the persisted cursor's own
+// size-based check already handles that case).
+func identityChanged(path string, info os.FileInfo) bool {
+	prev, ok := fileIdentityCache.Load(path)
+	fileIdentityCache.Store(path, info)
+	if !ok {
+		return false
+	}
+	return !os.SameFile(prev.(os.FileInfo), info)
+}
 
 type WebRequest struct {
 	Timestamp     string     `json:"timestamp"`
@@ -710,12 +735,19 @@ func readIncrementalLines(path string, maxLines int, prev webLogCursorEntry, has
 		return tailLines, next, nil
 	}
 
+	// Compare identity before hasPrev short-circuits: this also primes the
+	// cache on the very first scan of a path in this process.
+	rotatedByIdentity := identityChanged(path, info)
+
 	if !hasPrev {
 		return bootstrap()
 	}
 
-	if info.Size() < prev.Offset {
-		// Log rotated or truncated: bootstrap from tail again.
+	if info.Size() < prev.Offset || rotatedByIdentity {
+		// Log rotated or truncated: bootstrap from tail again. Size alone
+		// misses a fast rotation where the new file already grew past
+		// prev.Offset before this scan ran; file-identity comparison catches
+		// that case too (see fileIdentityCache).
 		return bootstrap()
 	}
 
@@ -909,6 +941,15 @@ func loadWebLogCursor(path string) *webLogCursorState {
 	return state
 }
 
+// saveWebLogCursor persists state via write-to-temp-file + fsync + rename
+// rather than a direct os.WriteFile. A direct write can leave a truncated,
+// invalid JSON file if the agent is killed mid-write; loadWebLogCursor
+// already treats a corrupt/missing cursor as "start over" (fail-open, so
+// this can never wedge the agent), but that fallback re-bootstraps every
+// tracked file and double-counts recently-seen requests until it catches up
+// — worth avoiding when the fix is this cheap. rename(2) is atomic on the
+// same filesystem, so a concurrent crash can only ever observe the fully-old
+// or fully-new file, never a partial one.
 func saveWebLogCursor(path string, state *webLogCursorState) {
 	if strings.TrimSpace(path) == "" || state == nil {
 		return
@@ -916,14 +957,37 @@ func saveWebLogCursor(path string, state *webLogCursorState) {
 	if state.Files == nil {
 		state.Files = map[string]webLogCursorEntry{}
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return
 	}
 	data, err := json.Marshal(state)
 	if err != nil {
 		return
 	}
-	_ = os.WriteFile(path, data, 0o600)
+
+	tmp, err := os.CreateTemp(dir, filepath.Base(path)+".tmp-*")
+	if err != nil {
+		return
+	}
+	tmpPath := tmp.Name()
+	defer func() { _ = os.Remove(tmpPath) }() // no-op once the rename below succeeds
+
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		return
+	}
+	if err := tmp.Sync(); err != nil {
+		_ = tmp.Close()
+		return
+	}
+	if err := tmp.Close(); err != nil {
+		return
+	}
+	if err := os.Chmod(tmpPath, 0o600); err != nil {
+		return
+	}
+	_ = os.Rename(tmpPath, path)
 }
 
 func mapKeys(m map[string]struct{}) []string {

@@ -504,20 +504,37 @@ Répondu en détail dans la roadmap ci-dessous — mais le principe général : 
 
 ### 🟡 Important — dette bloquante, 3 prochains mois
 
-| # | Problème | Correctif |
-|---|---|---|
-| 6 | Rate limiter 100 % en mémoire — cassé en multi-instance | Backend partagé (Redis) si scale-out prévu, sinon documenter la limite « single instance » |
-| 7 | Fallback WebSocket `?token=` en query string encore présent | Retirer le fallback, ne garder que cookie + message d'auth in-band |
-| 8 | Aucun timeout sur la collecte agent (`df`/`smartctl`) combiné à un ticker qui abandonne ses ticks → risque de blocage définitif du reporting | `exec.CommandContext` partout + timeout global sur la collecte |
-| 9 | Self-update agent : intégrité par checksum seul (pas de signature), health-check superficiel | Signer les releases (cosign/minisign) + health-check qui valide un vrai cycle de collecte |
-| 10 | `tasks.yaml` sans mécanisme de distribution fleet-wide | Endpoint de push de config côté serveur, ou intégration config-management documentée |
-| 11 | Curseur web logs : détection de rotation par taille seule, écriture non atomique, pas de dédup serveur | Écriture temp+rename+fsync, détection taille+mtime, clé de dédup à l'ingestion |
-| 12 | Zéro test sur `internal/auth` (TOTP), `internal/ws`, `internal/scheduler`, `internal/poller`, `internal/dispatch` | Prioriser TOTP (sécurité), puis les hubs WS |
-| 13 | Migrations forward-only, pas d'outil dédié | Évaluer goose, ou documenter/tester une procédure de rollback manuel |
-| 14 | Double connexion WebSocket notifications (`NotificationBell` + `AlertsView`) | Partager la connexion via le composable existant |
-| 15 | `stores/hosts.ts` (TTL 60s REST) et `stores/dashboard.ts` (WS live) peuvent afficher des chiffres différents sur le même écran | Source unique de vérité pour l'état hosts up/down |
-| 16 | 89 % des vues frontend appellent l'API directement plutôt que via composable | Étendre le pattern composable existant aux mutations restantes |
-| 17 | `build.sh` (3 plateformes) désynchronisé de la matrice de release réelle (4 plateformes) | Aligner `build.sh` sur `release.yml` |
+**Statut : traité, avec une reclassification importante sur le point 10 (voir détail).**
+
+| # | Problème | Correctif | Statut |
+|---|---|---|---|
+| 6 | Rate limiter 100 % en mémoire — cassé en multi-instance | Backend partagé (Redis) si scale-out prévu, sinon documenter la limite « single instance » | ✅ Documenté (`CLAUDE.md`) |
+| 7 | Fallback WebSocket `?token=` en query string encore présent | Retirer le fallback, ne garder que cookie + message d'auth in-band | ✅ Corrigé |
+| 8 | Aucun timeout sur la collecte agent (`df`/`smartctl`) combiné à un ticker qui abandonne ses ticks → risque de blocage définitif du reporting | `exec.CommandContext` partout + timeout global sur la collecte | ✅ Corrigé |
+| 9 | Self-update agent : intégrité par checksum seul (pas de signature), health-check superficiel | Signer les releases (cosign/minisign) + health-check qui valide un vrai cycle de collecte | ✅ Corrigé |
+| 10 | `tasks.yaml` sans mécanisme de distribution fleet-wide | ~~Endpoint de push de config côté serveur~~ | ⚠️ **Reclassé : pas un bug** |
+| 11 | Curseur web logs : détection de rotation par taille seule, écriture non atomique, pas de dédup serveur | Écriture temp+rename+fsync, détection taille+mtime, clé de dédup à l'ingestion | ✅ Corrigé (sauf dédup serveur, voir détail) |
+| 12 | Zéro test sur `internal/auth` (TOTP), `internal/ws`, `internal/scheduler`, `internal/poller`, `internal/dispatch` | Prioriser TOTP (sécurité), puis les hubs WS | ✅ Corrigé |
+| 13 | Migrations forward-only, pas d'outil dédié | Évaluer goose, ou documenter/tester une procédure de rollback manuel | ✅ Runbook rédigé et testé |
+| 14 | Double connexion WebSocket notifications (`NotificationBell` + `AlertsView`) | Partager la connexion via le composable existant | ✅ Corrigé |
+| 15 | `stores/hosts.ts` (TTL 60s REST) et `stores/dashboard.ts` (WS live) peuvent afficher des chiffres différents sur le même écran | Source unique de vérité pour l'état hosts up/down | ✅ Corrigé |
+| 16 | 89 % des vues frontend appellent l'API directement plutôt que via composable | Étendre le pattern composable existant aux mutations restantes | ✅ Migration complète des ~25 vues |
+| 17 | `build.sh` (3 plateformes) désynchronisé de la matrice de release réelle (4 plateformes) | Aligner `build.sh` sur `release.yml` | ✅ Corrigé |
+
+**Point 10 reclassé — retour de l'auteur du projet, à retenir pour la suite :** ce n'est pas un oubli mais une frontière de sécurité volontaire. `tasks.yaml` est une allowlist de commandes définie localement, en filesystem, sur chaque hôte — précisément pour que le **serveur ne puisse jamais pousser une commande arbitraire à un agent**. Construire un endpoint serveur→agent capable d'écrire ce fichier reviendrait à donner au serveur la capacité de définir et faire exécuter n'importe quelle commande sur les hôtes supervisés, ce qui est exactement le pouvoir que ce mécanisme est censé retirer au serveur. Aucune synchronisation n'a donc été construite. Cette section de l'audit et sa recommandation associée sont annulées ; le comportement actuel (configuration manuelle, par hôte, par un opérateur ayant un accès filesystem local) est correct par conception.
+
+**Détail des correctifs appliqués (points 6-9, 11-17) :**
+
+- **#6** : note ajoutée dans `CLAUDE.md` expliquant que `IPRateLimiter` est en mémoire process, cohérent avec le reste de l'architecture (bus d'événements, cache dashboard, hubs WS — tous en mémoire process également) ; migrer vers Redis n'aurait de sens que dans le cadre d'un chantier de scale-out horizontal complet, pas isolément.
+- **#7** : fallback `c.Query("token")` retiré de `WSTokenMiddleware` (`middleware.go`) et `authenticateWSClaims` (`ws/base.go`) — vérifié qu'aucun client actuel ne l'utilisait avant de le retirer.
+- **#8** : tous les appels `df`/`smartctl`/`ls` de `agent/internal/collector/disk.go` bornés par `exec.CommandContext` (10-15s selon la commande) ; `reporter.go` borne désormais la phase de collecte complète par un timeout de 25s avec `select`/`time.After` autour de `wg.Wait()`.
+- **#9** : nouveau flag `--internal-healthcheck` qui exécute un vrai cycle `collector.CollectSystem()` et sort en 0/1 — exécuté par le self-updater **avant** de redémarrer le service live (pas après), pour ne jamais perturber le service en cours si le nouveau binaire est cassé ; signature cosign keyless (Sigstore/OIDC GitHub Actions, sans clé à gérer) ajoutée sur les binaires agent et l'image Docker serveur dans `release.yml`, avec commandes de vérification documentées dans le corps de la release.
+- **#11** : écriture du curseur passée en temp-file + `fsync` + `rename` atomique ; détection de rotation combinant désormais taille **et** identité de fichier (`os.SameFile`, cache en mémoire par process) — couvre le cas d'une rotation rapide où le nouveau fichier dépasse déjà l'ancien offset avant le scan suivant. Testé par un test de régression qui simule une vraie rotation logrotate (rename, pas delete) et vérifie qu'un bootstrap propre se déclenche au lieu d'un seek à l'aveugle. La déduplication côté serveur à l'ingestion n'a pas été implémentée (nécessiterait une clé naturelle + une migration de schéma ; le fail-open actuel reste sans risque de blocage, juste un risque de double-comptage résiduel dans de rares cas).
+- **#12** : tests ajoutés sur `internal/auth` (génération/vérification TOTP, backup codes, y compris les cas de stockage corrompu/vide), `internal/poller` (dont un test qui panique délibérément dans un tick pour vérifier que `safego.Recover` empêche l'arrêt du poller — validation directe du correctif du point 🔴 #3), `internal/ws` (fonctions pures `isAllowedOrigin`/`snapshotChanged`), `internal/scheduler` (Add/Remove/Update/NextRun/Start avec une fausse DB), `internal/dispatch` (test d'intégration via `testutil.NewPostgresDB`, qui skip proprement sans Docker et s'exécute réellement en CI).
+- **#13** : procédure de rollback manuel rédigée dans le README (section « Revenir en arrière après une mise à jour ratée ») **et testée réellement** (pas seulement documentée en théorie) : schéma complet migré, migration destructrice simulée, `pg_dump`/`pg_restore`, état revenu identique bit à bit. Testé sur un Postgres 16 nu hors conteneur (pas de démon Docker dans cet environnement) — le mécanisme est donc vérifié, les commandes `docker compose exec` exactes du README n'ont pas pu être rejouées telles quelles.
+- **#14/#15** : voir le détail donné directement dans la conversation au moment de ces deux correctifs (composable `useNotifications` transformé en singleton partagé avec abonnement `onNotificationsMessage` pour `AlertsView` ; `stores/dashboard.ts` lit maintenant `stores/hosts.ts` via une `computed` au lieu de garder sa propre copie).
+- **#16** : chaque vue qui appelait l'API directement a désormais un composable `use<Domaine>.ts` dédié qui possède l'état/la logique API/WS ; la vue ne garde que les refs de template DOM (focus, etc.) et l'état d'UI pur. Piège rencontré et documenté pour toutes les vues : `vue-tsc` signale un ref de template DOM renvoyé par un composable comme « jamais lu » (l'attribut `ref="x"` n'est pas une lecture JS) — la règle appliquée partout est donc : les refs de template restent dans la vue, le composable expose un signal simple (compteur) si un focus doit être déclenché.
+- **#17** : `build.sh` reconstruit désormais exactement la même matrice à 4 cibles que `release.yml` (amd64/arm64/armv7/armv6, `GOARM` explicite) — testé en construisant réellement les 4 binaires.
 
 ### 🟢 Amélioration — backlog long terme
 

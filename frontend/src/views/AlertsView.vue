@@ -153,7 +153,7 @@ import AlertRuleModal from '../components/alerts/AlertRuleModal.vue'
 import ErrorBoundary from '../components/common/ErrorBoundary.vue'
 import { IconAlertTriangle, IconPlus } from '@tabler/icons-vue'
 import { useAlertsPage } from '../composables/useAlertsPage'
-import { useWebSocket } from '../composables/useWebSocket'
+import { onNotificationsMessage } from '../composables/useNotifications'
 
 const TAB_TITLES: Record<string, string> = {
   rules: 'Alertes',
@@ -234,12 +234,17 @@ onMounted(async () => {
   incidentsPollTimer = setInterval(loadIncidents, 300_000)
 })
 
+// Shares the single app-wide notifications WebSocket connection (owned by
+// NotificationBell/useNotifications) instead of opening a second connection
+// to the same route — this view only needs the raw messages to refresh its
+// own incidents/trackers state.
+const unsubscribeNotifications = onNotificationsMessage(onWebSocketAlert)
+
 onUnmounted(() => {
+  unsubscribeNotifications()
   if (incidentsPollTimer) {
     clearInterval(incidentsPollTimer)
     incidentsPollTimer = null
   }
 })
-
-useWebSocket('/api/v1/ws/notifications', onWebSocketAlert)
 </script>
