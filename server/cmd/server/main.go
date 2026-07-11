@@ -19,6 +19,7 @@ import (
 	"github.com/serversupervisor/server/internal/logging"
 	"github.com/serversupervisor/server/internal/poller"
 	"github.com/serversupervisor/server/internal/scheduler"
+	pushsvc "github.com/serversupervisor/server/internal/services/push"
 	"github.com/serversupervisor/server/internal/ws"
 )
 
@@ -106,6 +107,7 @@ func main() {
 
 	// Notification hub — shared between alert engine (push on fire) and WS handler
 	notifHub := ws.NewNotificationHub()
+	pushSvc := pushsvc.NewService(db)
 
 	// Event bus — writers publish topics; WS snapshot endpoints subscribe and push
 	// on change instead of polling the DB on a fixed timer.
@@ -115,7 +117,7 @@ func main() {
 	bg := background.New()
 	bg.Add(background.NewAuditCleanupJob(db, cfg))
 	bg.Add(background.NewHostStatusJob(db, eventBus))
-	bg.Add(background.NewAlertEvalJob(db, cfg, dispatcher, notifHub))
+	bg.Add(background.NewAlertEvalJob(db, cfg, dispatcher, notifHub, pushSvc))
 	// Metric downsampling is handled by the TimescaleDB continuous aggregate
 	// (system_metrics_5min); metric retention/compression by Timescale policies.
 	// The remaining job only trims release-tracker tag digests.

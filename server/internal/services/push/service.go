@@ -67,12 +67,26 @@ func (s *Service) Unsubscribe(ctx context.Context, endpoint string) error {
 	return s.repo.DeletePushSubscription(ctx, endpoint)
 }
 
+// Payload is the wire shape every domain sends: it matches exactly what
+// frontend/public/service-worker.js reads out of the push event. Status
+// distinguishes a one-shot event ("fired"/"detected"/"completed"/"failed")
+// from a lifecycle update ("resolved") that the service worker shows silently
+// by re-using Tag, instead of alerting a second time for something already
+// notified.
+type Payload struct {
+	Title  string `json:"title"`
+	Body   string `json:"body"`
+	Tag    string `json:"tag"`
+	URL    string `json:"url"`
+	Status string `json:"status,omitempty"`
+}
+
 // Send delivers a Web Push notification to every admin device subscription.
 // Shared by every domain (alerts, release trackers, git webhooks) that offers a
 // "browser" notification channel, so a native Android/PWA notification is shown
 // even when the app is fully closed — not just while a tab is open. Safe to call
 // with no VAPID keys or no subscriptions yet (silently returns).
-func (s *Service) Send(ctx context.Context, cfg *config.Config, payload map[string]interface{}) {
+func (s *Service) Send(ctx context.Context, cfg *config.Config, payload Payload) {
 	privateKey, publicKey, err := s.ensureVapidKeys(ctx)
 	if err != nil || privateKey == "" || publicKey == "" {
 		return

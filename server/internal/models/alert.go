@@ -153,6 +153,24 @@ type AlertRule struct {
 	ActiveIncidentCount int                 `json:"active_incident_count" db:"-"`
 }
 
+// DisplayName returns the human-readable label for a rule: its custom Name if
+// set, otherwise "<metric> <operator> <threshold> (crit|warn)" built from
+// whichever threshold is configured. This is the single formula behind every
+// rendering of a rule's name — the live WS/push notifications and the REST
+// notification feed both call it, so they can't drift apart.
+func (r AlertRule) DisplayName() string {
+	if r.Name != nil {
+		return *r.Name
+	}
+	if r.ThresholdCrit != nil {
+		return fmt.Sprintf("%s %s %.2f (crit)", r.Metric, r.Operator, *r.ThresholdCrit)
+	}
+	if r.ThresholdWarn != nil {
+		return fmt.Sprintf("%s %s %.2f (warn)", r.Metric, r.Operator, *r.ThresholdWarn)
+	}
+	return ""
+}
+
 type AlertIncident struct {
 	ID          int64      `json:"id" db:"id"`
 	RuleID      *int64     `json:"rule_id" db:"rule_id"`

@@ -17,6 +17,7 @@ import (
 	"github.com/serversupervisor/server/internal/dispatch"
 	"github.com/serversupervisor/server/internal/gitprovider"
 	"github.com/serversupervisor/server/internal/models"
+	"github.com/serversupervisor/server/internal/services/notifychannels"
 	"github.com/serversupervisor/server/internal/services/push"
 	"github.com/serversupervisor/server/internal/ws"
 )
@@ -28,11 +29,14 @@ type Poller struct {
 	cfg        *config.Config
 	dispatcher *dispatch.Dispatcher
 	notifHub   *ws.NotificationHub
-	pushSvc    *push.Service
+	dispatch   *notifychannels.Dispatcher
 }
 
 func NewPoller(db *database.DB, cfg *config.Config, dispatcher *dispatch.Dispatcher, notifHub *ws.NotificationHub, pushSvc *push.Service) *Poller {
-	return &Poller{db: db, cfg: cfg, dispatcher: dispatcher, notifHub: notifHub, pushSvc: pushSvc}
+	return &Poller{
+		db: db, cfg: cfg, dispatcher: dispatcher, notifHub: notifHub,
+		dispatch: notifychannels.NewDispatcher(cfg, pushSvc),
+	}
 }
 
 // CheckAll polls every enabled tracker once.
@@ -323,11 +327,12 @@ func (s *Poller) dispatchComposeUpdate(ctx context.Context, t models.ReleaseTrac
 	_ = s.db.MarkReleaseTrackerTriggered(ctx, t.ID)
 }
 
-// notifyDetected pushes a "release detected" browser notification.
+// notifyDetected pushes a "release detected" browser notification. Detection
+// only ever supports the "browser" channel (unlike execution completion,
+// which also supports smtp/ntfy) — that's an intentional, pre-existing
+// restriction, preserved here by never forwarding anything but "browser" to
+// the shared dispatcher even if other channels are present in NotifyChannels.
 func (s *Poller) notifyDetected(ctx context.Context, t models.ReleaseTracker, version, releaseURL, releaseName string) {
-	if len(t.NotifyChannels) == 0 {
-		return
-	}
 	hasBrowser := false
 	for _, ch := range t.NotifyChannels {
 		if ch == "browser" {
@@ -342,29 +347,35 @@ func (s *Poller) notifyDetected(ctx context.Context, t models.ReleaseTracker, ve
 	if t.TrackerType == "docker" {
 		label = "Docker"
 	}
-	if s.notifHub != nil {
-		s.notifHub.Broadcast(models.WSReleaseTrackerMessage{
-			Type: "release_tracker_detected",
-			Notification: models.WSReleaseTrackerNotification{
-				TrackerID: t.ID, TrackerName: t.Name, TrackerType: t.TrackerType,
-				Version: version, ReleaseURL: releaseURL, ReleaseName: releaseName,
-				Status: "detected", Label: label, TriggeredAt: time.Now().UTC(),
-			},
-		})
+	versionLabel := version
+	if versionLabel == "" {
+		versionLabel = "inconnue"
 	}
-	if s.pushSvc != nil {
-		versionLabel := version
-		if versionLabel == "" {
-			versionLabel = "inconnue"
-		}
-		go s.pushSvc.Send(ctx, s.cfg, map[string]interface{}{
-			"title":  fmt.Sprintf("%s tracker : %s", label, t.Name),
-			"body":   fmt.Sprintf("Nouvelle version détectée : %s", versionLabel),
-			"tag":    fmt.Sprintf("tracker-detected-%s-%s", t.ID, versionLabel),
-			"url":    fmt.Sprintf("/release-trackers/%s", t.ID),
-			"status": "detected",
-		})
-	}
+
+	s.dispatch.Send(ctx, notifychannels.Event{
+		LogID:    "tracker:" + t.ID,
+		Channels: []string{"browser"},
+		OnBrowser: func() {
+			if s.notifHub == nil {
+				return
+			}
+			s.notifHub.Broadcast(models.WSReleaseTrackerMessage{
+				Type: "release_tracker_detected",
+				Notification: models.WSReleaseTrackerNotification{
+					TrackerID: t.ID, TrackerName: t.Name, TrackerType: t.TrackerType,
+					Version: version, ReleaseURL: releaseURL, ReleaseName: releaseName,
+					Status: "detected", Label: label, TriggeredAt: time.Now().UTC(),
+				},
+			})
+		},
+		Push: &push.Payload{
+			Title:  fmt.Sprintf("%s tracker : %s", label, t.Name),
+			Body:   fmt.Sprintf("Nouvelle version détectée : %s", versionLabel),
+			Tag:    fmt.Sprintf("tracker-detected-%s-%s", t.ID, versionLabel),
+			URL:    fmt.Sprintf("/release-trackers/%s", t.ID),
+			Status: "detected",
+		},
+	})
 }
 
 // ===== pure helpers =====

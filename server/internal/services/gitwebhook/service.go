@@ -23,7 +23,7 @@ import (
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/dispatch"
 	"github.com/serversupervisor/server/internal/models"
-	"github.com/serversupervisor/server/internal/notify"
+	"github.com/serversupervisor/server/internal/services/notifychannels"
 	"github.com/serversupervisor/server/internal/services/push"
 	"github.com/serversupervisor/server/internal/ws"
 )
@@ -61,12 +61,16 @@ type Service struct {
 	cfg        *config.Config
 	dispatcher Dispatcher
 	notifHub   *ws.NotificationHub
-	pushSvc    *push.Service
+	dispatch   *notifychannels.Dispatcher
 	bgCtx      context.Context
 }
 
 func NewService(repo Repository, cfg *config.Config, dispatcher Dispatcher, notifHub *ws.NotificationHub, pushSvc *push.Service) *Service {
-	return &Service{repo: repo, cfg: cfg, dispatcher: dispatcher, notifHub: notifHub, pushSvc: pushSvc, bgCtx: context.Background()}
+	return &Service{
+		repo: repo, cfg: cfg, dispatcher: dispatcher, notifHub: notifHub,
+		dispatch: notifychannels.NewDispatcher(cfg, pushSvc),
+		bgCtx:    context.Background(),
+	}
 }
 
 // SetBackgroundContext threads a long-lived (SIGTERM-bound) ctx for the
@@ -314,52 +318,45 @@ func (s *Service) NotifyComplete(commandID, status string) {
 	}
 
 	emoji := "✅"
+	statusLabel := "réussie"
 	if status == "failed" {
 		emoji = "❌"
+		statusLabel = "échouée"
 	}
 	subject := fmt.Sprintf("[ServerSupervisor] Webhook %s %s %s", wh.Name, emoji, status)
 	msg := fmt.Sprintf("Webhook '%s' execution %s on host %s (task: %s)", wh.Name, status, wh.HostID, wh.CustomTaskID)
 
-	n := notify.New()
-	for _, ch := range channels {
-		switch ch {
-		case "smtp":
-			if s.cfg.SMTPTo == "" || s.cfg.SMTPFrom == "" {
-				continue
+	s.dispatch.Send(ctx, notifychannels.Event{
+		LogID:       "webhook:" + webhookID,
+		Channels:    channels,
+		SMTPSubject: subject,
+		SMTPBody:    msg,
+		SMTPTo:      s.cfg.SMTPTo,
+		NtfyTitle:   subject,
+		NtfyBody:    msg,
+		NtfyURL:     s.cfg.NotifyURL,
+		OnBrowser: func() {
+			if s.notifHub == nil {
+				return
 			}
-			if err := n.SendSMTP(s.cfg, s.cfg.SMTPFrom, s.cfg.SMTPTo, subject, msg); err != nil {
-				slog.ErrorContext(ctx, "webhook SMTP send", slog.Any("err", err))
-			}
-		case "ntfy":
-			if s.cfg.NotifyURL == "" {
-				continue
-			}
-			if err := n.SendNtfy(s.cfg, s.cfg.NotifyURL, subject, msg); err != nil {
-				slog.ErrorContext(ctx, "webhook ntfy send", slog.Any("err", err))
-			}
-		case "browser":
-			if s.notifHub != nil {
-				s.notifHub.Broadcast(models.WSWebhookExecutionMessage{
-					Type: "webhook_execution",
-					Notification: models.WSWebhookNotification{
-						WebhookID:   webhookID,
-						WebhookName: wh.Name,
-						Status:      status,
-						TriggeredAt: time.Now().UTC(),
-					},
-				})
-			}
-			if s.pushSvc != nil {
-				go s.pushSvc.Send(ctx, s.cfg, map[string]interface{}{
-					"title":  fmt.Sprintf("Webhook : %s", wh.Name),
-					"body":   fmt.Sprintf("Exécution %s", map[string]string{"completed": "réussie", "failed": "échouée"}[status]),
-					"tag":    fmt.Sprintf("webhook-exec-%s-%s", webhookID, status),
-					"url":    fmt.Sprintf("/git-webhooks/%s", webhookID),
-					"status": status,
-				})
-			}
-		}
-	}
+			s.notifHub.Broadcast(models.WSWebhookExecutionMessage{
+				Type: "webhook_execution",
+				Notification: models.WSWebhookNotification{
+					WebhookID:   webhookID,
+					WebhookName: wh.Name,
+					Status:      status,
+					TriggeredAt: time.Now().UTC(),
+				},
+			})
+		},
+		Push: &push.Payload{
+			Title:  fmt.Sprintf("Webhook : %s", wh.Name),
+			Body:   fmt.Sprintf("Exécution %s", statusLabel),
+			Tag:    fmt.Sprintf("webhook-exec-%s-%s", webhookID, status),
+			URL:    fmt.Sprintf("/git-webhooks/%s", webhookID),
+			Status: status,
+		},
+	})
 }
 
 // ===== signature / parsing helpers =====

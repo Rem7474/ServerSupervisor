@@ -12,7 +12,8 @@ import (
 	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/dispatch"
 	"github.com/serversupervisor/server/internal/models"
-	"github.com/serversupervisor/server/internal/notify"
+	"github.com/serversupervisor/server/internal/services/notifychannels"
+	"github.com/serversupervisor/server/internal/services/push"
 )
 
 // NotificationPusher broadcasts a real-time alert event to connected frontend clients.
@@ -46,11 +47,13 @@ func CurrentIncidentValue(ctx context.Context, db *database.DB, rule models.Aler
 // Unlike the periodic engine, this function fetches the actual current metric
 // value (not inc.Value, which is stale once the value drops below the trigger
 // and the engine stops updating it).
-func ResolveStaleIncidentsForRule(ctx context.Context, db *database.DB, rule models.AlertRule) {
+func ResolveStaleIncidentsForRule(ctx context.Context, db *database.DB, cfg *config.Config, pusher NotificationPusher, pushSvc *push.Service, rule models.AlertRule) {
 	incidents, err := db.ListOpenAlertIncidentsByRule(ctx, rule.ID)
 	if err != nil || len(incidents) == 0 {
 		return
 	}
+
+	chDispatch := notifychannels.NewDispatcher(cfg, pushSvc)
 
 	// Build a host map so status_offline can read the real host status.
 	hostMap := map[string]models.Host{}
@@ -82,12 +85,14 @@ func ResolveStaleIncidentsForRule(ctx context.Context, db *database.DB, rule mod
 			if err := db.ResolveAlertIncident(ctx, inc.ID); err == nil {
 				slog.InfoContext(ctx, "alerts: stale incident resolved after rule update",
 					slog.Int64("incident_id", inc.ID), slog.Int64("rule_id", rule.ID))
+				broadcastIncidentUpdate(pusher, "resolved", rule, host.ID)
+				chDispatch.Send(ctx, resolvedEvent(rule, host))
 			}
 		}
 	}
 }
 
-func EvaluateAlerts(ctx context.Context, db *database.DB, cfg *config.Config, dispatcher *dispatch.Dispatcher, pusher NotificationPusher) {
+func EvaluateAlerts(ctx context.Context, db *database.DB, cfg *config.Config, dispatcher *dispatch.Dispatcher, pusher NotificationPusher, pushSvc *push.Service) {
 	rules, err := db.GetAlertRules(ctx)
 	if err != nil {
 		slog.ErrorContext(ctx, "alerts: failed to fetch rules", slog.Any("err", err))
@@ -103,7 +108,7 @@ func EvaluateAlerts(ctx context.Context, db *database.DB, cfg *config.Config, di
 		return
 	}
 
-	n := notify.New()
+	chDispatch := notifychannels.NewDispatcher(cfg, pushSvc)
 
 	hostByID := make(map[string]models.Host, len(hosts))
 	for _, h := range hosts {
@@ -124,7 +129,7 @@ func EvaluateAlerts(ctx context.Context, db *database.DB, cfg *config.Config, di
 					if !ok {
 						host = models.Host{ID: inc.HostID, Name: inc.HostID}
 					}
-					go pushWebNotificationsResolved(ctx, db, cfg, rule, host)
+					chDispatch.Send(ctx, resolvedEvent(rule, host))
 				}
 			}
 			continue
@@ -176,10 +181,10 @@ func EvaluateAlerts(ctx context.Context, db *database.DB, cfg *config.Config, di
 					if _, auditErr := db.CreateAuditLog(ctx, "alert-engine", "alert_fired", host.ID, "", details, "success"); auditErr != nil {
 						slog.WarnContext(ctx, "alerts: failed to write alert_fired audit log", slog.Int64("incident_id", incID), slog.Any("err", auditErr))
 					}
-					sendAlertNotifications(n, cfg, rule, host, value)
 					triggerAlertCommand(ctx, dispatcher, db, rule, host)
-					pushBrowserNotification(pusher, rule, host, value, incID)
-					go pushWebNotifications(ctx, db, cfg, rule, host, value)
+					ev := firedEvent(cfg, rule, host, value)
+					ev.OnBrowser = newAlertBroadcast(pusher, rule, host, value, incID)
+					chDispatch.Send(ctx, ev)
 					broadcastIncidentUpdate(pusher, "fired", rule, host.ID)
 				} else {
 					// Keep incident context fresh so UI and resolution logic use current severity/value.
@@ -207,13 +212,13 @@ func EvaluateAlerts(ctx context.Context, db *database.DB, cfg *config.Config, di
 						slog.WarnContext(ctx, "alerts: failed to write alert_resolved audit log", slog.Int64("incident_id", inc.ID), slog.Any("err", auditErr))
 					}
 					broadcastIncidentUpdate(pusher, "resolved", rule, host.ID)
-					go pushWebNotificationsResolved(ctx, db, cfg, rule, host)
+					chDispatch.Send(ctx, resolvedEvent(rule, host))
 				}
 			}
 		}
 
 		if isProxmoxGlobalScope(rule) {
-			resolveStaleGlobalProxmoxIncidents(ctx, db, cfg, pusher, rule, evaluatedTargets)
+			resolveStaleGlobalProxmoxIncidents(ctx, db, chDispatch, pusher, rule, evaluatedTargets)
 		}
 	}
 }
@@ -549,7 +554,7 @@ func proxmoxScopedRuleForSyntheticTarget(rule models.AlertRule, targetID string)
 	return scoped, true
 }
 
-func resolveStaleGlobalProxmoxIncidents(ctx context.Context, db *database.DB, cfg *config.Config, pusher NotificationPusher, rule models.AlertRule, evaluatedTargets map[string]struct{}) {
+func resolveStaleGlobalProxmoxIncidents(ctx context.Context, db *database.DB, chDispatch *notifychannels.Dispatcher, pusher NotificationPusher, rule models.AlertRule, evaluatedTargets map[string]struct{}) {
 	openIncidents, err := db.ListOpenAlertIncidentsByRule(ctx, rule.ID)
 	if err != nil {
 		slog.ErrorContext(ctx, "alerts: failed to list open incidents for stale cleanup", slog.Int64("rule_id", rule.ID), slog.Any("err", err))
@@ -568,6 +573,6 @@ func resolveStaleGlobalProxmoxIncidents(ctx context.Context, db *database.DB, cf
 			continue
 		}
 		broadcastIncidentUpdate(pusher, "resolved", rule, inc.HostID)
-		go pushWebNotificationsResolved(ctx, db, cfg, rule, models.Host{ID: inc.HostID, Name: inc.HostID})
+		chDispatch.Send(ctx, resolvedEvent(rule, models.Host{ID: inc.HostID, Name: inc.HostID}))
 	}
 }

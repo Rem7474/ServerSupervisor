@@ -13,7 +13,7 @@ import (
 	"github.com/serversupervisor/server/internal/dispatch"
 	"github.com/serversupervisor/server/internal/gitprovider"
 	"github.com/serversupervisor/server/internal/models"
-	"github.com/serversupervisor/server/internal/notify"
+	"github.com/serversupervisor/server/internal/services/notifychannels"
 	"github.com/serversupervisor/server/internal/services/push"
 	"github.com/serversupervisor/server/internal/ws"
 )
@@ -43,7 +43,7 @@ type Service struct {
 	repo     Repository
 	cfg      *config.Config
 	notifHub *ws.NotificationHub
-	pushSvc  *push.Service
+	dispatch *notifychannels.Dispatcher
 	poller   *Poller
 }
 
@@ -52,7 +52,7 @@ func NewService(db *database.DB, cfg *config.Config, dispatcher *dispatch.Dispat
 		repo:     db,
 		cfg:      cfg,
 		notifHub: notifHub,
-		pushSvc:  pushSvc,
+		dispatch: notifychannels.NewDispatcher(cfg, pushSvc),
 		poller:   NewPoller(db, cfg, dispatcher, notifHub, pushSvc),
 	}
 }
@@ -324,52 +324,44 @@ func (s *Service) NotifyComplete(ctx context.Context, commandID, status string) 
 		msg = fmt.Sprintf("Release tracker '%s' (%s/%s) execution %s on host %s (task: %s)", tracker.Name, tracker.RepoOwner, tracker.RepoName, status, tracker.HostID, tracker.CustomTaskID)
 	}
 
-	notifier := notify.New()
-	for _, ch := range channels {
-		switch ch {
-		case "smtp":
-			if s.cfg.SMTPTo == "" || s.cfg.SMTPFrom == "" {
-				continue
-			}
-			if err := notifier.SendSMTP(s.cfg, s.cfg.SMTPFrom, s.cfg.SMTPTo, subject, msg); err != nil {
-				slog.ErrorContext(ctx, fmt.Sprintf("Release tracker SMTP send: %v", err))
-			}
-		case "ntfy":
-			if s.cfg.NotifyURL == "" {
-				continue
-			}
-			if err := notifier.SendNtfy(s.cfg, s.cfg.NotifyURL, subject, msg); err != nil {
-				slog.ErrorContext(ctx, fmt.Sprintf("Release tracker notify ntfy: %v", err))
-			}
-		case "browser":
-			if s.notifHub != nil {
-				s.notifHub.Broadcast(models.WSReleaseTrackerMessage{
-					Type: "release_tracker_execution",
-					Notification: models.WSReleaseTrackerNotification{
-						TrackerID: tracker.ID, TrackerName: tracker.Name, TrackerType: tracker.TrackerType,
-						Status: status, TriggeredAt: time.Now().UTC(),
-					},
-				})
-			}
-			if s.pushSvc != nil {
-				statusLabel := "réussie"
-				if status == "failed" {
-					statusLabel = "échouée"
-				}
-				trackerLabel := "Git"
-				if tracker.TrackerType == "docker" {
-					trackerLabel = "Docker"
-				}
-				go s.pushSvc.Send(ctx, s.cfg, map[string]interface{}{
-					"title":  fmt.Sprintf("%s tracker : %s", trackerLabel, tracker.Name),
-					"body":   fmt.Sprintf("Exécution %s", statusLabel),
-					"tag":    fmt.Sprintf("tracker-exec-%s-%s", tracker.ID, status),
-					"url":    fmt.Sprintf("/release-trackers/%s", tracker.ID),
-					"status": status,
-				})
-			}
-		}
+	statusLabel := "réussie"
+	trackerLabel := "Git"
+	if tracker.TrackerType == "docker" {
+		trackerLabel = "Docker"
 	}
+	if status == "failed" {
+		statusLabel = "échouée"
+	}
+
+	s.dispatch.Send(ctx, notifychannels.Event{
+		LogID:       "tracker:" + tracker.ID,
+		Channels:    channels,
+		SMTPSubject: subject,
+		SMTPBody:    msg,
+		SMTPTo:      s.cfg.SMTPTo,
+		NtfyTitle:   subject,
+		NtfyBody:    msg,
+		NtfyURL:     s.cfg.NotifyURL,
+		OnBrowser: func() {
+			if s.notifHub == nil {
+				return
+			}
+			s.notifHub.Broadcast(models.WSReleaseTrackerMessage{
+				Type: "release_tracker_execution",
+				Notification: models.WSReleaseTrackerNotification{
+					TrackerID: tracker.ID, TrackerName: tracker.Name, TrackerType: tracker.TrackerType,
+					Status: status, TriggeredAt: time.Now().UTC(),
+				},
+			})
+		},
+		Push: &push.Payload{
+			Title:  fmt.Sprintf("%s tracker : %s", trackerLabel, tracker.Name),
+			Body:   fmt.Sprintf("Exécution %s", statusLabel),
+			Tag:    fmt.Sprintf("tracker-exec-%s-%s", tracker.ID, status),
+			URL:    fmt.Sprintf("/release-trackers/%s", tracker.ID),
+			Status: status,
+		},
+	})
 }
 
 // ===== validation =====

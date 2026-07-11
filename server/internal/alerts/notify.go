@@ -1,22 +1,18 @@
 package alerts
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
 	"log/slog"
-	"net/http"
 	"strings"
 	"time"
 
-	"github.com/SherClockHolmes/webpush-go"
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/dispatch"
 	"github.com/serversupervisor/server/internal/models"
-	"github.com/serversupervisor/server/internal/notify"
+	"github.com/serversupervisor/server/internal/services/notifychannels"
+	"github.com/serversupervisor/server/internal/services/push"
 )
 
 func buildAlertMessage(rule models.AlertRule, host models.Host, value float64) string {
@@ -74,218 +70,110 @@ func buildAlertMessage(rule models.AlertRule, host models.Host, value float64) s
 	return fmt.Sprintf("Alert %s %s %.2f on host %s (%s)", rule.Metric, rule.Operator, value, host.Name, host.ID)
 }
 
-func sendAlertNotifications(n notify.Notifier, cfg *config.Config, rule models.AlertRule, host models.Host, value float64) {
-	msg := buildAlertMessage(rule, host, value)
-	payload := map[string]interface{}{
-		"title":          "ServerSupervisor Alert",
-		"message":        msg,
-		"rule_id":        rule.ID,
-		"host_id":        host.ID,
-		"host_name":      host.Name,
-		"metric":         rule.Metric,
-		"operator":       rule.Operator,
-		"threshold_warn": rule.ThresholdWarn,
-		"threshold_crit": rule.ThresholdCrit,
-		"value":          value,
-		"triggered_at":   time.Now().UTC(),
-	}
-
-	for _, channel := range rule.Actions.Channels {
-		switch channel {
-		case "smtp":
-			to := rule.Actions.SMTPTo
-			if to == "" {
-				to = cfg.SMTPTo
-			}
-			if to == "" || cfg.SMTPFrom == "" {
-				slog.Warn("alerts: SMTP to/from not configured", slog.Int64("rule_id", rule.ID))
-				continue
-			}
-			if err := n.SendSMTP(cfg, cfg.SMTPFrom, to, "[ServerSupervisor] Alert triggered", msg); err != nil {
-				slog.Error("alerts: SMTP send failed", slog.Int64("rule_id", rule.ID), slog.Any("err", err))
-			}
-
-		case "ntfy":
-			topic := rule.Actions.NtfyTopic
-			if topic == "" {
-				slog.Warn("alerts: ntfy topic not configured", slog.Int64("rule_id", rule.ID))
-				continue
-			}
-			ntfyURL := "https://ntfy.sh/" + topic
-			if err := n.SendNtfy(cfg, ntfyURL, "ServerSupervisor Alert", msg); err != nil {
-				slog.Error("alerts: ntfy failed", slog.Int64("rule_id", rule.ID), slog.Any("err", err))
-			}
-
-		case "notify":
-			// Legacy webhook channel — send to configured notify URL
-			notifyURL := cfg.NotifyURL
-			if notifyURL == "" {
-				slog.Warn("alerts: notify URL not configured")
-				continue
-			}
-			data, _ := json.Marshal(payload)
-			req, _ := http.NewRequest("POST", notifyURL, bytes.NewReader(data))
-			req.Header.Set("Content-Type", "application/json")
-			client := &http.Client{Timeout: 10 * time.Second}
-			if resp, err := client.Do(req); err != nil {
-				slog.Error("alerts: notify failed", slog.Any("err", err))
-			} else {
-				_ = resp.Body.Close()
-			}
-
-		case "browser":
-			// Browser notifications are delivered via the WebSocket push mechanism; no backend action needed here.
-
-		default:
-			slog.Warn("alerts: unknown channel", slog.String("channel", channel), slog.Int64("rule_id", rule.ID))
-		}
-	}
-}
-
-// ruleDisplayName builds a human-readable label for a rule, falling back to its
-// threshold when no custom name is set. Shared by the browser/push notification builders.
-func ruleDisplayName(rule models.AlertRule) string {
-	if rule.Name != nil {
-		return *rule.Name
-	}
-	if rule.ThresholdCrit != nil {
-		return fmt.Sprintf("%s %s %.2f (crit)", rule.Metric, rule.Operator, *rule.ThresholdCrit)
-	}
-	if rule.ThresholdWarn != nil {
-		return fmt.Sprintf("%s %s %.2f (warn)", rule.Metric, rule.Operator, *rule.ThresholdWarn)
-	}
-	return ""
-}
-
-// hasBrowserChannel reports whether the rule's actions include the "browser" channel.
-func hasBrowserChannel(rule models.AlertRule) bool {
-	for _, ch := range rule.Actions.Channels {
-		if ch == "browser" {
-			return true
-		}
-	}
-	return false
-}
-
-// pushWebNotifications delivers a Web Push notification to every registered device subscription
-// when a rule with the "browser" channel fires. Runs in a goroutine; VAPID keys are fetched
-// from the settings table (generated on first alert if not yet present).
-func pushWebNotifications(ctx context.Context, db *database.DB, cfg *config.Config, rule models.AlertRule, host models.Host, value float64) {
-	if !hasBrowserChannel(rule) {
-		return
-	}
-
-	unit := ""
-	switch rule.Metric {
+func alertMetricUnit(metric string) string {
+	switch metric {
 	case "cpu", "memory", "disk":
-		unit = "%"
-	}
-
-	sendWebPush(ctx, db, cfg, map[string]interface{}{
-		"title":  "Alerte : " + ruleDisplayName(rule),
-		"body":   fmt.Sprintf("%s — Valeur : %.2f%s", host.Name, value, unit),
-		"tag":    fmt.Sprintf("alert-%d-%s", rule.ID, host.ID),
-		"url":    "/alerts?tab=incidents",
-		"status": "fired",
-	})
-}
-
-// pushWebNotificationsResolved delivers a Web Push notification that updates (in place, via the
-// same tag) the notification sent when the incident fired, so the Android/PWA notification
-// reflects resolution in real time instead of staying stuck in the alerting state.
-func pushWebNotificationsResolved(ctx context.Context, db *database.DB, cfg *config.Config, rule models.AlertRule, host models.Host) {
-	if !hasBrowserChannel(rule) {
-		return
-	}
-
-	sendWebPush(ctx, db, cfg, map[string]interface{}{
-		"title":  "Résolu : " + ruleDisplayName(rule),
-		"body":   fmt.Sprintf("%s — revenu à la normale", host.Name),
-		"tag":    fmt.Sprintf("alert-%d-%s", rule.ID, host.ID),
-		"url":    "/alerts?tab=incidents",
-		"status": "resolved",
-	})
-}
-
-// sendWebPush marshals payload and delivers it to every registered admin device subscription.
-// VAPID keys are fetched from the settings table (generated on first alert if not yet present).
-func sendWebPush(ctx context.Context, db *database.DB, cfg *config.Config, payloadFields map[string]interface{}) {
-	privateKey, err := db.GetSetting(ctx, "vapid_private_key")
-	if err != nil || privateKey == "" {
-		return
-	}
-	publicKey, err := db.GetSetting(ctx, "vapid_public_key")
-	if err != nil || publicKey == "" {
-		return
-	}
-
-	payload, _ := json.Marshal(payloadFields)
-
-	subs, err := db.GetPushSubscriptionsByRole(ctx, "admin")
-	if err != nil || len(subs) == 0 {
-		return
-	}
-	for _, sub := range subs {
-		wpSub := &webpush.Subscription{
-			Endpoint: sub.Endpoint,
-			Keys: webpush.Keys{
-				P256dh: sub.P256DHKey,
-				Auth:   sub.AuthKey,
-			},
-		}
-		resp, sendErr := webpush.SendNotification(payload, wpSub, &webpush.Options{
-			Subscriber:      cfg.BaseURL,
-			VAPIDPublicKey:  publicKey,
-			VAPIDPrivateKey: privateKey,
-			TTL:             120,
-		})
-		if sendErr != nil {
-			slog.ErrorContext(ctx, "push: delivery failed", slog.String("endpoint", truncateStr(sub.Endpoint, 40)), slog.Any("err", sendErr))
-			if resp != nil && resp.StatusCode == http.StatusGone {
-				if delErr := db.DeletePushSubscription(ctx, sub.Endpoint); delErr != nil {
-					slog.DebugContext(ctx, "push: failed to prune gone subscription", slog.String("endpoint", truncateStr(sub.Endpoint, 40)), slog.Any("err", delErr))
-				}
-			}
-			continue
-		}
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
+		return "%"
+	default:
+		return ""
 	}
 }
 
-func truncateStr(s string, n int) string {
-	if len(s) <= n {
-		return s
-	}
-	return s[:n]
-}
+// firedEvent builds the notifychannels.Event for a newly-fired (or re-fired)
+// incident: smtp/ntfy/legacy-webhook/browser(WS+push) fanned out across
+// whatever channels the rule is configured with. OnBrowser is left nil — the
+// caller sets it, since it needs the incident ID and the live pusher.
+func firedEvent(cfg *config.Config, rule models.AlertRule, host models.Host, value float64) notifychannels.Event {
+	msg := buildAlertMessage(rule, host, value)
 
-// pushBrowserNotification sends a real-time WebSocket event to all connected frontend clients
-// when a rule with the "browser" channel fires. Safe to call with a nil pusher.
-func pushBrowserNotification(pusher NotificationPusher, rule models.AlertRule, host models.Host, value float64, incID int64) {
-	if pusher == nil {
-		return
-	}
-	if !hasBrowserChannel(rule) {
-		return
+	smtpTo := rule.Actions.SMTPTo
+	if smtpTo == "" {
+		smtpTo = cfg.SMTPTo
 	}
 
-	pusher.Broadcast(models.WSNewAlertMessage{
-		Type: "new_alert",
-		Notification: models.WSAlertIncidentNotification{
-			ID:            fmt.Sprintf("alert:%d", incID),
-			Type:          "alert_incident",
-			RuleID:        rule.ID,
-			HostID:        host.ID,
-			HostName:      host.Name,
-			RuleName:      ruleDisplayName(rule),
-			Metric:        rule.Metric,
-			Value:         value,
-			TriggeredAt:   time.Now().UTC(),
-			ResolvedAt:    nil,
-			BrowserNotify: true,
+	ntfyURL := ""
+	if rule.Actions.NtfyTopic != "" {
+		ntfyURL = "https://ntfy.sh/" + rule.Actions.NtfyTopic
+	}
+
+	return notifychannels.Event{
+		LogID:       fmt.Sprintf("rule:%d", rule.ID),
+		Channels:    rule.Actions.Channels,
+		SMTPSubject: "[ServerSupervisor] Alert triggered",
+		SMTPBody:    msg,
+		SMTPTo:      smtpTo,
+		NtfyTitle:   "ServerSupervisor Alert",
+		NtfyBody:    msg,
+		NtfyURL:     ntfyURL,
+		LegacyWebhook: map[string]interface{}{
+			"title":          "ServerSupervisor Alert",
+			"message":        msg,
+			"rule_id":        rule.ID,
+			"host_id":        host.ID,
+			"host_name":      host.Name,
+			"metric":         rule.Metric,
+			"operator":       rule.Operator,
+			"threshold_warn": rule.ThresholdWarn,
+			"threshold_crit": rule.ThresholdCrit,
+			"value":          value,
+			"triggered_at":   time.Now().UTC(),
 		},
-	})
+		Push: &push.Payload{
+			Title:  "Alerte : " + rule.DisplayName(),
+			Body:   fmt.Sprintf("%s — Valeur : %.2f%s", host.Name, value, alertMetricUnit(rule.Metric)),
+			Tag:    fmt.Sprintf("alert-%d-%s", rule.ID, host.ID),
+			URL:    "/alerts?tab=incidents",
+			Status: "fired",
+		},
+	}
+}
+
+// resolvedEvent builds the notifychannels.Event for an incident that just
+// resolved. Resolution only ever goes out over "browser" — smtp/ntfy/legacy
+// webhook don't fire on resolve, matching the pre-existing (fired-only)
+// behavior of those channels. The Web Push payload reuses the exact tag the
+// fired notification used, so the service worker updates it in place instead
+// of leaving the Android/PWA notification stuck in the alerting state.
+func resolvedEvent(rule models.AlertRule, host models.Host) notifychannels.Event {
+	return notifychannels.Event{
+		LogID:    fmt.Sprintf("rule:%d", rule.ID),
+		Channels: []string{"browser"},
+		Push: &push.Payload{
+			Title:  "Résolu : " + rule.DisplayName(),
+			Body:   fmt.Sprintf("%s — revenu à la normale", host.Name),
+			Tag:    fmt.Sprintf("alert-%d-%s", rule.ID, host.ID),
+			URL:    "/alerts?tab=incidents",
+			Status: "resolved",
+		},
+	}
+}
+
+// newAlertBroadcast returns the OnBrowser callback for a freshly-fired
+// incident: a WebSocket "new_alert" event carrying enough detail for the
+// frontend's notification bell/list, independent of the Web Push payload
+// above (which is sized for a system notification instead).
+func newAlertBroadcast(pusher NotificationPusher, rule models.AlertRule, host models.Host, value float64, incID int64) func() {
+	return func() {
+		if pusher == nil {
+			return
+		}
+		pusher.Broadcast(models.WSNewAlertMessage{
+			Type: "new_alert",
+			Notification: models.WSAlertIncidentNotification{
+				ID:            fmt.Sprintf("alert:%d", incID),
+				Type:          "alert_incident",
+				RuleID:        rule.ID,
+				HostID:        host.ID,
+				HostName:      host.Name,
+				RuleName:      rule.DisplayName(),
+				Metric:        rule.Metric,
+				Value:         value,
+				TriggeredAt:   time.Now().UTC(),
+				ResolvedAt:    nil,
+				BrowserNotify: true,
+			},
+		})
+	}
 }
 
 // broadcastIncidentUpdate pushes a lightweight WS event so the frontend can refresh its incidents list
