@@ -156,12 +156,6 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { useAuthStore } from '../stores/auth'
-import apiClient, { getApiErrorMessage } from '../api'
-import { isApiAbort } from '../api/client'
-import { useAbortSignal } from '../composables/useAbortSignal'
 import SettingsDatabaseCard from '../components/settings/SettingsDatabaseCard.vue'
 import SettingsMaintenanceCard from '../components/settings/SettingsMaintenanceCard.vue'
 import SettingsNotificationsCard from '../components/settings/SettingsNotificationsCard.vue'
@@ -171,255 +165,44 @@ import SettingsSystemInfoCard from '../components/settings/SettingsSystemInfoCar
 import SettingsProxmoxCard from '../components/settings/SettingsProxmoxCard.vue'
 import SettingsNPMCard from '../components/settings/SettingsNPMCard.vue'
 import SettingsRegistryCredentialsCard from '../components/settings/SettingsRegistryCredentialsCard.vue'
+import { useSettings } from '../composables/useSettings'
 
-const route = useRoute()
-const router = useRouter()
-const auth = useAuthStore()
-const signal = useAbortSignal()
-
-const tab = ref((route.query.tab as string) || 'general')
-
-watch(tab, (t) => {
-  router.replace({ query: { ...route.query, tab: t } })
-})
-
-const settings = ref({
-  baseUrl: '',
-  dbHost: '',
-  dbPort: '',
-  tlsEnabled: false,
-  metricsRetentionDays: 30,
-  auditRetentionDays: 90,
-  smtpConfigured: false,
-  smtpHost: '',
-  smtpPort: 587,
-  ntfyUrl: '',
-  latestAgentVersion: '',
-})
-
-const dbStatus = ref({
-  connected: false,
-  auditLogCount: 0,
-  metricsCount: 0,
-  hostsCount: 0,
-})
-
-// Editable form state
-const form = ref({
-  smtpHost: '',
-  smtpPort: 587,
-  smtpUser: '',
-  smtpPass: '',
-  smtpFrom: '',
-  smtpTo: '',
-  smtpTls: true,
-  ntfyUrl: '',
-  githubToken: '',
-  metricsRetentionDays: 30,
-  auditRetentionDays: 90,
-})
-
-const showSmtpPass = ref(false)
-const showGitHubToken = ref(false)
-
-// SMTP save/test state
-const savingSmtp = ref(false)
-const smtpSaveMsg = ref('')
-const smtpSaveOk = ref(false)
-const testingSmtp = ref(false)
-const smtpTestMessage = ref('')
-const smtpTestSuccess = ref(false)
-
-// Notifications save/test state
-const savingNotif = ref(false)
-const notifSaveMsg = ref('')
-const notifSaveOk = ref(false)
-const testingNtfy = ref(false)
-const ntfyTestMessage = ref('')
-const ntfyTestSuccess = ref(false)
-
-// Retention save state
-const savingRetention = ref(false)
-const retentionSaveMsg = ref('')
-const retentionSaveOk = ref(false)
-
-// Maintenance state
-const cleaningMetrics = ref(false)
-const cleanMessage = ref('')
-const cleanSuccess = ref(false)
-const cleaningAuditLogs = ref(false)
-const auditCleanMessage = ref('')
-const auditCleanSuccess = ref(false)
-
-function formatNumber(n: number | undefined): string {
-  if (!n) return '0'
-  return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
-}
-
-async function fetchSettings(): Promise<void> {
-  try {
-    const res = await apiClient.getSettings(signal)
-    if (res.data) {
-      settings.value = res.data.settings || {}
-      dbStatus.value = res.data.dbStatus || {}
-      const s = res.data.settings || {}
-      form.value.smtpHost = s.smtpHost || ''
-      form.value.smtpPort = s.smtpPort || 587
-      form.value.smtpUser = s.smtpUser || ''
-      form.value.smtpPass = s.smtpPass || ''
-      form.value.smtpFrom = s.smtpFrom || ''
-      form.value.smtpTo = s.smtpTo || ''
-      form.value.smtpTls = s.smtpTls !== undefined ? s.smtpTls : true
-      form.value.ntfyUrl = s.ntfyUrl || ''
-      form.value.githubToken = s.githubToken || ''
-      form.value.metricsRetentionDays = s.metricsRetentionDays || 30
-      form.value.auditRetentionDays = s.auditRetentionDays || 90
-    }
-  } catch (e) {
-    if (isApiAbort(e)) return
-    console.error('Erreur chargement paramètres:', getApiErrorMessage(e))
-  }
-}
-
-async function saveSmtp(): Promise<void> {
-  savingSmtp.value = true
-  smtpSaveMsg.value = ''
-  try {
-    await apiClient.updateSettings({
-      smtp_host: form.value.smtpHost,
-      smtp_port: form.value.smtpPort,
-      smtp_user: form.value.smtpUser,
-      smtp_pass: form.value.smtpPass,
-      smtp_from: form.value.smtpFrom,
-      smtp_to: form.value.smtpTo,
-      smtp_tls: form.value.smtpTls,
-    })
-    smtpSaveOk.value = true
-    smtpSaveMsg.value = 'Configuration SMTP enregistrée'
-    await fetchSettings()
-    setTimeout(() => { smtpSaveMsg.value = '' }, 4000)
-  } catch (e) {
-    smtpSaveOk.value = false
-    smtpSaveMsg.value = `Erreur : ${getApiErrorMessage(e)}`
-    setTimeout(() => { smtpSaveMsg.value = '' }, 5000)
-  } finally {
-    savingSmtp.value = false
-  }
-}
-
-async function saveNotifications(): Promise<void> {
-  savingNotif.value = true
-  notifSaveMsg.value = ''
-  try {
-    await apiClient.updateSettings({
-      ntfy_url: form.value.ntfyUrl,
-      github_token: form.value.githubToken,
-    })
-    notifSaveOk.value = true
-    notifSaveMsg.value = 'Notifications enregistrées'
-    await fetchSettings()
-    setTimeout(() => { notifSaveMsg.value = '' }, 4000)
-  } catch (e) {
-    notifSaveOk.value = false
-    notifSaveMsg.value = `Erreur : ${getApiErrorMessage(e)}`
-    setTimeout(() => { notifSaveMsg.value = '' }, 5000)
-  } finally {
-    savingNotif.value = false
-  }
-}
-
-async function saveRetention(): Promise<void> {
-  savingRetention.value = true
-  retentionSaveMsg.value = ''
-  try {
-    await apiClient.updateSettings({
-      metrics_retention_days: form.value.metricsRetentionDays,
-      audit_retention_days: form.value.auditRetentionDays,
-    })
-    retentionSaveOk.value = true
-    retentionSaveMsg.value = 'Rétention enregistrée'
-    await fetchSettings()
-    setTimeout(() => { retentionSaveMsg.value = '' }, 4000)
-  } catch (e) {
-    retentionSaveOk.value = false
-    retentionSaveMsg.value = `Erreur : ${getApiErrorMessage(e)}`
-    setTimeout(() => { retentionSaveMsg.value = '' }, 5000)
-  } finally {
-    savingRetention.value = false
-  }
-}
-
-async function testSmtp(): Promise<void> {
-  testingSmtp.value = true
-  smtpTestMessage.value = ''
-  try {
-    await apiClient.testSmtp()
-    smtpTestSuccess.value = true
-    smtpTestMessage.value = 'Connexion SMTP réussie'
-    setTimeout(() => { smtpTestMessage.value = '' }, 5000)
-  } catch (e) {
-    smtpTestSuccess.value = false
-    smtpTestMessage.value = `Erreur : ${getApiErrorMessage(e)}`
-    setTimeout(() => { smtpTestMessage.value = '' }, 5000)
-  } finally {
-    testingSmtp.value = false
-  }
-}
-
-async function testNtfy(): Promise<void> {
-  testingNtfy.value = true
-  ntfyTestMessage.value = ''
-  try {
-    await apiClient.testNtfy()
-    ntfyTestSuccess.value = true
-    ntfyTestMessage.value = 'Message test envoyé'
-    setTimeout(() => { ntfyTestMessage.value = '' }, 5000)
-  } catch (e) {
-    ntfyTestSuccess.value = false
-    ntfyTestMessage.value = `Erreur : ${getApiErrorMessage(e)}`
-    setTimeout(() => { ntfyTestMessage.value = '' }, 5000)
-  } finally {
-    testingNtfy.value = false
-  }
-}
-
-async function cleanMetrics(): Promise<void> {
-  cleaningMetrics.value = true
-  cleanMessage.value = ''
-  try {
-    const res = await apiClient.cleanupMetrics()
-    cleanSuccess.value = true
-    cleanMessage.value = res.data?.message || 'Nettoyage des métriques terminé'
-    await fetchSettings()
-    setTimeout(() => { cleanMessage.value = '' }, 5000)
-  } catch (e) {
-    cleanSuccess.value = false
-    cleanMessage.value = `Erreur : ${getApiErrorMessage(e)}`
-    setTimeout(() => { cleanMessage.value = '' }, 5000)
-  } finally {
-    cleaningMetrics.value = false
-  }
-}
-
-async function cleanAuditLogs(): Promise<void> {
-  cleaningAuditLogs.value = true
-  auditCleanMessage.value = ''
-  try {
-    const res = await apiClient.cleanupAudit()
-    auditCleanSuccess.value = true
-    auditCleanMessage.value = res.data?.message || 'Nettoyage des logs audit terminé'
-    await fetchSettings()
-    setTimeout(() => { auditCleanMessage.value = '' }, 5000)
-  } catch (e) {
-    auditCleanSuccess.value = false
-    auditCleanMessage.value = `Erreur : ${getApiErrorMessage(e)}`
-    setTimeout(() => { auditCleanMessage.value = '' }, 5000)
-  } finally {
-    cleaningAuditLogs.value = false
-  }
-}
-
-onMounted(() => {
-  fetchSettings()
-})
+const {
+  auth,
+  tab,
+  settings,
+  dbStatus,
+  form,
+  showSmtpPass,
+  showGitHubToken,
+  savingSmtp,
+  smtpSaveMsg,
+  smtpSaveOk,
+  testingSmtp,
+  smtpTestMessage,
+  smtpTestSuccess,
+  savingNotif,
+  notifSaveMsg,
+  notifSaveOk,
+  testingNtfy,
+  ntfyTestMessage,
+  ntfyTestSuccess,
+  savingRetention,
+  retentionSaveMsg,
+  retentionSaveOk,
+  cleaningMetrics,
+  cleanMessage,
+  cleanSuccess,
+  cleaningAuditLogs,
+  auditCleanMessage,
+  auditCleanSuccess,
+  formatNumber,
+  saveSmtp,
+  saveNotifications,
+  saveRetention,
+  testSmtp,
+  testNtfy,
+  cleanMetrics,
+  cleanAuditLogs,
+} = useSettings()
 </script>
