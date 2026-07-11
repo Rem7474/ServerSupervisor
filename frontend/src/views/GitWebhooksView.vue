@@ -595,8 +595,6 @@ import WebhookModal from '../components/webhooks/WebhookModal.vue'
 import TrackableContainersModal from '../components/webhooks/TrackableContainersModal.vue'
 import CommandLogPanel from '../components/host/CommandLogPanel.vue'
 import { ref } from 'vue'
-import api from '../api'
-import { useCommandStream } from '../composables/useCommandStream'
 const {
   activeTab,
   hosts,
@@ -641,64 +639,16 @@ const {
   isCooldownActive,
   cooldownRemainingLabel,
   cooldownEtaLabel,
+  selectedTrackerCmd,
+  showTrackerConsole,
+  closeTrackerLogs,
+  openTrackerLogs,
 } = useGitWebhooksPage()
 
-const { openCommandStream, closeStream } = useCommandStream()
-interface TrackerCmd { id: string; status?: string; output?: string; [key: string]: unknown }
-const selectedTrackerCmd = ref<TrackerCmd | null>(null)
-const showTrackerConsole = ref(false)
 const showDiscoverModal = ref(false)
 
 async function onBulkCreated(): Promise<void> {
   await loadTrackers()
-}
-
-function closeTrackerLogs(): void {
-  closeStream()
-  selectedTrackerCmd.value = null
-  showTrackerConsole.value = false
-}
-
-function connectTrackerStream(commandId: string): void {
-  openCommandStream(commandId, {
-    onInit(payload) {
-      if (!selectedTrackerCmd.value || selectedTrackerCmd.value.id !== commandId) return
-      selectedTrackerCmd.value = {
-        ...selectedTrackerCmd.value,
-        status: payload.status || selectedTrackerCmd.value.status,
-        output: payload.output ?? selectedTrackerCmd.value.output,
-      }
-    },
-    onChunk(payload) {
-      if (!selectedTrackerCmd.value || selectedTrackerCmd.value.id !== commandId) return
-      selectedTrackerCmd.value = {
-        ...selectedTrackerCmd.value,
-        output: (selectedTrackerCmd.value.output || '') + (payload.chunk || ''),
-      }
-    },
-    onStatus(payload) {
-      if (!selectedTrackerCmd.value || selectedTrackerCmd.value.id !== commandId) return
-      selectedTrackerCmd.value = {
-        ...selectedTrackerCmd.value,
-        status: payload.status || selectedTrackerCmd.value.status,
-        output: payload.output ?? selectedTrackerCmd.value.output,
-      }
-    },
-  })
-}
-
-async function openTrackerLogs(commandId: string): Promise<void> {
-  closeStream()
-  try {
-    const res = await api.getCommandStatus(commandId)
-    selectedTrackerCmd.value = res.data as unknown as TrackerCmd
-    showTrackerConsole.value = true
-    if (res.data?.status === 'pending' || res.data?.status === 'running') {
-      connectTrackerStream(commandId)
-    }
-  } catch {
-    // Keep page usable even if command history entry vanished.
-  }
 }
 </script>
 

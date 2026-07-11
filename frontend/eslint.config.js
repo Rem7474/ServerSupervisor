@@ -103,9 +103,7 @@ export default [
     files: [
       '**/views/ProxmoxNodeView.vue',
       '**/views/TrafficView.vue',
-      '**/views/AuditLogsView.vue',
       '**/views/GlobalScheduledTasksView.vue',
-      '**/views/MonitoringView.vue',
       '**/components/docker/DockerContainersTab.vue',
       // Child of the ProxmoxNodeView monolith; guest/link/network rows carry
       // runtime fields beyond the generated ProxmoxGuest model. Typed when the
