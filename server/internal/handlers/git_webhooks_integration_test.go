@@ -22,7 +22,7 @@ import (
 func newGitWebhookRouter(t *testing.T, role string) (*gin.Engine, *database.DB) {
 	t.Helper()
 	db, cfg := testutil.NewPostgresDBWithConfig(t)
-	h := handlers.NewGitWebhookHandler(gitwebhooksvc.NewService(db, cfg, dispatch.New(db), ws.NewNotificationHub()))
+	h := handlers.NewGitWebhookHandler(gitwebhooksvc.NewService(db, cfg, dispatch.New(db), ws.NewNotificationHub(), nil))
 
 	r := gin.New()
 	r.Use(withRole(role))

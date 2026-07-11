@@ -8,24 +8,25 @@ import (
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/dispatch"
+	"github.com/serversupervisor/server/internal/services/push"
 )
 
 // NewAlertEvalJob evaluates all alert rules against current host metrics every 60 seconds.
 // pusher receives real-time browser push events on alert fire; pass nil to disable.
-func NewAlertEvalJob(db *database.DB, cfg *config.Config, dispatcher *dispatch.Dispatcher, pusher alerts.NotificationPusher) Job {
+func NewAlertEvalJob(db *database.DB, cfg *config.Config, dispatcher *dispatch.Dispatcher, pusher alerts.NotificationPusher, pushSvc *push.Service) Job {
 	return Job{
 		Name: "alert-eval",
 		Run: func(ctx context.Context) {
 			// Evaluate immediately on startup so stale open incidents are
 			// resolved without waiting for the first 60-second tick.
-			alerts.EvaluateAlerts(ctx, db, cfg, dispatcher, pusher)
+			alerts.EvaluateAlerts(ctx, db, cfg, dispatcher, pusher, pushSvc)
 
 			ticker := time.NewTicker(60 * time.Second)
 			defer ticker.Stop()
 			for {
 				select {
 				case <-ticker.C:
-					alerts.EvaluateAlerts(ctx, db, cfg, dispatcher, pusher)
+					alerts.EvaluateAlerts(ctx, db, cfg, dispatcher, pusher, pushSvc)
 				case <-ctx.Done():
 					return
 				}

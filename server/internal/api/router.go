@@ -71,8 +71,9 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	}, bus))
 	auditH := handlers.NewAuditHandler(auditsvc.NewService(db))
 	userH := handlers.NewUserHandler(usersvc.NewService(db))
+	pushSvc := pushsvc.NewService(db)
 	alertRulesH := handlers.NewAlertRulesHandler(alertrulesvc.NewService(db, func(rule models.AlertRule) {
-		go alerts.ResolveStaleIncidentsForRule(context.Background(), db, rule)
+		go alerts.ResolveStaleIncidentsForRule(context.Background(), db, cfg, notifHub, pushSvc, rule)
 	}, alertrulesvc.EngineFuncs{
 		MetricValue: func(ctx context.Context, host models.Host, rule models.AlertRule) (float64, bool) {
 			return alerts.GetMetricValue(ctx, db, host, rule)
@@ -91,10 +92,10 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	notifH := handlers.NewNotificationsHandler(notifssvc.NewService(db, func(ctx context.Context, rule models.AlertRule, hostID string) (float64, bool) {
 		return alerts.CurrentIncidentValue(ctx, db, rule, hostID)
 	}))
-	pushH := handlers.NewPushHandler(pushsvc.NewService(db))
+	pushH := handlers.NewPushHandler(pushSvc)
 	scheduledTaskH := handlers.NewScheduledTaskHandler(scheduledtasksvc.NewService(db, sched, dispatcher), db)
-	gitWebhookH := handlers.NewGitWebhookHandler(gitwebhooksvc.NewService(db, cfg, dispatcher, notifHub))
-	releaseTrackerH := handlers.NewReleaseTrackerHandler(releasetrackersvc.NewService(db, cfg, dispatcher, notifHub))
+	gitWebhookH := handlers.NewGitWebhookHandler(gitwebhooksvc.NewService(db, cfg, dispatcher, notifHub, pushSvc))
+	releaseTrackerH := handlers.NewReleaseTrackerHandler(releasetrackersvc.NewService(db, cfg, dispatcher, notifHub, pushSvc))
 	agentH.AddCompletionListener(gitWebhookH)
 	agentH.AddCompletionListener(releaseTrackerH)
 

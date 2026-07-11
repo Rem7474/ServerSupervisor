@@ -3,6 +3,8 @@ package push
 import (
 	"context"
 	"testing"
+
+	"github.com/serversupervisor/server/internal/models"
 )
 
 type fakeRepo struct {
@@ -10,6 +12,10 @@ type fakeRepo struct {
 	setCalls   int
 	savedEnd   string
 	deletedEnd string
+}
+
+func (f *fakeRepo) GetPushSubscriptionsByRole(_ context.Context, _ string) ([]models.PushSubscription, error) {
+	return nil, nil
 }
 
 func (f *fakeRepo) GetSetting(_ context.Context, key string) (string, error) {

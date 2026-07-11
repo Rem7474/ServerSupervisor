@@ -17,6 +17,8 @@ import (
 	"github.com/serversupervisor/server/internal/dispatch"
 	"github.com/serversupervisor/server/internal/gitprovider"
 	"github.com/serversupervisor/server/internal/models"
+	"github.com/serversupervisor/server/internal/services/notifychannels"
+	"github.com/serversupervisor/server/internal/services/push"
 	"github.com/serversupervisor/server/internal/ws"
 )
 
@@ -27,10 +29,14 @@ type Poller struct {
 	cfg        *config.Config
 	dispatcher *dispatch.Dispatcher
 	notifHub   *ws.NotificationHub
+	dispatch   *notifychannels.Dispatcher
 }
 
-func NewPoller(db *database.DB, cfg *config.Config, dispatcher *dispatch.Dispatcher, notifHub *ws.NotificationHub) *Poller {
-	return &Poller{db: db, cfg: cfg, dispatcher: dispatcher, notifHub: notifHub}
+func NewPoller(db *database.DB, cfg *config.Config, dispatcher *dispatch.Dispatcher, notifHub *ws.NotificationHub, pushSvc *push.Service) *Poller {
+	return &Poller{
+		db: db, cfg: cfg, dispatcher: dispatcher, notifHub: notifHub,
+		dispatch: notifychannels.NewDispatcher(cfg, pushSvc),
+	}
 }
 
 // CheckAll polls every enabled tracker once.
@@ -90,7 +96,7 @@ func (s *Poller) checkOneGit(ctx context.Context, t models.ReleaseTracker) {
 	}
 
 	_ = s.db.UpdateReleaseTrackerDetected(ctx, t.ID, tag)
-	s.notifyDetected(t, tag, releaseURL, releaseName)
+	s.notifyDetected(ctx, t, tag, releaseURL, releaseName)
 	if t.HostID == "" || t.CustomTaskID == "" {
 		slog.InfoContext(ctx, fmt.Sprintf("Git tracker %s: new release %s detected (monitor-only, no task dispatched)", t.Name, tag))
 		return
@@ -171,7 +177,7 @@ func (s *Poller) checkOneDocker(ctx context.Context, t models.ReleaseTracker) {
 	_ = s.db.UpdateReleaseTrackerDigest(ctx, t.ID, digest)
 	_ = s.db.StoreTrackerTagDigest(ctx, t.ID, resolvedVersion, digest)
 	_ = s.db.UpdateReleaseTrackerDetected(ctx, t.ID, resolvedVersion)
-	s.notifyDetected(t, resolvedVersion, "", t.DockerImage+":"+tag)
+	s.notifyDetected(ctx, t, resolvedVersion, "", t.DockerImage+":"+tag)
 
 	if !trackerHasDispatchTarget(t) {
 		slog.InfoContext(ctx, fmt.Sprintf("Docker tracker %s: new digest for %s:%s (monitor-only, no task dispatched)", t.Name, t.DockerImage, tag))
@@ -321,11 +327,12 @@ func (s *Poller) dispatchComposeUpdate(ctx context.Context, t models.ReleaseTrac
 	_ = s.db.MarkReleaseTrackerTriggered(ctx, t.ID)
 }
 
-// notifyDetected pushes a "release detected" browser notification.
-func (s *Poller) notifyDetected(t models.ReleaseTracker, version, releaseURL, releaseName string) {
-	if s.notifHub == nil || len(t.NotifyChannels) == 0 {
-		return
-	}
+// notifyDetected pushes a "release detected" browser notification. Detection
+// only ever supports the "browser" channel (unlike execution completion,
+// which also supports smtp/ntfy) — that's an intentional, pre-existing
+// restriction, preserved here by never forwarding anything but "browser" to
+// the shared dispatcher even if other channels are present in NotifyChannels.
+func (s *Poller) notifyDetected(ctx context.Context, t models.ReleaseTracker, version, releaseURL, releaseName string) {
 	hasBrowser := false
 	for _, ch := range t.NotifyChannels {
 		if ch == "browser" {
@@ -340,12 +347,33 @@ func (s *Poller) notifyDetected(t models.ReleaseTracker, version, releaseURL, re
 	if t.TrackerType == "docker" {
 		label = "Docker"
 	}
-	s.notifHub.Broadcast(models.WSReleaseTrackerMessage{
-		Type: "release_tracker_detected",
-		Notification: models.WSReleaseTrackerNotification{
-			TrackerID: t.ID, TrackerName: t.Name, TrackerType: t.TrackerType,
-			Version: version, ReleaseURL: releaseURL, ReleaseName: releaseName,
-			Status: "detected", Label: label, TriggeredAt: time.Now().UTC(),
+	versionLabel := version
+	if versionLabel == "" {
+		versionLabel = "inconnue"
+	}
+
+	s.dispatch.Send(ctx, notifychannels.Event{
+		LogID:    "tracker:" + t.ID,
+		Channels: []string{"browser"},
+		OnBrowser: func() {
+			if s.notifHub == nil {
+				return
+			}
+			s.notifHub.Broadcast(models.WSReleaseTrackerMessage{
+				Type: "release_tracker_detected",
+				Notification: models.WSReleaseTrackerNotification{
+					TrackerID: t.ID, TrackerName: t.Name, TrackerType: t.TrackerType,
+					Version: version, ReleaseURL: releaseURL, ReleaseName: releaseName,
+					Status: "detected", Label: label, TriggeredAt: time.Now().UTC(),
+				},
+			})
+		},
+		Push: &push.Payload{
+			Title:  fmt.Sprintf("%s tracker : %s", label, t.Name),
+			Body:   fmt.Sprintf("Nouvelle version détectée : %s", versionLabel),
+			Tag:    fmt.Sprintf("tracker-detected-%s-%s", t.ID, versionLabel),
+			URL:    fmt.Sprintf("/release-trackers/%s", t.ID),
+			Status: "detected",
 		},
 	})
 }

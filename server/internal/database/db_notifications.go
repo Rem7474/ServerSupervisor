@@ -14,6 +14,12 @@ import (
 
 // GetRecentNotifications returns the latest alert incidents with enriched metadata
 // for WebSocket browser notification delivery.
+//
+// The display name of an alert rule is computed here in Go via
+// models.AlertRule.DisplayName() instead of a SQL string-building expression,
+// so this feed and the live WS/push notifications (alerts/notify.go) can never
+// disagree on how an unnamed rule's label is formatted — there is exactly one
+// formula, not a SQL copy and a Go copy that can drift apart.
 func (db *DB) GetRecentNotifications(ctx context.Context, limit int) ([]models.NotificationItem, error) {
 	rows, err := db.conn.QueryContext(ctx,
 		`SELECT * FROM (
@@ -23,10 +29,11 @@ func (db *DB) GetRecentNotifications(ctx context.Context, limit int) ([]models.N
 				ai.rule_id,
 				ai.host_id,
 				COALESCE(h.name, ai.host_id) AS host_name,
-				COALESCE(ar.name,
-					ar.metric || ' ' || ar.operator || ' ' || CAST(COALESCE(ar.threshold_crit, ar.threshold_warn, 0) AS TEXT),
-					'Règle supprimée') AS rule_name,
+				ar.name AS rule_custom_name,
 				COALESCE(ar.metric, '') AS metric,
+				ar.operator AS rule_operator,
+				ar.threshold_crit AS rule_threshold_crit,
+				ar.threshold_warn AS rule_threshold_warn,
 				COALESCE(ai.severity, '') AS severity,
 				''::text AS status,
 				''::text AS tracker_id,
@@ -53,8 +60,11 @@ func (db *DB) GetRecentNotifications(ctx context.Context, limit int) ([]models.N
 				NULL::bigint AS rule_id,
 				COALESCE(rt.host_id, '') AS host_id,
 				COALESCE(h.name, rt.host_id, 'Source inconnue') AS host_name,
-				COALESCE(rt.name, 'Release tracker') AS rule_name,
+				rt.name AS rule_custom_name,
 				'release_tracker'::text AS metric,
+				NULL::text AS rule_operator,
+				NULL::double precision AS rule_threshold_crit,
+				NULL::double precision AS rule_threshold_warn,
 				''::text AS severity,
 				COALESCE(rte.status, '') AS status,
 				COALESCE(rt.id::text, '') AS tracker_id,
@@ -83,9 +93,12 @@ func (db *DB) GetRecentNotifications(ctx context.Context, limit int) ([]models.N
 	for rows.Next() {
 		var item models.NotificationItem
 		var ruleID sql.NullInt64
+		var ruleCustomName, ruleOperator sql.NullString
+		var thresholdCrit, thresholdWarn sql.NullFloat64
 		if err := rows.Scan(
 			&item.ID, &item.Type, &ruleID, &item.HostID,
-			&item.HostName, &item.RuleName, &item.Metric, &item.Severity,
+			&item.HostName, &ruleCustomName, &item.Metric, &ruleOperator,
+			&thresholdCrit, &thresholdWarn, &item.Severity,
 			&item.Status, &item.TrackerID, &item.TrackerType,
 			&item.ReleaseURL, &item.ReleaseName, &item.Version,
 			&item.Value, &item.TriggeredAt, &item.ResolvedAt,
@@ -96,6 +109,29 @@ func (db *DB) GetRecentNotifications(ctx context.Context, limit int) ([]models.N
 		if ruleID.Valid {
 			item.RuleID = &ruleID.Int64
 		}
+
+		if item.Type == "alert_incident" {
+			rule := models.AlertRule{Metric: item.Metric, Operator: ruleOperator.String}
+			if ruleCustomName.Valid {
+				rule.Name = &ruleCustomName.String
+			}
+			if thresholdCrit.Valid {
+				rule.ThresholdCrit = &thresholdCrit.Float64
+			}
+			if thresholdWarn.Valid {
+				rule.ThresholdWarn = &thresholdWarn.Float64
+			}
+			item.RuleName = rule.DisplayName()
+			if item.RuleName == "" {
+				item.RuleName = "Règle supprimée"
+			}
+		} else {
+			item.RuleName = ruleCustomName.String
+			if item.RuleName == "" {
+				item.RuleName = "Release tracker"
+			}
+		}
+
 		db.enrichNotificationSource(ctx, &item)
 		items = append(items, item)
 	}

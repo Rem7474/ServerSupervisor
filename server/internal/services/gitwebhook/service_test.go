@@ -133,7 +133,7 @@ func signed(secret string, body []byte) http.Header {
 }
 
 func TestCreate_Validation(t *testing.T) {
-	svc := NewService(fakeRepo{}, nil, &fakeDispatcher{}, nil)
+	svc := NewService(fakeRepo{}, nil, &fakeDispatcher{}, nil, nil)
 	_, err := svc.Create(context.Background(), models.GitWebhookRequest{Provider: "github", HostID: "h", CustomTaskID: "t"})
 	var ae *apperr.Error
 	if !errors.As(err, &ae) || ae.HTTPStatus != 400 {
@@ -147,7 +147,7 @@ func TestCreate_Validation(t *testing.T) {
 
 func TestReceive_InvalidSignature(t *testing.T) {
 	wh := &models.GitWebhook{Enabled: true, Provider: "github", Secret: "s"}
-	svc := NewService(fakeRepo{receiveWH: wh}, nil, &fakeDispatcher{}, nil)
+	svc := NewService(fakeRepo{receiveWH: wh}, nil, &fakeDispatcher{}, nil, nil)
 	bad := http.Header{}
 	bad.Set("X-Hub-Signature-256", "sha256=00")
 	_, err := svc.Receive(context.Background(), "id", []byte(`{}`), bad, "1.2.3.4")
@@ -161,7 +161,7 @@ func TestReceive_RepoFilterSkips(t *testing.T) {
 	body := []byte(`{"ref":"refs/heads/main","repository":{"full_name":"acme/app"}}`)
 	wh := &models.GitWebhook{Enabled: true, Provider: "github", Secret: "s", EventFilter: "push", RepoFilter: "other/repo"}
 	disp := &fakeDispatcher{}
-	svc := NewService(fakeRepo{receiveWH: wh}, nil, disp, nil)
+	svc := NewService(fakeRepo{receiveWH: wh}, nil, disp, nil, nil)
 	res, err := svc.Receive(context.Background(), "id", body, signed("s", body), "1.2.3.4")
 	if err != nil {
 		t.Fatalf("Receive: %v", err)
@@ -178,7 +178,7 @@ func TestReceive_Dispatches(t *testing.T) {
 	body := []byte(`{"ref":"refs/heads/main","after":"sha","repository":{"full_name":"acme/app"}}`)
 	wh := &models.GitWebhook{Enabled: true, Provider: "github", Secret: "s", EventFilter: "push", HostID: "h1", CustomTaskID: "t1", Name: "wh"}
 	disp := &fakeDispatcher{}
-	svc := NewService(fakeRepo{receiveWH: wh, execID: "exec-1"}, nil, disp, nil)
+	svc := NewService(fakeRepo{receiveWH: wh, execID: "exec-1"}, nil, disp, nil, nil)
 	res, err := svc.Receive(context.Background(), "id", body, signed("s", body), "1.2.3.4")
 	if err != nil {
 		t.Fatalf("Receive: %v", err)

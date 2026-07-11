@@ -70,7 +70,7 @@ func TestEvaluateAlerts_CreatesAndResolvesIncident(t *testing.T) {
 	pusher := &stubPusher{}
 
 	// First evaluation: an incident should be opened at warn severity.
-	alerts.EvaluateAlerts(ctx, db, cfg, disp, pusher)
+	alerts.EvaluateAlerts(ctx, db, cfg, disp, pusher, nil)
 
 	inc, err := db.GetOpenAlertIncident(ctx, rule.ID, hostID)
 	if err != nil {
@@ -84,7 +84,7 @@ func TestEvaluateAlerts_CreatesAndResolvesIncident(t *testing.T) {
 	insertCPUMetric(t, db, hostID, 10, time.Now().Add(2*time.Second))
 
 	// Second evaluation: the open incident should be resolved.
-	alerts.EvaluateAlerts(ctx, db, cfg, disp, pusher)
+	alerts.EvaluateAlerts(ctx, db, cfg, disp, pusher, nil)
 
 	if _, err := db.GetOpenAlertIncident(ctx, rule.ID, hostID); err == nil {
 		t.Error("expected the incident to be resolved after CPU recovered, but one is still open")
@@ -115,7 +115,7 @@ func TestEvaluateAlerts_NoIncidentBelowThreshold(t *testing.T) {
 		t.Fatalf("create rule: %v", err)
 	}
 
-	alerts.EvaluateAlerts(ctx, db, &config.Config{}, dispatch.New(db), &stubPusher{})
+	alerts.EvaluateAlerts(ctx, db, &config.Config{}, dispatch.New(db), &stubPusher{}, nil)
 
 	if _, err := db.GetOpenAlertIncident(ctx, rule.ID, hostID); err == nil {
 		t.Error("did not expect an incident for a metric below the threshold")
