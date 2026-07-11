@@ -1,5 +1,6 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import apiClient from '../api'
+import { useHostsStore } from '../stores/hosts'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- display-layer shim for aggregate web-logs data (no Go model)
 type AnyRecord = Record<string, any>
@@ -12,6 +13,8 @@ interface TimeseriesPoint {
 }
 
 export function useTraffic() {
+  const hostsStore = useHostsStore()
+
   const periodOptions = [
     { value: '1h', label: '1h' },
     { value: '24h', label: '24h' },
@@ -175,6 +178,7 @@ export function useTraffic() {
   watch(autoRefresh, resetAutoRefresh)
 
   onMounted(async () => {
+    hostsStore.fetchHosts()
     await loadAll(true)
     resetAutoRefresh()
   })
@@ -184,6 +188,7 @@ export function useTraffic() {
   })
 
   return {
+    hostsStore,
     periodOptions,
     REFRESH_INTERVAL_MS,
     period,
