@@ -142,21 +142,74 @@ func sendAlertNotifications(n notify.Notifier, cfg *config.Config, rule models.A
 	}
 }
 
+// ruleDisplayName builds a human-readable label for a rule, falling back to its
+// threshold when no custom name is set. Shared by the browser/push notification builders.
+func ruleDisplayName(rule models.AlertRule) string {
+	if rule.Name != nil {
+		return *rule.Name
+	}
+	if rule.ThresholdCrit != nil {
+		return fmt.Sprintf("%s %s %.2f (crit)", rule.Metric, rule.Operator, *rule.ThresholdCrit)
+	}
+	if rule.ThresholdWarn != nil {
+		return fmt.Sprintf("%s %s %.2f (warn)", rule.Metric, rule.Operator, *rule.ThresholdWarn)
+	}
+	return ""
+}
+
+// hasBrowserChannel reports whether the rule's actions include the "browser" channel.
+func hasBrowserChannel(rule models.AlertRule) bool {
+	for _, ch := range rule.Actions.Channels {
+		if ch == "browser" {
+			return true
+		}
+	}
+	return false
+}
+
 // pushWebNotifications delivers a Web Push notification to every registered device subscription
 // when a rule with the "browser" channel fires. Runs in a goroutine; VAPID keys are fetched
 // from the settings table (generated on first alert if not yet present).
 func pushWebNotifications(ctx context.Context, db *database.DB, cfg *config.Config, rule models.AlertRule, host models.Host, value float64) {
-	hasBrowser := false
-	for _, ch := range rule.Actions.Channels {
-		if ch == "browser" {
-			hasBrowser = true
-			break
-		}
-	}
-	if !hasBrowser {
+	if !hasBrowserChannel(rule) {
 		return
 	}
 
+	unit := ""
+	switch rule.Metric {
+	case "cpu", "memory", "disk":
+		unit = "%"
+	}
+
+	sendWebPush(ctx, db, cfg, map[string]interface{}{
+		"title":  "Alerte : " + ruleDisplayName(rule),
+		"body":   fmt.Sprintf("%s — Valeur : %.2f%s", host.Name, value, unit),
+		"tag":    fmt.Sprintf("alert-%d-%s", rule.ID, host.ID),
+		"url":    "/alerts?tab=incidents",
+		"status": "fired",
+	})
+}
+
+// pushWebNotificationsResolved delivers a Web Push notification that updates (in place, via the
+// same tag) the notification sent when the incident fired, so the Android/PWA notification
+// reflects resolution in real time instead of staying stuck in the alerting state.
+func pushWebNotificationsResolved(ctx context.Context, db *database.DB, cfg *config.Config, rule models.AlertRule, host models.Host) {
+	if !hasBrowserChannel(rule) {
+		return
+	}
+
+	sendWebPush(ctx, db, cfg, map[string]interface{}{
+		"title":  "Résolu : " + ruleDisplayName(rule),
+		"body":   fmt.Sprintf("%s — revenu à la normale", host.Name),
+		"tag":    fmt.Sprintf("alert-%d-%s", rule.ID, host.ID),
+		"url":    "/alerts?tab=incidents",
+		"status": "resolved",
+	})
+}
+
+// sendWebPush marshals payload and delivers it to every registered admin device subscription.
+// VAPID keys are fetched from the settings table (generated on first alert if not yet present).
+func sendWebPush(ctx context.Context, db *database.DB, cfg *config.Config, payloadFields map[string]interface{}) {
 	privateKey, err := db.GetSetting(ctx, "vapid_private_key")
 	if err != nil || privateKey == "" {
 		return
@@ -166,27 +219,7 @@ func pushWebNotifications(ctx context.Context, db *database.DB, cfg *config.Conf
 		return
 	}
 
-	ruleName := ""
-	if rule.Name != nil {
-		ruleName = *rule.Name
-	} else if rule.ThresholdCrit != nil {
-		ruleName = fmt.Sprintf("%s %s %.2f (crit)", rule.Metric, rule.Operator, *rule.ThresholdCrit)
-	} else if rule.ThresholdWarn != nil {
-		ruleName = fmt.Sprintf("%s %s %.2f (warn)", rule.Metric, rule.Operator, *rule.ThresholdWarn)
-	}
-
-	unit := ""
-	switch rule.Metric {
-	case "cpu", "memory", "disk":
-		unit = "%"
-	}
-
-	payload, _ := json.Marshal(map[string]interface{}{
-		"title": "Alerte : " + ruleName,
-		"body":  fmt.Sprintf("%s — Valeur : %.2f%s", host.Name, value, unit),
-		"tag":   fmt.Sprintf("alert-%d-%s", rule.ID, host.ID),
-		"url":   "/alerts?tab=incidents",
-	})
+	payload, _ := json.Marshal(payloadFields)
 
 	subs, err := db.GetPushSubscriptionsByRole(ctx, "admin")
 	if err != nil || len(subs) == 0 {
@@ -233,24 +266,8 @@ func pushBrowserNotification(pusher NotificationPusher, rule models.AlertRule, h
 	if pusher == nil {
 		return
 	}
-	hasBrowser := false
-	for _, ch := range rule.Actions.Channels {
-		if ch == "browser" {
-			hasBrowser = true
-			break
-		}
-	}
-	if !hasBrowser {
+	if !hasBrowserChannel(rule) {
 		return
-	}
-
-	ruleName := ""
-	if rule.Name != nil {
-		ruleName = *rule.Name
-	} else if rule.ThresholdCrit != nil {
-		ruleName = fmt.Sprintf("%s %s %.2f (crit)", rule.Metric, rule.Operator, *rule.ThresholdCrit)
-	} else if rule.ThresholdWarn != nil {
-		ruleName = fmt.Sprintf("%s %s %.2f (warn)", rule.Metric, rule.Operator, *rule.ThresholdWarn)
 	}
 
 	pusher.Broadcast(models.WSNewAlertMessage{
@@ -261,7 +278,7 @@ func pushBrowserNotification(pusher NotificationPusher, rule models.AlertRule, h
 			RuleID:        rule.ID,
 			HostID:        host.ID,
 			HostName:      host.Name,
-			RuleName:      ruleName,
+			RuleName:      ruleDisplayName(rule),
 			Metric:        rule.Metric,
 			Value:         value,
 			TriggeredAt:   time.Now().UTC(),

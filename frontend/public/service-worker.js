@@ -1,4 +1,4 @@
-const SW_VERSION = '2026-04-28-v1'
+const SW_VERSION = '2026-07-11-v1'
 const STATIC_CACHE_PREFIX = 'serversupervisor-static'
 const RUNTIME_CACHE_PREFIX = 'serversupervisor-runtime'
 const CACHE_NAME = `${STATIC_CACHE_PREFIX}-${SW_VERSION}`
@@ -181,6 +181,7 @@ self.addEventListener('push', (event) => {
       data.body = event.data.text()
     }
   }
+  const isResolved = data.status === 'resolved'
   const title = data.title || 'ServerSupervisor'
   const options = {
     body: data.body || 'Nouvelle notification disponible',
@@ -189,7 +190,11 @@ self.addEventListener('push', (event) => {
     tag: data.tag || 'ss-alert',
     data: { url: data.url || '/alerts?tab=incidents' },
     requireInteraction: false,
-    renotify: true,
+    // Resolved notifications reuse the same tag as the original alert: showNotification()
+    // then updates it in place. renotify:false + silent keeps that update quiet (no new
+    // sound/vibration) instead of re-alerting for something that's now fixed.
+    renotify: !isResolved,
+    silent: isResolved,
   }
   event.waitUntil(
     self.registration.showNotification(title, options)

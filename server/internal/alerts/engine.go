@@ -105,14 +105,27 @@ func EvaluateAlerts(ctx context.Context, db *database.DB, cfg *config.Config, di
 
 	n := notify.New()
 
+	hostByID := make(map[string]models.Host, len(hosts))
+	for _, h := range hosts {
+		hostByID[h.ID] = h
+	}
+
 	for _, rule := range rules {
 		if !rule.Enabled {
+			staleIncidents, _ := db.ListOpenAlertIncidentsByRule(ctx, rule.ID)
 			resolvedCount, err := db.ResolveOpenAlertIncidentsByRule(ctx, rule.ID)
 			if err != nil {
 				slog.ErrorContext(ctx, "alerts: failed to resolve open incidents for disabled rule", slog.Int64("rule_id", rule.ID), slog.Any("err", err))
 			} else if resolvedCount > 0 {
 				slog.InfoContext(ctx, "alerts: disabled rule resolved open incidents", slog.Int64("rule_id", rule.ID), slog.Int64("resolved", resolvedCount))
 				broadcastIncidentUpdate(pusher, "resolved", rule, "")
+				for _, inc := range staleIncidents {
+					host, ok := hostByID[inc.HostID]
+					if !ok {
+						host = models.Host{ID: inc.HostID, Name: inc.HostID}
+					}
+					go pushWebNotificationsResolved(ctx, db, cfg, rule, host)
+				}
 			}
 			continue
 		}
@@ -194,12 +207,13 @@ func EvaluateAlerts(ctx context.Context, db *database.DB, cfg *config.Config, di
 						slog.WarnContext(ctx, "alerts: failed to write alert_resolved audit log", slog.Int64("incident_id", inc.ID), slog.Any("err", auditErr))
 					}
 					broadcastIncidentUpdate(pusher, "resolved", rule, host.ID)
+					go pushWebNotificationsResolved(ctx, db, cfg, rule, host)
 				}
 			}
 		}
 
 		if isProxmoxGlobalScope(rule) {
-			resolveStaleGlobalProxmoxIncidents(ctx, db, rule, evaluatedTargets)
+			resolveStaleGlobalProxmoxIncidents(ctx, db, cfg, pusher, rule, evaluatedTargets)
 		}
 	}
 }
@@ -535,7 +549,7 @@ func proxmoxScopedRuleForSyntheticTarget(rule models.AlertRule, targetID string)
 	return scoped, true
 }
 
-func resolveStaleGlobalProxmoxIncidents(ctx context.Context, db *database.DB, rule models.AlertRule, evaluatedTargets map[string]struct{}) {
+func resolveStaleGlobalProxmoxIncidents(ctx context.Context, db *database.DB, cfg *config.Config, pusher NotificationPusher, rule models.AlertRule, evaluatedTargets map[string]struct{}) {
 	openIncidents, err := db.ListOpenAlertIncidentsByRule(ctx, rule.ID)
 	if err != nil {
 		slog.ErrorContext(ctx, "alerts: failed to list open incidents for stale cleanup", slog.Int64("rule_id", rule.ID), slog.Any("err", err))
@@ -551,6 +565,9 @@ func resolveStaleGlobalProxmoxIncidents(ctx context.Context, db *database.DB, ru
 		}
 		if err := db.ResolveAlertIncident(ctx, inc.ID); err != nil {
 			slog.ErrorContext(ctx, "alerts: failed to resolve stale incident", slog.Int64("incident_id", inc.ID), slog.Int64("rule_id", rule.ID), slog.Any("err", err))
+			continue
 		}
+		broadcastIncidentUpdate(pusher, "resolved", rule, inc.HostID)
+		go pushWebNotificationsResolved(ctx, db, cfg, rule, models.Host{ID: inc.HostID, Name: inc.HostID})
 	}
 }
