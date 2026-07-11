@@ -90,45 +90,6 @@ export function useNotifications() {
     }
   }
 
-  function showExecutionBrowserNotification(title: string, body: string, tag: string): void {
-    try {
-      const n = new Notification(title, {
-        body,
-        icon: '/favicon.ico',
-        tag,
-        requireInteraction: false,
-      })
-      n.onclick = () => { window.focus(); n.close() }
-    } catch {
-      // API not supported or permission revoked mid-session
-    }
-  }
-
-  function showBrowserNotification(item: NotificationItem): void {
-    if (item?.type === 'release_tracker_detected' || item?.type === 'release_tracker_execution') {
-      const trackerTypeLabel = item.tracker_type === 'docker' ? 'Docker' : 'Git'
-      showExecutionBrowserNotification(
-        `${trackerTypeLabel} tracker : ${notificationTitle(item)}`,
-        item.type === 'release_tracker_detected'
-          ? `Nouvelle version detectee${item.version ? ` : ${item.version}` : ''}`
-          : `Execution ${trackerStatusLabel(item.status).toLowerCase()}`,
-        `tracker-history-${item.id}`,
-      )
-      return
-    }
-    try {
-      const n = new Notification(`Alerte : ${item.rule_name}`, {
-        body: `${item.host_name} — Valeur : ${item.value?.toFixed(2)}${metricUnit(item.metric)}`,
-        icon: '/favicon.ico',
-        tag: `alert-${item.id}`,
-        requireInteraction: false,
-      })
-      n.onclick = () => { window.focus(); n.close() }
-    } catch {
-      // API not supported or permission revoked mid-session
-    }
-  }
-
   function urlBase64ToUint8Array(base64String: string): Uint8Array<ArrayBuffer> {
     const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
     const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
@@ -214,14 +175,6 @@ export function useNotifications() {
         readAtRef.value = serverReadAt
       }
 
-      if (seenIdSet !== null && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-        for (const item of incoming) {
-          if (item.browser_notify && !seenIdSet.has(item.id)) {
-            showBrowserNotification(item)
-          }
-        }
-      }
-
       seenIdSet = new Set(incoming.map((n) => n.id))
       notifications.value = incoming
     } catch {
@@ -231,14 +184,16 @@ export function useNotifications() {
     }
   }
 
+  // Native OS notifications are shown exclusively by the service worker's Web Push
+  // handler (see setupPushNotifications below) — it fires regardless of whether this
+  // tab is open, so calling the Notification API here too would double-pop every
+  // event while the app is in the foreground. This WS handler only drives the in-app
+  // notification list/bell.
   useWebSocket<WSNotificationMessage>('/api/v1/ws/notifications', (payload) => {
     if (!payload?.type) return
 
     if (payload.type === 'new_alert') {
       const item = payload.notification
-      if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-        showBrowserNotification(item)
-      }
       if (seenIdSet !== null) seenIdSet.add(item.id)
       if (!notifications.value.some((n) => n.id === item.id)) {
         notifications.value = [item, ...notifications.value].slice(0, 30)
@@ -246,43 +201,12 @@ export function useNotifications() {
       return
     }
 
-    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-      if (payload.type === 'release_tracker_detected') {
-        const n = payload.notification
-        const trackerTypeLabel = n.tracker_type === 'docker' ? 'Docker' : 'Git'
-        const versionLabel = n.version ? ` (${n.version})` : ''
-        showExecutionBrowserNotification(
-          `${trackerTypeLabel} tracker : ${n.tracker_name}${versionLabel}`,
-          `Nouvelle version détectée${n.version ? ` : ${n.version}` : ''}${n.release_name ? ` - ${n.release_name}` : ''}`,
-          `tracker-detected-${n.tracker_id}-${n.version || 'unknown'}`,
-        )
-        fetchNotifications()
-        return
-      }
-
-      if (payload.type === 'release_tracker_execution') {
-        const n = payload.notification
-        const statusLabel = n.status === 'completed' || n.status === 'success' ? 'réussie' : 'échouée'
-        const typeLabel = n.tracker_type === 'docker' ? 'Docker' : 'Git'
-        showExecutionBrowserNotification(
-          `${typeLabel} tracker : ${n.tracker_name}`,
-          `Exécution ${statusLabel}`,
-          `tracker-exec-${n.tracker_id}-${n.status}`,
-        )
-        fetchNotifications()
-        return
-      }
-
-      if (payload.type === 'webhook_execution') {
-        const n = payload.notification
-        const statusLabel = n.status === 'completed' || n.status === 'success' ? 'réussie' : 'échouée'
-        showExecutionBrowserNotification(
-          `Webhook : ${n.webhook_name}`,
-          `Exécution ${statusLabel}`,
-          `webhook-exec-${n.webhook_id}-${n.status}`,
-        )
-        fetchNotifications()
-      }
+    if (
+      payload.type === 'release_tracker_detected' ||
+      payload.type === 'release_tracker_execution' ||
+      payload.type === 'webhook_execution'
+    ) {
+      fetchNotifications()
     }
   })
 

@@ -24,6 +24,7 @@ import (
 	"github.com/serversupervisor/server/internal/dispatch"
 	"github.com/serversupervisor/server/internal/models"
 	"github.com/serversupervisor/server/internal/notify"
+	"github.com/serversupervisor/server/internal/services/push"
 	"github.com/serversupervisor/server/internal/ws"
 )
 
@@ -60,11 +61,12 @@ type Service struct {
 	cfg        *config.Config
 	dispatcher Dispatcher
 	notifHub   *ws.NotificationHub
+	pushSvc    *push.Service
 	bgCtx      context.Context
 }
 
-func NewService(repo Repository, cfg *config.Config, dispatcher Dispatcher, notifHub *ws.NotificationHub) *Service {
-	return &Service{repo: repo, cfg: cfg, dispatcher: dispatcher, notifHub: notifHub, bgCtx: context.Background()}
+func NewService(repo Repository, cfg *config.Config, dispatcher Dispatcher, notifHub *ws.NotificationHub, pushSvc *push.Service) *Service {
+	return &Service{repo: repo, cfg: cfg, dispatcher: dispatcher, notifHub: notifHub, pushSvc: pushSvc, bgCtx: context.Background()}
 }
 
 // SetBackgroundContext threads a long-lived (SIGTERM-bound) ctx for the
@@ -336,18 +338,26 @@ func (s *Service) NotifyComplete(commandID, status string) {
 				slog.ErrorContext(ctx, "webhook ntfy send", slog.Any("err", err))
 			}
 		case "browser":
-			if s.notifHub == nil {
-				continue
+			if s.notifHub != nil {
+				s.notifHub.Broadcast(models.WSWebhookExecutionMessage{
+					Type: "webhook_execution",
+					Notification: models.WSWebhookNotification{
+						WebhookID:   webhookID,
+						WebhookName: wh.Name,
+						Status:      status,
+						TriggeredAt: time.Now().UTC(),
+					},
+				})
 			}
-			s.notifHub.Broadcast(models.WSWebhookExecutionMessage{
-				Type: "webhook_execution",
-				Notification: models.WSWebhookNotification{
-					WebhookID:   webhookID,
-					WebhookName: wh.Name,
-					Status:      status,
-					TriggeredAt: time.Now().UTC(),
-				},
-			})
+			if s.pushSvc != nil {
+				go s.pushSvc.Send(ctx, s.cfg, map[string]interface{}{
+					"title":  fmt.Sprintf("Webhook : %s", wh.Name),
+					"body":   fmt.Sprintf("Exécution %s", map[string]string{"completed": "réussie", "failed": "échouée"}[status]),
+					"tag":    fmt.Sprintf("webhook-exec-%s-%s", webhookID, status),
+					"url":    fmt.Sprintf("/git-webhooks/%s", webhookID),
+					"status": status,
+				})
+			}
 		}
 	}
 }

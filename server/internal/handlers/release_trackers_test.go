@@ -18,7 +18,7 @@ import (
 func newReleaseTrackerRouter(t *testing.T, role string) *gin.Engine {
 	t.Helper()
 	db, cfg := testutil.NewPostgresDBWithConfig(t)
-	h := handlers.NewReleaseTrackerHandler(releasetrackersvc.NewService(db, cfg, nil, nil))
+	h := handlers.NewReleaseTrackerHandler(releasetrackersvc.NewService(db, cfg, nil, nil, nil))
 
 	r := gin.New()
 	r.Use(func(c *gin.Context) { c.Set("role", role) })

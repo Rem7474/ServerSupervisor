@@ -19,7 +19,7 @@ import (
 func newReleaseTrackerCRUDRouter(t *testing.T) *gin.Engine {
 	t.Helper()
 	db, cfg := testutil.NewPostgresDBWithConfig(t)
-	h := handlers.NewReleaseTrackerHandler(releasetrackersvc.NewService(db, cfg, dispatch.New(db), ws.NewNotificationHub()))
+	h := handlers.NewReleaseTrackerHandler(releasetrackersvc.NewService(db, cfg, dispatch.New(db), ws.NewNotificationHub(), nil))
 
 	r := gin.New()
 	r.Use(withRole("admin"))

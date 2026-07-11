@@ -14,6 +14,7 @@ import (
 	"github.com/serversupervisor/server/internal/gitprovider"
 	"github.com/serversupervisor/server/internal/models"
 	"github.com/serversupervisor/server/internal/notify"
+	"github.com/serversupervisor/server/internal/services/push"
 	"github.com/serversupervisor/server/internal/ws"
 )
 
@@ -42,15 +43,17 @@ type Service struct {
 	repo     Repository
 	cfg      *config.Config
 	notifHub *ws.NotificationHub
+	pushSvc  *push.Service
 	poller   *Poller
 }
 
-func NewService(db *database.DB, cfg *config.Config, dispatcher *dispatch.Dispatcher, notifHub *ws.NotificationHub) *Service {
+func NewService(db *database.DB, cfg *config.Config, dispatcher *dispatch.Dispatcher, notifHub *ws.NotificationHub, pushSvc *push.Service) *Service {
 	return &Service{
 		repo:     db,
 		cfg:      cfg,
 		notifHub: notifHub,
-		poller:   NewPoller(db, cfg, dispatcher, notifHub),
+		pushSvc:  pushSvc,
+		poller:   NewPoller(db, cfg, dispatcher, notifHub, pushSvc),
 	}
 }
 
@@ -339,16 +342,32 @@ func (s *Service) NotifyComplete(ctx context.Context, commandID, status string) 
 				slog.ErrorContext(ctx, fmt.Sprintf("Release tracker notify ntfy: %v", err))
 			}
 		case "browser":
-			if s.notifHub == nil {
-				continue
+			if s.notifHub != nil {
+				s.notifHub.Broadcast(models.WSReleaseTrackerMessage{
+					Type: "release_tracker_execution",
+					Notification: models.WSReleaseTrackerNotification{
+						TrackerID: tracker.ID, TrackerName: tracker.Name, TrackerType: tracker.TrackerType,
+						Status: status, TriggeredAt: time.Now().UTC(),
+					},
+				})
 			}
-			s.notifHub.Broadcast(models.WSReleaseTrackerMessage{
-				Type: "release_tracker_execution",
-				Notification: models.WSReleaseTrackerNotification{
-					TrackerID: tracker.ID, TrackerName: tracker.Name, TrackerType: tracker.TrackerType,
-					Status: status, TriggeredAt: time.Now().UTC(),
-				},
-			})
+			if s.pushSvc != nil {
+				statusLabel := "réussie"
+				if status == "failed" {
+					statusLabel = "échouée"
+				}
+				trackerLabel := "Git"
+				if tracker.TrackerType == "docker" {
+					trackerLabel = "Docker"
+				}
+				go s.pushSvc.Send(ctx, s.cfg, map[string]interface{}{
+					"title":  fmt.Sprintf("%s tracker : %s", trackerLabel, tracker.Name),
+					"body":   fmt.Sprintf("Exécution %s", statusLabel),
+					"tag":    fmt.Sprintf("tracker-exec-%s-%s", tracker.ID, status),
+					"url":    fmt.Sprintf("/release-trackers/%s", tracker.ID),
+					"status": status,
+				})
+			}
 		}
 	}
 }
