@@ -300,7 +300,7 @@ sudo journalctl -u serversupervisor-agent -f
 | `DB_HOST` | Hôte PostgreSQL | `localhost` |
 | `DB_PORT` | Port PostgreSQL | `5432` |
 | `DB_USER` | Utilisateur | `supervisor` |
-| `DB_PASSWORD` | Mot de passe | `supervisor` |
+| `DB_PASSWORD` | Mot de passe **(à changer !)** | `supervisor` |
 | `DB_NAME` | Nom de la base | `serversupervisor` |
 | `DB_SSLMODE` | Mode SSL | `disable` |
 
@@ -343,6 +343,54 @@ sudo journalctl -u serversupervisor-agent -f
 | `AUDIT_RETENTION_DAYS` | Rétention des logs d'audit en jours | `90` |
 
 > Les paramètres de notifications et de rétention sont également éditables depuis le dashboard (Settings) et persistés en base de données.
+
+### Sauvegarde & restauration
+
+Le stack Docker Compose inclut un service `postgres-backup` (image
+[`prodrigestivill/postgres-backup-local`](https://github.com/prodrigestivill/docker-postgres-backup-local))
+qui exécute des `pg_dump` planifiés, compressés et rotés, de la base
+ServerSupervisor. C'est une sauvegarde au sens disaster recovery — elle
+protège contre la perte du volume Docker, une corruption, ou une erreur de
+manipulation. Ce n'est **pas** la même chose que `METRICS_RETENTION_DAYS` /
+les politiques de rétention TimescaleDB, qui ne font qu'expirer les anciennes
+métriques dans une base par ailleurs saine.
+
+| Variable | Description | Défaut |
+|---|---|---|
+| `BACKUP_SCHEDULE` | Planification (`@daily`, `@weekly`, ou cron 5 champs) | `@daily` |
+| `BACKUP_KEEP_DAYS` | Sauvegardes quotidiennes conservées | `7` |
+| `BACKUP_KEEP_WEEKS` | Sauvegardes hebdomadaires conservées | `4` |
+| `BACKUP_KEEP_MONTHS` | Sauvegardes mensuelles conservées | `6` |
+
+Les fichiers `.sql.gz` sont écrits dans le volume nommé `postgres_backups`
+(`/backups` dans le conteneur `postgres-backup`).
+
+**Restaurer une sauvegarde** (arrête l'API pendant la restauration ; adapter
+le nom de fichier) :
+
+```bash
+# 1. Arrêter le serveur pour éviter des écritures pendant la restauration
+docker compose stop server
+
+# 2. Copier la sauvegarde choisie hors du volume
+docker compose cp postgres-backup:/backups/daily/serversupervisor-<horodatage>.sql.gz ./restore.sql.gz
+gunzip restore.sql.gz
+
+# 3. Recréer une base vide (la restauration part d'un schéma propre)
+docker compose exec postgres psql -U supervisor -d postgres -c "DROP DATABASE serversupervisor;"
+docker compose exec postgres psql -U supervisor -d postgres -c "CREATE DATABASE serversupervisor OWNER supervisor;"
+
+# 4. Importer le dump
+cat restore.sql | docker compose exec -T postgres psql -U supervisor -d serversupervisor
+
+# 5. Redémarrer le serveur
+docker compose start server
+```
+
+> Testez cette procédure au moins une fois avant d'en avoir besoin en
+> production — une sauvegarde qui n'a jamais été restaurée n'est pas
+> vérifiée. Les noms de fichiers exacts (sous-dossier `daily/weekly/monthly`)
+> sont listés par `docker compose exec postgres-backup ls -la /backups`.
 
 ---
 

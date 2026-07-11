@@ -32,12 +32,16 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 
 # ==== Stage 3: Final Image ====
 FROM alpine:3.24
-RUN apk add --no-cache ca-certificates tzdata
+RUN apk add --no-cache ca-certificates tzdata && \
+    addgroup -g 1000 supervisor && \
+    adduser -D -u 1000 -G supervisor supervisor
 WORKDIR /app
 
 COPY --from=server-builder /serversupervisor .
 COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
+RUN chown -R supervisor:supervisor /app
 
+USER supervisor
 EXPOSE 8080
 
 ENTRYPOINT ["./serversupervisor"]

@@ -8,6 +8,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/serversupervisor/server/internal/models"
 	"github.com/serversupervisor/server/internal/networkview"
+	"github.com/serversupervisor/server/internal/safego"
 )
 
 func (h *WSHandler) sendDashboardSnapshot(ctx context.Context, conn *websocket.Conn, lastHash *string) error {
@@ -67,16 +68,19 @@ func (h *WSHandler) buildDashboardPayload(ctx context.Context) (*models.WSDashbo
 
 	go func() {
 		defer wg.Done()
+		defer safego.Recover(ctx, "ws.buildDashboardPayload.hosts")
 		hosts, hostsErr = h.db.GetAllHosts(ctx)
 	}()
 
 	go func() {
 		defer wg.Done()
+		defer safego.Recover(ctx, "ws.buildDashboardPayload.hostMetrics")
 		hostMetrics, _ = h.db.GetLatestMetricsAll(ctx)
 	}()
 
 	go func() {
 		defer wg.Done()
+		defer safego.Recover(ctx, "ws.buildDashboardPayload.versionComparisons")
 		c, err := h.buildVersionComparisons(ctx)
 		if err == nil {
 			comparisons = c
@@ -85,26 +89,31 @@ func (h *WSHandler) buildDashboardPayload(ctx context.Context) (*models.WSDashbo
 
 	go func() {
 		defer wg.Done()
+		defer safego.Recover(ctx, "ws.buildDashboardPayload.proxmoxNodes")
 		proxmoxNodes, _ = h.db.ListProxmoxNodes(ctx)
 	}()
 
 	go func() {
 		defer wg.Done()
+		defer safego.Recover(ctx, "ws.buildDashboardPayload.proxmoxLinks")
 		proxmoxLinks, _ = h.db.ListProxmoxGuestLinks(ctx, "confirmed")
 	}()
 
 	go func() {
 		defer wg.Done()
+		defer safego.Recover(ctx, "ws.buildDashboardPayload.aptPending")
 		aptPending = h.db.GetTotalAptPending(ctx)
 	}()
 
 	go func() {
 		defer wg.Done()
+		defer safego.Recover(ctx, "ws.buildDashboardPayload.aptPendingHosts")
 		aptPendingHosts = h.db.GetAptPendingAll(ctx)
 	}()
 
 	go func() {
 		defer wg.Done()
+		defer safego.Recover(ctx, "ws.buildDashboardPayload.diskUsage")
 		diskUsage = h.db.GetRootDiskPercentAll(ctx)
 	}()
 

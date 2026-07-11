@@ -14,6 +14,7 @@ import (
 	"github.com/serversupervisor/server/internal/handlers"
 	"github.com/serversupervisor/server/internal/models"
 	"github.com/serversupervisor/server/internal/networkview"
+	"github.com/serversupervisor/server/internal/safego"
 	"github.com/serversupervisor/server/internal/scheduler"
 	alertrulesvc "github.com/serversupervisor/server/internal/services/alertrule"
 	aptsvc "github.com/serversupervisor/server/internal/services/apt"
@@ -73,7 +74,10 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	userH := handlers.NewUserHandler(usersvc.NewService(db))
 	pushSvc := pushsvc.NewService(db)
 	alertRulesH := handlers.NewAlertRulesHandler(alertrulesvc.NewService(db, func(rule models.AlertRule) {
-		go alerts.ResolveStaleIncidentsForRule(context.Background(), db, cfg, notifHub, pushSvc, rule)
+		go func() {
+			defer safego.Recover(context.Background(), "alerts.ResolveStaleIncidentsForRule")
+			alerts.ResolveStaleIncidentsForRule(context.Background(), db, cfg, notifHub, pushSvc, rule)
+		}()
 	}, alertrulesvc.EngineFuncs{
 		MetricValue: func(ctx context.Context, host models.Host, rule models.AlertRule) (float64, bool) {
 			return alerts.GetMetricValue(ctx, db, host, rule)

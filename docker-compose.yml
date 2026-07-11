@@ -78,5 +78,29 @@ services:
       postgres:
         condition: service_healthy
 
+  # Scheduled logical backups (pg_dump, gzip, rotation) of the ServerSupervisor
+  # database. This is disaster recovery, not the TimescaleDB retention/compression
+  # policies configured in migrations — those expire old data, this protects
+  # against volume loss/corruption. See README.md "Sauvegarde & restauration"
+  # for the restore procedure; test it before you need it in production.
+  postgres-backup:
+    image: prodrigestivill/postgres-backup-local:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_DB: serversupervisor
+      POSTGRES_USER: supervisor
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-supervisor}
+      SCHEDULE: ${BACKUP_SCHEDULE:-@daily}
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-7}
+      BACKUP_KEEP_WEEKS: ${BACKUP_KEEP_WEEKS:-4}
+      BACKUP_KEEP_MONTHS: ${BACKUP_KEEP_MONTHS:-6}
+    volumes:
+      - postgres_backups:/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+
 volumes:
   postgres_data:
+  postgres_backups:

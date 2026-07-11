@@ -17,6 +17,7 @@ import (
 
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/notify"
+	"github.com/serversupervisor/server/internal/safego"
 	"github.com/serversupervisor/server/internal/services/push"
 )
 
@@ -116,7 +117,10 @@ func (d *Dispatcher) Send(ctx context.Context, ev Event) {
 				ev.OnBrowser()
 			}
 			if d.pushSvc != nil && ev.Push != nil {
-				go d.pushSvc.Send(ctx, d.cfg, *ev.Push)
+				go func() {
+					defer safego.Recover(ctx, "notifychannels.pushSend")
+					d.pushSvc.Send(ctx, d.cfg, *ev.Push)
+				}()
 			}
 
 		default:

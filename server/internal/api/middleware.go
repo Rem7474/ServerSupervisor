@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"log/slog"
 	"net"
 	"net/http"
@@ -17,6 +18,7 @@ import (
 	"github.com/serversupervisor/server/internal/database"
 	errs "github.com/serversupervisor/server/internal/errors"
 	"github.com/serversupervisor/server/internal/logging"
+	"github.com/serversupervisor/server/internal/safego"
 	"golang.org/x/time/rate"
 )
 
@@ -48,7 +50,10 @@ func NewIPRateLimiter(rps int, burst int, trustedProxyCIDRs []string) *IPRateLim
 		for {
 			select {
 			case <-ticker.C:
-				rl.cleanup()
+				func() {
+					defer safego.Recover(context.Background(), "rateLimiter.cleanup")
+					rl.cleanup()
+				}()
 			case <-rl.done:
 				return
 			}

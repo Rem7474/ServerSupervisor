@@ -12,6 +12,7 @@ import (
 	"github.com/serversupervisor/server/internal/events"
 	"github.com/serversupervisor/server/internal/models"
 	"github.com/serversupervisor/server/internal/proxmoxclient"
+	"github.com/serversupervisor/server/internal/safego"
 )
 
 // Repository is the data-access port. *database.DB satisfies it structurally
@@ -90,7 +91,10 @@ func (s *Service) TriggerPollByID(reqCtx, pollCtx context.Context, id string) er
 	}
 	for _, conn := range conns {
 		if conn.ID == id {
-			go s.poller.PollOne(pollCtx, conn)
+			go func() {
+				defer safego.Recover(pollCtx, "proxmox.TriggerPollByID")
+				s.poller.PollOne(pollCtx, conn)
+			}()
 			return nil
 		}
 	}
@@ -534,6 +538,7 @@ func (s *Service) NodeGuestNetworks(ctx context.Context, nodeID string) (map[int
 		wg.Add(1)
 		go func(guest models.ProxmoxGuest) {
 			defer wg.Done()
+			defer safego.Recover(ctx, "proxmox.NodeGuestNetworks")
 			var ifaces []proxmoxclient.GuestNetworkIface
 			var ferr error
 			if guest.GuestType == "vm" {

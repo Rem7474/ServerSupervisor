@@ -1,10 +1,12 @@
 package ws
 
 import (
+	"context"
 	"sync"
 
 	"github.com/gorilla/websocket"
 	"github.com/serversupervisor/server/internal/models"
+	"github.com/serversupervisor/server/internal/safego"
 )
 
 // CommandStreamHub manages real-time streaming of remote command output.
@@ -117,6 +119,7 @@ func (h *CommandStreamHub) BroadcastStatus(commandID, status, output string) {
 
 // runBroadcast runs the broadcast loop for a specific command.
 func (h *CommandStreamHub) runBroadcast(commandID string) {
+	defer safego.Recover(context.Background(), "ws.commandStream.runBroadcast")
 	h.mu.RLock()
 	broadcast := h.broadcasts[commandID]
 	h.mu.RUnlock()

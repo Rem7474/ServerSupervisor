@@ -1,6 +1,7 @@
 package ws
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
@@ -19,6 +20,7 @@ import (
 	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/events"
 	"github.com/serversupervisor/server/internal/models"
+	"github.com/serversupervisor/server/internal/safego"
 )
 
 // snapshotChanged returns true (and updates *lastHash) when payload differs from the
@@ -253,6 +255,7 @@ func (h *WSHandler) parseTokenClaims(tokenString string) (jwt.MapClaims, bool) {
 
 func (h *WSHandler) readLoop(conn *websocket.Conn, done chan struct{}) {
 	defer close(done)
+	defer safego.Recover(context.Background(), "ws.readLoop")
 	for {
 		if _, _, err := conn.ReadMessage(); err != nil {
 			return

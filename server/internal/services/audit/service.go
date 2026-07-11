@@ -15,6 +15,7 @@ import (
 	"github.com/serversupervisor/server/internal/apperr"
 	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/models"
+	"github.com/serversupervisor/server/internal/safego"
 )
 
 // Repository is the data-access port. *database.DB satisfies it structurally; the
@@ -112,7 +113,15 @@ func (s *Service) HostTimeline(ctx context.Context, hostID string, limit int) ([
 	incCh := make(chan []database.AlertIncidentWithRule, 1)
 	errCh := make(chan error, 3)
 
+	// Each goroutine recovers its own panic into errCh rather than just logging it:
+	// the join below waits for exactly 3 messages, so a silently-recovered panic
+	// that sent nothing would hang HostTimeline forever instead of just failing it.
 	go func() {
+		defer func() {
+			if rec := safego.RecoverErr(ctx, "audit.HostTimeline.logs"); rec != nil {
+				errCh <- fmt.Errorf("panic fetching audit logs: %v", rec)
+			}
+		}()
 		v, e := s.repo.GetAuditLogsByHost(ctx, hostID, limit)
 		if e != nil {
 			errCh <- e
@@ -121,6 +130,11 @@ func (s *Service) HostTimeline(ctx context.Context, hostID string, limit int) ([
 		}
 	}()
 	go func() {
+		defer func() {
+			if rec := safego.RecoverErr(ctx, "audit.HostTimeline.commands"); rec != nil {
+				errCh <- fmt.Errorf("panic fetching command history: %v", rec)
+			}
+		}()
 		v, e := s.repo.GetRecentCommandsByHost(ctx, hostID, limit)
 		if e != nil {
 			errCh <- e
@@ -129,6 +143,11 @@ func (s *Service) HostTimeline(ctx context.Context, hostID string, limit int) ([
 		}
 	}()
 	go func() {
+		defer func() {
+			if rec := safego.RecoverErr(ctx, "audit.HostTimeline.incidents"); rec != nil {
+				errCh <- fmt.Errorf("panic fetching alert incidents: %v", rec)
+			}
+		}()
 		v, e := s.repo.GetAlertIncidentsByHost(ctx, hostID, limit)
 		if e != nil {
 			errCh <- e

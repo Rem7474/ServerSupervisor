@@ -3,8 +3,9 @@ package background
 import (
 	"context"
 	"log/slog"
-	"runtime/debug"
 	"sync"
+
+	"github.com/serversupervisor/server/internal/safego"
 )
 
 // Job is a named background task that runs until its context is cancelled.
@@ -58,13 +59,6 @@ func (r *Runner) Stop() {
 
 func (r *Runner) run(ctx context.Context, job Job) {
 	defer r.wg.Done()
-	defer func() {
-		if rec := recover(); rec != nil {
-			slog.ErrorContext(ctx, "background job panicked",
-				slog.String("job", job.Name),
-				slog.Any("panic", rec),
-				slog.String("stack", string(debug.Stack())))
-		}
-	}()
+	defer safego.Recover(ctx, job.Name)
 	job.Run(ctx)
 }

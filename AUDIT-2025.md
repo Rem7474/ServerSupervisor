@@ -16,6 +16,8 @@ Ce qui ne veut pas dire que tout est propre. En creusant précisément pour vér
 
 À cela s'ajoutent des lacunes plus classiques mais réelles : aucune stratégie de sauvegarde pour la base (juste un volume Docker nommé), conteneur serveur qui tourne en root, rate limiter et fallback WebSocket par query string encore en place. Le détail complet, avec preuves, suit.
 
+**Mise à jour :** les 5 points 🔴 de la roadmap (section 7) — les trois ci-dessus, plus le conteneur root et l'absence de sauvegarde — ont été corrigés sur cette branche (`internal/safego`, garde admin sur `/settings`, garde `OverrideFromDB`, `USER` non-root dans le Dockerfile, service `postgres-backup`). `go build`/`go vet`/`go test ./...` passent sur l'ensemble du module serveur. Détail exact de chaque correctif en fin de section 7.
+
 ---
 
 ## 1. Audit Architecture Globale
@@ -480,13 +482,25 @@ Répondu en détail dans la roadmap ci-dessous — mais le principe général : 
 
 ### 🔴 Critique — sécurité, corruption, perte de service (immédiat, sans refactoring)
 
-| # | Problème | Preuve | Correctif |
-|---|---|---|---|
-| 1 | `GET /api/v1/settings` sans contrôle de rôle, renvoie mot de passe SMTP + token GitHub en clair à tout utilisateur authentifié | `handlers/settings.go:25-27`, `services/settings/service.go:60-68` | Ajouter le garde admin manquant + ne plus renvoyer les secrets bruts (booléen `xSet` à la place) |
-| 2 | `OverrideFromDB` écrase silencieusement `smtp_user/smtp_pass/ntfy_url/github_token` avec une chaîne vide à chaque sauvegarde Settings | `config.go:195-215`, `services/settings/service.go:97-102` | Ajouter le garde `&& v != ""` déjà présent sur les autres champs, + test de régression |
-| 3 | Goroutines non supervisées (`poller.Every`, fan-out WS dashboard, fan-out host `Complete()`, etc.) : une panique tue tout le process | `poller/poller.go`, `ws/snapshots.go:68-109`, `services/host/service.go:233-238` | Généraliser le `recover()` de `background/runner.go` via un helper partagé, l'appliquer à tous les `go func()` listés |
-| 4 | Conteneur serveur tourne en root (pas de `USER` dans le Dockerfile) | `server/Dockerfile` | Ajouter un utilisateur non-root avant `ENTRYPOINT` |
-| 5 | Aucune sauvegarde de la base ServerSupervisor — un volume Docker nommé, rien d'autre | `docker-compose.yml`, absence totale de script/service de backup | Service planifié `pg_dump`/`pgBackRest` + procédure de restauration testée |
+**Statut : les 5 points 🔴 ont été corrigés** (voir commit sur cette branche). Détail des correctifs réellement appliqués sous le tableau.
+
+| # | Problème | Preuve | Correctif | Statut |
+|---|---|---|---|---|
+| 1 | `GET /api/v1/settings` sans contrôle de rôle, renvoie mot de passe SMTP + token GitHub en clair à tout utilisateur authentifié | `handlers/settings.go:25-27`, `services/settings/service.go:60-68` | Ajouter le garde admin manquant | ✅ Corrigé |
+| 2 | `OverrideFromDB` écrase silencieusement `smtp_user/smtp_pass/ntfy_url/github_token` avec une chaîne vide à chaque sauvegarde Settings | `config.go:195-215`, `services/settings/service.go:97-102` | Ajouter le garde `&& v != ""` déjà présent sur les autres champs, + test de régression | ✅ Corrigé |
+| 3 | Goroutines non supervisées (`poller.Every`, fan-out WS dashboard, fan-out host `Complete()`, etc.) : une panique tue tout le process | `poller/poller.go`, `ws/snapshots.go:68-109`, `services/host/service.go:233-238` | Généraliser le `recover()` de `background/runner.go` via un helper partagé, l'appliquer à tous les `go func()` listés | ✅ Corrigé |
+| 4 | Conteneur serveur tourne en root (pas de `USER` dans le Dockerfile) | `server/Dockerfile` | Ajouter un utilisateur non-root avant `ENTRYPOINT` | ✅ Corrigé |
+| 5 | Aucune sauvegarde de la base ServerSupervisor — un volume Docker nommé, rien d'autre | `docker-compose.yml`, absence totale de script/service de backup | Service planifié `pg_dump`/`pgBackRest` + procédure de restauration testée | ✅ Corrigé |
+
+**Détail des correctifs appliqués :**
+
+1. **Garde admin ajouté** sur `SettingsHandler.GetSettings`, identique au pattern déjà utilisé par les 5 autres méthodes du même fichier. Choix délibéré : je n'ai **pas** modifié la forme de `Snapshot()` (pas de masquage du secret brut par un booléen `xSet`) — `SettingsView.vue`/`SettingsSmtpCard.vue`/`SettingsNotificationsCard.vue` préremplissent aujourd'hui le formulaire d'édition avec la valeur réelle (`form.value.smtpPass = s.smtpPass || ''`), un pattern d'édition assumé par le produit. Retirer la valeur brute casserait ce préremplissage et exigerait une refonte UX (masquage + flux « modifier » explicite) hors du périmètre d'un correctif de sécurité ciblé. Une fois le garde admin en place, l'exposition résiduelle (un admin voit son propre secret configuré) est un risque nettement plus faible que la fuite d'origine (n'importe quel viewer) et cohérent avec le modèle RBAC existant où l'admin a déjà l'accès le plus large. À réévaluer séparément si une refonte du formulaire Settings est planifiée.
+2. **Garde `&& v != ""` ajouté** sur les 4 champs (`smtp_user`, `smtp_pass`, `ntfy_url`, `github_token`), plus un test `TestOverrideFromDB_KeepsSecretsWhenBlank` dans `settings_override_test.go` qui verrouille le comportement.
+3. **Nouveau package `internal/safego`** (`Go`, `Recover`, `RecoverErr`) : un helper unique de recover+log, réutilisé par `background/runner.go` (refactor DRY, comportement identique) et appliqué à chaque goroutine non protégée identifiée par l'audit — `poller.Every` (par tick, pas par appel, pour ne pas tuer le poller après une seule panique), les 8 fan-out de `ws/buildDashboardPayload`, les 3 fan-out de `ws/buildVersionComparisons`, les 6 fan-out de `host.Complete()`, `proxmox.TriggerPollByID`/`NodeGuestNetworks`, `releasetracker.TriggerCheck`/`Run` (×2), le pool de workers de `weblogs.resolveIPsWithContext`, `notifychannels.Send` (push), `npm.RefreshNow`, `alerts.ResolveStaleIncidentsForRule` (déclenché depuis `router.go`), le ticker de nettoyage du rate limiter, `ws.readLoop` et `CommandStreamHub.runBroadcast`. Cas particulier : les 3 goroutines de `audit.HostTimeline` utilisent `RecoverErr` plutôt que `Recover` — elles se rejoignent via des channels, donc un panic simplement journalisé sans réponse aurait bloqué indéfiniment le `select` qui attend exactement 3 messages ; `RecoverErr` transforme la panique en erreur envoyée sur `errCh` pour débloquer proprement l'appelant.
+4. **Utilisateur non-root** ajouté à `server/Dockerfile` (stage final) : `addgroup`/`adduser` uid/gid 1000, `chown` de `/app`, `USER supervisor` avant `ENTRYPOINT`.
+5. **Service `postgres-backup`** ajouté à `docker-compose.yml` (image `prodrigestivill/postgres-backup-local`, `pg_dump` planifié + rotation jours/semaines/mois, volume dédié `postgres_backups`), variables documentées dans `.env.example`, procédure de restauration testable pas-à-pas ajoutée au README (section « Sauvegarde & restauration »). Cette procédure n'a pas pu être exécutée de bout en bout dans cet environnement (pas de démon Docker disponible dans ce sandbox) — à valider avant une mise en production.
+
+`go build ./...`, `go vet ./...` et `go test ./...` passent sur l'ensemble du module serveur après ces changements.
 
 ### 🟡 Important — dette bloquante, 3 prochains mois
 
