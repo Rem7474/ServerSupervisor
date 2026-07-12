@@ -89,7 +89,14 @@
                   <span class="nav-link-icon">
                     <IconServer2 class="icon" />
                   </span>
-                  <span class="nav-link-title">Proxmox</span>
+                  <span class="nav-link-title">
+                    Proxmox
+                    <span
+                      v-if="suggestedProxmoxLinksCount > 0"
+                      class="badge bg-azure-lt text-azure ms-1"
+                      :title="`${suggestedProxmoxLinksCount} liaison(s) hôte ↔ VM/LXC suggérée(s), à confirmer`"
+                    >{{ suggestedProxmoxLinksCount }}</span>
+                  </span>
                 </router-link>
               </li>
               <li class="nav-item">
@@ -446,6 +453,20 @@ const hostsDownCount = computed(() => {
   ).length
 })
 
+// Liens Proxmox guest<->hôte suggérés (auto-détectés) en attente de confirmation —
+// invisibles ailleurs dans l'app tant qu'on ne tombe pas sur la bonne page hôte/nœud.
+const suggestedProxmoxLinksCount = ref(0)
+let proxmoxLinksRefreshTimer: ReturnType<typeof setInterval> | null = null
+
+async function refreshSuggestedProxmoxLinksCount(): Promise<void> {
+  try {
+    const res = await apiClient.getProxmoxLinks('suggested')
+    suggestedProxmoxLinksCount.value = Array.isArray(res.data) ? res.data.length : 0
+  } catch {
+    // non-critique — on garde le dernier compte connu
+  }
+}
+
 // Offline detection — tracks browser connectivity via navigator.onLine events.
 // A "false" value means the browser has no network; the server may still be
 // reachable on a local network even when this is false, but it's the best
@@ -565,6 +586,8 @@ onMounted(() => {
     adminMenuOpen.value = false
     userMenuOpen.value = false
   })
+  refreshSuggestedProxmoxLinksCount()
+  proxmoxLinksRefreshTimer = setInterval(refreshSuggestedProxmoxLinksCount, 5 * 60 * 1000)
 })
 
 onUnmounted(() => {
@@ -576,6 +599,9 @@ onUnmounted(() => {
   window.removeEventListener('pageshow', handlePageShow)
   window.removeEventListener('focus', notifyAppResume)
   document.removeEventListener('click', handleOutsideClick, true)
+  if (proxmoxLinksRefreshTimer) {
+    clearInterval(proxmoxLinksRefreshTimer)
+  }
   if (resumeDebounceTimer) {
     clearTimeout(resumeDebounceTimer)
   }
