@@ -92,6 +92,40 @@
       </router-link>
     </div>
 
+    <!-- ─── Attention requise ────────────────────────────────────────────────── -->
+    <div
+      v-if="attentionItems.length > 0"
+      class="card mb-3"
+    >
+      <div class="card-header">
+        <h3 class="card-title mb-0">
+          <IconListCheck
+            :size="18"
+            class="icon me-1"
+          />
+          Attention requise
+        </h3>
+      </div>
+      <div class="list-group list-group-flush">
+        <router-link
+          v-for="item in attentionItems"
+          :key="item.key"
+          :to="item.to"
+          class="list-group-item list-group-item-action d-flex align-items-center gap-2"
+        >
+          <span
+            class="badge"
+            :class="item.severity === 'warning' ? 'bg-yellow-lt text-yellow' : 'bg-azure-lt text-azure'"
+          >{{ item.count }}</span>
+          <span class="flex-grow-1">{{ item.label }}</span>
+          <IconChevronRight
+            :size="16"
+            class="icon text-secondary"
+          />
+        </router-link>
+      </div>
+    </div>
+
     <!-- ─── KPIs ─────────────────────────────────────────────────────────────── -->
     <LoadingSkeleton
       v-if="loading"
@@ -545,11 +579,12 @@ import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import PaginationNav from '../components/PaginationNav.vue'
 import SortableHeader from '../components/common/SortableHeader.vue'
 import EmptyState from '../components/EmptyState.vue'
-import { IconAlertTriangle, IconPlus } from '@tabler/icons-vue'
+import { IconAlertTriangle, IconPlus, IconListCheck, IconChevronRight } from '@tabler/icons-vue'
 import BulkActionBar from '../components/BulkActionBar.vue'
 import { formatHostStatus, hostStatusClass } from '../utils/formatHostStatus'
 import { pluralize } from '../utils/formatters'
 import { useDashboard, type DashboardProxmoxLinkRecord } from '../composables/useDashboard'
+import { useAttentionCenter } from '../composables/useAttentionCenter'
 
 const Line = defineAsyncComponent(async () => {
   const [{ Line }, { Chart: ChartJS, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip, Legend }] = await Promise.all([
@@ -605,6 +640,8 @@ const {
   memColor,
   diskColor,
 } = useDashboard()
+
+const { items: attentionItems } = useAttentionCenter()
 
 const proxmoxLinkByHostId = computed<Record<string, DashboardProxmoxLinkRecord>>(() => {
   const map: Record<string, DashboardProxmoxLinkRecord> = {}
