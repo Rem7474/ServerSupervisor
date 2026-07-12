@@ -274,6 +274,22 @@
                       >
                       <span class="form-check-label">Nettoyer les images orphelines</span>
                     </label>
+                    <label class="form-check">
+                      <input
+                        v-model="form.reconcile_drift"
+                        class="form-check-input"
+                        type="checkbox"
+                      >
+                      <span class="form-check-label">Réconcilier automatiquement en cas de dérive</span>
+                    </label>
+                  </div>
+                </div>
+                <div
+                  v-if="form.update_action === 'compose'"
+                  class="col-12"
+                >
+                  <div class="form-hint mt-0">
+                    Dérive : le conteneur réellement déployé ne correspond plus à la version suivie (modification manuelle, échec silencieux...). Coché : relance pull + up -d automatiquement. Décoché : la dérive est seulement signalée sur le tracker.
                   </div>
                 </div>
                 <div class="col-md-6">

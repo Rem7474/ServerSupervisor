@@ -27,6 +27,7 @@ interface ReleaseTrackerLike {
   custom_task_id?: string
   update_action?: string
   compose_project?: string
+  drift_detected?: boolean
 }
 
 // A tracker only dispatches an update if it has a task to run: for git
@@ -46,6 +47,7 @@ export function useAttentionCenter() {
   const neverConnectedHosts = ref(0)
   const npmMonitoringOff = ref(0)
   const monitorOnlyTrackers = ref(0)
+  const driftedTrackers = ref(0)
   const expiringSslCerts = ref(0)
 
   async function refresh(): Promise<void> {
@@ -74,6 +76,11 @@ export function useAttentionCenter() {
     monitorOnlyTrackers.value =
       trackers.status === 'fulfilled'
         ? (trackers.value.data.trackers || []).filter((t) => t.enabled && isTrackerMonitorOnly(t)).length
+        : 0
+
+    driftedTrackers.value =
+      trackers.status === 'fulfilled'
+        ? (trackers.value.data.trackers || []).filter((t) => t.enabled && t.drift_detected).length
         : 0
 
     expiringSslCerts.value =
@@ -131,6 +138,15 @@ export function useAttentionCenter() {
         count: monitorOnlyTrackers.value,
         to: '/git-webhooks?tab=trackers',
         severity: 'info',
+      })
+    }
+    if (driftedTrackers.value > 0) {
+      list.push({
+        key: 'tracker-drift',
+        label: `${driftedTrackers.value} conteneur${driftedTrackers.value > 1 ? 's' : ''} en dérive par rapport à la version suivie`,
+        count: driftedTrackers.value,
+        to: '/git-webhooks?tab=trackers',
+        severity: 'warning',
       })
     }
     return list

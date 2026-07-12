@@ -12,9 +12,11 @@ import (
 )
 
 type fakeRepo struct {
-	created   bool
-	getErr    error
-	getResult *models.ReleaseTracker
+	created     bool
+	getErr      error
+	getResult   *models.ReleaseTracker
+	listResult  []models.ReleaseTracker
+	driftResult bool
 }
 
 func (f *fakeRepo) ListRegistryCredentials(context.Context) ([]models.RegistryCredential, error) {
@@ -29,7 +31,7 @@ func (f *fakeRepo) UpdateRegistryCredential(context.Context, string, models.Regi
 }
 func (f *fakeRepo) DeleteRegistryCredential(context.Context, string) error { return nil }
 func (f *fakeRepo) ListReleaseTrackers(context.Context) ([]models.ReleaseTracker, error) {
-	return nil, nil
+	return f.listResult, nil
 }
 func (f *fakeRepo) CreateReleaseTracker(_ context.Context, t models.ReleaseTracker) (*models.ReleaseTracker, error) {
 	f.created = true
@@ -53,6 +55,9 @@ func (f *fakeRepo) ListTrackerTagDigests(context.Context, string, int) ([]models
 }
 func (f *fakeRepo) UpdateReleaseTrackerExecutionByCommandID(context.Context, string, string) (string, bool, []string, error) {
 	return "", false, nil, nil
+}
+func (f *fakeRepo) TrackerDriftDetected(context.Context, models.ReleaseTracker) (bool, error) {
+	return f.driftResult, nil
 }
 
 func newSvc(repo Repository) *Service {
@@ -134,5 +139,32 @@ func TestGet_NotFound(t *testing.T) {
 	_, _, err := newSvc(&fakeRepo{getErr: sql.ErrNoRows}).Get(context.Background(), "x")
 	if status(err) != 404 {
 		t.Fatalf("missing tracker should be 404, got %v", err)
+	}
+}
+
+func TestGet_EnrichesDriftDetected(t *testing.T) {
+	repo := &fakeRepo{getResult: &models.ReleaseTracker{ID: "t1", UpdateAction: "compose"}, driftResult: true}
+	tracker, _, err := newSvc(repo).Get(context.Background(), "t1")
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if !tracker.DriftDetected {
+		t.Error("expected DriftDetected to be enriched from the repository")
+	}
+}
+
+func TestList_EnrichesDriftDetectedPerTracker(t *testing.T) {
+	repo := &fakeRepo{
+		listResult:  []models.ReleaseTracker{{ID: "t1"}, {ID: "t2"}},
+		driftResult: true,
+	}
+	trackers, err := newSvc(repo).List(context.Background())
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	for _, tr := range trackers {
+		if !tr.DriftDetected {
+			t.Errorf("tracker %s: expected DriftDetected to be enriched", tr.ID)
+		}
 	}
 }

@@ -1381,6 +1381,20 @@ export interface ReleaseTracker {
   healthcheck_timeout_sec: number /* int */;
   rollback_on_failure: boolean;
   registry_credentials_id?: string;
+  /**
+   * ReconcileDrift: when true, the poller re-dispatches pull+up if the
+   * actually-deployed container drifts from this tracker's last-recorded
+   * digest even though the registry itself hasn't moved (see poller.go's
+   * checkComposeDrift). False (default) means drift is only surfaced via
+   * DriftDetected, never auto-corrected.
+   */
+  reconcile_drift: boolean;
+  /**
+   * DriftDetected is computed on read (never stored): true when the
+   * actually-deployed digest no longer matches LatestImageDigest. Always
+   * false for non-compose trackers or ones with no digest recorded yet.
+   */
+  drift_detected?: boolean;
 }
 /**
  * ReleaseTrackerRequest is the create/update body for a release tracker — the
@@ -1412,6 +1426,7 @@ export interface ReleaseTrackerRequest {
   healthcheck_timeout_sec: number /* int */;
   rollback_on_failure: boolean;
   registry_credentials_id: string;
+  reconcile_drift: boolean;
 }
 export interface ReleaseTrackerExecution {
   id: string;
