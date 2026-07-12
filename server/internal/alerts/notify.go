@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"strings"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/dispatch"
 	"github.com/serversupervisor/server/internal/models"
+	"github.com/serversupervisor/server/internal/notify"
 	"github.com/serversupervisor/server/internal/services/notifychannels"
 	"github.com/serversupervisor/server/internal/services/push"
 )
@@ -91,16 +93,22 @@ func firedEvent(cfg *config.Config, rule models.AlertRule, host models.Host, val
 		smtpTo = cfg.SMTPTo
 	}
 
-	ntfyURL := ""
-	if rule.Actions.NtfyTopic != "" {
-		ntfyURL = "https://ntfy.sh/" + rule.Actions.NtfyTopic
+	ntfyURL := ntfyTopicURL(cfg.NotifyURL, rule.Actions.NtfyTopic)
+
+	// SMTP gets the styled HTML template when it renders cleanly; every other
+	// channel keeps the plain-text message (ntfy/webhook bodies aren't HTML).
+	smtpBody := msg
+	if html, err := notify.RenderAlertEmail(alertEmailData(cfg, rule, host, value)); err != nil {
+		slog.Warn("alerts: failed to render HTML alert email, falling back to plain text", slog.Any("err", err))
+	} else {
+		smtpBody = html
 	}
 
 	return notifychannels.Event{
 		LogID:       fmt.Sprintf("rule:%d", rule.ID),
 		Channels:    rule.Actions.Channels,
 		SMTPSubject: "[ServerSupervisor] Alert triggered",
-		SMTPBody:    msg,
+		SMTPBody:    smtpBody,
 		SMTPTo:      smtpTo,
 		NtfyTitle:   "ServerSupervisor Alert",
 		NtfyBody:    msg,
@@ -126,6 +134,76 @@ func firedEvent(cfg *config.Config, rule models.AlertRule, host models.Host, val
 			Status: "fired",
 		},
 	}
+}
+
+// alertEmailData formats a fired incident into the plain-string fields
+// alert_email_template.html expects. Threshold prefers the crit value when
+// set, same precedence as AlertRule.DisplayName().
+func alertEmailData(cfg *config.Config, rule models.AlertRule, host models.Host, value float64) notify.AlertEmailData {
+	threshold := rule.ThresholdWarn
+	if rule.ThresholdCrit != nil {
+		threshold = rule.ThresholdCrit
+	}
+	thresholdStr := ""
+	if threshold != nil {
+		thresholdStr = fmt.Sprintf("%.2f", *threshold)
+	}
+
+	cooldownMsg := ""
+	if rule.Actions.Cooldown > 0 {
+		cooldownMsg = formatCooldownDuration(rule.Actions.Cooldown)
+	}
+
+	return notify.AlertEmailData{
+		RuleName:        rule.DisplayName(),
+		RuleID:          rule.ID,
+		HostName:        host.Name,
+		Metric:          rule.Metric,
+		Operator:        rule.Operator,
+		Threshold:       thresholdStr,
+		Value:           fmt.Sprintf("%.2f", value),
+		Unit:            alertMetricUnit(rule.Metric),
+		TriggeredAt:     time.Now().Local().Format("2006-01-02 15:04:05"),
+		IncidentLink:    strings.TrimRight(cfg.BaseURL, "/") + "/alerts?tab=incidents",
+		CooldownMessage: cooldownMsg,
+	}
+}
+
+// formatCooldownDuration renders AlertActions.Cooldown (seconds) as a short
+// human string for the email footer ("no further notifications for X").
+func formatCooldownDuration(seconds int) string {
+	d := time.Duration(seconds) * time.Second
+	switch {
+	case d >= time.Hour:
+		return fmt.Sprintf("%dh", int(d.Hours()))
+	case d >= time.Minute:
+		return fmt.Sprintf("%d min", int(d.Minutes()))
+	default:
+		return fmt.Sprintf("%ds", seconds)
+	}
+}
+
+// ntfyTopicURL resolves the ntfy target for an alert rule. A rule only ever
+// overrides the topic (rule.Actions.NtfyTopic); the server (scheme+host) still
+// comes from the admin's configured ntfy URL (cfg.NotifyURL) — which may be a
+// self-hosted instance, not just ntfy.sh. Falls back to the public ntfy.sh
+// service when no server is configured at all, matching prior zero-config
+// behavior for anyone who never set the "ntfy_url" setting.
+func ntfyTopicURL(base, topic string) string {
+	if topic == "" {
+		return base
+	}
+	if base == "" {
+		return "https://ntfy.sh/" + topic
+	}
+	u, err := url.Parse(base)
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return "https://ntfy.sh/" + topic
+	}
+	u.Path = "/" + topic
+	u.RawQuery = ""
+	u.Fragment = ""
+	return u.String()
 }
 
 // resolvedEvent builds the notifychannels.Event for an incident that just
@@ -259,6 +337,7 @@ func triggerAlertCommand(ctx context.Context, dispatcher *dispatch.Dispatcher, d
 		payload = "{}"
 	}
 	triggeredBy := fmt.Sprintf("alert:%d", rule.ID)
+	auditDetails := fmt.Sprintf(`{"rule_id":%d,"module":%q,"action":%q,"target":%q}`, rule.ID, ct.Module, ct.Action, ctTarget)
 	if _, err := dispatcher.Create(ctx, dispatch.Request{
 		HostID:      targetHostID,
 		Module:      ct.Module,
@@ -266,6 +345,13 @@ func triggerAlertCommand(ctx context.Context, dispatcher *dispatch.Dispatcher, d
 		Target:      ctTarget,
 		Payload:     payload,
 		TriggeredBy: triggeredBy,
+		Audit: &dispatch.AuditLogRequest{
+			Username:  "alert-engine",
+			Action:    "alert_command_trigger",
+			HostID:    targetHostID,
+			IPAddress: "",
+			Details:   auditDetails,
+		},
 	}); err != nil {
 		slog.ErrorContext(ctx, "alerts: failed to create command trigger", slog.Int64("rule_id", rule.ID), slog.String("host_id", targetHostID), slog.Any("err", err))
 	} else {

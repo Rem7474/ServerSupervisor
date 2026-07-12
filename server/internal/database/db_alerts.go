@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"strings"
+	"time"
 
 	"github.com/serversupervisor/server/internal/models"
 )
@@ -207,6 +208,17 @@ func (db *DB) ResolveAlertIncident(ctx context.Context, id int64) error {
 	_, err := db.conn.ExecContext(ctx,
 		`UPDATE alert_incidents SET resolved_at = NOW() WHERE id = $1 AND resolved_at IS NULL`,
 		id,
+	)
+	return err
+}
+
+// UpdateAlertRuleLastFired stamps the rule's last-fired time. The engine uses
+// this to enforce AlertActions.Cooldown between repeated notifications/command
+// triggers for a rule that keeps flapping across the fire/resolve boundary.
+func (db *DB) UpdateAlertRuleLastFired(ctx context.Context, ruleID int64, t time.Time) error {
+	_, err := db.conn.ExecContext(ctx,
+		`UPDATE alert_rules SET last_fired = $2 WHERE id = $1`,
+		ruleID, t,
 	)
 	return err
 }

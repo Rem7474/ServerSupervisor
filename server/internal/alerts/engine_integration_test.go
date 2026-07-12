@@ -91,6 +91,62 @@ func TestEvaluateAlerts_CreatesAndResolvesIncident(t *testing.T) {
 	}
 }
 
+// TestEvaluateAlerts_CooldownSuppressesRenotification checks that
+// AlertActions.Cooldown suppresses the loud notification channels and any
+// command_trigger for a rule that re-fires (a fresh incident, since the prior
+// one resolved) within the cooldown window — while still recording the new
+// incident and pinging the lightweight incident-list refresh channel.
+func TestEvaluateAlerts_CooldownSuppressesRenotification(t *testing.T) {
+	db := testutil.NewPostgresDB(t)
+	ctx := context.Background()
+
+	hostID := "alert-host-cooldown"
+	if err := db.RegisterHost(ctx, &models.Host{
+		ID: hostID, Name: "alert-host", Hostname: "alert-host", Status: "online", LastSeen: time.Now(),
+	}); err != nil {
+		t.Fatalf("register host: %v", err)
+	}
+
+	insertCPUMetric(t, db, hostID, 95, time.Now())
+
+	warn := 50.0
+	rule := &models.AlertRule{
+		SourceType: "agent", HostID: &hostID, Metric: "cpu", Operator: ">",
+		ThresholdWarn: &warn, Enabled: true,
+		Actions: models.AlertActions{Channels: []string{"browser"}, Cooldown: 300},
+	}
+	if err := db.CreateAlertRule(ctx, rule); err != nil {
+		t.Fatalf("create rule: %v", err)
+	}
+
+	cfg := &config.Config{}
+	disp := dispatch.New(db)
+	pusher := &stubPusher{}
+
+	// First fire: LastFired is nil, so cooldown never applies — both the
+	// incident-list refresh and the "new_alert" browser broadcast go out.
+	alerts.EvaluateAlerts(ctx, db, cfg, disp, pusher, nil)
+	if pusher.count != 2 {
+		t.Fatalf("first fire: pusher.count = %d, want 2 (list refresh + new_alert broadcast)", pusher.count)
+	}
+
+	// Recover (resolves the incident), then re-breach immediately — a
+	// flapping rule re-firing well inside the 300s cooldown window.
+	insertCPUMetric(t, db, hostID, 10, time.Now().Add(1*time.Second))
+	alerts.EvaluateAlerts(ctx, db, cfg, disp, pusher, nil)
+	insertCPUMetric(t, db, hostID, 95, time.Now().Add(2*time.Second))
+
+	countBeforeRefire := pusher.count
+	alerts.EvaluateAlerts(ctx, db, cfg, disp, pusher, nil)
+
+	if _, err := db.GetOpenAlertIncident(ctx, rule.ID, hostID); err != nil {
+		t.Fatalf("expected a new incident to be recorded even during cooldown, got error: %v", err)
+	}
+	if got := pusher.count - countBeforeRefire; got != 1 {
+		t.Errorf("re-fire within cooldown: pusher.count increased by %d, want 1 (list refresh only, loud notification suppressed)", got)
+	}
+}
+
 // TestEvaluateAlerts_NoIncidentBelowThreshold ensures a healthy metric never
 // opens an incident.
 func TestEvaluateAlerts_NoIncidentBelowThreshold(t *testing.T) {

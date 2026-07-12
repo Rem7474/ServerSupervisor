@@ -181,11 +181,25 @@ func EvaluateAlerts(ctx context.Context, db *database.DB, cfg *config.Config, di
 					if _, auditErr := db.CreateAuditLog(ctx, "alert-engine", "alert_fired", host.ID, "", details, "success"); auditErr != nil {
 						slog.WarnContext(ctx, "alerts: failed to write alert_fired audit log", slog.Int64("incident_id", incID), slog.Any("err", auditErr))
 					}
-					triggerAlertCommand(ctx, dispatcher, db, rule, host)
-					ev := firedEvent(cfg, rule, host, value)
-					ev.OnBrowser = newAlertBroadcast(pusher, rule, host, value, incID)
-					chDispatch.Send(ctx, ev)
+					// The incident list refresh ping always goes out — it's a lightweight
+					// UI signal, not a notification channel — but the loud channels
+					// (smtp/ntfy/push/browser toast) and any command_trigger are subject
+					// to AlertActions.Cooldown, so a flapping rule can't spam either.
 					broadcastIncidentUpdate(pusher, "fired", rule, host.ID)
+
+					now := time.Now()
+					cooldown := time.Duration(rule.Actions.Cooldown) * time.Second
+					if cooldown > 0 && rule.LastFired != nil && now.Sub(*rule.LastFired) < cooldown {
+						slog.InfoContext(ctx, "alerts: notification/command_trigger suppressed by cooldown", slog.String("rule", ruleName), slog.String("host", host.Name), slog.Int64("incident_id", incID), slog.Duration("cooldown", cooldown))
+					} else {
+						if err := db.UpdateAlertRuleLastFired(ctx, rule.ID, now); err != nil {
+							slog.WarnContext(ctx, "alerts: failed to stamp rule last_fired", slog.Int64("rule_id", rule.ID), slog.Any("err", err))
+						}
+						triggerAlertCommand(ctx, dispatcher, db, rule, host)
+						ev := firedEvent(cfg, rule, host, value)
+						ev.OnBrowser = newAlertBroadcast(pusher, rule, host, value, incID)
+						chDispatch.Send(ctx, ev)
+					}
 				} else {
 					// Keep incident context fresh so UI and resolution logic use current severity/value.
 					severityChanged := AlertSeverity(inc.Severity) != currentSeveration
