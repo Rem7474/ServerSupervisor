@@ -195,7 +195,11 @@ func EvaluateAlerts(ctx context.Context, db *database.DB, cfg *config.Config, di
 						if err := db.UpdateAlertRuleLastFired(ctx, rule.ID, now); err != nil {
 							slog.WarnContext(ctx, "alerts: failed to stamp rule last_fired", slog.Int64("rule_id", rule.ID), slog.Any("err", err))
 						}
-						triggerAlertCommand(ctx, dispatcher, db, rule, host)
+						if cmdID := triggerAlertCommand(ctx, dispatcher, db, rule, host); cmdID != nil {
+							if err := db.UpdateAlertIncidentCommandID(ctx, incID, *cmdID); err != nil {
+								slog.WarnContext(ctx, "alerts: failed to link command to incident", slog.Int64("incident_id", incID), slog.Any("err", err))
+							}
+						}
 						ev := firedEvent(cfg, rule, host, value)
 						ev.OnBrowser = newAlertBroadcast(pusher, rule, host, value, incID)
 						chDispatch.Send(ctx, ev)

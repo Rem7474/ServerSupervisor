@@ -44,10 +44,12 @@ func (db *DB) GetRecentNotifications(ctx context.Context, limit int) ([]models.N
 				ai.value,
 				ai.triggered_at,
 				ai.resolved_at,
-				COALESCE(ar.actions->'channels' @> '["browser"]'::jsonb, FALSE) AS browser_notify
+				COALESCE(ar.actions->'channels' @> '["browser"]'::jsonb, FALSE) AS browser_notify,
+				COALESCE(rc.status, '') AS command_status
 			FROM alert_incidents ai
 			LEFT JOIN alert_rules ar ON ai.rule_id = ar.id
 			LEFT JOIN hosts h ON ai.host_id = h.id
+			LEFT JOIN remote_commands rc ON rc.id = ai.command_id
 
 			UNION ALL
 
@@ -75,7 +77,8 @@ func (db *DB) GetRecentNotifications(ctx context.Context, limit int) ([]models.N
 				0::double precision AS value,
 				rte.triggered_at,
 				rte.completed_at AS resolved_at,
-				TRUE AS browser_notify
+				TRUE AS browser_notify,
+				''::text AS command_status
 			FROM release_tracker_executions rte
 			JOIN release_trackers rt ON rte.tracker_id = rt.id
 			LEFT JOIN hosts h ON rt.host_id = h.id
@@ -102,7 +105,7 @@ func (db *DB) GetRecentNotifications(ctx context.Context, limit int) ([]models.N
 			&item.Status, &item.TrackerID, &item.TrackerType,
 			&item.ReleaseURL, &item.ReleaseName, &item.Version,
 			&item.Value, &item.TriggeredAt, &item.ResolvedAt,
-			&item.BrowserNotify,
+			&item.BrowserNotify, &item.CommandStatus,
 		); err != nil {
 			continue
 		}

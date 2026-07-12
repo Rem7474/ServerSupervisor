@@ -269,20 +269,23 @@ func broadcastIncidentUpdate(pusher NotificationPusher, event string, rule model
 }
 
 // triggerAlertCommand creates a remote command on the host when an alert fires,
-// if the rule's actions include a CommandTrigger.
+// if the rule's actions include a CommandTrigger. Returns the dispatched
+// command's ID so the caller can link it back to the incident (nil if no
+// command was dispatched, whether by design — no CommandTrigger configured —
+// or because the target host couldn't be resolved / the dispatch failed).
 //
 // For Proxmox-scoped alerts the engine builds a synthetic host (ID prefixed by
 // "proxmox:") that does not exist in the hosts table. We resolve the target to
 // the agent host linked to the Proxmox guest (when scope_mode=guest and a
 // confirmed link exists); other Proxmox scopes have no unique linked host, so
 // the trigger is skipped.
-func triggerAlertCommand(ctx context.Context, dispatcher *dispatch.Dispatcher, db *database.DB, rule models.AlertRule, host models.Host) {
+func triggerAlertCommand(ctx context.Context, dispatcher *dispatch.Dispatcher, db *database.DB, rule models.AlertRule, host models.Host) *string {
 	if dispatcher == nil {
-		return
+		return nil
 	}
 	ct := rule.Actions.CommandTrigger
 	if ct == nil || ct.Module == "" || ct.Action == "" {
-		return
+		return nil
 	}
 
 	targetHostID := host.ID
@@ -295,7 +298,7 @@ func triggerAlertCommand(ctx context.Context, dispatcher *dispatch.Dispatcher, d
 		c, err := db.GetDockerContainerByID(ctx, containerUUID)
 		if err != nil || c == nil {
 			slog.WarnContext(ctx, "alerts: command_trigger skipped — docker container not found", slog.Int64("rule_id", rule.ID), slog.String("container_uuid", containerUUID))
-			return
+			return nil
 		}
 		targetHostID = c.HostID
 		targetLabel = c.Name
@@ -309,7 +312,7 @@ func triggerAlertCommand(ctx context.Context, dispatcher *dispatch.Dispatcher, d
 			targetHostID = rest[:idx]
 		} else {
 			slog.WarnContext(ctx, "alerts: command_trigger skipped — malformed docker:compose host ID", slog.Int64("rule_id", rule.ID), slog.String("host_id", host.ID))
-			return
+			return nil
 		}
 	}
 
@@ -317,16 +320,16 @@ func triggerAlertCommand(ctx context.Context, dispatcher *dispatch.Dispatcher, d
 		parts := strings.SplitN(host.ID, ":", 3)
 		if len(parts) != 3 || parts[1] != "guest" || parts[2] == "" {
 			slog.WarnContext(ctx, "alerts: command_trigger skipped — no linked host for Proxmox scope", slog.Int64("rule_id", rule.ID), slog.String("scope", host.ID))
-			return
+			return nil
 		}
 		link, err := db.GetProxmoxGuestLinkByGuest(ctx, parts[2])
 		if err != nil || link == nil {
 			slog.WarnContext(ctx, "alerts: command_trigger skipped — no host link for Proxmox guest", slog.Int64("rule_id", rule.ID), slog.String("guest", parts[2]))
-			return
+			return nil
 		}
 		if link.Status != "confirmed" {
 			slog.WarnContext(ctx, "alerts: command_trigger skipped — Proxmox guest link not confirmed", slog.Int64("rule_id", rule.ID), slog.String("guest", parts[2]), slog.String("status", link.Status))
-			return
+			return nil
 		}
 		targetHostID = link.HostID
 		targetLabel = link.HostName
@@ -338,7 +341,7 @@ func triggerAlertCommand(ctx context.Context, dispatcher *dispatch.Dispatcher, d
 	}
 	triggeredBy := fmt.Sprintf("alert:%d", rule.ID)
 	auditDetails := fmt.Sprintf(`{"rule_id":%d,"module":%q,"action":%q,"target":%q}`, rule.ID, ct.Module, ct.Action, ctTarget)
-	if _, err := dispatcher.Create(ctx, dispatch.Request{
+	result, err := dispatcher.Create(ctx, dispatch.Request{
 		HostID:      targetHostID,
 		Module:      ct.Module,
 		Action:      ct.Action,
@@ -352,9 +355,14 @@ func triggerAlertCommand(ctx context.Context, dispatcher *dispatch.Dispatcher, d
 			IPAddress: "",
 			Details:   auditDetails,
 		},
-	}); err != nil {
+	})
+	if err != nil {
 		slog.ErrorContext(ctx, "alerts: failed to create command trigger", slog.Int64("rule_id", rule.ID), slog.String("host_id", targetHostID), slog.Any("err", err))
-	} else {
-		slog.InfoContext(ctx, "alerts: triggered command", slog.String("module", ct.Module), slog.String("action", ct.Action), slog.String("host", targetLabel), slog.Int64("rule_id", rule.ID))
+		return nil
 	}
+	slog.InfoContext(ctx, "alerts: triggered command", slog.String("module", ct.Module), slog.String("action", ct.Action), slog.String("host", targetLabel), slog.Int64("rule_id", rule.ID))
+	if result == nil || result.Command == nil {
+		return nil
+	}
+	return &result.Command.ID
 }

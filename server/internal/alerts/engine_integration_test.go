@@ -147,6 +147,56 @@ func TestEvaluateAlerts_CooldownSuppressesRenotification(t *testing.T) {
 	}
 }
 
+// TestEvaluateAlerts_LinksCommandTriggerToIncident checks that a rule with a
+// CommandTrigger gets its dispatched command linked back onto the incident
+// (AlertIncident.CommandID), and that the dispatch itself is audit-linked.
+func TestEvaluateAlerts_LinksCommandTriggerToIncident(t *testing.T) {
+	db := testutil.NewPostgresDB(t)
+	ctx := context.Background()
+
+	hostID := "alert-host-command-trigger"
+	if err := db.RegisterHost(ctx, &models.Host{
+		ID: hostID, Name: "alert-host", Hostname: "alert-host", Status: "online", LastSeen: time.Now(),
+	}); err != nil {
+		t.Fatalf("register host: %v", err)
+	}
+	insertCPUMetric(t, db, hostID, 95, time.Now())
+
+	warn := 50.0
+	rule := &models.AlertRule{
+		SourceType: "agent", HostID: &hostID, Metric: "cpu", Operator: ">",
+		ThresholdWarn: &warn, Enabled: true,
+		Actions: models.AlertActions{
+			Channels:       []string{"browser"},
+			CommandTrigger: &models.CommandTrigger{Module: "processes", Action: "list"},
+		},
+	}
+	if err := db.CreateAlertRule(ctx, rule); err != nil {
+		t.Fatalf("create rule: %v", err)
+	}
+
+	alerts.EvaluateAlerts(ctx, db, &config.Config{}, dispatch.New(db), &stubPusher{}, nil)
+
+	inc, err := db.GetOpenAlertIncident(ctx, rule.ID, hostID)
+	if err != nil {
+		t.Fatalf("expected an open incident, got error: %v", err)
+	}
+	if inc.CommandID == nil || *inc.CommandID == "" {
+		t.Fatal("expected the incident to be linked to a dispatched command, CommandID is nil")
+	}
+
+	cmd, err := db.GetRemoteCommandByID(ctx, *inc.CommandID)
+	if err != nil || cmd == nil {
+		t.Fatalf("expected the linked command to exist: %v", err)
+	}
+	if cmd.HostID != hostID || cmd.Module != "processes" || cmd.Action != "list" {
+		t.Errorf("linked command = %+v, want host=%s module=processes action=list", cmd, hostID)
+	}
+	if cmd.AuditLogID == nil {
+		t.Error("expected the command_trigger dispatch to be linked to an audit log entry")
+	}
+}
+
 // TestEvaluateAlerts_NoIncidentBelowThreshold ensures a healthy metric never
 // opens an incident.
 func TestEvaluateAlerts_NoIncidentBelowThreshold(t *testing.T) {
