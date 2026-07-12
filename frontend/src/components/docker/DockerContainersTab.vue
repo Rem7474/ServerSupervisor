@@ -88,6 +88,20 @@
       <table class="table table-vcenter card-table">
         <thead>
           <tr>
+            <th
+              v-if="canRunDocker"
+              class="docker-select-col"
+            >
+              <label class="form-check mb-0">
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  :checked="allVisibleSelected"
+                  aria-label="Sélectionner tous les conteneurs affichés"
+                  @change="toggleSelectAll(($event.target as HTMLInputElement).checked)"
+                >
+              </label>
+            </th>
             <th>
               <SortableHeader
                 label="Nom"
@@ -131,7 +145,19 @@
           <tr
             v-for="c in pagedContainers"
             :key="c.id"
+            :class="{ 'table-active': selectedIds.has(c.id) }"
           >
+            <td v-if="canRunDocker">
+              <label class="form-check mb-0">
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  :checked="selectedIds.has(c.id)"
+                  :aria-label="`Sélectionner ${c.name}`"
+                  @change="toggleSelected(c.id, ($event.target as HTMLInputElement).checked)"
+                >
+              </label>
+            </td>
             <td class="fw-semibold">
               {{ c.name }}
             </td>
@@ -372,6 +398,36 @@
       />
     </div>
   </div>
+
+  <BulkActionBar
+    :count="selectedIds.size"
+    @clear="selectedIds = new Set()"
+  >
+    <button
+      type="button"
+      class="btn btn-sm btn-success"
+      :disabled="bulkActionLoading"
+      @click="emitBulkAction('start')"
+    >
+      Démarrer
+    </button>
+    <button
+      type="button"
+      class="btn btn-sm btn-outline-danger"
+      :disabled="bulkActionLoading"
+      @click="emitBulkAction('stop')"
+    >
+      Arrêter
+    </button>
+    <button
+      type="button"
+      class="btn btn-sm btn-outline-warning"
+      :disabled="bulkActionLoading"
+      @click="emitBulkAction('restart')"
+    >
+      Redémarrer
+    </button>
+  </BulkActionBar>
 
   <EmptyState
     v-if="sortedContainers.length === 0"
@@ -665,6 +721,7 @@ import SortableHeader from '../common/SortableHeader.vue'
 import DockerPortBadges from '../common/DockerPortBadges.vue'
 import EmptyState from '../EmptyState.vue'
 import PaginationNav from '../PaginationNav.vue'
+import BulkActionBar from '../BulkActionBar.vue'
 import { useDockerContainerPorts } from '../../composables/useDockerContainerPorts'
 import { usePagination } from '../../composables/usePagination'
 import { getApiErrorMessage } from '../../api/client'
@@ -703,11 +760,13 @@ const props = withDefaults(defineProps<{
   versionComparisons?: VersionComparison[]
   canRunDocker?: boolean
   actionLoading?: Record<string, string | boolean>
+  bulkActionLoading?: boolean
 }>(), {
   containers: () => [],
   versionComparisons: () => [],
   canRunDocker: false,
   actionLoading: () => ({}),
+  bulkActionLoading: false,
 })
 
 const { normalizedPortsForContainer } = useDockerContainerPorts(toRef(props, 'containers') as any)
@@ -726,9 +785,34 @@ function containerVersion(c: Container): VersionComparison | null {
          null
 }
 
-defineEmits<{
+const emit = defineEmits<{
   (e: 'container-action', ...args: unknown[]): void
+  (e: 'bulk-container-action', containers: Container[], action: string): void
 }>()
+
+const selectedIds = ref<Set<string>>(new Set())
+
+function toggleSelected(id: string, checked: boolean): void {
+  const next = new Set(selectedIds.value)
+  if (checked) next.add(id)
+  else next.delete(id)
+  selectedIds.value = next
+}
+
+const allVisibleSelected = computed(() =>
+  sortedContainers.value.length > 0 && sortedContainers.value.every((c) => selectedIds.value.has(c.id))
+)
+
+function toggleSelectAll(checked: boolean): void {
+  selectedIds.value = checked ? new Set(sortedContainers.value.map((c) => c.id)) : new Set()
+}
+
+function emitBulkAction(action: string): void {
+  const selected = sortedContainers.value.filter((c) => selectedIds.value.has(c.id))
+  if (!selected.length) return
+  emit('bulk-container-action', selected, action)
+  selectedIds.value = new Set()
+}
 
 function trackImage(c: Container): void {
   const image = c.image || ''
@@ -913,7 +997,16 @@ const { currentPage, totalPages, pagedItems: pagedContainers, resetPage, setPage
   pageSize: PAGE_SIZE,
 })
 
-watch([search, stateFilter, hostFilter, composeFilter], resetPage)
+watch([search, stateFilter, hostFilter, composeFilter], () => {
+  resetPage()
+  selectedIds.value = new Set()
+})
 </script>
+
+<style scoped>
+.docker-select-col {
+  width: 1%;
+}
+</style>
 
 

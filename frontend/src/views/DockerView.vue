@@ -66,7 +66,9 @@
           :version-comparisons="(versionComparisons as any)"
           :can-run-docker="canRunDocker"
           :action-loading="(dockerActionLoading as any)"
+          :bulk-action-loading="bulkActionLoading"
           @container-action="(handleContainerAction as any)"
+          @bulk-container-action="(handleBulkContainerAction as any)"
         />
         <ComposeProjectsTab
           v-if="activeTab === 'compose'"
@@ -110,9 +112,11 @@ const {
   runningCount,
   dockerActionLoading,
   composeActionLoading,
+  bulkActionLoading,
   showDockerConsole,
   dockerLiveCmd,
   handleContainerAction,
+  handleBulkContainerAction,
   handleComposeAction,
   closeDockerConsole,
   wsStatus,
