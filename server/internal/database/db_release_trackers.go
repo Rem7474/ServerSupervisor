@@ -664,11 +664,20 @@ func (db *DB) UpdateReleaseTrackerExecutionByCommandID(ctx context.Context, comm
 }
 
 func (db *DB) ListReleaseTrackerExecutions(ctx context.Context, trackerID string, limit int) ([]models.ReleaseTrackerExecution, error) {
-	rows, err := db.conn.QueryContext(ctx, 
-		`SELECT id, tracker_id, command_id, tag_name, release_url, release_name,
-		        status, triggered_at, completed_at
-		 FROM release_tracker_executions
-		 WHERE tracker_id=$1 ORDER BY triggered_at DESC LIMIT $2`,
+	// alerts_after_count: incidents on the tracker's target host in the
+	// 15 minutes after the execution started — a cheap "did this deployment
+	// just break something" signal (see ReleaseTrackerExecution.AlertsAfterCount).
+	rows, err := db.conn.QueryContext(ctx,
+		`SELECT e.id, e.tracker_id, e.command_id, e.tag_name, e.release_url, e.release_name,
+		        e.status, e.triggered_at, e.completed_at,
+		        (SELECT COUNT(*) FROM alert_incidents ai
+		          WHERE ai.host_id = rt.host_id AND rt.host_id != ''
+		            AND ai.triggered_at >= e.triggered_at
+		            AND ai.triggered_at <= e.triggered_at + INTERVAL '15 minutes'
+		        ) AS alerts_after_count
+		 FROM release_tracker_executions e
+		 JOIN release_trackers rt ON rt.id = e.tracker_id
+		 WHERE e.tracker_id=$1 ORDER BY e.triggered_at DESC LIMIT $2`,
 		trackerID, limit)
 	if err != nil {
 		return nil, err
@@ -684,6 +693,7 @@ func (db *DB) ListReleaseTrackerExecutions(ctx context.Context, trackerID string
 			&e.ID, &e.TrackerID, &cmdID,
 			&e.TagName, &e.ReleaseURL, &e.ReleaseName,
 			&e.Status, &e.TriggeredAt, &completed,
+			&e.AlertsAfterCount,
 		); err != nil {
 			return nil, err
 		}

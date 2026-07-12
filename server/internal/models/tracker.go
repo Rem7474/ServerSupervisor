@@ -112,6 +112,11 @@ type ReleaseTrackerExecution struct {
 	Status      string     `json:"status"`
 	TriggeredAt time.Time  `json:"triggered_at"`
 	CompletedAt *time.Time `json:"completed_at,omitempty"`
+	// AlertsAfterCount is the number of alert incidents that fired on the
+	// tracker's target host within 15 minutes after this execution started —
+	// a cheap "did this deployment just break something" signal. Always 0 for
+	// trackers with no host_id (monitor-only).
+	AlertsAfterCount int `json:"alerts_after_count"`
 }
 
 // RegistryCredential stores authentication for polling private image registries.
