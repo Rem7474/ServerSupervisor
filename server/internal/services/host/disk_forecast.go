@@ -7,6 +7,13 @@ import "github.com/serversupervisor/server/internal/models"
 // produce an alarming "3 days until full" forecast.
 const minDiskForecastSpanDays = 7.0
 
+// minDiskForecastSlopePerDay filters out both truly flat/shrinking trends and
+// floating-point noise around zero: the least-squares numerator subtracts two
+// large, nearly-equal sums, which is inherently noisy at roughly the 1e-10
+// scale — nowhere near this threshold, but easily either side of an exact 0
+// comparison. A slope below this is not an actionable trend either way.
+const minDiskForecastSlopePerDay = 0.01
+
 // forecastDiskDaysUntilFull fits a least-squares line to used_percent over
 // time and extrapolates the number of days until the mount point would hit
 // 100% at the current rate. Returns ok=false when there's not enough history,
@@ -39,7 +46,7 @@ func forecastDiskDaysUntilFull(points []models.DiskMetrics) (days float64, ok bo
 		return 0, false
 	}
 	slopePerDay := (n*sumXY - sumX*sumY) / denom
-	if slopePerDay <= 0 {
+	if slopePerDay <= minDiskForecastSlopePerDay {
 		return 0, false
 	}
 
