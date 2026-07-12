@@ -166,10 +166,18 @@ export interface AlertIncident {
   resolved_at?: string;
   value: number /* float64 */;
   /**
-   * Enriched post-fetch (not DB columns): Docker synthetic IDs resolution
+   * CommandID is the remote_commands row a command_trigger dispatched when
+   * this incident fired, if the rule has one configured. Nil otherwise.
+   */
+  command_id?: string;
+  /**
+   * Enriched post-fetch (not DB columns): Docker synthetic IDs resolution,
+   * and the live status of CommandID's remote_commands row (joined at read
+   * time so the frontend doesn't need a second round-trip per incident).
    */
   value_label?: string;
   link_host_id?: string;
+  command_status?: string;
 }
 export interface NotificationItem {
   id: string;
@@ -205,6 +213,12 @@ export interface NotificationItem {
    */
   link_host_id?: string;
   value_label?: string;
+  /**
+   * CommandStatus is the remote_commands.status of the rule's command_trigger
+   * dispatch for this incident (alert_incident type only), joined from
+   * alert_incidents.command_id — empty when no command_trigger fired.
+   */
+  command_status?: string;
 }
 /**
  * PushSubscription represents a Web Push (VAPID) subscription for a user's browser/device.
@@ -592,6 +606,12 @@ export interface DiskMetrics {
   inodes_used: number /* int64 */;
   inodes_free: number /* int64 */;
   inodes_percent: number /* float64 */;
+  /**
+   * ForecastDaysUntilFull is a linear-trend extrapolation over the last 30
+   * days of used_percent samples (nil when the mount point isn't filling up,
+   * or there isn't at least 7 days of history to trust a trend from).
+   */
+  forecast_days_until_full?: number /* float64 */;
 }
 /**
  * DiskHealth for SMART monitoring (optional, collected if smartctl available)
@@ -1331,6 +1351,13 @@ export interface ReleaseTrackerExecution {
   status: string;
   triggered_at: string;
   completed_at?: string;
+  /**
+   * AlertsAfterCount is the number of alert incidents that fired on the
+   * tracker's target host within 15 minutes after this execution started —
+   * a cheap "did this deployment just break something" signal. Always 0 for
+   * trackers with no host_id (monitor-only).
+   */
+  alerts_after_count: number /* int */;
 }
 /**
  * RegistryCredential stores authentication for polling private image registries.
