@@ -28,14 +28,34 @@ export interface NotificationItem {
 }
 
 
+// Module-level shared state: useNotifications() is called from more than one
+// place (NotificationBell, always mounted in App.vue's navbar, plus any view
+// that wants the live feed) and must behave as a singleton — one WebSocket
+// connection, one poll timer, one notification feed for the whole app, not
+// one per call site. Declaring the state here instead of inside the
+// function body is Vue's standard "shared composable" pattern; `wsReady` /
+// `lifecycleReady` below gate the one-time connection/poll/permission setup
+// so only the first caller (in practice NotificationBell, since it mounts
+// before any route view) ever establishes it.
+const notifications = ref<NotificationItem[]>([])
+const loading = ref(false)
+const readAtRef = ref<string | null>(null)
+let seenIdSet: Set<string | number> | null = null
+let wsReady = false
+let lifecycleReady = false
+
+// Other consumers of the same shared WebSocket connection (e.g. AlertsView,
+// which needs the raw messages to refresh its own incidents/trackers state)
+// subscribe here instead of opening a second connection to the same route.
+type RawMessageListener = (payload: WSNotificationMessage) => void
+const rawListeners = new Set<RawMessageListener>()
+
+export function onNotificationsMessage(listener: RawMessageListener): () => void {
+  rawListeners.add(listener)
+  return () => rawListeners.delete(listener)
+}
+
 export function useNotifications() {
-  const notifications = ref<NotificationItem[]>([])
-  const loading = ref(false)
-  const readAtRef = ref<string | null>(null)
-
-  let pollTimer: ReturnType<typeof setInterval> | null = null
-  let seenIdSet: Set<string | number> | null = null
-
   const unreadCount = computed(() =>
     notifications.value.filter((n) =>
       !readAtRef.value || new Date(n.triggered_at ?? 0) > new Date(readAtRef.value)
@@ -189,26 +209,32 @@ export function useNotifications() {
   // tab is open, so calling the Notification API here too would double-pop every
   // event while the app is in the foreground. This WS handler only drives the in-app
   // notification list/bell.
-  useWebSocket<WSNotificationMessage>('/api/v1/ws/notifications', (payload) => {
-    if (!payload?.type) return
+  //
+  // Guarded by wsReady so only the first caller of useNotifications() this session
+  // establishes the connection — everyone else shares it via onNotificationsMessage
+  // instead of each opening their own connection to the same route.
+  if (!wsReady) {
+    wsReady = true
+    useWebSocket<WSNotificationMessage>('/api/v1/ws/notifications', (payload) => {
+      if (!payload?.type) return
 
-    if (payload.type === 'new_alert') {
-      const item = payload.notification
-      if (seenIdSet !== null) seenIdSet.add(item.id)
-      if (!notifications.value.some((n) => n.id === item.id)) {
-        notifications.value = [item, ...notifications.value].slice(0, 30)
+      if (payload.type === 'new_alert') {
+        const item = payload.notification
+        if (seenIdSet !== null) seenIdSet.add(item.id)
+        if (!notifications.value.some((n) => n.id === item.id)) {
+          notifications.value = [item, ...notifications.value].slice(0, 30)
+        }
+      } else if (
+        payload.type === 'release_tracker_detected' ||
+        payload.type === 'release_tracker_execution' ||
+        payload.type === 'webhook_execution'
+      ) {
+        fetchNotifications()
       }
-      return
-    }
 
-    if (
-      payload.type === 'release_tracker_detected' ||
-      payload.type === 'release_tracker_execution' ||
-      payload.type === 'webhook_execution'
-    ) {
-      fetchNotifications()
-    }
-  })
+      for (const listener of rawListeners) listener(payload)
+    })
+  }
 
   function syncNotificationsIfVisible(): void {
     if (document.visibilityState !== 'visible') return
@@ -216,6 +242,8 @@ export function useNotifications() {
   }
 
   onMounted(async () => {
+    if (lifecycleReady) return
+    lifecycleReady = true
     if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
       const perm = await Notification.requestPermission()
       if (perm === 'granted') {
@@ -226,14 +254,18 @@ export function useNotifications() {
     }
     watchPermissionChange()
     fetchNotifications()
-    pollTimer = setInterval(fetchNotifications, 30_000)
+    setInterval(fetchNotifications, 30_000)
     window.addEventListener('ss:app-resume', syncNotificationsIfVisible)
   })
 
-  onUnmounted(() => {
-    if (pollTimer) clearInterval(pollTimer)
-    window.removeEventListener('ss:app-resume', syncNotificationsIfVisible)
-  })
+  // Intentionally does not tear down the poll interval / the WS connection /
+  // the resume listener: this is a shared, app-session-scoped singleton whose de
+  // facto owner (NotificationBell, mounted once in App.vue's navbar) stays
+  // mounted for the whole authenticated session. Logout does a hard page
+  // reload (see api/client.ts), which is what actually resets wsReady/
+  // lifecycleReady for the next session — there is no scenario in this app
+  // where the owning component unmounts while the feed should keep running.
+  onUnmounted(() => {})
 
   return {
     notifications,

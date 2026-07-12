@@ -181,6 +181,19 @@ func runInternalUpdate(cfgPath, commandID, targetVersion string) error {
 		return finalizeUpdateFailure(s, ctx, commandID, progress, fmt.Errorf("installed version %q does not match target %q", installedVersion, targetVersion))
 	}
 
+	// --version only proves the binary starts and parses flags. Actually run
+	// its collection code once, standalone, before touching the live service
+	// — catches a binary that starts fine but panics/errors on real
+	// collection, and does so before ever restarting the running agent onto
+	// it (so a bad build never disrupts the live service in the first place).
+	progress("Verifying the new binary can complete a collection cycle")
+	if err := runHealthcheck(targetBinary, 15*time.Second); err != nil {
+		if rollbackErr := restorePreviousBinary(targetBinary, backupBinary); rollbackErr != nil {
+			return finalizeUpdateFailure(s, ctx, commandID, progress, fmt.Errorf("post-install healthcheck failed (%v) and rollback failed: %w", err, rollbackErr))
+		}
+		return finalizeUpdateFailure(s, ctx, commandID, progress, fmt.Errorf("post-install healthcheck failed: %w", err))
+	}
+
 	progress("Restarting %s", agentUpdateServiceName)
 	if err := exec.Command("systemctl", "restart", agentUpdateServiceName).Run(); err != nil {
 		if rollbackErr := restorePreviousBinary(targetBinary, backupBinary); rollbackErr != nil {
@@ -285,6 +298,19 @@ func restorePreviousBinary(targetBinary, backupBinary string) error {
 	}
 	_ = os.Remove(targetBinary)
 	return os.Rename(backupBinary, targetBinary)
+}
+
+// runHealthcheck runs the freshly-installed binary as a standalone, one-shot
+// process (not the systemd service) with --internal-healthcheck, which
+// exercises the real collection code path and exits non-zero on failure.
+func runHealthcheck(binaryPath string, timeout time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, binaryPath, "--internal-healthcheck").CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("healthcheck exited with error: %w (output: %s)", err, strings.TrimSpace(string(out)))
+	}
+	return nil
 }
 
 func waitForServiceActive(serviceName string, timeout time.Duration) error {

@@ -13,6 +13,7 @@ import (
 	"github.com/serversupervisor/server/internal/dispatch"
 	"github.com/serversupervisor/server/internal/gitprovider"
 	"github.com/serversupervisor/server/internal/models"
+	"github.com/serversupervisor/server/internal/safego"
 	"github.com/serversupervisor/server/internal/services/notifychannels"
 	"github.com/serversupervisor/server/internal/services/push"
 	"github.com/serversupervisor/server/internal/ws"
@@ -253,7 +254,10 @@ func (s *Service) TriggerCheck(reqCtx, pollCtx context.Context, id string) error
 	if err != nil {
 		return err
 	}
-	go s.poller.CheckOne(pollCtx, *t)
+	go func() {
+		defer safego.Recover(pollCtx, "releasetracker.TriggerCheck")
+		s.poller.CheckOne(pollCtx, *t)
+	}()
 	return nil
 }
 
@@ -277,7 +281,10 @@ func (s *Service) Run(reqCtx, pollCtx context.Context, id string) error {
 		if tag == "" {
 			tag = "latest"
 		}
-		go s.poller.DispatchDockerTracker(pollCtx, *t, tag, t.LastReleaseTag, t.LatestImageDigest, t.LatestImageDigest)
+		go func() {
+			defer safego.Recover(pollCtx, "releasetracker.Run.dispatchDocker")
+			s.poller.DispatchDockerTracker(pollCtx, *t, tag, t.LastReleaseTag, t.LatestImageDigest, t.LatestImageDigest)
+		}()
 		return nil
 	}
 	if t.HostID == "" || t.CustomTaskID == "" {
@@ -286,7 +293,10 @@ func (s *Service) Run(reqCtx, pollCtx context.Context, id string) error {
 	if t.LastReleaseTag == "" {
 		return apperr.Conflict("aucune release initiale enregistrée — attendez le prochain cycle de polling avant de déclencher manuellement")
 	}
-	go s.poller.DispatchGitRelease(pollCtx, *t, t.LastReleaseTag, "", "")
+	go func() {
+		defer safego.Recover(pollCtx, "releasetracker.Run.dispatchGit")
+		s.poller.DispatchGitRelease(pollCtx, *t, t.LastReleaseTag, "", "")
+	}()
 	return nil
 }
 

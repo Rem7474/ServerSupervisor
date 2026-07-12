@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/serversupervisor/server/internal/apperr"
 	"github.com/serversupervisor/server/internal/models"
+	"github.com/serversupervisor/server/internal/safego"
 	npmsvc "github.com/serversupervisor/server/internal/services/npm"
 )
 
@@ -169,6 +170,9 @@ func (h *NPMHandler) RefreshNow(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
-	go func() { _ = h.svc.RefreshSync(h.pollerCtx, id) }()
+	go func() {
+		defer safego.Recover(h.pollerCtx, "npm.RefreshNow")
+		_ = h.svc.RefreshSync(h.pollerCtx, id)
+	}()
 	c.JSON(http.StatusOK, gin.H{"message": "refresh triggered"})
 }

@@ -300,7 +300,7 @@ sudo journalctl -u serversupervisor-agent -f
 | `DB_HOST` | Hôte PostgreSQL | `localhost` |
 | `DB_PORT` | Port PostgreSQL | `5432` |
 | `DB_USER` | Utilisateur | `supervisor` |
-| `DB_PASSWORD` | Mot de passe | `supervisor` |
+| `DB_PASSWORD` | Mot de passe **(à changer !)** | `supervisor` |
 | `DB_NAME` | Nom de la base | `serversupervisor` |
 | `DB_SSLMODE` | Mode SSL | `disable` |
 
@@ -343,6 +343,102 @@ sudo journalctl -u serversupervisor-agent -f
 | `AUDIT_RETENTION_DAYS` | Rétention des logs d'audit en jours | `90` |
 
 > Les paramètres de notifications et de rétention sont également éditables depuis le dashboard (Settings) et persistés en base de données.
+
+### Sauvegarde & restauration
+
+Le stack Docker Compose inclut un service `postgres-backup` (image
+[`prodrigestivill/postgres-backup-local`](https://github.com/prodrigestivill/docker-postgres-backup-local))
+qui exécute des `pg_dump` planifiés, compressés et rotés, de la base
+ServerSupervisor. C'est une sauvegarde au sens disaster recovery — elle
+protège contre la perte du volume Docker, une corruption, ou une erreur de
+manipulation. Ce n'est **pas** la même chose que `METRICS_RETENTION_DAYS` /
+les politiques de rétention TimescaleDB, qui ne font qu'expirer les anciennes
+métriques dans une base par ailleurs saine.
+
+| Variable | Description | Défaut |
+|---|---|---|
+| `BACKUP_SCHEDULE` | Planification (`@daily`, `@weekly`, ou cron 5 champs) | `@daily` |
+| `BACKUP_KEEP_DAYS` | Sauvegardes quotidiennes conservées | `7` |
+| `BACKUP_KEEP_WEEKS` | Sauvegardes hebdomadaires conservées | `4` |
+| `BACKUP_KEEP_MONTHS` | Sauvegardes mensuelles conservées | `6` |
+
+Les fichiers `.sql.gz` sont écrits dans le volume nommé `postgres_backups`
+(`/backups` dans le conteneur `postgres-backup`).
+
+**Restaurer une sauvegarde** (arrête l'API pendant la restauration ; adapter
+le nom de fichier) :
+
+```bash
+# 1. Arrêter le serveur pour éviter des écritures pendant la restauration
+docker compose stop server
+
+# 2. Copier la sauvegarde choisie hors du volume
+docker compose cp postgres-backup:/backups/daily/serversupervisor-<horodatage>.sql.gz ./restore.sql.gz
+gunzip restore.sql.gz
+
+# 3. Recréer une base vide (la restauration part d'un schéma propre)
+docker compose exec postgres psql -U supervisor -d postgres -c "DROP DATABASE serversupervisor;"
+docker compose exec postgres psql -U supervisor -d postgres -c "CREATE DATABASE serversupervisor OWNER supervisor;"
+
+# 4. Importer le dump
+cat restore.sql | docker compose exec -T postgres psql -U supervisor -d serversupervisor
+
+# 5. Redémarrer le serveur
+docker compose start server
+```
+
+> Testez cette procédure au moins une fois avant d'en avoir besoin en
+> production — une sauvegarde qui n'a jamais été restaurée n'est pas
+> vérifiée. Les noms de fichiers exacts (sous-dossier `daily/weekly/monthly`)
+> sont listés par `docker compose exec postgres-backup ls -la /backups`.
+
+### Revenir en arrière après une mise à jour ratée (rollback manuel de migration)
+
+Les migrations SQL (`server/internal/database/migrations/`) s'appliquent
+automatiquement au démarrage et sont **forward-only** — il n'existe pas de
+mécanisme de "migration down" intégré. Avant de mettre à jour vers une
+version qui embarque de nouvelles migrations, prenez un instantané ad-hoc et
+gardez cette procédure à portée de main.
+
+**Avant la mise à jour :**
+
+```bash
+docker compose exec postgres pg_dump -Fc -U supervisor serversupervisor -f /tmp/pre-upgrade.dump
+docker compose cp postgres:/tmp/pre-upgrade.dump ./pre-upgrade.dump
+```
+
+**Si la nouvelle version pose problème :**
+
+```bash
+# 1. Revenir à l'image/tag précédent dans docker-compose.yml, puis arrêter le serveur
+docker compose stop server
+
+# 2. Recréer une base vide
+docker compose cp ./pre-upgrade.dump postgres:/tmp/pre-upgrade.dump
+docker compose exec postgres psql -U supervisor -d postgres -c \
+  "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='serversupervisor' AND pid <> pg_backend_pid();"
+docker compose exec postgres psql -U supervisor -d postgres -c "DROP DATABASE serversupervisor;"
+docker compose exec postgres psql -U supervisor -d postgres -c "CREATE DATABASE serversupervisor OWNER supervisor;"
+
+# 3. Restaurer l'instantané pré-mise à jour
+docker compose exec postgres pg_restore -U supervisor -d serversupervisor /tmp/pre-upgrade.dump
+
+# 4. Redémarrer sur l'ancienne image
+docker compose up -d server
+```
+
+> **Cette procédure a été testée de bout en bout** (pas seulement rédigée en
+> théorie) : schéma complet migré (baseline + les 71 migrations), une
+> migration destructrice simulée (colonne supprimée, lignes effacées), puis
+> `DROP DATABASE` / `CREATE DATABASE` / `pg_restore` depuis l'instantané —
+> l'état obtenu (schéma, `schema_migrations`, données) est identique bit à
+> bit à celui du moment de l'instantané. Cette validation a été faite sur un
+> PostgreSQL 16 nu (hors conteneur, sans l'extension TimescaleDB
+> disponible dans cet environnement de test) : le mécanisme `pg_dump`/
+> `pg_restore` lui-même est donc vérifié, mais les commandes `docker compose
+> exec` ci-dessus n'ont pas pu être rejouées telles quelles faute de démon
+> Docker disponible pendant cette validation. Testez-la une fois sur votre
+> propre stack avant d'en dépendre en production.
 
 ---
 

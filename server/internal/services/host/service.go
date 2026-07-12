@@ -18,6 +18,7 @@ import (
 	"github.com/serversupervisor/server/internal/dispatch"
 	"github.com/serversupervisor/server/internal/events"
 	"github.com/serversupervisor/server/internal/models"
+	"github.com/serversupervisor/server/internal/safego"
 )
 
 // Repository is the data-access port. *database.DB satisfies it structurally.
@@ -230,12 +231,36 @@ func (s *Service) Complete(ctx context.Context, id string) (*HostComplete, error
 	)
 	var wg sync.WaitGroup
 	wg.Add(6)
-	go func() { defer wg.Done(); metrics, _ = s.repo.GetLatestMetrics(ctx, id) }()
-	go func() { defer wg.Done(); containers, _ = s.repo.GetDockerContainers(ctx, id) }()
-	go func() { defer wg.Done(); aptStatus, _ = s.repo.GetAptStatus(ctx, id) }()
-	go func() { defer wg.Done(); diskMetrics, _ = s.repo.GetLatestDiskMetrics(ctx, id) }()
-	go func() { defer wg.Done(); diskHealth, _ = s.repo.GetLatestDiskHealth(ctx, id) }()
-	go func() { defer wg.Done(); cmdHistory, _ = s.repo.GetRecentCommandsByHost(ctx, id, 20) }()
+	go func() {
+		defer wg.Done()
+		defer safego.Recover(ctx, "host.Complete.metrics")
+		metrics, _ = s.repo.GetLatestMetrics(ctx, id)
+	}()
+	go func() {
+		defer wg.Done()
+		defer safego.Recover(ctx, "host.Complete.containers")
+		containers, _ = s.repo.GetDockerContainers(ctx, id)
+	}()
+	go func() {
+		defer wg.Done()
+		defer safego.Recover(ctx, "host.Complete.aptStatus")
+		aptStatus, _ = s.repo.GetAptStatus(ctx, id)
+	}()
+	go func() {
+		defer wg.Done()
+		defer safego.Recover(ctx, "host.Complete.diskMetrics")
+		diskMetrics, _ = s.repo.GetLatestDiskMetrics(ctx, id)
+	}()
+	go func() {
+		defer wg.Done()
+		defer safego.Recover(ctx, "host.Complete.diskHealth")
+		diskHealth, _ = s.repo.GetLatestDiskHealth(ctx, id)
+	}()
+	go func() {
+		defer wg.Done()
+		defer safego.Recover(ctx, "host.Complete.cmdHistory")
+		cmdHistory, _ = s.repo.GetRecentCommandsByHost(ctx, id, 20)
+	}()
 	wg.Wait()
 
 	s.resolveTemp(ctx, id, metrics)

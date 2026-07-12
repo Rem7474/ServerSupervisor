@@ -39,6 +39,7 @@ func main() {
 	initServerURL := flag.String("server-url", "", "Server URL override used with --init")
 	initAPIKey := flag.String("api-key", "", "API key override used with --init")
 	showVersion := flag.Bool("version", false, "Print the agent version and exit")
+	internalHealthcheck := flag.Bool("internal-healthcheck", false, "Run a one-shot self-test collection cycle and exit 0/1 accordingly (used by the self-updater to verify a new binary can actually collect metrics before committing to it, rather than only checking that it starts and parses flags)")
 	internalUpdate := flag.Bool("internal-update", false, "Run the detached self-update helper and exit")
 	updateCommandID := flag.String("update-command-id", "", "Command ID for internal update helper")
 	updateVersion := flag.String("update-version", "", "Target version for internal update helper")
@@ -58,6 +59,20 @@ func main() {
 		bootstrapLevel = "debug"
 	}
 	logging.Init(bootstrapLevel, "text")
+
+	if *internalHealthcheck {
+		// Deliberately config-independent: this only proves the collection
+		// code itself runs on this host without erroring, which --version
+		// does not (it only proves the binary starts and parses flags).
+		// Config validity is exercised separately by the real systemd
+		// service restart the self-updater performs around this check.
+		if _, err := collector.CollectSystem(false); err != nil {
+			slog.Error("healthcheck failed: could not complete a collection cycle", "err", err)
+			os.Exit(1)
+		}
+		fmt.Println("ok")
+		return
+	}
 
 	if *internalUpdate {
 		if err := runInternalUpdate(*configPath, *updateCommandID, *updateVersion); err != nil {

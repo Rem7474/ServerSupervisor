@@ -91,20 +91,19 @@
 
 <script setup lang="ts">
 import { ref, watch, nextTick, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { useAuthStore } from '../stores/auth'
-import api from '../api'
-import { getApiErrorMessage } from '../api/client'
+import { useLogin } from '../composables/useLogin'
 
-const router = useRouter()
-const auth = useAuthStore()
+const {
+  username,
+  password,
+  error,
+  loading,
+  needsMFA,
+  totpCode,
+  totpFocusRequest,
+  handleLogin,
+} = useLogin()
 
-const username = ref('')
-const password = ref('')
-const error = ref('')
-const loading = ref(false)
-const needsMFA = ref(false)
-const totpCode = ref('')
 const usernameInput = ref<HTMLInputElement | null>(null)
 const totpInput = ref<HTMLInputElement | null>(null)
 
@@ -112,47 +111,10 @@ onMounted(() => {
   usernameInput.value?.focus()
 })
 
-watch(needsMFA, async (val) => {
-  if (val) {
-    await nextTick()
-    totpInput.value?.focus()
-  }
+watch(totpFocusRequest, async () => {
+  await nextTick()
+  totpInput.value?.focus()
 })
-
-async function handleLogin(): Promise<void> {
-  loading.value = true
-  error.value = ''
-  try {
-    const { data } = await api.login(username.value, password.value, needsMFA.value ? totpCode.value : '')
-
-    if (data?.require_mfa) {
-      needsMFA.value = true
-      totpCode.value = ''
-      return
-    }
-
-    if (data?.role) {
-      auth.setAuth(data, username.value)
-      if (data.must_change_password) {
-        router.push('/account')
-      } else {
-        router.push('/')
-      }
-    } else {
-      error.value = 'Réponse de connexion invalide.'
-    }
-  } catch (e: unknown) {
-    if (needsMFA.value) {
-      totpCode.value = ''
-      nextTick(() => totpInput.value?.focus())
-      error.value = getApiErrorMessage(e, 'Code invalide ou expiré — générez un nouveau code.')
-    } else {
-      error.value = getApiErrorMessage(e, 'Erreur de connexion')
-    }
-  } finally {
-    loading.value = false
-  }
-}
 </script>
 
 <style scoped>

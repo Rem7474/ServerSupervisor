@@ -21,8 +21,13 @@ func NewSettingsHandler(svc *settingssvc.Service) *SettingsHandler {
 	return &SettingsHandler{svc: svc}
 }
 
-// GetSettings returns system configuration and database status.
+// GetSettings returns system configuration and database status. Admin-only:
+// the snapshot includes plaintext secrets (SMTP password, GitHub token).
 func (h *SettingsHandler) GetSettings(c *gin.Context) {
+	if c.GetString("role") != "admin" {
+		respondError(c, apperr.Forbidden("insufficient permissions"))
+		return
+	}
 	c.JSON(http.StatusOK, h.svc.Snapshot(c.Request.Context()))
 }
 

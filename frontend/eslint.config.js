@@ -101,11 +101,7 @@ export default [
     // rather than typing the monolith and re-touching every line during the
     // split. Remove these entries (and the residual any) as each file is split.
     files: [
-      '**/views/ProxmoxNodeView.vue',
-      '**/views/TrafficView.vue',
-      '**/views/AuditLogsView.vue',
       '**/views/GlobalScheduledTasksView.vue',
-      '**/views/MonitoringView.vue',
       '**/components/docker/DockerContainersTab.vue',
       // Child of the ProxmoxNodeView monolith; guest/link/network rows carry
       // runtime fields beyond the generated ProxmoxGuest model. Typed when the

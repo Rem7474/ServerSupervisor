@@ -35,7 +35,7 @@ func (db *DB) GetNetworkTopologyConfig(ctx context.Context) (*models.NetworkTopo
 				RootLabel:      "Infrastructure",
 				ExcludedPorts:  []int{},
 				ServiceMap:     "{}",
-				HostOverrides:  "{}",
+				HostOverrides:  "[]",
 				ManualServices: "[]",
 				AutheliaLabel:  "Authelia",
 				InternetLabel:  "Internet",

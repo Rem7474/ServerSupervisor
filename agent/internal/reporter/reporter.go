@@ -14,6 +14,16 @@ import (
 	"github.com/serversupervisor/agent/internal/sender"
 )
 
+// collectionTimeout bounds the parallel metric-collection phase of Send as a
+// last-resort safety net. Every individual collector already bounds its own
+// external commands (see docker.go, crowdsec.go, disk.go), but this catches
+// any collector — present or future — that doesn't: without it, one stuck
+// goroutine leaves wg.Wait() blocked forever, and since Send runs
+// synchronously in the agent's single main-loop goroutine with a ticker that
+// drops (does not queue) ticks while busy, that one hang would silently and
+// permanently stop all future reporting.
+const collectionTimeout = 25 * time.Second
+
 // Reporter builds and sends periodic host reports.
 type Reporter struct {
 	cfg         *config.Config
@@ -158,7 +168,17 @@ func (r *Reporter) Send(ctx context.Context, s *sender.Sender, cmdQueue chan<- [
 		}()
 	}
 
-	wg.Wait()
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(collectionTimeout):
+		slog.Warn("metric collection exceeded the safety timeout — sending a partial report; the still-running collector goroutine(s) will finish in the background and their results are discarded",
+			"timeout", collectionTimeout)
+	}
 
 	if collectedMetrics == nil {
 		return

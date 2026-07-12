@@ -1,5 +1,7 @@
 import { api } from './client'
 import type { IPTimelineResponse } from '../types/security'
+import type { LoginEvent } from '../types/generated'
+import type { SecurityData } from '../components/security/AuditSecurityPanel.vue'
 
 export const authApi = {
   login: (username: string, password: string, totpCode?: string) =>
@@ -9,11 +11,13 @@ export const authApi = {
     api.post('/v1/auth/change-password', { current_password: currentPassword, new_password: newPassword }),
   getLoginEvents: (signal?: AbortSignal) => api.get('/v1/auth/login-events', { signal }),
   getLoginEventsAdmin: (page?: number, limit?: number) =>
-    api.get('/v1/auth/login-events/admin', { params: { page: page ?? 1, limit: limit ?? 50 } }),
+    api.get<{ events: LoginEvent[], total: number, page: number, limit: number }>(
+      '/v1/auth/login-events/admin', { params: { page: page ?? 1, limit: limit ?? 50 } }
+    ),
   revokeAllSessions: () => api.post('/v1/auth/revoke-all-sessions', {}),
   logout: () => api.post('/auth/logout', {}),
   refreshSession: () => api.post('/auth/refresh', {}),
-  getSecuritySummary: (hours?: number) => api.get('/v1/auth/security', { params: { hours: hours ?? 24 } }),
+  getSecuritySummary: (hours?: number) => api.get<SecurityData>('/v1/auth/security', { params: { hours: hours ?? 24 } }),
   getWebLogsSummary: (period: string = '24h', hostId?: string, source?: string, scope?: 'threats' | 'full') =>
     api.get('/v1/security/web-logs', { params: { period, host_id: hostId ?? '', source: source ?? '', scope: scope ?? '' } }),
   getWebLogsTimeseries: (period: string = '24h', bucket: 'hour' | 'minute' = 'hour', hostId?: string, source?: string) =>

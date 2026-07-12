@@ -1,13 +1,33 @@
 package collector
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 )
+
+// dfTimeout/smartctlTimeout/lsTimeout bound every external command this file
+// runs. Without them a stuck NFS/CIFS mount (df) or a slow-to-spin-up disk
+// (smartctl) can hang indefinitely — the agent's single main-loop goroutine
+// would then never send another report again. Mirrors the
+// context.WithTimeout + exec.CommandContext pattern already used in docker.go.
+const (
+	dfTimeout       = 10 * time.Second
+	smartctlTimeout = 15 * time.Second
+	lsTimeout       = 10 * time.Second
+)
+
+// runDF runs `df` with the given args under dfTimeout, returning combined output.
+func runDF(args ...string) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), dfTimeout)
+	defer cancel()
+	return exec.CommandContext(ctx, "df", args...).CombinedOutput()
+}
 
 // pseudoFS lists filesystem types that carry no real storage and must be excluded.
 var pseudoFS = map[string]bool{
@@ -78,26 +98,22 @@ func CollectDiskMetrics() ([]DiskMetrics, error) {
 	// Essayer d'abord avec les flags GNU (plus compatibles)
 	// Si cela échoue, utiliser une approche de secours
 
-	cmdSpace := exec.Command("df", "-T", "-BG")
-	outSpace, err := cmdSpace.CombinedOutput()
+	outSpace, err := runDF("-T", "-BG")
 	useType := true
 	useHuman := false
 	if err != nil {
 		// Essayer avec -T -h (human readable) comme fallback
-		cmdSpace = exec.Command("df", "-T", "-h")
-		outSpace, err = cmdSpace.CombinedOutput()
+		outSpace, err = runDF("-T", "-h")
 		if err == nil {
 			useType = true
 			useHuman = true
 		} else {
-			cmdSpace = exec.Command("df", "-BG")
-			outSpace, err = cmdSpace.CombinedOutput()
+			outSpace, err = runDF("-BG")
 			if err == nil {
 				useType = false
 				useHuman = false
 			} else {
-				cmdSpace = exec.Command("df", "-h")
-				outSpace, err = cmdSpace.CombinedOutput()
+				outSpace, err = runDF("-h")
 				if err != nil {
 					return nil, err
 				}
@@ -115,8 +131,7 @@ func CollectDiskMetrics() ([]DiskMetrics, error) {
 	}
 
 	// Exécuter df -i pour obtenir les informations sur les inodes
-	cmdInodes := exec.Command("df", "-i")
-	outInodes, err := cmdInodes.CombinedOutput()
+	outInodes, err := runDF("-i")
 	if err != nil {
 		// Les inodes ne sont pas critiques, continuer sans elles
 		outInodes = []byte("")
@@ -457,7 +472,9 @@ func CheckSMARTAvailability() (ok bool, detail string) {
 
 // findPhysicalDisks trouve tous les disques physiques (sd*, nvme*, vd*)
 func findPhysicalDisks() ([]string, error) {
-	cmd := exec.Command("sh", "-c", "ls /dev/sd[a-z] /dev/nvme[0-9]n[0-9] /dev/vd[a-z] 2>/dev/null | sort -u")
+	ctx, cancel := context.WithTimeout(context.Background(), lsTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "sh", "-c", "ls /dev/sd[a-z] /dev/nvme[0-9]n[0-9] /dev/vd[a-z] 2>/dev/null | sort -u")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		// Pas de disques trouvés ou commande échouée
@@ -483,7 +500,9 @@ func collectSmartData(device string) (DiskHealth, error) {
 	}
 
 	// Exécuter smartctl avec sortie JSON (disponible depuis smartmontools 7.0)
-	cmd := exec.Command("smartctl", "-A", "-i", "-H", "-j", device)
+	ctx, cancel := context.WithTimeout(context.Background(), smartctlTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "smartctl", "-A", "-i", "-H", "-j", device)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		slog.Warn("smartctl warning", "device", device, "err", err)

@@ -662,7 +662,7 @@ export interface NetworkTopologyConfig {
   root_ip: string;
   excluded_ports: number /* int */[]; // Stored as JSONB
   service_map: string; // JSON {port: name}
-  host_overrides: string; // JSON
+  host_overrides: string; // JSON array of {hostId, ports} entries
   manual_services: string; // JSON
   authelia_label: string;
   authelia_ip: string;

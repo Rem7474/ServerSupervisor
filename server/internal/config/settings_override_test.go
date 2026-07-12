@@ -82,6 +82,40 @@ func TestOverrideFromDB_KeepsEnvWhenAbsentOrInvalid(t *testing.T) {
 	}
 }
 
+// TestOverrideFromDB_KeepsSecretsWhenBlank guards against a regression where an
+// admin saving the Settings form without re-entering a secret field (a common
+// UX pattern for password inputs) silently wipes a working env-var-configured
+// secret. smtp_user/smtp_pass/ntfy_url/github_token must behave exactly like
+// smtp_host: an empty persisted value must never override a non-empty one.
+func TestOverrideFromDB_KeepsSecretsWhenBlank(t *testing.T) {
+	c := &Config{
+		SMTPUser:    "env-user",
+		SMTPPass:    "env-pass",
+		NotifyURL:   "env-ntfy",
+		GitHubToken: "env-token",
+	}
+
+	c.OverrideFromDB(fakeSettingsLoader{settings: map[string]string{
+		"smtp_user":    "",
+		"smtp_pass":    "",
+		"ntfy_url":     "",
+		"github_token": "",
+	}})
+
+	if c.SMTPUser != "env-user" {
+		t.Errorf("SMTPUser = %q, want env-user (empty DB value must not override)", c.SMTPUser)
+	}
+	if c.SMTPPass != "env-pass" {
+		t.Errorf("SMTPPass = %q, want env-pass (empty DB value must not override)", c.SMTPPass)
+	}
+	if c.NotifyURL != "env-ntfy" {
+		t.Errorf("NotifyURL = %q, want env-ntfy (empty DB value must not override)", c.NotifyURL)
+	}
+	if c.GitHubToken != "env-token" {
+		t.Errorf("GitHubToken = %q, want env-token (empty DB value must not override)", c.GitHubToken)
+	}
+}
+
 func TestOverrideFromDB_LoaderErrorIsNoop(t *testing.T) {
 	c := &Config{SMTPHost: "env-host"}
 	c.OverrideFromDB(fakeSettingsLoader{err: context.DeadlineExceeded})

@@ -1,6 +1,7 @@
 package ws
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
@@ -19,6 +20,7 @@ import (
 	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/events"
 	"github.com/serversupervisor/server/internal/models"
+	"github.com/serversupervisor/server/internal/safego"
 )
 
 // snapshotChanged returns true (and updates *lastHash) when payload differs from the
@@ -195,16 +197,11 @@ func (h *WSHandler) authenticateWSWithRole(c *gin.Context, conn *websocket.Conn)
 
 // authenticateWSClaims authorises the connection. It prefers the session
 // cookie (sent automatically by the browser on the upgrade request) and falls
-// back to the legacy in-band {"type":"auth","token":"…"} handshake for older
-// clients. Returns the JWT claims on success.
+// back to the in-band {"type":"auth","token":"…"} handshake for clients that
+// cannot rely on cookies. Returns the JWT claims on success.
 func (h *WSHandler) authenticateWSClaims(c *gin.Context, conn *websocket.Conn) (jwt.MapClaims, bool) {
 	if c != nil && c.Request != nil {
 		if tok := cookies.ReadAccessToken(c.Request); tok != "" {
-			if claims, ok := h.parseTokenClaims(tok); ok {
-				return claims, true
-			}
-		}
-		if tok := c.Query("token"); tok != "" {
 			if claims, ok := h.parseTokenClaims(tok); ok {
 				return claims, true
 			}
@@ -253,6 +250,7 @@ func (h *WSHandler) parseTokenClaims(tokenString string) (jwt.MapClaims, bool) {
 
 func (h *WSHandler) readLoop(conn *websocket.Conn, done chan struct{}) {
 	defer close(done)
+	defer safego.Recover(context.Background(), "ws.readLoop")
 	for {
 		if _, _, err := conn.ReadMessage(); err != nil {
 			return

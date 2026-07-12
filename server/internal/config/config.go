@@ -192,10 +192,10 @@ func (c *Config) OverrideFromDB(db DBSettingsLoader) {
 			c.SMTPPort = i
 		}
 	}
-	if v, ok := settings["smtp_user"]; ok {
+	if v, ok := settings["smtp_user"]; ok && v != "" {
 		c.SMTPUser = v
 	}
-	if v, ok := settings["smtp_pass"]; ok {
+	if v, ok := settings["smtp_pass"]; ok && v != "" {
 		c.SMTPPass = v
 	}
 	if v, ok := settings["smtp_from"]; ok && v != "" {
@@ -207,10 +207,10 @@ func (c *Config) OverrideFromDB(db DBSettingsLoader) {
 	if v, ok := settings["smtp_tls"]; ok {
 		c.SMTPTLS = v == "true" || v == "1"
 	}
-	if v, ok := settings["ntfy_url"]; ok {
+	if v, ok := settings["ntfy_url"]; ok && v != "" {
 		c.NotifyURL = v
 	}
-	if v, ok := settings["github_token"]; ok {
+	if v, ok := settings["github_token"]; ok && v != "" {
 		c.GitHubToken = v
 	}
 	if v, ok := settings["metrics_retention_days"]; ok && v != "" {

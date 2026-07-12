@@ -6,6 +6,7 @@ import (
 
 	"github.com/serversupervisor/server/internal/models"
 	"github.com/serversupervisor/server/internal/releasetracker"
+	"github.com/serversupervisor/server/internal/safego"
 )
 
 // buildVersionComparisons aggregates running containers per release tracker
@@ -24,9 +25,21 @@ func (h *WSHandler) buildVersionComparisons(ctx context.Context) ([]models.Versi
 	)
 	var wg sync.WaitGroup
 	wg.Add(3)
-	go func() { defer wg.Done(); trackers, trackersErr = h.db.ListReleaseTrackers(ctx) }()
-	go func() { defer wg.Done(); containers, containersErr = h.db.GetAllDockerContainers(ctx) }()
-	go func() { defer wg.Done(); digestTagMap, _ = h.db.GetAllTrackerTagDigests(ctx) }()
+	go func() {
+		defer wg.Done()
+		defer safego.Recover(ctx, "ws.buildVersionComparisons.trackers")
+		trackers, trackersErr = h.db.ListReleaseTrackers(ctx)
+	}()
+	go func() {
+		defer wg.Done()
+		defer safego.Recover(ctx, "ws.buildVersionComparisons.containers")
+		containers, containersErr = h.db.GetAllDockerContainers(ctx)
+	}()
+	go func() {
+		defer wg.Done()
+		defer safego.Recover(ctx, "ws.buildVersionComparisons.digestTagMap")
+		digestTagMap, _ = h.db.GetAllTrackerTagDigests(ctx)
+	}()
 	wg.Wait()
 
 	if trackersErr != nil {

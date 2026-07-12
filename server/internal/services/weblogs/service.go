@@ -18,6 +18,7 @@ import (
 	"github.com/serversupervisor/server/internal/apperr"
 	"github.com/serversupervisor/server/internal/dispatch"
 	"github.com/serversupervisor/server/internal/models"
+	"github.com/serversupervisor/server/internal/safego"
 )
 
 // Repository is the data-access port. *database.DB satisfies it structurally.
@@ -312,6 +313,7 @@ func resolveIPsWithContext(topIPs []map[string]any) (map[string]int64, map[strin
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			defer safego.Recover(context.Background(), "weblogs.resolveIPsWithContext")
 			for row := range jobs {
 				ip := strings.TrimSpace(anyToString(row["ip"]))
 				hits := anyToInt64(row["hits"])

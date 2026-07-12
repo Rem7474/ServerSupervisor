@@ -1,16 +1,7 @@
 import { computed, ref, Ref } from 'vue'
 import { defineStore } from 'pinia'
-
-interface HostSummary {
-  id: string
-  name?: string
-  hostname?: string
-  ip_address?: string
-  os?: string
-  status?: string
-  last_seen?: string | number | Date | null
-  agent_version?: string
-}
+import { useHostsStore } from './hosts'
+import type { Host } from '../types/host'
 
 interface VersionComparison {
   docker_image?: string
@@ -40,7 +31,14 @@ interface ProxmoxSummary {
 }
 
 export const useDashboardStore = defineStore('dashboard', () => {
-  const hosts: Ref<HostSummary[]> = ref([])
+  // Read-through view of the shared hosts store, not an independent copy —
+  // this and the navbar badge (App.vue) must never be able to disagree about
+  // which hosts are online/offline. The dashboard WebSocket handler
+  // (useDashboard.ts) pushes live snapshots into useHostsStore directly
+  // instead of into a dashboard-only list.
+  const hostsStore = useHostsStore()
+  const hosts = computed<Host[]>(() => hostsStore.hosts)
+
   const aptPending: Ref<number> = ref(0)
   const versionComparisons: Ref<VersionComparison[]> = ref([])
   const proxmoxSummary: Ref<ProxmoxSummary | null> = ref(null)
@@ -57,10 +55,6 @@ export const useDashboardStore = defineStore('dashboard', () => {
     if (!s || !s.storage_total) return 0
     return (s.storage_used! / s.storage_total) * 100
   })
-
-  function setHosts(nextHosts: HostSummary[]): void {
-    hosts.value = nextHosts
-  }
 
   function setAptPending(nextAptPending: number): void {
     aptPending.value = nextAptPending
@@ -85,7 +79,6 @@ export const useDashboardStore = defineStore('dashboard', () => {
     outdatedDockerImages,
     outdatedVersions,
     proxmoxStoragePct,
-    setHosts,
     setAptPending,
     setVersionComparisons,
     setProxmoxSummary,
