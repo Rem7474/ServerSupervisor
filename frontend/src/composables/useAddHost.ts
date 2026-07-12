@@ -2,6 +2,7 @@ import { ref, computed, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import apiClient from '../api'
 import { getApiErrorMessage } from '../api/client'
+import { parseTagsInput } from '../utils/tags'
 
 interface HostResult {
   id?: string
@@ -22,7 +23,7 @@ const AGENT_POLL_TIMEOUT_MS = 120_000
 export function useAddHost() {
   const router = useRouter()
 
-  const form = ref({ name: '', ip_address: '' })
+  const form = ref({ name: '', ip_address: '', tags: '' })
   const error = ref('')
   const loading = ref(false)
   const touched = ref({ name: false, ip_address: false })
@@ -92,7 +93,11 @@ export function useAddHost() {
     loading.value = true
     error.value = ''
     try {
-      const res = await apiClient.registerHost(form.value)
+      const res = await apiClient.registerHost({
+        name: form.value.name,
+        ip_address: form.value.ip_address,
+        tags: parseTagsInput(form.value.tags),
+      })
       result.value = res.data
       if (res.data?.id) startAgentPolling(res.data.id)
     } catch (e: unknown) {

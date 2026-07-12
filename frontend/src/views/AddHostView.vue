@@ -79,6 +79,22 @@
                   {{ ipFeedback }}
                 </div>
               </div>
+              <div class="mb-3">
+                <label
+                  class="form-label"
+                  for="host-tags"
+                >Tags (optionnel)</label>
+                <input
+                  id="host-tags"
+                  v-model="form.tags"
+                  type="text"
+                  class="form-control"
+                  placeholder="prod, site-lyon"
+                >
+                <div class="form-hint">
+                  Séparés par des virgules — utile pour filtrer et grouper vos hôtes.
+                </div>
+              </div>
 
               <div
                 v-if="error"

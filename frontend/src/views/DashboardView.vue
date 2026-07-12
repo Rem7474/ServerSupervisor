@@ -227,6 +227,31 @@
             </select>
           </div>
           <div
+            v-if="allTags.length > 0"
+            class="col-12 col-md-4 col-lg-2"
+          >
+            <label
+              class="form-label"
+              for="dashboard-tag-filter"
+            >Tag</label>
+            <select
+              id="dashboard-tag-filter"
+              v-model="tagFilter"
+              class="form-select"
+            >
+              <option value="all">
+                Tous
+              </option>
+              <option
+                v-for="tag in allTags"
+                :key="tag"
+                :value="tag"
+              >
+                {{ tag }}
+              </option>
+            </select>
+          </div>
+          <div
             v-if="canRunApt"
             class="col-12 col-md-auto d-flex align-items-end"
           >
@@ -352,15 +377,21 @@
                     {{ host.hostname || 'Non connecté' }}
                   </div>
                   <div
-                    v-if="proxmoxGuestPath(host.id)"
-                    class="mt-1"
+                    v-if="proxmoxGuestPath(host.id) || (host.tags && host.tags.length > 0)"
+                    class="d-flex flex-wrap gap-1 mt-1"
                   >
                     <router-link
+                      v-if="proxmoxGuestPath(host.id)"
                       :to="proxmoxGuestPath(host.id)"
                       class="badge bg-orange-lt text-orange text-decoration-none"
                     >
                       Stats Proxmox
                     </router-link>
+                    <span
+                      v-for="tag in host.tags"
+                      :key="tag"
+                      class="badge bg-secondary-lt text-secondary"
+                    >{{ tag }}</span>
                   </div>
                 </td>
                 <td class="status-col">
@@ -542,6 +573,8 @@ const {
   loading,
   searchQuery,
   statusFilter,
+  tagFilter,
+  allTags,
   sortKey,
   sortDir,
   selectedHostIds,
@@ -615,7 +648,7 @@ function toggleSort(key: string): void {
   sortDir.value = 'asc'
 }
 
-watch([searchQuery, statusFilter, sortKey, sortDir], () => {
+watch([searchQuery, statusFilter, tagFilter, sortKey, sortDir], () => {
   currentHostPage.value = 1
 })
 

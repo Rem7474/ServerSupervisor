@@ -46,6 +46,18 @@
             required
           >
         </div>
+        <div class="col-12">
+          <label class="form-label">Tags</label>
+          <input
+            v-model="editForm.tags"
+            type="text"
+            class="form-control"
+            placeholder="prod, site-lyon"
+          >
+          <div class="form-hint">
+            Séparés par des virgules.
+          </div>
+        </div>
         <div
           v-if="editError"
           class="col-12"
@@ -139,12 +151,14 @@
 import { computed, ref, watch } from 'vue'
 import apiClient from '../../api'
 import { getApiErrorMessage } from '../../api/client'
+import { parseTagsInput, formatTagsInput } from '../../utils/tags'
 
 interface Host {
   name?: string
   hostname?: string
   ip_address?: string
   os?: string
+  tags?: string[]
 }
 
 interface HostForm {
@@ -152,6 +166,7 @@ interface HostForm {
   hostname: string
   ip_address: string
   os: string
+  tags: string
 }
 
 interface RotateKeyResult {
@@ -173,7 +188,7 @@ const props = withDefaults(defineProps<{
 
 const saving = ref(false)
 const editError = ref('')
-const editForm = ref<HostForm>({ name: '', hostname: '', ip_address: '', os: '' })
+const editForm = ref<HostForm>({ name: '', hostname: '', ip_address: '', os: '', tags: '' })
 const rotateKeyLoading = ref(false)
 const rotateKeyResult = ref<RotateKeyResult | null>(null)
 const rotateCopiedKey = ref(false)
@@ -197,6 +212,7 @@ watch(
       hostname: host?.hostname || '',
       ip_address: host?.ip_address || '',
       os: host?.os || '',
+      tags: formatTagsInput(host?.tags),
     }
   },
   { immediate: true }
@@ -206,7 +222,13 @@ async function saveEdit(): Promise<void> {
   editError.value = ''
   saving.value = true
   try {
-    const res = await apiClient.updateHost(String(props.hostId), editForm.value)
+    const res = await apiClient.updateHost(String(props.hostId), {
+      name: editForm.value.name,
+      hostname: editForm.value.hostname,
+      ip_address: editForm.value.ip_address,
+      os: editForm.value.os,
+      tags: parseTagsInput(editForm.value.tags),
+    })
     emit('updated', res.data)
     emit('close')
   } catch (e: unknown) {
