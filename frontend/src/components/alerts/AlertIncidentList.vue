@@ -332,7 +332,7 @@
               </td>
               <td>
                 <button
-                  v-if="!isCompleted(item) && item.id"
+                  v-if="isAdmin && !isCompleted(item) && item.id"
                   type="button"
                   class="btn btn-sm btn-ghost-secondary"
                   :disabled="resolvingId === item.id"
@@ -471,11 +471,13 @@ const props = withDefaults(defineProps<{
   loading?: boolean
   error?: string
   activeIncidentCount?: number
+  isAdmin?: boolean
 }>(), {
   incidents: () => [],
   loading: false,
   error: '',
   activeIncidentCount: 0,
+  isAdmin: false,
 })
 
 const emit = defineEmits<{

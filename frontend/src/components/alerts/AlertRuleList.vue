@@ -33,8 +33,8 @@
     >
       <EmptyState
         title="Aucune règle d'alerte configurée"
-        subtitle="Créez votre première règle pour commencer à surveiller votre infrastructure."
-        cta-label="Créer ma première alerte"
+        :subtitle="isAdmin ? 'Créez votre première règle pour commencer à surveiller votre infrastructure.' : 'Aucune règle visible sur les hôtes qui vous sont accessibles.'"
+        :cta-label="isAdmin ? 'Créer ma première alerte' : ''"
         @cta="$emit('add')"
       />
     </div>
@@ -64,11 +64,15 @@
             :key="rule.id"
           >
             <td>
-              <label class="form-check form-switch m-0">
+              <label
+                class="form-check form-switch m-0"
+                :title="isAdmin ? '' : 'Réservé aux administrateurs'"
+              >
                 <input
                   class="form-check-input"
                   type="checkbox"
                   :checked="rule.enabled"
+                  :disabled="!isAdmin"
                   @change="$emit('toggle', rule)"
                 >
               </label>
@@ -157,7 +161,10 @@
               </span>
             </td>
             <td>
-              <div class="btn-group">
+              <div
+                v-if="isAdmin"
+                class="btn-group"
+              >
                 <button
                   type="button"
                   class="btn btn-sm btn-ghost-secondary"
@@ -269,6 +276,7 @@ const props = withDefaults(defineProps<{
   loading?: boolean
   fetched?: boolean
   error?: string
+  isAdmin?: boolean
   formatDate: (d: string | undefined) => string
 }>(), {
   rules: () => [],
@@ -276,6 +284,7 @@ const props = withDefaults(defineProps<{
   loading: false,
   fetched: false,
   error: '',
+  isAdmin: false,
 })
 
 defineEmits<{

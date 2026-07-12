@@ -89,13 +89,13 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 		FetchProxmoxLogs: func(ctx context.Context, rule models.AlertRule) ([]string, time.Time) {
 			return alerts.FetchProxmoxAuthFailureLogs(ctx, db, rule)
 		},
-	}))
+	}), db)
 	settingsH := handlers.NewSettingsHandler(settingssvc.NewService(db, cfg, func() string {
 		return handlers.ResolveLatestAgentVersion(cfg)
 	}))
 	notifH := handlers.NewNotificationsHandler(notifssvc.NewService(db, func(ctx context.Context, rule models.AlertRule, hostID string) (float64, bool) {
 		return alerts.CurrentIncidentValue(ctx, db, rule, hostID)
-	}))
+	}), db)
 	pushH := handlers.NewPushHandler(pushSvc)
 	scheduledTaskH := handlers.NewScheduledTaskHandler(scheduledtasksvc.NewService(db, sched, dispatcher), db)
 	gitWebhookH := handlers.NewGitWebhookHandler(gitwebhooksvc.NewService(db, cfg, dispatcher, notifHub, pushSvc))
@@ -297,16 +297,21 @@ func registerPushRoutes(g *gin.RouterGroup, h *handlers.PushHandler) {
 }
 
 func registerAlertRoutes(g *gin.RouterGroup, rulesH *handlers.AlertRulesHandler) {
+	// Hostperm-filtered reads: any authenticated user. Each handler resolves
+	// the caller's scope itself (resolveAlertHostScope, host_authz.go) —
+	// admins and users with no host_permissions rows see everything,
+	// restricted users only see items scoped to their granted hosts.
+	g.GET("/alerts/incidents", rulesH.ListIncidents)
+	g.GET("/alert-rules", rulesH.ListAlertRules)
+
 	admin := g.Group("")
 	admin.Use(AdminOnlyMiddleware())
-	admin.GET("/alerts/incidents", rulesH.ListIncidents)
 	admin.POST("/alerts/incidents/:id/resolve", rulesH.ResolveIncident)
 	admin.GET("/alert-rules/capabilities/agent", rulesH.GetAgentAlertRuleCapabilities)
 	admin.GET("/alert-rules/capabilities/proxmox", rulesH.GetProxmoxAlertRuleCapabilities)
 	admin.GET("/alert-rules/capabilities/synthetic", rulesH.GetSyntheticAlertRuleCapabilities)
 	admin.GET("/alert-rules/capabilities/docker", rulesH.GetDockerAlertRuleCapabilities)
 	admin.GET("/hosts/:id/capabilities", rulesH.GetHostAlertMetrics)
-	admin.GET("/alert-rules", rulesH.ListAlertRules)
 	admin.GET("/alert-rules/:id", rulesH.GetAlertRule)
 	admin.POST("/alert-rules", rulesH.CreateAlertRule)
 	admin.PATCH("/alert-rules/:id", rulesH.UpdateAlertRule)

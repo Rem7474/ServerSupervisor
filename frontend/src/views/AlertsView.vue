@@ -19,7 +19,7 @@
         </div>
         <div class="col-auto ms-auto d-flex gap-2">
           <button
-            v-if="alertsTab === 'rules'"
+            v-if="alertsTab === 'rules' && auth.isAdmin"
             type="button"
             class="btn btn-primary"
             @click="startAddAlert"
@@ -94,6 +94,7 @@
         :loading="loading"
         :fetched="fetched"
         :error="saveError"
+        :is-admin="auth.isAdmin"
         :format-date="(formatDate as any)"
         @add="startAddAlert"
         @edit="(startEditAlert as any)"
@@ -122,6 +123,7 @@
         :loading="incidentsLoading"
         :error="incidentsError"
         :active-incident-count="activeIncidentCount"
+        :is-admin="auth.isAdmin"
         @refresh="loadIncidents"
       />
     </div>
@@ -154,6 +156,9 @@ import ErrorBoundary from '../components/common/ErrorBoundary.vue'
 import { IconAlertTriangle, IconPlus } from '@tabler/icons-vue'
 import { useAlertsPage } from '../composables/useAlertsPage'
 import { onNotificationsMessage } from '../composables/useNotifications'
+import { useAuthStore } from '../stores/auth'
+
+const auth = useAuthStore()
 
 const TAB_TITLES: Record<string, string> = {
   rules: 'Alertes',
