@@ -5,10 +5,12 @@ on:
     branches: [main, develop]
     paths:
       - 'frontend/**'
+      - '!frontend/**/*.md'
       - '.github/workflows/ci-frontend.yml'
   pull_request:
     paths:
       - 'frontend/**'
+      - '!frontend/**/*.md'
       - '.github/workflows/ci-frontend.yml'
 
 permissions:
