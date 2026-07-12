@@ -178,6 +178,19 @@
                     Tâches planifiées
                   </router-link>
                   <router-link
+                    v-if="auth.isAdmin"
+                    to="/runbooks"
+                    class="dropdown-item"
+                    role="menuitem"
+                    @click="secondaryMenuOpen = false"
+                  >
+                    <IconPlayerPlay
+                      :size="16"
+                      class="icon icon-sm me-2"
+                    />
+                    Runbooks
+                  </router-link>
+                  <router-link
                     to="/commands"
                     class="dropdown-item"
                     role="menuitem"
@@ -424,6 +437,7 @@ import {
   IconServer2, IconBell, IconDots, IconShieldLock, IconShieldCheck,
   IconChartLine, IconClock, IconTerminal2, IconTopologyStar3, IconActivity,
   IconBox, IconGitBranch, IconClipboardList, IconUsers, IconSettings, IconServer,
+  IconPlayerPlay,
 } from '@tabler/icons-vue'
 import ErrorBoundary from './components/common/ErrorBoundary.vue'
 import { subscribeHttpErrors, subscribeNetworkOk } from './utils/httpErrorBus'

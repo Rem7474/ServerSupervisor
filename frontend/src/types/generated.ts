@@ -308,6 +308,7 @@ export interface RemoteCommand {
   triggered_by: string;
   audit_log_id?: number /* int64 */;
   scheduled_task_id?: string;
+  runbook_execution_id?: string;
   created_at: string;
   started_at?: string;
   ended_at?: string;
@@ -1084,6 +1085,77 @@ export interface AgentReport {
   custom_tasks?: CustomTaskSummary[];
   tasks_config_yaml?: string;
   timestamp: string;
+}
+
+//////////
+// source: runbook.go
+
+export interface Runbook {
+  id: string;
+  name: string;
+  description: string;
+  created_at: string;
+  updated_at: string;
+  steps: RunbookStep[];
+}
+export interface RunbookStep {
+  id: string;
+  runbook_id: string;
+  position: number /* int */;
+  host_id: string;
+  module: string;
+  action: string;
+  target: string;
+  payload: string;
+  continue_on_failure: boolean;
+}
+/**
+ * RunbookExecution is one run of a runbook, advancing one step at a time as
+ * each step's remote_commands row reaches a terminal state.
+ */
+export interface RunbookExecution {
+  id: string;
+  runbook_id: string;
+  status: string; // running | completed | failed
+  current_step_position: number /* int */;
+  triggered_by: string;
+  started_at: string;
+  completed_at?: string;
+  runbook_name?: string;
+  steps?: RunbookExecutionStep[];
+}
+/**
+ * RunbookExecutionStep is one step's definition joined with the outcome of
+ * the remote_commands row it dispatched (empty Status/CommandID if this step
+ * hasn't been reached yet).
+ */
+export interface RunbookExecutionStep {
+  position: number /* int */;
+  host_id: string;
+  module: string;
+  action: string;
+  target: string;
+  command_id?: string;
+  status?: string;
+  output?: string;
+}
+export interface RunbookStepCreate {
+  host_id: string;
+  module: string;
+  action: string;
+  target: string;
+  payload: string;
+  continue_on_failure: boolean;
+}
+export interface RunbookCreate {
+  name: string;
+  description: string;
+  steps: RunbookStepCreate[];
+}
+export interface RunbookUpdate {
+  name?: string;
+  description?: string;
+  steps?: RunbookStepCreate[];
 }
 
 //////////

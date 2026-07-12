@@ -7,20 +7,21 @@ import "time"
 // RemoteCommand represents any task dispatched to a remote agent.
 // module ∈ "docker" | "apt" | "systemd" | "journal"
 type RemoteCommand struct {
-	ID              string     `json:"id" db:"id"` // UUID v4
-	HostID          string     `json:"host_id" db:"host_id"`
-	Module          string     `json:"module" db:"module"`   // docker | apt | systemd | journal
-	Action          string     `json:"action" db:"action"`   // start, stop, upgrade, logs, list, …
-	Target          string     `json:"target" db:"target"`   // container / service name; empty for apt
-	Payload         string     `json:"payload" db:"payload"` // JSON extra args (e.g. {"working_dir": "…"})
-	Status          string     `json:"status" db:"status"`   // pending | running | completed | failed
-	Output          string     `json:"output" db:"output"`
-	TriggeredBy     string     `json:"triggered_by" db:"triggered_by"`
-	AuditLogID      *int64     `json:"audit_log_id,omitempty" db:"audit_log_id"`
-	ScheduledTaskID *string    `json:"scheduled_task_id,omitempty" db:"scheduled_task_id"`
-	CreatedAt       time.Time  `json:"created_at" db:"created_at"`
-	StartedAt       *time.Time `json:"started_at" db:"started_at"`
-	EndedAt         *time.Time `json:"ended_at" db:"ended_at"`
+	ID                 string     `json:"id" db:"id"` // UUID v4
+	HostID             string     `json:"host_id" db:"host_id"`
+	Module             string     `json:"module" db:"module"`   // docker | apt | systemd | journal
+	Action             string     `json:"action" db:"action"`   // start, stop, upgrade, logs, list, …
+	Target             string     `json:"target" db:"target"`   // container / service name; empty for apt
+	Payload            string     `json:"payload" db:"payload"` // JSON extra args (e.g. {"working_dir": "…"})
+	Status             string     `json:"status" db:"status"`   // pending | running | completed | failed
+	Output             string     `json:"output" db:"output"`
+	TriggeredBy        string     `json:"triggered_by" db:"triggered_by"`
+	AuditLogID         *int64     `json:"audit_log_id,omitempty" db:"audit_log_id"`
+	ScheduledTaskID    *string    `json:"scheduled_task_id,omitempty" db:"scheduled_task_id"`
+	RunbookExecutionID *string    `json:"runbook_execution_id,omitempty" db:"runbook_execution_id"`
+	CreatedAt          time.Time  `json:"created_at" db:"created_at"`
+	StartedAt          *time.Time `json:"started_at" db:"started_at"`
+	EndedAt            *time.Time `json:"ended_at" db:"ended_at"`
 }
 
 type DockerCommandRequest struct {

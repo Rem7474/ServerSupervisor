@@ -30,6 +30,7 @@ import (
 	proxmoxsvc "github.com/serversupervisor/server/internal/services/proxmox"
 	pushsvc "github.com/serversupervisor/server/internal/services/push"
 	releasetrackersvc "github.com/serversupervisor/server/internal/services/releasetracker"
+	runbooksvc "github.com/serversupervisor/server/internal/services/runbook"
 	scheduledtasksvc "github.com/serversupervisor/server/internal/services/scheduledtask"
 	settingssvc "github.com/serversupervisor/server/internal/services/settings"
 	sslsvc "github.com/serversupervisor/server/internal/services/ssl"
@@ -101,8 +102,10 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	scheduledTaskH := handlers.NewScheduledTaskHandler(scheduledtasksvc.NewService(db, sched, dispatcher), db)
 	gitWebhookH := handlers.NewGitWebhookHandler(gitwebhooksvc.NewService(db, cfg, dispatcher, notifHub, pushSvc))
 	releaseTrackerH := handlers.NewReleaseTrackerHandler(releasetrackersvc.NewService(db, cfg, dispatcher, notifHub, pushSvc))
+	runbookH := handlers.NewRunbooksHandler(runbooksvc.NewService(db, dispatcher))
 	agentH.AddCompletionListener(gitWebhookH)
 	agentH.AddCompletionListener(releaseTrackerH)
+	agentH.AddCompletionListener(runbookH)
 
 	proxmoxH := handlers.NewProxmoxHandler(proxmoxsvc.NewService(db, cfg, bus))
 	hostPermH := handlers.NewHostPermissionHandler(hostpermsvc.NewService(db))
@@ -132,6 +135,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	registerUserRoutes(v1, userH)
 	registerGitWebhookRoutes(r, v1, gitWebhookH, webhookRateLimiter)
 	registerReleaseTrackerRoutes(v1, releaseTrackerH)
+	registerRunbookRoutes(v1, runbookH)
 	registerProxmoxRoutes(v1, proxmoxH)
 	registerHostPermissionRoutes(v1, hostPermH)
 	registerUptimeRoutes(v1, uptimeH)
@@ -382,6 +386,22 @@ func registerReleaseTrackerRoutes(g *gin.RouterGroup, h *handlers.ReleaseTracker
 	g.POST("/registry-credentials", h.CreateRegistryCredential)
 	g.PUT("/registry-credentials/:id", h.UpdateRegistryCredential)
 	g.DELETE("/registry-credentials/:id", h.DeleteRegistryCredential)
+}
+
+// registerRunbookRoutes is admin-only: a runbook can name any host and chain
+// several actions across the fleet in one go, a bigger blast radius than a
+// single scheduled task (see handlers.RunbooksHandler's doc comment).
+func registerRunbookRoutes(g *gin.RouterGroup, h *handlers.RunbooksHandler) {
+	admin := g.Group("")
+	admin.Use(AdminOnlyMiddleware())
+	admin.GET("/runbooks", h.ListRunbooks)
+	admin.POST("/runbooks", h.CreateRunbook)
+	admin.GET("/runbooks/:id", h.GetRunbook)
+	admin.PATCH("/runbooks/:id", h.UpdateRunbook)
+	admin.DELETE("/runbooks/:id", h.DeleteRunbook)
+	admin.POST("/runbooks/:id/run", h.RunRunbook)
+	admin.GET("/runbooks/:id/executions", h.ListRunbookExecutions)
+	admin.GET("/runbooks/:id/executions/:execution_id", h.GetRunbookExecution)
 }
 
 func registerProxmoxRoutes(g *gin.RouterGroup, h *handlers.ProxmoxHandler) {
