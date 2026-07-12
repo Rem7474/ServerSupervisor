@@ -1,5 +1,6 @@
 import { ref, computed, onMounted } from 'vue'
 import apiClient from '../api'
+import { isNeverConnectedHost } from '../utils/hosts'
 
 /**
  * Aggregates signals the backend already detects but that are otherwise only
@@ -37,10 +38,6 @@ function isTrackerMonitorOnly(t: ReleaseTrackerLike): boolean {
   return !t.custom_task_id
 }
 
-// A host whose last_seen is still within a few seconds of its created_at has
-// never actually reported — RegisterHost stamps last_seen=now() at creation,
-// and only a real agent report moves it meaningfully later than that.
-const NEVER_SEEN_TOLERANCE_MS = 60_000
 const SSL_WARNING_DAYS = 14
 
 export function useAttentionCenter() {
@@ -66,16 +63,7 @@ export function useAttentionCenter() {
 
     neverConnectedHosts.value =
       hosts.status === 'fulfilled' && Array.isArray(hosts.value.data)
-        ? hosts.value.data.filter((h) => {
-            if (h.status !== 'offline') return false
-            const created = new Date(h.created_at).getTime()
-            const seen = new Date(h.last_seen).getTime()
-            return (
-              Number.isFinite(created) &&
-              Number.isFinite(seen) &&
-              Math.abs(seen - created) < NEVER_SEEN_TOLERANCE_MS
-            )
-          }).length
+        ? hosts.value.data.filter(isNeverConnectedHost).length
         : 0
 
     npmMonitoringOff.value =

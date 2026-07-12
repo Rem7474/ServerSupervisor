@@ -411,9 +411,17 @@
                     {{ host.hostname || 'Non connecté' }}
                   </div>
                   <div
-                    v-if="proxmoxGuestPath(host.id) || (host.tags && host.tags.length > 0)"
+                    v-if="proxmoxGuestPath(host.id) || (host.tags && host.tags.length > 0) || isNeverConnectedHost(host)"
                     class="d-flex flex-wrap gap-1 mt-1"
                   >
+                    <router-link
+                      v-if="isNeverConnectedHost(host)"
+                      :to="`/hosts/${host.id}`"
+                      class="badge bg-yellow-lt text-yellow text-decoration-none"
+                      title="Hôte enregistré, mais l'agent ne s'est jamais connecté — ouvrez la fiche hôte pour régénérer la clé et récupérer la commande d'installation."
+                    >
+                      Installation en attente
+                    </router-link>
                     <router-link
                       v-if="proxmoxGuestPath(host.id)"
                       :to="proxmoxGuestPath(host.id)"
@@ -475,7 +483,14 @@
                 </td>
                 <td>{{ hostMetrics[host.id] ? formatUptime(hostMetrics[host.id]!.uptime) : '-' }}</td>
                 <td class="last-activity-col">
-                  <RelativeTime :date="(host.last_seen as any) || ''" />
+                  <span
+                    v-if="isNeverConnectedHost(host)"
+                    class="text-secondary small"
+                  >Jamais connecté</span>
+                  <RelativeTime
+                    v-else
+                    :date="(host.last_seen as any) || ''"
+                  />
                 </td>
               </tr>
               <tr v-if="hosts.length > 0 && sortedHosts.length === 0">
@@ -582,6 +597,7 @@ import EmptyState from '../components/EmptyState.vue'
 import { IconAlertTriangle, IconPlus, IconListCheck, IconChevronRight } from '@tabler/icons-vue'
 import BulkActionBar from '../components/BulkActionBar.vue'
 import { formatHostStatus, hostStatusClass } from '../utils/formatHostStatus'
+import { isNeverConnectedHost } from '../utils/hosts'
 import { pluralize } from '../utils/formatters'
 import { useDashboard, type DashboardProxmoxLinkRecord } from '../composables/useDashboard'
 import { useAttentionCenter } from '../composables/useAttentionCenter'

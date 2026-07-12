@@ -114,7 +114,7 @@
               <div class="text-secondary small mb-2">
                 Copiez-la maintenant, elle ne sera plus affichee.
               </div>
-              <div class="d-flex align-items-center gap-2 mb-2">
+              <div class="d-flex align-items-center gap-2 mb-3">
                 <div class="bg-dark rounded p-2 flex-fill">
                   <code class="text-light">{{ rotateKeyResult.api_key }}</code>
                 </div>
@@ -126,6 +126,19 @@
                   {{ rotateCopiedKey ? 'Copie' : 'Copier' }}
                 </button>
               </div>
+              <div class="d-flex align-items-center justify-content-between mb-1">
+                <div class="text-secondary small">
+                  Commande d'installation (a executer sur l'hote cible) :
+                </div>
+                <button
+                  type="button"
+                  class="btn btn-outline-light btn-sm"
+                  @click="copyRotatedInstallCmd"
+                >
+                  {{ rotateCopiedInstallCmd ? 'Copie' : 'Copier' }}
+                </button>
+              </div>
+              <pre class="bg-dark text-light p-2 rounded small mb-3 text-wrap">{{ rotatedInstallCmd }}</pre>
               <div class="d-flex align-items-center justify-content-between mb-1">
                 <div class="text-secondary small">
                   Configuration agent :
@@ -152,6 +165,7 @@ import { computed, ref, watch } from 'vue'
 import apiClient from '../../api'
 import { getApiErrorMessage } from '../../api/client'
 import { parseTagsInput, formatTagsInput } from '../../utils/tags'
+import { buildInstallCommand, buildAgentConfig } from '../../utils/agentInstall'
 
 interface Host {
   name?: string
@@ -193,15 +207,16 @@ const rotateKeyLoading = ref(false)
 const rotateKeyResult = ref<RotateKeyResult | null>(null)
 const rotateCopiedKey = ref(false)
 const rotateCopiedConfig = ref(false)
-
-const serverHostname =
-  typeof window !== 'undefined' && window.location?.hostname
-    ? window.location.hostname
-    : 'localhost'
+const rotateCopiedInstallCmd = ref(false)
 
 const rotatedAgentConfig = computed(() => {
-  if (!rotateKeyResult.value) return ''
-  return `server_url: "http://${serverHostname}:8080"\napi_key: "${rotateKeyResult.value.api_key}"\nreport_interval: 30\ncollect_docker: true\ncollect_apt: true`
+  if (!rotateKeyResult.value?.api_key) return ''
+  return buildAgentConfig(rotateKeyResult.value.api_key)
+})
+
+const rotatedInstallCmd = computed(() => {
+  if (!rotateKeyResult.value?.api_key) return ''
+  return buildInstallCommand(rotateKeyResult.value.api_key)
 })
 
 watch(
@@ -266,6 +281,15 @@ async function copyRotatedConfig(): Promise<void> {
   rotateCopiedConfig.value = true
   setTimeout(() => {
     rotateCopiedConfig.value = false
+  }, 1500)
+}
+
+async function copyRotatedInstallCmd(): Promise<void> {
+  if (!rotatedInstallCmd.value) return
+  await navigator.clipboard.writeText(rotatedInstallCmd.value)
+  rotateCopiedInstallCmd.value = true
+  setTimeout(() => {
+    rotateCopiedInstallCmd.value = false
   }, 1500)
 }
 </script>

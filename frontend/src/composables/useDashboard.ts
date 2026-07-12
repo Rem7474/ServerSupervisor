@@ -44,6 +44,7 @@ interface DashboardHostRecord {
   ip_address?: string
   os?: string
   agent_version?: string
+  created_at?: string | number | Date | null
   last_seen?: string | number | Date | null
   tags?: string[]
 }
