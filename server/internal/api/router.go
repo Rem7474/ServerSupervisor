@@ -63,6 +63,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 		return handlers.ResolveLatestAgentVersion(cfg)
 	}, bus))
 	wsH := ws.NewWSHandler(db, cfg, notifHub, bus)
+	dispatcher.SetAgentPusher(wsH.GetAgentHub())
 	agentH := handlers.NewAgentHandler(db, cfg, wsH.GetStreamHub(), notifHub, bus)
 	aptH := handlers.NewAptHandler(aptsvc.NewService(db, dispatcher), db)
 	dockerH := handlers.NewDockerHandler(dockersvc.NewService(db, dispatcher), db)
@@ -112,7 +113,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 
 	registerPublicRoutes(r, authH, db)
 	registerWSRoutes(r, wsH, cfg)
-	registerAgentRoutes(r, db, cfg, agentH, agentRateLimiter)
+	registerAgentRoutes(r, db, cfg, agentH, wsH, agentRateLimiter)
 
 	v1 := r.Group("/api/v1")
 	v1.Use(JWTMiddleware(cfg))
@@ -172,7 +173,7 @@ func registerWSRoutes(r *gin.Engine, h *ws.WSHandler, cfg *config.Config) {
 	g.GET("/notifications", h.NotificationStream)
 }
 
-func registerAgentRoutes(r *gin.Engine, db *database.DB, cfg *config.Config, h *handlers.AgentHandler, rl *IPRateLimiter) {
+func registerAgentRoutes(r *gin.Engine, db *database.DB, cfg *config.Config, h *handlers.AgentHandler, wsH *ws.WSHandler, rl *IPRateLimiter) {
 	g := r.Group("/api/agent")
 	g.Use(RateLimiterMiddleware(rl))
 	g.Use(APIKeyMiddleware(db, cfg))
@@ -181,6 +182,8 @@ func registerAgentRoutes(r *gin.Engine, db *database.DB, cfg *config.Config, h *
 	g.POST("/command/stream", h.StreamCommandOutput)
 	g.POST("/apt-status", h.ReceiveAptStatus)
 	g.POST("/audit", h.LogAuditAction)
+	// Optional low-latency command push channel — see ws.WSHandler.AgentChannel.
+	g.GET("/ws", wsH.AgentChannel)
 }
 
 func registerAuthRoutes(g *gin.RouterGroup, h *handlers.AuthHandler) {

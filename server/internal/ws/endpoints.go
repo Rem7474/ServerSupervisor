@@ -1,6 +1,7 @@
 package ws
 
 import (
+	"context"
 	"net/http"
 	"time"
 
@@ -8,6 +9,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/serversupervisor/server/internal/events"
 	"github.com/serversupervisor/server/internal/models"
+	"github.com/serversupervisor/server/internal/safego"
 )
 
 func (h *WSHandler) Dashboard(c *gin.Context) {
@@ -49,6 +51,84 @@ func (h *WSHandler) Apt(c *gin.Context) {
 	h.serveSnapshot(c, false, []string{events.TopicApt}, func(conn *websocket.Conn, lastHash *string) error {
 		return h.sendAptSnapshot(ctx, conn, lastHash)
 	})
+}
+
+// agentInboundMessage is the shape of app-level messages an agent sends over
+// its push connection. Only "heartbeat" is meaningful today — the connection
+// itself already proves liveness via WS ping/pong; the heartbeat exists to
+// make that traffic explicit and app-level, and to leave room for the agent
+// to report something more useful here later without a wire-format change.
+type agentInboundMessage struct {
+	Type string `json:"type"`
+}
+
+// AgentChannel is a persistent, agent-initiated WebSocket connection used to
+// push newly dispatched commands to the agent immediately (see AgentHub)
+// instead of it waiting out its next poll interval. It sits on the same
+// /api/agent route group as the REST report endpoints, so it is
+// authenticated by the same APIKeyMiddleware — host_id is already in the gin
+// context by the time this runs. Purely optional from the agent's point of
+// view: an agent that never connects here keeps working exactly as before
+// via the existing poll/report cycle, just without the latency win.
+func (h *WSHandler) AgentChannel(c *gin.Context) {
+	hostID := c.GetString("host_id")
+	if hostID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	ip := c.ClientIP()
+	if !h.acquireConn(ip) {
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": "too many WebSocket connections from this IP"})
+		return
+	}
+	defer h.releaseConn(ip)
+
+	conn, err := h.upgrader().Upgrade(c.Writer, c.Request, nil)
+	if err != nil {
+		return
+	}
+	defer func() {
+		h.agentHub.Unregister(hostID, conn)
+		releaseWriteGuard(conn)
+		_ = conn.Close()
+	}()
+
+	h.agentHub.Register(hostID, conn)
+
+	_ = conn.SetReadDeadline(time.Now().Add(wsPongWait))
+	conn.SetPongHandler(func(string) error {
+		return conn.SetReadDeadline(time.Now().Add(wsPongWait))
+	})
+
+	pingTicker := time.NewTicker(wsPingInterval)
+	defer pingTicker.Stop()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		defer safego.Recover(context.Background(), "ws.agentChannel.readLoop")
+		for {
+			var msg agentInboundMessage
+			if err := conn.ReadJSON(&msg); err != nil {
+				return
+			}
+			// Any well-formed inbound message (heartbeat today) is itself
+			// proof of liveness, same as a protocol pong.
+			_ = conn.SetReadDeadline(time.Now().Add(wsPongWait))
+		}
+	}()
+
+	for {
+		select {
+		case <-done:
+			return
+		case <-pingTicker.C:
+			if err := safeWriteMessage(conn, websocket.PingMessage, nil); err != nil {
+				return
+			}
+		}
+	}
 }
 
 // serveSnapshot upgrades the connection then pushes the snapshot event-driven:
