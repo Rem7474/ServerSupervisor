@@ -5,10 +5,12 @@ on:
     branches: [main, develop]
     paths:
       - 'server/**'
+      - '!server/**/*.md'
       - '.github/workflows/ci-server.yml'
   pull_request:
     paths:
       - 'server/**'
+      - '!server/**/*.md'
       - '.github/workflows/ci-server.yml'
 
 permissions:

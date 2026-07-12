@@ -1,6 +1,6 @@
 # ServerSupervisor
 
-Système de supervision d'infrastructure : monitoring de VMs, conteneurs Docker, mises à jour APT, services systemd, tâches planifiées, suivi des releases GitHub et supervision Proxmox VE via API.
+Système de supervision d'infrastructure : monitoring de VMs, conteneurs Docker, mises à jour APT, services systemd, tâches planifiées, suivi des releases GitHub, supervision Proxmox VE via API et monitoring synthétique (sondes uptime, certificats SSL, intégration Nginx Proxy Manager).
 
 ## Architecture
 
@@ -17,6 +17,9 @@ Système de supervision d'infrastructure : monitoring de VMs, conteneurs Docker,
 │  └──────────┘ └──────────┘ └──────────┘ └────────────────┘   │
 │  ┌──────────────────────────┐ ┌─────────────────────────┐    │
 │  │ Tâches planifiées (cron) │ │ Proxmox VE (nœuds/VMs)  │    │
+│  └──────────────────────────┘ └─────────────────────────┘    │
+│  ┌──────────────────────────┐ ┌─────────────────────────┐    │
+│  │ NPM / Uptime / SSL       │ │ Notifications (Push)    │    │
 │  └──────────────────────────┘ └─────────────────────────┘    │
 ├────────────────────────────────────────────────────────────────┤
 │               Server Go (API REST + WebSocket + JWT)           │
@@ -55,14 +58,17 @@ Système de supervision d'infrastructure : monitoring de VMs, conteneurs Docker,
 - **Détail hôte** : exécution à distance de commandes systemd (start/stop/restart/enable/disable), logs journalctl streamés, snapshot des processus — directement depuis la page hôte
 - **Streaming commandes** : affichage en temps réel de la sortie des commandes longues via WebSocket
 - **Versions** : suivi des releases GitHub et comparaison avec les images Docker en cours
+- **Monitoring** : sondes HTTP/TCP synthétiques (uptime) et suivi d'expiration des certificats SSL/TLS, historique et stats par sonde sur `/monitoring`
 - **Audit → Commandes** : historique paginé de toutes les commandes (apt/docker/systemd/journal/processus), toutes sources
 - **Audit → Connexions** : logs de connexion avec statistiques et IPs bloquées (admin)
 - **Tâches planifiées** : création de tâches cron par hôte (apt, docker, systemd, journal, processus ou custom), déclenchement manuel immédiat, historique des exécutions
 - **Alertes** : règles d'alertes configurables avec notifications email (SMTP), ntfy, webhook ou notifications navigateur
+- **Notifications** : centre de notifications in-app sur `/notifications` + push navigateur (Web Push/VAPID), en complément des canaux SMTP/ntfy/webhook des alertes
 - **Compte → Sécurité** : gestion MFA/2FA du compte utilisateur sur `/account/security`
-- **Sécurité (admin)** : analytics sécurité hôtes sur `/security` (connexions, IPs bloquées), stats trafic web sur `/traffic`, menaces web sur `/threats`
+- **Sécurité (admin)** : analytics sécurité hôtes sur `/security` (connexions, IPs bloquées, corrélation CrowdSec si activée côté agent), stats trafic web sur `/traffic`, menaces web sur `/threats`
 - **UI cohérente** : barres de recherche/filtres/tri harmonisées sur les vues principales (Docker, APT, Audit)
 - **Proxmox VE** : supervision de l'infrastructure de virtualisation via API Proxmox (sans agent sur l'hyperviseur) — nœuds, VMs QEMU, conteneurs LXC, stockage ; polling configurable par connexion
+- **NPM (Nginx Proxy Manager)** : connexion à une ou plusieurs instances NPM, import sélectif de proxy hosts, création automatique des sondes uptime/certificats SSL correspondants, activation du monitoring par host
 
 ### Proxmox VE (supervision sans agent)
 - Connexion à un ou plusieurs clusters / nœuds Proxmox via l'API REST officielle (token API)
@@ -78,6 +84,13 @@ Système de supervision d'infrastructure : monitoring de VMs, conteneurs Docker,
 - Configuration dans **Paramètres** : ajout/édition/suppression de connexions, bouton **Tester** (sans sauvegarder), déclenchement manuel d'un poll
 - Sécurité : `token_secret` stocké en base, jamais retourné au frontend ; `insecure_skip_verify` désactivé par défaut
 
+### NPM (Nginx Proxy Manager)
+- Connexion à une ou plusieurs instances [Nginx Proxy Manager](https://nginxproxymanager.com/) via son API REST (identity + secret)
+- Import sélectif des proxy hosts existants (modal à cocher) — pas de découverte automatique périodique ; seul un rafraîchissement léger (`npm_enabled`, `last_seen_at`) tourne en arrière-plan sur les hosts déjà importés
+- Pour chaque proxy host importé : création automatique d'une sonde uptime HTTP et d'un certificat SSL suivi (voir Monitoring), avec un interrupteur maître + deux sous-interrupteurs (uptime / SSL) par host
+- Vue `/npm` : gestion des connexions (admin) + liste des proxy hosts importés
+- Sécurité : `secret` stocké en base, jamais retourné au frontend (même modèle que le `token_secret` Proxmox)
+
 ### Agent
 - Collecte automatique : CPU, RAM, disques, réseau, uptime
 - Monitoring Docker via CLI (conteneurs, réseaux, projets compose, variables d'environnement)
@@ -85,6 +98,7 @@ Système de supervision d'infrastructure : monitoring de VMs, conteneurs Docker,
 - Collecte S.M.A.R.T. et métriques disques (via `smartctl`)
 - Collecte web logs unifiée (Nginx/Apache/httpd/NPM) : trafic + menaces en un seul parsing
 - Ingestion incrémentale des logs web via cursor persistant (évite de relire les mêmes lignes à chaque cycle)
+- **Corrélation CrowdSec** (optionnelle, désactivée par défaut) : rapproche le trafic web collecté des décisions actives de l'API locale CrowdSec (bans/captcha) — nécessite `collect_web_logs: true` et une clé bouncer CrowdSec
 - Exécution de commandes distantes : APT, Docker/Compose, systemd, journalctl, snapshot processus
 - **Tâches custom** : exécution de scripts/binaires locaux pré-déclarés dans `tasks.yaml` (allowlist, sans shell, sans exécution de code arbitraire distant)
 - Streaming temps réel de la sortie des commandes longues (chunk par chunk)
@@ -293,6 +307,9 @@ sudo journalctl -u serversupervisor-agent -f
 | `BASE_URL` | URL publique (CORS + WebSocket) | `http://localhost:8080` |
 | `TRUSTED_PROXIES` | CIDRs des reverse proxies (ex: `172.18.0.0/16`) | `` |
 | `ALLOWED_ORIGINS` | Origins CORS supplémentaires autorisées (virgule) | `` |
+| `APP_ENV` | `dev`/`development` assouplit la validation stricte des secrets (JWT auto-généré) ; toute autre valeur = production stricte | `production` |
+| `LOG_LEVEL` | Niveau de log (`debug`/`info`/`warn`/`error`) | `info` |
+| `LOG_FORMAT` | Format de log (`json`/`text`) | `text` en dev, `json` sinon |
 
 #### Base de données
 | Variable | Description | Défaut |
@@ -681,6 +698,48 @@ Métriques additionnelles disponibles pour les règles d'alertes :
 - `npm_traffic_bytes`
 - `npm_5xx_errors`
 
+#### Notifications & Push
+| Méthode | Endpoint | Description | Rôle |
+|---|---|---|---|
+| `GET` | `/api/v1/notifications` | Centre de notifications in-app | Authentifié |
+| `POST` | `/api/v1/notifications/mark-read` | Marquer comme lues | Authentifié |
+| `GET` | `/api/v1/push/vapid-public-key` | Clé publique VAPID | Authentifié |
+| `POST` | `/api/v1/push/subscribe` | Enregistrer un abonnement Web Push | Authentifié |
+| `DELETE` | `/api/v1/push/subscribe` | Supprimer l'abonnement | Authentifié |
+
+#### Monitoring (sondes uptime & certificats SSL)
+| Méthode | Endpoint | Description | Rôle |
+|---|---|---|---|
+| `GET` | `/api/v1/uptime/probes` | Liste des sondes uptime | Authentifié |
+| `GET` | `/api/v1/uptime/probes/:id` | Détail d'une sonde | Authentifié |
+| `GET` | `/api/v1/uptime/probes/:id/history` | Historique des checks | Authentifié |
+| `GET` | `/api/v1/uptime/probes/:id/stats` | Statistiques agrégées | Authentifié |
+| `POST` | `/api/v1/uptime/probes` | Créer une sonde | Admin |
+| `PUT` | `/api/v1/uptime/probes/:id` | Modifier une sonde | Admin |
+| `DELETE` | `/api/v1/uptime/probes/:id` | Supprimer une sonde | Admin |
+| `POST` | `/api/v1/uptime/probes/:id/check-now` | Vérification immédiate | Admin |
+| `GET` | `/api/v1/ssl/certificates` | Liste des certificats suivis | Authentifié |
+| `GET` | `/api/v1/ssl/certificates/:id` | Détail d'un certificat | Authentifié |
+| `GET` | `/api/v1/ssl/certificates/:id/history` | Historique des checks | Authentifié |
+| `POST` | `/api/v1/ssl/certificates` | Ajouter un certificat à suivre | Admin |
+| `PUT` | `/api/v1/ssl/certificates/:id` | Modifier | Admin |
+| `DELETE` | `/api/v1/ssl/certificates/:id` | Supprimer | Admin |
+| `POST` | `/api/v1/ssl/certificates/:id/check-now` | Vérification immédiate | Admin |
+
+#### NPM (Nginx Proxy Manager)
+| Méthode | Endpoint | Description | Rôle |
+|---|---|---|---|
+| `GET` | `/api/v1/npm/connections` | Liste des connexions NPM (sans secrets) | Authentifié |
+| `GET` | `/api/v1/npm/connections/:id/proxy-hosts` | Proxy hosts importés d'une connexion | Authentifié |
+| `GET` | `/api/v1/npm/proxy-hosts` | Tous les proxy hosts importés | Authentifié |
+| `POST` | `/api/v1/npm/connections` | Créer une connexion | Admin |
+| `PUT` | `/api/v1/npm/connections/:id` | Modifier une connexion | Admin |
+| `DELETE` | `/api/v1/npm/connections/:id` | Supprimer une connexion | Admin |
+| `POST` | `/api/v1/npm/connections/test` | Tester sans sauvegarder | Admin |
+| `POST` | `/api/v1/npm/connections/:id/refresh-now` | Rafraîchir immédiatement | Admin |
+| `PATCH` | `/api/v1/npm/proxy-hosts/:id` | Modifier le monitoring d'un proxy host | Admin |
+| `PATCH` | `/api/v1/npm/proxy-hosts/:id/npm-enabled` | Activer/désactiver le suivi | Admin |
+
 #### Utilisateurs (admin)
 | Méthode | Endpoint | Description |
 |---|---|---|
@@ -755,8 +814,9 @@ Métriques additionnelles disponibles pour les règles d'alertes :
 | `/api/v1/ws/network` | Flux réseau |
 | `/api/v1/ws/apt` | Flux statut APT |
 | `/api/v1/ws/commands/stream/:id` | Sortie live d'une commande par UUID |
+| `/api/v1/ws/notifications` | Flux notifications (in-app + déclenche le push) |
 
-> Authentification WebSocket : envoyer `{"type":"auth","token":"<jwt>"}` après connexion, ou passer `?token=<jwt>` en query string.
+> Authentification WebSocket : cookie de session envoyé automatiquement à la connexion, avec repli sur l'envoi de `{"type":"auth","token":"<jwt>"}` en message une fois la connexion établie (pour les clients qui ne peuvent pas compter sur le cookie). Il n'y a **pas** de fallback `?token=` en query string — retiré volontairement (fuite potentielle dans les logs de proxy/l'historique navigateur).
 
 #### Agent (API Key requise)
 | Méthode | Endpoint | Description |
@@ -781,8 +841,8 @@ Métriques additionnelles disponibles pour les règles d'alertes :
 ## Développement
 
 ### Prérequis
-- Go 1.22+
-- Node.js 20+
+- Go 1.25+ (version exacte dans `server/go.mod` / `agent/go.mod`)
+- Node.js 22+ (utilisé en CI ; le Dockerfile build sur Node 26)
 - TimescaleDB 2.27.2 (PostgreSQL 16) — prérequis obligatoire (hypertables, time_bucket, retention policies)
 
 ### Développement local
@@ -818,82 +878,54 @@ cd frontend && npm run build
 
 ```
 ServerSupervisor/
-├── server/                         # Serveur Go
-│   ├── cmd/server/main.go
+├── server/                          # API Go (Gin) + WebSocket + scheduler + pollers
+│   ├── cmd/server/main.go           # Bootstrap : config, migrations, background jobs, HTTP server
 │   └── internal/
-│       ├── api/
-│       │   ├── router.go           # Routes & middleware (retourne ReleaseTrackerHandler + ProxmoxHandler)
-│       │   ├── auth.go             # Auth + MFA + login events
-│       │   ├── agent.go            # API agent (rapport, commandes, audit)
-│       │   ├── audit.go            # Audit logs + historique commandes
-│       │   ├── hosts.go            # Gestion hôtes + disques
-│       │   ├── docker.go           # Docker + Compose
-│       │   ├── system.go           # Systemd + journal + processus
-│       │   ├── apt.go              # APT management
-│       │   ├── scheduled_tasks.go  # Tâches planifiées (CRUD + run)
-│       │   ├── network.go          # Topologie réseau
-│       │   ├── alert_rules.go      # Règles d'alertes (CRUD unifié)
-│       │   ├── alerts.go           # Incidents d'alertes
-│       │   ├── users.go            # Gestion utilisateurs (RBAC)
-│       │   ├── settings.go         # Settings dynamiques (DB)
-│       │   ├── ws.go               # WebSocket handlers
-│       │   ├── command_stream.go   # Hub streaming commandes
-│       │   └── middleware.go       # JWT, API Key, CORS, rate limiter
-│       ├── alerts/engine.go        # Moteur d'évaluation des alertes
-│       ├── config/config.go        # Config + OverrideFromDB
-│       ├── database/               # Couche TimescaleDB/PostgreSQL (db_*.go)
-│       │   ├── db_proxmox.go       # CRUD + upsert Proxmox (connexions, nœuds, guests, storages)
-│       │   ├── db_scheduled_tasks.go
-│       │   ├── db_webhooks.go
-│       │   ├── db_release_trackers.go
-│       │   └── migrations/         # Migrations SQL (001 → 027)
-│       ├── github/                 # GitHub release tracker
-│       ├── handlers/
-│       │   ├── proxmox.go          # ProxmoxHandler : CRUD connexions + poller (30s tick)
-│       │   ├── release_trackers.go
-│       │   └── git_webhooks.go
-│       ├── proxmoxclient/
-│       │   └── client.go           # Client HTTP Proxmox VE (PVEAPIToken, TLS, endpoints)
-│       ├── scheduler/scheduler.go  # Scheduler cron (robfig/cron)
-│       └── models/
-│           ├── proxmox.go          # ProxmoxConnection, ProxmoxNode, ProxmoxGuest, ProxmoxStorage
-│           └── models.go           # Autres modèles partagés
-├── agent/                          # Agent Go (déployé dans les VMs — pas sur Proxmox)
-│   ├── cmd/agent/main.go
+│       ├── api/                     # router.go (routes/middleware wiring) + middleware.go (JWT/CSRF/rate limit)
+│       ├── handlers/                # Traduction HTTP : bind → service → respondError (fichiers par domaine)
+│       ├── services/<domaine>/      # Logique métier + port Repository, un package par domaine :
+│       │                            #   agent, alertrule, apt, audit, authn, docker, gitwebhook, host, hostperm,
+│       │                            #   network, notifications, npm, proxmox, push, releasetracker,
+│       │                            #   scheduledtask, settings, ssl, uptime, user, weblogs
+│       ├── database/                # Implémentation des ports Repository (db_*.go) + migrations/*.sql
+│       ├── models/                  # Structs partagés, un fichier par domaine (pas de models.go unique)
+│       ├── apperr/                  # Erreurs typées → enveloppe HTTP uniforme {"error","code"}
+│       ├── events/                  # Bus pub/sub in-process (déclenche les push WebSocket sur écriture)
+│       ├── ws/                      # WSHandler, CommandStreamHub, NotificationHub (snapshots event-driven)
+│       ├── alerts/                  # Moteur d'évaluation des règles (engine/metrics/authfailures/severity/notify)
+│       ├── background/              # Jobs supervisés : audit cleanup, host status, alert eval, rétentions, uptime, SSL
+│       ├── safego/                  # Helper recover()+log partagé, utilisé par toute goroutine détachée
+│       ├── poller/                  # Boucle générique Every(ctx, interval, ...)
+│       ├── scheduler/               # Scheduler cron (tâches planifiées)
+│       ├── dispatch/                # Persistance des remote_commands (file de commandes agent)
+│       ├── proxmoxclient/           # Client HTTP Proxmox VE
+│       ├── npmclient/               # Client HTTP Nginx Proxy Manager
+│       ├── gitprovider/             # Client releases GitHub/GitLab/Gitea
+│       ├── releasetracker/          # Helpers purs de comparaison de version (pas le tracker lui-même)
+│       ├── synthetic/               # Sondes uptime HTTP/TCP + vérification de certificats SSL
+│       ├── config/                  # Config env vars + override runtime depuis la table settings
+│       └── notify/                  # Envoi SMTP + ntfy + template HTML d'alerte
+├── agent/                           # Collecteur Go déployé sur chaque VM/hôte supervisé (pas sur Proxmox)
+│   ├── cmd/agent/main.go            # Flags, --init, --internal-update, --internal-healthcheck
 │   └── internal/
-│       ├── collector/              # system.go, docker.go, apt.go, disk.go…
-│       ├── config/
-│       │   ├── config.go           # Config YAML + env vars
-│       │   └── tasks.go            # Loader tasks.yaml (tâches custom)
-│       └── sender/sender.go        # Envoi rapports + commandes
-├── frontend/                       # Dashboard Vue.js (Tabler CSS)
+│       ├── reporter/                # Collecte parallèle → POST /api/agent/report
+│       ├── dispatcher/              # Exécution des commandes (mutex apt + sémaphore + registry par module)
+│       ├── collector/               # Un fichier par domaine : system, docker, apt, disk, web_logs, systemd,
+│       │                            #   journal, processes, crowdsec
+│       ├── sender/                  # Structs Report/PendingCommand/CommandResult + client HTTP
+│       └── config/                  # Config YAML + env vars ; tasks.go charge tasks.yaml
+├── frontend/                        # SPA Vue 3 + TypeScript (Tabler CSS)
 │   └── src/
-│       ├── api/index.js            # Client API axios (inclut méthodes Proxmox)
-│       ├── router/index.js         # Routes SPA
-│       ├── stores/auth.js          # Store Pinia (auth + rôle)
-│       ├── components/settings/
-│       │   ├── SettingsProxmoxCard.vue  # Gestion connexions Proxmox (admin)
-│       │   └── …                        # Autres cartes Settings
-│       └── views/
-│           ├── DashboardView.vue
-│           ├── HostDetailView.vue       # Dashboard hôte (métriques, docker, systemd, journal, processus)
-│           ├── ProxmoxView.vue          # Vue globale Proxmox (/proxmox)
-│           ├── ProxmoxNodeView.vue      # Détail nœud (/proxmox/nodes/:id)
-│           ├── DockerView.vue
-│           ├── NetworkView.vue
-│           ├── AptView.vue
-│           ├── AuditLogsView.vue        # Commandes + Connexions
-│           ├── AlertsView.vue
-│           ├── SecurityView.vue
-│           ├── SettingsView.vue
-│           ├── UsersView.vue
-│           └── AccountView.vue
-├── .github/workflows/
-│   ├── release.yml                 # Release multi-arch (agent + image Docker)
-│   ├── ci-server.yml
-│   ├── ci-agent.yml
-│   └── ci-frontend.yml
-├── docker-compose.yml
+│       ├── api/                     # client.ts (axios + intercepteurs CSRF/401) + modules par domaine
+│       ├── router/                  # Routes lazy-loaded + retry sur ChunkLoadError
+│       ├── stores/                  # Pinia : auth, hosts, dashboard, alertRules
+│       ├── composables/             # useWebSocket, useDashboard, useHostDetail, use<Domaine> par vue
+│       ├── components/              # Organisés par domaine (proxmox/, npm/, security/, settings/, ...)
+│       ├── views/                   # Une vue par route
+│       └── types/                   # generated.ts (généré par tygo depuis les modèles Go) + types par domaine
+├── protocol/                        # Fixture golden du contrat agent↔serveur + README
+├── .github/workflows/               # ci-{server,agent,frontend}.yml, release.yml, security.yml, pr-checks.yml, stale.yml
+├── docker-compose.yml                # postgres (TimescaleDB) + server + postgres-backup
 ├── .env.example
 └── README.md
 ```

@@ -5,10 +5,12 @@ on:
     branches: [main, develop]
     paths:
       - 'agent/**'
+      - '!agent/**/*.md'
       - '.github/workflows/ci-agent.yml'
   pull_request:
     paths:
       - 'agent/**'
+      - '!agent/**/*.md'
       - '.github/workflows/ci-agent.yml'
 
 permissions:
