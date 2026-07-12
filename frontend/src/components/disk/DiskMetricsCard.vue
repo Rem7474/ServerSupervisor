@@ -70,6 +70,14 @@
               <div class="text-muted small">
                 {{ metric.used_percent.toFixed(1) }}%
               </div>
+              <div
+                v-if="metric.forecast_days_until_full != null"
+                class="small mt-1"
+                :class="forecastClass(metric.forecast_days_until_full)"
+                :title="`Estimation basée sur la tendance des 30 derniers jours`"
+              >
+                Saturation dans ~{{ Math.round(metric.forecast_days_until_full) }} j
+              </div>
             </td>
             <td>
               <span
@@ -126,6 +134,12 @@ function getProgressBarClass(percent: number): string {
   if (percent >= 80) return 'bg-warning'
   if (percent >= 70) return 'bg-info'
   return 'bg-success'
+}
+
+function forecastClass(days: number): string {
+  if (days <= 14) return 'text-danger'
+  if (days <= 30) return 'text-warning'
+  return 'text-muted'
 }
 </script>
 

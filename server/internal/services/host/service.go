@@ -297,13 +297,31 @@ func (s *Service) Dashboard(ctx context.Context, id string) (*HostDashboard, err
 	return &HostDashboard{Host: host, Metrics: metrics, Containers: containers, AptStatus: aptStatus}, nil
 }
 
-// DiskMetrics returns the latest disk metrics for a host (never nil).
+// DiskMetrics returns the latest disk metrics for a host (never nil), each
+// enriched with a best-effort saturation forecast (see attachDiskForecast).
 func (s *Service) DiskMetrics(ctx context.Context, id string) ([]models.DiskMetrics, error) {
 	m, err := s.repo.GetLatestDiskMetrics(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	return nonNilDiskMetrics(m), nil
+	metrics := nonNilDiskMetrics(m)
+	for i := range metrics {
+		s.attachDiskForecast(ctx, id, &metrics[i])
+	}
+	return metrics, nil
+}
+
+// attachDiskForecast fills ForecastDaysUntilFull from the mount point's last
+// 30 days of usage trend. Best-effort: a failure to fetch trend data just
+// leaves the forecast unset, it never fails the whole disk-metrics response.
+func (s *Service) attachDiskForecast(ctx context.Context, hostID string, m *models.DiskMetrics) {
+	trend, _, err := s.repo.GetDiskMetricsAggregated(ctx, hostID, m.MountPoint, 24*30)
+	if err != nil {
+		return
+	}
+	if days, ok := forecastDiskDaysUntilFull(trend); ok {
+		m.ForecastDaysUntilFull = &days
+	}
 }
 
 // DiskMetricsHistory returns a mount point's recent samples (never nil).
