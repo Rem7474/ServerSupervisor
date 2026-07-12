@@ -467,7 +467,17 @@
                   class="mb-2"
                 >
                   <div class="d-flex justify-content-between small mb-1">
-                    <span class="font-monospace">{{ h.vhost || h.host_name || h.host_id || '(unknown)' }}</span>
+                    <router-link
+                      v-if="h.host_id"
+                      :to="`/hosts/${h.host_id}`"
+                      class="font-monospace text-decoration-none"
+                    >
+                      {{ h.vhost || h.host_name || h.host_id }}
+                    </router-link>
+                    <span
+                      v-else
+                      class="font-monospace"
+                    >{{ h.vhost || h.host_name || '(unknown)' }}</span>
                     <span>{{ numberFormat(h.hits || 0) }}</span>
                   </div>
                   <div
@@ -591,7 +601,14 @@
                   {{ r.ip }}
                 </td>
                 <td class="small">
-                  {{ r.domain || r.host || r.host_name || r.host_id || '-' }}
+                  <router-link
+                    v-if="r.host_id"
+                    :to="`/hosts/${r.host_id}`"
+                    class="text-decoration-none"
+                  >
+                    {{ r.domain || r.host || r.host_name || r.host_id }}
+                  </router-link>
+                  <span v-else>{{ r.domain || r.host || r.host_name || '-' }}</span>
                 </td>
                 <td><span class="badge bg-blue-lt text-blue">{{ r.method }}</span></td>
                 <td

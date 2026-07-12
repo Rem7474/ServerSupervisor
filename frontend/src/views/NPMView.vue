@@ -161,17 +161,19 @@
                       @change="toggle(h, 'uptime_monitoring_enabled', ($event.target as HTMLInputElement).checked)"
                     >
                   </label>
-                  <span
+                  <router-link
                     v-if="h.uptime_probe_id && h.uptime_status"
-                    class="badge small"
+                    :to="`/monitoring/probes/${h.uptime_probe_id}`"
+                    class="badge small text-decoration-none"
                     :class="uptimeBadge(h.uptime_status)"
+                    title="Voir la sonde uptime"
                   >
                     {{ h.uptime_status }}
                     <span
                       v-if="h.uptime_last_latency_ms"
                       class="ms-1 opacity-75"
                     >{{ h.uptime_last_latency_ms }}ms</span>
-                  </span>
+                  </router-link>
                   <span
                     v-else-if="!h.uptime_probe_id"
                     class="text-muted"
@@ -193,11 +195,15 @@
                       @change="toggle(h, 'ssl_monitoring_enabled', ($event.target as HTMLInputElement).checked)"
                     >
                   </label>
-                  <span
+                  <router-link
                     v-if="h.ssl_certificate_id && h.ssl_days_remaining !== null && h.ssl_days_remaining !== undefined"
-                    class="badge small"
+                    :to="`/monitoring/ssl/${h.ssl_certificate_id}`"
+                    class="badge small text-decoration-none"
                     :class="sslBadge(h.ssl_days_remaining)"
-                  >{{ h.ssl_days_remaining }}j</span>
+                    title="Voir le certificat SSL"
+                  >
+                    {{ h.ssl_days_remaining }}j
+                  </router-link>
                   <span
                     v-else-if="!h.ssl_enabled"
                     class="text-muted"
