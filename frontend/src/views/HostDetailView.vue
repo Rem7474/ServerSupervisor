@@ -337,8 +337,12 @@
 
         <div v-show="activeTab === 'docker'">
           <HostDockerTab
+            :host-id="hostId"
             :containers="(containers as any)"
             :version-comparisons="(versionComparisons as any)"
+            :can-run="canRunApt"
+            @open-command="openCommand"
+            @history-changed="loadCmdHistoryRefresh"
           />
         </div>
 

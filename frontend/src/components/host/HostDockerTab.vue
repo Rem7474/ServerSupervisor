@@ -17,6 +17,7 @@
             <th>Status</th>
             <th>Port interne</th>
             <th>Port hôte exposé</th>
+            <th v-if="canRun" />
           </tr>
         </thead>
         <tbody>
@@ -84,10 +85,92 @@
                 kind="exposed"
               />
             </td>
+            <td
+              v-if="canRun"
+              class="text-end text-nowrap"
+            >
+              <div class="d-flex align-items-center justify-content-end gap-1">
+                <button
+                  v-if="['exited', 'dead', 'created', 'paused'].includes(c.state || '')"
+                  type="button"
+                  :disabled="!!actionLoading[containerKey(c)]"
+                  class="btn btn-sm btn-success"
+                  title="Démarrer"
+                  aria-label="Démarrer le conteneur"
+                  @click="runAction(c, 'start')"
+                >
+                  <span
+                    v-if="actionLoading[containerKey(c)] === 'start'"
+                    class="spinner-border spinner-border-sm"
+                  />
+                  <IconPlayerPlay
+                    v-else
+                    :size="16"
+                    class="icon icon-sm"
+                  />
+                </button>
+                <button
+                  v-if="c.state === 'running'"
+                  type="button"
+                  :disabled="!!actionLoading[containerKey(c)]"
+                  class="btn btn-sm btn-outline-danger"
+                  title="Arrêter"
+                  aria-label="Arrêter le conteneur"
+                  @click="runAction(c, 'stop')"
+                >
+                  <span
+                    v-if="actionLoading[containerKey(c)] === 'stop'"
+                    class="spinner-border spinner-border-sm"
+                  />
+                  <IconPlayerStop
+                    v-else
+                    :size="16"
+                    class="icon icon-sm"
+                  />
+                </button>
+                <button
+                  v-if="c.state === 'running'"
+                  type="button"
+                  :disabled="!!actionLoading[containerKey(c)]"
+                  class="btn btn-sm btn-outline-warning"
+                  title="Redémarrer"
+                  aria-label="Redémarrer le conteneur"
+                  @click="runAction(c, 'restart')"
+                >
+                  <span
+                    v-if="actionLoading[containerKey(c)] === 'restart'"
+                    class="spinner-border spinner-border-sm"
+                  />
+                  <IconRefresh
+                    v-else
+                    :size="16"
+                    class="icon icon-sm"
+                  />
+                </button>
+                <button
+                  type="button"
+                  :disabled="!!actionLoading[containerKey(c)]"
+                  class="btn btn-sm btn-ghost-secondary"
+                  title="Voir les logs"
+                  aria-label="Voir les logs du conteneur"
+                  @click="runAction(c, 'logs')"
+                >
+                  <span
+                    v-if="actionLoading[containerKey(c)] === 'logs'"
+                    class="spinner-border spinner-border-sm"
+                  />
+                  <IconList
+                    v-else
+                    :size="16"
+                    class="icon icon-sm"
+                  />
+                </button>
+              </div>
+            </td>
           </tr>
           <tr v-if="!containers.length">
             <td
-              colspan="8"
+              :colspan="canRun ? 9 : 8"
               class="text-center text-secondary py-4"
             >
               Aucun conteneur Docker actif sur cet hôte.
@@ -100,9 +183,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, toRef } from 'vue'
+import { computed, ref, toRef } from 'vue'
+import { IconPlayerPlay, IconPlayerStop, IconRefresh, IconList } from '@tabler/icons-vue'
 import DockerPortBadges from '../common/DockerPortBadges.vue'
 import { useDockerContainerPorts } from '../../composables/useDockerContainerPorts'
+import { useConfirmDialog } from '../../composables/useConfirmDialog'
+import { addToast } from '../../composables/useGlobalToast'
+import apiClient, { getApiErrorMessage } from '../../api'
 
 interface Container {
   id: string
@@ -124,12 +211,23 @@ interface VersionComparison {
 }
 
 const props = withDefaults(defineProps<{
+  hostId: string | number
   containers?: Container[]
   versionComparisons?: VersionComparison[]
+  canRun?: boolean
 }>(), {
   containers: () => [],
   versionComparisons: () => [],
+  canRun: false,
 })
+
+const emit = defineEmits<{
+  (e: 'open-command', payload: Record<string, unknown>): void
+  (e: 'history-changed'): void
+}>()
+
+const dialog = useConfirmDialog()
+const actionLoading = ref<Record<string, string | null>>({})
 
 const { normalizedPortsForContainer } = useDockerContainerPorts(toRef(props, 'containers'))
 
@@ -143,5 +241,41 @@ const versionMap = computed<Record<string, VersionComparison>>(() => {
 
 function containerVersion(container: Container): VersionComparison | null {
   return versionMap.value[container.image] || versionMap.value[`${container.image}:${container.image_tag}`] || null
+}
+
+function containerKey(container: Container): string {
+  return container.name || container.id
+}
+
+async function runAction(container: Container, action: string): Promise<void> {
+  const name = containerKey(container)
+  if (actionLoading.value[name]) return
+
+  if (action === 'stop' || action === 'restart') {
+    const ok = await dialog.confirm({
+      title: `${action === 'stop' ? 'Arrêter' : 'Redémarrer'} le conteneur`,
+      message: `Confirmer : ${action} du conteneur « ${name} » ?`,
+      variant: 'warning',
+    })
+    if (!ok) return
+  }
+
+  actionLoading.value = { ...actionLoading.value, [name]: action }
+  try {
+    const res = await apiClient.sendDockerCommand(String(props.hostId), name, action)
+    emit('open-command', {
+      id: res.data.command_id,
+      module: 'docker',
+      action,
+      target: name,
+      status: 'pending',
+      output: '',
+    })
+    emit('history-changed')
+  } catch (e: unknown) {
+    addToast(getApiErrorMessage(e, 'Erreur Docker'), 'error', 6000)
+  } finally {
+    actionLoading.value = { ...actionLoading.value, [name]: null }
+  }
 }
 </script>
