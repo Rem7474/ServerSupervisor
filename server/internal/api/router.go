@@ -231,6 +231,7 @@ func registerHostRoutes(g *gin.RouterGroup, h *handlers.HostHandler, agentH *han
 	hostViewer.GET("/disk/metrics/aggregated", h.GetDiskMetricsAggregated)
 	hostViewer.GET("/disk/health", h.GetDiskHealth)
 	hostViewer.GET("/complete", h.GetHostComplete)
+	hostViewer.GET("/exposure", h.GetHostExposure)
 
 	// Write operations on hosts require operator level.
 	hostOperator := g.Group("/hosts/:id")

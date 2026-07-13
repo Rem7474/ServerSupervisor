@@ -635,6 +635,50 @@ export interface DiskHealth {
 }
 
 //////////
+// source: host_exposure.go
+
+/**
+ * HostExposedDomain is one NPM domain that routes to a specific host (matched
+ * by npm_proxy_hosts.forward_host == host.ip_address), enriched with
+ * aggregated web-log traffic for that domain over the requested window. The
+ * traffic rows are looked up by domain, not host_id: they are collected by
+ * whichever agent parses the reverse-proxy's access logs (typically the NPM
+ * host itself), which is usually a different host than the backend this
+ * domain forwards to.
+ */
+export interface HostExposedDomain {
+  proxy_host_id: string;
+  connection_id: string;
+  connection_name: string;
+  domain_names: string[];
+  forward_port: number /* int */;
+  ssl_enabled: boolean;
+  npm_enabled: boolean;
+  requests: number /* int64 */;
+  bytes: number /* int64 */;
+  errors_4xx: number /* int64 */;
+  errors_5xx: number /* int64 */;
+  suspicious_requests: number /* int64 */;
+  blocked_requests: number /* int64 */;
+}
+/**
+ * HostExposure is the compute-on-read correlation result for one host: every
+ * NPM domain that forwards to it (matched by IP) plus aggregated web-log
+ * traffic for those domains over the requested window. Nothing here is
+ * persisted — it is recomputed from npm_proxy_hosts + web_log_requests on
+ * every request.
+ */
+export interface HostExposure {
+  host_id: string;
+  ip_address: string;
+  since: string;
+  domains: HostExposedDomain[];
+  total_requests: number /* int64 */;
+  total_suspicious_requests: number /* int64 */;
+  total_blocked_requests: number /* int64 */;
+}
+
+//////////
 // source: network.go
 
 export interface PortMapping {

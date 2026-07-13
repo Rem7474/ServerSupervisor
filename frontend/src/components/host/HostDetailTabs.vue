@@ -73,6 +73,7 @@ const visibleTabs = computed<Tab[]>(() => {
       badge: props.commandsCount || null,
       badgeClass: 'badge bg-secondary-lt text-secondary ms-1',
     },
+    { key: 'exposition', label: 'Exposition' },
   ]
 
   if (props.canRunApt) {

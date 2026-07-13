@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -39,6 +40,7 @@ type Repository interface {
 	GetDiskMetricsHistory(ctx context.Context, hostID, mountPoint string, limit int) ([]models.DiskMetrics, error)
 	GetDiskMetricsAggregated(ctx context.Context, hostID, mountPoint string, hours int) ([]models.DiskMetrics, string, error)
 	GetRecentCommandsByHost(ctx context.Context, hostID string, limit int) ([]models.RemoteCommand, error)
+	GetHostExposure(ctx context.Context, ip string, since time.Time) (*models.HostExposure, error)
 }
 
 // Dispatcher is the agent-command port. *dispatch.Dispatcher satisfies it.
@@ -295,6 +297,25 @@ func (s *Service) Dashboard(ctx context.Context, id string) (*HostDashboard, err
 	containers, _ := s.repo.GetDockerContainers(ctx, id)
 	aptStatus, _ := s.repo.GetAptStatus(ctx, id)
 	return &HostDashboard{Host: host, Metrics: metrics, Containers: containers, AptStatus: aptStatus}, nil
+}
+
+// Exposure returns the NPM-domain correlation for a host: every proxy host
+// that forwards to its IP address, enriched with aggregated web-log traffic
+// for those domains over the given period. The domains routing to a host are
+// invisible from the host's own detail page today (that data is collected and
+// scoped under the reverse-proxy host, not this one) — this stitches it back
+// together by IP, since that is the only link NPM's own config gives us.
+func (s *Service) Exposure(ctx context.Context, id string, period time.Duration) (*models.HostExposure, error) {
+	h, err := s.Get(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	exposure, err := s.repo.GetHostExposure(ctx, h.IPAddress, time.Now().Add(-period))
+	if err != nil {
+		return nil, err
+	}
+	exposure.HostID = id
+	return exposure, nil
 }
 
 // DiskMetrics returns the latest disk metrics for a host (never nil), each

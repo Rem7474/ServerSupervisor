@@ -1,5 +1,5 @@
 import { api } from './client'
-import type { Host, HostRegistration, HostUpdate } from '../types/host'
+import type { Host, HostExposure, HostRegistration, HostUpdate } from '../types/host'
 
 export const hostsApi = {
   // Hosts
@@ -7,6 +7,8 @@ export const hostsApi = {
   getHost: (id: string) => api.get<Host>(`/v1/hosts/${id}`),
   getHostComplete: (id: string) => api.get(`/v1/hosts/${id}/complete`),
   getHostDashboard: (id: string) => api.get(`/v1/hosts/${id}/dashboard`),
+  getHostExposure: (id: string, period?: string) =>
+    api.get<HostExposure>(`/v1/hosts/${id}/exposure`, { params: { period: period || '24h' } }),
   registerHost: (data: Partial<HostRegistration>) => api.post('/v1/hosts', data),
   updateHost: (id: string, data: Partial<HostUpdate>) => api.patch(`/v1/hosts/${id}`, data),
   deleteHost: (id: string) => api.delete(`/v1/hosts/${id}`),

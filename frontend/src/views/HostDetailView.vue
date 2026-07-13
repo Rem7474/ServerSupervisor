@@ -366,6 +366,10 @@
           />
         </div>
 
+        <div v-show="activeTab === 'exposition'">
+          <HostExposureTab :host-id="hostId" />
+        </div>
+
         <div v-show="activeTab === 'systeme'">
           <HostSystemTab
             v-if="canRunApt"
@@ -600,6 +604,7 @@ import HostCommandsTab from '../components/host/HostCommandsTab.vue'
 import HostDetailTabs from '../components/host/HostDetailTabs.vue'
 import HostDockerTab from '../components/host/HostDockerTab.vue'
 import HostEditForm from '../components/host/HostEditForm.vue'
+import HostExposureTab from '../components/host/HostExposureTab.vue'
 import HostSystemTab from '../components/host/HostSystemTab.vue'
 import HostTasksTab from '../components/host/HostTasksTab.vue'
 import HostTimelineTab from '../components/host/HostTimelineTab.vue'

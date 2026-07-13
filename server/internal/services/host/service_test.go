@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/serversupervisor/server/internal/apperr"
 	"github.com/serversupervisor/server/internal/dispatch"
@@ -16,6 +17,10 @@ type fakeRepo struct {
 	host       *models.Host
 	getErr     error
 	agentCmds  []models.RemoteCommand
+
+	exposureResult *models.HostExposure
+	gotExposureIP  string
+	gotExposureAt  time.Time
 }
 
 func (f *fakeRepo) RegisterHost(_ context.Context, h *models.Host) error {
@@ -56,6 +61,14 @@ func (f *fakeRepo) GetDiskMetricsAggregated(context.Context, string, string, int
 }
 func (f *fakeRepo) GetRecentCommandsByHost(context.Context, string, int) ([]models.RemoteCommand, error) {
 	return nil, nil
+}
+func (f *fakeRepo) GetHostExposure(_ context.Context, ip string, since time.Time) (*models.HostExposure, error) {
+	f.gotExposureIP = ip
+	f.gotExposureAt = since
+	if f.exposureResult != nil {
+		return f.exposureResult, nil
+	}
+	return &models.HostExposure{IPAddress: ip, Since: since, Domains: []models.HostExposedDomain{}}, nil
 }
 
 type fakeDispatcher struct{ gotReq dispatch.Request }
@@ -138,5 +151,53 @@ func TestTriggerAgentUpdate_Dispatches(t *testing.T) {
 	}
 	if disp.gotReq.Module != "agent" || disp.gotReq.Action != "update" || disp.gotReq.Audit == nil {
 		t.Errorf("dispatch request not built correctly: %+v", disp.gotReq)
+	}
+}
+
+func TestExposure_HostNotFound(t *testing.T) {
+	repo := &fakeRepo{getErr: errors.New("no rows")}
+	_, err := newSvc(repo, &fakeDispatcher{}).Exposure(context.Background(), "missing", time.Hour)
+	var ae *apperr.Error
+	if !errors.As(err, &ae) || ae.HTTPStatus != 404 {
+		t.Fatalf("missing host should be apperr 404, got %v", err)
+	}
+}
+
+func TestExposure_QueriesRepoByHostIPAndSetsHostID(t *testing.T) {
+	repo := &fakeRepo{host: &models.Host{ID: "h1", IPAddress: "10.0.0.5"}}
+	before := time.Now()
+	result, err := newSvc(repo, &fakeDispatcher{}).Exposure(context.Background(), "h1", 24*time.Hour)
+	if err != nil {
+		t.Fatalf("Exposure: %v", err)
+	}
+	if repo.gotExposureIP != "10.0.0.5" {
+		t.Errorf("expected repo to be queried with the host's own IP, got %q", repo.gotExposureIP)
+	}
+	if d := before.Add(-24 * time.Hour).Sub(repo.gotExposureAt); d > time.Second || d < -time.Second {
+		t.Errorf("expected since ~= now-period, got %v (now was %v)", repo.gotExposureAt, before)
+	}
+	if result.HostID != "h1" {
+		t.Errorf("expected HostID to be set to the requested host id, got %q", result.HostID)
+	}
+}
+
+func TestExposure_PropagatesRepoResult(t *testing.T) {
+	repo := &fakeRepo{
+		host: &models.Host{ID: "h1", IPAddress: "10.0.0.5"},
+		exposureResult: &models.HostExposure{
+			IPAddress:     "10.0.0.5",
+			Domains:       []models.HostExposedDomain{{DomainNames: []string{"app.example.com"}, Requests: 42}},
+			TotalRequests: 42,
+		},
+	}
+	result, err := newSvc(repo, &fakeDispatcher{}).Exposure(context.Background(), "h1", time.Hour)
+	if err != nil {
+		t.Fatalf("Exposure: %v", err)
+	}
+	if len(result.Domains) != 1 || result.Domains[0].Requests != 42 || result.TotalRequests != 42 {
+		t.Errorf("expected repo result to be propagated through, got %+v", result)
+	}
+	if result.HostID != "h1" {
+		t.Errorf("expected HostID to still be overwritten to the requested id, got %q", result.HostID)
 	}
 }
