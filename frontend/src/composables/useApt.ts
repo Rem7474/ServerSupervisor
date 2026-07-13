@@ -226,14 +226,18 @@ export function useApt() {
   async function runAptCmdForHost(host: Host, command: string): Promise<void> {
     if (!canRunApt.value) return
 
-    const confirmed = await confirmBulkAction(
-      `apt ${command}`,
-      1,
-      command === 'dist-upgrade'
-        ? `⚠️ apt dist-upgrade peut supprimer des paquets existants.\nExécuter sur : ${host.name || host.hostname} ?`
-        : `Exécuter sur : ${host.name || host.hostname} ?`
-    )
-    if (!confirmed) return
+    // `apt update` ne fait que rafraîchir l'index des paquets — non destructif,
+    // contrairement à upgrade/dist-upgrade qui restent confirmés.
+    if (command !== 'update') {
+      const confirmed = await confirmBulkAction(
+        `apt ${command}`,
+        1,
+        command === 'dist-upgrade'
+          ? `⚠️ apt dist-upgrade peut supprimer des paquets existants.\nExécuter sur : ${host.name || host.hostname} ?`
+          : `Exécuter sur : ${host.name || host.hostname} ?`
+      )
+      if (!confirmed) return
+    }
 
     hostCmdLoading.value = { ...hostCmdLoading.value, [host.id]: command }
     try {
@@ -282,14 +286,18 @@ export function useApt() {
       .map((h: Host) => h.name || h.hostname)
       .join(', ')
 
-    const confirmed = await confirmBulkAction(
-      `apt ${command}`,
-      selectedHosts.value.length,
-      command === 'dist-upgrade'
-        ? `⚠️ apt dist-upgrade peut supprimer des paquets existants.\nExécuter sur : ${hostnames || 'les hôtes sélectionnés'} ?`
-        : `Exécuter sur : ${hostnames || 'les hôtes sélectionnés'} ?`
-    )
-    if (!confirmed) return
+    // `apt update` ne fait que rafraîchir l'index des paquets — non destructif,
+    // contrairement à upgrade/dist-upgrade qui restent confirmés.
+    if (command !== 'update') {
+      const confirmed = await confirmBulkAction(
+        `apt ${command}`,
+        selectedHosts.value.length,
+        command === 'dist-upgrade'
+          ? `⚠️ apt dist-upgrade peut supprimer des paquets existants.\nExécuter sur : ${hostnames || 'les hôtes sélectionnés'} ?`
+          : `Exécuter sur : ${hostnames || 'les hôtes sélectionnés'} ?`
+      )
+      if (!confirmed) return
+    }
 
     aptBulkLoading.value = command
     try {

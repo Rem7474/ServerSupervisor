@@ -2,8 +2,10 @@ import { ref, onMounted } from 'vue'
 import { npmApi } from '../api/npm'
 import type { NPMProxyHostEnriched } from '../types/npm'
 import { getApiErrorMessage } from '../api/client'
+import { useConfirmDialog } from './useConfirmDialog'
 
 export function useNPM() {
+  const dialog = useConfirmDialog()
   const hosts = ref<NPMProxyHostEnriched[]>([])
   const loading = ref(true)
   const loadError = ref('')
@@ -33,6 +35,25 @@ export function useNPM() {
       host.monitoring_enabled = false
       host.uptime_monitoring_enabled = false
       host.ssl_monitoring_enabled = false
+    }
+
+    if (!value) {
+      // Désactiver un proxy host coupe immédiatement son routage réel dans NPM —
+      // seule direction de ce toggle qui mérite une confirmation.
+      const confirmed = await dialog.confirm({
+        title: 'Désactiver le proxy host',
+        message: `Désactiver "${host.domain_names?.[0] || host.id}" dans NPM coupe immédiatement le routage réel vers ce service.`,
+        variant: 'warning',
+      })
+      if (!confirmed) {
+        // Reassigner explicitement (même hors erreur API) pour resynchroniser
+        // la case à cocher native, dont l'état DOM a déjà changé au clic.
+        host.npm_enabled = prev
+        host.monitoring_enabled = prev
+        host.uptime_monitoring_enabled = prev
+        host.ssl_monitoring_enabled = prev
+        return
+      }
     }
 
     togglingNPM.value[host.id] = true

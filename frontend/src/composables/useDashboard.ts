@@ -636,14 +636,18 @@ export function useDashboard() {
       .filter((h: DashboardHostRecord) => selectedHostIds.value.includes(h.id))
       .map((h: DashboardHostRecord) => h.hostname || h.name)
       .join(', ')
-    const confirmed = await confirmBulkAction(
-      `apt ${command}`,
-      selectedHostIds.value.length,
-      hostnames
-        ? `Exécuter sur ${selectedHostIds.value.length} hôte${selectedHostIds.value.length > 1 ? 's' : ''} :\n${hostnames}\n\nCela peut affecter la stabilité de plusieurs serveurs.`
-        : 'Cette action peut affecter la stabilité de plusieurs serveurs.'
-    )
-    if (!confirmed) return
+    // `apt update` ne fait que rafraîchir l'index des paquets — non destructif,
+    // contrairement à upgrade/dist-upgrade qui restent confirmés.
+    if (command !== 'update') {
+      const confirmed = await confirmBulkAction(
+        `apt ${command}`,
+        selectedHostIds.value.length,
+        hostnames
+          ? `Exécuter sur ${selectedHostIds.value.length} hôte${selectedHostIds.value.length > 1 ? 's' : ''} :\n${hostnames}\n\nCela peut affecter la stabilité de plusieurs serveurs.`
+          : 'Cette action peut affecter la stabilité de plusieurs serveurs.'
+      )
+      if (!confirmed) return
+    }
     aptLoading.value = command
     try {
       await apiClient.sendAptCommand(selectedHostIds.value, command)

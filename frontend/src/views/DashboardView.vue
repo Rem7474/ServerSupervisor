@@ -332,7 +332,7 @@
                   @toggle="toggleSort('ip_os')"
                 />
               </th>
-              <th>
+              <th title="Vert < 70 % · Jaune 70-90 % · Rouge > 90 %">
                 <SortableHeader
                   label="CPU"
                   :active="sortKey === 'cpu'"
@@ -340,7 +340,7 @@
                   @toggle="toggleSort('cpu')"
                 />
               </th>
-              <th>
+              <th title="Vert < 75 % · Jaune 75-90 % · Rouge > 90 %">
                 <SortableHeader
                   label="RAM"
                   :active="sortKey === 'ram'"
@@ -348,7 +348,7 @@
                   @toggle="toggleSort('ram')"
                 />
               </th>
-              <th>
+              <th title="Vert < 75 % · Jaune 75-90 % · Rouge > 90 %">
                 <SortableHeader
                   label="Disque"
                   :active="sortKey === 'disk'"

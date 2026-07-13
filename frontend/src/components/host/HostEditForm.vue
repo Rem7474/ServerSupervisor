@@ -166,6 +166,7 @@ import apiClient from '../../api'
 import { getApiErrorMessage } from '../../api/client'
 import { parseTagsInput, formatTagsInput } from '../../utils/tags'
 import { buildInstallCommand, buildAgentConfig } from '../../utils/agentInstall'
+import { useConfirmDialog } from '../../composables/useConfirmDialog'
 
 interface Host {
   name?: string
@@ -200,6 +201,7 @@ const props = withDefaults(defineProps<{
   host: null,
 })
 
+const dialog = useConfirmDialog()
 const saving = ref(false)
 const editError = ref('')
 const editForm = ref<HostForm>({ name: '', hostname: '', ip_address: '', os: '', tags: '' })
@@ -254,6 +256,13 @@ async function saveEdit(): Promise<void> {
 }
 
 async function rotateHostKey(): Promise<void> {
+  const confirmed = await dialog.confirm({
+    title: 'Régénérer la clé API',
+    message: "L'ancienne clé sera immédiatement invalidée : l'agent actuellement déployé sur cet hôte perdra l'accès tant qu'il n'aura pas été reconfiguré avec la nouvelle clé.",
+    variant: 'warning',
+  })
+  if (!confirmed) return
+
   rotateKeyLoading.value = true
   rotateKeyResult.value = null
   try {

@@ -233,13 +233,17 @@ export function useHostDetail() {
   )
 
   async function sendAptCmd(command: string) {
-    const confirmed = await dialog.confirm({
-      title: `apt ${command}`,
-      message: `Exécuter sur : ${host.value?.hostname}`,
-      variant: command === 'dist-upgrade' ? 'danger' : 'warning',
-    })
+    // `apt update` ne fait que rafraîchir l'index des paquets — non destructif,
+    // contrairement à upgrade/dist-upgrade qui restent confirmés.
+    if (command !== 'update') {
+      const confirmed = await dialog.confirm({
+        title: `apt ${command}`,
+        message: `Exécuter sur : ${host.value?.hostname}`,
+        variant: command === 'dist-upgrade' ? 'danger' : 'warning',
+      })
 
-    if (!confirmed) return
+      if (!confirmed) return
+    }
 
     aptCmdLoading.value = command
     try {
