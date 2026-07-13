@@ -4,7 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"sync"
 	"time"
+
+	"github.com/serversupervisor/server/internal/safego"
 )
 
 // buildWebLogsWhere builds the shared WHERE clause + positional args used by
@@ -25,39 +28,148 @@ func buildWebLogsWhere(since time.Time, hostID, source string) (string, []any) {
 	return where, args
 }
 
+// errCollector lets a WaitGroup-joined fan-out of independent queries report
+// failures without a data race: each goroutine calls set(err) at most once,
+// and the caller reads first() after Wait() to get the first one reported.
+type errCollector struct {
+	mu  sync.Mutex
+	err error
+}
+
+func (c *errCollector) set(err error) {
+	if err == nil {
+		return
+	}
+	c.mu.Lock()
+	if c.err == nil {
+		c.err = err
+	}
+	c.mu.Unlock()
+}
+
+func (c *errCollector) first() error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.err
+}
+
 // GetWebLogsSummary aggregates traffic + threats statistics across all
 // captured web requests in the requested window. The shape of the returned
 // map matches what the SecurityView/TrafficView frontends expect.
+//
+// The traffic/threats/CrowdSec sections below are independent aggregate
+// queries over the same window — none reads another's result — so they run
+// concurrently instead of as one long sequential chain. On a large table with
+// no host filter (the default "all hosts" view), that sequential chain of
+// ~15 queries was the direct cause of the dashboard's 30s request timeout;
+// running them in parallel bounds the wall-clock cost by the single slowest
+// query instead of their sum. Each still returns a real error on failure
+// (via errCollector) except the best-effort "blocked" stats, which
+// preserves the pre-existing "absent key on error" behavior other code
+// depends on (see promoteBlockedIntoThreats in the weblogs service).
 func (db *DB) GetWebLogsSummary(ctx context.Context, since time.Time, hostID string, source string) (map[string]any, error) {
 	where, args := buildWebLogsWhere(since, hostID, source)
 
-	traffic := map[string]any{}
-	var totalRequests int64
-	var totalBytes int64
-	var status2xx int64
-	var status3xx int64
-	var errors4xx int64
-	var errors5xx int64
-	if err := db.conn.QueryRowContext(ctx,
-		fmt.Sprintf(`SELECT COALESCE(COUNT(*),0), COALESCE(SUM(bytes),0),
-		COALESCE(SUM(CASE WHEN status BETWEEN 200 AND 299 THEN 1 ELSE 0 END),0),
-		COALESCE(SUM(CASE WHEN status BETWEEN 300 AND 399 THEN 1 ELSE 0 END),0),
-		COALESCE(SUM(CASE WHEN status BETWEEN 400 AND 499 THEN 1 ELSE 0 END),0),
-		COALESCE(SUM(CASE WHEN status >= 500 THEN 1 ELSE 0 END),0)
-		FROM web_log_requests WHERE %s`, where),
-		args...,
-	).Scan(&totalRequests, &totalBytes, &status2xx, &status3xx, &errors4xx, &errors5xx); err != nil {
+	var errs errCollector
+	var wg sync.WaitGroup
+
+	var totalRequests, totalBytes, status2xx, status3xx, errors4xx, errors5xx int64
+	var blockedRequests, blockedIPs int64
+	var blockedOK bool
+	var topDomains, topEndpoints, topHosts []map[string]any
+	threatsLocal := map[string]any{}
+	crowdSecLocal := map[string]any{}
+
+	wg.Add(7)
+
+	go func() {
+		defer wg.Done()
+		defer safego.Recover(ctx, "weblogs.summary.counts")
+		errs.set(db.conn.QueryRowContext(ctx,
+			fmt.Sprintf(`SELECT COALESCE(COUNT(*),0), COALESCE(SUM(bytes),0),
+			COALESCE(SUM(CASE WHEN status BETWEEN 200 AND 299 THEN 1 ELSE 0 END),0),
+			COALESCE(SUM(CASE WHEN status BETWEEN 300 AND 399 THEN 1 ELSE 0 END),0),
+			COALESCE(SUM(CASE WHEN status BETWEEN 400 AND 499 THEN 1 ELSE 0 END),0),
+			COALESCE(SUM(CASE WHEN status >= 500 THEN 1 ELSE 0 END),0)
+			FROM web_log_requests WHERE %s`, where),
+			args...,
+		).Scan(&totalRequests, &totalBytes, &status2xx, &status3xx, &errors4xx, &errors5xx))
+	}()
+
+	go func() {
+		defer wg.Done()
+		defer safego.Recover(ctx, "weblogs.summary.blocked")
+		// Best-effort, matching the pre-existing behavior: a failure here just
+		// leaves the blocked_* keys absent instead of failing the whole summary.
+		if err := db.conn.QueryRowContext(ctx,
+			fmt.Sprintf(`SELECT
+			COALESCE(COUNT(*),0),
+			COALESCE(COUNT(DISTINCT ip),0)
+			FROM web_log_requests WHERE %s AND blocked = TRUE`, where),
+			args...,
+		).Scan(&blockedRequests, &blockedIPs); err == nil {
+			blockedOK = true
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		defer safego.Recover(ctx, "weblogs.summary.topDomains")
+		td, err := db.topDomainsWithMethods(ctx, where, args)
+		if err != nil {
+			errs.set(err)
+			return
+		}
+		topDomains = td
+	}()
+
+	go func() {
+		defer wg.Done()
+		defer safego.Recover(ctx, "weblogs.summary.topEndpoints")
+		te, err := db.topEndpointTraffic(ctx, where, args)
+		if err != nil {
+			errs.set(err)
+			return
+		}
+		topEndpoints = te
+	}()
+
+	go func() {
+		defer wg.Done()
+		defer safego.Recover(ctx, "weblogs.summary.topHosts")
+		th, err := db.topHostTraffic(ctx, where, args)
+		if err != nil {
+			errs.set(err)
+			return
+		}
+		topHosts = th
+	}()
+
+	go func() {
+		defer wg.Done()
+		defer safego.Recover(ctx, "weblogs.summary.threats")
+		errs.set(db.fillWebLogsThreats(ctx, threatsLocal, where, args))
+	}()
+
+	go func() {
+		defer wg.Done()
+		defer safego.Recover(ctx, "weblogs.summary.crowdsec")
+		errs.set(db.fillWebLogsCrowdSec(ctx, crowdSecLocal, where, args, hostID))
+	}()
+
+	wg.Wait()
+	if err := errs.first(); err != nil {
 		return nil, err
 	}
+
+	traffic := map[string]any{}
 	traffic["total_requests"] = totalRequests
 	traffic["total_bytes"] = totalBytes
 	traffic["errors_4xx"] = errors4xx
 	traffic["errors_5xx"] = errors5xx
-
-	count := toInt64(traffic["total_requests"])
-	if count > 0 {
-		traffic["ratio_4xx"] = float64(toInt64(traffic["errors_4xx"])) / float64(count)
-		traffic["ratio_5xx"] = float64(toInt64(traffic["errors_5xx"])) / float64(count)
+	if totalRequests > 0 {
+		traffic["ratio_4xx"] = float64(errors4xx) / float64(totalRequests)
+		traffic["ratio_5xx"] = float64(errors5xx) / float64(totalRequests)
 	} else {
 		traffic["ratio_4xx"] = float64(0)
 		traffic["ratio_5xx"] = float64(0)
@@ -68,17 +180,7 @@ func (db *DB) GetWebLogsSummary(ctx context.Context, since time.Time, hostID str
 		"4xx": errors4xx,
 		"5xx": errors5xx,
 	}
-
-	// Blocked requests statistics
-	var blockedRequests int64
-	var blockedIPs int64
-	if err := db.conn.QueryRowContext(ctx,
-		fmt.Sprintf(`SELECT
-		COALESCE(COUNT(*),0),
-		COALESCE(COUNT(DISTINCT ip),0)
-		FROM web_log_requests WHERE %s AND blocked = TRUE`, where),
-		args...,
-	).Scan(&blockedRequests, &blockedIPs); err == nil {
+	if blockedOK {
 		traffic["blocked_requests"] = blockedRequests
 		traffic["blocked_ips"] = blockedIPs
 		if totalRequests > 0 {
@@ -87,8 +189,37 @@ func (db *DB) GetWebLogsSummary(ctx context.Context, since time.Time, hostID str
 			traffic["blocked_ratio"] = float64(0)
 		}
 	}
+	traffic["top_domains"] = topDomains
+	traffic["top_endpoints"] = topEndpoints
 
-	// Pre-fetch method distribution for all domains in a single query to avoid N+1.
+	// top_proxy_hosts is the same data as top_domains; derive it without an extra query.
+	topProxyHosts := make([]map[string]any, 0, len(topDomains))
+	for _, d := range topDomains {
+		topProxyHosts = append(topProxyHosts, map[string]any{
+			"vhost":      d["domain"],
+			"hits":       d["hits"],
+			"bytes":      d["bytes"],
+			"errors_4xx": d["errors_4xx"],
+			"errors_5xx": d["errors_5xx"],
+		})
+	}
+	traffic["top_proxy_hosts"] = topProxyHosts
+	traffic["top_hosts"] = topHosts
+
+	for k, v := range crowdSecLocal {
+		threatsLocal[k] = v
+	}
+
+	return map[string]any{
+		"traffic": traffic,
+		"threats": threatsLocal,
+	}, nil
+}
+
+// topDomainsWithMethods returns the top 20 domains by hit count, each
+// enriched with its method distribution (pre-fetched in one batched query to
+// avoid an N+1 over the per-domain loop).
+func (db *DB) topDomainsWithMethods(ctx context.Context, where string, args []any) ([]map[string]any, error) {
 	domainMethods := map[string]map[string]int64{}
 	methodBatchRows, err := db.conn.QueryContext(ctx,
 		fmt.Sprintf(`SELECT COALESCE(NULLIF(domain,''), '(unknown)'), method, COUNT(*)
@@ -113,6 +244,9 @@ func (db *DB) GetWebLogsSummary(ctx context.Context, since time.Time, hostID str
 		domainMethods[dom][method] = cnt
 	}
 	_ = methodBatchRows.Close()
+	if err := methodBatchRows.Err(); err != nil {
+		return nil, err
+	}
 
 	rows, err := db.conn.QueryContext(ctx,
 		fmt.Sprintf(`SELECT COALESCE(NULLIF(domain,''), '(unknown)') AS domain,
@@ -155,9 +289,13 @@ func (db *DB) GetWebLogsSummary(ctx context.Context, since time.Time, hostID str
 			"methods":    methods,
 		})
 	}
-	traffic["top_domains"] = topDomains
+	return topDomains, rows.Err()
+}
 
-	endpointRows, err := db.conn.QueryContext(ctx,
+// topEndpointTraffic returns the top 30 (method, path, status) combinations
+// by hit count.
+func (db *DB) topEndpointTraffic(ctx context.Context, where string, args []any) ([]map[string]any, error) {
+	rows, err := db.conn.QueryContext(ctx,
 		fmt.Sprintf(`SELECT method, path, status, COUNT(*) AS hits, COALESCE(SUM(bytes),0) AS bytes
 		FROM web_log_requests
 		WHERE %s
@@ -169,15 +307,15 @@ func (db *DB) GetWebLogsSummary(ctx context.Context, since time.Time, hostID str
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = endpointRows.Close() }()
+	defer func() { _ = rows.Close() }()
 	topEndpoints := make([]map[string]any, 0)
-	for endpointRows.Next() {
+	for rows.Next() {
 		var method string
 		var path string
 		var status int
 		var hits int64
 		var bytes int64
-		if err := endpointRows.Scan(&method, &path, &status, &hits, &bytes); err != nil {
+		if err := rows.Scan(&method, &path, &status, &hits, &bytes); err != nil {
 			return nil, err
 		}
 		topEndpoints = append(topEndpoints, map[string]any{
@@ -188,22 +326,15 @@ func (db *DB) GetWebLogsSummary(ctx context.Context, since time.Time, hostID str
 			"bytes":  bytes,
 		})
 	}
-	traffic["top_endpoints"] = topEndpoints
+	return topEndpoints, rows.Err()
+}
 
-	// top_proxy_hosts is the same data as top_domains; derive it without an extra query.
-	topProxyHosts := make([]map[string]any, 0, len(topDomains))
-	for _, d := range topDomains {
-		topProxyHosts = append(topProxyHosts, map[string]any{
-			"vhost":      d["domain"],
-			"hits":       d["hits"],
-			"bytes":      d["bytes"],
-			"errors_4xx": d["errors_4xx"],
-			"errors_5xx": d["errors_5xx"],
-		})
-	}
-	traffic["top_proxy_hosts"] = topProxyHosts
-
-	hostTrafficRows, err := db.conn.QueryContext(ctx,
+// topHostTraffic returns the top 20 hosts by hit count, joined against
+// `hosts` for their display name. Unlike the threats-side "most targeted
+// hosts" (see fillWebLogsThreats), host_id here is a real hosts.id from the
+// JOIN, safe to link to /hosts/:id.
+func (db *DB) topHostTraffic(ctx context.Context, where string, args []any) ([]map[string]any, error) {
+	rows, err := db.conn.QueryContext(ctx,
 		fmt.Sprintf(`SELECT h.id, h.name, COUNT(*) AS hits, COALESCE(SUM(r.bytes),0) AS bytes
 		FROM web_log_requests r
 		JOIN hosts h ON h.id = r.host_id
@@ -216,13 +347,13 @@ func (db *DB) GetWebLogsSummary(ctx context.Context, since time.Time, hostID str
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = hostTrafficRows.Close() }()
+	defer func() { _ = rows.Close() }()
 	topHosts := make([]map[string]any, 0)
-	for hostTrafficRows.Next() {
+	for rows.Next() {
 		var id, name string
 		var hits int64
 		var bytes int64
-		if err := hostTrafficRows.Scan(&id, &name, &hits, &bytes); err != nil {
+		if err := rows.Scan(&id, &name, &hits, &bytes); err != nil {
 			return nil, err
 		}
 		topHosts = append(topHosts, map[string]any{
@@ -232,20 +363,7 @@ func (db *DB) GetWebLogsSummary(ctx context.Context, since time.Time, hostID str
 			"bytes":     bytes,
 		})
 	}
-	traffic["top_hosts"] = topHosts
-
-	threats := map[string]any{}
-	if err := db.fillWebLogsThreats(ctx, threats, where, args); err != nil {
-		return nil, err
-	}
-	if err := db.fillWebLogsCrowdSec(ctx, threats, where, args, hostID); err != nil {
-		return nil, err
-	}
-
-	return map[string]any{
-		"traffic": traffic,
-		"threats": threats,
-	}, nil
+	return topHosts, rows.Err()
 }
 
 // GetWebLogsThreats computes only the threats portion of the summary (suspicious
@@ -257,26 +375,53 @@ func (db *DB) GetWebLogsSummary(ctx context.Context, since time.Time, hostID str
 func (db *DB) GetWebLogsThreats(ctx context.Context, since time.Time, hostID string, source string) (map[string]any, error) {
 	where, args := buildWebLogsWhere(since, hostID, source)
 
-	threats := map[string]any{}
+	var errs errCollector
+	var wg sync.WaitGroup
+	wg.Add(3)
 
-	// blocked_ips: the only blocked statistic the BotView displays. Indexed by
-	// idx_web_log_requests_blocked_captured / idx_web_log_requests_ip_blocked.
 	var blockedIPs int64
-	if err := db.conn.QueryRowContext(ctx,
-		fmt.Sprintf(`SELECT COALESCE(COUNT(DISTINCT ip),0)
-		FROM web_log_requests WHERE %s AND blocked = TRUE`, where),
-		args...,
-	).Scan(&blockedIPs); err == nil {
-		threats["blocked_ips"] = blockedIPs
+	var blockedOK bool
+	threatsLocal := map[string]any{}
+	crowdSecLocal := map[string]any{}
+
+	go func() {
+		defer wg.Done()
+		defer safego.Recover(ctx, "weblogs.threats.blocked")
+		// blocked_ips: the only blocked statistic the BotView displays. Indexed by
+		// idx_web_log_requests_blocked_captured / idx_web_log_requests_ip_blocked.
+		if err := db.conn.QueryRowContext(ctx,
+			fmt.Sprintf(`SELECT COALESCE(COUNT(DISTINCT ip),0)
+			FROM web_log_requests WHERE %s AND blocked = TRUE`, where),
+			args...,
+		).Scan(&blockedIPs); err == nil {
+			blockedOK = true
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		defer safego.Recover(ctx, "weblogs.threats.suspicious")
+		errs.set(db.fillWebLogsThreats(ctx, threatsLocal, where, args))
+	}()
+
+	go func() {
+		defer wg.Done()
+		defer safego.Recover(ctx, "weblogs.threats.crowdsec")
+		errs.set(db.fillWebLogsCrowdSec(ctx, crowdSecLocal, where, args, hostID))
+	}()
+
+	wg.Wait()
+	if err := errs.first(); err != nil {
+		return nil, err
 	}
 
-	if err := db.fillWebLogsThreats(ctx, threats, where, args); err != nil {
-		return nil, err
+	if blockedOK {
+		threatsLocal["blocked_ips"] = blockedIPs
 	}
-	if err := db.fillWebLogsCrowdSec(ctx, threats, where, args, hostID); err != nil {
-		return nil, err
+	for k, v := range crowdSecLocal {
+		threatsLocal[k] = v
 	}
-	return threats, nil
+	return threatsLocal, nil
 }
 
 // fillWebLogsThreats populates the suspicious-activity threat signals (counts,
@@ -703,17 +848,4 @@ func (db *DB) GetWebLogsTimeseries(ctx context.Context, since time.Time, hostID 
 	}
 
 	return out, nil
-}
-
-// toInt64 is a tiny coercion helper used when collapsing map[string]any
-// numeric values back to int64 for arithmetic.
-func toInt64(v any) int64 {
-	switch t := v.(type) {
-	case int64:
-		return t
-	case int:
-		return int64(t)
-	default:
-		return 0
-	}
 }

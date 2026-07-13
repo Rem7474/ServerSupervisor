@@ -15,51 +15,53 @@
           </div>
         </div>
         <div class="d-flex gap-2 flex-wrap timeline-header-actions">
-          <template v-if="!blocked">
-            <select
-              v-model="banDuration"
-              class="form-select form-select-sm"
-              style="width: auto;"
+          <template v-if="!readOnly">
+            <template v-if="!blocked">
+              <select
+                v-model="banDuration"
+                class="form-select form-select-sm"
+                style="width: auto;"
+              >
+                <option value="1h">
+                  1h
+                </option>
+                <option value="4h">
+                  4h
+                </option>
+                <option value="24h">
+                  24h
+                </option>
+                <option value="48h">
+                  48h
+                </option>
+                <option value="168h">
+                  7j
+                </option>
+              </select>
+              <button
+                type="button"
+                class="btn btn-sm"
+                :class="banError ? 'btn-danger' : 'btn-outline-danger'"
+                :disabled="banLoading || !hostId"
+                :title="!hostId ? 'Hôte non déterminé — renseigne le filtre Hôte' : ''"
+                @click="handleBanClick"
+              >
+                <span
+                  v-if="banLoading"
+                  class="spinner-border spinner-border-sm me-1"
+                />
+                <span v-if="banLoading">Blocage…</span>
+                <span v-else-if="banError">Erreur — Réessayer</span>
+                <span v-else>Bloquer (CrowdSec)</span>
+              </button>
+            </template>
+            <span
+              v-else
+              class="badge bg-success-lt text-success align-self-center"
             >
-              <option value="1h">
-                1h
-              </option>
-              <option value="4h">
-                4h
-              </option>
-              <option value="24h">
-                24h
-              </option>
-              <option value="48h">
-                48h
-              </option>
-              <option value="168h">
-                7j
-              </option>
-            </select>
-            <button
-              type="button"
-              class="btn btn-sm"
-              :class="banError ? 'btn-danger' : 'btn-outline-danger'"
-              :disabled="banLoading || !hostId"
-              :title="!hostId ? 'Hôte non déterminé — renseigne le filtre Hôte' : ''"
-              @click="handleBanClick"
-            >
-              <span
-                v-if="banLoading"
-                class="spinner-border spinner-border-sm me-1"
-              />
-              <span v-if="banLoading">Blocage…</span>
-              <span v-else-if="banError">Erreur — Réessayer</span>
-              <span v-else>Bloquer (CrowdSec)</span>
-            </button>
+              IP bloquée par CrowdSec
+            </span>
           </template>
-          <span
-            v-else
-            class="badge bg-success-lt text-success align-self-center"
-          >
-            IP bloquée par CrowdSec
-          </span>
           <button
             type="button"
             class="btn btn-sm btn-outline-secondary"
@@ -300,6 +302,7 @@ const props = defineProps({
   banLoading: { type: Boolean, default: false },
   banError: { type: Boolean, default: false },
   hostId: { type: String, default: '' },
+  readOnly: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['close', 'ban'])

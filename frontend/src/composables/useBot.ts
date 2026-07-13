@@ -2,6 +2,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import apiClient, { getApiErrorMessage } from '../api'
 import { addToast } from './useGlobalToast'
 import { useHostsStore } from '../stores/hosts'
+import { looksLikeIP } from '../utils/network'
 import type { WebLogIPTimelineRow } from '../types/security'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- display-layer shim for aggregate web-logs data (no Go model)
@@ -33,6 +34,12 @@ export function useBot() {
   const selectedIP = ref('')
   const timelineHostId = ref('')
   const timeline = ref<WebLogIPTimelineRow[]>([])
+
+  const showDomainModal = ref(false)
+  const selectedDomain = ref('')
+  const domainLoading = ref(false)
+  const domainDetails = ref<AnyRecord>({})
+  const searchTerm = ref('')
 
   const threats = computed(() => summary.value.threats || {})
   const topPaths = computed(() => threats.value.top_paths || [])
@@ -202,6 +209,46 @@ export function useBot() {
     timelineHostId.value = ''
   }
 
+  // "most_targeted_hosts" entries are keyed by vhost domain name, not a real
+  // hosts.id (see fillWebLogsThreats server-side) — this opens the matching
+  // domain's request breakdown instead of trying to route to /hosts/:id,
+  // which 404s/500s since that string was never a real host.
+  async function openDomain(domain: string) {
+    if (!domain) return
+    selectedDomain.value = domain
+    showDomainModal.value = true
+    domainLoading.value = true
+    try {
+      const res = await apiClient.getDomainDetails(domain, period.value, hostId.value || undefined, source.value || undefined, 300)
+      domainDetails.value = res.data?.details || {}
+    } catch (err) {
+      console.error('Failed to load domain details', err)
+      domainDetails.value = {}
+    } finally {
+      domainLoading.value = false
+    }
+  }
+
+  function closeDomainModal() {
+    showDomainModal.value = false
+    selectedDomain.value = ''
+    domainDetails.value = {}
+  }
+
+  // Free-text search: routes to the domain or IP detail view depending on
+  // what the input looks like, so a domain or IP that never made a "top N"
+  // list is still directly reachable.
+  function handleSearch() {
+    const term = searchTerm.value.trim()
+    if (!term) return
+    if (looksLikeIP(term)) {
+      void openTimeline(term)
+    } else {
+      void openDomain(term)
+    }
+    searchTerm.value = ''
+  }
+
   async function handleBanFromModal(duration: string) {
     banState.value = 'loading'
     const ip = selectedIP.value
@@ -295,6 +342,11 @@ export function useBot() {
     banState,
     selectedIP,
     timeline,
+    showDomainModal,
+    selectedDomain,
+    domainLoading,
+    domainDetails,
+    searchTerm,
     threats,
     topPaths,
     mostTargetedHosts,
@@ -314,6 +366,9 @@ export function useBot() {
     setPeriod,
     openTimeline,
     closeTimeline,
+    openDomain,
+    closeDomainModal,
+    handleSearch,
     handleBanFromModal,
     unblockCrowdSecEntry,
   }

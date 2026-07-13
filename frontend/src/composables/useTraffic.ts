@@ -1,6 +1,8 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import apiClient from '../api'
 import { useHostsStore } from '../stores/hosts'
+import { looksLikeIP } from '../utils/network'
+import type { WebLogIPTimelineRow } from '../types/security'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- display-layer shim for aggregate web-logs data (no Go model)
 type AnyRecord = Record<string, any>
@@ -22,7 +24,13 @@ export function useTraffic() {
     { value: '720h', label: '30j' },
   ]
 
-  const REFRESH_INTERVAL_MS = 8000
+  // The summary+timeseries call is an expensive multi-query aggregate over
+  // the whole table (see GetWebLogsSummary server-side); polling it every few
+  // seconds was compounding into the dashboard's request timeout on a large
+  // table. The live tail (a simple indexed "last N requests" query) stays on
+  // a fast cadence; the heavy aggregate refreshes on a much slower one.
+  const REFRESH_INTERVAL_MS = 30000
+  const LIVE_REFRESH_INTERVAL_MS = 8000
 
   const period = ref('24h')
   const source = ref('')
@@ -41,7 +49,16 @@ export function useTraffic() {
   const domainLoading = ref(false)
   const domainDetails = ref<AnyRecord>({})
 
+  // Read-only IP view (no ban action — that stays a BotView/Threats concern).
+  const showIPModal = ref(false)
+  const selectedIP = ref('')
+  const ipTimelineLoading = ref(false)
+  const ipTimeline = ref<WebLogIPTimelineRow[]>([])
+
+  const searchTerm = ref('')
+
   let refreshTimer: number | null = null
+  let liveRefreshTimer: number | null = null
   const chartReady = ref(false)
 
   const traffic = computed(() => summary.value.traffic || {})
@@ -117,14 +134,22 @@ export function useTraffic() {
     void loadAll(true)
   }
 
-  async function loadAll(showSpinner: boolean) {
+  async function loadLive(): Promise<void> {
+    try {
+      const liveRes = await apiClient.getWebLogsLive(hostId.value || undefined, source.value || undefined, 120)
+      liveRequests.value = liveRes.data?.requests || []
+    } catch (err) {
+      console.error('Failed to load live requests', err)
+    }
+  }
+
+  async function loadSummary(showSpinner: boolean): Promise<void> {
     if (showSpinner) loading.value = true
     try {
       const bucket = period.value === '1h' ? 'minute' : 'hour'
-      const [summaryRes, timeseriesRes, liveRes] = await Promise.all([
+      const [summaryRes, timeseriesRes] = await Promise.all([
         apiClient.getWebLogsSummary(period.value, hostId.value || undefined, source.value || undefined),
         apiClient.getWebLogsTimeseries(period.value, bucket, hostId.value || undefined, source.value || undefined),
-        apiClient.getWebLogsLive(hostId.value || undefined, source.value || undefined, 120),
       ])
       summary.value = {
         traffic: summaryRes.data?.traffic || {},
@@ -132,7 +157,6 @@ export function useTraffic() {
       }
       compare.value = summaryRes.data?.compare || { delta_percent: {} }
       timeseries.value = timeseriesRes.data?.points || []
-      liveRequests.value = liveRes.data?.requests || []
       lastUpdatedAt.value = new Date()
     } catch (err) {
       console.error('Failed to load traffic dashboard', err)
@@ -142,15 +166,26 @@ export function useTraffic() {
     }
   }
 
+  async function loadAll(showSpinner: boolean): Promise<void> {
+    await Promise.all([loadSummary(showSpinner), loadLive()])
+  }
+
   function resetAutoRefresh() {
     if (refreshTimer) {
       window.clearInterval(refreshTimer)
       refreshTimer = null
     }
+    if (liveRefreshTimer) {
+      window.clearInterval(liveRefreshTimer)
+      liveRefreshTimer = null
+    }
     if (!autoRefresh.value) return
     refreshTimer = window.setInterval(() => {
-      void loadAll(false)
+      void loadSummary(false)
     }, REFRESH_INTERVAL_MS)
+    liveRefreshTimer = window.setInterval(() => {
+      void loadLive()
+    }, LIVE_REFRESH_INTERVAL_MS)
   }
 
   async function openDomain(domain: string) {
@@ -175,6 +210,42 @@ export function useTraffic() {
     domainDetails.value = {}
   }
 
+  async function openIP(ip: string) {
+    if (!ip) return
+    selectedIP.value = ip
+    showIPModal.value = true
+    ipTimelineLoading.value = true
+    try {
+      const res = await apiClient.getIPTimeline(ip, hostId.value || undefined, period.value, 500)
+      ipTimeline.value = res.data?.requests || []
+    } catch (err) {
+      console.error('Failed to load IP timeline', err)
+      ipTimeline.value = []
+    } finally {
+      ipTimelineLoading.value = false
+    }
+  }
+
+  function closeIPModal() {
+    showIPModal.value = false
+    selectedIP.value = ''
+    ipTimeline.value = []
+  }
+
+  // Free-text search: routes to the domain or IP detail view depending on
+  // what the input looks like, so a domain or IP that never made a "top N"
+  // list is still directly reachable.
+  function handleSearch() {
+    const term = searchTerm.value.trim()
+    if (!term) return
+    if (looksLikeIP(term)) {
+      void openIP(term)
+    } else {
+      void openDomain(term)
+    }
+    searchTerm.value = ''
+  }
+
   watch(autoRefresh, resetAutoRefresh)
 
   onMounted(async () => {
@@ -185,6 +256,7 @@ export function useTraffic() {
 
   onBeforeUnmount(() => {
     if (refreshTimer) window.clearInterval(refreshTimer)
+    if (liveRefreshTimer) window.clearInterval(liveRefreshTimer)
   })
 
   return {
@@ -205,6 +277,11 @@ export function useTraffic() {
     selectedDomain,
     domainLoading,
     domainDetails,
+    showIPModal,
+    selectedIP,
+    ipTimelineLoading,
+    ipTimeline,
+    searchTerm,
     chartReady,
     traffic,
     threats,
@@ -227,5 +304,8 @@ export function useTraffic() {
     loadAll,
     openDomain,
     closeDomainModal,
+    openIP,
+    closeIPModal,
+    handleSearch,
   }
 }
