@@ -129,6 +129,12 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true, requiresAdmin: true },
   },
   {
+    path: '/runbooks',
+    name: 'Runbooks',
+    component: () => import('../views/RunbooksView.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true },
+  },
+  {
     path: '/proxmox',
     name: 'Proxmox',
     component: () => import('../views/ProxmoxView.vue'),

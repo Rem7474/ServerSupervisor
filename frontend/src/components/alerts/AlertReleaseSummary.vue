@@ -141,6 +141,13 @@
                 v-else
                 class="text-muted"
               >—</span>
+              <div
+                v-if="tracker.drift_detected"
+                class="badge bg-orange-lt text-orange mt-1"
+                title="Le conteneur réellement déployé ne correspond plus à la version suivie."
+              >
+                Dérive détectée
+              </div>
             </td>
             <td>
               <span
@@ -192,6 +199,7 @@ interface Tracker {
   last_checked_at?: string
   last_error?: string
   last_execution?: TrackerExecution | null
+  drift_detected?: boolean
 }
 
 withDefaults(defineProps<{

@@ -359,7 +359,16 @@
                     v-for="h in mostTargetedHosts"
                     :key="h.host_id"
                   >
-                    <td>{{ h.host_name || h.host_id }}</td>
+                    <td>
+                      <router-link
+                        v-if="h.host_id"
+                        :to="`/hosts/${h.host_id}`"
+                        class="text-decoration-none"
+                      >
+                        {{ h.host_name || h.host_id }}
+                      </router-link>
+                      <span v-else>{{ h.host_name || '—' }}</span>
+                    </td>
                     <td class="text-end">
                       {{ h.hits || 0 }}
                     </td>

@@ -10,6 +10,7 @@ export interface DiskMetric {
   inodes_total: number
   inodes_used: number
   inodes_percent: number
+  forecast_days_until_full?: number
 }
 
 export function useDiskMetrics(hostId: MaybeRef<string>, initialData?: DiskMetric[] | null) {

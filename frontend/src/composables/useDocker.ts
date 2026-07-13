@@ -8,6 +8,7 @@ import { useCommandStream } from './useCommandStream'
 import apiClient from '../api'
 import type { DockerContainer, ComposeProject, VersionComparison } from '../types/docker'
 import { getApiErrorMessage } from '../api/client'
+import { confirmBulkAction } from '../utils/bulkActionHelpers'
 
 interface DockerLiveCmd {
   id: string
@@ -85,6 +86,44 @@ export function useDocker() {
     }
   }
 
+  const bulkActionLoading = ref(false)
+
+  // Fire-and-forget in parallel across the selected containers — no live
+  // console per item (that doesn't scale past a couple of containers), just
+  // a summary toast. The WS docker snapshot picks up the resulting state
+  // changes on its own, same as it already does for every other command.
+  async function handleBulkContainerAction(containers: DockerContainer[], action: string): Promise<void> {
+    if (!containers.length || bulkActionLoading.value) return
+    const verb = action === 'start' ? 'Démarrer' : action === 'stop' ? 'Arrêter' : 'Redémarrer'
+    const names = containers.map((c) => c.name).join(', ')
+    const ok = await confirmBulkAction(
+      verb,
+      containers.length,
+      `${verb} ${containers.length} conteneur${containers.length > 1 ? 's' : ''} :\n${names}`
+    )
+    if (!ok) return
+
+    bulkActionLoading.value = true
+    try {
+      const results = await Promise.allSettled(
+        containers.map((c) => apiClient.sendDockerCommand(c.host_id, c.name, action))
+      )
+      const succeeded = results.filter((r) => r.status === 'fulfilled').length
+      const failed = results.length - succeeded
+      if (failed === 0) {
+        addToast(`${succeeded} commande${succeeded > 1 ? 's' : ''} envoyée${succeeded > 1 ? 's' : ''}`, 'success')
+      } else {
+        addToast(
+          `${succeeded} envoyée(s), ${failed} échec(s)`,
+          failed === results.length ? 'error' : 'warning',
+          6000
+        )
+      }
+    } finally {
+      bulkActionLoading.value = false
+    }
+  }
+
   async function handleComposeAction({ hostId, name, action, workingDir }: { hostId: string; name: string; action: string; workingDir?: string }): Promise<void> {
     if (composeActionLoading.value[name]) return
 
@@ -150,9 +189,11 @@ export function useDocker() {
     runningCount,
     dockerActionLoading,
     composeActionLoading,
+    bulkActionLoading,
     showDockerConsole,
     dockerLiveCmd,
     handleContainerAction,
+    handleBulkContainerAction,
     handleComposeAction,
     closeDockerConsole,
     wsStatus,

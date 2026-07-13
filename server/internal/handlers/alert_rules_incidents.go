@@ -27,10 +27,19 @@ func (h *AlertRulesHandler) ResolveIncident(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "incident resolved"})
 }
 
-// ListIncidents returns all alert incidents with pagination.
+// ListIncidents returns a page of alert incidents. Admins and users with no
+// host_permissions entries see everything; hostperm-restricted users only see
+// incidents resolvable to one of their granted hosts (direct agent-host
+// incidents plus Docker container/compose incidents, resolved via
+// LinkHostID — Proxmox and synthetic incidents have no resolvable host and
+// stay admin-only-visible in this MVP). Filtering runs after the DB page is
+// fetched, so a restricted user's page can come back with fewer than `limit`
+// items — an accepted trade-off for this opt-in, niche RBAC case rather than
+// pushing host resolution into SQL.
 func (h *AlertRulesHandler) ListIncidents(c *gin.Context) {
-	if c.GetString("role") != models.RoleAdmin {
-		respondError(c, apperr.Forbidden("insufficient permissions"))
+	scope, err := resolveAlertHostScope(c, h.db)
+	if err != nil {
+		respondError(c, apperr.Failed("failed to validate host permissions"))
 		return
 	}
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
@@ -46,5 +55,20 @@ func (h *AlertRulesHandler) ListIncidents(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, incidents)
+	c.JSON(http.StatusOK, filterAlertIncidentsByScope(incidents, scope))
+}
+
+// filterAlertIncidentsByScope keeps only the incidents an alertHostScope-
+// restricted caller is allowed to see.
+func filterAlertIncidentsByScope(incidents []models.AlertIncident, scope alertHostScope) []models.AlertIncident {
+	if scope.unrestricted {
+		return incidents
+	}
+	out := make([]models.AlertIncident, 0, len(incidents))
+	for _, inc := range incidents {
+		if scope.allowsHost(resolvableHostID(inc.HostID, inc.LinkHostID)) {
+			out = append(out, inc)
+		}
+	}
+	return out
 }

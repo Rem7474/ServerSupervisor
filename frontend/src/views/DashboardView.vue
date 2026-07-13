@@ -92,6 +92,40 @@
       </router-link>
     </div>
 
+    <!-- ─── Attention requise ────────────────────────────────────────────────── -->
+    <div
+      v-if="attentionItems.length > 0"
+      class="card mb-3"
+    >
+      <div class="card-header">
+        <h3 class="card-title mb-0">
+          <IconListCheck
+            :size="18"
+            class="icon me-1"
+          />
+          Attention requise
+        </h3>
+      </div>
+      <div class="list-group list-group-flush">
+        <router-link
+          v-for="item in attentionItems"
+          :key="item.key"
+          :to="item.to"
+          class="list-group-item list-group-item-action d-flex align-items-center gap-2"
+        >
+          <span
+            class="badge"
+            :class="item.severity === 'warning' ? 'bg-yellow-lt text-yellow' : 'bg-azure-lt text-azure'"
+          >{{ item.count }}</span>
+          <span class="flex-grow-1">{{ item.label }}</span>
+          <IconChevronRight
+            :size="16"
+            class="icon text-secondary"
+          />
+        </router-link>
+      </div>
+    </div>
+
     <!-- ─── KPIs ─────────────────────────────────────────────────────────────── -->
     <LoadingSkeleton
       v-if="loading"
@@ -227,6 +261,31 @@
             </select>
           </div>
           <div
+            v-if="allTags.length > 0"
+            class="col-12 col-md-4 col-lg-2"
+          >
+            <label
+              class="form-label"
+              for="dashboard-tag-filter"
+            >Tag</label>
+            <select
+              id="dashboard-tag-filter"
+              v-model="tagFilter"
+              class="form-select"
+            >
+              <option value="all">
+                Tous
+              </option>
+              <option
+                v-for="tag in allTags"
+                :key="tag"
+                :value="tag"
+              >
+                {{ tag }}
+              </option>
+            </select>
+          </div>
+          <div
             v-if="canRunApt"
             class="col-12 col-md-auto d-flex align-items-end"
           >
@@ -352,15 +411,29 @@
                     {{ host.hostname || 'Non connecté' }}
                   </div>
                   <div
-                    v-if="proxmoxGuestPath(host.id)"
-                    class="mt-1"
+                    v-if="proxmoxGuestPath(host.id) || (host.tags && host.tags.length > 0) || isNeverConnectedHost(host)"
+                    class="d-flex flex-wrap gap-1 mt-1"
                   >
                     <router-link
+                      v-if="isNeverConnectedHost(host)"
+                      :to="`/hosts/${host.id}`"
+                      class="badge bg-yellow-lt text-yellow text-decoration-none"
+                      title="Hôte enregistré, mais l'agent ne s'est jamais connecté — ouvrez la fiche hôte pour régénérer la clé et récupérer la commande d'installation."
+                    >
+                      Installation en attente
+                    </router-link>
+                    <router-link
+                      v-if="proxmoxGuestPath(host.id)"
                       :to="proxmoxGuestPath(host.id)"
                       class="badge bg-orange-lt text-orange text-decoration-none"
                     >
                       Stats Proxmox
                     </router-link>
+                    <span
+                      v-for="tag in host.tags"
+                      :key="tag"
+                      class="badge bg-secondary-lt text-secondary"
+                    >{{ tag }}</span>
                   </div>
                 </td>
                 <td class="status-col">
@@ -410,7 +483,14 @@
                 </td>
                 <td>{{ hostMetrics[host.id] ? formatUptime(hostMetrics[host.id]!.uptime) : '-' }}</td>
                 <td class="last-activity-col">
-                  <RelativeTime :date="(host.last_seen as any) || ''" />
+                  <span
+                    v-if="isNeverConnectedHost(host)"
+                    class="text-secondary small"
+                  >Jamais connecté</span>
+                  <RelativeTime
+                    v-else
+                    :date="(host.last_seen as any) || ''"
+                  />
                 </td>
               </tr>
               <tr v-if="hosts.length > 0 && sortedHosts.length === 0">
@@ -514,11 +594,13 @@ import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import PaginationNav from '../components/PaginationNav.vue'
 import SortableHeader from '../components/common/SortableHeader.vue'
 import EmptyState from '../components/EmptyState.vue'
-import { IconAlertTriangle, IconPlus } from '@tabler/icons-vue'
+import { IconAlertTriangle, IconPlus, IconListCheck, IconChevronRight } from '@tabler/icons-vue'
 import BulkActionBar from '../components/BulkActionBar.vue'
 import { formatHostStatus, hostStatusClass } from '../utils/formatHostStatus'
+import { isNeverConnectedHost } from '../utils/hosts'
 import { pluralize } from '../utils/formatters'
 import { useDashboard, type DashboardProxmoxLinkRecord } from '../composables/useDashboard'
+import { useAttentionCenter } from '../composables/useAttentionCenter'
 
 const Line = defineAsyncComponent(async () => {
   const [{ Line }, { Chart: ChartJS, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip, Legend }] = await Promise.all([
@@ -542,6 +624,8 @@ const {
   loading,
   searchQuery,
   statusFilter,
+  tagFilter,
+  allTags,
   sortKey,
   sortDir,
   selectedHostIds,
@@ -572,6 +656,8 @@ const {
   memColor,
   diskColor,
 } = useDashboard()
+
+const { items: attentionItems } = useAttentionCenter()
 
 const proxmoxLinkByHostId = computed<Record<string, DashboardProxmoxLinkRecord>>(() => {
   const map: Record<string, DashboardProxmoxLinkRecord> = {}
@@ -615,7 +701,7 @@ function toggleSort(key: string): void {
   sortDir.value = 'asc'
 }
 
-watch([searchQuery, statusFilter, sortKey, sortDir], () => {
+watch([searchQuery, statusFilter, tagFilter, sortKey, sortDir], () => {
   currentHostPage.value = 1
 })
 

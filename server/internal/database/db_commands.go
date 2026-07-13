@@ -120,12 +120,12 @@ func (db *DB) UpdateRemoteCommandStatus(ctx context.Context, id, status, output 
 func (db *DB) GetRemoteCommandByID(ctx context.Context, id string) (*models.RemoteCommand, error) {
 	var cmd models.RemoteCommand
 	var startedAt, endedAt sql.NullTime
-	var scheduledTaskID sql.NullString
+	var scheduledTaskID, runbookExecutionID sql.NullString
 	err := db.conn.QueryRowContext(ctx,
-		`SELECT id, host_id, module, action, target, payload, status, output, triggered_by, audit_log_id, created_at, started_at, ended_at, scheduled_task_id
+		`SELECT id, host_id, module, action, target, payload, status, output, triggered_by, audit_log_id, created_at, started_at, ended_at, scheduled_task_id, runbook_execution_id
 		 FROM remote_commands WHERE id = $1`, id,
 	).Scan(&cmd.ID, &cmd.HostID, &cmd.Module, &cmd.Action, &cmd.Target, &cmd.Payload,
-		&cmd.Status, &cmd.Output, &cmd.TriggeredBy, &cmd.AuditLogID, &cmd.CreatedAt, &startedAt, &endedAt, &scheduledTaskID)
+		&cmd.Status, &cmd.Output, &cmd.TriggeredBy, &cmd.AuditLogID, &cmd.CreatedAt, &startedAt, &endedAt, &scheduledTaskID, &runbookExecutionID)
 	if err != nil {
 		return nil, err
 	}
@@ -137,6 +137,9 @@ func (db *DB) GetRemoteCommandByID(ctx context.Context, id string) (*models.Remo
 	}
 	if scheduledTaskID.Valid {
 		cmd.ScheduledTaskID = &scheduledTaskID.String
+	}
+	if runbookExecutionID.Valid {
+		cmd.RunbookExecutionID = &runbookExecutionID.String
 	}
 	return &cmd, nil
 }

@@ -103,6 +103,10 @@ type DiskMetrics struct {
 	InodesUsed    int64     `json:"inodes_used" db:"inodes_used"`
 	InodesFree    int64     `json:"inodes_free" db:"inodes_free"`
 	InodesPercent float64   `json:"inodes_percent" db:"inodes_percent"`
+	// ForecastDaysUntilFull is a linear-trend extrapolation over the last 30
+	// days of used_percent samples (nil when the mount point isn't filling up,
+	// or there isn't at least 7 days of history to trust a trend from).
+	ForecastDaysUntilFull *float64 `json:"forecast_days_until_full,omitempty" db:"-"`
 }
 
 // DiskHealth for SMART monitoring (optional, collected if smartctl available)

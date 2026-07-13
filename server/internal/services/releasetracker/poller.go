@@ -168,8 +168,17 @@ func (s *Poller) checkOneDocker(ctx context.Context, t models.ReleaseTracker) {
 			if time.Since(*t.LastReleaseDetectedAt) >= cooldown {
 				slog.InfoContext(ctx, fmt.Sprintf("Docker tracker %s: cooldown elapsed (%dh) for %s:%s → dispatching", t.Name, t.CooldownHours, t.DockerImage, tag))
 				s.DispatchDockerTracker(ctx, t, tag, resolvedVersion, digest, digest)
+				// Just dispatched — the agent hasn't reported back yet, so a
+				// drift check this cycle would compare against stale state.
+				return
 			}
 		}
+		// Registry hasn't moved — nothing new to deploy from that angle, and we
+		// didn't just dispatch a cooldown-delayed update above. For an opt-in
+		// reconciling compose tracker, the actually-running container may still
+		// have drifted from what we last deployed anyway (manual change, silent
+		// failure, ...); GitOps-style, pull it back into line.
+		s.reconcileComposeDrift(ctx, t, tag, resolvedVersion, digest)
 		return
 	}
 
@@ -190,6 +199,27 @@ func (s *Poller) checkOneDocker(ctx context.Context, t models.ReleaseTracker) {
 	}
 	slog.InfoContext(ctx, fmt.Sprintf("Docker tracker %s: new digest for %s:%s → dispatching (%s) on host %s", t.Name, t.DockerImage, tag, t.UpdateAction, t.HostID))
 	s.DispatchDockerTracker(ctx, t, tag, resolvedVersion, oldDigest, digest)
+}
+
+// reconcileComposeDrift is the GitOps-style self-healing check: called only
+// when the registry digest is unchanged (checkOneDocker already handled the
+// "new version" case via a normal dispatch). It re-applies the tracker's
+// last-known-good digest if the actually-deployed container has drifted away
+// from it — e.g. someone ran `docker compose up` with a different image, or a
+// previous deployment failed after partially applying. A no-op for anything
+// but an opt-in (ReconcileDrift), compose-mode tracker with a real dispatch
+// target; TrackerDriftDetected is also what powers the read-only
+// DriftDetected flag surfaced to the frontend when ReconcileDrift is off.
+func (s *Poller) reconcileComposeDrift(ctx context.Context, t models.ReleaseTracker, tag, resolvedVersion, digest string) {
+	if !t.ReconcileDrift || t.UpdateAction != "compose" || !trackerHasDispatchTarget(t) {
+		return
+	}
+	drifted, err := s.db.TrackerDriftDetected(ctx, t)
+	if err != nil || !drifted {
+		return
+	}
+	slog.InfoContext(ctx, fmt.Sprintf("Compose tracker %s: drift detected on %s (deployed container no longer matches %s) → reconciling", t.Name, t.ComposeProject, digest))
+	s.dispatchComposeUpdate(ctx, t, tag, resolvedVersion, digest)
 }
 
 // ===== dispatch =====

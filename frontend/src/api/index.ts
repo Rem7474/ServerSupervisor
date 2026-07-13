@@ -18,6 +18,7 @@ import { webhooksApi } from './webhooks'
 import { settingsApi } from './settings'
 import { proxmoxApi } from './proxmox'
 import { npmApi } from './npm'
+import { runbooksApi } from './runbooks'
 
 // Re-export shared helpers/types so `import api, { getApiErrorMessage } from '../api'`
 // and type imports keep resolving.
@@ -44,4 +45,5 @@ export default {
   ...settingsApi,
   ...proxmoxApi,
   ...npmApi,
+  ...runbooksApi,
 }

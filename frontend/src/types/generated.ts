@@ -166,10 +166,18 @@ export interface AlertIncident {
   resolved_at?: string;
   value: number /* float64 */;
   /**
-   * Enriched post-fetch (not DB columns): Docker synthetic IDs resolution
+   * CommandID is the remote_commands row a command_trigger dispatched when
+   * this incident fired, if the rule has one configured. Nil otherwise.
+   */
+  command_id?: string;
+  /**
+   * Enriched post-fetch (not DB columns): Docker synthetic IDs resolution,
+   * and the live status of CommandID's remote_commands row (joined at read
+   * time so the frontend doesn't need a second round-trip per incident).
    */
   value_label?: string;
   link_host_id?: string;
+  command_status?: string;
 }
 export interface NotificationItem {
   id: string;
@@ -205,6 +213,12 @@ export interface NotificationItem {
    */
   link_host_id?: string;
   value_label?: string;
+  /**
+   * CommandStatus is the remote_commands.status of the rule's command_trigger
+   * dispatch for this incident (alert_incident type only), joined from
+   * alert_incidents.command_id — empty when no command_trigger fired.
+   */
+  command_status?: string;
 }
 /**
  * PushSubscription represents a Web Push (VAPID) subscription for a user's browser/device.
@@ -294,6 +308,7 @@ export interface RemoteCommand {
   triggered_by: string;
   audit_log_id?: number /* int64 */;
   scheduled_task_id?: string;
+  runbook_execution_id?: string;
   created_at: string;
   started_at?: string;
   ended_at?: string;
@@ -592,6 +607,12 @@ export interface DiskMetrics {
   inodes_used: number /* int64 */;
   inodes_free: number /* int64 */;
   inodes_percent: number /* float64 */;
+  /**
+   * ForecastDaysUntilFull is a linear-trend extrapolation over the last 30
+   * days of used_percent samples (nil when the mount point isn't filling up,
+   * or there isn't at least 7 days of history to trust a trend from).
+   */
+  forecast_days_until_full?: number /* float64 */;
 }
 /**
  * DiskHealth for SMART monitoring (optional, collected if smartctl available)
@@ -611,6 +632,50 @@ export interface DiskHealth {
   pending_sectors: number /* int */;
   uncorrectable_sectors: number /* int */;
   percentage_used: number /* int */; // SSD/NVMe wear indicator
+}
+
+//////////
+// source: host_exposure.go
+
+/**
+ * HostExposedDomain is one NPM domain that routes to a specific host (matched
+ * by npm_proxy_hosts.forward_host == host.ip_address), enriched with
+ * aggregated web-log traffic for that domain over the requested window. The
+ * traffic rows are looked up by domain, not host_id: they are collected by
+ * whichever agent parses the reverse-proxy's access logs (typically the NPM
+ * host itself), which is usually a different host than the backend this
+ * domain forwards to.
+ */
+export interface HostExposedDomain {
+  proxy_host_id: string;
+  connection_id: string;
+  connection_name: string;
+  domain_names: string[];
+  forward_port: number /* int */;
+  ssl_enabled: boolean;
+  npm_enabled: boolean;
+  requests: number /* int64 */;
+  bytes: number /* int64 */;
+  errors_4xx: number /* int64 */;
+  errors_5xx: number /* int64 */;
+  suspicious_requests: number /* int64 */;
+  blocked_requests: number /* int64 */;
+}
+/**
+ * HostExposure is the compute-on-read correlation result for one host: every
+ * NPM domain that forwards to it (matched by IP) plus aggregated web-log
+ * traffic for those domains over the requested window. Nothing here is
+ * persisted — it is recomputed from npm_proxy_hosts + web_log_requests on
+ * every request.
+ */
+export interface HostExposure {
+  host_id: string;
+  ip_address: string;
+  since: string;
+  domains: HostExposedDomain[];
+  total_requests: number /* int64 */;
+  total_suspicious_requests: number /* int64 */;
+  total_blocked_requests: number /* int64 */;
 }
 
 //////////
@@ -1067,6 +1132,77 @@ export interface AgentReport {
 }
 
 //////////
+// source: runbook.go
+
+export interface Runbook {
+  id: string;
+  name: string;
+  description: string;
+  created_at: string;
+  updated_at: string;
+  steps: RunbookStep[];
+}
+export interface RunbookStep {
+  id: string;
+  runbook_id: string;
+  position: number /* int */;
+  host_id: string;
+  module: string;
+  action: string;
+  target: string;
+  payload: string;
+  continue_on_failure: boolean;
+}
+/**
+ * RunbookExecution is one run of a runbook, advancing one step at a time as
+ * each step's remote_commands row reaches a terminal state.
+ */
+export interface RunbookExecution {
+  id: string;
+  runbook_id: string;
+  status: string; // running | completed | failed
+  current_step_position: number /* int */;
+  triggered_by: string;
+  started_at: string;
+  completed_at?: string;
+  runbook_name?: string;
+  steps?: RunbookExecutionStep[];
+}
+/**
+ * RunbookExecutionStep is one step's definition joined with the outcome of
+ * the remote_commands row it dispatched (empty Status/CommandID if this step
+ * hasn't been reached yet).
+ */
+export interface RunbookExecutionStep {
+  position: number /* int */;
+  host_id: string;
+  module: string;
+  action: string;
+  target: string;
+  command_id?: string;
+  status?: string;
+  output?: string;
+}
+export interface RunbookStepCreate {
+  host_id: string;
+  module: string;
+  action: string;
+  target: string;
+  payload: string;
+  continue_on_failure: boolean;
+}
+export interface RunbookCreate {
+  name: string;
+  description: string;
+  steps: RunbookStepCreate[];
+}
+export interface RunbookUpdate {
+  name?: string;
+  description?: string;
+  steps?: RunbookStepCreate[];
+}
+
+//////////
 // source: settings.go
 
 /**
@@ -1289,6 +1425,20 @@ export interface ReleaseTracker {
   healthcheck_timeout_sec: number /* int */;
   rollback_on_failure: boolean;
   registry_credentials_id?: string;
+  /**
+   * ReconcileDrift: when true, the poller re-dispatches pull+up if the
+   * actually-deployed container drifts from this tracker's last-recorded
+   * digest even though the registry itself hasn't moved (see poller.go's
+   * checkComposeDrift). False (default) means drift is only surfaced via
+   * DriftDetected, never auto-corrected.
+   */
+  reconcile_drift: boolean;
+  /**
+   * DriftDetected is computed on read (never stored): true when the
+   * actually-deployed digest no longer matches LatestImageDigest. Always
+   * false for non-compose trackers or ones with no digest recorded yet.
+   */
+  drift_detected?: boolean;
 }
 /**
  * ReleaseTrackerRequest is the create/update body for a release tracker — the
@@ -1320,6 +1470,7 @@ export interface ReleaseTrackerRequest {
   healthcheck_timeout_sec: number /* int */;
   rollback_on_failure: boolean;
   registry_credentials_id: string;
+  reconcile_drift: boolean;
 }
 export interface ReleaseTrackerExecution {
   id: string;
@@ -1331,6 +1482,13 @@ export interface ReleaseTrackerExecution {
   status: string;
   triggered_at: string;
   completed_at?: string;
+  /**
+   * AlertsAfterCount is the number of alert incidents that fired on the
+   * tracker's target host within 15 minutes after this execution started —
+   * a cheap "did this deployment just break something" signal. Always 0 for
+   * trackers with no host_id (monitor-only).
+   */
+  alerts_after_count: number /* int */;
 }
 /**
  * RegistryCredential stores authentication for polling private image registries.

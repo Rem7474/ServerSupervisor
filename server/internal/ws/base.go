@@ -67,6 +67,7 @@ type WSHandler struct {
 	cfg       *config.Config
 	streamHub *CommandStreamHub
 	notifHub  *NotificationHub
+	agentHub  *AgentHub
 	events    *events.Bus
 	ipConns   map[string]int
 	ipConnsMu sync.Mutex
@@ -90,6 +91,7 @@ func NewWSHandler(db *database.DB, cfg *config.Config, notifHub *NotificationHub
 		cfg:       cfg,
 		streamHub: NewCommandStreamHub(),
 		notifHub:  notifHub,
+		agentHub:  NewAgentHub(),
 		events:    bus,
 		ipConns:   make(map[string]int),
 	}
@@ -122,6 +124,10 @@ func (h *WSHandler) GetStreamHub() *CommandStreamHub {
 
 func (h *WSHandler) GetNotificationHub() *NotificationHub {
 	return h.notifHub
+}
+
+func (h *WSHandler) GetAgentHub() *AgentHub {
+	return h.agentHub
 }
 
 func (h *WSHandler) upgrader() *websocket.Upgrader {

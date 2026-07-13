@@ -45,6 +45,26 @@
               </div>
             </div>
 
+            <div
+              v-if="!rule && step === 1"
+              class="alert-presets mb-3"
+            >
+              <div class="text-secondary small mb-2">
+                Démarrer avec un modèle (tout reste modifiable ensuite) :
+              </div>
+              <div class="d-flex flex-wrap gap-2">
+                <button
+                  v-for="preset in alertRulePresets"
+                  :key="preset.key"
+                  type="button"
+                  class="btn btn-outline-secondary btn-sm"
+                  @click="applyPreset(preset)"
+                >
+                  {{ preset.icon }} {{ preset.label }}
+                </button>
+              </div>
+            </div>
+
             <div v-if="step === 1">
               <AlertRuleStepSource
                 :form="form"
@@ -185,6 +205,7 @@ import { useAlertRuleForm, type AlertRuleInput } from '../../composables/useAler
 import type { AlertRulePayload as ApiAlertRulePayload } from '../../types/alert'
 import { useModalFocusTrap } from '../../composables/useModalFocusTrap'
 import { ALERT_METRIC_ORDER, getAlertMetricMeta } from '../../utils/alertMetrics'
+import { ALERT_RULE_PRESETS, type AlertRulePreset } from '../../utils/alertRulePresets'
 import { getApiErrorMessage } from '../../api/client'
 
 interface Host {
@@ -607,6 +628,19 @@ function onKeyDown(event: KeyboardEvent): void {
 function selectMetric(metric: string): void {
   form.value.metric = metric
   onMetricChange()
+}
+
+const alertRulePresets = ALERT_RULE_PRESETS
+
+function applyPreset(preset: AlertRulePreset): void {
+  form.value.metric = preset.metric
+  onMetricChange()
+  form.value.name = preset.label
+  form.value.operator = preset.operator
+  form.value.threshold_warn = preset.thresholdWarn
+  form.value.threshold_crit = preset.thresholdCrit
+  form.value.duration = preset.duration
+  channelBrowser.value = true
 }
 
 function setSourceType(sourceType: string): void {

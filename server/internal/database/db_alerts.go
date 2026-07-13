@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"strings"
+	"time"
 
 	"github.com/serversupervisor/server/internal/models"
 )
@@ -145,18 +146,22 @@ func (db *DB) GetAlertRules(ctx context.Context) ([]models.AlertRule, error) {
 func (db *DB) GetOpenAlertIncident(ctx context.Context, ruleID int64, hostID string) (*models.AlertIncident, error) {
 	var inc models.AlertIncident
 	var nullableRuleID sql.NullInt64
+	var nullableCommandID sql.NullString
 	err := db.conn.QueryRowContext(ctx,
-		`SELECT id, rule_id, host_id, severity, triggered_at, resolved_at, value
+		`SELECT id, rule_id, host_id, severity, triggered_at, resolved_at, value, command_id
  FROM alert_incidents
  WHERE rule_id = $1 AND host_id = $2 AND resolved_at IS NULL
  ORDER BY triggered_at DESC LIMIT 1`,
 		ruleID, hostID,
-	).Scan(&inc.ID, &nullableRuleID, &inc.HostID, &inc.Severity, &inc.TriggeredAt, &inc.ResolvedAt, &inc.Value)
+	).Scan(&inc.ID, &nullableRuleID, &inc.HostID, &inc.Severity, &inc.TriggeredAt, &inc.ResolvedAt, &inc.Value, &nullableCommandID)
 	if err != nil {
 		return nil, err
 	}
 	if nullableRuleID.Valid {
 		inc.RuleID = &nullableRuleID.Int64
+	}
+	if nullableCommandID.Valid {
+		inc.CommandID = &nullableCommandID.String
 	}
 	return &inc, nil
 }
@@ -211,6 +216,28 @@ func (db *DB) ResolveAlertIncident(ctx context.Context, id int64) error {
 	return err
 }
 
+// UpdateAlertRuleLastFired stamps the rule's last-fired time. The engine uses
+// this to enforce AlertActions.Cooldown between repeated notifications/command
+// triggers for a rule that keeps flapping across the fire/resolve boundary.
+func (db *DB) UpdateAlertRuleLastFired(ctx context.Context, ruleID int64, t time.Time) error {
+	_, err := db.conn.ExecContext(ctx,
+		`UPDATE alert_rules SET last_fired = $2 WHERE id = $1`,
+		ruleID, t,
+	)
+	return err
+}
+
+// UpdateAlertIncidentCommandID links an incident to the remote_commands row
+// its command_trigger dispatched, so the remediation outcome can be read back
+// alongside the incident later (see GetAlertIncidents' join).
+func (db *DB) UpdateAlertIncidentCommandID(ctx context.Context, incidentID int64, commandID string) error {
+	_, err := db.conn.ExecContext(ctx,
+		`UPDATE alert_incidents SET command_id = $2 WHERE id = $1`,
+		incidentID, commandID,
+	)
+	return err
+}
+
 // UpdateAlertIncidentContext refreshes the host/value/severity of an open incident.
 // This keeps the active incident aligned with the latest evaluation state.
 func (db *DB) UpdateAlertIncidentContext(ctx context.Context, id int64, hostID string, value float64, severity string) error {
@@ -247,8 +274,11 @@ func (db *DB) ResolveOpenAlertIncidentsByRule(ctx context.Context, ruleID int64)
 
 func (db *DB) GetAlertIncidents(ctx context.Context, limit, offset int) ([]models.AlertIncident, error) {
 	rows, err := db.conn.QueryContext(ctx,
-		`SELECT id, rule_id, host_id, severity, triggered_at, resolved_at, value
- FROM alert_incidents ORDER BY triggered_at DESC LIMIT $1 OFFSET $2`,
+		`SELECT ai.id, ai.rule_id, ai.host_id, ai.severity, ai.triggered_at, ai.resolved_at, ai.value,
+		        ai.command_id, COALESCE(rc.status, '') AS command_status
+ FROM alert_incidents ai
+ LEFT JOIN remote_commands rc ON rc.id = ai.command_id
+ ORDER BY ai.triggered_at DESC LIMIT $1 OFFSET $2`,
 		limit, offset,
 	)
 	if err != nil {
@@ -260,11 +290,15 @@ func (db *DB) GetAlertIncidents(ctx context.Context, limit, offset int) ([]model
 	for rows.Next() {
 		var inc models.AlertIncident
 		var nullableRuleID sql.NullInt64
-		if err := rows.Scan(&inc.ID, &nullableRuleID, &inc.HostID, &inc.Severity, &inc.TriggeredAt, &inc.ResolvedAt, &inc.Value); err != nil {
+		var nullableCommandID sql.NullString
+		if err := rows.Scan(&inc.ID, &nullableRuleID, &inc.HostID, &inc.Severity, &inc.TriggeredAt, &inc.ResolvedAt, &inc.Value, &nullableCommandID, &inc.CommandStatus); err != nil {
 			continue
 		}
 		if nullableRuleID.Valid {
 			inc.RuleID = &nullableRuleID.Int64
+		}
+		if nullableCommandID.Valid {
+			inc.CommandID = &nullableCommandID.String
 		}
 		db.enrichDockerIncident(ctx, &inc)
 		incidents = append(incidents, inc)

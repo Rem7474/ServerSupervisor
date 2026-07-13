@@ -41,6 +41,16 @@ type ReleaseTracker struct {
 	HealthcheckTimeoutSec int    `json:"healthcheck_timeout_sec"`
 	RollbackOnFailure     bool   `json:"rollback_on_failure"`
 	RegistryCredentialsID string `json:"registry_credentials_id,omitempty"`
+	// ReconcileDrift: when true, the poller re-dispatches pull+up if the
+	// actually-deployed container drifts from this tracker's last-recorded
+	// digest even though the registry itself hasn't moved (see poller.go's
+	// checkComposeDrift). False (default) means drift is only surfaced via
+	// DriftDetected, never auto-corrected.
+	ReconcileDrift bool `json:"reconcile_drift"`
+	// DriftDetected is computed on read (never stored): true when the
+	// actually-deployed digest no longer matches LatestImageDigest. Always
+	// false for non-compose trackers or ones with no digest recorded yet.
+	DriftDetected bool `json:"drift_detected,omitempty"`
 }
 
 // ReleaseTrackerRequest is the create/update body for a release tracker — the
@@ -71,6 +81,7 @@ type ReleaseTrackerRequest struct {
 	HealthcheckTimeoutSec int      `json:"healthcheck_timeout_sec"`
 	RollbackOnFailure     bool     `json:"rollback_on_failure"`
 	RegistryCredentialsID string   `json:"registry_credentials_id"`
+	ReconcileDrift        bool     `json:"reconcile_drift"`
 }
 
 // ToModel maps the request onto a ReleaseTracker (config fields only; callers
@@ -99,6 +110,7 @@ func (r ReleaseTrackerRequest) ToModel() ReleaseTracker {
 		HealthcheckTimeoutSec: r.HealthcheckTimeoutSec,
 		RollbackOnFailure:     r.RollbackOnFailure,
 		RegistryCredentialsID: r.RegistryCredentialsID,
+		ReconcileDrift:        r.ReconcileDrift,
 	}
 }
 
@@ -112,6 +124,11 @@ type ReleaseTrackerExecution struct {
 	Status      string     `json:"status"`
 	TriggeredAt time.Time  `json:"triggered_at"`
 	CompletedAt *time.Time `json:"completed_at,omitempty"`
+	// AlertsAfterCount is the number of alert incidents that fired on the
+	// tracker's target host within 15 minutes after this execution started —
+	// a cheap "did this deployment just break something" signal. Always 0 for
+	// trackers with no host_id (monitor-only).
+	AlertsAfterCount int `json:"alerts_after_count"`
 }
 
 // RegistryCredential stores authentication for polling private image registries.

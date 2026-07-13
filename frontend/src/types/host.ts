@@ -10,3 +10,6 @@ export type Host = Omit<GeneratedHost, 'status'> & { status: HostStatus }
 
 // Request bodies (generated from the Go request models).
 export type { HostRegistration, HostUpdate } from './generated'
+
+// Host-exposure correlation (NPM domains routing to this host + their web-log traffic).
+export type { HostExposure, HostExposedDomain } from './generated'

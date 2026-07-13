@@ -30,6 +30,7 @@ import (
 	proxmoxsvc "github.com/serversupervisor/server/internal/services/proxmox"
 	pushsvc "github.com/serversupervisor/server/internal/services/push"
 	releasetrackersvc "github.com/serversupervisor/server/internal/services/releasetracker"
+	runbooksvc "github.com/serversupervisor/server/internal/services/runbook"
 	scheduledtasksvc "github.com/serversupervisor/server/internal/services/scheduledtask"
 	settingssvc "github.com/serversupervisor/server/internal/services/settings"
 	sslsvc "github.com/serversupervisor/server/internal/services/ssl"
@@ -63,6 +64,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 		return handlers.ResolveLatestAgentVersion(cfg)
 	}, bus))
 	wsH := ws.NewWSHandler(db, cfg, notifHub, bus)
+	dispatcher.SetAgentPusher(wsH.GetAgentHub())
 	agentH := handlers.NewAgentHandler(db, cfg, wsH.GetStreamHub(), notifHub, bus)
 	aptH := handlers.NewAptHandler(aptsvc.NewService(db, dispatcher), db)
 	dockerH := handlers.NewDockerHandler(dockersvc.NewService(db, dispatcher), db)
@@ -89,19 +91,21 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 		FetchProxmoxLogs: func(ctx context.Context, rule models.AlertRule) ([]string, time.Time) {
 			return alerts.FetchProxmoxAuthFailureLogs(ctx, db, rule)
 		},
-	}))
+	}), db)
 	settingsH := handlers.NewSettingsHandler(settingssvc.NewService(db, cfg, func() string {
 		return handlers.ResolveLatestAgentVersion(cfg)
 	}))
 	notifH := handlers.NewNotificationsHandler(notifssvc.NewService(db, func(ctx context.Context, rule models.AlertRule, hostID string) (float64, bool) {
 		return alerts.CurrentIncidentValue(ctx, db, rule, hostID)
-	}))
+	}), db)
 	pushH := handlers.NewPushHandler(pushSvc)
 	scheduledTaskH := handlers.NewScheduledTaskHandler(scheduledtasksvc.NewService(db, sched, dispatcher), db)
 	gitWebhookH := handlers.NewGitWebhookHandler(gitwebhooksvc.NewService(db, cfg, dispatcher, notifHub, pushSvc))
 	releaseTrackerH := handlers.NewReleaseTrackerHandler(releasetrackersvc.NewService(db, cfg, dispatcher, notifHub, pushSvc))
+	runbookH := handlers.NewRunbooksHandler(runbooksvc.NewService(db, dispatcher))
 	agentH.AddCompletionListener(gitWebhookH)
 	agentH.AddCompletionListener(releaseTrackerH)
+	agentH.AddCompletionListener(runbookH)
 
 	proxmoxH := handlers.NewProxmoxHandler(proxmoxsvc.NewService(db, cfg, bus))
 	hostPermH := handlers.NewHostPermissionHandler(hostpermsvc.NewService(db))
@@ -112,7 +116,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 
 	registerPublicRoutes(r, authH, db)
 	registerWSRoutes(r, wsH, cfg)
-	registerAgentRoutes(r, db, cfg, agentH, agentRateLimiter)
+	registerAgentRoutes(r, db, cfg, agentH, wsH, agentRateLimiter)
 
 	v1 := r.Group("/api/v1")
 	v1.Use(JWTMiddleware(cfg))
@@ -131,6 +135,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	registerUserRoutes(v1, userH)
 	registerGitWebhookRoutes(r, v1, gitWebhookH, webhookRateLimiter)
 	registerReleaseTrackerRoutes(v1, releaseTrackerH)
+	registerRunbookRoutes(v1, runbookH)
 	registerProxmoxRoutes(v1, proxmoxH)
 	registerHostPermissionRoutes(v1, hostPermH)
 	registerUptimeRoutes(v1, uptimeH)
@@ -172,7 +177,7 @@ func registerWSRoutes(r *gin.Engine, h *ws.WSHandler, cfg *config.Config) {
 	g.GET("/notifications", h.NotificationStream)
 }
 
-func registerAgentRoutes(r *gin.Engine, db *database.DB, cfg *config.Config, h *handlers.AgentHandler, rl *IPRateLimiter) {
+func registerAgentRoutes(r *gin.Engine, db *database.DB, cfg *config.Config, h *handlers.AgentHandler, wsH *ws.WSHandler, rl *IPRateLimiter) {
 	g := r.Group("/api/agent")
 	g.Use(RateLimiterMiddleware(rl))
 	g.Use(APIKeyMiddleware(db, cfg))
@@ -181,6 +186,8 @@ func registerAgentRoutes(r *gin.Engine, db *database.DB, cfg *config.Config, h *
 	g.POST("/command/stream", h.StreamCommandOutput)
 	g.POST("/apt-status", h.ReceiveAptStatus)
 	g.POST("/audit", h.LogAuditAction)
+	// Optional low-latency command push channel — see ws.WSHandler.AgentChannel.
+	g.GET("/ws", wsH.AgentChannel)
 }
 
 func registerAuthRoutes(g *gin.RouterGroup, h *handlers.AuthHandler) {
@@ -224,6 +231,7 @@ func registerHostRoutes(g *gin.RouterGroup, h *handlers.HostHandler, agentH *han
 	hostViewer.GET("/disk/metrics/aggregated", h.GetDiskMetricsAggregated)
 	hostViewer.GET("/disk/health", h.GetDiskHealth)
 	hostViewer.GET("/complete", h.GetHostComplete)
+	hostViewer.GET("/exposure", h.GetHostExposure)
 
 	// Write operations on hosts require operator level.
 	hostOperator := g.Group("/hosts/:id")
@@ -297,16 +305,21 @@ func registerPushRoutes(g *gin.RouterGroup, h *handlers.PushHandler) {
 }
 
 func registerAlertRoutes(g *gin.RouterGroup, rulesH *handlers.AlertRulesHandler) {
+	// Hostperm-filtered reads: any authenticated user. Each handler resolves
+	// the caller's scope itself (resolveAlertHostScope, host_authz.go) —
+	// admins and users with no host_permissions rows see everything,
+	// restricted users only see items scoped to their granted hosts.
+	g.GET("/alerts/incidents", rulesH.ListIncidents)
+	g.GET("/alert-rules", rulesH.ListAlertRules)
+
 	admin := g.Group("")
 	admin.Use(AdminOnlyMiddleware())
-	admin.GET("/alerts/incidents", rulesH.ListIncidents)
 	admin.POST("/alerts/incidents/:id/resolve", rulesH.ResolveIncident)
 	admin.GET("/alert-rules/capabilities/agent", rulesH.GetAgentAlertRuleCapabilities)
 	admin.GET("/alert-rules/capabilities/proxmox", rulesH.GetProxmoxAlertRuleCapabilities)
 	admin.GET("/alert-rules/capabilities/synthetic", rulesH.GetSyntheticAlertRuleCapabilities)
 	admin.GET("/alert-rules/capabilities/docker", rulesH.GetDockerAlertRuleCapabilities)
 	admin.GET("/hosts/:id/capabilities", rulesH.GetHostAlertMetrics)
-	admin.GET("/alert-rules", rulesH.ListAlertRules)
 	admin.GET("/alert-rules/:id", rulesH.GetAlertRule)
 	admin.POST("/alert-rules", rulesH.CreateAlertRule)
 	admin.PATCH("/alert-rules/:id", rulesH.UpdateAlertRule)
@@ -374,6 +387,22 @@ func registerReleaseTrackerRoutes(g *gin.RouterGroup, h *handlers.ReleaseTracker
 	g.POST("/registry-credentials", h.CreateRegistryCredential)
 	g.PUT("/registry-credentials/:id", h.UpdateRegistryCredential)
 	g.DELETE("/registry-credentials/:id", h.DeleteRegistryCredential)
+}
+
+// registerRunbookRoutes is admin-only: a runbook can name any host and chain
+// several actions across the fleet in one go, a bigger blast radius than a
+// single scheduled task (see handlers.RunbooksHandler's doc comment).
+func registerRunbookRoutes(g *gin.RouterGroup, h *handlers.RunbooksHandler) {
+	admin := g.Group("")
+	admin.Use(AdminOnlyMiddleware())
+	admin.GET("/runbooks", h.ListRunbooks)
+	admin.POST("/runbooks", h.CreateRunbook)
+	admin.GET("/runbooks/:id", h.GetRunbook)
+	admin.PATCH("/runbooks/:id", h.UpdateRunbook)
+	admin.DELETE("/runbooks/:id", h.DeleteRunbook)
+	admin.POST("/runbooks/:id/run", h.RunRunbook)
+	admin.GET("/runbooks/:id/executions", h.ListRunbookExecutions)
+	admin.GET("/runbooks/:id/executions/:execution_id", h.GetRunbookExecution)
 }
 
 func registerProxmoxRoutes(g *gin.RouterGroup, h *handlers.ProxmoxHandler) {

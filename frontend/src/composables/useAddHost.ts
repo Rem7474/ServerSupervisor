@@ -2,19 +2,13 @@ import { ref, computed, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import apiClient from '../api'
 import { getApiErrorMessage } from '../api/client'
+import { parseTagsInput } from '../utils/tags'
+import { buildInstallCommand, buildAgentConfig } from '../utils/agentInstall'
 
 interface HostResult {
   id?: string
   api_key?: string
 }
-
-const serverUrl =
-  typeof window !== 'undefined' && window.location?.origin
-    ? window.location.origin
-    : 'http://localhost:8080'
-
-const INSTALL_SCRIPT_URL =
-  'https://raw.githubusercontent.com/Rem7474/ServerSupervisor/main/agent/install.sh'
 
 const AGENT_POLL_INTERVAL_MS = 3000
 const AGENT_POLL_TIMEOUT_MS = 120_000
@@ -22,7 +16,7 @@ const AGENT_POLL_TIMEOUT_MS = 120_000
 export function useAddHost() {
   const router = useRouter()
 
-  const form = ref({ name: '', ip_address: '' })
+  const form = ref({ name: '', ip_address: '', tags: '' })
   const error = ref('')
   const loading = ref(false)
   const touched = ref({ name: false, ip_address: false })
@@ -76,13 +70,13 @@ export function useAddHost() {
   onUnmounted(stopAgentPolling)
 
   const installCmd = computed(() => {
-    if (!result.value) return ''
-    return `curl -sSL ${INSTALL_SCRIPT_URL} | sudo bash -s -- --server-url ${serverUrl} --api-key "${result.value.api_key}"`
+    if (!result.value?.api_key) return ''
+    return buildInstallCommand(result.value.api_key)
   })
 
   const agentConfig = computed(() => {
-    if (!result.value) return ''
-    return `server_url: "${serverUrl}"\napi_key: "${result.value.api_key}"\nreport_interval: 30\ncollect_docker: true\ncollect_apt: true`
+    if (!result.value?.api_key) return ''
+    return buildAgentConfig(result.value.api_key)
   })
 
   async function handleSubmit(): Promise<void> {
@@ -92,7 +86,11 @@ export function useAddHost() {
     loading.value = true
     error.value = ''
     try {
-      const res = await apiClient.registerHost(form.value)
+      const res = await apiClient.registerHost({
+        name: form.value.name,
+        ip_address: form.value.ip_address,
+        tags: parseTagsInput(form.value.tags),
+      })
       result.value = res.data
       if (res.data?.id) startAgentPolling(res.data.id)
     } catch (e: unknown) {

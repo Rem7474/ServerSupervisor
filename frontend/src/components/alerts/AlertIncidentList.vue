@@ -311,6 +311,13 @@
                       class="ms-1"
                     >· {{ resolveHint(item) }}</span>
                   </div>
+                  <div
+                    v-if="item.command_status"
+                    class="text-muted small mt-1"
+                  >
+                    Remédiation :
+                    <span :class="commandStatusBadgeClass(item.command_status)">{{ commandStatusLabel(item.command_status) }}</span>
+                  </div>
                 </template>
               </td>
               <td class="text-muted small">
@@ -325,7 +332,7 @@
               </td>
               <td>
                 <button
-                  v-if="!isCompleted(item) && item.id"
+                  v-if="isAdmin && !isCompleted(item) && item.id"
                   type="button"
                   class="btn btn-sm btn-ghost-secondary"
                   :disabled="resolvingId === item.id"
@@ -423,6 +430,8 @@ interface Incident {
   source_label?: string
   link_host_id?: string
   value_label?: string
+  command_id?: string
+  command_status?: string
   metric?: string
   status?: string
   version?: string
@@ -462,11 +471,13 @@ const props = withDefaults(defineProps<{
   loading?: boolean
   error?: string
   activeIncidentCount?: number
+  isAdmin?: boolean
 }>(), {
   incidents: () => [],
   loading: false,
   error: '',
   activeIncidentCount: 0,
+  isAdmin: false,
 })
 
 const emit = defineEmits<{
@@ -611,6 +622,24 @@ function notificationRoute(incident: Incident): string {
     return '/git-webhooks?tab=trackers'
   }
   return resolveIncidentHostRoute(incident?.host_id, incident?.metric, incident?.link_host_id)
+}
+
+// commandStatusLabel/commandStatusBadgeClass describe the remote_commands row
+// a rule's command_trigger dispatched when this incident fired (see
+// item.command_status, joined server-side from remote_commands.status).
+function commandStatusLabel(status: string | undefined): string {
+  if (status === 'pending') return 'en attente'
+  if (status === 'running') return 'en cours'
+  if (status === 'completed') return 'réussie'
+  if (status === 'failed') return 'échouée'
+  return status || 'inconnue'
+}
+
+function commandStatusBadgeClass(status: string | undefined): string {
+  if (status === 'completed') return 'badge bg-green-lt text-green'
+  if (status === 'failed') return 'badge bg-danger-lt text-danger'
+  if (status === 'running') return 'badge bg-info-lt text-info'
+  return 'badge bg-warning-lt text-warning'
 }
 
 function trackerStatusLabel(status: string | undefined): string {

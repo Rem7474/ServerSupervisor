@@ -59,14 +59,56 @@ func parseAlertRuleID(c *gin.Context) (int64, bool) {
 	return id, true
 }
 
-// ListAlertRules returns all alert rules.
+// ListAlertRules returns alert rules. Admins and users with no host_permissions
+// entries see all rules; hostperm-restricted users only see rules scoped to one
+// of their granted hosts (Docker/agent rules — Proxmox scopes and agent rules
+// with no host_id apply cluster/fleet-wide and have no single resolvable host,
+// so they stay admin-only-visible in this MVP). Rule CRUD/test/capabilities
+// endpoints are unaffected — still admin-only via the router group.
 func (h *AlertRulesHandler) ListAlertRules(c *gin.Context) {
+	scope, err := resolveAlertHostScope(c, h.db)
+	if err != nil {
+		respondError(c, apperr.Failed("failed to validate host permissions"))
+		return
+	}
 	rules, err := h.svc.List(c.Request.Context())
 	if err != nil {
 		respondError(c, err)
 		return
 	}
-	c.JSON(http.StatusOK, rules)
+	c.JSON(http.StatusOK, filterAlertRulesByScope(rules, scope))
+}
+
+// filterAlertRulesByScope keeps only the rules an alertHostScope-restricted
+// caller is allowed to see.
+func filterAlertRulesByScope(rules []models.AlertRule, scope alertHostScope) []models.AlertRule {
+	if scope.unrestricted {
+		return rules
+	}
+	out := make([]models.AlertRule, 0, len(rules))
+	for _, r := range rules {
+		if scope.allowsHost(ruleHostID(r)) {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
+// ruleHostID returns the single host a rule is scoped to, or "" when the rule
+// has no single resolvable host (Proxmox scope, or an agent rule with no
+// host_id — i.e. it applies fleet-wide).
+func ruleHostID(r models.AlertRule) string {
+	switch r.SourceType {
+	case models.AlertSourceDocker:
+		if r.DockerScope != nil {
+			return r.DockerScope.HostID
+		}
+	case models.AlertSourceAgent:
+		if r.HostID != nil {
+			return *r.HostID
+		}
+	}
+	return ""
 }
 
 // GetAlertRule returns a single alert rule by ID.

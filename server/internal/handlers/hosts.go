@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"net/http"
+	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/serversupervisor/server/internal/apperr"
@@ -147,4 +149,22 @@ func (h *HostHandler) GetHostDashboard(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, dashboard)
+}
+
+// GetHostExposure returns the NPM domains that forward to this host (matched
+// by IP) enriched with aggregated web-log traffic for those domains over
+// ?period (default 24h, example: 24h, 168h).
+func (h *HostHandler) GetHostExposure(c *gin.Context) {
+	raw := strings.TrimSpace(c.DefaultQuery("period", "24h"))
+	period, err := time.ParseDuration(raw)
+	if err != nil || period <= 0 {
+		respondError(c, apperr.Validation("invalid period (example: 24h, 168h)"))
+		return
+	}
+	exposure, err := h.svc.Exposure(c.Request.Context(), c.Param("id"), period)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, exposure)
 }

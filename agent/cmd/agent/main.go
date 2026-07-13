@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/serversupervisor/agent/internal/agentws"
 	"github.com/serversupervisor/agent/internal/collector"
 	"github.com/serversupervisor/agent/internal/config"
 	"github.com/serversupervisor/agent/internal/dispatcher"
@@ -185,6 +186,20 @@ func main() {
 		}
 	}()
 
+	// pollNowCh is nudged by agentws when the server pushes a "poll_now" over
+	// the optional low-latency channel. Buffered 1 and coalesced by the
+	// non-blocking send in pollNow: several nudges before the main loop gets
+	// to them collapse into a single early poll, same as the ticker already
+	// does implicitly (it doesn't queue missed ticks either).
+	pollNowCh := make(chan struct{}, 1)
+	pollNow := func() {
+		select {
+		case pollNowCh <- struct{}{}:
+		default:
+		}
+	}
+	go agentws.Run(ctx, cfg, pollNow)
+
 	rep.Send(ctx, s, commandQueue)
 
 	ticker := time.NewTicker(time.Duration(cfg.ReportInterval) * time.Second)
@@ -194,6 +209,9 @@ func main() {
 		select {
 		case <-ticker.C:
 			rep.Send(ctx, s, commandQueue)
+		case <-pollNowCh:
+			rep.Send(ctx, s, commandQueue)
+			ticker.Reset(time.Duration(cfg.ReportInterval) * time.Second)
 		case <-ctx.Done():
 			slog.Info("agent shutting down")
 			close(commandQueue)

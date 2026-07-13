@@ -179,9 +179,15 @@ type AlertIncident struct {
 	TriggeredAt time.Time  `json:"triggered_at" db:"triggered_at"`
 	ResolvedAt  *time.Time `json:"resolved_at" db:"resolved_at"`
 	Value       float64    `json:"value" db:"value"`
-	// Enriched post-fetch (not DB columns): Docker synthetic IDs resolution
-	ValueLabel string `json:"value_label,omitempty" db:"-"`
-	LinkHostID string `json:"link_host_id,omitempty" db:"-"`
+	// CommandID is the remote_commands row a command_trigger dispatched when
+	// this incident fired, if the rule has one configured. Nil otherwise.
+	CommandID *string `json:"command_id,omitempty" db:"command_id"`
+	// Enriched post-fetch (not DB columns): Docker synthetic IDs resolution,
+	// and the live status of CommandID's remote_commands row (joined at read
+	// time so the frontend doesn't need a second round-trip per incident).
+	ValueLabel    string `json:"value_label,omitempty" db:"-"`
+	LinkHostID    string `json:"link_host_id,omitempty" db:"-"`
+	CommandStatus string `json:"command_status,omitempty" db:"-"`
 }
 
 type NotificationItem struct {
@@ -214,6 +220,10 @@ type NotificationItem struct {
 	// Docker synthetic ID resolution: real host to navigate to, and human state label
 	LinkHostID string `json:"link_host_id,omitempty"`
 	ValueLabel string `json:"value_label,omitempty"`
+	// CommandStatus is the remote_commands.status of the rule's command_trigger
+	// dispatch for this incident (alert_incident type only), joined from
+	// alert_incidents.command_id — empty when no command_trigger fired.
+	CommandStatus string `json:"command_status,omitempty"`
 }
 
 // PushSubscription represents a Web Push (VAPID) subscription for a user's browser/device.

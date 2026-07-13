@@ -4,7 +4,7 @@ Scoped guidance for the Vue 3 + TypeScript SPA. Read the root [CLAUDE.md](../CLA
 
 ## Adding or changing a view
 
-Every view should own its data/logic via a dedicated `composables/use<Domain>.ts` (see the ~48 files in `composables/` for the pattern — `useNPM.ts`, `useMonitoring.ts`, `useProxmoxNode.ts`, etc.); the view itself keeps only template refs (DOM focus targets, child-component refs via `defineExpose`) and display formatting. This is the pattern for every view **except** `GlobalScheduledTasksView.vue`, a known, separately-tracked exception — don't treat it as a second precedent, migrate it the same way if you're touching it.
+Every view should own its data/logic via a dedicated `composables/use<Domain>.ts` (see the ~49 files in `composables/` for the pattern — `useNPM.ts`, `useMonitoring.ts`, `useProxmoxNode.ts`, `useGlobalScheduledTasks.ts`, etc.); the view itself keeps only template refs (DOM focus targets, child-component refs via `defineExpose`) and display formatting. `GlobalScheduledTasksView.vue` was the last holdout and has since been migrated too — there is no longer a standing exception to this pattern.
 
 Gotcha hit repeatedly during that migration: `vue-tsc` flags a template ref (`ref="x"`) returned by a composable as "never read," because the template's `ref` attribute isn't a JS read `vue-tsc` can see. Keep template refs declared in the view; have the composable expose a plain signal (e.g. a counter) if it needs to trigger something back in the view.
 

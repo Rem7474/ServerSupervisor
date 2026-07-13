@@ -157,6 +157,20 @@
         <table class="table table-vcenter table-hover card-table mb-0">
           <thead>
             <tr>
+              <th
+                v-if="canManage"
+                class="tasks-select-col"
+              >
+                <label class="form-check mb-0">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    :checked="allVisibleSelected"
+                    aria-label="Sélectionner toutes les tâches affichées"
+                    @change="toggleSelectAll(($event.target as HTMLInputElement).checked)"
+                  >
+                </label>
+              </th>
               <th>
                 <SortableHeader
                   label="Hôte"
@@ -195,7 +209,19 @@
             <tr
               v-for="task in filteredTasks"
               :key="task.id"
+              :class="{ 'table-active': selectedIds.has(task.id) }"
             >
+              <td v-if="canManage">
+                <label class="form-check mb-0">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    :checked="selectedIds.has(task.id)"
+                    :aria-label="`Sélectionner ${task.name}`"
+                    @change="toggleSelected(task.id, ($event.target as HTMLInputElement).checked)"
+                  >
+                </label>
+              </td>
               <td>
                 <router-link
                   :to="`/hosts/${task.host_id}`"
@@ -328,6 +354,43 @@
       </div>
     </div>
 
+    <BulkActionBar
+      :count="selectedIds.size"
+      @clear="clearSelection"
+    >
+      <button
+        type="button"
+        class="btn btn-sm btn-success"
+        :disabled="bulkLoading"
+        @click="handleBulkEnable(selectedTasks)"
+      >
+        Activer
+      </button>
+      <button
+        type="button"
+        class="btn btn-sm btn-outline-secondary"
+        :disabled="bulkLoading"
+        @click="handleBulkDisable(selectedTasks)"
+      >
+        Désactiver
+      </button>
+      <button
+        type="button"
+        class="btn btn-sm btn-outline-primary"
+        :disabled="bulkLoading"
+        @click="handleBulkRun(selectedTasks)"
+      >
+        Exécuter
+      </button>
+      <button
+        type="button"
+        class="btn btn-sm btn-outline-danger"
+        :disabled="bulkLoading"
+        @click="handleBulkDelete(selectedTasks)"
+      >
+        Supprimer
+      </button>
+    </BulkActionBar>
 
     <!-- Create task modal -->
     <div
@@ -762,312 +825,84 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
 import { IconClock, IconPencil, IconRefresh, IconTrash } from '@tabler/icons-vue'
-import { useAuthStore } from '../stores/auth'
-import { useHostsStore } from '../stores/hosts'
-import { addToast } from '../composables/useGlobalToast'
-import api from '../api'
-import { isManualOnly, describeCron, nextCronRun, MANUAL_SENTINEL } from '../utils/cron'
-import { useConfirmDialog } from '../composables/useConfirmDialog'
 import DataToolbar from '../components/common/DataToolbar.vue'
 import SortableHeader from '../components/common/SortableHeader.vue'
-import type { ScheduledTaskWithHost } from '../types/task'
-import { getApiErrorMessage } from '../api/client'
+import BulkActionBar from '../components/BulkActionBar.vue'
+import { useGlobalScheduledTasks } from '../composables/useGlobalScheduledTasks'
 
-const auth = useAuthStore()
-const hostsStore = useHostsStore()
-const dialog = useConfirmDialog()
-
-const tasks = ref<ScheduledTaskWithHost[]>([])
-const loading = ref(false)
-const error = ref('')
-const runningId = ref<string | number | null>(null)
-
-const filterText = ref('')
-const filterHost = ref('')
-const filterModule = ref('')
-const filterStatus = ref('')
-const sortKey = ref('name')
-const sortDir = ref<'asc' | 'desc'>('asc')
-
-const editTask = ref<any>(null)
-const editForm = ref({ name: '', cron_expression: '', enabled: false })
-const editSaving = ref(false)
-const editError = ref('')
-
-const historyTask = ref<any>(null)
-const executions = ref<any[]>([])
-const historyLoading = ref(false)
-const historyError = ref('')
-const expandedId = ref<string | number | null>(null)
-
-const canManage = computed(() => auth.role === 'admin' || auth.role === 'operator')
-
-const moduleActions: Record<string, string[]> = {
-  apt: ['update', 'upgrade', 'install', 'remove'],
-  docker: ['start', 'stop', 'restart', 'pull', 'prune'],
-  systemd: ['restart', 'start', 'stop', 'enable', 'disable'],
-  journal: ['tail'],
-  processes: ['list'],
-}
-
-const cronPresets = [
-  { label: 'Toutes les heures', value: '@hourly' },
-  { label: 'Tous les jours à 3h', value: '0 3 * * *' },
-  { label: 'Dimanche minuit', value: '@weekly' },
-  { label: '1er du mois', value: '@monthly' },
-]
-
-function targetLabel(module: string): string {
-  if (module === 'docker') return 'Conteneur (nom ou ID)'
-  if (module === 'systemd') return 'Service systemd'
-  if (module === 'custom') return 'ID de tâche custom'
-  if (module === 'apt') return 'Paquet (optionnel pour install/remove)'
-  return ''
-}
-
-function targetPlaceholder(module: string): string {
-  if (module === 'docker') return 'nginx'
-  if (module === 'systemd') return 'nginx.service'
-  if (module === 'custom') return 'my-deploy-task'
-  if (module === 'apt') return 'nginx'
-  return ''
-}
-
-function emptyCreateForm() {
-  return { host_id: '', name: '', module: 'apt', action: 'update', target: '', cron_expression: '', enabled: false }
-}
-
-const createModalOpen = ref(false)
-const createForm = ref(emptyCreateForm())
-const createSaving = ref(false)
-const createError = ref('')
-
-const createCronDesc = computed(() => describeCron(createForm.value.cron_expression))
-const createNextRun = computed(() => {
-  const expr = createForm.value.cron_expression
-  if (!expr || expr === MANUAL_SENTINEL) return null
-  return nextCronRun(expr)
-})
-
-function onModuleChange(): void {
-  const actions = moduleActions[createForm.value.module]
-  createForm.value.action = actions ? actions[0] : ''
-  createForm.value.target = ''
-}
-
-function openCreate(): void {
-  createForm.value = emptyCreateForm()
-  createError.value = ''
-  createModalOpen.value = true
-}
-
-async function saveCreate(): Promise<void> {
-  createSaving.value = true
-  createError.value = ''
-  try {
-    const { host_id, ...body } = createForm.value
-    const cron = body.cron_expression.trim() || MANUAL_SENTINEL
-    await api.createScheduledTask(host_id, {
-      name: body.name,
-      module: body.module,
-      action: body.action,
-      target: body.target,
-      payload: '',
-      cron_expression: cron,
-      enabled: cron !== MANUAL_SENTINEL && body.enabled,
-    })
-    createModalOpen.value = false
-    await loadTasks()
-  } catch (e: unknown) {
-    createError.value = getApiErrorMessage(e, 'Erreur lors de la création')
-  } finally {
-    createSaving.value = false
-  }
-}
-
-const hostList = computed(() => {
-  const names = [...new Set(tasks.value.map((t: any) => t.host_name))]
-  return names.sort()
-})
-
-const editCronDesc = computed(() => describeCron(editForm.value.cron_expression))
-const editNextRun = computed(() => {
-  const expr = editForm.value.cron_expression
-  if (!expr || expr === MANUAL_SENTINEL) return null
-  return nextCronRun(expr)
-})
-
-const filteredTasks = computed(() => {
-  const filtered = tasks.value.filter((task: any) => {
-    if (filterHost.value && task.host_name !== filterHost.value) return false
-    if (filterModule.value && task.module !== filterModule.value) return false
-    if (filterStatus.value === 'enabled' && (!task.enabled || isManualOnly(task))) return false
-    if (filterStatus.value === 'disabled' && (task.enabled || isManualOnly(task))) return false
-    if (filterStatus.value === 'manual' && !isManualOnly(task)) return false
-    if (filterStatus.value === 'failed' && task.last_run_status !== 'failed') return false
-    if (filterText.value) {
-      const q = filterText.value.toLowerCase()
-      if (!task.name.toLowerCase().includes(q) &&
-          !task.host_name.toLowerCase().includes(q) &&
-          !task.module.toLowerCase().includes(q) &&
-          !(task.target || '').toLowerCase().includes(q)) return false
-    }
-    return true
-  })
-
-  return [...filtered].sort((a, b) => {
-    const key = sortKey.value
-    const av = (a as Record<string, unknown>)[key] ?? ''
-    const bv = (b as Record<string, unknown>)[key] ?? ''
-    const cmp = String(av).localeCompare(String(bv), 'fr', { numeric: true })
-    return sortDir.value === 'asc' ? cmp : -cmp
-  })
-})
-
-function toggleSort(key: string): void {
-  if (sortKey.value === key) {
-    sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
-  } else {
-    sortKey.value = key
-    sortDir.value = 'asc'
-  }
-}
-
-function formatDate(iso: string | undefined): string {
-  if (!iso) return ''
-  return new Date(iso).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
-}
-
-function statusBadge(status: string | undefined): string {
-  if (status === 'completed') return 'badge bg-success-lt'
-  if (status === 'failed') return 'badge bg-danger-lt'
-  if (status === 'running') return 'badge bg-info-lt'
-  return 'badge bg-warning-lt'
-}
-
-function durationSec(start: string, end: string): string {
-  const ms = new Date(end).getTime() - new Date(start).getTime()
-  return (ms / 1000).toFixed(1)
-}
-
-function firstLine(output: string | undefined): string {
-  return (output || '').split('\n')[0].trim()
-}
-
-function openEdit(task: any): void {
-  editTask.value = task
-  editForm.value = { name: task.name, cron_expression: task.cron_expression, enabled: task.enabled }
-  editError.value = ''
-}
-
-async function saveEdit(): Promise<void> {
-  editSaving.value = true
-  editError.value = ''
-  try {
-    await api.updateScheduledTask(editTask.value.id, {
-      name: editForm.value.name,
-      module: editTask.value.module,
-      action: editTask.value.action,
-      target: editTask.value.target,
-      payload: editTask.value.payload,
-      cron_expression: editForm.value.cron_expression,
-      enabled: editForm.value.enabled,
-    })
-    editTask.value = null
-    await loadTasks()
-  } catch (e: unknown) {
-    editError.value = getApiErrorMessage(e, 'Erreur lors de la sauvegarde')
-  } finally {
-    editSaving.value = false
-  }
-}
-
-async function confirmDelete(task: any): Promise<void> {
-  const ok = await dialog.confirm({
-    title: 'Supprimer la tâche',
-    message: `Supprimer « ${task.name} » sur ${task.host_name} ?`,
-    variant: 'danger',
-  })
-  if (!ok) return
-  try {
-    await api.deleteScheduledTask(task.id)
-    await loadTasks()
-  } catch (e: unknown) {
-    error.value = getApiErrorMessage(e, 'Erreur lors de la suppression')
-  }
-}
-
-async function openHistory(task: any): Promise<void> {
-  historyTask.value = task
-  executions.value = []
-  expandedId.value = null
-  historyError.value = ''
-  historyLoading.value = true
-  try {
-    const { data } = await api.getScheduledTaskExecutions(task.id, 20)
-    executions.value = data
-  } catch (e: unknown) {
-    historyError.value = getApiErrorMessage(e, 'Erreur de chargement')
-  } finally {
-    historyLoading.value = false
-  }
-}
-
-async function loadTasks(): Promise<void> {
-  loading.value = true
-  error.value = ''
-  try {
-    const { data } = await api.getAllScheduledTasks()
-    tasks.value = data
-  } catch (e: unknown) {
-    error.value = getApiErrorMessage(e, 'Erreur de chargement')
-  } finally {
-    loading.value = false
-  }
-}
-
-async function toggleTask(task: any): Promise<void> {
-  const enabling = !task.enabled
-  const ok = await dialog.confirm({
-    title: enabling ? 'Activer la tâche' : 'Désactiver la tâche',
-    message: `Voulez-vous ${enabling ? 'activer' : 'désactiver'} « ${task.name} » sur ${task.host_name} ?`,
-    variant: 'warning',
-  })
-  if (!ok) return
-  try {
-    await api.updateScheduledTask(task.id, {
-      name: task.name, module: task.module, action: task.action,
-      target: task.target, payload: task.payload,
-      cron_expression: task.cron_expression, enabled: enabling,
-    })
-    await loadTasks()
-  } catch (e: unknown) {
-    error.value = getApiErrorMessage(e, 'Erreur')
-  }
-}
-
-async function runNow(task: any): Promise<void> {
-  runningId.value = task.id
-  try {
-    const { data } = await api.runScheduledTask(task.id)
-    addToast(`${task.name} déclenchée — commande ${data.command_id}`, 'success')
-    await loadTasks()
-  } catch (e: unknown) {
-    error.value = getApiErrorMessage(e, 'Erreur')
-  } finally {
-    runningId.value = null
-  }
-}
-
-onMounted(() => {
-  hostsStore.fetchHosts()
-  loadTasks()
-})
+const {
+  hostsStore,
+  tasks,
+  loading,
+  error,
+  runningId,
+  filterText,
+  filterHost,
+  filterModule,
+  filterStatus,
+  sortKey,
+  sortDir,
+  selectedIds,
+  bulkLoading,
+  editTask,
+  editForm,
+  editSaving,
+  editError,
+  historyTask,
+  executions,
+  historyLoading,
+  historyError,
+  expandedId,
+  createModalOpen,
+  createForm,
+  createSaving,
+  createError,
+  canManage,
+  moduleActions,
+  cronPresets,
+  createCronDesc,
+  createNextRun,
+  editCronDesc,
+  editNextRun,
+  hostList,
+  filteredTasks,
+  allVisibleSelected,
+  selectedTasks,
+  toggleSelected,
+  toggleSelectAll,
+  clearSelection,
+  toggleSort,
+  targetLabel,
+  targetPlaceholder,
+  onModuleChange,
+  openCreate,
+  saveCreate,
+  formatDate,
+  statusBadge,
+  durationSec,
+  firstLine,
+  isManualOnly,
+  describeCron,
+  openEdit,
+  saveEdit,
+  confirmDelete,
+  openHistory,
+  loadTasks,
+  toggleTask,
+  runNow,
+  handleBulkEnable,
+  handleBulkDisable,
+  handleBulkDelete,
+  handleBulkRun,
+} = useGlobalScheduledTasks()
 </script>
 
 <style scoped>
+.tasks-select-col {
+  width: 1%;
+}
+
 .tasks-filter-select {
   min-width: 150px;
 }

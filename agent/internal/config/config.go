@@ -37,6 +37,13 @@ type Config struct {
 	CrowdSecAlertsMachineID    string `yaml:"crowdsec_alerts_machine_id"`
 	CrowdSecAlertsPassword     string `yaml:"crowdsec_alerts_password"`
 
+	// Low-latency command push: an optional, additive WebSocket connection the
+	// agent opens to the server purely to be nudged to poll immediately when a
+	// command is dispatched, instead of waiting out report_interval. Disabling
+	// it only removes that latency win — command delivery still works exactly
+	// as before via the regular poll cycle.
+	DisableWSPush bool `yaml:"disable_ws_push"`
+
 	// TLS
 	InsecureSkipVerify bool `yaml:"insecure_skip_verify"`
 
@@ -158,6 +165,9 @@ func Load(path string) (*Config, error) {
 			cfg.WebLogsTopN = n
 		}
 	}
+	if env := os.Getenv("SUPERVISOR_DISABLE_WS_PUSH"); env != "" {
+		cfg.DisableWSPush = env == "true" || env == "1"
+	}
 	if env := os.Getenv("SUPERVISOR_INSECURE_SKIP_VERIFY"); env != "" {
 		cfg.InsecureSkipVerify = env == "true" || env == "1"
 	}
@@ -215,6 +225,7 @@ func defaultConfig() *Config {
 		CrowdSecAPIKey:             "",
 		CrowdSecAlertsMachineID:    "",
 		CrowdSecAlertsPassword:     "",
+		DisableWSPush:              false,
 		LogLevel:                   "info",
 		LogFormat:                  "text",
 	}
@@ -276,6 +287,13 @@ web_logs_cursor_file: "/var/lib/serversupervisor/web_logs_cursor.json"
 # log_format: text|json (default text — switch to json for centralized ingestion).
 log_level: "info"
 log_format: "text"
+
+# Low-latency command push: an optional WebSocket connection the agent opens
+# to the server purely to be nudged to poll immediately when a command is
+# dispatched, instead of waiting out report_interval. Purely additive — set
+# to true only if your network blocks WebSocket upgrades to the server;
+# command delivery still works exactly as before via the regular poll cycle.
+disable_ws_push: false
 
 # Skip TLS verification (for self-signed certs)
 insecure_skip_verify: false

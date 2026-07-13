@@ -44,6 +44,7 @@ export interface WebhookItem {
   healthcheck_timeout_sec?: number
   rollback_on_failure?: boolean
   registry_credentials_id?: string
+  reconcile_drift?: boolean
 }
 
 export interface WebhookFormData {
@@ -75,6 +76,7 @@ export interface WebhookFormData {
   healthcheck_timeout_sec?: number
   rollback_on_failure?: boolean
   registry_credentials_id?: string
+  reconcile_drift?: boolean
 }
 
 const gitEnvVars = [
@@ -154,6 +156,7 @@ export function useWebhookForm(props: WebhookFormProps, onSubmit: (payload: Webh
     healthcheck_timeout_sec: 0,
     rollback_on_failure: false,
     registry_credentials_id: '',
+    reconcile_drift: false,
   })
 
   const form: Ref<WebhookFormData> = ref(defaultWebhookForm())
@@ -207,6 +210,7 @@ export function useWebhookForm(props: WebhookFormProps, onSubmit: (payload: Webh
             healthcheck_timeout_sec: Number.isFinite(props.item.healthcheck_timeout_sec) ? props.item.healthcheck_timeout_sec : 0,
             rollback_on_failure: !!props.item.rollback_on_failure,
             registry_credentials_id: props.item.registry_credentials_id || '',
+            reconcile_drift: !!props.item.reconcile_drift,
           }
         : defaultTrackerForm()
       return
@@ -315,6 +319,7 @@ export function useWebhookForm(props: WebhookFormProps, onSubmit: (payload: Webh
         payload.compose_service = ''
         payload.pre_update_task_id = ''
         payload.post_update_task_id = ''
+        payload.reconcile_drift = false
       }
       // Git trackers never use the compose path or registry credentials.
       if (payload.tracker_type !== 'docker') {

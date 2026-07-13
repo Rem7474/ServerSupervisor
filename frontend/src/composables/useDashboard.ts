@@ -44,7 +44,9 @@ interface DashboardHostRecord {
   ip_address?: string
   os?: string
   agent_version?: string
+  created_at?: string | number | Date | null
   last_seen?: string | number | Date | null
+  tags?: string[]
 }
 
 interface DashboardMetricPoint {
@@ -246,6 +248,7 @@ export function useDashboard() {
 
   const searchQuery = ref('')
   const statusFilter = ref('all')
+  const tagFilter = ref('all')
   const sortKey = ref(localStorage.getItem('dashboard.sortKey') || 'name')
   const sortDir = ref<SortDirection>((localStorage.getItem('dashboard.sortDir') as SortDirection) || 'asc')
   watch(sortKey, (v) => localStorage.setItem('dashboard.sortKey', v))
@@ -324,12 +327,21 @@ export function useDashboard() {
     return effectiveMetricsByHost.value[hostId] ?? EMPTY_METRIC
   }
 
+  const allTags = computed(() => {
+    const set = new Set<string>()
+    for (const host of hosts.value as DashboardHostRecord[]) {
+      for (const tag of host.tags || []) set.add(tag)
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b))
+  })
+
   const filteredHosts = computed(() => {
     const query = searchQuery.value.trim().toLowerCase()
     return hosts.value.filter((host: DashboardHostRecord) => {
       if (statusFilter.value !== 'all' && host.status !== statusFilter.value) return false
+      if (tagFilter.value !== 'all' && !(host.tags || []).includes(tagFilter.value)) return false
       if (!query) return true
-      return [host.name, host.hostname, host.ip_address, host.os]
+      return [host.name, host.hostname, host.ip_address, host.os, ...(host.tags || [])]
         .filter(Boolean)
         .join(' ')
         .toLowerCase()
@@ -742,6 +754,8 @@ export function useDashboard() {
     loading,
     searchQuery,
     statusFilter,
+    tagFilter,
+    allTags,
     sortKey,
     sortDir,
     selectedHostIds,

@@ -37,6 +37,7 @@ type Repository interface {
 	ListTrackableContainers(ctx context.Context) ([]models.TrackableContainer, error)
 	ListTrackerTagDigests(ctx context.Context, trackerID string, limit int) ([]models.ReleaseVersionHistoryItem, error)
 	UpdateReleaseTrackerExecutionByCommandID(ctx context.Context, commandID, status string) (trackerID string, notifyOnRelease bool, channels []string, err error)
+	TrackerDriftDetected(ctx context.Context, t models.ReleaseTracker) (bool, error)
 }
 
 // Service holds the release-tracker HTTP use-cases + owns the background poller.
@@ -107,6 +108,9 @@ func (s *Service) List(ctx context.Context) ([]models.ReleaseTracker, error) {
 	}
 	if trackers == nil {
 		trackers = []models.ReleaseTracker{}
+	}
+	for i := range trackers {
+		trackers[i].DriftDetected, _ = s.repo.TrackerDriftDetected(ctx, trackers[i])
 	}
 	return trackers, nil
 }
@@ -189,6 +193,7 @@ func (s *Service) Get(ctx context.Context, id string) (*models.ReleaseTracker, [
 	if execs == nil {
 		execs = []models.ReleaseTrackerExecution{}
 	}
+	t.DriftDetected, _ = s.repo.TrackerDriftDetected(ctx, *t)
 	return t, execs, nil
 }
 

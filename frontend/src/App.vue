@@ -89,7 +89,14 @@
                   <span class="nav-link-icon">
                     <IconServer2 class="icon" />
                   </span>
-                  <span class="nav-link-title">Proxmox</span>
+                  <span class="nav-link-title">
+                    Proxmox
+                    <span
+                      v-if="suggestedProxmoxLinksCount > 0"
+                      class="badge bg-azure-lt text-azure ms-1"
+                      :title="`${suggestedProxmoxLinksCount} liaison(s) hôte ↔ VM/LXC suggérée(s), à confirmer`"
+                    >{{ suggestedProxmoxLinksCount }}</span>
+                  </span>
                 </router-link>
               </li>
               <li class="nav-item">
@@ -169,6 +176,19 @@
                       class="icon icon-sm me-2"
                     />
                     Tâches planifiées
+                  </router-link>
+                  <router-link
+                    v-if="auth.isAdmin"
+                    to="/runbooks"
+                    class="dropdown-item"
+                    role="menuitem"
+                    @click="secondaryMenuOpen = false"
+                  >
+                    <IconPlayerPlay
+                      :size="16"
+                      class="icon icon-sm me-2"
+                    />
+                    Runbooks
                   </router-link>
                   <router-link
                     to="/commands"
@@ -417,6 +437,7 @@ import {
   IconServer2, IconBell, IconDots, IconShieldLock, IconShieldCheck,
   IconChartLine, IconClock, IconTerminal2, IconTopologyStar3, IconActivity,
   IconBox, IconGitBranch, IconClipboardList, IconUsers, IconSettings, IconServer,
+  IconPlayerPlay,
 } from '@tabler/icons-vue'
 import ErrorBoundary from './components/common/ErrorBoundary.vue'
 import { subscribeHttpErrors, subscribeNetworkOk } from './utils/httpErrorBus'
@@ -445,6 +466,20 @@ const hostsDownCount = computed(() => {
     (h) => h.status === 'offline'
   ).length
 })
+
+// Liens Proxmox guest<->hôte suggérés (auto-détectés) en attente de confirmation —
+// invisibles ailleurs dans l'app tant qu'on ne tombe pas sur la bonne page hôte/nœud.
+const suggestedProxmoxLinksCount = ref(0)
+let proxmoxLinksRefreshTimer: ReturnType<typeof setInterval> | null = null
+
+async function refreshSuggestedProxmoxLinksCount(): Promise<void> {
+  try {
+    const res = await apiClient.getProxmoxLinks('suggested')
+    suggestedProxmoxLinksCount.value = Array.isArray(res.data) ? res.data.length : 0
+  } catch {
+    // non-critique — on garde le dernier compte connu
+  }
+}
 
 // Offline detection — tracks browser connectivity via navigator.onLine events.
 // A "false" value means the browser has no network; the server may still be
@@ -565,6 +600,8 @@ onMounted(() => {
     adminMenuOpen.value = false
     userMenuOpen.value = false
   })
+  refreshSuggestedProxmoxLinksCount()
+  proxmoxLinksRefreshTimer = setInterval(refreshSuggestedProxmoxLinksCount, 5 * 60 * 1000)
 })
 
 onUnmounted(() => {
@@ -576,6 +613,9 @@ onUnmounted(() => {
   window.removeEventListener('pageshow', handlePageShow)
   window.removeEventListener('focus', notifyAppResume)
   document.removeEventListener('click', handleOutsideClick, true)
+  if (proxmoxLinksRefreshTimer) {
+    clearInterval(proxmoxLinksRefreshTimer)
+  }
   if (resumeDebounceTimer) {
     clearTimeout(resumeDebounceTimer)
   }
