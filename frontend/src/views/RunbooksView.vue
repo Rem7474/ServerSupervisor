@@ -473,6 +473,7 @@ import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import {
   useRunbooks, RUNBOOK_MODULES, actionsForModule, moduleRequiresTarget, emptyStep,
 } from '../composables/useRunbooks'
+import { useConfirmDialog } from '../composables/useConfirmDialog'
 import type { Runbook, RunbookStepCreate } from '../types/generated'
 
 const {
@@ -482,6 +483,8 @@ const {
   loadRunbooks, startAdd, startEdit, closeModal, saveRunbook, deleteRunbook, runRunbook,
   openHistory, closeHistory, selectExecution,
 } = useRunbooks()
+
+const dialog = useConfirmDialog()
 
 const form = reactive<{ name: string; description: string; steps: RunbookStepCreate[] }>({
   name: '', description: '', steps: [emptyStep()],
@@ -520,12 +523,22 @@ async function handleSave(): Promise<void> {
 }
 
 async function handleDelete(rb: Runbook): Promise<void> {
-  if (!confirm(`Supprimer le runbook "${rb.name}" ? Cette action est irréversible.`)) return
+  const confirmed = await dialog.confirm({
+    title: 'Supprimer le runbook',
+    message: `Supprimer le runbook "${rb.name}" ? Cette action est irréversible.`,
+    variant: 'danger',
+  })
+  if (!confirmed) return
   await deleteRunbook(rb)
 }
 
 async function handleRun(rb: Runbook): Promise<void> {
-  if (!confirm(`Lancer le runbook "${rb.name}" sur ${rb.steps.length} étape(s) ?`)) return
+  const confirmed = await dialog.confirm({
+    title: 'Lancer le runbook',
+    message: `Lancer le runbook "${rb.name}" sur ${rb.steps.length} étape(s) ?`,
+    variant: 'warning',
+  })
+  if (!confirmed) return
   await runRunbook(rb)
 }
 

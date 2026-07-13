@@ -237,7 +237,7 @@
             :size="18"
             class="icon me-2"
           />
-          Sessions actives
+          Historique de connexion
         </h3>
         <button
           v-if="auth.isAuthenticated"

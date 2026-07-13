@@ -156,7 +156,7 @@ const props = withDefaults(defineProps<{
 })
 
 const emit = defineEmits<{
-  (e: 'open-console', payload: { commandId: string | number; prefix: string; command: string }): void
+  (e: 'open-console', payload: { commandId: string | number; prefix: string; command: string; module: string; target: string }): void
   (e: 'history-changed'): void
 }>()
 
@@ -219,6 +219,8 @@ async function runAction(serviceName: string, action: string): Promise<void> {
       commandId: res.data.command_id,
       prefix: 'systemctl ',
       command: `${action} ${serviceName}`,
+      module: 'systemd',
+      target: serviceName,
     })
   } catch (e) {
     error.value = getApiErrorMessage(e, `Impossible d'exécuter systemctl ${action}`)

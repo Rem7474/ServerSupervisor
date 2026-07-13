@@ -19,6 +19,7 @@
         <IconChevronDown
           :size="16"
           class="ms-auto docker-chevron"
+          :class="{ 'is-open': isOpen }"
         />
       </h3>
       <div class="card-options text-secondary small">
@@ -157,17 +158,23 @@
       </table>
       <div
         v-if="feedback"
-        class="alert alert-info m-3 mb-0 py-2"
+        class="alert alert-info alert-dismissible m-3 mb-0 py-2"
         role="status"
       >
         {{ feedback }}
+        <button
+          type="button"
+          class="btn-close"
+          aria-label="Fermer"
+          @click="dismissFeedback"
+        />
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onUnmounted } from 'vue'
 import { IconChevronDown } from '@tabler/icons-vue'
 import apiClient from '../../api'
 import { useAuthStore } from '../../stores/auth'
@@ -198,6 +205,29 @@ const isOpen = ref(false)
 const panelId = 'dashboard-docker-versions-panel'
 const runningIds = ref<Record<string, boolean>>({})
 const feedback = ref('')
+const FEEDBACK_TIMEOUT_MS = 6000
+let feedbackTimer: ReturnType<typeof setTimeout> | null = null
+
+function showFeedback(message: string): void {
+  if (feedbackTimer) clearTimeout(feedbackTimer)
+  feedback.value = message
+  feedbackTimer = setTimeout(() => {
+    feedback.value = ''
+    feedbackTimer = null
+  }, FEEDBACK_TIMEOUT_MS)
+}
+
+function dismissFeedback(): void {
+  if (feedbackTimer) {
+    clearTimeout(feedbackTimer)
+    feedbackTimer = null
+  }
+  feedback.value = ''
+}
+
+onUnmounted(() => {
+  if (feedbackTimer) clearTimeout(feedbackTimer)
+})
 
 const outdatedCount = computed(() =>
   props.versions.filter(v => !v.is_up_to_date && (v.running_version || v.update_confirmed)).length
@@ -230,12 +260,12 @@ async function runTracker(v: DockerVersion): Promise<void> {
   if (isRunDisabled(v)) return
   const id = v.tracker_id!
   runningIds.value = { ...runningIds.value, [id]: true }
-  feedback.value = ''
+  dismissFeedback()
   try {
     await apiClient.runReleaseTracker(id)
-    feedback.value = `Déclenchement lancé pour ${v.docker_image}.`
+    showFeedback(`Déclenchement lancé pour ${v.docker_image}.`)
   } catch (e: unknown) {
-    feedback.value = getApiErrorMessage(e, 'Échec du déclenchement manuel.')
+    showFeedback(getApiErrorMessage(e, 'Échec du déclenchement manuel.'))
   } finally {
     const next = { ...runningIds.value }
     delete next[id]
