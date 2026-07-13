@@ -78,7 +78,7 @@ func TestGetHostExposure(t *testing.T) {
 		TotalRequests: 3,
 		Requests: []models.WebRequest{
 			{IP: "1.2.3.4", Method: "GET", Path: "/", Status: 200, Bytes: 100, Domain: "app.example.com"},
-			{IP: "5.6.7.8", Method: "GET", Path: "/admin", Status: 404, Bytes: 50, Domain: "app.example.com", Category: "bot", Blocked: true},
+			{IP: "5.6.7.8", Method: "GET", Path: "/admin", Status: 404, Bytes: 50, Domain: "app.example.com", Blocked: true},
 			// Different domain, not routed to the backend host — must not be counted.
 			{IP: "9.9.9.9", Method: "GET", Path: "/", Status: 200, Bytes: 10, Domain: "other.example.com"},
 		},

@@ -36,7 +36,7 @@ func TestGetWebLogsSummary_ParallelFanOutMatchesExpectedAggregates(t *testing.T)
 		Requests: []models.WebRequest{
 			{IP: "1.1.1.1", Method: "GET", Path: "/", Status: 200, Bytes: 100, Domain: "app.example.com"},
 			{IP: "1.1.1.2", Method: "GET", Path: "/", Status: 200, Bytes: 200, Domain: "app.example.com"},
-			{IP: "1.1.1.3", Method: "GET", Path: "/wp-admin", Status: 404, Bytes: 50, Domain: "app.example.com", Category: "bot"},
+			{IP: "1.1.1.3", Method: "GET", Path: "/wp-admin", Status: 404, Bytes: 50, Domain: "app.example.com"},
 			{IP: "1.1.1.4", Method: "GET", Path: "/", Status: 500, Bytes: 10, Domain: "app.example.com"},
 			{IP: "1.1.1.5", Method: "GET", Path: "/", Status: 403, Bytes: 5, Domain: "app.example.com", Blocked: true},
 			{IP: "2.2.2.1", Method: "GET", Path: "/", Status: 200, Bytes: 300, Domain: "other.example.com"},

@@ -11,14 +11,17 @@ import (
 	"fmt"
 	"net/http"
 	"net/netip"
+	"sort"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/serversupervisor/server/internal/apperr"
+	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/dispatch"
 	"github.com/serversupervisor/server/internal/models"
 	"github.com/serversupervisor/server/internal/safego"
+	"github.com/serversupervisor/server/internal/threatdetect"
 )
 
 // Repository is the data-access port. *database.DB satisfies it structurally.
@@ -42,10 +45,69 @@ type Dispatcher interface {
 type Service struct {
 	repo       Repository
 	dispatcher Dispatcher
+	cfg        *config.Config
 }
 
-func NewService(repo Repository, dispatcher Dispatcher) *Service {
-	return &Service{repo: repo, dispatcher: dispatcher}
+func NewService(repo Repository, dispatcher Dispatcher, cfg *config.Config) *Service {
+	return &Service{repo: repo, dispatcher: dispatcher, cfg: cfg}
+}
+
+// weightsFromConfig copies the admin-tunable threat-scoring coefficients out
+// of the flat *config.Config fields (kept flat to match every other Config
+// field, and settings-overridable via the same OverrideFromDB path) into the
+// threatdetect.Weights shape Score expects.
+func weightsFromConfig(cfg *config.Config) threatdetect.Weights {
+	if cfg == nil {
+		return threatdetect.DefaultWeights()
+	}
+	return threatdetect.Weights{
+		CategoryWordPress:        cfg.ThreatWeightWordPress,
+		CategoryAdminPanel:       cfg.ThreatWeightAdminPanel,
+		CategoryPathTraversal:    cfg.ThreatWeightPathTraversal,
+		CategoryKnownScanner:     cfg.ThreatWeightKnownScanner,
+		CategorySuspiciousMethod: cfg.ThreatWeightSuspiciousMethod,
+		Status2xxMultiplier:      cfg.ThreatWeightStatus2xx,
+		Status3xxMultiplier:      cfg.ThreatWeightStatus3xx,
+		Status404Multiplier:      cfg.ThreatWeightStatus404,
+		Status4xxOtherMultiplier: cfg.ThreatWeightStatus4xxOther,
+		Status5xxMultiplier:      cfg.ThreatWeightStatus5xx,
+		BreadthWeight:            cfg.ThreatWeightBreadth,
+		HitsWeight:               cfg.ThreatWeightHits,
+		ThresholdMedium:          cfg.ThreatThresholdMedium,
+		ThresholdHigh:            cfg.ThreatThresholdHigh,
+		ThresholdCritical:        cfg.ThreatThresholdCritical,
+	}
+}
+
+// applyThreatScoring computes each top-IP's threat_score/level from the raw
+// category/status breakdown fillWebLogsThreats attached, using the admin's
+// configurable Weights, then re-ranks by score — the repository only
+// pre-filters by raw hit count — and caps the list at 25, matching the
+// pre-existing BotView contract.
+func (s *Service) applyThreatScoring(threats map[string]any) {
+	rawIPs, ok := threats["top_ips"].([]map[string]any)
+	if !ok {
+		return
+	}
+	w := weightsFromConfig(s.cfg)
+	for _, ip := range rawIPs {
+		hits := anyToInt64(ip["hits"])
+		uniquePaths := anyToInt64(ip["unique_paths"])
+		cat, _ := ip["_category_counts"].(threatdetect.CategoryCounts)
+		st, _ := ip["_status_counts"].(threatdetect.StatusCounts)
+		score, level := threatdetect.Score(hits, uniquePaths, cat, st, w)
+		ip["threat_score"] = score
+		ip["level"] = level
+		delete(ip, "_category_counts")
+		delete(ip, "_status_counts")
+	}
+	sort.Slice(rawIPs, func(i, j int) bool {
+		return toFloat(rawIPs[i]["threat_score"]) > toFloat(rawIPs[j]["threat_score"])
+	})
+	if len(rawIPs) > 25 {
+		rawIPs = rawIPs[:25]
+	}
+	threats["top_ips"] = rawIPs
 }
 
 // BlockIP validates the IP + duration and dispatches a CrowdSec ban, returning
@@ -128,6 +190,7 @@ func (s *Service) Summary(ctx context.Context, period time.Duration, hostID, sou
 		if err != nil {
 			return nil, err
 		}
+		s.applyThreatScoring(threats)
 		// No traffic block in this scope; promote only applies the crowdsec bump.
 		promoteBlockedIntoThreats(map[string]any{"threats": threats}, threats)
 		return &SummaryResult{Since: since, Threats: threats}, nil
@@ -227,6 +290,9 @@ func (s *Service) Summary(ctx context.Context, period time.Duration, hostID, sou
 	}
 
 	threats := summary["threats"]
+	if threatsMap, ok := threats.(map[string]any); ok {
+		s.applyThreatScoring(threatsMap)
+	}
 	promoteBlockedIntoThreats(summary, threats)
 
 	return &SummaryResult{Since: since, Traffic: summary["traffic"], Threats: threats, Compare: compare}, nil

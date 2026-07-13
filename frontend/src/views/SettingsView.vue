@@ -61,6 +61,16 @@
         <button
           type="button"
           class="nav-link"
+          :class="{ active: tab === 'threats' }"
+          @click="tab = 'threats'"
+        >
+          Détection de menaces
+        </button>
+      </li>
+      <li class="nav-item">
+        <button
+          type="button"
+          class="nav-link"
           :class="{ active: tab === 'maintenance' }"
           @click="tab = 'maintenance'"
         >
@@ -138,6 +148,18 @@
       />
     </div>
 
+    <!-- Détection de menaces -->
+    <div v-show="tab === 'threats'">
+      <SettingsThreatDetectionCard
+        :form="form"
+        :auth-is-admin="auth.isAdmin"
+        :saving-threat-detection="savingThreatDetection"
+        :threat-detection-save-msg="threatDetectionSaveMsg"
+        :threat-detection-save-ok="threatDetectionSaveOk"
+        @save="saveThreatDetection"
+      />
+    </div>
+
     <!-- Maintenance -->
     <div v-show="tab === 'maintenance'">
       <SettingsMaintenanceCard
@@ -161,6 +183,7 @@ import SettingsMaintenanceCard from '../components/settings/SettingsMaintenanceC
 import SettingsNotificationsCard from '../components/settings/SettingsNotificationsCard.vue'
 import SettingsRetentionCard from '../components/settings/SettingsRetentionCard.vue'
 import SettingsSmtpCard from '../components/settings/SettingsSmtpCard.vue'
+import SettingsThreatDetectionCard from '../components/settings/SettingsThreatDetectionCard.vue'
 import SettingsSystemInfoCard from '../components/settings/SettingsSystemInfoCard.vue'
 import SettingsProxmoxCard from '../components/settings/SettingsProxmoxCard.vue'
 import SettingsNPMCard from '../components/settings/SettingsNPMCard.vue'
@@ -190,6 +213,9 @@ const {
   savingRetention,
   retentionSaveMsg,
   retentionSaveOk,
+  savingThreatDetection,
+  threatDetectionSaveMsg,
+  threatDetectionSaveOk,
   cleaningMetrics,
   cleanMessage,
   cleanSuccess,
@@ -200,6 +226,7 @@ const {
   saveSmtp,
   saveNotifications,
   saveRetention,
+  saveThreatDetection,
   testSmtp,
   testNtfy,
   cleanMetrics,

@@ -73,6 +73,25 @@ type Config struct {
 	MetricsRetentionDays int
 	AuditRetentionDays   int
 	WebLogsRetentionDays int
+
+	// Threat detection (web logs) — admin-tunable coefficients behind the
+	// BotView "IPs suspectes" score. See internal/threatdetect.Weights for
+	// what each one does; defaults mirror threatdetect.DefaultWeights().
+	ThreatWeightWordPress        float64
+	ThreatWeightAdminPanel       float64
+	ThreatWeightPathTraversal    float64
+	ThreatWeightKnownScanner     float64
+	ThreatWeightSuspiciousMethod float64
+	ThreatWeightStatus2xx        float64
+	ThreatWeightStatus3xx        float64
+	ThreatWeightStatus404        float64
+	ThreatWeightStatus4xxOther   float64
+	ThreatWeightStatus5xx        float64
+	ThreatWeightBreadth          float64
+	ThreatWeightHits             float64
+	ThreatThresholdMedium        float64
+	ThreatThresholdHigh          float64
+	ThreatThresholdCritical      float64
 }
 
 // AppEnv reports the current deployment environment ("dev"/"development"
@@ -169,6 +188,25 @@ func Load() *Config {
 		MetricsRetentionDays: getIntEnv("METRICS_RETENTION_DAYS", 30),
 		AuditRetentionDays:   getIntEnv("AUDIT_RETENTION_DAYS", 90),
 		WebLogsRetentionDays: getIntEnv("WEB_LOGS_RETENTION_DAYS", 30),
+
+		// Defaults below must match internal/threatdetect.DefaultWeights() —
+		// duplicated as literals rather than imported so this leaf config
+		// package doesn't need to depend on the models/threatdetect chain.
+		ThreatWeightWordPress:        getFloatEnv("THREAT_WEIGHT_WORDPRESS", 2),
+		ThreatWeightAdminPanel:       getFloatEnv("THREAT_WEIGHT_ADMIN_PANEL", 3),
+		ThreatWeightPathTraversal:    getFloatEnv("THREAT_WEIGHT_PATH_TRAVERSAL", 5),
+		ThreatWeightKnownScanner:     getFloatEnv("THREAT_WEIGHT_KNOWN_SCANNER", 4),
+		ThreatWeightSuspiciousMethod: getFloatEnv("THREAT_WEIGHT_SUSPICIOUS_METHOD", 2),
+		ThreatWeightStatus2xx:        getFloatEnv("THREAT_WEIGHT_STATUS_2XX", 0.1),
+		ThreatWeightStatus3xx:        getFloatEnv("THREAT_WEIGHT_STATUS_3XX", 1),
+		ThreatWeightStatus404:        getFloatEnv("THREAT_WEIGHT_STATUS_404", 2),
+		ThreatWeightStatus4xxOther:   getFloatEnv("THREAT_WEIGHT_STATUS_4XX", 1.5),
+		ThreatWeightStatus5xx:        getFloatEnv("THREAT_WEIGHT_STATUS_5XX", 3),
+		ThreatWeightBreadth:          getFloatEnv("THREAT_WEIGHT_BREADTH", 3),
+		ThreatWeightHits:             getFloatEnv("THREAT_WEIGHT_HITS", 2),
+		ThreatThresholdMedium:        getFloatEnv("THREAT_THRESHOLD_MEDIUM", 15),
+		ThreatThresholdHigh:          getFloatEnv("THREAT_THRESHOLD_HIGH", 50),
+		ThreatThresholdCritical:      getFloatEnv("THREAT_THRESHOLD_CRITICAL", 150),
 	}
 }
 
@@ -226,6 +264,35 @@ func (c *Config) OverrideFromDB(db DBSettingsLoader) {
 	if v, ok := settings["web_logs_retention_days"]; ok && v != "" {
 		if i, err := strconv.Atoi(v); err == nil {
 			c.WebLogsRetentionDays = i
+		}
+	}
+
+	overrideFloat(settings, "threat_weight_wordpress", &c.ThreatWeightWordPress)
+	overrideFloat(settings, "threat_weight_adminpanel", &c.ThreatWeightAdminPanel)
+	overrideFloat(settings, "threat_weight_pathtraversal", &c.ThreatWeightPathTraversal)
+	overrideFloat(settings, "threat_weight_knownscanner", &c.ThreatWeightKnownScanner)
+	overrideFloat(settings, "threat_weight_suspiciousmethod", &c.ThreatWeightSuspiciousMethod)
+	overrideFloat(settings, "threat_weight_status_2xx", &c.ThreatWeightStatus2xx)
+	overrideFloat(settings, "threat_weight_status_3xx", &c.ThreatWeightStatus3xx)
+	overrideFloat(settings, "threat_weight_status_404", &c.ThreatWeightStatus404)
+	overrideFloat(settings, "threat_weight_status_4xx", &c.ThreatWeightStatus4xxOther)
+	overrideFloat(settings, "threat_weight_status_5xx", &c.ThreatWeightStatus5xx)
+	overrideFloat(settings, "threat_weight_breadth", &c.ThreatWeightBreadth)
+	overrideFloat(settings, "threat_weight_hits", &c.ThreatWeightHits)
+	overrideFloat(settings, "threat_threshold_medium", &c.ThreatThresholdMedium)
+	overrideFloat(settings, "threat_threshold_high", &c.ThreatThresholdHigh)
+	overrideFloat(settings, "threat_threshold_critical", &c.ThreatThresholdCritical)
+}
+
+// overrideFloat applies settings[key] to *dst when present and parseable,
+// leaving the existing value (env var or hardcoded default) untouched
+// otherwise. Used for the threat-detection weights, where the zero value
+// (0) is a legitimate admin choice — unlike the int fields above, it can't
+// double as a "not set" sentinel.
+func overrideFloat(settings map[string]string, key string, dst *float64) {
+	if v, ok := settings[key]; ok && v != "" {
+		if f, err := strconv.ParseFloat(v, 64); err == nil {
+			*dst = f
 		}
 	}
 }
@@ -302,6 +369,15 @@ func getIntEnv(key string, fallback int) int {
 	if v := os.Getenv(key); v != "" {
 		if i, err := strconv.Atoi(v); err == nil {
 			return i
+		}
+	}
+	return fallback
+}
+
+func getFloatEnv(key string, fallback float64) float64 {
+	if v := os.Getenv(key); v != "" {
+		if f, err := strconv.ParseFloat(v, 64); err == nil {
+			return f
 		}
 	}
 	return fallback

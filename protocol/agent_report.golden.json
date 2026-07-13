@@ -110,52 +110,6 @@
       ]
     },
     "threats": {
-      "suspicious_requests": 7,
-      "unique_suspicious_ips": 7,
-      "top_suspicious_ips": [
-        {
-          "ip": "contract",
-          "hits": 7,
-          "unique_paths": 7,
-          "first_seen": "contract",
-          "last_seen": "contract",
-          "category": "contract",
-          "user_agents": [
-            "contract"
-          ],
-          "requests": [
-            {
-              "timestamp": "contract",
-              "ip": "contract",
-              "method": "contract",
-              "path": "contract",
-              "status": 7,
-              "bytes": 7,
-              "user_agent": "contract",
-              "domain": "contract",
-              "category": "contract",
-              "blocked": true,
-              "blocked_source": "contract",
-              "blocked_reason": "contract",
-              "blocked_at": "2024-01-02T03:04:05Z",
-              "blocked_until": "2024-01-02T03:04:05Z"
-            }
-          ],
-          "blocked": true,
-          "blocked_source": "contract",
-          "blocked_type": "contract",
-          "blocked_reason": "contract",
-          "blocked_at": "2024-01-02T03:04:05Z",
-          "blocked_until": "2024-01-02T03:04:05Z"
-        }
-      ],
-      "top_suspicious_paths": [
-        {
-          "path": "contract",
-          "category": "contract",
-          "hits": 7
-        }
-      ],
       "crowdsec_total_blocked": 7,
       "crowdsec_top_blocked": [
         {
@@ -179,7 +133,6 @@
         "bytes": 7,
         "user_agent": "contract",
         "domain": "contract",
-        "category": "contract",
         "blocked": true,
         "blocked_source": "contract",
         "blocked_reason": "contract",

@@ -51,6 +51,23 @@ export function useSettings() {
     githubToken: '',
     metricsRetentionDays: 30,
     auditRetentionDays: 90,
+    // Threat-detection weights — defaults mirror threatdetect.DefaultWeights()
+    // server-side; overwritten by fetchSettings() once the real config loads.
+    threatWeightWordpress: 2,
+    threatWeightAdminpanel: 3,
+    threatWeightPathtraversal: 5,
+    threatWeightKnownscanner: 4,
+    threatWeightSuspiciousmethod: 2,
+    threatWeightStatus2xx: 0.1,
+    threatWeightStatus3xx: 1,
+    threatWeightStatus404: 2,
+    threatWeightStatus4xx: 1.5,
+    threatWeightStatus5xx: 3,
+    threatWeightBreadth: 3,
+    threatWeightHits: 2,
+    threatThresholdMedium: 15,
+    threatThresholdHigh: 50,
+    threatThresholdCritical: 150,
   })
 
   const showSmtpPass = ref(false)
@@ -76,6 +93,11 @@ export function useSettings() {
   const savingRetention = ref(false)
   const retentionSaveMsg = ref('')
   const retentionSaveOk = ref(false)
+
+  // Threat-detection weights save state
+  const savingThreatDetection = ref(false)
+  const threatDetectionSaveMsg = ref('')
+  const threatDetectionSaveOk = ref(false)
 
   // Maintenance state
   const cleaningMetrics = ref(false)
@@ -108,6 +130,21 @@ export function useSettings() {
         form.value.githubToken = s.githubToken || ''
         form.value.metricsRetentionDays = s.metricsRetentionDays || 30
         form.value.auditRetentionDays = s.auditRetentionDays || 90
+        form.value.threatWeightWordpress = s.threatWeightWordPress ?? 2
+        form.value.threatWeightAdminpanel = s.threatWeightAdminPanel ?? 3
+        form.value.threatWeightPathtraversal = s.threatWeightPathTraversal ?? 5
+        form.value.threatWeightKnownscanner = s.threatWeightKnownScanner ?? 4
+        form.value.threatWeightSuspiciousmethod = s.threatWeightSuspiciousMethod ?? 2
+        form.value.threatWeightStatus2xx = s.threatWeightStatus2xx ?? 0.1
+        form.value.threatWeightStatus3xx = s.threatWeightStatus3xx ?? 1
+        form.value.threatWeightStatus404 = s.threatWeightStatus404 ?? 2
+        form.value.threatWeightStatus4xx = s.threatWeightStatus4xx ?? 1.5
+        form.value.threatWeightStatus5xx = s.threatWeightStatus5xx ?? 3
+        form.value.threatWeightBreadth = s.threatWeightBreadth ?? 3
+        form.value.threatWeightHits = s.threatWeightHits ?? 2
+        form.value.threatThresholdMedium = s.threatThresholdMedium ?? 15
+        form.value.threatThresholdHigh = s.threatThresholdHigh ?? 50
+        form.value.threatThresholdCritical = s.threatThresholdCritical ?? 150
       }
     } catch (e) {
       if (isApiAbort(e)) return
@@ -180,6 +217,40 @@ export function useSettings() {
       setTimeout(() => { retentionSaveMsg.value = '' }, 5000)
     } finally {
       savingRetention.value = false
+    }
+  }
+
+  async function saveThreatDetection(): Promise<void> {
+    savingThreatDetection.value = true
+    threatDetectionSaveMsg.value = ''
+    try {
+      await apiClient.updateSettings({
+        threat_weight_wordpress: form.value.threatWeightWordpress,
+        threat_weight_adminpanel: form.value.threatWeightAdminpanel,
+        threat_weight_pathtraversal: form.value.threatWeightPathtraversal,
+        threat_weight_knownscanner: form.value.threatWeightKnownscanner,
+        threat_weight_suspiciousmethod: form.value.threatWeightSuspiciousmethod,
+        threat_weight_status_2xx: form.value.threatWeightStatus2xx,
+        threat_weight_status_3xx: form.value.threatWeightStatus3xx,
+        threat_weight_status_404: form.value.threatWeightStatus404,
+        threat_weight_status_4xx: form.value.threatWeightStatus4xx,
+        threat_weight_status_5xx: form.value.threatWeightStatus5xx,
+        threat_weight_breadth: form.value.threatWeightBreadth,
+        threat_weight_hits: form.value.threatWeightHits,
+        threat_threshold_medium: form.value.threatThresholdMedium,
+        threat_threshold_high: form.value.threatThresholdHigh,
+        threat_threshold_critical: form.value.threatThresholdCritical,
+      })
+      threatDetectionSaveOk.value = true
+      threatDetectionSaveMsg.value = 'Score de menace enregistré'
+      await fetchSettings()
+      setTimeout(() => { threatDetectionSaveMsg.value = '' }, 4000)
+    } catch (e) {
+      threatDetectionSaveOk.value = false
+      threatDetectionSaveMsg.value = `Erreur : ${getApiErrorMessage(e)}`
+      setTimeout(() => { threatDetectionSaveMsg.value = '' }, 5000)
+    } finally {
+      savingThreatDetection.value = false
     }
   }
 
@@ -280,6 +351,9 @@ export function useSettings() {
     savingRetention,
     retentionSaveMsg,
     retentionSaveOk,
+    savingThreatDetection,
+    threatDetectionSaveMsg,
+    threatDetectionSaveOk,
     cleaningMetrics,
     cleanMessage,
     cleanSuccess,
@@ -291,6 +365,7 @@ export function useSettings() {
     saveSmtp,
     saveNotifications,
     saveRetention,
+    saveThreatDetection,
     testSmtp,
     testNtfy,
     cleanMetrics,

@@ -1207,8 +1207,11 @@ export interface RunbookUpdate {
 
 /**
  * SettingsUpdateRequest is the admin body for PUT /settings. Every field is
- * optional; only the ones provided (non-zero, or non-nil for SMTPTLS) are
- * persisted to the settings table.
+ * optional; only the ones provided (non-zero, or non-nil for SMTPTLS and the
+ * threat-detection weights) are persisted to the settings table. The threat
+ * weights use *float64 rather than float64 because 0 is a legitimate value
+ * for a weight (e.g. "ignore 2xx entirely") and must be distinguishable from
+ * "not provided" — same reasoning as SMTPTLS being a *bool.
  */
 export interface SettingsUpdateRequest {
   smtp_host: string;
@@ -1222,6 +1225,21 @@ export interface SettingsUpdateRequest {
   github_token: string;
   metrics_retention_days: number /* int */;
   audit_retention_days: number /* int */;
+  threat_weight_wordpress?: number /* float64 */;
+  threat_weight_adminpanel?: number /* float64 */;
+  threat_weight_pathtraversal?: number /* float64 */;
+  threat_weight_knownscanner?: number /* float64 */;
+  threat_weight_suspiciousmethod?: number /* float64 */;
+  threat_weight_status_2xx?: number /* float64 */;
+  threat_weight_status_3xx?: number /* float64 */;
+  threat_weight_status_404?: number /* float64 */;
+  threat_weight_status_4xx?: number /* float64 */;
+  threat_weight_status_5xx?: number /* float64 */;
+  threat_weight_breadth?: number /* float64 */;
+  threat_weight_hits?: number /* float64 */;
+  threat_threshold_medium?: number /* float64 */;
+  threat_threshold_high?: number /* float64 */;
+  threat_threshold_critical?: number /* float64 */;
 }
 
 //////////
@@ -1611,6 +1629,11 @@ export interface WebRequest {
   bytes: number /* int64 */;
   user_agent: string;
   domain: string;
+  /**
+   * Category is empty on the wire from the agent — internal/threatdetect
+   * fills it in server-side (via ClassifyRequests) right after decode,
+   * before the report is persisted.
+   */
   category?: string;
   blocked?: boolean;
   blocked_source?: string;
@@ -1638,27 +1661,6 @@ export interface TrafficSummary {
   errors_5xx: number /* int */;
   top_domains: NPMDomainStat[];
 }
-export interface BotDetectionIP {
-  ip: string;
-  hits: number /* int */;
-  unique_paths: number /* int */;
-  first_seen: string;
-  last_seen: string;
-  category: string;
-  user_agents: string[];
-  requests: WebRequest[];
-  blocked?: boolean;
-  blocked_source?: string;
-  blocked_type?: string; // "ban", "captcha", "audit", etc. (CrowdSec decision type)
-  blocked_reason?: string;
-  blocked_at?: string;
-  blocked_until?: string;
-}
-export interface BotDetectionPath {
-  path: string;
-  category: string;
-  hits: number /* int */;
-}
 export interface CrowdSecBlockedEntry {
   ip: string;
   type?: string; // "ban", "captcha", "audit", etc.
@@ -1668,11 +1670,13 @@ export interface CrowdSecBlockedEntry {
   as_name?: string;
   blocked_until?: string;
 }
+/**
+ * ThreatSummary carries only what the agent itself can observe — the local
+ * CrowdSec correlation. Suspicious-request classification and counts are
+ * computed server-side (see internal/threatdetect) from the raw Requests
+ * below, not reported by the agent.
+ */
 export interface ThreatSummary {
-  suspicious_requests: number /* int */;
-  unique_suspicious_ips: number /* int */;
-  top_suspicious_ips: BotDetectionIP[];
-  top_suspicious_paths: BotDetectionPath[];
   crowdsec_total_blocked?: number /* int */;
   crowdsec_top_blocked?: CrowdSecBlockedEntry[];
 }
