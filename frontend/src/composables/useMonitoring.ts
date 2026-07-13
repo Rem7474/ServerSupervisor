@@ -61,11 +61,6 @@ export function useMonitoring() {
     }
   }
 
-  function probeSortIcon(col: ProbeCol): string {
-    if (probeSort.value.col !== col) return '⇅'
-    return probeSort.value.dir === 'asc' ? '▲' : '▼'
-  }
-
   const sortedProbes = computed(() => {
     const arr = [...probes.value]
     const { col, dir } = probeSort.value
@@ -244,11 +239,6 @@ export function useMonitoring() {
     } else {
       certSort.value = { col, dir: 'asc' }
     }
-  }
-
-  function certSortIcon(col: CertCol): string {
-    if (certSort.value.col !== col) return '⇅'
-    return certSort.value.dir === 'asc' ? '▲' : '▼'
   }
 
   const sortedCerts = computed(() => {
@@ -439,8 +429,8 @@ export function useMonitoring() {
     probeStats,
     checkingProbeId,
     downCount,
+    probeSort,
     toggleProbeSort,
-    probeSortIcon,
     pagedProbes,
     probeBadge,
     probeStatusLabel,
@@ -464,8 +454,8 @@ export function useMonitoring() {
     loadingCerts,
     checkingCertId,
     expiringCount,
+    certSort,
     toggleCertSort,
-    certSortIcon,
     pagedCerts,
     formatDate,
     shortIssuer,

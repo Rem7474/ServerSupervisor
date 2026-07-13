@@ -115,50 +115,45 @@
             <thead>
               <tr>
                 <th>
-                  <button
-                    type="button"
-                    class="btn-sort"
-                    @click="toggleProbeSort('name')"
-                  >
-                    Sonde <span class="sort-icon">{{ probeSortIcon('name') }}</span>
-                  </button>
+                  <SortableHeader
+                    label="Sonde"
+                    :active="probeSort.col === 'name'"
+                    :direction="probeSort.dir"
+                    @toggle="toggleProbeSort('name')"
+                  />
                 </th>
                 <th>Cible</th>
                 <th>
-                  <button
-                    type="button"
-                    class="btn-sort"
-                    @click="toggleProbeSort('status')"
-                  >
-                    Statut <span class="sort-icon">{{ probeSortIcon('status') }}</span>
-                  </button>
+                  <SortableHeader
+                    label="Statut"
+                    :active="probeSort.col === 'status'"
+                    :direction="probeSort.dir"
+                    @toggle="toggleProbeSort('status')"
+                  />
                 </th>
                 <th>
-                  <button
-                    type="button"
-                    class="btn-sort"
-                    @click="toggleProbeSort('uptime')"
-                  >
-                    Uptime 24h <span class="sort-icon">{{ probeSortIcon('uptime') }}</span>
-                  </button>
+                  <SortableHeader
+                    label="Uptime 24h"
+                    :active="probeSort.col === 'uptime'"
+                    :direction="probeSort.dir"
+                    @toggle="toggleProbeSort('uptime')"
+                  />
                 </th>
                 <th>
-                  <button
-                    type="button"
-                    class="btn-sort"
-                    @click="toggleProbeSort('latency')"
-                  >
-                    Latence <span class="sort-icon">{{ probeSortIcon('latency') }}</span>
-                  </button>
+                  <SortableHeader
+                    label="Latence"
+                    :active="probeSort.col === 'latency'"
+                    :direction="probeSort.dir"
+                    @toggle="toggleProbeSort('latency')"
+                  />
                 </th>
                 <th>
-                  <button
-                    type="button"
-                    class="btn-sort"
-                    @click="toggleProbeSort('last_checked')"
-                  >
-                    Dernière vérification <span class="sort-icon">{{ probeSortIcon('last_checked') }}</span>
-                  </button>
+                  <SortableHeader
+                    label="Dernière vérification"
+                    :active="probeSort.col === 'last_checked'"
+                    :direction="probeSort.dir"
+                    @toggle="toggleProbeSort('last_checked')"
+                  />
                 </th>
                 <th />
               </tr>
@@ -310,42 +305,38 @@
             <thead>
               <tr>
                 <th>
-                  <button
-                    type="button"
-                    class="btn-sort"
-                    @click="toggleCertSort('name')"
-                  >
-                    Nom <span class="sort-icon">{{ certSortIcon('name') }}</span>
-                  </button>
+                  <SortableHeader
+                    label="Nom"
+                    :active="certSort.col === 'name'"
+                    :direction="certSort.dir"
+                    @toggle="toggleCertSort('name')"
+                  />
                 </th>
                 <th>Endpoint</th>
                 <th>Émetteur</th>
                 <th>
-                  <button
-                    type="button"
-                    class="btn-sort"
-                    @click="toggleCertSort('expiration')"
-                  >
-                    Expiration <span class="sort-icon">{{ certSortIcon('expiration') }}</span>
-                  </button>
+                  <SortableHeader
+                    label="Expiration"
+                    :active="certSort.col === 'expiration'"
+                    :direction="certSort.dir"
+                    @toggle="toggleCertSort('expiration')"
+                  />
                 </th>
                 <th class="text-nowrap">
-                  <button
-                    type="button"
-                    class="btn-sort"
-                    @click="toggleCertSort('days')"
-                  >
-                    Jours restants <span class="sort-icon">{{ certSortIcon('days') }}</span>
-                  </button>
+                  <SortableHeader
+                    label="Jours restants"
+                    :active="certSort.col === 'days'"
+                    :direction="certSort.dir"
+                    @toggle="toggleCertSort('days')"
+                  />
                 </th>
                 <th>
-                  <button
-                    type="button"
-                    class="btn-sort"
-                    @click="toggleCertSort('last_checked')"
-                  >
-                    Dernière vérification <span class="sort-icon">{{ certSortIcon('last_checked') }}</span>
-                  </button>
+                  <SortableHeader
+                    label="Dernière vérification"
+                    :active="certSort.col === 'last_checked'"
+                    :direction="certSort.dir"
+                    @toggle="toggleCertSort('last_checked')"
+                  />
                 </th>
                 <th />
               </tr>
@@ -730,6 +721,7 @@ import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import RelativeTime from '../components/RelativeTime.vue'
 import PageRefreshBar from '../components/PageRefreshBar.vue'
 import PaginationNav from '../components/PaginationNav.vue'
+import SortableHeader from '../components/common/SortableHeader.vue'
 import { useMonitoring } from '../composables/useMonitoring'
 
 const auth = useAuthStore()
@@ -760,8 +752,8 @@ const {
   probeStats,
   checkingProbeId,
   downCount,
+  probeSort,
   toggleProbeSort,
-  probeSortIcon,
   pagedProbes,
   probeBadge,
   probeStatusLabel,
@@ -783,8 +775,8 @@ const {
   loadingCerts,
   checkingCertId,
   expiringCount,
+  certSort,
   toggleCertSort,
-  certSortIcon,
   pagedCerts,
   formatDate,
   shortIssuer,
@@ -805,28 +797,3 @@ const {
   setCertPage,
 } = useMonitoring()
 </script>
-
-<style scoped>
-.btn-sort {
-  background: none;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-  font: inherit;
-  font-weight: inherit;
-  text-align: left;
-  color: inherit;
-  white-space: nowrap;
-}
-.btn-sort:hover {
-  color: var(--tblr-primary);
-}
-.sort-icon {
-  font-size: 0.7em;
-  opacity: 0.5;
-  margin-left: 0.25rem;
-}
-.btn-sort:hover .sort-icon {
-  opacity: 0.9;
-}
-</style>
