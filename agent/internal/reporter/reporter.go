@@ -157,13 +157,9 @@ func (r *Reporter) Send(ctx context.Context, s *sender.Sender, cmdQueue chan<- [
 				slog.Warn("web logs collection skipped", "err", err)
 				return
 			}
-			suspicious := 0
-			if report.Threats != nil {
-				suspicious = report.Threats.SuspiciousRequests
-			}
 			slog.Debug("web logs scan complete",
 				"source", report.Source, "files", len(report.LogFilesScanned),
-				"requests", report.TotalRequests, "suspicious", suspicious)
+				"requests", report.TotalRequests)
 			webLogs = report
 		}()
 	}

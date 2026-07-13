@@ -49,7 +49,6 @@ type WebRequest struct {
 	Bytes         int64      `json:"bytes"`
 	UserAgent     string     `json:"user_agent"`
 	Domain        string     `json:"domain"`
-	Category      string     `json:"category,omitempty"`
 	Blocked       bool       `json:"blocked,omitempty"`
 	BlockedSource string     `json:"blocked_source,omitempty"`
 	BlockedReason string     `json:"blocked_reason,omitempty"`
@@ -80,32 +79,9 @@ type TrafficSummary struct {
 	TopDomains    []NPMDomainStat `json:"top_domains"`
 }
 
-type BotDetectionIP struct {
-	IP            string       `json:"ip"`
-	Hits          int          `json:"hits"`
-	UniquePaths   int          `json:"unique_paths"`
-	FirstSeen     string       `json:"first_seen"`
-	LastSeen      string       `json:"last_seen"`
-	Category      string       `json:"category"`
-	UserAgents    []string     `json:"user_agents"`
-	Requests      []WebRequest `json:"requests"`
-	Blocked       bool         `json:"blocked,omitempty"`
-	BlockedSource string       `json:"blocked_source,omitempty"`
-	BlockedType   string       `json:"blocked_type,omitempty"`   // "ban", "captcha", "audit", etc.
-	BlockedReason string       `json:"blocked_reason,omitempty"`
-	BlockedAt     *time.Time   `json:"blocked_at,omitempty"`
-	BlockedUntil  *time.Time   `json:"blocked_until,omitempty"`
-}
-
-type BotDetectionPath struct {
-	Path     string `json:"path"`
-	Category string `json:"category"`
-	Hits     int    `json:"hits"`
-}
-
 type CrowdSecBlockedEntry struct {
 	IP           string `json:"ip"`
-	Type         string `json:"type"`   // "ban", "captcha", "audit", etc.
+	Type         string `json:"type"` // "ban", "captcha", "audit", etc.
 	Reason       string `json:"reason"`
 	Origin       string `json:"origin"`
 	Country      string `json:"country,omitempty"`
@@ -113,11 +89,10 @@ type CrowdSecBlockedEntry struct {
 	BlockedUntil string `json:"blocked_until,omitempty"`
 }
 
+// ThreatSummary carries only what the agent itself can observe — the local
+// CrowdSec correlation. Suspicious-request classification and counts are
+// decided server-side from the raw Requests below, not by the agent.
 type ThreatSummary struct {
-	SuspiciousRequests   int                    `json:"suspicious_requests"`
-	UniqueSuspiciousIPs  int                    `json:"unique_suspicious_ips"`
-	TopSuspiciousIPs     []BotDetectionIP       `json:"top_suspicious_ips"`
-	TopSuspiciousPaths   []BotDetectionPath     `json:"top_suspicious_paths"`
 	CrowdSecTotalBlocked int                    `json:"crowdsec_total_blocked,omitempty"`
 	CrowdSecTopBlocked   []CrowdSecBlockedEntry `json:"crowdsec_top_blocked,omitempty"`
 }
@@ -167,16 +142,6 @@ var commonAccessLogRegex = regexp.MustCompile(
 	`^(\S+) \S+ \S+ \[([^\]]+)\] "(\S+) ([^\s"]+) [^"]+" (\d{3}) (\d+|-) "[^"]*" "([^"]*)"`,
 )
 
-var suspiciousPathNeedles = []string{
-	"/.env", "/wp-admin", "/wp-login", "/xmlrpc.php", "/cgi-bin", "/phpmyadmin", "/pma",
-	"/manager/html", "/actuator", "/.git", "/vendor/phpunit", "/solr", "/hudson", "/jenkins",
-	"/autodiscover", "/owa", "../", "/etc/passwd", "/bin/bash", "/struts", "/boaform", "/api/jsonws",
-}
-
-var suspiciousUANeedles = []string{
-	"masscan", "nmap", "zgrab", "sqlmap", "nikto", "dirbuster", "gobuster", "wpscan", "acunetix", "nessus",
-}
-
 func CollectWebLogs(logPathGlobs []string, tailLines int, topN int, requestLimit int, cursorFile string, crowdSecConnectionString string, crowdSecAPIKey string, crowdSecAlertsMachineID string, crowdSecAlertsPassword string, crowdSecEnabled bool) (*WebLogReport, error) {
 	if tailLines <= 0 {
 		tailLines = 5000
@@ -195,7 +160,7 @@ func CollectWebLogs(logPathGlobs []string, tailLines int, topN int, requestLimit
 	report := &WebLogReport{
 		Source:           "unknown",
 		Traffic:          &TrafficSummary{TopDomains: []NPMDomainStat{}},
-		Threats:          &ThreatSummary{TopSuspiciousIPs: []BotDetectionIP{}, TopSuspiciousPaths: []BotDetectionPath{}},
+		Threats:          &ThreatSummary{},
 		Requests:         make([]WebRequest, 0, requestLimit),
 		LogFilesScanned:  files,
 		TailLinesPerFile: tailLines,
@@ -209,16 +174,6 @@ func CollectWebLogs(logPathGlobs []string, tailLines int, topN int, requestLimit
 	domainMethods := map[string]map[string]int{}
 	domainPaths := map[string]map[string]int{}
 	sourceHits := map[string]int{}
-
-	ipHits := map[string]int{}
-	ipPaths := map[string]map[string]struct{}{}
-	ipUAs := map[string]map[string]struct{}{}
-	ipReq := map[string][]WebRequest{}
-	ipFirstSeen := map[string]time.Time{}
-	ipLastSeen := map[string]time.Time{}
-	ipCategory := map[string]string{}
-	pathHits := map[string]int{}
-	pathCategory := map[string]string{}
 
 	for _, file := range files {
 		seenFiles[file] = struct{}{}
@@ -265,7 +220,6 @@ func CollectWebLogs(logPathGlobs []string, tailLines int, topN int, requestLimit
 			}
 			domainPaths[domain][e.path]++
 
-			category := suspiciousCategory(e.method, e.path, e.ua)
 			request := WebRequest{
 				Timestamp: e.timestamp.Format(time.RFC3339),
 				IP:        e.ip,
@@ -275,48 +229,18 @@ func CollectWebLogs(logPathGlobs []string, tailLines int, topN int, requestLimit
 				Bytes:     e.bytes,
 				UserAgent: e.ua,
 				Domain:    domain,
-				Category:  category,
 			}
 			report.Requests = append(report.Requests, request)
-
-			if category == "" {
-				continue
-			}
-			report.Threats.SuspiciousRequests++
-			ipHits[e.ip]++
-			pathHits[e.path]++
-			pathCategory[e.path] = category
-			if ipPaths[e.ip] == nil {
-				ipPaths[e.ip] = map[string]struct{}{}
-			}
-			ipPaths[e.ip][e.path] = struct{}{}
-			if ipUAs[e.ip] == nil {
-				ipUAs[e.ip] = map[string]struct{}{}
-			}
-			if e.ua != "" {
-				ipUAs[e.ip][e.ua] = struct{}{}
-			}
-			if _, ok := ipFirstSeen[e.ip]; !ok || e.timestamp.Before(ipFirstSeen[e.ip]) {
-				ipFirstSeen[e.ip] = e.timestamp
-			}
-			if e.timestamp.After(ipLastSeen[e.ip]) {
-				ipLastSeen[e.ip] = e.timestamp
-			}
-			if ipCategory[e.ip] == "" {
-				ipCategory[e.ip] = category
-			}
-			if len(ipReq[e.ip]) < 20 {
-				ipReq[e.ip] = append(ipReq[e.ip], request)
-			}
 		}
 	}
 
-	// Cap requests to the configured limit (most recent entries).
+	// Cap requests to the configured limit (most recent entries). Suspicious-
+	// request classification happens server-side (internal/threatdetect)
+	// from these raw entries, not here — see ThreatSummary's doc comment.
 	if requestLimit > 0 && len(report.Requests) > requestLimit {
 		report.Requests = report.Requests[len(report.Requests)-requestLimit:]
 	}
 
-	report.Threats.UniqueSuspiciousIPs = len(ipHits)
 	for domain, hits := range domainHits {
 		report.Traffic.TopDomains = append(report.Traffic.TopDomains, NPMDomainStat{
 			Domain:    domain,
@@ -333,35 +257,6 @@ func CollectWebLogs(logPathGlobs []string, tailLines int, topN int, requestLimit
 	})
 	if len(report.Traffic.TopDomains) > topN {
 		report.Traffic.TopDomains = report.Traffic.TopDomains[:topN]
-	}
-
-	for ip, hits := range ipHits {
-		report.Threats.TopSuspiciousIPs = append(report.Threats.TopSuspiciousIPs, BotDetectionIP{
-			IP:          ip,
-			Hits:        hits,
-			UniquePaths: len(ipPaths[ip]),
-			FirstSeen:   ipFirstSeen[ip].Format(time.RFC3339),
-			LastSeen:    ipLastSeen[ip].Format(time.RFC3339),
-			Category:    ipCategory[ip],
-			UserAgents:  mapKeys(ipUAs[ip]),
-			Requests:    ipReq[ip],
-		})
-	}
-	sort.Slice(report.Threats.TopSuspiciousIPs, func(i, j int) bool {
-		return report.Threats.TopSuspiciousIPs[i].Hits > report.Threats.TopSuspiciousIPs[j].Hits
-	})
-	if len(report.Threats.TopSuspiciousIPs) > topN {
-		report.Threats.TopSuspiciousIPs = report.Threats.TopSuspiciousIPs[:topN]
-	}
-
-	for path, hits := range pathHits {
-		report.Threats.TopSuspiciousPaths = append(report.Threats.TopSuspiciousPaths, BotDetectionPath{Path: path, Category: pathCategory[path], Hits: hits})
-	}
-	sort.Slice(report.Threats.TopSuspiciousPaths, func(i, j int) bool {
-		return report.Threats.TopSuspiciousPaths[i].Hits > report.Threats.TopSuspiciousPaths[j].Hits
-	})
-	if len(report.Threats.TopSuspiciousPaths) > topN {
-		report.Threats.TopSuspiciousPaths = report.Threats.TopSuspiciousPaths[:topN]
 	}
 
 	if report.Source == "unknown" {
@@ -383,6 +278,7 @@ func CollectWebLogs(logPathGlobs []string, tailLines int, topN int, requestLimit
 		}
 
 		// Enrich individual requests with CrowdSec data
+		enrichedCount := 0
 		for i := range report.Requests {
 			if decision, ok := crowdSecDecisions[report.Requests[i].IP]; ok {
 				report.Requests[i].Blocked = decision.Blocked
@@ -390,20 +286,7 @@ func CollectWebLogs(logPathGlobs []string, tailLines int, topN int, requestLimit
 				report.Requests[i].BlockedReason = decision.Reason
 				report.Requests[i].BlockedAt = &decision.BlockedAt
 				report.Requests[i].BlockedUntil = &decision.BlockedUntil
-			}
-		}
-
-		// Enrich top suspicious IPs with CrowdSec data
-		blockedCount := 0
-		for i := range report.Threats.TopSuspiciousIPs {
-			if decision, ok := crowdSecDecisions[report.Threats.TopSuspiciousIPs[i].IP]; ok {
-				report.Threats.TopSuspiciousIPs[i].Blocked = decision.Blocked
-				report.Threats.TopSuspiciousIPs[i].BlockedSource = "crowdsec"
-				report.Threats.TopSuspiciousIPs[i].BlockedType = decision.Type
-				report.Threats.TopSuspiciousIPs[i].BlockedReason = decision.Reason
-				report.Threats.TopSuspiciousIPs[i].BlockedAt = &decision.BlockedAt
-				report.Threats.TopSuspiciousIPs[i].BlockedUntil = &decision.BlockedUntil
-				blockedCount++
+				enrichedCount++
 			}
 		}
 
@@ -448,7 +331,7 @@ func CollectWebLogs(logPathGlobs []string, tailLines int, topN int, requestLimit
 		}
 		report.Threats.CrowdSecTopBlocked = topBlocked
 
-		slog.Debug("web_logs crowdsec correlation applied", "active_decisions", len(crowdSecDecisions), "enriched_ips", blockedCount)
+		slog.Debug("web_logs crowdsec correlation applied", "active_decisions", len(crowdSecDecisions), "enriched_requests", enrichedCount)
 	}
 
 	return report, nil
@@ -502,38 +385,6 @@ func parseAccessLine(line string) (parsedLine, bool) {
 	}
 
 	return parsedLine{}, false
-}
-
-func suspiciousCategory(method, path, ua string) string {
-	pathLower := strings.ToLower(path)
-	switch {
-	case strings.Contains(pathLower, "/wp-") || strings.Contains(pathLower, "/xmlrpc.php"):
-		return "WordPress"
-	case strings.Contains(pathLower, "/admin") || strings.Contains(pathLower, "/manager/html") || strings.Contains(pathLower, "/phpmyadmin"):
-		return "AdminPanel"
-	case strings.Contains(pathLower, "../") || strings.Contains(pathLower, "/etc/passwd") || strings.Contains(pathLower, "/bin/bash"):
-		return "PathTraversal"
-	}
-
-	for _, needle := range suspiciousPathNeedles {
-		if strings.Contains(pathLower, needle) {
-			return "KnownScanner"
-		}
-	}
-
-	uaLower := strings.ToLower(ua)
-	for _, needle := range suspiciousUANeedles {
-		if strings.Contains(uaLower, needle) {
-			return "KnownScanner"
-		}
-	}
-
-	switch strings.ToUpper(method) {
-	case "OPTIONS", "PROPFIND", "TRACE", "CONNECT":
-		return "SuspiciousMethod"
-	}
-
-	return ""
 }
 
 func cleanPath(path string) string {
@@ -988,19 +839,4 @@ func saveWebLogCursor(path string, state *webLogCursorState) {
 		return
 	}
 	_ = os.Rename(tmpPath, path)
-}
-
-func mapKeys(m map[string]struct{}) []string {
-	if len(m) == 0 {
-		return []string{}
-	}
-	out := make([]string, 0, len(m))
-	for k := range m {
-		out = append(out, k)
-	}
-	sort.Strings(out)
-	if len(out) > 5 {
-		out = out[:5]
-	}
-	return out
 }

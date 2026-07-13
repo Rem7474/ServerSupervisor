@@ -76,31 +76,6 @@ func TestParseAccessLine_Garbage(t *testing.T) {
 	}
 }
 
-func TestSuspiciousCategory(t *testing.T) {
-	tests := []struct {
-		name             string
-		method, path, ua string
-		want             string
-	}{
-		{"wordpress wp-login", "GET", "/wp-login.php", "x", "WordPress"},
-		{"wordpress xmlrpc", "POST", "/xmlrpc.php", "x", "WordPress"},
-		{"admin panel", "GET", "/admin/config", "x", "AdminPanel"},
-		{"phpmyadmin", "GET", "/phpmyadmin/index.php", "x", "AdminPanel"},
-		{"path traversal etc passwd", "GET", "/../../etc/passwd", "x", "PathTraversal"},
-		{"known scanner path .env", "GET", "/.env", "x", "KnownScanner"},
-		{"known scanner UA sqlmap", "GET", "/", "sqlmap/1.5", "KnownScanner"},
-		{"suspicious method PROPFIND", "PROPFIND", "/", "x", "SuspiciousMethod"},
-		{"benign request", "GET", "/index.html", "Mozilla/5.0", ""},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := suspiciousCategory(tt.method, tt.path, tt.ua); got != tt.want {
-				t.Errorf("suspiciousCategory(%q,%q,%q) = %q, want %q", tt.method, tt.path, tt.ua, got, tt.want)
-			}
-		})
-	}
-}
-
 func TestParseImageTag(t *testing.T) {
 	tests := []struct {
 		in        string

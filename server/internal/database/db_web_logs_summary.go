@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/serversupervisor/server/internal/safego"
+	"github.com/serversupervisor/server/internal/threatdetect"
 )
 
 // buildWebLogsWhere builds the shared WHERE clause + positional args used by
@@ -444,6 +445,14 @@ func (db *DB) fillWebLogsThreats(ctx context.Context, threats map[string]any, wh
 	threats["suspicious_ips"] = suspiciousIPs
 	threats["targeted_hosts"] = targetedHosts
 
+	// The per-category/per-status breakdown below feeds threatdetect.Score,
+	// which the weblogs service applies once it also has the admin's
+	// configurable Weights (the database layer has no config dependency).
+	// LIMIT 500 here is only a coarse safety cap on a pathological window —
+	// the service re-ranks by computed score and keeps the top 25, so this
+	// must stay well above 25 or a low-hit-but-high-severity IP could be cut
+	// before it ever gets scored. Category literals must match the
+	// threatdetect.Category* constants.
 	ipRows, err := db.conn.QueryContext(ctx,
 		fmt.Sprintf(`SELECT ip,
 		COUNT(*) AS hits,
@@ -455,12 +464,22 @@ func (db *DB) fillWebLogsThreats(ctx context.Context, threats map[string]any, wh
 		MAX(CASE WHEN blocked = TRUE THEN blocked_reason END) AS blocked_reason,
 		MAX(CASE WHEN blocked = TRUE THEN blocked_at END) AS blocked_at,
 		MAX(CASE WHEN blocked = TRUE THEN blocked_until END) AS blocked_until,
-		MAX(CASE WHEN blocked = TRUE THEN 1 ELSE 0 END) AS is_blocked
+		MAX(CASE WHEN blocked = TRUE THEN 1 ELSE 0 END) AS is_blocked,
+		COALESCE(SUM(CASE WHEN category = 'WordPress' THEN 1 ELSE 0 END),0) AS cat_wordpress,
+		COALESCE(SUM(CASE WHEN category = 'AdminPanel' THEN 1 ELSE 0 END),0) AS cat_adminpanel,
+		COALESCE(SUM(CASE WHEN category = 'PathTraversal' THEN 1 ELSE 0 END),0) AS cat_pathtraversal,
+		COALESCE(SUM(CASE WHEN category = 'KnownScanner' THEN 1 ELSE 0 END),0) AS cat_knownscanner,
+		COALESCE(SUM(CASE WHEN category = 'SuspiciousMethod' THEN 1 ELSE 0 END),0) AS cat_suspiciousmethod,
+		COALESCE(SUM(CASE WHEN status BETWEEN 200 AND 299 THEN 1 ELSE 0 END),0) AS status_2xx,
+		COALESCE(SUM(CASE WHEN status BETWEEN 300 AND 399 THEN 1 ELSE 0 END),0) AS status_3xx,
+		COALESCE(SUM(CASE WHEN status = 404 THEN 1 ELSE 0 END),0) AS status_404,
+		COALESCE(SUM(CASE WHEN status BETWEEN 400 AND 499 AND status <> 404 THEN 1 ELSE 0 END),0) AS status_4xx_other,
+		COALESCE(SUM(CASE WHEN status >= 500 THEN 1 ELSE 0 END),0) AS status_5xx
 		FROM web_log_requests
 		WHERE %s AND suspicious = TRUE
 		GROUP BY ip
 		ORDER BY hits DESC
-		LIMIT 25`, where),
+		LIMIT 500`, where),
 		args...,
 	)
 	if err != nil {
@@ -480,28 +499,23 @@ func (db *DB) fillWebLogsThreats(ctx context.Context, threats map[string]any, wh
 		var blockedAt sql.NullTime
 		var blockedUntil sql.NullTime
 		var isBlocked int
-		if err := ipRows.Scan(&ip, &hits, &uniquePaths, &hostCount, &firstSeen, &lastSeen, &blockedSource, &blockedReason, &blockedAt, &blockedUntil, &isBlocked); err != nil {
+		var cat threatdetect.CategoryCounts
+		var st threatdetect.StatusCounts
+		if err := ipRows.Scan(&ip, &hits, &uniquePaths, &hostCount, &firstSeen, &lastSeen, &blockedSource, &blockedReason, &blockedAt, &blockedUntil, &isBlocked,
+			&cat.WordPress, &cat.AdminPanel, &cat.PathTraversal, &cat.KnownScanner, &cat.SuspiciousMethod,
+			&st.Status2xx, &st.Status3xx, &st.Status404, &st.Status4xxOther, &st.Status5xx,
+		); err != nil {
 			return err
 		}
-		score := hits * uniquePaths
-		level := "LOW"
-		switch {
-		case score >= 400:
-			level = "CRITICAL"
-		case score >= 200:
-			level = "HIGH"
-		case score >= 80:
-			level = "MEDIUM"
-		}
 		ipData := map[string]any{
-			"ip":           ip,
-			"hits":         hits,
-			"unique_paths": uniquePaths,
-			"host_count":   hostCount,
-			"first_seen":   firstSeen,
-			"last_seen":    lastSeen,
-			"threat_score": score,
-			"level":        level,
+			"ip":               ip,
+			"hits":             hits,
+			"unique_paths":     uniquePaths,
+			"host_count":       hostCount,
+			"first_seen":       firstSeen,
+			"last_seen":        lastSeen,
+			"_category_counts": cat,
+			"_status_counts":   st,
 		}
 		if isBlocked == 1 {
 			ipData["blocked"] = true

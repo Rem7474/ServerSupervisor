@@ -3,14 +3,17 @@ package models
 import "time"
 
 type WebRequest struct {
-	Timestamp     string     `json:"timestamp"`
-	IP            string     `json:"ip"`
-	Method        string     `json:"method"`
-	Path          string     `json:"path"`
-	Status        int        `json:"status"`
-	Bytes         int64      `json:"bytes"`
-	UserAgent     string     `json:"user_agent"`
-	Domain        string     `json:"domain"`
+	Timestamp string `json:"timestamp"`
+	IP        string `json:"ip"`
+	Method    string `json:"method"`
+	Path      string `json:"path"`
+	Status    int    `json:"status"`
+	Bytes     int64  `json:"bytes"`
+	UserAgent string `json:"user_agent"`
+	Domain    string `json:"domain"`
+	// Category is empty on the wire from the agent — internal/threatdetect
+	// fills it in server-side (via ClassifyRequests) right after decode,
+	// before the report is persisted.
 	Category      string     `json:"category,omitempty"`
 	Blocked       bool       `json:"blocked,omitempty"`
 	BlockedSource string     `json:"blocked_source,omitempty"`
@@ -42,29 +45,6 @@ type TrafficSummary struct {
 	TopDomains    []NPMDomainStat `json:"top_domains"`
 }
 
-type BotDetectionIP struct {
-	IP            string       `json:"ip"`
-	Hits          int          `json:"hits"`
-	UniquePaths   int          `json:"unique_paths"`
-	FirstSeen     string       `json:"first_seen"`
-	LastSeen      string       `json:"last_seen"`
-	Category      string       `json:"category"`
-	UserAgents    []string     `json:"user_agents"`
-	Requests      []WebRequest `json:"requests"`
-	Blocked       bool         `json:"blocked,omitempty"`
-	BlockedSource string       `json:"blocked_source,omitempty"`
-	BlockedType   string       `json:"blocked_type,omitempty"` // "ban", "captcha", "audit", etc. (CrowdSec decision type)
-	BlockedReason string       `json:"blocked_reason,omitempty"`
-	BlockedAt     *time.Time   `json:"blocked_at,omitempty"`
-	BlockedUntil  *time.Time   `json:"blocked_until,omitempty"`
-}
-
-type BotDetectionPath struct {
-	Path     string `json:"path"`
-	Category string `json:"category"`
-	Hits     int    `json:"hits"`
-}
-
 type CrowdSecBlockedEntry struct {
 	IP           string `json:"ip"`
 	Type         string `json:"type,omitempty"` // "ban", "captcha", "audit", etc.
@@ -75,11 +55,11 @@ type CrowdSecBlockedEntry struct {
 	BlockedUntil string `json:"blocked_until,omitempty"`
 }
 
+// ThreatSummary carries only what the agent itself can observe — the local
+// CrowdSec correlation. Suspicious-request classification and counts are
+// computed server-side (see internal/threatdetect) from the raw Requests
+// below, not reported by the agent.
 type ThreatSummary struct {
-	SuspiciousRequests   int                    `json:"suspicious_requests"`
-	UniqueSuspiciousIPs  int                    `json:"unique_suspicious_ips"`
-	TopSuspiciousIPs     []BotDetectionIP       `json:"top_suspicious_ips"`
-	TopSuspiciousPaths   []BotDetectionPath     `json:"top_suspicious_paths"`
 	CrowdSecTotalBlocked int                    `json:"crowdsec_total_blocked,omitempty"`
 	CrowdSecTopBlocked   []CrowdSecBlockedEntry `json:"crowdsec_top_blocked,omitempty"`
 }

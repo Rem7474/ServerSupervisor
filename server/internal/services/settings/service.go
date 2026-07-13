@@ -67,6 +67,22 @@ func (s *Service) Snapshot(ctx context.Context) map[string]any {
 			"ntfyUrl":              c.NotifyURL,
 			"githubToken":          c.GitHubToken,
 			"latestAgentVersion":   s.latestVersion(),
+
+			"threatWeightWordPress":        c.ThreatWeightWordPress,
+			"threatWeightAdminPanel":       c.ThreatWeightAdminPanel,
+			"threatWeightPathTraversal":    c.ThreatWeightPathTraversal,
+			"threatWeightKnownScanner":     c.ThreatWeightKnownScanner,
+			"threatWeightSuspiciousMethod": c.ThreatWeightSuspiciousMethod,
+			"threatWeightStatus2xx":        c.ThreatWeightStatus2xx,
+			"threatWeightStatus3xx":        c.ThreatWeightStatus3xx,
+			"threatWeightStatus404":        c.ThreatWeightStatus404,
+			"threatWeightStatus4xx":        c.ThreatWeightStatus4xxOther,
+			"threatWeightStatus5xx":        c.ThreatWeightStatus5xx,
+			"threatWeightBreadth":          c.ThreatWeightBreadth,
+			"threatWeightHits":             c.ThreatWeightHits,
+			"threatThresholdMedium":        c.ThreatThresholdMedium,
+			"threatThresholdHigh":          c.ThreatThresholdHigh,
+			"threatThresholdCritical":      c.ThreatThresholdCritical,
 		},
 		"dbStatus": s.databaseStatus(ctx),
 	}
@@ -118,6 +134,27 @@ func (s *Service) Update(ctx context.Context, req models.SettingsUpdateRequest, 
 	if req.AuditRetentionDays > 0 {
 		save("audit_retention_days", strconv.Itoa(req.AuditRetentionDays))
 	}
+
+	saveFloat := func(key string, v *float64) {
+		if v != nil {
+			save(key, strconv.FormatFloat(*v, 'f', -1, 64))
+		}
+	}
+	saveFloat("threat_weight_wordpress", req.ThreatWeightWordPress)
+	saveFloat("threat_weight_adminpanel", req.ThreatWeightAdminPanel)
+	saveFloat("threat_weight_pathtraversal", req.ThreatWeightPathTraversal)
+	saveFloat("threat_weight_knownscanner", req.ThreatWeightKnownScanner)
+	saveFloat("threat_weight_suspiciousmethod", req.ThreatWeightSuspiciousMethod)
+	saveFloat("threat_weight_status_2xx", req.ThreatWeightStatus2xx)
+	saveFloat("threat_weight_status_3xx", req.ThreatWeightStatus3xx)
+	saveFloat("threat_weight_status_404", req.ThreatWeightStatus404)
+	saveFloat("threat_weight_status_4xx", req.ThreatWeightStatus4xxOther)
+	saveFloat("threat_weight_status_5xx", req.ThreatWeightStatus5xx)
+	saveFloat("threat_weight_breadth", req.ThreatWeightBreadth)
+	saveFloat("threat_weight_hits", req.ThreatWeightHits)
+	saveFloat("threat_threshold_medium", req.ThreatThresholdMedium)
+	saveFloat("threat_threshold_high", req.ThreatThresholdHigh)
+	saveFloat("threat_threshold_critical", req.ThreatThresholdCritical)
 
 	s.cfg.OverrideFromDB(s.repo)
 	_, _ = s.repo.CreateAuditLog(ctx, username, "update_settings", "", clientIP, "Settings updated via UI", "success")

@@ -505,6 +505,9 @@ func (s *Service) storeDiskAndMetadata(ctx context.Context, hostID, safeHostID s
 	}
 
 	if report.WebLogs != nil {
+		// The agent no longer decides what's suspicious (see
+		// models.ThreatSummary's doc comment) — both repo calls below
+		// classify server-side (internal/threatdetect) before they persist.
 		if err := s.repo.UpdateHostWebLogs(ctx, hostID, report.WebLogs); err != nil {
 			slog.ErrorContext(ctx, fmt.Sprintf("Warning: failed to update web logs cache for host %s: %v", safeHostID, err))
 		}

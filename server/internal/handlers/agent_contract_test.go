@@ -55,7 +55,11 @@ func TestAgentReportContract(t *testing.T) {
 	if len(report.WebLogs.Threats.CrowdSecTopBlocked) == 0 || report.WebLogs.Threats.CrowdSecTopBlocked[0].Type == "" {
 		t.Error("crowdsec_top_blocked[].type did not decode (CrowdSec decision type would be lost)")
 	}
-	if len(report.WebLogs.Threats.TopSuspiciousIPs) == 0 || report.WebLogs.Threats.TopSuspiciousIPs[0].BlockedType == "" {
-		t.Error("top_suspicious_ips[].blocked_type did not decode")
+	// Suspicious-request classification is now decided server-side
+	// (internal/threatdetect) from these raw per-request fields, not
+	// reported by the agent — so their survival through decode matters more
+	// than it used to.
+	if len(report.WebLogs.Requests) == 0 || report.WebLogs.Requests[0].Path == "" || report.WebLogs.Requests[0].UserAgent == "" {
+		t.Error("web_logs.requests[] raw fields (path/user_agent) did not decode")
 	}
 }

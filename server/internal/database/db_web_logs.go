@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/serversupervisor/server/internal/models"
+	"github.com/serversupervisor/server/internal/threatdetect"
 )
 
 // UpdateHostWebLogs refreshes the small per-host counters on the hosts table
@@ -20,13 +21,16 @@ func (db *DB) UpdateHostWebLogs(ctx context.Context, hostID string, report *mode
 		return nil
 	}
 	traffic := report.Traffic
-	threats := report.Threats
 	if traffic == nil {
 		traffic = &models.TrafficSummary{}
 	}
-	if threats == nil {
-		threats = &models.ThreatSummary{}
-	}
+	// Classification is idempotent and cheap (plain string matching over at
+	// most a few hundred requests) — call it here rather than relying on the
+	// caller to have classified first, so this function is correct in
+	// isolation (e.g. called directly from a test, or before
+	// InsertWebLogSnapshot in either order).
+	threatdetect.ClassifyRequests(report.Requests)
+	suspiciousRequests, suspiciousIPs := threatdetect.SummarizeSuspicious(report.Requests)
 
 	_, err := db.conn.ExecContext(ctx,
 		`UPDATE hosts
@@ -46,8 +50,8 @@ func (db *DB) UpdateHostWebLogs(ctx context.Context, hostID string, report *mode
 		traffic.TotalBytes,
 		traffic.Errors4xx,
 		traffic.Errors5xx,
-		threats.SuspiciousRequests,
-		threats.UniqueSuspiciousIPs,
+		suspiciousRequests,
+		suspiciousIPs,
 		hostID,
 	)
 	return err
@@ -69,6 +73,11 @@ func (db *DB) InsertWebLogSnapshot(ctx context.Context, hostID string, report *m
 	if threats == nil {
 		threats = &models.ThreatSummary{}
 	}
+	// See the matching comment in UpdateHostWebLogs — classification here too
+	// rather than trusting the caller, so this function stays correct on its
+	// own regardless of call order.
+	threatdetect.ClassifyRequests(report.Requests)
+	suspiciousRequests, suspiciousIPs := threatdetect.SummarizeSuspicious(report.Requests)
 
 	tx, err := db.conn.BeginTx(ctx, nil)
 	if err != nil {
@@ -97,8 +106,8 @@ func (db *DB) InsertWebLogSnapshot(ctx context.Context, hostID string, report *m
 		traffic.TotalBytes,
 		traffic.Errors4xx,
 		traffic.Errors5xx,
-		threats.SuspiciousRequests,
-		threats.UniqueSuspiciousIPs,
+		suspiciousRequests,
+		suspiciousIPs,
 		threats.CrowdSecTotalBlocked,
 		crowdSecTopJSON,
 	).Scan(&snapshotID)

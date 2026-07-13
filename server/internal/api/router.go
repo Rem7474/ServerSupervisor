@@ -111,7 +111,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	hostPermH := handlers.NewHostPermissionHandler(hostpermsvc.NewService(db))
 	uptimeH := handlers.NewUptimeHandler(uptimesvc.NewService(db))
 	sslH := handlers.NewSSLHandler(sslsvc.NewService(db))
-	webLogsH := handlers.NewWebLogsHandler(weblogssvc.NewService(db, dispatcher))
+	webLogsH := handlers.NewWebLogsHandler(weblogssvc.NewService(db, dispatcher, cfg))
 	npmH := handlers.NewNPMHandler(npmsvc.NewService(db))
 
 	registerPublicRoutes(r, authH, db)
