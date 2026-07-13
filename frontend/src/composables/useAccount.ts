@@ -119,20 +119,6 @@ export function useAccount() {
     return getStatusBadgeClass(status, 'badge bg-yellow-lt text-yellow')
   }
 
-  function parseUA(ua: string | undefined): { browser: string; os: string } {
-    if (!ua) return { browser: '—', os: '—' }
-    const browser = ua.includes('Firefox/') ? 'Firefox'
-      : ua.includes('Edg/') ? 'Edge'
-      : ua.includes('Chrome/') ? 'Chrome'
-      : ua.includes('Safari/') ? 'Safari' : 'Other'
-    const os = ua.includes('Windows') ? 'Windows'
-      : ua.includes('Mac OS X') ? 'macOS'
-      : ua.includes('Android') ? 'Android'
-      : (ua.includes('iPhone') || ua.includes('iPad')) ? 'iOS'
-      : ua.includes('Linux') ? 'Linux' : 'Other'
-    return { browser, os }
-  }
-
   function openLogViewer(cmd: CommandRow): void {
     if (selectedCmd.value?.id === cmd.id) { closeLogViewer(); return }
     closeLogViewer()
@@ -270,7 +256,6 @@ export function useAccount() {
     statusClass,
     moduleLabel,
     moduleClass,
-    parseUA,
     openLogViewer,
     closeLogViewer,
     resetPwForm,

@@ -423,62 +423,10 @@
             class="badge bg-secondary-lt text-secondary"
           >{{ loginEvents.length }}</span>
         </div>
-        <div class="table-responsive">
-          <table class="table table-vcenter card-table">
-            <thead>
-              <tr>
-                <th>Date / Heure</th>
-                <th>IP</th>
-                <th>Navigateur</th>
-                <th>OS</th>
-                <th>Statut</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-if="loginEventsLoading">
-                <td
-                  colspan="5"
-                  class="text-center text-secondary py-3"
-                >
-                  Chargement...
-                </td>
-              </tr>
-              <tr v-else-if="!loginEvents.length">
-                <td
-                  colspan="5"
-                  class="text-center text-secondary py-4"
-                >
-                  Aucune connexion enregistrée
-                </td>
-              </tr>
-              <tr
-                v-for="ev in loginEvents"
-                :key="ev.id"
-              >
-                <td class="text-secondary small">
-                  {{ formatDateTime(ev.created_at) }}
-                </td>
-                <td class="text-secondary small font-monospace">
-                  {{ ev.ip_address }}
-                </td>
-                <td class="text-secondary small">
-                  {{ parseUA(ev.user_agent).browser }}
-                </td>
-                <td class="text-secondary small">
-                  {{ parseUA(ev.user_agent).os }}
-                </td>
-                <td>
-                  <span
-                    class="badge"
-                    :class="ev.success ? 'bg-green-lt text-green' : 'bg-red-lt text-red'"
-                  >
-                    {{ ev.success ? 'Succès' : 'Échec' }}
-                  </span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <ConnectionsTable
+          :events="loginEvents"
+          :loading="loginEventsLoading"
+        />
       </div>
     </div>
   </div>
@@ -487,6 +435,7 @@
 <script setup lang="ts">
 import { IconAlertTriangle, IconClock, IconFileText, IconKey, IconLock, IconLogout } from '@tabler/icons-vue'
 import CommandLogPanel from '../components/host/CommandLogPanel.vue'
+import ConnectionsTable from '../components/common/ConnectionsTable.vue'
 import { useAccount } from '../composables/useAccount'
 
 const {
@@ -515,7 +464,6 @@ const {
   statusClass,
   moduleLabel,
   moduleClass,
-  parseUA,
   openLogViewer,
   closeLogViewer,
   resetPwForm,

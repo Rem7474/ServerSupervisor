@@ -300,69 +300,11 @@
             Toutes les connexions
           </h3>
         </div>
-        <div class="table-responsive">
-          <table class="table table-vcenter card-table">
-            <thead>
-              <tr>
-                <th>Date / Heure</th>
-                <th>Utilisateur</th>
-                <th>IP</th>
-                <th>Navigateur</th>
-                <th>OS</th>
-                <th>Statut</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-if="connexionsLoading">
-                <td
-                  colspan="6"
-                  class="py-2"
-                >
-                  <LoadingSkeleton
-                    variant="table"
-                    :lines="4"
-                  />
-                </td>
-              </tr>
-              <tr v-else-if="!connexions.length">
-                <td
-                  colspan="6"
-                  class="text-center text-secondary py-4"
-                >
-                  Aucune connexion enregistrée
-                </td>
-              </tr>
-              <tr
-                v-for="ev in connexions"
-                :key="ev.id"
-              >
-                <td class="text-secondary small">
-                  {{ formatDate(ev.created_at) }}
-                </td>
-                <td class="fw-semibold">
-                  {{ ev.username }}
-                </td>
-                <td class="text-secondary small font-monospace">
-                  {{ ev.ip_address }}
-                </td>
-                <td class="text-secondary small">
-                  {{ parseUA(ev.user_agent).browser }}
-                </td>
-                <td class="text-secondary small">
-                  {{ parseUA(ev.user_agent).os }}
-                </td>
-                <td>
-                  <span
-                    class="badge"
-                    :class="ev.success ? 'bg-green-lt text-green' : 'bg-red-lt text-red'"
-                  >
-                    {{ ev.success ? 'Succès' : 'Échec' }}
-                  </span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <ConnectionsTable
+          :events="connexions"
+          :loading="connexionsLoading"
+          show-username
+        />
         <div class="card-footer d-flex align-items-center justify-content-between">
           <div class="text-secondary small">
             Page {{ connexionsPage }} / {{ totalConnexionsPages }}
@@ -388,6 +330,7 @@ import DataToolbar from '../components/common/DataToolbar.vue'
 import SortableHeader from '../components/common/SortableHeader.vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import AuditSecurityPanel from '../components/security/AuditSecurityPanel.vue'
+import ConnectionsTable from '../components/common/ConnectionsTable.vue'
 
 const { formatLocaleDateTime: formatDate } = useDateFormatter()
 
@@ -434,6 +377,5 @@ const {
   cmdLabel,
   formatDuration,
   statusClass,
-  parseUA,
 } = useAuditLogs()
 </script>

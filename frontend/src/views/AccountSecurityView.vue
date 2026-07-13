@@ -258,62 +258,10 @@
           Connexions récentes associées à votre compte. Le bouton ci-dessus déconnecte tous les autres appareils immédiatement.
         </p>
       </div>
-      <div class="table-responsive">
-        <table class="table table-vcenter card-table">
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>IP</th>
-              <th>Navigateur</th>
-              <th>OS</th>
-              <th>Statut</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-if="sessionsLoading">
-              <td
-                colspan="5"
-                class="text-center text-secondary py-3"
-              >
-                Chargement...
-              </td>
-            </tr>
-            <tr v-else-if="!loginEvents.length">
-              <td
-                colspan="5"
-                class="text-center text-secondary py-3"
-              >
-                Aucune connexion enregistrée
-              </td>
-            </tr>
-            <tr
-              v-for="ev in loginEvents"
-              :key="ev.id"
-            >
-              <td class="text-secondary small">
-                {{ formatDateTime(ev.created_at) }}
-              </td>
-              <td class="text-secondary small font-monospace">
-                {{ ev.ip_address }}
-              </td>
-              <td class="text-secondary small">
-                {{ parseUA(ev.user_agent).browser }}
-              </td>
-              <td class="text-secondary small">
-                {{ parseUA(ev.user_agent).os }}
-              </td>
-              <td>
-                <span
-                  class="badge"
-                  :class="ev.success ? 'bg-green-lt text-green' : 'bg-red-lt text-red'"
-                >
-                  {{ ev.success ? 'Succès' : 'Échec' }}
-                </span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <ConnectionsTable
+        :events="loginEvents"
+        :loading="sessionsLoading"
+      />
 
       <div
         v-if="revokeError"
@@ -343,6 +291,7 @@
 
 <script setup lang="ts">
 import { IconClock, IconCopy, IconDeviceDesktop, IconX } from '@tabler/icons-vue'
+import ConnectionsTable from '../components/common/ConnectionsTable.vue'
 import { useAccountSecurity } from '../composables/useAccountSecurity'
 
 const {
@@ -366,13 +315,11 @@ const {
   revokeLoading,
   revokeError,
   revokeSuccess,
-  formatDateTime,
   startSetup,
   verifySetup,
   disableMFA,
   revokeOtherSessions,
   copySecret,
   copyBackupCodes,
-  parseUA,
 } = useAccountSecurity()
 </script>

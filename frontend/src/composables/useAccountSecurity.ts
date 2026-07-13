@@ -1,6 +1,5 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import apiClient from '../api'
-import { formatDateTime } from '../utils/formatters'
 import type { LoginEvent } from '../types/generated'
 import { useAuthStore } from '../stores/auth'
 import { getApiErrorMessage, isApiAbort } from '../api/client'
@@ -164,20 +163,6 @@ export function useAccountSecurity() {
     setTimeout(() => { copiedBackup.value = false }, 1500)
   }
 
-  function parseUA(ua: string | undefined): { browser: string; os: string } {
-    if (!ua) return { browser: '—', os: '—' }
-    const browser = ua.includes('Firefox/') ? 'Firefox'
-      : ua.includes('Edg/') ? 'Edge'
-      : ua.includes('Chrome/') ? 'Chrome'
-      : ua.includes('Safari/') ? 'Safari' : 'Other'
-    const os = ua.includes('Windows') ? 'Windows'
-      : ua.includes('Mac OS X') ? 'macOS'
-      : ua.includes('Android') ? 'Android'
-      : (ua.includes('iPhone') || ua.includes('iPad')) ? 'iOS'
-      : ua.includes('Linux') ? 'Linux' : 'Other'
-    return { browser, os }
-  }
-
   onMounted(() => {
     loadStatus()
     loadLoginEvents()
@@ -206,13 +191,11 @@ export function useAccountSecurity() {
     revokeLoading,
     revokeError,
     revokeSuccess,
-    formatDateTime,
     startSetup,
     verifySetup,
     disableMFA,
     revokeOtherSessions,
     copySecret,
     copyBackupCodes,
-    parseUA,
   }
 }
