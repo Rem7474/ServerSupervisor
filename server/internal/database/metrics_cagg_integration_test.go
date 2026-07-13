@@ -43,7 +43,7 @@ func TestProxmoxNodeMetricsSummary_CAGG(t *testing.T) {
 			 VALUES ($1, $2, 'pve1', 0.5, 1000, 500, NOW() - INTERVAL '20 minutes')`,
 			nodeID, connID)
 	}
-	testutil.MustQuery(t, db, `CALL refresh_continuous_aggregate('proxmox_node_metrics_5min', NULL, NULL)`)
+	testutil.RefreshContinuousAggregate(t, db, "proxmox_node_metrics_5min")
 
 	// CAGG path (bucket 5min).
 	summary, err := db.GetProxmoxNodeMetricsSummary(ctx, 1, 5)
@@ -84,7 +84,7 @@ func TestProxmoxGuestMetricsSummary_CAGG(t *testing.T) {
 			`INSERT INTO proxmox_guest_metrics (guest_id, cpu_usage, mem_total, mem_used, timestamp)
 			 VALUES ($1, 0.25, 2000, 500, NOW() - INTERVAL '20 minutes')`, guestID)
 	}
-	testutil.MustQuery(t, db, `CALL refresh_continuous_aggregate('proxmox_guest_metrics_5min', NULL, NULL)`)
+	testutil.RefreshContinuousAggregate(t, db, "proxmox_guest_metrics_5min")
 
 	summary, err := db.GetProxmoxGuestMetricsSummary(ctx, guestID, 1, 5)
 	if err != nil {
@@ -122,7 +122,7 @@ func TestMetricsSummary_RealTimeFreshness(t *testing.T) {
 	testutil.MustQuery(t, db,
 		`INSERT INTO system_metrics (host_id, timestamp, cpu_usage_percent, memory_percent)
 		 VALUES ($1, NOW() - INTERVAL '20 minutes', 50, 50)`, hostID)
-	testutil.MustQuery(t, db, `CALL refresh_continuous_aggregate('system_metrics_5min', NULL, NULL)`)
+	testutil.RefreshContinuousAggregate(t, db, "system_metrics_5min")
 	testutil.MustQuery(t, db,
 		`INSERT INTO system_metrics (host_id, timestamp, cpu_usage_percent, memory_percent)
 		 VALUES ($1, NOW() - INTERVAL '1 minute', 50, 50)`, hostID)
@@ -163,7 +163,7 @@ func TestDiskMetricsAggregated_CAGG(t *testing.T) {
 			`INSERT INTO disk_metrics (host_id, timestamp, mount_point, filesystem, size_gb, used_gb, avail_gb, used_percent)
 			 VALUES ($1, NOW() - INTERVAL '2 hours', '/', 'ext4', 100, 60, 40, 60)`, hostID)
 	}
-	testutil.MustQuery(t, db, `CALL refresh_continuous_aggregate('disk_metrics_1h', NULL, NULL)`)
+	testutil.RefreshContinuousAggregate(t, db, "disk_metrics_1h")
 
 	// hours=48 → hourly path, served from the CAGG.
 	metrics, aggType, err := db.GetDiskMetricsAggregated(ctx, hostID, "/", 48)

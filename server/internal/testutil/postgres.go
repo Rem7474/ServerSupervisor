@@ -11,11 +11,13 @@ package testutil
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"testing"
 	"time"
 
+	"github.com/lib/pq"
 	"github.com/serversupervisor/server/internal/config"
 	"github.com/serversupervisor/server/internal/database"
 	"github.com/testcontainers/testcontainers-go"
@@ -82,19 +84,19 @@ func NewPostgresDB(t *testing.T) *database.DB {
 	}
 
 	cfg := &config.Config{
-		DBHost:               host,
-		DBPort:               port.Port(),
-		DBUser:               pgUser,
-		DBPassword:           pgPassword,
-		DBName:               pgDatabase,
-		DBSSLMode:            "disable",
-		JWTSecret:            "test-jwt-secret-with-enough-length-1234",
-		JWTExpiration:        24 * time.Hour,
+		DBHost:                 host,
+		DBPort:                 port.Port(),
+		DBUser:                 pgUser,
+		DBPassword:             pgPassword,
+		DBName:                 pgDatabase,
+		DBSSLMode:              "disable",
+		JWTSecret:              "test-jwt-secret-with-enough-length-1234",
+		JWTExpiration:          24 * time.Hour,
 		RefreshTokenExpiration: 7 * 24 * time.Hour,
-		APIKeyHeader:         "X-API-Key",
-		MetricsRetentionDays: 30,
-		AuditRetentionDays:   90,
-		WebLogsRetentionDays: 30,
+		APIKeyHeader:           "X-API-Key",
+		MetricsRetentionDays:   30,
+		AuditRetentionDays:     90,
+		WebLogsRetentionDays:   30,
 	}
 
 	db, err := database.New(cfg)
@@ -179,6 +181,36 @@ func MustQuery(t *testing.T, db *database.DB, query string, args ...interface{})
 	}
 }
 
-// Unused returns a value to silence the unused-import linter when the file
-// is included in a build but the tests inside are gated by Docker.
-var _ = fmt.Sprintf
+// pqLockNotAvailable is the SQLSTATE Postgres/TimescaleDB raises when a
+// continuous aggregate refresh is already in progress.
+const pqLockNotAvailable = "55P03"
+
+// RefreshContinuousAggregate refreshes a TimescaleDB continuous aggregate,
+// retrying on SQLSTATE 55P03 (lock_not_available). ensureTimescaleObjects
+// registers an automatic refresh policy for every CAGG right after creating
+// it, and TimescaleDB's background job scheduler can fire that policy's
+// first run within moments of registration — independently of, and racing,
+// this manual call. TimescaleDB doesn't queue concurrent refreshes on the
+// same CAGG, it fails one of them immediately, so a short client-side retry
+// is the correct fix here: the race is a property of a freshly-provisioned
+// test container, not a bug in the app being tested.
+func RefreshContinuousAggregate(t *testing.T, db *database.DB, name string) {
+	t.Helper()
+	const maxAttempts = 5
+	query := fmt.Sprintf(`CALL refresh_continuous_aggregate('%s', NULL, NULL)`, name)
+	var lastErr error
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		_, err := db.Exec(context.Background(), query)
+		if err == nil {
+			return
+		}
+		lastErr = err
+		var pqErr *pq.Error
+		if !errors.As(err, &pqErr) || string(pqErr.Code) != pqLockNotAvailable {
+			t.Fatalf("refresh continuous aggregate %s failed: %v", name, err)
+		}
+		time.Sleep(time.Duration(attempt) * 300 * time.Millisecond)
+	}
+	t.Fatalf("refresh continuous aggregate %s: still failing with concurrent-refresh (%s) after %d attempts: %v",
+		name, pqLockNotAvailable, maxAttempts, lastErr)
+}
