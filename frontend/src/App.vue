@@ -424,7 +424,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useAuthStore } from './stores/auth'
 import { useHostsStore } from './stores/hosts'
 import { useRouter, useRoute } from 'vue-router'
@@ -480,6 +480,33 @@ async function refreshSuggestedProxmoxLinksCount(): Promise<void> {
     // non-critique — on garde le dernier compte connu
   }
 }
+
+// Gated on isAuthenticated (not a bare onMounted call): App.vue mounts once
+// for the whole SPA lifetime, including on the login page — an unconditional
+// authenticated-only call here 401s on every unauthenticated load, and the
+// 401 handler's hard reload back to /login re-triggers this same mount,
+// producing an infinite reload loop. Login is a soft router.push (no
+// remount), so the watcher — not onMounted — is what starts polling once a
+// session actually exists, and stops it again on logout so a still-open tab
+// doesn't 401 five minutes after signing out.
+watch(
+  () => auth.isAuthenticated,
+  (isAuth) => {
+    if (isAuth) {
+      refreshSuggestedProxmoxLinksCount()
+      if (!proxmoxLinksRefreshTimer) {
+        proxmoxLinksRefreshTimer = setInterval(refreshSuggestedProxmoxLinksCount, 5 * 60 * 1000)
+      }
+    } else {
+      suggestedProxmoxLinksCount.value = 0
+      if (proxmoxLinksRefreshTimer) {
+        clearInterval(proxmoxLinksRefreshTimer)
+        proxmoxLinksRefreshTimer = null
+      }
+    }
+  },
+  { immediate: true }
+)
 
 // Offline detection — tracks browser connectivity via navigator.onLine events.
 // A "false" value means the browser has no network; the server may still be
@@ -600,8 +627,6 @@ onMounted(() => {
     adminMenuOpen.value = false
     userMenuOpen.value = false
   })
-  refreshSuggestedProxmoxLinksCount()
-  proxmoxLinksRefreshTimer = setInterval(refreshSuggestedProxmoxLinksCount, 5 * 60 * 1000)
 })
 
 onUnmounted(() => {

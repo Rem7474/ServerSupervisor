@@ -115,6 +115,28 @@
           />
           Rafraîchir
         </button>
+
+        <div class="threats-filter-field ms-auto">
+          <label class="form-label mb-1">Rechercher un domaine ou une IP</label>
+          <div class="input-group input-group-sm">
+            <input
+              v-model="searchTerm"
+              type="text"
+              class="form-control form-control-sm"
+              placeholder="exemple.com ou 1.2.3.4"
+              style="min-width: 16rem;"
+              @keyup.enter="handleSearch"
+            >
+            <button
+              type="button"
+              class="btn btn-outline-secondary btn-sm"
+              :disabled="!searchTerm.trim()"
+              @click="handleSearch"
+            >
+              Voir les requêtes
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -360,13 +382,14 @@
                     :key="h.host_id"
                   >
                     <td>
-                      <router-link
+                      <button
                         v-if="h.host_id"
-                        :to="`/hosts/${h.host_id}`"
-                        class="text-decoration-none"
+                        type="button"
+                        class="btn btn-link p-0 text-decoration-none"
+                        @click="openDomain(h.host_id)"
                       >
                         {{ h.host_name || h.host_id }}
-                      </router-link>
+                      </button>
                       <span v-else>{{ h.host_name || '—' }}</span>
                     </td>
                     <td class="text-end">
@@ -544,12 +567,22 @@
       @close="closeTimeline"
       @ban="handleBanFromModal"
     />
+
+    <DomainDetailsModal
+      :show="showDomainModal"
+      :domain="selectedDomain"
+      :loading="domainLoading"
+      :details="domainDetails"
+      :period="period"
+      @close="closeDomainModal"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import IPTimelineModal from '../components/security/IPTimelineModal.vue'
+import DomainDetailsModal from '../components/security/DomainDetailsModal.vue'
 import { useBot } from '../composables/useBot'
 
 const {
@@ -567,6 +600,11 @@ const {
   banState,
   selectedIP,
   timeline,
+  showDomainModal,
+  selectedDomain,
+  domainLoading,
+  domainDetails,
+  searchTerm,
   threats,
   topPaths,
   mostTargetedHosts,
@@ -586,6 +624,9 @@ const {
   setPeriod,
   openTimeline,
   closeTimeline,
+  openDomain,
+  closeDomainModal,
+  handleSearch,
   handleBanFromModal,
   unblockCrowdSecEntry,
 } = useBot()

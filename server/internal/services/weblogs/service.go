@@ -133,29 +133,88 @@ func (s *Service) Summary(ctx context.Context, period time.Duration, hostID, sou
 		return &SummaryResult{Since: since, Threats: threats}, nil
 	}
 
-	summary, err := s.repo.GetWebLogsSummary(ctx, since, hostID, source)
-	if err != nil {
-		return nil, err
-	}
-
-	if traffic, ok := summary["traffic"].(map[string]any); ok {
-		if topIPs, err := s.repo.GetWebLogsTopClientIPs(ctx, since, hostID, source, 120); err == nil {
-			traffic["top_client_ips"] = topIPs
-			traffic["country_distribution"] = countryDistribution(topIPs)
+	// The summary, top-IP geolocation and the two KPI windows are independent
+	// reads over the same table/window — running them sequentially was one of
+	// the compounding causes of the dashboard's request timeout on top of
+	// GetWebLogsSummary's own internal fan-out. None of these needs another's
+	// result (the top-IP block only writes into the summary's traffic map
+	// afterward), so they run concurrently and are joined below.
+	var (
+		wg                      sync.WaitGroup
+		mu                      sync.Mutex
+		firstErr                error
+		summary                 map[string]any
+		topIPs                  []map[string]any
+		countryDist             []map[string]any
+		currentKPI, previousKPI map[string]any
+	)
+	setErr := func(err error) {
+		if err == nil {
+			return
 		}
+		mu.Lock()
+		if firstErr == nil {
+			firstErr = err
+		}
+		mu.Unlock()
 	}
-
 	now := time.Now().UTC()
 	currentSince := now.Add(-period)
 	previousSince := currentSince.Add(-period)
-	currentKPI, err := s.repo.GetWebLogsKPIWindow(ctx, currentSince, now, hostID, source)
-	if err != nil {
-		return nil, err
+
+	wg.Add(4)
+	go func() {
+		defer wg.Done()
+		defer safego.Recover(ctx, "weblogs.Summary.summary")
+		sm, err := s.repo.GetWebLogsSummary(ctx, since, hostID, source)
+		if err != nil {
+			setErr(err)
+			return
+		}
+		summary = sm
+	}()
+	go func() {
+		defer wg.Done()
+		defer safego.Recover(ctx, "weblogs.Summary.topIPs")
+		// Best-effort, matching the pre-existing "if err == nil" behavior: a
+		// failure here just skips the top-IP/country enrichment.
+		ips, err := s.repo.GetWebLogsTopClientIPs(ctx, since, hostID, source, 120)
+		if err != nil {
+			return
+		}
+		topIPs = ips
+		countryDist = countryDistribution(ips)
+	}()
+	go func() {
+		defer wg.Done()
+		defer safego.Recover(ctx, "weblogs.Summary.currentKPI")
+		kpi, err := s.repo.GetWebLogsKPIWindow(ctx, currentSince, now, hostID, source)
+		if err != nil {
+			setErr(err)
+			return
+		}
+		currentKPI = kpi
+	}()
+	go func() {
+		defer wg.Done()
+		defer safego.Recover(ctx, "weblogs.Summary.previousKPI")
+		kpi, err := s.repo.GetWebLogsKPIWindow(ctx, previousSince, currentSince, hostID, source)
+		if err != nil {
+			setErr(err)
+			return
+		}
+		previousKPI = kpi
+	}()
+	wg.Wait()
+	if firstErr != nil {
+		return nil, firstErr
 	}
-	previousKPI, err := s.repo.GetWebLogsKPIWindow(ctx, previousSince, currentSince, hostID, source)
-	if err != nil {
-		return nil, err
+
+	if traffic, ok := summary["traffic"].(map[string]any); ok && topIPs != nil {
+		traffic["top_client_ips"] = topIPs
+		traffic["country_distribution"] = countryDist
 	}
+
 	compare := map[string]any{
 		"current":  currentKPI,
 		"previous": previousKPI,

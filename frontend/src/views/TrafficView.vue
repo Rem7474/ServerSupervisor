@@ -236,6 +236,28 @@
             />
             Rafraîchir
           </button>
+
+          <div class="traffic-filter-field ms-auto">
+            <label class="form-label mb-1">Rechercher un domaine ou une IP</label>
+            <div class="input-group input-group-sm">
+              <input
+                v-model="searchTerm"
+                type="text"
+                class="form-control form-control-sm"
+                placeholder="exemple.com ou 1.2.3.4"
+                style="min-width: 16rem;"
+                @keyup.enter="handleSearch"
+              >
+              <button
+                type="button"
+                class="btn btn-outline-secondary btn-sm"
+                :disabled="!searchTerm.trim()"
+                @click="handleSearch"
+              >
+                Voir les requêtes
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -633,215 +655,23 @@
         </div>
       </div>
 
-      <div
-        v-if="showDomainModal"
-        class="traffic-modal-backdrop"
-        @click.self="closeDomainModal"
-      >
-        <div class="traffic-modal card shadow-lg">
-          <div class="card-header d-flex align-items-center justify-content-between">
-            <div>
-              <h3 class="card-title mb-0">
-                Détails domaine: <span class="font-monospace">{{ selectedDomain }}</span>
-              </h3>
-              <div class="text-secondary small">
-                Fenêtre de logs détaillée sur {{ period }}
-              </div>
-            </div>
-            <button
-              type="button"
-              class="btn btn-sm btn-outline-secondary"
-              @click="closeDomainModal"
-            >
-              Fermer
-            </button>
-          </div>
+      <DomainDetailsModal
+        :show="showDomainModal"
+        :domain="selectedDomain"
+        :loading="domainLoading"
+        :details="domainDetails"
+        :period="period"
+        @close="closeDomainModal"
+      />
 
-          <div class="card-body traffic-modal-body">
-            <div
-              v-if="domainLoading"
-              class="text-center py-4 text-secondary"
-            >
-              <span class="spinner-border spinner-border-sm me-2" />
-              Chargement des détails...
-            </div>
-
-            <template v-else>
-              <div class="row row-cards mb-3">
-                <div class="col-6 col-lg-3">
-                  <div class="border rounded p-2 text-center">
-                    <div class="text-secondary small">
-                      Hits
-                    </div>
-                    <div class="h3 mb-0">
-                      {{ domainDetails.hits || 0 }}
-                    </div>
-                  </div>
-                </div>
-                <div class="col-6 col-lg-3">
-                  <div class="border rounded p-2 text-center">
-                    <div class="text-secondary small">
-                      Bytes
-                    </div>
-                    <div class="h3 mb-0">
-                      {{ formatBytes(domainDetails.bytes || 0) }}
-                    </div>
-                  </div>
-                </div>
-                <div class="col-6 col-lg-3">
-                  <div class="border rounded p-2 text-center">
-                    <div class="text-secondary small">
-                      4xx
-                    </div>
-                    <div class="h3 mb-0 text-yellow">
-                      {{ domainDetails.status_4xx || 0 }}
-                    </div>
-                  </div>
-                </div>
-                <div class="col-6 col-lg-3">
-                  <div class="border rounded p-2 text-center">
-                    <div class="text-secondary small">
-                      5xx
-                    </div>
-                    <div class="h3 mb-0 text-red">
-                      {{ domainDetails.status_5xx || 0 }}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div class="row row-cards mb-3">
-                <div class="col-lg-6">
-                  <div class="card h-100">
-                    <div class="card-header">
-                      <h4 class="card-title mb-0">
-                        Top chemins
-                      </h4>
-                    </div>
-                    <div class="card-body p-0">
-                      <div
-                        v-if="!(domainDetails.top_paths || []).length"
-                        class="text-center py-3 text-secondary small"
-                      >
-                        Aucun chemin
-                      </div>
-                      <div
-                        v-for="p in domainDetails.top_paths"
-                        v-else
-                        :key="p.path"
-                        class="d-flex justify-content-between border-bottom px-3 py-2"
-                      >
-                        <span
-                          class="font-monospace small text-truncate me-2"
-                          style="max-width: 75%;"
-                        >{{ p.path }}</span>
-                        <span class="badge bg-azure-lt text-azure">{{ p.hits }}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div class="col-lg-6">
-                  <div class="card h-100">
-                    <div class="card-header">
-                      <h4 class="card-title mb-0">
-                        Top IPs clientes
-                      </h4>
-                    </div>
-                    <div class="card-body p-0">
-                      <div
-                        v-if="!(domainDetails.top_clients || []).length"
-                        class="text-center py-3 text-secondary small"
-                      >
-                        Aucune IP
-                      </div>
-                      <div
-                        v-for="ip in domainDetails.top_clients"
-                        v-else
-                        :key="ip.ip"
-                        class="d-flex justify-content-between border-bottom px-3 py-2"
-                      >
-                        <span class="font-monospace small">{{ ip.ip }}</span>
-                        <span class="badge bg-purple-lt text-purple">{{ ip.hits }}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div class="card">
-                <div class="card-header">
-                  <h4 class="card-title mb-0">
-                    Logs récents
-                  </h4>
-                </div>
-                <div
-                  class="table-responsive"
-                  style="max-height: 360px;"
-                >
-                  <table class="table table-sm table-vcenter mb-0">
-                    <thead>
-                      <tr>
-                        <th>Heure</th>
-                        <th>IP</th>
-                        <th>Méthode</th>
-                        <th>Chemin</th>
-                        <th>Status</th>
-                        <th>Bytes</th>
-                        <th>UA</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr v-if="!(domainDetails.requests || []).length">
-                        <td
-                          colspan="7"
-                          class="text-center text-secondary py-3"
-                        >
-                          Aucune requête disponible
-                        </td>
-                      </tr>
-                      <tr
-                        v-for="(r, idx) in domainDetails.requests || []"
-                        :key="`${r.timestamp}-${idx}`"
-                      >
-                        <td class="small">
-                          {{ formatDate(r.timestamp) }}
-                        </td>
-                        <td class="font-monospace small">
-                          {{ r.ip }}
-                        </td>
-                        <td><span class="badge bg-blue-lt text-blue">{{ r.method }}</span></td>
-                        <td
-                          class="font-monospace small text-truncate domain-path"
-                          :title="r.path"
-                          style="max-width: 18rem;"
-                        >
-                          {{ r.path }}
-                        </td>
-                        <td>
-                          <span
-                            class="badge"
-                            :class="statusClass(r.status)"
-                          >{{ r.status }}</span>
-                        </td>
-                        <td class="small">
-                          {{ formatBytes(r.bytes || 0) }}
-                        </td>
-                        <td
-                          class="small text-truncate domain-ua"
-                          :title="r.user_agent || '-'"
-                          style="max-width: 20rem;"
-                        >
-                          {{ r.user_agent || '-' }}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </template>
-          </div>
-        </div>
-      </div>
+      <IPTimelineModal
+        :show="showIPModal"
+        :ip="selectedIP"
+        :timeline="ipTimeline"
+        :loading="ipTimelineLoading"
+        read-only
+        @close="closeIPModal"
+      />
     </div>
   </div>
 </template>
@@ -854,6 +684,8 @@ import TrafficWorldMap from '../components/security/TrafficWorldMap.vue'
 import TrafficRequestsChart from '../components/security/TrafficRequestsChart.vue'
 import TrafficStatusChart from '../components/security/TrafficStatusChart.vue'
 import { useTraffic } from '../composables/useTraffic'
+import DomainDetailsModal from '../components/security/DomainDetailsModal.vue'
+import IPTimelineModal from '../components/security/IPTimelineModal.vue'
 
 const {
   hostsStore,
@@ -871,6 +703,11 @@ const {
   selectedDomain,
   domainLoading,
   domainDetails,
+  showIPModal,
+  selectedIP,
+  ipTimelineLoading,
+  ipTimeline,
+  searchTerm,
   chartReady,
   traffic,
   threats,
@@ -893,6 +730,8 @@ const {
   loadAll,
   openDomain,
   closeDomainModal,
+  closeIPModal,
+  handleSearch,
 } = useTraffic()
 </script>
 
