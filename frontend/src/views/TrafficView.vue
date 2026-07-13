@@ -100,16 +100,12 @@
     </div>
 
     <div v-else>
-      <div class="traffic-topbar mb-3">
-        <div class="d-flex align-items-center gap-2">
-          <span
-            class="live-dot"
-            :class="{ paused: !autoRefresh }"
-          />
-          <span class="fw-semibold">Stats web</span>
-          <span class="badge bg-green-lt text-green">{{ autoRefresh ? `Auto (${REFRESH_INTERVAL_MS / 1000}s)` : 'Pause' }}</span>
-          <span class="text-secondary small">dernière MAJ {{ lastUpdatedLabel }}</span>
-        </div>
+      <PageRefreshBar
+        v-model="autoRefresh"
+        label="Stats web"
+        :interval-sec="REFRESH_INTERVAL_MS / 1000"
+        :last-updated-at="lastUpdatedAt"
+      >
         <div class="d-flex align-items-center gap-2 flex-wrap">
           <span class="small text-secondary">Période :</span>
           <button
@@ -123,7 +119,7 @@
             {{ p.label }}
           </button>
         </div>
-      </div>
+      </PageRefreshBar>
 
       <div class="page-header mb-4">
         <div class="page-pretitle">
@@ -679,6 +675,7 @@
 <script setup lang="ts">
 import { IconAlertTriangle } from '@tabler/icons-vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
+import PageRefreshBar from '../components/PageRefreshBar.vue'
 import TrafficKpiCards from '../components/security/TrafficKpiCards.vue'
 import TrafficWorldMap from '../components/security/TrafficWorldMap.vue'
 import TrafficRequestsChart from '../components/security/TrafficRequestsChart.vue'
@@ -699,6 +696,7 @@ const {
   compare,
   timeseries,
   liveRequests,
+  lastUpdatedAt,
   showDomainModal,
   selectedDomain,
   domainLoading,
@@ -719,7 +717,6 @@ const {
   countryDistribution,
   statusDistribution,
   showInitialLoading,
-  lastUpdatedLabel,
   sourceHasNoData,
   numberFormat,
   formatBytes,
@@ -742,29 +739,6 @@ const {
   justify-content: space-between;
   gap: 0.75rem;
   flex-wrap: wrap;
-}
-
-.live-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: var(--ss-status-online);
-  animation: pulse 1.6s infinite;
-}
-
-.live-dot.paused {
-  animation: none;
-  background: var(--tblr-secondary);
-}
-
-@keyframes pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.35;
-  }
 }
 
 .traffic-modal-backdrop {

@@ -1,26 +1,11 @@
 <template>
   <div>
-    <div class="threats-topbar mb-3">
-      <div class="d-flex align-items-center gap-2 flex-wrap">
-        <span
-          class="live-dot"
-          :class="{ paused: !autoRefresh }"
-        />
-        <span class="fw-semibold">Menaces web</span>
-        <button
-          class="badge border-0 cursor-pointer"
-          :class="autoRefresh ? 'bg-green-lt text-green' : 'bg-secondary-lt text-secondary'"
-          type="button"
-          :title="autoRefresh ? 'Cliquer pour mettre en pause' : 'Cliquer pour reprendre'"
-          @click="autoRefresh = !autoRefresh"
-        >
-          {{ autoRefresh ? `Auto (${BOT_REFRESH_SEC}s)` : 'Pause' }}
-        </button>
-        <span
-          v-if="lastUpdatedAt"
-          class="text-secondary small"
-        >dernière MAJ {{ lastUpdatedAt.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) }}</span>
-      </div>
+    <PageRefreshBar
+      v-model="autoRefresh"
+      label="Menaces web"
+      :interval-sec="BOT_REFRESH_SEC"
+      :last-updated-at="lastUpdatedAt"
+    >
       <div class="d-flex align-items-center gap-2 flex-wrap">
         <span class="small text-secondary">Période :</span>
         <button
@@ -34,7 +19,7 @@
           {{ p.label }}
         </button>
       </div>
-    </div>
+    </PageRefreshBar>
 
     <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
       <div>
@@ -581,6 +566,7 @@
 
 <script setup lang="ts">
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
+import PageRefreshBar from '../components/PageRefreshBar.vue'
 import IPTimelineModal from '../components/security/IPTimelineModal.vue'
 import DomainDetailsModal from '../components/security/DomainDetailsModal.vue'
 import { useBot } from '../composables/useBot'
@@ -633,32 +619,6 @@ const {
 </script>
 
 <style scoped>
-.live-dot {
-  width: 8px;
-  height: 8px;
-  flex-shrink: 0;
-  border-radius: 999px;
-  background: var(--ss-status-online, #22c55e);
-  animation: pulse-dot 1.6s infinite;
-}
-.live-dot.paused {
-  animation: none;
-  background: var(--tblr-secondary);
-}
-@keyframes pulse-dot {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.35; }
-}
-.cursor-pointer { cursor: pointer; }
-
-.threats-topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-}
-
 @media (max-width: 992px) {
   .threats-filters {
     align-items: stretch !important;

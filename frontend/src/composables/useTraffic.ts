@@ -82,11 +82,6 @@ export function useTraffic() {
   const statusDistribution = computed(() => traffic.value.status_distribution || { '2xx': 0, '3xx': 0, '4xx': 0, '5xx': 0 })
   const showInitialLoading = computed(() => loading.value && !chartReady.value)
 
-  const lastUpdatedLabel = computed(() => {
-    if (!lastUpdatedAt.value) return 'jamais'
-    return lastUpdatedAt.value.toLocaleTimeString()
-  })
-
   const sourceHasNoData = computed(() => {
     if (!source.value || loading.value || !chartReady.value) return false
     return (traffic.value.total_requests || 0) === 0
@@ -293,7 +288,6 @@ export function useTraffic() {
     countryDistribution,
     statusDistribution,
     showInitialLoading,
-    lastUpdatedLabel,
     sourceHasNoData,
     numberFormat,
     formatBytes,
