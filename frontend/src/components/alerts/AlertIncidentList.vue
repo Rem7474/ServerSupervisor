@@ -262,13 +262,13 @@
                   style="max-width: 220px;"
                   :title="item.rule_name"
                 >
-                  {{ item.rule_name || defaultNotificationTitle(item) }}
+                  {{ notificationTitle(item) }}
                 </div>
                 <div
                   v-if="item.metric"
                   class="text-muted small"
                 >
-                  {{ incidentMetricLabel(item.metric) }}
+                  {{ metricLabel(item.metric) }}
                 </div>
               </td>
               <td>
@@ -299,13 +299,13 @@
                   </div>
                 </template>
                 <template v-else>
-                  <code>{{ incidentFormatValue(item.value, item.metric, item.value_label) }}</code>
+                  <code>{{ formatIncidentValue({ value: item.value, metric: item.metric, value_label: item.value_label }) }}</code>
                   <div
                     v-if="!isCompleted(item) && item.current_value != null"
                     class="text-muted small mt-1"
                   >
                     Actuel :
-                    <span class="fw-medium">{{ incidentFormatValue(item.current_value, item.metric, item.value_label) }}</span>
+                    <span class="fw-medium">{{ formatIncidentValue({ value: item.current_value, metric: item.metric, value_label: item.value_label }) }}</span>
                     <span
                       v-if="resolveHint(item)"
                       class="ms-1"
@@ -417,33 +417,21 @@ import { computed, ref, watch } from 'vue'
 import { IconBell, IconCheck, IconChevronLeft, IconChevronRight, IconRefresh, IconSearch, IconX } from '@tabler/icons-vue'
 import apiClient from '../../api'
 import BadgePill from '../common/BadgePill.vue'
-import { getAlertMetricMeta } from '../../utils/alertMetrics'
-import { resolveIncidentHostRoute } from '../../utils/incidentRouting'
+import { addToast } from '../../composables/useGlobalToast'
+import { getApiErrorMessage } from '../../api/client'
+import {
+  formatIncidentValue,
+  metricLabel,
+  notificationResolved as isCompleted,
+  notificationRoute,
+  notificationTitle,
+  resolvableIncidentId,
+  resolveHint,
+  trackerStatusLabel,
+} from '../../utils/incidentFormat'
+import type { NotificationItem } from '../../types/generated'
 
-interface Incident {
-  id?: string | number
-  type?: string
-  severity?: string
-  rule_name?: string
-  host_id?: string
-  host_name?: string
-  source_label?: string
-  link_host_id?: string
-  value_label?: string
-  command_id?: string
-  command_status?: string
-  metric?: string
-  status?: string
-  version?: string
-  value?: number | string
-  current_value?: number | null
-  clear_threshold?: number | null
-  operator?: string
-  triggered_at?: string
-  resolved_at?: string | null
-  tracker_id?: string | number
-  [key: string]: unknown
-}
+type Incident = NotificationItem
 
 interface AnnotatedIncident extends Incident {
   _isOld: boolean
@@ -606,22 +594,18 @@ async function markAllRead() {
 }
 
 async function manualResolve(incident: Incident) {
-  if (!incident.id || resolvingId.value) return
+  const id = resolvableIncidentId(incident)
+  if (!id || resolvingId.value) return
   resolvingId.value = incident.id
   try {
-    await apiClient.resolveAlertIncident(incident.id)
+    await apiClient.resolveAlertIncident(id)
+    addToast('Incident résolu', 'success')
     emit('refresh')
+  } catch (err: unknown) {
+    addToast(getApiErrorMessage(err, 'Impossible de résoudre'), 'error')
   } finally {
     resolvingId.value = null
   }
-}
-
-function notificationRoute(incident: Incident): string {
-  if (incident?.type === 'release_tracker_detected' || incident?.type === 'release_tracker_execution') {
-    if (incident?.tracker_id) return `/release-trackers/${encodeURIComponent(String(incident.tracker_id))}`
-    return '/git-webhooks?tab=trackers'
-  }
-  return resolveIncidentHostRoute(incident?.host_id, incident?.metric, incident?.link_host_id)
 }
 
 // commandStatusLabel/commandStatusBadgeClass describe the remote_commands row
@@ -640,62 +624,6 @@ function commandStatusBadgeClass(status: string | undefined): string {
   if (status === 'failed') return 'badge bg-danger-lt text-danger'
   if (status === 'running') return 'badge bg-info-lt text-info'
   return 'badge bg-warning-lt text-warning'
-}
-
-function trackerStatusLabel(status: string | undefined): string {
-  if (status === 'pending' || status === 'running') return 'Détection en cours'
-  if (status === 'completed' || status === 'success') return 'Exécution réussie'
-  if (status === 'failed' || status === 'error') return 'Exécution échouée'
-  return status || 'État inconnu'
-}
-
-function isCompleted(incident: Incident): boolean {
-  if (incident?.type === 'release_tracker_detected' || incident?.type === 'release_tracker_execution') {
-    return !!incident?.resolved_at || ['completed', 'success', 'failed', 'error'].includes((incident?.status || '').toLowerCase())
-  }
-  return !!incident?.resolved_at
-}
-
-function incidentMetricLabel(metric: string | undefined): string {
-  const meta = getAlertMetricMeta(metric || '')
-  return meta?.label || metric || '-'
-}
-
-function defaultNotificationTitle(incident: Incident): string {
-  if (incident?.type === 'release_tracker_detected') return 'Nouvelle version détectée'
-  if (incident?.type === 'release_tracker_execution') return 'Exécution de tracker'
-  return incident?.metric ? incidentMetricLabel(incident.metric) : 'Notification'
-}
-
-function incidentFormatValue(value: number | string | undefined, metric: string | undefined, valueLabel?: string): string {
-  if (metric === 'release_tracker') return '-'
-  if (metric === 'status_offline') return value === 1 ? 'offline' : 'online'
-  if (metric === 'disk_smart_status') return Number(value) >= 1 ? 'FAILED' : 'OK'
-  if (metric === 'docker_container_state') {
-    if (valueLabel) return valueLabel
-    const n = Number(value)
-    if (n < 0.5) return 'running'
-    if (n < 1.5) return 'dégradé'
-    return 'critique'
-  }
-  if (metric === 'docker_compose_degraded_services') {
-    const n = Number(value)
-    return n === 1 ? '1 service dégradé' : `${n} services dégradés`
-  }
-  const unit = getAlertMetricMeta(metric || '').unit
-  return `${Number(value).toFixed(2)}${unit}`
-}
-
-// resolveHint describes the threshold the live value must cross for the alert
-// to resolve, e.g. "repasse OK ≤ 70°C" for a ">" rule.
-function resolveHint(incident: Incident): string {
-  if (incident.clear_threshold == null) return ''
-  const formatted = incidentFormatValue(incident.clear_threshold, incident.metric)
-  const op = incident.operator || ''
-  // A ">"/">=" rule resolves when the value drops to/below the clear threshold.
-  if (op === '>' || op === '>=') return `repasse OK ≤ ${formatted}`
-  if (op === '<' || op === '<=') return `repasse OK ≥ ${formatted}`
-  return `seuil de résolution ${formatted}`
 }
 
 function formatDate(dateStr: string | undefined | null): string {

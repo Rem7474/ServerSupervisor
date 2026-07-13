@@ -2,7 +2,15 @@ import { ref, computed, watch, onMounted } from 'vue'
 import api from '../api'
 import type { NotificationItem } from '../types/generated'
 import { addToast } from './useGlobalToast'
-import { resolveIncidentHostRoute } from '../utils/incidentRouting'
+import {
+  isTrackerType,
+  isUnread as sharedIsUnread,
+  metricUnit,
+  notificationResolved,
+  notificationRoute,
+  notificationTitle,
+  resolvableIncidentId,
+} from '../utils/incidentFormat'
 import { getApiErrorMessage, isApiAbort } from '../api/client'
 import { useAbortSignal } from './useAbortSignal'
 
@@ -41,41 +49,11 @@ export function useNotificationCenter() {
   const statusFilter = ref<'active' | 'resolved' | ''>('')
 
   const unreadCount = computed(() =>
-    items.value.filter((n) => !readAt.value || new Date(n.triggered_at) > new Date(readAt.value)).length
+    items.value.filter((n) => sharedIsUnread(n, readAt.value)).length
   )
 
   function isUnread(item: NotificationItem): boolean {
-    return !readAt.value || new Date(item.triggered_at) > new Date(readAt.value)
-  }
-
-  function isTrackerType(item: NotificationItem): boolean {
-    return item.type === 'release_tracker_detected' || item.type === 'release_tracker_execution'
-  }
-
-  function notificationTitle(item: NotificationItem): string {
-    if (isTrackerType(item)) return item.rule_name || 'Release tracker'
-    return item.rule_name || 'Alerte'
-  }
-
-  function notificationResolved(item: NotificationItem): boolean {
-    if (isTrackerType(item)) {
-      return !!item.resolved_at || ['completed', 'success', 'failed', 'error'].includes((item.status || '').toLowerCase())
-    }
-    return !!item.resolved_at
-  }
-
-  function notificationRoute(item: NotificationItem): string {
-    if (isTrackerType(item)) {
-      if (item.tracker_id) return `/release-trackers/${encodeURIComponent(String(item.tracker_id))}`
-      return '/git-webhooks?tab=trackers'
-    }
-    return resolveIncidentHostRoute(item.host_id, item.metric, item.link_host_id)
-  }
-
-  function metricUnit(metric?: string): string {
-    if (!metric) return ''
-    if (['cpu', 'memory', 'disk'].some((k) => metric.includes(k))) return '%'
-    return ''
+    return sharedIsUnread(item, readAt.value)
   }
 
   function iconBg(item: NotificationItem): string {
@@ -93,15 +71,12 @@ export function useNotificationCenter() {
     return notificationResolved(item) ? 'bg-green-lt text-green' : 'bg-red-lt text-red'
   }
 
-  function incidentNumericId(item: NotificationItem): string {
-    // item.id is formatted as "alert:123" for alert incidents
-    return item.id.replace(/^alert:/, '')
-  }
-
   async function resolveIncident(item: NotificationItem): Promise<void> {
+    const id = resolvableIncidentId(item)
+    if (!id) return
     resolvingId.value = item.id
     try {
-      await api.resolveAlertIncident(incidentNumericId(item))
+      await api.resolveAlertIncident(id)
       items.value = items.value.map((n) =>
         n.id === item.id ? { ...n, resolved_at: new Date().toISOString() } : n
       )
