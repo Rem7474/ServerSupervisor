@@ -515,49 +515,37 @@
                   >
                 </div>
                 <div class="col-12">
-                  <label class="form-label">
-                    Planification (cron)
-                    <span class="text-muted ms-1 small">— laisser vide pour manuel uniquement</span>
-                  </label>
-                  <input
-                    v-model="createForm.cron_expression"
-                    type="text"
-                    class="form-control font-monospace"
-                    placeholder="ex: 0 3 * * *"
-                  >
-                  <div
-                    v-if="createForm.cron_expression"
-                    class="form-hint"
-                  >
-                    <span v-if="createCronDesc">{{ createCronDesc }}</span>
-                    <span
-                      v-if="createNextRun"
-                      :class="createCronDesc ? 'ms-2 text-primary' : 'text-primary'"
-                    >→ prochain : {{ formatDate(createNextRun?.toISOString()) }}</span>
-                    <span
-                      v-else-if="!createCronDesc"
-                      class="text-warning"
-                    >Expression non reconnue</span>
-                  </div>
-                  <div class="mt-2 d-flex flex-wrap gap-2">
-                    <button
-                      v-for="preset in cronPresets"
-                      :key="preset.value"
-                      type="button"
-                      class="btn btn-sm btn-outline-secondary"
-                      @click="createForm.cron_expression = preset.value"
+                  <label class="form-check form-switch">
+                    <input
+                      v-model="createManualOnly"
+                      type="checkbox"
+                      class="form-check-input"
                     >
-                      {{ preset.label }}
-                    </button>
+                    <span class="form-check-label">Exécution manuelle uniquement (pas de planification automatique)</span>
+                  </label>
+                </div>
+                <div
+                  v-if="!createManualOnly"
+                  class="col-12"
+                >
+                  <label class="form-label">Planification</label>
+                  <CronBuilder v-model="createForm.cron_expression" />
+                  <div
+                    v-if="createNextRun"
+                    class="form-hint text-primary"
+                  >
+                    → prochain : {{ formatDate(createNextRun?.toISOString()) }}
                   </div>
                 </div>
-                <div class="col-12">
+                <div
+                  v-if="!createManualOnly"
+                  class="col-12"
+                >
                   <label class="form-check">
                     <input
                       v-model="createForm.enabled"
                       type="checkbox"
                       class="form-check-input"
-                      :disabled="!createForm.cron_expression"
                     >
                     <span class="form-check-label">Activée (planifiée automatiquement)</span>
                   </label>
@@ -619,36 +607,40 @@
                 class="form-control"
               >
             </div>
-            <div class="mb-3">
-              <label class="form-label">Expression cron</label>
+            <div class="mb-3 form-check form-switch">
               <input
-                v-model="editForm.cron_expression"
-                type="text"
-                class="form-control font-monospace"
-                placeholder="ex: 0 3 * * *"
+                id="editManualOnly"
+                v-model="editManualOnly"
+                type="checkbox"
+                class="form-check-input"
               >
+              <label
+                class="form-check-label"
+                for="editManualOnly"
+              >Exécution manuelle uniquement (pas de planification automatique)</label>
+            </div>
+            <div
+              v-if="!editManualOnly"
+              class="mb-3"
+            >
+              <label class="form-label">Planification</label>
+              <CronBuilder v-model="editForm.cron_expression" />
               <div
-                v-if="editForm.cron_expression"
-                class="form-hint"
+                v-if="editNextRun"
+                class="form-hint text-primary"
               >
-                <span v-if="editCronDesc">{{ editCronDesc }}</span>
-                <span
-                  v-if="editNextRun"
-                  :class="editCronDesc ? 'ms-2 text-primary' : 'text-primary'"
-                >→ prochain : {{ formatDate(editNextRun?.toISOString()) }}</span>
-                <span
-                  v-else-if="!editCronDesc"
-                  class="text-warning"
-                >Expression non reconnue</span>
+                → prochain : {{ formatDate(editNextRun?.toISOString()) }}
               </div>
             </div>
-            <div class="mb-3 form-check">
+            <div
+              v-if="!editManualOnly"
+              class="mb-3 form-check"
+            >
               <input
                 id="editEnabled"
                 v-model="editForm.enabled"
                 type="checkbox"
                 class="form-check-input"
-                :disabled="isManualOnly(editTask)"
               >
               <label
                 class="form-check-label"
@@ -829,6 +821,7 @@ import { IconClock, IconPencil, IconRefresh, IconTrash } from '@tabler/icons-vue
 import DataToolbar from '../components/common/DataToolbar.vue'
 import SortableHeader from '../components/common/SortableHeader.vue'
 import BulkActionBar from '../components/BulkActionBar.vue'
+import CronBuilder from '../components/CronBuilder.vue'
 import { useGlobalScheduledTasks } from '../composables/useGlobalScheduledTasks'
 
 const {
@@ -847,6 +840,7 @@ const {
   bulkLoading,
   editTask,
   editForm,
+  editManualOnly,
   editSaving,
   editError,
   historyTask,
@@ -856,14 +850,12 @@ const {
   expandedId,
   createModalOpen,
   createForm,
+  createManualOnly,
   createSaving,
   createError,
   canManage,
   moduleActions,
-  cronPresets,
-  createCronDesc,
   createNextRun,
-  editCronDesc,
   editNextRun,
   hostList,
   filteredTasks,

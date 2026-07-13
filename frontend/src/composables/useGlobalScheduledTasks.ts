@@ -1,4 +1,4 @@
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { useHostsStore } from '../stores/hosts'
 import { addToast } from './useGlobalToast'
@@ -17,12 +17,7 @@ const moduleActions: Record<string, string[]> = {
   processes: ['list'],
 }
 
-const cronPresets = [
-  { label: 'Toutes les heures', value: '@hourly' },
-  { label: 'Tous les jours à 3h', value: '0 3 * * *' },
-  { label: 'Dimanche minuit', value: '@weekly' },
-  { label: '1er du mois', value: '@monthly' },
-]
+const DEFAULT_CRON = '0 3 * * *'
 
 function targetLabel(module: string): string {
   if (module === 'docker') return 'Conteneur (nom ou ID)'
@@ -41,7 +36,7 @@ function targetPlaceholder(module: string): string {
 }
 
 function emptyCreateForm() {
-  return { host_id: '', name: '', module: 'apt', action: 'update', target: '', cron_expression: '', enabled: false }
+  return { host_id: '', name: '', module: 'apt', action: 'update', target: '', cron_expression: DEFAULT_CRON, enabled: true }
 }
 
 function formatDate(iso: string | undefined): string {
@@ -100,6 +95,7 @@ export function useGlobalScheduledTasks() {
 
   const editTask = ref<ScheduledTaskWithHost | null>(null)
   const editForm = ref({ name: '', cron_expression: '', enabled: false })
+  const editManualOnly = ref(false)
   const editSaving = ref(false)
   const editError = ref('')
 
@@ -111,23 +107,49 @@ export function useGlobalScheduledTasks() {
 
   const createModalOpen = ref(false)
   const createForm = ref(emptyCreateForm())
+  const createManualOnly = ref(false)
   const createSaving = ref(false)
   const createError = ref('')
 
   const canManage = computed(() => auth.role === 'admin' || auth.role === 'operator')
 
-  const createCronDesc = computed(() => describeCron(createForm.value.cron_expression))
   const createNextRun = computed(() => {
     const expr = createForm.value.cron_expression
     if (!expr || expr === MANUAL_SENTINEL) return null
     return nextCronRun(expr)
   })
 
-  const editCronDesc = computed(() => describeCron(editForm.value.cron_expression))
   const editNextRun = computed(() => {
     const expr = editForm.value.cron_expression
     if (!expr || expr === MANUAL_SENTINEL) return null
     return nextCronRun(expr)
+  })
+
+  // Mirrors HostTasksTab's manual-only toggle: an explicit checkbox instead
+  // of inferring "manual" from an empty cron field, so both scheduled-task
+  // editors (per-host and global) share the same mental model.
+  watch(createManualOnly, (manual) => {
+    if (manual) {
+      createForm.value.enabled = false
+      createForm.value.cron_expression = MANUAL_SENTINEL
+    } else {
+      createForm.value.enabled = true
+      if (createForm.value.cron_expression === MANUAL_SENTINEL) {
+        createForm.value.cron_expression = DEFAULT_CRON
+      }
+    }
+  })
+
+  watch(editManualOnly, (manual) => {
+    if (manual) {
+      editForm.value.enabled = false
+      editForm.value.cron_expression = MANUAL_SENTINEL
+    } else {
+      editForm.value.enabled = true
+      if (editForm.value.cron_expression === MANUAL_SENTINEL) {
+        editForm.value.cron_expression = DEFAULT_CRON
+      }
+    }
   })
 
   const hostList = computed(() => {
@@ -199,6 +221,7 @@ export function useGlobalScheduledTasks() {
 
   function openCreate(): void {
     createForm.value = emptyCreateForm()
+    createManualOnly.value = false
     createError.value = ''
     createModalOpen.value = true
   }
@@ -208,15 +231,14 @@ export function useGlobalScheduledTasks() {
     createError.value = ''
     try {
       const { host_id, ...body } = createForm.value
-      const cron = body.cron_expression.trim() || MANUAL_SENTINEL
       await api.createScheduledTask(host_id, {
         name: body.name,
         module: body.module,
         action: body.action,
         target: body.target,
         payload: '',
-        cron_expression: cron,
-        enabled: cron !== MANUAL_SENTINEL && body.enabled,
+        cron_expression: body.cron_expression,
+        enabled: body.cron_expression !== MANUAL_SENTINEL && body.enabled,
       })
       createModalOpen.value = false
       await loadTasks()
@@ -230,6 +252,7 @@ export function useGlobalScheduledTasks() {
   function openEdit(task: ScheduledTaskWithHost): void {
     editTask.value = task
     editForm.value = { name: task.name, cron_expression: task.cron_expression, enabled: task.enabled }
+    editManualOnly.value = isManualOnly(task)
     editError.value = ''
   }
 
@@ -395,6 +418,7 @@ export function useGlobalScheduledTasks() {
     bulkLoading,
     editTask,
     editForm,
+    editManualOnly,
     editSaving,
     editError,
     historyTask,
@@ -404,14 +428,12 @@ export function useGlobalScheduledTasks() {
     expandedId,
     createModalOpen,
     createForm,
+    createManualOnly,
     createSaving,
     createError,
     canManage,
     moduleActions,
-    cronPresets,
-    createCronDesc,
     createNextRun,
-    editCronDesc,
     editNextRun,
     hostList,
     filteredTasks,
