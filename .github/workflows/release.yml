@@ -17,7 +17,6 @@ concurrency:
 
 env:
   REGISTRY: ghcr.io
-  SERVER_IMAGE: ghcr.io/${{ github.repository_owner }}/serversupervisor
 
 jobs:
   # ─────────────────────────────────────────
@@ -30,6 +29,7 @@ jobs:
       version: ${{ steps.meta.outputs.version }}
       is_prerelease: ${{ steps.meta.outputs.is_prerelease }}
       changelog: ${{ steps.changelog.outputs.changelog }}
+      image: ${{ steps.image.outputs.image }}
 
     steps:
       - uses: actions/checkout@v7
@@ -47,6 +47,19 @@ jobs:
           else
             echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
           fi
+
+      # GHCR (like every OCI registry) requires the repository path to be
+      # lowercase; github.repository_owner preserves the account's actual
+      # display case (e.g. "Rem7474"). docker/metadata-action lowercases
+      # internally so the build+push step below is fine either way, but
+      # cosign's reference parser is stricter and rejects mixed case
+      # outright — compute the lowercase reference once here so every job
+      # (sign, release notes) uses the same value the image actually landed
+      # at, instead of each re-deriving it from the raw owner name.
+      - name: Compute lowercase image reference
+        id: image
+        run: |
+          echo "image=ghcr.io/$(echo '${{ github.repository_owner }}/serversupervisor' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
 
       - name: Generate changelog from commits
         id: changelog
@@ -210,7 +223,7 @@ jobs:
         id: docker-meta
         uses: docker/metadata-action@v6
         with:
-          images: ${{ env.SERVER_IMAGE }}
+          images: ${{ needs.meta.outputs.image }}
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
@@ -245,7 +258,7 @@ jobs:
         env:
           COSIGN_YES: "true"
         run: |
-          cosign sign "${{ env.SERVER_IMAGE }}@${{ steps.build.outputs.digest }}"
+          cosign sign "${{ needs.meta.outputs.image }}@${{ steps.build.outputs.digest }}"
 
   # ─────────────────────────────────────────
   # GitHub Release avec tous les assets
@@ -279,7 +292,7 @@ jobs:
 
             **Serveur** (inclut frontend intégré) :
             ```bash
-            docker pull ${{ env.SERVER_IMAGE }}:${{ needs.meta.outputs.version }}
+            docker pull ${{ needs.meta.outputs.image }}:${{ needs.meta.outputs.version }}
             ```
 
             ### 📦 Binaires agent
@@ -327,7 +340,7 @@ jobs:
             cosign verify \
               --certificate-identity-regexp "^https://github.com/${{ github.repository }}/.github/workflows/release.yml@.*" \
               --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-              ${{ env.SERVER_IMAGE }}:${{ needs.meta.outputs.version }}
+              ${{ needs.meta.outputs.image }}:${{ needs.meta.outputs.version }}
             ```
 
             ### 📝 Changelog
