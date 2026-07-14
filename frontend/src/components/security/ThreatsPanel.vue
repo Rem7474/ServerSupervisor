@@ -21,109 +21,14 @@
       </div>
     </PageRefreshBar>
 
-    <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
-      <div>
-        <div class="page-pretitle">
-          <router-link
-            to="/"
-            class="text-decoration-none"
-          >
-            Dashboard
-          </router-link>
-          <span class="text-muted mx-1">/</span>
-          <span>Menaces web</span>
-        </div>
-        <h2 class="page-title">
-          Menaces web
-        </h2>
-        <div class="text-secondary">
-          IPs suspectes, chemins scannés, corrélation multi-hôtes et chronologie détaillée
-        </div>
-      </div>
-    </div>
-
-    <div class="card mb-4">
-      <div class="card-body d-flex flex-wrap gap-2 align-items-end threats-filters">
-        <div class="threats-filter-field">
-          <label class="form-label mb-1">Source</label>
-          <select
-            v-model="source"
-            class="form-select form-select-sm"
-            style="min-width: 9rem;"
-          >
-            <option value="">
-              Toutes
-            </option>
-            <option value="npm">
-              npm
-            </option>
-            <option value="nginx">
-              nginx
-            </option>
-            <option value="apache">
-              apache
-            </option>
-            <option value="caddy">
-              caddy
-            </option>
-          </select>
-        </div>
-        <div class="threats-filter-field">
-          <label class="form-label mb-1">Hôte</label>
-          <select
-            v-model="hostId"
-            class="form-select form-select-sm"
-            :disabled="loading"
-            style="min-width: 12rem;"
-          >
-            <option value="">
-              Tous les hôtes
-            </option>
-            <option
-              v-for="h in hostsStore.hosts"
-              :key="h.id"
-              :value="h.id"
-            >
-              {{ h.name || h.hostname || h.ip_address }}
-            </option>
-          </select>
-        </div>
-        <button
-          type="button"
-          class="btn btn-primary btn-sm threats-refresh-btn"
-          :disabled="loading"
-          @click="loadThreats"
-        >
-          <span
-            v-if="loading"
-            class="spinner-border spinner-border-sm me-1"
-          />
-          Rafraîchir
-        </button>
-
-        <div class="threats-filter-field ms-auto">
-          <label class="form-label mb-1">Rechercher un domaine ou une IP</label>
-          <div class="input-group input-group-sm">
-            <input
-              v-model="searchTerm"
-              type="text"
-              class="form-control form-control-sm"
-              placeholder="exemple.com ou 1.2.3.4"
-              style="min-width: 16rem;"
-              @keyup.enter="handleSearch"
-            >
-            <button
-              type="button"
-              class="btn btn-outline-secondary btn-sm"
-              :disabled="!searchTerm.trim()"
-              @click="handleSearch"
-            >
-              Voir les requêtes
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+    <TrafficThreatsFilterBar
+      v-model:source="source"
+      v-model:host-id="hostId"
+      v-model:search-term="searchTerm"
+      :loading="loading"
+      @refresh="loadThreats"
+      @search="handleSearch"
+    />
 
     <!-- Squelette chargement -->
     <template v-if="loading">
@@ -565,16 +470,16 @@
 </template>
 
 <script setup lang="ts">
-import LoadingSkeleton from '../components/LoadingSkeleton.vue'
-import PageRefreshBar from '../components/PageRefreshBar.vue'
-import IPTimelineModal from '../components/security/IPTimelineModal.vue'
-import DomainDetailsModal from '../components/security/DomainDetailsModal.vue'
-import { useBot } from '../composables/useBot'
+import LoadingSkeleton from '../LoadingSkeleton.vue'
+import PageRefreshBar from '../PageRefreshBar.vue'
+import TrafficThreatsFilterBar from './TrafficThreatsFilterBar.vue'
+import IPTimelineModal from './IPTimelineModal.vue'
+import DomainDetailsModal from './DomainDetailsModal.vue'
+import { useBot } from '../../composables/useBot'
 
 const {
   period,
   periodOptions,
-  hostsStore,
   source,
   hostId,
   loading,
@@ -619,27 +524,12 @@ const {
 </script>
 
 <style scoped>
+.top-path-row {
+  gap: 0.5rem;
+}
+
 @media (max-width: 992px) {
-  .threats-filters {
-    align-items: stretch !important;
-  }
-
-  .threats-filter-field {
-    flex: 1 1 220px;
-  }
-
-  .threats-filter-field .form-select,
-  .threats-filter-field .form-control {
-    min-width: 0 !important;
-    width: 100%;
-  }
-
-  .threats-refresh-btn {
-    width: 100%;
-  }
-
   .top-path-row {
-    gap: 0.5rem;
     align-items: flex-start;
   }
 

@@ -1,33 +1,6 @@
 <template>
   <div>
-    <div
-      v-if="showInitialLoading"
-      class="traffic-page-skeleton"
-    >
-      <div class="traffic-topbar mb-3">
-        <div class="traffic-topbar-skeleton-left">
-          <span class="traffic-topbar-skeleton-dot" />
-          <span class="traffic-topbar-skeleton-line traffic-topbar-skeleton-line-title" />
-          <span class="traffic-topbar-skeleton-pill traffic-topbar-skeleton-pill-wide" />
-          <span class="traffic-topbar-skeleton-line traffic-topbar-skeleton-line-meta" />
-        </div>
-        <div class="traffic-topbar-skeleton-right">
-          <span
-            v-for="n in 4"
-            :key="n"
-            class="traffic-topbar-skeleton-pill"
-            :class="n === 1 ? 'traffic-topbar-skeleton-pill-active' : ''"
-          />
-        </div>
-      </div>
-
-      <div class="page-header mb-4">
-        <LoadingSkeleton
-          variant="card"
-          :lines="3"
-        />
-      </div>
-
+    <div v-if="showInitialLoading">
       <LoadingSkeleton
         variant="card"
         :lines="2"
@@ -121,141 +94,15 @@
         </div>
       </PageRefreshBar>
 
-      <div class="page-header mb-4">
-        <div class="page-pretitle">
-          <router-link
-            to="/"
-            class="text-decoration-none"
-          >
-            Dashboard
-          </router-link>
-          <span class="text-muted mx-1">/</span>
-          <span>Stats web</span>
-        </div>
-        <h2 class="page-title">
-          Stats web
-        </h2>
-        <div class="text-secondary">
-          Trafic HTTP, erreurs, endpoints, géographie des clients et actualisation automatique
-        </div>
-      </div>
-
-      <div class="card mb-4">
-        <div class="card-body d-flex flex-wrap gap-2 align-items-end traffic-filters">
-          <div class="traffic-filter-field">
-            <label class="form-label mb-1">Source</label>
-            <div class="input-group input-group-sm">
-              <select
-                v-model="source"
-                class="form-select form-select-sm"
-                :disabled="loading"
-                style="min-width: 9rem;"
-              >
-                <option value="">
-                  Toutes
-                </option>
-                <option value="npm">
-                  npm
-                </option>
-                <option value="nginx">
-                  nginx
-                </option>
-                <option value="apache">
-                  apache
-                </option>
-                <option value="caddy">
-                  caddy
-                </option>
-              </select>
-              <span
-                v-if="loading"
-                class="input-group-text px-2"
-              >
-                <span
-                  class="spinner-border"
-                  style="width:.75rem;height:.75rem;border-width:2px"
-                />
-              </span>
-              <span
-                v-else-if="sourceHasNoData"
-                class="input-group-text px-2 text-warning"
-                title="Aucune donnée pour cette source sur la période sélectionnée"
-              >
-                <IconAlertTriangle :size="14" />
-              </span>
-            </div>
-          </div>
-
-          <div class="traffic-filter-field">
-            <label class="form-label mb-1">Hôte</label>
-            <select
-              v-model="hostId"
-              class="form-select form-select-sm"
-              :disabled="loading"
-              style="min-width: 12rem;"
-            >
-              <option value="">
-                Tous les hôtes
-              </option>
-              <option
-                v-for="h in hostsStore.hosts"
-                :key="h.id"
-                :value="h.id"
-              >
-                {{ h.name || h.hostname || h.ip_address }}
-              </option>
-            </select>
-          </div>
-
-          <div class="form-check form-switch mb-1 ms-1">
-            <input
-              id="auto-refresh"
-              v-model="autoRefresh"
-              class="form-check-input"
-              type="checkbox"
-            >
-            <label
-              class="form-check-label small"
-              for="auto-refresh"
-            >Rafraîchissement auto</label>
-          </div>
-
-          <button
-            type="button"
-            class="btn btn-primary btn-sm traffic-refresh-btn"
-            :disabled="loading"
-            @click="loadAll(true)"
-          >
-            <span
-              v-if="loading"
-              class="spinner-border spinner-border-sm me-1"
-            />
-            Rafraîchir
-          </button>
-
-          <div class="traffic-filter-field ms-auto">
-            <label class="form-label mb-1">Rechercher un domaine ou une IP</label>
-            <div class="input-group input-group-sm">
-              <input
-                v-model="searchTerm"
-                type="text"
-                class="form-control form-control-sm"
-                placeholder="exemple.com ou 1.2.3.4"
-                style="min-width: 16rem;"
-                @keyup.enter="handleSearch"
-              >
-              <button
-                type="button"
-                class="btn btn-outline-secondary btn-sm"
-                :disabled="!searchTerm.trim()"
-                @click="handleSearch"
-              >
-                Voir les requêtes
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+      <TrafficThreatsFilterBar
+        v-model:source="source"
+        v-model:host-id="hostId"
+        v-model:search-term="searchTerm"
+        :loading="loading"
+        :source-has-no-data="sourceHasNoData"
+        @refresh="loadAll(true)"
+        @search="handleSearch"
+      />
 
       <TrafficKpiCards
         :traffic="traffic"
@@ -673,19 +520,18 @@
 </template>
 
 <script setup lang="ts">
-import { IconAlertTriangle } from '@tabler/icons-vue'
-import LoadingSkeleton from '../components/LoadingSkeleton.vue'
-import PageRefreshBar from '../components/PageRefreshBar.vue'
-import TrafficKpiCards from '../components/security/TrafficKpiCards.vue'
-import TrafficWorldMap from '../components/security/TrafficWorldMap.vue'
-import TrafficRequestsChart from '../components/security/TrafficRequestsChart.vue'
-import TrafficStatusChart from '../components/security/TrafficStatusChart.vue'
-import { useTraffic } from '../composables/useTraffic'
-import DomainDetailsModal from '../components/security/DomainDetailsModal.vue'
-import IPTimelineModal from '../components/security/IPTimelineModal.vue'
+import LoadingSkeleton from '../LoadingSkeleton.vue'
+import PageRefreshBar from '../PageRefreshBar.vue'
+import TrafficThreatsFilterBar from './TrafficThreatsFilterBar.vue'
+import TrafficKpiCards from './TrafficKpiCards.vue'
+import TrafficWorldMap from './TrafficWorldMap.vue'
+import TrafficRequestsChart from './TrafficRequestsChart.vue'
+import TrafficStatusChart from './TrafficStatusChart.vue'
+import { useTraffic } from '../../composables/useTraffic'
+import DomainDetailsModal from './DomainDetailsModal.vue'
+import IPTimelineModal from './IPTimelineModal.vue'
 
 const {
-  hostsStore,
   periodOptions,
   REFRESH_INTERVAL_MS,
   period,
@@ -733,14 +579,6 @@ const {
 </script>
 
 <style scoped>
-.traffic-topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-}
-
 .traffic-modal-backdrop {
   position: fixed;
   inset: 0;
@@ -756,26 +594,6 @@ const {
   width: min(1200px, 96vw);
   max-height: 92vh;
   overflow: auto;
-}
-
-@media (max-width: 992px) {
-  .traffic-filters {
-    align-items: stretch !important;
-  }
-
-  .traffic-filter-field {
-    flex: 1 1 220px;
-  }
-
-  .traffic-filter-field .form-select,
-  .traffic-filter-field .form-control {
-    min-width: 0 !important;
-    width: 100%;
-  }
-
-  .traffic-refresh-btn {
-    width: 100%;
-  }
 }
 
 @media (max-width: 768px) {
@@ -807,69 +625,6 @@ const {
   position: relative;
 }
 
-.traffic-page-skeleton .traffic-topbar-skeleton-left,
-.traffic-page-skeleton .traffic-topbar-skeleton-right {
-  flex: 1 1 0;
-  min-width: 0;
-}
-
-.traffic-page-skeleton .traffic-topbar-skeleton-left {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.traffic-page-skeleton .traffic-topbar-skeleton-right {
-  display: flex;
-  justify-content: flex-end;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.traffic-topbar-skeleton-dot,
-.traffic-topbar-skeleton-line,
-.traffic-topbar-skeleton-pill {
-  background: linear-gradient(90deg, rgba(203, 213, 225, 0.2) 25%, rgba(203, 213, 225, 0.5) 50%, rgba(203, 213, 225, 0.2) 75%);
-  background-size: 220% 100%;
-  animation: loading-skeleton-wave 1.4s ease infinite;
-}
-
-.traffic-topbar-skeleton-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  flex-shrink: 0;
-}
-
-.traffic-topbar-skeleton-line {
-  height: 0.8rem;
-  border-radius: 999px;
-}
-
-.traffic-topbar-skeleton-line-title {
-  width: 110px;
-}
-
-.traffic-topbar-skeleton-line-meta {
-  width: 120px;
-}
-
-.traffic-topbar-skeleton-pill {
-  width: 88px;
-  height: 2rem;
-  border-radius: 999px;
-  flex-shrink: 0;
-}
-
-.traffic-topbar-skeleton-pill-wide {
-  width: 82px;
-}
-
-.traffic-topbar-skeleton-pill-active {
-  width: 96px;
-}
-
 .skeleton-fade-enter-active,
 .skeleton-fade-leave-active {
   transition: opacity 0.2s ease;
@@ -880,4 +635,3 @@ const {
   opacity: 0;
 }
 </style>
-

@@ -49,7 +49,7 @@ export function useTraffic() {
   const domainLoading = ref(false)
   const domainDetails = ref<AnyRecord>({})
 
-  // Read-only IP view (no ban action — that stays a BotView/Threats concern).
+  // Read-only IP view (no ban action — that stays a Threats-mode concern).
   const showIPModal = ref(false)
   const selectedIP = ref('')
   const ipTimelineLoading = ref(false)

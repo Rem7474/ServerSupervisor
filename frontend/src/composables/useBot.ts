@@ -156,7 +156,7 @@ export function useBot() {
   async function loadThreats() {
     loading.value = true
     try {
-      // BotView reads only `threats`; request the threats-only scope so the server
+      // Threats mode reads only `threats`; request the threats-only scope so the server
       // skips the heavy (unindexed) traffic aggregates + geolocation that would
       // otherwise time the request out on long windows.
       const res = await apiClient.getWebLogsSummary(period.value, hostId.value || undefined, source.value || undefined, 'threats')

@@ -24,7 +24,7 @@ const summaryData = {
   },
 }
 
-vi.mock('../api', () => ({
+vi.mock('../../api', () => ({
   default: {
     getWebLogsSummary: vi.fn(async () => summaryData),
     getWebLogsTimeseries: vi.fn(async () => ({
@@ -40,20 +40,20 @@ vi.mock('../api', () => ({
   },
 }))
 
-import TrafficView from './TrafficView.vue'
+import TrafficOverviewPanel from './TrafficOverviewPanel.vue'
 
-describe('TrafficView (browser / real render)', () => {
+describe('TrafficOverviewPanel (browser / real render)', () => {
   beforeEach(() => {
     document.body.innerHTML = ''
-    // TrafficView calls useHostsStore() in setup; install a fresh Pinia so the
-    // store resolves without the app having to register the plugin.
+    // TrafficOverviewPanel calls useHostsStore() in setup; install a fresh
+    // Pinia so the store resolves without the app having to register the plugin.
     setActivePinia(createPinia())
   })
 
   it('renders chart canvases and the SVG world map for real', async () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
-    mount(TrafficView, {
+    mount(TrafficOverviewPanel, {
       attachTo: host,
       global: { stubs: { 'router-link': true } },
     })
