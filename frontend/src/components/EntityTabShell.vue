@@ -3,7 +3,7 @@
     <div :class="{ 'card-header': cardHeader }">
       <ul
         class="nav nav-tabs"
-        :class="[cardHeader ? 'card-header-tabs' : 'mb-3', navClass]"
+        :class="[cardHeader ? 'card-header-tabs' : navMarginClass, navClass]"
       >
         <li
           v-for="t in tabs"
@@ -62,7 +62,7 @@ export interface EntityTab {
   lazy?: boolean
 }
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   modelValue: string
   tabs: EntityTab[]
   navClass?: string
@@ -71,7 +71,16 @@ const props = defineProps<{
   // nav-tabs strip with its own bottom margin (for a shell placed directly
   // in the page, each tab bringing its own card(s) below).
   cardHeader?: boolean
-}>()
+  // Bottom margin on the bare (non-card-header) nav strip — callers differ
+  // (Host uses mb-3, Alerts uses mb-4) and neither is more "correct" than
+  // the other, so this is a plain override rather than a baked-in default
+  // dressed up as one. Ignored when cardHeader is set.
+  navMarginClass?: string
+}>(), {
+  navClass: undefined,
+  cardHeader: false,
+  navMarginClass: 'mb-3',
+})
 
 const emit = defineEmits<{
   'update:modelValue': [value: string]
