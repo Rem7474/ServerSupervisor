@@ -73,7 +73,7 @@
                   role="menu"
                 >
                   <router-link
-                    v-for="item in visibleItems(section)"
+                    v-for="item in section.items"
                     :key="item.to"
                     :to="item.to"
                     class="dropdown-item"
@@ -97,6 +97,27 @@
             </ul>
 
             <div class="ms-auto d-flex align-items-center gap-2">
+              <button
+                type="button"
+                class="btn btn-outline-secondary d-none d-sm-flex align-items-center gap-2 command-palette-trigger"
+                title="Rechercher (Ctrl+K)"
+                @click="paletteToggle"
+              >
+                <IconSearch
+                  :size="16"
+                  class="icon"
+                />
+                <span class="text-secondary small">Rechercher…</span>
+                <kbd class="ms-2">Ctrl K</kbd>
+              </button>
+              <button
+                type="button"
+                class="btn btn-icon d-sm-none"
+                aria-label="Rechercher"
+                @click="paletteToggle"
+              >
+                <IconSearch :size="18" />
+              </button>
               <NotificationBell />
               <div
                 ref="userMenuRef"
@@ -194,6 +215,9 @@
       <ConfirmDialog />
       <!-- Global Toast Notifications -->
       <ToastContainer />
+      <!-- Command palette — mounted only while open so its search input gets
+           a fresh onMounted focus every time (see CommandPalette.vue) -->
+      <CommandPalette v-if="paletteOpen" />
     </div>
 
     <!-- Login page (no sidebar) -->
@@ -210,16 +234,19 @@ import ConfirmDialog from './components/ConfirmDialog.vue'
 import ToastContainer from './components/ToastContainer.vue'
 import NotificationBell from './components/NotificationBell.vue'
 import AppFooter from './components/AppFooter.vue'
-import { IconAlertTriangle, IconServer } from '@tabler/icons-vue'
+import { IconAlertTriangle, IconServer, IconSearch } from '@tabler/icons-vue'
 import ErrorBoundary from './components/common/ErrorBoundary.vue'
+import CommandPalette from './components/CommandPalette.vue'
 import { subscribeHttpErrors, subscribeNetworkOk } from './utils/httpErrorBus'
+import { useCommandPalette } from './composables/useCommandPalette'
 import apiClient from './api'
-import { navigationSections, type NavSection } from './config/navigation'
+import { visibleNavSections, type NavSection } from './config/navigation'
 
 const auth = useAuthStore()
 const hostsStore = useHostsStore()
 const router = useRouter()
 const route = useRoute()
+const { isOpen: paletteOpen, toggle: paletteToggle } = useCommandPalette()
 const navbarOpen = ref(false)
 const userMenuOpen = ref(false)
 const userMenuRef = ref<HTMLElement | null>(null)
@@ -309,11 +336,7 @@ function handlePageShow(event: PageTransitionEvent): void {
   }
 }
 
-function visibleItems(section: NavSection) {
-  return section.items.filter((item) => !item.adminOnly || auth.isAdmin)
-}
-
-const visibleSections = computed(() => navigationSections.filter((section) => visibleItems(section).length > 0))
+const visibleSections = computed(() => visibleNavSections(auth.isAdmin))
 
 function isItemActive(to: string): boolean {
   return to === '/' ? route.path === '/' : route.path.startsWith(to)

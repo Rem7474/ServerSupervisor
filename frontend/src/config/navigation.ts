@@ -89,3 +89,17 @@ export const navigationSections: NavSection[] = [
     ],
   },
 ]
+
+// Shared by the navbar and the command palette so the two never disagree
+// about which destinations a given role can see. Returns only sections that
+// still have at least one visible item (Sécurité/Réglages are 100%
+// adminOnly today, so a viewer/operator gets 4 sections, not 6 with two
+// dead-ends).
+export function visibleNavSections(isAdmin: boolean): NavSection[] {
+  return navigationSections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => !item.adminOnly || isAdmin),
+    }))
+    .filter((section) => section.items.length > 0)
+}
