@@ -213,12 +213,6 @@ export function useGlobalScheduledTasks() {
     }
   }
 
-  function onModuleChange(): void {
-    const actions = moduleActions[createForm.value.module]
-    createForm.value.action = actions ? actions[0] : ''
-    createForm.value.target = ''
-  }
-
   function openCreate(): void {
     createForm.value = emptyCreateForm()
     createManualOnly.value = false
@@ -445,7 +439,6 @@ export function useGlobalScheduledTasks() {
     toggleSort,
     targetLabel,
     targetPlaceholder,
-    onModuleChange,
     openCreate,
     saveCreate,
     formatDate,

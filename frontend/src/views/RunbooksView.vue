@@ -214,66 +214,15 @@
                 <div class="col-auto pt-2 fw-bold text-muted">
                   {{ index + 1 }}
                 </div>
-                <div class="col-md-3">
-                  <label class="form-label form-label-sm">Hôte</label>
-                  <select
-                    v-model="step.host_id"
-                    class="form-select form-select-sm"
-                  >
-                    <option value="">
-                      Sélectionner...
-                    </option>
-                    <option
-                      v-for="host in hostsStore.hosts"
-                      :key="host.id"
-                      :value="host.id"
-                    >
-                      {{ host.name || host.hostname }}
-                    </option>
-                  </select>
-                </div>
-                <div class="col-md-3">
-                  <label class="form-label form-label-sm">Module</label>
-                  <select
-                    v-model="step.module"
-                    class="form-select form-select-sm"
-                    @change="onModuleChange(step)"
-                  >
-                    <option
-                      v-for="m in RUNBOOK_MODULES"
-                      :key="m.value"
-                      :value="m.value"
-                    >
-                      {{ m.label }}
-                    </option>
-                  </select>
-                </div>
-                <div class="col-md-3">
-                  <label class="form-label form-label-sm">Action</label>
-                  <select
-                    v-model="step.action"
-                    class="form-select form-select-sm"
-                  >
-                    <option
-                      v-for="a in actionsForModule(step.module)"
-                      :key="a.value"
-                      :value="a.value"
-                    >
-                      {{ a.label }}
-                    </option>
-                  </select>
-                </div>
-                <div
-                  v-if="moduleRequiresTarget(step.module)"
-                  class="col-md-2"
-                >
-                  <label class="form-label form-label-sm">Cible</label>
-                  <input
-                    v-model="step.target"
-                    type="text"
-                    class="form-control form-control-sm"
-                    :placeholder="step.module === 'custom' ? 'id de la tâche' : 'nom du service'"
-                  >
+                <div class="col">
+                  <DispatchStepEditor
+                    v-model:host-id="step.host_id"
+                    v-model:module="step.module"
+                    v-model:action="step.action"
+                    v-model:target="step.target"
+                    :actions-for-module="actionsForModule"
+                    :target-config="runbookTargetConfig"
+                  />
                 </div>
                 <div class="col-auto">
                   <button
@@ -470,8 +419,9 @@ import { computed, onMounted, reactive, watch } from 'vue'
 import { IconHistory, IconPencil, IconPlayerPlay, IconPlus, IconTrash } from '@tabler/icons-vue'
 import EmptyState from '../components/EmptyState.vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
+import DispatchStepEditor from '../components/DispatchStepEditor.vue'
 import {
-  useRunbooks, RUNBOOK_MODULES, actionsForModule, moduleRequiresTarget, emptyStep,
+  useRunbooks, actionsForModule, moduleRequiresTarget, emptyStep,
 } from '../composables/useRunbooks'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
 import type { Runbook, RunbookStepCreate } from '../types/generated'
@@ -512,10 +462,9 @@ const canSave = computed(() =>
   form.steps.every((s) => s.host_id && s.module && s.action)
 )
 
-function onModuleChange(step: RunbookStepCreate): void {
-  const actions = actionsForModule(step.module)
-  step.action = actions[0]?.value || ''
-  step.target = ''
+function runbookTargetConfig(module: string): { label: string; placeholder?: string } | null {
+  if (!moduleRequiresTarget(module)) return null
+  return { label: 'Cible', placeholder: module === 'custom' ? 'id de la tâche' : 'nom du service' }
 }
 
 async function handleSave(): Promise<void> {

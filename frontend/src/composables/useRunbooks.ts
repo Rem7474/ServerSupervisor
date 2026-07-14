@@ -3,23 +3,7 @@ import apiClient from '../api'
 import { getApiErrorMessage } from '../api/client'
 import { useHostsStore } from '../stores/hosts'
 import type { Runbook, RunbookCreate, RunbookStepCreate, RunbookExecution } from '../types/generated'
-
-export interface ModuleOption {
-  value: string
-  label: string
-}
-
-// Mirrors server/internal/services/runbook/service.go's commandModuleActions
-// whitelist exactly — a step can only ever name an action already valid for
-// that module, same as the alert rule command_trigger picker.
-export const RUNBOOK_MODULES: ModuleOption[] = [
-  { value: 'docker', label: 'Docker' },
-  { value: 'apt', label: 'APT' },
-  { value: 'systemd', label: 'Service systemd' },
-  { value: 'journal', label: 'Journal systemd' },
-  { value: 'processes', label: 'Processus' },
-  { value: 'custom', label: 'Tâche personnalisée' },
-]
+import type { DispatchOption } from '../utils/dispatchStep'
 
 const ACTION_LABELS: Record<string, string> = {
   logs: 'Voir les logs', restart: 'Redémarrer', start: 'Démarrer', stop: 'Arrêter',
@@ -40,7 +24,7 @@ const MODULE_ACTIONS: Record<string, string[]> = {
 
 const MODULES_REQUIRING_TARGET = new Set(['journal', 'systemd', 'custom'])
 
-export function actionsForModule(module: string): ModuleOption[] {
+export function actionsForModule(module: string): DispatchOption[] {
   const actions = MODULE_ACTIONS[module] || []
   return actions.map((value) => ({ value, label: ACTION_LABELS[value] || value }))
 }

@@ -421,25 +421,6 @@
                 {{ createError }}
               </div>
               <div class="row g-3">
-                <div class="col-12">
-                  <label class="form-label required">Hôte</label>
-                  <select
-                    v-model="createForm.host_id"
-                    class="form-select"
-                    required
-                  >
-                    <option value="">
-                      Sélectionner un hôte...
-                    </option>
-                    <option
-                      v-for="h in hostsStore.hosts"
-                      :key="h.id"
-                      :value="h.id"
-                    >
-                      {{ h.name || h.hostname || h.ip_address }}
-                    </option>
-                  </select>
-                </div>
                 <div class="col-md-6">
                   <label class="form-label required">Nom</label>
                   <input
@@ -450,69 +431,17 @@
                     required
                   >
                 </div>
-                <div class="col-md-3">
-                  <label class="form-label required">Module</label>
-                  <select
-                    v-model="createForm.module"
-                    class="form-select"
-                    required
-                    @change="onModuleChange"
-                  >
-                    <option value="apt">
-                      apt
-                    </option>
-                    <option value="docker">
-                      docker
-                    </option>
-                    <option value="systemd">
-                      systemd
-                    </option>
-                    <option value="journal">
-                      journal
-                    </option>
-                    <option value="processes">
-                      processes
-                    </option>
-                    <option value="custom">
-                      custom
-                    </option>
-                  </select>
-                </div>
-                <div class="col-md-3">
-                  <label class="form-label required">Action</label>
-                  <select
-                    v-if="moduleActions[createForm.module]"
-                    v-model="createForm.action"
-                    class="form-select"
-                    required
-                  >
-                    <option
-                      v-for="a in moduleActions[createForm.module]"
-                      :key="a"
-                      :value="a"
-                    >
-                      {{ a }}
-                    </option>
-                  </select>
-                  <input
-                    v-else
-                    v-model="createForm.action"
-                    type="text"
-                    class="form-control"
-                    required
-                  >
-                </div>
-                <div
-                  v-if="targetLabel(createForm.module)"
-                  class="col-12"
-                >
-                  <label class="form-label">{{ targetLabel(createForm.module) }}</label>
-                  <input
-                    v-model="createForm.target"
-                    type="text"
-                    class="form-control"
-                    :placeholder="targetPlaceholder(createForm.module)"
-                  >
+                <div class="col-12">
+                  <DispatchStepEditor
+                    v-model:host-id="createForm.host_id"
+                    v-model:module="createForm.module"
+                    v-model:action="createForm.action"
+                    v-model:target="createForm.target"
+                    v-model:cron-expression="createForm.cron_expression"
+                    :actions-for-module="scheduledTaskActionsForModule"
+                    :target-config="scheduledTaskTargetConfig"
+                    :show-cron="!createManualOnly"
+                  />
                 </div>
                 <div class="col-12">
                   <label class="form-check form-switch">
@@ -525,15 +454,10 @@
                   </label>
                 </div>
                 <div
-                  v-if="!createManualOnly"
+                  v-if="!createManualOnly && createNextRun"
                   class="col-12"
                 >
-                  <label class="form-label">Planification</label>
-                  <CronBuilder v-model="createForm.cron_expression" />
-                  <div
-                    v-if="createNextRun"
-                    class="form-hint text-primary"
-                  >
+                  <div class="form-hint text-primary">
                     → prochain : {{ formatDate(createNextRun?.toISOString()) }}
                   </div>
                 </div>
@@ -822,10 +746,11 @@ import DataToolbar from '../components/common/DataToolbar.vue'
 import SortableHeader from '../components/common/SortableHeader.vue'
 import BulkActionBar from '../components/BulkActionBar.vue'
 import CronBuilder from '../components/CronBuilder.vue'
+import DispatchStepEditor from '../components/DispatchStepEditor.vue'
+import type { DispatchOption } from '../utils/dispatchStep'
 import { useGlobalScheduledTasks } from '../composables/useGlobalScheduledTasks'
 
 const {
-  hostsStore,
   tasks,
   loading,
   error,
@@ -867,7 +792,6 @@ const {
   toggleSort,
   targetLabel,
   targetPlaceholder,
-  onModuleChange,
   openCreate,
   saveCreate,
   formatDate,
@@ -888,6 +812,20 @@ const {
   handleBulkDelete,
   handleBulkRun,
 } = useGlobalScheduledTasks()
+
+// moduleActions/targetLabel/targetPlaceholder are advisory only here (the
+// scheduled-task backend validates the module but not the action string —
+// see root CLAUDE.md), unlike DispatchStepEditor's other caller (Runbooks),
+// so these adapt them to the shared editor's shape rather than the editor
+// enforcing one universal whitelist.
+function scheduledTaskActionsForModule(module: string): DispatchOption[] {
+  return (moduleActions[module] || []).map((a) => ({ value: a, label: a }))
+}
+
+function scheduledTaskTargetConfig(module: string): { label: string; placeholder?: string } | null {
+  const label = targetLabel(module)
+  return label ? { label, placeholder: targetPlaceholder(module) } : null
+}
 </script>
 
 <style scoped>
