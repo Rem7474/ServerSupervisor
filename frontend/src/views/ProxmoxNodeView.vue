@@ -338,140 +338,92 @@
       <div class="side-layout">
         <div class="side-main">
           <div class="card">
-            <div class="card-header">
-              <ul class="nav nav-tabs card-header-tabs proxmox-node-tabs">
-                <li class="nav-item">
-                  <button
-                    type="button"
-                    class="nav-link"
-                    :class="{ active: tab === 'vms' }"
-                    @click="tab = 'vms'; loadGuestNetworks()"
-                  >
-                    VMs <span class="badge bg-azure-lt text-azure ms-1">{{ vms.length }}</span>
-                  </button>
-                </li>
-                <li class="nav-item">
-                  <button
-                    type="button"
-                    class="nav-link"
-                    :class="{ active: tab === 'lxc' }"
-                    @click="tab = 'lxc'; loadGuestNetworks()"
-                  >
-                    LXC <span class="badge bg-azure-lt text-azure ms-1">{{ lxcs.length }}</span>
-                  </button>
-                </li>
-                <li class="nav-item">
-                  <button
-                    type="button"
-                    class="nav-link"
-                    :class="{ active: tab === 'storage' }"
-                    @click="tab = 'storage'"
-                  >
-                    Stockage <span class="badge bg-azure-lt text-azure ms-1">{{ node.storages?.length ?? 0 }}</span>
-                  </button>
-                </li>
-                <li class="nav-item">
-                  <button
-                    type="button"
-                    class="nav-link"
-                    :class="{ active: tab === 'disks' }"
-                    @click="tab = 'disks'"
-                  >
-                    Disques <span class="badge bg-azure-lt text-azure ms-1">{{ node.disks?.length ?? 0 }}</span>
-                  </button>
-                </li>
-                <li class="nav-item">
-                  <button
-                    type="button"
-                    class="nav-link"
-                    :class="{ active: tab === 'tasks' }"
-                    @click="tab = 'tasks'"
-                  >
-                    Tâches <span class="badge bg-azure-lt text-azure ms-1">{{ node.tasks?.length ?? 0 }}</span>
-                    <span
-                      v-if="failedTaskCount > 0"
-                      class="badge bg-warning ms-1"
-                    >{{ failedTaskCount }}</span>
-                  </button>
-                </li>
-                <li class="nav-item">
-                  <button
-                    type="button"
-                    class="nav-link"
-                    :class="{ active: tab === 'updates' }"
-                    @click="tab = 'updates'"
-                  >
-                    Mises à jour
-                    <span
-                      v-if="node.pending_updates > 0"
-                      class="badge ms-1 bg-warning-lt text-warning"
-                    >
-                      {{ node.pending_updates }}
-                    </span>
-                  </button>
-                </li>
-                <li class="nav-item">
-                  <button
-                    type="button"
-                    class="nav-link"
-                    :class="{ active: tab === 'services' }"
-                    @click="tab = 'services'; loadServices()"
-                  >
-                    Services
-                  </button>
-                </li>
-                <li class="nav-item">
-                  <button
-                    type="button"
-                    class="nav-link"
-                    :class="{ active: tab === 'security' }"
-                    @click="tab = 'security'"
-                  >
-                    Sécurité <span class="badge bg-azure-lt text-azure ms-1">{{ securityEventsCount }}</span>
-                  </button>
-                </li>
-              </ul>
-            </div>
-
-            <!-- VMs tab -->
-            <div
-              v-if="isTabMounted('vms')"
-              v-show="tab === 'vms'"
+            <EntityTabShell
+              :model-value="tab"
+              :tabs="proxmoxTabs"
+              nav-class="proxmox-node-tabs"
+              card-header
+              @update:model-value="onTabClick"
             >
-              <ProxmoxNodeGuestsTab
-                kind="vm"
-                :guests="vms"
-                :guest-networks="guestNetworks"
-                :guest-networks-loading="guestNetworksLoading"
-                :links="guestLinks"
-                :peer-nodes="peerNodes"
-                :node-id="String(route.params.id)"
-                @confirm-link="confirmGuestLink"
-                @ignore-link="ignoreGuestLink"
-                @go-host="goToHost"
-                @migrate="openMigrateModal($event, 'vm')"
-              />
-            </div>
+              <template #vms>
+                <ProxmoxNodeGuestsTab
+                  kind="vm"
+                  :guests="vms"
+                  :guest-networks="guestNetworks"
+                  :guest-networks-loading="guestNetworksLoading"
+                  :links="guestLinks"
+                  :peer-nodes="peerNodes"
+                  :node-id="String(route.params.id)"
+                  @confirm-link="confirmGuestLink"
+                  @ignore-link="ignoreGuestLink"
+                  @go-host="goToHost"
+                  @migrate="openMigrateModal($event, 'vm')"
+                />
+              </template>
 
-            <!-- LXC tab -->
-            <div
-              v-if="isTabMounted('lxc')"
-              v-show="tab === 'lxc'"
-            >
-              <ProxmoxNodeGuestsTab
-                kind="lxc"
-                :guests="lxcs"
-                :guest-networks="guestNetworks"
-                :guest-networks-loading="guestNetworksLoading"
-                :links="guestLinks"
-                :peer-nodes="peerNodes"
-                :node-id="String(route.params.id)"
-                @confirm-link="confirmGuestLink"
-                @ignore-link="ignoreGuestLink"
-                @go-host="goToHost"
-                @migrate="openMigrateModal($event, 'lxc')"
-              />
-            </div>
+              <template #lxc>
+                <ProxmoxNodeGuestsTab
+                  kind="lxc"
+                  :guests="lxcs"
+                  :guest-networks="guestNetworks"
+                  :guest-networks-loading="guestNetworksLoading"
+                  :links="guestLinks"
+                  :peer-nodes="peerNodes"
+                  :node-id="String(route.params.id)"
+                  @confirm-link="confirmGuestLink"
+                  @ignore-link="ignoreGuestLink"
+                  @go-host="goToHost"
+                  @migrate="openMigrateModal($event, 'lxc')"
+                />
+              </template>
+
+              <template #disks>
+                <ProxmoxNodeDisksTab :disks="node.disks || []" />
+              </template>
+
+              <template #tasks>
+                <ProxmoxNodeTasksTab
+                  :tasks="node.tasks || []"
+                  :active-upid="activeUpid"
+                  @view-logs="startPollingTask($event.upid, { action: $event.action, label: $event.label })"
+                />
+              </template>
+
+              <template #updates>
+                <ProxmoxNodeUpdatesTab
+                  :pending-updates="node.pending_updates"
+                  :last-update-check-at="node.last_update_check_at"
+                  :apt-refreshing="aptRefreshing"
+                  :apt-refresh-msg="aptRefreshMsg"
+                  :apt-refresh-ok="aptRefreshOk"
+                  @refresh-apt="triggerAptRefresh"
+                />
+              </template>
+
+              <template #services>
+                <ProxmoxNodeServicesTab
+                  :services="services"
+                  :loading="servicesLoading"
+                  :error="servicesError"
+                  :action-msg="svcActionMsg"
+                  :action-ok="svcActionOk"
+                  @refresh="loadServices"
+                  @action="svcAction($event.name, $event.action)"
+                />
+              </template>
+
+              <template #security>
+                <ProxmoxNodeSecurityTab
+                  :node-id="String(route.params.id)"
+                  :active="tab === 'security'"
+                  @count="securityEventsCount = $event"
+                />
+              </template>
+
+              <template #storage>
+                <ProxmoxNodeStorageTab :storages="node.storages || []" />
+              </template>
+            </EntityTabShell>
 
             <!-- Link action feedback -->
             <div
@@ -479,77 +431,6 @@
               class="card-footer py-2"
             >
               <span :class="['small', linkMsgOk ? 'text-success' : 'text-danger']">{{ linkMsg }}</span>
-            </div>
-
-            <!-- Disks tab -->
-            <div
-              v-if="isTabMounted('disks')"
-              v-show="tab === 'disks'"
-            >
-              <ProxmoxNodeDisksTab :disks="node.disks || []" />
-            </div>
-
-            <!-- Tasks tab -->
-            <div
-              v-if="isTabMounted('tasks')"
-              v-show="tab === 'tasks'"
-            >
-              <ProxmoxNodeTasksTab
-                :tasks="node.tasks || []"
-                :active-upid="activeUpid"
-                @view-logs="startPollingTask($event.upid, { action: $event.action, label: $event.label })"
-              />
-            </div>
-
-            <!-- Updates tab -->
-            <div
-              v-if="isTabMounted('updates')"
-              v-show="tab === 'updates'"
-            >
-              <ProxmoxNodeUpdatesTab
-                :pending-updates="node.pending_updates"
-                :last-update-check-at="node.last_update_check_at"
-                :apt-refreshing="aptRefreshing"
-                :apt-refresh-msg="aptRefreshMsg"
-                :apt-refresh-ok="aptRefreshOk"
-                @refresh-apt="triggerAptRefresh"
-              />
-            </div>
-
-            <!-- Services tab -->
-            <div
-              v-if="isTabMounted('services')"
-              v-show="tab === 'services'"
-            >
-              <ProxmoxNodeServicesTab
-                :services="services"
-                :loading="servicesLoading"
-                :error="servicesError"
-                :action-msg="svcActionMsg"
-                :action-ok="svcActionOk"
-                @refresh="loadServices"
-                @action="svcAction($event.name, $event.action)"
-              />
-            </div>
-
-            <!-- Security tab -->
-            <div
-              v-if="isTabMounted('security')"
-              v-show="tab === 'security'"
-            >
-              <ProxmoxNodeSecurityTab
-                :node-id="String(route.params.id)"
-                :active="tab === 'security'"
-                @count="securityEventsCount = $event"
-              />
-            </div>
-
-            <!-- Storage tab -->
-            <div
-              v-if="isTabMounted('storage')"
-              v-show="tab === 'storage'"
-            >
-              <ProxmoxNodeStorageTab :storages="node.storages || []" />
             </div>
           </div>
         </div> <!-- /side-main -->
@@ -646,12 +527,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, defineAsyncComponent } from 'vue'
+import { ref, computed, defineAsyncComponent } from 'vue'
 import { useRoute } from 'vue-router'
 const CommandLogPanel = defineAsyncComponent(() => import('../components/host/CommandLogPanel.vue'))
 const ProxmoxNodeChartsPanel = defineAsyncComponent(() => import('../components/proxmox/ProxmoxNodeChartsPanel.vue'))
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import PageRefreshBar from '../components/PageRefreshBar.vue'
+import EntityTabShell from '../components/EntityTabShell.vue'
+import type { EntityTab } from '../components/EntityTabShell.vue'
 import ProxmoxNodeDisksTab from '../components/proxmox/ProxmoxNodeDisksTab.vue'
 import ProxmoxNodeStorageTab from '../components/proxmox/ProxmoxNodeStorageTab.vue'
 import ProxmoxNodeTasksTab from '../components/proxmox/ProxmoxNodeTasksTab.vue'
@@ -668,7 +551,6 @@ const {
   loading,
   error,
   tab,
-  isTabMounted,
   guestLinks,
   linkMsg,
   linkMsgOk,
@@ -737,6 +619,43 @@ const {
 // logic attached, so it stays here rather than in the composable.
 const securityEventsCount = ref(0)
 
+const azureBadge = 'badge bg-azure-lt text-azure ms-1'
+
+const proxmoxTabs = computed<EntityTab[]>(() => [
+  { key: 'vms', label: 'VMs', badges: [{ value: vms.value.length, badgeClass: azureBadge }], lazy: true },
+  { key: 'lxc', label: 'LXC', badges: [{ value: lxcs.value.length, badgeClass: azureBadge }], lazy: true },
+  { key: 'storage', label: 'Stockage', badges: [{ value: node.value?.storages?.length ?? 0, badgeClass: azureBadge }], lazy: true },
+  { key: 'disks', label: 'Disques', badges: [{ value: node.value?.disks?.length ?? 0, badgeClass: azureBadge }], lazy: true },
+  {
+    key: 'tasks',
+    label: 'Tâches',
+    badges: [
+      { value: node.value?.tasks?.length ?? 0, badgeClass: azureBadge },
+      ...(failedTaskCount.value > 0 ? [{ value: failedTaskCount.value, badgeClass: 'badge bg-warning ms-1' }] : []),
+    ],
+    lazy: true,
+  },
+  {
+    key: 'updates',
+    label: 'Mises à jour',
+    badges: node.value?.pending_updates > 0 ? [{ value: node.value.pending_updates, badgeClass: 'badge ms-1 bg-warning-lt text-warning' }] : [],
+    lazy: true,
+  },
+  { key: 'services', label: 'Services', lazy: true },
+  { key: 'security', label: 'Sécurité', badges: [{ value: securityEventsCount.value, badgeClass: azureBadge }], lazy: true },
+])
+
+// VMs/LXC and Services fetch their own supporting data lazily, only when the
+// user actually switches to them — not on a tab restored programmatically
+// from a ?tab= deep link (load() sets `tab` directly and has its own,
+// deliberately narrower, initial-load sequencing). Listening to the shell's
+// click emit rather than watching `tab` itself preserves that distinction.
+function onTabClick(key: string): void {
+  tab.value = key
+  if (key === 'vms' || key === 'lxc') loadGuestNetworks()
+  if (key === 'services') loadServices()
+}
+
 function memPct(n: { mem_used?: number; mem_total?: number }): string | number {
   if (!n.mem_total) return 0
   return (((n.mem_used ?? 0) / n.mem_total) * 100).toFixed(1)
@@ -796,14 +715,17 @@ function formatDate(iso: string | undefined): string {
 </script>
 
 <style scoped>
-.proxmox-node-tabs {
+/* .proxmox-node-tabs is applied via a prop to EntityTabShell's own <ul>, so
+   these selectors target markup owned by a child component's template —
+   :deep() is required for scoped CSS to reach it. */
+:deep(.proxmox-node-tabs) {
   flex-wrap: nowrap;
   overflow-x: auto;
   overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
 }
 
-.proxmox-node-tabs .nav-item {
+:deep(.proxmox-node-tabs .nav-item) {
   flex: 0 0 auto;
 }
 
@@ -836,7 +758,7 @@ function formatDate(iso: string | undefined): string {
 }
 
 @media (max-width: 768px) {
-  .proxmox-node-tabs .nav-link {
+  :deep(.proxmox-node-tabs .nav-link) {
     white-space: nowrap;
     padding-inline: 0.6rem;
   }

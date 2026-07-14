@@ -282,211 +282,206 @@
           @updated="host = ($event as any)"
         />
 
-        <HostDetailTabs
+        <EntityTabShell
           v-model="activeTab"
-          :can-run-apt="canRunApt"
-          :containers-count="containers.length"
-          :pending-packages="aptStatus?.pending_packages || 0"
-          :security-updates="aptStatus?.security_updates || 0"
-          :commands-count="cmdHistory.length"
-          :tasks-count="tasksCount"
-        />
-
-        <div v-show="activeTab === 'metrics'">
-          <div
-            v-if="host && host.status !== 'online'"
-            class="alert alert-warning mb-3"
-          >
-            <IconAlertCircle
-              :size="16"
-              class="icon me-2"
+          :tabs="hostTabs"
+        >
+          <template #metrics>
+            <div
+              v-if="host && host.status !== 'online'"
+              class="alert alert-warning mb-3"
+            >
+              <IconAlertCircle
+                :size="16"
+                class="icon me-2"
+              />
+              Agent hors ligne — les données affichées peuvent être obsolètes ou indisponibles.
+            </div>
+            <HostMetricsPanel
+              :host-id="hostId"
+              :metrics="effectiveMetrics"
+              :metrics-source="effectiveMetricsSource"
+              :proxmox-guest-id="proxmoxLink?.guest_id ?? null"
+              :refresh-tick="metricsUpdatedAt"
             />
-            Agent hors ligne — les données affichées peuvent être obsolètes ou indisponibles.
-          </div>
-          <HostMetricsPanel
-            :host-id="hostId"
-            :metrics="effectiveMetrics"
-            :metrics-source="effectiveMetricsSource"
-            :proxmox-guest-id="proxmoxLink?.guest_id ?? null"
-            :refresh-tick="metricsUpdatedAt"
-          />
-          <DiskMetricsCard
-            :host-id="hostId"
-            :initial-metrics="(diskMetrics as any)"
-            class="mb-4"
-          />
-          <DiskHistoryChart
-            :host-id="hostId"
-            :mounts="(diskMetrics?.map((d: any) => d.mount_point) ?? [])"
-            :refresh-tick="metricsUpdatedAt"
-            class="mb-4"
-          />
-          <DiskHealthCard
-            v-if="hasLocalSmart || !isProxmoxLinked"
-            :host-id="hostId"
-            :initial-health="(diskHealth as any)"
-            class="mb-4"
-          />
-          <ProxmoxHostDiskHealthCard
-            v-else
-            :host-id="hostId"
-            :node-name="proxmoxLink?.node_name ?? null"
-            class="mb-4"
-          />
-        </div>
+            <DiskMetricsCard
+              :host-id="hostId"
+              :initial-metrics="(diskMetrics as any)"
+              class="mb-4"
+            />
+            <DiskHistoryChart
+              :host-id="hostId"
+              :mounts="(diskMetrics?.map((d: any) => d.mount_point) ?? [])"
+              :refresh-tick="metricsUpdatedAt"
+              class="mb-4"
+            />
+            <DiskHealthCard
+              v-if="hasLocalSmart || !isProxmoxLinked"
+              :host-id="hostId"
+              :initial-health="(diskHealth as any)"
+              class="mb-4"
+            />
+            <ProxmoxHostDiskHealthCard
+              v-else
+              :host-id="hostId"
+              :node-name="proxmoxLink?.node_name ?? null"
+              class="mb-4"
+            />
+          </template>
 
-        <div v-show="activeTab === 'docker'">
-          <HostDockerTab
-            :host-id="hostId"
-            :containers="(containers as any)"
-            :version-comparisons="(versionComparisons as any)"
-            :can-run="canRunApt"
-            @open-command="openCommand"
-            @history-changed="loadCmdHistoryRefresh"
-          />
-        </div>
+          <template #docker>
+            <HostDockerTab
+              :host-id="hostId"
+              :containers="(containers as any)"
+              :version-comparisons="(versionComparisons as any)"
+              :can-run="canRunApt"
+              @open-command="openCommand"
+              @history-changed="loadCmdHistoryRefresh"
+            />
+          </template>
 
-        <div v-show="activeTab === 'apt'">
-          <HostAptTab
-            :apt-status="aptStatus"
-            :can-run-apt="canRunApt"
-            :apt-cmd-loading="aptCmdLoading"
-            :uu-status="uuStatus"
-            :uu-runs="(uuRuns as any)"
-            :uu-form="(uuForm as any)"
-            :uu-loading="uuLoading"
-            @run-apt-command="sendAptCmd"
-            @uu-install="handleUUInstall"
-            @uu-configure="handleUUConfigure"
-            @uu-run-now="handleUURunNow"
-            @uu-log="(openUULog as any)"
-          />
-        </div>
+          <template #apt>
+            <HostAptTab
+              :apt-status="aptStatus"
+              :can-run-apt="canRunApt"
+              :apt-cmd-loading="aptCmdLoading"
+              :uu-status="uuStatus"
+              :uu-runs="(uuRuns as any)"
+              :uu-form="(uuForm as any)"
+              :uu-loading="uuLoading"
+              @run-apt-command="sendAptCmd"
+              @uu-install="handleUUInstall"
+              @uu-configure="handleUUConfigure"
+              @uu-run-now="handleUURunNow"
+              @uu-log="(openUULog as any)"
+            />
+          </template>
 
-        <div v-show="activeTab === 'commandes'">
-          <HostCommandsTab
-            :commands="(cmdHistory as any)"
-            @watch-command="(openCommand as any)"
-          />
-        </div>
+          <template #commandes>
+            <HostCommandsTab
+              :commands="(cmdHistory as any)"
+              @watch-command="(openCommand as any)"
+            />
+          </template>
 
-        <div v-show="activeTab === 'exposition'">
-          <HostExposureTab :host-id="hostId" />
-        </div>
+          <template #exposition>
+            <HostExposureTab :host-id="hostId" />
+          </template>
 
-        <div v-show="activeTab === 'systeme'">
-          <HostSystemTab
-            v-if="canRunApt"
-            :host-id="hostId"
-            :can-run-apt="canRunApt"
-            @open-command="openCommand"
-            @history-changed="loadCmdHistoryRefresh"
-          />
-        </div>
+          <template #systeme>
+            <HostSystemTab
+              v-if="canRunApt"
+              :host-id="hostId"
+              :can-run-apt="canRunApt"
+              @open-command="openCommand"
+              @history-changed="loadCmdHistoryRefresh"
+            />
+          </template>
 
-        <div v-show="activeTab === 'processus'">
-          <HostProcessesPanel
-            v-if="canRunApt"
-            :host-id="hostId"
-            :can-run="canRunApt"
-            @history-changed="loadCmdHistoryRefresh"
-          />
-        </div>
+          <template #processus>
+            <HostProcessesPanel
+              v-if="canRunApt"
+              :host-id="hostId"
+              :can-run="canRunApt"
+              @history-changed="loadCmdHistoryRefresh"
+            />
+          </template>
 
-        <div v-show="activeTab === 'planifiees'">
-          <HostTasksTab
-            :host-id="hostId"
-            :can-run-apt="canRunApt"
-            :active="activeTab === 'planifiees'"
-            @open-command="openCommand"
-            @tasks-count="tasksCount = $event"
-            @history-changed="loadCmdHistoryRefresh"
-          />
-        </div>
+          <template #planifiees>
+            <HostTasksTab
+              :host-id="hostId"
+              :can-run-apt="canRunApt"
+              :active="activeTab === 'planifiees'"
+              @open-command="openCommand"
+              @tasks-count="tasksCount = $event"
+              @history-changed="loadCmdHistoryRefresh"
+            />
+          </template>
 
-        <div v-show="activeTab === 'timeline'">
-          <HostTimelineTab :host-id="hostId" />
-        </div>
+          <template #timeline>
+            <HostTimelineTab :host-id="hostId" />
+          </template>
 
-        <!-- Security tab: Per-host permissions (admin only) -->
-        <div v-show="activeTab === 'securite'">
-          <div
-            v-if="auth.isAdmin"
-            class="card"
-          >
-            <div class="card-header d-flex align-items-center justify-content-between">
-              <h3 class="card-title mb-0 d-flex align-items-center gap-2">
-                <IconLock
-                  :size="16"
-                  class="icon icon-sm text-warning"
-                />
-                Permissions par hôte
-              </h3>
-              <span class="badge badge-sm bg-danger text-white">Admin only</span>
-            </div>
-            <div class="card-body p-0">
-              <div
-                v-if="permLoading"
-                class="text-center py-3"
-              >
-                <span class="spinner-border spinner-border-sm" />
+          <!-- Security tab: Per-host permissions (admin only) -->
+          <template #securite>
+            <div
+              v-if="auth.isAdmin"
+              class="card"
+            >
+              <div class="card-header d-flex align-items-center justify-content-between">
+                <h3 class="card-title mb-0 d-flex align-items-center gap-2">
+                  <IconLock
+                    :size="16"
+                    class="icon icon-sm text-warning"
+                  />
+                  Permissions par hôte
+                </h3>
+                <span class="badge badge-sm bg-danger text-white">Admin only</span>
               </div>
-              <div
-                v-else-if="!hostPerms.length"
-                class="text-center py-3 text-muted small"
-              >
-                Aucune restriction — tous les utilisateurs accèdent à cet hôte selon leur rôle global.
+              <div class="card-body p-0">
+                <div
+                  v-if="permLoading"
+                  class="text-center py-3"
+                >
+                  <span class="spinner-border spinner-border-sm" />
+                </div>
+                <div
+                  v-else-if="!hostPerms.length"
+                  class="text-center py-3 text-muted small"
+                >
+                  Aucune restriction — tous les utilisateurs accèdent à cet hôte selon leur rôle global.
+                </div>
+                <table
+                  v-else
+                  class="table table-vcenter mb-0"
+                >
+                  <thead>
+                    <tr>
+                      <th>Utilisateur</th>
+                      <th>Niveau</th>
+                      <th />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr
+                      v-for="p in hostPerms"
+                      :key="p.username"
+                    >
+                      <td>{{ p.username }}</td>
+                      <td>
+                        <span :class="p.level === 'operator' ? 'badge bg-blue-lt' : 'badge bg-secondary-lt'">
+                          {{ p.level }}
+                        </span>
+                      </td>
+                      <td class="text-end">
+                        <button
+                          type="button"
+                          class="btn btn-sm btn-ghost-danger"
+                          title="Révoquer"
+                          @click="revokePermission(p.username)"
+                        >
+                          <IconX
+                            :size="16"
+                            class="icon icon-sm"
+                          />
+                        </button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
-              <table
-                v-else
-                class="table table-vcenter mb-0"
-              >
-                <thead>
-                  <tr>
-                    <th>Utilisateur</th>
-                    <th>Niveau</th>
-                    <th />
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr
-                    v-for="p in hostPerms"
-                    :key="p.username"
-                  >
-                    <td>{{ p.username }}</td>
-                    <td>
-                      <span :class="p.level === 'operator' ? 'badge bg-blue-lt' : 'badge bg-secondary-lt'">
-                        {{ p.level }}
-                      </span>
-                    </td>
-                    <td class="text-end">
-                      <button
-                        type="button"
-                        class="btn btn-sm btn-ghost-danger"
-                        title="Révoquer"
-                        @click="revokePermission(p.username)"
-                      >
-                        <IconX
-                          :size="16"
-                          class="icon icon-sm"
-                        />
-                      </button>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+              <div class="card-footer d-flex justify-content-end">
+                <button
+                  type="button"
+                  class="btn btn-sm btn-outline-primary"
+                  @click="openAddPermission"
+                >
+                  + Ajouter
+                </button>
+              </div>
             </div>
-            <div class="card-footer d-flex justify-content-end">
-              <button
-                type="button"
-                class="btn btn-sm btn-outline-primary"
-                @click="openAddPermission"
-              >
-                + Ajouter
-              </button>
-            </div>
-          </div>
-        </div>
+          </template>
+        </EntityTabShell>
       </div>
 
       <CommandLogPanel
@@ -605,7 +600,8 @@ import HostProcessesPanel from '../components/host/HostProcessesPanel.vue'
 import WsStatusBar from '../components/WsStatusBar.vue'
 import HostAptTab from '../components/host/HostAptTab.vue'
 import HostCommandsTab from '../components/host/HostCommandsTab.vue'
-import HostDetailTabs from '../components/host/HostDetailTabs.vue'
+import EntityTabShell from '../components/EntityTabShell.vue'
+import type { EntityTab } from '../components/EntityTabShell.vue'
 import HostDockerTab from '../components/host/HostDockerTab.vue'
 import HostEditForm from '../components/host/HostEditForm.vue'
 import HostExposureTab from '../components/host/HostExposureTab.vue'
@@ -691,6 +687,52 @@ const {
 // instead of an empty SMART card.
 const hasLocalSmart = computed(() => ((diskHealth.value as unknown[] | null)?.length ?? 0) > 0)
 const isProxmoxLinked = computed(() => !!proxmoxLink.value && proxmoxLink.value.status !== 'ignored')
+
+const hostTabs = computed<EntityTab[]>(() => {
+  const securityUpdates = aptStatus.value?.security_updates || 0
+  const pendingPackages = aptStatus.value?.pending_packages || 0
+
+  const tabs: EntityTab[] = [
+    { key: 'metrics', label: 'Métriques' },
+    {
+      key: 'docker',
+      label: 'Docker',
+      badges: containers.value.length ? [{ value: containers.value.length, badgeClass: 'badge bg-blue-lt text-blue ms-1' }] : [],
+    },
+    {
+      key: 'apt',
+      label: 'APT',
+      badges: securityUpdates > 0
+        ? [{ value: securityUpdates, badgeClass: 'badge bg-red-lt text-red ms-1' }]
+        : pendingPackages > 0
+          ? [{ value: pendingPackages, badgeClass: 'badge bg-yellow-lt text-yellow ms-1' }]
+          : [],
+    },
+    {
+      key: 'commandes',
+      label: 'Commandes',
+      badges: cmdHistory.value.length ? [{ value: cmdHistory.value.length, badgeClass: 'badge bg-secondary-lt text-secondary ms-1' }] : [],
+    },
+    { key: 'exposition', label: 'Exposition' },
+  ]
+
+  if (canRunApt.value) {
+    tabs.push(
+      { key: 'systeme', label: 'Systeme' },
+      { key: 'processus', label: 'Processus' }
+    )
+  }
+
+  tabs.push({ key: 'securite', label: 'Sécurité' })
+  tabs.push({
+    key: 'planifiees',
+    label: 'Tâches planifiées',
+    badges: tasksCount.value ? [{ value: tasksCount.value, badgeClass: 'badge bg-secondary-lt text-secondary ms-1' }] : [],
+  })
+  tabs.push({ key: 'timeline', label: 'Timeline' })
+
+  return tabs
+})
 </script>
 
 <style scoped>

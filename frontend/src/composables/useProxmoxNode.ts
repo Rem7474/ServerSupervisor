@@ -17,14 +17,7 @@ export function useProxmoxNode() {
   const tab = ref('vms')
   watch(tab, (t) => {
     router.replace({ query: { ...route.query, tab: t } })
-    mountedTabs.value.add(t)
   })
-
-  const mountedTabs = ref(new Set<string>(['vms']))
-
-  function isTabMounted(t: string): boolean {
-    return mountedTabs.value.has(t)
-  }
 
   const guestLinks = ref<Record<string, any>>({})
   const linkMsg = ref('')
@@ -130,7 +123,6 @@ export function useProxmoxNode() {
       const validTabs = ['vms', 'lxc', 'storage', 'disks', 'tasks', 'updates', 'services', 'security']
       if (validTabs.includes(requestedTab)) {
         tab.value = requestedTab
-        mountedTabs.value.add(requestedTab)
       }
       const res = await api.getProxmoxNode(String(route.params.id))
       node.value = res.data
@@ -607,7 +599,6 @@ export function useProxmoxNode() {
     loading,
     error,
     tab,
-    isTabMounted,
     guestLinks,
     linkMsg,
     linkMsgOk,
