@@ -20,6 +20,7 @@ import (
 	aptsvc "github.com/serversupervisor/server/internal/services/apt"
 	auditsvc "github.com/serversupervisor/server/internal/services/audit"
 	authnsvc "github.com/serversupervisor/server/internal/services/authn"
+	dashboardsvc "github.com/serversupervisor/server/internal/services/dashboard"
 	dockersvc "github.com/serversupervisor/server/internal/services/docker"
 	gitwebhooksvc "github.com/serversupervisor/server/internal/services/gitwebhook"
 	hostsvc "github.com/serversupervisor/server/internal/services/host"
@@ -113,6 +114,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	sslH := handlers.NewSSLHandler(sslsvc.NewService(db))
 	webLogsH := handlers.NewWebLogsHandler(weblogssvc.NewService(db, dispatcher, cfg))
 	npmH := handlers.NewNPMHandler(npmsvc.NewService(db))
+	dashboardH := handlers.NewDashboardHandler(dashboardsvc.NewService(db))
 
 	registerPublicRoutes(r, authH, db)
 	registerWSRoutes(r, wsH, cfg)
@@ -141,6 +143,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	registerUptimeRoutes(v1, uptimeH)
 	registerSSLRoutes(v1, sslH)
 	registerNPMRoutes(v1, npmH)
+	registerDashboardRoutes(v1, dashboardH)
 
 	registerStaticFiles(r)
 
@@ -479,6 +482,10 @@ func registerUptimeRoutes(g *gin.RouterGroup, h *handlers.UptimeHandler) {
 	admin.PUT("/uptime/probes/:id", h.Update)
 	admin.DELETE("/uptime/probes/:id", h.Delete)
 	admin.POST("/uptime/probes/:id/check-now", h.CheckNow)
+}
+
+func registerDashboardRoutes(g *gin.RouterGroup, h *handlers.DashboardHandler) {
+	g.GET("/dashboard/attention", h.Attention)
 }
 
 func registerSSLRoutes(g *gin.RouterGroup, h *handlers.SSLHandler) {
