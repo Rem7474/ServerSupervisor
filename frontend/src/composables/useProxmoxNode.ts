@@ -70,8 +70,10 @@ export function useProxmoxNode() {
 
   const liveStatus = ref<any>(null)
   const liveStatusLoading = ref(false)
-  const liveStatusTime = ref('')
+  const lastUpdatedAt = ref<Date | null>(null)
   const liveStatusError = ref('')
+  const autoRefresh = ref(true)
+  const LIVE_STATUS_REFRESH_SEC = 60
 
   // RRD charts
   const rrdTimeframe = ref('hour')
@@ -445,7 +447,7 @@ export function useProxmoxNode() {
     try {
       const res = await api.getProxmoxNodeStatus(String(route.params.id))
       liveStatus.value = res.data
-      liveStatusTime.value = new Date().toLocaleTimeString('fr-FR')
+      lastUpdatedAt.value = new Date()
     } catch (e: unknown) {
       const ax = e as { response?: { data?: { error?: string }; status?: number } }
       liveStatusError.value = ax.response?.data?.error || `Erreur ${ax.response?.status ?? ''} — vérifiez la connectivité au nœud.`
@@ -593,7 +595,7 @@ export function useProxmoxNode() {
 
   onMounted(() => {
     load()
-    liveStatusTimer = setInterval(loadLiveStatus, 60_000)
+    liveStatusTimer = setInterval(() => { if (autoRefresh.value) loadLiveStatus() }, LIVE_STATUS_REFRESH_SEC * 1000)
   })
   onUnmounted(() => {
     stopPolling()
@@ -635,8 +637,10 @@ export function useProxmoxNode() {
     submitMigration,
     liveStatus,
     liveStatusLoading,
-    liveStatusTime,
+    lastUpdatedAt,
     liveStatusError,
+    autoRefresh,
+    LIVE_STATUS_REFRESH_SEC,
     rrdTimeframe,
     rrdCpuChart,
     rrdRamChart,

@@ -18,6 +18,13 @@
       {{ error }}
     </div>
     <div v-else-if="node">
+      <PageRefreshBar
+        v-model="autoRefresh"
+        label="Nœud Proxmox"
+        :interval-sec="LIVE_STATUS_REFRESH_SEC"
+        :last-updated-at="lastUpdatedAt"
+      />
+
       <!-- Header -->
       <div class="page-header mb-4">
         <div class="page-pretitle">
@@ -274,21 +281,19 @@
             </div>
           </div>
 
-          <!-- Live refresh timestamp + error (absolute, no added height) -->
+          <!-- Live refresh error + in-flight indicator (absolute, no added height) -->
+          <!-- last-updated timestamp itself now lives in the page-level PageRefreshBar above -->
           <div class="position-absolute bottom-0 end-0 pb-2 pe-3 d-flex align-items-center gap-2 node-live-meta">
             <span
               v-if="liveStatusError"
               class="text-danger node-live-meta-text"
             >{{ liveStatusError }}</span>
             <span
-              v-if="liveStatus"
+              v-if="liveStatus && liveStatusLoading"
               class="text-muted node-live-meta-text"
             >
-              <span
-                v-if="liveStatusLoading"
-                class="spinner-border me-1 node-live-meta-spinner"
-              />
-              Actualisé à {{ liveStatusTime }}
+              <span class="spinner-border me-1 node-live-meta-spinner" />
+              Actualisation…
             </span>
           </div>
         </div>
@@ -646,6 +651,7 @@ import { useRoute } from 'vue-router'
 const CommandLogPanel = defineAsyncComponent(() => import('../components/host/CommandLogPanel.vue'))
 const ProxmoxNodeChartsPanel = defineAsyncComponent(() => import('../components/proxmox/ProxmoxNodeChartsPanel.vue'))
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
+import PageRefreshBar from '../components/PageRefreshBar.vue'
 import ProxmoxNodeDisksTab from '../components/proxmox/ProxmoxNodeDisksTab.vue'
 import ProxmoxNodeStorageTab from '../components/proxmox/ProxmoxNodeStorageTab.vue'
 import ProxmoxNodeTasksTab from '../components/proxmox/ProxmoxNodeTasksTab.vue'
@@ -692,8 +698,10 @@ const {
   submitMigration,
   liveStatus,
   liveStatusLoading,
-  liveStatusTime,
   liveStatusError,
+  lastUpdatedAt,
+  autoRefresh,
+  LIVE_STATUS_REFRESH_SEC,
   rrdTimeframe,
   rrdCpuChart,
   rrdRamChart,
