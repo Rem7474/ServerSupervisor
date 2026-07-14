@@ -226,7 +226,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useAuthStore } from './stores/auth'
 import { useHostsStore } from './stores/hosts'
 import { useRouter, useRoute } from 'vue-router'
@@ -239,6 +239,7 @@ import ErrorBoundary from './components/common/ErrorBoundary.vue'
 import CommandPalette from './components/CommandPalette.vue'
 import { subscribeHttpErrors, subscribeNetworkOk } from './utils/httpErrorBus'
 import { useCommandPalette } from './composables/useCommandPalette'
+import { useAttentionCenter } from './composables/useAttentionCenter'
 import apiClient from './api'
 import { visibleNavSections, type NavSection } from './config/navigation'
 
@@ -266,45 +267,13 @@ const hostsDownCount = computed(() => {
   ).length
 })
 
-// Liens Proxmox guest<->hôte suggérés (auto-détectés) en attente de confirmation —
-// invisibles ailleurs dans l'app tant qu'on ne tombe pas sur la bonne page hôte/nœud.
-const suggestedProxmoxLinksCount = ref(0)
-let proxmoxLinksRefreshTimer: ReturnType<typeof setInterval> | null = null
-
-async function refreshSuggestedProxmoxLinksCount(): Promise<void> {
-  try {
-    const res = await apiClient.getProxmoxLinks('suggested')
-    suggestedProxmoxLinksCount.value = Array.isArray(res.data) ? res.data.length : 0
-  } catch {
-    // non-critique — on garde le dernier compte connu
-  }
-}
-
-// Gated on isAuthenticated (not a bare onMounted call): App.vue mounts once
-// for the whole SPA lifetime, including on the login page — an unconditional
-// authenticated-only call here 401s on every unauthenticated load, and the
-// 401 handler's hard reload back to /login re-triggers this same mount,
-// producing an infinite reload loop. Login is a soft router.push (no
-// remount), so the watcher — not onMounted — is what starts polling once a
-// session actually exists, and stops it again on logout so a still-open tab
-// doesn't 401 five minutes after signing out.
-watch(
-  () => auth.isAuthenticated,
-  (isAuth) => {
-    if (isAuth) {
-      refreshSuggestedProxmoxLinksCount()
-      if (!proxmoxLinksRefreshTimer) {
-        proxmoxLinksRefreshTimer = setInterval(refreshSuggestedProxmoxLinksCount, 5 * 60 * 1000)
-      }
-    } else {
-      suggestedProxmoxLinksCount.value = 0
-      if (proxmoxLinksRefreshTimer) {
-        clearInterval(proxmoxLinksRefreshTimer)
-        proxmoxLinksRefreshTimer = null
-      }
-    }
-  },
-  { immediate: true }
+// Suggested Proxmox links badge: shares useAttentionCenter's module-level
+// state (and its own auth-gated poll/watch — see that composable) rather
+// than fetching independently, so this badge and DashboardView's "Attention
+// requise" card can no longer disagree about the count.
+const { items: attentionItems } = useAttentionCenter()
+const suggestedProxmoxLinksCount = computed(
+  () => attentionItems.value.find((i) => i.key === 'proxmox-links')?.count ?? 0
 )
 
 // Offline detection — tracks browser connectivity via navigator.onLine events.
@@ -431,9 +400,6 @@ onUnmounted(() => {
   window.removeEventListener('pageshow', handlePageShow)
   window.removeEventListener('focus', notifyAppResume)
   document.removeEventListener('click', handleOutsideClick, true)
-  if (proxmoxLinksRefreshTimer) {
-    clearInterval(proxmoxLinksRefreshTimer)
-  }
   if (resumeDebounceTimer) {
     clearTimeout(resumeDebounceTimer)
   }

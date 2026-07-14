@@ -19,6 +19,7 @@ import { settingsApi } from './settings'
 import { proxmoxApi } from './proxmox'
 import { npmApi } from './npm'
 import { runbooksApi } from './runbooks'
+import { dashboardApi } from './dashboard'
 
 // Re-export shared helpers/types so `import api, { getApiErrorMessage } from '../api'`
 // and type imports keep resolving.
@@ -46,4 +47,5 @@ export default {
   ...proxmoxApi,
   ...npmApi,
   ...runbooksApi,
+  ...dashboardApi,
 }
