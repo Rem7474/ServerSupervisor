@@ -86,7 +86,7 @@ func ResolveStaleIncidentsForRule(ctx context.Context, db *database.DB, cfg *con
 				slog.InfoContext(ctx, "alerts: stale incident resolved after rule update",
 					slog.Int64("incident_id", inc.ID), slog.Int64("rule_id", rule.ID))
 				broadcastIncidentUpdate(pusher, "resolved", rule, host.ID)
-				chDispatch.Send(ctx, resolvedEvent(rule, host))
+				chDispatch.Send(ctx, resolvedEvent(rule, host, inc))
 			}
 		}
 	}
@@ -129,7 +129,7 @@ func EvaluateAlerts(ctx context.Context, db *database.DB, cfg *config.Config, di
 					if !ok {
 						host = models.Host{ID: inc.HostID, Name: inc.HostID}
 					}
-					chDispatch.Send(ctx, resolvedEvent(rule, host))
+					chDispatch.Send(ctx, resolvedEvent(rule, host, inc))
 				}
 			}
 			continue
@@ -230,7 +230,7 @@ func EvaluateAlerts(ctx context.Context, db *database.DB, cfg *config.Config, di
 						slog.WarnContext(ctx, "alerts: failed to write alert_resolved audit log", slog.Int64("incident_id", inc.ID), slog.Any("err", auditErr))
 					}
 					broadcastIncidentUpdate(pusher, "resolved", rule, host.ID)
-					chDispatch.Send(ctx, resolvedEvent(rule, host))
+					chDispatch.Send(ctx, resolvedEvent(rule, host, *inc))
 				}
 			}
 		}
@@ -591,6 +591,6 @@ func resolveStaleGlobalProxmoxIncidents(ctx context.Context, db *database.DB, ch
 			continue
 		}
 		broadcastIncidentUpdate(pusher, "resolved", rule, inc.HostID)
-		chDispatch.Send(ctx, resolvedEvent(rule, models.Host{ID: inc.HostID, Name: inc.HostID}))
+		chDispatch.Send(ctx, resolvedEvent(rule, models.Host{ID: inc.HostID, Name: inc.HostID}, inc))
 	}
 }

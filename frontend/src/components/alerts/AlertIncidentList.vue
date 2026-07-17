@@ -324,7 +324,10 @@
                 {{ formatDate(item.triggered_at) }}
               </td>
               <td class="text-muted small">
-                <span v-if="item.resolved_at">{{ formatDate(item.resolved_at) }}</span>
+                <template v-if="item.resolved_at">
+                  {{ formatDate(item.resolved_at) }}
+                  <span v-if="!isTrackerType(item)">({{ incidentDuration(item) }})</span>
+                </template>
                 <span
                   v-else
                   class="text-secondary"
@@ -421,6 +424,8 @@ import { addToast } from '../../composables/useGlobalToast'
 import { getApiErrorMessage } from '../../api/client'
 import {
   formatIncidentValue,
+  incidentDuration,
+  isTrackerType,
   metricLabel,
   notificationResolved as isCompleted,
   notificationRoute,

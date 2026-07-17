@@ -98,6 +98,29 @@ export function resolveHint(item: HintFields): string {
   return `seuil de résolution ${formatted}`
 }
 
+// Elapsed time between trigger and resolution (or "now" for a still-active
+// incident), same bucketing as the resolved push notification body
+// (server/internal/alerts/notify.go's formatDuration) — the two are
+// independent implementations (Go/TS share no code across the wire, see
+// alertMetricUnit/metricUnit for the same split), kept in step by hand.
+export function incidentDuration(item: Pick<NotificationItem, 'triggered_at' | 'resolved_at'>): string {
+  if (!item.triggered_at) return ''
+  const start = new Date(item.triggered_at).getTime()
+  const end = item.resolved_at ? new Date(item.resolved_at).getTime() : Date.now()
+  const seconds = Math.max(0, Math.round((end - start) / 1000))
+  if (seconds < 60) return `${seconds}s`
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes} min`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) {
+    const remMinutes = minutes % 60
+    return remMinutes === 0 ? `${hours}h` : `${hours}h${String(remMinutes).padStart(2, '0')}`
+  }
+  const days = Math.floor(hours / 24)
+  const remHours = hours % 24
+  return remHours === 0 ? `${days}j` : `${days}j${remHours}h`
+}
+
 export function isUnread(item: Pick<NotificationItem, 'triggered_at'>, readAt: string | null): boolean {
   return !readAt || new Date(item.triggered_at ?? 0) > new Date(readAt)
 }
