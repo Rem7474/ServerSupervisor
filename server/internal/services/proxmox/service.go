@@ -528,6 +528,15 @@ func (s *Service) NodeGuestNetworks(ctx context.Context, nodeID string) (map[int
 	if err != nil {
 		return nil, err
 	}
+	return fetchGuestNetworksForNode(ctx, client, node, guests), nil
+}
+
+// fetchGuestNetworksForNode fans out one goroutine per running guest on a
+// single node, querying the QEMU guest agent (VMs) or the LXC interfaces API.
+// A guest whose agent is unreachable or returns nothing is silently omitted
+// from the result rather than surfaced as an error — this mirrors PVE's own
+// behavior when the guest agent isn't installed/running.
+func fetchGuestNetworksForNode(ctx context.Context, client *proxmoxclient.Client, node *models.ProxmoxNode, guests []models.ProxmoxGuest) map[int][]proxmoxclient.GuestNetworkIface {
 	result := make(map[int][]proxmoxclient.GuestNetworkIface)
 	var mu sync.Mutex
 	var wg sync.WaitGroup
@@ -538,7 +547,7 @@ func (s *Service) NodeGuestNetworks(ctx context.Context, nodeID string) (map[int
 		wg.Add(1)
 		go func(guest models.ProxmoxGuest) {
 			defer wg.Done()
-			defer safego.Recover(ctx, "proxmox.NodeGuestNetworks")
+			defer safego.Recover(ctx, "proxmox.fetchGuestNetworksForNode")
 			var ifaces []proxmoxclient.GuestNetworkIface
 			var ferr error
 			if guest.GuestType == "vm" {
@@ -553,6 +562,56 @@ func (s *Service) NodeGuestNetworks(ctx context.Context, nodeID string) (map[int
 			result[guest.VMID] = ifaces
 			mu.Unlock()
 		}(g)
+	}
+	wg.Wait()
+	return result
+}
+
+// maxConcurrentNodeNetworkFetches bounds how many Proxmox nodes are queried
+// for live guest network interfaces at once from AllGuestNetworks, so a
+// deployment with many nodes doesn't burst an unbounded number of goroutines
+// (each node itself already fans out one goroutine per running guest).
+const maxConcurrentNodeNetworkFetches = 4
+
+// AllGuestNetworks fetches live guest network interfaces for every running
+// VM/LXC guest across all Proxmox connections/nodes. It backs the Network
+// page's IP inventory: a real-time, non-persisted snapshot (no caching, no
+// DB storage of the resulting IPs) — same live-call approach the Proxmox
+// node view already uses per node, just fanned out across all nodes.
+func (s *Service) AllGuestNetworks(ctx context.Context) (map[string]map[int][]proxmoxclient.GuestNetworkIface, error) {
+	nodes, err := s.repo.ListProxmoxNodes(ctx)
+	if err != nil {
+		return nil, err
+	}
+	result := make(map[string]map[int][]proxmoxclient.GuestNetworkIface, len(nodes))
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	sem := make(chan struct{}, maxConcurrentNodeNetworkFetches)
+	for _, n := range nodes {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(node models.ProxmoxNode) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			defer safego.Recover(ctx, "proxmox.AllGuestNetworks")
+
+			secret, conn, serr := s.resolveSecret(ctx, node.ConnectionID)
+			if serr != nil {
+				return
+			}
+			client := proxmoxclient.New(conn.APIURL, conn.TokenID, secret, conn.InsecureSkipVerify)
+			guests, gerr := s.repo.ListProxmoxGuestsByNode(ctx, node.ConnectionID, node.NodeName)
+			if gerr != nil {
+				return
+			}
+			nets := fetchGuestNetworksForNode(ctx, client, &node, guests)
+			if len(nets) == 0 {
+				return
+			}
+			mu.Lock()
+			result[node.ID] = nets
+			mu.Unlock()
+		}(n)
 	}
 	wg.Wait()
 	return result, nil

@@ -264,11 +264,173 @@
         </table>
       </div>
     </div>
+
+    <div
+      v-if="ipInventoryLoading || proxmoxGuests.length"
+      class="card mt-4"
+    >
+      <div class="card-header">
+        <h3 class="card-title">
+          Adresses IP Proxmox
+        </h3>
+        <div class="card-options">
+          <span
+            v-if="ipInventoryLoading"
+            class="spinner-border spinner-border-sm text-secondary"
+          />
+          <span
+            v-else
+            class="badge bg-azure-lt text-azure ms-1"
+          >
+            {{ proxmoxGuests.length }} ressource{{ proxmoxGuests.length > 1 ? 's' : '' }}
+          </span>
+        </div>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-vcenter card-table">
+          <thead>
+            <tr>
+              <th>Ressource</th>
+              <th>Nœud</th>
+              <th>IP(s)</th>
+              <th>Hôte corrélé</th>
+              <th>État</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="g in proxmoxGuests"
+              :key="g.guest_id"
+            >
+              <td>
+                <span class="fw-semibold">{{ g.name }}</span>
+                <span
+                  class="badge ms-2"
+                  :class="g.guest_type === 'lxc' ? 'bg-purple-lt text-purple' : 'bg-blue-lt text-blue'"
+                >{{ g.guest_type === 'lxc' ? 'LXC' : 'VM' }}</span>
+              </td>
+              <td class="text-secondary">
+                {{ g.node }}
+              </td>
+              <td class="text-secondary small font-monospace">
+                <span
+                  v-if="g.ip_addresses.length === 0"
+                  class="text-muted"
+                >-</span>
+                <span
+                  v-for="ip in g.ip_addresses"
+                  :key="ip"
+                  class="badge bg-blue-lt text-blue me-1"
+                >{{ ip }}</span>
+              </td>
+              <td>
+                <router-link
+                  v-if="g.host_id"
+                  :to="`/hosts/${g.host_id}`"
+                  class="text-decoration-none"
+                >
+                  {{ g.host_name || g.host_id }}
+                </router-link>
+                <span
+                  v-else
+                  class="text-muted"
+                >Non lié</span>
+              </td>
+              <td>
+                <span :class="g.status === 'running' ? 'badge bg-green-lt text-green' : 'badge bg-secondary-lt text-secondary'">
+                  {{ g.status === 'running' ? 'En cours' : g.status || 'inconnu' }}
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div
+        v-if="!ipInventoryLoading && proxmoxGuests.length === 0"
+        class="text-center text-secondary py-4"
+      >
+        Aucune IP Proxmox détectée
+      </div>
+    </div>
+
+    <div
+      v-if="ipInventoryLoading || npmEntries.length"
+      class="card mt-4"
+    >
+      <div class="card-header">
+        <h3 class="card-title">
+          Domaines NPM
+        </h3>
+        <div class="card-options">
+          <span
+            v-if="ipInventoryLoading"
+            class="spinner-border spinner-border-sm text-secondary"
+          />
+          <span
+            v-else
+            class="badge bg-azure-lt text-azure ms-1"
+          >
+            {{ npmEntries.length }} domaine{{ npmEntries.length > 1 ? 's' : '' }}
+          </span>
+        </div>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-vcenter card-table">
+          <thead>
+            <tr>
+              <th>Domaine(s)</th>
+              <th>IP / hôte cible</th>
+              <th>Port</th>
+              <th>Ressource corrélée</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="n in npmEntries"
+              :key="n.proxy_host_id"
+            >
+              <td class="fw-semibold">
+                {{ (n.domain_names || []).join(', ') || '-' }}
+              </td>
+              <td class="text-secondary small font-monospace">
+                {{ n.forward_host }}
+              </td>
+              <td class="text-secondary">
+                {{ n.forward_port }}
+              </td>
+              <td>
+                <router-link
+                  v-if="n.matched_type === 'host'"
+                  :to="`/hosts/${n.matched_id}`"
+                  class="text-decoration-none"
+                >
+                  {{ n.matched_name }}
+                </router-link>
+                <span v-else-if="n.matched_type === 'proxmox_guest'">
+                  {{ n.matched_name }}
+                </span>
+                <span
+                  v-else
+                  class="badge bg-secondary-lt text-secondary"
+                >Non résolu</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div
+        v-if="!ipInventoryLoading && npmEntries.length === 0"
+        class="text-center text-secondary py-4"
+      >
+        Aucun domaine NPM détecté
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import type { NetworkProxmoxGuestIP, NetworkNPMEntry } from '../../types/network'
 
 interface PortMapping {
   host_port?: number | string
@@ -318,9 +480,15 @@ interface PortRow {
 const props = withDefaults(defineProps<{
   hosts?: Host[]
   containers?: Container[]
+  proxmoxGuests?: NetworkProxmoxGuestIP[]
+  npmEntries?: NetworkNPMEntry[]
+  ipInventoryLoading?: boolean
 }>(), {
   hosts: () => [],
   containers: () => [],
+  proxmoxGuests: () => [],
+  npmEntries: () => [],
+  ipInventoryLoading: false,
 })
 
 const search = ref('')

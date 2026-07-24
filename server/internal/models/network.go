@@ -75,3 +75,39 @@ type TopologySnapshot struct {
 	Config     *NetworkTopologyConfig `json:"config,omitempty"`
 	UpdatedAt  time.Time              `json:"updated_at"`
 }
+
+// ========== Network IP Inventory (Proxmox guests + NPM domains) ==========
+
+// NetworkProxmoxGuestIP is a Proxmox VM/LXC guest with its live-fetched IP
+// addresses, correlated with a ServerSupervisor Host when a confirmed
+// proxmox_guest_links entry exists.
+type NetworkProxmoxGuestIP struct {
+	GuestID     string   `json:"guest_id"`
+	Name        string   `json:"name"`
+	Node        string   `json:"node"`
+	GuestType   string   `json:"guest_type"` // "vm" | "lxc"
+	VMID        int      `json:"vmid"`
+	Status      string   `json:"status"`
+	IPAddresses []string `json:"ip_addresses"`
+	HostID      string   `json:"host_id,omitempty"`
+	HostName    string   `json:"host_name,omitempty"`
+}
+
+// NetworkNPMEntry is an Nginx Proxy Manager proxy host entry, correlated by
+// IP with a ServerSupervisor Host or a Proxmox guest when possible.
+type NetworkNPMEntry struct {
+	ProxyHostID int      `json:"proxy_host_id"`
+	DomainNames []string `json:"domain_names"`
+	ForwardHost string   `json:"forward_host"`
+	ForwardPort int      `json:"forward_port"`
+	MatchedType string   `json:"matched_type,omitempty"` // "host" | "proxmox_guest"
+	MatchedID   string   `json:"matched_id,omitempty"`
+	MatchedName string   `json:"matched_name,omitempty"`
+}
+
+// NetworkIPInventory is the combined, real-time (non-persisted) IP inventory
+// shown on the Network page's cards view.
+type NetworkIPInventory struct {
+	ProxmoxGuests []NetworkProxmoxGuestIP `json:"proxmox_guests"`
+	NPMHosts      []NetworkNPMEntry       `json:"npm_hosts"`
+}

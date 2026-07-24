@@ -6,8 +6,10 @@ package network
 
 import (
 	"context"
+	"errors"
 	"time"
 
+	"github.com/serversupervisor/server/internal/apperr"
 	"github.com/serversupervisor/server/internal/events"
 	"github.com/serversupervisor/server/internal/models"
 )
@@ -22,20 +24,41 @@ type Repository interface {
 // SnapshotBuilder builds the live network snapshot (wired to networkview.BuildSnapshot).
 type SnapshotBuilder func(ctx context.Context) (*models.NetworkSnapshot, error)
 
+// IPInventoryBuilder builds the live, non-persisted Proxmox/NPM IP inventory
+// (wired to networkview.BuildIPInventory). Nil until SetIPInventoryBuilder is
+// called, same post-construction-wiring idiom as dispatch.Dispatcher's
+// AgentPusher — it needs *proxmox.Service and *npm.Service, both constructed
+// after this service in router.go, so it can't be a constructor argument.
+type IPInventoryBuilder func(ctx context.Context) (*models.NetworkIPInventory, error)
+
 // Service holds the network use-cases.
 type Service struct {
-	repo  Repository
-	build SnapshotBuilder
-	bus   *events.Bus
+	repo             Repository
+	build            SnapshotBuilder
+	buildIPInventory IPInventoryBuilder
+	bus              *events.Bus
 }
 
 func NewService(repo Repository, build SnapshotBuilder, bus *events.Bus) *Service {
 	return &Service{repo: repo, build: build, bus: bus}
 }
 
+// SetIPInventoryBuilder wires the IP inventory builder after construction.
+func (s *Service) SetIPInventoryBuilder(build IPInventoryBuilder) {
+	s.buildIPInventory = build
+}
+
 // Snapshot returns the live network snapshot.
 func (s *Service) Snapshot(ctx context.Context) (*models.NetworkSnapshot, error) {
 	return s.build(ctx)
+}
+
+// IPInventory returns the live Proxmox/NPM IP inventory.
+func (s *Service) IPInventory(ctx context.Context) (*models.NetworkIPInventory, error) {
+	if s.buildIPInventory == nil {
+		return nil, apperr.Internal(errors.New("IP inventory builder not configured"))
+	}
+	return s.buildIPInventory(ctx)
 }
 
 // TopologyConfig returns the persisted topology configuration.

@@ -334,6 +334,9 @@
           <NetworkPortList
             :hosts="hosts"
             :containers="containers"
+            :proxmox-guests="proxmoxGuestIPs"
+            :npm-entries="npmEntries"
+            :ip-inventory-loading="ipInventoryLoading"
           />
         </div>
       </div>
@@ -355,6 +358,9 @@ import { useNetwork } from '../composables/useNetwork'
 const {
   hosts,
   containers,
+  proxmoxGuestIPs,
+  npmEntries,
+  ipInventoryLoading,
   viewMode,
   networkTab,
   rootNodeName,

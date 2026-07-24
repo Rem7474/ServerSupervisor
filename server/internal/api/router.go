@@ -70,9 +70,10 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	aptH := handlers.NewAptHandler(aptsvc.NewService(db, dispatcher), db)
 	dockerH := handlers.NewDockerHandler(dockersvc.NewService(db, dispatcher), db)
 	systemH := handlers.NewSystemHandler(db, cfg, dispatcher, wsH.GetStreamHub())
-	networkH := handlers.NewNetworkHandler(networksvc.NewService(db, func(ctx context.Context) (*models.NetworkSnapshot, error) {
+	networkSvc := networksvc.NewService(db, func(ctx context.Context) (*models.NetworkSnapshot, error) {
 		return networkview.BuildSnapshot(ctx, db)
-	}, bus))
+	}, bus)
+	networkH := handlers.NewNetworkHandler(networkSvc)
 	auditH := handlers.NewAuditHandler(auditsvc.NewService(db))
 	userH := handlers.NewUserHandler(usersvc.NewService(db))
 	pushSvc := pushsvc.NewService(db)
@@ -108,13 +109,19 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	agentH.AddCompletionListener(releaseTrackerH)
 	agentH.AddCompletionListener(runbookH)
 
-	proxmoxH := handlers.NewProxmoxHandler(proxmoxsvc.NewService(db, cfg, bus))
+	proxmoxService := proxmoxsvc.NewService(db, cfg, bus)
+	proxmoxH := handlers.NewProxmoxHandler(proxmoxService)
 	hostPermH := handlers.NewHostPermissionHandler(hostpermsvc.NewService(db))
 	uptimeH := handlers.NewUptimeHandler(uptimesvc.NewService(db))
 	sslH := handlers.NewSSLHandler(sslsvc.NewService(db))
 	webLogsH := handlers.NewWebLogsHandler(weblogssvc.NewService(db, dispatcher, cfg))
-	npmH := handlers.NewNPMHandler(npmsvc.NewService(db))
+	npmService := npmsvc.NewService(db)
+	npmH := handlers.NewNPMHandler(npmService)
 	dashboardH := handlers.NewDashboardHandler(dashboardsvc.NewService(db))
+
+	networkSvc.SetIPInventoryBuilder(func(ctx context.Context) (*models.NetworkIPInventory, error) {
+		return networkview.BuildIPInventory(ctx, db, proxmoxService, npmService)
+	})
 
 	registerPublicRoutes(r, authH, db)
 	registerWSRoutes(r, wsH, cfg)
@@ -270,6 +277,7 @@ func registerDockerRoutes(g *gin.RouterGroup, dockerH *handlers.DockerHandler, s
 	g.GET("/network/topology", networkH.GetTopologySnapshot)
 	g.GET("/network/config", networkH.GetTopologyConfig)
 	g.PUT("/network/config", networkH.SaveTopologyConfig)
+	g.GET("/network/ip-inventory", networkH.GetIPInventory)
 }
 
 func registerAPTRoutes(g *gin.RouterGroup, h *handlers.AptHandler) {

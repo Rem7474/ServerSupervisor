@@ -7,10 +7,15 @@ import { ref, computed, onMounted, watch } from 'vue'
 import apiClient from '../api'
 import { useWebSocket } from './useWebSocket'
 import type { WSNetworkSnapshot } from '../types/ws'
+import type { NetworkProxmoxGuestIP, NetworkNPMEntry } from '../types/network'
 
 export function useNetwork() {
   const hosts = ref<any[]>([])
   const containers = ref<any[]>([])
+  const proxmoxGuestIPs = ref<NetworkProxmoxGuestIP[]>([])
+  const npmEntries = ref<NetworkNPMEntry[]>([])
+  const ipInventoryLoading = ref(false)
+  const ipInventoryError = ref(false)
   const viewMode = ref(localStorage.getItem('networkViewMode') || 'graph')
   const networkTab = ref('topology')
   const rootNodeName = ref('Infrastructure')
@@ -310,6 +315,21 @@ export function useNetwork() {
     }
   }
 
+  // ─── IP inventory (Proxmox guests + NPM domains, live/non-persisted) ──────
+  async function fetchIPInventory(): Promise<void> {
+    ipInventoryLoading.value = true
+    ipInventoryError.value = false
+    try {
+      const res = await apiClient.getIPInventory()
+      proxmoxGuestIPs.value = res.data?.proxmox_guests || []
+      npmEntries.value = res.data?.npm_hosts || []
+    } catch {
+      ipInventoryError.value = true
+    } finally {
+      ipInventoryLoading.value = false
+    }
+  }
+
   // ─── WebSocket ────────────────────────────────────────────────────────────
   const { wsStatus, wsError, retryCount, reconnect } = useWebSocket<WSNetworkSnapshot>('/api/v1/ws/network', (payload) => {
     if (payload.type !== 'network') return
@@ -346,11 +366,18 @@ export function useNetwork() {
   onMounted(async () => {
     await loadTopologyConfig()
     await fetchSnapshot()
+    // Fire-and-forget: live Proxmox calls can be slow, must not delay the
+    // hosts/containers snapshot above.
+    void fetchIPInventory()
   })
 
   return {
     hosts,
     containers,
+    proxmoxGuestIPs,
+    npmEntries,
+    ipInventoryLoading,
+    ipInventoryError,
     viewMode,
     networkTab,
     rootNodeName,

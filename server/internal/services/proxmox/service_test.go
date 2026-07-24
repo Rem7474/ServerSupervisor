@@ -15,6 +15,13 @@ import (
 type fakeRepo struct {
 	link    *models.ProxmoxGuestLink
 	created bool
+
+	// Used by AllGuestNetworks tests only; nil/empty for every other test,
+	// which preserves their existing nil-returning behavior below.
+	nodes        []models.ProxmoxNode
+	enabledConns []database.ProxmoxConnectionFull
+	connByID     map[string]*models.ProxmoxConnection
+	guestsByNode map[string][]models.ProxmoxGuest
 }
 
 func (f *fakeRepo) ListProxmoxConnections(context.Context) ([]models.ProxmoxConnection, error) {
@@ -24,7 +31,10 @@ func (f *fakeRepo) CreateProxmoxConnection(context.Context, string, string, stri
 	f.created = true
 	return "id", nil
 }
-func (f *fakeRepo) GetProxmoxConnectionByID(context.Context, string) (*models.ProxmoxConnection, error) {
+func (f *fakeRepo) GetProxmoxConnectionByID(_ context.Context, id string) (*models.ProxmoxConnection, error) {
+	if f.connByID != nil {
+		return f.connByID[id], nil
+	}
 	return nil, nil
 }
 func (f *fakeRepo) UpdateProxmoxConnection(context.Context, string, string, string, string, string, bool, bool, int) error {
@@ -32,7 +42,7 @@ func (f *fakeRepo) UpdateProxmoxConnection(context.Context, string, string, stri
 }
 func (f *fakeRepo) DeleteProxmoxConnection(context.Context, string) error { return nil }
 func (f *fakeRepo) GetEnabledProxmoxConnections(context.Context) ([]database.ProxmoxConnectionFull, error) {
-	return nil, nil
+	return f.enabledConns, nil
 }
 func (f *fakeRepo) GetProxmoxTokenSecret(context.Context, string) (string, error) { return "", nil }
 func (f *fakeRepo) GetProxmoxSummary(context.Context) (models.ProxmoxSummary, error) {
@@ -41,7 +51,10 @@ func (f *fakeRepo) GetProxmoxSummary(context.Context) (models.ProxmoxSummary, er
 func (f *fakeRepo) ListProxmoxGuests(context.Context, string, string, string) ([]models.ProxmoxGuest, error) {
 	return nil, nil
 }
-func (f *fakeRepo) ListProxmoxGuestsByNode(context.Context, string, string) ([]models.ProxmoxGuest, error) {
+func (f *fakeRepo) ListProxmoxGuestsByNode(_ context.Context, connectionID, nodeName string) ([]models.ProxmoxGuest, error) {
+	if f.guestsByNode != nil {
+		return f.guestsByNode[connectionID+"|"+nodeName], nil
+	}
 	return nil, nil
 }
 func (f *fakeRepo) GetProxmoxGuestMetricsSummary(context.Context, string, int, int) ([]models.ProxmoxNodeMetricsSummary, error) {
@@ -69,7 +82,9 @@ func (f *fakeRepo) GetProxmoxGuestLinkByHost(context.Context, string) (*models.P
 func (f *fakeRepo) ListProxmoxLinkCandidates(context.Context, string) ([]models.ProxmoxGuest, error) {
 	return nil, nil
 }
-func (f *fakeRepo) ListProxmoxNodes(context.Context) ([]models.ProxmoxNode, error) { return nil, nil }
+func (f *fakeRepo) ListProxmoxNodes(context.Context) ([]models.ProxmoxNode, error) {
+	return f.nodes, nil
+}
 func (f *fakeRepo) ListProxmoxNodesByConnection(context.Context, string) ([]models.ProxmoxNode, error) {
 	return nil, nil
 }

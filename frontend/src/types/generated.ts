@@ -769,6 +769,43 @@ export interface TopologySnapshot {
   config?: NetworkTopologyConfig;
   updated_at: string;
 }
+/**
+ * NetworkProxmoxGuestIP is a Proxmox VM/LXC guest with its live-fetched IP
+ * addresses, correlated with a ServerSupervisor Host when a confirmed
+ * proxmox_guest_links entry exists.
+ */
+export interface NetworkProxmoxGuestIP {
+  guest_id: string;
+  name: string;
+  node: string;
+  guest_type: string; // "vm" | "lxc"
+  vmid: number /* int */;
+  status: string;
+  ip_addresses: string[];
+  host_id?: string;
+  host_name?: string;
+}
+/**
+ * NetworkNPMEntry is an Nginx Proxy Manager proxy host entry, correlated by
+ * IP with a ServerSupervisor Host or a Proxmox guest when possible.
+ */
+export interface NetworkNPMEntry {
+  proxy_host_id: number /* int */;
+  domain_names: string[];
+  forward_host: string;
+  forward_port: number /* int */;
+  matched_type?: string; // "host" | "proxmox_guest"
+  matched_id?: string;
+  matched_name?: string;
+}
+/**
+ * NetworkIPInventory is the combined, real-time (non-persisted) IP inventory
+ * shown on the Network page's cards view.
+ */
+export interface NetworkIPInventory {
+  proxmox_guests: NetworkProxmoxGuestIP[];
+  npm_hosts: NetworkNPMEntry[];
+}
 
 //////////
 // source: npm.go
