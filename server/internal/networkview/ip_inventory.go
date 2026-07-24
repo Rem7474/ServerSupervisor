@@ -3,12 +3,18 @@ package networkview
 import (
 	"context"
 	"net"
+	"regexp"
 	"strings"
 
 	"github.com/serversupervisor/server/internal/database"
 	"github.com/serversupervisor/server/internal/models"
 	"github.com/serversupervisor/server/internal/proxmoxclient"
 )
+
+// ethInterfaceName matches the standard "ethX" guest interface (eth0, eth1, …).
+// Other interfaces the guest agent reports — docker0, veth*, br-*, tailscale0,
+// lo, ens18, ... — are noise for this correlation feature and are excluded.
+var ethInterfaceName = regexp.MustCompile(`^eth\d+$`)
 
 // GuestNetworksProvider is the subset of proxmox.Service's live-fetch
 // capability BuildIPInventory needs. Defined here (consumer side) so it can
@@ -139,12 +145,15 @@ func BuildIPInventory(ctx context.Context, db *database.DB, proxmoxSvc GuestNetw
 	}, nil
 }
 
-// extractRoutableIPs strips the CIDR mask from each interface's IPs and
-// drops loopback/link-local addresses, which are never useful correlation
-// targets on the Network page.
+// extractRoutableIPs keeps only the "ethX" interface(s), strips the CIDR
+// mask from their IPs, and drops loopback/link-local addresses — none of
+// which are useful correlation targets on the Network page.
 func extractRoutableIPs(ifaces []proxmoxclient.GuestNetworkIface) []string {
 	var ips []string
 	for _, iface := range ifaces {
+		if !ethInterfaceName.MatchString(iface.Name) {
+			continue
+		}
 		for _, cidr := range iface.IPs {
 			addr := cidr
 			if idx := strings.IndexByte(cidr, '/'); idx >= 0 {

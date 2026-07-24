@@ -112,7 +112,12 @@ func TestBuildIPInventory(t *testing.T) {
 
 	guestNets := fakeGuestNetworks{nets: map[string]map[int][]proxmoxclient.GuestNetworkIface{
 		nodeID: {
-			100: {{Name: "eth0", IPs: []string{"10.0.5.5/24", "127.0.0.1/8"}}},
+			// Guest A also reports a docker0 bridge IP, which must be
+			// excluded — only "ethX" interfaces are correlation targets.
+			100: {
+				{Name: "eth0", IPs: []string{"10.0.5.5/24", "127.0.0.1/8"}},
+				{Name: "docker0", IPs: []string{"172.17.0.1/16"}},
+			},
 			200: {{Name: "eth0", IPs: []string{"10.0.5.6/24"}}},
 		},
 	}}
@@ -140,7 +145,7 @@ func TestBuildIPInventory(t *testing.T) {
 		t.Errorf("guest A should be linked to %s, got %+v", appHostID, gotA)
 	}
 	if gotA == nil || len(gotA.IPAddresses) != 1 || gotA.IPAddresses[0] != "10.0.5.5" {
-		t.Errorf("guest A should have exactly one routable IP (loopback filtered out), got %+v", gotA)
+		t.Errorf("guest A should have exactly one routable IP (loopback and docker0 filtered out, only eth0 kept), got %+v", gotA)
 	}
 	if gotB == nil || gotB.HostID != "" {
 		t.Errorf("guest B has no confirmed link, expected empty host_id, got %+v", gotB)

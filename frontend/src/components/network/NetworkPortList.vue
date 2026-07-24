@@ -292,14 +292,21 @@
             <tr>
               <th>Ressource</th>
               <th>Nœud</th>
-              <th>IP(s)</th>
+              <th>
+                <SortableHeader
+                  label="IP(s)"
+                  :active="true"
+                  :direction="proxmoxIpSortDir"
+                  @toggle="toggleProxmoxIpSort"
+                />
+              </th>
               <th>Hôte corrélé</th>
               <th>État</th>
             </tr>
           </thead>
           <tbody>
             <tr
-              v-for="g in proxmoxGuests"
+              v-for="g in sortedProxmoxGuests"
               :key="g.guest_id"
             >
               <td>
@@ -379,14 +386,21 @@
           <thead>
             <tr>
               <th>Domaine(s)</th>
-              <th>IP / hôte cible</th>
+              <th>
+                <SortableHeader
+                  label="IP / hôte cible"
+                  :active="true"
+                  :direction="npmIpSortDir"
+                  @toggle="toggleNpmIpSort"
+                />
+              </th>
               <th>Port</th>
               <th>Ressource corrélée</th>
             </tr>
           </thead>
           <tbody>
             <tr
-              v-for="n in npmEntries"
+              v-for="n in sortedNpmEntries"
               :key="n.proxy_host_id"
             >
               <td class="fw-semibold">
@@ -431,6 +445,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import type { NetworkProxmoxGuestIP, NetworkNPMEntry } from '../../types/network'
+import SortableHeader from '../common/SortableHeader.vue'
 
 interface PortMapping {
   host_port?: number | string
@@ -561,6 +576,54 @@ const containersWithNetStats = computed(() =>
   [...props.containers]
     .filter((c) => c.state === 'running' && ((c.net_rx_bytes ?? 0) > 0 || (c.net_tx_bytes ?? 0) > 0))
     .sort((a, b) => ((b.net_rx_bytes ?? 0) + (b.net_tx_bytes ?? 0)) - ((a.net_rx_bytes ?? 0) + (a.net_tx_bytes ?? 0)))
+)
+
+// ─── IP sorting (Adresses IP Proxmox / Domaines NPM tables) ───────────────
+// IPv4 addresses sort numerically (10.0.0.9 before 10.0.0.10), not
+// lexicographically like a plain string compare would; anything that isn't
+// a parseable IPv4 (a hostname in NPM's forward_host, or no IP at all) falls
+// back to a locale string compare and always sorts after real IPs.
+function ipToComparable(ip: string): number | null {
+  if (!ip) return null
+  const parts = ip.split('.')
+  if (parts.length !== 4) return null
+  let value = 0
+  for (const part of parts) {
+    const n = Number(part)
+    if (!Number.isInteger(n) || n < 0 || n > 255) return null
+    value = value * 256 + n
+  }
+  return value
+}
+
+function compareIPs(a: string, b: string, direction: 'asc' | 'desc'): number {
+  const dir = direction === 'asc' ? 1 : -1
+  const av = ipToComparable(a)
+  const bv = ipToComparable(b)
+  if (av === null && bv === null) return a.localeCompare(b, 'fr', { sensitivity: 'base' }) * dir
+  if (av === null) return 1 * dir
+  if (bv === null) return -1 * dir
+  if (av < bv) return -1 * dir
+  if (av > bv) return 1 * dir
+  return 0
+}
+
+const proxmoxIpSortDir = ref<'asc' | 'desc'>('asc')
+function toggleProxmoxIpSort(): void {
+  proxmoxIpSortDir.value = proxmoxIpSortDir.value === 'asc' ? 'desc' : 'asc'
+}
+const sortedProxmoxGuests = computed(() =>
+  [...props.proxmoxGuests].sort((a, b) =>
+    compareIPs(a.ip_addresses[0] || '', b.ip_addresses[0] || '', proxmoxIpSortDir.value),
+  ),
+)
+
+const npmIpSortDir = ref<'asc' | 'desc'>('asc')
+function toggleNpmIpSort(): void {
+  npmIpSortDir.value = npmIpSortDir.value === 'asc' ? 'desc' : 'asc'
+}
+const sortedNpmEntries = computed(() =>
+  [...props.npmEntries].sort((a, b) => compareIPs(a.forward_host || '', b.forward_host || '', npmIpSortDir.value)),
 )
 
 function formatBytes(bytes: number | undefined): string {
