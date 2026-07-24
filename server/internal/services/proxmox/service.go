@@ -531,31 +531,49 @@ func (s *Service) NodeGuestNetworks(ctx context.Context, nodeID string) (map[int
 	return fetchGuestNetworksForNode(ctx, client, node, guests), nil
 }
 
-// fetchGuestNetworksForNode fans out one goroutine per running guest on a
-// single node, querying the QEMU guest agent (VMs) or the LXC interfaces API.
-// A guest whose agent is unreachable or returns nothing is silently omitted
-// from the result rather than surfaced as an error — this mirrors PVE's own
-// behavior when the guest agent isn't installed/running.
+// fetchGuestNetworksForNode fans out one goroutine per guest on a single
+// node. A running guest is queried live (QEMU guest agent for VMs, the LXC
+// interfaces API for containers); if that yields nothing — agent not
+// installed/running, or the guest is stopped — it falls back to the
+// guest's persisted config ("netN"'s ip= for LXC, cloud-init's
+// "ipconfigN" for VMs), which only ever exposes a *statically* assigned
+// address (see proxmoxclient.ParseStaticConfigIPs). A guest with neither is
+// silently omitted from the result rather than surfaced as an error — this
+// mirrors PVE's own behavior when nothing is reachable.
 func fetchGuestNetworksForNode(ctx context.Context, client *proxmoxclient.Client, node *models.ProxmoxNode, guests []models.ProxmoxGuest) map[int][]proxmoxclient.GuestNetworkIface {
 	result := make(map[int][]proxmoxclient.GuestNetworkIface)
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 	for _, g := range guests {
-		if g.Status != "running" {
-			continue
-		}
 		wg.Add(1)
 		go func(guest models.ProxmoxGuest) {
 			defer wg.Done()
 			defer safego.Recover(ctx, "proxmox.fetchGuestNetworksForNode")
 			var ifaces []proxmoxclient.GuestNetworkIface
-			var ferr error
-			if guest.GuestType == "vm" {
-				ifaces, ferr = client.GetVMNetworkInterfaces(node.NodeName, guest.VMID)
-			} else {
-				ifaces, ferr = client.GetLXCInterfaces(node.NodeName, guest.VMID)
+			if guest.Status == "running" {
+				var ferr error
+				if guest.GuestType == "vm" {
+					ifaces, ferr = client.GetVMNetworkInterfaces(node.NodeName, guest.VMID)
+				} else {
+					ifaces, ferr = client.GetLXCInterfaces(node.NodeName, guest.VMID)
+				}
+				if ferr != nil {
+					ifaces = nil
+				}
 			}
-			if ferr != nil || len(ifaces) == 0 {
+			if len(ifaces) == 0 {
+				var cfg map[string]any
+				var cerr error
+				if guest.GuestType == "vm" {
+					cfg, cerr = client.GetVMConfig(node.NodeName, guest.VMID)
+				} else {
+					cfg, cerr = client.GetLXCConfig(node.NodeName, guest.VMID)
+				}
+				if cerr == nil {
+					ifaces = proxmoxclient.ParseStaticConfigIPs(cfg)
+				}
+			}
+			if len(ifaces) == 0 {
 				return
 			}
 			mu.Lock()
