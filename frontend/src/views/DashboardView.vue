@@ -677,7 +677,14 @@ const bannerItems = computed<BannerItem[]>(() => {
     list.push({ key: item.key, label: item.label, to: item.to, severity: item.severity as BannerItem['severity'], count: item.count })
   }
 
-  return list
+  // Defensive sort: today CVE is always pushed first (the only "danger"
+  // source) and attentionItems is info/warning-only, so insertion order
+  // happens to already be severity-ordered — but nothing enforces that
+  // invariant here. Sorting explicitly means a future "danger"-severity
+  // attention item still surfaces above a "warning" one instead of silently
+  // landing wherever it was pushed.
+  const severityRank: Record<BannerItem['severity'], number> = { danger: 0, warning: 1, info: 2 }
+  return list.sort((a, b) => severityRank[a.severity] - severityRank[b.severity])
 })
 
 function bannerBadgeClass(severity: BannerItem['severity']): string {

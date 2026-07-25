@@ -642,7 +642,10 @@ const proxmoxTabs = computed<EntityTab[]>(() => [
     lazy: true,
   },
   { key: 'services', label: 'Services', lazy: true },
-  { key: 'security', label: 'Sécurité', badges: [{ value: securityEventsCount.value, badgeClass: azureBadge }], lazy: true },
+  // Labeled "Journaux sécurité" (not "Sécurité") to avoid colliding with
+  // HostDetailView's "Permissions" tab — same word previously used on both,
+  // unrelated content (PVE syslog auth-failure search here vs. per-host RBAC there).
+  { key: 'security', label: 'Journaux sécurité', badges: [{ value: securityEventsCount.value, badgeClass: azureBadge }], lazy: true },
 ])
 
 // VMs/LXC and Services fetch their own supporting data lazily, only when the

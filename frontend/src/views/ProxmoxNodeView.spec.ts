@@ -84,7 +84,7 @@ describe('ProxmoxNodeView (characterization)', () => {
 
     const text = wrapper.text()
     expect(text).toContain('pve1')
-    for (const label of ['VMs', 'LXC', 'Stockage', 'Disques', 'Tâches', 'Mises à jour', 'Services', 'Sécurité']) {
+    for (const label of ['VMs', 'LXC', 'Stockage', 'Disques', 'Tâches', 'Mises à jour', 'Services', 'Journaux sécurité']) {
       expect(text).toContain(label)
     }
   })

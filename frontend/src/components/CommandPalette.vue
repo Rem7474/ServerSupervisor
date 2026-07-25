@@ -1,5 +1,6 @@
 <template>
   <div
+    ref="dialogRef"
     class="modal modal-blur fade show"
     style="display: block;"
     tabindex="-1"
@@ -7,6 +8,7 @@
     aria-modal="true"
     aria-label="Palette de commande"
     @click.self="close"
+    @keydown.tab="trapFocus"
   >
     <div class="modal-dialog modal-lg modal-dialog-centered">
       <div class="modal-content command-palette">
@@ -56,11 +58,27 @@
                 :size="18"
                 class="icon me-2 text-secondary flex-shrink-0"
               />
-              <span class="command-palette-item-label">{{ result.label }}</span>
+              <span class="command-palette-item-label">
+                <template
+                  v-for="(part, i) in highlightParts(result.label, query)"
+                  :key="i"
+                ><mark
+                  v-if="part.matched"
+                  class="command-palette-match"
+                >{{ part.text }}</mark><template v-else>{{ part.text }}</template></template>
+              </span>
               <span
                 v-if="result.sublabel"
                 class="command-palette-item-sublabel"
-              >{{ result.sublabel }}</span>
+              >
+                <template
+                  v-for="(part, i) in highlightParts(result.sublabel, query)"
+                  :key="i"
+                ><mark
+                  v-if="part.matched"
+                  class="command-palette-match"
+                >{{ part.text }}</mark><template v-else>{{ part.text }}</template></template>
+              </span>
             </button>
           </div>
         </div>
@@ -74,15 +92,39 @@
 import { computed, onMounted, ref } from 'vue'
 import { IconSearch } from '@tabler/icons-vue'
 import { useCommandPalette, type PaletteResult } from '../composables/useCommandPalette'
+import { highlightParts } from '../utils/highlightMatch'
 
 const { query, activeIndex, results, close, selectResult } = useCommandPalette()
 
 const inputRef = ref<HTMLInputElement | null>(null)
+const dialogRef = ref<HTMLElement | null>(null)
 
 // Mounted fresh on every open (App.vue renders this v-if="isOpen"), so a
 // plain onMounted focus is reliable — unlike a permanently-mounted modal
 // toggled by an internal v-if, there's no stale-ref timing to work around.
 onMounted(() => inputRef.value?.focus())
+
+// Keeps Tab/Shift+Tab cycling within the palette instead of escaping to the
+// page underneath — this modal isn't teleported out of the app tree and has
+// no backdrop-level focus trap, so without this a keyboard-only user could
+// tab straight past it into the dimmed navbar/host table behind it.
+function trapFocus(e: KeyboardEvent): void {
+  const root = dialogRef.value
+  if (!root) return
+  const focusable = Array.from(
+    root.querySelectorAll<HTMLElement>('input, button:not([disabled])')
+  )
+  if (!focusable.length) return
+  const first = focusable[0]
+  const last = focusable[focusable.length - 1]
+  if (e.shiftKey && document.activeElement === first) {
+    e.preventDefault()
+    last.focus()
+  } else if (!e.shiftKey && document.activeElement === last) {
+    e.preventDefault()
+    first.focus()
+  }
+}
 
 interface DisplayResult extends PaletteResult {
   globalIndex: number
@@ -182,5 +224,15 @@ const groupedResults = computed(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Uses the theme's own accent + a translucent bg (not a plain <mark> yellow
+   highlight) so it reads correctly on the dark surface and doesn't clash
+   with the active/hover row background above. */
+.command-palette-match {
+  background: rgba(var(--tblr-primary-rgb, 32, 107, 196), 0.22);
+  color: var(--tblr-primary, inherit);
+  border-radius: 3px;
+  padding: 0 1px;
 }
 </style>

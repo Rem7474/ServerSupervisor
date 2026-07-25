@@ -723,7 +723,10 @@ const hostTabs = computed<EntityTab[]>(() => {
     )
   }
 
-  tabs.push({ key: 'securite', label: 'Sécurité' })
+  // Labeled "Permissions" (not "Sécurité") to avoid colliding with
+  // ProxmoxNodeView's "Journaux sécurité" tab — same word, unrelated content
+  // (per-host RBAC here vs. PVE syslog auth-failure search there).
+  tabs.push({ key: 'securite', label: 'Permissions' })
   tabs.push({
     key: 'planifiees',
     label: 'Tâches planifiées',

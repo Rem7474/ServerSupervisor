@@ -265,6 +265,32 @@ button:focus-visible {
   font-size: 0.875rem;
 }
 
+/* Browser autofill (login username/password, saved host IPs, remembered
+ * search terms, ...) forces its own light background via UA styling that
+ * `background-color` alone can't override — only -webkit-text-fill-color +
+ * a same-color inset box-shadow can. Without this, autofilled fields on this
+ * dark-only theme (no toggle — see index.html's data-bs-theme="dark") render
+ * light input text (Tabler's --tblr-body-color) on the browser's forced
+ * light autofill background: invisible text, worst on the login form since
+ * every field there is `autocomplete`-tagged. */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+textarea:-webkit-autofill,
+textarea:-webkit-autofill:hover,
+textarea:-webkit-autofill:focus,
+select:-webkit-autofill,
+select:-webkit-autofill:hover,
+select:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--tblr-body-color, #e5e7eb);
+  -webkit-box-shadow: 0 0 0 1000px var(--tblr-bg-surface, #1f2937) inset;
+  box-shadow: 0 0 0 1000px var(--tblr-bg-surface, #1f2937) inset;
+  caret-color: var(--tblr-body-color, #e5e7eb);
+  /* Delays the browser's own transition-based repaint of the autofill
+     background so ours wins instead of flashing light then dark. */
+  transition: background-color 5000s ease-in-out 0s;
+}
+
 /* ── Form validation ── */
 .is-invalid {
   border-color: #e74c3c !important;

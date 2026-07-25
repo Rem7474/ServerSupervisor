@@ -1,11 +1,13 @@
-import { ref, computed, onMounted, type Component } from 'vue'
+import { ref, computed, onMounted, watch, type Component } from 'vue'
 import { useRouter } from 'vue-router'
-import { IconServer, IconBrandDocker } from '@tabler/icons-vue'
+import { IconServer, IconBrandDocker, IconBell } from '@tabler/icons-vue'
 import { useAuthStore } from '../stores/auth'
 import { useHostsStore } from '../stores/hosts'
+import { useAlertRulesStore } from '../stores/alertRules'
 import apiClient from '../api'
 import type { DockerContainer } from '../types/docker'
 import { visibleNavSections } from '../config/navigation'
+import { getAlertMetricMeta } from '../utils/alertMetrics'
 
 export interface PaletteResult {
   key: string
@@ -13,7 +15,7 @@ export interface PaletteResult {
   sublabel: string
   icon: Component
   to: string
-  group: 'Navigation' | 'Hôtes' | 'Conteneurs'
+  group: 'Navigation' | 'Hôtes' | 'Conteneurs' | 'Alertes'
 }
 
 const MAX_RESULTS_PER_GROUP = 6
@@ -41,6 +43,7 @@ export function useCommandPalette() {
   const router = useRouter()
   const auth = useAuthStore()
   const hostsStore = useHostsStore()
+  const alertRulesStore = useAlertRulesStore()
 
   async function ensureContainersLoaded(): Promise<void> {
     if (containersLoaded.value || containersLoading.value) return
@@ -67,6 +70,7 @@ export function useCommandPalette() {
     query.value = ''
     activeIndex.value = 0
     hostsStore.fetchHosts()
+    void alertRulesStore.fetchRules()
     void ensureContainersLoaded()
   }
 
@@ -139,11 +143,54 @@ export function useCommandPalette() {
       }))
   })
 
+  // No per-rule route exists (editing happens via a modal on /alerts itself,
+  // not a dedicated page) — every match deep-links to the Règles tab, where
+  // the matched rule is still visible in the list to open from there.
+  const alertResults = computed<PaletteResult[]>(() => {
+    const q = query.value.trim().toLowerCase()
+    if (!q) return []
+    return alertRulesStore.rules
+      .filter((r) =>
+        r.name?.toLowerCase().includes(q) ||
+        getAlertMetricMeta(r.metric).label.toLowerCase().includes(q)
+      )
+      .slice(0, MAX_RESULTS_PER_GROUP)
+      .map((r) => ({
+        key: `alert-rule:${r.id}`,
+        label: r.name || getAlertMetricMeta(r.metric).label,
+        sublabel: r.enabled ? getAlertMetricMeta(r.metric).label : 'Désactivée',
+        icon: IconBell,
+        to: '/alerts?tab=rules',
+        group: 'Alertes' as const,
+      }))
+  })
+
   const results = computed<PaletteResult[]>(() => [
     ...navResults.value,
     ...hostResults.value,
     ...containerResults.value,
+    ...alertResults.value,
   ])
+
+  // Without this, typing a query that narrows the list below the current
+  // activeIndex leaves it pointing past the end: the "active" row highlight
+  // (CommandPalette.vue's :class="{ active: ... }") disappears entirely, and
+  // Enter silently no-ops (selectResult guards on an undefined result) until
+  // an arrow key happens to bring the index back in range.
+  watch(query, () => {
+    activeIndex.value = 0
+  })
+
+  // Separately clamps (rather than resets to 0) when the result set itself
+  // shrinks without a query change — e.g. containers finish loading async
+  // after open() and turn out to match fewer rows than the host/nav results
+  // already on screen — so an in-range selection isn't yanked back to the
+  // top for a change the user didn't make.
+  watch(results, (list) => {
+    if (activeIndex.value > list.length - 1) {
+      activeIndex.value = Math.max(0, list.length - 1)
+    }
+  })
 
   function moveActive(delta: number): void {
     const len = results.value.length
