@@ -91,7 +91,7 @@
               </div>
             </div>
 
-            <div class="table-responsive">
+            <div class="table-responsive containers-scroll">
               <table class="table table-sm table-vcenter">
                 <thead>
                   <tr>
@@ -297,3 +297,15 @@ function close(): void {
   emit('close')
 }
 </script>
+
+<style scoped>
+/* The scroll container here is .modal-body (via .modal-dialog-scrollable),
+   not this table — so pin the header to that ancestor's scroll instead of
+   giving the table its own nested max-height/overflow. */
+.containers-scroll thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--tblr-bg-surface);
+}
+</style>

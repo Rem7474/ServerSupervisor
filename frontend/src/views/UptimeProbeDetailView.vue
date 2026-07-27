@@ -188,7 +188,7 @@
             {{ groupedResults.length }} séquence(s) sur {{ results.length }} check(s)
           </small>
         </div>
-        <div class="table-responsive">
+        <div class="table-responsive scroll-table">
           <table class="table table-vcenter card-table">
             <thead>
               <tr>

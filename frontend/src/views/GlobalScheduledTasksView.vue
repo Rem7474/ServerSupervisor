@@ -152,7 +152,7 @@
       </div>
       <div
         v-else
-        class="table-responsive"
+        class="table-responsive scroll-table"
       >
         <table class="table table-vcenter table-hover card-table mb-0">
           <thead>

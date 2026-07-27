@@ -347,6 +347,22 @@ select:-webkit-autofill:focus {
   z-index: var(--z-index-sticky);
 }
 
+/* Bounds a long table to its own scroll area with the header pinned inside
+   it, so scrolling a long list doesn't scroll the column headers out of
+   view. Apply alongside .table-responsive (which only handles horizontal
+   overflow on its own). */
+.scroll-table {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.scroll-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--tblr-bg-surface);
+}
+
 /* ── Responsive icons ── */
 .icon-xs {
   width: 12px;

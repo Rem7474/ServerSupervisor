@@ -141,7 +141,7 @@
               </h4>
             </div>
             <div
-              class="table-responsive"
+              class="table-responsive scroll-table"
               style="max-height: 360px;"
             >
               <table class="table table-sm table-vcenter mb-0">

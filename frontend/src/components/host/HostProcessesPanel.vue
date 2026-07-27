@@ -61,7 +61,7 @@
     </div>
     <div
       v-if="filteredProcesses.length"
-      class="table-responsive"
+      class="table-responsive scroll-table"
     >
       <table
         class="table table-vcenter table-hover card-table mb-0"

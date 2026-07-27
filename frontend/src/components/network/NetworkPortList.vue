@@ -59,7 +59,7 @@
     </div>
 
     <div class="card mb-4">
-      <div class="table-responsive">
+      <div class="table-responsive scroll-table">
         <table class="table table-vcenter card-table">
           <thead>
             <tr>
@@ -153,7 +153,7 @@
           </span>
         </div>
       </div>
-      <div class="table-responsive">
+      <div class="table-responsive scroll-table">
         <table class="table table-vcenter card-table">
           <thead>
             <tr>
@@ -222,7 +222,7 @@
           </span>
         </div>
       </div>
-      <div class="table-responsive">
+      <div class="table-responsive scroll-table">
         <table class="table table-vcenter card-table">
           <thead>
             <tr>
@@ -286,7 +286,7 @@
           </span>
         </div>
       </div>
-      <div class="table-responsive">
+      <div class="table-responsive scroll-table">
         <table class="table table-vcenter card-table">
           <thead>
             <tr>
@@ -381,7 +381,7 @@
           </span>
         </div>
       </div>
-      <div class="table-responsive">
+      <div class="table-responsive scroll-table">
         <table class="table table-vcenter card-table">
           <thead>
             <tr>

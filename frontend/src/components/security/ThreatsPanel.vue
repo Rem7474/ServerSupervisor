@@ -122,7 +122,7 @@
                 IPs suspectes
               </h3>
             </div>
-            <div class="table-responsive">
+            <div class="table-responsive scroll-table">
               <table class="table table-vcenter card-table">
                 <thead>
                   <tr>
@@ -248,7 +248,7 @@
                 Domaines les plus ciblés
               </h3>
             </div>
-            <div class="table-responsive">
+            <div class="table-responsive scroll-table">
               <table class="table table-vcenter card-table">
                 <thead>
                   <tr>
@@ -298,7 +298,7 @@
                 IP × Domaines (scan coordonné)
               </h3>
             </div>
-            <div class="table-responsive">
+            <div class="table-responsive scroll-table">
               <table class="table table-vcenter card-table">
                 <thead>
                   <tr>
@@ -355,7 +355,7 @@
                 {{ crowdSecTotal.toLocaleString() }} décisions actives
               </span>
             </div>
-            <div class="table-responsive">
+            <div class="table-responsive scroll-table">
               <table class="table table-vcenter card-table">
                 <thead>
                   <tr>

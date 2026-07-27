@@ -90,7 +90,7 @@
 
       <div
         v-else
-        class="table-responsive npm-hosts-scroll"
+        class="table-responsive scroll-table"
       >
         <table class="table table-vcenter card-table">
           <thead>
@@ -274,20 +274,3 @@ function sslBadge(days: number): string {
   return 'bg-success-lt text-success'
 }
 </script>
-
-<style scoped>
-/* A long proxy-host list otherwise scrolls the column headers away with the
-   page — bound the table to its own scroll area and pin the header inside
-   it (mirrors IPTimelineModal's sticky-thead pattern). */
-.npm-hosts-scroll {
-  max-height: 70vh;
-  overflow-y: auto;
-}
-
-.npm-hosts-scroll thead th {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  background: var(--tblr-bg-surface);
-}
-</style>

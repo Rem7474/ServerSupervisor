@@ -56,7 +56,7 @@
     </div>
     <div
       v-else-if="events.length"
-      class="table-responsive"
+      class="table-responsive scroll-table"
     >
       <table class="table table-vcenter card-table">
         <thead>

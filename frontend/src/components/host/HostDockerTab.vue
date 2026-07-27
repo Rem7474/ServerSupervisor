@@ -5,7 +5,7 @@
         Conteneurs Docker <span v-if="containers.length">({{ containers.length }})</span>
       </h3>
     </div>
-    <div class="table-responsive">
+    <div class="table-responsive scroll-table">
       <table class="table table-vcenter card-table">
         <thead>
           <tr>

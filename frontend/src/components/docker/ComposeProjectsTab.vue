@@ -49,7 +49,7 @@
     v-if="filteredComposeProjects.length > 0"
     class="card"
   >
-    <div class="table-responsive">
+    <div class="table-responsive scroll-table">
       <table class="table table-vcenter card-table">
         <thead>
           <tr>

@@ -41,7 +41,7 @@
 
     <div
       v-else
-      class="table-responsive"
+      class="table-responsive scroll-table"
     >
       <table class="table table-vcenter card-table">
         <thead>
