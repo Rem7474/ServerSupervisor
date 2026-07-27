@@ -80,15 +80,11 @@ export function useNPM() {
   // toggle gère les flags de monitoring ServerSupervisor (uptime/SSL).
   async function toggle(
     host: NPMProxyHostEnriched,
-    field: 'monitoring_enabled' | 'uptime_monitoring_enabled' | 'ssl_monitoring_enabled',
+    field: 'uptime_monitoring_enabled' | 'ssl_monitoring_enabled',
     value: boolean,
   ): Promise<void> {
     const prev = host[field]
     host[field] = value
-    if (field === 'monitoring_enabled' && !value) {
-      host.uptime_monitoring_enabled = false
-      host.ssl_monitoring_enabled = false
-    }
 
     toggling.value[host.id] = true
     actionError.value = ''
@@ -98,10 +94,6 @@ export function useNPM() {
       if (idx !== -1) hosts.value[idx] = res.data
     } catch (e: unknown) {
       host[field] = prev
-      if (field === 'monitoring_enabled' && !value) {
-        host.uptime_monitoring_enabled = host.monitoring_enabled
-        host.ssl_monitoring_enabled = host.monitoring_enabled
-      }
       actionError.value = getApiErrorMessage(e, 'Erreur lors de la mise à jour du monitoring.')
       setTimeout(() => { actionError.value = '' }, 5000)
     } finally {

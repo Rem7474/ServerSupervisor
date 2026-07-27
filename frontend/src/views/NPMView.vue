@@ -90,7 +90,7 @@
 
       <div
         v-else
-        class="table-responsive"
+        class="table-responsive npm-hosts-scroll"
       >
         <table class="table table-vcenter card-table">
           <thead>
@@ -103,12 +103,6 @@
                 title="Activer/désactiver le proxy host dans NPM"
               >
                 Actif NPM
-              </th>
-              <th
-                class="text-center"
-                title="Activer/désactiver tout le monitoring (uptime + SSL)"
-              >
-                Monitoring
               </th>
               <th class="text-center">
                 Uptime
@@ -156,20 +150,6 @@
                     :disabled="togglingNPM[h.id]"
                     title="Activer ou désactiver ce proxy host dans Nginx Proxy Manager"
                     @change="toggleNPM(h, ($event.target as HTMLInputElement).checked)"
-                  >
-                </label>
-              </td>
-
-              <!-- Master monitoring toggle -->
-              <td class="text-center">
-                <label class="form-check form-switch mb-0 d-inline-flex justify-content-center">
-                  <input
-                    class="form-check-input"
-                    type="checkbox"
-                    :checked="h.monitoring_enabled"
-                    :disabled="toggling[h.id] || !h.npm_enabled"
-                    :title="!h.npm_enabled ? 'Activez le host dans NPM d\'abord' : ''"
-                    @change="toggle(h, 'monitoring_enabled', ($event.target as HTMLInputElement).checked)"
                   >
                 </label>
               </td>
@@ -294,3 +274,20 @@ function sslBadge(days: number): string {
   return 'bg-success-lt text-success'
 }
 </script>
+
+<style scoped>
+/* A long proxy-host list otherwise scrolls the column headers away with the
+   page — bound the table to its own scroll area and pin the header inside
+   it (mirrors IPTimelineModal's sticky-thead pattern). */
+.npm-hosts-scroll {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.npm-hosts-scroll thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--tblr-bg-surface);
+}
+</style>
