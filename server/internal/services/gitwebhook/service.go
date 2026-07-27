@@ -229,7 +229,7 @@ func (s *Service) Receive(ctx context.Context, id string, body []byte, headers h
 	}
 
 	if running, _ := s.repo.GetRunningExecutionForWebhook(ctx, id); running {
-		exec := newExecution(id, wh.Provider, parsed, "skipped")
+		exec := newExecution(id, wh.Provider, parsed, "skipped", body)
 		if created, _ := s.repo.CreateWebhookExecution(ctx, exec); created != nil {
 			now := time.Now()
 			_ = s.repo.UpdateWebhookExecutionStatus(ctx, created.ID, "skipped", &now)
@@ -237,7 +237,7 @@ func (s *Service) Receive(ctx context.Context, id string, body []byte, headers h
 		return &ReceiveResult{Status: "skipped", Reason: "already_running"}, nil
 	}
 
-	createdExec, err := s.repo.CreateWebhookExecution(ctx, newExecution(id, wh.Provider, parsed, "pending"))
+	createdExec, err := s.repo.CreateWebhookExecution(ctx, newExecution(id, wh.Provider, parsed, "pending", body))
 	if err != nil {
 		slog.ErrorContext(ctx, "webhook execution record failed", slog.String("id", id), slog.Any("err", err))
 		return nil, apperr.Internal(err)
@@ -285,7 +285,17 @@ func (s *Service) Receive(ctx context.Context, id string, body []byte, headers h
 	return &ReceiveResult{Status: "dispatched", ExecutionID: createdExec.ID, CommandID: result.Command.ID}, nil
 }
 
-func newExecution(id, provider string, p *parsedGitPayload, status string) models.GitWebhookExecution {
+// maxStoredPayloadBytes bounds how much of the raw delivery body is kept per
+// execution — enough to debug "why didn't this trigger" without an execution
+// list response ballooning on a provider that sends an unusually large payload
+// (e.g. GitHub's push event lists every commit).
+const maxStoredPayloadBytes = 65536
+
+func newExecution(id, provider string, p *parsedGitPayload, status string, rawBody []byte) models.GitWebhookExecution {
+	raw := rawBody
+	if len(raw) > maxStoredPayloadBytes {
+		raw = raw[:maxStoredPayloadBytes]
+	}
 	return models.GitWebhookExecution{
 		WebhookID:     id,
 		Provider:      provider,
@@ -295,6 +305,7 @@ func newExecution(id, provider string, p *parsedGitPayload, status string) model
 		CommitMessage: p.CommitMessage,
 		Pusher:        p.Pusher,
 		Status:        status,
+		RawPayload:    string(raw),
 	}
 }
 

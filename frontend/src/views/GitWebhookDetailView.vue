@@ -181,6 +181,7 @@
           logs-mode="inline"
           @refresh="loadExecutions"
           @open-logs="openExecutionLogs"
+          @open-payload="selectedPayload = $event"
         />
 
         <div class="mt-3">
@@ -206,16 +207,25 @@
       @close="closeEdit"
       @submit="saveEdit"
     />
+
+    <PayloadViewerModal
+      :payload="selectedPayload"
+      @close="selectedPayload = null"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
 import RelativeTime from '../components/RelativeTime.vue'
 import WebhookUrlCard from '../components/webhooks/WebhookUrlCard.vue'
 import WebhookExecutionList from '../components/webhooks/WebhookExecutionList.vue'
 import WebhookModal from '../components/webhooks/WebhookModal.vue'
+import PayloadViewerModal from '../components/webhooks/PayloadViewerModal.vue'
 import CommandLogPanel from '../components/host/CommandLogPanel.vue'
 import { useGitWebhookDetail } from '../composables/useGitWebhookDetail'
+
+const selectedPayload = ref<string | null>(null)
 
 const {
   id,

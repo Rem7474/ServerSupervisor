@@ -364,6 +364,7 @@
                               <th>Hôte</th>
                               <th>Action</th>
                               <th>État</th>
+                              <th />
                             </tr>
                           </thead>
                           <tbody>
@@ -379,11 +380,26 @@
                                   v-if="s.status"
                                   class="badge"
                                   :class="executionBadgeClass(s.status)"
-                                >{{ executionStatusLabel(s.status) }}</span>
+                                >{{ executionStatusLabel(s.status) }}
+                                  <span
+                                    v-if="s.status === 'running' || s.status === 'pending'"
+                                    class="spinner-border spinner-border-sm ms-1"
+                                  /></span>
                                 <span
                                   v-else
                                   class="text-muted small"
                                 >en attente</span>
+                              </td>
+                              <td>
+                                <button
+                                  v-if="s.command_id"
+                                  type="button"
+                                  class="btn btn-sm btn-ghost-secondary"
+                                  title="Voir les logs de cette étape"
+                                  @click="openStepLogs(s)"
+                                >
+                                  <IconFileText :size="16" />
+                                </button>
                               </td>
                             </tr>
                           </tbody>
@@ -393,6 +409,21 @@
                   </template>
                 </tbody>
               </table>
+            </div>
+
+            <div
+              v-if="showStepLogPanel"
+              class="mt-3"
+              style="height: 320px;"
+            >
+              <CommandLogPanel
+                :command="selectedStepCommand"
+                :show="showStepLogPanel"
+                title="Logs de l'étape"
+                empty-text="Aucune étape sélectionnée"
+                @close="closeStepLogs"
+                @open="showStepLogPanel = true"
+              />
             </div>
           </div>
           <div class="modal-footer">
@@ -416,10 +447,11 @@
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, watch } from 'vue'
-import { IconHistory, IconPencil, IconPlayerPlay, IconPlus, IconTrash } from '@tabler/icons-vue'
+import { IconFileText, IconHistory, IconPencil, IconPlayerPlay, IconPlus, IconTrash } from '@tabler/icons-vue'
 import EmptyState from '../components/EmptyState.vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import DispatchStepEditor from '../components/DispatchStepEditor.vue'
+import CommandLogPanel from '../components/host/CommandLogPanel.vue'
 import {
   useRunbooks, actionsForModule, moduleRequiresTarget, emptyStep,
 } from '../composables/useRunbooks'
@@ -432,6 +464,7 @@ const {
   historyRunbook, executions, executionsLoading, selectedExecution, runningIds,
   loadRunbooks, startAdd, startEdit, closeModal, saveRunbook, deleteRunbook, runRunbook,
   openHistory, closeHistory, selectExecution,
+  selectedStepCommand, showStepLogPanel, openStepLogs, closeStepLogs,
 } = useRunbooks()
 
 const dialog = useConfirmDialog()

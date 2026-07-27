@@ -94,114 +94,137 @@
       {{ error }}
     </div>
 
-    <div class="card">
-      <div
-        v-if="loading && commands.length === 0"
-        class="card-body text-center text-muted py-5"
-      >
-        <div class="spinner-border mb-2" />
-        <div>Chargement…</div>
-      </div>
+    <div class="side-layout">
+      <div class="side-main">
+        <div class="card">
+          <div
+            v-if="loading && commands.length === 0"
+            class="card-body text-center text-muted py-5"
+          >
+            <div class="spinner-border mb-2" />
+            <div>Chargement…</div>
+          </div>
 
-      <div
-        v-else-if="commands.length === 0"
-        class="card-body"
-      >
-        <EmptyState
-          :icon="IconTerminal2"
-          title="Aucune commande trouvée."
-        />
-      </div>
+          <div
+            v-else-if="commands.length === 0"
+            class="card-body"
+          >
+            <EmptyState
+              :icon="IconTerminal2"
+              title="Aucune commande trouvée."
+            />
+          </div>
 
-      <div
-        v-else
-        class="table-responsive"
-      >
-        <table class="table table-vcenter card-table">
-          <thead>
-            <tr>
-              <th>Hôte</th>
-              <th>Module</th>
-              <th>Action / Cible</th>
-              <th>Statut</th>
-              <th>Déclencheur</th>
-              <th>Créé</th>
-              <th />
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="cmd in commands"
-              :key="cmd.id"
-            >
-              <td class="text-muted small">
-                {{ cmd.host_name }}
-              </td>
-              <td>
-                <span
-                  class="badge"
-                  :class="moduleBadge(cmd.module)"
-                >{{ cmd.module }}</span>
-              </td>
-              <td>
-                <span class="fw-medium">{{ cmd.action }}</span>
-                <span
-                  v-if="cmd.target"
-                  class="text-muted ms-1"
-                >{{ cmd.target }}</span>
-              </td>
-              <td>
-                <span
-                  class="badge"
-                  :class="statusBadge(cmd.status)"
-                >{{ cmd.status }}</span>
-              </td>
-              <td class="text-muted small">
-                {{ cmd.triggered_by || '—' }}
-              </td>
-              <td class="text-muted small">
-                <RelativeTime :date="cmd.created_at" />
-              </td>
-              <td class="text-end">
-                <button
-                  v-if="cmd.status === 'pending' || cmd.status === 'running'"
-                  type="button"
-                  class="btn btn-sm btn-outline-danger"
-                  :disabled="cancellingId === cmd.id"
-                  @click="cancelCmd(cmd.id)"
+          <div
+            v-else
+            class="table-responsive"
+          >
+            <table class="table table-vcenter card-table">
+              <thead>
+                <tr>
+                  <th>Hôte</th>
+                  <th>Module</th>
+                  <th>Action / Cible</th>
+                  <th>Statut</th>
+                  <th>Déclencheur</th>
+                  <th>Créé</th>
+                  <th />
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="cmd in commands"
+                  :key="cmd.id"
                 >
-                  <span
-                    v-if="cancellingId === cmd.id"
-                    class="spinner-border spinner-border-sm me-1"
-                  />
-                  Annuler
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+                  <td class="text-muted small">
+                    {{ cmd.host_name }}
+                  </td>
+                  <td>
+                    <span
+                      class="badge"
+                      :class="moduleBadge(cmd.module)"
+                    >{{ cmd.module }}</span>
+                  </td>
+                  <td>
+                    <span class="fw-medium">{{ cmd.action }}</span>
+                    <span
+                      v-if="cmd.target"
+                      class="text-muted ms-1"
+                    >{{ cmd.target }}</span>
+                  </td>
+                  <td>
+                    <span
+                      class="badge"
+                      :class="statusBadge(cmd.status)"
+                    >{{ cmd.status }}</span>
+                  </td>
+                  <td class="text-muted small">
+                    {{ cmd.triggered_by || '—' }}
+                  </td>
+                  <td class="text-muted small">
+                    <RelativeTime :date="cmd.created_at" />
+                  </td>
+                  <td class="text-end">
+                    <button
+                      type="button"
+                      class="btn btn-sm btn-outline-secondary me-1"
+                      title="Voir les logs"
+                      @click="openLogs(cmd)"
+                    >
+                      <IconFileText :size="14" />
+                    </button>
+                    <button
+                      v-if="cmd.status === 'pending' || cmd.status === 'running'"
+                      type="button"
+                      class="btn btn-sm btn-outline-danger"
+                      :disabled="cancellingId === cmd.id"
+                      @click="cancelCmd(cmd.id)"
+                    >
+                      <span
+                        v-if="cancellingId === cmd.id"
+                        class="spinner-border spinner-border-sm me-1"
+                      />
+                      Annuler
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div
+            v-if="totalPages > 1"
+            class="card-footer d-flex align-items-center justify-content-between"
+          >
+            <span class="text-muted small">{{ total }} commande{{ total !== 1 ? 's' : '' }}</span>
+            <PaginationNav
+              :current-page="page"
+              :total-pages="totalPages"
+              @select="setPage"
+            />
+          </div>
+        </div>
       </div>
 
-      <div
-        v-if="totalPages > 1"
-        class="card-footer d-flex align-items-center justify-content-between"
-      >
-        <span class="text-muted small">{{ total }} commande{{ total !== 1 ? 's' : '' }}</span>
-        <PaginationNav
-          :current-page="page"
-          :total-pages="totalPages"
-          @select="setPage"
-        />
-      </div>
+      <CommandLogPanel
+        :command="selectedCommand"
+        :show="showLogPanel"
+        title="Logs de la commande"
+        empty-text="Aucune commande sélectionnée"
+        wrapper-class="side-panel"
+        @open="showLogPanel = true"
+        @close="closeLogs"
+      />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { IconTerminal2 } from '@tabler/icons-vue'
+import { IconFileText, IconTerminal2 } from '@tabler/icons-vue'
 import PaginationNav from '../components/PaginationNav.vue'
 import RelativeTime from '../components/RelativeTime.vue'
 import EmptyState from '../components/EmptyState.vue'
+import CommandLogPanel from '../components/host/CommandLogPanel.vue'
 import { useActiveCommands } from '../composables/useActiveCommands'
 
 const {
@@ -220,5 +243,9 @@ const {
   setPage,
   moduleBadge,
   statusBadge,
+  selectedCommand,
+  showLogPanel,
+  openLogs,
+  closeLogs,
 } = useActiveCommands()
 </script>

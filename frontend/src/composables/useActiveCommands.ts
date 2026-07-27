@@ -4,6 +4,8 @@ import { addToast } from './useGlobalToast'
 import type { RemoteCommandWithHost } from '../types/audit'
 import { getApiErrorMessage, isApiAbort } from '../api/client'
 import { useAbortSignal } from './useAbortSignal'
+import { useCommandStream } from './useCommandStream'
+import type { CommandStreamInitMsg, CommandStreamChunkMsg, CommandStatusUpdateMsg } from '../types/ws'
 
 const PAGE_SIZE = 50
 const POLL_INTERVAL = 10_000
@@ -20,6 +22,56 @@ export function useActiveCommands() {
   const statusFilter = ref('')
   const moduleFilter = ref('')
   let pollTimer: ReturnType<typeof setInterval> | null = null
+
+  // ── Live logs ─────────────────────────────────────────────────────────────────
+  const selectedCommand = ref<RemoteCommandWithHost | null>(null)
+  const showLogPanel = ref(false)
+  const { openCommandStream, closeStream } = useCommandStream()
+
+  function openLogs(cmd: RemoteCommandWithHost): void {
+    if (selectedCommand.value?.id === cmd.id) {
+      showLogPanel.value = true
+      return
+    }
+    closeStream()
+    selectedCommand.value = { ...cmd }
+    showLogPanel.value = true
+
+    if (cmd.status === 'pending' || cmd.status === 'running') {
+      connectStream(cmd.id)
+    }
+  }
+
+  function closeLogs(): void {
+    closeStream()
+    selectedCommand.value = null
+    showLogPanel.value = false
+  }
+
+  function syncCommandInList(commandId: string, patch: Partial<RemoteCommandWithHost>): void {
+    const idx = commands.value.findIndex((c) => c.id === commandId)
+    if (idx === -1) return
+    const next = [...commands.value]
+    next[idx] = { ...next[idx], ...patch }
+    commands.value = next
+  }
+
+  function connectStream(commandId: string): void {
+    openCommandStream(commandId, {
+      closeOnTerminalStatus: true,
+      onInit(p: CommandStreamInitMsg) {
+        if (selectedCommand.value) { selectedCommand.value.status = p.status; selectedCommand.value.output = p.output || '' }
+        syncCommandInList(commandId, { status: p.status, output: p.output || '' })
+      },
+      onChunk(p: CommandStreamChunkMsg) {
+        if (selectedCommand.value) selectedCommand.value.output = (selectedCommand.value.output || '') + p.chunk
+      },
+      onStatus(p: CommandStatusUpdateMsg) {
+        if (selectedCommand.value) { selectedCommand.value.status = p.status; if (p.output) selectedCommand.value.output = p.output }
+        syncCommandInList(commandId, { status: p.status, ...(p.output ? { output: p.output } : {}) })
+      },
+    })
+  }
 
   const totalPages = computed(() => Math.max(1, Math.ceil(total.value / PAGE_SIZE)))
   const activeCount = computed(() => commands.value.filter((c) => c.status === 'pending' || c.status === 'running').length)
@@ -96,6 +148,7 @@ export function useActiveCommands() {
 
   onUnmounted(() => {
     if (pollTimer) clearInterval(pollTimer)
+    closeStream()
   })
 
   return {
@@ -114,5 +167,9 @@ export function useActiveCommands() {
     setPage,
     moduleBadge,
     statusBadge,
+    selectedCommand,
+    showLogPanel,
+    openLogs,
+    closeLogs,
   }
 }

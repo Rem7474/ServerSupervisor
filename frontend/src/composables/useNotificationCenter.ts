@@ -3,12 +3,7 @@ import api from '../api'
 import type { NotificationItem } from '../types/generated'
 import { addToast } from './useGlobalToast'
 import {
-  isTrackerType,
   isUnread as sharedIsUnread,
-  metricUnit,
-  notificationResolved,
-  notificationRoute,
-  notificationTitle,
   resolvableIncidentId,
 } from '../utils/incidentFormat'
 import { getApiErrorMessage, isApiAbort } from '../api/client'
@@ -52,23 +47,64 @@ export function useNotificationCenter() {
     items.value.filter((n) => sharedIsUnread(n, readAt.value)).length
   )
 
+  // ── Grouping by host ──────────────────────────────────────────────────────────
+  // Default view: a flat chronological list makes it hard to see "is this host
+  // having a bad day" at a glance once there are more than a handful of items.
+  // Grouped-by-host stays opt-out (not opt-in) since it's strictly a display
+  // reorganization of the same `items` — nothing is hidden by default, groups
+  // just start expanded.
+  const groupByHost = ref(true)
+  const collapsedHosts = ref(new Set<string>())
+
+  function toggleGroupByHost(): void {
+    groupByHost.value = !groupByHost.value
+  }
+
+  function isHostCollapsed(key: string): boolean {
+    return collapsedHosts.value.has(key)
+  }
+
+  function toggleHostGroup(key: string): void {
+    const next = new Set(collapsedHosts.value)
+    if (next.has(key)) next.delete(key)
+    else next.add(key)
+    collapsedHosts.value = next
+  }
+
+  interface NotificationGroup {
+    key: string
+    hostName: string
+    items: NotificationItem[]
+    unreadCount: number
+  }
+
+  const groupedItems = computed<NotificationGroup[]>(() => {
+    const order: string[] = []
+    const map = new Map<string, NotificationItem[]>()
+    for (const item of items.value) {
+      const key = item.host_name || '__sans_hote__'
+      if (!map.has(key)) {
+        map.set(key, [])
+        order.push(key)
+      }
+      map.get(key)!.push(item)
+    }
+    // `items` already arrives newest-first from the API, so `order` (first
+    // occurrence per host) already reflects each group's most recent item —
+    // no separate re-sort needed.
+    return order.map((key) => {
+      const list = map.get(key)!
+      return {
+        key,
+        hostName: key === '__sans_hote__' ? 'Sans hôte' : key,
+        items: list,
+        unreadCount: list.filter((n) => sharedIsUnread(n, readAt.value)).length,
+      }
+    })
+  })
+
   function isUnread(item: NotificationItem): boolean {
     return sharedIsUnread(item, readAt.value)
-  }
-
-  function iconBg(item: NotificationItem): string {
-    if (isTrackerType(item)) return 'bg-blue text-white'
-    if (item.severity === 'crit') return 'bg-red text-white'
-    if (item.severity === 'warn') return 'bg-yellow text-white'
-    return 'bg-secondary text-white'
-  }
-
-  function severityBadge(severity: string): string {
-    return severity === 'crit' ? 'bg-red-lt text-red' : 'bg-yellow-lt text-yellow'
-  }
-
-  function resolvedBadge(item: NotificationItem): string {
-    return notificationResolved(item) ? 'bg-green-lt text-green' : 'bg-red-lt text-red'
   }
 
   async function resolveIncident(item: NotificationItem): Promise<void> {
@@ -148,15 +184,12 @@ export function useNotificationCenter() {
     typeFilter,
     statusFilter,
     unreadCount,
+    groupByHost,
+    toggleGroupByHost,
+    groupedItems,
+    isHostCollapsed,
+    toggleHostGroup,
     isUnread,
-    isTrackerType,
-    notificationTitle,
-    notificationResolved,
-    notificationRoute,
-    metricUnit,
-    iconBg,
-    severityBadge,
-    resolvedBadge,
     resolveIncident,
     loadMore,
     handleMarkRead,

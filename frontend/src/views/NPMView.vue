@@ -16,6 +16,31 @@
       </h2>
     </div>
 
+    <div
+      v-if="expiringCerts.length"
+      class="alert mb-3"
+      :class="expiringCerts.some((c) => c.ssl_days_remaining <= 7) ? 'alert-danger' : 'alert-warning'"
+    >
+      <div class="fw-medium mb-1">
+        <IconLock
+          :size="16"
+          class="icon me-1"
+        />
+        {{ expiringCerts.length }} certificat{{ expiringCerts.length > 1 ? 's' : '' }} expirant sous 30 jours
+      </div>
+      <div class="d-flex flex-wrap gap-2">
+        <router-link
+          v-for="c in expiringCerts"
+          :key="c.id"
+          :to="`/monitoring/ssl/${c.ssl_certificate_id}`"
+          class="badge text-decoration-none"
+          :class="sslBadge(c.ssl_days_remaining)"
+        >
+          {{ c.domain_names[0] }} — {{ c.ssl_days_remaining }}j
+        </router-link>
+      </div>
+    </div>
+
     <div class="card">
       <div class="card-header d-flex align-items-center justify-content-between">
         <h3 class="card-title mb-0">
@@ -232,7 +257,8 @@
 </template>
 
 <script setup lang="ts">
-import { IconRefresh } from '@tabler/icons-vue'
+import { computed } from 'vue'
+import { IconLock, IconRefresh } from '@tabler/icons-vue'
 import { useNPM } from '../composables/useNPM'
 
 const {
@@ -246,6 +272,15 @@ const {
   toggleNPM,
   toggle,
 } = useNPM()
+
+// Surfaces certificates about to expire in a banner instead of requiring a
+// full table scan — sorted most-urgent first.
+const expiringCerts = computed(() =>
+  hosts.value
+    .filter((h): h is typeof h & { ssl_days_remaining: number } =>
+      !!h.ssl_certificate_id && h.ssl_days_remaining != null && h.ssl_days_remaining <= 30)
+    .sort((a, b) => a.ssl_days_remaining - b.ssl_days_remaining)
+)
 
 function uptimeBadge(status: string): string {
   if (status === 'up') return 'bg-success-lt text-success'

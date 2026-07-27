@@ -1,9 +1,17 @@
-import { ref } from 'vue'
+import { onUnmounted, ref } from 'vue'
 import apiClient from '../api'
 import { getApiErrorMessage } from '../api/client'
 import { useHostsStore } from '../stores/hosts'
-import type { Runbook, RunbookCreate, RunbookStepCreate, RunbookExecution } from '../types/generated'
+import { useCommandStream } from './useCommandStream'
+import type { CommandStreamInitMsg, CommandStreamChunkMsg, CommandStatusUpdateMsg } from '../types/ws'
+import type { Runbook, RunbookCreate, RunbookStepCreate, RunbookExecution, RunbookExecutionStep } from '../types/generated'
 import type { DispatchOption } from '../utils/dispatchStep'
+
+const EXECUTION_POLL_MS = 3_000
+
+function isRunbookTerminal(status: string | undefined): boolean {
+  return status === 'completed' || status === 'failed'
+}
 
 const ACTION_LABELS: Record<string, string> = {
   logs: 'Voir les logs', restart: 'Redémarrer', start: 'Démarrer', stop: 'Arrêter',
@@ -117,11 +125,56 @@ export function useRunbooks() {
   }
 
   const runningIds = ref(new Set<string>())
+  let executionPollTimer: ReturnType<typeof setInterval> | null = null
+
+  function stopExecutionPoll(): void {
+    if (executionPollTimer) {
+      clearInterval(executionPollTimer)
+      executionPollTimer = null
+    }
+  }
+
+  // Polls the open history modal while its runbook has a non-terminal
+  // execution — the API only dispatches the first step and advances via the
+  // agent's own command-completion callback (see runbook.Service.NotifyComplete
+  // in the backend), so there's no push channel here; a short poll is the
+  // simplest way to reflect step-by-step progress without one.
+  function startExecutionPoll(rb: Runbook): void {
+    stopExecutionPoll()
+    executionPollTimer = setInterval(async () => {
+      if (!historyRunbook.value || historyRunbook.value.id !== rb.id) {
+        stopExecutionPoll()
+        return
+      }
+      try {
+        const res = await apiClient.getRunbookExecutions(rb.id)
+        executions.value = res.data || []
+      } catch {
+        return
+      }
+      const top = executions.value[0]
+      if (!top) return
+      if (selectedExecution.value?.id === top.id || !selectedExecution.value) {
+        await selectExecution(top)
+      }
+      if (isRunbookTerminal(executions.value[0]?.status)) {
+        stopExecutionPoll()
+      }
+    }, EXECUTION_POLL_MS)
+  }
 
   async function runRunbook(rb: Runbook): Promise<void> {
     runningIds.value.add(rb.id)
     try {
       await apiClient.runRunbook(rb.id)
+      // Drop the user straight into the execution they just launched instead
+      // of leaving them staring at a spinner-only button — see the history
+      // modal's step table + live log panel for actual progress.
+      await openHistory(rb)
+      if (executions.value.length) {
+        await selectExecution(executions.value[0])
+        startExecutionPoll(rb)
+      }
     } catch (e: unknown) {
       error.value = getApiErrorMessage(e)
     } finally {
@@ -144,6 +197,8 @@ export function useRunbooks() {
   }
 
   function closeHistory(): void {
+    stopExecutionPoll()
+    closeStepLogs()
     historyRunbook.value = null
     executions.value = []
     selectedExecution.value = null
@@ -154,10 +209,62 @@ export function useRunbooks() {
     try {
       const res = await apiClient.getRunbookExecution(historyRunbook.value.id, exec.id)
       selectedExecution.value = res.data
+      if (!isRunbookTerminal(res.data.status) && !executionPollTimer) {
+        startExecutionPoll(historyRunbook.value)
+      }
     } catch (e: unknown) {
       error.value = getApiErrorMessage(e)
     }
   }
+
+  // ── Live step logs ────────────────────────────────────────────────────────────
+  const selectedStepCommand = ref<{ id: string; host_id?: string; module?: string; action?: string; target?: string; status?: string; output?: string } | null>(null)
+  const showStepLogPanel = ref(false)
+  const { openCommandStream, closeStream } = useCommandStream()
+
+  function openStepLogs(step: RunbookExecutionStep): void {
+    if (!step.command_id) return
+    if (selectedStepCommand.value?.id === step.command_id) {
+      showStepLogPanel.value = true
+      return
+    }
+    closeStream()
+    selectedStepCommand.value = {
+      id: step.command_id,
+      host_id: step.host_id,
+      module: step.module,
+      action: step.action,
+      target: step.target,
+      status: step.status,
+      output: step.output || '',
+    }
+    showStepLogPanel.value = true
+    if (step.status === 'pending' || step.status === 'running') {
+      openCommandStream(step.command_id, {
+        closeOnTerminalStatus: true,
+        onInit(p: CommandStreamInitMsg) {
+          if (selectedStepCommand.value) { selectedStepCommand.value.status = p.status; selectedStepCommand.value.output = p.output || '' }
+        },
+        onChunk(p: CommandStreamChunkMsg) {
+          if (selectedStepCommand.value) selectedStepCommand.value.output = (selectedStepCommand.value.output || '') + p.chunk
+        },
+        onStatus(p: CommandStatusUpdateMsg) {
+          if (selectedStepCommand.value) { selectedStepCommand.value.status = p.status; if (p.output) selectedStepCommand.value.output = p.output }
+        },
+      })
+    }
+  }
+
+  function closeStepLogs(): void {
+    closeStream()
+    selectedStepCommand.value = null
+    showStepLogPanel.value = false
+  }
+
+  onUnmounted(() => {
+    stopExecutionPoll()
+    closeStream()
+  })
 
   return {
     hostsStore,
@@ -184,5 +291,9 @@ export function useRunbooks() {
     openHistory,
     closeHistory,
     selectExecution,
+    selectedStepCommand,
+    showStepLogPanel,
+    openStepLogs,
+    closeStepLogs,
   }
 }

@@ -181,6 +181,15 @@
                   v-else
                   class="text-muted"
                 >—</span>
+                <button
+                  v-if="execution.raw_payload"
+                  type="button"
+                  class="btn btn-sm btn-ghost-secondary"
+                  title="Voir le payload reçu"
+                  @click="$emit('open-payload', execution.raw_payload)"
+                >
+                  <IconBraces :size="14" />
+                </button>
               </td>
             </template>
           </tr>
@@ -205,7 +214,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { IconFileText, IconRefresh } from '@tabler/icons-vue'
+import { IconBraces, IconFileText, IconRefresh } from '@tabler/icons-vue'
 import RelativeTime from '../RelativeTime.vue'
 import PaginationNav from '../PaginationNav.vue'
 import { usePagination } from '../../composables/usePagination'
@@ -227,6 +236,7 @@ interface Execution {
   command_id?: string
   status?: string
   alerts_after_count?: number
+  raw_payload?: string
 }
 
 const props = withDefaults(defineProps<{
@@ -261,6 +271,7 @@ const {
 defineEmits<{
   (e: 'refresh'): void
   (e: 'open-logs', commandId: string): void
+  (e: 'open-payload', rawPayload: string): void
 }>()
 
 function execStatusBadge(status: string | undefined): string {

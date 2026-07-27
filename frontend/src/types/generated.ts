@@ -1846,6 +1846,12 @@ export interface GitWebhookExecution {
   status: string;
   triggered_at: string;
   completed_at?: string;
+  /**
+   * RawPayload is the provider's raw JSON delivery body, truncated to a
+   * bounded size (see gitwebhook.maxStoredPayloadBytes) — kept for debugging
+   * "why didn't this trigger", not as an unbounded audit log.
+   */
+  raw_payload?: string;
 }
 
 //////////

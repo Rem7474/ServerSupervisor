@@ -34,6 +34,19 @@ interface ResultGroup {
 
 const PROBE_REFRESH_SEC = 30
 
+// Uptime Kuma itself pairs a fixed-length "last N pings" heartbeat bar with a
+// separately selectable uptime-% window — the bar isn't re-bucketed per
+// window (that would need server-side time-bucketing this API doesn't have),
+// only the % figure is. HEARTBEAT_BAR_SIZE caps how many of the most recent
+// `results` render as bars, independent of statsWindow.
+const HEARTBEAT_BAR_SIZE = 50
+
+export const STATS_WINDOWS = [
+  { hours: 24, label: '24h' },
+  { hours: 168, label: '7j' },
+  { hours: 720, label: '30j' },
+] as const
+
 export function useUptimeProbeDetail() {
   const route = useRoute()
   const probeId = route.params.id as string
@@ -44,7 +57,8 @@ export function useUptimeProbeDetail() {
   const stats = ref<UptimeStats | null>(null)
   const loading = ref(false)
   const error = ref('')
-  const statsWindow = 24
+  const statsWindow = ref<number>(24)
+  const statsLoading = ref(false)
 
   const groupedResults = computed<ResultGroup[]>(() => {
     if (!results.value.length) return []
@@ -116,6 +130,12 @@ export function useUptimeProbeDetail() {
   const autoRefresh = ref(true)
   const lastUpdatedAt = ref<Date | null>(null)
 
+  // Oldest-first (Uptime Kuma convention: reading left-to-right ends on "now")
+  // slice of the most recent checks, for the heartbeat bar.
+  const heartbeatBar = computed<ProbeResult[]>(() =>
+    [...results.value].reverse().slice(-HEARTBEAT_BAR_SIZE)
+  )
+
   async function fetchAll(): Promise<void> {
     loading.value = true
     error.value = ''
@@ -123,7 +143,7 @@ export function useUptimeProbeDetail() {
       const [pr, hr, sr] = await Promise.all([
         api.getUptimeProbe(probeId, signal),
         api.getUptimeHistory(probeId, 200, signal),
-        api.getUptimeStats(probeId, statsWindow, signal),
+        api.getUptimeStats(probeId, statsWindow.value, signal),
       ])
       probe.value = pr.data
       results.value = hr.data?.results || []
@@ -134,6 +154,23 @@ export function useUptimeProbeDetail() {
       error.value = getApiErrorMessage(e, 'Impossible de charger la sonde')
     } finally {
       loading.value = false
+    }
+  }
+
+  // Only re-fetches Stats (the % uptime figure) — the heartbeat bar and
+  // history table are independent of the selected window (see HEARTBEAT_BAR_SIZE).
+  async function setStatsWindow(hours: number): Promise<void> {
+    if (hours === statsWindow.value) return
+    statsWindow.value = hours
+    statsLoading.value = true
+    try {
+      const sr = await api.getUptimeStats(probeId, hours, signal)
+      stats.value = sr.data
+    } catch (e: unknown) {
+      if (isApiAbort(e)) return
+      error.value = getApiErrorMessage(e, 'Impossible de charger les statistiques')
+    } finally {
+      statsLoading.value = false
     }
   }
 
@@ -153,6 +190,9 @@ export function useUptimeProbeDetail() {
     loading,
     error,
     statsWindow,
+    statsLoading,
+    setStatsWindow,
+    heartbeatBar,
     groupedResults,
     chartData,
     statusLabel,

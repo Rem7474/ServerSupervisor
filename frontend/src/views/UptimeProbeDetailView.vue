@@ -61,10 +61,16 @@
           <div class="card card-sm h-100">
             <div class="card-body">
               <div class="subheader">
-                Uptime ({{ statsWindow }}h)
+                Uptime ({{ STATS_WINDOWS.find((w) => w.hours === statsWindow)?.label }})
               </div>
               <div class="h2 mb-0 mt-1">
-                {{ stats ? stats.uptime_percent.toFixed(2) + '%' : '—' }}
+                <span
+                  v-if="statsLoading"
+                  class="spinner-border spinner-border-sm"
+                />
+                <template v-else>
+                  {{ stats ? stats.uptime_percent.toFixed(2) + '%' : '—' }}
+                </template>
               </div>
               <div class="text-secondary small">
                 {{ stats ? `${stats.successful_checks} OK / ${stats.total_checks} checks` : '' }}
@@ -100,6 +106,52 @@
                 {{ probe.consecutive_failures }}
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-3">
+        <div class="card-header d-flex align-items-center justify-content-between">
+          <h3 class="card-title mb-0">
+            Disponibilité
+          </h3>
+          <div class="btn-group btn-group-sm">
+            <button
+              v-for="w in STATS_WINDOWS"
+              :key="w.hours"
+              type="button"
+              class="btn"
+              :class="statsWindow === w.hours ? 'btn-primary' : 'btn-outline-secondary'"
+              @click="setStatsWindow(w.hours)"
+            >
+              {{ w.label }}
+            </button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div
+            v-if="heartbeatBar.length"
+            class="d-flex align-items-end gap-1"
+            style="height: 40px;"
+          >
+            <div
+              v-for="r in heartbeatBar"
+              :key="r.id"
+              class="flex-fill rounded-1"
+              :class="r.success ? 'bg-green' : 'bg-red'"
+              style="height: 100%; min-width: 3px;"
+              :title="`${formatDateTime(r.checked_at)} — ${r.success ? 'OK' : 'KO'}${r.success ? ` (${r.latency_ms} ms)` : (r.error ? ` — ${r.error}` : '')}`"
+            />
+          </div>
+          <div
+            v-else
+            class="text-secondary small"
+          >
+            Aucun check encore enregistré.
+          </div>
+          <div class="d-flex justify-content-between text-secondary small mt-1">
+            <span>{{ heartbeatBar.length ? formatDateTime(heartbeatBar[0].checked_at) : '' }}</span>
+            <span>maintenant</span>
           </div>
         </div>
       </div>
@@ -214,7 +266,7 @@ import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import PageRefreshBar from '../components/PageRefreshBar.vue'
 import { formatDateTime } from '../utils/formatters'
 import { getChartPalette } from '../utils/chartTheme'
-import { useUptimeProbeDetail } from '../composables/useUptimeProbeDetail'
+import { useUptimeProbeDetail, STATS_WINDOWS } from '../composables/useUptimeProbeDetail'
 
 const Line = defineAsyncComponent(async () => {
   const [{ Line: LineComponent }, chart] = await Promise.all([
@@ -235,6 +287,9 @@ const {
   loading,
   error,
   statsWindow,
+  statsLoading,
+  setStatsWindow,
+  heartbeatBar,
   groupedResults,
   chartData,
   statusLabel,
