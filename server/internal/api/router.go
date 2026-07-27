@@ -166,6 +166,11 @@ func registerPublicRoutes(r *gin.Engine, h *handlers.AuthHandler, db *database.D
 	r.POST("/api/auth/login", h.Login)
 	r.POST("/api/auth/refresh", h.RefreshToken)
 	r.POST("/api/auth/logout", h.Logout)
+	// WebAuthn login ceremony: alternative to submitting a TOTP code during the
+	// MFA step, so it must be reachable before a session exists — each of these
+	// re-verifies the password itself (see BeginWebAuthnLogin's doc comment).
+	r.POST("/api/auth/webauthn/login/begin", h.BeginWebAuthnLogin)
+	r.POST("/api/auth/webauthn/login/finish", h.FinishWebAuthnLogin)
 	r.GET("/api/health", func(c *gin.Context) {
 		if err := db.Ping(); err != nil {
 			c.JSON(503, gin.H{"status": "degraded", "db": "unreachable", "error": err.Error()})
@@ -212,6 +217,10 @@ func registerAuthRoutes(g *gin.RouterGroup, h *handlers.AuthHandler) {
 	g.POST("/auth/mfa/disable", h.DisableMFA)
 	g.GET("/auth/security", h.GetSecuritySummary)
 	g.DELETE("/auth/blocked-ips/:ip", h.UnblockIP)
+	g.GET("/auth/webauthn/credentials", h.ListWebAuthnCredentials)
+	g.POST("/auth/webauthn/register/begin", h.BeginWebAuthnRegistration)
+	g.POST("/auth/webauthn/register/finish", h.FinishWebAuthnRegistration)
+	g.DELETE("/auth/webauthn/credentials/:id", h.DeleteWebAuthnCredential)
 }
 
 func registerWebLogsRoutes(g *gin.RouterGroup, h *handlers.WebLogsHandler) {

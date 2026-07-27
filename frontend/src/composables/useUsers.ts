@@ -31,6 +31,9 @@ export function useUsers() {
   const createMessage = ref('')
   const createSuccess = ref(false)
 
+  const actionMessage = ref('')
+  const actionSuccess = ref(false)
+
   function formatDate(date: string | undefined): string {
     if (!date) return '-'
     return dayjs.utc(date).local().format('YYYY-MM-DD HH:mm')
@@ -109,8 +112,11 @@ export function useUsers() {
     saving.value = true
     try {
       await apiClient.updateUserRole(user.id, user.role)
+      actionSuccess.value = true
+      actionMessage.value = `Rôle de ${user.username} mis à jour.`
     } catch (e) {
-      console.error('Erreur lors de la mise à jour du rôle:', e)
+      actionSuccess.value = false
+      actionMessage.value = getApiErrorMessage(e, `Échec de la mise à jour du rôle de ${user.username}.`)
       await fetchUsers()
     } finally {
       saving.value = false
@@ -129,9 +135,12 @@ export function useUsers() {
     saving.value = true
     try {
       await apiClient.deleteUser(user.id)
+      actionSuccess.value = true
+      actionMessage.value = `Utilisateur ${user.username} supprimé.`
       await fetchUsers()
     } catch (e) {
-      console.error('Erreur lors de la suppression:', e)
+      actionSuccess.value = false
+      actionMessage.value = getApiErrorMessage(e, `Échec de la suppression de ${user.username}.`)
     } finally {
       saving.value = false
     }
@@ -148,6 +157,8 @@ export function useUsers() {
     newUserForm,
     createMessage,
     createSuccess,
+    actionMessage,
+    actionSuccess,
     formatDate,
     isLastAdmin,
     getDeleteButtonTitle,

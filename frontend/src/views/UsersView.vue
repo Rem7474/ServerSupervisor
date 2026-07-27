@@ -110,6 +110,18 @@
       </div>
     </div>
 
+    <div
+      v-if="actionMessage"
+      :class="['alert alert-dismissible mb-3', actionSuccess ? 'alert-success' : 'alert-danger']"
+    >
+      {{ actionMessage }}
+      <a
+        class="btn-close"
+        data-bs-dismiss="alert"
+        aria-label="close"
+      />
+    </div>
+
     <!-- Users List -->
     <div class="card">
       <div
@@ -208,6 +220,8 @@ const {
   newUserForm,
   createMessage,
   createSuccess,
+  actionMessage,
+  actionSuccess,
   formatDate,
   isLastAdmin,
   getDeleteButtonTitle,

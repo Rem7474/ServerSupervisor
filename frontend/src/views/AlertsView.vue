@@ -200,10 +200,16 @@ watch(alertsTab, (tab) => {
 onMounted(async () => {
   await init()
 
-  if (route.query.tab === 'incidents') {
-    await switchToIncidents()
+  // Default landing tab is the active-incidents triage view, not rule
+  // configuration — an ops opening /alerts wants to see what's actually
+  // firing right now. `?tab=rules`/`?tab=releases` (used by deep links, e.g.
+  // the command palette's alert-rule search results) are honored explicitly.
+  if (route.query.tab === 'rules') {
+    // stays on the 'rules' default from useAlertsPage()
   } else if (route.query.tab === 'releases') {
     await switchToTrackers()
+  } else {
+    await switchToIncidents()
   }
 
   incidentsPollTimer = setInterval(loadIncidents, 300_000)

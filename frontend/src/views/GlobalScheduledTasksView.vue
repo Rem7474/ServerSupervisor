@@ -191,7 +191,12 @@
                 Module / Action
               </th>
               <th class="d-none d-md-table-cell">
-                Planification
+                <SortableHeader
+                  label="Planification"
+                  :active="sortKey === 'next_run_at'"
+                  :direction="sortDir"
+                  @toggle="toggleSort('next_run_at')"
+                />
               </th>
               <th class="d-none d-md-table-cell">
                 <SortableHeader

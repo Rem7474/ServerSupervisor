@@ -18,6 +18,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 
@@ -55,18 +56,33 @@ type Repository interface {
 	GetLoginEventsByUser(ctx context.Context, username string, limit, offset int) ([]models.LoginEvent, error)
 	GetAllLoginEvents(ctx context.Context, limit, offset int) ([]models.LoginEvent, error)
 	CountLoginEvents(ctx context.Context) (int64, error)
+
+	// WebAuthn (passkeys / security keys) — an additional MFA factor alongside TOTP.
+	CreateWebAuthnCredential(ctx context.Context, userID int64, name string, cred webauthn.Credential) (*models.WebAuthnCredential, error)
+	ListWebAuthnCredentials(ctx context.Context, userID int64) ([]models.WebAuthnCredential, error)
+	DeleteWebAuthnCredential(ctx context.Context, id string, userID int64) error
+	CountWebAuthnCredentials(ctx context.Context, userID int64) (int, error)
+	UpdateWebAuthnCredentialUsage(ctx context.Context, credentialID []byte, cred webauthn.Credential) error
 }
 
 // Service holds the authentication use-cases.
 type Service struct {
-	repo        Repository
-	cfg         *config.Config
-	memFailures map[string][]time.Time
-	memMu       sync.Mutex
+	repo             Repository
+	cfg              *config.Config
+	memFailures      map[string][]time.Time
+	memMu            sync.Mutex
+	wa               *webauthn.WebAuthn
+	webauthnSessions *webauthnSessionStore
 }
 
 func NewService(repo Repository, cfg *config.Config) *Service {
-	return &Service{repo: repo, cfg: cfg, memFailures: make(map[string][]time.Time)}
+	return &Service{
+		repo:             repo,
+		cfg:              cfg,
+		memFailures:      make(map[string][]time.Time),
+		wa:               initWebAuthn(cfg),
+		webauthnSessions: newWebauthnSessionStore(),
+	}
 }
 
 // SessionTokens carries the freshly minted credentials for a session; the handler
@@ -126,34 +142,42 @@ func (s *Service) recordFailure(ctx context.Context, username, ip, userAgent str
 
 // ===== login / sessions =====
 
-// Authenticate verifies credentials + MFA. It returns (user, false, nil) on
-// success, (nil, true, nil) when MFA is enabled but no code was supplied (the
-// caller should prompt), or a typed error (429 blocked / 401 invalid / 500 misconfig).
-func (s *Service) Authenticate(ctx context.Context, username, password, totpCode, ip, userAgent string) (*models.User, bool, error) {
+// Authenticate verifies credentials + MFA. It returns (user, nil, nil) on
+// success, (nil, requirement, nil) when a second factor is registered but no
+// TOTP code was supplied (the caller should prompt — a WebAuthn requirement is
+// completed via BeginWebAuthnLogin/FinishWebAuthnLogin instead, not this
+// method), or a typed error (429 blocked / 401 invalid / 500 misconfig).
+func (s *Service) Authenticate(ctx context.Context, username, password, totpCode, ip, userAgent string) (*models.User, *models.MFARequirement, error) {
 	if s.ipBlocked(ctx, ip) {
-		return nil, false, apperr.TooManyRequests("Too many failed login attempts, try again later")
+		return nil, nil, apperr.TooManyRequests("Too many failed login attempts, try again later")
 	}
 	user, err := s.repo.GetUserByUsername(ctx, username)
 	if err != nil {
 		s.recordFailure(ctx, username, ip, userAgent)
-		return nil, false, apperr.Unauthorized("invalid credentials")
+		return nil, nil, apperr.Unauthorized("invalid credentials")
 	}
 	if bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)) != nil {
 		s.recordFailure(ctx, username, ip, userAgent)
-		return nil, false, apperr.Unauthorized("invalid credentials")
+		return nil, nil, apperr.Unauthorized("invalid credentials")
 	}
 
-	if user.MFAEnabled {
-		if user.TOTPSecret == "" {
-			return nil, false, apperr.Failed("MFA configuration error")
-		}
+	hasWebAuthn := s.HasWebAuthnCredentials(ctx, user.ID)
+
+	if user.MFAEnabled || hasWebAuthn {
 		if totpCode == "" {
-			return nil, true, nil
+			return nil, &models.MFARequirement{TOTP: user.MFAEnabled, WebAuthn: hasWebAuthn}, nil
+		}
+		if !user.MFAEnabled || user.TOTPSecret == "" {
+			// A TOTP code was submitted but this account has no TOTP secret to
+			// check it against (WebAuthn-only account) — reject rather than
+			// silently accepting any code.
+			s.recordFailure(ctx, username, ip, userAgent)
+			return nil, nil, apperr.Unauthorized("invalid TOTP code")
 		}
 		if !auth.VerifyTOTPCode(user.TOTPSecret, totpCode) {
 			if !auth.VerifyBackupCode(user.BackupCodes, totpCode) {
 				s.recordFailure(ctx, username, ip, userAgent)
-				return nil, false, apperr.Unauthorized("invalid TOTP code")
+				return nil, nil, apperr.Unauthorized("invalid TOTP code")
 			}
 			if err := s.repo.ConsumeMFABackupCode(ctx, user.Username, totpCode); err != nil {
 				slog.ErrorContext(ctx, "failed to consume backup code", slog.String("user", user.Username), slog.Any("err", err))
@@ -162,7 +186,7 @@ func (s *Service) Authenticate(ctx context.Context, username, password, totpCode
 	}
 
 	_ = s.repo.CreateLoginEvent(ctx, username, ip, userAgent, true)
-	return user, false, nil
+	return user, nil, nil
 }
 
 // IssueSession mints + stores a new session (JWT + refresh token + CSRF) for a user.

@@ -40,7 +40,10 @@ export function useMonitoring() {
 
   const autoRefresh = ref(true)
   const lastUpdatedAt = ref<Date | null>(null)
-  const error = ref('')
+  // Kept separate (not a shared `error`) so a probe-fetch failure doesn't show
+  // up while the user is looking at the SSL tab and vice versa.
+  const probeError = ref('')
+  const certError = ref('')
 
   // ── Uptime ────────────────────────────────────────────────────────────────────
   const probes = ref<Probe[]>([])
@@ -118,9 +121,10 @@ export function useMonitoring() {
       const { data } = await api.getUptimeProbes()
       probes.value = data?.probes || []
       lastUpdatedAt.value = new Date()
+      probeError.value = ''
       fetchAllProbeStats()
     } catch (e: unknown) {
-      error.value = (e as { response?: { data?: { error?: string } }; message?: string })?.response?.data?.error
+      probeError.value = (e as { response?: { data?: { error?: string } }; message?: string })?.response?.data?.error
         || (e as { message?: string })?.message || 'Impossible de charger les sondes'
     } finally {
       loadingProbes.value = false
@@ -146,7 +150,7 @@ export function useMonitoring() {
       await api.checkUptimeProbeNow(p.id)
       await fetchProbes()
     } catch (e: unknown) {
-      error.value = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Échec de la vérification'
+      probeError.value = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Échec de la vérification'
     } finally {
       checkingProbeId.value = ''
     }
@@ -216,7 +220,7 @@ export function useMonitoring() {
       await api.deleteUptimeProbe(p.id)
       await fetchProbes()
     } catch (e: unknown) {
-      error.value = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Suppression impossible'
+      probeError.value = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Suppression impossible'
     }
   }
 
@@ -318,8 +322,9 @@ export function useMonitoring() {
       const { data } = await api.getSSLCertificates()
       certs.value = data?.certificates || []
       lastUpdatedAt.value = new Date()
+      certError.value = ''
     } catch (e: unknown) {
-      error.value = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Impossible de charger les certificats'
+      certError.value = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Impossible de charger les certificats'
     } finally {
       loadingCerts.value = false
     }
@@ -331,7 +336,7 @@ export function useMonitoring() {
       await api.checkSSLCertificateNow(c.id)
       await fetchCerts()
     } catch (e: unknown) {
-      error.value = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Échec de la vérification'
+      certError.value = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Échec de la vérification'
     } finally {
       checkingCertId.value = ''
     }
@@ -396,7 +401,7 @@ export function useMonitoring() {
       await api.deleteSSLCertificate(c.id)
       await fetchCerts()
     } catch (e: unknown) {
-      error.value = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Suppression impossible'
+      certError.value = (e as { response?: { data?: { error?: string } } })?.response?.data?.error || 'Suppression impossible'
     }
   }
 
@@ -421,7 +426,8 @@ export function useMonitoring() {
     PAGE_SIZE,
     autoRefresh,
     lastUpdatedAt,
-    error,
+    probeError,
+    certError,
 
     // uptime
     probes,

@@ -69,10 +69,10 @@
     </div>
 
     <div
-      v-if="error"
+      v-if="tab === 'uptime' ? probeError : certError"
       class="alert alert-danger mb-3"
     >
-      {{ error }}
+      {{ tab === 'uptime' ? probeError : certError }}
     </div>
 
     <!-- ===== UPTIME TAB ===== -->
@@ -746,7 +746,8 @@ const {
   PAGE_SIZE,
   autoRefresh,
   lastUpdatedAt,
-  error,
+  probeError,
+  certError,
   probes,
   loadingProbes,
   probeStats,

@@ -107,7 +107,7 @@ Système de supervision d'infrastructure : monitoring de VMs, conteneurs Docker,
 
 ### Sécurité
 - Authentification JWT avec refresh tokens
-- MFA/2FA (TOTP) optionnel par compte
+- MFA/2FA optionnel par compte : TOTP et/ou clés de sécurité/passkeys (WebAuthn)
 - API Keys uniques par agent avec rotation
 - Vérification stricte de l'appartenance des commandes à chaque hôte
 - Rate limiting par IP avec cleanup automatique et support reverse proxy
@@ -630,7 +630,11 @@ curl http://localhost:8080/api/v1/hosts \
 | `POST` | `/api/v1/auth/revoke-all-sessions` | Révoquer toutes les sessions | Authentifié |
 | `GET` | `/api/v1/auth/security` | Résumé sécurité + IPs bloquées + agrégats `bot_detection` et `npm_analytics` | Admin |
 | `DELETE` | `/api/v1/auth/blocked-ips/:ip` | Débloquer une IP | Admin |
-| `GET/POST` | `/api/v1/auth/mfa/*` | Gestion MFA/2FA (setup/verify/disable) | Authentifié |
+| `GET/POST` | `/api/v1/auth/mfa/*` | Gestion MFA/2FA TOTP (setup/verify/disable) | Authentifié |
+| `GET` | `/api/v1/auth/webauthn/credentials` | Liste des clés de sécurité/passkeys | Authentifié |
+| `POST` | `/api/v1/auth/webauthn/register/begin\|finish` | Enregistrer une clé de sécurité/passkey | Authentifié |
+| `DELETE` | `/api/v1/auth/webauthn/credentials/:id` | Supprimer une clé de sécurité/passkey | Authentifié |
+| `POST` | `/api/auth/webauthn/login/begin\|finish` | Connexion via clé de sécurité/passkey (étape MFA) | Public |
 
 #### Hôtes & Métriques
 | Méthode | Endpoint | Description | Rôle |

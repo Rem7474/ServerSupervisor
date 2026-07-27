@@ -285,6 +285,16 @@ export interface TOTPSecretResponse {
   qr_code: string; // Data URL for QR code
   backup_codes: string[]; // 10 single-use backup codes
 }
+/**
+ * MFARequirement describes which second factors are available for a user who
+ * still needs to complete an MFA step at login — the frontend uses this to
+ * decide whether to show the TOTP code field, a "use your security key"
+ * button, or both.
+ */
+export interface MFARequirement {
+  totp: boolean;
+  webauthn: boolean;
+}
 export const RoleAdmin = "admin"; // Full access
 export const RoleOperator = "operator"; // Can launch APT commands + read all
 export const RoleViewer = "viewer"; // Read-only
@@ -1765,6 +1775,22 @@ export interface WebLogIPTimelineRow {
   blocked_reason?: string;
   blocked_at?: string;
   blocked_until?: string;
+}
+
+//////////
+// source: webauthn.go
+
+/**
+ * WebAuthnCredential is a registered passkey/security key for a user — an
+ * additional MFA factor alongside TOTP. Credential holds the full go-webauthn
+ * record (public key, sign counter, flags, attestation) needed to run a login
+ * ceremony; it's never serialized to the client (json:"-"), only Name/dates are.
+ */
+export interface WebAuthnCredential {
+  id: string;
+  name: string;
+  created_at: string;
+  last_used_at?: string;
 }
 
 //////////
