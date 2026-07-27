@@ -7,7 +7,10 @@
 // the entire integration surface and keeping it in one place avoids a second
 // library's JSON dialect potentially drifting from go-webauthn's.
 
-function base64urlToBuffer(value: string): ArrayBuffer {
+// Exported (not just used internally) so their round-trip can be unit tested
+// without mocking navigator.credentials — a padding/charset bug here would
+// silently break every WebAuthn ceremony's challenge/id fields.
+export function base64urlToBuffer(value: string): ArrayBuffer {
   const padded = value.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(value.length / 4) * 4, '=')
   const raw = atob(padded)
   const buffer = new Uint8Array(raw.length)
@@ -15,7 +18,7 @@ function base64urlToBuffer(value: string): ArrayBuffer {
   return buffer.buffer
 }
 
-function bufferToBase64url(buffer: ArrayBuffer): string {
+export function bufferToBase64url(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer)
   let str = ''
   for (let i = 0; i < bytes.length; i++) str += String.fromCharCode(bytes[i])

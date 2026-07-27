@@ -782,6 +782,7 @@ Métriques additionnelles disponibles pour les règles d'alertes :
 | `GET` | `/api/v1/proxmox/nodes` | Tous les nœuds (`?connection_id=` optionnel) | Authentifié |
 | `GET` | `/api/v1/proxmox/nodes/:id` | Détail nœud avec guests + stockages | Authentifié |
 | `GET` | `/api/v1/proxmox/guests` | Tous les guests (`?type=vm\|lxc`, `?status=running`) | Authentifié |
+| `POST` | `/api/v1/proxmox/guests/:id/action` | Démarrer / arrêter / redémarrer une VM ou CT (`{"action":"start\|shutdown\|reboot"}`) | Admin |
 | `GET` | `/api/v1/proxmox/instances` | Liste des connexions (sans secrets) | Authentifié |
 | `POST` | `/api/v1/proxmox/instances` | Créer une connexion | Admin |
 | `GET` | `/api/v1/proxmox/instances/:id` | Détail d'une connexion | Admin |

@@ -190,5 +190,29 @@ func TestNodeServiceAction_InvalidAction(t *testing.T) {
 	}
 }
 
+func TestGuestAction_InvalidAction(t *testing.T) {
+	_, err := newSvc(&fakeRepo{}).GuestAction(context.Background(), "guest-1", "frobnicate")
+	if status(err) != 400 {
+		t.Fatalf("invalid action should be 400, got %v", err)
+	}
+}
+
+// stop (hard power-off, no ACPI shutdown) is deliberately excluded from the
+// whitelist — see the "Proxmox integration" note in the root CLAUDE.md.
+func TestGuestAction_ExcludesHardStop(t *testing.T) {
+	_, err := newSvc(&fakeRepo{}).GuestAction(context.Background(), "guest-1", "stop")
+	if status(err) != 400 {
+		t.Fatalf("hard stop must not be whitelisted, got %v", err)
+	}
+}
+
+func TestGuestAction_GuestNotFound(t *testing.T) {
+	// GetProxmoxGuestByID's fakeRepo stub always errors -> not found.
+	_, err := newSvc(&fakeRepo{}).GuestAction(context.Background(), "missing", "start")
+	if status(err) != 404 {
+		t.Fatalf("missing guest should be 404, got %v", err)
+	}
+}
+
 func mustConnErr(_ *models.ProxmoxConnection, err error) error { return err }
 func mustLinkErr(_ *models.ProxmoxGuestLink, err error) error  { return err }
