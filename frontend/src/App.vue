@@ -34,11 +34,11 @@
           >
             <ul class="navbar-nav">
               <!-- Badge hôtes hors ligne -->
-              <li class="nav-item">
-                <span
-                  v-if="hostsDownCount > 0"
-                  class="badge bg-red-lt text-red ms-2 py-2 hosts-down-badge"
-                >
+              <li
+                v-if="hostsDownCount > 0"
+                class="nav-item d-flex align-items-center"
+              >
+                <span class="badge bg-red-lt text-red ms-2 py-2 hosts-down-badge">
                   <IconAlertTriangle class="icon icon-sm me-1" />
                   {{ hostsDownCount }} HORS LIGNE
                 </span>
@@ -439,6 +439,20 @@ onUnmounted(() => {
 
 .hosts-down-badge {
   line-height: 1.5;
+}
+
+/* Tabler's default <kbd> (--tblr-code-bg, a near-black code-block swatch in
+   dark mode + h5-scale font) reads as a mismatched "code snippet" chip next
+   to the button's small, muted "Rechercher…" label instead of a subtle
+   keyboard-shortcut hint. Sized/toned down to match. */
+.command-palette-trigger kbd {
+  padding: 0.15rem 0.4rem;
+  font-size: 0.7rem;
+  line-height: 1.4;
+  color: var(--tblr-secondary);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--tblr-border-color);
+  border-radius: 4px;
 }
 
 .app-network-alert {

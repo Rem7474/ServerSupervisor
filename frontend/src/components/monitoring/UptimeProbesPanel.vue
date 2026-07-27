@@ -110,6 +110,14 @@
                 <div class="text-secondary small">
                   {{ p.type.toUpperCase() }} · {{ p.interval_sec }}s
                 </div>
+                <router-link
+                  v-if="p.npm_proxy_host_id"
+                  to="/npm"
+                  class="badge bg-azure-lt text-azure text-decoration-none mt-1"
+                  :title="`Géré par le proxy host NPM ${p.npm_proxy_host_domain} — l'activer/désactiver se fait depuis NPM`"
+                >
+                  NPM · {{ p.npm_proxy_host_domain }}
+                </router-link>
               </td>
               <td class="text-secondary">
                 <code>{{ p.target }}</code>

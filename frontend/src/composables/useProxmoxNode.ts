@@ -7,10 +7,12 @@ import { ref, computed, shallowRef, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import api from '../api'
 import { getApiErrorMessage } from '../api/client'
+import { useProxmoxGuestActions, type GuestPowerAction } from './useProxmoxGuestActions'
 
 export function useProxmoxNode() {
   const route = useRoute()
   const router = useRouter()
+  const guestActions = useProxmoxGuestActions()
   const node = ref<any>(null)
   const loading = ref(true)
   const error = ref('')
@@ -112,6 +114,23 @@ export function useProxmoxNode() {
 
   const vms = computed(() => node.value?.guests?.filter((g: any) => g.guest_type === 'vm') ?? [])
   const lxcs = computed(() => node.value?.guests?.filter((g: any) => g.guest_type === 'lxc') ?? [])
+
+  // Re-fetches only the guest statuses after a start/shutdown/reboot — a full
+  // load() also re-triggers sensor/live-status/RRD/peer-node fetches and
+  // flips loading back to true (full-page skeleton), which is overkill for
+  // "did this one guest's status change".
+  async function refreshGuests(): Promise<void> {
+    try {
+      const res = await api.getProxmoxNode(String(route.params.id))
+      if (node.value) node.value.guests = res.data?.guests ?? node.value.guests
+    } catch {
+      // best-effort; the next manual/periodic refresh will retry
+    }
+  }
+
+  async function handleGuestAction(guest: any, action: GuestPowerAction): Promise<void> {
+    await guestActions.performGuestAction(guest, action, refreshGuests)
+  }
   const failedTaskCount = computed(() =>
     (node.value?.tasks ?? []).filter((t: any) => t.status === 'stopped' && t.exit_status && t.exit_status !== 'OK').length
   )
@@ -661,5 +680,7 @@ export function useProxmoxNode() {
     confirmGuestLink,
     ignoreGuestLink,
     goToHost,
+    guestActionLoading: guestActions.actionLoading,
+    handleGuestAction,
   }
 }

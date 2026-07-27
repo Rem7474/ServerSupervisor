@@ -99,7 +99,7 @@
               @toggle="toggleSort('linked_host')"
             />
           </th>
-          <th v-if="showMigrate" />
+          <th v-if="showActionsCol" />
         </tr>
       </thead>
       <tbody>
@@ -173,16 +173,71 @@
               @go="emit('go-host', linkForGuest(g))"
             />
           </td>
-          <td v-if="showMigrate">
-            <button
-              v-if="peerNodes.length > 0"
-              type="button"
-              class="btn btn-sm btn-ghost-secondary"
-              title="Migrer vers un autre nœud"
-              @click="emit('migrate', g)"
-            >
-              Migrer
-            </button>
+          <td v-if="showActionsCol">
+            <div class="d-flex align-items-center gap-1">
+              <template v-if="auth.isAdmin">
+                <button
+                  v-if="g.status === 'stopped'"
+                  type="button"
+                  class="btn btn-sm btn-icon btn-ghost-success"
+                  title="Démarrer"
+                  :disabled="actionLoadingFor(g) !== null"
+                  @click="emit('guest-action', g, 'start')"
+                >
+                  <span
+                    v-if="actionLoadingFor(g) === 'start'"
+                    class="spinner-border spinner-border-sm"
+                  />
+                  <IconPlayerPlay
+                    v-else
+                    :size="16"
+                  />
+                </button>
+                <template v-else>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-icon btn-ghost-warning"
+                    title="Redémarrer"
+                    :disabled="actionLoadingFor(g) !== null"
+                    @click="emit('guest-action', g, 'reboot')"
+                  >
+                    <span
+                      v-if="actionLoadingFor(g) === 'reboot'"
+                      class="spinner-border spinner-border-sm"
+                    />
+                    <IconRefresh
+                      v-else
+                      :size="16"
+                    />
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-icon btn-ghost-danger"
+                    title="Arrêter"
+                    :disabled="actionLoadingFor(g) !== null"
+                    @click="emit('guest-action', g, 'shutdown')"
+                  >
+                    <span
+                      v-if="actionLoadingFor(g) === 'shutdown'"
+                      class="spinner-border spinner-border-sm"
+                    />
+                    <IconPlayerStop
+                      v-else
+                      :size="16"
+                    />
+                  </button>
+                </template>
+              </template>
+              <button
+                v-if="showMigrate && peerNodes.length > 0"
+                type="button"
+                class="btn btn-sm btn-ghost-secondary"
+                title="Migrer vers un autre nœud"
+                @click="emit('migrate', g)"
+              >
+                Migrer
+              </button>
+            </div>
           </td>
         </tr>
       </tbody>
@@ -192,8 +247,11 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { IconPlayerPlay, IconPlayerStop, IconRefresh } from '@tabler/icons-vue'
 import SortableHeader from '../common/SortableHeader.vue'
 import GuestLinkCell from './GuestLinkCell.vue'
+import { useAuthStore } from '../../stores/auth'
+import type { GuestPowerAction } from '../../composables/useProxmoxGuestActions'
 
 type Guest = Record<string, any>
 type LinkMap = Record<string, any>
@@ -206,6 +264,7 @@ const props = defineProps<{
   links: LinkMap
   peerNodes: Guest[]
   nodeId: string
+  actionLoading?: Record<string, GuestPowerAction | undefined>
 }>()
 
 const emit = defineEmits<{
@@ -213,14 +272,29 @@ const emit = defineEmits<{
   (e: 'ignore-link', guest: Guest): void
   (e: 'go-host', link: any): void
   (e: 'migrate', guest: Guest): void
+  (e: 'guest-action', guest: Guest, action: GuestPowerAction): void
 }>()
+
+const auth = useAuthStore()
 
 const showTags = computed(() => props.kind === 'vm')
 const showMigrate = computed(() => props.kind === 'vm')
+// Migrate is open to any authenticated user (PVE-token-scoped, see the
+// Proxmox integration note in root CLAUDE.md), so the VM tab already shows
+// this column regardless of role. Power actions are admin-only, so the LXC
+// tab only gains the column for admins — it never had a migrate button.
+const showActionsCol = computed(() => showMigrate.value || auth.isAdmin)
 const idLabel = computed(() => (props.kind === 'vm' ? 'VMID' : 'CT ID'))
 const cpuSuffix = computed(() => (props.kind === 'vm' ? ' vCPU' : ''))
 const emptyText = computed(() => (props.kind === 'vm' ? 'Aucune VM sur ce nœud.' : 'Aucun conteneur LXC sur ce nœud.'))
-const colspan = computed(() => (props.kind === 'vm' ? 13 : 11))
+const colspan = computed(() => {
+  const base = props.kind === 'vm' ? 12 : 11
+  return showActionsCol.value ? base + 1 : base
+})
+
+function actionLoadingFor(guest: Guest): GuestPowerAction | null {
+  return props.actionLoading?.[guest.id] ?? null
+}
 
 const sortKey = ref('vmid')
 const sortDir = ref<'asc' | 'desc'>('asc')

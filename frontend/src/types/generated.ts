@@ -1335,6 +1335,15 @@ export interface UptimeProbe {
   consecutive_failures: number /* int */;
   created_at: string;
   updated_at: string;
+  /**
+   * NPMProxyHostID/Domain are set when this probe was created (and is still
+   * referenced) by an NPM proxy host's monitoring toggle — see
+   * npm.Service.UpdateProxyHostMonitoring. Deleting a probe with this set
+   * silently desyncs that proxy host's toggle state (the FK is ON DELETE
+   * SET NULL, not RESTRICT), so callers should warn before deleting.
+   */
+  npm_proxy_host_id?: string;
+  npm_proxy_host_domain?: string;
 }
 /**
  * UptimeProbeRequest is the create/update body for an uptime probe. The pointer
@@ -1396,6 +1405,11 @@ export interface SSLCertificate {
   last_error?: string;
   created_at: string;
   updated_at: string;
+  /**
+   * NPMProxyHostID/Domain — see the identical UptimeProbe fields' comment.
+   */
+  npm_proxy_host_id?: string;
+  npm_proxy_host_domain?: string;
 }
 /**
  * SSLCertificateRequest is the create/update body for a monitored TLS endpoint.

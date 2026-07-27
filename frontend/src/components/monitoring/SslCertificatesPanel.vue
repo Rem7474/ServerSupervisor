@@ -104,6 +104,15 @@
                   v-if="!c.enabled"
                   class="badge bg-secondary-lt text-secondary ms-1"
                 >désactivé</span>
+                <div v-if="c.npm_proxy_host_id">
+                  <router-link
+                    to="/npm"
+                    class="badge bg-azure-lt text-azure text-decoration-none mt-1"
+                    :title="`Géré par le proxy host NPM ${c.npm_proxy_host_domain} — l'activer/désactiver se fait depuis NPM`"
+                  >
+                    NPM · {{ c.npm_proxy_host_domain }}
+                  </router-link>
+                </div>
               </td>
               <td class="text-secondary">
                 <code>{{ c.host }}:{{ c.port }}</code>

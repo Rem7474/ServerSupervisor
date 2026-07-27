@@ -172,9 +172,13 @@ export function useSslCertificates() {
   }
 
   async function confirmDeleteCert(c: SSLCert): Promise<void> {
+    // See the identical guard in useUptimeProbes.ts's confirmDeleteProbe —
+    // same ON DELETE SET NULL desync risk against npm_proxy_hosts.
     const ok = await dialog.confirm({
       title: 'Supprimer le certificat ?',
-      message: `Cette action supprimera "${c.name}" du suivi.`,
+      message: c.npm_proxy_host_id
+        ? `"${c.name}" est géré par le proxy host NPM "${c.npm_proxy_host_domain}". Le supprimer ici laissera le toggle de suivi SSL de NPM activé mais sans effet — désactivez plutôt le suivi depuis NPM si c'est le but. Continuer quand même ?`
+        : `Cette action supprimera "${c.name}" du suivi.`,
       okLabel: 'Supprimer',
       destructive: true,
     })

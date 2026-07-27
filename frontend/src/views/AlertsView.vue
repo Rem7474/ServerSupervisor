@@ -79,6 +79,7 @@
           :error="incidentsError"
           :active-incident-count="activeIncidentCount"
           :is-admin="auth.isAdmin"
+          :initial-search="hostFilterFromQuery"
           @refresh="loadIncidents"
         />
       </template>
@@ -160,6 +161,13 @@ const {
   formatDate,
   onWebSocketAlert,
 } = useAlertsPage()
+
+// `?host=` (set by HostDetailView's incident deep links) seeds the incidents
+// tab's search box so arriving from a specific host lands pre-filtered
+// instead of on the full fleet-wide list. Read once at mount, not reactively,
+// so clearing the search box afterwards doesn't get stomped back by the
+// still-present query param.
+const hostFilterFromQuery = typeof route.query.host === 'string' ? route.query.host : ''
 
 const alertsTabs = computed<EntityTab[]>(() => [
   {

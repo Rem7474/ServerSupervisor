@@ -157,6 +157,12 @@ const groupedResults = computed(() => {
 }
 
 .command-palette-input {
+  /* Without flex-basis + min-width:0, a `width:100%` form-control inside this
+     flex row keeps its full intrinsic width instead of sharing space with
+     the icon/kbd siblings, pushing "Échap" past the card's rounded corner
+     (clipped by .command-palette's overflow:hidden) instead of just before it. */
+  flex: 1 1 auto;
+  min-width: 0;
   border: 0;
   box-shadow: none;
   padding: 0;
@@ -168,9 +174,19 @@ const groupedResults = computed(() => {
   box-shadow: none;
 }
 
+/* Matches the navbar trigger button's kbd styling (App.vue) — Tabler's
+   default <kbd> (dark code-block background + h5-scale font) reads as a
+   mismatched "code snippet" chip rather than a subtle shortcut hint here. */
 .command-palette-esc {
   flex-shrink: 0;
   margin-left: 0.5rem;
+  padding: 0.15rem 0.4rem;
+  font-size: 0.7rem;
+  line-height: 1.4;
+  color: var(--tblr-secondary);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--tblr-border-color);
+  border-radius: 4px;
 }
 
 .command-palette-results {

@@ -354,10 +354,12 @@
                   :links="guestLinks"
                   :peer-nodes="peerNodes"
                   :node-id="String(route.params.id)"
+                  :action-loading="guestActionLoading"
                   @confirm-link="confirmGuestLink"
                   @ignore-link="ignoreGuestLink"
                   @go-host="goToHost"
                   @migrate="openMigrateModal($event, 'vm')"
+                  @guest-action="handleGuestAction"
                 />
               </template>
 
@@ -370,10 +372,12 @@
                   :links="guestLinks"
                   :peer-nodes="peerNodes"
                   :node-id="String(route.params.id)"
+                  :action-loading="guestActionLoading"
                   @confirm-link="confirmGuestLink"
                   @ignore-link="ignoreGuestLink"
                   @go-host="goToHost"
                   @migrate="openMigrateModal($event, 'lxc')"
+                  @guest-action="handleGuestAction"
                 />
               </template>
 
@@ -613,6 +617,8 @@ const {
   confirmGuestLink,
   ignoreGuestLink,
   goToHost,
+  guestActionLoading,
+  handleGuestAction,
 } = useProxmoxNode()
 
 // Trivial UI-only state fed by ProxmoxNodeSecurityTab's @count emit — no API/WS

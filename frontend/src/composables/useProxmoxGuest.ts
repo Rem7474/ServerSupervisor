@@ -1,15 +1,14 @@
-import { ref, onMounted, onUnmounted } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import dayjs from '../utils/dayjs'
 import api from '../api'
 import { getApiErrorMessage, isApiAbort } from '../api/client'
 import { useAbortSignal } from './useAbortSignal'
-import { useConfirmDialog } from './useConfirmDialog'
-import { addToast } from './useGlobalToast'
+import { useProxmoxGuestActions, type GuestPowerAction } from './useProxmoxGuestActions'
 import type { ChartData } from 'chart.js'
 import type { ProxmoxGuestLink } from '../types/generated'
 
-export type GuestPowerAction = 'start' | 'shutdown' | 'reboot'
+export type { GuestPowerAction }
 
 const GUEST_REFRESH_SEC = 30
 
@@ -33,7 +32,7 @@ interface ProxmoxGuest {
 export function useProxmoxGuest() {
   const route = useRoute()
   const signal = useAbortSignal()
-  const dialog = useConfirmDialog()
+  const guestActions = useProxmoxGuestActions()
   const guest = ref<ProxmoxGuest | null>(null)
   const guestLink = ref<ProxmoxGuestLink | null>(null)
   const loading = ref(true)
@@ -43,7 +42,7 @@ export function useProxmoxGuest() {
   const chartData = ref<ChartData<'line'> | null>(null)
   const autoRefresh = ref(true)
   const lastUpdatedAt = ref<Date | null>(null)
-  const actionLoading = ref<GuestPowerAction | null>(null)
+  const actionLoading = computed(() => guestActions.isLoading(guest.value?.id))
 
   function bucketMinutesFor(inputHours: number): number {
     if (inputHours <= 6) return 1
@@ -127,38 +126,9 @@ export function useProxmoxGuest() {
     loadGuestSummary()
   }
 
-  const ACTION_LABELS: Record<GuestPowerAction, string> = {
-    start: 'Démarrer',
-    shutdown: 'Arrêter',
-    reboot: 'Redémarrer',
-  }
-
-  // start doesn't interrupt anything running, so it's fired without a confirm
-  // step; shutdown/reboot do, so they go through the same dialog pattern used
-  // for every other destructive action in this app.
   async function performGuestAction(action: GuestPowerAction): Promise<void> {
     if (!guest.value) return
-    if (action !== 'start') {
-      const confirmed = await dialog.confirm({
-        title: `${ACTION_LABELS[action]} ${guest.value.name || `#${guest.value.vmid}`} ?`,
-        message: action === 'shutdown'
-          ? 'Une extinction propre (ACPI) sera demandée à la VM/CT. Les services qui y tournent seront interrompus.'
-          : 'La VM/CT va redémarrer immédiatement. Les services qui y tournent seront interrompus le temps du redémarrage.',
-        variant: 'danger',
-        okLabel: ACTION_LABELS[action],
-      })
-      if (!confirmed) return
-    }
-    actionLoading.value = action
-    try {
-      await api.proxmoxGuestAction(guest.value.id, action)
-      addToast(`${ACTION_LABELS[action]} envoyé — le statut se mettra à jour sous ${GUEST_REFRESH_SEC}s.`, 'success')
-      await loadGuest()
-    } catch (e: unknown) {
-      addToast(getApiErrorMessage(e, `Échec de l'action "${ACTION_LABELS[action]}"`), 'error')
-    } finally {
-      actionLoading.value = null
-    }
+    await guestActions.performGuestAction(guest.value, action, loadGuest)
   }
 
   let refreshTimer: ReturnType<typeof setInterval> | undefined

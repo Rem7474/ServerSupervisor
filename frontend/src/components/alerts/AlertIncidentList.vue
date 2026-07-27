@@ -465,12 +465,14 @@ const props = withDefaults(defineProps<{
   error?: string
   activeIncidentCount?: number
   isAdmin?: boolean
+  initialSearch?: string
 }>(), {
   incidents: () => [],
   loading: false,
   error: '',
   activeIncidentCount: 0,
   isAdmin: false,
+  initialSearch: '',
 })
 
 const emit = defineEmits<{
@@ -479,7 +481,10 @@ const emit = defineEmits<{
 
 const filterType = ref('all')
 const filterStatus = ref('all')
-const searchQuery = ref('')
+// Seeded from the caller (e.g. HostDetailView's "?host=" deep link) so
+// arriving from a specific host's incidents lands pre-filtered instead of on
+// the full undifferentiated list.
+const searchQuery = ref(props.initialSearch)
 const currentPage = ref(1)
 const markingRead = ref(false)
 const resolvingId = ref<string | number | null>(null)

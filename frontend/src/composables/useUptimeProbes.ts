@@ -193,9 +193,16 @@ export function useUptimeProbes() {
   }
 
   async function confirmDeleteProbe(p: Probe): Promise<void> {
+    // p.npm_proxy_host_id is only ever set when an NPM proxy host's
+    // monitoring toggle created this probe — the FK is ON DELETE SET NULL,
+    // not RESTRICT, so deleting it here would silently leave that toggle
+    // showing "enabled" with nothing behind it (see the Monitoring/NPM
+    // overlap note this warning is meant to head off).
     const ok = await dialog.confirm({
       title: 'Supprimer la sonde ?',
-      message: `Cette action supprimera "${p.name}" et tout son historique.`,
+      message: p.npm_proxy_host_id
+        ? `"${p.name}" est gérée par le proxy host NPM "${p.npm_proxy_host_domain}". La supprimer ici laissera le toggle de suivi NPM activé mais sans effet — désactivez plutôt le suivi depuis NPM si c'est le but. Continuer quand même ?`
+        : `Cette action supprimera "${p.name}" et tout son historique.`,
       okLabel: 'Supprimer',
       destructive: true,
     })

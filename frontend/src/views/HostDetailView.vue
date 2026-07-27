@@ -109,6 +109,19 @@
           />
           <span class="fw-medium">{{ proxmoxLink.guest_name || `VMID ${proxmoxLink.vmid}` }}</span>
           <span class="text-muted small">({{ proxmoxLink.guest_type?.toUpperCase() }} · {{ proxmoxLink.node_name }})</span>
+          <!-- This panel only has the link's own metadata (status, metrics
+               source) — no running/stopped state, so power actions can't
+               live here without a second API call. Send to the guest's own
+               page instead, which already has them (start/shutdown/reboot,
+               auto-refresh, full metrics). -->
+          <router-link
+            :to="`/proxmox/guests/${proxmoxLink.guest_id}`"
+            class="text-decoration-none small d-inline-flex align-items-center gap-1"
+            title="Voir le guest Proxmox (démarrer/arrêter, métriques détaillées)"
+          >
+            Voir le guest
+            <IconExternalLink :size="14" />
+          </router-link>
         </div>
 
         <!-- Status badge + suggestion actions -->
@@ -405,7 +418,7 @@
                 <router-link
                   v-for="item in hostActiveIncidents"
                   :key="item.id"
-                  to="/alerts?tab=incidents"
+                  :to="hostAlertsLink"
                   class="list-group-item list-group-item-action d-flex align-items-center gap-2"
                 >
                   <span
@@ -721,7 +734,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { IconLink, IconLock, IconPencil, IconRefresh, IconTrash, IconX, IconAlertCircle, IconAlertTriangle } from '@tabler/icons-vue'
+import { IconLink, IconLock, IconPencil, IconRefresh, IconTrash, IconX, IconAlertCircle, IconAlertTriangle, IconExternalLink } from '@tabler/icons-vue'
 import { useHostDetail } from '../composables/useHostDetail'
 import RelativeTime from '../components/RelativeTime.vue'
 import DiskMetricsCard from '../components/disk/DiskMetricsCard.vue'
@@ -826,6 +839,14 @@ const dockerRunningCount = computed(() =>
 
 const hasLocalSmart = computed(() => ((diskHealth.value as unknown[] | null)?.length ?? 0) > 0)
 const isProxmoxLinked = computed(() => !!proxmoxLink.value && proxmoxLink.value.status !== 'ignored')
+
+// Incidents' `host_name` is `hosts.name` (see db_notifications.go), so this
+// pre-fills AlertIncidentList's search box to this host instead of landing on
+// the undifferentiated full incidents list.
+const hostAlertsLink = computed(() => ({
+  path: '/alerts',
+  query: { tab: 'incidents', host: host.value?.name || host.value?.hostname || '' },
+}))
 
 const hostTabs = computed<EntityTab[]>(() => {
   const securityUpdates = aptStatus.value?.security_updates || 0
