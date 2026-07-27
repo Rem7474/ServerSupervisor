@@ -30,6 +30,7 @@ type Repository interface {
 
 	ListProxmoxGuests(ctx context.Context, connectionID, guestType, status string) ([]models.ProxmoxGuest, error)
 	ListProxmoxGuestsByNode(ctx context.Context, connectionID, nodeName string) ([]models.ProxmoxGuest, error)
+	GetProxmoxGuestByID(ctx context.Context, id string) (*models.ProxmoxGuest, error)
 	GetProxmoxGuestMetricsSummary(ctx context.Context, guestID string, hours, bucketMinutes int) ([]models.ProxmoxNodeMetricsSummary, error)
 
 	ListProxmoxGuestLinks(ctx context.Context, status string) ([]models.ProxmoxGuestLink, error)
@@ -633,6 +634,34 @@ func (s *Service) AllGuestNetworks(ctx context.Context) (map[string]map[int][]pr
 	}
 	wg.Wait()
 	return result, nil
+}
+
+// validGuestAction whitelists the power actions this server will forward to
+// PVE — deliberately excludes the hard "stop" (immediate power-off, no
+// graceful shutdown) to keep this feature's blast radius limited to actions
+// an admin can't easily make worse by clicking twice.
+var validGuestAction = map[string]bool{"start": true, "shutdown": true, "reboot": true}
+
+// GuestAction issues a start/shutdown/reboot power action on a VM or LXC
+// container, resolving its connection/node from the stored guest record.
+func (s *Service) GuestAction(ctx context.Context, guestID, action string) (string, error) {
+	if !validGuestAction[action] {
+		return "", apperr.Validation("invalid guest action")
+	}
+	guest, err := s.repo.GetProxmoxGuestByID(ctx, guestID)
+	if err != nil {
+		return "", apperr.NotFound("guest not found")
+	}
+	secret, conn, err := s.resolveSecret(ctx, guest.ConnectionID)
+	if err != nil {
+		return "", err
+	}
+	client := proxmoxclient.New(conn.APIURL, conn.TokenID, secret, conn.InsecureSkipVerify)
+	upid, err := client.GuestAction(guest.NodeName, guest.VMID, guest.GuestType, action)
+	if err != nil {
+		return "", apperr.BadGateway(err.Error())
+	}
+	return upid, nil
 }
 
 // MigrateGuest migrates a guest to target; guestType defaults to "vm".

@@ -805,6 +805,48 @@ func (c *Client) MigrateGuest(node string, vmid int, guestType, target string, o
 	return envelope.Data, nil
 }
 
+// GuestAction issues a power action (start/shutdown/reboot) on a VM or LXC
+// container. guestType must be "vm" or "lxc". Returns the UPID of the
+// resulting PVE task — the action itself is async on the PVE side.
+func (c *Client) GuestAction(node string, vmid int, guestType, action string) (string, error) {
+	var apiPath string
+	if guestType == "lxc" {
+		apiPath = fmt.Sprintf("/nodes/%s/lxc/%d/status/%s", node, vmid, action)
+	} else {
+		apiPath = fmt.Sprintf("/nodes/%s/qemu/%d/status/%s", node, vmid, action)
+	}
+	reqURL := c.baseURL + apiPath
+	req, err := http.NewRequest(http.MethodPost, reqURL, nil)
+	if err != nil {
+		return "", fmt.Errorf("build request: %w", err)
+	}
+	req.Header.Set("Authorization", fmt.Sprintf("PVEAPIToken=%s=%s", c.tokenID, c.tokenSecret))
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("request: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		snippet := string(body)
+		if len(snippet) > 300 {
+			snippet = snippet[:300]
+		}
+		return "", fmt.Errorf("HTTP %d: %s", resp.StatusCode, snippet)
+	}
+
+	var envelope struct {
+		Data string `json:"data"` // UPID of the task
+	}
+	if err := json.Unmarshal(body, &envelope); err != nil {
+		return "", fmt.Errorf("parse response: %w", err)
+	}
+	return envelope.Data, nil
+}
+
 func (c *Client) NodeServiceAction(node, service, action string) (string, error) {
 	url := c.baseURL + fmt.Sprintf("/nodes/%s/services/%s/%s", node, service, action)
 	req, err := http.NewRequest(http.MethodPost, url, nil)

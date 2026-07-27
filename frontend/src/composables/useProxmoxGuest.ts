@@ -1,11 +1,17 @@
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import dayjs from '../utils/dayjs'
 import api from '../api'
 import { getApiErrorMessage, isApiAbort } from '../api/client'
 import { useAbortSignal } from './useAbortSignal'
+import { useConfirmDialog } from './useConfirmDialog'
+import { addToast } from './useGlobalToast'
 import type { ChartData } from 'chart.js'
 import type { ProxmoxGuestLink } from '../types/generated'
+
+export type GuestPowerAction = 'start' | 'shutdown' | 'reboot'
+
+const GUEST_REFRESH_SEC = 30
 
 interface GuestMetricPoint { timestamp: string; cpu_avg?: number; memory_avg?: number; [key: string]: unknown }
 
@@ -27,6 +33,7 @@ interface ProxmoxGuest {
 export function useProxmoxGuest() {
   const route = useRoute()
   const signal = useAbortSignal()
+  const dialog = useConfirmDialog()
   const guest = ref<ProxmoxGuest | null>(null)
   const guestLink = ref<ProxmoxGuestLink | null>(null)
   const loading = ref(true)
@@ -34,6 +41,9 @@ export function useProxmoxGuest() {
   const error = ref('')
   const hours = ref(24)
   const chartData = ref<ChartData<'line'> | null>(null)
+  const autoRefresh = ref(true)
+  const lastUpdatedAt = ref<Date | null>(null)
+  const actionLoading = ref<GuestPowerAction | null>(null)
 
   function bucketMinutesFor(inputHours: number): number {
     if (inputHours <= 6) return 1
@@ -43,7 +53,10 @@ export function useProxmoxGuest() {
   }
 
   async function loadGuest(): Promise<void> {
-    loading.value = true
+    // Only show the full-page skeleton on the very first load — periodic
+    // auto-refresh ticks update guest/guestLink in place instead of flashing
+    // the whole page back to a loading state every GUEST_REFRESH_SEC.
+    if (!guest.value) loading.value = true
     error.value = ''
     try {
       const res = await api.getProxmoxGuests(undefined, signal)
@@ -56,6 +69,7 @@ export function useProxmoxGuest() {
       guest.value = found
       const linkRes = await api.getProxmoxGuestLink(found.id, signal)
       guestLink.value = linkRes.data
+      lastUpdatedAt.value = new Date()
     } catch (e: unknown) {
       if (isApiAbort(e)) return
       error.value = getApiErrorMessage(e, 'Erreur lors du chargement du guest Proxmox.')
@@ -113,9 +127,50 @@ export function useProxmoxGuest() {
     loadGuestSummary()
   }
 
+  const ACTION_LABELS: Record<GuestPowerAction, string> = {
+    start: 'Démarrer',
+    shutdown: 'Arrêter',
+    reboot: 'Redémarrer',
+  }
+
+  // start doesn't interrupt anything running, so it's fired without a confirm
+  // step; shutdown/reboot do, so they go through the same dialog pattern used
+  // for every other destructive action in this app.
+  async function performGuestAction(action: GuestPowerAction): Promise<void> {
+    if (!guest.value) return
+    if (action !== 'start') {
+      const confirmed = await dialog.confirm({
+        title: `${ACTION_LABELS[action]} ${guest.value.name || `#${guest.value.vmid}`} ?`,
+        message: action === 'shutdown'
+          ? 'Une extinction propre (ACPI) sera demandée à la VM/CT. Les services qui y tournent seront interrompus.'
+          : 'La VM/CT va redémarrer immédiatement. Les services qui y tournent seront interrompus le temps du redémarrage.',
+        variant: 'danger',
+        okLabel: ACTION_LABELS[action],
+      })
+      if (!confirmed) return
+    }
+    actionLoading.value = action
+    try {
+      await api.proxmoxGuestAction(guest.value.id, action)
+      addToast(`${ACTION_LABELS[action]} envoyé — le statut se mettra à jour sous ${GUEST_REFRESH_SEC}s.`, 'success')
+      await loadGuest()
+    } catch (e: unknown) {
+      addToast(getApiErrorMessage(e, `Échec de l'action "${ACTION_LABELS[action]}"`), 'error')
+    } finally {
+      actionLoading.value = null
+    }
+  }
+
+  let refreshTimer: ReturnType<typeof setInterval> | undefined
   onMounted(async () => {
     await loadGuest()
     await loadGuestSummary()
+    refreshTimer = setInterval(() => {
+      if (autoRefresh.value) loadGuest()
+    }, GUEST_REFRESH_SEC * 1000)
+  })
+  onUnmounted(() => {
+    if (refreshTimer) clearInterval(refreshTimer)
   })
 
   return {
@@ -126,6 +181,11 @@ export function useProxmoxGuest() {
     error,
     hours,
     chartData,
+    autoRefresh,
+    lastUpdatedAt,
+    GUEST_REFRESH_SEC,
     changeRange,
+    actionLoading,
+    performGuestAction,
   }
 }

@@ -449,6 +449,11 @@ func registerProxmoxRoutes(g *gin.RouterGroup, h *handlers.ProxmoxHandler) {
 	proxmoxAdmin.POST("/proxmox/instances/:id/test", h.TestConnectionByID)
 	proxmoxAdmin.POST("/proxmox/instances/:id/poll-now", h.PollNow)
 	proxmoxAdmin.PUT("/proxmox/nodes/:id/sensor-source", h.UpdateNodeSensorSource)
+	// Guest power actions (start/shutdown/reboot) — admin only: unlike the
+	// migrate/service-action routes above (open to any authenticated user,
+	// gated only by the PVE token's own Sys.Modify scope), this can power off
+	// a running VM/CT directly, so it's gated at the app layer too.
+	proxmoxAdmin.POST("/proxmox/guests/:id/action", h.GuestAction)
 	// Guest ↔ host link management
 	g.GET("/proxmox/links", h.ListLinks)
 	g.POST("/proxmox/links", h.CreateLink)

@@ -46,6 +46,8 @@ export const proxmoxApi = {
   getProxmoxGuestMetrics: (guestId: string, hours?: number, bucketMinutes?: number, signal?: AbortSignal) =>
     api.get(`/v1/proxmox/guests/${guestId}/metrics`, { params: { hours: hours ?? 24, bucket_minutes: bucketMinutes ?? 5 }, signal }),
   getProxmoxGuestLink: (guestId: string, signal?: AbortSignal) => api.get(`/v1/proxmox/guests/${guestId}/link`, { signal }),
+  proxmoxGuestAction: (guestId: string, action: 'start' | 'shutdown' | 'reboot') =>
+    api.post<{ upid: string; message: string }>(`/v1/proxmox/guests/${guestId}/action`, { action }),
 
   // Guest ↔ host links
   getProxmoxLinks: (status?: string) =>

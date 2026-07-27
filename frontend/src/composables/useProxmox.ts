@@ -55,6 +55,21 @@ export function useProxmox() {
     return list
   })
 
+  // Cluster-wide CPU/RAM, computed client-side from the same per-node figures
+  // already fetched for the table — the backend summary only aggregates
+  // storage today. CPU is a plain average across online nodes (not weighted
+  // by core count, which isn't exposed per node); RAM is a true sum since
+  // mem_used/mem_total are both in bytes.
+  const clusterResources = computed(() => {
+    const online = filteredNodes.value.filter((n) => n.status === 'online')
+    const memUsed = online.reduce((sum, n) => sum + (n.mem_used || 0), 0)
+    const memTotal = online.reduce((sum, n) => sum + (n.mem_total || 0), 0)
+    const avgCpu = online.length
+      ? online.reduce((sum, n) => sum + (n.cpu_usage || 0), 0) / online.length
+      : 0
+    return { memUsed, memTotal, avgCpu, onlineCount: online.length }
+  })
+
   function toggleNodeSort(key: string): void {
     if (nodeSortKey.value === key) {
       nodeSortDir.value = nodeSortDir.value === 'asc' ? 'desc' : 'asc'
@@ -129,6 +144,7 @@ export function useProxmox() {
     sortedNodes,
     toggleNodeSort,
     hasHealthAlerts,
+    clusterResources,
     load,
   }
 }

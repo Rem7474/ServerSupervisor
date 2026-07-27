@@ -286,6 +286,139 @@
           v-model="activeTab"
           :tabs="hostTabs"
         >
+          <template #overview>
+            <div class="row row-cards mb-3">
+              <div class="col-6 col-lg-3">
+                <div class="card card-sm h-100">
+                  <div class="card-body">
+                    <div class="subheader">
+                      APT
+                    </div>
+                    <div
+                      class="h2 mb-0 mt-1"
+                      :class="(aptStatus?.security_updates || 0) > 0 ? 'text-danger' : (aptStatus?.pending_packages || 0) > 0 ? 'text-warning' : 'text-success'"
+                    >
+                      {{ aptStatus?.pending_packages || 0 }}
+                    </div>
+                    <div class="text-secondary small">
+                      {{ aptStatus?.security_updates || 0 }} sécurité
+                      <a
+                        href="#"
+                        class="ms-1"
+                        @click.prevent="activeTab = 'apt'"
+                      >voir</a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-6 col-lg-3">
+                <div class="card card-sm h-100">
+                  <div class="card-body">
+                    <div class="subheader">
+                      Conteneurs Docker
+                    </div>
+                    <div class="h2 mb-0 mt-1">
+                      {{ dockerRunningCount }} / {{ containers.length }}
+                    </div>
+                    <div class="text-secondary small">
+                      en cours
+                      <a
+                        href="#"
+                        class="ms-1"
+                        @click.prevent="activeTab = 'docker'"
+                      >voir</a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-6 col-lg-3">
+                <div class="card card-sm h-100">
+                  <div class="card-body">
+                    <div class="subheader">
+                      Tâches planifiées
+                    </div>
+                    <div class="h2 mb-0 mt-1">
+                      {{ tasksCount }}
+                    </div>
+                    <div class="text-secondary small">
+                      <a
+                        href="#"
+                        @click.prevent="activeTab = 'planifiees'"
+                      >voir</a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-6 col-lg-3">
+                <div class="card card-sm h-100">
+                  <div class="card-body">
+                    <div class="subheader">
+                      Commandes récentes
+                    </div>
+                    <div class="h2 mb-0 mt-1">
+                      {{ cmdHistory.length }}
+                    </div>
+                    <div class="text-secondary small">
+                      <a
+                        href="#"
+                        @click.prevent="activeTab = 'commandes'"
+                      >voir</a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card mb-3">
+              <div class="card-header d-flex align-items-center justify-content-between">
+                <h3 class="card-title mb-0">
+                  <IconAlertTriangle
+                    :size="18"
+                    class="icon me-1"
+                  />
+                  Alertes actives sur cet hôte
+                </h3>
+                <router-link
+                  to="/alerts?tab=incidents"
+                  class="btn btn-sm btn-outline-secondary"
+                >
+                  Toutes les alertes
+                </router-link>
+              </div>
+              <div
+                v-if="incidentsLoading"
+                class="card-body text-center text-secondary py-4"
+              >
+                <div class="spinner-border spinner-border-sm me-2" />
+                Chargement…
+              </div>
+              <div
+                v-else-if="!hostActiveIncidents.length"
+                class="card-body text-center text-secondary py-4"
+              >
+                Aucune alerte active sur cet hôte.
+              </div>
+              <div
+                v-else
+                class="list-group list-group-flush"
+              >
+                <router-link
+                  v-for="item in hostActiveIncidents"
+                  :key="item.id"
+                  to="/alerts?tab=incidents"
+                  class="list-group-item list-group-item-action d-flex align-items-center gap-2"
+                >
+                  <span
+                    class="badge"
+                    :class="item.severity === 'crit' ? 'bg-red-lt text-red' : 'bg-yellow-lt text-yellow'"
+                  >{{ item.severity }}</span>
+                  <span class="flex-grow-1">{{ item.rule_name || item.metric }}</span>
+                  <RelativeTime :date="item.triggered_at || ''" />
+                </router-link>
+              </div>
+            </div>
+          </template>
+
           <template #metrics>
             <div
               v-if="host && host.status !== 'online'"
@@ -588,7 +721,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { IconLink, IconLock, IconPencil, IconRefresh, IconTrash, IconX, IconAlertCircle } from '@tabler/icons-vue'
+import { IconLink, IconLock, IconPencil, IconRefresh, IconTrash, IconX, IconAlertCircle, IconAlertTriangle } from '@tabler/icons-vue'
 import { useHostDetail } from '../composables/useHostDetail'
 import RelativeTime from '../components/RelativeTime.vue'
 import DiskMetricsCard from '../components/disk/DiskMetricsCard.vue'
@@ -631,6 +764,8 @@ const {
   diskHealth,
   proxmoxLink,
   linkSaving,
+  hostActiveIncidents,
+  incidentsLoading,
   effectiveMetrics,
   effectiveMetricsSource,
   showLinkForm,
@@ -685,6 +820,10 @@ const {
 // Local SMART is unreadable inside an LXC/VM. When the host has no local disk
 // health but is linked to Proxmox, we surface the hosting node's disk health
 // instead of an empty SMART card.
+const dockerRunningCount = computed(() =>
+  containers.value.filter((c) => c.state === 'running').length
+)
+
 const hasLocalSmart = computed(() => ((diskHealth.value as unknown[] | null)?.length ?? 0) > 0)
 const isProxmoxLinked = computed(() => !!proxmoxLink.value && proxmoxLink.value.status !== 'ignored')
 
@@ -693,6 +832,13 @@ const hostTabs = computed<EntityTab[]>(() => {
   const pendingPackages = aptStatus.value?.pending_packages || 0
 
   const tabs: EntityTab[] = [
+    {
+      key: 'overview',
+      label: "Vue d'ensemble",
+      badges: hostActiveIncidents.value.length
+        ? [{ value: hostActiveIncidents.value.length, badgeClass: 'badge bg-red-lt text-red ms-1' }]
+        : [],
+    },
     { key: 'metrics', label: 'Métriques' },
     {
       key: 'docker',

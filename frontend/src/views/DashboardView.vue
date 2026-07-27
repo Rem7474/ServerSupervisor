@@ -39,7 +39,7 @@
 
     <!-- ─── Points d'attention (CVE + Proxmox + Attention, un seul bandeau) ─── -->
     <div
-      v-if="bannerItems.length > 0"
+      v-if="!loading && bannerItems.length > 0"
       class="card mb-3"
     >
       <div class="card-header">
@@ -76,6 +76,18 @@
           />
         </router-link>
       </div>
+    </div>
+
+    <!-- ─── État explicite quand rien ne nécessite d'attention ──────────────── -->
+    <div
+      v-else-if="!loading && hosts.length > 0"
+      class="alert alert-success d-flex align-items-center gap-2 mb-3"
+    >
+      <IconCircleCheck
+        :size="20"
+        class="icon flex-shrink-0"
+      />
+      <span>Tout est opérationnel — aucune alerte, mise à jour de sécurité ou anomalie Proxmox en attente.</span>
     </div>
 
     <!-- ─── KPIs ─────────────────────────────────────────────────────────────── -->
@@ -565,7 +577,7 @@ import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import PaginationNav from '../components/PaginationNav.vue'
 import SortableHeader from '../components/common/SortableHeader.vue'
 import EmptyState from '../components/EmptyState.vue'
-import { IconAlertTriangle, IconPlus, IconListCheck, IconChevronRight, IconChevronDown } from '@tabler/icons-vue'
+import { IconAlertTriangle, IconPlus, IconListCheck, IconChevronRight, IconChevronDown, IconCircleCheck } from '@tabler/icons-vue'
 import BulkActionBar from '../components/BulkActionBar.vue'
 import { formatHostStatus, hostStatusClass } from '../utils/formatHostStatus'
 import { isNeverConnectedHost } from '../utils/hosts'

@@ -16,168 +16,154 @@
       </h2>
     </div>
 
-    <ul class="nav nav-tabs mb-4">
-      <li class="nav-item">
-        <button
-          type="button"
-          class="nav-link"
-          :class="{ active: tab === 'general' }"
-          @click="tab = 'general'"
-        >
-          Général
-        </button>
-      </li>
-      <li class="nav-item">
-        <button
-          type="button"
-          class="nav-link"
-          :class="{ active: tab === 'notifications' }"
-          @click="tab = 'notifications'"
-        >
-          Notifications
-        </button>
-      </li>
-      <li class="nav-item">
-        <button
-          type="button"
-          class="nav-link"
-          :class="{ active: tab === 'integrations' }"
-          @click="tab = 'integrations'"
-        >
-          Intégrations
-        </button>
-      </li>
-      <li class="nav-item">
-        <button
-          type="button"
-          class="nav-link"
-          :class="{ active: tab === 'retention' }"
-          @click="tab = 'retention'"
-        >
-          Rétention
-        </button>
-      </li>
-      <li class="nav-item">
-        <button
-          type="button"
-          class="nav-link"
-          :class="{ active: tab === 'threats' }"
-          @click="tab = 'threats'"
-        >
-          Détection de menaces
-        </button>
-      </li>
-      <li class="nav-item">
-        <button
-          type="button"
-          class="nav-link"
-          :class="{ active: tab === 'maintenance' }"
-          @click="tab = 'maintenance'"
-        >
-          Maintenance
-        </button>
-      </li>
-    </ul>
+    <div class="row">
+      <!-- Sidebar navigation -->
+      <div class="col-12 col-md-3 mb-4 mb-md-0">
+        <div class="list-group mb-3">
+          <button
+            v-for="t in SETTINGS_TABS"
+            :key="t.key"
+            type="button"
+            class="list-group-item list-group-item-action d-flex align-items-center gap-2"
+            :class="{ active: tab === t.key }"
+            @click="tab = t.key"
+          >
+            <component
+              :is="t.icon"
+              :size="18"
+              class="icon"
+            />
+            {{ t.label }}
+          </button>
+        </div>
 
-    <!-- Général -->
-    <div
-      v-show="tab === 'general'"
-      class="row row-cards"
-    >
-      <div class="col-lg-6">
-        <SettingsSystemInfoCard :settings="settings" />
+        <!-- Danger zone: visually isolated so destructive maintenance actions
+             aren't one indistinguishable tab among six equally-weighted ones. -->
+        <div class="text-danger small fw-medium mb-1 px-1">
+          Zone sensible
+        </div>
+        <div class="list-group border-danger">
+          <button
+            type="button"
+            class="list-group-item list-group-item-action d-flex align-items-center gap-2 text-danger"
+            :class="{ active: tab === 'maintenance' }"
+            @click="tab = 'maintenance'"
+          >
+            <IconAlertTriangle
+              :size="18"
+              class="icon"
+            />
+            Maintenance
+          </button>
+        </div>
       </div>
-      <div class="col-lg-6">
-        <SettingsDatabaseCard
-          :db-status="dbStatus"
-          :format-number="formatNumber"
-        />
+
+      <!-- Content -->
+      <div class="col-12 col-md-9">
+        <!-- Général -->
+        <div
+          v-show="tab === 'general'"
+          class="row row-cards"
+        >
+          <div class="col-lg-6">
+            <SettingsSystemInfoCard :settings="settings" />
+          </div>
+          <div class="col-lg-6">
+            <SettingsDatabaseCard
+              :db-status="dbStatus"
+              :format-number="formatNumber"
+            />
+          </div>
+        </div>
+
+        <!-- Notifications -->
+        <div v-show="tab === 'notifications'">
+          <SettingsSmtpCard
+            :form="form"
+            :auth-is-admin="auth.isAdmin"
+            :show-smtp-pass="showSmtpPass"
+            :saving-smtp="savingSmtp"
+            :smtp-save-msg="smtpSaveMsg"
+            :smtp-save-ok="smtpSaveOk"
+            :testing-smtp="testingSmtp"
+            :smtp-test-message="smtpTestMessage"
+            :smtp-test-success="smtpTestSuccess"
+            @update:show-smtp-pass="showSmtpPass = $event"
+            @save="saveSmtp"
+            @test="testSmtp"
+          />
+          <div class="mt-4">
+            <SettingsNotificationsCard
+              :form="form"
+              :auth-is-admin="auth.isAdmin"
+              :show-git-hub-token="showGitHubToken"
+              :saving-notif="savingNotif"
+              :notif-save-msg="notifSaveMsg"
+              :notif-save-ok="notifSaveOk"
+              :testing-ntfy="testingNtfy"
+              :ntfy-test-message="ntfyTestMessage"
+              :ntfy-test-success="ntfyTestSuccess"
+              @update:show-github-token="showGitHubToken = $event"
+              @save="saveNotifications"
+              @test="testNtfy"
+            />
+          </div>
+        </div>
+
+        <!-- Intégrations -->
+        <div v-show="tab === 'integrations'">
+          <SettingsProxmoxCard :auth-is-admin="auth.isAdmin" />
+          <SettingsNPMCard :auth-is-admin="auth.isAdmin" />
+          <SettingsRegistryCredentialsCard :auth-is-admin="auth.isAdmin" />
+        </div>
+
+        <!-- Rétention -->
+        <div v-show="tab === 'retention'">
+          <SettingsRetentionCard
+            :form="form"
+            :auth-is-admin="auth.isAdmin"
+            :saving-retention="savingRetention"
+            :retention-save-msg="retentionSaveMsg"
+            :retention-save-ok="retentionSaveOk"
+            @save="saveRetention"
+          />
+        </div>
+
+        <!-- Détection de menaces -->
+        <div v-show="tab === 'threats'">
+          <SettingsThreatDetectionCard
+            :form="form"
+            :auth-is-admin="auth.isAdmin"
+            :saving-threat-detection="savingThreatDetection"
+            :threat-detection-save-msg="threatDetectionSaveMsg"
+            :threat-detection-save-ok="threatDetectionSaveOk"
+            @save="saveThreatDetection"
+          />
+        </div>
+
+        <!-- Maintenance -->
+        <div v-show="tab === 'maintenance'">
+          <SettingsMaintenanceCard
+            :settings="settings"
+            :cleaning-metrics="cleaningMetrics"
+            :clean-message="cleanMessage"
+            :clean-success="cleanSuccess"
+            :cleaning-audit-logs="cleaningAuditLogs"
+            :audit-clean-message="auditCleanMessage"
+            :audit-clean-success="auditCleanSuccess"
+            @clean-metrics="cleanMetrics"
+            @clean-audit="cleanAuditLogs"
+          />
+        </div>
       </div>
-    </div>
-
-    <!-- Notifications -->
-    <div v-show="tab === 'notifications'">
-      <SettingsSmtpCard
-        :form="form"
-        :auth-is-admin="auth.isAdmin"
-        :show-smtp-pass="showSmtpPass"
-        :saving-smtp="savingSmtp"
-        :smtp-save-msg="smtpSaveMsg"
-        :smtp-save-ok="smtpSaveOk"
-        :testing-smtp="testingSmtp"
-        :smtp-test-message="smtpTestMessage"
-        :smtp-test-success="smtpTestSuccess"
-        @update:show-smtp-pass="showSmtpPass = $event"
-        @save="saveSmtp"
-        @test="testSmtp"
-      />
-      <div class="mt-4">
-        <SettingsNotificationsCard
-          :form="form"
-          :auth-is-admin="auth.isAdmin"
-          :show-git-hub-token="showGitHubToken"
-          :saving-notif="savingNotif"
-          :notif-save-msg="notifSaveMsg"
-          :notif-save-ok="notifSaveOk"
-          :testing-ntfy="testingNtfy"
-          :ntfy-test-message="ntfyTestMessage"
-          :ntfy-test-success="ntfyTestSuccess"
-          @update:show-github-token="showGitHubToken = $event"
-          @save="saveNotifications"
-          @test="testNtfy"
-        />
-      </div>
-    </div>
-
-    <!-- Intégrations -->
-    <div v-show="tab === 'integrations'">
-      <SettingsProxmoxCard :auth-is-admin="auth.isAdmin" />
-      <SettingsNPMCard :auth-is-admin="auth.isAdmin" />
-      <SettingsRegistryCredentialsCard :auth-is-admin="auth.isAdmin" />
-    </div>
-
-    <!-- Rétention -->
-    <div v-show="tab === 'retention'">
-      <SettingsRetentionCard
-        :form="form"
-        :auth-is-admin="auth.isAdmin"
-        :saving-retention="savingRetention"
-        :retention-save-msg="retentionSaveMsg"
-        :retention-save-ok="retentionSaveOk"
-        @save="saveRetention"
-      />
-    </div>
-
-    <!-- Détection de menaces -->
-    <div v-show="tab === 'threats'">
-      <SettingsThreatDetectionCard
-        :form="form"
-        :auth-is-admin="auth.isAdmin"
-        :saving-threat-detection="savingThreatDetection"
-        :threat-detection-save-msg="threatDetectionSaveMsg"
-        :threat-detection-save-ok="threatDetectionSaveOk"
-        @save="saveThreatDetection"
-      />
-    </div>
-
-    <!-- Maintenance -->
-    <div v-show="tab === 'maintenance'">
-      <SettingsMaintenanceCard
-        :settings="settings"
-        :cleaning-metrics="cleaningMetrics"
-        :clean-message="cleanMessage"
-        :clean-success="cleanSuccess"
-        :cleaning-audit-logs="cleaningAuditLogs"
-        :audit-clean-message="auditCleanMessage"
-        :audit-clean-success="auditCleanSuccess"
-        @clean-metrics="cleanMetrics"
-        @clean-audit="cleanAuditLogs"
-      />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import {
+  IconAdjustments, IconAlertTriangle, IconBell, IconDatabase, IconPlugConnected, IconShieldSearch,
+} from '@tabler/icons-vue'
 import SettingsDatabaseCard from '../components/settings/SettingsDatabaseCard.vue'
 import SettingsMaintenanceCard from '../components/settings/SettingsMaintenanceCard.vue'
 import SettingsNotificationsCard from '../components/settings/SettingsNotificationsCard.vue'
@@ -189,6 +175,14 @@ import SettingsProxmoxCard from '../components/settings/SettingsProxmoxCard.vue'
 import SettingsNPMCard from '../components/settings/SettingsNPMCard.vue'
 import SettingsRegistryCredentialsCard from '../components/settings/SettingsRegistryCredentialsCard.vue'
 import { useSettings } from '../composables/useSettings'
+
+const SETTINGS_TABS = [
+  { key: 'general', label: 'Général', icon: IconAdjustments },
+  { key: 'notifications', label: 'Notifications', icon: IconBell },
+  { key: 'integrations', label: 'Intégrations', icon: IconPlugConnected },
+  { key: 'retention', label: 'Rétention', icon: IconDatabase },
+  { key: 'threats', label: 'Détection de menaces', icon: IconShieldSearch },
+]
 
 const {
   auth,

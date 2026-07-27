@@ -53,6 +53,25 @@ func (h *ProxmoxHandler) MigrateGuest(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"upid": upid, "message": fmt.Sprintf("Migration vers %s lancée", body.Target)})
 }
 
+// GuestAction issues a start/shutdown/reboot power action on a VM or LXC
+// container. URL param :id = the internal proxmox_guests row ID (not the PVE
+// vmid — the service resolves node/vmid/guest_type from it).
+func (h *ProxmoxHandler) GuestAction(c *gin.Context) {
+	var body struct {
+		Action string `json:"action" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		respondError(c, apperr.Validation("action requise"))
+		return
+	}
+	upid, err := h.svc.GuestAction(c.Request.Context(), c.Param("id"), body.Action)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"upid": upid, "message": fmt.Sprintf("Action %q envoyée", body.Action)})
+}
+
 // NodeServiceAction proxies a systemd service action to PVE (start/stop/restart/reload).
 func (h *ProxmoxHandler) NodeServiceAction(c *gin.Context) {
 	upid, err := h.svc.NodeServiceAction(c.Request.Context(), c.Param("id"), c.Param("service"), c.Param("action"))

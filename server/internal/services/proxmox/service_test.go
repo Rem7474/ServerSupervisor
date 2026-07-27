@@ -57,6 +57,9 @@ func (f *fakeRepo) ListProxmoxGuestsByNode(_ context.Context, connectionID, node
 	}
 	return nil, nil
 }
+func (f *fakeRepo) GetProxmoxGuestByID(context.Context, string) (*models.ProxmoxGuest, error) {
+	return nil, errors.New("not found")
+}
 func (f *fakeRepo) GetProxmoxGuestMetricsSummary(context.Context, string, int, int) ([]models.ProxmoxNodeMetricsSummary, error) {
 	return nil, nil
 }

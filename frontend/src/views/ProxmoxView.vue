@@ -81,6 +81,42 @@
           </div>
         </div>
       </div>
+      <div class="col-6 col-lg-3">
+        <div class="card card-sm h-100">
+          <div class="card-body">
+            <div class="subheader">
+              CPU cluster (moy.)
+            </div>
+            <div
+              class="h1 mt-2 mb-0"
+              :class="cpuTextColor(clusterResources.avgCpu)"
+            >
+              {{ (clusterResources.avgCpu * 100).toFixed(1) }}%
+            </div>
+            <div class="text-muted small">
+              sur {{ clusterResources.onlineCount }} nœud{{ clusterResources.onlineCount > 1 ? 's' : '' }} en ligne
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="card card-sm h-100">
+          <div class="card-body">
+            <div class="subheader">
+              RAM cluster
+            </div>
+            <div
+              class="h1 mt-2 mb-0"
+              :class="ramTextColor(clusterResources.memUsed, clusterResources.memTotal)"
+            >
+              {{ formatBytes(clusterResources.memUsed) }}
+            </div>
+            <div class="text-muted small">
+              sur {{ formatBytes(clusterResources.memTotal) }}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Cluster health signals (only shown when there are issues) -->
@@ -428,6 +464,7 @@ const {
   sortedNodes,
   toggleNodeSort,
   hasHealthAlerts,
+  clusterResources,
   load,
 } = useProxmox()
 
@@ -448,6 +485,20 @@ function ramColor(used: number, total: number): string {
   if (pct > 0.85) return 'bg-danger'
   if (pct > 0.6) return 'bg-warning'
   return 'bg-success'
+}
+
+function cpuTextColor(usage: number): string {
+  if (usage > 0.85) return 'text-danger'
+  if (usage > 0.6) return 'text-warning'
+  return 'text-success'
+}
+
+function ramTextColor(used: number, total: number): string {
+  if (!total) return 'text-secondary'
+  const pct = used / total
+  if (pct > 0.85) return 'text-danger'
+  if (pct > 0.6) return 'text-warning'
+  return 'text-success'
 }
 
 function formatBytes(bytes: number | undefined): string {

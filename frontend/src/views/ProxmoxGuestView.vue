@@ -1,5 +1,11 @@
 <template>
   <div>
+    <PageRefreshBar
+      v-model="autoRefresh"
+      label="Guest Proxmox"
+      :interval-sec="GUEST_REFRESH_SEC"
+      :last-updated-at="lastUpdatedAt"
+    />
     <div v-if="loading">
       <LoadingSkeleton
         variant="kpi"
@@ -18,49 +24,110 @@
       {{ error }}
     </div>
     <div v-else-if="guest">
-      <div class="page-header mb-4">
-        <div class="page-pretitle">
-          <router-link
-            to="/"
-            class="text-decoration-none"
-          >
-            Dashboard
-          </router-link>
-          <span class="text-muted mx-1">/</span>
-          <router-link
-            to="/proxmox"
-            class="text-decoration-none"
-          >
-            Proxmox VE
-          </router-link>
-          <span class="text-muted mx-1">/</span>
-          <router-link
-            :to="`/proxmox/nodes/${guestNodeId}`"
-            class="text-decoration-none"
-          >
-            {{ guest.node_name }}
-          </router-link>
-          <span class="text-muted mx-1">/</span>
-          <span>{{ guest.guest_type.toUpperCase() }} {{ guest.vmid }}</span>
-        </div>
-        <div class="d-flex align-items-center gap-3 flex-wrap">
-          <h2 class="page-title mb-0">
-            {{ guest.name || `${guest.guest_type.toUpperCase()} ${guest.vmid}` }}
-          </h2>
-          <span :class="statusBadgeClass(guest.status)">{{ guest.status }}</span>
-          <span class="badge bg-azure-lt text-azure">{{ guest.guest_type.toUpperCase() }}</span>
-          <template v-if="guestLink?.host_id">
-            <MetricsSourceBadge source="proxmox" />
+      <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
+        <div>
+          <div class="page-pretitle">
             <router-link
-              :to="`/hosts/${guestLink.host_id}`"
-              class="ms-1"
+              to="/"
+              class="text-decoration-none"
             >
-              {{ guestLink.host_hostname || guestLink.host_name }}
+              Dashboard
             </router-link>
-          </template>
+            <span class="text-muted mx-1">/</span>
+            <router-link
+              to="/proxmox"
+              class="text-decoration-none"
+            >
+              Proxmox VE
+            </router-link>
+            <span class="text-muted mx-1">/</span>
+            <router-link
+              :to="`/proxmox/nodes/${guestNodeId}`"
+              class="text-decoration-none"
+            >
+              {{ guest.node_name }}
+            </router-link>
+            <span class="text-muted mx-1">/</span>
+            <span>{{ guest.guest_type.toUpperCase() }} {{ guest.vmid }}</span>
+          </div>
+          <div class="d-flex align-items-center gap-3 flex-wrap">
+            <h2 class="page-title mb-0">
+              {{ guest.name || `${guest.guest_type.toUpperCase()} ${guest.vmid}` }}
+            </h2>
+            <span :class="statusBadgeClass(guest.status)">{{ guest.status }}</span>
+            <span class="badge bg-azure-lt text-azure">{{ guest.guest_type.toUpperCase() }}</span>
+            <template v-if="guestLink?.host_id">
+              <MetricsSourceBadge source="proxmox" />
+              <router-link
+                :to="`/hosts/${guestLink.host_id}`"
+                class="ms-1"
+              >
+                {{ guestLink.host_hostname || guestLink.host_name }}
+              </router-link>
+            </template>
+          </div>
+          <div class="text-secondary">
+            Nœud {{ guest.node_name }} · VMID {{ guest.vmid }}
+          </div>
         </div>
-        <div class="text-secondary">
-          Nœud {{ guest.node_name }} · VMID {{ guest.vmid }}
+        <div
+          v-if="auth.isAdmin"
+          class="d-flex gap-2"
+        >
+          <button
+            v-if="guest.status === 'stopped'"
+            type="button"
+            class="btn btn-sm btn-outline-success"
+            :disabled="actionLoading !== null"
+            @click="performGuestAction('start')"
+          >
+            <span
+              v-if="actionLoading === 'start'"
+              class="spinner-border spinner-border-sm me-1"
+            />
+            <IconPlayerPlay
+              v-else
+              :size="16"
+              class="icon me-1"
+            />
+            Démarrer
+          </button>
+          <template v-else>
+            <button
+              type="button"
+              class="btn btn-sm btn-outline-warning"
+              :disabled="actionLoading !== null"
+              @click="performGuestAction('reboot')"
+            >
+              <span
+                v-if="actionLoading === 'reboot'"
+                class="spinner-border spinner-border-sm me-1"
+              />
+              <IconRefresh
+                v-else
+                :size="16"
+                class="icon me-1"
+              />
+              Redémarrer
+            </button>
+            <button
+              type="button"
+              class="btn btn-sm btn-outline-danger"
+              :disabled="actionLoading !== null"
+              @click="performGuestAction('shutdown')"
+            >
+              <span
+                v-if="actionLoading === 'shutdown'"
+                class="spinner-border spinner-border-sm me-1"
+              />
+              <IconPlayerStop
+                v-else
+                :size="16"
+                class="icon me-1"
+              />
+              Arrêter
+            </button>
+          </template>
         </div>
       </div>
 
@@ -176,12 +243,16 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent } from 'vue'
 import { useRoute } from 'vue-router'
+import { IconPlayerPlay, IconPlayerStop, IconRefresh } from '@tabler/icons-vue'
 import MetricsSourceBadge from '../components/common/MetricsSourceBadge.vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
+import PageRefreshBar from '../components/PageRefreshBar.vue'
+import { useAuthStore } from '../stores/auth'
 import { useProxmoxGuest } from '../composables/useProxmoxGuest'
 import type { ChartOptions, TooltipItem } from 'chart.js'
 
 const route = useRoute()
+const auth = useAuthStore()
 
 const {
   guest,
@@ -191,7 +262,12 @@ const {
   error,
   hours,
   chartData,
+  autoRefresh,
+  lastUpdatedAt,
+  GUEST_REFRESH_SEC,
   changeRange,
+  actionLoading,
+  performGuestAction,
 } = useProxmoxGuest()
 
 const Line = defineAsyncComponent(async () => {
