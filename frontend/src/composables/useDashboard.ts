@@ -621,11 +621,6 @@ export function useDashboard() {
     startSummaryRefreshTimer()
   }
 
-  function selectAllFiltered() {
-    const ids = sortedHosts.value.map((h: DashboardHostRecord) => h.id)
-    selectedHostIds.value = Array.from(new Set([...selectedHostIds.value, ...ids]))
-  }
-
   function clearSelection() {
     selectedHostIds.value = []
   }
@@ -786,7 +781,6 @@ export function useDashboard() {
     fetchSummary,
     refreshCveSummary,
     changeSummaryRange,
-    selectAllFiltered,
     clearSelection,
     sendBulkApt,
     formatUptime,

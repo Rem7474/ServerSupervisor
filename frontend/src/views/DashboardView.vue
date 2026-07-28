@@ -178,18 +178,6 @@
               </option>
             </select>
           </div>
-          <div
-            v-if="canRunApt"
-            class="col-12 col-md-auto d-flex align-items-end"
-          >
-            <button
-              type="button"
-              class="btn btn-outline-secondary btn-sm"
-              @click="selectAllFiltered"
-            >
-              Tout sélectionner
-            </button>
-          </div>
         </div>
       </div>
     </div>
@@ -200,7 +188,17 @@
         <table class="table table-vcenter card-table">
           <thead>
             <tr>
-              <th class="host-selection-col" />
+              <th class="host-selection-col">
+                <label class="form-check mb-0">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    :checked="allVisibleHostsSelected"
+                    aria-label="Sélectionner tous les hôtes affichés"
+                    @change="toggleSelectAllVisibleHosts(($event.target as HTMLInputElement).checked)"
+                  >
+                </label>
+              </th>
               <th>
                 <SortableHeader
                   label="Nom"
@@ -631,7 +629,6 @@ const {
   summaryChartOptions,
   fetchSummary,
   changeSummaryRange,
-  selectAllFiltered,
   clearSelection,
   sendBulkApt,
   formatUptime,
@@ -743,6 +740,21 @@ const paginatedHosts = computed(() => {
 
 function setHostPage(page: number): void {
   currentHostPage.value = page
+}
+
+// Scoped to the current page, like Docker's equivalent header checkbox —
+// selecting "all" shouldn't silently span every page of the current filter.
+const allVisibleHostsSelected = computed(() =>
+  paginatedHosts.value.length > 0 && paginatedHosts.value.every((h) => selectedHostIds.value.includes(h.id))
+)
+
+function toggleSelectAllVisibleHosts(checked: boolean): void {
+  const next = new Set(selectedHostIds.value)
+  for (const h of paginatedHosts.value) {
+    if (checked) next.add(h.id)
+    else next.delete(h.id)
+  }
+  selectedHostIds.value = Array.from(next)
 }
 
 function toggleSort(key: string): void {
