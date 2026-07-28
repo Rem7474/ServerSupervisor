@@ -1,5 +1,6 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import api from '../api'
+import { npmApi } from '../api/npm'
 import type { SSLCertificate } from '../types/ssl'
 import { useConfirmDialog } from './useConfirmDialog'
 import dayjs from '../utils/dayjs'
@@ -172,18 +173,23 @@ export function useSslCertificates() {
   }
 
   async function confirmDeleteCert(c: SSLCert): Promise<void> {
-    // See the identical guard in useUptimeProbes.ts's confirmDeleteProbe —
-    // same ON DELETE SET NULL desync risk against npm_proxy_hosts.
+    // See the identical guard+unification in useUptimeProbes.ts's
+    // confirmDeleteProbe — same ON DELETE SET NULL desync risk against
+    // npm_proxy_hosts, same fix: flip the NPM-side flag off as part of the
+    // same action instead of leaving a second manual step in NPM.
     const ok = await dialog.confirm({
       title: 'Supprimer le certificat ?',
       message: c.npm_proxy_host_id
-        ? `"${c.name}" est géré par le proxy host NPM "${c.npm_proxy_host_domain}". Le supprimer ici laissera le toggle de suivi SSL de NPM activé mais sans effet — désactivez plutôt le suivi depuis NPM si c'est le but. Continuer quand même ?`
+        ? `"${c.name}" est géré par le proxy host NPM "${c.npm_proxy_host_domain}". Le supprimer désactivera aussi le suivi SSL de ce proxy host dans NPM.`
         : `Cette action supprimera "${c.name}" du suivi.`,
       okLabel: 'Supprimer',
       destructive: true,
     })
     if (!ok) return
     try {
+      if (c.npm_proxy_host_id) {
+        await npmApi.updateProxyHost(c.npm_proxy_host_id, { ssl_monitoring_enabled: false })
+      }
       await api.deleteSSLCertificate(c.id)
       await fetchCerts()
     } catch (e: unknown) {

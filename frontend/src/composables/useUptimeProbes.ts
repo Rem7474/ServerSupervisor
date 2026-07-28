@@ -1,5 +1,6 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import api from '../api'
+import { npmApi } from '../api/npm'
 import type { UptimeProbe } from '../types/uptime'
 import { useConfirmDialog } from './useConfirmDialog'
 import { usePagination } from './usePagination'
@@ -56,7 +57,17 @@ export function useUptimeProbes() {
       switch (col) {
         case 'name': return m * a.name.localeCompare(b.name)
         case 'status': {
-          const rank = (p: Probe) => p.last_status === 'down' ? 0 : p.last_status === 'up' ? 1 : 2
+          // A disabled probe keeps whatever last_status it had when it was
+          // still being checked — without a dedicated bucket it stays mixed
+          // in with currently-down, actively-monitored probes even though
+          // it's no longer being checked at all. Sorted last, since it's not
+          // actionable the way a real outage is.
+          const rank = (p: Probe) => {
+            if (!p.enabled) return 3
+            if (p.last_status === 'down') return 0
+            if (p.last_status === 'up') return 1
+            return 2
+          }
           return m * (rank(a) - rank(b))
         }
         case 'uptime': {
@@ -195,19 +206,23 @@ export function useUptimeProbes() {
   async function confirmDeleteProbe(p: Probe): Promise<void> {
     // p.npm_proxy_host_id is only ever set when an NPM proxy host's
     // monitoring toggle created this probe — the FK is ON DELETE SET NULL,
-    // not RESTRICT, so deleting it here would silently leave that toggle
-    // showing "enabled" with nothing behind it (see the Monitoring/NPM
-    // overlap note this warning is meant to head off).
+    // not RESTRICT. Deleting the probe alone would leave that toggle showing
+    // "enabled" with nothing behind it, so this also flips the NPM-side flag
+    // off first — one action does both instead of leaving a second manual
+    // step in NPM.
     const ok = await dialog.confirm({
       title: 'Supprimer la sonde ?',
       message: p.npm_proxy_host_id
-        ? `"${p.name}" est gérée par le proxy host NPM "${p.npm_proxy_host_domain}". La supprimer ici laissera le toggle de suivi NPM activé mais sans effet — désactivez plutôt le suivi depuis NPM si c'est le but. Continuer quand même ?`
+        ? `"${p.name}" est gérée par le proxy host NPM "${p.npm_proxy_host_domain}". La supprimer désactivera aussi le suivi uptime de ce proxy host dans NPM.`
         : `Cette action supprimera "${p.name}" et tout son historique.`,
       okLabel: 'Supprimer',
       destructive: true,
     })
     if (!ok) return
     try {
+      if (p.npm_proxy_host_id) {
+        await npmApi.updateProxyHost(p.npm_proxy_host_id, { uptime_monitoring_enabled: false })
+      }
       await api.deleteUptimeProbe(p.id)
       await fetchProbes()
     } catch (e: unknown) {

@@ -99,6 +99,7 @@
             <tr
               v-for="p in pagedProbes"
               :key="p.id"
+              :class="{ 'opacity-60': !p.enabled }"
             >
               <td>
                 <router-link

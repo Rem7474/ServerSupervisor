@@ -92,6 +92,7 @@
             <tr
               v-for="c in pagedCerts"
               :key="c.id"
+              :class="{ 'opacity-60': !c.enabled }"
             >
               <td>
                 <router-link
