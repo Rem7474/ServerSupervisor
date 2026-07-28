@@ -191,7 +191,7 @@
                   @click="openEditForm(inst)"
                 >
                   <IconPencil
-                    :size="2"
+                    :size="16"
                     class="icon icon-sm"
                   />
                 </button>
@@ -202,7 +202,7 @@
                   @click="testById(inst)"
                 >
                   <IconClock
-                    :size="2"
+                    :size="16"
                     class="icon icon-sm"
                   />
                 </button>
@@ -213,7 +213,7 @@
                   @click="pollNow(inst)"
                 >
                   <IconRefresh
-                    :size="2"
+                    :size="16"
                     class="icon icon-sm"
                   />
                 </button>
@@ -224,7 +224,7 @@
                   @click="remove(inst)"
                 >
                   <IconTrash
-                    :size="2"
+                    :size="16"
                     class="icon icon-sm"
                   />
                 </button>

@@ -181,7 +181,7 @@
                   @click="openEditForm(conn)"
                 >
                   <IconPencil
-                    :size="2"
+                    :size="16"
                     class="icon icon-sm"
                   />
                 </button>
@@ -193,7 +193,7 @@
                   @click="refreshNow(conn)"
                 >
                   <IconRefresh
-                    :size="2"
+                    :size="16"
                     class="icon icon-sm"
                   />
                 </button>
@@ -205,7 +205,7 @@
                   @click="remove(conn)"
                 >
                   <IconTrash
-                    :size="2"
+                    :size="16"
                     class="icon icon-sm"
                   />
                 </button>

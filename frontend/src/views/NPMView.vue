@@ -53,7 +53,7 @@
           @click="load"
         >
           <IconRefresh
-            :size="2"
+            :size="16"
             class="icon icon-sm me-1"
           />
           Actualiser
