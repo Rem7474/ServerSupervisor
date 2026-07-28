@@ -185,7 +185,7 @@ const routes: RouteRecordRaw[] = [
   // Legacy redirects — keep old deep-links working
   { path: '/uptime', redirect: '/monitoring' },
   { path: '/uptime/probes/:id', redirect: (to) => `/monitoring/probes/${to.params.id}` },
-  { path: '/ssl', redirect: '/monitoring?tab=ssl' },
+  { path: '/ssl', redirect: '/monitoring' },
   {
     path: '/proxmox/nodes/:id',
     name: 'ProxmoxNode',

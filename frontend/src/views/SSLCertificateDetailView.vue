@@ -3,7 +3,7 @@
     <div class="page-header mb-3">
       <div class="page-pretitle">
         <router-link
-          to="/monitoring?tab=ssl"
+          to="/monitoring"
           class="text-decoration-none"
         >
           Monitoring

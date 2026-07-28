@@ -7,6 +7,17 @@ import { usePagination } from './usePagination'
 
 type Probe = UptimeProbe
 
+interface HeartbeatTick {
+  id: string | number
+  checked_at: string
+  success: boolean
+}
+
+// How many recent ticks the compact per-row heartbeat bar shows — smaller
+// than the single-probe detail page's HEARTBEAT_BAR_SIZE (50) since this
+// renders once per row in a list instead of as the page's own focal point.
+const ROW_HEARTBEAT_SIZE = 20
+
 interface ProbeForm {
   id: string
   name: string
@@ -34,6 +45,7 @@ export function useUptimeProbes() {
   const probes = ref<Probe[]>([])
   const loadingProbes = ref(false)
   const probeStats = ref<Record<string, { uptime_percent: number }>>({})
+  const probeHistory = ref<Record<string, HeartbeatTick[]>>({})
   const checkingProbeId = ref('')
 
   const downCount = computed(() => probes.value.filter((p) => p.last_status === 'down').length)
@@ -118,6 +130,7 @@ export function useUptimeProbes() {
       lastUpdatedAt.value = new Date()
       error.value = ''
       fetchAllProbeStats()
+      fetchAllProbeHistory()
     } catch (e: unknown) {
       error.value = (e as { response?: { data?: { error?: string } }; message?: string })?.response?.data?.error
         || (e as { message?: string })?.message || 'Impossible de charger les sondes'
@@ -137,6 +150,23 @@ export function useUptimeProbes() {
       }
     }
     probeStats.value = map
+  }
+
+  // Powers the compact per-row heartbeat bar on the merged Monitoring
+  // overview (see useMonitoringOverview.ts) — one extra request per probe,
+  // same fan-out pattern fetchAllProbeStats already uses.
+  async function fetchAllProbeHistory(): Promise<void> {
+    const results = await Promise.allSettled(
+      probes.value.map((p) => api.getUptimeHistory(p.id, ROW_HEARTBEAT_SIZE).then((r) => ({ id: p.id, data: r.data })))
+    )
+    const map: Record<string, HeartbeatTick[]> = {}
+    for (const r of results) {
+      if (r.status === 'fulfilled') {
+        // API returns newest-first; reverse so the bar reads left(oldest)-to-right(now).
+        map[r.value.id] = [...(r.value.data?.results || [])].reverse()
+      }
+    }
+    probeHistory.value = map
   }
 
   async function checkProbeNow(p: Probe): Promise<void> {
@@ -258,6 +288,7 @@ export function useUptimeProbes() {
     probes,
     loadingProbes,
     probeStats,
+    probeHistory,
     checkingProbeId,
     downCount,
     probeSort,
