@@ -1,10 +1,12 @@
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { npmApi } from '../api/npm'
 import type { NPMProxyHostEnriched } from '../types/npm'
 import { getApiErrorMessage } from '../api/client'
 import { useConfirmDialog } from './useConfirmDialog'
 
 export type NPMSortKey = 'connection_name' | 'domain' | 'forward' | 'npm_enabled' | 'uptime_status' | 'ssl_days_remaining'
+
+const NPM_REFRESH_SEC = 30
 
 export function useNPM() {
   const dialog = useConfirmDialog()
@@ -14,6 +16,12 @@ export function useNPM() {
   const actionError = ref('')
   const toggling = ref<Record<string, boolean>>({})
   const togglingNPM = ref<Record<string, boolean>>({})
+  const autoRefresh = ref(true)
+  const lastUpdatedAt = ref<Date | null>(null)
+  let refreshTimer: ReturnType<typeof setInterval> | null = null
+  const hasPendingToggle = computed(() =>
+    Object.values(toggling.value).some(Boolean) || Object.values(togglingNPM.value).some(Boolean)
+  )
   // Matches the backend's default ORDER BY c.name ASC, domain_names[1] ASC
   // (db_npm.go) until the user picks a column.
   const sortKey = ref<NPMSortKey>('connection_name')
@@ -65,11 +73,23 @@ export function useNPM() {
     try {
       const res = await npmApi.listAllProxyHosts()
       hosts.value = res.data.proxy_hosts ?? []
+      lastUpdatedAt.value = new Date()
     } catch (e: unknown) {
       loadError.value = getApiErrorMessage(e, 'Impossible de charger les proxy hosts.')
     } finally {
       loading.value = false
     }
+  }
+
+  function startRefreshTimer(): void {
+    stopRefreshTimer()
+    refreshTimer = setInterval(() => {
+      if (autoRefresh.value && !hasPendingToggle.value) load()
+    }, NPM_REFRESH_SEC * 1000)
+  }
+
+  function stopRefreshTimer(): void {
+    if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null }
   }
 
   // toggleNPM appelle NPM pour activer/désactiver le proxy host dans NPM lui-même.
@@ -147,7 +167,11 @@ export function useNPM() {
     }
   }
 
-  onMounted(load)
+  onMounted(() => {
+    load()
+    startRefreshTimer()
+  })
+  onUnmounted(stopRefreshTimer)
 
   return {
     hosts,
@@ -159,6 +183,9 @@ export function useNPM() {
     actionError,
     toggling,
     togglingNPM,
+    autoRefresh,
+    lastUpdatedAt,
+    NPM_REFRESH_SEC,
     load,
     toggleNPM,
     toggle,

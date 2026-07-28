@@ -1,5 +1,11 @@
 <template>
   <div>
+    <PageRefreshBar
+      v-model="autoRefresh"
+      label="NPM"
+      :interval-sec="NPM_REFRESH_SEC"
+      :last-updated-at="lastUpdatedAt"
+    />
     <div class="page-header mb-4">
       <div class="page-pretitle">
         <router-link
@@ -46,18 +52,6 @@
         <h3 class="card-title mb-0">
           Tous les proxy hosts
         </h3>
-        <button
-          type="button"
-          class="btn btn-sm btn-outline-secondary"
-          :disabled="loading"
-          @click="load"
-        >
-          <IconRefresh
-            :size="16"
-            class="icon icon-sm me-1"
-          />
-          Actualiser
-        </button>
       </div>
 
       <div
@@ -291,8 +285,9 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { IconLock, IconRefresh, IconAlertTriangle } from '@tabler/icons-vue'
+import { IconLock, IconAlertTriangle } from '@tabler/icons-vue'
 import SortableHeader from '../components/common/SortableHeader.vue'
+import PageRefreshBar from '../components/PageRefreshBar.vue'
 import { useNPM } from '../composables/useNPM'
 
 const {
@@ -305,7 +300,9 @@ const {
   actionError,
   toggling,
   togglingNPM,
-  load,
+  autoRefresh,
+  lastUpdatedAt,
+  NPM_REFRESH_SEC,
   toggleNPM,
   toggle,
   toggleSort,

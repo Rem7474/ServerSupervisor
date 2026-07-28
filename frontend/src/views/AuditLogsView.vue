@@ -19,16 +19,6 @@
           Historique des actions, connexions et commandes
         </div>
       </div>
-      <div class="d-flex align-items-center gap-2">
-        <button
-          type="button"
-          class="btn btn-outline-secondary"
-          :disabled="connexionsLoading || cmdsLoading"
-          @click="refresh"
-        >
-          Actualiser
-        </button>
-      </div>
     </div>
 
     <!-- Tab navigation -->
@@ -353,7 +343,6 @@ const {
   activeTab,
   switchToCommandes,
   switchToConnexions,
-  refresh,
   cmdsPage,
   cmdsTotal,
   cmdsLoading,

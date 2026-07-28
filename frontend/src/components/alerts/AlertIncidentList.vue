@@ -108,17 +108,6 @@
             Tout marquer lu
           </button>
           <button
-            type="button"
-            class="btn btn-sm btn-ghost-secondary"
-            @click="$emit('refresh')"
-          >
-            <IconRefresh
-              :size="16"
-              class="icon me-1"
-            />
-            Actualiser
-          </button>
-          <button
             v-if="hasActiveFilters"
             class="btn btn-sm btn-outline-secondary"
             type="button"
@@ -376,7 +365,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { IconBell, IconCheck, IconRefresh, IconSearch, IconX } from '@tabler/icons-vue'
+import { IconBell, IconCheck, IconSearch, IconX } from '@tabler/icons-vue'
 import apiClient from '../../api'
 import BadgePill from '../common/BadgePill.vue'
 import PaginationNav from '../PaginationNav.vue'

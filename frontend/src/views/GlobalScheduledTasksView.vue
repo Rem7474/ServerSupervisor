@@ -1,5 +1,11 @@
 <template>
   <div>
+    <PageRefreshBar
+      v-model="autoRefresh"
+      label="Tâches planifiées"
+      :interval-sec="TASKS_REFRESH_SEC"
+      :last-updated-at="lastUpdatedAt"
+    />
     <div class="page-header mb-3">
       <div class="d-flex align-items-center justify-content-between gap-3">
         <div>
@@ -25,17 +31,6 @@
             @click="openCreate"
           >
             + Nouvelle tâche
-          </button>
-          <button
-            type="button"
-            class="btn btn-outline-secondary btn-sm"
-            @click="loadTasks"
-          >
-            <IconRefresh
-              :size="16"
-              class="icon icon-sm"
-            />
-            Actualiser
           </button>
         </div>
       </div>
@@ -746,12 +741,13 @@
 </template>
 
 <script setup lang="ts">
-import { IconClock, IconPencil, IconRefresh, IconTrash } from '@tabler/icons-vue'
+import { IconClock, IconPencil, IconTrash } from '@tabler/icons-vue'
 import DataToolbar from '../components/common/DataToolbar.vue'
 import SortableHeader from '../components/common/SortableHeader.vue'
 import BulkActionBar from '../components/BulkActionBar.vue'
 import CronBuilder from '../components/CronBuilder.vue'
 import DispatchStepEditor from '../components/DispatchStepEditor.vue'
+import PageRefreshBar from '../components/PageRefreshBar.vue'
 import type { DispatchOption } from '../utils/dispatchStep'
 import { useGlobalScheduledTasks } from '../composables/useGlobalScheduledTasks'
 
@@ -759,6 +755,9 @@ const {
   tasks,
   loading,
   error,
+  autoRefresh,
+  lastUpdatedAt,
+  TASKS_REFRESH_SEC,
   runningId,
   filterText,
   filterHost,
@@ -810,7 +809,6 @@ const {
   saveEdit,
   confirmDelete,
   openHistory,
-  loadTasks,
   toggleTask,
   runNow,
   handleBulkEnable,

@@ -1,4 +1,4 @@
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { useConfirmDialog } from './useConfirmDialog'
 import apiClient from '../api'
@@ -13,6 +13,8 @@ interface User {
   created_at?: string
 }
 
+const USERS_REFRESH_SEC = 60
+
 export function useUsers() {
   const auth = useAuthStore()
   const signal = useAbortSignal()
@@ -21,6 +23,9 @@ export function useUsers() {
   const loading = ref(false)
   const saving = ref(false)
   const creatingUser = ref(false)
+  const autoRefresh = ref(true)
+  const lastUpdatedAt = ref<Date | null>(null)
+  let refreshTimer: ReturnType<typeof setInterval> | null = null
 
   const newUserForm = ref({
     username: '',
@@ -57,6 +62,7 @@ export function useUsers() {
     try {
       const res = await apiClient.getUsers(signal)
       users.value = res.data || []
+      lastUpdatedAt.value = new Date()
     } catch (e) {
       if (isApiAbort(e)) return
       console.error('Erreur lors du chargement des utilisateurs:', getApiErrorMessage(e))
@@ -64,6 +70,20 @@ export function useUsers() {
     } finally {
       loading.value = false
     }
+  }
+
+  function startRefreshTimer(): void {
+    stopRefreshTimer()
+    refreshTimer = setInterval(() => {
+      // Skip a tick while a role change/delete is in flight to avoid
+      // refetching mid-mutation (saveRole/deleteUser already refetch
+      // themselves once the confirm dialog + request settle).
+      if (autoRefresh.value && !saving.value) fetchUsers()
+    }, USERS_REFRESH_SEC * 1000)
+  }
+
+  function stopRefreshTimer(): void {
+    if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null }
   }
 
   async function createUser(): Promise<void> {
@@ -146,7 +166,11 @@ export function useUsers() {
     }
   }
 
-  onMounted(fetchUsers)
+  onMounted(() => {
+    fetchUsers()
+    startRefreshTimer()
+  })
+  onUnmounted(stopRefreshTimer)
 
   return {
     auth,
@@ -159,6 +183,9 @@ export function useUsers() {
     createSuccess,
     actionMessage,
     actionSuccess,
+    autoRefresh,
+    lastUpdatedAt,
+    USERS_REFRESH_SEC,
     formatDate,
     isLastAdmin,
     getDeleteButtonTitle,

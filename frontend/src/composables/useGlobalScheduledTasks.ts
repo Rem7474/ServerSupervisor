@@ -1,4 +1,4 @@
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useAuthStore } from '../stores/auth'
 import { useHostsStore } from '../stores/hosts'
 import { addToast } from './useGlobalToast'
@@ -20,6 +20,7 @@ const moduleActions: Record<string, string[]> = {
 }
 
 const DEFAULT_CRON = '0 3 * * *'
+const TASKS_REFRESH_SEC = 30
 
 function targetLabel(module: string): string {
   if (module === 'docker') return 'Conteneur (nom ou ID)'
@@ -81,6 +82,9 @@ export function useGlobalScheduledTasks() {
   const loading = ref(false)
   const error = ref('')
   const runningId = ref<string | number | null>(null)
+  const autoRefresh = ref(true)
+  const lastUpdatedAt = ref<Date | null>(null)
+  let refreshTimer: ReturnType<typeof setInterval> | null = null
 
   const filterText = ref('')
   const filterHost = ref('')
@@ -309,11 +313,25 @@ export function useGlobalScheduledTasks() {
     try {
       const { data } = await api.getAllScheduledTasks()
       tasks.value = data
+      lastUpdatedAt.value = new Date()
     } catch (e: unknown) {
       error.value = getApiErrorMessage(e, 'Erreur de chargement')
     } finally {
       loading.value = false
     }
+  }
+
+  function startRefreshTimer(): void {
+    stopRefreshTimer()
+    refreshTimer = setInterval(() => {
+      // Skip while a task is manually being run — avoids the row's
+      // "running" state flickering under a refetch mid-execution.
+      if (autoRefresh.value && runningId.value === null) loadTasks()
+    }, TASKS_REFRESH_SEC * 1000)
+  }
+
+  function stopRefreshTimer(): void {
+    if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null }
   }
 
   async function toggleTask(task: ScheduledTaskWithHost): Promise<void> {
@@ -393,13 +411,18 @@ export function useGlobalScheduledTasks() {
   onMounted(() => {
     hostsStore.fetchHosts()
     loadTasks()
+    startRefreshTimer()
   })
+  onUnmounted(stopRefreshTimer)
 
   return {
     hostsStore,
     tasks,
     loading,
     error,
+    autoRefresh,
+    lastUpdatedAt,
+    TASKS_REFRESH_SEC,
     runningId,
     filterText,
     filterHost,

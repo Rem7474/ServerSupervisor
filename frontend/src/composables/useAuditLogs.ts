@@ -301,16 +301,6 @@ export function useAuditLogs() {
     if (!connexionsLoaded.value) await fetchConnexions()
   }
 
-  function refresh(): void {
-    if (activeTab.value === 'commandes') {
-      cmdsLoaded.value = false
-      fetchCmds()
-    } else {
-      connexionsLoaded.value = false
-      fetchConnexions()
-    }
-  }
-
   // ── Pagination ────────────────────────────────────────────────────────────────
   function selectCmdsPage(page: number): void {
     if (page === cmdsPage.value) return
@@ -405,7 +395,6 @@ export function useAuditLogs() {
     activeTab,
     switchToCommandes,
     switchToConnexions,
-    refresh,
     cmds,
     cmdsPage,
     cmdsTotal,

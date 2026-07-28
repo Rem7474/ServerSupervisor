@@ -1,5 +1,11 @@
 <template>
   <div>
+    <PageRefreshBar
+      v-model="autoRefresh"
+      label="Utilisateurs"
+      :interval-sec="USERS_REFRESH_SEC"
+      :last-updated-at="lastUpdatedAt"
+    />
     <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
       <div>
         <div class="page-pretitle">
@@ -19,14 +25,6 @@
           Gestion des rôles (admin / operator / viewer)
         </div>
       </div>
-      <button
-        type="button"
-        class="btn btn-outline-secondary"
-        :disabled="loading"
-        @click="fetchUsers"
-      >
-        Actualiser
-      </button>
     </div>
 
     <!-- Create User Form -->
@@ -209,6 +207,7 @@
 
 <script setup lang="ts">
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
+import PageRefreshBar from '../components/PageRefreshBar.vue'
 import { useUsers } from '../composables/useUsers'
 
 const {
@@ -222,10 +221,12 @@ const {
   createSuccess,
   actionMessage,
   actionSuccess,
+  autoRefresh,
+  lastUpdatedAt,
+  USERS_REFRESH_SEC,
   formatDate,
   isLastAdmin,
   getDeleteButtonTitle,
-  fetchUsers,
   createUser,
   saveRole,
   deleteUser,
