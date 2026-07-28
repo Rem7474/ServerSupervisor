@@ -95,35 +95,77 @@
         <table class="table table-vcenter card-table">
           <thead>
             <tr>
-              <th>Connexion</th>
-              <th>Domaine</th>
-              <th>Forward</th>
+              <th>
+                <SortableHeader
+                  label="Connexion"
+                  :active="sortKey === 'connection_name'"
+                  :direction="sortDir"
+                  @toggle="toggleSort('connection_name')"
+                />
+              </th>
+              <th>
+                <SortableHeader
+                  label="Domaine"
+                  :active="sortKey === 'domain'"
+                  :direction="sortDir"
+                  @toggle="toggleSort('domain')"
+                />
+              </th>
+              <th>
+                <SortableHeader
+                  label="Forward"
+                  :active="sortKey === 'forward'"
+                  :direction="sortDir"
+                  @toggle="toggleSort('forward')"
+                />
+              </th>
               <th
                 class="text-center"
                 title="Activer/désactiver le proxy host dans NPM"
               >
-                Actif NPM
+                <SortableHeader
+                  label="Actif NPM"
+                  :active="sortKey === 'npm_enabled'"
+                  :direction="sortDir"
+                  @toggle="toggleSort('npm_enabled')"
+                />
               </th>
               <th class="text-center">
-                Uptime
+                <SortableHeader
+                  label="Uptime"
+                  :active="sortKey === 'uptime_status'"
+                  :direction="sortDir"
+                  @toggle="toggleSort('uptime_status')"
+                />
               </th>
               <th class="text-center">
-                SSL
+                <SortableHeader
+                  label="SSL"
+                  :active="sortKey === 'ssl_days_remaining'"
+                  :direction="sortDir"
+                  @toggle="toggleSort('ssl_days_remaining')"
+                />
               </th>
             </tr>
           </thead>
           <tbody>
             <tr
-              v-for="h in hosts"
+              v-for="h in sortedHosts"
               :key="h.id"
-              :class="{ 'opacity-60': !h.npm_enabled }"
+              :class="{ 'opacity-60': !h.npm_enabled, 'table-warning': needsAttention(h) }"
             >
               <td class="text-muted small">
                 {{ h.connection_name }}
               </td>
               <td>
-                <div class="fw-medium">
-                  {{ h.domain_names[0] }}
+                <div class="d-flex align-items-center gap-1">
+                  <IconAlertTriangle
+                    v-if="needsAttention(h)"
+                    :size="14"
+                    class="text-warning flex-shrink-0"
+                    title="Proxy host actif dans NPM mais sans sonde uptime — une panne ne serait pas détectée."
+                  />
+                  <span class="fw-medium">{{ h.domain_names[0] }}</span>
                 </div>
                 <div
                   v-if="h.domain_names.length > 1"
@@ -238,11 +280,15 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { IconLock, IconRefresh } from '@tabler/icons-vue'
+import { IconLock, IconRefresh, IconAlertTriangle } from '@tabler/icons-vue'
+import SortableHeader from '../components/common/SortableHeader.vue'
 import { useNPM } from '../composables/useNPM'
 
 const {
   hosts,
+  sortedHosts,
+  sortKey,
+  sortDir,
   loading,
   loadError,
   actionError,
@@ -251,6 +297,8 @@ const {
   load,
   toggleNPM,
   toggle,
+  toggleSort,
+  needsAttention,
 } = useNPM()
 
 // Surfaces certificates about to expire in a banner instead of requiring a
