@@ -368,7 +368,7 @@
                   </td>
                   <td><span :class="moduleClass(cmd.module)">{{ moduleLabel(cmd.module) }}</span></td>
                   <td><code class="small">{{ cmdLabel(cmd) }}</code></td>
-                  <td><span :class="statusClass(cmd.status)">{{ cmd.status }}</span></td>
+                  <td><span :class="statusClass(cmd.status)">{{ commandStatusLabel(cmd.status) }}</span></td>
                   <td class="text-secondary small">
                     {{ formatDuration(cmd.started_at, cmd.ended_at) }}
                   </td>
@@ -406,6 +406,7 @@
 <script setup lang="ts">
 import { IconAlertTriangle, IconClock, IconFileText, IconKey, IconLock } from '@tabler/icons-vue'
 import CommandLogPanel from '../components/host/CommandLogPanel.vue'
+import { commandStatusLabel } from '../utils/commandStatus'
 import { useAccount } from '../composables/useAccount'
 
 const {

@@ -88,7 +88,7 @@
                 <span
                   class="badge"
                   :class="execStatusBadge(execution.status)"
-                >{{ execution.status }}</span>
+                >{{ commandStatusLabel(execution.status) }}</span>
                 <router-link
                   v-if="execution.alerts_after_count"
                   to="/alerts?tab=incidents"
@@ -157,7 +157,7 @@
                 <span
                   class="badge"
                   :class="execStatusBadge(execution.status)"
-                >{{ execution.status }}</span>
+                >{{ commandStatusLabel(execution.status) }}</span>
               </td>
               <td>
                 <button
@@ -218,6 +218,7 @@ import { IconBraces, IconFileText, IconRefresh } from '@tabler/icons-vue'
 import RelativeTime from '../RelativeTime.vue'
 import PaginationNav from '../PaginationNav.vue'
 import { usePagination } from '../../composables/usePagination'
+import { commandStatusLabel } from '../../utils/commandStatus'
 
 interface Execution {
   id?: string | number

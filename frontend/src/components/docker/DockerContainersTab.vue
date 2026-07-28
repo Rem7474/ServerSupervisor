@@ -211,7 +211,7 @@
               </div>
             </td>
             <td>
-              <span :class="stateClass(c.state)">{{ c.state }}</span>
+              <span :class="stateClass(c.state)">{{ stateLabel(c.state) }}</span>
             </td>
             <td class="small">
               <DockerPortBadges
@@ -545,7 +545,7 @@
               <span
                 class="ms-2"
                 :class="stateClass(inspectTarget.state)"
-              >{{ inspectTarget.state }}</span>
+              >{{ stateLabel(inspectTarget.state) }}</span>
             </div>
           </div>
           <button
@@ -894,6 +894,36 @@ function isComposeContainer(container: Container): boolean {
   return !!container.labels?.['com.docker.compose.project']
 }
 
+const STATE_LABELS: Record<string, string> = {
+  running: 'En cours',
+  restarting: 'Redémarrage',
+  paused: 'En pause',
+  created: 'Créé',
+  exited: 'Arrêté',
+  dead: 'Mort',
+  removing: 'Suppression',
+}
+
+function stateLabel(state: string | undefined): string {
+  return STATE_LABELS[state || ''] || state || ''
+}
+
+// Groups states by operational severity rather than sorting alphabetically
+// (which interleaved "created"/"dead"/"exited" with no meaningful order).
+const STATE_RANK: Record<string, number> = {
+  running: 0,
+  restarting: 1,
+  paused: 1,
+  created: 2,
+  exited: 3,
+  dead: 4,
+  removing: 4,
+}
+
+function stateRank(state: string | undefined): number {
+  return STATE_RANK[state || ''] ?? 5
+}
+
 function stateClass(state: string | undefined): string {
   const map: Record<string, string> = {
     running:    'badge bg-green-lt text-green',
@@ -977,6 +1007,10 @@ const sortedContainers = computed(() => {
   const dir = sortDir.value === 'asc' ? 1 : -1
   const sorted = [...filteredContainers.value]
   sorted.sort((a, b) => {
+    if (sortBy.value === 'state') {
+      return (stateRank(a.state) - stateRank(b.state)) * dir
+    }
+
     let av: unknown = a[sortBy.value]
     let bv: unknown = b[sortBy.value]
 

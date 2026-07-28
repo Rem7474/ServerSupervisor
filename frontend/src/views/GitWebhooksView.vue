@@ -168,7 +168,17 @@
                       class="text-muted"
                       style="min-width:60px"
                     >VM</span>
-                    <span class="text-truncate">{{ webhook.host_name || webhook.host_id }}</span>
+                    <router-link
+                      v-if="webhook.host_id"
+                      :to="`/hosts/${webhook.host_id}`"
+                      class="text-truncate text-decoration-none"
+                    >
+                      {{ webhook.host_name || webhook.host_id }}
+                    </router-link>
+                    <span
+                      v-else
+                      class="text-truncate"
+                    >{{ webhook.host_name || webhook.host_id }}</span>
                   </div>
                   <div class="d-flex gap-2 mb-1">
                     <span
@@ -355,7 +365,12 @@
                         class="text-muted"
                         style="min-width:60px"
                       >VM</span>
-                      <span class="text-truncate">{{ tracker.host_name || tracker.host_id }}</span>
+                      <router-link
+                        :to="`/hosts/${tracker.host_id}`"
+                        class="text-truncate text-decoration-none"
+                      >
+                        {{ tracker.host_name || tracker.host_id }}
+                      </router-link>
                     </div>
                     <div class="d-flex gap-2 mb-1">
                       <span
@@ -371,7 +386,12 @@
                         class="text-muted"
                         style="min-width:60px"
                       >VM</span>
-                      <span class="text-truncate">{{ tracker.host_name || tracker.host_id }}</span>
+                      <router-link
+                        :to="`/hosts/${tracker.host_id}`"
+                        class="text-truncate text-decoration-none"
+                      >
+                        {{ tracker.host_name || tracker.host_id }}
+                      </router-link>
                     </div>
                     <div class="d-flex gap-2 mb-1">
                       <span

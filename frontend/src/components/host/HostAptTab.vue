@@ -307,7 +307,7 @@
           <div class="fw-semibold small mb-2">
             Historique des upgrades automatiques
           </div>
-          <div class="table-responsive">
+          <div class="table-responsive scroll-table">
             <table class="table table-sm table-vcenter">
               <thead>
                 <tr>

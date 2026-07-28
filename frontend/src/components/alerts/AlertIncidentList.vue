@@ -191,7 +191,7 @@
     </div>
     <div
       v-else
-      class="table-responsive"
+      class="table-responsive scroll-table"
     >
       <table class="table table-vcenter card-table">
         <thead>
@@ -360,66 +360,26 @@
 
     <div
       v-if="totalPages > 1"
-      class="card-footer d-flex align-items-center"
+      class="card-footer d-flex align-items-center justify-content-between"
     >
       <p class="m-0 text-muted">
         Page {{ currentPage }} / {{ totalPages }}
       </p>
-      <ul class="pagination m-0 ms-auto">
-        <li
-          class="page-item"
-          :class="{ disabled: currentPage === 1 }"
-        >
-          <button
-            type="button"
-            class="page-link"
-            @click="currentPage--"
-          >
-            <IconChevronLeft
-              :size="16"
-              class="icon"
-            />
-          </button>
-        </li>
-        <li
-          v-for="page in visiblePages"
-          :key="page"
-          class="page-item"
-          :class="{ active: page === currentPage, disabled: page === '…' }"
-        >
-          <button
-            type="button"
-            class="page-link"
-            @click="typeof page === 'number' && (currentPage = page)"
-          >
-            {{ page }}
-          </button>
-        </li>
-        <li
-          class="page-item"
-          :class="{ disabled: currentPage === totalPages }"
-        >
-          <button
-            type="button"
-            class="page-link"
-            @click="currentPage++"
-          >
-            <IconChevronRight
-              :size="16"
-              class="icon"
-            />
-          </button>
-        </li>
-      </ul>
+      <PaginationNav
+        :current-page="currentPage"
+        :total-pages="totalPages"
+        @select="currentPage = $event"
+      />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { IconBell, IconCheck, IconChevronLeft, IconChevronRight, IconRefresh, IconSearch, IconX } from '@tabler/icons-vue'
+import { IconBell, IconCheck, IconRefresh, IconSearch, IconX } from '@tabler/icons-vue'
 import apiClient from '../../api'
 import BadgePill from '../common/BadgePill.vue'
+import PaginationNav from '../PaginationNav.vue'
 import { addToast } from '../../composables/useGlobalToast'
 import { getApiErrorMessage } from '../../api/client'
 import {
@@ -556,21 +516,6 @@ const totalPages = computed(() => Math.max(1, Math.ceil(annotatedIncidents.value
 const paginatedIncidents = computed(() => {
   const start = (currentPage.value - 1) * PAGE_SIZE
   return annotatedIncidents.value.slice(start, start + PAGE_SIZE)
-})
-
-const visiblePages = computed<(number | string)[]>(() => {
-  const total = totalPages.value
-  const cur = currentPage.value
-  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1)
-  const pages: (number | string)[] = []
-  if (cur <= 4) {
-    pages.push(1, 2, 3, 4, 5, '…', total)
-  } else if (cur >= total - 3) {
-    pages.push(1, '…', total - 4, total - 3, total - 2, total - 1, total)
-  } else {
-    pages.push(1, '…', cur - 1, cur, cur + 1, '…', total)
-  }
-  return pages
 })
 
 function setTypeFilter(value: string): void {

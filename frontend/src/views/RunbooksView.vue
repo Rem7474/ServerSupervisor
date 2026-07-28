@@ -318,7 +318,7 @@
             </div>
             <div
               v-else
-              class="table-responsive"
+              class="table-responsive scroll-table"
             >
               <table class="table table-sm table-vcenter">
                 <thead>

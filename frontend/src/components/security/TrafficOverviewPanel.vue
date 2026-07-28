@@ -226,11 +226,13 @@
               >
                 Aucune IP suspecte.
               </div>
-              <div
+              <button
                 v-for="ip in topThreatIPs.slice(0, 10)"
                 v-else
                 :key="ip.ip"
-                class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom"
+                type="button"
+                class="btn d-flex justify-content-between align-items-center px-3 py-2 border-bottom w-100 rounded-0 text-start"
+                @click="openIP(ip.ip)"
               >
                 <div>
                   <div class="font-monospace small">
@@ -241,7 +243,7 @@
                   </div>
                 </div>
                 <span class="badge bg-red-lt text-red">{{ numberFormat(ip.hits || 0) }}</span>
-              </div>
+              </button>
             </div>
           </div>
         </div>
@@ -267,7 +269,7 @@
               <h3 class="card-title mb-0">
                 Pays les plus actifs
               </h3>
-              <span class="small text-secondary">{{ numberFormat(topClientIPs.length) }} IPs</span>
+              <span class="small text-secondary">{{ numberFormat(countryDistribution.length) }} pays</span>
             </div>
             <div class="table-responsive">
               <table class="table table-vcenter card-table">
@@ -315,7 +317,7 @@
           <div class="card h-100">
             <div class="card-header">
               <h3 class="card-title mb-0">
-                Top domaines cibles (proxy)
+                Répartition du trafic par domaine
               </h3>
             </div>
             <div class="card-body">
@@ -463,7 +465,13 @@
                   {{ formatDate(r.timestamp) }}
                 </td>
                 <td class="font-monospace small">
-                  {{ r.ip }}
+                  <button
+                    type="button"
+                    class="btn btn-link btn-sm p-0 font-monospace text-decoration-none"
+                    @click="openIP(r.ip)"
+                  >
+                    {{ r.ip }}
+                  </button>
                 </td>
                 <td class="small">
                   <router-link
@@ -559,7 +567,6 @@ const {
   topProxyHosts,
   topEndpoints,
   topThreatIPs,
-  topClientIPs,
   countryDistribution,
   statusDistribution,
   showInitialLoading,
@@ -573,6 +580,7 @@ const {
   loadAll,
   openDomain,
   closeDomainModal,
+  openIP,
   closeIPModal,
   handleSearch,
 } = useTraffic()

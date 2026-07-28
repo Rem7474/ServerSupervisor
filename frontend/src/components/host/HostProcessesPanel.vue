@@ -69,36 +69,46 @@
       >
         <thead>
           <tr>
-            <th
-              class="cursor-pointer"
-              @click="sortBy('pid')"
-            >
-              PID <span class="text-secondary">{{ sortIcon('pid') }}</span>
+            <th>
+              <SortableHeader
+                label="PID"
+                :active="sortKey === 'pid'"
+                :direction="sortDirLabel"
+                @toggle="sortBy('pid')"
+              />
             </th>
-            <th
-              class="cursor-pointer"
-              @click="sortBy('name')"
-            >
-              Nom <span class="text-secondary">{{ sortIcon('name') }}</span>
+            <th>
+              <SortableHeader
+                label="Nom"
+                :active="sortKey === 'name'"
+                :direction="sortDirLabel"
+                @toggle="sortBy('name')"
+              />
             </th>
             <th>Utilisateur</th>
-            <th
-              class="cursor-pointer"
-              @click="sortBy('cpu_pct')"
-            >
-              CPU% <span class="text-secondary">{{ sortIcon('cpu_pct') }}</span>
+            <th>
+              <SortableHeader
+                label="CPU%"
+                :active="sortKey === 'cpu_pct'"
+                :direction="sortDirLabel"
+                @toggle="sortBy('cpu_pct')"
+              />
             </th>
-            <th
-              class="cursor-pointer"
-              @click="sortBy('mem_pct')"
-            >
-              MEM% <span class="text-secondary">{{ sortIcon('mem_pct') }}</span>
+            <th>
+              <SortableHeader
+                label="MEM%"
+                :active="sortKey === 'mem_pct'"
+                :direction="sortDirLabel"
+                @toggle="sortBy('mem_pct')"
+              />
             </th>
-            <th
-              class="cursor-pointer"
-              @click="sortBy('mem_rss_kb')"
-            >
-              RSS (KB) <span class="text-secondary">{{ sortIcon('mem_rss_kb') }}</span>
+            <th>
+              <SortableHeader
+                label="RSS (KB)"
+                :active="sortKey === 'mem_rss_kb'"
+                :direction="sortDirLabel"
+                @toggle="sortBy('mem_rss_kb')"
+              />
             </th>
             <th>État</th>
           </tr>
@@ -154,6 +164,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
+import SortableHeader from '../common/SortableHeader.vue'
 import { useHostProcesses, type HostProcess } from '../../composables/useHostProcesses'
 
 type SortKey = keyof HostProcess
@@ -173,6 +184,10 @@ const { processes, loading, error, load } = useHostProcesses(props.hostId)
 const processFilter = ref('')
 const sortKey = ref<SortKey>('cpu_pct')
 const sortDir = ref(-1)
+// SortableHeader only knows 'asc'/'desc' — sortDir itself stays the original
+// signed multiplier so the sort formula below (and its direction for each
+// column) is untouched by this presentational-only migration.
+const sortDirLabel = computed<'asc' | 'desc'>(() => (sortDir.value === -1 ? 'desc' : 'asc'))
 
 const filteredProcesses = computed(() => {
   let list = processes.value
@@ -195,11 +210,6 @@ function sortBy(key: SortKey): void {
     sortKey.value = key
     sortDir.value = key === 'name' || key === 'user' ? 1 : -1
   }
-}
-
-function sortIcon(key: SortKey): string {
-  if (sortKey.value !== key) return ''
-  return sortDir.value === -1 ? '▼' : '▲'
 }
 
 async function loadProcesses(): Promise<void> {

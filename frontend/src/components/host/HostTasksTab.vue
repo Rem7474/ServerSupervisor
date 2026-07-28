@@ -58,19 +58,34 @@
         <table class="table table-vcenter table-hover card-table mb-0">
           <thead>
             <tr>
-              <th>Nom</th>
+              <th>
+                <SortableHeader
+                  label="Nom"
+                  :active="sortKey === 'name'"
+                  :direction="sortDir"
+                  @toggle="toggleSort('name')"
+                />
+              </th>
               <th>Module / Action</th>
               <th>Planification</th>
-              <th>Prochaine exécution</th>
-              <th>Dernier resultat</th>
-              <th>Activee</th>
+              <th>
+                <SortableHeader
+                  label="Prochaine exécution"
+                  :active="sortKey === 'next_run_at'"
+                  :direction="sortDir"
+                  @toggle="toggleSort('next_run_at')"
+                />
+              </th>
+              <th>Dernier résultat</th>
+              <th>Activée</th>
               <th />
             </tr>
           </thead>
           <tbody>
             <tr
-              v-for="task in tasks"
+              v-for="task in sortedTasks"
               :key="task.id"
+              :class="{ 'opacity-60': !task.enabled && !isManualOnly(task) }"
             >
               <td>{{ task.name }}</td>
               <td>
@@ -401,9 +416,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { IconClock, IconList } from '@tabler/icons-vue'
 import CronBuilder from '../CronBuilder.vue'
+import SortableHeader from '../common/SortableHeader.vue'
 import apiClient from '../../api'
 import { useConfirmDialog } from '../../composables/useConfirmDialog'
 import { useDateFormatter } from '../../composables/useDateFormatter'
@@ -473,6 +489,31 @@ const props = withDefaults(defineProps<{
 const dialog = useConfirmDialog()
 const { formatExactDate: formatTaskDate } = useDateFormatter()
 const tasks = ref<Task[]>([])
+type TaskSortKey = 'name' | 'next_run_at'
+const sortKey = ref<TaskSortKey>('name')
+const sortDir = ref<'asc' | 'desc'>('asc')
+
+function toggleSort(key: TaskSortKey): void {
+  if (sortKey.value === key) {
+    sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
+    return
+  }
+  sortKey.value = key
+  sortDir.value = 'asc'
+}
+
+const sortedTasks = computed(() => {
+  const dir = sortDir.value === 'asc' ? 1 : -1
+  return [...tasks.value].sort((a, b) => {
+    if (sortKey.value === 'next_run_at') {
+      const av = a.next_run_at ? new Date(a.next_run_at).getTime() : 0
+      const bv = b.next_run_at ? new Date(b.next_run_at).getTime() : 0
+      return (av - bv) * dir
+    }
+    return (a.name || '').toLowerCase().localeCompare((b.name || '').toLowerCase()) * dir
+  })
+})
+
 const tasksLoading = ref(false)
 const tasksError = ref('')
 const taskRunningId = ref<string | number | null>(null)

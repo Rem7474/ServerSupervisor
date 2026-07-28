@@ -6,6 +6,7 @@ import apiClient from '../api'
 import { addToast } from './useGlobalToast'
 import { getApiErrorMessage } from '../api/client'
 import { useStatusBadge } from './useStatusBadge'
+import { commandStatusLabel } from '../utils/commandStatus'
 import { useCommandStream } from './useCommandStream'
 import type { RemoteCommand, RemoteCommandWithHost } from '../types/audit'
 import type { CommandStreamInitMsg, CommandStreamChunkMsg, CommandStatusUpdateMsg } from '../types/ws'
@@ -134,13 +135,6 @@ export function useAuditLogs() {
     custom:    { label: 'Custom',     cls: 'badge bg-teal-lt text-teal' },
   }
 
-  const STATUS_LABELS: Record<string, string> = {
-    pending:   'En attente',
-    running:   'En cours',
-    completed: 'Terminé',
-    failed:    'Échoué',
-  }
-
   function moduleLabel(module: string): string {
     return MODULE_META[module]?.label ?? module
   }
@@ -150,7 +144,7 @@ export function useAuditLogs() {
   }
 
   function statusLabel(status: string): string {
-    return STATUS_LABELS[status] ?? status
+    return commandStatusLabel(status)
   }
 
   function cmdLabel(cmd: RemoteCommand): string {

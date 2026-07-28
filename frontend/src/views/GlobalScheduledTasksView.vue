@@ -214,7 +214,7 @@
             <tr
               v-for="task in filteredTasks"
               :key="task.id"
-              :class="{ 'table-active': selectedIds.has(task.id) }"
+              :class="{ 'table-active': selectedIds.has(task.id), 'opacity-60': !task.enabled }"
             >
               <td v-if="canManage">
                 <label class="form-check mb-0">
