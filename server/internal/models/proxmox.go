@@ -174,6 +174,15 @@ type ProxmoxSummary struct {
 	StorageNearFull   int `json:"storage_near_full"`   // usage > 80 %
 	StorageOffline    int `json:"storage_offline"`     // active=false or enabled=false
 	RecentFailedTasks int `json:"recent_failed_tasks"` // exit_status != 'OK' in last 24 h
+	// IDs of the proxmox_nodes rows behind each health signal above, so the
+	// frontend can filter/highlight the node table instead of showing an
+	// inactionable count. Node-level (NodesDown) is a direct proxmox_nodes
+	// query; the other three join through proxmox_storages/proxmox_tasks on
+	// (connection_id, node_name) since those tables don't carry a node ID.
+	NodesDownIDs           []string `json:"nodes_down_ids,omitempty"`
+	StorageNearFullNodeIDs []string `json:"storage_near_full_node_ids,omitempty"`
+	StorageOfflineNodeIDs  []string `json:"storage_offline_node_ids,omitempty"`
+	FailedTaskNodeIDs      []string `json:"failed_task_node_ids,omitempty"`
 }
 
 // ProxmoxNodeMetricsSummary is a time-bucketed aggregate used for dashboard trend charts.

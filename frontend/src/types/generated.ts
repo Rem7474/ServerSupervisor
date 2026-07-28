@@ -1106,6 +1106,17 @@ export interface ProxmoxSummary {
   storage_near_full: number /* int */; // usage > 80 %
   storage_offline: number /* int */; // active=false or enabled=false
   recent_failed_tasks: number /* int */; // exit_status != 'OK' in last 24 h
+  /**
+   * IDs of the proxmox_nodes rows behind each health signal above, so the
+   * frontend can filter/highlight the node table instead of showing an
+   * inactionable count. Node-level (NodesDown) is a direct proxmox_nodes
+   * query; the other three join through proxmox_storages/proxmox_tasks on
+   * (connection_id, node_name) since those tables don't carry a node ID.
+   */
+  nodes_down_ids?: string[];
+  storage_near_full_node_ids?: string[];
+  storage_offline_node_ids?: string[];
+  failed_task_node_ids?: string[];
 }
 /**
  * ProxmoxNodeMetricsSummary is a time-bucketed aggregate used for dashboard trend charts.

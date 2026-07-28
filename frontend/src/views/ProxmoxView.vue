@@ -119,7 +119,8 @@
       </div>
     </div>
 
-    <!-- Cluster health signals (only shown when there are issues) -->
+    <!-- Cluster health signals (only shown when there are issues) — each card
+         filters the node table below to the nodes behind that signal. -->
     <div
       v-if="hasHealthAlerts"
       class="row row-cards mb-4"
@@ -128,7 +129,14 @@
         v-if="(summary.nodes_down ?? 0) > 0"
         class="col-6 col-lg-3"
       >
-        <div class="card card-sm h-100 border-danger">
+        <div
+          class="card card-sm h-100 border-danger cursor-pointer"
+          role="button"
+          tabindex="0"
+          :class="{ 'health-card-active': healthFilterLabel === 'Nœuds hors ligne' }"
+          @click="toggleHealthFilter(summary.nodes_down_ids, 'Nœuds hors ligne')"
+          @keydown.enter.prevent="toggleHealthFilter(summary.nodes_down_ids, 'Nœuds hors ligne')"
+        >
           <div class="card-body">
             <div class="subheader text-danger">
               Nœuds hors ligne
@@ -143,7 +151,14 @@
         v-if="(summary.storage_near_full ?? 0) > 0"
         class="col-6 col-lg-3"
       >
-        <div class="card card-sm h-100 border-warning">
+        <div
+          class="card card-sm h-100 border-warning cursor-pointer"
+          role="button"
+          tabindex="0"
+          :class="{ 'health-card-active': healthFilterLabel === 'Stockages > 80 %' }"
+          @click="toggleHealthFilter(summary.storage_near_full_node_ids, 'Stockages > 80 %')"
+          @keydown.enter.prevent="toggleHealthFilter(summary.storage_near_full_node_ids, 'Stockages > 80 %')"
+        >
           <div class="card-body">
             <div class="subheader text-warning">
               Stockages &gt; 80 %
@@ -158,7 +173,14 @@
         v-if="(summary.storage_offline ?? 0) > 0"
         class="col-6 col-lg-3"
       >
-        <div class="card card-sm h-100 border-danger">
+        <div
+          class="card card-sm h-100 border-danger cursor-pointer"
+          role="button"
+          tabindex="0"
+          :class="{ 'health-card-active': healthFilterLabel === 'Stockages inactifs' }"
+          @click="toggleHealthFilter(summary.storage_offline_node_ids, 'Stockages inactifs')"
+          @keydown.enter.prevent="toggleHealthFilter(summary.storage_offline_node_ids, 'Stockages inactifs')"
+        >
           <div class="card-body">
             <div class="subheader text-danger">
               Stockages inactifs
@@ -173,7 +195,14 @@
         v-if="(summary.recent_failed_tasks ?? 0) > 0"
         class="col-6 col-lg-3"
       >
-        <div class="card card-sm h-100 border-warning">
+        <div
+          class="card card-sm h-100 border-warning cursor-pointer"
+          role="button"
+          tabindex="0"
+          :class="{ 'health-card-active': healthFilterLabel === 'Tâches échouées (24 h)' }"
+          @click="toggleHealthFilter(summary.failed_task_node_ids, 'Tâches échouées (24 h)')"
+          @keydown.enter.prevent="toggleHealthFilter(summary.failed_task_node_ids, 'Tâches échouées (24 h)')"
+        >
           <div class="card-body">
             <div class="subheader text-warning">
               Tâches échouées (24 h)
@@ -199,9 +228,23 @@
       class="card"
     >
       <div class="card-header d-flex align-items-center justify-content-between gap-2 flex-wrap">
-        <h3 class="card-title mb-0">
-          Nœuds Proxmox
-        </h3>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <h3 class="card-title mb-0">
+            Nœuds Proxmox
+          </h3>
+          <span
+            v-if="healthFilterLabel"
+            class="badge bg-azure-lt text-azure d-flex align-items-center gap-1"
+          >
+            Filtré : {{ healthFilterLabel }}
+            <button
+              type="button"
+              class="btn-close btn-close-sm ms-1"
+              aria-label="Retirer le filtre"
+              @click="clearHealthFilter"
+            />
+          </span>
+        </div>
         <div class="d-flex gap-2 proxmox-toolbar-controls">
           <select
             v-model="filterConnection"
@@ -227,13 +270,13 @@
             @click="load"
           >
             <IconRefresh
-              :size="2"
+              :size="16"
               class="icon icon-sm"
             />
           </button>
         </div>
       </div>
-      <div class="table-responsive">
+      <div class="table-responsive scroll-table">
         <table class="table table-vcenter card-table">
           <thead>
             <tr>
@@ -322,6 +365,21 @@
                 <td />
               </tr>
             </template>
+            <tr v-else-if="sortedNodes.length === 0 && healthFilterLabel">
+              <td
+                colspan="9"
+                class="text-center text-muted py-4"
+              >
+                Aucun nœud ne correspond au filtre « {{ healthFilterLabel }} » (peut-être déjà résolu).
+                <button
+                  type="button"
+                  class="btn btn-sm btn-link"
+                  @click="clearHealthFilter"
+                >
+                  Retirer le filtre
+                </button>
+              </td>
+            </tr>
             <tr v-else-if="sortedNodes.length === 0">
               <td
                 colspan="9"
@@ -465,8 +523,19 @@ const {
   toggleNodeSort,
   hasHealthAlerts,
   clusterResources,
+  healthFilterLabel,
+  filterByHealthIds,
+  clearHealthFilter,
   load,
 } = useProxmox()
+
+function toggleHealthFilter(ids: string[] | undefined, label: string): void {
+  if (healthFilterLabel.value === label) {
+    clearHealthFilter()
+    return
+  }
+  filterByHealthIds(ids, label)
+}
 
 function memPct(node: ProxmoxNode): string | number {
   if (!node.mem_total) return 0
@@ -517,6 +586,14 @@ function formatDate(iso: string | undefined): string {
 </script>
 
 <style scoped>
+.cursor-pointer {
+  cursor: pointer;
+}
+
+.health-card-active {
+  box-shadow: 0 0 0 2px var(--tblr-primary);
+}
+
 @media (max-width: 768px) {
   .proxmox-toolbar-controls {
     width: 100%;

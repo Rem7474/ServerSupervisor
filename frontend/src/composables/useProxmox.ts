@@ -20,14 +20,39 @@ export function useProxmox() {
   const nodeSortKey = ref<string>('node_name')
   const nodeSortDir = ref<'asc' | 'desc'>('asc')
 
+  // Drill-down from a ProxmoxSummary health card (nodes_down_ids, etc.) — an
+  // empty array (not null) means "the signal is active but matched zero of
+  // the currently loaded nodes," which the table should say explicitly
+  // rather than silently showing everything.
+  const healthFilterIds = ref<string[] | null>(null)
+  const healthFilterLabel = ref('')
+
+  function filterByHealthIds(ids: string[] | undefined, label: string): void {
+    healthFilterIds.value = ids ?? []
+    healthFilterLabel.value = label
+  }
+
+  function clearHealthFilter(): void {
+    healthFilterIds.value = null
+    healthFilterLabel.value = ''
+  }
+
+  // Base for the cluster-wide CPU/RAM KPI cards, which must stay whole-cluster
+  // even while the node table below is drilled down to a health signal.
   const filteredNodes = computed(() =>
     filterConnection.value
       ? nodes.value.filter((n) => n.connection_id === filterConnection.value)
       : nodes.value
   )
 
+  const tableNodes = computed(() => {
+    if (healthFilterIds.value === null) return filteredNodes.value
+    const ids = new Set(healthFilterIds.value)
+    return filteredNodes.value.filter((n) => ids.has(n.id))
+  })
+
   const sortedNodes = computed(() => {
-    const list = [...filteredNodes.value]
+    const list = [...tableNodes.value]
     const dir = nodeSortDir.value === 'asc' ? 1 : -1
     list.sort((a, b) => {
       let aVal: number | string
@@ -145,6 +170,10 @@ export function useProxmox() {
     toggleNodeSort,
     hasHealthAlerts,
     clusterResources,
+    healthFilterIds,
+    healthFilterLabel,
+    filterByHealthIds,
+    clearHealthFilter,
     load,
   }
 }
