@@ -86,7 +86,7 @@ export function useCommandPalette() {
   const navResults = computed<PaletteResult[]>(() => {
     const q = query.value.trim().toLowerCase()
     const results: PaletteResult[] = []
-    for (const section of visibleNavSections(auth.isAdmin)) {
+    for (const section of visibleNavSections(auth)) {
       for (const item of section.items) {
         if (!q || item.label.toLowerCase().includes(q) || section.label.toLowerCase().includes(q)) {
           results.push({

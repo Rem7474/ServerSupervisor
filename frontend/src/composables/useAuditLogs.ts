@@ -3,6 +3,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useConfirmDialog } from './useConfirmDialog'
 import apiClient from '../api'
+import { addToast } from './useGlobalToast'
+import { getApiErrorMessage } from '../api/client'
 import { useStatusBadge } from './useStatusBadge'
 import { useCommandStream } from './useCommandStream'
 import type { RemoteCommand, RemoteCommandWithHost } from '../types/audit'
@@ -92,6 +94,7 @@ export function useAuditLogs() {
 
   const selectedCmd = ref<RemoteCommand | null>(null)
   const showLogViewer = ref(false)
+  const cancellingId = ref<string | null>(null)
   let auditPollTimer: ReturnType<typeof setInterval> | null = null
 
   const { openCommandStream, closeStream } = useCommandStream()
@@ -353,6 +356,19 @@ export function useAuditLogs() {
     } catch { /* keep stale data */ }
   }
 
+  async function cancelCmd(id: string): Promise<void> {
+    cancellingId.value = id
+    try {
+      await apiClient.cancelCommand(id)
+      cmds.value = cmds.value.map((c) => (c.id === id ? { ...c, status: 'cancelled' } : c))
+      addToast('Commande annulée', 'success')
+    } catch (err: unknown) {
+      addToast(getApiErrorMessage(err, 'Impossible d\'annuler'), 'error')
+    } finally {
+      cancellingId.value = null
+    }
+  }
+
   async function unblockIP(ip: string): Promise<void> {
     const ok = await dialog.confirm({
       title: 'Débloquer cette IP',
@@ -431,6 +447,8 @@ export function useAuditLogs() {
     showLogViewer,
     openLogViewer,
     closeLogViewer,
+    cancellingId,
+    cancelCmd,
     selectCmdsPage,
     connexions,
     connexionsPage,

@@ -13,6 +13,10 @@ export interface NavItem {
   to: string
   icon: Component
   adminOnly?: boolean
+  // Permission string checked via auth.hasPermission (see stores/auth.ts's
+  // ROLE_PERMISSIONS) — for items visible to operator+admin but not viewer,
+  // where adminOnly's admin-vs-everyone-else split is too coarse.
+  requiresPermission?: string
 }
 
 export interface NavSection {
@@ -36,7 +40,7 @@ export const navigationSections: NavSection[] = [
     items: [
       { label: 'Dashboard', to: '/', icon: IconLayoutDashboard },
       { label: 'Alertes', to: '/alerts', icon: IconBell },
-      { label: 'Commandes en cours', to: '/commands', icon: IconTerminal2 },
+      { label: 'Commandes', to: '/audit', icon: IconTerminal2, requiresPermission: 'view:audit:commands' },
     ],
   },
   {
@@ -95,11 +99,14 @@ export const navigationSections: NavSection[] = [
 // still have at least one visible item (Sécurité/Réglages are 100%
 // adminOnly today, so a viewer/operator gets 4 sections, not 6 with two
 // dead-ends).
-export function visibleNavSections(isAdmin: boolean): NavSection[] {
+export function visibleNavSections(auth: { isAdmin: boolean; hasPermission: (permission: string) => boolean }): NavSection[] {
   return navigationSections
     .map((section) => ({
       ...section,
-      items: section.items.filter((item) => !item.adminOnly || isAdmin),
+      items: section.items.filter((item) =>
+        (!item.adminOnly || auth.isAdmin) &&
+        (!item.requiresPermission || auth.hasPermission(item.requiresPermission))
+      ),
     }))
     .filter((section) => section.items.length > 0)
 }

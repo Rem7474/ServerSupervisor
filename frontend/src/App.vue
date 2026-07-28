@@ -305,7 +305,7 @@ function handlePageShow(event: PageTransitionEvent): void {
   }
 }
 
-const visibleSections = computed(() => visibleNavSections(auth.isAdmin))
+const visibleSections = computed(() => visibleNavSections(auth))
 
 function isItemActive(to: string): boolean {
   return to === '/' ? route.path === '/' : route.path.startsWith(to)

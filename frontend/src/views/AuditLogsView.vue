@@ -132,7 +132,7 @@
         </DataToolbar>
 
         <div class="card">
-          <div class="table-responsive">
+          <div class="table-responsive scroll-table">
             <table class="table table-vcenter card-table">
               <thead>
                 <tr>
@@ -239,7 +239,7 @@
                   <td class="text-secondary small">
                     {{ formatDuration(cmd.started_at, cmd.ended_at) }}
                   </td>
-                  <td>
+                  <td class="text-end">
                     <button
                       type="button"
                       class="btn btn-sm btn-ghost-secondary"
@@ -251,6 +251,19 @@
                         :size="16"
                         class="icon icon-sm"
                       />
+                    </button>
+                    <button
+                      v-if="cmd.status === 'pending' || cmd.status === 'running'"
+                      type="button"
+                      class="btn btn-sm btn-outline-danger ms-1"
+                      :disabled="cancellingId === cmd.id"
+                      @click="cancelCmd(cmd.id)"
+                    >
+                      <span
+                        v-if="cancellingId === cmd.id"
+                        class="spinner-border spinner-border-sm me-1"
+                      />
+                      Annuler
                     </button>
                   </td>
                 </tr>
@@ -358,6 +371,8 @@ const {
   showLogViewer,
   openLogViewer,
   closeLogViewer,
+  cancellingId,
+  cancelCmd,
   selectCmdsPage,
   connexions,
   connexionsPage,

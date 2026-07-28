@@ -4,6 +4,9 @@ import { useAuthStore } from '../stores/auth'
 interface RouteMeta {
   requiresAuth?: boolean
   requiresAdmin?: boolean
+  // Permission string checked via auth.hasPermission — for routes open to
+  // operator+admin but not viewer, where requiresAdmin is too coarse.
+  requiresPermission?: string
 }
 
 const routes: RouteRecordRaw[] = [
@@ -62,7 +65,11 @@ const routes: RouteRecordRaw[] = [
     path: '/audit',
     name: 'AuditLogs',
     component: () => import('../views/AuditLogsView.vue'),
-    meta: { requiresAuth: true, requiresAdmin: true },
+    // Not admin-only: the Commandes tab is meant for operator+admin
+    // (ROLE_PERMISSIONS' 'view:audit:commands') — it absorbed the standalone
+    // /commands page below. The Connexions tab stays admin-only, gated
+    // in-template (auth.role === 'admin'), same as before this change.
+    meta: { requiresAuth: true, requiresPermission: 'view:audit:commands' },
   },
   {
     path: '/traffic',
@@ -165,12 +172,6 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true },
   },
   {
-    path: '/commands',
-    name: 'ActiveCommands',
-    component: () => import('../views/ActiveCommandsView.vue'),
-    meta: { requiresAuth: true },
-  },
-  {
     path: '/notifications',
     name: 'NotificationCenter',
     component: () => import('../views/NotificationCenterView.vue'),
@@ -186,6 +187,9 @@ const routes: RouteRecordRaw[] = [
   { path: '/uptime', redirect: '/monitoring' },
   { path: '/uptime/probes/:id', redirect: (to) => `/monitoring/probes/${to.params.id}` },
   { path: '/ssl', redirect: '/monitoring' },
+  // /commands was a standalone page; it merged into Audit's Commandes tab
+  // (same remote_commands data, now with search/sort/host links it lacked).
+  { path: '/commands', redirect: '/audit' },
   {
     path: '/proxmox/nodes/:id',
     name: 'ProxmoxNode',
@@ -247,6 +251,8 @@ router.beforeEach(
       // Force password change before accessing any other page
       next('/account')
     } else if (meta.requiresAdmin && !auth.hasPermission('*')) {
+      next('/')
+    } else if (meta.requiresPermission && !auth.hasPermission(meta.requiresPermission)) {
       next('/')
     } else if (to.path === '/login' && auth.isAuthenticated) {
       next('/')
