@@ -103,7 +103,7 @@
             >
               <td>
                 <router-link
-                  :to="`/monitoring/probes/${p.id}`"
+                  :to="p.npm_proxy_host_id ? `/monitoring/host/${p.npm_proxy_host_id}` : `/monitoring/probes/${p.id}`"
                   class="fw-semibold text-decoration-none"
                 >
                   {{ p.name }}

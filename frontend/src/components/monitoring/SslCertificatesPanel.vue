@@ -96,7 +96,7 @@
             >
               <td>
                 <router-link
-                  :to="`/monitoring/ssl/${c.id}`"
+                  :to="c.npm_proxy_host_id ? `/monitoring/host/${c.npm_proxy_host_id}` : `/monitoring/ssl/${c.id}`"
                   class="fw-semibold text-decoration-none"
                 >
                   {{ c.name }}

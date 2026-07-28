@@ -8,9 +8,12 @@ import dayjs from '../utils/dayjs'
 
 type SSLCert = SSLCertificate
 
-export function useSSLCertificateDetail() {
+// certIdOverride mirrors useUptimeProbeDetail's probeIdOverride — lets
+// MonitoringHostDetailView reuse this composable keyed by an id it already
+// resolved (the NPM proxy host's linked cert) instead of route.params.id.
+export function useSSLCertificateDetail(certIdOverride?: string) {
   const route = useRoute()
-  const certId = route.params.id as string
+  const certId = certIdOverride ?? (route.params.id as string)
   const signal = useAbortSignal()
 
   const cert = ref<SSLCert | null>(null)

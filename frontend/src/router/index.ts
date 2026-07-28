@@ -159,6 +159,12 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: true },
   },
   {
+    path: '/monitoring/host/:id',
+    name: 'MonitoringHostDetail',
+    component: () => import('../views/MonitoringHostDetailView.vue'),
+    meta: { requiresAuth: true },
+  },
+  {
     path: '/commands',
     name: 'ActiveCommands',
     component: () => import('../views/ActiveCommandsView.vue'),

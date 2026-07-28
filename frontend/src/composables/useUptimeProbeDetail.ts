@@ -47,9 +47,13 @@ export const STATS_WINDOWS = [
   { hours: 720, label: '30j' },
 ] as const
 
-export function useUptimeProbeDetail() {
+// probeIdOverride lets MonitoringHostDetailView's unified per-host page reuse
+// this composable keyed by an id it already resolved (the NPM proxy host's
+// linked probe) instead of route.params.id, which only exists on the
+// standalone /monitoring/probes/:id route.
+export function useUptimeProbeDetail(probeIdOverride?: string) {
   const route = useRoute()
-  const probeId = route.params.id as string
+  const probeId = probeIdOverride ?? (route.params.id as string)
   const signal = useAbortSignal()
 
   const probe = ref<UptimeProbe | null>(null)

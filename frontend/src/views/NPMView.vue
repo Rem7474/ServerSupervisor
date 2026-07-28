@@ -32,7 +32,7 @@
         <router-link
           v-for="c in expiringCerts"
           :key="c.id"
-          :to="`/monitoring/ssl/${c.ssl_certificate_id}`"
+          :to="`/monitoring/host/${c.id}`"
           class="badge text-decoration-none"
           :class="sslBadge(c.ssl_days_remaining)"
         >
@@ -165,7 +165,18 @@
                     class="text-warning flex-shrink-0"
                     title="Proxy host actif dans NPM mais sans sonde uptime — une panne ne serait pas détectée."
                   />
-                  <span class="fw-medium">{{ h.domain_names[0] }}</span>
+                  <router-link
+                    v-if="h.uptime_probe_id || h.ssl_certificate_id"
+                    :to="`/monitoring/host/${h.id}`"
+                    class="fw-medium text-decoration-none"
+                    title="Voir le suivi uptime + SSL de ce proxy host"
+                  >
+                    {{ h.domain_names[0] }}
+                  </router-link>
+                  <span
+                    v-else
+                    class="fw-medium"
+                  >{{ h.domain_names[0] }}</span>
                 </div>
                 <div
                   v-if="h.domain_names.length > 1"
@@ -210,7 +221,7 @@
                   </label>
                   <router-link
                     v-if="h.uptime_probe_id && h.uptime_status"
-                    :to="`/monitoring/probes/${h.uptime_probe_id}`"
+                    :to="`/monitoring/host/${h.id}`"
                     class="badge small text-decoration-none"
                     :class="uptimeBadge(h.uptime_status)"
                     title="Voir la sonde uptime"
@@ -244,7 +255,7 @@
                   </label>
                   <router-link
                     v-if="h.ssl_certificate_id && h.ssl_days_remaining !== null && h.ssl_days_remaining !== undefined"
-                    :to="`/monitoring/ssl/${h.ssl_certificate_id}`"
+                    :to="`/monitoring/host/${h.id}`"
                     class="badge small text-decoration-none"
                     :class="sslBadge(h.ssl_days_remaining)"
                     title="Voir le certificat SSL"
