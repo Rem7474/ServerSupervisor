@@ -799,12 +799,21 @@ function toggleSelected(id: string, checked: boolean): void {
   selectedIds.value = next
 }
 
+// Scoped to the current page, matching the checkbox's own aria-label
+// ("...affichés") — selecting "all" used to silently span every page of the
+// current filter, which made a bulk stop/restart much wider than what the
+// screen showed.
 const allVisibleSelected = computed(() =>
-  sortedContainers.value.length > 0 && sortedContainers.value.every((c) => selectedIds.value.has(c.id))
+  pagedContainers.value.length > 0 && pagedContainers.value.every((c) => selectedIds.value.has(c.id))
 )
 
 function toggleSelectAll(checked: boolean): void {
-  selectedIds.value = checked ? new Set(sortedContainers.value.map((c) => c.id)) : new Set()
+  const next = new Set(selectedIds.value)
+  for (const c of pagedContainers.value) {
+    if (checked) next.add(c.id)
+    else next.delete(c.id)
+  }
+  selectedIds.value = next
 }
 
 function emitBulkAction(action: string): void {
