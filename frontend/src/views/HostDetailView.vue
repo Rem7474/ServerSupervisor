@@ -562,7 +562,7 @@
                   />
                   Permissions par hôte
                 </h3>
-                <span class="badge badge-sm bg-danger text-white">Admin only</span>
+                <span class="badge badge-sm bg-red text-white">Admin only</span>
               </div>
               <div class="card-body p-0">
                 <div

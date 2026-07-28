@@ -351,7 +351,7 @@
               <h3 class="card-title mb-0">
                 IPs bloquées par CrowdSec
               </h3>
-              <span class="badge bg-success-lt text-success fs-4">
+              <span class="badge bg-green-lt text-green fs-4">
                 {{ crowdSecTotal.toLocaleString() }} décisions actives
               </span>
             </div>

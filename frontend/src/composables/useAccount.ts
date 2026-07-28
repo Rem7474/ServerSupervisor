@@ -90,7 +90,7 @@ export function useAccount() {
   const { getStatusBadgeClass } = useStatusBadge()
 
   const roleBadgeClass = computed(() => {
-    const map: Record<string, string> = { admin: 'bg-danger-lt text-danger', operator: 'bg-warning-lt text-warning', viewer: 'bg-secondary-lt text-secondary' }
+    const map: Record<string, string> = { admin: 'bg-red-lt text-red', operator: 'bg-yellow-lt text-yellow', viewer: 'bg-secondary-lt text-secondary' }
     return map[profile.value?.role ?? ""] || 'bg-secondary-lt text-secondary'
   })
 

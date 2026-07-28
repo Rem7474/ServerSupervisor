@@ -42,6 +42,7 @@ const EXECUTION_STATE_MAP: Record<string, string> = {
   failed:    'badge bg-red-lt text-red',
   error:     'badge bg-red-lt text-red',
   skipped:   'badge bg-secondary-lt text-secondary',
+  cancelled: 'badge bg-orange-lt text-orange',
 }
 
 export function getExecutionStateClass(

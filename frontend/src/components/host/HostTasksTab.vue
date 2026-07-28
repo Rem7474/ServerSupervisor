@@ -119,9 +119,9 @@
               <td>
                 <span
                   v-if="task.last_run_status"
-                  :class="task.last_run_status === 'completed' ? 'badge bg-success-lt' : task.last_run_status === 'pending' || task.last_run_status === 'running' ? 'badge bg-warning-lt' : 'badge bg-danger-lt'"
+                  :class="getExecutionStateClass(task.last_run_status)"
                 >
-                  {{ task.last_run_status }}
+                  {{ commandStatusLabel(task.last_run_status) }}
                   <span
                     v-if="task.last_run_at"
                     class="ms-1 text-muted small"
@@ -426,6 +426,8 @@ import { useDateFormatter } from '../../composables/useDateFormatter'
 import { useToast } from '../../composables/useToast'
 import { MANUAL_SENTINEL, isManualOnly, describeCron } from '../../utils/cron'
 import { getApiErrorMessage } from '../../api/client'
+import { getExecutionStateClass } from '../../utils/statusClasses'
+import { commandStatusLabel } from '../../utils/commandStatus'
 
 type TaskModule = 'apt' | 'docker' | 'systemd' | 'journal' | 'processes' | 'custom'
 

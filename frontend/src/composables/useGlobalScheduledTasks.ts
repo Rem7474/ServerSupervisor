@@ -8,6 +8,8 @@ import { isManualOnly, describeCron, nextCronRun, MANUAL_SENTINEL } from '../uti
 import { useConfirmDialog } from './useConfirmDialog'
 import type { ScheduledTaskWithHost, ScheduledTaskExecution } from '../types/task'
 import { getApiErrorMessage } from '../api/client'
+import { getExecutionStateClass } from '../utils/statusClasses'
+import { commandStatusLabel } from '../utils/commandStatus'
 
 const moduleActions: Record<string, string[]> = {
   apt: ['update', 'upgrade', 'install', 'remove'],
@@ -45,10 +47,7 @@ function formatDate(iso: string | undefined): string {
 }
 
 function statusBadge(status: string | undefined): string {
-  if (status === 'completed') return 'badge bg-success-lt'
-  if (status === 'failed') return 'badge bg-danger-lt'
-  if (status === 'running') return 'badge bg-info-lt'
-  return 'badge bg-warning-lt'
+  return getExecutionStateClass(status, 'badge bg-yellow-lt text-yellow')
 }
 
 function durationSec(start: string, end: string): string {
@@ -443,6 +442,7 @@ export function useGlobalScheduledTasks() {
     saveCreate,
     formatDate,
     statusBadge,
+    commandStatusLabel,
     durationSec,
     firstLine,
     isManualOnly,

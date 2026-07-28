@@ -270,7 +270,7 @@
                   v-if="task.last_run_status"
                   :class="statusBadge(task.last_run_status)"
                 >
-                  {{ task.last_run_status }}
+                  {{ commandStatusLabel(task.last_run_status) }}
                   <span
                     v-if="task.last_run_at"
                     class="ms-1 text-muted small"
@@ -289,7 +289,7 @@
                 <span
                   v-else-if="!canManage"
                   class="badge"
-                  :class="task.enabled ? 'bg-success-lt' : 'bg-secondary-lt'"
+                  :class="task.enabled ? 'bg-green-lt' : 'bg-secondary-lt'"
                 >
                   {{ task.enabled ? 'Oui' : 'Non' }}
                 </span>
@@ -675,7 +675,7 @@
                       {{ formatDate(ex.created_at) }}
                     </td>
                     <td>
-                      <span :class="statusBadge(ex.status)">{{ ex.status }}</span>
+                      <span :class="statusBadge(ex.status)">{{ commandStatusLabel(ex.status) }}</span>
                     </td>
                     <td class="text-nowrap">
                       <span v-if="ex.ended_at && ex.started_at">{{ durationSec(ex.started_at, ex.ended_at) }}s</span>
@@ -801,6 +801,7 @@ const {
   saveCreate,
   formatDate,
   statusBadge,
+  commandStatusLabel,
   durationSec,
   firstLine,
   isManualOnly,

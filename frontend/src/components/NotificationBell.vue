@@ -93,7 +93,7 @@
               </div>
               <span
                 v-if="notificationResolved(item)"
-                class="badge bg-success-lt text-success flex-shrink-0 notification-state-badge"
+                class="badge bg-green-lt text-green flex-shrink-0 notification-state-badge"
               >Termine</span>
               <div
                 v-else

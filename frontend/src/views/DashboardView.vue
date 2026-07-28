@@ -557,7 +557,7 @@
         apt upgrade
         <span
           v-if="selectedCount > 5"
-          class="badge bg-danger-lt text-danger ms-1"
+          class="badge bg-red-lt text-red ms-1"
         >DANGER</span>
       </button>
     </BulkActionBar>

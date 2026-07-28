@@ -203,8 +203,8 @@ function taskStatusLabel(t: ProxmoxTask): string {
 
 function taskStatusBadgeClass(t: ProxmoxTask): string {
   if (t.status === 'running') return 'bg-blue-lt text-blue'
-  if (t.exit_status === 'OK' || t.status === 'OK') return 'bg-success-lt text-success'
-  if (t.exit_status) return 'bg-danger-lt text-danger'
+  if (t.exit_status === 'OK' || t.status === 'OK') return 'bg-green-lt text-green'
+  if (t.exit_status) return 'bg-red-lt text-red'
   return 'bg-secondary-lt text-secondary'
 }
 </script>

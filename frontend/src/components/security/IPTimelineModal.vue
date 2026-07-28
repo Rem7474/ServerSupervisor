@@ -57,7 +57,7 @@
             </template>
             <span
               v-else
-              class="badge bg-success-lt text-success align-self-center"
+              class="badge bg-green-lt text-green align-self-center"
             >
               IP bloquée par CrowdSec
             </span>
@@ -259,7 +259,7 @@
                         <span v-if="r.blocked">
                           <strong>Blocage:</strong>
                           <span
-                            class="badge bg-success-lt text-success ms-1"
+                            class="badge bg-green-lt text-green ms-1"
                             :title="r.blocked_reason || '-'"
                           >
                             {{ r.blocked_source || 'crowdsec' }}

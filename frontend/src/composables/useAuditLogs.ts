@@ -7,6 +7,7 @@ import { addToast } from './useGlobalToast'
 import { getApiErrorMessage } from '../api/client'
 import { useStatusBadge } from './useStatusBadge'
 import { commandStatusLabel } from '../utils/commandStatus'
+import { moduleLabel, moduleClass } from '../utils/moduleMeta'
 import { useCommandStream } from './useCommandStream'
 import type { RemoteCommand, RemoteCommandWithHost } from '../types/audit'
 import type { CommandStreamInitMsg, CommandStreamChunkMsg, CommandStatusUpdateMsg } from '../types/ws'
@@ -124,24 +125,6 @@ export function useAuditLogs() {
   const totalConnexionsPages = computed(() =>
     Math.max(1, Math.ceil(connexionsTotal.value / connexionsLimit))
   )
-
-  // ── Module display helpers ────────────────────────────────────────────────────
-  const MODULE_META: Record<string, { label: string; cls: string }> = {
-    apt:       { label: 'APT',        cls: 'badge bg-azure-lt text-azure' },
-    docker:    { label: 'Docker',     cls: 'badge bg-blue-lt text-blue' },
-    systemd:   { label: 'Systemd',    cls: 'badge bg-green-lt text-green' },
-    journal:   { label: 'Journal',    cls: 'badge bg-purple-lt text-purple' },
-    processes: { label: 'Processus',  cls: 'badge bg-orange-lt text-orange' },
-    custom:    { label: 'Custom',     cls: 'badge bg-teal-lt text-teal' },
-  }
-
-  function moduleLabel(module: string): string {
-    return MODULE_META[module]?.label ?? module
-  }
-
-  function moduleClass(module: string): string {
-    return MODULE_META[module]?.cls ?? 'badge bg-secondary-lt text-secondary'
-  }
 
   function statusLabel(status: string): string {
     return commandStatusLabel(status)

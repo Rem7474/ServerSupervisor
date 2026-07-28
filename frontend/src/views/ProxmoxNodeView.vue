@@ -637,14 +637,14 @@ const proxmoxTabs = computed<EntityTab[]>(() => [
     label: 'Tâches',
     badges: [
       { value: node.value?.tasks?.length ?? 0, badgeClass: azureBadge },
-      ...(failedTaskCount.value > 0 ? [{ value: failedTaskCount.value, badgeClass: 'badge bg-warning ms-1' }] : []),
+      ...(failedTaskCount.value > 0 ? [{ value: failedTaskCount.value, badgeClass: 'badge bg-yellow text-white ms-1' }] : []),
     ],
     lazy: true,
   },
   {
     key: 'updates',
     label: 'Mises à jour',
-    badges: node.value?.pending_updates > 0 ? [{ value: node.value.pending_updates, badgeClass: 'badge ms-1 bg-warning-lt text-warning' }] : [],
+    badges: node.value?.pending_updates > 0 ? [{ value: node.value.pending_updates, badgeClass: 'badge ms-1 bg-yellow-lt text-yellow' }] : [],
     lazy: true,
   },
   { key: 'services', label: 'Services', lazy: true },

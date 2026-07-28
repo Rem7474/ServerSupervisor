@@ -232,10 +232,10 @@ function formatSyslogTime(item: SyslogItem): string {
 
 function syslogLevelBadgeClass(item: SyslogItem): string {
   const raw = String(item?.parsedLevel || item?.pri || item?.level || '').toLowerCase()
-  if (raw.includes('critical') || raw.includes('fatal') || raw.includes('panic')) return 'bg-danger-lt text-danger'
-  if (raw.includes('error') || raw.includes('err')) return 'bg-danger-lt text-danger'
+  if (raw.includes('critical') || raw.includes('fatal') || raw.includes('panic')) return 'bg-red-lt text-red'
+  if (raw.includes('error') || raw.includes('err')) return 'bg-red-lt text-red'
   if (raw.includes('warning') || raw.includes('warn')) return 'bg-orange-lt text-orange'
-  if (raw.includes('success') || raw.includes('ok')) return 'bg-success-lt text-success'
+  if (raw.includes('success') || raw.includes('ok')) return 'bg-green-lt text-green'
   if (raw.includes('info') || raw.includes('notice')) return 'bg-azure-lt text-azure'
   return 'bg-secondary-lt text-secondary'
 }

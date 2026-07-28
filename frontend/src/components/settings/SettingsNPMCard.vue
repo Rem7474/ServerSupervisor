@@ -152,16 +152,16 @@
               >Désactivé</span>
               <span
                 v-else-if="conn.last_error"
-                class="badge bg-danger-lt text-danger"
+                class="badge bg-red-lt text-red"
                 :title="conn.last_error"
               >Erreur</span>
               <span
                 v-else-if="conn.last_success_at"
-                class="badge bg-success-lt text-success"
+                class="badge bg-green-lt text-green"
               >OK</span>
               <span
                 v-else
-                class="badge bg-warning-lt text-warning"
+                class="badge bg-yellow-lt text-yellow"
               >En attente</span>
             </td>
             <td class="text-muted small">

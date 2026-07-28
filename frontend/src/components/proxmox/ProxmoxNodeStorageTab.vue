@@ -58,11 +58,11 @@
           <td>
             <span
               v-if="s.active && s.enabled"
-              class="badge bg-success-lt text-success"
+              class="badge bg-green-lt text-green"
             >Actif</span>
             <span
               v-else
-              class="badge bg-danger-lt text-danger"
+              class="badge bg-red-lt text-red"
             >Inactif</span>
           </td>
         </tr>

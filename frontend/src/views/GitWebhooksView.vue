@@ -460,12 +460,12 @@
                     <span class="text-muted">Dernière vérif : {{ formatRelative(tracker.last_checked_at) }}</span>
                     <span
                       v-if="tracker.last_error"
-                      class="ms-1 badge bg-danger-lt text-danger"
+                      class="ms-1 badge bg-red-lt text-red"
                       :title="(tracker.last_error as string)"
                     >erreur</span>
                     <span
                       v-else-if="!tracker.last_release_tag && tracker.tracker_type !== 'docker'"
-                      class="ms-1 badge bg-warning-lt text-warning"
+                      class="ms-1 badge bg-yellow-lt text-yellow"
                     >aucune release trouvée</span>
                   </template>
                   <template v-else>

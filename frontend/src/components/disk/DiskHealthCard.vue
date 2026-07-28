@@ -55,7 +55,7 @@
               </div>
             </div>
             <BadgePill
-              :tone="getStatusBadgeClass(disk.smart_status)"
+              :tone="smartStatusTone(disk.smart_status)"
               :text="disk.smart_status"
               compact
             />
@@ -173,6 +173,7 @@ import { IconClock } from '@tabler/icons-vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 import BadgePill from '../common/BadgePill.vue'
 import { useDiskHealth, type DiskHealth } from '../../composables/useDiskHealth'
+import { smartStatusTone } from '../../utils/diskHealth'
 
 const props = withDefaults(defineProps<{
   hostId: string
@@ -187,18 +188,6 @@ onMounted(async () => {
   if (props.initialHealth) return
   await load()
 })
-
-type Tone = 'success' | 'danger' | 'warning' | 'secondary'
-
-function getStatusBadgeClass(status: string): Tone {
-  switch (status) {
-    case 'PASSED': return 'success'
-    case 'FAILED': return 'danger'
-    case 'UNKNOWN': return 'warning'
-    case 'NOT_AVAILABLE': return 'secondary'
-    default: return 'secondary'
-  }
-}
 
 function getCardClass(status: string): string {
   switch (status) {

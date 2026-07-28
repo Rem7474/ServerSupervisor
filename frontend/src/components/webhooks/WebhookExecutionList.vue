@@ -219,6 +219,7 @@ import RelativeTime from '../RelativeTime.vue'
 import PaginationNav from '../PaginationNav.vue'
 import { usePagination } from '../../composables/usePagination'
 import { commandStatusLabel } from '../../utils/commandStatus'
+import { execBadgeColor } from '../../utils/statusClasses'
 
 interface Execution {
   id?: string | number
@@ -276,13 +277,6 @@ defineEmits<{
 }>()
 
 function execStatusBadge(status: string | undefined): string {
-  const map: Record<string, string> = {
-    pending: 'bg-yellow-lt text-yellow',
-    running: 'bg-blue-lt text-blue',
-    completed: 'bg-success-lt text-success',
-    failed: 'bg-danger-lt text-danger',
-    skipped: 'bg-secondary-lt text-secondary',
-  }
-  return map[status || ''] || 'bg-secondary-lt text-secondary'
+  return execBadgeColor(status)
 }
 </script>

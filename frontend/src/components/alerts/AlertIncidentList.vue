@@ -316,7 +316,7 @@
                     class="text-muted small mt-1"
                   >
                     Remédiation :
-                    <span :class="commandStatusBadgeClass(item.command_status)">{{ commandStatusLabel(item.command_status) }}</span>
+                    <span :class="getExecutionStateClass(item.command_status)">{{ commandStatusLabel(item.command_status) }}</span>
                   </div>
                 </template>
               </td>
@@ -382,6 +382,7 @@ import BadgePill from '../common/BadgePill.vue'
 import PaginationNav from '../PaginationNav.vue'
 import { addToast } from '../../composables/useGlobalToast'
 import { getApiErrorMessage } from '../../api/client'
+import { getExecutionStateClass } from '../../utils/statusClasses'
 import {
   formatIncidentValue,
   incidentDuration,
@@ -563,22 +564,17 @@ async function manualResolve(incident: Incident) {
   }
 }
 
-// commandStatusLabel/commandStatusBadgeClass describe the remote_commands row
-// a rule's command_trigger dispatched when this incident fired (see
-// item.command_status, joined server-side from remote_commands.status).
+// Describes the remote_commands row a rule's command_trigger dispatched when
+// this incident fired (item.command_status, joined server-side from
+// remote_commands.status) — adjectival wording ("réussie"/"échouée") to
+// agree with "Remédiation :" above it, not the standalone noun forms
+// commandStatusLabel in utils/commandStatus.ts uses elsewhere.
 function commandStatusLabel(status: string | undefined): string {
   if (status === 'pending') return 'en attente'
   if (status === 'running') return 'en cours'
   if (status === 'completed') return 'réussie'
   if (status === 'failed') return 'échouée'
   return status || 'inconnue'
-}
-
-function commandStatusBadgeClass(status: string | undefined): string {
-  if (status === 'completed') return 'badge bg-green-lt text-green'
-  if (status === 'failed') return 'badge bg-danger-lt text-danger'
-  if (status === 'running') return 'badge bg-info-lt text-info'
-  return 'badge bg-warning-lt text-warning'
 }
 
 function formatDate(dateStr: string | undefined | null): string {

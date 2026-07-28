@@ -322,14 +322,14 @@ const expiringCerts = computed(() =>
 )
 
 function uptimeBadge(status: string): string {
-  if (status === 'up') return 'bg-success-lt text-success'
-  if (status === 'down') return 'bg-danger-lt text-danger'
+  if (status === 'up') return 'bg-green-lt text-green'
+  if (status === 'down') return 'bg-red-lt text-red'
   return 'bg-secondary-lt text-secondary'
 }
 
 function sslBadge(days: number): string {
-  if (days <= 7) return 'bg-danger-lt text-danger'
-  if (days <= 30) return 'bg-warning-lt text-warning'
-  return 'bg-success-lt text-success'
+  if (days <= 7) return 'bg-red-lt text-red'
+  if (days <= 30) return 'bg-yellow-lt text-yellow'
+  return 'bg-green-lt text-green'
 }
 </script>
