@@ -5,7 +5,7 @@ import { formatDateLong as formatDate, formatDateTime } from '../utils/formatter
 import { useCommandStream } from './useCommandStream'
 import { getApiErrorMessage, isApiAbort } from '../api/client'
 import { useAbortSignal } from './useAbortSignal'
-import type { RemoteCommand, LoginEvent } from '../types/generated'
+import type { RemoteCommand } from '../types/generated'
 import { useStatusBadge } from './useStatusBadge'
 import { moduleLabel, moduleClass } from '../utils/moduleMeta'
 
@@ -83,10 +83,6 @@ export function useAccount() {
   const myCommands = computed(() =>
     allCommands.value.filter((c: CommandRow) => c.triggered_by === auth.username).slice(0, 50)
   )
-
-  const loginEvents = ref<LoginEvent[]>([])
-  const loginEventsLoading = ref(false)
-  const loginEventsLoaded = ref(false)
 
   const selectedCmd = ref<CommandRow | null>(null)
 
@@ -203,25 +199,6 @@ export function useAccount() {
     if (!allCommands.value.length && !cmdsLoading.value) loadMyCommands()
   }
 
-  async function loadLoginEvents(): Promise<void> {
-    loginEventsLoading.value = true
-    try {
-      const res = await apiClient.getLoginEvents(signal)
-      loginEvents.value = res.data?.events || []
-      loginEventsLoaded.value = true
-    } catch (e) {
-      if (isApiAbort(e)) return
-      loginEvents.value = []
-    } finally {
-      loginEventsLoading.value = false
-    }
-  }
-
-  function switchToConnexions() {
-    activeTab.value = 'connexions'
-    if (!loginEventsLoaded.value) loadLoginEvents()
-  }
-
   onMounted(() => {
     loadProfile()
     loadMyCommands()
@@ -244,8 +221,6 @@ export function useAccount() {
     allCommands,
     cmdsLoading,
     myCommands,
-    loginEvents,
-    loginEventsLoading,
     selectedCmd,
     roleBadgeClass,
     roleLabel,
@@ -261,6 +236,5 @@ export function useAccount() {
     resetPwForm,
     submitChangePassword,
     switchToHistorique,
-    switchToConnexions,
   }
 }

@@ -65,18 +65,12 @@
         </button>
       </li>
       <li class="nav-item">
-        <button
-          type="button"
+        <router-link
+          to="/account/security"
           class="nav-link"
-          :class="{ active: activeTab === 'connexions' }"
-          @click="switchToConnexions"
         >
           Connexions
-          <span
-            v-if="loginEvents.length"
-            class="badge bg-secondary-lt text-secondary ms-1"
-          >{{ loginEvents.length }}</span>
-        </button>
+        </router-link>
       </li>
     </ul>
 
@@ -406,36 +400,12 @@
         @open="showConsole = true"
       />
     </div>
-
-    <!-- ── Onglet Connexions ── -->
-    <div v-show="activeTab === 'connexions'">
-      <div class="card">
-        <div class="card-header d-flex align-items-center justify-content-between">
-          <h3 class="card-title mb-0">
-            <IconLogout
-              :size="20"
-              class="icon me-2"
-            />
-            Activité de connexion
-          </h3>
-          <span
-            v-if="loginEvents.length"
-            class="badge bg-secondary-lt text-secondary"
-          >{{ loginEvents.length }}</span>
-        </div>
-        <ConnectionsTable
-          :events="loginEvents"
-          :loading="loginEventsLoading"
-        />
-      </div>
-    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { IconAlertTriangle, IconClock, IconFileText, IconKey, IconLock, IconLogout } from '@tabler/icons-vue'
+import { IconAlertTriangle, IconClock, IconFileText, IconKey, IconLock } from '@tabler/icons-vue'
 import CommandLogPanel from '../components/host/CommandLogPanel.vue'
-import ConnectionsTable from '../components/common/ConnectionsTable.vue'
 import { useAccount } from '../composables/useAccount'
 
 const {
@@ -452,8 +422,6 @@ const {
   pwStrengthMeta,
   cmdsLoading,
   myCommands,
-  loginEvents,
-  loginEventsLoading,
   selectedCmd,
   roleBadgeClass,
   roleLabel,
@@ -469,6 +437,5 @@ const {
   resetPwForm,
   submitChangePassword,
   switchToHistorique,
-  switchToConnexions,
 } = useAccount()
 </script>
