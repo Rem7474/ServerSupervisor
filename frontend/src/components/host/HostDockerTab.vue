@@ -36,23 +36,14 @@
               <template v-if="containerVersion(c)">
                 <br>
                 <span
-                  v-if="containerVersion(c)?.tracker_id && containerVersion(c)?.custom_task_id && containerVersion(c)?.is_up_to_date"
+                  v-if="containerVersion(c)?.is_up_to_date"
                   class="badge bg-green-lt text-green mt-1"
-                >A jour</span>
+                >À jour</span>
                 <span
-                  v-else-if="containerVersion(c)?.tracker_id && containerVersion(c)?.custom_task_id && !containerVersion(c)?.is_up_to_date && containerVersion(c)?.running_version"
+                  v-else-if="containerVersion(c)?.running_version || containerVersion(c)?.update_confirmed"
                   class="badge bg-yellow-lt text-yellow mt-1"
-                  :title="`Dernière : ${containerVersion(c)?.latest_version}`"
-                >MAJ dispo</span>
-                <span
-                  v-else-if="containerVersion(c)?.tracker_id && !containerVersion(c)?.custom_task_id"
-                  class="badge bg-secondary-lt text-secondary mt-1"
-                  title="Tracker est configuré mais aucune task n'a été associée"
-                >Surveillance seule</span>
-                <span
-                  v-else-if="!containerVersion(c)?.tracker_id"
-                  class="badge bg-secondary-lt text-secondary mt-1"
-                >Pas de tracker</span>
+                  :title="`Dernière version : ${containerVersion(c)?.latest_version}`"
+                >Mise à jour disponible</span>
                 <span
                   v-else
                   class="badge bg-secondary-lt text-secondary mt-1"
@@ -208,6 +199,7 @@ interface VersionComparison {
   is_up_to_date?: boolean
   running_version?: string
   latest_version?: string
+  update_confirmed?: boolean
 }
 
 const props = withDefaults(defineProps<{

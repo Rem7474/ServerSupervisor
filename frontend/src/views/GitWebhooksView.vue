@@ -143,7 +143,7 @@
                 <div class="ms-auto d-flex gap-1">
                   <span
                     v-if="!webhook.enabled"
-                    class="badge bg-secondary"
+                    class="badge bg-secondary-lt text-secondary"
                   >Désactivé</span>
                 </div>
               </div>
@@ -196,7 +196,7 @@
                   <span
                     class="ms-1 badge"
                     :class="execStatusBadge(webhook.last_execution.status || '')"
-                  >{{ webhook.last_execution.status }}</span>
+                  >{{ commandStatusLabel(webhook.last_execution.status) }}</span>
                   <span class="ms-1 text-muted">{{ formatRelative(webhook.last_execution.triggered_at || '') }}</span>
                 </div>
                 <div
@@ -315,7 +315,7 @@
                 <div class="ms-auto">
                   <span
                     v-if="!tracker.enabled"
-                    class="badge bg-secondary"
+                    class="badge bg-secondary-lt text-secondary"
                   >Désactivé</span>
                 </div>
               </div>
@@ -417,7 +417,7 @@
                     <span
                       class="text-muted"
                       style="min-width:60px"
-                    >Derniere</span>
+                    >Dernière</span>
                     <span class="badge bg-green-lt text-green">{{ tracker.last_release_tag }}</span>
                   </div>
                   <div class="d-flex gap-2 mb-1">
@@ -453,7 +453,7 @@
                     <span
                       class="ms-1 badge"
                       :class="execStatusBadge(tracker.last_execution.status || '')"
-                    >{{ tracker.last_execution.status }}</span>
+                    >{{ commandStatusLabel(tracker.last_execution.status) }}</span>
                     <span class="ms-1 text-muted">{{ formatRelative(tracker.last_execution.triggered_at || '') }}</span>
                   </template>
                   <template v-else-if="tracker.last_checked_at">
@@ -608,6 +608,7 @@
 
 <script setup lang="ts">
 import { useGitWebhooksPage } from '../composables/useGitWebhooksPage'
+import { commandStatusLabel } from '../utils/commandStatus'
 import { IconActivity, IconGitBranch, IconPlus, IconRefresh, IconSearch, IconTrash } from '@tabler/icons-vue'
 import WebhookUrlCard from '../components/webhooks/WebhookUrlCard.vue'
 import WebhookExecutionList from '../components/webhooks/WebhookExecutionList.vue'

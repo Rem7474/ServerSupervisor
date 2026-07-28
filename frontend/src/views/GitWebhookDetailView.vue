@@ -21,7 +21,7 @@
           >{{ webhook.provider }}</span>
           <span
             v-if="webhook && !webhook.enabled"
-            class="badge bg-secondary"
+            class="badge bg-secondary-lt text-secondary"
           >Désactivé</span>
         </h2>
       </div>

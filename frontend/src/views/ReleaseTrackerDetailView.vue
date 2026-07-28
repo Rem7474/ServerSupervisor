@@ -27,7 +27,7 @@
           </template>
           <span
             v-if="tracker && !tracker.enabled"
-            class="badge bg-secondary"
+            class="badge bg-secondary-lt text-secondary"
           >Désactivé</span>
           <span
             v-if="tracker && cooldownActive"
