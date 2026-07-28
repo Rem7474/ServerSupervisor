@@ -133,9 +133,15 @@
                   <div
                     v-for="name in d.domain_names"
                     :key="name"
-                    class="font-monospace small"
                   >
-                    {{ name }}
+                    <button
+                      type="button"
+                      class="btn btn-link btn-sm p-0 font-monospace small text-decoration-none"
+                      title="Voir le détail des requêtes/menaces pour ce domaine"
+                      @click="openDomain(name)"
+                    >
+                      {{ name }}
+                    </button>
                   </div>
                 </td>
                 <td>{{ d.connection_name }}</td>
@@ -175,12 +181,22 @@
         </div>
       </template>
     </template>
+
+    <DomainDetailsModal
+      :show="showDomainModal"
+      :domain="selectedDomain"
+      :loading="domainLoading"
+      :details="domainDetails"
+      :period="periodLabel"
+      @close="closeDomainModal"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import api from '../../api'
+import DomainDetailsModal from '../security/DomainDetailsModal.vue'
 import type { HostExposure } from '../../types/host'
 import { getApiErrorMessage } from '../../api/client'
 import { formatBytes } from '../../utils/formatters'
@@ -199,6 +215,39 @@ const error = ref('')
 const period = ref('24h')
 
 const periodLabel = computed(() => PERIODS.find((p) => p.value === period.value)?.label ?? period.value)
+
+// The "Requêtes/Suspectes/Bloquées" KPIs and per-domain counts had no
+// drill-down at all — reuses the same domain detail drawer Traffic/Threats
+// already have (hits, top paths, top IPs, recent request log) instead of
+// leaving these numbers unexplorable. Not host-scoped: exposure's own web
+// traffic is domain-first (collected by the proxy's agent, not this host's),
+// same reasoning as GetHostExposure itself — see root CLAUDE.md.
+const showDomainModal = ref(false)
+const selectedDomain = ref('')
+const domainLoading = ref(false)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- mirrors DomainDetailsModal's own ad-hoc details prop (no Go model for this aggregate)
+const domainDetails = ref<Record<string, any>>({})
+
+async function openDomain(domain: string): Promise<void> {
+  if (!domain) return
+  selectedDomain.value = domain
+  showDomainModal.value = true
+  domainLoading.value = true
+  try {
+    const res = await api.getDomainDetails(domain, period.value)
+    domainDetails.value = res.data?.details || {}
+  } catch {
+    domainDetails.value = {}
+  } finally {
+    domainLoading.value = false
+  }
+}
+
+function closeDomainModal(): void {
+  showDomainModal.value = false
+  selectedDomain.value = ''
+  domainDetails.value = {}
+}
 
 async function load(): Promise<void> {
   loading.value = true
