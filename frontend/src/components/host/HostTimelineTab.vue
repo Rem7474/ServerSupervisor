@@ -1,5 +1,11 @@
 <template>
   <div>
+    <PageRefreshBar
+      v-model="autoRefresh"
+      label="Timeline"
+      :interval-sec="TIMELINE_REFRESH_SEC"
+      :last-updated-at="lastUpdatedAt"
+    />
     <div class="d-flex align-items-center gap-2 mb-3">
       <div class="d-flex gap-2 flex-wrap">
         <button
@@ -13,18 +19,6 @@
           {{ f.label }}
         </button>
       </div>
-      <button
-        type="button"
-        class="btn btn-sm btn-outline-secondary ms-auto"
-        :disabled="loading"
-        @click="load"
-      >
-        <span
-          v-if="loading"
-          class="spinner-border spinner-border-sm me-1"
-        />
-        Actualiser
-      </button>
     </div>
 
     <div
@@ -119,11 +113,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { IconClipboard, IconTerminal2, IconAlertTriangle } from '@tabler/icons-vue'
 import api from '../../api'
 import type { HostTimelineEvent } from '../../types/audit'
 import RelativeTime from '../RelativeTime.vue'
+import PageRefreshBar from '../PageRefreshBar.vue'
 import { getApiErrorMessage } from '../../api/client'
 
 const props = defineProps<{ hostId: string }>()
@@ -135,10 +130,15 @@ const TYPE_FILTERS = [
   { value: 'incident', label: 'Incidents' },
 ]
 
+const TIMELINE_REFRESH_SEC = 60
+
 const events = ref<HostTimelineEvent[]>([])
 const loading = ref(false)
 const error = ref('')
 const typeFilter = ref('')
+const autoRefresh = ref(true)
+const lastUpdatedAt = ref<Date | null>(null)
+let refreshTimer: ReturnType<typeof setInterval> | null = null
 
 const filteredEvents = computed(() =>
   typeFilter.value ? events.value.filter((e) => e.type === typeFilter.value) : events.value
@@ -150,11 +150,23 @@ async function load(): Promise<void> {
   try {
     const res = await api.getHostTimeline(props.hostId, 100)
     events.value = res.data.events || []
+    lastUpdatedAt.value = new Date()
   } catch (err: unknown) {
     error.value = getApiErrorMessage(err, 'Erreur de chargement')
   } finally {
     loading.value = false
   }
+}
+
+function startRefreshTimer(): void {
+  stopRefreshTimer()
+  refreshTimer = setInterval(() => {
+    if (autoRefresh.value) load()
+  }, TIMELINE_REFRESH_SEC * 1000)
+}
+
+function stopRefreshTimer(): void {
+  if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null }
 }
 
 function iconBg(ev: HostTimelineEvent): string {
@@ -182,7 +194,11 @@ function statusBadge(status: string): string {
   return map[status] || 'bg-secondary-lt text-secondary'
 }
 
-onMounted(load)
+onMounted(() => {
+  load()
+  startRefreshTimer()
+})
+onUnmounted(stopRefreshTimer)
 </script>
 
 <style scoped>

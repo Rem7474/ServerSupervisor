@@ -27,7 +27,12 @@
           v-if="loading"
           class="spinner-border spinner-border-sm me-1"
         />
-        {{ loading ? 'Chargement...' : '↻ Actualiser' }}
+        <IconRefresh
+          v-else
+          :size="16"
+          class="icon icon-sm me-1"
+        />
+        {{ loading ? 'Chargement...' : 'Actualiser' }}
       </button>
       <span
         v-if="actionMsg"
@@ -139,6 +144,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { IconRefresh } from '@tabler/icons-vue'
 
 interface Service {
   name: string

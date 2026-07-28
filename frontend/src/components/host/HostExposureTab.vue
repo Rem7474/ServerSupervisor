@@ -1,5 +1,11 @@
 <template>
   <div>
+    <PageRefreshBar
+      v-model="autoRefresh"
+      label="Exposition"
+      :interval-sec="EXPOSURE_REFRESH_SEC"
+      :last-updated-at="lastUpdatedAt"
+    />
     <div class="d-flex align-items-center gap-2 mb-3">
       <div class="d-flex gap-2 flex-wrap">
         <button
@@ -13,18 +19,6 @@
           {{ p.label }}
         </button>
       </div>
-      <button
-        type="button"
-        class="btn btn-sm btn-outline-secondary ms-auto"
-        :disabled="loading"
-        @click="load"
-      >
-        <span
-          v-if="loading"
-          class="spinner-border spinner-border-sm me-1"
-        />
-        Actualiser
-      </button>
     </div>
 
     <div
@@ -194,9 +188,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import api from '../../api'
 import DomainDetailsModal from '../security/DomainDetailsModal.vue'
+import PageRefreshBar from '../PageRefreshBar.vue'
 import type { HostExposure } from '../../types/host'
 import { getApiErrorMessage } from '../../api/client'
 import { formatBytes } from '../../utils/formatters'
@@ -209,10 +204,15 @@ const PERIODS = [
   { value: '720h', label: '30j' },
 ]
 
+const EXPOSURE_REFRESH_SEC = 60
+
 const exposure = ref<HostExposure | null>(null)
 const loading = ref(false)
 const error = ref('')
 const period = ref('24h')
+const autoRefresh = ref(true)
+const lastUpdatedAt = ref<Date | null>(null)
+let refreshTimer: ReturnType<typeof setInterval> | null = null
 
 const periodLabel = computed(() => PERIODS.find((p) => p.value === period.value)?.label ?? period.value)
 
@@ -255,6 +255,7 @@ async function load(): Promise<void> {
   try {
     const res = await api.getHostExposure(props.hostId, period.value)
     exposure.value = res.data
+    lastUpdatedAt.value = new Date()
   } catch (err: unknown) {
     error.value = getApiErrorMessage(err, 'Erreur de chargement')
   } finally {
@@ -262,6 +263,21 @@ async function load(): Promise<void> {
   }
 }
 
+function startRefreshTimer(): void {
+  stopRefreshTimer()
+  refreshTimer = setInterval(() => {
+    if (autoRefresh.value) load()
+  }, EXPOSURE_REFRESH_SEC * 1000)
+}
+
+function stopRefreshTimer(): void {
+  if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null }
+}
+
 watch(period, load)
-onMounted(load)
+onMounted(() => {
+  load()
+  startRefreshTimer()
+})
+onUnmounted(stopRefreshTimer)
 </script>
