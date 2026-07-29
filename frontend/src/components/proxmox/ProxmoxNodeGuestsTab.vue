@@ -286,6 +286,7 @@ import SortableHeader from '../common/SortableHeader.vue'
 import GuestLinkCell from './GuestLinkCell.vue'
 import { useAuthStore } from '../../stores/auth'
 import type { GuestPowerAction } from '../../composables/useProxmoxGuestActions'
+import { compareValues } from '../../utils/sort'
 
 type Guest = Record<string, any>
 type LinkMap = Record<string, any>
@@ -342,19 +343,6 @@ function toggleSort(key: string) {
   }
   sortKey.value = key
   sortDir.value = 'asc'
-}
-
-function compareValues(a: unknown, b: unknown, direction: 'asc' | 'desc' = 'asc'): number {
-  const dir = direction === 'asc' ? 1 : -1
-  if (a == null && b == null) return 0
-  if (a == null) return 1 * dir
-  if (b == null) return -1 * dir
-  if (typeof a === 'string' || typeof b === 'string') {
-    return String(a).localeCompare(String(b), 'fr', { sensitivity: 'base' }) * dir
-  }
-  if (a < b) return -1 * dir
-  if (a > b) return 1 * dir
-  return 0
 }
 
 function linkForGuest(g: Guest) {

@@ -115,6 +115,7 @@ import { computed, ref } from 'vue'
 import { IconList } from '@tabler/icons-vue'
 import SortableHeader from '../common/SortableHeader.vue'
 import type { ProxmoxTask } from '../../types/proxmox'
+import { compareValues } from '../../utils/sort'
 
 const props = defineProps<{
   tasks: ProxmoxTask[]
@@ -135,19 +136,6 @@ function toggleSort(key: string) {
   }
   sortKey.value = key
   sortDir.value = 'asc'
-}
-
-function compareValues(a: unknown, b: unknown, direction: 'asc' | 'desc' = 'asc'): number {
-  const dir = direction === 'asc' ? 1 : -1
-  if (a == null && b == null) return 0
-  if (a == null) return 1 * dir
-  if (b == null) return -1 * dir
-  if (typeof a === 'string' || typeof b === 'string') {
-    return String(a).localeCompare(String(b), 'fr', { sensitivity: 'base' }) * dir
-  }
-  if (a < b) return -1 * dir
-  if (a > b) return 1 * dir
-  return 0
 }
 
 function taskDurationSeconds(task: ProxmoxTask): number | null {

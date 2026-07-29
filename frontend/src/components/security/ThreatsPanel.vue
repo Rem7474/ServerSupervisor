@@ -128,13 +128,28 @@
                   <tr>
                     <th>IP</th>
                     <th class="text-end">
-                      Hits
+                      <SortableHeader
+                        label="Hits"
+                        :active="ipSortKey === 'hits'"
+                        :direction="ipSortDir"
+                        @toggle="toggleIPSort('hits')"
+                      />
                     </th>
                     <th class="text-end">
-                      Chemins
+                      <SortableHeader
+                        label="Chemins"
+                        :active="ipSortKey === 'unique_paths'"
+                        :direction="ipSortDir"
+                        @toggle="toggleIPSort('unique_paths')"
+                      />
                     </th>
                     <th class="text-end">
-                      Domaines
+                      <SortableHeader
+                        label="Domaines"
+                        :active="ipSortKey === 'host_count'"
+                        :direction="ipSortDir"
+                        @toggle="toggleIPSort('host_count')"
+                      />
                     </th>
                     <th>Niveau</th>
                     <th>Blocage</th>
@@ -151,7 +166,7 @@
                     </td>
                   </tr>
                   <tr
-                    v-for="ip in topIPs"
+                    v-for="ip in pagedTopIPs"
                     :key="ip.ip"
                   >
                     <td class="font-monospace small">
@@ -201,6 +216,19 @@
                   </tr>
                 </tbody>
               </table>
+            </div>
+            <div
+              v-if="ipTotalPages > 1"
+              class="card-footer d-flex align-items-center justify-content-between"
+            >
+              <div class="text-secondary small">
+                Page {{ ipPage }} sur {{ ipTotalPages }} — {{ topIPs.length }} IPs
+              </div>
+              <PaginationNav
+                :current-page="ipPage"
+                :total-pages="ipTotalPages"
+                @select="setIPPage"
+              />
             </div>
           </div>
         </div>
@@ -254,7 +282,12 @@
                   <tr>
                     <th>Domaine cible</th>
                     <th class="text-end">
-                      Hits
+                      <SortableHeader
+                        label="Hits"
+                        :active="hostSortKey === 'hits'"
+                        :direction="hostSortDir"
+                        @toggle="toggleHostSort('hits')"
+                      />
                     </th>
                   </tr>
                 </thead>
@@ -268,7 +301,7 @@
                     </td>
                   </tr>
                   <tr
-                    v-for="h in mostTargetedHosts"
+                    v-for="h in sortedMostTargetedHosts"
                     :key="h.host_id"
                   >
                     <td>
@@ -304,24 +337,35 @@
                   <tr>
                     <th>IP</th>
                     <th class="text-end">
-                      Domaines
+                      <SortableHeader
+                        label="Domaines"
+                        :active="matrixSortKey === 'host_count'"
+                        :direction="matrixSortDir"
+                        @toggle="toggleMatrixSort('host_count')"
+                      />
                     </th>
                     <th class="text-end">
-                      Hits
+                      <SortableHeader
+                        label="Hits"
+                        :active="matrixSortKey === 'hits'"
+                        :direction="matrixSortDir"
+                        @toggle="toggleMatrixSort('hits')"
+                      />
                     </th>
+                    <th />
                   </tr>
                 </thead>
                 <tbody>
                   <tr v-if="!ipHostMatrix.length">
                     <td
-                      colspan="3"
+                      colspan="4"
                       class="text-center text-secondary py-4"
                     >
                       Pas de scan coordonné détecté
                     </td>
                   </tr>
                   <tr
-                    v-for="m in ipHostMatrix"
+                    v-for="m in sortedIpHostMatrix"
                     :key="m.ip"
                   >
                     <td class="font-monospace small">
@@ -332,6 +376,15 @@
                     </td>
                     <td class="text-end">
                       {{ m.hits || 0 }}
+                    </td>
+                    <td class="text-end">
+                      <button
+                        type="button"
+                        class="btn btn-sm btn-outline-primary"
+                        @click="openTimeline(m.ip)"
+                      >
+                        Timeline
+                      </button>
                     </td>
                   </tr>
                 </tbody>
@@ -359,19 +412,40 @@
               <table class="table table-vcenter card-table">
                 <thead>
                   <tr>
-                    <th>IP</th>
+                    <th>
+                      <SortableHeader
+                        label="IP"
+                        :active="crowdSecSortKey === 'ip'"
+                        :direction="crowdSecSortDir"
+                        @toggle="toggleCrowdSecSort('ip')"
+                      />
+                    </th>
                     <th>Action</th>
                     <th>Scénario</th>
                     <th>Origine</th>
-                    <th>Pays</th>
+                    <th>
+                      <SortableHeader
+                        label="Pays"
+                        :active="crowdSecSortKey === 'country'"
+                        :direction="crowdSecSortDir"
+                        @toggle="toggleCrowdSecSort('country')"
+                      />
+                    </th>
                     <th>AS / Opérateur</th>
-                    <th>Expiration</th>
+                    <th>
+                      <SortableHeader
+                        label="Expiration"
+                        :active="crowdSecSortKey === 'blocked_until'"
+                        :direction="crowdSecSortDir"
+                        @toggle="toggleCrowdSecSort('blocked_until')"
+                      />
+                    </th>
                     <th />
                   </tr>
                 </thead>
                 <tbody>
                   <tr
-                    v-for="entry in crowdSecIPs"
+                    v-for="entry in sortedCrowdSecIPs"
                     :key="entry.ip"
                   >
                     <td class="font-monospace small">
@@ -481,12 +555,20 @@
 </template>
 
 <script setup lang="ts">
+import { computed, ref } from 'vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 import PageRefreshBar from '../PageRefreshBar.vue'
 import TrafficThreatsFilterBar from './TrafficThreatsFilterBar.vue'
 import IPTimelineModal from './IPTimelineModal.vue'
 import DomainDetailsModal from './DomainDetailsModal.vue'
+import SortableHeader from '../common/SortableHeader.vue'
+import PaginationNav from '../PaginationNav.vue'
 import { useBot } from '../../composables/useBot'
+import { usePagination } from '../../composables/usePagination'
+import { compareValues } from '../../utils/sort'
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- display-layer shim for aggregate web-logs data (no Go model)
+type AnyRecord = Record<string, any>
 
 const {
   period,
@@ -528,6 +610,67 @@ const {
   handleBanFromModal,
   unblockCrowdSecEntry,
 } = useBot()
+
+// Client-side sort/pagination over each table's already-loaded data — every
+// list here (topIPs, mostTargetedHosts, ipHostMatrix, crowdSecIPs) is server-
+// capped (25/30/… rows) rather than genuinely paginated server-side, so this
+// only reorders/chunks what's already in memory. crowdSecIPs specifically
+// stays sort-only (no PaginationNav): its own "Affichage des N premières
+// entrées sur M" footnote already says the rest isn't loaded, and a pager
+// here would wrongly imply you could page through to it.
+const ipSortKey = ref<'hits' | 'unique_paths' | 'host_count'>('hits')
+const ipSortDir = ref<'asc' | 'desc'>('desc')
+function toggleIPSort(key: typeof ipSortKey.value): void {
+  if (ipSortKey.value === key) {
+    ipSortDir.value = ipSortDir.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    ipSortKey.value = key
+    ipSortDir.value = 'desc'
+  }
+}
+const sortedTopIPs = computed(() =>
+  [...topIPs.value].sort((a: AnyRecord, b: AnyRecord) => compareValues(a[ipSortKey.value], b[ipSortKey.value], ipSortDir.value))
+)
+const { currentPage: ipPage, totalPages: ipTotalPages, pagedItems: pagedTopIPs, setPage: setIPPage } =
+  usePagination({ items: sortedTopIPs, pageSize: 10 })
+
+const hostSortKey = ref<'hits'>('hits')
+const hostSortDir = ref<'asc' | 'desc'>('desc')
+function toggleHostSort(key: typeof hostSortKey.value): void {
+  hostSortDir.value = hostSortKey.value === key && hostSortDir.value === 'desc' ? 'asc' : 'desc'
+  hostSortKey.value = key
+}
+const sortedMostTargetedHosts = computed(() =>
+  [...mostTargetedHosts.value].sort((a: AnyRecord, b: AnyRecord) => compareValues(a[hostSortKey.value], b[hostSortKey.value], hostSortDir.value))
+)
+
+const matrixSortKey = ref<'host_count' | 'hits'>('hits')
+const matrixSortDir = ref<'asc' | 'desc'>('desc')
+function toggleMatrixSort(key: typeof matrixSortKey.value): void {
+  if (matrixSortKey.value === key) {
+    matrixSortDir.value = matrixSortDir.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    matrixSortKey.value = key
+    matrixSortDir.value = 'desc'
+  }
+}
+const sortedIpHostMatrix = computed(() =>
+  [...ipHostMatrix.value].sort((a: AnyRecord, b: AnyRecord) => compareValues(a[matrixSortKey.value], b[matrixSortKey.value], matrixSortDir.value))
+)
+
+const crowdSecSortKey = ref<'ip' | 'country' | 'blocked_until'>('blocked_until')
+const crowdSecSortDir = ref<'asc' | 'desc'>('desc')
+function toggleCrowdSecSort(key: typeof crowdSecSortKey.value): void {
+  if (crowdSecSortKey.value === key) {
+    crowdSecSortDir.value = crowdSecSortDir.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    crowdSecSortKey.value = key
+    crowdSecSortDir.value = 'asc'
+  }
+}
+const sortedCrowdSecIPs = computed(() =>
+  [...crowdSecIPs.value].sort((a: AnyRecord, b: AnyRecord) => compareValues(a[crowdSecSortKey.value], b[crowdSecSortKey.value], crowdSecSortDir.value))
+)
 </script>
 
 <style scoped>

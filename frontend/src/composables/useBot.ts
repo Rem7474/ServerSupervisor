@@ -1,4 +1,5 @@
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import apiClient, { getApiErrorMessage } from '../api'
 import { addToast } from './useGlobalToast'
 import { useHostsStore } from '../stores/hosts'
@@ -10,7 +11,14 @@ import type { WebLogIPTimelineRow } from '../types/security'
 type AnyRecord = Record<string, any>
 
 export function useBot() {
-  const period = ref('24h')
+  // period/source/hostId persist in the URL (?period=&source=&host_id=) so a
+  // refresh or a shared link keeps the filter instead of always resetting to
+  // "24h, all sources, all hosts" — same ?tab= idea HostDetailView already
+  // uses, applied to this page's filter bar instead of a tab.
+  const route = useRoute()
+  const router = useRouter()
+
+  const period = ref(typeof route.query.period === 'string' ? route.query.period : '24h')
   const periodOptions = [
     { value: '1h', label: '1h' },
     { value: '24h', label: '24h' },
@@ -19,8 +27,12 @@ export function useBot() {
   ]
   const hostsStore = useHostsStore()
 
-  const source = ref('')
-  const hostId = ref('')
+  const source = ref(typeof route.query.source === 'string' ? route.query.source : '')
+  const hostId = ref(typeof route.query.host_id === 'string' ? route.query.host_id : '')
+
+  watch([period, source, hostId], ([p, s, h]) => {
+    router.replace({ query: { ...route.query, period: p, source: s || undefined, host_id: h || undefined } })
+  })
 
   const loading = ref(false)
   const summary = ref<AnyRecord>({ threats: {} })
