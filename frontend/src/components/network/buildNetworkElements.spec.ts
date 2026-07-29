@@ -124,6 +124,32 @@ describe('buildNetworkElements — routing edges', () => {
   })
 })
 
+describe('buildNetworkElements — Proxmox guest nodes (no agent)', () => {
+  it('emits a guest node and its NPM-linked service with a proxy edge', () => {
+    const els = buildNetworkElements(makeInput({
+      guests: [{ id: 'g1', label: 'erp-vm', sublabel: 'pve1 · 10.0.0.5' }],
+      services: [{ id: 'npm-1', guestId: 'g1', name: 'erp.example.com', domain: 'erp.example.com', internalPort: 443, linkToProxy: true }],
+    }))
+    const guest = nodeById(els, 'guest-g1')
+    expect(guest).toBeTruthy()
+    expect(d(guest!).type).toBe('proxmox_guest')
+    const svc = nodeById(els, 'svc-guest-g1-npm-1')
+    expect(svc).toBeTruthy()
+    expect(d(svc!).parent).toBe('guest-g1')
+    const edge = edgeById(els, 'e-proxy-svc-guest-g1-npm-1')
+    expect(edge).toBeTruthy()
+    expect(d(edge!).source).toBe('root')
+  })
+
+  it('does not render a guest with no NPM-matched service', () => {
+    const els = buildNetworkElements(makeInput({
+      data: [{ id: 'h1' }],
+      services: [{ id: 's1', hostId: 'h1', name: 'web', internalPort: 3000 }],
+    }))
+    expect(nodes(els).some(e => d(e).type === 'proxmox_guest')).toBe(false)
+  })
+})
+
 describe('buildNetworkElements — robustness (phantom edges)', () => {
   it('drops edges whose proxy node was never emitted (pinned port excluded)', () => {
     // h1 is the proxy, pinned on port 80 — but port 80 is excluded, so the

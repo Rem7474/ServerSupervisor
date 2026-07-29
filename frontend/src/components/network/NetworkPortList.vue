@@ -420,9 +420,13 @@
                 >
                   {{ n.matched_name }}
                 </router-link>
-                <span v-else-if="n.matched_type === 'proxmox_guest'">
+                <router-link
+                  v-else-if="n.matched_type === 'proxmox_guest'"
+                  :to="`/proxmox/guests/${n.matched_id}`"
+                  class="text-decoration-none"
+                >
                   {{ n.matched_name }}
-                </span>
+                </router-link>
                 <span
                   v-else
                   class="badge bg-secondary-lt text-secondary"

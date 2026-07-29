@@ -294,6 +294,7 @@
                   :root-label="rootNodeName"
                   :root-ip="rootNodeIp"
                   :services="filteredServices"
+                  :guests="guestNodes"
                   :host-port-overrides="hostPortOverrides"
                   :authelia-label="autheliaLabel"
                   :authelia-ip="autheliaIp"
@@ -385,6 +386,7 @@ const {
   discoveredPortsByHost,
   hostPortOverrides,
   combinedServices,
+  guestNodes,
   filteredGraphHosts,
   filteredServices,
   totalPorts,

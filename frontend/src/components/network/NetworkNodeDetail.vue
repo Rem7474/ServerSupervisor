@@ -45,6 +45,26 @@
         </div>
       </div>
 
+      <!-- Rôle réseau (Proxmox guest, no agent) -->
+      <div
+        v-if="selectedNode?.type === 'proxmox_guest'"
+        class="detail-section"
+      >
+        <div class="detail-section-title">
+          VM Proxmox
+        </div>
+        <div class="detail-kv">
+          <span class="detail-key">Statut</span>
+          <span :class="statusBadgeClass">
+            <span class="status-dot status-dot-animated" />
+            {{ selectedNode.status || 'unknown' }}
+          </span>
+        </div>
+        <div class="detail-kv text-secondary small">
+          Sans agent ServerSupervisor — détectée via la corrélation IP des domaines NPM.
+        </div>
+      </div>
+
       <!-- Port node details -->
       <div
         v-if="selectedNode?.type === 'port'"
@@ -231,6 +251,24 @@
         >
           Voir l'hôte associé
         </router-link>
+        <router-link
+          v-if="selectedNode?.type === 'proxmox_guest' && selectedNode.guestId"
+          :to="`/proxmox/guests/${selectedNode.guestId}`"
+          class="btn btn-sm btn-outline-primary"
+        >
+          <IconHome
+            :size="14"
+            class="me-1"
+          />
+          Ouvrir la VM
+        </router-link>
+        <router-link
+          v-if="selectedNode?.type === 'service' && selectedNode.guestId"
+          :to="`/proxmox/guests/${selectedNode.guestId}`"
+          class="btn btn-sm btn-outline-secondary"
+        >
+          Voir la VM associée
+        </router-link>
         <template v-if="selectedNode?.type === 'service' && serviceUrl">
           <a
             :href="serviceUrl"
@@ -258,6 +296,7 @@ import { IconHome } from '@tabler/icons-vue'
 interface SelectedNode {
   type?: string
   hostId?: string
+  guestId?: string
   status?: string
   sublabel?: string
   portNumber?: number | string
@@ -391,6 +430,7 @@ const nodeTypeLabel = computed(() => {
   const map: Record<string, string> = {
     root: 'Reverse proxy',
     host: 'Hôte',
+    proxmox_guest: 'VM Proxmox',
     service: 'Service',
     port: 'Port',
     authelia: 'Authelia',
@@ -402,6 +442,7 @@ const nodeTypeLabel = computed(() => {
 const typeTagClass = computed(() => {
   const type = props.selectedNode?.type
   if (type === 'host') return 'badge bg-secondary-lt text-secondary'
+  if (type === 'proxmox_guest') return 'badge bg-amber-lt text-amber'
   if (type === 'service') return 'badge bg-cyan-lt text-cyan'
   if (type === 'port') return 'badge bg-blue-lt text-blue'
   if (type === 'authelia') return 'badge bg-purple-lt text-purple'

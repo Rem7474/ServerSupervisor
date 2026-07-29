@@ -156,7 +156,7 @@ import cytoscape from 'cytoscape'
 // @ts-expect-error cytoscape-fcose lacks types
 import fcose from 'cytoscape-fcose'
 import { createCytoscapeInstance, bindCytoscapeResize, destroyCytoscapeInstance } from '../../composables/useCytoscape'
-import { buildNetworkElements, type NetworkHost, type NetworkService, type HostPortOverride } from './buildNetworkElements'
+import { buildNetworkElements, type NetworkHost, type NetworkService, type NetworkGuestNode, type HostPortOverride } from './buildNetworkElements'
 import { getNetworkGraphStyle } from './networkGraphStyle'
 
 cytoscape.use(fcose)
@@ -176,6 +176,7 @@ const props = withDefaults(defineProps<{
   autheliaHostId?: string
   rootPortId?: string
   autheliaPortId?: string
+  guests?: NetworkGuestNode[]
 }>(), {
   rootLabel: 'root',
   rootIp: '',
@@ -190,6 +191,7 @@ const props = withDefaults(defineProps<{
   autheliaHostId: '',
   rootPortId: '',
   autheliaPortId: '',
+  guests: () => [],
 })
 
 const emit = defineEmits<{
@@ -238,6 +240,7 @@ function buildElements() {
     rootPortId: props.rootPortId,
     autheliaPortId: props.autheliaPortId,
     statusColors,
+    guests: props.guests,
   })
 }
 
@@ -340,6 +343,11 @@ function initCytoscape(): void {
       lines.push(d.label)
       if (d.sublabel) lines.push(`IP : ${d.sublabel}`)
       lines.push(`Statut : ${d.status || 'unknown'}`)
+    } else if (d.type === 'proxmox_guest') {
+      lines.push(d.label)
+      if (d.sublabel) lines.push(d.sublabel)
+      lines.push(`Statut : ${d.status || 'unknown'}`)
+      lines.push('VM Proxmox sans agent')
     } else if (d.type === 'service') {
       lines.push(d.label)
       if (d.sublabel) lines.push(d.sublabel)
@@ -441,6 +449,7 @@ watch(
     () => props.autheliaHostId,
     () => props.rootPortId,
     () => props.autheliaPortId,
+    () => props.guests,
   ],
   () => {
     if (!cy) return
