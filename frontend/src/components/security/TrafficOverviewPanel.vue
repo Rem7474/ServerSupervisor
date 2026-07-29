@@ -507,12 +507,23 @@
       </div>
 
       <DomainDetailsModal
-        :show="showDomainModal"
-        :domain="selectedDomain"
-        :loading="domainLoading"
-        :details="domainDetails"
-        :period="period"
-        @close="closeDomainModal"
+        :show="domainModal.show.value"
+        :domain="domainModal.domain.value"
+        :loading="domainModal.loading.value"
+        :error="domainModal.error.value"
+        :details="domainModal.details.value"
+        :period="domainModal.period.value"
+        :filters="domainModal.filters"
+        :sort-key="domainModal.sortKey.value"
+        :sort-dir="domainModal.sortDir.value"
+        :page="domainModal.page.value"
+        :total-pages="domainModal.totalPages.value"
+        :has-active-filters="domainModal.hasActiveFilters.value"
+        @close="domainModal.close"
+        @update-filter="domainModal.setFilter($event.key, $event.value)"
+        @clear-filters="domainModal.clearFilters"
+        @toggle-sort="domainModal.toggleSort"
+        @update:page="domainModal.setPage"
       />
 
       <IPTimelineModal
@@ -551,10 +562,7 @@ const {
   timeseries,
   liveRequests,
   lastUpdatedAt,
-  showDomainModal,
-  selectedDomain,
-  domainLoading,
-  domainDetails,
+  domainModal,
   showIPModal,
   selectedIP,
   ipTimelineLoading,
@@ -579,7 +587,6 @@ const {
   setPeriod,
   loadAll,
   openDomain,
-  closeDomainModal,
   openIP,
   closeIPModal,
   handleSearch,

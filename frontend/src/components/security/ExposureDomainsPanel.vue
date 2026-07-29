@@ -160,20 +160,30 @@
     </template>
 
     <DomainDetailsModal
-      :show="showDomainModal"
-      :domain="selectedDomain"
-      :loading="domainLoading"
-      :details="domainDetails"
-      :period="periodLabel"
-      @close="closeDomainModal"
+      :show="domainModal.show.value"
+      :domain="domainModal.domain.value"
+      :loading="domainModal.loading.value"
+      :error="domainModal.error.value"
+      :details="domainModal.details.value"
+      :period="domainModal.period.value"
+      :filters="domainModal.filters"
+      :sort-key="domainModal.sortKey.value"
+      :sort-dir="domainModal.sortDir.value"
+      :page="domainModal.page.value"
+      :total-pages="domainModal.totalPages.value"
+      :has-active-filters="domainModal.hasActiveFilters.value"
+      @close="domainModal.close"
+      @update-filter="domainModal.setFilter($event.key, $event.value)"
+      @clear-filters="domainModal.clearFilters"
+      @toggle-sort="domainModal.toggleSort"
+      @update:page="domainModal.setPage"
     />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import api from '../../api'
 import DomainDetailsModal from './DomainDetailsModal.vue'
+import { useDomainDetails } from '../../composables/useDomainDetails'
 import type { HostExposure } from '../../types/host'
 import { formatBytes } from '../../utils/formatters'
 
@@ -190,30 +200,10 @@ const props = defineProps<{
   subjectLabel: string
 }>()
 
-const showDomainModal = ref(false)
-const selectedDomain = ref('')
-const domainLoading = ref(false)
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- mirrors DomainDetailsModal's own ad-hoc details prop (no Go model for this aggregate)
-const domainDetails = ref<Record<string, any>>({})
+const domainModal = useDomainDetails()
 
-async function openDomain(domain: string): Promise<void> {
+function openDomain(domain: string): void {
   if (!domain) return
-  selectedDomain.value = domain
-  showDomainModal.value = true
-  domainLoading.value = true
-  try {
-    const res = await api.getDomainDetails(domain, props.period)
-    domainDetails.value = res.data?.details || {}
-  } catch {
-    domainDetails.value = {}
-  } finally {
-    domainLoading.value = false
-  }
-}
-
-function closeDomainModal(): void {
-  showDomainModal.value = false
-  selectedDomain.value = ''
-  domainDetails.value = {}
+  domainModal.open(domain, { period: props.period })
 }
 </script>

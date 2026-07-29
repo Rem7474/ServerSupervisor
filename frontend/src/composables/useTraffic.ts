@@ -2,6 +2,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import apiClient from '../api'
 import { useHostsStore } from '../stores/hosts'
 import { looksLikeIP } from '../utils/network'
+import { useDomainDetails } from './useDomainDetails'
 import type { WebLogIPTimelineRow } from '../types/security'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- display-layer shim for aggregate web-logs data (no Go model)
@@ -44,10 +45,7 @@ export function useTraffic() {
   const liveRequests = ref<AnyRecord[]>([])
   const lastUpdatedAt = ref<Date | null>(null)
 
-  const showDomainModal = ref(false)
-  const selectedDomain = ref('')
-  const domainLoading = ref(false)
-  const domainDetails = ref<AnyRecord>({})
+  const domainModal = useDomainDetails()
 
   // Read-only IP view (no ban action — that stays a Threats-mode concern).
   const showIPModal = ref(false)
@@ -183,26 +181,9 @@ export function useTraffic() {
     }, LIVE_REFRESH_INTERVAL_MS)
   }
 
-  async function openDomain(domain: string) {
+  function openDomain(domain: string) {
     if (!domain) return
-    selectedDomain.value = domain
-    showDomainModal.value = true
-    domainLoading.value = true
-    try {
-      const res = await apiClient.getDomainDetails(domain, period.value, hostId.value || undefined, source.value || undefined, 300)
-      domainDetails.value = res.data?.details || {}
-    } catch (err) {
-      console.error('Failed to load domain details', err)
-      domainDetails.value = {}
-    } finally {
-      domainLoading.value = false
-    }
-  }
-
-  function closeDomainModal() {
-    showDomainModal.value = false
-    selectedDomain.value = ''
-    domainDetails.value = {}
+    domainModal.open(domain, { period: period.value, hostId: hostId.value || undefined, source: source.value || undefined })
   }
 
   async function openIP(ip: string) {
@@ -268,10 +249,7 @@ export function useTraffic() {
     timeseries,
     liveRequests,
     lastUpdatedAt,
-    showDomainModal,
-    selectedDomain,
-    domainLoading,
-    domainDetails,
+    domainModal,
     showIPModal,
     selectedIP,
     ipTimelineLoading,
@@ -297,7 +275,6 @@ export function useTraffic() {
     setPeriod,
     loadAll,
     openDomain,
-    closeDomainModal,
     openIP,
     closeIPModal,
     handleSearch,

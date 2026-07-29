@@ -1,5 +1,5 @@
 import { api } from './client'
-import type { IPTimelineResponse } from '../types/security'
+import type { IPTimelineResponse, DomainDetailsParams } from '../types/security'
 import type { LoginEvent } from '../types/generated'
 import type { SecurityData } from '../components/security/AuditSecurityPanel.vue'
 import type { WebAuthnCredential } from '../types/webauthn'
@@ -33,9 +33,21 @@ export const authApi = {
     api.get<IPTimelineResponse>(`/v1/security/web-logs/ip/${encodeURIComponent(ip)}`, {
       params: { host_id: hostId ?? '', period, limit },
     }),
-  getDomainDetails: (domain: string, period: string = '24h', hostId?: string, source?: string, limit: number = 300) =>
+  getDomainDetails: (domain: string, period: string = '24h', params: DomainDetailsParams = {}) =>
     api.get(`/v1/security/web-logs/domain/${encodeURIComponent(domain)}`, {
-      params: { period, host_id: hostId ?? '', source: source ?? '', limit },
+      params: {
+        period,
+        host_id: params.hostId ?? '',
+        source: params.source ?? '',
+        page: params.page ?? 1,
+        limit: params.limit ?? 50,
+        status: params.status ?? '',
+        method: params.method ?? '',
+        path: params.path ?? '',
+        ip: params.ip ?? '',
+        sort: params.sort ?? '',
+        dir: params.dir ?? '',
+      },
     }),
   getCommand: (id: string) => api.get(`/v1/commands/${id}`),
   blockCrowdSecIP: (ip: string, hostId: string, duration: string = '4h') =>

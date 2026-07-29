@@ -3,6 +3,7 @@ import apiClient, { getApiErrorMessage } from '../api'
 import { addToast } from './useGlobalToast'
 import { useHostsStore } from '../stores/hosts'
 import { looksLikeIP } from '../utils/network'
+import { useDomainDetails } from './useDomainDetails'
 import type { WebLogIPTimelineRow } from '../types/security'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- display-layer shim for aggregate web-logs data (no Go model)
@@ -35,10 +36,7 @@ export function useBot() {
   const timelineHostId = ref('')
   const timeline = ref<WebLogIPTimelineRow[]>([])
 
-  const showDomainModal = ref(false)
-  const selectedDomain = ref('')
-  const domainLoading = ref(false)
-  const domainDetails = ref<AnyRecord>({})
+  const domainModal = useDomainDetails()
   const searchTerm = ref('')
 
   const threats = computed(() => summary.value.threats || {})
@@ -213,26 +211,9 @@ export function useBot() {
   // hosts.id (see fillWebLogsThreats server-side) — this opens the matching
   // domain's request breakdown instead of trying to route to /hosts/:id,
   // which 404s/500s since that string was never a real host.
-  async function openDomain(domain: string) {
+  function openDomain(domain: string) {
     if (!domain) return
-    selectedDomain.value = domain
-    showDomainModal.value = true
-    domainLoading.value = true
-    try {
-      const res = await apiClient.getDomainDetails(domain, period.value, hostId.value || undefined, source.value || undefined, 300)
-      domainDetails.value = res.data?.details || {}
-    } catch (err) {
-      console.error('Failed to load domain details', err)
-      domainDetails.value = {}
-    } finally {
-      domainLoading.value = false
-    }
-  }
-
-  function closeDomainModal() {
-    showDomainModal.value = false
-    selectedDomain.value = ''
-    domainDetails.value = {}
+    domainModal.open(domain, { period: period.value, hostId: hostId.value || undefined, source: source.value || undefined })
   }
 
   // Free-text search: routes to the domain or IP detail view depending on
@@ -342,10 +323,7 @@ export function useBot() {
     banState,
     selectedIP,
     timeline,
-    showDomainModal,
-    selectedDomain,
-    domainLoading,
-    domainDetails,
+    domainModal,
     searchTerm,
     threats,
     topPaths,
@@ -367,7 +345,6 @@ export function useBot() {
     openTimeline,
     closeTimeline,
     openDomain,
-    closeDomainModal,
     handleSearch,
     handleBanFromModal,
     unblockCrowdSecEntry,
