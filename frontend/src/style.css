@@ -211,13 +211,24 @@ button:focus-visible {
  * flexbox centering (display: inline-flex; align-items/justify-content:
  * center) place the icon — same visual result for buttons that already
  * worked (.btn-icon without .btn-sm/.btn-xl), a real fix for the ones that
- * didn't. */
-.btn-icon {
+ * didn't.
+ *
+ * Selectors are deliberately `.btn.btn-icon` / `.btn.btn-icon .icon` (one
+ * class more specific than Tabler's own `.btn-icon` / `.btn-icon .icon`),
+ * not just source order: Vite emits @tabler/core's CSS as its own
+ * `vendor-tabler-*.css` chunk, and that chunk's <link> ends up injected
+ * *after* this app's own bundled CSS in the built index.html — so a
+ * same-specificity override here would actually lose to Tabler's original
+ * rule in production despite appearing later in this file. Every element
+ * this targets already carries both `.btn` and `.btn-icon` (see any
+ * `class="btn btn-icon btn-sm ..."` usage), so this doesn't narrow what it
+ * matches — it only guarantees it wins regardless of chunk load order. */
+.btn.btn-icon {
   padding-left: var(--tblr-btn-padding-y);
   padding-right: var(--tblr-btn-padding-y);
 }
 
-.btn-icon .icon {
+.btn.btn-icon .icon {
   margin: 0;
 }
 
