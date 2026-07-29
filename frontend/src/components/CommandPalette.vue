@@ -22,7 +22,7 @@
             v-model="query"
             type="text"
             class="form-control command-palette-input"
-            placeholder="Rechercher une page, un hôte, un conteneur…"
+            placeholder="Rechercher une page, un hôte, un conteneur, un domaine, une IP…"
             autocomplete="off"
             spellcheck="false"
           >

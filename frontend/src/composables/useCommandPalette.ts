@@ -1,11 +1,12 @@
 import { ref, computed, onMounted, watch, type Component } from 'vue'
 import { useRouter } from 'vue-router'
-import { IconServer, IconBrandDocker, IconBell } from '@tabler/icons-vue'
+import { IconServer, IconBrandDocker, IconBell, IconWorld } from '@tabler/icons-vue'
 import { useAuthStore } from '../stores/auth'
 import { useHostsStore } from '../stores/hosts'
 import { useAlertRulesStore } from '../stores/alertRules'
 import apiClient from '../api'
 import type { DockerContainer } from '../types/docker'
+import type { NetworkNPMEntry, NetworkProxmoxGuestIP } from '../types/network'
 import { visibleNavSections } from '../config/navigation'
 import { getAlertMetricMeta } from '../utils/alertMetrics'
 
@@ -15,7 +16,7 @@ export interface PaletteResult {
   sublabel: string
   icon: Component
   to: string
-  group: 'Navigation' | 'Hôtes' | 'Conteneurs' | 'Alertes'
+  group: 'Navigation' | 'Hôtes' | 'Conteneurs' | 'Alertes' | 'Domaines'
 }
 
 const MAX_RESULTS_PER_GROUP = 6
@@ -37,6 +38,10 @@ const activeIndex = ref(0)
 const containers = ref<DockerContainer[]>([])
 const containersLoaded = ref(false)
 const containersLoading = ref(false)
+const npmEntries = ref<NetworkNPMEntry[]>([])
+const proxmoxGuestIPs = ref<NetworkProxmoxGuestIP[]>([])
+const ipInventoryLoaded = ref(false)
+const ipInventoryLoading = ref(false)
 let globalListenerReady = false
 
 export function useCommandPalette() {
@@ -59,6 +64,28 @@ export function useCommandPalette() {
     }
   }
 
+  // The IP inventory correlates NPM proxy hosts to a Host or a Proxmox guest
+  // by live IP match (server-side, internal/networkview.BuildIPInventory) —
+  // it's the same data NetworkView.vue's cards mode already fetches, reused
+  // here so "search a domain/IP" resolves the full domain → IP → VM/hôte
+  // chain instead of just the nav/host/container matches above. Fire-and-forget,
+  // same non-blocking pattern as ensureContainersLoaded: a slow/failed
+  // Proxmox live fetch must not delay the rest of the palette.
+  async function ensureIPInventoryLoaded(): Promise<void> {
+    if (ipInventoryLoaded.value || ipInventoryLoading.value) return
+    ipInventoryLoading.value = true
+    try {
+      const res = await apiClient.getIPInventory()
+      npmEntries.value = res.data?.npm_hosts || []
+      proxmoxGuestIPs.value = res.data?.proxmox_guests || []
+      ipInventoryLoaded.value = true
+    } catch {
+      // Non-critical — domain search is a bonus; nav/host results still work.
+    } finally {
+      ipInventoryLoading.value = false
+    }
+  }
+
   function open(): void {
     // The Ctrl/Cmd+K listener is global (attached once from App.vue, whose
     // script setup runs regardless of the login-vs-authenticated template
@@ -72,6 +99,7 @@ export function useCommandPalette() {
     hostsStore.fetchHosts()
     void alertRulesStore.fetchRules()
     void ensureContainersLoaded()
+    void ensureIPInventoryLoaded()
   }
 
   function close(): void {
@@ -165,11 +193,60 @@ export function useCommandPalette() {
       }))
   })
 
+  // Matches on either the domain name(s) or the forward IP — covers both
+  // "search a domain, find what it points to" and "search an IP, find what
+  // domain(s) route to it." The sublabel renders the full resolved chain
+  // (IP → VM on its Proxmox node → linked hôte, or IP → hôte directly) so the
+  // user doesn't need to open the Network page just to see what a domain
+  // maps to; the link still deep-links to the most specific page available
+  // (host detail or the Proxmox guest page) and falls back to /network for
+  // an unresolved forward_host (no Host/guest currently matches that IP).
+  const domainResults = computed<PaletteResult[]>(() => {
+    const q = query.value.trim().toLowerCase()
+    if (!q) return []
+    return npmEntries.value
+      .filter((n) =>
+        (n.domain_names || []).some((d) => d.toLowerCase().includes(q)) ||
+        n.forward_host?.toLowerCase().includes(q)
+      )
+      .slice(0, MAX_RESULTS_PER_GROUP)
+      .map((n) => {
+        const guest = n.matched_type === 'proxmox_guest'
+          ? proxmoxGuestIPs.value.find((g) => g.guest_id === n.matched_id)
+          : undefined
+        let chain = `${n.forward_host}:${n.forward_port}`
+        if (n.matched_type === 'host') {
+          chain += ` → ${n.matched_name}`
+        } else if (guest) {
+          chain += ` → VM ${guest.name} (nœud ${guest.node})`
+          if (guest.host_name) chain += ` → ${guest.host_name}`
+        } else if (n.matched_type === 'proxmox_guest') {
+          chain += ` → ${n.matched_name}`
+        } else {
+          chain += ' → non résolu'
+        }
+        const to = n.matched_type === 'host'
+          ? `/hosts/${n.matched_id}`
+          : n.matched_type === 'proxmox_guest'
+            ? `/proxmox/guests/${n.matched_id}`
+            : '/network'
+        return {
+          key: `domain:${n.proxy_host_id}`,
+          label: (n.domain_names || []).join(', ') || n.forward_host,
+          sublabel: chain,
+          icon: IconWorld,
+          to,
+          group: 'Domaines' as const,
+        }
+      })
+  })
+
   const results = computed<PaletteResult[]>(() => [
     ...navResults.value,
     ...hostResults.value,
     ...containerResults.value,
     ...alertResults.value,
+    ...domainResults.value,
   ])
 
   // Without this, typing a query that narrows the list below the current
