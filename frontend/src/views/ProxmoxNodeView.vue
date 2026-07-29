@@ -351,6 +351,8 @@
                   :guests="vms"
                   :guest-networks="guestNetworks"
                   :guest-networks-loading="guestNetworksLoading"
+                  :guest-exposure="guestExposure"
+                  :guest-exposure-loading="guestExposureLoading"
                   :links="guestLinks"
                   :peer-nodes="peerNodes"
                   :node-id="String(route.params.id)"
@@ -369,6 +371,8 @@
                   :guests="lxcs"
                   :guest-networks="guestNetworks"
                   :guest-networks-loading="guestNetworksLoading"
+                  :guest-exposure="guestExposure"
+                  :guest-exposure-loading="guestExposureLoading"
                   :links="guestLinks"
                   :peer-nodes="peerNodes"
                   :node-id="String(route.params.id)"
@@ -604,6 +608,9 @@ const {
   guestNetworks,
   guestNetworksLoading,
   loadGuestNetworks,
+  guestExposure,
+  guestExposureLoading,
+  loadGuestExposure,
   services,
   servicesLoading,
   servicesError,
@@ -661,7 +668,7 @@ const proxmoxTabs = computed<EntityTab[]>(() => [
 // click emit rather than watching `tab` itself preserves that distinction.
 function onTabClick(key: string): void {
   tab.value = key
-  if (key === 'vms' || key === 'lxc') loadGuestNetworks()
+  if (key === 'vms' || key === 'lxc') { loadGuestNetworks(); loadGuestExposure() }
   if (key === 'services') loadServices()
 }
 

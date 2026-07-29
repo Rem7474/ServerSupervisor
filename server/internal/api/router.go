@@ -437,6 +437,7 @@ func registerProxmoxRoutes(g *gin.RouterGroup, h *handlers.ProxmoxHandler) {
 	g.GET("/proxmox/guests", h.ListGuests)
 	g.GET("/proxmox/guests/:id/metrics", h.GetGuestMetricsSummary)
 	g.GET("/proxmox/guests/:id/link", h.GetLinkByGuest)
+	g.GET("/proxmox/guests/:id/exposure", h.GetGuestExposure)
 	// Connection management — admin only
 	proxmoxAdmin := g.Group("")
 	proxmoxAdmin.Use(AdminOnlyMiddleware())
@@ -484,6 +485,8 @@ func registerProxmoxRoutes(g *gin.RouterGroup, h *handlers.ProxmoxHandler) {
 
 	// Guest network interfaces (live — VM via QEMU agent, LXC native)
 	g.GET("/proxmox/nodes/:id/guest-networks", h.GetNodeGuestNetworks)
+	// Guest ↔ NPM domain correlation (live IP matched against npm_proxy_hosts.forward_host)
+	g.GET("/proxmox/nodes/:id/guest-exposure", h.GetNodeGuestExposure)
 
 	// Node actions (write — require Sys.Modify on the Proxmox token)
 	g.POST("/proxmox/nodes/:id/apt-refresh", h.RefreshNodeApt)

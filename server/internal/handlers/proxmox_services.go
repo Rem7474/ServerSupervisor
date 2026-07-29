@@ -3,6 +3,8 @@ package handlers
 import (
 	"fmt"
 	"net/http"
+	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/serversupervisor/server/internal/apperr"
@@ -21,6 +23,24 @@ func (h *ProxmoxHandler) RefreshNodeApt(c *gin.Context) {
 // GetNodeGuestNetworks returns a map of vmid → []GuestNetworkIface for a node's guests.
 func (h *ProxmoxHandler) GetNodeGuestNetworks(c *gin.Context) {
 	result, err := h.svc.NodeGuestNetworks(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, result)
+}
+
+// GetNodeGuestExposure returns, per vmid, the NPM domains that route to that
+// guest's own live IP(s) enriched with aggregated web-log traffic over
+// ?period (default 24h) — the guest-level counterpart of GetHostExposure.
+func (h *ProxmoxHandler) GetNodeGuestExposure(c *gin.Context) {
+	raw := strings.TrimSpace(c.DefaultQuery("period", "24h"))
+	period, err := time.ParseDuration(raw)
+	if err != nil || period <= 0 {
+		respondError(c, apperr.Validation("invalid period (example: 24h, 168h)"))
+		return
+	}
+	result, err := h.svc.NodeGuestExposure(c.Request.Context(), c.Param("id"), period)
 	if err != nil {
 		respondError(c, err)
 		return

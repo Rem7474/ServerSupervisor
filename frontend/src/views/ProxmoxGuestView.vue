@@ -188,6 +188,33 @@
         </div>
       </div>
 
+      <div
+        v-if="guestLink?.status === 'confirmed' && guestLink?.host_id"
+        class="card mb-4"
+      >
+        <div class="card-body d-flex align-items-center justify-content-between gap-2 flex-wrap">
+          <div>
+            <div class="fw-medium">
+              Domaines &amp; exposition
+            </div>
+            <div class="text-secondary small">
+              Ce guest est lié à l'hôte {{ guestLink.host_hostname || guestLink.host_name }} — la corrélation domaine/IP se lit sur son onglet Exposition.
+            </div>
+          </div>
+          <router-link
+            :to="`/hosts/${guestLink.host_id}?tab=exposition`"
+            class="btn btn-sm btn-outline-primary"
+          >
+            Voir la corrélation domaine/IP
+          </router-link>
+        </div>
+      </div>
+      <GuestExposureCard
+        v-else
+        :guest-id="guest.id"
+        class="mb-4"
+      />
+
       <div class="card">
         <div class="card-header d-flex align-items-center justify-content-between gap-2 flex-wrap">
           <h3 class="card-title mb-0">
@@ -247,6 +274,7 @@ import { IconPlayerPlay, IconPlayerStop, IconRefresh } from '@tabler/icons-vue'
 import MetricsSourceBadge from '../components/common/MetricsSourceBadge.vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import PageRefreshBar from '../components/PageRefreshBar.vue'
+import GuestExposureCard from '../components/proxmox/GuestExposureCard.vue'
 import { useAuthStore } from '../stores/auth'
 import { useProxmoxGuest } from '../composables/useProxmoxGuest'
 import type { ChartOptions, TooltipItem } from 'chart.js'

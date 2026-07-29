@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/serversupervisor/server/internal/apperr"
 	"github.com/serversupervisor/server/internal/config"
@@ -125,6 +126,9 @@ func (f *fakeRepo) ListProxmoxBackupJobs(context.Context, string) ([]models.Prox
 	return nil, nil
 }
 func (f *fakeRepo) ListProxmoxBackupRuns(context.Context, string) ([]models.ProxmoxBackupRun, error) {
+	return nil, nil
+}
+func (f *fakeRepo) GetExposureByIPs(context.Context, []string, time.Time) (map[string]*models.HostExposure, error) {
 	return nil, nil
 }
 

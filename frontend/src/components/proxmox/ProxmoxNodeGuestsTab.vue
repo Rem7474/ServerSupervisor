@@ -37,6 +37,14 @@
           </th>
           <th>
             <SortableHeader
+              label="Domaines"
+              :active="sortKey === 'domains'"
+              :direction="sortDir"
+              @toggle="toggleSort('domains')"
+            />
+          </th>
+          <th>
+            <SortableHeader
               label="CPU alloué"
               :active="sortKey === 'cpu_alloc'"
               :direction="sortDir"
@@ -145,6 +153,32 @@
                 >{{ ip.split('/')[0] }}</span>
               </div>
             </template>
+            <span
+              v-else
+              class="text-muted"
+            >—</span>
+          </td>
+          <td>
+            <span
+              v-if="guestExposureLoading"
+              class="text-muted small"
+            >…</span>
+            <router-link
+              v-else-if="guestDomains(g).length"
+              :to="`/proxmox/guests/${g.id}?nodeId=${nodeId}`"
+              class="text-decoration-none"
+              :title="guestDomains(g).join(', ')"
+            >
+              <span
+                v-for="name in guestDomains(g).slice(0, 2)"
+                :key="name"
+                class="badge bg-azure-lt text-azure me-1 font-monospace"
+              >{{ name }}</span>
+              <span
+                v-if="guestDomains(g).length > 2"
+                class="badge bg-secondary-lt text-secondary"
+              >+{{ guestDomains(g).length - 2 }}</span>
+            </router-link>
             <span
               v-else
               class="text-muted"
@@ -261,6 +295,8 @@ const props = defineProps<{
   guests: Guest[]
   guestNetworks: Record<string, any[]>
   guestNetworksLoading?: boolean
+  guestExposure?: Record<string, any>
+  guestExposureLoading?: boolean
   links: LinkMap
   peerNodes: Guest[]
   nodeId: string
@@ -288,7 +324,7 @@ const idLabel = computed(() => (props.kind === 'vm' ? 'VMID' : 'CT ID'))
 const cpuSuffix = computed(() => (props.kind === 'vm' ? ' vCPU' : ''))
 const emptyText = computed(() => (props.kind === 'vm' ? 'Aucune VM sur ce nœud.' : 'Aucun conteneur LXC sur ce nœud.'))
 const colspan = computed(() => {
-  const base = props.kind === 'vm' ? 12 : 11
+  const base = (props.kind === 'vm' ? 12 : 11) + 1 // +1 for the Domaines column
   return showActionsCol.value ? base + 1 : base
 })
 
@@ -342,6 +378,19 @@ function linkedHostLabel(guest: Guest): string {
   return link.host_hostname || link.host_name || ''
 }
 
+// Flattens the guest's NPM exposure (map keyed by vmid, see useProxmoxNode's
+// guestExposure) into a flat, deduped domain-name list for display/sort.
+function guestDomains(guest: Guest): string[] {
+  const exposure = props.guestExposure?.[String(guest.vmid)]
+  const domains = exposure?.domains
+  if (!Array.isArray(domains)) return []
+  const names = new Set<string>()
+  for (const d of domains) {
+    for (const name of d?.domain_names ?? []) names.add(name)
+  }
+  return [...names]
+}
+
 const sortedGuests = computed(() => {
   const list = [...(props.guests ?? [])]
   list.sort((a, b) => {
@@ -350,6 +399,7 @@ const sortedGuests = computed(() => {
       case 'name': return compareValues(a.name || '', b.name || '', sortDir.value)
       case 'status': return compareValues(a.status || '', b.status || '', sortDir.value)
       case 'ip': return compareValues(guestPrimaryIp(a), guestPrimaryIp(b), sortDir.value)
+      case 'domains': return compareValues(guestDomains(a).length, guestDomains(b).length, sortDir.value)
       case 'cpu_alloc': return compareValues(a.cpu_alloc, b.cpu_alloc, sortDir.value)
       case 'cpu_used': return compareValues(a.cpu_usage, b.cpu_usage, sortDir.value)
       case 'mem_alloc': return compareValues(a.mem_alloc, b.mem_alloc, sortDir.value)

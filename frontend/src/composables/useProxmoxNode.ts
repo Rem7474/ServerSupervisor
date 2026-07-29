@@ -105,6 +105,21 @@ export function useProxmoxNode() {
     finally { guestNetworksLoading.value = false }
   }
 
+  // NPM domains routing to each guest's own IP(s), keyed by vmid — same
+  // lazy/load-once-per-mount pattern as guestNetworks above.
+  const guestExposure = ref<Record<string, any>>({})
+  const guestExposureLoading = ref(false)
+
+  async function loadGuestExposure(): Promise<void> {
+    if (guestExposureLoading.value || Object.keys(guestExposure.value).length > 0) return
+    guestExposureLoading.value = true
+    try {
+      const res = await api.getProxmoxNodeGuestExposure(String(route.params.id))
+      guestExposure.value = res.data ?? {}
+    } catch { /* non-bloquant */ }
+    finally { guestExposureLoading.value = false }
+  }
+
   // services
   const services = ref<any[]>([])
   const servicesLoading = ref(false)
@@ -354,8 +369,11 @@ export function useProxmoxNode() {
     }
   }
 
+  // Guests linked to a ServerSupervisor host already get their domain/IP
+  // correlation for free from that host's own Exposition tab (same IP, same
+  // GetHostExposure query) — land there directly instead of the overview tab.
   function goToHost(link: any): void {
-    if (link?.host_id) router.push(`/hosts/${link.host_id}`)
+    if (link?.host_id) router.push(`/hosts/${link.host_id}?tab=exposition`)
   }
 
   function showMsg(msg: string, ok: boolean): void {
@@ -667,6 +685,9 @@ export function useProxmoxNode() {
     guestNetworks,
     guestNetworksLoading,
     loadGuestNetworks,
+    guestExposure,
+    guestExposureLoading,
+    loadGuestExposure,
     services,
     servicesLoading,
     servicesError,

@@ -25,19 +25,42 @@ func (db *DB) GetHostExposure(ctx context.Context, ip string, since time.Time) (
 	if ip == "" {
 		return result, nil
 	}
+	byIP, err := db.GetExposureByIPs(ctx, []string{ip}, since)
+	if err != nil {
+		return nil, err
+	}
+	if exp, ok := byIP[ip]; ok {
+		return exp, nil
+	}
+	return result, nil
+}
+
+// GetExposureByIPs is the batched form of GetHostExposure: it resolves every
+// NPM proxy host whose forward_host matches any of the given IPs in a single
+// query (used for Proxmox guests, which — unlike a ServerSupervisor host —
+// have no persisted IP column and may report several interfaces), grouping
+// results by forward_host. IPs with no matching proxy host are simply absent
+// from the returned map. An empty ips slice short-circuits before querying,
+// same reasoning as GetHostExposure's empty-ip guard.
+func (db *DB) GetExposureByIPs(ctx context.Context, ips []string, since time.Time) (map[string]*models.HostExposure, error) {
+	result := map[string]*models.HostExposure{}
+	if len(ips) == 0 {
+		return result, nil
+	}
 
 	rows, err := db.conn.QueryContext(ctx, `
-		SELECT p.id, p.connection_id, c.name, p.domain_names, p.forward_port, p.ssl_enabled, p.npm_enabled
+		SELECT p.id, p.connection_id, c.name, p.domain_names, p.forward_port, p.ssl_enabled, p.npm_enabled, p.forward_host
 		FROM npm_proxy_hosts p
 		JOIN npm_connections c ON c.id = p.connection_id
-		WHERE p.forward_host = $1
-		ORDER BY p.domain_names[1] ASC`, ip)
+		WHERE p.forward_host = ANY($1)
+		ORDER BY p.forward_host, p.domain_names[1] ASC`, pq.Array(ips))
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = rows.Close() }()
 
 	type proxyHostRow struct {
+		ip                               string
 		id, connectionID, connectionName string
 		domains                          []string
 		forwardPort                      int
@@ -47,7 +70,7 @@ func (db *DB) GetHostExposure(ctx context.Context, ip string, since time.Time) (
 	var allDomains []string
 	for rows.Next() {
 		var r proxyHostRow
-		if err := rows.Scan(&r.id, &r.connectionID, &r.connectionName, pq.Array(&r.domains), &r.forwardPort, &r.sslEnabled, &r.npmEnabled); err != nil {
+		if err := rows.Scan(&r.id, &r.connectionID, &r.connectionName, pq.Array(&r.domains), &r.forwardPort, &r.sslEnabled, &r.npmEnabled, &r.ip); err != nil {
 			return nil, err
 		}
 		proxyHosts = append(proxyHosts, r)
@@ -85,10 +108,15 @@ func (db *DB) GetHostExposure(ctx context.Context, ip string, since time.Time) (
 				agg.BlockedRequests += s.blocked
 			}
 		}
-		result.Domains = append(result.Domains, agg)
-		result.TotalRequests += agg.Requests
-		result.TotalSuspicious += agg.SuspiciousRequests
-		result.TotalBlocked += agg.BlockedRequests
+		exp, ok := result[ph.ip]
+		if !ok {
+			exp = &models.HostExposure{IPAddress: ph.ip, Since: since, Domains: []models.HostExposedDomain{}}
+			result[ph.ip] = exp
+		}
+		exp.Domains = append(exp.Domains, agg)
+		exp.TotalRequests += agg.Requests
+		exp.TotalSuspicious += agg.SuspiciousRequests
+		exp.TotalBlocked += agg.BlockedRequests
 	}
 	return result, nil
 }

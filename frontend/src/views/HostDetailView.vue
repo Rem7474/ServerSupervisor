@@ -511,7 +511,10 @@
           </template>
 
           <template #exposition>
-            <HostExposureTab :host-id="hostId" />
+            <HostExposureTab
+              :host-id="hostId"
+              @loaded="exposureDomainCount = $event"
+            />
           </template>
 
           <template #systeme>
@@ -733,7 +736,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { IconLink, IconLock, IconPencil, IconRefresh, IconTrash, IconX, IconAlertCircle, IconAlertTriangle, IconExternalLink } from '@tabler/icons-vue'
 import { useHostDetail } from '../composables/useHostDetail'
 import RelativeTime from '../components/RelativeTime.vue'
@@ -840,6 +843,11 @@ const dockerRunningCount = computed(() =>
 const hasLocalSmart = computed(() => ((diskHealth.value as unknown[] | null)?.length ?? 0) > 0)
 const isProxmoxLinked = computed(() => !!proxmoxLink.value && proxmoxLink.value.status !== 'ignored')
 
+// Fed by HostExposureTab's @loaded emit — the tab mounts eagerly (Host's
+// tabs use v-show, not lazy), so this is already populated before the user
+// ever clicks "Exposition".
+const exposureDomainCount = ref(0)
+
 // Incidents' `host_name` is `hosts.name` (see db_notifications.go), so this
 // pre-fills AlertIncidentList's search box to this host instead of landing on
 // the undifferentiated full incidents list.
@@ -880,7 +888,13 @@ const hostTabs = computed<EntityTab[]>(() => {
       label: 'Commandes',
       badges: cmdHistory.value.length ? [{ value: cmdHistory.value.length, badgeClass: 'badge bg-secondary-lt text-secondary ms-1' }] : [],
     },
-    { key: 'exposition', label: 'Exposition' },
+    {
+      key: 'exposition',
+      label: 'Exposition',
+      badges: exposureDomainCount.value > 0
+        ? [{ value: exposureDomainCount.value, badgeClass: 'badge bg-azure-lt text-azure ms-1' }]
+        : [],
+    },
   ]
 
   if (canRunApt.value) {

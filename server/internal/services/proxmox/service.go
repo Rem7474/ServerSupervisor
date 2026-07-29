@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/serversupervisor/server/internal/apperr"
 	"github.com/serversupervisor/server/internal/config"
@@ -60,6 +61,8 @@ type Repository interface {
 	ListProxmoxTasksByNode(ctx context.Context, connectionID, nodeName string, limit int) ([]models.ProxmoxTask, error)
 	ListProxmoxBackupJobs(ctx context.Context, connectionID string) ([]models.ProxmoxBackupJob, error)
 	ListProxmoxBackupRuns(ctx context.Context, connectionID string) ([]models.ProxmoxBackupRun, error)
+
+	GetExposureByIPs(ctx context.Context, ips []string, since time.Time) (map[string]*models.HostExposure, error)
 }
 
 // Service holds the Proxmox HTTP use-cases + owns the background poller.
@@ -530,6 +533,149 @@ func (s *Service) NodeGuestNetworks(ctx context.Context, nodeID string) (map[int
 		return nil, err
 	}
 	return fetchGuestNetworksForNode(ctx, client, node, guests), nil
+}
+
+// guestIPsFromNetworks flattens a vmid → interfaces map into a vmid → plain
+// IPs map, stripping the CIDR suffix and dropping link-local (fe80) and empty
+// addresses — the same filtering the frontend already applies to this data
+// (see ProxmoxNodeGuestsTab.vue's IP column) so exposure lookups never probe
+// an address nobody would recognize as this guest's own.
+func guestIPsFromNetworks(networks map[int][]proxmoxclient.GuestNetworkIface) map[int][]string {
+	result := make(map[int][]string, len(networks))
+	for vmid, ifaces := range networks {
+		for _, iface := range ifaces {
+			for _, cidr := range iface.IPs {
+				ip := strings.SplitN(cidr, "/", 2)[0]
+				if ip == "" || strings.HasPrefix(ip, "fe80") {
+					continue
+				}
+				result[vmid] = append(result[vmid], ip)
+			}
+		}
+	}
+	return result
+}
+
+// NodeGuestExposure answers, for every guest on a node, which NPM domains
+// route to it — the same IP-matched correlation GetHostExposure gives a
+// ServerSupervisor host, but keyed by a guest's own live network IP(s)
+// (fetched the same way NodeGuestNetworks does) rather than a persisted
+// hosts.ip_address, since proxmox_guests has no IP column. A guest with
+// several interfaces/IPs has its matches merged and deduped by proxy host ID;
+// a guest with none is simply absent from the result.
+func (s *Service) NodeGuestExposure(ctx context.Context, nodeID string, period time.Duration) (map[int]*models.HostExposure, error) {
+	networks, err := s.NodeGuestNetworks(ctx, nodeID)
+	if err != nil {
+		return nil, err
+	}
+	vmidIPs := guestIPsFromNetworks(networks)
+	if len(vmidIPs) == 0 {
+		return map[int]*models.HostExposure{}, nil
+	}
+
+	ipSet := map[string]struct{}{}
+	for _, ips := range vmidIPs {
+		for _, ip := range ips {
+			ipSet[ip] = struct{}{}
+		}
+	}
+	ips := make([]string, 0, len(ipSet))
+	for ip := range ipSet {
+		ips = append(ips, ip)
+	}
+
+	since := time.Now().Add(-period)
+	byIP, err := s.repo.GetExposureByIPs(ctx, ips, since)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make(map[int]*models.HostExposure, len(vmidIPs))
+	for vmid, guestIPs := range vmidIPs {
+		merged := mergeExposureByIPs(guestIPs, byIP, since)
+		if len(merged.Domains) == 0 {
+			continue
+		}
+		result[vmid] = merged
+	}
+	return result, nil
+}
+
+// mergeExposureByIPs collapses one guest's IP → *HostExposure lookups (from
+// GetExposureByIPs) into a single HostExposure, deduped by proxy host ID —
+// a guest with several interfaces can otherwise have the same NPM domain
+// counted twice if it happens to match on more than one of its addresses.
+// IPAddress is set from every IP the guest was queried with, not just the
+// ones an NPM proxy host happened to match, so a caller can still tell "this
+// guest has IP X" from "this guest has IP X and nothing routes to it" —
+// mirrors GetHostExposure, which always sets IPAddress up front too.
+func mergeExposureByIPs(ips []string, byIP map[string]*models.HostExposure, since time.Time) *models.HostExposure {
+	merged := &models.HostExposure{IPAddress: strings.Join(ips, ", "), Since: since, Domains: []models.HostExposedDomain{}}
+	seen := map[string]bool{}
+	for _, ip := range ips {
+		exp, ok := byIP[ip]
+		if !ok {
+			continue
+		}
+		for _, d := range exp.Domains {
+			if seen[d.ProxyHostID] {
+				continue
+			}
+			seen[d.ProxyHostID] = true
+			merged.Domains = append(merged.Domains, d)
+			merged.TotalRequests += d.Requests
+			merged.TotalSuspicious += d.SuspiciousRequests
+			merged.TotalBlocked += d.BlockedRequests
+		}
+	}
+	return merged
+}
+
+// GuestExposure is the single-guest counterpart of NodeGuestExposure — same
+// IP-matched NPM correlation, but resolved for one guest by DB ID rather than
+// batched across a whole node. Used by the guest detail page, which (unlike
+// the node guest list) doesn't necessarily know the guest's node UUID up
+// front — only its own connection_id/node_name, carried on the guest row
+// itself.
+func (s *Service) GuestExposure(ctx context.Context, guestID string, period time.Duration) (*models.HostExposure, error) {
+	guest, err := s.repo.GetProxmoxGuestByID(ctx, guestID)
+	if err != nil {
+		return nil, err
+	}
+	since := time.Now().Add(-period)
+	result := &models.HostExposure{Since: since, Domains: []models.HostExposedDomain{}}
+
+	nodes, err := s.repo.ListProxmoxNodesByConnection(ctx, guest.ConnectionID)
+	if err != nil {
+		return nil, err
+	}
+	var node *models.ProxmoxNode
+	for i := range nodes {
+		if nodes[i].NodeName == guest.NodeName {
+			node = &nodes[i]
+			break
+		}
+	}
+	if node == nil {
+		return result, nil
+	}
+
+	secret, conn, err := s.resolveSecret(ctx, node.ConnectionID)
+	if err != nil {
+		return nil, err
+	}
+	client := proxmoxclient.New(conn.APIURL, conn.TokenID, secret, conn.InsecureSkipVerify)
+	networks := fetchGuestNetworksForNode(ctx, client, node, []models.ProxmoxGuest{*guest})
+	ips := guestIPsFromNetworks(networks)[guest.VMID]
+	if len(ips) == 0 {
+		return result, nil
+	}
+
+	byIP, err := s.repo.GetExposureByIPs(ctx, ips, since)
+	if err != nil {
+		return nil, err
+	}
+	return mergeExposureByIPs(ips, byIP, since), nil
 }
 
 // fetchGuestNetworksForNode fans out one goroutine per guest on a single
