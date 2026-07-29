@@ -188,6 +188,39 @@ button:focus-visible {
   box-shadow: 0 0 0 3px rgba(123, 157, 248, 0.3);
 }
 
+/* Tabler bug workaround: icon-only buttons collapse to a couple of px wide.
+ * Root cause (verified against @tabler/core/dist/css/tabler.css): .btn-sm
+ * and .btn-xl redefine --tblr-btn-line-height as a *unitless* number (valid
+ * for the CSS `line-height` property, which accepts bare multipliers), but
+ * .btn's own min-width/min-height also reuse that same variable inside a
+ * calc() that otherwise adds lengths — mixing a unitless number into that
+ * calc() makes the whole expression invalid, so the browser drops
+ * min-width/min-height entirely for those two size variants (confirmed via
+ * a headless-browser measurement, not just reading the source). Icon-only
+ * buttons (.btn-icon) have no text to size themselves around and rely on
+ * exactly that floor; without it, they shrink to whatever their zeroed
+ * horizontal padding plus a negative icon margin computes to (also close to
+ * zero — that trick assumes the icon renders at exactly
+ * --tblr-btn-icon-size, which text-content-less buttons have no other size
+ * driver to confirm). Net effect: a `.btn-icon.btn-sm` button measures ~2px
+ * wide while its SVG (still full-size) visibly overflows outside it.
+ * Fixed by sizing icon-only buttons off real, unconditionally-valid padding
+ * instead of a min-width/height calc() that can silently go invalid: pad
+ * .btn-icon symmetrically (like its own top/bottom padding, so it comes out
+ * square) and drop the icon's negative margin, letting .btn's existing
+ * flexbox centering (display: inline-flex; align-items/justify-content:
+ * center) place the icon — same visual result for buttons that already
+ * worked (.btn-icon without .btn-sm/.btn-xl), a real fix for the ones that
+ * didn't. */
+.btn-icon {
+  padding-left: var(--tblr-btn-padding-y);
+  padding-right: var(--tblr-btn-padding-y);
+}
+
+.btn-icon .icon {
+  margin: 0;
+}
+
 /* ── Avatar utilities ── */
 .avatar-64 {
   width: 64px;
