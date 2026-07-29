@@ -186,7 +186,7 @@
               <div class="d-flex gap-1 justify-content-end">
                 <button
                   type="button"
-                  class="btn btn-sm btn-outline-secondary"
+                  class="btn btn-sm btn-ghost-secondary"
                   title="Modifier"
                   @click="openEditForm(inst)"
                 >
@@ -197,7 +197,7 @@
                 </button>
                 <button
                   type="button"
-                  class="btn btn-sm btn-outline-info"
+                  class="btn btn-sm btn-ghost-info"
                   title="Tester"
                   @click="testById(inst)"
                 >
@@ -208,7 +208,7 @@
                 </button>
                 <button
                   type="button"
-                  class="btn btn-sm btn-outline-primary"
+                  class="btn btn-sm btn-ghost-primary"
                   title="Collecter maintenant"
                   @click="pollNow(inst)"
                 >
@@ -219,7 +219,7 @@
                 </button>
                 <button
                   type="button"
-                  class="btn btn-sm btn-outline-danger"
+                  class="btn btn-sm btn-ghost-danger"
                   title="Supprimer"
                   @click="remove(inst)"
                 >

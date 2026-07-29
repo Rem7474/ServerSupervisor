@@ -300,7 +300,7 @@
                 <div class="d-flex gap-1 justify-content-end">
                   <button
                     type="button"
-                    class="btn btn-sm btn-outline-secondary"
+                    class="btn btn-sm btn-ghost-secondary"
                     title="Historique d'exécutions"
                     @click="openHistory(task)"
                   >
@@ -312,7 +312,7 @@
                   <button
                     v-if="canManage"
                     type="button"
-                    class="btn btn-sm btn-outline-primary"
+                    class="btn btn-sm btn-ghost-primary"
                     :disabled="runningId === task.id"
                     @click="runNow(task)"
                   >
@@ -325,7 +325,7 @@
                   <button
                     v-if="canManage"
                     type="button"
-                    class="btn btn-sm btn-outline-secondary"
+                    class="btn btn-sm btn-ghost-secondary"
                     title="Modifier"
                     @click="openEdit(task)"
                   >
@@ -337,7 +337,7 @@
                   <button
                     v-if="canManage"
                     type="button"
-                    class="btn btn-sm btn-outline-danger"
+                    class="btn btn-sm btn-ghost-danger"
                     title="Supprimer"
                     @click="confirmDelete(task)"
                   >

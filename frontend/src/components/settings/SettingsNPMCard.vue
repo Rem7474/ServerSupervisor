@@ -176,7 +176,7 @@
                 <!-- Edit -->
                 <button
                   type="button"
-                  class="btn btn-sm btn-outline-secondary"
+                  class="btn btn-sm btn-ghost-secondary"
                   title="Modifier"
                   @click="openEditForm(conn)"
                 >
@@ -188,7 +188,7 @@
                 <!-- Refresh -->
                 <button
                   type="button"
-                  class="btn btn-sm btn-outline-info"
+                  class="btn btn-sm btn-ghost-info"
                   title="Rafraîchir maintenant"
                   @click="refreshNow(conn)"
                 >
@@ -200,7 +200,7 @@
                 <!-- Delete -->
                 <button
                   type="button"
-                  class="btn btn-sm btn-outline-danger"
+                  class="btn btn-sm btn-ghost-danger"
                   title="Supprimer"
                   @click="remove(conn)"
                 >

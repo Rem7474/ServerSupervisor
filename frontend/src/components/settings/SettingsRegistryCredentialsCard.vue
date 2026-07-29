@@ -128,7 +128,7 @@
               <div class="d-flex gap-1 justify-content-end">
                 <button
                   type="button"
-                  class="btn btn-sm btn-outline-secondary"
+                  class="btn btn-sm btn-ghost-secondary"
                   title="Modifier"
                   @click="openEditForm(cred)"
                 >
@@ -136,7 +136,7 @@
                 </button>
                 <button
                   type="button"
-                  class="btn btn-sm btn-outline-danger"
+                  class="btn btn-sm btn-ghost-danger"
                   title="Supprimer"
                   @click="remove(cred)"
                 >
