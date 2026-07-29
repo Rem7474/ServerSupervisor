@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"sort"
 	"time"
 
 	"github.com/lib/pq"
@@ -89,34 +90,37 @@ func (db *DB) GetExposureByIPs(ctx context.Context, ips []string, since time.Tim
 	}
 
 	for _, ph := range proxyHosts {
-		agg := models.HostExposedDomain{
-			ProxyHostID:    ph.id,
-			ConnectionID:   ph.connectionID,
-			ConnectionName: ph.connectionName,
-			DomainNames:    ph.domains,
-			ForwardPort:    ph.forwardPort,
-			SSLEnabled:     ph.sslEnabled,
-			NPMEnabled:     ph.npmEnabled,
-		}
-		for _, d := range ph.domains {
-			if s, ok := stats[d]; ok {
-				agg.Requests += s.requests
-				agg.Bytes += s.bytes
-				agg.Errors4xx += s.errors4xx
-				agg.Errors5xx += s.errors5xx
-				agg.SuspiciousRequests += s.suspicious
-				agg.BlockedRequests += s.blocked
-			}
-		}
 		exp, ok := result[ph.ip]
 		if !ok {
 			exp = &models.HostExposure{IPAddress: ph.ip, Since: since, Domains: []models.HostExposedDomain{}}
 			result[ph.ip] = exp
 		}
-		exp.Domains = append(exp.Domains, agg)
-		exp.TotalRequests += agg.Requests
-		exp.TotalSuspicious += agg.SuspiciousRequests
-		exp.TotalBlocked += agg.BlockedRequests
+		for _, domain := range ph.domains {
+			entry := models.HostExposedDomain{
+				ProxyHostID:    ph.id,
+				ConnectionID:   ph.connectionID,
+				ConnectionName: ph.connectionName,
+				DomainName:     domain,
+				ForwardPort:    ph.forwardPort,
+				SSLEnabled:     ph.sslEnabled,
+				NPMEnabled:     ph.npmEnabled,
+			}
+			if s, ok := stats[domain]; ok {
+				entry.Requests = s.requests
+				entry.Bytes = s.bytes
+				entry.Errors4xx = s.errors4xx
+				entry.Errors5xx = s.errors5xx
+				entry.SuspiciousRequests = s.suspicious
+				entry.BlockedRequests = s.blocked
+			}
+			exp.Domains = append(exp.Domains, entry)
+			exp.TotalRequests += entry.Requests
+			exp.TotalSuspicious += entry.SuspiciousRequests
+			exp.TotalBlocked += entry.BlockedRequests
+		}
+	}
+	for _, exp := range result {
+		sort.Slice(exp.Domains, func(i, j int) bool { return exp.Domains[i].DomainName < exp.Domains[j].DomainName })
 	}
 	return result, nil
 }

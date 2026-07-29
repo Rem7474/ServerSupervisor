@@ -668,19 +668,23 @@ export interface DiskHealth {
 // source: host_exposure.go
 
 /**
- * HostExposedDomain is one NPM domain that routes to a specific host (matched
- * by npm_proxy_hosts.forward_host == host.ip_address), enriched with
- * aggregated web-log traffic for that domain over the requested window. The
- * traffic rows are looked up by domain, not host_id: they are collected by
- * whichever agent parses the reverse-proxy's access logs (typically the NPM
- * host itself), which is usually a different host than the backend this
- * domain forwards to.
+ * HostExposedDomain is one NPM domain name that routes to a specific host
+ * (matched by npm_proxy_hosts.forward_host == host.ip_address), enriched with
+ * aggregated web-log traffic for that one domain over the requested window.
+ * One row per domain name, not per NPM proxy host record: an NPM proxy host
+ * can carry several domain-name aliases pointing at the same target, and
+ * each alias gets its own real per-domain traffic figures (an NPM proxy host
+ * entry isn't itself a traffic-bearing unit — domains are). The traffic rows
+ * are looked up by domain, not host_id: they are collected by whichever
+ * agent parses the reverse-proxy's access logs (typically the NPM host
+ * itself), which is usually a different host than the backend this domain
+ * forwards to.
  */
 export interface HostExposedDomain {
   proxy_host_id: string;
   connection_id: string;
   connection_name: string;
-  domain_names: string[];
+  domain_name: string;
   forward_port: number /* int */;
   ssl_enabled: boolean;
   npm_enabled: boolean;

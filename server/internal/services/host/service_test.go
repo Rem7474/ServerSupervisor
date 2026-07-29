@@ -186,7 +186,7 @@ func TestExposure_PropagatesRepoResult(t *testing.T) {
 		host: &models.Host{ID: "h1", IPAddress: "10.0.0.5"},
 		exposureResult: &models.HostExposure{
 			IPAddress:     "10.0.0.5",
-			Domains:       []models.HostExposedDomain{{DomainNames: []string{"app.example.com"}, Requests: 42}},
+			Domains:       []models.HostExposedDomain{{DomainName: "app.example.com", Requests: 42}},
 			TotalRequests: 42,
 		},
 	}

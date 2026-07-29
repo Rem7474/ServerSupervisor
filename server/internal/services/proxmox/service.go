@@ -535,21 +535,25 @@ func (s *Service) NodeGuestNetworks(ctx context.Context, nodeID string) (map[int
 	return fetchGuestNetworksForNode(ctx, client, node, guests), nil
 }
 
-// guestIPsFromNetworks flattens a vmid → interfaces map into a vmid → plain
-// IPs map, stripping the CIDR suffix and dropping link-local (fe80) and empty
-// addresses — the same filtering the frontend already applies to this data
-// (see ProxmoxNodeGuestsTab.vue's IP column) so exposure lookups never probe
-// an address nobody would recognize as this guest's own.
-func guestIPsFromNetworks(networks map[int][]proxmoxclient.GuestNetworkIface) map[int][]string {
-	result := make(map[int][]string, len(networks))
+// guestPrimaryIPs picks one IP per guest out of a vmid → interfaces map —
+// the first non-link-local (fe80), non-empty address across a guest's
+// interfaces, in PVE's own reported order. This mirrors the primary-IP
+// selection ProxmoxNodeGuestsTab.vue's IP column already does client-side
+// (guestPrimaryIp): the rest of the app already treats "this guest's IP" as
+// one address, not a set, so exposure correlation matches that instead of
+// inventing a second, wider notion of "guest IP" nothing else uses.
+func guestPrimaryIPs(networks map[int][]proxmoxclient.GuestNetworkIface) map[int]string {
+	result := make(map[int]string, len(networks))
 	for vmid, ifaces := range networks {
+	iface:
 		for _, iface := range ifaces {
 			for _, cidr := range iface.IPs {
 				ip := strings.SplitN(cidr, "/", 2)[0]
 				if ip == "" || strings.HasPrefix(ip, "fe80") {
 					continue
 				}
-				result[vmid] = append(result[vmid], ip)
+				result[vmid] = ip
+				break iface
 			}
 		}
 	}
@@ -558,26 +562,24 @@ func guestIPsFromNetworks(networks map[int][]proxmoxclient.GuestNetworkIface) ma
 
 // NodeGuestExposure answers, for every guest on a node, which NPM domains
 // route to it — the same IP-matched correlation GetHostExposure gives a
-// ServerSupervisor host, but keyed by a guest's own live network IP(s)
-// (fetched the same way NodeGuestNetworks does) rather than a persisted
-// hosts.ip_address, since proxmox_guests has no IP column. A guest with
-// several interfaces/IPs has its matches merged and deduped by proxy host ID;
-// a guest with none is simply absent from the result.
+// ServerSupervisor host, but keyed by a guest's own live primary IP (fetched
+// the same way NodeGuestNetworks does) rather than a persisted
+// hosts.ip_address, since proxmox_guests has no IP column. A guest with no
+// resolvable IP, or whose IP matches no NPM proxy host, is simply absent
+// from the result.
 func (s *Service) NodeGuestExposure(ctx context.Context, nodeID string, period time.Duration) (map[int]*models.HostExposure, error) {
 	networks, err := s.NodeGuestNetworks(ctx, nodeID)
 	if err != nil {
 		return nil, err
 	}
-	vmidIPs := guestIPsFromNetworks(networks)
-	if len(vmidIPs) == 0 {
+	vmidIP := guestPrimaryIPs(networks)
+	if len(vmidIP) == 0 {
 		return map[int]*models.HostExposure{}, nil
 	}
 
 	ipSet := map[string]struct{}{}
-	for _, ips := range vmidIPs {
-		for _, ip := range ips {
-			ipSet[ip] = struct{}{}
-		}
+	for _, ip := range vmidIP {
+		ipSet[ip] = struct{}{}
 	}
 	ips := make([]string, 0, len(ipSet))
 	for ip := range ipSet {
@@ -590,45 +592,13 @@ func (s *Service) NodeGuestExposure(ctx context.Context, nodeID string, period t
 		return nil, err
 	}
 
-	result := make(map[int]*models.HostExposure, len(vmidIPs))
-	for vmid, guestIPs := range vmidIPs {
-		merged := mergeExposureByIPs(guestIPs, byIP, since)
-		if len(merged.Domains) == 0 {
-			continue
+	result := make(map[int]*models.HostExposure, len(vmidIP))
+	for vmid, ip := range vmidIP {
+		if exp, ok := byIP[ip]; ok && len(exp.Domains) > 0 {
+			result[vmid] = exp
 		}
-		result[vmid] = merged
 	}
 	return result, nil
-}
-
-// mergeExposureByIPs collapses one guest's IP → *HostExposure lookups (from
-// GetExposureByIPs) into a single HostExposure, deduped by proxy host ID —
-// a guest with several interfaces can otherwise have the same NPM domain
-// counted twice if it happens to match on more than one of its addresses.
-// IPAddress is set from every IP the guest was queried with, not just the
-// ones an NPM proxy host happened to match, so a caller can still tell "this
-// guest has IP X" from "this guest has IP X and nothing routes to it" —
-// mirrors GetHostExposure, which always sets IPAddress up front too.
-func mergeExposureByIPs(ips []string, byIP map[string]*models.HostExposure, since time.Time) *models.HostExposure {
-	merged := &models.HostExposure{IPAddress: strings.Join(ips, ", "), Since: since, Domains: []models.HostExposedDomain{}}
-	seen := map[string]bool{}
-	for _, ip := range ips {
-		exp, ok := byIP[ip]
-		if !ok {
-			continue
-		}
-		for _, d := range exp.Domains {
-			if seen[d.ProxyHostID] {
-				continue
-			}
-			seen[d.ProxyHostID] = true
-			merged.Domains = append(merged.Domains, d)
-			merged.TotalRequests += d.Requests
-			merged.TotalSuspicious += d.SuspiciousRequests
-			merged.TotalBlocked += d.BlockedRequests
-		}
-	}
-	return merged
 }
 
 // GuestExposure is the single-guest counterpart of NodeGuestExposure — same
@@ -636,7 +606,9 @@ func mergeExposureByIPs(ips []string, byIP map[string]*models.HostExposure, sinc
 // batched across a whole node. Used by the guest detail page, which (unlike
 // the node guest list) doesn't necessarily know the guest's node UUID up
 // front — only its own connection_id/node_name, carried on the guest row
-// itself.
+// itself. Unlike NodeGuestExposure, this always returns the guest's IP (once
+// known) even with zero domain matches, so the caller can still show "this
+// guest's IP is X" — mirrors GetHostExposure, which does the same.
 func (s *Service) GuestExposure(ctx context.Context, guestID string, period time.Duration) (*models.HostExposure, error) {
 	guest, err := s.repo.GetProxmoxGuestByID(ctx, guestID)
 	if err != nil {
@@ -666,16 +638,20 @@ func (s *Service) GuestExposure(ctx context.Context, guestID string, period time
 	}
 	client := proxmoxclient.New(conn.APIURL, conn.TokenID, secret, conn.InsecureSkipVerify)
 	networks := fetchGuestNetworksForNode(ctx, client, node, []models.ProxmoxGuest{*guest})
-	ips := guestIPsFromNetworks(networks)[guest.VMID]
-	if len(ips) == 0 {
+	ip := guestPrimaryIPs(networks)[guest.VMID]
+	if ip == "" {
 		return result, nil
 	}
+	result.IPAddress = ip
 
-	byIP, err := s.repo.GetExposureByIPs(ctx, ips, since)
+	byIP, err := s.repo.GetExposureByIPs(ctx, []string{ip}, since)
 	if err != nil {
 		return nil, err
 	}
-	return mergeExposureByIPs(ips, byIP, since), nil
+	if exp, ok := byIP[ip]; ok {
+		return exp, nil
+	}
+	return result, nil
 }
 
 // fetchGuestNetworksForNode fans out one goroutine per guest on a single

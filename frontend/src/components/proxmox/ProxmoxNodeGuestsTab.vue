@@ -379,14 +379,15 @@ function linkedHostLabel(guest: Guest): string {
 }
 
 // Flattens the guest's NPM exposure (map keyed by vmid, see useProxmoxNode's
-// guestExposure) into a flat, deduped domain-name list for display/sort.
+// guestExposure) into a flat, deduped domain-name list for display/sort. One
+// exposure.domains entry is already one domain name (see HostExposedDomain).
 function guestDomains(guest: Guest): string[] {
   const exposure = props.guestExposure?.[String(guest.vmid)]
   const domains = exposure?.domains
   if (!Array.isArray(domains)) return []
   const names = new Set<string>()
   for (const d of domains) {
-    for (const name of d?.domain_names ?? []) names.add(name)
+    if (d?.domain_name) names.add(d.domain_name)
   }
   return [...names]
 }

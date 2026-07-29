@@ -99,8 +99,8 @@ func TestGetHostExposure(t *testing.T) {
 			t.Fatalf("expected exactly one matching proxy host, got %d", len(exposure.Domains))
 		}
 		d := exposure.Domains[0]
-		if len(d.DomainNames) != 1 || d.DomainNames[0] != "app.example.com" {
-			t.Errorf("expected domain_names=[app.example.com], got %v", d.DomainNames)
+		if d.DomainName != "app.example.com" {
+			t.Errorf("expected domain_name=app.example.com, got %v", d.DomainName)
 		}
 		if d.Requests != 2 {
 			t.Errorf("expected 2 requests for app.example.com, got %d", d.Requests)
@@ -119,6 +119,51 @@ func TestGetHostExposure(t *testing.T) {
 		}
 		if exposure.TotalRequests != 2 || exposure.TotalSuspicious != 1 || exposure.TotalBlocked != 1 {
 			t.Errorf("unexpected totals: %+v", exposure)
+		}
+	})
+
+	// A single NPM proxy host entry can carry several domain-name aliases for
+	// the same target; each alias must surface as its own row with its own
+	// real traffic figures, not summed together under one row.
+	if _, err := db.UpsertNPMProxyHost(ctx, models.NPMProxyHost{
+		ConnectionID: conn.ID, NPMID: 2, DomainNames: []string{"z-multi-a.example.com", "z-multi-b.example.com"},
+		ForwardHost: backendIP, ForwardPort: 9090, SSLEnabled: false, NPMEnabled: true,
+	}); err != nil {
+		t.Fatalf("upsert multi-domain proxy host: %v", err)
+	}
+	multiReport := &models.WebLogReport{
+		Source:        "npm",
+		Traffic:       &models.TrafficSummary{},
+		Threats:       &models.ThreatSummary{},
+		CollectedAt:   now,
+		TotalRequests: 2,
+		Requests: []models.WebRequest{
+			{IP: "1.1.1.1", Method: "GET", Path: "/", Status: 200, Bytes: 10, Domain: "z-multi-a.example.com"},
+			{IP: "1.1.1.1", Method: "GET", Path: "/", Status: 200, Bytes: 20, Domain: "z-multi-b.example.com"},
+			{IP: "1.1.1.1", Method: "GET", Path: "/", Status: 200, Bytes: 30, Domain: "z-multi-b.example.com"},
+		},
+	}
+	if err := db.InsertWebLogSnapshot(ctx, proxyHostID, multiReport); err != nil {
+		t.Fatalf("insert multi-domain web log snapshot: %v", err)
+	}
+
+	t.Run("one NPM proxy host with several domain aliases yields one row per domain, each with its own stats", func(t *testing.T) {
+		exposure, err := db.GetHostExposure(ctx, backendIP, now.Add(-time.Hour))
+		if err != nil {
+			t.Fatalf("GetHostExposure: %v", err)
+		}
+		if len(exposure.Domains) != 3 {
+			t.Fatalf("expected 3 domain rows (1 + 2 aliases), got %d: %+v", len(exposure.Domains), exposure.Domains)
+		}
+		byName := map[string]int64{}
+		for _, d := range exposure.Domains {
+			byName[d.DomainName] = d.Requests
+		}
+		if byName["z-multi-a.example.com"] != 1 {
+			t.Errorf("expected 1 request for z-multi-a.example.com, got %d", byName["z-multi-a.example.com"])
+		}
+		if byName["z-multi-b.example.com"] != 2 {
+			t.Errorf("expected 2 requests for z-multi-b.example.com, got %d", byName["z-multi-b.example.com"])
 		}
 	})
 
