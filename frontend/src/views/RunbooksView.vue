@@ -104,7 +104,7 @@
                 <div class="btn-group">
                   <button
                     type="button"
-                    class="btn btn-sm btn-primary"
+                    class="btn btn-icon btn-sm btn-primary"
                     title="Lancer"
                     :disabled="runningIds.has(rb.id)"
                     @click="handleRun(rb)"
@@ -121,7 +121,7 @@
                   </button>
                   <button
                     type="button"
-                    class="btn btn-sm btn-ghost-secondary"
+                    class="btn btn-icon btn-sm btn-ghost-secondary"
                     title="Historique"
                     @click="openHistory(rb)"
                   >
@@ -132,7 +132,7 @@
                   </button>
                   <button
                     type="button"
-                    class="btn btn-sm btn-ghost-secondary"
+                    class="btn btn-icon btn-sm btn-ghost-secondary"
                     title="Modifier"
                     @click="startEdit(rb)"
                   >
@@ -143,7 +143,7 @@
                   </button>
                   <button
                     type="button"
-                    class="btn btn-sm btn-ghost-danger"
+                    class="btn btn-icon btn-sm btn-ghost-danger"
                     title="Supprimer"
                     @click="handleDelete(rb)"
                   >

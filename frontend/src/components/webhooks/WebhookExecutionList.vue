@@ -102,7 +102,7 @@
                 <button
                   v-if="execution.command_id && logsMode === 'inline'"
                   type="button"
-                  class="btn btn-sm btn-ghost-secondary"
+                  class="btn btn-icon btn-sm btn-ghost-secondary"
                   title="Voir les logs"
                   @click="$emit('open-logs', execution.command_id)"
                 >
@@ -163,7 +163,7 @@
                 <button
                   v-if="execution.command_id && logsMode === 'inline'"
                   type="button"
-                  class="btn btn-sm btn-ghost-secondary"
+                  class="btn btn-icon btn-sm btn-ghost-secondary"
                   title="Voir les logs"
                   @click="$emit('open-logs', execution.command_id)"
                 >
@@ -184,7 +184,7 @@
                 <button
                   v-if="execution.raw_payload"
                   type="button"
-                  class="btn btn-sm btn-ghost-secondary"
+                  class="btn btn-icon btn-sm btn-ghost-secondary"
                   title="Voir le payload reçu"
                   @click="$emit('open-payload', execution.raw_payload)"
                 >

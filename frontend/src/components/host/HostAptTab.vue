@@ -347,7 +347,7 @@
                   <td>
                     <button
                       type="button"
-                      class="btn btn-sm btn-ghost-secondary"
+                      class="btn btn-icon btn-sm btn-ghost-secondary"
                       title="Voir les logs"
                       :disabled="!run.log_snippet"
                       @click="$emit('uu-log', run)"

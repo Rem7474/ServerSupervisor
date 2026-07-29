@@ -326,7 +326,7 @@
                 <button
                   v-if="isAdmin && !isCompleted(item) && item.id"
                   type="button"
-                  class="btn btn-sm btn-ghost-secondary"
+                  class="btn btn-icon btn-sm btn-ghost-secondary"
                   :disabled="resolvingId === item.id"
                   title="Clôturer manuellement"
                   @click="manualResolve(item)"

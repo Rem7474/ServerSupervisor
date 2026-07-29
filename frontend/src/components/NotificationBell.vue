@@ -103,7 +103,7 @@
                 <button
                   v-if="auth.isAdmin && item.type === 'alert_incident'"
                   type="button"
-                  class="btn btn-sm btn-outline-success py-0 px-1 notification-resolve-btn"
+                  class="btn btn-icon btn-sm btn-outline-success py-0 px-1 notification-resolve-btn"
                   title="Résoudre"
                   :disabled="resolvingId === item.id"
                   @click.stop="resolveIncident(item)"

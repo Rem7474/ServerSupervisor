@@ -189,7 +189,7 @@
               >
                 <button
                   type="button"
-                  class="btn btn-sm btn-ghost-secondary"
+                  class="btn btn-icon btn-sm btn-ghost-secondary"
                   title="Modifier"
                   @click="$emit('edit', rule)"
                 >
@@ -200,7 +200,7 @@
                 </button>
                 <button
                   type="button"
-                  class="btn btn-sm btn-ghost-danger"
+                  class="btn btn-icon btn-sm btn-ghost-danger"
                   title="Supprimer"
                   @click="$emit('delete', rule)"
                 >

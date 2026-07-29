@@ -300,7 +300,7 @@
                 <div class="d-flex gap-1 justify-content-end">
                   <button
                     type="button"
-                    class="btn btn-sm btn-ghost-secondary"
+                    class="btn btn-icon btn-sm btn-ghost-secondary"
                     title="Historique d'exécutions"
                     @click="openHistory(task)"
                   >
@@ -325,7 +325,7 @@
                   <button
                     v-if="canManage"
                     type="button"
-                    class="btn btn-sm btn-ghost-secondary"
+                    class="btn btn-icon btn-sm btn-ghost-secondary"
                     title="Modifier"
                     @click="openEdit(task)"
                   >
@@ -337,7 +337,7 @@
                   <button
                     v-if="canManage"
                     type="button"
-                    class="btn btn-sm btn-ghost-danger"
+                    class="btn btn-icon btn-sm btn-ghost-danger"
                     title="Supprimer"
                     @click="confirmDelete(task)"
                   >

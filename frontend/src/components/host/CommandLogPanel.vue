@@ -36,7 +36,7 @@
           <!-- Download -->
           <button
             type="button"
-            class="btn btn-sm btn-ghost-secondary"
+            class="btn btn-icon btn-sm btn-ghost-secondary"
             title="Télécharger (.txt)"
             :disabled="!command"
             @click="download"
@@ -50,7 +50,7 @@
           <button
             v-if="clearable"
             type="button"
-            class="btn btn-sm btn-ghost-secondary"
+            class="btn btn-icon btn-sm btn-ghost-secondary"
             title="Vider la console"
             :disabled="!command"
             @click="$emit('clear')"
@@ -63,7 +63,7 @@
           <!-- Close -->
           <button
             type="button"
-            class="btn btn-sm btn-ghost-secondary"
+            class="btn btn-icon btn-sm btn-ghost-secondary"
             title="Fermer"
             @click="$emit('close')"
           >

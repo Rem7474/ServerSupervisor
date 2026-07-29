@@ -140,7 +140,7 @@
                     v-if="getComposeStatus(p) === 'stopped'"
                     type="button"
                     :disabled="!!actionLoading[p.name]"
-                    class="btn btn-sm btn-success"
+                    class="btn btn-icon btn-sm btn-success"
                     title="Start (up -d)"
                     aria-label="Démarrer le projet"
                     @click="$emit('compose-action', { hostId: p.host_id, name: p.name, action: 'compose_up', workingDir: p.working_dir || '' })"
@@ -158,7 +158,7 @@
                     <button
                       type="button"
                       :disabled="!!actionLoading[p.name]"
-                      class="btn btn-sm btn-outline-danger"
+                      class="btn btn-icon btn-sm btn-outline-danger"
                       title="Stop (down)"
                       aria-label="Arrêter le projet"
                       @click="$emit('compose-action', { hostId: p.host_id, name: p.name, action: 'compose_down', workingDir: p.working_dir || '' })"
@@ -176,7 +176,7 @@
                     <button
                       type="button"
                       :disabled="!!actionLoading[p.name]"
-                      class="btn btn-sm btn-outline-warning"
+                      class="btn btn-icon btn-sm btn-outline-warning"
                       title="Redémarrer"
                       aria-label="Redémarrer le projet"
                       @click="$emit('compose-action', { hostId: p.host_id, name: p.name, action: 'compose_restart', workingDir: p.working_dir || '' })"
@@ -194,7 +194,7 @@
                   <button
                     type="button"
                     :disabled="!!actionLoading[p.name]"
-                    class="btn btn-sm btn-ghost-secondary"
+                    class="btn btn-icon btn-sm btn-ghost-secondary"
                     title="Voir les logs"
                     aria-label="Voir les logs du projet"
                     @click="$emit('compose-action', { hostId: p.host_id, name: p.name, action: 'compose_logs', workingDir: p.working_dir || '' })"
@@ -211,7 +211,7 @@
                 </template>
                 <button
                   type="button"
-                  class="btn btn-sm btn-ghost-secondary"
+                  class="btn btn-icon btn-sm btn-ghost-secondary"
                   title="Config"
                   @click="selectedProject = p"
                 >

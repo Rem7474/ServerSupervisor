@@ -230,7 +230,7 @@
                 </button>
                 <button
                   type="button"
-                  class="btn btn-sm btn-outline-danger ms-auto"
+                  class="btn btn-icon btn-sm btn-outline-danger ms-auto"
                   @click="confirmDeleteWebhook(webhook)"
                 >
                   <IconTrash :size="14" />
@@ -489,7 +489,7 @@
                 </button>
                 <button
                   type="button"
-                  class="btn btn-sm btn-outline-info"
+                  class="btn btn-icon btn-sm btn-outline-info"
                   title="Verifier maintenant"
                   @click="checkNow(tracker)"
                 >
@@ -505,7 +505,7 @@
                 </button>
                 <button
                   type="button"
-                  class="btn btn-sm btn-outline-danger ms-auto"
+                  class="btn btn-icon btn-sm btn-outline-danger ms-auto"
                   @click="confirmDeleteTracker(tracker)"
                 >
                   <IconTrash :size="14" />

@@ -241,7 +241,7 @@
                     v-if="['exited', 'dead', 'created', 'paused'].includes(c.state)"
                     type="button"
                     :disabled="!!actionLoading[c.name]"
-                    class="btn btn-sm btn-success"
+                    class="btn btn-icon btn-sm btn-success"
                     title="Démarrer"
                     aria-label="Démarrer le conteneur"
                     @click="$emit('container-action', { hostId: c.host_id, name: c.name, action: 'start', container: c })"
@@ -259,7 +259,7 @@
                     v-if="c.state === 'running'"
                     type="button"
                     :disabled="!!actionLoading[c.name]"
-                    class="btn btn-sm btn-outline-danger"
+                    class="btn btn-icon btn-sm btn-outline-danger"
                     title="Arrêter"
                     aria-label="Arrêter le conteneur"
                     @click="$emit('container-action', { hostId: c.host_id, name: c.name, action: 'stop', container: c })"
@@ -278,7 +278,7 @@
                     v-if="c.state === 'running'"
                     type="button"
                     :disabled="!!actionLoading[c.name]"
-                    class="btn btn-sm btn-outline-warning"
+                    class="btn btn-icon btn-sm btn-outline-warning"
                     title="Redémarrer"
                     aria-label="Redémarrer le conteneur"
                     @click="$emit('container-action', { hostId: c.host_id, name: c.name, action: 'restart', container: c })"
@@ -295,7 +295,7 @@
                   <button
                     type="button"
                     :disabled="!!actionLoading[c.name]"
-                    class="btn btn-sm btn-ghost-secondary"
+                    class="btn btn-icon btn-sm btn-ghost-secondary"
                     title="Voir les logs"
                     aria-label="Voir les logs du conteneur"
                     @click="$emit('container-action', { hostId: c.host_id, name: c.name, action: 'logs', container: c })"
@@ -312,7 +312,7 @@
                 </template>
                 <button
                   type="button"
-                  class="btn btn-sm btn-ghost-secondary"
+                  class="btn btn-icon btn-sm btn-ghost-secondary"
                   title="Inspecter"
                   aria-label="Inspecter le conteneur"
                   @click="inspectTarget = c; inspectTab = 'env'"
@@ -325,7 +325,7 @@
                 <button
                   v-if="containerVersion(c)?.tracker_id"
                   type="button"
-                  class="btn btn-sm btn-ghost-secondary"
+                  class="btn btn-icon btn-sm btn-ghost-secondary"
                   title="Voir le suivi de version"
                   aria-label="Voir le suivi de version"
                   @click="openTracker(containerVersion(c)?.tracker_id)"
@@ -339,7 +339,7 @@
                   v-if="containerVersion(c)?.tracker_id"
                   type="button"
                   :disabled="isTrackerRunDisabled(containerVersion(c))"
-                  class="btn btn-sm btn-ghost-primary"
+                  class="btn btn-icon btn-sm btn-ghost-primary"
                   :title="trackerRunTooltip(containerVersion(c))"
                   aria-label="Déclencher le tracker"
                   @click="runTracker(containerVersion(c), c)"
@@ -355,7 +355,7 @@
                 </button>
                 <button
                   type="button"
-                  class="btn btn-sm btn-ghost-secondary"
+                  class="btn btn-icon btn-sm btn-ghost-secondary"
                   title="Suivre les mises à jour de cette image"
                   aria-label="Créer un tracker de mise à jour"
                   @click="trackImage(c)"

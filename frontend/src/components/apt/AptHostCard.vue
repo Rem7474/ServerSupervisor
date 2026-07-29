@@ -46,7 +46,7 @@
         <button
           v-if="activeCommand"
           type="button"
-          class="btn btn-sm btn-ghost-secondary flex-shrink-0"
+          class="btn btn-icon btn-sm btn-ghost-secondary flex-shrink-0"
           title="Voir les logs en direct"
           @click="$emit('watch-command', activeCommand)"
         >
@@ -102,7 +102,7 @@
           </div>
           <button
             type="button"
-            class="btn btn-sm btn-outline-secondary"
+            class="btn btn-icon btn-sm btn-outline-secondary"
             title="Planifier une commande APT"
             @click="$emit('schedule')"
           >
@@ -118,7 +118,7 @@
         >Mode lecture seule</span>
         <button
           type="button"
-          class="btn btn-sm btn-ghost-secondary flex-shrink-0"
+          class="btn btn-icon btn-sm btn-ghost-secondary flex-shrink-0"
           :title="expanded ? 'Réduire' : 'Développer'"
           @click="$emit('update:expanded', !expanded)"
         >
@@ -288,7 +288,7 @@
               >· {{ cmd.triggered_by }}</span>
               <button
                 type="button"
-                class="btn btn-sm btn-ghost-secondary ms-auto flex-shrink-0"
+                class="btn btn-icon btn-sm btn-ghost-secondary ms-auto flex-shrink-0"
                 title="Voir les logs"
                 @click="$emit('watch-command', cmd)"
               >

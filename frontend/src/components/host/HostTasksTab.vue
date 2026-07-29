@@ -151,7 +151,7 @@
                   <button
                     v-if="task.last_command_id"
                     type="button"
-                    class="btn btn-sm btn-ghost-secondary"
+                    class="btn btn-icon btn-sm btn-ghost-secondary"
                     title="Voir les logs"
                     @click="openTaskLogs(task)"
                   >

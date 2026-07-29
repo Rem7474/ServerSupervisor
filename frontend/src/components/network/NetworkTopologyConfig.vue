@@ -485,7 +485,7 @@
                     <button
                       v-if="isPortModified(host.id, port.port)"
                       type="button"
-                      class="btn btn-sm btn-ghost-secondary"
+                      class="btn btn-icon btn-sm btn-ghost-secondary"
                       title="Reinitialiser ce port"
                       aria-label="Reinitialiser ce port"
                       @click="resetPortSetting(host.id, port.port)"

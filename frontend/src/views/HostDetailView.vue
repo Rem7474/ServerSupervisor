@@ -182,7 +182,7 @@
           </select>
           <button
             type="button"
-            class="btn btn-sm btn-outline-danger"
+            class="btn btn-icon btn-sm btn-outline-danger"
             :disabled="linkSaving"
             title="Supprimer le lien"
             @click="deleteLink"
@@ -602,7 +602,7 @@
                       <td class="text-end">
                         <button
                           type="button"
-                          class="btn btn-sm btn-ghost-danger"
+                          class="btn btn-icon btn-sm btn-ghost-danger"
                           title="Révoquer"
                           @click="revokePermission(p.username)"
                         >

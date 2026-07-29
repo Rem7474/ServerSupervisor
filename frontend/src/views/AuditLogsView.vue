@@ -232,7 +232,7 @@
                   <td class="text-end">
                     <button
                       type="button"
-                      class="btn btn-sm btn-ghost-secondary"
+                      class="btn btn-icon btn-sm btn-ghost-secondary"
                       :disabled="!cmd.output && cmd.status === 'pending'"
                       title="Voir les logs"
                       @click="openLogViewer(cmd)"
