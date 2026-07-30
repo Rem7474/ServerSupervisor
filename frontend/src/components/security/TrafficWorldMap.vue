@@ -126,16 +126,15 @@ async function renderWorldMap() {
     .attr('stroke', '#ffffff')
     .attr('stroke-width', 0.6)
 
-  countries
-    .selectAll('title')
-    .data((d: any) => [d])
-    .join('title')
-    .text((d: AnyRecord) => {
-      const country = String(d?.properties?.name || 'Unknown')
-      const key = mapCountryKey(country)
-      const hits = countryHits.get(key) || 0
-      return `${country}: ${numberFormat(hits)} hits`
-    })
+  // aria-label (not a <title>) so screen readers still get per-country
+  // context without also triggering the browser's native hover tooltip —
+  // that stacked visually with the custom one below.
+  countries.attr('aria-label', (d: AnyRecord) => {
+    const country = String(d?.properties?.name || 'Unknown')
+    const key = mapCountryKey(country)
+    const hits = countryHits.get(key) || 0
+    return `${country}: ${numberFormat(hits)} hits`
+  })
 
   countries
     .on('mouseenter', function (this: SVGPathElement, event: MouseEvent, d: AnyRecord) {
