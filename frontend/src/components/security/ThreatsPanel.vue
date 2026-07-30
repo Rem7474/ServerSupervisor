@@ -663,11 +663,13 @@
       :page="domainModal.page.value"
       :total-pages="domainModal.totalPages.value"
       :has-active-filters="domainModal.hasActiveFilters.value"
+      :block-state="domainModal.blockState"
       @close="domainModal.close"
       @update-filter="domainModal.setFilter($event.key, $event.value)"
       @clear-filters="domainModal.clearFilters"
       @toggle-sort="domainModal.toggleSort"
       @update:page="domainModal.setPage"
+      @block-ip="domainModal.blockIP($event.ip, $event.hostId)"
     />
   </div>
 </template>

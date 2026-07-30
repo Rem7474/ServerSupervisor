@@ -178,8 +178,12 @@ func (db *DB) GetDomainDetails(ctx context.Context, domain string, since time.Ti
 	}
 	out["top_paths"] = paths
 
+	// MAX(host_id) picks an arbitrary-but-stable collector host when a
+	// (rare) multi-host domain window mixes IDs — good enough to seed a
+	// ban dispatch target for the "Bloquer" action, which the caller can
+	// still override via its own host filter same as everywhere else.
 	ipRows, err := db.conn.QueryContext(ctx,
-		fmt.Sprintf(`SELECT ip, COUNT(*) AS hits,
+		fmt.Sprintf(`SELECT ip, COUNT(*) AS hits, MAX(host_id) AS host_id,
 		MAX(CASE WHEN blocked = TRUE THEN blocked_source END) AS blocked_source,
 		MAX(CASE WHEN blocked = TRUE THEN blocked_reason END) AS blocked_reason,
 		MAX(CASE WHEN blocked = TRUE THEN blocked_at END) AS blocked_at,
@@ -198,17 +202,17 @@ func (db *DB) GetDomainDetails(ctx context.Context, domain string, since time.Ti
 	defer func() { _ = ipRows.Close() }()
 	ipClients := make([]map[string]any, 0)
 	for ipRows.Next() {
-		var ip string
+		var ip, hostID string
 		var hits int64
 		var blockedSource sql.NullString
 		var blockedReason sql.NullString
 		var blockedAt sql.NullTime
 		var blockedUntil sql.NullTime
 		var isBlocked int
-		if err := ipRows.Scan(&ip, &hits, &blockedSource, &blockedReason, &blockedAt, &blockedUntil, &isBlocked); err != nil {
+		if err := ipRows.Scan(&ip, &hits, &hostID, &blockedSource, &blockedReason, &blockedAt, &blockedUntil, &isBlocked); err != nil {
 			return nil, err
 		}
-		clientData := map[string]any{"ip": ip, "hits": hits}
+		clientData := map[string]any{"ip": ip, "hits": hits, "host_id": hostID}
 		if isBlocked == 1 {
 			clientData["blocked"] = true
 			if blockedSource.Valid {

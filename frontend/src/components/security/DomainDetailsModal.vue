@@ -115,22 +115,25 @@
                   >
                     Aucun chemin
                   </div>
-                  <button
+                  <div
                     v-for="p in details.top_paths"
                     v-else
                     :key="p.path"
-                    type="button"
-                    class="row-btn clickable-row d-flex justify-content-between align-items-center border-bottom px-3 py-2 w-100"
+                    role="button"
+                    tabindex="0"
+                    class="row-btn clickable-row d-flex justify-content-between align-items-center border-bottom px-3 py-2"
                     :class="{ active: filters.path === p.path }"
                     :title="`Filtrer sur ${p.path}`"
                     @click="$emit('update-filter', { key: 'path', value: filters.path === p.path ? '' : p.path })"
+                    @keydown.enter="$emit('update-filter', { key: 'path', value: filters.path === p.path ? '' : p.path })"
+                    @keydown.space.prevent="$emit('update-filter', { key: 'path', value: filters.path === p.path ? '' : p.path })"
                   >
                     <span
-                      class="font-monospace small text-truncate me-2"
+                      class="font-monospace small text-truncate me-2 user-select-all"
                       style="max-width: 75%;"
                     >{{ p.path }}</span>
                     <span class="badge bg-azure-lt text-azure">{{ p.hits }}</span>
-                  </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -148,25 +151,66 @@
                   >
                     Aucune IP
                   </div>
-                  <button
+                  <div
                     v-for="c in details.top_clients"
                     v-else
                     :key="c.ip"
-                    type="button"
-                    class="row-btn clickable-row d-flex justify-content-between align-items-center border-bottom px-3 py-2 w-100"
+                    role="button"
+                    tabindex="0"
+                    class="row-btn clickable-row d-flex justify-content-between align-items-center gap-2 border-bottom px-3 py-2"
                     :class="{ active: filters.ip === c.ip }"
                     :title="`Filtrer sur ${c.ip}`"
                     @click="$emit('update-filter', { key: 'ip', value: filters.ip === c.ip ? '' : c.ip })"
+                    @keydown.enter="$emit('update-filter', { key: 'ip', value: filters.ip === c.ip ? '' : c.ip })"
+                    @keydown.space.prevent="$emit('update-filter', { key: 'ip', value: filters.ip === c.ip ? '' : c.ip })"
                   >
-                    <span class="font-monospace small">
+                    <span class="font-monospace small user-select-all">
                       {{ c.ip }}
                       <span
                         v-if="c.blocked"
                         class="badge bg-red-lt text-red ms-1"
                       >Bloquée</span>
                     </span>
-                    <span class="badge bg-purple-lt text-purple">{{ c.hits }}</span>
-                  </button>
+                    <span class="d-flex align-items-center gap-1 flex-shrink-0">
+                      <span class="badge bg-purple-lt text-purple">{{ c.hits }}</span>
+                      <button
+                        type="button"
+                        class="btn btn-icon btn-sm btn-ghost-secondary"
+                        title="Copier l'IP"
+                        @click.stop="copyIP(c.ip)"
+                      >
+                        <IconCheck
+                          v-if="copiedIP === c.ip"
+                          :size="14"
+                          class="icon text-success"
+                        />
+                        <IconCopy
+                          v-else
+                          :size="14"
+                          class="icon"
+                        />
+                      </button>
+                      <button
+                        v-if="!c.blocked"
+                        type="button"
+                        class="btn btn-icon btn-sm"
+                        :class="blockState?.[c.ip] === 'error' ? 'btn-ghost-danger' : 'btn-ghost-secondary'"
+                        :disabled="blockState?.[c.ip] === 'loading' || !c.host_id"
+                        :title="!c.host_id ? 'Hôte introuvable' : blockState?.[c.ip] === 'error' ? 'Erreur — Réessayer' : `Bloquer ${c.ip} (CrowdSec, 4h)`"
+                        @click.stop="$emit('block-ip', { ip: c.ip, hostId: c.host_id })"
+                      >
+                        <span
+                          v-if="blockState?.[c.ip] === 'loading'"
+                          class="spinner-border spinner-border-sm"
+                        />
+                        <IconBan
+                          v-else
+                          :size="14"
+                          class="icon"
+                        />
+                      </button>
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -319,7 +363,45 @@
                       {{ formatDate(r.timestamp) }}
                     </td>
                     <td class="font-monospace small">
-                      {{ r.ip }}
+                      <span class="d-flex align-items-center gap-1">
+                        <span class="user-select-all">{{ r.ip }}</span>
+                        <button
+                          type="button"
+                          class="btn btn-icon btn-sm btn-ghost-secondary"
+                          title="Copier l'IP"
+                          @click="copyIP(r.ip)"
+                        >
+                          <IconCheck
+                            v-if="copiedIP === r.ip"
+                            :size="12"
+                            class="icon text-success"
+                          />
+                          <IconCopy
+                            v-else
+                            :size="12"
+                            class="icon"
+                          />
+                        </button>
+                        <button
+                          v-if="!r.blocked"
+                          type="button"
+                          class="btn btn-icon btn-sm"
+                          :class="blockState?.[r.ip] === 'error' ? 'btn-ghost-danger' : 'btn-ghost-secondary'"
+                          :disabled="blockState?.[r.ip] === 'loading' || !r.host_id"
+                          :title="!r.host_id ? 'Hôte introuvable' : blockState?.[r.ip] === 'error' ? 'Erreur — Réessayer' : `Bloquer ${r.ip} (CrowdSec, 4h)`"
+                          @click="$emit('block-ip', { ip: r.ip, hostId: r.host_id })"
+                        >
+                          <span
+                            v-if="blockState?.[r.ip] === 'loading'"
+                            class="spinner-border spinner-border-sm"
+                          />
+                          <IconBan
+                            v-else
+                            :size="12"
+                            class="icon"
+                          />
+                        </button>
+                      </span>
                     </td>
                     <td><span class="badge bg-blue-lt text-blue">{{ r.method }}</span></td>
                     <td
@@ -380,7 +462,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
+import { IconBan, IconCheck, IconCopy } from '@tabler/icons-vue'
 import SortableHeader from '../common/SortableHeader.vue'
 import PaginationNav from '../PaginationNav.vue'
 import type { DomainDetailsFilterKey, DomainDetailsSortKey } from '../../composables/useDomainDetails'
@@ -401,9 +484,11 @@ const props = withDefaults(defineProps<{
   page: number
   totalPages: number
   hasActiveFilters: boolean
+  blockState?: Record<string, 'loading' | 'error'>
 }>(), {
   error: '',
   details: () => ({}),
+  blockState: () => ({}),
 })
 
 defineEmits<{
@@ -412,9 +497,20 @@ defineEmits<{
   (e: 'clear-filters'): void
   (e: 'toggle-sort', key: DomainDetailsSortKey): void
   (e: 'update:page', page: number): void
+  (e: 'block-ip', payload: { ip: string; hostId: string }): void
 }>()
 
 const METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'HEAD', 'OPTIONS', 'PATCH']
+
+const copiedIP = ref('')
+
+function copyIP(ip: string): void {
+  navigator.clipboard.writeText(ip).catch(() => {})
+  copiedIP.value = ip
+  setTimeout(() => {
+    if (copiedIP.value === ip) copiedIP.value = ''
+  }, 1500)
+}
 
 // Keeps the previous page's KPIs/table visible (instead of flashing back to
 // the full-page spinner) while a filter/sort/page change re-fetches — only
