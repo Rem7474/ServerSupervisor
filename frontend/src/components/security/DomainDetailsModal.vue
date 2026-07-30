@@ -44,7 +44,7 @@
             <div class="col-6 col-lg-3">
               <button
                 type="button"
-                class="kpi-btn border rounded p-2 text-center w-100"
+                class="kpi-btn clickable-row border rounded p-2 text-center w-100"
                 :class="{ active: filters.status === '' }"
                 @click="$emit('update-filter', { key: 'status', value: '' })"
               >
@@ -69,7 +69,7 @@
             <div class="col-6 col-lg-3">
               <button
                 type="button"
-                class="kpi-btn border rounded p-2 text-center w-100"
+                class="kpi-btn clickable-row border rounded p-2 text-center w-100"
                 :class="{ active: filters.status === '4xx' }"
                 title="Filtrer sur les statuts 4xx"
                 @click="$emit('update-filter', { key: 'status', value: filters.status === '4xx' ? '' : '4xx' })"
@@ -85,7 +85,7 @@
             <div class="col-6 col-lg-3">
               <button
                 type="button"
-                class="kpi-btn border rounded p-2 text-center w-100"
+                class="kpi-btn clickable-row border rounded p-2 text-center w-100"
                 :class="{ active: filters.status === '5xx' }"
                 title="Filtrer sur les statuts 5xx"
                 @click="$emit('update-filter', { key: 'status', value: filters.status === '5xx' ? '' : '5xx' })"
@@ -120,7 +120,7 @@
                     v-else
                     :key="p.path"
                     type="button"
-                    class="row-btn d-flex justify-content-between align-items-center border-bottom px-3 py-2 w-100"
+                    class="row-btn clickable-row d-flex justify-content-between align-items-center border-bottom px-3 py-2 w-100"
                     :class="{ active: filters.path === p.path }"
                     :title="`Filtrer sur ${p.path}`"
                     @click="$emit('update-filter', { key: 'path', value: filters.path === p.path ? '' : p.path })"
@@ -153,7 +153,7 @@
                     v-else
                     :key="c.ip"
                     type="button"
-                    class="row-btn d-flex justify-content-between align-items-center border-bottom px-3 py-2 w-100"
+                    class="row-btn clickable-row d-flex justify-content-between align-items-center border-bottom px-3 py-2 w-100"
                     :class="{ active: filters.ip === c.ip }"
                     :title="`Filtrer sur ${c.ip}`"
                     @click="$emit('update-filter', { key: 'ip', value: filters.ip === c.ip ? '' : c.ip })"
@@ -469,15 +469,14 @@ function statusClass(status: number): string {
 .kpi-btn,
 .row-btn {
   background: transparent;
-  cursor: pointer;
   transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 
-.kpi-btn:hover,
-.row-btn:hover {
-  border-color: var(--tblr-primary) !important;
-}
-
+/* Hover fill comes from the shared .clickable-row utility (style.css) —
+   same color used for every clickable row/card across Threats/Traffic, so
+   this modal's filter affordances read the same way. .active stays a
+   distinct, persistent "currently filtered on this" indicator (border +
+   tint), not a hover state. */
 .kpi-btn.active,
 .row-btn.active {
   border-color: var(--tblr-primary) !important;
