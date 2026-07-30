@@ -71,7 +71,7 @@
                 Requêtes suspectes
               </div>
               <div class="h2 mb-0 text-orange">
-                {{ threats.suspicious_requests || 0 }}
+                {{ (threats.suspicious_requests || 0).toLocaleString('fr-FR') }}
               </div>
             </div>
           </div>
@@ -83,7 +83,7 @@
                 IPs suspectes
               </div>
               <div class="h2 mb-0">
-                {{ threats.suspicious_ips || 0 }}
+                {{ (threats.suspicious_ips || 0).toLocaleString('fr-FR') }}
               </div>
             </div>
           </div>
@@ -95,7 +95,7 @@
                 Domaines ciblés
               </div>
               <div class="h2 mb-0">
-                {{ threats.targeted_hosts || 0 }}
+                {{ (threats.targeted_hosts || 0).toLocaleString('fr-FR') }}
               </div>
             </div>
           </div>
@@ -107,16 +107,16 @@
                 IPs bloquées
               </div>
               <div class="h2 mb-0 text-success">
-                {{ threats.blocked_ips || 0 }}
+                {{ (threats.blocked_ips || 0).toLocaleString('fr-FR') }}
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      <div class="row row-cards">
+      <div class="row row-cards align-items-start">
         <div class="col-lg-7">
-          <div class="card h-100">
+          <div class="card">
             <div class="card-header">
               <h3 class="card-title mb-0">
                 IPs suspectes
@@ -173,13 +173,13 @@
                       {{ ip.ip }}
                     </td>
                     <td class="text-end">
-                      {{ ip.hits || 0 }}
+                      {{ (ip.hits || 0).toLocaleString('fr-FR') }}
                     </td>
                     <td class="text-end">
-                      {{ ip.unique_paths || 0 }}
+                      {{ (ip.unique_paths || 0).toLocaleString('fr-FR') }}
                     </td>
                     <td class="text-end">
-                      {{ ip.host_count || 0 }}
+                      {{ (ip.host_count || 0).toLocaleString('fr-FR') }}
                     </td>
                     <td>
                       <span
@@ -234,13 +234,13 @@
         </div>
 
         <div class="col-lg-5">
-          <div class="card h-100">
+          <div class="card">
             <div class="card-header">
               <h3 class="card-title mb-0">
                 Top chemins scannés
               </h3>
             </div>
-            <div class="card-body p-0">
+            <div class="card-body p-0 top-paths-scroll">
               <div
                 v-if="!topPaths.length"
                 class="text-center py-4 text-secondary small"
@@ -253,7 +253,7 @@
                 :key="`${p.path}-${p.category}`"
                 class="d-flex justify-content-between border-bottom px-3 py-2 top-path-row"
               >
-                <div>
+                <div class="top-path-label">
                   <div class="font-monospace small">
                     {{ p.path }}
                   </div>
@@ -261,7 +261,7 @@
                     {{ p.category || 'Unknown' }}
                   </div>
                 </div>
-                <span class="badge bg-yellow-lt text-yellow">{{ p.hits }}</span>
+                <span class="badge bg-yellow-lt text-yellow flex-shrink-0">{{ (p.hits || 0).toLocaleString('fr-FR') }}</span>
               </div>
             </div>
           </div>
@@ -303,20 +303,18 @@
                   <tr
                     v-for="h in sortedMostTargetedHosts"
                     :key="h.host_id"
+                    :class="{ 'cursor-pointer clickable-row': h.host_id }"
+                    :tabindex="h.host_id ? 0 : undefined"
+                    :role="h.host_id ? 'button' : undefined"
+                    @click="h.host_id && openDomain(h.host_id)"
+                    @keydown.enter="h.host_id && openDomain(h.host_id)"
+                    @keydown.space.prevent="h.host_id && openDomain(h.host_id)"
                   >
-                    <td>
-                      <button
-                        v-if="h.host_id"
-                        type="button"
-                        class="btn btn-link p-0 text-decoration-none"
-                        @click="openDomain(h.host_id)"
-                      >
-                        {{ h.host_name || h.host_id }}
-                      </button>
-                      <span v-else>{{ h.host_name || '—' }}</span>
+                    <td class="font-monospace small">
+                      {{ h.host_name || h.host_id || '—' }}
                     </td>
                     <td class="text-end">
-                      {{ h.hits || 0 }}
+                      {{ (h.hits || 0).toLocaleString('fr-FR') }}
                     </td>
                   </tr>
                 </tbody>
@@ -372,10 +370,10 @@
                       {{ m.ip }}
                     </td>
                     <td class="text-end">
-                      {{ m.host_count || 0 }}
+                      {{ (m.host_count || 0).toLocaleString('fr-FR') }}
                     </td>
                     <td class="text-end">
-                      {{ m.hits || 0 }}
+                      {{ (m.hits || 0).toLocaleString('fr-FR') }}
                     </td>
                     <td class="text-end">
                       <button
@@ -420,7 +418,7 @@
                         @toggle="toggleCrowdSecSort('ip')"
                       />
                     </th>
-                    <th>Action</th>
+                    <th>Décision</th>
                     <th>Scénario</th>
                     <th>Origine</th>
                     <th>
@@ -674,17 +672,34 @@ const sortedCrowdSecIPs = computed(() =>
 </script>
 
 <style scoped>
-.top-path-row {
-  gap: 0.5rem;
+/* Caps the path list independently of the "IPs suspectes" table next to it —
+   the two cards no longer force each other to an equal height (see
+   `align-items-start` on their parent row), so a long scan list scrolls in
+   place instead of stretching the sibling card with dead space. */
+.top-paths-scroll {
+  max-height: 420px;
+  overflow-y: auto;
 }
 
-@media (max-width: 992px) {
-  .top-path-row {
-    align-items: flex-start;
-  }
+.top-path-row {
+  gap: 0.5rem;
+  align-items: flex-start;
+}
 
-  .top-path-row .font-monospace {
-    overflow-wrap: anywhere;
-  }
+.top-path-label {
+  min-width: 0;
+}
+
+.top-path-row .font-monospace {
+  overflow-wrap: anywhere;
+}
+
+.clickable-row:hover {
+  background-color: var(--tblr-bg-surface-secondary);
+}
+
+.clickable-row:focus-visible {
+  outline: 2px solid var(--tblr-primary);
+  outline-offset: -2px;
 }
 </style>
