@@ -37,9 +37,9 @@
         :lines="4"
         class="mb-4"
       />
-      <div class="row row-cards">
+      <div class="row row-cards align-items-start">
         <div class="col-lg-7">
-          <div class="card h-100">
+          <div class="card">
             <div class="card-body">
               <LoadingSkeleton
                 variant="table"
@@ -49,11 +49,45 @@
           </div>
         </div>
         <div class="col-lg-5">
-          <div class="card h-100">
+          <div class="card">
             <div class="card-body">
               <LoadingSkeleton
                 variant="table"
                 :lines="6"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="row row-cards mt-4">
+        <div class="col-lg-6">
+          <div class="card h-100">
+            <div class="card-body">
+              <LoadingSkeleton
+                variant="table"
+                :lines="5"
+              />
+            </div>
+          </div>
+        </div>
+        <div class="col-lg-6">
+          <div class="card h-100">
+            <div class="card-body">
+              <LoadingSkeleton
+                variant="table"
+                :lines="5"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="row row-cards mt-4">
+        <div class="col-12">
+          <div class="card">
+            <div class="card-body">
+              <LoadingSkeleton
+                variant="table"
+                :lines="5"
               />
             </div>
           </div>
@@ -82,7 +116,7 @@
               <div class="text-secondary small mb-1">
                 IPs suspectes
               </div>
-              <div class="h2 mb-0">
+              <div class="h2 mb-0 text-orange">
                 {{ (threats.suspicious_ips || 0).toLocaleString('fr-FR') }}
               </div>
             </div>
@@ -94,7 +128,7 @@
               <div class="text-secondary small mb-1">
                 Domaines ciblés
               </div>
-              <div class="h2 mb-0">
+              <div class="h2 mb-0 text-orange">
                 {{ (threats.targeted_hosts || 0).toLocaleString('fr-FR') }}
               </div>
             </div>
