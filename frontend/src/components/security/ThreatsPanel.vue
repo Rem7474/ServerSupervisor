@@ -37,9 +37,9 @@
         :lines="4"
         class="mb-4"
       />
-      <div class="row row-cards align-items-start">
+      <div class="row row-cards">
         <div class="col-lg-7">
-          <div class="card">
+          <div class="card h-100">
             <div class="card-body">
               <LoadingSkeleton
                 variant="table"
@@ -49,7 +49,7 @@
           </div>
         </div>
         <div class="col-lg-5">
-          <div class="card">
+          <div class="card h-100">
             <div class="card-body">
               <LoadingSkeleton
                 variant="table"
@@ -159,9 +159,9 @@
         </div>
       </div>
 
-      <div class="row row-cards align-items-start">
+      <div class="row row-cards">
         <div class="col-lg-7">
-          <div class="card">
+          <div class="card h-100">
             <div class="card-header">
               <h3 class="card-title mb-0">
                 IPs suspectes
@@ -279,7 +279,7 @@
         </div>
 
         <div class="col-lg-5">
-          <div class="card">
+          <div class="card h-100">
             <div class="card-header">
               <h3 class="card-title mb-0">
                 Top chemins scannés
