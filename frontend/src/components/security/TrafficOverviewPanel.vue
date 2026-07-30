@@ -231,7 +231,7 @@
                 v-else
                 :key="ip.ip"
                 type="button"
-                class="btn d-flex justify-content-between align-items-center px-3 py-2 border-bottom w-100 rounded-0 text-start"
+                class="btn clickable-row d-flex justify-content-between align-items-center px-3 py-2 border-bottom w-100 rounded-0 text-start"
                 @click="openIP(ip.ip)"
               >
                 <div>
@@ -249,9 +249,9 @@
         </div>
       </div>
 
-      <div class="row row-cards mb-4">
+      <div class="row row-cards mb-4 align-items-start">
         <div class="col-xl-8">
-          <div class="card h-100">
+          <div class="card">
             <div class="card-header d-flex align-items-center justify-content-between">
               <h3 class="card-title mb-0">
                 Carte mondiale des IP clientes
@@ -264,14 +264,14 @@
         </div>
 
         <div class="col-xl-4">
-          <div class="card h-100">
+          <div class="card">
             <div class="card-header d-flex align-items-center justify-content-between">
               <h3 class="card-title mb-0">
                 Pays les plus actifs
               </h3>
               <span class="small text-secondary">{{ numberFormat(countryDistribution.length) }} pays</span>
             </div>
-            <div class="table-responsive">
+            <div class="table-responsive scroll-table">
               <table class="table table-vcenter card-table">
                 <thead>
                   <tr>
@@ -331,20 +331,16 @@
                 <div
                   v-for="h in topProxyHosts.slice(0, 8)"
                   :key="h.vhost || h.host_id || h.host_name"
-                  class="mb-2"
+                  class="mb-2 rounded p-1"
+                  :class="{ 'clickable-row': h.vhost }"
+                  :tabindex="h.vhost ? 0 : undefined"
+                  :role="h.vhost ? 'button' : undefined"
+                  @click="h.vhost && openDomain(h.vhost)"
+                  @keydown.enter="h.vhost && openDomain(h.vhost)"
+                  @keydown.space.prevent="h.vhost && openDomain(h.vhost)"
                 >
                   <div class="d-flex justify-content-between small mb-1">
-                    <router-link
-                      v-if="h.host_id"
-                      :to="`/hosts/${h.host_id}`"
-                      class="font-monospace text-decoration-none"
-                    >
-                      {{ h.vhost || h.host_name || h.host_id }}
-                    </router-link>
-                    <span
-                      v-else
-                      class="font-monospace"
-                    >{{ h.vhost || h.host_name || '(unknown)' }}</span>
+                    <span class="font-monospace">{{ h.vhost || h.host_name || '(unknown)' }}</span>
                     <span>{{ numberFormat(h.hits || 0) }}</span>
                   </div>
                   <div
@@ -383,13 +379,12 @@
                     <th class="text-end">
                       5xx
                     </th>
-                    <th />
                   </tr>
                 </thead>
                 <tbody>
                   <tr v-if="!topDomains.length">
                     <td
-                      colspan="5"
+                      colspan="4"
                       class="text-center text-secondary py-4"
                     >
                       Aucune donnée de trafic.
@@ -398,6 +393,12 @@
                   <tr
                     v-for="item in topDomains.slice(0, 10)"
                     :key="item.domain"
+                    :class="{ 'clickable-row': item.domain }"
+                    :tabindex="item.domain ? 0 : undefined"
+                    :role="item.domain ? 'button' : undefined"
+                    @click="item.domain && openDomain(item.domain)"
+                    @keydown.enter="item.domain && openDomain(item.domain)"
+                    @keydown.space.prevent="item.domain && openDomain(item.domain)"
                   >
                     <td class="font-monospace small">
                       {{ item.domain || '(unknown)' }}
@@ -410,15 +411,6 @@
                     </td>
                     <td class="text-end text-red">
                       {{ numberFormat(item.errors_5xx || 0) }}
-                    </td>
-                    <td class="text-end">
-                      <button
-                        type="button"
-                        class="btn btn-sm btn-outline-primary"
-                        @click="openDomain(item.domain)"
-                      >
-                        Détails
-                      </button>
                     </td>
                   </tr>
                 </tbody>

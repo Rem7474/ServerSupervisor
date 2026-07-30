@@ -55,6 +55,10 @@ export function useBot() {
   const topPaths = computed(() => threats.value.top_paths || [])
   const mostTargetedHosts = computed(() => threats.value.most_targeted_hosts || [])
   const ipHostMatrix = computed(() => threats.value.ip_host_matrix || [])
+  const countryDistribution = computed(() => {
+    const rows = threats.value.country_distribution || []
+    return [...rows].sort((a: AnyRecord, b: AnyRecord) => (Number(b?.hits) || 0) - (Number(a?.hits) || 0))
+  })
   const unblockedIPs = ref(new Set<string>())
   const rowState = ref<Record<string, 'loading' | 'error'>>({})
   const optimisticBans = ref<AnyRecord[]>([])
@@ -341,6 +345,7 @@ export function useBot() {
     topPaths,
     mostTargetedHosts,
     ipHostMatrix,
+    countryDistribution,
     rowState,
     crowdSecIPs,
     crowdSecTotal,

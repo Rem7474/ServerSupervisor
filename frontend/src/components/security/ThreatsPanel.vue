@@ -60,6 +60,17 @@
         </div>
       </div>
       <div class="row row-cards mt-4">
+        <div class="col-xl-8">
+          <LoadingSkeleton variant="chart" />
+        </div>
+        <div class="col-xl-4">
+          <LoadingSkeleton
+            variant="table"
+            :lines="6"
+          />
+        </div>
+      </div>
+      <div class="row row-cards mt-4">
         <div class="col-lg-6">
           <div class="card h-100">
             <div class="card-body">
@@ -315,6 +326,68 @@
         </div>
       </div>
 
+      <div class="row row-cards mt-4 align-items-start">
+        <div class="col-xl-8">
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title mb-0">
+                Carte mondiale des menaces
+              </h3>
+            </div>
+            <div class="card-body">
+              <TrafficWorldMap :country-distribution="countryDistribution" />
+            </div>
+          </div>
+        </div>
+        <div class="col-xl-4">
+          <div class="card">
+            <div class="card-header d-flex align-items-center justify-content-between">
+              <h3 class="card-title mb-0">
+                Pays des IPs suspectes
+              </h3>
+              <span class="small text-secondary">{{ countryDistribution.length }} pays</span>
+            </div>
+            <div class="table-responsive scroll-table">
+              <table class="table table-vcenter card-table">
+                <thead>
+                  <tr>
+                    <th>Pays</th>
+                    <th>Code</th>
+                    <th class="text-end">
+                      Hits
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-if="!countryDistribution.length">
+                    <td
+                      colspan="3"
+                      class="text-center text-secondary py-4"
+                    >
+                      Aucune donnée pays.
+                    </td>
+                  </tr>
+                  <tr
+                    v-for="item in countryDistribution"
+                    :key="`country-${item.country}`"
+                  >
+                    <td class="small">
+                      {{ item.country || 'Inconnu' }}
+                    </td>
+                    <td>
+                      <span class="badge bg-azure-lt text-azure">{{ item.country_code || '--' }}</span>
+                    </td>
+                    <td class="text-end">
+                      {{ (item.hits || 0).toLocaleString('fr-FR') }}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="row row-cards mt-4">
         <div class="col-lg-6">
           <div class="card h-100">
@@ -350,7 +423,7 @@
                   <tr
                     v-for="h in sortedMostTargetedHosts"
                     :key="h.host_id"
-                    :class="{ 'cursor-pointer clickable-row': h.host_id }"
+                    :class="{ 'clickable-row': h.host_id }"
                     :tabindex="h.host_id ? 0 : undefined"
                     :role="h.host_id ? 'button' : undefined"
                     @click="h.host_id && openDomain(h.host_id)"
@@ -606,6 +679,7 @@ import PageRefreshBar from '../PageRefreshBar.vue'
 import TrafficThreatsFilterBar from './TrafficThreatsFilterBar.vue'
 import IPTimelineModal from './IPTimelineModal.vue'
 import DomainDetailsModal from './DomainDetailsModal.vue'
+import TrafficWorldMap from './TrafficWorldMap.vue'
 import SortableHeader from '../common/SortableHeader.vue'
 import PaginationNav from '../PaginationNav.vue'
 import { useBot } from '../../composables/useBot'
@@ -635,6 +709,7 @@ const {
   topPaths,
   mostTargetedHosts,
   ipHostMatrix,
+  countryDistribution,
   rowState,
   crowdSecIPs,
   crowdSecTotal,
@@ -734,14 +809,5 @@ const sortedCrowdSecIPs = computed(() =>
 
 .top-path-row .font-monospace {
   overflow-wrap: anywhere;
-}
-
-.clickable-row:hover {
-  background-color: var(--tblr-bg-surface-secondary);
-}
-
-.clickable-row:focus-visible {
-  outline: 2px solid var(--tblr-primary);
-  outline-offset: -2px;
 }
 </style>

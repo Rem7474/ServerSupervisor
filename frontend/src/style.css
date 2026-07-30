@@ -407,6 +407,29 @@ select:-webkit-autofill:focus {
   background: var(--tblr-bg-surface);
 }
 
+/* Shared "this whole row opens a detail view" affordance — one hover/focus
+   color used everywhere a full row (or a full-width row-shaped button, e.g.
+   Traffic's "Top IPs suspectes" list) is clickable, so the interaction reads
+   the same across Threats/Traffic instead of each table inventing its own.
+   The .btn variant needs the extra class for specificity: Tabler's own
+   .btn:hover sets background-color too, and (per the btn-icon fix above)
+   its CSS ships in a separate chunk loaded after app CSS in production, so
+   equal-specificity selectors aren't safe to rely on beating it. */
+.clickable-row {
+  cursor: pointer;
+}
+
+.clickable-row:hover,
+.btn.clickable-row:hover {
+  background-color: var(--tblr-bg-surface-secondary);
+}
+
+.clickable-row:focus-visible,
+.btn.clickable-row:focus-visible {
+  outline: 2px solid var(--tblr-primary);
+  outline-offset: -2px;
+}
+
 /* ── Responsive icons ── */
 .icon-xs {
   width: 12px;

@@ -194,6 +194,14 @@ func (s *Service) Summary(ctx context.Context, period time.Duration, hostID, sou
 		s.applyThreatScoring(threats)
 		// No traffic block in this scope; promote only applies the crowdsec bump.
 		promoteBlockedIntoThreats(map[string]any{"threats": threats}, threats)
+		// Same geoloc helper the "full" scope uses for its traffic map, run
+		// inline here instead of in a goroutine: applyThreatScoring already
+		// capped top_ips at 25 (vs. 120 for traffic), so this is a fraction of
+		// the fan-out the full scope already accepts, bounded by the same
+		// 4-worker/2s-timeout/24h-cache resolveIPsWithContext.
+		if ips, ok := threats["top_ips"].([]map[string]any); ok {
+			threats["country_distribution"] = countryDistribution(ips)
+		}
 		return &SummaryResult{Since: since, Threats: threats}, nil
 	}
 
