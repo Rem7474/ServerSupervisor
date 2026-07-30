@@ -235,7 +235,7 @@
         </div>
         <router-link
           v-if="selectedNode?.type === 'host' && selectedNode.hostId"
-          :to="`/hosts/${selectedNode.hostId}`"
+          :to="`/hosts/${selectedNode.hostId}?tab=exposition`"
           class="btn btn-sm btn-outline-primary"
         >
           <IconHome
@@ -246,7 +246,7 @@
         </router-link>
         <router-link
           v-if="selectedNode?.type !== 'host' && selectedNode?.hostId"
-          :to="`/hosts/${selectedNode.hostId}`"
+          :to="`/hosts/${selectedNode.hostId}?tab=exposition`"
           class="btn btn-sm btn-outline-secondary"
         >
           Voir l'hôte associé

@@ -333,7 +333,7 @@
               <td>
                 <router-link
                   v-if="g.host_id"
-                  :to="`/hosts/${g.host_id}`"
+                  :to="`/hosts/${g.host_id}?tab=exposition`"
                   class="text-decoration-none"
                 >
                   {{ g.host_name || g.host_id }}
@@ -415,7 +415,7 @@
               <td>
                 <router-link
                   v-if="n.matched_type === 'host'"
-                  :to="`/hosts/${n.matched_id}`"
+                  :to="`/hosts/${n.matched_id}?tab=exposition`"
                   class="text-decoration-none"
                 >
                   {{ n.matched_name }}
