@@ -274,7 +274,7 @@
                 Top chemins scannés
               </h3>
             </div>
-            <div class="card-body p-0 top-paths-scroll">
+            <div class="card-body p-0">
               <div
                 v-if="!topPaths.length"
                 class="text-center py-4 text-secondary small"
@@ -282,7 +282,7 @@
                 Aucun chemin suspect.
               </div>
               <div
-                v-for="p in topPaths"
+                v-for="p in pagedTopPaths"
                 v-else
                 :key="`${p.path}-${p.category}`"
                 class="d-flex justify-content-between border-bottom px-3 py-2 top-path-row"
@@ -297,6 +297,19 @@
                 </div>
                 <span class="badge bg-yellow-lt text-yellow flex-shrink-0">{{ (p.hits || 0).toLocaleString('fr-FR') }}</span>
               </div>
+            </div>
+            <div
+              v-if="pathsTotalPages > 1"
+              class="card-footer d-flex align-items-center justify-content-between"
+            >
+              <div class="text-secondary small">
+                Page {{ pathsPage }} sur {{ pathsTotalPages }} — {{ topPaths.length }} chemins
+              </div>
+              <PaginationNav
+                :current-page="pathsPage"
+                :total-pages="pathsTotalPages"
+                @select="setPathsPage"
+              />
             </div>
           </div>
         </div>
@@ -666,6 +679,10 @@ const sortedTopIPs = computed(() =>
 const { currentPage: ipPage, totalPages: ipTotalPages, pagedItems: pagedTopIPs, setPage: setIPPage } =
   usePagination({ items: sortedTopIPs, pageSize: 10 })
 
+const topPathsArray = computed<AnyRecord[]>(() => [...topPaths.value])
+const { currentPage: pathsPage, totalPages: pathsTotalPages, pagedItems: pagedTopPaths, setPage: setPathsPage } =
+  usePagination({ items: topPathsArray, pageSize: 10 })
+
 const hostSortKey = ref<'hits'>('hits')
 const hostSortDir = ref<'asc' | 'desc'>('desc')
 function toggleHostSort(key: typeof hostSortKey.value): void {
@@ -706,15 +723,6 @@ const sortedCrowdSecIPs = computed(() =>
 </script>
 
 <style scoped>
-/* Caps the path list independently of the "IPs suspectes" table next to it —
-   the two cards no longer force each other to an equal height (see
-   `align-items-start` on their parent row), so a long scan list scrolls in
-   place instead of stretching the sibling card with dead space. */
-.top-paths-scroll {
-  max-height: 420px;
-  overflow-y: auto;
-}
-
 .top-path-row {
   gap: 0.5rem;
   align-items: flex-start;
