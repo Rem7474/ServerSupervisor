@@ -326,9 +326,9 @@
         </div>
       </div>
 
-      <div class="row row-cards mt-4">
+      <div class="row row-cards mt-4 align-items-start">
         <div class="col-xl-8">
-          <div class="card h-100">
+          <div class="card">
             <div class="card-header">
               <h3 class="card-title mb-0">
                 Carte mondiale des menaces
@@ -340,14 +340,14 @@
           </div>
         </div>
         <div class="col-xl-4">
-          <div class="card h-100">
+          <div class="card">
             <div class="card-header d-flex align-items-center justify-content-between">
               <h3 class="card-title mb-0">
                 Pays des IPs suspectes
               </h3>
               <span class="small text-secondary">{{ countryDistribution.length }} pays</span>
             </div>
-            <div class="table-responsive scroll-table threats-country-scroll">
+            <div class="table-responsive scroll-table">
               <table class="table table-vcenter card-table">
                 <thead>
                   <tr>
@@ -798,17 +798,6 @@ const sortedCrowdSecIPs = computed(() =>
 </script>
 
 <style scoped>
-/* Caps the country table close to the map's own fixed 340px height instead
-   of .scroll-table's generous 70vh — country_distribution here is derived
-   from only the top 25 scored suspicious IPs (deduplicated by country), so
-   it's small enough that this cap keeps both cards genuinely comparable in
-   height, unlike Traffic's equivalent table (fed by up to 120 IPs across
-   all traffic, easily taller than the map — see TrafficOverviewPanel.vue,
-   which deliberately keeps align-items-start + the 70vh cap instead). */
-.threats-country-scroll {
-  max-height: 340px;
-}
-
 .top-path-row {
   gap: 0.5rem;
   align-items: flex-start;
