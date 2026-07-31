@@ -17,7 +17,7 @@
           v-model="processFilter"
           type="text"
           class="form-control form-control-sm"
-          placeholder="Filtrer..."
+          placeholder="Filtrer…"
           style="width: 160px;"
         >
         <button

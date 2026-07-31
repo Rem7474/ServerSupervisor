@@ -90,7 +90,11 @@
           class="btn btn-outline-secondary btn-sm ms-2"
           @click="addServiceRow"
         >
-          + Ajouter
+          <IconPlus
+            :size="16"
+            class="icon me-1"
+          />
+          Ajouter
         </button>
       </div>
       <div class="table-responsive network-config-table">
@@ -524,7 +528,7 @@
 
 <script setup lang="ts">
 import { computed, watch } from 'vue'
-import { IconRefresh } from '@tabler/icons-vue'
+import { IconPlus, IconRefresh } from '@tabler/icons-vue'
 
 interface NetworkService {
   id: string

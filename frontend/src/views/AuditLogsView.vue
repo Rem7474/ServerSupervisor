@@ -60,7 +60,7 @@
         <DataToolbar
           searchable
           :search="cmdSearch"
-          search-placeholder="Rechercher hôte, commande, utilisateur..."
+          search-placeholder="Rechercher hôte, commande, utilisateur…"
           @update:search="onSearchUpdate"
         >
           <template #bottom>

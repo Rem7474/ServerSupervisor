@@ -3,7 +3,7 @@
   <DataToolbar
     searchable
     :search="composeSearchInput"
-    search-placeholder="Rechercher un projet..."
+    search-placeholder="Rechercher un projet…"
     @update:search="composeSearchInput = $event"
   >
     <template #bottom>

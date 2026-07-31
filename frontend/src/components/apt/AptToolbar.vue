@@ -2,7 +2,7 @@
   <DataToolbar
     searchable
     :search="search"
-    search-placeholder="Rechercher un hôte..."
+    search-placeholder="Rechercher un hôte…"
     @update:search="search = $event"
   >
     <template #right>

@@ -126,7 +126,7 @@
               v-model="searchQuery"
               type="text"
               class="form-control"
-              placeholder="Rechercher un hôte..."
+              placeholder="Rechercher un hôte…"
             >
           </div>
           <div class="col-12 col-md-4 col-lg-2">

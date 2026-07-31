@@ -39,7 +39,7 @@
     <DataToolbar
       searchable
       :search="filterText"
-      search-placeholder="Rechercher une tâche..."
+      search-placeholder="Rechercher une tâche…"
       @update:search="filterText = $event"
     >
       <template #right>

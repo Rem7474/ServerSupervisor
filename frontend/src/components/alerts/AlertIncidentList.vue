@@ -41,7 +41,7 @@
               v-model="searchQuery"
               type="text"
               class="form-control"
-              placeholder="Rechercher une règle, un hôte, une source..."
+              placeholder="Rechercher une règle, un hôte, une source…"
             >
             <button
               v-if="searchQuery"

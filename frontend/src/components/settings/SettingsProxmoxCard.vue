@@ -10,7 +10,11 @@
         class="btn btn-sm btn-primary"
         @click="openAddForm"
       >
-        + Ajouter une connexion
+        <IconPlus
+          :size="16"
+          class="icon me-1"
+        />
+        Ajouter une connexion
       </button>
     </div>
 
@@ -246,7 +250,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { IconClock, IconPencil, IconRefresh, IconTrash } from '@tabler/icons-vue'
+import { IconClock, IconPencil, IconPlus, IconRefresh, IconTrash } from '@tabler/icons-vue'
 import api from '../../api/index'
 import type { ProxmoxConnection } from '../../types/proxmox'
 import { getApiErrorMessage } from '../../api/client'

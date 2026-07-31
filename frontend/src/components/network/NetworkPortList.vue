@@ -8,7 +8,7 @@
               v-model="search"
               type="text"
               class="form-control"
-              placeholder="Rechercher un port, conteneur, image..."
+              placeholder="Rechercher un port, conteneur, image…"
             >
           </div>
           <div class="col-md-6 col-lg-3">
