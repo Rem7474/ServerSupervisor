@@ -131,19 +131,14 @@
       </div>
       <div
         v-else-if="!filteredTasks.length"
-        class="card-body text-center py-5"
+        class="card-body"
       >
-        <IconClock
-          :size="40"
-          class="icon mb-3 text-muted"
-          :stroke-width="1.5"
+        <EmptyState
+          :icon="IconClock"
+          :icon-size="40"
+          title="Aucune tâche trouvée"
+          :subtitle="tasks.length ? 'Modifiez vos filtres.' : canManage ? 'Cliquez sur « Nouvelle tâche » pour commencer.' : 'Aucune tâche configurée.'"
         />
-        <h3 class="mb-1">
-          Aucune tâche trouvée
-        </h3>
-        <p class="text-secondary mb-0">
-          {{ tasks.length ? 'Modifiez vos filtres.' : canManage ? 'Cliquez sur « Nouvelle tâche » pour commencer.' : 'Aucune tâche configurée.' }}
-        </p>
       </div>
       <div
         v-else
@@ -752,6 +747,7 @@ import { IconClock, IconPencil, IconTrash } from '@tabler/icons-vue'
 import DataToolbar from '../components/common/DataToolbar.vue'
 import SortableHeader from '../components/common/SortableHeader.vue'
 import BulkActionBar from '../components/BulkActionBar.vue'
+import EmptyState from '../components/EmptyState.vue'
 import CronBuilder from '../components/CronBuilder.vue'
 import DispatchStepEditor from '../components/DispatchStepEditor.vue'
 import PageRefreshBar from '../components/PageRefreshBar.vue'

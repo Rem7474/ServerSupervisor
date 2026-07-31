@@ -99,25 +99,14 @@
         v-else-if="webhooks.length === 0"
         class="card"
       >
-        <div class="card-body text-center py-5 text-muted">
-          <IconGitBranch
-            :size="48"
-            class="mb-3 d-block mx-auto opacity-50"
-            :stroke-width="1.5"
+        <div class="card-body">
+          <EmptyState
+            :icon="IconGitBranch"
+            title="Aucun webhook configuré."
+            subtitle="Recevez des événements depuis GitHub, GitLab, Gitea ou Forgejo pour déclencher des scripts sur vos VMs."
+            cta-label="Créer le premier webhook"
+            @cta="openCreateWebhook"
           />
-          <p class="mb-2">
-            Aucun webhook configuré.
-          </p>
-          <p class="text-muted small">
-            Recevez des événements depuis GitHub, GitLab, Gitea ou Forgejo pour déclencher des scripts sur vos VMs.
-          </p>
-          <button
-            type="button"
-            class="btn btn-sm btn-primary"
-            @click="openCreateWebhook"
-          >
-            Créer le premier webhook
-          </button>
         </div>
       </div>
 
@@ -265,25 +254,14 @@
         v-else-if="trackers.length === 0"
         class="card"
       >
-        <div class="card-body text-center py-5 text-muted">
-          <IconActivity
-            :size="48"
-            class="mb-3 d-block mx-auto opacity-50"
-            :stroke-width="1.5"
+        <div class="card-body">
+          <EmptyState
+            :icon="IconActivity"
+            title="Aucun tracker configuré."
+            subtitle="Surveillez les releases Git ou les images Docker et déclenchez automatiquement un script sur une VM lors d'une mise à jour."
+            cta-label="Créer le premier tracker"
+            @cta="openCreateTracker"
           />
-          <p class="mb-2">
-            Aucun tracker configuré.
-          </p>
-          <p class="text-muted small">
-            Surveillez les releases Git ou les images Docker et déclenchez automatiquement un script sur une VM lors d'une mise à jour.
-          </p>
-          <button
-            type="button"
-            class="btn btn-sm btn-primary"
-            @click="openCreateTracker"
-          >
-            Créer le premier tracker
-          </button>
         </div>
       </div>
 
@@ -612,6 +590,7 @@
 import { useGitWebhooksPage } from '../composables/useGitWebhooksPage'
 import { commandStatusLabel } from '../utils/commandStatus'
 import { IconActivity, IconGitBranch, IconPlus, IconRefresh, IconSearch, IconTrash } from '@tabler/icons-vue'
+import EmptyState from '../components/EmptyState.vue'
 import WebhookUrlCard from '../components/webhooks/WebhookUrlCard.vue'
 import WebhookExecutionList from '../components/webhooks/WebhookExecutionList.vue'
 import WebhookModal from '../components/webhooks/WebhookModal.vue'

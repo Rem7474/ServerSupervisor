@@ -16,19 +16,14 @@
     </div>
     <div
       v-else-if="health.length === 0"
-      class="card-body text-center text-muted py-5"
+      class="card-body"
     >
-      <IconClock
-        :size="36"
-        class="mb-2 icon icon-md icon-responsive-lg"
-        :stroke-width="1.5"
+      <EmptyState
+        :icon="IconClock"
+        :icon-size="36"
+        title="Aucune donnée SMART disponible"
+        subtitle="Vérifie que l'agent collecte SMART et que smartmontools est installé."
       />
-      <div class="small fw-medium">
-        Aucune donnée SMART disponible
-      </div>
-      <div class="mt-1 opacity-75 small">
-        Vérifie que l'agent collecte SMART et que smartmontools est installé.
-      </div>
     </div>
     <div
       v-else
@@ -171,6 +166,7 @@
 import { onMounted } from 'vue'
 import { IconClock } from '@tabler/icons-vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
+import EmptyState from '../EmptyState.vue'
 import BadgePill from '../common/BadgePill.vue'
 import { useDiskHealth, type DiskHealth } from '../../composables/useDiskHealth'
 import { smartStatusTone } from '../../utils/diskHealth'

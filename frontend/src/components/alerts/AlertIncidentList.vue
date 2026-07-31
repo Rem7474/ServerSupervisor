@@ -142,41 +142,25 @@
     </div>
     <div
       v-else-if="incidents.length === 0"
-      class="card-body text-center py-5 text-muted"
+      class="card-body"
     >
-      <IconBell
-        :size="48"
-        class="icon icon-lg mb-3"
-        :stroke-width="1.5"
+      <EmptyState
+        :icon="IconBell"
+        title="Aucune notification enregistrée"
+        subtitle="Les alertes et les notifications du release tracker apparaîtront ici"
       />
-      <div>Aucune notification enregistrée</div>
-      <div class="text-muted small mt-1">
-        Les alertes et les notifications du release tracker apparaîtront ici
-      </div>
     </div>
     <div
       v-else-if="filteredIncidents.length === 0"
-      class="card-body text-center py-5 text-muted"
+      class="card-body"
     >
-      <IconBell
-        :size="48"
-        class="icon icon-lg mb-3"
-        :stroke-width="1.5"
+      <EmptyState
+        :icon="IconBell"
+        title="Aucune notification ne correspond à cette recherche."
+        subtitle="Essayez un autre mot-clé ou réinitialisez les filtres."
+        :cta-label="hasActiveFilters ? 'Réinitialiser' : ''"
+        @cta="resetFilters"
       />
-      <div class="fw-semibold text-body">
-        Aucune notification ne correspond à cette recherche.
-      </div>
-      <div class="text-muted small mt-1">
-        Essayez un autre mot-clé ou réinitialisez les filtres.
-      </div>
-      <button
-        v-if="hasActiveFilters"
-        class="btn btn-sm btn-outline-secondary mt-3"
-        type="button"
-        @click="resetFilters"
-      >
-        Réinitialiser
-      </button>
     </div>
     <div
       v-else
@@ -368,6 +352,7 @@ import { computed, ref, watch } from 'vue'
 import { IconBell, IconCheck, IconSearch, IconX } from '@tabler/icons-vue'
 import apiClient from '../../api'
 import BadgePill from '../common/BadgePill.vue'
+import EmptyState from '../EmptyState.vue'
 import PaginationNav from '../PaginationNav.vue'
 import { addToast } from '../../composables/useGlobalToast'
 import { getApiErrorMessage } from '../../api/client'

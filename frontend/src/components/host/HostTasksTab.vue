@@ -29,27 +29,16 @@
       </div>
       <div
         v-else-if="!tasks.length"
-        class="card-body text-center py-5"
+        class="card-body"
       >
-        <IconClock
-          :size="40"
-          class="icon mb-3 text-muted"
-          :stroke-width="1.5"
+        <EmptyState
+          :icon="IconClock"
+          :icon-size="40"
+          title="Aucune tâche planifiée"
+          subtitle="Automatisez vos opérations en créant une tâche planifiée."
+          :cta-label="canRunApt ? 'Nouvelle tâche' : ''"
+          @cta="openCreateTask"
         />
-        <h3 class="mb-1">
-          Aucune tâche planifiée
-        </h3>
-        <p class="text-secondary mb-3">
-          Automatisez vos opérations en créant une tâche planifiée.
-        </p>
-        <button
-          v-if="canRunApt"
-          type="button"
-          class="btn btn-primary"
-          @click="openCreateTask"
-        >
-          Nouvelle tâche
-        </button>
       </div>
       <div
         v-else
@@ -421,6 +410,7 @@ import { computed, ref, watch } from 'vue'
 import { IconClock, IconList } from '@tabler/icons-vue'
 import CronBuilder from '../CronBuilder.vue'
 import SortableHeader from '../common/SortableHeader.vue'
+import EmptyState from '../EmptyState.vue'
 import apiClient from '../../api'
 import { useConfirmDialog } from '../../composables/useConfirmDialog'
 import { useDateFormatter } from '../../composables/useDateFormatter'

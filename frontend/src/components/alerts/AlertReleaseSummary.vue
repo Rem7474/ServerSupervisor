@@ -38,20 +38,14 @@
 
     <div
       v-else-if="trackers.length === 0"
-      class="card-body text-center py-5 text-muted"
+      class="card-body"
     >
-      <IconActivity
-        :size="48"
-        class="icon icon-lg mb-3 d-block mx-auto opacity-50"
-        :stroke-width="1.5"
+      <EmptyState
+        :icon="IconActivity"
+        title="Aucun tracker configuré"
+        cta-label="Créer un tracker"
+        cta-to="/git-webhooks"
       />
-      <div>Aucun tracker configuré</div>
-      <router-link
-        to="/git-webhooks"
-        class="btn btn-sm btn-primary mt-3"
-      >
-        Créer un tracker
-      </router-link>
     </div>
 
     <div
@@ -181,6 +175,7 @@
 <script setup lang="ts">
 import { useDateFormatter } from '../../composables/useDateFormatter'
 import { IconActivity, IconAlertTriangle, IconChevronRight, IconCopy } from '@tabler/icons-vue'
+import EmptyState from '../EmptyState.vue'
 
 interface TrackerExecution {
   status: string
