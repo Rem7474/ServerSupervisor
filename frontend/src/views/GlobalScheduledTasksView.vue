@@ -125,9 +125,9 @@
     <div class="card">
       <div
         v-if="loading"
-        class="card-body text-center py-5"
+        class="card-body"
       >
-        <span class="spinner-border text-primary" />
+        <LoadingSkeleton variant="table" />
       </div>
       <div
         v-else-if="!filteredTasks.length"
@@ -630,11 +630,8 @@
               />
             </div>
             <div class="modal-body p-0">
-              <div
-                v-if="historyLoading"
-                class="text-center py-5"
-              >
-                <span class="spinner-border text-primary" />
+              <div v-if="historyLoading">
+                <LoadingSkeleton variant="table" />
               </div>
               <div
                 v-else-if="historyError"
@@ -748,6 +745,7 @@ import DataToolbar from '../components/common/DataToolbar.vue'
 import SortableHeader from '../components/common/SortableHeader.vue'
 import BulkActionBar from '../components/BulkActionBar.vue'
 import EmptyState from '../components/EmptyState.vue'
+import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import CronBuilder from '../components/CronBuilder.vue'
 import DispatchStepEditor from '../components/DispatchStepEditor.vue'
 import PageRefreshBar from '../components/PageRefreshBar.vue'

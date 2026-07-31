@@ -85,15 +85,11 @@
     </div>
 
     <div v-show="activeTab === 'webhooks'">
-      <div
+      <LoadingSkeleton
         v-if="loadingWebhooks"
-        class="text-center py-5"
-      >
-        <div
-          class="spinner-border text-primary"
-          role="status"
-        />
-      </div>
+        variant="card"
+        :lines="3"
+      />
 
       <div
         v-else-if="webhooks.length === 0"
@@ -240,15 +236,11 @@
     </div>
 
     <div v-show="activeTab === 'trackers'">
-      <div
+      <LoadingSkeleton
         v-if="loadingTrackers"
-        class="text-center py-5"
-      >
-        <div
-          class="spinner-border text-primary"
-          role="status"
-        />
-      </div>
+        variant="card"
+        :lines="3"
+      />
 
       <div
         v-else-if="trackers.length === 0"
@@ -591,6 +583,7 @@ import { useGitWebhooksPage } from '../composables/useGitWebhooksPage'
 import { commandStatusLabel } from '../utils/commandStatus'
 import { IconActivity, IconGitBranch, IconPlus, IconRefresh, IconSearch, IconTrash } from '@tabler/icons-vue'
 import EmptyState from '../components/EmptyState.vue'
+import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import WebhookUrlCard from '../components/webhooks/WebhookUrlCard.vue'
 import WebhookExecutionList from '../components/webhooks/WebhookExecutionList.vue'
 import WebhookModal from '../components/webhooks/WebhookModal.vue'
