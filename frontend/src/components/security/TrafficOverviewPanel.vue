@@ -177,11 +177,8 @@
                 </thead>
                 <tbody>
                   <tr v-if="!topEndpoints.length">
-                    <td
-                      colspan="4"
-                      class="text-center text-secondary py-4"
-                    >
-                      Aucun endpoint sur la période.
+                    <td colspan="4">
+                      <EmptyState title="Aucun endpoint sur la période." />
                     </td>
                   </tr>
                   <tr
@@ -284,11 +281,8 @@
                 </thead>
                 <tbody>
                   <tr v-if="!countryDistribution.length">
-                    <td
-                      colspan="3"
-                      class="text-center text-secondary py-4"
-                    >
-                      Aucune donnée pays.
+                    <td colspan="3">
+                      <EmptyState title="Aucune donnée pays." />
                     </td>
                   </tr>
                   <tr
@@ -383,11 +377,8 @@
                 </thead>
                 <tbody>
                   <tr v-if="!topDomains.length">
-                    <td
-                      colspan="4"
-                      class="text-center text-secondary py-4"
-                    >
-                      Aucune donnée de trafic.
+                    <td colspan="4">
+                      <EmptyState title="Aucune donnée de trafic." />
                     </td>
                   </tr>
                   <tr
@@ -442,11 +433,8 @@
             </thead>
             <tbody>
               <tr v-if="!liveRequests.length">
-                <td
-                  colspan="7"
-                  class="text-center text-secondary py-4"
-                >
-                  Aucune requête récente.
+                <td colspan="7">
+                  <EmptyState title="Aucune requête récente." />
                 </td>
               </tr>
               <tr
@@ -535,6 +523,7 @@
 <script setup lang="ts">
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 import PageRefreshBar from '../PageRefreshBar.vue'
+import EmptyState from '../EmptyState.vue'
 import TrafficThreatsFilterBar from './TrafficThreatsFilterBar.vue'
 import TrafficKpiCards from './TrafficKpiCards.vue'
 import TrafficWorldMap from './TrafficWorldMap.vue'

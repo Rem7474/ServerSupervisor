@@ -203,11 +203,8 @@
                 </thead>
                 <tbody>
                   <tr v-if="!topIPs.length">
-                    <td
-                      colspan="7"
-                      class="text-center text-secondary py-4"
-                    >
-                      Aucune IP suspecte sur la période.
+                    <td colspan="7">
+                      <EmptyState title="Aucune IP suspecte sur la période." />
                     </td>
                   </tr>
                   <tr
@@ -360,11 +357,8 @@
                 </thead>
                 <tbody>
                   <tr v-if="!countryDistribution.length">
-                    <td
-                      colspan="3"
-                      class="text-center text-secondary py-4"
-                    >
-                      Aucune donnée pays.
+                    <td colspan="3">
+                      <EmptyState title="Aucune donnée pays." />
                     </td>
                   </tr>
                   <tr
@@ -413,11 +407,8 @@
                 </thead>
                 <tbody>
                   <tr v-if="!mostTargetedHosts.length">
-                    <td
-                      colspan="2"
-                      class="text-center text-secondary py-4"
-                    >
-                      Aucun domaine ciblé
+                    <td colspan="2">
+                      <EmptyState title="Aucun domaine ciblé" />
                     </td>
                   </tr>
                   <tr
@@ -475,11 +466,8 @@
                 </thead>
                 <tbody>
                   <tr v-if="!ipHostMatrix.length">
-                    <td
-                      colspan="4"
-                      class="text-center text-secondary py-4"
-                    >
-                      Pas de scan coordonné détecté
+                    <td colspan="4">
+                      <EmptyState title="Pas de scan coordonné détecté" />
                     </td>
                   </tr>
                   <tr
@@ -678,6 +666,7 @@
 import { computed, ref } from 'vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 import PageRefreshBar from '../PageRefreshBar.vue'
+import EmptyState from '../EmptyState.vue'
 import TrafficThreatsFilterBar from './TrafficThreatsFilterBar.vue'
 import IPTimelineModal from './IPTimelineModal.vue'
 import DomainDetailsModal from './DomainDetailsModal.vue'

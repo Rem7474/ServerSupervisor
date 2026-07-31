@@ -349,11 +349,8 @@
                 </thead>
                 <tbody>
                   <tr v-if="!(details.requests || []).length">
-                    <td
-                      colspan="7"
-                      class="text-center text-secondary py-3"
-                    >
-                      Aucune requête disponible
+                    <td colspan="7">
+                      <EmptyState title="Aucune requête disponible" />
                     </td>
                   </tr>
                   <tr
@@ -467,6 +464,7 @@ import { computed, ref } from 'vue'
 import { IconBan, IconCheck, IconCopy } from '@tabler/icons-vue'
 import SortableHeader from '../common/SortableHeader.vue'
 import PaginationNav from '../PaginationNav.vue'
+import EmptyState from '../EmptyState.vue'
 import { useModalChrome } from '../../composables/useModalChrome'
 import type { DomainDetailsFilterKey, DomainDetailsSortKey } from '../../composables/useDomainDetails'
 

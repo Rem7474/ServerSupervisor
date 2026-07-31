@@ -144,14 +144,13 @@
             </td>
           </tr>
           <tr v-if="versions.length === 0">
-            <td
-              colspan="8"
-              class="text-center text-secondary py-4"
-            >
-              Aucun suivi de version configuré. Ajoutez des release trackers dans
-              <router-link to="/git-webhooks">
-                Git / Automatisation
-              </router-link>.
+            <td colspan="8">
+              <EmptyState
+                title="Aucun suivi de version configuré."
+                subtitle="Ajoutez des release trackers pour surveiller vos images Docker."
+                cta-label="Git / Automatisation"
+                cta-to="/git-webhooks"
+              />
             </td>
           </tr>
         </tbody>
@@ -178,6 +177,7 @@ import { ref, computed, onUnmounted } from 'vue'
 import { IconChevronDown } from '@tabler/icons-vue'
 import apiClient from '../../api'
 import { useAuthStore } from '../../stores/auth'
+import EmptyState from '../EmptyState.vue'
 import { getApiErrorMessage } from '../../api/client'
 
 interface DockerVersion {
