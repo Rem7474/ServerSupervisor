@@ -160,11 +160,8 @@
             </td>
           </tr>
           <tr v-if="!containers.length">
-            <td
-              :colspan="canRun ? 9 : 8"
-              class="text-center text-secondary py-4"
-            >
-              Aucun conteneur Docker actif sur cet hôte.
+            <td :colspan="canRun ? 9 : 8">
+              <EmptyState title="Aucun conteneur Docker actif sur cet hôte." />
             </td>
           </tr>
         </tbody>
@@ -177,6 +174,7 @@
 import { computed, ref, toRef } from 'vue'
 import { IconPlayerPlay, IconPlayerStop, IconRefresh, IconList } from '@tabler/icons-vue'
 import DockerPortBadges from '../common/DockerPortBadges.vue'
+import EmptyState from '../EmptyState.vue'
 import { useDockerContainerPorts } from '../../composables/useDockerContainerPorts'
 import { useConfirmDialog } from '../../composables/useConfirmDialog'
 import { addToast } from '../../composables/useGlobalToast'

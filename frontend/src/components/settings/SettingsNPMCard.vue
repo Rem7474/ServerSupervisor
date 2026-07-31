@@ -128,11 +128,8 @@
         </thead>
         <tbody>
           <tr v-if="connections.length === 0">
-            <td
-              colspan="7"
-              class="text-center text-muted py-4"
-            >
-              Aucune connexion NPM configurée.
+            <td colspan="7">
+              <EmptyState title="Aucune connexion NPM configurée." />
             </td>
           </tr>
           <tr
@@ -236,6 +233,7 @@ import { npmApi } from '../../api/npm'
 import type { NPMConnection } from '../../types/npm'
 import { getApiErrorMessage } from '../../api/client'
 import { useConfirmDialog } from '../../composables/useConfirmDialog'
+import EmptyState from '../EmptyState.vue'
 
 const { confirm } = useConfirmDialog()
 

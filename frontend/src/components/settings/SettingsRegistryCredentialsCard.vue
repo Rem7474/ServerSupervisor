@@ -101,11 +101,8 @@
         </thead>
         <tbody>
           <tr v-if="credentials.length === 0">
-            <td
-              colspan="4"
-              class="text-center text-muted py-4"
-            >
-              Aucun identifiant de registre configuré.
+            <td colspan="4">
+              <EmptyState title="Aucun identifiant de registre configuré." />
             </td>
           </tr>
           <tr
@@ -163,6 +160,7 @@ import { ref, onMounted } from 'vue'
 import api from '../../api/index'
 import { getApiErrorMessage } from '../../api/client'
 import { useConfirmDialog } from '../../composables/useConfirmDialog'
+import EmptyState from '../EmptyState.vue'
 
 const { confirm } = useConfirmDialog()
 

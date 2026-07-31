@@ -138,11 +138,8 @@
         </thead>
         <tbody>
           <tr v-if="instances.length === 0">
-            <td
-              colspan="8"
-              class="text-center text-muted py-4"
-            >
-              Aucune connexion Proxmox configurée.
+            <td colspan="8">
+              <EmptyState title="Aucune connexion Proxmox configurée." />
             </td>
           </tr>
           <tr
@@ -255,6 +252,7 @@ import api from '../../api/index'
 import type { ProxmoxConnection } from '../../types/proxmox'
 import { getApiErrorMessage } from '../../api/client'
 import { useConfirmDialog } from '../../composables/useConfirmDialog'
+import EmptyState from '../EmptyState.vue'
 
 const { confirm } = useConfirmDialog()
 
