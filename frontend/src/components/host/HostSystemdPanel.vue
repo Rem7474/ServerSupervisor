@@ -90,40 +90,80 @@
               {{ svc.description || '—' }}
             </td>
             <td class="text-nowrap">
-              <div class="btn-group btn-group-sm">
+              <div class="d-flex align-items-center gap-1">
                 <button
                   v-if="svc.active_state !== 'active'"
                   type="button"
-                  class="btn btn-outline-success"
+                  :disabled="!!actionPending[svc.name]"
+                  class="btn btn-icon btn-sm btn-ghost-success"
                   title="Démarrer"
+                  aria-label="Démarrer le service"
                   @click="runAction(svc.name, 'start')"
                 >
-                  Start
+                  <span
+                    v-if="actionPending[svc.name] === 'start'"
+                    class="spinner-border spinner-border-sm"
+                  />
+                  <IconPlayerPlay
+                    v-else
+                    :size="16"
+                    class="icon icon-sm"
+                  />
                 </button>
                 <button
                   v-if="svc.active_state === 'active'"
                   type="button"
-                  class="btn btn-outline-danger"
+                  :disabled="!!actionPending[svc.name]"
+                  class="btn btn-icon btn-sm btn-ghost-danger"
                   title="Arrêter"
+                  aria-label="Arrêter le service"
                   @click="runAction(svc.name, 'stop')"
                 >
-                  Stop
+                  <span
+                    v-if="actionPending[svc.name] === 'stop'"
+                    class="spinner-border spinner-border-sm"
+                  />
+                  <IconPlayerStop
+                    v-else
+                    :size="16"
+                    class="icon icon-sm"
+                  />
                 </button>
                 <button
                   type="button"
-                  class="btn btn-outline-secondary"
+                  :disabled="!!actionPending[svc.name]"
+                  class="btn btn-icon btn-sm btn-ghost-warning"
                   title="Redémarrer"
+                  aria-label="Redémarrer le service"
                   @click="runAction(svc.name, 'restart')"
                 >
-                  Restart
+                  <span
+                    v-if="actionPending[svc.name] === 'restart'"
+                    class="spinner-border spinner-border-sm"
+                  />
+                  <IconRefresh
+                    v-else
+                    :size="16"
+                    class="icon icon-sm"
+                  />
                 </button>
                 <button
                   type="button"
-                  class="btn btn-outline-secondary"
+                  :disabled="!!actionPending[svc.name]"
+                  class="btn btn-icon btn-sm btn-ghost-secondary"
                   title="Statut"
+                  aria-label="Voir le statut du service"
                   @click="runAction(svc.name, 'status')"
                 >
-                  Status
+                  <span
+                    v-if="actionPending[svc.name] === 'status'"
+                    class="spinner-border spinner-border-sm"
+                  />
+                  <IconTerminal2
+                    v-else
+                    :size="16"
+                    class="icon icon-sm"
+                  />
                 </button>
               </div>
             </td>
@@ -136,6 +176,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { IconPlayerPlay, IconPlayerStop, IconRefresh, IconTerminal2 } from '@tabler/icons-vue'
 import apiClient, { getApiErrorMessage } from '../../api'
 import { useCommandStream } from '../../composables/useCommandStream'
 import { useLocalStorage } from '../../composables/useLocalStorage'
@@ -164,6 +205,7 @@ const dialog = useConfirmDialog()
 const services = ref<SystemdService[]>([])
 const loading = ref(false)
 const error = ref('')
+const actionPending = ref<Record<string, string | null>>({})
 const filter = useLocalStorage(`host-systemd-filter:${props.hostId}`, 'active')
 const STREAM_TIMEOUT_MS = 60000
 const { collectCommandOutput } = useCommandStream()
@@ -213,6 +255,7 @@ async function runAction(serviceName: string, action: string): Promise<void> {
     })
     if (!ok) return
   }
+  actionPending.value[serviceName] = action
   try {
     const res = await apiClient.sendSystemdCommand(props.hostId, serviceName, action)
     emit('open-console', {
@@ -224,6 +267,8 @@ async function runAction(serviceName: string, action: string): Promise<void> {
     })
   } catch (e) {
     error.value = getApiErrorMessage(e, `Impossible d'exécuter systemctl ${action}`)
+  } finally {
+    actionPending.value[serviceName] = null
   }
 }
 </script>
