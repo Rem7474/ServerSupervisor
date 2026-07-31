@@ -698,7 +698,7 @@
                           >{{ firstLine(ex.output) }}</span>
                           <button
                             type="button"
-                            class="btn btn-xs btn-ghost-secondary ms-auto flex-shrink-0"
+                            class="btn btn-sm btn-ghost-secondary ms-auto flex-shrink-0"
                             @click="expandedId = ex.id"
                           >
                             Voir tout
@@ -711,7 +711,7 @@
                           >{{ ex.output }}</pre>
                           <button
                             type="button"
-                            class="btn btn-xs btn-ghost-secondary"
+                            class="btn btn-sm btn-ghost-secondary"
                             @click="expandedId = null"
                           >
                             Réduire
