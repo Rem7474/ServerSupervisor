@@ -348,23 +348,17 @@
             </tr>
           </thead>
           <tbody>
-            <!-- Skeleton rows while loading -->
-            <template v-if="loading">
-              <tr
-                v-for="i in 3"
-                :key="`sk-${i}`"
+            <tr v-if="loading">
+              <td
+                colspan="9"
+                class="py-2"
               >
-                <td><div class="skeleton-text w-75" /></td>
-                <td><div class="skeleton-text w-50" /></td>
-                <td><div class="skeleton-text w-25" /></td>
-                <td><div class="skeleton-text w-25" /></td>
-                <td><div class="skeleton-text" /></td>
-                <td><div class="skeleton-text" /></td>
-                <td><div class="skeleton-text w-50" /></td>
-                <td><div class="skeleton-text w-75" /></td>
-                <td />
-              </tr>
-            </template>
+                <LoadingSkeleton
+                  variant="table"
+                  :lines="3"
+                />
+              </td>
+            </tr>
             <tr v-else-if="sortedNodes.length === 0 && healthFilterLabel">
               <td colspan="9">
                 <EmptyState
@@ -493,6 +487,7 @@ import { useAuthStore } from '../stores/auth'
 import SortableHeader from '../components/common/SortableHeader.vue'
 import PageRefreshBar from '../components/PageRefreshBar.vue'
 import EmptyState from '../components/EmptyState.vue'
+import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import { useProxmox } from '../composables/useProxmox'
 import type { ProxmoxNode } from '../types/proxmox'
 
