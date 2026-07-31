@@ -17,12 +17,9 @@
 
     <div
       v-if="loading"
-      class="card-body text-center py-5"
+      class="card-body"
     >
-      <div
-        class="spinner-border text-primary"
-        role="status"
-      />
+      <LoadingSkeleton variant="table" />
     </div>
     <div
       v-else-if="executions.length === 0"
@@ -217,6 +214,7 @@ import { computed } from 'vue'
 import { IconBraces, IconFileText, IconRefresh } from '@tabler/icons-vue'
 import RelativeTime from '../RelativeTime.vue'
 import PaginationNav from '../PaginationNav.vue'
+import LoadingSkeleton from '../LoadingSkeleton.vue'
 import { usePagination } from '../../composables/usePagination'
 import { commandStatusLabel } from '../../utils/commandStatus'
 import { execBadgeColor } from '../../utils/statusClasses'

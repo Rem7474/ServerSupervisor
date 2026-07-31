@@ -124,15 +124,9 @@
 
     <div
       v-if="loading"
-      class="card-body text-center py-5"
+      class="card-body"
     >
-      <div
-        class="spinner-border text-primary"
-        role="status"
-      />
-      <div class="mt-2 text-muted">
-        Chargement...
-      </div>
+      <LoadingSkeleton variant="list" />
     </div>
     <div
       v-else-if="error"
@@ -353,6 +347,7 @@ import { IconBell, IconCheck, IconSearch, IconX } from '@tabler/icons-vue'
 import apiClient from '../../api'
 import BadgePill from '../common/BadgePill.vue'
 import EmptyState from '../EmptyState.vue'
+import LoadingSkeleton from '../LoadingSkeleton.vue'
 import PaginationNav from '../PaginationNav.vue'
 import { addToast } from '../../composables/useGlobalToast'
 import { getApiErrorMessage } from '../../api/client'

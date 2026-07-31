@@ -13,18 +13,11 @@
       {{ error }}
     </div>
 
-    <!-- Spinner : en cours de chargement OU pas encore chargé une première fois -->
     <div
       v-if="loading || !fetched"
-      class="card-body text-center py-5"
+      class="card-body"
     >
-      <div
-        class="spinner-border text-primary"
-        role="status"
-      />
-      <div class="mt-2">
-        Chargement...
-      </div>
+      <LoadingSkeleton variant="table" />
     </div>
 
     <div
@@ -221,6 +214,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import EmptyState from '../EmptyState.vue'
+import LoadingSkeleton from '../LoadingSkeleton.vue'
 import SortableHeader from '../common/SortableHeader.vue'
 import { IconPencil, IconTrash } from '@tabler/icons-vue'
 import { formatDurationSecs } from '../../utils/formatters'

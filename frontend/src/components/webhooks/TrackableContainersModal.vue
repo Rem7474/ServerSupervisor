@@ -33,12 +33,10 @@
             automatique à chaque nouvelle image).
           </p>
 
-          <div
+          <LoadingSkeleton
             v-if="loading"
-            class="text-center py-4"
-          >
-            <div class="spinner-border text-primary" />
-          </div>
+            variant="list"
+          />
 
           <div
             v-else-if="!containers.length"
@@ -170,6 +168,7 @@
 import { computed, ref, watch } from 'vue'
 import api from '../../api'
 import { useModalChrome } from '../../composables/useModalChrome'
+import LoadingSkeleton from '../LoadingSkeleton.vue'
 
 interface Container {
   host_id: string
