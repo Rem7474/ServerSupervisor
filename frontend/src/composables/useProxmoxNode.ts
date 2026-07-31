@@ -126,6 +126,7 @@ export function useProxmoxNode() {
   const servicesError = ref('')
   const svcActionMsg = ref('')
   const svcActionOk = ref(false)
+  const svcActionLoading = ref<Record<string, string | null>>({})
 
   const vms = computed(() => node.value?.guests?.filter((g: any) => g.guest_type === 'vm') ?? [])
   const lxcs = computed(() => node.value?.guests?.filter((g: any) => g.guest_type === 'lxc') ?? [])
@@ -563,6 +564,7 @@ export function useProxmoxNode() {
 
   async function svcAction(name: string, action: string): Promise<void> {
     svcActionMsg.value = ''
+    svcActionLoading.value[name] = action
     try {
       const res = await api.proxmoxNodeServiceAction(String(route.params.id), name, action)
       const upid = res.data?.upid
@@ -573,6 +575,8 @@ export function useProxmoxNode() {
     } catch (e: unknown) {
       svcActionMsg.value = getApiErrorMessage(e, `Erreur lors de ${action} ${name}.`)
       svcActionOk.value = false
+    } finally {
+      svcActionLoading.value[name] = null
     }
     setTimeout(() => { svcActionMsg.value = '' }, 6000)
   }
@@ -693,6 +697,7 @@ export function useProxmoxNode() {
     servicesError,
     svcActionMsg,
     svcActionOk,
+    svcActionLoading,
     loadServices,
     svcAction,
     vms,

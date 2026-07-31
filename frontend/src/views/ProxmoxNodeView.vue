@@ -415,6 +415,7 @@
                   :error="servicesError"
                   :action-msg="svcActionMsg"
                   :action-ok="svcActionOk"
+                  :action-loading="svcActionLoading"
                   @refresh="loadServices"
                   @action="svcAction($event.name, $event.action)"
                 />
@@ -619,6 +620,7 @@ const {
   servicesError,
   svcActionMsg,
   svcActionOk,
+  svcActionLoading,
   loadServices,
   svcAction,
   vms,

@@ -92,40 +92,80 @@
               {{ svc.desc || '—' }}
             </td>
             <td class="text-nowrap">
-              <div class="btn-group btn-group-sm">
+              <div class="d-flex align-items-center gap-1">
                 <button
                   v-if="svc['active-state'] !== 'active'"
                   type="button"
-                  class="btn btn-outline-success"
+                  :disabled="!!actionLoading?.[svc.name]"
+                  class="btn btn-icon btn-sm btn-ghost-success"
                   title="Démarrer"
+                  aria-label="Démarrer le service"
                   @click="emit('action', { name: svc.name, action: 'start' })"
                 >
-                  Start
+                  <span
+                    v-if="actionLoading?.[svc.name] === 'start'"
+                    class="spinner-border spinner-border-sm"
+                  />
+                  <IconPlayerPlay
+                    v-else
+                    :size="16"
+                    class="icon icon-sm"
+                  />
                 </button>
                 <button
                   v-if="svc['active-state'] === 'active'"
                   type="button"
-                  class="btn btn-outline-danger"
+                  :disabled="!!actionLoading?.[svc.name]"
+                  class="btn btn-icon btn-sm btn-ghost-danger"
                   title="Arrêter"
+                  aria-label="Arrêter le service"
                   @click="emit('action', { name: svc.name, action: 'stop' })"
                 >
-                  Stop
+                  <span
+                    v-if="actionLoading?.[svc.name] === 'stop'"
+                    class="spinner-border spinner-border-sm"
+                  />
+                  <IconPlayerStop
+                    v-else
+                    :size="16"
+                    class="icon icon-sm"
+                  />
                 </button>
                 <button
                   type="button"
-                  class="btn btn-outline-secondary"
+                  :disabled="!!actionLoading?.[svc.name]"
+                  class="btn btn-icon btn-sm btn-ghost-warning"
                   title="Redémarrer"
+                  aria-label="Redémarrer le service"
                   @click="emit('action', { name: svc.name, action: 'restart' })"
                 >
-                  Restart
+                  <span
+                    v-if="actionLoading?.[svc.name] === 'restart'"
+                    class="spinner-border spinner-border-sm"
+                  />
+                  <IconRefresh
+                    v-else
+                    :size="16"
+                    class="icon icon-sm"
+                  />
                 </button>
                 <button
                   type="button"
-                  class="btn btn-outline-secondary"
+                  :disabled="!!actionLoading?.[svc.name]"
+                  class="btn btn-icon btn-sm btn-ghost-secondary"
                   title="Recharger"
+                  aria-label="Recharger le service"
                   @click="emit('action', { name: svc.name, action: 'reload' })"
                 >
-                  Reload
+                  <span
+                    v-if="actionLoading?.[svc.name] === 'reload'"
+                    class="spinner-border spinner-border-sm"
+                  />
+                  <IconReload
+                    v-else
+                    :size="16"
+                    class="icon icon-sm"
+                  />
                 </button>
               </div>
             </td>
@@ -144,7 +184,7 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { IconRefresh } from '@tabler/icons-vue'
+import { IconPlayerPlay, IconPlayerStop, IconRefresh, IconReload } from '@tabler/icons-vue'
 
 interface Service {
   name: string
@@ -160,6 +200,7 @@ const props = defineProps<{
   error?: string
   actionMsg?: string
   actionOk?: boolean
+  actionLoading?: Record<string, string | null>
 }>()
 
 const emit = defineEmits<{
