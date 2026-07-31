@@ -250,7 +250,8 @@
                       v-if="actionLoading[c.name] === 'start'"
                       class="spinner-border spinner-border-sm"
                     />
-                    <IconPlayerPlay v-else
+                    <IconPlayerPlay
+                      v-else
                       :size="16"
                       class="icon icon-sm"
                     />
@@ -287,7 +288,8 @@
                       v-if="actionLoading[c.name] === 'restart'"
                       class="spinner-border spinner-border-sm"
                     />
-                    <IconRefresh v-else
+                    <IconRefresh
+                      v-else
                       :size="16"
                       class="icon icon-sm"
                     />
@@ -304,7 +306,8 @@
                       v-if="actionLoading[c.name] === 'logs'"
                       class="spinner-border spinner-border-sm"
                     />
-                    <IconList v-else
+                    <IconList
+                      v-else
                       :size="16"
                       class="icon icon-sm"
                     />
@@ -348,7 +351,8 @@
                     v-if="trackerRunLoading[containerVersion(c)?.tracker_id || '']"
                     class="spinner-border spinner-border-sm"
                   />
-                  <IconPlayerPlay v-else
+                  <IconPlayerPlay
+                    v-else
                     :size="16"
                     class="icon icon-sm"
                   />

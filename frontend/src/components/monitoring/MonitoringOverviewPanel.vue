@@ -306,8 +306,8 @@
     <!-- ===== MODAL SONDE ===== -->
     <div
       v-if="probeModalOpen"
-      class="modal modal-blur fade show"
-      style="display:block"
+      ref="probeModalRef"
+      class="modal modal-blur fade show d-block"
       tabindex="-1"
       role="dialog"
       aria-modal="true"
@@ -469,8 +469,8 @@
     <!-- ===== MODAL CERTIFICAT ===== -->
     <div
       v-if="certModalOpen"
-      class="modal modal-blur fade show"
-      style="display:block"
+      ref="certModalRef"
+      class="modal modal-blur fade show d-block"
       tabindex="-1"
       role="dialog"
       aria-modal="true"
@@ -577,6 +577,7 @@
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
 import { IconActivity, IconLock, IconTrash } from '@tabler/icons-vue'
 import { useAuthStore } from '../../stores/auth'
 import EmptyState from '../EmptyState.vue'
@@ -587,6 +588,7 @@ import PaginationNav from '../PaginationNav.vue'
 import SortableHeader from '../common/SortableHeader.vue'
 import { formatDateTime } from '../../utils/formatters'
 import { useMonitoringOverview, type MonitoringRow } from '../../composables/useMonitoringOverview'
+import { useModalChrome } from '../../composables/useModalChrome'
 
 const auth = useAuthStore()
 
@@ -635,6 +637,11 @@ const {
   saveCert,
   confirmDeleteCert,
 } = useMonitoringOverview()
+
+const probeModalRef = ref<HTMLElement | null>(null)
+const certModalRef = ref<HTMLElement | null>(null)
+useModalChrome(probeModalRef, () => probeModalOpen.value, { onClose: closeProbeModal })
+useModalChrome(certModalRef, () => certModalOpen.value, { onClose: closeCertModal })
 
 function rowLink(row: MonitoringRow): string {
   if (row.npmProxyHostId) return `/monitoring/host/${row.npmProxyHostId}`
