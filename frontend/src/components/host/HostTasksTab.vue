@@ -201,6 +201,7 @@
   <Teleport to="body">
     <template v-if="showTaskModal">
       <div
+        ref="modalRef"
         class="modal modal-blur fade show d-block"
         tabindex="-1"
         role="dialog"
@@ -424,6 +425,7 @@ import apiClient from '../../api'
 import { useConfirmDialog } from '../../composables/useConfirmDialog'
 import { useDateFormatter } from '../../composables/useDateFormatter'
 import { useToast } from '../../composables/useToast'
+import { useModalChrome } from '../../composables/useModalChrome'
 import { MANUAL_SENTINEL, isManualOnly, describeCron } from '../../utils/cron'
 import { getApiErrorMessage } from '../../api/client'
 import { getExecutionStateClass } from '../../utils/statusClasses'
@@ -521,6 +523,8 @@ const tasksError = ref('')
 const taskRunningId = ref<string | number | null>(null)
 const { value: taskRunResult, showToast: showTaskRunResult } = useToast<TaskRunResult | null>(null)
 const showTaskModal = ref(false)
+const modalRef = ref<HTMLElement | null>(null)
+useModalChrome(modalRef, () => showTaskModal.value, { onClose: closeTaskModal })
 const editingTask = ref<Task | null>(null)
 const taskSaving = ref(false)
 const taskModalError = ref('')

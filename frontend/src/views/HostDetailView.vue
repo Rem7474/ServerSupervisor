@@ -649,10 +649,10 @@
     <!-- Add permission modal -->
     <div
       v-if="addPermModal"
-      class="modal modal-blur show d-block modal-permissions-overlay"
+      ref="permModalRef"
+      class="modal modal-blur fade show d-block modal-permissions-overlay"
       tabindex="-1"
       @click.self="addPermModal = false"
-      @keydown.escape.stop="addPermModal = false"
     >
       <div
         class="modal-dialog modal-dialog-centered modal-permissions-dialog"
@@ -739,6 +739,7 @@
 import { computed, ref } from 'vue'
 import { IconLink, IconLock, IconPencil, IconRefresh, IconTrash, IconX, IconAlertCircle, IconAlertTriangle, IconExternalLink } from '@tabler/icons-vue'
 import { useHostDetail } from '../composables/useHostDetail'
+import { useModalChrome } from '../composables/useModalChrome'
 import RelativeTime from '../components/RelativeTime.vue'
 import DiskMetricsCard from '../components/disk/DiskMetricsCard.vue'
 import DiskHealthCard from '../components/disk/DiskHealthCard.vue'
@@ -832,6 +833,9 @@ const {
   handleUURunNow,
   openUULog,
 } = useHostDetail()
+
+const permModalRef = ref<HTMLElement | null>(null)
+useModalChrome(permModalRef, () => addPermModal.value, { onClose: () => { addPermModal.value = false } })
 
 // Local SMART is unreadable inside an LXC/VM. When the host has no local disk
 // health but is linked to Proxmox, we surface the hosting node's disk health

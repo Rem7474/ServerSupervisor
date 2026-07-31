@@ -163,6 +163,7 @@
     <!-- Create/edit modal -->
     <div
       v-if="showModal"
+      ref="editModalRef"
       class="modal modal-blur fade show d-block"
       tabindex="-1"
     >
@@ -288,6 +289,7 @@
     <!-- History modal -->
     <div
       v-if="historyRunbook"
+      ref="historyModalRef"
       class="modal modal-blur fade show d-block"
       tabindex="-1"
     >
@@ -446,7 +448,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { IconFileText, IconHistory, IconPencil, IconPlayerPlay, IconPlus, IconTrash } from '@tabler/icons-vue'
 import EmptyState from '../components/EmptyState.vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
@@ -456,6 +458,7 @@ import {
   useRunbooks, actionsForModule, moduleRequiresTarget, emptyStep,
 } from '../composables/useRunbooks'
 import { useConfirmDialog } from '../composables/useConfirmDialog'
+import { useModalChrome } from '../composables/useModalChrome'
 import type { Runbook, RunbookStepCreate } from '../types/generated'
 
 const {
@@ -466,6 +469,11 @@ const {
   openHistory, closeHistory, selectExecution,
   selectedStepCommand, showStepLogPanel, openStepLogs, closeStepLogs,
 } = useRunbooks()
+
+const editModalRef = ref<HTMLElement | null>(null)
+const historyModalRef = ref<HTMLElement | null>(null)
+useModalChrome(editModalRef, () => showModal.value, { onClose: closeModal })
+useModalChrome(historyModalRef, () => !!historyRunbook.value, { onClose: closeHistory })
 
 const dialog = useConfirmDialog()
 

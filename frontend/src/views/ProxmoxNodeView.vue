@@ -455,82 +455,84 @@
     </div> <!-- /v-else-if node -->
 
     <!-- Migration modal -->
-    <div
-      v-if="migrateModal.open"
-      class="modal modal-blur fade show d-block"
-      tabindex="-1"
-      style="background:rgba(0,0,0,.5)"
-      @click.self="migrateModal.open = false"
-    >
-      <div class="modal-dialog modal-sm modal-dialog-centered">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">
-              Migrer {{ migrateModal.guest?.name || `VMID ${migrateModal.guest?.vmid}` }}
-            </h5>
-            <button
-              type="button"
-              class="btn-close"
-              @click="migrateModal.open = false"
-            />
-          </div>
-          <div class="modal-body">
-            <div class="mb-3">
-              <label class="form-label">Nœud cible</label>
-              <select
-                v-model="migrateModal.target"
-                class="form-select"
-              >
-                <option
-                  v-for="n in peerNodes"
-                  :key="n.node_name"
-                  :value="n.node_name"
-                >
-                  {{ n.node_name }}
-                </option>
-              </select>
-            </div>
-            <div class="mb-2">
-              <label class="form-check">
-                <input
-                  v-model="migrateModal.online"
-                  type="checkbox"
-                  class="form-check-input"
-                >
-                <span class="form-check-label">Migration à chaud (sans arrêt)</span>
-              </label>
-            </div>
-            <div
-              v-if="migrateModal.error"
-              class="alert alert-danger mb-0 mt-2 py-2 small"
-            >
-              {{ migrateModal.error }}
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button
-              type="button"
-              class="btn btn-secondary"
-              @click="migrateModal.open = false"
-            >
-              Annuler
-            </button>
-            <button
-              type="button"
-              class="btn btn-primary"
-              :disabled="migrateModal.loading || !migrateModal.target"
-              @click="submitMigration"
-            >
-              <span
-                v-if="migrateModal.loading"
-                class="spinner-border spinner-border-sm me-1"
+    <template v-if="migrateModal.open">
+      <div
+        ref="migrateModalRef"
+        class="modal modal-blur fade show d-block"
+        tabindex="-1"
+        @click.self="migrateModal.open = false"
+      >
+        <div class="modal-dialog modal-sm modal-dialog-centered">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title">
+                Migrer {{ migrateModal.guest?.name || `VMID ${migrateModal.guest?.vmid}` }}
+              </h5>
+              <button
+                type="button"
+                class="btn-close"
+                @click="migrateModal.open = false"
               />
-              Migrer
-            </button>
+            </div>
+            <div class="modal-body">
+              <div class="mb-3">
+                <label class="form-label">Nœud cible</label>
+                <select
+                  v-model="migrateModal.target"
+                  class="form-select"
+                >
+                  <option
+                    v-for="n in peerNodes"
+                    :key="n.node_name"
+                    :value="n.node_name"
+                  >
+                    {{ n.node_name }}
+                  </option>
+                </select>
+              </div>
+              <div class="mb-2">
+                <label class="form-check">
+                  <input
+                    v-model="migrateModal.online"
+                    type="checkbox"
+                    class="form-check-input"
+                  >
+                  <span class="form-check-label">Migration à chaud (sans arrêt)</span>
+                </label>
+              </div>
+              <div
+                v-if="migrateModal.error"
+                class="alert alert-danger mb-0 mt-2 py-2 small"
+              >
+                {{ migrateModal.error }}
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button
+                type="button"
+                class="btn btn-secondary"
+                @click="migrateModal.open = false"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                class="btn btn-primary"
+                :disabled="migrateModal.loading || !migrateModal.target"
+                @click="submitMigration"
+              >
+                <span
+                  v-if="migrateModal.loading"
+                  class="spinner-border spinner-border-sm me-1"
+                />
+                Migrer
+              </button>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+      <div class="modal-backdrop fade show" />
+    </template>
   </div>
 </template>
 
@@ -551,6 +553,7 @@ import ProxmoxNodeServicesTab from '../components/proxmox/ProxmoxNodeServicesTab
 import ProxmoxNodeSecurityTab from '../components/proxmox/ProxmoxNodeSecurityTab.vue'
 import ProxmoxNodeGuestsTab from '../components/proxmox/ProxmoxNodeGuestsTab.vue'
 import { useProxmoxNode } from '../composables/useProxmoxNode'
+import { useModalChrome } from '../composables/useModalChrome'
 
 const route = useRoute()
 
@@ -627,6 +630,9 @@ const {
   guestActionLoading,
   handleGuestAction,
 } = useProxmoxNode()
+
+const migrateModalRef = ref<HTMLElement | null>(null)
+useModalChrome(migrateModalRef, () => migrateModal.value.open, { onClose: () => { migrateModal.value.open = false } })
 
 // Trivial UI-only state fed by ProxmoxNodeSecurityTab's @count emit — no API/WS
 // logic attached, so it stays here rather than in the composable.
