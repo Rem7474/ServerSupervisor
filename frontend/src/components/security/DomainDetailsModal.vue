@@ -32,13 +32,10 @@
           {{ error }}
         </div>
 
-        <div
+        <LoadingSkeleton
           v-if="loading && !hasData"
-          class="text-center py-4 text-secondary"
-        >
-          <span class="spinner-border spinner-border-sm me-2" />
-          Chargement des détails...
-        </div>
+          variant="kpi"
+        />
 
         <template v-else>
           <div class="row row-cards mb-3">
@@ -465,6 +462,7 @@ import { IconBan, IconCheck, IconCopy } from '@tabler/icons-vue'
 import SortableHeader from '../common/SortableHeader.vue'
 import PaginationNav from '../PaginationNav.vue'
 import EmptyState from '../EmptyState.vue'
+import LoadingSkeleton from '../LoadingSkeleton.vue'
 import { useModalChrome } from '../../composables/useModalChrome'
 import type { DomainDetailsFilterKey, DomainDetailsSortKey } from '../../composables/useDomainDetails'
 

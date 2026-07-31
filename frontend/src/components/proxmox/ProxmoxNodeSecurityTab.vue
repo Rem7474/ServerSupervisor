@@ -50,9 +50,9 @@
     </div>
     <div
       v-if="loading"
-      class="card-body text-muted small"
+      class="card-body"
     >
-      <span class="spinner-border spinner-border-sm me-1" />Chargement des événements de sécurité…
+      <LoadingSkeleton variant="table" />
     </div>
     <div
       v-else-if="events.length"
@@ -108,6 +108,7 @@ import { ref, watch } from 'vue'
 import api from '../../api'
 import { getApiErrorMessage } from '../../api/client'
 import EmptyState from '../EmptyState.vue'
+import LoadingSkeleton from '../LoadingSkeleton.vue'
 import { IconShieldCheck } from '@tabler/icons-vue'
 
 type SyslogItem = Record<string, any>

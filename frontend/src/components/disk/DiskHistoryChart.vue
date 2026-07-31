@@ -56,13 +56,10 @@
         :options="chartOptions"
         class="h-100"
       />
-      <div
+      <LoadingSkeleton
         v-else-if="loading"
-        class="h-100 d-flex align-items-center justify-content-center text-secondary"
-      >
-        <div class="spinner-border spinner-border-sm me-2" />
-        Chargement…
-      </div>
+        variant="chart"
+      />
       <div
         v-else
         class="h-100 d-flex align-items-center justify-content-center text-secondary"
@@ -77,6 +74,7 @@
 import { ref, shallowRef, watch, onMounted, computed, defineAsyncComponent } from 'vue'
 import type { ChartData, ChartOptions, TooltipItem } from 'chart.js'
 import { fetchDiskMetricsHistory } from '../../composables/useDiskMetricsHistory'
+import LoadingSkeleton from '../LoadingSkeleton.vue'
 import dayjs from '../../utils/dayjs'
 import { getApiErrorMessage } from '../../api/client'
 

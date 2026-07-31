@@ -23,9 +23,9 @@
     <div class="card">
       <div
         v-if="tasksLoading"
-        class="card-body text-center py-5"
+        class="card-body"
       >
-        <span class="spinner-border text-primary" />
+        <LoadingSkeleton variant="table" />
       </div>
       <div
         v-else-if="!tasks.length"
@@ -411,6 +411,7 @@ import { IconClock, IconList } from '@tabler/icons-vue'
 import CronBuilder from '../CronBuilder.vue'
 import SortableHeader from '../common/SortableHeader.vue'
 import EmptyState from '../EmptyState.vue'
+import LoadingSkeleton from '../LoadingSkeleton.vue'
 import apiClient from '../../api'
 import { useConfirmDialog } from '../../composables/useConfirmDialog'
 import { useDateFormatter } from '../../composables/useDateFormatter'

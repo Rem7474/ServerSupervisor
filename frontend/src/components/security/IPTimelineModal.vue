@@ -74,13 +74,10 @@
       </div>
 
       <div class="card-body p-0 timeline-body">
-        <div
+        <LoadingSkeleton
           v-if="loading"
-          class="text-center py-4 text-secondary"
-        >
-          <span class="spinner-border spinner-border-sm me-2" />
-          Chargement chronologie...
-        </div>
+          variant="list"
+        />
         <div
           v-else-if="!timeline.length"
           class="text-center py-4 text-secondary"
@@ -293,6 +290,7 @@ import { ref } from 'vue'
 import { useConfirmDialog } from '../../composables/useConfirmDialog'
 import { useIpTimeline } from '../../composables/useIpTimeline'
 import { useModalChrome } from '../../composables/useModalChrome'
+import LoadingSkeleton from '../LoadingSkeleton.vue'
 import type { WebLogIPTimelineRow } from '../../types/security'
 
 const props = defineProps({

@@ -7,13 +7,10 @@
       {{ error }}
     </div>
 
-    <div
+    <LoadingSkeleton
       v-if="loading && !exposure"
-      class="text-center text-muted py-4"
-    >
-      <div class="spinner-border mb-2" />
-      <div>Chargement de la corrélation…</div>
-    </div>
+      variant="kpi"
+    />
 
     <template v-else-if="exposure">
       <div class="row row-cards mb-3">
@@ -185,6 +182,7 @@
 
 <script setup lang="ts">
 import DomainDetailsModal from './DomainDetailsModal.vue'
+import LoadingSkeleton from '../LoadingSkeleton.vue'
 import { useDomainDetails } from '../../composables/useDomainDetails'
 import type { HostExposure } from '../../types/host'
 import { formatBytes } from '../../utils/formatters'

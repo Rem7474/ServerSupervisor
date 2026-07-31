@@ -28,13 +28,10 @@
       {{ error }}
     </div>
 
-    <div
+    <LoadingSkeleton
       v-if="loading && events.length === 0"
-      class="text-center text-muted py-4"
-    >
-      <div class="spinner-border mb-2" />
-      <div>Chargement de la timeline…</div>
-    </div>
+      variant="list"
+    />
 
     <div
       v-else-if="filteredEvents.length === 0"
@@ -119,6 +116,7 @@ import api from '../../api'
 import type { HostTimelineEvent } from '../../types/audit'
 import RelativeTime from '../RelativeTime.vue'
 import PageRefreshBar from '../PageRefreshBar.vue'
+import LoadingSkeleton from '../LoadingSkeleton.vue'
 import { getApiErrorMessage } from '../../api/client'
 
 const props = defineProps<{ hostId: string }>()
