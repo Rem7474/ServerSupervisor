@@ -284,7 +284,7 @@ const emit = defineEmits<{
 }>()
 
 const modalRef = ref<HTMLElement | null>(null)
-useModalFocusTrap(modalRef)
+useModalFocusTrap(modalRef, () => props.visible)
 
 const browserPermission = ref<NotificationPermission | 'unsupported'>(
   typeof Notification !== 'undefined' ? Notification.permission : 'unsupported'

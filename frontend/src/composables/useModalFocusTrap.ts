@@ -1,6 +1,14 @@
-import { onMounted, onUnmounted, ref, Ref } from 'vue'
+import { onUnmounted, ref, watch, Ref } from 'vue'
 
-export function useModalFocusTrap(modalRef: Ref<HTMLElement | null>) {
+// isOpen is a getter, not a Ref, so callers can pass `() => props.visible`
+// or `() => dialog.isOpen.value` uniformly. Watching it (flush: 'post',
+// so it runs after the v-if this modal is gated behind has patched the
+// DOM) instead of binding in onMounted is the fix for a real bug: every
+// consumer of this composable keeps its component mounted for the whole
+// page lifetime and toggles an *inner* v-if to show/hide the modal, so
+// modalRef.value was still null when onMounted fired and the trap never
+// actually engaged.
+export function useModalFocusTrap(modalRef: Ref<HTMLElement | null>, isOpen: () => boolean) {
   const initialFocus = ref<HTMLElement | null>(null)
 
   const getFocusableElements = () => {
@@ -28,30 +36,29 @@ export function useModalFocusTrap(modalRef: Ref<HTMLElement | null>) {
     focusables[nextIndex]?.focus()
   }
 
-  onMounted(() => {
-    // Store initial focus
-    initialFocus.value = document.activeElement as HTMLElement
+  watch(
+    isOpen,
+    (open) => {
+      if (open) {
+        initialFocus.value = document.activeElement as HTMLElement
 
-    // Focus first input or focusable element
-    const focusables = getFocusableElements()
-    if (focusables.length > 0) {
-      // Prefer focusing the first input
-      const firstInput = focusables.find(el => el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.tagName === 'TEXTAREA')
-      if (firstInput) {
-        firstInput.focus()
+        const focusables = getFocusableElements()
+        if (focusables.length > 0) {
+          const firstInput = focusables.find(el => el.tagName === 'INPUT' || el.tagName === 'SELECT' || el.tagName === 'TEXTAREA')
+          ;(firstInput || focusables[0])?.focus()
+        }
+
+        modalRef.value?.addEventListener('keydown', handleKeyDown)
       } else {
-        focusables[0]?.focus()
+        modalRef.value?.removeEventListener('keydown', handleKeyDown)
+        initialFocus.value?.focus()
       }
-    }
-
-    // Add trap listener
-    modalRef.value?.addEventListener('keydown', handleKeyDown)
-  })
+    },
+    { flush: 'post' }
+  )
 
   onUnmounted(() => {
-    // Restore initial focus
     modalRef.value?.removeEventListener('keydown', handleKeyDown)
-    initialFocus.value?.focus()
   })
 
   return { getFocusableElements }

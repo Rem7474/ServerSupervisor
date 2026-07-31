@@ -197,7 +197,7 @@ const emit = defineEmits<{
 }>()
 
 const modalRef = ref<HTMLElement | null>(null)
-useModalFocusTrap(modalRef)
+useModalFocusTrap(modalRef, () => props.visible)
 
 const loading = ref(false)
 const saving = ref(false)

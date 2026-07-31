@@ -87,7 +87,7 @@ const typedText = ref('')
 const inputRef = ref<HTMLInputElement | null>(null)
 const modalRef = ref<HTMLElement | null>(null)
 
-useModalFocusTrap(modalRef)
+useModalFocusTrap(modalRef, () => dialog.isOpen.value)
 
 watch(dialog.isOpen, (val) => {
   if (val) {
