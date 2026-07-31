@@ -35,3 +35,65 @@ Four stores, each with a `stores/*.spec.ts` — update the matching spec when yo
 - Don't hand-edit `types/generated.ts`.
 - Don't open a second WebSocket connection to an endpoint another composable already subscribes to (e.g. `useNotifications` for `/api/v1/ws/notifications`) — share the existing connection instead of instantiating `useWebSocket` again.
 - i18n isn't set up (hardcoded French strings, `<html lang="fr">`, no `vue-i18n`) — don't half-introduce it for one component; that's a project-wide decision, not a local one.
+
+## Design system
+
+Distilled from a cross-page UI/UX consistency audit ([UIUX-AUDIT-2026.md](../UIUX-AUDIT-2026.md)) and the decisions made while remediating it. Tabler is the underlying library (dark-only theme, `data-bs-theme="dark"` fixed in `index.html`) but several of its class names have converged on more than one spelling across this codebase over time — the rules below are the one spelling to use in new code.
+
+### Buttons
+
+| Role | Classes | Notes |
+|---|---|---|
+| Primary page action | `btn btn-primary` | One per screen |
+| Secondary action | `btn btn-outline-secondary` | Never `btn-outline-light`/`btn-ghost-light` — those read as a light-theme leftover on this dark-only app |
+| Tertiary / toolbar action | `btn btn-sm btn-ghost-secondary` | |
+| Destructive, in a table row | `btn btn-icon btn-sm btn-ghost-danger` | + explicit `title` and `aria-label` |
+| Destructive, in a modal footer | `btn btn-danger` | Solid red is reserved for this one case |
+| **Lifecycle action (start/stop/restart/…), in a table row** | `btn btn-icon btn-sm btn-ghost-<success\|danger\|warning>` (`btn-ghost-secondary` for logs/status/reload) | Icon only + `title` + `aria-label`, French |
+| **Lifecycle action, in a page header** | `btn btn-sm btn-outline-<success\|danger\|warning>` | Icon + French text |
+
+`btn-xs` **does not exist in Tabler** (no definition ships in `@tabler/core`) — using it silently falls back to the browser default button size. Use `btn-sm`, or add a real `.btn-xs` rule to `style.css` if a 4th size tier is genuinely needed. Labels: French, sentence case, infinitive verb form (`Supprimer`, not `SUPPRIMER` or `Delete`).
+
+The lifecycle-action rule above is deliberately a class convention, not a shared `LifecycleActions.vue` component — Docker containers, PVE guests and systemd units have genuinely different action vocabularies, payload shapes, permission gates and pending-state sources; a component parameterizing all of that would have a larger API than the markup it replaces. Where two sites share not just the look but the actual domain identity (e.g. `ProxmoxNodeGuestsTab.vue` and `ProxmoxGuestView.vue`, both guest power actions), share the *logic* via a composable (see `composables/useProxmoxGuestActions.ts`) and let each site keep its own markup.
+
+### Colors
+
+Use the semantic names for anything that carries a state meaning — not the raw Tabler palette names, even where they currently resolve to the same hex:
+
+| Intent | Token | Value |
+|---|---|---|
+| Error / destructive | `danger` | `#d63939` |
+| Success / active | `success` | `#2fb344` |
+| Warning | `warning` | `#f59f00` |
+| Info / accent | `primary` | `#066fd1` |
+| Neutral / secondary | `secondary` | `#6b7280` |
+
+Don't use `red`/`green`/`yellow` for a state (they duplicate `danger`/`success`/`warning` in name only). Don't use `orange` for a warning — `text-orange`/`bg-orange-lt` is `#f76707`, a genuinely different hue from `warning`/`yellow` (`#f59f00`), so mixing them makes the same severity render in two colors. Don't use `azure` as the accent color — `bg-azure-lt` (`#4299e1`) is a near-duplicate of `primary`/`blue` (`#066fd1`); reserve `azure` (and other palette names like `purple`, `teal`, `cyan`) for neutral categorical tagging, not state. Never hardcode a hex value in a component's `<style>` block — the `--ss-*` tokens in `style.css:71-124` exist for exactly the slate surfaces/status colors Tabler doesn't provide; add to that block instead.
+
+### Icons
+
+`@tabler/icons-vue` exclusively — no other icon set, no ad-hoc inline `<svg>` except genuine dataviz (network graphs, maps). Four size tiers via the `:size` prop: **14** (inside a `btn-sm`/badge), **16** (default inline/table icon), **24** (card-header icon), **48** (empty-state icon). Don't introduce 18/20/32/36/40 — they're unjustified intermediates. Default `stroke-width` (2) everywhere except large decorative empty-state icons (1.5). One action = one icon everywhere: `IconTrash` = delete, `IconPencil` = edit, `IconRefresh` = restart, `IconReload` = reload (a distinct action from restart — don't conflate the two icons), `IconCopy` = copy, `IconPlayerPlay`/`IconPlayerStop` = start/stop.
+
+### Tables
+
+- Base classes: `table table-vcenter card-table`. Add `table-sm` only for dense secondary tables (side panels); never add `mb-0` by hand (`card-table` already sets it).
+- Sorting: `SortableHeader.vue` — don't hand-roll a `sortKey`/chevron toggle.
+- Pagination: `PaginationNav.vue`, in the card footer — there is no other pagination component in the app, keep it that way.
+- Clickable row: `.clickable-row` (global utility, `style.css:418-436`, shared hover/focus color) + `role="button"` + `tabindex="0"` + `@keydown.enter` + `@keydown.space.prevent`. Reference implementation: `ThreatsPanel.vue`. Reserve `table-hover` for tables whose rows are *not* individually clickable — using both on the same table sends two competing hover signals.
+- Empty state: `<EmptyState>` (wrapped in `<tr><td :colspan="N">` when inside a `<tbody>`), never an ad-hoc `<div class="text-center text-muted">`.
+- Loading: `<LoadingSkeleton>` for a first-load of a zone whose shape is known (table, KPI strip, chart); `spinner-border` only for a punctual action (button in flight, per-row action) — never both in the same view for the same zone.
+- Actions column: `text-end`, last column, `btn-icon btn-sm` buttons.
+
+### Modals
+
+There is no `AppModal.vue` and none is planned as a big-bang migration — see `composables/useModalChrome.ts` (ESC handling with a top-of-stack-only dispatch, scroll lock, focus trap) instead, wired into each modal's own existing markup with ~4 lines of script. It replaced `useModalFocusTrap.ts`, which had a latent bug: it bound its listener in `onMounted` while every consumer stays mounted and toggles an inner `v-if`, so the trap never actually engaged. If a *new* modal is being added and its markup would clearly benefit from a shared header/body/footer shell, that's the point to introduce `AppModal.vue` — additively, for new modals only, built on top of `useModalChrome`. Don't retrofit it onto `DomainDetailsModal.vue`/`IPTimelineModal.vue` — those are full-screen drawers built from a Tabler `.card`, not `.modal`/`.modal-dialog`/`.modal-content`, and forcing them into a modal shell would be the wrong abstraction, not a consistency fix.
+
+Destructive confirmation: `useConfirmDialog()` (a module-level singleton, `ConfirmDialog.vue` rendered once in `App.vue`) — never a native `window.confirm()`.
+
+### Forms
+
+`form-label` (+ `required` modifier) · `form-control` / `form-select` (+ `-sm` in a toolbar) · **`form-hint`** for helper text under a field (never `text-muted small` — that's prose, not a field hint) · `invalid-feedback` for validation errors.
+
+### Copy
+
+French, accented, sentence case, `…` (real ellipsis character, not three dots). Action labels are infinitive verbs. Don't half-introduce i18n for one component (see the "Don't" list above).
