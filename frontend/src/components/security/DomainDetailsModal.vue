@@ -289,7 +289,7 @@
                 {{ filters.path }}
                 <button
                   type="button"
-                  class="btn-close btn-close-white ms-1"
+                  class="btn-close ms-1"
                   style="font-size: 0.55rem;"
                   aria-label="Retirer le filtre chemin"
                   @click="$emit('update-filter', { key: 'path', value: '' })"
@@ -302,7 +302,7 @@
                 {{ filters.ip }}
                 <button
                   type="button"
-                  class="btn-close btn-close-white ms-1"
+                  class="btn-close ms-1"
                   style="font-size: 0.55rem;"
                   aria-label="Retirer le filtre IP"
                   @click="$emit('update-filter', { key: 'ip', value: '' })"

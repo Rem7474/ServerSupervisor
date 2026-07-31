@@ -407,7 +407,7 @@
           </div>
           <button
             type="button"
-            class="btn-close btn-close-white me-2 m-auto"
+            class="btn-close me-2 m-auto"
             @click="taskRunResult = null"
           />
         </div>

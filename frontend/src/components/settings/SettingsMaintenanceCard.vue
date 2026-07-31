@@ -18,7 +18,7 @@
             type="button"
             class="btn btn-warning btn-sm"
             :disabled="cleaningMetrics"
-            @click="showCleanMetricsModal = true"
+            @click="confirmCleanMetrics"
           >
             {{ cleaningMetrics ? 'Nettoyage en cours...' : 'Lancer le nettoyage' }}
           </button>
@@ -41,7 +41,7 @@
             type="button"
             class="btn btn-warning btn-sm"
             :disabled="cleaningAuditLogs"
-            @click="showCleanAuditModal = true"
+            @click="confirmCleanAudit"
           >
             {{ cleaningAuditLogs ? 'Nettoyage en cours...' : 'Lancer le nettoyage' }}
           </button>
@@ -54,111 +54,18 @@
         </div>
       </div>
     </div>
-
-    <div
-      v-if="showCleanMetricsModal"
-      class="modal modal-blur fade show"
-      style="display: block; background: rgba(0,0,0,0.5);"
-    >
-      <div class="modal-dialog modal-sm modal-dialog-centered">
-        <div class="modal-content">
-          <button
-            type="button"
-            class="btn-close"
-            aria-label="Close"
-            @click="showCleanMetricsModal = false"
-          />
-          <div class="modal-status bg-warning" />
-          <div class="modal-body text-center py-4">
-            <IconCircle
-              :size="24"
-              class="icon mb-2 text-warning icon-lg"
-            />
-            <h3>Confirmer le nettoyage</h3>
-            <div class="text-secondary mb-3">
-              La politique de rétention TimescaleDB sera mise à jour à {{ settings.metricsRetentionDays }} jours. Le nettoyage sera appliqué automatiquement par TimescaleDB.
-            </div>
-          </div>
-          <div class="modal-footer">
-            <div class="w-100 d-flex gap-2">
-              <button
-                type="button"
-                class="btn btn-link link-secondary w-100"
-                @click="showCleanMetricsModal = false"
-              >
-                Annuler
-              </button>
-              <button
-                type="button"
-                class="btn btn-warning w-100"
-                @click="confirmCleanMetrics"
-              >
-                Continuer
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div
-      v-if="showCleanAuditModal"
-      class="modal modal-blur fade show"
-      style="display: block; background: rgba(0,0,0,0.5);"
-    >
-      <div class="modal-dialog modal-sm modal-dialog-centered">
-        <div class="modal-content">
-          <button
-            type="button"
-            class="btn-close"
-            aria-label="Close"
-            @click="showCleanAuditModal = false"
-          />
-          <div class="modal-status bg-warning" />
-          <div class="modal-body text-center py-4">
-            <IconCircle
-              :size="24"
-              class="icon mb-2 text-warning icon-lg"
-            />
-            <h3>Confirmer le nettoyage</h3>
-            <div class="text-secondary mb-3">
-              Les entrées audit plus anciennes que {{ settings.auditRetentionDays }} jours seront supprimées. Cette action est irréversible.
-            </div>
-          </div>
-          <div class="modal-footer">
-            <div class="w-100 d-flex gap-2">
-              <button
-                type="button"
-                class="btn btn-link link-secondary w-100"
-                @click="showCleanAuditModal = false"
-              >
-                Annuler
-              </button>
-              <button
-                type="button"
-                class="btn btn-warning w-100"
-                @click="confirmCleanAudit"
-              >
-                Continuer
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import { IconCircle } from '@tabler/icons-vue'
+import { useConfirmDialog } from '../../composables/useConfirmDialog'
 
 interface Settings {
   metricsRetentionDays: number
   auditRetentionDays: number
 }
 
-withDefaults(defineProps<{
+const props = withDefaults(defineProps<{
   settings: Settings
   cleaningMetrics?: boolean
   cleanMessage?: string
@@ -180,16 +87,27 @@ const emit = defineEmits<{
   (e: 'clean-audit'): void
 }>()
 
-const showCleanMetricsModal = ref(false)
-const showCleanAuditModal = ref(false)
+const dialog = useConfirmDialog()
 
-function confirmCleanMetrics(): void {
-  showCleanMetricsModal.value = false
+async function confirmCleanMetrics(): Promise<void> {
+  const confirmed = await dialog.confirm({
+    title: 'Confirmer le nettoyage',
+    message: `La politique de rétention TimescaleDB sera mise à jour à ${props.settings.metricsRetentionDays} jours. Le nettoyage sera appliqué automatiquement par TimescaleDB.`,
+    variant: 'warning',
+    okLabel: 'Continuer',
+  })
+  if (!confirmed) return
   emit('clean-metrics')
 }
 
-function confirmCleanAudit(): void {
-  showCleanAuditModal.value = false
+async function confirmCleanAudit(): Promise<void> {
+  const confirmed = await dialog.confirm({
+    title: 'Confirmer le nettoyage',
+    message: `Les entrées audit plus anciennes que ${props.settings.auditRetentionDays} jours seront supprimées. Cette action est irréversible.`,
+    variant: 'warning',
+    okLabel: 'Continuer',
+  })
+  if (!confirmed) return
   emit('clean-audit')
 }
 </script>

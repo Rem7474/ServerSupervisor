@@ -588,43 +588,9 @@ const {
 </script>
 
 <style scoped>
-.traffic-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.35);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: var(--z-index-modal-overlay);
-  padding: 1rem;
-}
-
-.traffic-modal {
-  width: min(1200px, 96vw);
-  max-height: 92vh;
-  overflow: auto;
-}
-
 @media (max-width: 768px) {
-  .traffic-modal-backdrop {
-    padding: 0;
-  }
-
-  .traffic-modal {
-    width: 100vw;
-    max-height: 100dvh;
-    height: 100dvh;
-    border-radius: 0;
-  }
-
-  .traffic-modal-body {
-    padding: 0.75rem;
-  }
-
   .endpoint-path,
-  .live-path,
-  .domain-path,
-  .domain-ua {
+  .live-path {
     max-width: 12rem !important;
   }
 }

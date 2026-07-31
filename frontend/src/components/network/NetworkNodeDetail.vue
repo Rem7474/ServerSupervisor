@@ -12,7 +12,7 @@
       </div>
       <button
         type="button"
-        class="btn-close btn-close-white btn-close-sm"
+        class="btn-close"
         aria-label="Fermer"
         @click="$emit('close')"
       />

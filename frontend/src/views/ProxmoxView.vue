@@ -239,7 +239,7 @@
             Filtré : {{ healthFilterLabel }}
             <button
               type="button"
-              class="btn-close btn-close-sm ms-1"
+              class="btn-close ms-1"
               aria-label="Retirer le filtre"
               @click="clearHealthFilter"
             />
