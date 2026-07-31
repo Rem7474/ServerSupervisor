@@ -80,8 +80,8 @@
         <div>
           <label class="form-label mb-0">Services manuels via proxy</label>
           <div class="text-secondary small mt-1">
-            Services definis manuellement, non detectes automatiquement.
-            Pour les ports decouverts, utilisez la section "Ports decouverts" ci-dessous
+            Services définis manuellement, non détectés automatiquement.
+            Pour les ports découverts, utilisez la section "Ports découverts" ci-dessous
             et cochez "Proxy".
           </div>
         </div>
@@ -207,13 +207,13 @@
                 class="text-center py-4"
               >
                 <div class="text-secondary small">
-                  Aucun service configure
+                  Aucun service configuré
                 </div>
                 <div
                   class="text-muted"
                   style="font-size:.8rem"
                 >
-                  Ajoutez un service pour le faire apparaitre dans la topologie reseau
+                  Ajoutez un service pour le faire apparaître dans la topologie réseau
                 </div>
               </td>
             </tr>
@@ -503,7 +503,7 @@
                     class="text-center py-4"
                   >
                     <div class="text-secondary small">
-                      Aucun port detecte
+                      Aucun port détecté
                     </div>
                     <div
                       class="text-muted"

@@ -253,7 +253,7 @@
                     placeholder="0"
                   >
                   <div class="form-hint">
-                    Attente max de l'etat healthy apres up -d (0 = desactive).
+                    Attente max de l'état healthy après up -d (0 = désactivé).
                   </div>
                 </div>
                 <div class="col-md-8 d-flex align-items-end">
@@ -264,7 +264,7 @@
                         class="form-check-input"
                         type="checkbox"
                       >
-                      <span class="form-check-label">Rollback si echec / unhealthy</span>
+                      <span class="form-check-label">Rollback si échec / unhealthy</span>
                     </label>
                     <label class="form-check">
                       <input
@@ -318,7 +318,7 @@
                     placeholder="ex: backup-postgres"
                   >
                   <div class="form-hint">
-                    Tache <code>tasks.yaml</code> executee avant le pull (ex: sauvegarde).
+                    Tâche <code>tasks.yaml</code> exécutée avant le pull (ex: sauvegarde).
                   </div>
                 </div>
                 <div class="col-md-6">
@@ -407,7 +407,7 @@
                     class="form-check-input"
                     type="checkbox"
                   >
-                  <span class="form-check-label">En cas de succes</span>
+                  <span class="form-check-label">En cas de succès</span>
                 </label>
                 <label
                   v-if="mode === 'webhook'"
@@ -418,7 +418,7 @@
                     class="form-check-input"
                     type="checkbox"
                   >
-                  <span class="form-check-label">En cas d'echec</span>
+                  <span class="form-check-label">En cas d'échec</span>
                 </label>
                 <label
                   v-if="mode === 'tracker'"
@@ -430,7 +430,7 @@
                     type="checkbox"
                     :disabled="!form.notify_channels.length"
                   >
-                  <span class="form-check-label">Notifier a chaque mise a jour detectee</span>
+                  <span class="form-check-label">Notifier à chaque mise à jour détectée</span>
                 </label>
               </div>
               <div class="d-flex flex-wrap gap-3 mt-2">

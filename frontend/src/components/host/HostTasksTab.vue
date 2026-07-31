@@ -17,7 +17,7 @@
         class="btn btn-primary"
         @click="openCreateTask"
       >
-        Nouvelle tache
+        Nouvelle tâche
       </button>
     </div>
     <div class="card">
@@ -37,10 +37,10 @@
           :stroke-width="1.5"
         />
         <h3 class="mb-1">
-          Aucune tache planifiee
+          Aucune tâche planifiée
         </h3>
         <p class="text-secondary mb-3">
-          Automatisez vos operations en creant une tache planifiee.
+          Automatisez vos opérations en créant une tâche planifiée.
         </p>
         <button
           v-if="canRunApt"
@@ -48,7 +48,7 @@
           class="btn btn-primary"
           @click="openCreateTask"
         >
-          Nouvelle tache
+          Nouvelle tâche
         </button>
       </div>
       <div
@@ -210,7 +210,7 @@
           <div class="modal-content">
             <div class="modal-header">
               <h5 class="modal-title">
-                {{ editingTask ? 'Modifier la tache' : 'Nouvelle tache planifiee' }}
+                {{ editingTask ? 'Modifier la tâche' : 'Nouvelle tâche planifiée' }}
               </h5>
               <button
                 type="button"
@@ -323,7 +323,7 @@
                       id="task-yaml-hint"
                       class="form-hint"
                     >
-                      Aucune tache detectee dans <code>tasks.yaml</code> - saisissez l'ID manuellement.
+                      Aucune tâche détectée dans <code>tasks.yaml</code> - saisissez l'ID manuellement.
                     </div>
                   </template>
                 </template>
@@ -385,7 +385,7 @@
                   v-if="taskSaving"
                   class="spinner-border spinner-border-sm me-1"
                 />
-                {{ editingTask ? 'Enregistrer' : 'Creer' }}
+                {{ editingTask ? 'Enregistrer' : 'Créer' }}
               </button>
             </div>
           </div>
@@ -684,8 +684,8 @@ function openTaskLogs(task: Task): void {
 
 async function confirmDeleteTask(task: Task): Promise<void> {
   const confirmed = await dialog.confirm({
-    title: 'Supprimer la tache',
-    message: `Supprimer la tache "${task.name}" ?\nCette action est irreversible.`,
+    title: 'Supprimer la tâche',
+    message: `Supprimer la tâche "${task.name}" ?\nCette action est irréversible.`,
     variant: 'danger',
   })
   if (!confirmed) return
