@@ -306,11 +306,8 @@
             />
           </div>
           <div class="modal-body">
-            <div
-              v-if="executionsLoading"
-              class="text-center py-4"
-            >
-              <div class="spinner-border text-primary" />
+            <div v-if="executionsLoading">
+              <LoadingSkeleton variant="table" />
             </div>
             <div
               v-else-if="executions.length === 0"

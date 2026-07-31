@@ -240,15 +240,10 @@
           class="card-body"
           style="height: 14rem;"
         >
-          <div
+          <LoadingSkeleton
             v-if="summaryLoading"
-            class="h-100 d-flex align-items-center justify-content-center"
-          >
-            <div
-              class="spinner-border text-secondary"
-              role="status"
-            />
-          </div>
+            variant="chart"
+          />
           <Line
             v-else-if="chartData"
             :data="chartData"

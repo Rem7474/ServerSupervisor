@@ -493,15 +493,10 @@
           ref="chartContainerRef"
           class="card-body summary-chart-body"
         >
-          <div
+          <LoadingSkeleton
             v-if="summaryLoading || !chartVisible"
-            class="h-100 d-flex align-items-center justify-content-center"
-          >
-            <div
-              class="spinner-border text-secondary"
-              role="status"
-            />
-          </div>
+            variant="chart"
+          />
           <Line
             v-else-if="summaryChartData"
             :data="(summaryChartData as any)"

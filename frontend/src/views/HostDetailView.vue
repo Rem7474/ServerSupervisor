@@ -400,10 +400,9 @@
               </div>
               <div
                 v-if="incidentsLoading"
-                class="card-body text-center text-secondary py-4"
+                class="card-body"
               >
-                <div class="spinner-border spinner-border-sm me-2" />
-                Chargement…
+                <LoadingSkeleton variant="list" />
               </div>
               <div
                 v-else-if="!hostActiveIncidents.length"
@@ -568,11 +567,8 @@
                 <span class="badge badge-sm bg-red text-white">Admin only</span>
               </div>
               <div class="card-body p-0">
-                <div
-                  v-if="permLoading"
-                  class="text-center py-3"
-                >
-                  <span class="spinner-border spinner-border-sm" />
+                <div v-if="permLoading">
+                  <LoadingSkeleton variant="table" />
                 </div>
                 <div
                   v-else-if="!hostPerms.length"
