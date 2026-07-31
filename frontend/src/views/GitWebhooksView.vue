@@ -569,40 +569,42 @@
       @created="onBulkCreated"
     />
 
-    <div
-      v-if="newWebhookSecret"
-      class="modal modal-blur show d-block"
-      style="background:rgba(0,0,0,.7)"
-    >
-      <div class="modal-dialog modal-md">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">
-              Webhook créé
-            </h5>
-          </div>
-          <div class="modal-body">
-            <div class="alert alert-warning">
-              Copiez ce secret maintenant, il ne sera plus affiché en clair.
+    <template v-if="newWebhookSecret">
+      <div
+        ref="secretModalRef"
+        class="modal modal-blur fade show d-block"
+      >
+        <div class="modal-dialog modal-md">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title">
+                Webhook créé
+              </h5>
             </div>
-            <WebhookUrlCard
-              :webhook-id="newWebhookId"
-              :secret="newWebhookSecret"
-              :initial-secret="true"
-            />
-          </div>
-          <div class="modal-footer">
-            <button
-              type="button"
-              class="btn btn-primary"
-              @click="closeSecretModal"
-            >
-              J'ai copié le secret
-            </button>
+            <div class="modal-body">
+              <div class="alert alert-warning">
+                Copiez ce secret maintenant, il ne sera plus affiché en clair.
+              </div>
+              <WebhookUrlCard
+                :webhook-id="newWebhookId"
+                :secret="newWebhookSecret"
+                :initial-secret="true"
+              />
+            </div>
+            <div class="modal-footer">
+              <button
+                type="button"
+                class="btn btn-primary"
+                @click="closeSecretModal"
+              >
+                J'ai copié le secret
+              </button>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+      <div class="modal-backdrop fade show" />
+    </template>
   </div>
 </template>
 
@@ -616,6 +618,7 @@ import WebhookModal from '../components/webhooks/WebhookModal.vue'
 import TrackableContainersModal from '../components/webhooks/TrackableContainersModal.vue'
 import CommandLogPanel from '../components/host/CommandLogPanel.vue'
 import { ref } from 'vue'
+import { useModalChrome } from '../composables/useModalChrome'
 const {
   activeTab,
   hosts,
@@ -665,6 +668,12 @@ const {
   closeTrackerLogs,
   openTrackerLogs,
 } = useGitWebhooksPage()
+
+// No dismiss affordance by design — the secret is shown once, and the
+// only way out is the "J'ai copié le secret" button, so ESC/backdrop
+// close must stay disabled (persistent: true).
+const secretModalRef = ref<HTMLElement | null>(null)
+useModalChrome(secretModalRef, () => !!newWebhookSecret.value, { persistent: true })
 
 const showDiscoverModal = ref(false)
 

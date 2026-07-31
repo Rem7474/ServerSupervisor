@@ -1,6 +1,7 @@
 <template>
   <div
     v-if="show"
+    ref="modalRef"
     class="timeline-drawer-backdrop"
     @click.self="$emit('close')"
   >
@@ -291,6 +292,7 @@
 import { ref } from 'vue'
 import { useConfirmDialog } from '../../composables/useConfirmDialog'
 import { useIpTimeline } from '../../composables/useIpTimeline'
+import { useModalChrome } from '../../composables/useModalChrome'
 import type { WebLogIPTimelineRow } from '../../types/security'
 
 const props = defineProps({
@@ -306,6 +308,9 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['close', 'ban'])
+
+const modalRef = ref<HTMLElement | null>(null)
+useModalChrome(modalRef, () => props.show, { onClose: () => emit('close') })
 
 const dialog = useConfirmDialog()
 const banDuration = ref('4h')

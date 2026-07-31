@@ -1,6 +1,7 @@
 <template>
   <div
     v-if="show"
+    ref="modalRef"
     class="traffic-modal-backdrop"
     @click.self="$emit('close')"
   >
@@ -466,6 +467,7 @@ import { computed, ref } from 'vue'
 import { IconBan, IconCheck, IconCopy } from '@tabler/icons-vue'
 import SortableHeader from '../common/SortableHeader.vue'
 import PaginationNav from '../PaginationNav.vue'
+import { useModalChrome } from '../../composables/useModalChrome'
 import type { DomainDetailsFilterKey, DomainDetailsSortKey } from '../../composables/useDomainDetails'
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- display-layer shim for the ad-hoc GetDomainDetails aggregate (no Go model)
@@ -491,7 +493,7 @@ const props = withDefaults(defineProps<{
   blockState: () => ({}),
 })
 
-defineEmits<{
+const emit = defineEmits<{
   (e: 'close'): void
   (e: 'update-filter', payload: { key: DomainDetailsFilterKey; value: string }): void
   (e: 'clear-filters'): void
@@ -499,6 +501,9 @@ defineEmits<{
   (e: 'update:page', page: number): void
   (e: 'block-ip', payload: { ip: string; hostId: string }): void
 }>()
+
+const modalRef = ref<HTMLElement | null>(null)
+useModalChrome(modalRef, () => props.show, { onClose: () => emit('close') })
 
 const METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'HEAD', 'OPTIONS', 'PATCH']
 

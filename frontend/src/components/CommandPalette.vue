@@ -92,12 +92,22 @@
 import { computed, onMounted, ref } from 'vue'
 import { IconSearch } from '@tabler/icons-vue'
 import { useCommandPalette, type PaletteResult } from '../composables/useCommandPalette'
+import { useModalChrome } from '../composables/useModalChrome'
 import { highlightParts } from '../utils/highlightMatch'
 
-const { query, activeIndex, results, close, selectResult } = useCommandPalette()
+const { query, activeIndex, results, isOpen, close, selectResult } = useCommandPalette()
 
 const inputRef = ref<HTMLInputElement | null>(null)
 const dialogRef = ref<HTMLElement | null>(null)
+
+// Only the scroll lock is missing here — CommandPalette already has its own
+// working ESC (a global window listener in useCommandPalette.ts, shared with
+// the Ctrl/Cmd+K open shortcut) and its own Tab trap (trapFocus below), both
+// correct because this component is mounted fresh per open rather than
+// staying mounted and toggling an inner v-if like every other modal in the
+// app. Reusing useModalChrome's ESC/focus-trap here would double-fire
+// alongside those, so both are switched off.
+useModalChrome(dialogRef, () => isOpen.value, { closeOnEsc: false, trapFocus: false })
 
 // Mounted fresh on every open (App.vue renders this v-if="isOpen"), so a
 // plain onMounted focus is reliable — unlike a permanently-mounted modal
