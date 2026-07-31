@@ -140,7 +140,7 @@
                     v-if="getComposeStatus(p) === 'stopped'"
                     type="button"
                     :disabled="!!actionLoading[p.name]"
-                    class="btn btn-icon btn-sm btn-success"
+                    class="btn btn-icon btn-sm btn-ghost-success"
                     title="Start (up -d)"
                     aria-label="Démarrer le projet"
                     @click="$emit('compose-action', { hostId: p.host_id, name: p.name, action: 'compose_up', workingDir: p.working_dir || '' })"
@@ -159,7 +159,7 @@
                     <button
                       type="button"
                       :disabled="!!actionLoading[p.name]"
-                      class="btn btn-icon btn-sm btn-outline-danger"
+                      class="btn btn-icon btn-sm btn-ghost-danger"
                       title="Stop (down)"
                       aria-label="Arrêter le projet"
                       @click="$emit('compose-action', { hostId: p.host_id, name: p.name, action: 'compose_down', workingDir: p.working_dir || '' })"
@@ -177,7 +177,7 @@
                     <button
                       type="button"
                       :disabled="!!actionLoading[p.name]"
-                      class="btn btn-icon btn-sm btn-outline-warning"
+                      class="btn btn-icon btn-sm btn-ghost-warning"
                       title="Redémarrer"
                       aria-label="Redémarrer le projet"
                       @click="$emit('compose-action', { hostId: p.host_id, name: p.name, action: 'compose_restart', workingDir: p.working_dir || '' })"
