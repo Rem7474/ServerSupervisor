@@ -1,7 +1,7 @@
 <template>
   <div class="card">
     <div
-      class="card-header dashboard-docker-header"
+      class="card-header dashboard-docker-header clickable-row"
       role="button"
       tabindex="0"
       :aria-expanded="isOpen"
@@ -275,10 +275,6 @@ async function runTracker(v: DockerVersion): Promise<void> {
 </script>
 
 <style scoped>
-.dashboard-docker-header {
-  cursor: pointer;
-}
-
 .docker-chevron {
   flex-shrink: 0;
   transition: transform 0.2s;

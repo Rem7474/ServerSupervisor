@@ -431,7 +431,7 @@
     <!-- ─── Graphique de tendance (collapsible, replié par défaut) ──────────── -->
     <div class="card mb-4">
       <div
-        class="card-header dashboard-chart-header"
+        class="card-header dashboard-chart-header clickable-row"
         role="button"
         tabindex="0"
         :aria-expanded="chartOpen"
@@ -802,10 +802,6 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.dashboard-chart-header {
-  cursor: pointer;
-}
-
 .chart-chevron {
   flex-shrink: 0;
   transition: transform 0.2s;

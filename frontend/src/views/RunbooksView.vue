@@ -334,8 +334,12 @@
                     :key="exec.id"
                   >
                     <tr
-                      class="cursor-pointer"
+                      class="clickable-row"
+                      role="button"
+                      tabindex="0"
                       @click="selectExecution(exec)"
+                      @keydown.enter="selectExecution(exec)"
+                      @keydown.space.prevent="selectExecution(exec)"
                     >
                       <td>
                         <span
