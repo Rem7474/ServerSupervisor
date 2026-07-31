@@ -215,7 +215,7 @@
     >
       <button
         type="button"
-        class="btn btn-sm btn-outline-orange"
+        class="btn btn-sm btn-outline-warning"
         @click="openLinkForm"
       >
         <IconLink

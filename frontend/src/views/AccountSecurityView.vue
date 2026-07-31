@@ -122,7 +122,7 @@
                   <code class="small">{{ setup.secret }}</code>
                   <button
                     type="button"
-                    class="btn btn-sm btn-ghost-light py-0"
+                    class="btn btn-sm btn-ghost-secondary py-0"
                     title="Copier"
                     @click="copySecret"
                   >
@@ -163,7 +163,7 @@
               <pre class="bg-dark text-light rounded p-2 small">{{ setup.backup_codes.join('\n') }}</pre>
               <button
                 type="button"
-                class="btn btn-outline-light btn-sm"
+                class="btn btn-outline-secondary btn-sm"
                 @click="copyBackupCodes"
               >
                 {{ copiedBackup ? 'Copié ✓' : 'Copier les codes' }}

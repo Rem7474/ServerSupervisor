@@ -87,7 +87,7 @@
         </div>
         <button
           type="button"
-          class="btn btn-outline-light btn-sm ms-2"
+          class="btn btn-outline-secondary btn-sm ms-2"
           @click="addServiceRow"
         >
           + Ajouter
