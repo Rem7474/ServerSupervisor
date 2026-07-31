@@ -57,11 +57,8 @@
       <tbody>
         <template v-if="!tasks.length">
           <tr>
-            <td
-              colspan="7"
-              class="text-center text-muted py-4"
-            >
-              Aucune tâche récente pour ce nœud.
+            <td colspan="7">
+              <EmptyState title="Aucune tâche récente pour ce nœud." />
             </td>
           </tr>
         </template>
@@ -114,6 +111,7 @@
 import { computed, ref } from 'vue'
 import { IconList } from '@tabler/icons-vue'
 import SortableHeader from '../common/SortableHeader.vue'
+import EmptyState from '../EmptyState.vue'
 import type { ProxmoxTask } from '../../types/proxmox'
 import { compareValues } from '../../utils/sort'
 

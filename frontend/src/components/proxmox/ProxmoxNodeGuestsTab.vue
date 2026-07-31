@@ -112,11 +112,8 @@
       </thead>
       <tbody>
         <tr v-if="sortedGuests.length === 0">
-          <td
-            :colspan="colspan"
-            class="text-center text-muted py-4"
-          >
-            {{ emptyText }}
+          <td :colspan="colspan">
+            <EmptyState :title="emptyText" />
           </td>
         </tr>
         <tr
@@ -284,6 +281,7 @@ import { computed, ref } from 'vue'
 import { IconPlayerPlay, IconPlayerStop, IconRefresh } from '@tabler/icons-vue'
 import SortableHeader from '../common/SortableHeader.vue'
 import GuestLinkCell from './GuestLinkCell.vue'
+import EmptyState from '../EmptyState.vue'
 import { useAuthStore } from '../../stores/auth'
 import type { GuestPowerAction } from '../../composables/useProxmoxGuestActions'
 import { compareValues } from '../../utils/sort'

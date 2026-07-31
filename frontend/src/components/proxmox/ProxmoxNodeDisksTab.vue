@@ -55,11 +55,8 @@
       </thead>
       <tbody>
         <tr v-if="!sortedDisks.length">
-          <td
-            colspan="6"
-            class="text-center text-muted py-4"
-          >
-            Aucun disque détecté sur ce nœud.
+          <td colspan="6">
+            <EmptyState title="Aucun disque détecté sur ce nœud." />
           </td>
         </tr>
         <tr
@@ -117,6 +114,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import SortableHeader from '../common/SortableHeader.vue'
+import EmptyState from '../EmptyState.vue'
 import type { ProxmoxDisk } from '../../types/proxmox'
 import { compareValues } from '../../utils/sort'
 

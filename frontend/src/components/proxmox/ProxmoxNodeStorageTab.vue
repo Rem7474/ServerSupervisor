@@ -15,11 +15,8 @@
       </thead>
       <tbody>
         <tr v-if="!storages.length">
-          <td
-            colspan="8"
-            class="text-center text-muted py-4"
-          >
-            Aucun stockage sur ce nœud.
+          <td colspan="8">
+            <EmptyState title="Aucun stockage sur ce nœud." />
           </td>
         </tr>
         <tr
@@ -73,6 +70,7 @@
 
 <script setup lang="ts">
 import type { ProxmoxStorage } from '../../types/proxmox'
+import EmptyState from '../EmptyState.vue'
 
 defineProps<{ storages: ProxmoxStorage[] }>()
 

@@ -206,19 +206,11 @@
               </td>
             </tr>
             <tr v-if="networkServices.length === 0">
-              <td
-                colspan="10"
-                class="text-center py-4"
-              >
-                <div class="text-secondary small">
-                  Aucun service configuré
-                </div>
-                <div
-                  class="text-muted"
-                  style="font-size:.8rem"
-                >
-                  Ajoutez un service pour le faire apparaître dans la topologie réseau
-                </div>
+              <td colspan="10">
+                <EmptyState
+                  title="Aucun service configuré"
+                  subtitle="Ajoutez un service pour le faire apparaître dans la topologie réseau"
+                />
               </td>
             </tr>
           </tbody>
@@ -502,19 +494,11 @@
                   </td>
                 </tr>
                 <tr v-if="(discoveredPortsByHost[host.id] || []).length === 0">
-                  <td
-                    colspan="7"
-                    class="text-center py-4"
-                  >
-                    <div class="text-secondary small">
-                      Aucun port détecté
-                    </div>
-                    <div
-                      class="text-muted"
-                      style="font-size:.8rem"
-                    >
-                      L'agent doit être actif et avoir collecté les données réseau
-                    </div>
+                  <td colspan="7">
+                    <EmptyState
+                      title="Aucun port détecté"
+                      subtitle="L'agent doit être actif et avoir collecté les données réseau"
+                    />
                   </td>
                 </tr>
               </tbody>
@@ -529,6 +513,7 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue'
 import { IconPlus, IconRefresh } from '@tabler/icons-vue'
+import EmptyState from '../EmptyState.vue'
 
 interface NetworkService {
   id: string

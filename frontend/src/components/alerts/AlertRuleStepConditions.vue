@@ -319,11 +319,8 @@
           </thead>
           <tbody>
             <tr v-if="!testResults.results?.length">
-              <td
-                colspan="3"
-                class="text-center text-secondary"
-              >
-                Aucun hôte concerné
+              <td colspan="3">
+                <EmptyState title="Aucun hôte concerné" />
               </td>
             </tr>
             <tr
@@ -360,6 +357,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import EmptyState from '../EmptyState.vue'
 import type { AlertRuleFormData } from '../../composables/useAlertRuleForm'
 
 interface TestResultRow {

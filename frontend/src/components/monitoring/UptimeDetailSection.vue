@@ -217,11 +217,8 @@
                 </td>
               </tr>
               <tr v-if="!results.length">
-                <td
-                  colspan="6"
-                  class="text-center text-secondary py-4"
-                >
-                  Aucun résultat encore. La première vérification arrive sous {{ probe.interval_sec }}s.
+                <td colspan="6">
+                  <EmptyState :title="`Aucun résultat encore. La première vérification arrive sous ${probe.interval_sec}s.`" />
                 </td>
               </tr>
             </tbody>
@@ -243,6 +240,7 @@
 import { defineAsyncComponent, watch } from 'vue'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
 import PageRefreshBar from '../PageRefreshBar.vue'
+import EmptyState from '../EmptyState.vue'
 import { formatDateTime } from '../../utils/formatters'
 import { getChartPalette } from '../../utils/chartTheme'
 import { useUptimeProbeDetail, STATS_WINDOWS } from '../../composables/useUptimeProbeDetail'

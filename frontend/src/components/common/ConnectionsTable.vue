@@ -26,11 +26,8 @@
           </td>
         </tr>
         <tr v-else-if="!events.length">
-          <td
-            :colspan="columnCount"
-            class="text-center text-secondary py-4"
-          >
-            Aucune connexion enregistrée
+          <td :colspan="columnCount">
+            <EmptyState title="Aucune connexion enregistrée" />
           </td>
         </tr>
         <tr
@@ -73,6 +70,7 @@
 import { computed } from 'vue'
 import type { LoginEvent } from '../../types/generated'
 import LoadingSkeleton from '../LoadingSkeleton.vue'
+import EmptyState from '../EmptyState.vue'
 import { parseUserAgent } from '../../utils/parseUserAgent'
 import { formatDateTime } from '../../utils/formatters'
 
