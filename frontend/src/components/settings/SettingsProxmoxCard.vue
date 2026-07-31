@@ -250,6 +250,9 @@ import { IconClock, IconPencil, IconRefresh, IconTrash } from '@tabler/icons-vue
 import api from '../../api/index'
 import type { ProxmoxConnection } from '../../types/proxmox'
 import { getApiErrorMessage } from '../../api/client'
+import { useConfirmDialog } from '../../composables/useConfirmDialog'
+
+const { confirm } = useConfirmDialog()
 
 // Use the shared domain type (the settings card only reads a subset of fields).
 type ProxmoxInstance = ProxmoxConnection
@@ -422,7 +425,12 @@ async function pollNow(inst: ProxmoxInstance): Promise<void> {
 }
 
 async function remove(inst: ProxmoxInstance): Promise<void> {
-  if (!confirm(`Supprimer la connexion Proxmox « ${inst.name} » ? Toutes les données collectées seront effacées.`)) return
+  const confirmed = await confirm({
+    title: 'Supprimer la connexion Proxmox ?',
+    message: `Supprimer la connexion Proxmox « ${inst.name} » ? Toutes les données collectées seront effacées.`,
+    variant: 'danger',
+  })
+  if (!confirmed) return
   try {
     await api.deleteProxmoxInstance(inst.id)
     await load()

@@ -231,6 +231,9 @@ import { IconPencil, IconRefresh, IconTrash } from '@tabler/icons-vue'
 import { npmApi } from '../../api/npm'
 import type { NPMConnection } from '../../types/npm'
 import { getApiErrorMessage } from '../../api/client'
+import { useConfirmDialog } from '../../composables/useConfirmDialog'
+
+const { confirm } = useConfirmDialog()
 
 withDefaults(defineProps<{
   authIsAdmin?: boolean
@@ -379,7 +382,12 @@ async function refreshNow(conn: NPMConnection): Promise<void> {
 }
 
 async function remove(conn: NPMConnection): Promise<void> {
-  if (!confirm(`Supprimer la connexion NPM « ${conn.name} » ? Les proxy hosts et leurs sondes uptime/SSL associées ne seront PAS supprimés.`)) return
+  const confirmed = await confirm({
+    title: 'Supprimer la connexion NPM ?',
+    message: `Supprimer la connexion NPM « ${conn.name} » ? Les proxy hosts et leurs sondes uptime/SSL associées ne seront PAS supprimés.`,
+    variant: 'danger',
+  })
+  if (!confirmed) return
   try {
     await npmApi.deleteConnection(conn.id)
     await load()

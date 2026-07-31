@@ -162,6 +162,9 @@
 import { ref, onMounted } from 'vue'
 import api from '../../api/index'
 import { getApiErrorMessage } from '../../api/client'
+import { useConfirmDialog } from '../../composables/useConfirmDialog'
+
+const { confirm } = useConfirmDialog()
 
 interface Credential {
   id: string
@@ -268,7 +271,12 @@ async function save(): Promise<void> {
 }
 
 async function remove(cred: Credential): Promise<void> {
-  if (!confirm(`Supprimer l'identifiant « ${cred.name} » ? Les trackers qui l'utilisent repasseront en accès public.`)) return
+  const confirmed = await confirm({
+    title: "Supprimer l'identifiant ?",
+    message: `Supprimer l'identifiant « ${cred.name} » ? Les trackers qui l'utilisent repasseront en accès public.`,
+    variant: 'danger',
+  })
+  if (!confirmed) return
   try {
     await api.deleteRegistryCredential(cred.id)
     await load()
