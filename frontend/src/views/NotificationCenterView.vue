@@ -103,10 +103,9 @@
     <div class="card">
       <div
         v-if="loading && items.length === 0"
-        class="card-body text-center text-muted py-5"
+        class="card-body"
       >
-        <div class="spinner-border mb-2" />
-        <div>Chargement…</div>
+        <LoadingSkeleton variant="list" />
       </div>
 
       <div
@@ -193,6 +192,7 @@
 <script setup lang="ts">
 import { IconChevronRight, IconList, IconStack2 } from '@tabler/icons-vue'
 import NotificationListItem from '../components/NotificationListItem.vue'
+import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import { useAuthStore } from '../stores/auth'
 import { useNotificationCenter } from '../composables/useNotificationCenter'
 

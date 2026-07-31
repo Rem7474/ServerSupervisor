@@ -34,15 +34,11 @@
       {{ error }}
     </div>
 
-    <div
+    <LoadingSkeleton
       v-if="loading"
-      class="text-center py-5"
-    >
-      <div
-        class="spinner-border text-primary"
-        role="status"
-      />
-    </div>
+      variant="card"
+      :lines="6"
+    />
 
     <div
       v-else-if="webhook"
@@ -218,6 +214,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import RelativeTime from '../components/RelativeTime.vue'
+import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import WebhookUrlCard from '../components/webhooks/WebhookUrlCard.vue'
 import WebhookExecutionList from '../components/webhooks/WebhookExecutionList.vue'
 import WebhookModal from '../components/webhooks/WebhookModal.vue'

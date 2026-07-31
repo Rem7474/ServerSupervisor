@@ -56,10 +56,9 @@
 
       <div
         v-if="loading"
-        class="card-body text-center text-muted py-5"
+        class="card-body"
       >
-        <div class="spinner-border spinner-border-sm me-2" />
-        Chargement…
+        <LoadingSkeleton variant="table" />
       </div>
 
       <div
@@ -288,6 +287,7 @@ import { computed } from 'vue'
 import { IconLock, IconAlertTriangle } from '@tabler/icons-vue'
 import SortableHeader from '../components/common/SortableHeader.vue'
 import PageRefreshBar from '../components/PageRefreshBar.vue'
+import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import { useNPM } from '../composables/useNPM'
 
 const {
