@@ -255,8 +255,8 @@
   <!-- Modal projet compose (raw config) -->
   <div
     v-if="selectedProject"
-    class="modal modal-blur fade show"
-    style="display: block;"
+    ref="modalRef"
+    class="modal modal-blur fade show d-block"
     @click.self="selectedProject = null"
   >
     <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
@@ -368,6 +368,7 @@ import { IconFile, IconList, IconPlayerPlay, IconRefresh, IconPlayerStop } from 
 import apiClient from '../../api'
 import DataToolbar from '../common/DataToolbar.vue'
 import { getApiErrorMessage } from '../../api/client'
+import { useModalChrome } from '../../composables/useModalChrome'
 
 interface ComposeProject {
   id: string | number
@@ -427,6 +428,8 @@ watch(composeSearchInput, (val) => {
 const composeHostFilter = ref('')
 const composeStateFilter = ref('')
 const selectedProject = ref<ComposeProject | null>(null)
+const modalRef = ref<HTMLElement | null>(null)
+useModalChrome(modalRef, () => !!selectedProject.value, { onClose: () => { selectedProject.value = null } })
 const copied = ref(false)
 const trackerRunLoading = ref<Record<string, boolean>>({})
 const trackerFeedback = ref('')

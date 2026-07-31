@@ -1,6 +1,7 @@
 <template>
   <div
     v-if="payload"
+    ref="modalRef"
     class="modal modal-blur fade show d-block"
     tabindex="-1"
     @click.self="$emit('close')"
@@ -67,14 +68,18 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { IconCheck, IconCopy } from '@tabler/icons-vue'
+import { useModalChrome } from '../../composables/useModalChrome'
 
 const props = defineProps<{
   payload: string | null
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   (e: 'close'): void
 }>()
+
+const modalRef = ref<HTMLElement | null>(null)
+useModalChrome(modalRef, () => !!props.payload, { onClose: () => emit('close') })
 
 const copied = ref(false)
 

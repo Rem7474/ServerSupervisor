@@ -448,8 +448,8 @@
   <!-- Modal conteneur (labels/compose info) -->
   <div
     v-if="selectedContainer"
-    class="modal modal-blur fade show"
-    style="display: block;"
+    ref="containerModalRef"
+    class="modal modal-blur fade show d-block"
     @click.self="selectedContainer = null"
   >
     <div class="modal-dialog modal-lg modal-dialog-centered">
@@ -529,8 +529,8 @@
   <!-- Modal Inspection (env vars / volumes / networks) -->
   <div
     v-if="inspectTarget"
-    class="modal modal-blur fade show"
-    style="display: block;"
+    ref="inspectModalRef"
+    class="modal modal-blur fade show d-block"
     @click.self="inspectTarget = null"
   >
     <div class="modal-dialog modal-lg modal-dialog-centered">
@@ -722,6 +722,7 @@ import DockerPortBadges from '../common/DockerPortBadges.vue'
 import EmptyState from '../EmptyState.vue'
 import PaginationNav from '../PaginationNav.vue'
 import BulkActionBar from '../BulkActionBar.vue'
+import { useModalChrome } from '../../composables/useModalChrome'
 import { useDockerContainerPorts } from '../../composables/useDockerContainerPorts'
 import { usePagination } from '../../composables/usePagination'
 import { getApiErrorMessage } from '../../api/client'
@@ -851,6 +852,10 @@ const sortDir = ref<'asc' | 'desc'>('asc')
 const inspectTarget = ref<Container | null>(null)
 const inspectTab = ref('env')
 const selectedContainer = ref<Container | null>(null)
+const containerModalRef = ref<HTMLElement | null>(null)
+const inspectModalRef = ref<HTMLElement | null>(null)
+useModalChrome(containerModalRef, () => !!selectedContainer.value, { onClose: () => { selectedContainer.value = null } })
+useModalChrome(inspectModalRef, () => !!inspectTarget.value, { onClose: () => { inspectTarget.value = null } })
 const trackerRunLoading = ref<Record<string, boolean>>({})
 const trackerFeedback = ref('')
 

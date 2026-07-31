@@ -1,10 +1,11 @@
 <template>
-  <div
-    v-if="host"
-    class="modal modal-blur show d-block modal-overlay"
-    tabindex="-1"
-    @click.self="$emit('close')"
-  >
+  <template v-if="host">
+    <div
+      ref="modalRef"
+      class="modal modal-blur fade show d-block"
+      tabindex="-1"
+      @click.self="$emit('close')"
+    >
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
         <div class="modal-header">
@@ -110,15 +111,18 @@
         </div>
       </div>
     </div>
-  </div>
+    </div>
+    <div class="modal-backdrop fade show" />
+  </template>
 </template>
 
 <script setup lang="ts">
-import { reactive, computed, watch } from 'vue'
+import { reactive, computed, ref, watch } from 'vue'
 import apiClient from '../../api'
 import CronBuilder from '../CronBuilder.vue'
 import { MANUAL_SENTINEL } from '../../utils/cron'
 import { getApiErrorMessage } from '../../api/client'
+import { useModalChrome } from '../../composables/useModalChrome'
 
 const props = defineProps<{
   host: { id: string; name?: string; hostname?: string } | null
@@ -128,6 +132,9 @@ const emit = defineEmits<{
   (e: 'close'): void
   (e: 'created'): void
 }>()
+
+const modalRef = ref<HTMLElement | null>(null)
+useModalChrome(modalRef, () => !!props.host, { onClose: () => emit('close') })
 
 const form = reactive({
   name: '',
@@ -183,7 +190,3 @@ async function saveSchedule(): Promise<void> {
   }
 }
 </script>
-
-<style scoped>
-.modal-overlay { background: rgba(0, 0, 0, .5); z-index: 1050; }
-</style>
