@@ -2,7 +2,7 @@
   <div
     v-if="dialog.isOpen.value"
     ref="modalRef"
-    class="modal modal-blur fade show"
+    class="modal modal-blur fade show modal-confirm"
     style="display: block;"
     tabindex="-1"
     role="dialog"
@@ -72,7 +72,7 @@
   </div>
   <div
     v-if="dialog.isOpen.value"
-    class="modal-backdrop fade show"
+    class="modal-backdrop fade show modal-confirm-backdrop"
   />
 </template>
 

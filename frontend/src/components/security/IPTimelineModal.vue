@@ -351,7 +351,7 @@ async function handleBanClick() {
   justify-content: center;
   align-items: center;
   padding: 0.75rem;
-  z-index: 1060;
+  z-index: var(--z-index-modal-overlay);
 }
 
 .timeline-modal {

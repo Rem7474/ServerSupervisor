@@ -66,6 +66,16 @@ body {
   --z-index-tooltip: 1080;
   --z-index-modal-backdrop: 1040;
   --z-index-modal: 1050;
+  /* Above --z-index-modal: the two full-screen "drawer" overlays
+     (DomainDetailsModal/IPTimelineModal — Tabler .card in a flexbox
+     overlay, not .modal/.modal-dialog) render themselves at this
+     level so they can sit above the page's own content. */
+  --z-index-modal-overlay: 1060;
+  /* Above --z-index-modal-overlay: ConfirmDialog is a global singleton
+     (rendered once in App.vue) that can be opened from inside any other
+     modal or drawer (e.g. the CrowdSec-ban confirm from IPTimelineModal)
+     — it must always render on top of whatever opened it, not behind it. */
+  --z-index-modal-top: 1065;
   --z-index-sticky: 20;
 
   /* ── Design tokens (ss-* prefix) ──────────────────────────────────────
@@ -384,6 +394,16 @@ select:-webkit-autofill:focus {
 .modal,
 .z-modal {
   z-index: var(--z-index-modal);
+}
+
+/* ConfirmDialog is a global singleton that can be triggered from inside
+   another modal/drawer — see --z-index-modal-top above. */
+.modal-confirm-backdrop {
+  z-index: var(--z-index-modal-top);
+}
+
+.modal.modal-confirm {
+  z-index: calc(var(--z-index-modal-top) + 1);
 }
 
 .sticky-top,
