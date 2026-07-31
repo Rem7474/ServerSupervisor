@@ -191,11 +191,8 @@
               </td>
             </tr>
             <tr v-if="!users.length && !loading">
-              <td
-                colspan="4"
-                class="text-center text-secondary py-4"
-              >
-                Aucun utilisateur
+              <td colspan="4">
+                <EmptyState title="Aucun utilisateur" />
               </td>
             </tr>
           </tbody>
@@ -208,6 +205,7 @@
 <script setup lang="ts">
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'
 import PageRefreshBar from '../components/PageRefreshBar.vue'
+import EmptyState from '../components/EmptyState.vue'
 import { useUsers } from '../composables/useUsers'
 
 const {

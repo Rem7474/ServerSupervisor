@@ -385,11 +385,8 @@
                 </td>
               </tr>
               <tr v-if="hosts.length > 0 && sortedHosts.length === 0">
-                <td
-                  colspan="10"
-                  class="text-center text-secondary py-4"
-                >
-                  Aucun hôte ne correspond à votre recherche.
+                <td colspan="10">
+                  <EmptyState title="Aucun hôte ne correspond à votre recherche." />
                 </td>
               </tr>
             </template>

@@ -366,33 +366,22 @@
               </tr>
             </template>
             <tr v-else-if="sortedNodes.length === 0 && healthFilterLabel">
-              <td
-                colspan="9"
-                class="text-center text-muted py-4"
-              >
-                Aucun nœud ne correspond au filtre « {{ healthFilterLabel }} » (peut-être déjà résolu).
-                <button
-                  type="button"
-                  class="btn btn-sm btn-link"
-                  @click="clearHealthFilter"
-                >
-                  Retirer le filtre
-                </button>
+              <td colspan="9">
+                <EmptyState
+                  title="Aucun nœud ne correspond au filtre"
+                  :subtitle="`« ${healthFilterLabel} » (peut-être déjà résolu)`"
+                  cta-label="Retirer le filtre"
+                  @cta="clearHealthFilter"
+                />
               </td>
             </tr>
             <tr v-else-if="sortedNodes.length === 0">
-              <td
-                colspan="9"
-                class="text-center text-muted py-4"
-              >
-                Aucun nœud Proxmox trouvé.
-                <router-link
-                  v-if="auth.isAdmin"
-                  to="/settings"
-                  class="ms-1"
-                >
-                  Configurer une connexion
-                </router-link>
+              <td colspan="9">
+                <EmptyState
+                  title="Aucun nœud Proxmox trouvé."
+                  :cta-label="auth.isAdmin ? 'Configurer une connexion' : ''"
+                  cta-to="/settings"
+                />
               </td>
             </tr>
             <tr
@@ -503,6 +492,7 @@ import { IconRefresh } from '@tabler/icons-vue'
 import { useAuthStore } from '../stores/auth'
 import SortableHeader from '../components/common/SortableHeader.vue'
 import PageRefreshBar from '../components/PageRefreshBar.vue'
+import EmptyState from '../components/EmptyState.vue'
 import { useProxmox } from '../composables/useProxmox'
 import type { ProxmoxNode } from '../types/proxmox'
 

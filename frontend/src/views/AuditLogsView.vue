@@ -191,11 +191,8 @@
                   </td>
                 </tr>
                 <tr v-else-if="!sortedCmds.length">
-                  <td
-                    colspan="8"
-                    class="text-center text-secondary py-4"
-                  >
-                    Aucune commande enregistrée
+                  <td colspan="8">
+                    <EmptyState title="Aucune commande enregistrée" />
                   </td>
                 </tr>
                 <tr
@@ -329,6 +326,7 @@ import { useDateFormatter } from '../composables/useDateFormatter'
 import { useAuditLogs } from '../composables/useAuditLogs'
 import PaginationNav from '../components/PaginationNav.vue'
 import CommandLogPanel from '../components/host/CommandLogPanel.vue'
+import EmptyState from '../components/EmptyState.vue'
 import DataToolbar from '../components/common/DataToolbar.vue'
 import SortableHeader from '../components/common/SortableHeader.vue'
 import LoadingSkeleton from '../components/LoadingSkeleton.vue'

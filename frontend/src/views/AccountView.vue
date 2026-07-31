@@ -343,11 +343,8 @@
                   </td>
                 </tr>
                 <tr v-else-if="!myCommands.length">
-                  <td
-                    colspan="7"
-                    class="text-center text-secondary py-3"
-                  >
-                    Aucune activité récente
+                  <td colspan="7">
+                    <EmptyState title="Aucune activité récente" />
                   </td>
                 </tr>
                 <tr
@@ -406,6 +403,7 @@
 <script setup lang="ts">
 import { IconAlertTriangle, IconClock, IconFileText, IconKey, IconLock } from '@tabler/icons-vue'
 import CommandLogPanel from '../components/host/CommandLogPanel.vue'
+import EmptyState from '../components/EmptyState.vue'
 import { commandStatusLabel } from '../utils/commandStatus'
 import { useAccount } from '../composables/useAccount'
 
