@@ -203,7 +203,7 @@ import AlertRuleStepConditions from './AlertRuleStepConditions.vue'
 import AlertRuleStepNotifications from './AlertRuleStepNotifications.vue'
 import { useAlertRuleForm, type AlertRuleInput } from '../../composables/useAlertRuleForm'
 import type { AlertRulePayload as ApiAlertRulePayload } from '../../types/alert'
-import { useModalFocusTrap } from '../../composables/useModalFocusTrap'
+import { useModalChrome } from '../../composables/useModalChrome'
 import { ALERT_METRIC_ORDER, getAlertMetricMeta } from '../../utils/alertMetrics'
 import { ALERT_RULE_PRESETS, type AlertRulePreset } from '../../utils/alertRulePresets'
 import { getApiErrorMessage } from '../../api/client'
@@ -284,7 +284,7 @@ const emit = defineEmits<{
 }>()
 
 const modalRef = ref<HTMLElement | null>(null)
-useModalFocusTrap(modalRef, () => props.visible)
+useModalChrome(modalRef, () => props.visible, { onClose: close })
 
 const browserPermission = ref<NotificationPermission | 'unsupported'>(
   typeof Notification !== 'undefined' ? Notification.permission : 'unsupported'
@@ -539,18 +539,6 @@ watch(
 )
 
 watch(
-  () => props.visible,
-  (visible) => {
-    if (visible) {
-      document.addEventListener('keydown', onKeyDown)
-      return
-    }
-    document.removeEventListener('keydown', onKeyDown)
-  },
-  { immediate: true }
-)
-
-watch(
   () => metricCards.value,
   (cards) => {
     if (!Array.isArray(cards) || cards.length === 0) return
@@ -567,7 +555,6 @@ watch(
 
 onUnmounted(() => {
   if (autoTestTimer) clearTimeout(autoTestTimer)
-  document.removeEventListener('keydown', onKeyDown)
 })
 
 async function submit() {
@@ -619,10 +606,6 @@ async function downloadTestLogs(): Promise<void> {
 
 function close(): void {
   emit('close')
-}
-
-function onKeyDown(event: KeyboardEvent): void {
-  if (event.key === 'Escape' && props.visible) close()
 }
 
 function selectMetric(metric: string): void {

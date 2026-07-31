@@ -497,8 +497,8 @@
 </template>
 
 <script setup lang="ts">
-import { onUnmounted, ref, watch } from 'vue'
-import { useModalFocusTrap } from '../../composables/useModalFocusTrap'
+import { ref } from 'vue'
+import { useModalChrome } from '../../composables/useModalChrome'
 import { useWebhookForm, type WebhookItem, type Host, type WebhookFormData } from '../../composables/useWebhookForm'
 import WebhookTrackerFields from './WebhookTrackerFields.vue'
 import WebhookEnvVarsCard from './WebhookEnvVarsCard.vue'
@@ -531,7 +531,7 @@ const emit = defineEmits<{
 }>()
 
 const modalRef = ref<HTMLElement | null>(null)
-useModalFocusTrap(modalRef, () => props.visible)
+useModalChrome(modalRef, () => props.visible, { onClose: close })
 
 const {
   form,
@@ -546,29 +546,9 @@ const {
   clearError,
 } = useWebhookForm(props, (payload) => emit('submit', payload))
 
-watch(
-  () => props.visible,
-  (visible) => {
-    if (visible) {
-      document.addEventListener('keydown', onKeyDown)
-      return
-    }
-    document.removeEventListener('keydown', onKeyDown)
-  },
-  { immediate: true },
-)
-
-onUnmounted(() => {
-  document.removeEventListener('keydown', onKeyDown)
-})
-
 function close(): void {
   clearError()
   emit('close')
-}
-
-function onKeyDown(event: KeyboardEvent): void {
-  if (event.key === 'Escape' && props.visible) close()
 }
 </script>
 

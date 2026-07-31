@@ -169,7 +169,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import api from '../../api'
-import { useModalFocusTrap } from '../../composables/useModalFocusTrap'
+import { useModalChrome } from '../../composables/useModalChrome'
 
 interface Container {
   host_id: string
@@ -197,7 +197,7 @@ const emit = defineEmits<{
 }>()
 
 const modalRef = ref<HTMLElement | null>(null)
-useModalFocusTrap(modalRef, () => props.visible)
+useModalChrome(modalRef, () => props.visible, { onClose: close })
 
 const loading = ref(false)
 const saving = ref(false)
