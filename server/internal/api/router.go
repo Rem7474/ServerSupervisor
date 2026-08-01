@@ -20,6 +20,7 @@ import (
 	aptsvc "github.com/serversupervisor/server/internal/services/apt"
 	auditsvc "github.com/serversupervisor/server/internal/services/audit"
 	authnsvc "github.com/serversupervisor/server/internal/services/authn"
+	backupsvc "github.com/serversupervisor/server/internal/services/backup"
 	dashboardsvc "github.com/serversupervisor/server/internal/services/dashboard"
 	dockersvc "github.com/serversupervisor/server/internal/services/docker"
 	gitwebhooksvc "github.com/serversupervisor/server/internal/services/gitwebhook"
@@ -105,9 +106,11 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	gitWebhookH := handlers.NewGitWebhookHandler(gitwebhooksvc.NewService(db, cfg, dispatcher, notifHub, pushSvc))
 	releaseTrackerH := handlers.NewReleaseTrackerHandler(releasetrackersvc.NewService(db, cfg, dispatcher, notifHub, pushSvc))
 	runbookH := handlers.NewRunbooksHandler(runbooksvc.NewService(db, dispatcher))
+	backupH := handlers.NewBackupHandler(backupsvc.NewService(db, dispatcher, cfg, notifHub, pushSvc), db)
 	agentH.AddCompletionListener(gitWebhookH)
 	agentH.AddCompletionListener(releaseTrackerH)
 	agentH.AddCompletionListener(runbookH)
+	agentH.AddCompletionListener(backupH)
 
 	proxmoxService := proxmoxsvc.NewService(db, cfg, bus)
 	proxmoxH := handlers.NewProxmoxHandler(proxmoxService)
@@ -149,6 +152,7 @@ func SetupRouter(db *database.DB, cfg *config.Config, notifHub *ws.NotificationH
 	registerHostPermissionRoutes(v1, hostPermH)
 	registerUptimeRoutes(v1, uptimeH)
 	registerSSLRoutes(v1, sslH)
+	registerBackupRoutes(v1, backupH)
 	registerNPMRoutes(v1, npmH)
 	registerDashboardRoutes(v1, dashboardH)
 
@@ -200,6 +204,7 @@ func registerAgentRoutes(r *gin.Engine, db *database.DB, cfg *config.Config, h *
 	g.POST("/command/result", h.ReportCommandResult)
 	g.POST("/command/stream", h.StreamCommandOutput)
 	g.POST("/apt-status", h.ReceiveAptStatus)
+	g.POST("/restic-status", h.ReceiveResticStatus)
 	g.POST("/audit", h.LogAuditAction)
 	// Optional low-latency command push channel — see ws.WSHandler.AgentChannel.
 	g.GET("/ws", wsH.AgentChannel)
@@ -524,6 +529,13 @@ func registerSSLRoutes(g *gin.RouterGroup, h *handlers.SSLHandler) {
 	admin.PUT("/ssl/certificates/:id", h.Update)
 	admin.DELETE("/ssl/certificates/:id", h.Delete)
 	admin.POST("/ssl/certificates/:id/check-now", h.CheckNow)
+}
+
+func registerBackupRoutes(g *gin.RouterGroup, h *handlers.BackupHandler) {
+	g.GET("/hosts/:id/backup", h.GetStatus)
+	g.GET("/hosts/:id/backup/runs", h.ListRuns)
+	g.GET("/backup/runs/:runId", h.GetRun)
+	g.POST("/hosts/:id/backup/run", h.RunBackup)
 }
 
 func registerNPMRoutes(g *gin.RouterGroup, h *handlers.NPMHandler) {

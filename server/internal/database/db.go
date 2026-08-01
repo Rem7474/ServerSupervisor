@@ -64,8 +64,14 @@ type DB struct {
 	conn *sql.DB
 }
 
-// New opens a connection to the database, runs migrations, and returns a DB.
-func New(cfg *config.Config) (*DB, error) {
+// Open connects to an already-migrated database without running migrations or
+// the TimescaleDB continuous-aggregate setup. Most callers want New; Open
+// exists for server/internal/testutil/postgres.go, which clones a database
+// from a pre-migrated template — re-running New's migrate()/
+// ensureTimescaleObjects on the clone would be redundant at best, and for
+// ensureTimescaleObjects specifically would re-register the continuous-
+// aggregate refresh policies the test template deliberately strips.
+func Open(cfg *config.Config) (*DB, error) {
 	conn, err := sql.Open("postgres", cfg.DBDSN())
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
@@ -78,7 +84,16 @@ func New(cfg *config.Config) (*DB, error) {
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
-	db := &DB{conn: conn}
+	return &DB{conn: conn}, nil
+}
+
+// New opens a connection to the database, runs migrations, and returns a DB.
+func New(cfg *config.Config) (*DB, error) {
+	db, err := Open(cfg)
+	if err != nil {
+		return nil, err
+	}
+
 	if err := db.migrate(); err != nil {
 		return nil, fmt.Errorf("failed to run migrations: %w", err)
 	}

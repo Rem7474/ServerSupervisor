@@ -130,6 +130,29 @@ func (h *AgentHandler) ReceiveAptStatus(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
 
+// ReceiveResticStatus upserts a Restic status snapshot pushed out-of-band by
+// the agent, right after a run_backup command completes, so the UI reflects
+// the fresh state without waiting for the next periodic report.
+func (h *AgentHandler) ReceiveResticStatus(c *gin.Context) {
+	hostID := c.GetString("host_id")
+	if hostID == "" {
+		respondError(c, apperr.Unauthorized("host not identified"))
+		return
+	}
+
+	var status models.ResticStatus
+	if err := c.ShouldBindJSON(&status); err != nil {
+		respondError(c, apperr.Validation(err.Error()))
+		return
+	}
+
+	if err := h.svc.UpdateResticStatus(c.Request.Context(), hostID, &status); err != nil {
+		respondError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "ok"})
+}
+
 // GetHostCommandHistory returns all recent commands for a host across all modules.
 func (h *AgentHandler) GetHostCommandHistory(c *gin.Context) {
 	hostID := c.Param("id")

@@ -101,6 +101,7 @@ Système de supervision d'infrastructure : monitoring de VMs, conteneurs Docker,
 - **Corrélation CrowdSec** (optionnelle, désactivée par défaut) : rapproche le trafic web collecté des décisions actives de l'API locale CrowdSec (bans/captcha) — nécessite `collect_web_logs: true` et une clé bouncer CrowdSec
 - Exécution de commandes distantes : APT, Docker/Compose, systemd, journalctl, snapshot processus
 - **Tâches custom** : exécution de scripts/binaires locaux pré-déclarés dans `tasks.yaml` (allowlist, sans shell, sans exécution de code arbitraire distant)
+- **Sauvegardes Restic** (optionnelle) : supervision passive de l'état Restic local + déclenchement de backup à la demande ou planifié, sans jamais faire remonter les credentials au serveur (voir [Sauvegardes Restic](#sauvegardes-restic))
 - Streaming temps réel de la sortie des commandes longues (chunk par chunk)
 - Rapport de résultat des commandes autonomes au démarrage (ex: `apt update`)
 - Binaire unique sans dépendances, multi-architecture (amd64/arm64/armv7/armv6)
@@ -169,6 +170,7 @@ L'agent est un binaire Go statique, mais certaines fonctionnalités s'appuient s
 | Température CPU (`collect_cpu_temperature`) | `/sys/class/thermal` ou `/sys/class/hwmon`, fallback `sensors` (`lm-sensors`) | Oui si température CPU activée |
 | Commandes système (services/logs) | `systemctl`, `journalctl` (systemd) | Recommandé |
 | Snapshot processus | `ps` (`procps`) | Recommandé |
+| Sauvegardes Restic (`collect_restic`) | `restic`, éventuellement `resticprofile` — toolkit installé/configuré séparément (non fourni par ServerSupervisor) | Oui si Restic activé |
 
 Exemple Debian/Ubuntu:
 
@@ -597,6 +599,39 @@ Variables d'environnement injectées automatiquement par un Git Webhook :
 
 ---
 
+### Sauvegardes Restic
+
+Supervision optionnelle des sauvegardes [Restic](https://restic.net)/[resticprofile](https://creativeprojects.github.io/resticprofile/) sur les hôtes supervisés. Le toolkit Restic (binaire, `resticconf`, `run_backup.sh`, `resticprofile.yaml`) doit déjà être installé et configuré sur la machine — ServerSupervisor ne l'installe pas et ne stocke **jamais** ses credentials (mot de passe du dépôt, clés Swift/S3/B2, identifiants SMTP) : ils restent dans `resticconf` sur l'hôte, lu localement par l'agent et jamais transmis au serveur.
+
+#### Activer la collecte (`agent.yaml`)
+
+```yaml
+collect_restic: true
+restic_bin: "/usr/local/bin/restic"
+restic_conf_path: "/home/user/restic-backups/resticconf"
+restic_run_script_path: "/home/user/restic-backups/run_backup.sh"
+restic_status_file_path: "/home/user/restic-backups/backup-status.json"
+restic_enable_progress: true
+restic_progress_fps: 0.1
+restic_backup_idle_timeout_minutes: 20
+```
+
+Seuls des chemins et des indicateurs de fonctionnalité vivent ici — jamais un secret. `restic_status_file_path` pointe vers le status-file JSON de resticprofile (`status-file: ...` dans `resticprofile.yaml`, idéalement avec `extended-status: true`) : c'est la source privilégiée pour le monitoring passif ; sans ce fichier, l'agent retombe sur `restic snapshots --json` / `restic stats --json`.
+
+#### Monitoring passif vs déclenchement actif
+
+- **Passif** : à chaque rapport périodique, l'agent lit l'état Restic local (status-file ou fallback commandes) et le remonte au serveur — visible dans l'onglet **Sauvegardes** de la fiche hôte, sans qu'aucun backup n'ait été déclenché par ServerSupervisor.
+- **Actif** : le bouton **Lancer un backup** de cet onglet dispatche une commande agent (`module=restic action=run_backup`) qui exécute directement `run_backup.sh`, avec suivi de progression en direct (pourcentage, fichiers/octets traités, ETA) tant que le navigateur reste sur la page.
+- **Planifié** : un backup récurrent se programme comme n'importe quelle autre tâche planifiée — page **Tâches planifiées**, module `restic`, action `run_backup`, cible = nom du profil resticprofile (`files`, `db`, …, laisser vide pour le profil par défaut du script). Il n'y a pas de webhook ni de cron externe à configurer côté ServerSupervisor.
+
+#### Limites du suivi en direct
+
+- La progression en direct dépend de `RESTIC_PROGRESS_FPS` et de la sortie `--json` de restic (forcés automatiquement par l'agent) — un backup lancé en dehors de ServerSupervisor (cron système, ligne de commande) n'est jamais suivi en direct, seul son résultat final apparaît via le monitoring passif au prochain rapport.
+- Un backup manuel n'a pas de limite de durée fixe : il est coupé uniquement s'il reste silencieux plus de `restic_backup_idle_timeout_minutes` (pas de plafond absolu, contrairement aux autres commandes agent).
+- Fermer l'onglet interrompt seulement l'affichage, pas le backup lui-même — revenir sur la page plus tard affiche le résultat final une fois le rapport de statut à jour.
+
+---
+
 ## API REST
 
 ### Authentification
@@ -668,6 +703,14 @@ curl http://localhost:8080/api/v1/hosts \
 |---|---|---|---|
 | `GET` | `/api/v1/hosts/:id/apt` | Statut APT d'un hôte | Authentifié |
 | `POST` | `/api/v1/apt/command` | Envoyer une commande APT | Operator+ |
+
+#### Sauvegardes Restic
+| Méthode | Endpoint | Description | Rôle |
+|---|---|---|---|
+| `GET` | `/api/v1/hosts/:id/backup` | Statut agrégé (dernier run + état passif) | Authentifié |
+| `GET` | `/api/v1/hosts/:id/backup/runs` | Historique des backups d'un hôte | Authentifié |
+| `GET` | `/api/v1/backup/runs/:runId` | Détail d'un run | Authentifié |
+| `POST` | `/api/v1/hosts/:id/backup/run` | Déclencher un backup manuel | Operator+ |
 
 #### Système (systemd / journal / processus)
 | Méthode | Endpoint | Description | Rôle |

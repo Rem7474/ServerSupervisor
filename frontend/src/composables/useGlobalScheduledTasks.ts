@@ -17,6 +17,7 @@ const moduleActions: Record<string, string[]> = {
   systemd: ['restart', 'start', 'stop', 'enable', 'disable'],
   journal: ['tail'],
   processes: ['list'],
+  restic: ['run_backup'],
 }
 
 const DEFAULT_CRON = '0 3 * * *'
@@ -27,6 +28,7 @@ function targetLabel(module: string): string {
   if (module === 'systemd') return 'Service systemd'
   if (module === 'custom') return 'ID de tâche custom'
   if (module === 'apt') return 'Paquet (optionnel pour install/remove)'
+  if (module === 'restic') return 'Profil resticprofile (optionnel)'
   return ''
 }
 
@@ -35,6 +37,7 @@ function targetPlaceholder(module: string): string {
   if (module === 'systemd') return 'nginx.service'
   if (module === 'custom') return 'my-deploy-task'
   if (module === 'apt') return 'nginx'
+  if (module === 'restic') return 'files'
   return ''
 }
 

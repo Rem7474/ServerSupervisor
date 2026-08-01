@@ -300,6 +300,48 @@ export const RoleOperator = "operator"; // Can launch APT commands + read all
 export const RoleViewer = "viewer"; // Read-only
 
 //////////
+// source: backup.go
+
+/**
+ * BackupRun is one Restic backup execution — dispatched via
+ * module=restic action=run_backup (manual trigger or a scheduled task) and
+ * populated from the linked remote_commands row's terminal result. Never
+ * contains restic/Swift/SMTP credentials.
+ */
+export interface BackupRun {
+  id: string;
+  host_id: string;
+  profile?: string;
+  command_id?: string;
+  triggered_by?: string;
+  status: string; // running | ok | warning | error
+  started_at: string;
+  finished_at?: string;
+  duration_sec?: number /* int */;
+  progress_percent?: number /* float64 */;
+  files_done?: number /* int64 */;
+  files_total?: number /* int64 */;
+  bytes_done?: number /* int64 */;
+  bytes_total?: number /* int64 */;
+  snapshot_id?: string;
+  snapshot_time?: string;
+  repo_size_bytes?: number /* int64 */;
+  error_message?: string;
+  raw_summary?: string;
+  created_at: string;
+}
+/**
+ * BackupStatus is the aggregated view returned by GET .../backup: the latest
+ * backup_runs row when one exists, else a fallback built from the periodic,
+ * passive ResticStatus report (for hosts whose backups aren't dispatched by
+ * ServerSupervisor at all).
+ */
+export interface BackupStatus {
+  latest_run?: BackupRun;
+  passive_state?: ResticStatus;
+}
+
+//////////
 // source: command.go
 
 /**
@@ -1192,6 +1234,25 @@ export interface AgentCapabilities {
   web_logs: boolean; // Web access log parsing enabled
   systemd: boolean; // Systemd unit monitoring enabled
   journal: boolean; // Journald log collection enabled
+  restic: boolean; // Restic backup collector enabled
+}
+/**
+ * ResticStatus mirrors agent/internal/collector.ResticStatus — the periodic,
+ * passive snapshot of Restic's state. Never contains resticconf content or
+ * resolved credential values.
+ */
+export interface ResticStatus {
+  installed: boolean;
+  last_run_at?: string;
+  last_status?: string;
+  duration_sec?: number /* int */;
+  files_new?: number /* int */;
+  files_changed?: number /* int */;
+  bytes_added?: number /* int64 */;
+  snapshot_id?: string;
+  repo_size_bytes?: number /* int64 */;
+  error_message?: string;
+  source: string;
 }
 /**
  * AgentReport is the full status report sent by the agent to the server
@@ -1210,6 +1271,7 @@ export interface AgentReport {
   disk_health?: DiskHealth[];
   custom_tasks?: CustomTaskSummary[];
   tasks_config_yaml?: string;
+  restic?: ResticStatus;
   timestamp: string;
 }
 
@@ -2036,6 +2098,22 @@ export interface WSWebhookNotification {
 export interface WSWebhookExecutionMessage {
   type: string;
   notification: WSWebhookNotification;
+}
+/**
+ * WSBackupNotification is the nested payload of a "backup_run" message.
+ */
+export interface WSBackupNotification {
+  host_id: string;
+  status: string;
+  triggered_at: string;
+}
+/**
+ * WSBackupRunMessage is pushed when a restic run_backup command fails
+ * (type "backup_run").
+ */
+export interface WSBackupRunMessage {
+  type: string;
+  notification: WSBackupNotification;
 }
 /**
  * WSReleaseTrackerNotification is the nested payload of release-tracker messages.
